@@ -2,8 +2,8 @@
 
 Es el mismo camino por long polling (`escucha.py`, el escuchador) y por webhook (la ruta
 `POST /telegram/{slug}` de `leda.entrada`): una sola copia, para que pasar de una máquina a un
-servidor no cambie el comportamiento. Portado de `prueba_chica/escuchar.py`, que queda intacta
-hasta la E3-8.
+servidor no cambie el comportamiento. Portado de `prueba_chica/escuchar.py`, borrada el
+2026-10-07.
 
 - **Un mensaje escrito** en un chat privado, de alguien del equipo (`identificar_en_espacio`),
   se guarda en `inbound_message` con el bot que lo recibió y `on conflict do nothing`: un

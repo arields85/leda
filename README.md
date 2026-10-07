@@ -55,7 +55,8 @@ src/leda/
   llm.py               Direcciones de los proveedores y tiempo máximo de la IA
   entrada.py           Aplicación HTTP: webhook de Telegram, tablero y salud
   motor/               El motor de conversación: turnos, escalera, ciclo, reloj de Leda,
-                       escuchador (escucha.py) y lo que se hace con cada update (recibir.py)
+                       escuchador (escucha.py), lo que se hace con cada update (recibir.py)
+                       y el lector del registro de turnos (leer.py)
   tablero.py           El tablero de sólo lectura de un espacio
   tablero_vista.py     Su página
   cli.py               python -m leda …
@@ -66,8 +67,9 @@ y sus módulos) se borró en la Etapa 3 del Motor (`docs/STATUS.md`), y con ella
 la cadencia y el ciclo de fondo viejos (`escalera.py`, `reloj.py`, `ciclo.py`, E3-7). Leda
 conversa con el motor de conversación (`src/leda/motor/`): en una máquina, por long polling
 con `python -m leda escuchar <espacio>`; en un servidor, por webhook con `python -m leda
-servir` (`PRUEBA-LOCAL.md`). Las cadencias vuelven después de M3. El motor de la prueba
-chica, descartable, sigue en `prueba_chica/` hasta la E3-8.
+servir` (`PRUEBA-LOCAL.md`). Las cadencias vuelven después de M3. El registro de turnos
+se lee con `python -m leda.motor.leer <espacio> --completo`. El motor de la prueba chica,
+descartable, se borró el 2026-10-07.
 
 ## El turno del agente
 

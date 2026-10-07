@@ -3,8 +3,8 @@
 `LEDA_LLM_API_KEY`. Nunca se manda la clave de un proveedor a otro. Fakes
 puros, sin red ni credencial real; ninguna aserción imprime una clave.
 
-Las pruebas de `llm.desde_base` se retiraron con él (E3-3); la prueba chica arma su
-cliente con `config.clave_llm` (`prueba_chica/ia_real.py`)."""
+Las pruebas de `llm.desde_base` se retiraron con él (E3-3); el motor arma su
+cliente con `config.clave_llm` (`leda.motor.ia_real`)."""
 
 from __future__ import annotations
 

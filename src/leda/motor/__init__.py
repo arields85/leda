@@ -3,7 +3,7 @@
 La IA elige jugadas de una lista cerrada y redacta desde los hechos; el código decide si
 valen, las maneja y ejecuta por la cocina (`herramientas.ejecutar`, con su confirmación y su
 auditoría). Es el diseño que pasó la prueba real de la Etapa 2, portado por capas desde
-`prueba_chica/`, que queda intacta hasta la E3-8:
+la prueba chica (`prueba_chica/`, borrada el 2026-10-07):
 
 1. contratos y partes puras: `tiempo`, `ia`, `ancla`, `cambios_de_estado`, `preguntas`,
    `instrucciones` y `registro` (el registro de turnos);

@@ -4,7 +4,7 @@ Etapa 2, E2-3b).
     python -m leda.motor.escucha corework
     python -m leda escuchar corework
 
-Portado de `prueba_chica/escuchar.py`, que queda intacta hasta la E3-8. Lo que se hace con cada
+Portado de `prueba_chica/escuchar.py`, borrada el 2026-10-07. Lo que se hace con cada
 update es lo mismo que en el webhook de `leda.entrada` (`recibir.py`); acá queda lo propio de
 escuchar:
 

@@ -16,7 +16,7 @@ Only works on the development databases (`leda`, `leda_flujo`, `leda_motor`). Si
 effect while off: every day counts as a working day, so reminder deadlines in working
 days get shorter. Prints only the database name and the calendar, never the
 connection. In `leda_motor` the Motor's small test keeps the restriction on and moves
-Leda's clock instead (`python -m prueba_chica.reloj`, user decision 10.2 in
+Leda's clock instead (`python -m leda.motor.reloj`, user decision 10.2 in
 `odd/tasks/prueba-chica-del-motor.md`).
 """
 import pathlib

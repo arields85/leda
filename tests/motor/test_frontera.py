@@ -1,11 +1,13 @@
 """La frontera del motor de conversación (`leda.motor`; `odd/tasks/motor-definitivo.md`, E3-5).
 
 El motor sólo alcanza la capa sólida de `leda` y sólo toca las tablas que se declaran acá. Es
-el patrón de `prueba_chica/test_frontera.py`, más la lista de tablas, que reemplaza a la regla
-de juntar el SQL del motor en un solo módulo (decisiones técnicas de la E3-5).
+el patrón que tenía la prueba chica (`prueba_chica/test_frontera.py`), más la lista de tablas,
+que reemplaza a la regla de juntar el SQL del motor en un solo módulo (decisiones técnicas de
+la E3-5).
 
 - **Módulos.** Lo que un módulo de `leda/motor/` importa de `leda` tiene que estar en
-  `PERMITIDOS` (y, si se limita, sólo esos nombres). Nunca importa `prueba_chica`.
+  `PERMITIDOS` (y, si se limita, sólo esos nombres). Nunca importa `prueba_chica`, borrada el
+  2026-10-07, por si volviera.
 - **Cadena.** Desde ahí se recorren los imports en cadena, incluidos los de dentro de funciones
   (un módulo alcanzado cuenta entero, y un paquete, con todos sus archivos), y ninguno puede
   llegar a `PROHIBIDOS`: los módulos de los flujos A y B. Un módulo alcanzado que no se
@@ -32,7 +34,7 @@ LEDA = RAIZ / "src" / "leda"
 ESQUEMA = RAIZ / "db" / "esquema.sql"
 PAQUETE = "motor"
 
-# Módulo de `leda` y, cuando sólo se permite una parte, los nombres permitidos. Sale de la
+# Módulo de `leda` y, cuando sólo se permite una parte, los nombres permitidos. Salió de la
 # lista de la prueba chica (`prueba_chica/test_frontera.py`), más `versiones`, con la que el
 # motor audita lo que escribe directo (decisiones técnicas de la E3-5), y, desde la entrada del
 # motor (E3-7), el barrido de los mensajes sin respuesta (`huerfanos`) y lo que la entrada

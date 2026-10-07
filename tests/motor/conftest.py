@@ -1,7 +1,7 @@
 """Fixtures de las pruebas del motor.
 
 La base efímera y la conexión son las de `tests/conftest.py` (`uri`, `conn`); acá va el
-mundo de las conversaciones de prueba, el mismo de `prueba_chica/conftest.py`: un espacio con
+mundo de las conversaciones de prueba, el mismo que tenía la prueba chica: un espacio con
 dos personas, Ismael, referente y autoridad, y Marcos, con una tarea asignada que vence el
 viernes 9 de octubre de 2026. También sus dos tareas (`tareas`), sus turnos (`marcos`) y la
 duda de un toque: Marcos arrancó sin decir cuál, y Leda le preguntó con sus dos tareas. Y la

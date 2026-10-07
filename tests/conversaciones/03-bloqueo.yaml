@@ -1,4 +1,4 @@
-# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
 fuente: tests/conversaciones/03-bloqueo.md
 numero: "03"
 titulo: "Estoy trabado, falta el repuesto"

@@ -2,8 +2,8 @@
 
 Evidencia: NaN colgó ~93-95 s el 1,3 % de las llamadas y el cliente esperaba
 hasta 600 s. Los proveedores de `llm.py` se retiraron con los flujos A y B (E3-3);
-queda la validación de los dos parámetros (`llm._tiempos`), que usa la prueba chica
-(`prueba_chica/ia_real.py`).
+queda la validación de los dos parámetros (`llm.tiempos`, aquí con su alias
+`llm._tiempos`), que usa el motor (`leda.motor.ia_real`).
 """
 
 from __future__ import annotations

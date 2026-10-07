@@ -138,14 +138,18 @@ En un servidor alcanzable desde internet, el mismo motor atiende por webhook:
 motor de cada espacio. Los dos caminos usan la misma función (`leda.motor.recibir`); uno o
 el otro, nunca los dos con el mismo bot.
 
-El escuchador de la prueba chica (`python -m prueba_chica.escuchar corework`) sigue hasta la
-E3-8, para comparar.
-
 En otra terminal, para ver cómo va:
 
 ```bash
 python -m leda estado corework
+python -m leda.motor.leer corework --completo
 ```
+
+`leda.motor.leer` muestra el registro de turnos del motor (lo que cada persona escribió o
+tocó, las jugadas que eligió la IA, los hechos y lo que salió), las preguntas abiertas, las
+esperas de respuesta y los avisos guardados. Sólo lee. `--persona X` filtra por nombre y
+`--desde HH:MM`, por la hora del reloj de Leda; sin `--completo`, corta cada texto en 300
+caracteres.
 
 ---
 

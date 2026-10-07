@@ -2,7 +2,7 @@
 
 `odd/tasks/motor-definitivo.md`, tarea E3-1: las pruebas de la capa sólida viven en
 `tests/garantias/` y no dependen de la conversación de los flujos A y B, que se borra en la
-E3-4. Dos controles, con el patrón de `prueba_chica/test_frontera.py`:
+E3-4. Dos controles, con el patrón que tenía la prueba chica:
 
 - Estático. Ningún archivo de `tests/garantias/`, ni los módulos auxiliares de `tests/` que
   esos archivos importan (en cadena, también los imports de dentro de funciones), importa un

@@ -89,11 +89,12 @@ TABLAS_MUERTAS = ("conversation_access_log", "learning")
 # Que sus columnas no aparezcan en `src/` es la señal de que eso se respeta.
 TABLAS_POR_FUNCION = ("acceso_tablero",)
 
-# El motor de conversación de la prueba chica (migraciones 0030 y 0031): durante
-# la Etapa 2 del Motor lo usa `prueba_chica/`, que vive fuera de `src/leda` a
-# propósito (`odd/tasks/prueba-chica-del-motor.md`, sección 4). La Etapa 3 las
-# lleva a `src/leda` o las borra.
-TABLAS_DE_LA_PRUEBA_CHICA = (
+# Las tablas del motor de conversación (migraciones 0030 y 0031). Nacieron con
+# la prueba chica, borrada el 2026-10-07, y hoy las usa `src/leda/motor/`.
+# Siguen exentas porque una columna todavía no la lee nadie
+# (`conversation_state.mostrado_para_confirmar`); sacarlas pide decidir qué
+# promete esa columna (`PROMESAS_SIN_CUMPLIR`) o borrarla.
+TABLAS_DEL_MOTOR = (
     "conversation_state", "conversation_turn", "conversation_question",
     "conversation_option", "scheduled_notice", "task_forecast",
     "blocker_unblocker")
@@ -146,7 +147,7 @@ def test_no_hay_esquema_nuevo_sin_uso_ni_declarado():
     tablas = _columnas_por_tabla()
 
     exentas = (set(TABLAS_MUERTAS) | set(TABLAS_POR_FUNCION)
-               | set(TABLAS_DE_LA_PRUEBA_CHICA))
+               | set(TABLAS_DEL_MOTOR))
     sin_uso = {
         columna
         for tabla, columnas in tablas.items() if tabla not in exentas

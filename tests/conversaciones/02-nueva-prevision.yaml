@@ -1,4 +1,4 @@
-# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
 fuente: tests/conversaciones/02-nueva-prevision.md
 numero: "02"
 titulo: "Llego el 27, el proveedor se demoró"

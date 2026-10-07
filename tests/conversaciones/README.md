@@ -195,7 +195,7 @@ Personas, roles y tareas salen de `espacios/corework.yaml` y `espacios/corework.
   ellas (mecánica §10 junta en un envío los mensajes automáticos del día) es otra conversación. Es una sola
   hora para todo lo que Leda manda por su cuenta (la escalera, los avisos guardados, también a otra persona,
   y el pedido que sigue a un avance), la que dicen los hechos y a la que llega el reloj adelantado de la
-  prueba por Telegram (`prueba_chica/tiempo.py`, `HORA_DE_SALIDA`).
+  prueba por Telegram (`leda.motor.tiempo`, `HORA_DE_SALIDA`).
 
 ### Calendario de referencia
 

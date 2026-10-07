@@ -280,7 +280,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "no desapareció."),
         que_hacer=(f"{_BUSCAR_DETALLE} y verificá que el chat de {{nombre}} "
                    "no tenga un borrador suelto.")),
-    # El Motor (`prueba_chica/turno.py`, ADR 0018, decisiones 1 y 9g): un pedido que no
+    # El Motor (`motor/turno.py`, ADR 0018, decisiones 1 y 9g): un pedido que no
     # está en la lista cerrada de jugadas. No es una falla: Leda respondió.
     "motor_fuera_de_la_lista": ExplicacionDeEtapa(
         titulo="Leda recibió de {nombre} un pedido que todavía no sabe hacer",
@@ -291,7 +291,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=("Leé el mensaje y decidí si hace falta una jugada nueva (ADR "
                    "0018, decisión 1); si hace falta, se escribe primero como "
                    "conversación de prueba. No hace falta avisarle a {nombre}.")),
-    # El Motor (`prueba_chica/escalera.py`, mecánica §9): falta configuración del espacio
+    # El Motor (`motor/escalera.py`, mecánica §9): falta configuración del espacio
     # para la escalera. Leda siguió con el mínimo del núcleo o sin escalar.
     "motor_escalera": ExplicacionDeEtapa(
         titulo="La escalera de recordatorios necesita atención",
@@ -304,7 +304,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(f"{_BUSCAR_DETALLE} y completá en el pack del espacio lo que falta "
                    "(`aviso_previo_dias_habiles` o la ruta "
                    "`falta_persistente_de_respuesta`).")),
-    # El Motor (`prueba_chica/avisos.py`, ADR 0018, decisión 8): la IA no redactó un aviso
+    # El Motor (`motor/avisos.py`, ADR 0018, decisión 8): la IA no redactó un aviso
     # guardado tras sus reintentos. Nunca sale un texto armado a mano.
     "motor_aviso_guardado": ExplicacionDeEtapa(
         titulo="Un aviso de Leda no salió",
@@ -330,7 +330,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "minutos más tarde."),
         que_hacer=(_BUSCAR_DETALLE + ": la referencia técnica dice cómo falló la IA. Si se "
                    "repite seguido, revisá el proveedor de la IA.")),
-    # El Motor (`prueba_chica/ciclo.py`): se cayó un paso del ciclo que corre en el
+    # El Motor (`motor/ciclo.py`): se cayó un paso del ciclo que corre en el
     # escuchador. Los demás pasos siguieron.
     "motor_ciclo": ExplicacionDeEtapa(
         titulo="Se cayó una parte del ciclo del motor",

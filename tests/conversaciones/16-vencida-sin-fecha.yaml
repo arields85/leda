@@ -1,4 +1,4 @@
-# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
 fuente: tests/conversaciones/16-vencida-sin-fecha.md
 numero: "16"
 titulo: "Arranqué hoy, con la tarea vencida"

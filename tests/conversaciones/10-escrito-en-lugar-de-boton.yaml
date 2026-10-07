@@ -1,4 +1,4 @@
-# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
 # Sólo los pasos 1 y 2: la parte "Para la prueba de la entrega" no corre en la prueba chica.
 fuente: tests/conversaciones/10-escrito-en-lugar-de-boton.md
 numero: "10"
