@@ -407,6 +407,16 @@ y no por la API.
   - la sesión se guarda fuera del repositorio y no se muestra nunca;
   - se renueva sola;
   - se verifica con las conversaciones de prueba antes de su prueba por Telegram.
+- **Hecho (2026-10-07):**
+  - `1543b74`: `motor/chatgpt.py` y los comandos `python -m leda chatgpt login|estado|salir`. El protocolo
+    sale del código oficial de `openai/codex`. La sesión se guarda en `~/.leda/chatgpt.json` y se renueva
+    sola.
+  - `7356bd0`: el corredor con `--ia sol-suscripcion`.
+  - Revisiones `review-24340405ed89989c` y `review-92398477f4ec8cf8`, aprobadas.
+  - Suite completa: 1162.
+  - Falta que el usuario inicie sesión y medir con la IA real.
+  - `PENDIENTE`: un candado sobre el archivo de sesión. Si dos procesos renuevan a la vez, uno puede invalidar
+    al otro; mientras tanto, no se corren juntos el escuchador y una ronda.
 - **Alcance** (usuario, el mismo día): es para el uso personal de ahora. Cuando Leda sea comercial, cada
   cliente paga su propio proveedor de IA, con su clave (`python -m leda modelo … --proveedor`).
 
