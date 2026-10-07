@@ -129,7 +129,7 @@ def test_a_la_hora_lleva_el_reloj_a_esa_hora_del_mismo_dia_y_nunca_para_atras(
 
     noche = a_la_hora(conn, mundo["id"], real, time(22, 30), base=base)
 
-    assert noche.leda == octubre(13, 22, 30)
+    assert noche.leda == octubre(13, 10) + timedelta(hours=12, minutes=30)   # 22:30
     assert not noche.en_horario
     with pytest.raises(HoraAtrasada):
         a_la_hora(conn, mundo["id"], real, time(9, 0), base=base)
