@@ -270,6 +270,10 @@ la suscripción:
   repetirlas, 10 de 10. Es la misma clase en dos rondas y no se conoce la causa: un intento fallido de
   redactar un aviso no dejaba rastro hasta el quinto. Decisión del usuario: primero dejar rastro de cada
   intento fallido, después decidir.
+- **El rastro (`5c4f13b`, `2b4afbf`, revisión `review-a17b92496966ae08`):** cada intento fallido deja un
+  incidente de severidad baja, sin avisar a la administración, y el informe de la ronda lo muestra con el tipo
+  de error y nada más. La regresión siguiente dio **95 de 95** (`985b099`), sin ningún aviso atrasado y
+  con "previsión" en 0 de 500 mensajes: la causa sigue sin conocerse, y el rastro queda para la próxima vez.
 
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
