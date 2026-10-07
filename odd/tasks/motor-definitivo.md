@@ -275,13 +275,16 @@ revisión por tramos.
 - [ ] **E3-8. Regresión y prueba real:** las 17 conversaciones, cinco veces con GPT-6 sol, y la guía de
       la E2-9 por Telegram. Después se borra `prueba_chica/`.
       **Comparación de IA** (pedido del usuario, 2026-10-06; el gasto en IA real está autorizado):
-      - Las 17 conversaciones, cinco veces, sobre el motor definitivo terminado, con cuatro IA:
+      - Las 17 conversaciones, cinco veces, sobre el motor definitivo terminado, con cinco IA:
         - GPT-6 sol, la referencia (85 de 85 en la ronda 3);
-        - GPT-6.1 luna, por OpenRouter;
-        - DeepSeek flash, por el proveedor `nan`, no por OpenRouter.
-        - GLM 5.3 flash, también por `nan` (pedido del usuario, el mismo día).
-      - Los identificadores de DeepSeek "4.1 flash" y de GLM 5.3 flash se confirman en `nan` antes de
-        correr; en la bitácora figura `deepseek-v4-flash`.
+        - GPT-6 luna (`openai/gpt-6-luna`) y GPT-6 luna pro (`openai/gpt-6-luna-pro`), por OpenRouter;
+        - DeepSeek flash (`deepseek-v4-flash`) y GLM 5.3 flash (`glm5.3-flash`), por el proveedor `nan`,
+          no por OpenRouter.
+      - Verificado el 2026-10-06:
+        - Los dos modelos de `nan` responden.
+        - GPT-6.1 luna no existe en OpenRouter. El usuario eligió luna y luna pro, que cuestan lo mismo
+          por token (USD 0,10 de entrada y 0,50 de salida por millón), contra 2,00 y 10,00 de sol.
+        - Crédito en OpenRouter: USD 9,75.
       - Se miden garantías, comprensión, latencia y costo, y el resultado va a la bitácora.
       - Luna se descartó en la ronda 1 (38 de 80), con el motor anterior a la revisión del contrato
         (ADR 0018, 9k y 9m).
