@@ -451,6 +451,32 @@ Después de M3 quedan:
     concepto del sistema, y la regresión con la IA real midiendo esas palabras en el texto de Leda.
   - *Qué haría innecesaria la próxima ronda:* que un dato nuevo no pueda llegar a la IA con un nombre de
     la cocina sin que una prueba falle.
+- **Hecho:** `b886ad8` y `9b7c6f4` (revisión `review-7151cacd0f975300`). "previsión" pasó a 0 de 499
+  mensajes (`28974cf`). El rastro de los avisos que no se redactan: `5c4f13b` y `2b4afbf` (revisión
+  `review-a17b92496966ae08`), con la regresión en 95 de 95 (`985b099`). `main` subió hasta `f2a769c`.
+
+### El formato de los mensajes (2026-10-07)
+
+Pedido del usuario al aprobar M3, con capturas: los mensajes son bloques de texto rígidos; tienen que ser
+breves, con las tareas y lo importante en negrita, un renglón en blanco entre párrafos y viñetas cuando hay
+varias cosas.
+- **Diseño:**
+  - La IA escribe un formato mínimo: `**negrita**`, párrafos separados por un renglón en blanco y viñetas con
+    "• ". La instrucción de redacción describe ese trabajo, sin frases de ejemplo, y deja de decir "sin
+    Markdown".
+  - El mensaje se guarda en el outbox tal como lo escribió la IA, así la IA ve su propio formato en el
+    historial.
+  - Al enviar, la cocina lo convierte en texto plano más entidades `bold` de Telegram, sin `parse_mode`. No
+    hay nada que escapar, y una marca mal cerrada queda como texto. Las posiciones se cuentan en UTF-16
+    después del saludo del día, y conviven con la entidad del texto copiable.
+  - Sin migración.
+- **Chequeo de rumbo.**
+  - *Clase:* forma de la salida, no comprensión. Es nueva: no apareció antes.
+  - *Mecanismo o caso:* mecanismo. Un contrato de salida que vale para todos los mensajes de la IA.
+  - *Cocina o frases al mozo:* el mozo decide qué destacar y la cocina garantiza que Telegram lo muestre bien
+    o, si no puede, que salga como texto.
+  - *Qué lo demuestra:* la prueba del contrato en `tests/garantias` (rojo primero), la conversación de prueba
+    20 leída en las transcripciones con la IA real y la próxima prueba por Telegram.
 
 ## 4b. Guía de la prueba por Telegram (M3)
 
