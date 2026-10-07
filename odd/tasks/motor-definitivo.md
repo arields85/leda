@@ -421,6 +421,15 @@ y no por la API.
 - **Alcance** (usuario, el mismo día): es para el uso personal de ahora. Cuando Leda sea comercial, cada
   cliente paga su propio proveedor de IA, con su clave (`python -m leda modelo … --proveedor`).
 
+**M3 cumplido (2026-10-07).** El usuario aprobó la prueba por Telegram ("si, aprobado. va muy bien").
+Después de M3 quedan:
+- las palabras de todos los días, en marcha;
+- el formato de los mensajes, pedido del usuario: breves, con negrita, párrafos y viñetas;
+- borrar `prueba_chica/`;
+- llevar la rama a `main`, que decide el usuario;
+- la Fase C;
+- la plataforma web.
+
 ## 4b. Guía de la prueba por Telegram (M3)
 
 La misma prueba de la E2-9 (`prueba_chica/README.md`), sobre el motor definitivo.

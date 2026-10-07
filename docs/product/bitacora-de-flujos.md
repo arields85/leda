@@ -217,6 +217,30 @@ del ADR 0018 (5b):
 Ningún criterio de corte (5c) se disparó. Con este registro se cumple el paso **M2**. Queda la
 Etapa 3: limpieza y motor de conversación definitivo.
 
+## Prueba por Telegram real del motor definitivo (E3-8, 2026-10-07): aprobada; paso M3
+
+La guía de la E2-9 (`odd/tasks/motor-definitivo.md`, sección 4b), sobre el motor definitivo (`leda.motor`).
+- **Con qué:** GPT-6 sol por la suscripción de ChatGPT del usuario. `leda_motor` recreada con las tareas
+  venciendo el viernes 16. El reloj de Leda recorrió del 07/10 al 22/10, y el paso 16 se hizo a las 22:30 con
+  el comando nuevo `reloj … hora`.
+- **Números:** 31 turnos, ningún incidente y ningún efecto equivocado.
+- **Lo nuevo funcionó:**
+  - A las 22:31 del jueves 22, "lo termino mañana" quedó anotado para el viernes 23 (la fecha en hora del
+    espacio).
+  - Habló del mundo y no de la cocina: "Ismael se enterará hoy a las 10:00", "mañana a las 10:00 te volveré
+    a pedir el estado".
+  - La escalera completa salió en sus días, y el escalamiento fue honesto con quienes no tienen Telegram.
+- **Detalles anotados:**
+  - Una vez anunció "hoy a las 10:00" cuando ya eran las 10:00:41.
+  - Una pregunta que había quedado para después volvió dos días más tarde, en medio de otro tema.
+  - Usó la palabra "previsión", que no se entiende: Marcos preguntó "¿qué es previsión?". Se corrige con la
+    regla de las palabras de todos los días.
+- **Juicio del usuario:** "si, aprobado. va muy bien". Pidió mensajes más breves y con formato: negrita para
+  las tareas y lo importante, párrafos separados y listas con viñetas.
+
+**Paso M3 cumplido (2026-10-07):** el motor definitivo está construido, los flujos A y B borrados, las
+garantías en verde y la prueba real aprobada.
+
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
 Tarea E3-8 de `odd/tasks/motor-definitivo.md`. Las 18 conversaciones de prueba (las 17 de la Etapa 2 y la

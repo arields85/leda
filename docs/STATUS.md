@@ -28,6 +28,10 @@ estructura, en una plataforma web con su propio ADR) y el diseño del
 [ADR 0018](decisions/0018-motor-de-conversacion.md) para la prueba (la IA elige jugadas de una lista cerrada y el
 código las ejecuta). El 0018 quedó como "propuesta" hasta que pasara la prueba chica.
 
+**Paso M3 cumplido (2026-10-07).** El usuario aprobó la prueba por Telegram del motor definitivo (bitácora
+de flujos). Siguen el formato de los mensajes y las palabras de todos los días; después, la Fase C y la
+plataforma.
+
 **Paso M2 cumplido (2026-10-06).** La prueba chica pasó: rondas automáticas 85 de 85 con GPT-6 sol y la
 prueba por Telegram real, en la que, según el usuario, Leda no se perdió aun fuera del guion y se siente
 conversacional, sin un botón (bitácora de flujos, "Prueba por Telegram real del flujo D"). El usuario

@@ -64,7 +64,7 @@ misma clase de falla y el usuario frenó el parcheo (análisis en `docs/research
 | 0 | Arranque limpio: etiquetas, cierre en `main`, rama y carpeta nuevas | Hecho |
 | 1 | Diseño sin código: ADR 0017, ADR 0018, conversaciones de prueba | **M1**, el usuario acepta los dos ADR: **cumplido el 2026-10-04** (el 0018 quedó "propuesta" hasta que pasó la prueba; aceptado el 2026-10-06) |
 | 2 | Prueba chica y descartable, por Telegram real, con tareas de `sembrar` y base `leda_motor` | **M2:** resultado registrado en la bitácora, pase o no, contra los criterios del ADR 0018 (decisión 5): **cumplido el 2026-10-06, pasó** |
-| 3 | Cortar los enredos, mudar las pruebas de garantías, borrar los flujos A y B, construir el motor; la plataforma web, con su ADR | **M3:** motor construido, flujos viejos borrados, garantías en verde, prueba real aprobada |
+| 3 | Cortar los enredos, mudar las pruebas de garantías, borrar los flujos A y B, construir el motor; la plataforma web, con su ADR | **M3:** motor construido, flujos viejos borrados, garantías en verde, prueba real aprobada: **cumplido el 2026-10-07** |
 
 Las etapas 2 y 3 tienen cada una su plan propio, que se escribe al llegar.
 
