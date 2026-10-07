@@ -63,17 +63,21 @@ Una tabla nueva, `archivo`, guarda el contenido de cada archivo recibido, separa
 
 **Límites:**
 
-- **Tamaño:** 20 MB por archivo, que es lo máximo que la API de bots de Telegram deja descargar. Es
-  un límite del producto, que un espacio puede bajar con `workspace_setting` y nunca subir por
-  encima de lo que el canal permite. Que Telegram no deje bajar más es un límite del adaptador, no
-  la regla de negocio (frontera, regla 3).
+- **Tamaño:** 60 MB por archivo (usuario, 2026-10-07). Es un límite del producto, que un espacio
+  puede bajar con `workspace_setting`. El canal tiene el suyo: la API de bots de Telegram deja
+  descargar hasta 20 MB (core.telegram.org/bots/api, objeto `File`), y sin límite con un servidor
+  propio de la API de bots. Mientras no esté ese servidor rige el del canal, 20 MB; se instala cuando
+  Leda vaya a un equipo real, con el resto de la operación. Que Telegram no deje bajar más es un
+  límite del adaptador, no la regla de negocio (frontera, regla 3).
 - **Tipo:** lista permitida del producto, igual para todos los clientes, juzgada por el contenido y
   no por la extensión ni por el tipo que declara quien manda: imágenes (JPEG, PNG, WebP, HEIC), PDF,
-  documentos de oficina, texto plano y CSV. Quedan afuera los ejecutables, los scripts, el HTML y el
-  SVG (que pueden ejecutar código en el navegador de quien los abre). Comprimidos y videos:
-  `PENDIENTE` (preguntas 3 y 5).
+  documentos de oficina, texto plano, CSV y videos (usuario, 2026-10-07). También comprimidos y archivos
+  de proyecto, como el programa exportado de un PLC (usuario, 2026-10-07): Leda nunca los abre ni los
+  ejecuta, y la página los ofrece sólo para descargar. Quedan afuera los ejecutables sueltos, los
+  scripts, el HTML y el SVG (que pueden ejecutar código en el navegador de quien los abre).
 - **Fuera de límite:** Leda lo dice en palabras de todos los días y propone qué hacer (mandarlo
-  como foto, partirlo o mandar un enlace). Nunca lo descarta en silencio.
+  como foto, uno más corto o un enlace). Nunca lo descarta en silencio. Un enlace (por ejemplo, a un
+  video en Drive) es evidencia de la clase enlace (decisión 5).
 
 **Alternativas descartadas:**
 
@@ -122,8 +126,9 @@ Una tabla nueva, `archivo`, guarda el contenido de cada archivo recibido, separa
   Leda la estaba esperando (ADR 0018, decisión 3, el ejemplo de la foto del tablero).
 - **Sin una entrega abierta,** Leda pregunta para qué es, como ante cualquier duda (situación general
   5). El archivo queda guardado como parte de la conversación y no cuenta como evidencia hasta que
-  una entrega lo tome. Si una foto de avance mandada antes cuenta para la entrega posterior:
-  `PENDIENTE` (pregunta 4).
+  una entrega lo tome. **Lo mandado antes cuenta si se incluye al confirmar** (usuario, 2026-10-07):
+  la vista previa de la entrega muestra también lo que llegó durante la tarea ("la foto del martes y
+  la de hoy") y la persona confirma o saca alguna. Nada entra sin que la persona lo vea.
 
 ### 5. La entrega junta la evidencia y la política se cumple por tipo
 
@@ -136,8 +141,8 @@ Una tabla nueva, `archivo`, guarda el contenido de cada archivo recibido, separa
   el contenido, nunca la IA.
 - **Cada tipo de la política acepta ciertas clases**, y eso es dato del pack, versionado con la
   política (frontera, regla 5), no código. Propuesta para CoreWork: `explicacion` ← texto; `foto` y
-  `captura` ← imagen; `archivo` ← archivo o imagen; `resultado_de_prueba` ← archivo o imagen, y si
-  también texto es `PENDIENTE` (pregunta 2).
+  `captura` ← imagen; `archivo` ← archivo, imagen o enlace; `resultado_de_prueba` ← texto, archivo,
+  imagen o enlace (usuario, 2026-10-07: un resultado de prueba se puede contar por escrito).
 - **`evidencia_pendiente` cambia:** la política se cumple cuando cada tipo pedido tiene una pieza
   propia del ciclo vigente, no retirada, de una clase que ese tipo acepta. Una pieza cubre un solo
   tipo. Con eso, en electricidad una frase sola ya no alcanza: falta la foto. Es la regla de la
@@ -209,8 +214,9 @@ Una tabla nueva, `archivo`, guarda el contenido de cada archivo recibido, separa
 - **Nadie más del equipo.** El tablero de hoy le muestra a todo el equipo títulos y estados; la
   página suma fotos, archivos y comentarios de revisión, que son de otra sensibilidad. El seguimiento
   existe para facilitar el trabajo, no para vigilar personas (constitución §8).
-- **La autoridad final del espacio** (en CoreWork, Dirección) ve las tareas que aprueba. Si ve todas:
-  `PENDIENTE` (pregunta 1).
+- **La autoridad final del espacio** (en CoreWork, Dirección) ve todas las tareas del espacio
+  (usuario, 2026-10-07): conserva la decisión final y puede necesitar cualquier evidencia. Es sólo
+  lectura, cada vista queda registrada y no recibe un aviso por cada entrega.
 - **El administrador de plataforma** ve cualquier tarea del espacio, con un enlace que pide por el
   bot de administración y nunca por el del espacio (constitución §2: el sombrero lo define el
   canal). Ese acceso queda atado a su usuario de plataforma, a una tarea de un espacio, y cada vez
@@ -288,11 +294,12 @@ Una tabla nueva, `archivo`, guarda el contenido de cada archivo recibido, separa
   nuevas tienen dueño `leda_owner`.
 - **Inmutabilidad:** `update` y `delete` sobre `evidence` y `archivo` fallan para `leda_app`; un
   retiro no borra nada; el `check` de la huella rechaza un contenido que no coincide.
-- **Límites:** un archivo de más de 20 MB y uno fuera de la lista se rechazan; el tipo se juzga por
+- **Límites:** un archivo por encima del límite vigente y uno fuera de la lista se rechazan; el tipo se juzga por
   el contenido (un ejecutable renombrado `.pdf`, un SVG).
 - **Política por tipo:** una frase sola no cubre `foto`; una imagen sola no cubre `explicacion`; lo
   retirado y lo del ciclo anterior no cuentan; aprobar sigue exigiendo la política completa.
-- **Alcance de la página:** la ven el responsable, quien aprueba y el referente del área; otro
+- **Alcance de la página:** la ven el responsable, quien aprueba, el referente del área y la autoridad
+  final; otro
   integrante, una membresía inactiva y un token revocado reciben la página genérica; el cambio de
   aprobador se refleja en el siguiente pedido.
 - **El enlace:** sólo su hash queda en la base; no aparece en el texto que redacta la IA ni en el
@@ -319,23 +326,18 @@ y una nota en el ADR 0009 (el enlace pendiente y las fotos que dejaba fuera).
 
 - **La base crece con los archivos** y el respaldo con ella; la deuda de respaldo y restauración de
   `docs/STATUS.md` pesa más.
-- **El webhook atiende de a un mensaje** (deuda registrada): bajar un archivo de 20 MB demora a los
+- **El webhook atiende de a un mensaje** (deuda registrada): bajar un video grande demora a los
   demás.
+- **Un comprimido puede traer cualquier cosa adentro:** Leda no lo abre; quien lo descarga lo abre en
+  su máquina, como un adjunto de correo.
 - **Una imagen mandada como archivo conserva sus metadatos**, incluida la ubicación; se guarda tal
   cual para que la huella siga valiendo.
 - **El reintento del despachador** puede duplicar un álbum si Telegram lo recibió y la respuesta se
   perdió, como ya pasa con el texto.
 
-## Preguntas al usuario (`PENDIENTE`)
+## Preguntas al usuario
 
-1. **¿La autoridad final del espacio ve la página de todas las tareas?** Por ejemplo, Ismael abriría
-   la entrega de Nahuel aunque la apruebe Marcos.
-2. **¿Un resultado de prueba puede ser sólo un texto?** Por ejemplo, Nahuel escribe "probé el lazo y
-   anda": ¿alcanza, o hace falta una captura o un archivo?
-3. **¿Se aceptan comprimidos y archivos de proyecto?** Por ejemplo, Nahuel manda `linea2.zip` con la
-   exportación del programa del PLC. Leda no puede mostrar lo que hay adentro.
-4. **¿Una foto de avance cuenta para la entrega?** Por ejemplo, el martes Lucas manda una foto del rack
-   a medio armar y el viernes dice "terminé": ¿esa foto ya es evidencia, o sólo lo que manda al
-   entregar?
-5. **¿Se aceptan videos?** Por ejemplo, un video corto del motor andando como resultado de prueba.
-   Pesan más y tienen el mismo tope de 20 MB.
+Las cinco del borrador quedaron decididas por el usuario el 2026-10-07 y están en sus decisiones:
+la autoridad final ve todas las páginas (7b); un resultado de prueba puede ser texto (5); se aceptan
+comprimidos y archivos de proyecto sin abrirlos (2); lo mandado antes de entregar cuenta si se incluye al
+confirmar (4); se aceptan videos, con 60 MB de límite y 20 MB mientras no esté el servidor propio (2).
