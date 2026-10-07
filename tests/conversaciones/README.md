@@ -62,6 +62,12 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     hechos en un mensaje y el aviso a Ismael; Leda escribe breve, un renglón por idea, con 📋, ✏️, 🗓️ y
     ⚠️ al principio del renglón (en cada bloque, la tarea primero), fechas cortas, sin negrita, quien se
     entera dicho en pasiva sobre esa persona y el cierre aparte, al final.
+25. [`25-sin-puntuacion.md`](25-sin-puntuacion.md): mensajes de corrido, sin puntuación y con errores de
+    tipeo, que mezclan dos tareas; el primero es el literal de la prueba por Telegram real ("con el PLC
+    estoy compliacdo, me falta el cable para programar comunicaciones…"). Leda reparte cada hecho en su
+    tarea o, si no puede saber a cuál va, pregunta; nunca arma una causa o un motivo con palabras de la
+    otra tarea. Es la primera con dos respuestas correctas en un paso: el YAML espera el reparto y la
+    pregunta de duda se juzga leyendo la transcripción.
 
 La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 1 a 3, y ADR 0019):
 
@@ -93,7 +99,8 @@ ADR 0018, decisión 9l). La 18, hablar de lo que pasa en el mundo y no de la coc
 2026-10-06, de la prueba por Telegram real; Etapa 3, E3-6). La 19, decir el hecho con palabras de todos
 los días y no los nombres del sistema (decisión del usuario, 2026-10-07, de la prueba por Telegram real).
 La 20, el formato de los mensajes (pedido del usuario, 2026-10-07, al aprobar M3; segunda y tercera
-vuelta el mismo día, después de verlo en Telegram).
+vuelta el mismo día, después de verlo en Telegram). La 25, los mensajes sin puntuación que mezclan dos
+tareas (hallazgo de la prueba por Telegram real del 2026-10-07).
 
 ## El corredor
 

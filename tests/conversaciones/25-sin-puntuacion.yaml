@@ -1,0 +1,182 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/25-sin-puntuacion.md
+numero: "25"
+titulo: "Mensajes sin puntuación"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-19 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-22"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-22"
+    estado: asignada
+    depende_de: PLC
+
+# El corredor no sabe expresar "una cosa o la otra": cada paso espera una sola respuesta. En el
+# paso 2 espera el reparto correcto (a); la pregunta de duda (b) también es correcta y, si la IA
+# la elige, el corredor la marca como falla de comprensión y se juzga leyendo la transcripción
+# (el .md lo dice en el paso).
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-19 10:00"]
+    # Un solo aviso previo con las dos tareas, que vencen el mismo día (como en la 13).
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tareas: [PLC, COM]
+    estado_despues:
+      ultimo_aviso: {Marcos: [COM, PLC]}
+    dice:
+      - las dos tareas de Marcos, cada una en su renglón con 🗓️ y su fecha corta, el jue 22/10
+      - que no hace falta contestar, solo en el último renglón
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-19 10:40"
+    # El mensaje de la prueba por Telegram real del 2026-10-07, literal.
+    escribe: "con el PLC estoy compliacdo, me falta el cable para programar comunicaciones estimo que la tengo para el viernes 23"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC, causa: "me falta el cable para programar"}
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-10-23"}
+    efectos:
+      estados: {PLC: bloqueada}
+      bloqueos: [{tarea: PLC, causa: presente}]
+      previsiones: [{tarea: COM, fecha: "2026-10-23", motivo: ausente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          hechos: {prevision: "2026-10-23", fecha_comprometida: "2026-10-22",
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 1, motivo: ausente}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC, pregunta: quien_destraba}
+      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-10-23",
+         fecha_comprometida: "2026-10-22", atraso_si_se_cumple_la_prevision_dias_habiles: 1,
+         motivo: ausente}
+    pregunta: {tipo: quien_destraba, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+    dice:
+      - "cada tarea en su bloque, primero su renglón con 📋 y su nombre solo y debajo, con ✏️, lo anotado: la del PLC está trabada porque le falta el cable para programar; la de comunicaciones la termina el vie 23/10"
+      - "con ⚠️, la consecuencia de la de comunicaciones: vence el jue 22/10, un día hábil de atraso"
+      - que Ismael será notificado, en pasiva sobre él y en futuro
+      - "una sola pregunta, sola y en el último renglón: quién puede destrabar la del PLC"
+    no_dice:
+      - una causa del bloqueo que nombre las comunicaciones
+      - un motivo de la fecha nueva, que Marcos no dio
+      - la fecha del viernes 23 en la tarea del PLC
+      - el bloqueo en la tarea de comunicaciones
+      - que Leda le avisa a Ismael
+      - negrita
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-19 10:41"]
+    salen:
+      - a: Ismael
+        tipo: nueva_prevision
+        tarea: COM
+        hechos: {prevision: "2026-10-23", fecha_comprometida: "2026-10-22",
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 1, dependientes: [],
+                 motivo: ausente}
+    dice:
+      - la tarea de comunicaciones en su renglón con 📋, el primero de su bloque
+      - debajo, que Marcos dijo que la termina el vie 23/10, sin motivo
+      - "que vence el jue 22/10 y, con ⚠️, el atraso: un día hábil"
+      - que no hace falta que conteste, solo en el último renglón
+    no_dice:
+      - un motivo inventado (el cable, el PLC)
+      - nada de la tarea del PLC
+      - que la fecha cambió
+
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-19 10:50"
+    escribe: "el cable lo consigue martin de compras y comunicaciones al final es el lunes 26 xq me falta el switch tmb"
+    jugadas:
+      - {nombre: anotar_quien_destraba, quien: "martin de compras", puede_traer: [tarea]}
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-10-26", motivo: "me falta el switch"}
+    efectos:
+      destraban: [{tarea: PLC, alguien: true, no_sabe: false}]
+      previsiones: [{tarea: COM, fecha: "2026-10-26", motivo: presente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          hechos: {prevision: "2026-10-26", fecha_comprometida: "2026-10-22",
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 2, motivo: presente}
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente}
+      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-10-26",
+         fecha_comprometida: "2026-10-22", atraso_si_se_cumple_la_prevision_dias_habiles: 2,
+         motivo: presente}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - "cada tarea en su bloque con 📋 primero: en la del PLC, con ✏️, que Martín de compras consigue el cable; en la de comunicaciones, con ✏️, que la termina el lun 26/10 porque le falta el switch"
+      - "con ⚠️, la consecuencia de la de comunicaciones: vence el jue 22/10, dos días hábiles de atraso"
+      - que Ismael será notificado, en pasiva sobre él y en futuro
+      - el próximo paso, aparte y al final
+    no_dice:
+      - el switch como causa del bloqueo del PLC
+      - Martín en la tarea de comunicaciones
+      - que Leda le escribió a Martín o lo va a seguir
+      - otra vez la pregunta de quién destraba la del PLC
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-19 10:51"]
+    salen:
+      - a: Ismael
+        tipo: nueva_prevision
+        tarea: COM
+        hechos: {prevision: "2026-10-26", fecha_comprometida: "2026-10-22",
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 2, dependientes: [],
+                 motivo: presente}
+    dice:
+      - la tarea de comunicaciones en su renglón con 📋, el primero de su bloque
+      - debajo, que Marcos dijo que la termina el lun 26/10 porque le falta el switch
+      - "que vence el jue 22/10 y, con ⚠️, el atraso: dos días hábiles"
+      - que no hace falta que conteste, solo en el último renglón
+    no_dice:
+      - el cable o Martín
+      - que la fecha cambió
+
+  - paso: 6
+    quien: Marcos
+    a_las: "2026-10-20 15:00"
+    escribe: "ya llego el cable sigo con el plc y lo de comunicaciones lo termine recien al final"
+    jugadas:
+      - {nombre: destrabar, tarea: PLC}
+      - {nombre: entregar, tarea: COM}
+    efectos:
+      estados: {PLC: en_curso}
+      bloqueos_resueltos: [PLC]
+    hechos:
+      - {jugada: destrabar, resultado: anotado, tarea: PLC, estado: en_curso,
+         vuelve_a_pedir_el_estado: ausente, pregunta: ausente}
+      - {jugada: entregar, resultado: no_por_chat, tarea: COM}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - "en el bloque de la del PLC, con 📋 primero y ✏️ debajo: que quedó anotado que se destrabó y sigue en curso"
+      - "en el bloque de la de comunicaciones: con honestidad, que todavía no puede recibir la entrega por acá"
+      - el próximo paso, aparte y al final
+    no_dice:
+      - que la tarea de comunicaciones quedó entregada, en revisión o terminada
+      - que Ismael se enteró o se va a enterar
+      - que la del PLC está terminada
+      - otra vez la pregunta de quién lo destraba
