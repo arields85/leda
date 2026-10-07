@@ -26,10 +26,12 @@ Una vez para todas las conversaciones: ninguna regla sabe de qué conversación 
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from leda.db import admin
+from leda.motor.avisos import ETAPA_AVISO_REINTENTO
 
 from .carga import ZONA, Mundo
 from .motores import Motor
@@ -43,6 +45,12 @@ GARANTIA, COMPRENSION, MOTOR = "garantia", "comprension", "motor"
 DATOS_LIBRES = frozenset({"motivo", "causa", "palabras", "quien", "a", "que_pide"})
 FUERA_DE_LA_LISTA = "fuera_de_la_lista"
 ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
+# Un aviso cuya redacción falló y se reintenta (usuario, 2026-10-07): en la corrida es un aviso
+# que no salió a su hora. El informe se publica: de la falla dice sólo su clase y su código
+# HTTP, nunca su texto (`falla_sin_texto`).
+AVISO_SIN_REDACTAR = "el aviso no salió a su hora: la IA no lo redactó"
+_CLASE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
+_HTTP = re.compile(r"\bHTTP (\d{3})\b|'(\d{3}) [A-Z]")
 
 
 @dataclass
@@ -125,8 +133,11 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                                   "es_respuesta": f["es_respuesta"], "tipo": f["tipo"],
                                   "cuerpo": f["cuerpo"], "estado": f["estado"]}
                    for f in cur.fetchall()}
-        cur.execute("select id, etapa, severidad from incident where workspace_id = %s", (ws,))
+        cur.execute("""select id, etapa, severidad, referencia_cruda from incident
+                        where workspace_id = %s""", (ws,))
         incidentes = {str(f["id"]): {"etapa": f["etapa"], "severidad": f["severidad"]}
+                      | ({"falla": falla_sin_texto(f["referencia_cruda"])}
+                         if f["etapa"] == ETAPA_AVISO_REINTENTO else {})
                       for f in cur.fetchall()}
         # Los del espacio de la corrida, no los de toda la base (revisión de la E2-7).
         cur.execute("select count(*) n from admin_notice where workspace_id = %s", (ws,))
@@ -194,6 +205,30 @@ def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
         "avisos_al_administrador": despues["avisos_admin"] - antes["avisos_admin"],
         "avances": nuevas("avances"),
     }
+
+
+def falla_sin_texto(referencia: str | None) -> dict[str, Any]:
+    """De la referencia técnica de un incidente (`Clase: texto`), lo que puede ir a un informe
+    publicado: la clase de la excepción y, si la tiene, el código HTTP. Nunca el texto."""
+    antes = (referencia or "").split(":", 1)[0].strip()
+    falla: dict[str, Any] = {"falla": antes if _CLASE.fullmatch(antes) else "desconocida"}
+    codigo = _HTTP.search(referencia or "")
+    if codigo:
+        falla["http"] = int(codigo.group(1) or codigo.group(2))
+    return falla
+
+
+def comprobar_incidentes(c: Comprobacion, incidentes: list[dict[str, Any]]) -> None:
+    """Los incidentes nuevos de un paso, salvo los de un pedido fuera de la lista (que se
+    comparan con los avisos al administrador esperados). Un intento de redactar un aviso que
+    falló se dice como lo que es, con su falla sin texto; cualquier otro, como incidente."""
+    for i in incidentes:
+        if i["etapa"] == ETAPA_AVISO_REINTENTO:
+            c.falla(MOTOR, AVISO_SIN_REDACTAR, None, i["falla"])
+    otros = [i for i in incidentes
+             if i["etapa"] not in (ETAPA_FUERA_DE_LA_LISTA, ETAPA_AVISO_REINTENTO)]
+    if otros:
+        c.falla(MOTOR, "incidente", [], otros)
 
 
 # --- Traducir a claves --------------------------------------------------------------------------
@@ -363,9 +398,7 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
         else:
             falta = True
             c.falla(COMPRENSION, "falta el aviso al administrador", al_admin_e, len(fuera))
-    otros = [i for i in hubo["incidentes"] if i["etapa"] != ETAPA_FUERA_DE_LA_LISTA]
-    if otros:
-        c.falla(MOTOR, "incidente", [], otros)
+    comprobar_incidentes(c, hubo["incidentes"])
     a_otros = [s for s in hubo["salidas"] if not s["es_respuesta"]]
     if a_otros:
         de_mas = True

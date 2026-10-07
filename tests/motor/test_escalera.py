@@ -24,7 +24,7 @@ from typing import Any
 import pytest
 
 from leda.db import admin
-from leda.motor.avisos import enviar_avisos
+from leda.motor.avisos import ETAPA_AVISO_GUARDADO, enviar_avisos
 from leda.motor.escalera import ETAPA_ESCALERA, correr_escalera
 from leda.motor.ia import Jugada
 from leda.motor.tiempo import RelojFijo
@@ -429,7 +429,7 @@ def test_un_pedido_que_la_ia_no_redacto_no_detiene_la_escalera(conn, mundo, dias
         conn.commit()
     [pedido] = avisos_guardados(conn, "pedido_de_estado")
     assert pedido["estado"] == "fallido"
-    assert uno(conn, "select etapa from incident")["etapa"] == "motor_aviso_guardado"
+    assert cuantas(conn, "incident", "etapa = %s", ETAPA_AVISO_GUARDADO) == 1
 
     [v1] = dias.ciclo(octubre(13, 10))
 

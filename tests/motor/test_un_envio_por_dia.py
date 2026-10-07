@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 import pytest
 
 from leda.db import admin
+from leda.motor.avisos import ETAPA_AVISO_GUARDADO, ETAPA_AVISO_REINTENTO
 from leda.motor.escalera import correr_escalera
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.tiempo import RelojFijo
@@ -146,7 +147,9 @@ def test_un_aviso_que_ya_habia_fallado_no_le_quita_intentos_al_otro(conn, mundo,
                             reverse=True)
     assert (fallido["estado"], fallido["intentos"]) == ("fallido", 5)
     assert (sigue["estado"], sigue["intentos"]) == ("guardado", 1)
-    assert cuantas(conn, "incident") == 1
+    assert cuantas(conn, "incident", "etapa = %s", ETAPA_AVISO_GUARDADO) == 1
+    # El que sigue deja el rastro de su intento (usuario, 2026-10-07).
+    assert cuantas(conn, "incident", "etapa = %s", ETAPA_AVISO_REINTENTO) == 1
     bien = IAGuionada(redacciones=["Vence el viernes."])
     assert enviar(conn, mundo, bien, octubre(6, 10, 1)) == {"enviado": 1}
 

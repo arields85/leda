@@ -317,6 +317,19 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(_BUSCAR_DETALLE + " y corregí la causa (proveedor de la IA caído, clave "
                    "vencida o un defecto). Una escalera sigue con su paso siguiente; decidí "
                    "si hay que decirle a {nombre} lo que no le llegó.")),
+    # El Motor (`leda.motor.avisos`; usuario, 2026-10-07): un intento de redactar un aviso
+    # guardado falló y se reintenta. Queda como rastro, sin avisar a la administración; si
+    # se avisara, esto es lo que leería.
+    "motor_aviso_reintento": ExplicacionDeEtapa(
+        titulo="Un aviso de Leda se demoró",
+        que_paso=("La IA no redactó un aviso guardado en uno de sus intentos. Se reintenta "
+                  "solo, a los 1, 2, 4 y 8 minutos; al quinto fallo queda su propio incidente "
+                  "(`motor_aviso_guardado`). El resumen dice qué intento fue y cuándo se "
+                  "reintenta."),
+        que_vio=("Todavía nada: el aviso le llega a {nombre} cuando la IA lo redacte, unos "
+                 "minutos más tarde."),
+        que_hacer=(_BUSCAR_DETALLE + ": la referencia técnica dice cómo falló la IA. Si se "
+                   "repite seguido, revisá el proveedor de la IA.")),
     # El Motor (`prueba_chica/ciclo.py`): se cayó un paso del ciclo que corre en el
     # escuchador. Los demás pasos siguieron.
     "motor_ciclo": ExplicacionDeEtapa(
@@ -469,7 +482,8 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
                         chat_id: int | None = None,
                         app_user_id: str | None = None,
                         notificado_en=None,
-                        avisar_admin: bool = True) -> str:
+                        avisar_admin: bool = True,
+                        sin_avisar_porque: str | None = None) -> str:
     """Inserta un incidente sanitizado y avisa a la administración de
     plataforma (Constitución §10). Helper compartido para que quien necesite
     registrar un incidente no arme el insert a mano en cada lugar nuevo.
@@ -500,7 +514,9 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
     incidentes sin fin). Con `avisar_admin=False` nunca se llena
     `notificado_admin_en` -- sería mentir que se avisó por un canal que se
     sabe caído -- y el `resumen` deja una nota honesta, mismo criterio que
-    cuando nadie es alcanzable.
+    cuando nadie es alcanzable. `sin_avisar_porque` reemplaza esa nota cuando
+    el corte es por otra razón (el Motor, un intento fallido que se
+    reintenta: `motor.avisos`), así el resumen no miente sobre por qué.
 
     Devuelve el id del incidente insertado."""
     incident_id = str(uuid.uuid4())
@@ -522,6 +538,8 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
             resumen_final += (" No se avisó a la administración: ningún "
                               "administrador de plataforma tiene el bot de "
                               "administración vinculado.")
+    elif sin_avisar_porque is not None:
+        resumen_final += f" No se avisó a la administración: {sin_avisar_porque}"
     else:
         resumen_final += (" No se avisó a la administración: el canal de "
                           "administración es justamente el que falló -- "

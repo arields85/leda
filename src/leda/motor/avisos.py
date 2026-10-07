@@ -27,7 +27,9 @@ lo aplica el despachador (`despachador._tope_diario`): pospone, nunca descarta; 
 por día y por espacio, no se alcanza.
 
 Si la IA no lo redacta (o redacta un texto que el canal no lleva), el envío entero espera y se
-reintenta a los 1, 2, 4 y 8 minutos, con sus avisos juntos; al quinto
+reintenta a los 1, 2, 4 y 8 minutos, con sus avisos juntos. Cada intento que se reintenta deja
+un incidente de severidad baja, sin avisar a la administración, para poder probar la causa de un
+aviso que se demoró (usuario, 2026-10-07); al quinto
 fallo queda `fallido` con sus hechos, se registra un incidente y, si una persona lo causó (el
 turno que lo guardó), se le guarda un aviso de la falla con lo pendiente, que también redacta
 la IA: nunca sale un texto armado a mano. Un destinatario ausente no recibe nada: su aviso
@@ -73,6 +75,8 @@ ESPERAS_TRAS_UN_FALLO = (timedelta(minutes=1), timedelta(minutes=2), timedelta(m
 INTENTOS = len(ESPERAS_TRAS_UN_FALLO) + 1
 
 ETAPA_AVISO_GUARDADO = "motor_aviso_guardado"
+# Un intento fallido que se reintenta: sólo el rastro (usuario, 2026-10-07).
+ETAPA_AVISO_REINTENTO = "motor_aviso_reintento"
 
 # La espera de respuesta de un pedido de estado (`pending_reply.tipo`, ADR 0017, decisión 6)
 # y la pregunta que la acompaña.
@@ -398,7 +402,31 @@ def _si_la_ia_no_redacta(m: Momento, envio: list[_Listo], falla: Exception) -> l
         for x, intentos in siguen:
             cur.execute("""update scheduled_notice set intentos = %s, proximo_intento_en = %s
                             where id = %s""", (intentos, proximo, str(x.aviso["id"])))
+        _el_rastro_del_intento(m, siguen, falla, proximo)
     return resultados
+
+
+def _el_rastro_del_intento(m: Momento, siguen: list[tuple[_Listo, int]], falla: Exception,
+                           proximo: datetime) -> None:
+    """Un incidente por envío que se reintenta, con la falla en la referencia técnica (que
+    `registrar_incidente` sanea): sin él, un aviso que se demoró no deja cómo probar la causa
+    (usuario, 2026-10-07). Severidad baja y sin avisar a la administración: un reintento no
+    es para molestarla, y el quinto fallo la sigue avisando con su propio incidente."""
+    intentos = sorted({n for _, n in siguen})
+    cuales = (f"el intento {intentos[0]}" if len(intentos) == 1
+              else f"los intentos {', '.join(map(str, intentos[:-1]))} y {intentos[-1]}")
+    tipos = ", ".join(x.aviso["tipo"] for x, _ in siguen)
+    cuantos = "un aviso guardado" if len(siguen) == 1 else f"{len(siguen)} avisos guardados"
+    hora = proximo.astimezone(m.cal.zona).strftime("%H:%M")
+    registrar_incidente(
+        m.cur, m.workspace_id,
+        f"La IA no redactó {cuantos} del motor de conversación ({tipos}, para "
+        f"{siguen[0][0].destinatario['nombre']}) en {cuales}: se reintenta a las {hora}, "
+        f"con sus hechos guardados.",
+        severidad="baja", referencia_cruda=f"{type(falla).__name__}: {falla}",
+        etapa=ETAPA_AVISO_REINTENTO, avisar_admin=False,
+        sin_avisar_porque="un intento que se reintenta queda sólo como rastro; el quinto "
+                          "fallo sí la avisa.")
 
 
 def _un_aviso_que_fallo(m: Momento, aviso, destinatario, falla: Exception,

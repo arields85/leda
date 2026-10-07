@@ -424,9 +424,7 @@ class _Corredor:
         else:
             clase = cp.MOTOR
             self._comprobar_salen(c, paso.get("salen") or [], r.salidas)
-            otros = [i for i in hubo["incidentes"] if i["etapa"] != cp.ETAPA_FUERA_DE_LA_LISTA]
-            if otros:
-                c.falla(cp.MOTOR, "incidente", [], otros)
+            cp.comprobar_incidentes(c, hubo["incidentes"])
         estado = dict(paso.get("estado_despues") or {})
         de = estado.pop("de", self.persona)
         cp.comprobar_estado(c, estado, despues, de, clase)

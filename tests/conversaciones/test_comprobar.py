@@ -118,3 +118,26 @@ def test_un_dato_que_puede_traer_vale_si_son_palabras_de_la_persona():
     # Sin puede_traer, un dato libre que no se esperaba sigue siendo una falla.
     sin = {k: v for k, v in esperada.items() if k != "puede_traer"}
     assert not cp.jugada_coincide(sin, real(motivo="llego el switch"), mensaje)
+
+
+def test_de_la_falla_de_un_aviso_el_informe_sabe_la_clase_y_el_codigo_nunca_el_texto():
+    """Usuario, 2026-10-07: el informe se publica. De la referencia técnica de un intento que
+    falló, sólo la clase de la excepción y su código HTTP, con las dos formas que lo traen."""
+    assert cp.falla_sin_texto("HTTPStatusError: ChatGPT respondió HTTP 429 (x).") == {
+        "falla": "HTTPStatusError", "http": 429}
+    assert cp.falla_sin_texto("HTTPStatusError: Server error '503 Service Unavailable' for "
+                              "url 'https://ejemplo'") == {"falla": "HTTPStatusError",
+                                                           "http": 503}
+    assert cp.falla_sin_texto("ReadTimeout: la red se cortó en 30 s") == {"falla": "ReadTimeout"}
+    # Algo que no es una clase no pasa como si lo fuera.
+    assert cp.falla_sin_texto("un texto suelto sin clase: con datos") == {"falla": "desconocida"}
+    assert cp.falla_sin_texto(None) == {"falla": "desconocida"}
+
+    c = cp.Comprobacion()
+    cp.comprobar_incidentes(c, [
+        {"etapa": "motor_aviso_reintento", "severidad": "baja", "falla": {"falla": "X"}},
+        {"etapa": cp.ETAPA_FUERA_DE_LA_LISTA, "severidad": "baja"},
+        {"etapa": "motor_ciclo", "severidad": "alta"}])
+    assert [(f.clase, f.que, f.real) for f in c.fallas] == [
+        (cp.MOTOR, cp.AVISO_SIN_REDACTAR, {"falla": "X"}),
+        (cp.MOTOR, "incidente", [{"etapa": "motor_ciclo", "severidad": "alta"}])]
