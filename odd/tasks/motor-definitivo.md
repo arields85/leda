@@ -396,6 +396,18 @@ plataforma cuando Leda tenga una base más completa.
      - `PENDIENTE`: un vencimiento en fin de semana no tiene prueba en la escalera. Con la semilla de 10
        días habría caído el sábado 17.
 
+**La IA por la suscripción de ChatGPT del usuario (decisión del usuario, 2026-10-07).** Leda usa GPT-6 sol con
+la suscripción paga del usuario, iniciando sesión con su cuenta de ChatGPT como lo hace opencode (OAuth de Codex),
+y no por la API.
+- El agente le avisó el riesgo: las extensiones que lo hacen se declaran "sólo para uso personal de desarrollo",
+  y el servidor de Codex podría exigir sus instrucciones.
+- El usuario eligió hacerlo igual, sin el programa oficial "Sign in with ChatGPT".
+- Va como un proveedor más (`chatgpt`):
+  - el inicio de sesión lo corre el usuario;
+  - la sesión se guarda fuera del repositorio y no se muestra nunca;
+  - se renueva sola;
+  - se verifica con las conversaciones de prueba antes de su prueba por Telegram.
+
 ## 4b. Guía de la prueba por Telegram (M3)
 
 La misma prueba de la E2-9 (`prueba_chica/README.md`), sobre el motor definitivo.
