@@ -219,7 +219,7 @@ revisión por tramos.
 
 **Fase B. El motor definitivo.**
 
-- [ ] **E3-5. El paquete del motor** en `src/leda`, con su prueba de frontera (lista permitida de módulos
+- [x] **E3-5. El paquete del motor** en `src/leda`, con su prueba de frontera (lista permitida de módulos
       y de tablas; bordes conocidos que sólo achican).
       **Decisiones técnicas (agente, 2026-10-06, con el mapa de la prueba chica):**
       - **Primero, la auditoría en la cocina.** Desde que se borró `agente.py` (`d002c99`),
@@ -245,6 +245,28 @@ revisión por tramos.
         propio, y no importando un archivo de prueba desde otro.
       - **Un solo corredor para los dos motores:** el corredor y las conversaciones YAML se mudan con un
         parámetro para elegir el motor (`prueba_chica` o `leda.motor`), para la regresión de la E3-8.
+      **Hecha (2026-10-06), delegada a un escritor.**
+      - `d9517d5`: la auditoría vuelve a la cocina. Cada llamada a `herramientas.ejecutar` deja una fila
+        con la versión de las reglas, en la misma transacción que el efecto.
+        - Es la semántica vieja de `agente`: `herramienta:<nombre>` cuando se ejecutó, también una
+          consulta; `herramienta_rechazada:<nombre>` en un rechazo de negocio; nada cuando quedó
+          negado o esperando una confirmación.
+        - Ahora lleva además el sujeto y si hubo confirmación.
+        - Las huellas viven en `src/leda/versiones.py`.
+      - `be0f0a3`: el paquete `src/leda/motor/` con la capa 1 (`tiempo`, `ia`, `ancla`,
+        `cambios_de_estado`, `preguntas`, `instrucciones` y `registro`). Sus pruebas están en
+        `tests/motor/`, con una frontera de módulos y de tablas permitidas, y una prueba fija la huella
+        de las instrucciones de la IA que pasaron la prueba real.
+      - `12e63d9`: si falta un archivo del núcleo, la huella falla en vez de calcularse sobre nada.
+        Viene de una advertencia de la revisión.
+      - **Evidencia:**
+        - La auditoría en rojo antes del arreglo: `4 failed, 2 passed`.
+        - Suite completa: 674.
+        - `tests/garantias`: 145 al cerrar el commit `be0f0a3`, y uno más con `12e63d9`.
+        - `tests/motor`: 42.
+        - Garantías y motor, después de `12e63d9`: 188.
+        - `prueba_chica`: 410.
+      - **Revisiones:** `review-fb5aae5abbb4e2a8` y `review-6e0da2c028ca5d98`, aprobadas y reconocidas.
 - [ ] **E3-6. Mudar el diseño probado:** estado, registro de turnos, fichas de los circuitos probados,
       avisos guardados, escalera y reloj. Entran las dos entradas de la prueba real: hablar del mundo y no
       de la cocina, con su conversación de prueba escrita primero; y los efectos en `audit_log` con la
