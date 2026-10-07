@@ -98,6 +98,7 @@ reales. Las unidades de abajo que no son el seguimiento ni la plataforma tambié
 | Leda le pasa el pedido de una tarea nueva a quien la carga, con confirmación de quien pide | ADR 0017, decisión 1 (se reevalúa si una prueba real muestra que los pedidos se pierden) |
 | Quien decide las tareas las acepta dentro de Leda, en el formulario web; nunca por chat | ADR 0017, decisión 2 |
 | Leda le pregunta al referente si acepta una fecha nueva y, si confirma, la cambia ella misma | ADR 0017, decisión 4 (pedido explícito del usuario) |
+| Delegar por chat. Un referente le pasa una tarea a un integrante de su sector; Leda le pregunta a ese integrante si la acepta y le avisa a quien delegó cuando aceptó. Ejemplo: Marcos le pasa "Revisar comunicaciones" a Nahuel, que está a su cargo. | Usuario, 2026-10-07, a partir de la prueba por Telegram de la E2-9. Cambia la decisión 2 del ADR 0017 (reasignar queda fuera del chat): lleva su enmienda antes del código. Un cambio de responsable exige confirmación humana (constitución §7) y cruza el umbral de re-aprobación (mecánica §7). Quedan para el diseño: quién puede delegar a quién; qué pasa si el integrante no acepta; quién aprueba después el trabajo; y qué se entera el referente del que delega (en el ejemplo, Ismael). |
 
 ### Antecedentes
 

@@ -99,81 +99,11 @@ pasa a una conversación de prueba. Destino de cada uno:
   caracteres al iniciar; el proyecto carga unos 72.000 (`LC_ALL=C.UTF-8 wc -m`, 2026-10-06): `docs/STATUS.md` y
   el documento de la unidad no deberían crecer. El global lo maneja gentle-ai (`gentle-ai sync` pisaría una
   edición a mano): achicarlo lo decide el usuario.
-- **Respaldo de lo no subido.** `main` está subido hasta `e466eb5`. Viven en un solo disco la rama congelada
-  `feat/flujo-de-un-mensaje` (92 commits sin subir, 7 con líneas de atribución), los commits de aviso de las
-  ramas congeladas y las etiquetas del 2026-10-04 (la rama del Motor está subida desde el 2026-10-06). Recomendación
-  del agente: guardar la rama congelada con `git bundle`, sin reescribirla (los documentos citan sus hashes).
-
-`PENDIENTE` dentro de los ADR y del plan, para resolver al llegar: si se avisa que se cargaron tareas (ADR 0017,
-decisión 2); qué pasa si quien destraba dice que no le corresponde (decisión 3a); la tensión entre preguntarle al
-referente (3a, paso 4) y "Leda es la PM", al diseñar la persecución completa, que es de la prueba siguiente; qué
-hace la persona con una tarea terminada mientras la entrega no se recibe por chat (con el circuito de entrega);
-y cómo llega el tono de cada cliente a la IA. Los de la E1-4 están en las notas de `docs/ROADMAP.md`.
-
-## Estado comprobado
-
-**Código y esquema.** La rama del Motor agregó la prueba chica, descartable, en `prueba_chica/` (fuera de
-`src/leda`), las migraciones `0030` y `0031` (tablas del motor), las etapas del motor en `src/leda/incidentes.py`
-y `leda_motor` en `tools/restriccion_horario.py`; lo demás es el código de `main`.
-
-- `row level security` forzado en 34 tablas (recuento del 2026-09-30) más las de la `0030` y la `0031`;
-  aislamiento entre clientes cerrado por las migraciones `0003` a `0005`
-  ([`architecture/frontera.md`](architecture/frontera.md#cómo-se-cerró-la-regla-1)). `PENDIENTE`: un ensayo de
-  propiedad sobre un clúster enteramente limpio.
-- Sin vocabulario de cliente en el esquema. El estado de tarea es proyección de eventos. Migraciones hasta
-  `0025` en `main`, más `0030` y `0031` en la rama, cada una con rollback y ensayo de paridad.
-- HTTP: `POST /telegram/{slug}`, `GET /tablero/{token}` (sólo lectura) y `GET /salud`; no hay API de lectura.
-- La conversación de `main` son los flujos A y B, congelados.
-- Para el seguimiento en `main` (relevamiento del 2026-10-04): cinco enredos entre módulos (documento de la
-  unidad); no existe la operación de pedir más tiempo; los textos de recordatorios están fijos en `escalera.py`
-  y `reloj.py`. La prueba chica lo resuelve por su cuenta.
-
-**Rama congelada `feat/flujo-de-un-mensaje`:** en `cc732dd` (etiqueta `respaldo-flujos-antes-de-d`) más su commit
-de aviso; flujos C1 a C6 y migraciones `0026` a `0029`.
-
-**Git.**
-
-- Repositorio `arields85/leda` (público). `arields85/prisma` queda como respaldo congelado (remoto
-  `respaldo-prisma`). Engram usa el proyecto `prisma-pm`.
-- `origin/main` está en `e466eb5` (documentos del Motor hasta M1, por avance rápido) y no recibe nada hasta M3.
-  La rama del Motor está subida a `origin/feat/motor-de-conversacion` como respaldo (2026-10-06); el agente la
-  sube con autorización del usuario.
-- Carpetas borradas el 2026-10-06 (usuario): `c4-medicion`, `flujo-c6` y `prueba-0-35`. Sus commits, que no
-  estaban en ninguna rama, quedan en las etiquetas locales `archivo-c4-medicion`, `archivo-flujo-c6` y
-  `archivo-prueba-0-35`. Sus `.env`, sin leer, en `D:\Proyectos\Leda-PM-worktrees\_archivo-env-de-carpetas-borradas`.
-- Etiquetas: `respaldo-flujos-antes-de-d`, `respaldo-main-antes-de-d` (punto de partida de la rama),
-  `respaldo-0-36-en-pausa` (sólo consulta), `pre-renombre-leda` y `respaldo-flujos-antes-de-c2`, `-c5` y `-c6`.
-- Ramas: `feat/motor-de-conversacion` (vigente) y `main`; congeladas, `feat/flujo-de-un-mensaje` y
-  `auxiliar/alta-y-google` (`c9e7389`, ADR 0010 propuesta); restos sin uso: `feat/flujo-c6` y las copias
-  `auxiliar/alta-y-google-*`.
-
-## Baseline de pruebas
-
-| Dónde | Comando | Fecha | Resultado |
-|---|---|---|---|
-| `main` | `.venv\Scripts\python.exe -m pytest -q` | 2026-09-30 | 2279 passed, 333 deselected |
-| Rama congelada, en `24e92ce` | `python -m pytest -q -p no:cacheprovider` | 2026-10-04 | 3997 passed, 333 deselected, 1 warning |
-| Punto de partida del Motor (`respaldo-main-antes-de-d`) | `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` | 2026-10-04 | 2286 passed, 333 deselected, 1 warning in 631.96s |
-| Rama del Motor, en la E2-6 | suite completa | 2026-10-05 | 2306 passed, 333 deselected, 1 warning in 780.79s |
-| Rama del Motor, `prueba_chica` | `pytest prueba_chica` | 2026-10-06 | 411 passed in 133.45s |
-| Rama del Motor, después de la E3-1 | suite completa | 2026-10-06 | 2310 passed, 333 deselected, 1 warning in 837.96s |
-| Rama del Motor, garantías limpias | `pytest tests/garantias` | 2026-10-06 | 84 passed in 95.36s |
-| Rama del Motor, después de la E3-2 | suite completa | 2026-10-06 | 2316 passed, 333 deselected, 1 warning in 845.33s |
-| Rama del Motor, sin los flujos A y B (E3-3 y E3-4) | suite completa | 2026-10-06 | 626 passed (sin banco: 0 deselected) |
-| Rama del Motor, garantías | `pytest tests/garantias` | 2026-10-06 | 139 passed in 137.87s |
-
-Los deselected eran el banco real (`modelo_real`), retirado con los flujos viejos (E3-4). La tercera fila es la línea base de garantías del Motor. Estas
-cifras miden el código: **una suite en verde no es evidencia de que la conversación funcione** (`AGENTS.md`,
-"Cómo pensamos juntos", punto 12).
-
-## Operación
-
-- Sin producción, trabajo real, Docker ni staging. Telegram real sólo con datos ficticios (cuentas de prueba
-  Ariel, Ismael y Marcos, que opera el usuario).
-- Bases locales: `leda` (`main`), `leda_flujo` (rama congelada, hasta `0029`) y `leda_motor` (creada el
-  2026-10-05; el `.env` de la carpeta del Motor apunta a ella; respaldo
-  `db/respaldos/leda_motor-antes-primer-contacto-20261005.dump`). Los roles `leda_*` los comparten todas las
-  bases.
+- **Respaldo de lo no subido.** `main` está subido hasta `e466eb5`, y la rama del Motor está subida. La rama
+  congelada `feat/flujo-de-un-mensaje` (92 commits sin subir, 7 con líneas de atribución) y las etiquetas
+  quedaron en un `git bundle` del repositorio entero (2026-10-07, verificado), sin reescribir nada:
+  `D:\Proyectos\Leda-PM-respaldos\leda-repositorio-completo-20261007.bundle`. Está en el mismo disco:
+  `PENDIENTE` copiarlo a la nube o a otro disco.
 - **Bots del Motor:** dos nuevos, del equipo y de administración, creados por el usuario; sus tokens, en el `.env`
   de la carpeta del Motor (el agente no lo lee). La carpeta tiene su propio `.venv`, con las versiones de `main`.
 - **Restricción de horario apagada en `leda_flujo`** desde el 2026-10-02; el horario de CoreWork vuelve con
