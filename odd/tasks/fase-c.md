@@ -93,7 +93,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] **C-1b.** El ADR 0019, la evidencia y la página de la tarea: aceptado por el usuario (2026-10-07),
   con cinco decisiones más (Ismael ve todas las páginas; resultado de prueba por texto; comprimidos y
   proyectos sin abrirlos; lo mandado antes cuenta si se incluye; videos, 60 MB con 20 MB por ahora).
-- [ ] **C-2.** Conversaciones de prueba de la entrega y la aprobación.
+- [x] **C-2.** Conversaciones de prueba de la entrega y la aprobación (2026-10-07, `47ccf57`):
+  `tests/conversaciones/21-entrega-con-evidencia.md`, `22-falta-evidencia.md`, `23-aprobacion.md` y
+  `24-quien-aprueba-no-contesta.md`, listadas en su README. Sólo el `.md`, sin YAML: no corren hasta
+  la C-3. `pytest tests/conversaciones`: 105 passed. Los `PENDIENTE` que dejan están marcados en cada
+  paso.
 - [ ] **C-3.** Fichas de la entrega y la aprobación, la confirmación escrita y los avisos por el motor.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
 - [ ] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).
