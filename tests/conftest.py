@@ -145,10 +145,7 @@ def conn(uri):
     with c.cursor() as cur:
         cur.execute("set role leda_admin")
         cur.execute("""
-            truncate task_intake_free_text_slot, task_intake_field,
-                     task_intake_choice, task_intake_choice_set,
-                     task_intake_request,
-                     task_state_event, objective_state_event, task, task_draft,
+            truncate task_state_event, objective_state_event, task, task_draft,
                      task_evidence_policy, objective,
                      message_outbox, inbound_message, pending_reply, blocker,
                      evidence, approval, dependency, absence,

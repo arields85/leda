@@ -19,8 +19,7 @@ from leda.db import espacio
 from leda.despachador import TransporteDePrueba, despachar
 from leda.salida import enqueue_outbox
 
-TABLAS_DE_LAS_RAMAS_CONGELADAS = (
-    "pending_action", "task_intake_request", "task_intake_choice_set", "pending_reply")
+TABLAS_DE_LAS_RAMAS_CONGELADAS = ("pending_action", "pending_reply")
 
 
 def test_el_despachador_manda_la_respuesta_y_lo_que_leda_inicia(conn, mundo, escribe):

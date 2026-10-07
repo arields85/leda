@@ -716,7 +716,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # Hasta acá la base migrada sólo tiene 0002, que es lo que este
             # caso ejercita. La comparación de abajo exige la cadena completa:
             # sin ella diverge por cada migración posterior, y el fallo culpa
-            # a la instalación limpia en vez de a la cadena incompleta.
+            # a la instalación limpia en vez de a la cadena incompleta. La 0032
+            # se niega a borrar solicitudes del alta guiada: la de este caso ya
+            # cumplió su papel y se borra antes.
+            db.execute("delete from task_intake_request where id = %s", (request,))
             for posterior in _migraciones_posteriores_a("0002"):
                 db.execute(_sql_script(posterior))
 
@@ -754,11 +757,16 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             ).fetchone()["definition"]
             assert migrated_utf16 == clean_utf16
 
+            # Lo que sigue ejercita la vuelta atrás de la 0002, que necesita las
+            # tablas del alta guiada: se deshace la 0032 (las recrea vacías) y la
+            # base queda donde esa vuelta atrás espera encontrarla.
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0032_borrar_el_alta_guiada.sql"))
+
             db.execute("delete from message_outbox where pending_action_id = %s",
                        (terminal_pending,))
             db.execute("delete from audit_log where sujeto_id = %s", (draft,))
             db.execute("delete from pending_action where id = %s", (terminal_pending,))
-            db.execute("delete from task_intake_request where id = %s", (request,))
             db.execute("delete from task_draft where id = %s", (draft,))
             db.execute("delete from inbound_message where id = %s", (inbound,))
             db.execute("update task_draft set converted_task_id = null where id = %s",

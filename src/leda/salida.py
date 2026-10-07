@@ -518,7 +518,6 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    expires_at: datetime | None = None,
                    is_response: bool = False,
                    pending_action_id: str | None = None,
-                   intake_choice_set_id: str | None = None,
                    allow_split: bool = False,
                    es_bienvenida: bool = False,
                    bloque_copiable: str | None = None,
@@ -544,7 +543,7 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                 "El bloque copiable tiene que ser el final de un mensaje que "
                 "no se parte.")
         entidad_de_bloque(normalize_visible_text(text), bloque_copiable)
-    has_buttons = (pending_action_id is not None or intake_choice_set_id is not None
+    has_buttons = (pending_action_id is not None
                    or (bloque_copiable is not None
                        and cabe_en_boton_de_copiar(bloque_copiable)))
     # Cualquier mensaje dirigido a una persona (nunca uno de grupo, que no
@@ -576,16 +575,16 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
             """insert into message_outbox
                  (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
                   estado, programado_para, vence_en, dedupe_key, es_respuesta,
-                  pending_action_id, intake_choice_set_id, es_bienvenida,
+                  pending_action_id, es_bienvenida,
                   bloque_copiable, respuesta_grupo, es_coordinacion)
                values (%s, %s, %s, %s, %s, %s,
                        coalesce(%s, now()) + %s * interval '1 microsecond',
-                       %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       %s, %s, %s, %s, %s, %s, %s, %s)
                on conflict (dedupe_key) do nothing""",
             (workspace_id, chat_id, recipient_membership_id, message_type,
              payload.text, state, scheduled_for, index,
              expires_at, payload.dedupe_key,
-             is_response, pending_action_id, intake_choice_set_id, es_bienvenida,
+             is_response, pending_action_id, es_bienvenida,
              bloque_copiable, grupo_respuesta, es_coordinacion),
         )
         inserted += cur.rowcount
