@@ -16,6 +16,7 @@ Cada herramienta declara:
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -26,6 +27,8 @@ from psycopg.types.json import Jsonb
 
 from .autoridad import (Denegado, Solicitante, puede_aprobar_tarea,
                          requiere_confirmacion, verificar)
+from . import versiones
+from .db import registrar_auditoria
 from .incidentes import ETAPA_EVIDENCIA_INVALIDA, registrar_incidente
 from .salida import (OBJETIVO_ETIQUETA_BOTON, enqueue_outbox,
                      etiquetas_de_tarea, normalize_visible_text,
@@ -538,6 +541,13 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
     `huella` de la última preparación corrida acá -- así quien llama arma un
     recibo que cuenta qué pasó, sin que `ejecutar` deje de devolver sólo el
     resultado del handler.
+
+    Toda operación que llega a correr deja su fila en `audit_log`, en esta
+    misma transacción y con la versión de las reglas (`_auditar`): lo que se
+    ejecutó, como `herramienta:<nombre>`; lo que la cocina rechazó por una
+    regla de negocio, como `herramienta_rechazada:<nombre>`. Lo que no llegó
+    a correr (sin permiso, argumentos inválidos, esperando confirmación o
+    una elección) no deja ninguna.
     """
     if nombre == "crear_tarea":
         raise Denegado(
@@ -558,6 +568,8 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
             # un rechazo de negocio, no de autoridad. Se devuelve tal cual,
             # sin pasar por confirmación -- confirmar algo imposible no
             # tiene sentido.
+            _auditar(cur, quien, nombre, args, ya_confirmada=ya_confirmada,
+                     rechazo=prep)
             return prep
         if preparacion is not None:
             preparacion["cambio"] = prep.cambio
@@ -576,13 +588,79 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
         llamada["chat_id"] = chat_id
 
     try:
-        return h.handler(cur, quien, **llamada)
+        resultado = h.handler(cur, quien, **llamada)
     except NecesitaElegir as e:
         # La herramienta sabe qué falta; acá se completa con qué hacía falta
         # para ella. El texto ambiguo no vuelve a viajar.
         e.herramienta = nombre
         e.argumentos = {k: v for k, v in args.items() if k not in e.descarta}
         raise
+    _auditar(cur, quien, nombre, args, ya_confirmada=ya_confirmada,
+             rechazo=resultado if _es_rechazo(nombre, resultado) else None)
+    return resultado
+
+
+# De qué trata cada operación, por el argumento que nombra su sujeto, en este
+# orden: el primero presente es el sujeto de la fila de auditoría.
+_SUJETO_POR_ARGUMENTO = (("tarea_id", "task"), ("bloqueo_id", "blocker"),
+                         ("dependencia_id", "dependency"),
+                         ("origen_tarea_id", "task"))
+
+
+def _es_rechazo(nombre: str, resultado: Any) -> bool:
+    """Si el handler devolvió un impedimento de negocio sin escribir nada.
+
+    Es la regla de la confirmación por botón de `gateway` (antes de `d002c99`):
+    nunca auditar como ejecutado lo que no escribió nada. `aprobar_tarea` es la
+    excepción: escribe la aprobación aunque la tarea no llegue a cerrarse
+    (`cerrada` en `False`), y eso sí es un efecto (ADR 0008)."""
+    if not isinstance(resultado, dict):
+        return False
+    if nombre == "aprobar_tarea" and resultado.get("aprobada"):
+        return False
+    return bool(resultado.get("error")
+                or resultado.get("cerrada") is False
+                or resultado.get("iniciada") is False
+                or resultado.get("en_revision") is False)
+
+
+def _sujeto(args: dict[str, Any]) -> tuple[str | None, str | None]:
+    for clave, tipo in _SUJETO_POR_ARGUMENTO:
+        valor = args.get(clave)
+        if valor is None:
+            continue
+        try:
+            return tipo, str(uuid.UUID(str(valor)))
+        except ValueError:
+            # Un identificador que no es tal no nombra ningún sujeto; los
+            # argumentos quedan igual en el detalle.
+            return None, None
+    return None, None
+
+
+def _auditar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
+             args: dict[str, Any], *, ya_confirmada: bool,
+             rechazo: Any = None) -> None:
+    """La fila de `audit_log` de una operación que corrió (Constitución §12).
+
+    El actor es quien la pidió. Si la persona la confirmó (`ya_confirmada`),
+    la decidió ella (`persona`); si no, la pidió Leda en su nombre (`leda`),
+    como en `agente.py`. Los argumentos y el rechazo pasan por JSON con
+    `default=str`, porque una fecha o un identificador también pueden viajar."""
+    detalle: dict[str, Any] = {"args": args, "confirmada": ya_confirmada}
+    if rechazo is not None:
+        detalle["rechazo"] = rechazo
+    sujeto_tipo, sujeto_id = _sujeto(args)
+    registrar_auditoria(
+        cur,
+        accion=(f"herramienta_rechazada:{nombre}" if rechazo is not None
+                else f"herramienta:{nombre}"),
+        workspace_id=quien.workspace_id, actor_app_user_id=quien.app_user_id,
+        actor_kind="persona" if ya_confirmada else "leda",
+        sujeto_tipo=sujeto_tipo, sujeto_id=sujeto_id,
+        detalle=json.loads(json.dumps(detalle, default=str)),
+        pack_hash=versiones.pack_hash(cur, quien.workspace_id),
+        nucleo_hash=versiones.nucleo_hash())
 
 
 def _resumen(h: Herramienta, args: dict) -> str:
@@ -2289,10 +2367,10 @@ def _quitar_dependencia(cur, quien: Solicitante, dependencia_id):
             "de las dos tareas, ni referente de quien lo es.")
 
     # Baja física, no un estado "quitada": `dependency` no tiene columnas de
-    # baja blanda como `blocker.resuelto_en`, y `agente.py` ya audita todo
-    # llamado a herramienta (`registrar_auditoria`, accion
-    # "herramienta:quitar_dependencia", con los argumentos) con quién, cuándo
-    # y qué dependencia, así que el rastro no depende de esta fila.
+    # baja blanda como `blocker.resuelto_en`, y `ejecutar` audita toda
+    # operación que corre (`_auditar`, accion "herramienta:quitar_dependencia",
+    # con los argumentos y la dependencia como sujeto) con quién, cuándo y
+    # con qué versión de las reglas, así que el rastro no depende de esta fila.
     cur.execute("delete from dependency where id = %s", (dependencia_id,))
     return {"eliminada": True}
 
