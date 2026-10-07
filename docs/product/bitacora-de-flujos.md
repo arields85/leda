@@ -275,6 +275,19 @@ la suscripción:
   de error y nada más. La regresión siguiente dio **95 de 95** (`985b099`), sin ningún aviso atrasado y
   con "previsión" en 0 de 500 mensajes: la causa sigue sin conocerse, y el rastro queda para la próxima vez.
 
+## El formato de los mensajes (2026-10-07)
+
+Pedido del usuario al aprobar M3: mensajes breves, con negrita, párrafos y viñetas. Diseño y chequeo de rumbo en
+`odd/tasks/motor-definitivo.md`. La IA escribe `**negrita**`, párrafos y "• "; al enviar, la cocina lo
+convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marca mal cerrada sale como texto.
+- **Commits:** `a61f36e` (conversación de prueba 20), `47f674d` (la salida), `25ec91d` (la instrucción) y
+  `a704883` (el corredor). Revisiones `review-5f70100e7d4c1f51` y `review-a55346b24f27d539`, aprobadas. Suite
+  completa: 1207.
+- **Regresión de las 20 conversaciones por 5, con GPT-6 sol por la suscripción:** **100 de 100** y 100 de 100
+  en garantías. La IA usa el formato: las tareas y las fechas en negrita, un párrafo por cosa y viñetas para
+  listar tareas.
+- **Falta:** el juicio del usuario, primero sobre ejemplos de las transcripciones y después por Telegram.
+
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
 Tarea E3-8 de `odd/tasks/motor-definitivo.md`. Las 18 conversaciones de prueba (las 17 de la Etapa 2 y la
