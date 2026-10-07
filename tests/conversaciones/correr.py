@@ -6,6 +6,7 @@
     python -m tests.conversaciones.correr [--conversacion NN ...] [--veces 5]
                                           [--motor leda.motor|prueba_chica]
                                           [--ia guionada|ALIAS|PROVEEDOR/MODELO]
+                                          [--parametros JSON | --parametros-archivo ARCHIVO]
                                           [--grabar CARPETA] [--repetir ARCHIVO] [--paralelo N]
                                           [--ronda NOMBRE] [--sin-informe] [--pasar-el-techo]
 
@@ -16,6 +17,13 @@
   (`openrouter/openai/gpt-6-luna-pro`, `nan/deepseek-v4-flash`), o uno de los nombres cortos de
   `ALIAS` (`sol`, `luna`, `luna-pro`, `deepseek-flash`, `glm-flash`...). La clave es la del
   proveedor en el entorno (`leda.config.clave_llm`), que nunca se imprime.
+- `--parametros '<json>'` (o `--parametros-archivo`) son los parámetros del cliente de la IA, los
+  mismos de `model_config.parametros` (`leda.motor.ia_real.validar_parametros`: `timeout_s`,
+  `plazo_s`, `tope_jugadas`, `tope_redaccion`, `cuerpo_extra`...); uno que no vale no corre.
+  Sin ellos, los de omisión. Los nombres de `SIN_RAZONAR` (`glm-sin-razonar`,
+  `deepseek-sin-razonar`) traen el modelo de `nan` con los suyos para que no razone por dentro
+  (E3-8: la primera regresión los corrió sin parámetros y falló por los límites);
+  `--parametros` se suma a ellos. Quedan en la cabecera del informe y en la libreta.
 - `--grabar CARPETA` guarda lo que respondió la IA en cada corrida; `--repetir ARCHIVO` corre esa
   grabación otra vez con la IA guionada que la repite, para mirar una falla.
 - `--paralelo N` corre N corridas a la vez, cada una en su base.
@@ -72,6 +80,19 @@ ALIAS = {"sol": "openrouter/openai/gpt-6-sol", "luna": "openrouter/openai/gpt-6-
          "sol61": "openrouter/openai/gpt-6.1-sol",
          "sonnet": "openrouter/anthropic/claude-sonnet-5.5",
          "deepseek-flash": "nan/deepseek-v4-flash", "glm-flash": "nan/glm5.3-flash"}
+# Los dos de `nan` sin razonar por dentro (E3-8): cada uno con el campo del pedido que `nan`
+# acepta para eso, y más tiempo que el de omisión. GLM cuenta lo que razona dentro del tope y
+# podía volver vacío y cortado.
+SIN_RAZONAR = {
+    "glm-sin-razonar": ("nan/glm5.3-flash", {
+        "cuerpo_extra": {"reasoning_effort": "low"}, "timeout_s": 60, "plazo_s": 90}),
+    "deepseek-sin-razonar": ("nan/deepseek-v4-flash", {
+        "cuerpo_extra": {"chat_template_kwargs": {"enable_thinking": False}},
+        "timeout_s": 60, "plazo_s": 90}),
+}
+# `nan` puede devolver la misma respuesta a un pedido idéntico: lo dice el informe.
+NOTA_DE_CACHE = ("nan puede guardar en caché los pedidos idénticos: las repeticiones no son "
+                 "muestras del todo independientes.")
 PROHIBIDAS = frozenset({"leda", "leda_flujo", "leda_motor"})
 PREFIJO = "leda_corrida_"
 # Lo que devuelve una ronda sin crédito en el proveedor: distinto del techo (2) y de una caída (1).
@@ -191,12 +212,36 @@ def ia_pedida(texto: str) -> tuple[str, str] | None:
         return None
     from leda.llm import BASE_URLS
 
-    proveedor, _, modelo = ALIAS.get(texto, texto).partition("/")
+    completo = SIN_RAZONAR[texto][0] if texto in SIN_RAZONAR else ALIAS.get(texto, texto)
+    proveedor, _, modelo = completo.partition("/")
     if proveedor not in BASE_URLS or not modelo:
         raise ValueError(f"--ia {texto!r}: tiene que ser {GUIONADA}, uno de "
-                         f"{', '.join(ALIAS)} o PROVEEDOR/MODELO, con un proveedor de "
-                         f"{', '.join(BASE_URLS)}.")
+                         f"{', '.join([*ALIAS, *SIN_RAZONAR])} o PROVEEDOR/MODELO, con un "
+                         f"proveedor de {', '.join(BASE_URLS)}.")
     return proveedor, modelo
+
+
+def parametros_pedidos(ia: str, texto: str | None = None, *,
+                       archivo: Path | None = None) -> dict:
+    """Los parámetros del cliente de la IA: los del nombre de `SIN_RAZONAR`, si lo es, con los de
+    `--parametros` (el JSON `texto`) o `--parametros-archivo` encima. Revisados como los de
+    `model_config.parametros`; un JSON que no es un objeto o un valor que no vale es
+    `ValueError`, nombrándolo."""
+    from leda.motor.ia_real import validar_parametros
+
+    parametros = dict(SIN_RAZONAR[ia][1]) if ia in SIN_RAZONAR else {}
+    if archivo is not None:
+        texto = archivo.read_text("utf-8")
+    if texto is not None:
+        try:
+            explicitos = json.loads(texto)
+        except ValueError as e:
+            raise ValueError(f"--parametros no es JSON ({e}).") from None
+        if not isinstance(explicitos, dict):
+            raise ValueError(f"--parametros tiene que ser un objeto JSON; vino {texto!r}.")
+        parametros.update(explicitos)
+    validar_parametros(parametros)          # ParametrosInvalidos es un ValueError
+    return parametros
 
 
 def _nombre_de_archivo(texto: str) -> str:
@@ -205,9 +250,10 @@ def _nombre_de_archivo(texto: str) -> str:
     return re.sub(r"[^\w.-]+", "-", texto)
 
 
-def _ia_real(proveedor: str, modelo: str, motor):
+def _ia_real(proveedor: str, modelo: str, motor, parametros: dict | None = None):
     """La IA real del `motor` (`motores.Motor`) en ese proveedor, con el cliente que cuenta lo
-    que gasta. La clave es la de ese proveedor y nunca se imprime."""
+    que gasta y sus `parametros` (`parametros_pedidos`). La clave es la de ese proveedor y nunca
+    se imprime."""
     from leda.config import config
     from leda.llm import BASE_URLS
 
@@ -217,7 +263,7 @@ def _ia_real(proveedor: str, modelo: str, motor):
     clave = config.clave_llm(proveedor)
     if not clave:
         raise SystemExit(f"Falta {config.variable_clave_llm(proveedor)} en el entorno.")
-    cliente = ClienteQueCuenta.crear(modelo, clave, BASE_URLS[proveedor], {})
+    cliente = ClienteQueCuenta.crear(modelo, clave, BASE_URLS[proveedor], parametros or {})
     return motor.IAReal(cliente, motor.Tono(**TONO), nombre=f"{proveedor}/{modelo}")
 
 
@@ -241,7 +287,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--conversacion", nargs="*", metavar="NN")
     p.add_argument("--veces", type=int, default=5)
     p.add_argument("--ia", default=GUIONADA, metavar="guionada|ALIAS|PROVEEDOR/MODELO",
-                   help=f"la IA de la ronda; nombres cortos: {', '.join(ALIAS)}")
+                   help=f"la IA de la ronda; nombres cortos: {', '.join([*ALIAS, *SIN_RAZONAR])}")
+    con_parametros = p.add_mutually_exclusive_group()
+    con_parametros.add_argument("--parametros", metavar="JSON",
+                                help="los parámetros del cliente de la IA, como en "
+                                     "model_config.parametros")
+    con_parametros.add_argument("--parametros-archivo", type=Path, metavar="ARCHIVO")
     p.add_argument("--motor", choices=MOTORES, default=POR_OMISION,
                    help="el motor de conversación que corre (por omisión, el definitivo)")
     p.add_argument("--grabar", type=Path, metavar="CARPETA")
@@ -264,6 +315,15 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as e:
         p.error(str(e))
     proveedor, modelo = pedida or ("-", "-")
+    if (a.parametros is not None or a.parametros_archivo is not None) and not real:
+        # Sin una IA real no hay cliente que los use: nunca se ignoran en silencio.
+        p.error("--parametros va sólo con una IA real (no con la guionada ni con --repetir).")
+    parametros: dict = {}
+    if real:
+        try:
+            parametros = parametros_pedidos(a.ia, a.parametros, archivo=a.parametros_archivo)
+        except (ValueError, OSError) as e:
+            p.error(str(e))
 
     from . import informe
     from .motores import cargar as cargar_motor
@@ -287,7 +347,7 @@ def main(argv: list[str] | None = None) -> int:
         if pedida is None:
             return IAQueGraba(IAPerfecta({k: t["titulo"] for k, t in conv["tareas"].items()},
                                          jugada=motor.Jugada))
-        return IAQueGraba(_ia_real(proveedor, modelo, motor))
+        return IAQueGraba(_ia_real(proveedor, modelo, motor, parametros))
 
     gasto = Gasto()
 
@@ -353,6 +413,7 @@ def main(argv: list[str] | None = None) -> int:
                       "ronda": ronda, "motor": motor.nombre, "proveedor": proveedor,
                       "modelo": modelo,
                       "conversacion": str(conv["numero"]).zfill(2), "vez": vez, **costo,
+                      **({"parametros": parametros} if parametros else {}),
                       **({"cortada": cortada} if cortada else {}),
                       **({"invalida": invalida} if invalida else {})},
                      reservado=reservado)
@@ -470,6 +531,12 @@ def main(argv: list[str] | None = None) -> int:
                     "Veces": a.veces if not a.repetir else 1,
                     "Gasto de la etapa": f"USD {gasto.total():.2f} de {gasto.techo:.0f}"
                     if real else "sin gasto"}
+        if real:
+            cabecera["Parámetros de la IA"] = (
+                f"`{json.dumps(parametros, ensure_ascii=False, sort_keys=True)}`"
+                if parametros else "ninguno (los de omisión)")
+        if real and proveedor == "nan":
+            cabecera["Caché del proveedor"] = NOTA_DE_CACHE
         resumen, _ = informe.escribir(
             corridas, ronda=ronda, cabecera=cabecera, cortes=cortes, invalidas=invalidas,
             motivo_del_corte=SIN_CREDITO if sin_credito.is_set() else None)

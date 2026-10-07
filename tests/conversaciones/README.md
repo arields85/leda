@@ -88,6 +88,13 @@ python -m tests.conversaciones.correr --repetir tests/conversaciones/grabaciones
 (`deepseek-v4-flash` y `glm5.3-flash`, por `nan`), `sol61` y `sonnet`. La clave es la del proveedor:
 `LEDA_OPENROUTER_API_KEY` para OpenRouter y `LEDA_LLM_API_KEY` para los demás.
 
+**Los parámetros de la IA:** `--parametros '<json>'` (o `--parametros-archivo ARCHIVO`) son los mismos de
+`model_config.parametros` (`timeout_s`, `plazo_s`, `tope_jugadas`, `tope_redaccion`, `cuerpo_extra`, que
+se suma al pedido); uno que no vale no corre. `glm-sin-razonar` y `deepseek-sin-razonar` traen el modelo
+de `nan` con los suyos para que no razone por dentro, y `--parametros` se suma a ellos. Quedan en la
+cabecera del informe y en la libreta. `nan` puede guardar en caché los pedidos idénticos: sus
+repeticiones no son muestras del todo independientes (lo dice el informe).
+
 Cada corrida va en una base nueva del servidor de `LEDA_TEST_DB_URL` (`.env.test`), copia de una
 plantilla, y se borra al terminar; nunca toca `leda`, `leda_flujo` ni `leda_motor`. El transporte es
 falso. Con una IA real la clave sale del entorno y nunca se imprime. **El techo:** antes de empezar se

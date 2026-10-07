@@ -540,8 +540,8 @@ def test_una_ronda_por_nan_anota_tokens_y_no_pregunta_el_credito(tmp_path, monke
     _ronda_sin_servidor(monkeypatch, tmp_path, bien)
     creadas = []
     monkeypatch.setattr(correr, "_ia_real",
-                        lambda proveedor, modelo, motor: creadas.append(
-                            (proveedor, modelo, motor.nombre)) or _IAEnNan())
+                        lambda proveedor, modelo, motor, parametros: creadas.append(
+                            (proveedor, modelo, motor.nombre, parametros)) or _IAEnNan())
     monkeypatch.setattr(correr, "_credito_restante",
                         lambda: pytest.fail("el crédito se le pregunta sólo a OpenRouter"))
 
@@ -549,7 +549,7 @@ def test_una_ronda_por_nan_anota_tokens_y_no_pregunta_el_credito(tmp_path, monke
                           "--ronda", "nan"])
 
     assert codigo == 0
-    assert creadas == [("nan", "deepseek-v4-flash", "leda.motor")]
+    assert creadas == [("nan", "deepseek-v4-flash", "leda.motor", {})]
     salida = capsys.readouterr().out
     assert "Precio desconocido en nan" in salida and "nan no lo informa" in salida
     [anotada] = Gasto(tmp_path / "gasto.json").leer()["corridas"]
@@ -560,3 +560,125 @@ def test_una_ronda_por_nan_anota_tokens_y_no_pregunta_el_credito(tmp_path, monke
     informe = (tmp_path / "resultados" / "nan.md").read_text("utf-8")
     assert "**Precio desconocido:** 1 llamada(s)" in informe
     assert "- **IA:** nan/deepseek-v4-flash" in informe
+
+
+# --- Los parámetros de la IA (E3-8: los dos de `nan`, sin razonar) ----------------------------
+#
+# La regresión con los dos flash de `nan` falló sobre todo por los límites: el corredor creaba el
+# cliente sin parámetros. `--parametros` (o `--parametros-archivo`) los pasa al cliente, y dos
+# nombres cortos traen los de cada modelo sin razonar. Ninguna prueba llama a un proveedor.
+
+GLM_SIN_RAZONAR = {"cuerpo_extra": {"reasoning_effort": "low"}, "timeout_s": 60, "plazo_s": 90}
+DEEPSEEK_SIN_RAZONAR = {"cuerpo_extra": {"chat_template_kwargs": {"enable_thinking": False}},
+                        "timeout_s": 60, "plazo_s": 90}
+
+
+@pytest.mark.parametrize(("ia", "esperada", "parametros"), [
+    ("glm-sin-razonar", ("nan", "glm5.3-flash"), GLM_SIN_RAZONAR),
+    ("deepseek-sin-razonar", ("nan", "deepseek-v4-flash"), DEEPSEEK_SIN_RAZONAR),
+    ("glm-flash", ("nan", "glm5.3-flash"), {}),
+    ("sol", ("openrouter", "openai/gpt-6-sol"), {}),
+])
+def test_los_nombres_sin_razonar_traen_sus_parametros(ia, esperada, parametros):
+    assert correr.ia_pedida(ia) == esperada
+    assert correr.parametros_pedidos(ia) == parametros
+
+
+def test_los_parametros_explicitos_se_suman_a_los_del_nombre(tmp_path):
+    assert correr.parametros_pedidos("glm-flash", '{"plazo_s": 120}') == {"plazo_s": 120}
+    assert correr.parametros_pedidos("glm-sin-razonar", '{"plazo_s": 120}') == {
+        **GLM_SIN_RAZONAR, "plazo_s": 120}
+    archivo = tmp_path / "parametros.json"
+    archivo.write_text('{"tope_redaccion": 4000}', "utf-8")
+    assert correr.parametros_pedidos("sol", archivo=archivo) == {"tope_redaccion": 4000}
+
+
+@pytest.mark.parametrize(("texto", "nombrado"), [
+    ("{no es json", "--parametros"),
+    ("[1, 2]", "--parametros"),
+    ('{"plazo_s": 0}', "plazo_s"),
+    ('{"cuerpo_extra": {"model": "otro"}}', "model"),
+    ('{"plazo": 90}', "plazo"),
+])
+def test_unos_parametros_que_no_valen_no_corren(texto, nombrado, capsys):
+    with pytest.raises(ValueError, match=nombrado):
+        correr.parametros_pedidos("glm-flash", texto)
+    with pytest.raises(SystemExit):
+        correr.main(["--ia", "glm-flash", "--parametros", texto, "--conversacion", "01",
+                     "--veces", "1"])
+    assert nombrado in capsys.readouterr().err
+
+
+def test_los_parametros_sin_una_ia_real_no_se_ignoran(capsys):
+    with pytest.raises(SystemExit):
+        correr.main(["--parametros", '{"plazo_s": 90}', "--conversacion", "01", "--veces", "1"])
+    assert "IA real" in capsys.readouterr().err
+
+
+def test_la_ia_real_lleva_los_parametros_al_cliente(monkeypatch):
+    import types
+
+    import leda.config
+
+    from tests.conversaciones import motores
+
+    real = leda.config.config
+    monkeypatch.setattr(leda.config, "config", types.SimpleNamespace(
+        clave_llm=lambda proveedor: "clave-falsa", variable_clave_llm=real.variable_clave_llm))
+
+    ia = correr._ia_real("nan", "glm5.3-flash", motores.cargar(), GLM_SIN_RAZONAR)
+
+    assert ia.cliente.parametros["cuerpo_extra"] == {"reasoning_effort": "low"}
+    assert ia.cliente.parametros["plazo_s"] == 90
+    assert ia.cliente.http.timeout.read == 60
+
+
+def test_una_ronda_sin_razonar_anota_sus_parametros_y_avisa_de_la_cache(
+        tmp_path, monkeypatch, capsys):
+    from tests.conversaciones.corredor import Corrida
+
+    def bien(conn, conv, ia, *, vez=1, motor=None):
+        ia.llamadas.append({"tipo": "jugadas", "usos": [{"prompt_tokens": 70,
+                                                          "completion_tokens": 7}]})
+        return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
+                       "garantias", llamadas=list(ia.llamadas), motor_usado=motor.nombre)
+
+    _ronda_sin_servidor(monkeypatch, tmp_path, bien)
+    creadas = []
+
+    class _GLM:
+        nombre = "nan/glm5.3-flash"
+
+    monkeypatch.setattr(correr, "_ia_real",
+                        lambda proveedor, modelo, motor, parametros: creadas.append(
+                            (proveedor, modelo, parametros)) or _GLM())
+
+    codigo = correr.main(["--ia", "glm-sin-razonar", "--parametros", '{"plazo_s": 120}',
+                          "--conversacion", "01", "--veces", "1", "--ronda", "sin-razonar"])
+
+    assert codigo == 0
+    esperados = {**GLM_SIN_RAZONAR, "plazo_s": 120}
+    assert creadas == [("nan", "glm5.3-flash", esperados)]
+    [anotada] = Gasto(tmp_path / "gasto.json").leer()["corridas"]
+    assert anotada["parametros"] == esperados
+    informe = (tmp_path / "resultados" / "sin-razonar.md").read_text("utf-8")
+    assert '"reasoning_effort": "low"' in informe and '"plazo_s": 120' in informe
+    assert "caché" in informe and "independientes" in informe
+
+
+def test_una_ronda_sin_parametros_lo_dice_y_no_anota_parametros(tmp_path, monkeypatch):
+    from tests.conversaciones.corredor import Corrida
+
+    def bien(conn, conv, ia, *, vez=1, motor=None):
+        return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
+                       "garantias")
+
+    _ronda_sin_servidor(monkeypatch, tmp_path, bien)
+
+    assert correr.main(["--ia", "sol", "--conversacion", "01", "--veces", "1",
+                        "--ronda", "sol"]) == 0
+    [anotada] = Gasto(tmp_path / "gasto.json").leer()["corridas"]
+    assert "parametros" not in anotada
+    informe = (tmp_path / "resultados" / "sol.md").read_text("utf-8")
+    assert "los de omisión" in informe
+    assert "caché" not in informe             # la nota es sólo de `nan`
