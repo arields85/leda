@@ -52,6 +52,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from .motores import MOTORES, POR_OMISION
+
 RAIZ = Path(__file__).resolve().parents[2]
 MODELOS = {"sol": "openai/gpt-6-sol", "luna": "openai/gpt-6-luna",
            "sol61": "openai/gpt-6.1-sol", "sonnet": "anthropic/claude-sonnet-5.5"}
@@ -167,20 +169,19 @@ def _commit() -> str:
         return "?"
 
 
-def _ia_real(modelo: str):
+def _ia_real(modelo: str, motor):
+    """La IA real del `motor` (`motores.Motor`), con el cliente que cuenta lo que gasta."""
     from leda.config import config
     from leda.llm import BASE_URLS
 
     from .carga import TONO
     from .gasto import ClienteQueCuenta
-    from prueba_chica.ia_real import IAReal
-    from prueba_chica.instrucciones import Tono
 
     clave = config.clave_llm("openrouter")
     if not clave:
         raise SystemExit(f"Falta {config.variable_clave_llm('openrouter')} en el entorno.")
     cliente = ClienteQueCuenta.crear(modelo, clave, BASE_URLS["openrouter"], {})
-    return IAReal(cliente, Tono(**TONO), nombre=f"openrouter/{modelo}")
+    return motor.IAReal(cliente, motor.Tono(**TONO), nombre=f"openrouter/{modelo}")
 
 
 def _credito_restante() -> float | None:
@@ -203,6 +204,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--conversacion", nargs="*", metavar="NN")
     p.add_argument("--veces", type=int, default=5)
     p.add_argument("--ia", choices=["guionada", *MODELOS], default="guionada")
+    p.add_argument("--motor", choices=MOTORES, default=POR_OMISION,
+                   help="el motor de conversación que corre (por omisión, el definitivo)")
     p.add_argument("--grabar", type=Path, metavar="CARPETA")
     p.add_argument("--repetir", type=Path, metavar="ARCHIVO")
     p.add_argument("--paralelo", type=int, default=1)
@@ -219,11 +222,13 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["LEDA_LOAD_DOTENV"] = "0"
 
     from . import informe
+    from .motores import cargar as cargar_motor
     from .corredor import correr_conversacion, elegir, llamadas_previstas
     from .gasto import (MARGEN_DE_LA_ESTIMACION, SIN_CREDITO, Gasto, TechoAlcanzado,
                         costo_de_las_llamadas, llamadas_sin_credito, modelo_de)
     from .grabar import IAPerfecta, IAQueGraba, IARepetida
 
+    motor = cargar_motor(a.motor)
     if a.repetir:
         grabada = json.loads(a.repetir.read_text("utf-8"))
         convs = elegir([grabada["conversacion"]])
@@ -234,10 +239,11 @@ def main(argv: list[str] | None = None) -> int:
 
     def nueva_ia(conv):
         if a.repetir:
-            return IAQueGraba(IARepetida.desde_archivo(a.repetir))
+            return IAQueGraba(IARepetida.desde_archivo(a.repetir, jugada=motor.Jugada))
         if a.ia == "guionada":
-            return IAQueGraba(IAPerfecta({k: t["titulo"] for k, t in conv["tareas"].items()}))
-        return IAQueGraba(_ia_real(MODELOS[a.ia]))
+            return IAQueGraba(IAPerfecta({k: t["titulo"] for k, t in conv["tareas"].items()},
+                                         jugada=motor.Jugada))
+        return IAQueGraba(_ia_real(MODELOS[a.ia], motor))
 
     gasto = Gasto()
     modelo = MODELOS.get(a.ia, a.ia)
@@ -292,7 +298,8 @@ def main(argv: list[str] | None = None) -> int:
         if corrida is not None:
             corrida.costo = costo
         gasto.anotar({"cuando": datetime.now().isoformat(timespec="seconds"),
-                      "ronda": ronda, "modelo": modelo if a.ia in MODELOS else "-",
+                      "ronda": ronda, "motor": motor.nombre,
+                      "modelo": modelo if a.ia in MODELOS else "-",
                       "conversacion": str(conv["numero"]).zfill(2), "vez": vez, **costo,
                       **({"cortada": cortada} if cortada else {}),
                       **({"invalida": invalida} if invalida else {})},
@@ -335,7 +342,7 @@ def main(argv: list[str] | None = None) -> int:
                 conn = leda.db.conectar(url)
                 try:
                     ia = nueva_ia(conv)
-                    corrida = correr_conversacion(conn, conv, ia, vez=vez)
+                    corrida = correr_conversacion(conn, conv, ia, vez=vez, motor=motor)
                 finally:
                     conn.close()
             finally:
@@ -361,9 +368,9 @@ def main(argv: list[str] | None = None) -> int:
             return None
         if a.grabar:
             a.grabar.mkdir(parents=True, exist_ok=True)
-            (a.grabar / f"{corrida.numero}-{a.ia}-{vez}.json").write_text(json.dumps(
-                {"conversacion": corrida.numero, "vez": vez, "ia": corrida.ia,
-                 "llamadas": corrida.llamadas},
+            (a.grabar / f"{corrida.numero}-{motor.nombre}-{a.ia}-{vez}.json").write_text(
+                json.dumps({"conversacion": corrida.numero, "vez": vez, "ia": corrida.ia,
+                            "motor": motor.nombre, "llamadas": corrida.llamadas},
                 ensure_ascii=False, indent=1, default=str), "utf-8")
         with imprimir:
             estado = "ERROR" if corrida.error else ("bien" if corrida.bien else
@@ -371,7 +378,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {corrida.numero} vez {vez}: {estado}", flush=True)
         return corrida
 
-    ronda = a.ronda or (f"{datetime.now():%Y-%m-%d-%H%M}-{a.ia}"
+    ronda = a.ronda or (f"{datetime.now():%Y-%m-%d-%H%M}-{motor.nombre}-{a.ia}"
                         + ("-repeticion" if a.repetir else ""))
     bases = Bases(os.environ["LEDA_TEST_DB_URL"])
     for vieja in bases.limpiar_viejas():
@@ -403,6 +410,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Ronda cortada: {len(cortes)} corrida(s) no corrieron o no terminaron.")
     if not a.sin_informe and (corridas or cortes or invalidas):
         cabecera = {"Fecha": f"{datetime.now():%Y-%m-%d %H:%M}", "Commit": _commit(),
+                    "Motor": motor.nombre,
                     "IA": ([*corridas, *(c for c, _ in invalidas)][0].ia
                            if corridas or invalidas else a.ia),
                     "Veces": a.veces if not a.repetir else 1,

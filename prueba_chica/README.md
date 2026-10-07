@@ -44,7 +44,8 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
 - `reloj.py`: el reloj de Leda en `leda_motor` y el comando que lo adelanta (decisión 10.2).
 - `leer.py`: el lector del registro de turnos, de sólo lectura.
 - El corredor de las conversaciones de prueba (E2-7) se mudó a `tests/conversaciones/` en la
-  E3-8, con sus YAML, sus informes y su libreta del gasto.
+  E3-8, con sus YAML, sus informes y su libreta del gasto. Corre este motor con
+  `--motor prueba_chica`.
 - `test_frontera.py`: qué puede importar esta carpeta de `src/leda` y qué nunca debe alcanzar.
 
 ## Cómo se corren sus pruebas

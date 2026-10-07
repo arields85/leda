@@ -67,10 +67,15 @@ clasifica cada diferencia como garantía, comprensión o motor (`comprobar.py`).
 están en `grabar.py`: la guionada con las jugadas esperadas, la que graba y la que repite. El techo de
 gasto y la libreta, en `gasto.py`; el informe de cada ronda, en `informe.py`; el comando, en `correr.py`.
 
+**Un solo corredor para los dos motores** (`motores.py`): `--motor leda.motor`, el definitivo, es el de
+siempre; `--motor prueba_chica` corre el de la prueba chica, para la regresión de la E3-8. El informe, la
+libreta del gasto y cada grabación dicen qué motor corrió. Cuando se borre `prueba_chica/`, sale de la lista.
+
 ```
 python -m tests.conversaciones.correr --ia guionada --veces 1          # en seco, sin gasto
+python -m tests.conversaciones.correr --ia guionada --veces 1 --motor prueba_chica
 python -m tests.conversaciones.correr --ia sol --veces 5 --paralelo 5 --grabar tests/conversaciones/grabaciones
-python -m tests.conversaciones.correr --repetir tests/conversaciones/grabaciones/03-sol-2.json
+python -m tests.conversaciones.correr --repetir tests/conversaciones/grabaciones/03-leda.motor-sol-2.json
 ```
 
 Cada corrida va en una base nueva del servidor de `LEDA_TEST_DB_URL` (`.env.test`), copia de una

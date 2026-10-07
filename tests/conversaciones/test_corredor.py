@@ -9,6 +9,7 @@ corrida la repite igual.
 from __future__ import annotations
 
 import copy
+import json
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ import pytest
 from leda.db import admin
 
 from tests.conversaciones import comprobar as cp
+from tests.conversaciones import motores
 from tests.conversaciones.carga import cargar
 from tests.conversaciones.corredor import CARPETA, correr_conversacion, elegir, leer, todas
 from tests.conversaciones.grabar import IAPerfecta, IAQueGraba, IARepetida
@@ -222,7 +224,7 @@ def test_la_corrida_en_seco_por_linea_de_comandos_graba_y_repite(conn, tmp_path,
 
     assert correr.main(["--conversacion", "01", "--veces", "1", "--sin-informe",
                         "--grabar", str(tmp_path)]) == 0
-    [grabacion] = list(tmp_path.glob("01-guionada-1.json"))
+    [grabacion] = list(tmp_path.glob("01-leda.motor-guionada-1.json"))
     assert correr.main(["--repetir", str(grabacion), "--sin-informe"]) == 0
 
     salida = capsys.readouterr().out
@@ -250,3 +252,63 @@ def test_cada_paso_en_que_leda_escribe_lleva_la_casilla_del_proximo_paso(conn):
     primero = next(p for p in corrida.pasos if not p.preludio)     # el destrabe del paso 1
     assert PROXIMO_PASO not in primero.dice and any("próximo paso concreto" in d
                                                     for d in primero.dice)
+
+# --- Los dos motores (E3-8) -------------------------------------------------------------------
+#
+# Un solo corredor para el motor de la prueba chica y el definitivo (`motores.py`): la misma
+# conversación, con la IA guionada, da lo mismo en los dos, y cada corrida dice cuál corrió.
+
+def test_el_motor_por_omision_es_el_definitivo():
+    assert motores.POR_OMISION == "leda.motor"
+    assert motores.cargar().procesar_turno.__module__ == "leda.motor.turno"
+    with pytest.raises(ValueError, match="No hay un motor"):
+        motores.cargar("otro")
+
+
+@pytest.mark.parametrize("nombre", motores.MOTORES)
+def test_cada_motor_corre_la_conversacion_con_su_propio_codigo(conn, nombre):
+    motor = motores.cargar(nombre)
+    [conv] = elegir(["17"])
+
+    corrida = correr_conversacion(conn, conv, IAQueGraba(IAPerfecta(
+        {k: t["titulo"] for k, t in conv["tareas"].items()}, jugada=motor.Jugada)), motor=motor)
+
+    assert corrida.error is None and corrida.fallas() == []
+    assert corrida.motor_usado == nombre
+    assert motor.procesar_turno.__module__ == f"{nombre}.turno"
+    assert motor.Ciclo.__module__ == f"{nombre}.ciclo"
+
+
+def test_los_dos_motores_dan_lo_mismo_con_la_ia_guionada(conn):
+    [conv] = elegir(["02"])
+    por_motor = {}
+    for nombre in motores.MOTORES:
+        motor = motores.cargar(nombre)
+        corrida = correr_conversacion(conn, conv, IAPerfecta(
+            {k: t["titulo"] for k, t in conv["tareas"].items()}, jugada=motor.Jugada),
+            motor=motor)
+        _limpiar(conn)
+        assert corrida.error is None
+        por_motor[nombre] = _sin_corridas_variables(corrida)
+
+    definitivo, chica = (por_motor[n] for n in motores.MOTORES)
+    assert definitivo == chica
+
+
+@pytest.mark.parametrize("nombre", motores.MOTORES)
+def test_el_informe_y_la_grabacion_dicen_que_motor_corrio(conn, tmp_path, monkeypatch, nombre):
+    from tests.conversaciones import correr, informe
+
+    monkeypatch.setattr(informe, "RESULTADOS", tmp_path / "resultados")
+    monkeypatch.setenv("LEDA_LOAD_DOTENV", "0")
+
+    assert correr.main(["--motor", nombre, "--conversacion", "01", "--veces", "1",
+                        "--ronda", "con-motor", "--grabar", str(tmp_path / "g")]) == 0
+
+    resumen = (tmp_path / "resultados" / "con-motor.md").read_text("utf-8")
+    transcripciones = (tmp_path / "resultados" / "con-motor-transcripciones.md").read_text(
+        "utf-8")
+    assert f"- **Motor:** {nombre}" in resumen
+    assert f"Motor: `{nombre}`" in transcripciones
+    [grabacion] = (tmp_path / "g").glob(f"01-{nombre}-guionada-1.json")
+    assert json.loads(grabacion.read_text("utf-8"))["motor"] == nombre

@@ -8,7 +8,7 @@ código de los hechos tiene su significado en `hechos.py`, y la IA recibe el de 
 llega en cada pedido. Un hecho sin significado es una falla del motor en la corrida.
 
 Portadas de `prueba_chica/test_hechos.py`. La de un hecho sin significado como falla del motor
-en una corrida pasa por el corredor de las conversaciones: espera a la E3-8.
+en una corrida pasa por el corredor de las conversaciones (`tests/conversaciones/`, E3-8).
 """
 
 from __future__ import annotations
@@ -25,6 +25,9 @@ from leda.motor.instrucciones import INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACC
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import SOLO_SI_PREGUNTA, procesar_turno
 
+from tests.conversaciones import motores
+from tests.conversaciones.corredor import correr_conversacion, elegir
+from tests.conversaciones.grabar import IAPerfecta
 from tests.motor.ayudantes import (AHORA, SITUACION, ProveedorFalso, ia_real_falsa,
                                    llamada_de_jugadas, respuesta_de_texto)
 
@@ -136,6 +139,21 @@ def test_una_pregunta_sobre_lo_hecho_no_lleva_jugada_ni_aviso_y_se_contesta_del_
 
 
 # --- En la corrida, un hecho sin significado es una falla del motor --------------------------
+
+def test_un_hecho_sin_significado_es_una_falla_del_motor(conn, monkeypatch):
+    """Pasa por el corredor de las conversaciones (`tests/conversaciones/`), con el motor
+    definitivo y la IA guionada."""
+    motor = motores.cargar("leda.motor")
+    [conv] = elegir(["01"])
+    monkeypatch.setattr(hechos, "SIGNIFICADOS",
+                        {k: v for k, v in hechos.SIGNIFICADOS.items() if k != "jugada"})
+
+    corrida = correr_conversacion(conn, conv, IAPerfecta(
+        {k: t["titulo"] for k, t in conv["tareas"].items()}, jugada=motor.Jugada), motor=motor)
+
+    assert corrida.motor_usado == "leda.motor"
+    fallas = [f for _, f in corrida.fallas("motor") if f.que == "hechos sin significado"]
+    assert fallas and "jugada" in fallas[0].real
 
 
 # --- Tercera vuelta de ajuste (usuario, 2026-10-06) ------------------------------------------

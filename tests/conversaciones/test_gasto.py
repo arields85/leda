@@ -122,7 +122,7 @@ def test_el_corredor_no_empieza_si_la_ronda_pasaria_el_techo(tmp_path, monkeypat
     ruta = tmp_path / "gasto.json"
     Gasto(ruta).anotar(_corrida(29.99))
     monkeypatch.setattr(gasto, "RUTA", ruta)
-    monkeypatch.setattr(correr, "_ia_real", lambda modelo: pytest.fail("no debía crear la IA"))
+    monkeypatch.setattr(correr, "_ia_real", lambda *a: pytest.fail("no debía crear la IA"))
     monkeypatch.setattr(correr.Bases, "crear_plantilla",
                         lambda self: pytest.fail("no debía crear bases"))
     # Sin servidor de bases: decidir el techo no depende de él (revisión de la E2-7).
@@ -178,7 +178,7 @@ def _ronda_sin_servidor(monkeypatch, tmp_path, correr_conversacion):
     monkeypatch.setenv("LEDA_TEST_DB_URL", "dbname=leda_corrida_no_se_usa")
     monkeypatch.setenv("LEDA_LOAD_DOTENV", "0")
     monkeypatch.setattr(correr, "Bases", _BasesFalsas)
-    monkeypatch.setattr(correr, "_ia_real", lambda modelo: _IAQueCuesta())
+    monkeypatch.setattr(correr, "_ia_real", lambda *a: _IAQueCuesta())
     monkeypatch.setattr(leda.db, "conectar", lambda url: _ConexionFalsa())
     monkeypatch.setattr(corredor, "correr_conversacion", correr_conversacion)
     # Ninguna prueba consulta el crédito de verdad: por omisión, el proveedor no lo dice.
@@ -192,7 +192,7 @@ def _llamada_que_costo(ia, usd: float) -> None:
 
 def test_una_corrida_que_se_cae_deja_su_gasto_y_el_informe_dice_que_se_corto(
         tmp_path, monkeypatch, capsys):
-    def se_cae(conn, conv, ia, *, vez=1):
+    def se_cae(conn, conv, ia, *, vez=1, motor=None):
         _llamada_que_costo(ia, 0.5)       # la IA ya cobró antes de que se cayera
         raise RuntimeError("se cayó la conexión")
 
@@ -204,6 +204,7 @@ def test_una_corrida_que_se_cae_deja_su_gasto_y_el_informe_dice_que_se_corto(
     assert codigo == 1           # 1 por una caída; el 2 es sólo del techo
     [anotada] = Gasto(tmp_path / "gasto.json").leer()["corridas"]
     assert anotada["usd"] == pytest.approx(0.5)
+    assert anotada["motor"] == "leda.motor"         # el motor que corrió, por omisión
     assert "RuntimeError" in anotada["cortada"]
     informe = (tmp_path / "resultados" / "cortada.md").read_text("utf-8")
     assert "cortada" in informe.lower() and "RuntimeError" in informe
@@ -214,7 +215,7 @@ def test_una_corrida_que_se_cae_deja_su_gasto_y_el_informe_dice_que_se_corto(
 def test_llegar_al_techo_a_mitad_de_la_ronda_sale_con_error_y_lo_dice(tmp_path, monkeypatch):
     from tests.conversaciones.corredor import Corrida
 
-    def bien(conn, conv, ia, *, vez=1):
+    def bien(conn, conv, ia, *, vez=1, motor=None):
         _llamada_que_costo(ia, 0.1)
         return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
                        "garantias")
@@ -258,7 +259,7 @@ def test_si_la_plantilla_no_se_puede_crear_igual_se_borra(tmp_path, monkeypatch)
 
 def test_la_grabacion_guarda_lo_que_uso_cada_llamada_de_la_ia_real():
     from tests.conversaciones.grabar import IAQueGraba
-    from prueba_chica.ia_real import IAReal
+    from leda.motor.ia_real import IAReal
 
     def responder(pedido: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={
@@ -370,7 +371,7 @@ def test_la_ronda_no_empieza_si_el_credito_no_alcanza(tmp_path, monkeypatch, cap
 def test_si_no_se_puede_consultar_el_credito_avisa_y_sigue(tmp_path, monkeypatch, capsys):
     from tests.conversaciones.corredor import Corrida
 
-    def bien(conn, conv, ia, *, vez=1):
+    def bien(conn, conv, ia, *, vez=1, motor=None):
         return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
                        "garantias")
 
@@ -387,7 +388,7 @@ def test_un_402_a_mitad_de_la_ronda_la_corta_e_invalida_las_corridas_que_choco(
         tmp_path, monkeypatch):
     from tests.conversaciones.corredor import Corrida
 
-    def primera_bien_despues_sin_credito(conn, conv, ia, *, vez=1):
+    def primera_bien_despues_sin_credito(conn, conv, ia, *, vez=1, motor=None):
         if vez == 1:
             _llamada_que_costo(ia, 0.1)
         else:

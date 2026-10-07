@@ -33,7 +33,7 @@ from typing import Any, Callable
 
 import httpx
 
-from prueba_chica.ia_real import ClienteCompatible
+from leda.motor.ia_real import ClienteCompatible
 
 TECHO_USD = 30.0
 AVISO_DESDE = 0.8

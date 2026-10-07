@@ -22,9 +22,9 @@ import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from prueba_chica.ia import IA, Jugada
+from leda.motor.ia import IA, Jugada
 
 # Las claves de una jugada esperada que no son datos para la IA.
 _SOLO_PARA_COMPROBAR = ("puede_traer",)
@@ -36,11 +36,13 @@ class RepeticionDesviada(RuntimeError):
 
 @dataclass
 class IAPerfecta:
-    """La IA guionada con las jugadas que el paso espera. `titulos` es clave → título."""
+    """La IA guionada con las jugadas que el paso espera. `titulos` es clave → título; `jugada`,
+    la clase de jugada del motor que corre (`motores.Motor.Jugada`)."""
 
     titulos: dict[str, str]
     nombre: str = "guionada"
     paso: dict[str, Any] | None = None
+    jugada: Callable[[str, dict[str, Any]], Any] = Jugada
 
     def preparar(self, paso: dict[str, Any]) -> None:
         self.paso = paso
@@ -63,7 +65,7 @@ class IAPerfecta:
             if "opcion" in datos:
                 datos["opcion"] = opciones.get(de_la_clave.get(datos["opcion"])) or datos["opcion"]
             nombre = e["nombre"]
-            jugadas.append(Jugada(nombre, datos))
+            jugadas.append(self.jugada(nombre, datos))
         return jugadas
 
     def redactar(self, pedido: dict[str, Any]) -> str:
@@ -140,22 +142,26 @@ class IAQueGraba:
 
 @dataclass
 class IARepetida:
-    """Repite una grabación, en orden. Un pedido de otro tipo que el grabado es un desvío."""
+    """Repite una grabación, en orden. Un pedido de otro tipo que el grabado es un desvío.
+    `jugada` es la clase de jugada del motor que corre."""
 
     llamadas: list[dict[str, Any]]
     nombre: str = "repeticion"
+    jugada: Callable[[str, dict[str, Any]], Any] = Jugada
 
     @classmethod
-    def desde_archivo(cls, ruta: Path) -> IARepetida:
+    def desde_archivo(cls, ruta: Path, *,
+                      jugada: Callable[[str, dict[str, Any]], Any] = Jugada) -> IARepetida:
         datos = json.loads(Path(ruta).read_text("utf-8"))
-        return cls(list(datos["llamadas"]), nombre=f"repeticion:{datos.get('ia', '?')}")
+        return cls(list(datos["llamadas"]), nombre=f"repeticion:{datos.get('ia', '?')}",
+                   jugada=jugada)
 
     def preparar(self, paso: dict[str, Any]) -> None:
         pass
 
     def elegir_jugadas(self, situacion: dict[str, Any]) -> list[Jugada]:
         r = self._siguiente("jugadas")
-        return [Jugada(j["nombre"], j.get("datos") or {}) for j in r]
+        return [self.jugada(j["nombre"], j.get("datos") or {}) for j in r]
 
     def redactar(self, pedido: dict[str, Any]) -> str:
         return self._siguiente("redaccion")

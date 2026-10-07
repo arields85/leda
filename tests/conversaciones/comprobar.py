@@ -32,6 +32,8 @@ from typing import Any
 from leda.db import admin
 
 from .carga import ZONA, Mundo
+from .motores import Motor
+from .motores import cargar as cargar_motor
 
 GARANTIA, COMPRENSION, MOTOR = "garantia", "comprension", "motor"
 
@@ -238,12 +240,13 @@ def coincide(esperado: Any, real: Any) -> bool:
 
 
 def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any],
-                    mensaje: str | None = None) -> bool:
+                    mensaje: str | None = None, *, motor: Motor | None = None) -> bool:
     """Una jugada elegida contra la esperada: el nombre (`fuera_de_la_lista` es cualquiera que
-    no esté en la lista), los datos estructurados iguales, y los libres presentes si y sólo si
-    se esperan (salvo los de `puede_traer`, que pueden venir si son palabras de la persona:
-    todas las del dato están en su `mensaje`, sin importar mayúsculas ni acentos)."""
-    from prueba_chica.fichas import FICHAS, palabras
+    no esté en la lista del `motor`), los datos estructurados iguales, y los libres presentes si
+    y sólo si se esperan (salvo los de `puede_traer`, que pueden venir si son palabras de la
+    persona: todas las del dato están en su `mensaje`, sin importar mayúsculas ni acentos)."""
+    motor = motor or cargar_motor()
+    FICHAS, palabras = motor.FICHAS, motor.palabras     # noqa: N806 -- los nombres del motor
 
     nombre = esperada["nombre"]
     if nombre == FUERA_DE_LA_LISTA:
@@ -273,9 +276,9 @@ def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any],
 
 
 def comprobar_jugadas(c: Comprobacion, esperadas: list[dict], reales: list[dict],
-                      mensaje: str | None = None) -> bool:
+                      mensaje: str | None = None, *, motor: Motor | None = None) -> bool:
     ok = len(esperadas) == len(reales) and all(
-        jugada_coincide(e, r, mensaje) for e, r in zip(esperadas, reales))
+        jugada_coincide(e, r, mensaje, motor=motor) for e, r in zip(esperadas, reales))
     if not ok:
         c.falla(COMPRENSION, "jugadas", esperadas, reales)
     return ok

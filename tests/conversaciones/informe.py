@@ -139,7 +139,8 @@ def transcripciones(corridas: list[Corrida], *, ronda: str) -> str:
               "la marca quien lee.", ""]
     for c in sorted(corridas, key=lambda c: (c.numero, c.vez)):
         lineas += [f"## {c.numero} · {c.titulo} · vez {c.vez}", "",
-                   f"Fuente: `{c.fuente}`. IA: `{c.ia}`. Automático: {_celda(c)}.", ""]
+                   f"Fuente: `{c.fuente}`. Motor: `{c.motor_usado}`. IA: `{c.ia}`. "
+                   f"Automático: {_celda(c)}.", ""]
         if c.error:
             lineas += ["```", c.error, "```", ""]
         for p in c.pasos:

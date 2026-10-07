@@ -24,6 +24,7 @@ from prueba_chica.turno import SOLO_SI_PREGUNTA, procesar_turno
 
 from leda.db import admin
 
+from tests.conversaciones import motores
 from tests.conversaciones.corredor import correr_conversacion, elegir
 from tests.conversaciones.grabar import IAPerfecta
 
@@ -140,8 +141,9 @@ def test_un_hecho_sin_significado_es_una_falla_del_motor(conn, monkeypatch):
     monkeypatch.setattr(hechos, "SIGNIFICADOS",
                         {k: v for k, v in hechos.SIGNIFICADOS.items() if k != "jugada"})
 
+    motor = motores.cargar("prueba_chica")
     corrida = correr_conversacion(conn, conv, IAPerfecta(
-        {k: t["titulo"] for k, t in conv["tareas"].items()}))
+        {k: t["titulo"] for k, t in conv["tareas"].items()}, jugada=motor.Jugada), motor=motor)
 
     fallas = [f for _, f in corrida.fallas("motor") if f.que == "hechos sin significado"]
     assert fallas and "jugada" in fallas[0].real

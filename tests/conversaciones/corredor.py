@@ -18,7 +18,8 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
 
 El transporte es falso (`despachador.TransporteDePrueba`): nada sale a Telegram. La IA es la que
 se le pasa: la guionada con las jugadas esperadas (`grabar.IAPerfecta`), una real o una
-grabación (`grabar.IARepetida`).
+grabación (`grabar.IARepetida`). El motor de conversación es el que se le pasa (`motores.py`):
+el definitivo, por omisión, o el de la prueba chica; la corrida dice cuál corrió.
 """
 
 from __future__ import annotations
@@ -29,21 +30,20 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 
 from leda.autoridad import identificar_en_espacio
 from leda.db import espacio
 from leda.despachador import TransporteDePrueba
+from leda.motor.ia import IA
 
 from . import comprobar as cp
-from prueba_chica import hechos
 from .carga import Mundo, cargar, momento
-from prueba_chica.ciclo import Ciclo
 from .grabar import IAMixta, IAPerfecta
-from prueba_chica.ia import IA
-from prueba_chica.turno import procesar_toque, procesar_turno
+from .motores import POR_OMISION, Motor
+from .motores import cargar as cargar_motor
 
 CARPETA = Path(__file__).resolve().parent
 RAIZ = Path(__file__).resolve().parents[2]
@@ -165,6 +165,9 @@ class Corrida:
     error: str | None = None
     llamadas: list[dict[str, Any]] = field(default_factory=list)
     costo: dict[str, Any] | None = None
+    # El motor de conversación que corrió (`motores.MOTORES`); `motor`, abajo, es otra cosa:
+    # si el código hizo lo esperado con las jugadas esperadas.
+    motor_usado: str = POR_OMISION
 
     def fallas(self, clase: str | None = None) -> list[tuple[Any, cp.Falla]]:
         return [(p.paso, f) for p in self.pasos for f in p.fallas
@@ -192,8 +195,8 @@ class Corrida:
 
 
 class _Corredor:
-    def __init__(self, conn, conv: dict[str, Any], ia: IA) -> None:
-        self.conn, self.conv, self.ia = conn, conv, ia
+    def __init__(self, conn, conv: dict[str, Any], ia: IA, motor: Motor) -> None:
+        self.conn, self.conv, self.ia, self.motor = conn, conv, ia, motor
         self.persona = conv.get("persona", "Marcos")
         self.mundo: Mundo = cargar(conn, conv)
         self.reloj = RelojDeCorrida(momento(conv["inicio"]))
@@ -203,13 +206,13 @@ class _Corredor:
         # Las claves y los códigos sin significado de lo que la IA recibe (`hechos.py`): una
         # falla del motor en el paso en que aparecen (revisión del contrato, 2026-10-05).
         self.sin_significado: set[str] = set()
-        ia = _QueMira(ia, [], self.sin_significado)
-        self.ciclo = Ciclo(conn, self.mundo.workspace_id, ia, self.reloj, self.transporte,
+        ia = _QueMira(ia, [], self.sin_significado, motor.sin_significado)
+        self.ciclo = motor.Ciclo(conn, self.mundo.workspace_id, ia, self.reloj, self.transporte,
                            transporte_admin=self.transporte_admin, cada_s=0.0,
                            monotono=lambda: 0.0, imprimir=callar)
-        self.despacho = Ciclo(conn, self.mundo.workspace_id, ia, self.reloj, self.transporte,
-                              transporte_admin=self.transporte_admin, seguimiento=False,
-                              imprimir=callar)
+        self.despacho = motor.Ciclo(conn, self.mundo.workspace_id, ia, self.reloj,
+                                    self.transporte, transporte_admin=self.transporte_admin,
+                                    seguimiento=False, imprimir=callar)
         self.foco = set(conv.get("foco") or self.mundo.tareas)
         self.enlazadas: set[str] = set()     # filas del outbox ya enlazadas a un entregado
 
@@ -227,7 +230,7 @@ class _Corredor:
             r.cuando = paso["a_las"]
             ia = self.ia
             if preludio:
-                guion = IAPerfecta(self.mundo.titulos)
+                guion = IAPerfecta(self.mundo.titulos, jugada=self.motor.Jugada)
                 guion.preparar(paso)
                 ia = IAMixta(guion, self.ia)
             elif hasattr(self.ia, "preparar"):
@@ -277,11 +280,13 @@ class _Corredor:
             quien = identificar_en_espacio(cur, persona["telegram"], self.mundo.workspace_id)
         self.conn.commit()
         situaciones: list[dict[str, Any]] = []
-        ia_que_mira = _QueMira(ia, situaciones, self.sin_significado)
+        ia_que_mira = _QueMira(ia, situaciones, self.sin_significado,
+                               self.motor.sin_significado)
         if "escribe" in paso:
             texto = paso["escribe"]
             entrante = self._guardar_mensaje(quien, persona, texto)
-            resultado = procesar_turno(self.conn, quien, entrante, ia_que_mira, self.reloj)
+            resultado = self.motor.procesar_turno(self.conn, quien, entrante, ia_que_mira,
+                                                  self.reloj)
             self.conn.commit()
             jugadas = [self._jugada(j.nombre, j.datos, situaciones[-1] if situaciones else {})
                        for j in resultado.jugadas]
@@ -289,16 +294,16 @@ class _Corredor:
         else:
             token, etiqueta = self._token(persona["membership_id"], paso["toca"])
             texto = f"[toca] {etiqueta}"
-            resultado = procesar_toque(self.conn, quien, token, persona["telegram"], ia_que_mira,
-                                       self.reloj)
+            resultado = self.motor.procesar_toque(self.conn, quien, token, persona["telegram"],
+                                                  ia_que_mira, self.reloj)
             self.conn.commit()
             if resultado is None:
                 raise LookupError(f"El toque de {paso['toca']} no es de una pregunta suya.")
             jugadas = [{"nombre": "elegir", "opcion": paso["toca"]}]
             latencia = self._latencia(persona["membership_id"])
             if paso.get("repetir_toque"):
-                otra = procesar_toque(self.conn, quien, token, persona["telegram"], ia_que_mira,
-                                      self.reloj)
+                otra = self.motor.procesar_toque(self.conn, quien, token, persona["telegram"],
+                                                 ia_que_mira, self.reloj)
                 self.conn.commit()
                 self._repetido = otra is not None and otra.repetido
         return resultado, texto, jugadas, latencia
@@ -394,7 +399,7 @@ class _Corredor:
         quien = paso.get("quien", self.persona)
         if "escribe" in paso or "toca" in paso:
             jugadas_bien = cp.comprobar_jugadas(c, paso.get("jugadas") or [], r.jugadas,
-                                                paso["escribe"]) \
+                                                paso["escribe"], motor=self.motor) \
                 if "escribe" in paso else True
             _, falta = cp.comprobar_efectos(c, paso.get("efectos") or {}, hubo, titulos)
             # Lo que depende de haber entendido: con las jugadas esperadas, una diferencia es
@@ -465,11 +470,13 @@ def _avisos_del_envio(avisos: list[dict[str, Any]], titulos: dict[str, str]
 
 class _QueMira:
     """Deja ver la situación que recibió la IA para elegir (los alias de ese turno) y junta en
-    `sin_significado` las claves y los códigos de cada pedido que no tienen significado."""
+    `sin_significado` las claves y los códigos de cada pedido que no tienen significado, según
+    el vocabulario del motor (`buscar`, su `hechos.sin_significado`)."""
 
-    def __init__(self, ia: IA, situaciones: list[dict[str, Any]],
-                 sin_significado: set[str]) -> None:
+    def __init__(self, ia: IA, situaciones: list[dict[str, Any]], sin_significado: set[str],
+                 buscar: Callable[[Any], set[str]]) -> None:
         self.ia, self.situaciones, self.faltan = ia, situaciones, sin_significado
+        self.buscar = buscar
 
     @property
     def nombre(self) -> str:
@@ -481,11 +488,11 @@ class _QueMira:
 
     def elegir_jugadas(self, situacion):
         self.situaciones.append(situacion)
-        self.faltan |= hechos.sin_significado(situacion)
+        self.faltan |= self.buscar(situacion)
         return self.ia.elegir_jugadas(situacion)
 
     def redactar(self, pedido):
-        self.faltan |= hechos.sin_significado(pedido)
+        self.faltan |= self.buscar(pedido)
         return self.ia.redactar(pedido)
 
 
@@ -522,12 +529,15 @@ def _resumen(s: Salida) -> dict[str, Any]:
             "hechos": s.hechos}
 
 
-def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1) -> Corrida:
-    """Una corrida de la conversación sobre la base de `conn`, que tiene que estar vacía."""
+def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1,
+                        motor: Motor | None = None) -> Corrida:
+    """Una corrida de la conversación sobre la base de `conn`, que tiene que estar vacía, con el
+    motor de conversación `motor` (por omisión, el definitivo)."""
+    motor = motor or cargar_motor()
     corrida = Corrida(str(conv["numero"]).zfill(2), conv["titulo"], conv["fuente"], vez,
-                      ia.nombre, conv.get("mide", "garantias"))
+                      ia.nombre, conv.get("mide", "garantias"), motor_usado=motor.nombre)
     try:
-        corredor = _Corredor(conn, conv, ia)
+        corredor = _Corredor(conn, conv, ia, motor)
         for paso in conv.get("preludio") or []:
             corrida.pasos.append(corredor.correr(paso, preludio=True))
         for paso in conv["pasos"]:
