@@ -389,6 +389,12 @@ plataforma cuando Leda tenga una base más completa.
   2. Recrear `leda_motor` y hacer la prueba por Telegram del usuario (M3); recrear la base necesita su
      autorización.
   3. Borrar `prueba_chica/` después de M3.
+  4. **`leda_motor`, recreada para M3 (2026-10-07, autorizado):**
+     - Respaldo en `db/respaldos/leda_motor-antes-m3-b-20261007.dump`.
+     - La semilla se cargó con el vencimiento a 9 días (copia temporal fuera del repositorio), para que V
+       caiga un día hábil: el viernes 16.
+     - `PENDIENTE`: un vencimiento en fin de semana no tiene prueba en la escalera. Con la semilla de 10
+       días habría caído el sábado 17.
 
 ## 4b. Guía de la prueba por Telegram (M3)
 
