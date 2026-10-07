@@ -28,6 +28,13 @@ Telegram real): a quién le llega qué y cuándo (`llega`), nunca el estado inte
 2026-10-07, de la prueba por Telegram real: "que es prevision?"): un significado dice qué es el
 dato para la persona (el día que dio para terminar, el día en que vence, quien aprueba su
 trabajo), nunca el nombre del concepto en la cocina, que la IA repetía como palabra.
+
+Con los significados reescritos, la IA seguía escribiendo "si se cumple esa previsión"
+(usuario, 2026-10-07): el pedido de redacción traía el concepto en los nombres de sus claves,
+de sus códigos y de las jugadas. Los nombres de la cocina no cambian (la base, las fichas, los
+hechos guardados y el pedido para elegir jugadas, donde la IA elige por nombre); en el borde,
+la redacción recibe cada uno que nombra un concepto (`CONCEPTOS_DE_LA_COCINA`) cambiado por el
+que dice el hecho (`PARA_LA_REDACCION`, `para_redactar`), con el mismo significado.
 """
 
 from __future__ import annotations
@@ -363,6 +370,8 @@ SIGNIFICADOS: Mapping[str, str] = {
 }
 
 
+# --- Los nombres para redactar (usuario, 2026-10-07) -----------------------------------------
+#
 # Los conceptos de la cocina: un nombre que lleva uno de éstos, o que es el de una jugada
 # (`FICHAS`), nunca le llega a la IA que redacta.
 CONCEPTOS_DE_LA_COCINA = ("prevision", "comprometid", "referente", "dependiente", "escal",
@@ -372,6 +381,86 @@ CONCEPTOS_DE_LA_COCINA = ("prevision", "comprometid", "referente", "dependiente"
 def es_un_concepto_de_la_cocina(nombre: str) -> bool:
     """Si un nombre nombra un concepto de la cocina: lleva uno o es el de una jugada."""
     return nombre in FICHAS or any(c in nombre for c in CONCEPTOS_DE_LA_COCINA)
+
+
+# Cada nombre de la cocina que nombra un concepto, con el que recibe la IA que redacta: dice el
+# hecho como lo vive la persona, con el mismo significado. Ninguno es un nombre de la cocina:
+# dos cosas distintas nunca comparten un nombre.
+PARA_LA_REDACCION: Mapping[str, str] = {
+    # --- Claves de un hecho o de un aviso -------------------------------------------------------
+    "prevision": "dia_que_dio_para_terminarla",
+    "fecha_comprometida": "dia_en_que_vence",
+    "atraso_si_se_cumple_la_prevision_dias_habiles":
+        "atraso_si_la_termina_el_dia_que_dio_dias_habiles",
+    "dependientes": "tareas_que_dependen_de_esta",
+    "aviso_al_referente": "aviso_a_quien_aprueba_su_trabajo",
+    "el_pedido_de_estado": "sigue_esperando_saber_como_viene",
+    "vuelve_a_pedir_el_estado": "vuelve_a_preguntar_como_viene",
+    "no_vuelve_a_pedir_el_estado": "no_vuelve_a_preguntar_como_viene",
+    "escalado_a": "avisados_de_que_no_contestaba",
+    "prevision_vencida": "el_dia_que_dio_para_terminarla_tambien_paso",
+    "prevision_corregida": "dia_para_terminarla_corregido",
+    "aviso_de_la_prevision_corregida": "aviso_del_dia_para_terminarla_corregido",
+    "correccion_al_referente": "correccion_a_quien_aprueba_su_trabajo",
+    "aviso_de_la_prevision_anterior": "aviso_del_dia_para_terminarla_que_vuelve_a_valer",
+    "prevision_que_no_vale": "dia_para_terminarla_que_ya_no_vale",
+    "prevision_vigente": "dia_para_terminarla_que_vale_ahora",
+    "pide_el_estado_el": "pregunta_como_viene_el",
+    "pedidos_de_estado_sin_respuesta": "veces_que_pregunto_como_viene_sin_respuesta",
+    "pedidos_de_estado_que_no_le_llegaron": "preguntas_de_como_viene_que_no_le_llegaron",
+    # --- Códigos: por qué no se hizo, no salió o ya no va a pasar ------------------------------
+    "sin_fecha_comprometida": "sin_dia_en_que_vence",
+    "nadie_pidio_el_estado": "no_le_habia_preguntado_como_viene",
+    "ya_se_escalo": "ya_se_aviso_que_no_contestaba",
+    "misma_fecha_comprometida": "el_dia_que_dio_es_el_dia_en_que_vence",
+    "sin_referente": "nadie_aprueba_su_trabajo",
+    "hay_una_prevision_mas_nueva": "despues_dio_otro_dia_para_terminarla",
+    "volvio_a_la_fecha_comprometida": "volvio_al_dia_en_que_vence",
+    "reemplazado_por_el_reencuadre": "reemplazado_por_retomar_despues_de_la_ausencia",
+    # --- Códigos: los avisos que Leda manda por su cuenta --------------------------------------
+    "aviso_previo": "aviso_de_que_vence_pronto",
+    "vencimiento_con_prevision": "vence_hoy_pero_dio_otro_dia_para_terminarla",
+    "pedido_de_estado": "pregunta_como_viene_la_tarea",
+    "reencuadre": "retoma_despues_de_una_ausencia",
+    "escalamiento": "aviso_de_que_no_contesta",
+    "repregunta_de_estado": "vuelve_a_preguntar_tras_una_respuesta_sin_algo_cierto",
+    "repregunta": "vuelve_a_hacer_una_pregunta_sin_respuesta",
+    "escalamiento_de_una_pregunta": "aviso_de_una_pregunta_sin_respuesta",
+    "nueva_prevision": "dio_otro_dia_para_terminar_su_tarea",
+    "correccion_de_prevision": "el_dia_para_terminarla_que_recibio_ya_no_vale",
+    # --- Las jugadas, por lo que hacen (su ficha) ----------------------------------------------
+    "anotar_bloqueo": "anotar_que_esta_trabada",
+    "anotar_inicio": "anotar_que_arranco",
+    "anotar_prevision": "anotar_para_cuando_la_termina",
+    "anotar_quien_destraba": "anotar_quien_puede_destrabarla",
+    "cancelar": "dejar_sin_efecto_la_pregunta",
+    "consultar_pendientes": "contar_sus_tareas_pendientes",
+    "corregir": "corregir_algo_ya_anotado",
+    "dejar_para_despues": "dejar_la_pregunta_para_mas_tarde",
+    "destrabar": "anotar_que_ya_puede_seguir",
+    "elegir": "elegir_una_opcion",
+    "entregar": "recibir_la_entrega",
+    "informar_avance": "anotar_como_viene_sin_algo_cierto",
+    "pedir_reasignacion": "pasarle_la_tarea_a_otra_persona",
+}
+_DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
+
+# Lo que alguien escribió, tal cual: un mensaje entero nunca se traduce.
+_LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto"})
+
+
+def para_redactar(valor: Any) -> Any:
+    """Una copia del pedido de redacción con cada clave y cada código de la cocina que nombra un
+    concepto cambiado por el suyo para redactar (`PARA_LA_REDACCION`); lo demás, tal cual."""
+    if isinstance(valor, Mapping):
+        return {PARA_LA_REDACCION.get(k, k):
+                v if k in _LO_QUE_ALGUIEN_ESCRIBIO else para_redactar(v)
+                for k, v in valor.items()}
+    if isinstance(valor, (list, tuple)):
+        return [para_redactar(v) for v in valor]
+    if isinstance(valor, str):
+        return PARA_LA_REDACCION.get(valor, valor)
+    return valor
 
 
 # --- Los días de las fechas (tercera vuelta de ajuste, usuario, 2026-10-06) ------------------
@@ -424,7 +513,9 @@ def dias(pedido: Mapping[str, Any], *, proximos: int = 0) -> list[str]:
 
 
 def significado(nombre: str) -> str | None:
-    """Qué significa una clave o un código; una jugada, por su ficha."""
+    """Qué significa una clave o un código; una jugada, por su ficha; un nombre para redactar,
+    lo mismo que el de la cocina que reemplaza."""
+    nombre = _DE_LA_COCINA.get(nombre, nombre)
     if nombre in SIGNIFICADOS:
         return SIGNIFICADOS[nombre]
     ficha = FICHAS.get(nombre)

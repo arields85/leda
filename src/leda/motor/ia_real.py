@@ -14,6 +14,8 @@ Se trae lo mínimo de la llamada estructurada de la rama congelada (`llm.py` en
 - Los dos pedidos llevan, después de las instrucciones, el significado de cada dato y cada código
   que traen (`hechos.bloque`; revisión del contrato, 2026-10-05), y el día de la semana de cada
   fecha, con hoy, ayer, mañana o pasado mañana (`hechos.dias`; tercera vuelta, 2026-10-06).
+  La redacción recibe los nombres que dicen el hecho, nunca el de un concepto de la cocina
+  (`hechos.para_redactar`; usuario, 2026-10-07).
 
 Habla el protocolo de chat de OpenAI, que es el de GPT-6 sol por OpenRouter (el modelo del
 espacio sale de `model_config`, como hacía `leda.llm.desde_base`, retirado en la E3-3; la
@@ -361,7 +363,8 @@ class IAReal:
         return leer_jugadas(respuesta)
 
     def redactar(self, pedido: dict[str, Any]) -> str:
-        pedido = {**pedido, "dias": hechos.dias(pedido)}     # el día de cada fecha, del código
+        # El día de cada fecha, del código; y los nombres que dicen el hecho, nunca el concepto.
+        pedido = hechos.para_redactar({**pedido, "dias": hechos.dias(pedido)})
         respuesta = self.cliente.completar({
             "temperature": self.cliente.parametros.get("temperature", 0.3),
             "max_tokens": int(self.cliente.parametros.get("tope_redaccion", TOPE_REDACCION)),

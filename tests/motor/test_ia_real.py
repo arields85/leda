@@ -230,7 +230,10 @@ def test_la_redaccion_recibe_sus_instrucciones_el_tono_y_el_pedido():
     for linea in ("- Trato: de vos.", "- Formalidad: profesional cordial.",
                   "- Longitud: breve.", "- Emojis: permitidos."):
         assert linea in sistema["content"]
-    assert json.loads(usuario["content"]) == {**pedido, "dias": hechos.dias(pedido)}
+    # Con los nombres que dicen el hecho (`hechos.para_redactar`, 2026-10-07).
+    assert json.loads(usuario["content"]) == hechos.para_redactar(
+        {**pedido, "dias": hechos.dias(pedido)})
+    assert json.loads(usuario["content"])["hechos"][0]["jugada"] == "anotar_que_arranco"
 
 
 def test_las_instrucciones_describen_el_trabajo_y_el_marcador():
@@ -363,7 +366,9 @@ def test_un_turno_con_la_ia_real_anota_y_redacta_desde_los_hechos(conn, mundo, e
     assert resultado.hechos[0]["resultado"] == "anotado"
     redaccion = json.loads(proveedor.pedidos[1]["cuerpo"]["messages"][1]["content"])
     assert redaccion["persona"] == "Marcos" and redaccion["hoy"] == "2026-10-05"
-    assert redaccion["hechos"] == resultado.hechos
+    # Los hechos guardados quedan con los nombres de la cocina; la redacción, con los suyos.
+    assert redaccion["hechos"] == hechos.para_redactar(resultado.hechos)
+    assert resultado.hechos[0]["jugada"] == "anotar_prevision"
     with admin(conn) as cur:
         cur.execute("select fecha_prevista::text f, ia from task_forecast, conversation_turn "
                     "where conversation_turn.sentido = 'entrada'")

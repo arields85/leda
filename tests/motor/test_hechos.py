@@ -118,10 +118,12 @@ def test_los_dos_pedidos_a_la_ia_llevan_el_significado_de_sus_datos():
     # Los pedidos llevan además el día de cada fecha (`dias`), con su significado.
     con_dias = {**SITUACION, "dias": hechos.dias(SITUACION, proximos=DIAS_PROXIMOS)}
     assert eleccion == f"{INSTRUCCIONES_JUGADAS}\n\n{hechos.bloque(con_dias)}"
-    assert redaccion.startswith(f"{INSTRUCCIONES_REDACCION}\n\n"
-                                f"{hechos.bloque({**pedido, 'dias': hechos.dias(pedido)})}")
+    # La redacción, con los nombres que dicen el hecho (`hechos.para_redactar`, 2026-10-07).
+    con_dias = hechos.para_redactar({**pedido, "dias": hechos.dias(pedido)})
+    assert redaccion.startswith(f"{INSTRUCCIONES_REDACCION}\n\n{hechos.bloque(con_dias)}")
     assert hechos.significado("atraso_si_se_cumple_la_prevision_dias_habiles") in redaccion
     assert hechos.significado("nueva_prevision") in redaccion
+    assert "prevision" not in redaccion.split(INSTRUCCIONES_REDACCION, 1)[1]
 
 
 def test_las_instrucciones_remiten_a_los_significados_y_piden_un_proximo_paso():
