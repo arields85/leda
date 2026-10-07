@@ -55,6 +55,24 @@ def bot_id_del_token(token: str) -> int:
     return int(prefijo)
 
 
+class IANoConfigurada:
+    """La IA de un espacio que no tiene una configurada (`ia_real.desde_base` no la encontró):
+    no responde nunca. El turno sigue su camino de siempre cuando la IA no responde (ADR 0018,
+    decisión 8): nada se ejecuta, la persona recibe el texto fijo y queda un incidente con el
+    motivo. Así un servidor mal configurado nunca deja a nadie sin respuesta."""
+
+    nombre = "sin_configurar"
+
+    def __init__(self, motivo: str) -> None:
+        self.motivo = motivo
+
+    def elegir_jugadas(self, situacion: dict[str, Any]) -> list:
+        raise LookupError(self.motivo)
+
+    def redactar(self, pedido: dict[str, Any]) -> str:
+        raise LookupError(self.motivo)
+
+
 class IntentosPorUpdate:
     """Las veces que falló recibir cada update. Las primeras veces se reintenta; a los
     `INTENTOS_POR_UPDATE`, se deja."""

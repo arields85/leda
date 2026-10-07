@@ -19,6 +19,7 @@ from leda.incidentes import registrar_incidente
 from leda.motor.avisos import ETAPA_AVISO_GUARDADO
 from leda.motor.ciclo import ETAPA_CICLO
 from leda.motor.escalera import ETAPA_ESCALERA
+from leda.motor.fondo import ETAPA_SIN_BOT
 
 from tests.motor.ayudantes import administrador, uno
 
@@ -30,7 +31,9 @@ from tests.motor.ayudantes import administrador, uno
      "La IA no redactó un aviso guardado"),
     (ETAPA_CICLO, "Se cayó una parte del ciclo del motor",
      "Una parte del ciclo que corre cada minuto"),
-], ids=lambda v: v if v.startswith("motor_") else "")
+    (ETAPA_SIN_BOT, "Un espacio activo no tiene su bot configurado",
+     "El servidor de Leda (`servir`) encontró un espacio activo sin el token"),
+],ids=lambda v: v if v.startswith("motor_") else "")
 def test_cada_etapa_del_motor_tiene_su_explicacion(conn, mundo, etapa, titulo, que_paso):
     administrador(conn)
     with espacio(conn, mundo["id"]) as cur:

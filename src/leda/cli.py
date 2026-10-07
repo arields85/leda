@@ -8,8 +8,8 @@
     python -m leda cadencia corework objetivos_semanales
     python -m leda despachar corework       vacía la cola una vez
     python -m leda escuchar corework        el motor de conversación, por long polling
-    python -m leda servir                   tablero + cadencias + escalera + despacho
-    python -m leda servir --sin-cadencias    igual, sin disparar cadencias automáticas
+    python -m leda servir                   webhook + tablero + el ciclo del motor
+    python -m leda webhooks                 registra el webhook de cada bot
 """
 
 from __future__ import annotations
@@ -210,8 +210,8 @@ def main(argv: list[str] | None = None) -> int:
 
     srv = sub.add_parser("servir")
     srv.add_argument("--puerto", type=int, default=8080)
-    srv.add_argument("--sin-cadencias", action="store_true",
-                     help="no dispara cadencias automáticas; escalera y despacho siguen")
+
+    sub.add_parser("webhooks")
 
     a = p.parse_args(argv)
 
@@ -246,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "servir":
         import uvicorn
-        from .reloj import montar
+        from .motor.fondo import montar
 
         conn_chequeo = conectar()
         try:
@@ -255,9 +255,27 @@ def main(argv: list[str] | None = None) -> int:
             conn_chequeo.close()
         if codigo is not None:
             return codigo
-        montar(lambda: conectar(), con_cadencias=not a.sin_cadencias).start()
+        # El ciclo del motor (escalera, avisos guardados, despacho, mensajes sin respuesta)
+        # para cada espacio activo con su bot, en un hilo de fondo (`leda.motor.fondo`).
+        montar(lambda: conectar()).start()
         uvicorn.run("leda.entrada:app", host="0.0.0.0", port=a.puerto)
         return 0
+
+    if a.cmd == "webhooks":
+        # No necesita base: le dice a Telegram dónde entregar. Nunca imprime un token.
+        from .entrada import registrar_webhooks
+
+        try:
+            resultado = registrar_webhooks()
+        except LookupError as e:
+            print(e)
+            return 1
+        if not resultado:
+            print("No hay ningún bot configurado (LEDA_BOT_TOKEN_<ESPACIO>).")
+            return 1
+        for slug, ok in resultado.items():
+            print(f"  {slug:16s} {'registrado' if ok else 'Telegram no lo aceptó'}")
+        return 0 if all(resultado.values()) else 1
 
     if a.cmd == "grupo":
         # No necesita base: sólo pregunta a Telegram qué llegó.

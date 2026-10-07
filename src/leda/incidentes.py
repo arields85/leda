@@ -329,6 +329,17 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "vuelva a andar."),
         que_hacer=(_BUSCAR_DETALLE + " y corregí la causa; la consola del escuchador "
                    "dice en cada vuelta si sigue cayéndose.")),
+    # El Motor (`leda.motor.fondo`, E3-7): el servidor del webhook encontró un espacio activo
+    # sin el token de su bot. Nada de ese espacio corre hasta que se configure.
+    "motor_sin_bot": ExplicacionDeEtapa(
+        titulo="Un espacio activo no tiene su bot configurado",
+        que_paso=("El servidor de Leda (`servir`) encontró un espacio activo sin el token de "
+                  "su bot en el entorno: su ciclo (la escalera, los avisos guardados y el "
+                  "despacho de mensajes) no corre, y su webhook no atiende."),
+        que_vio=("Nada: lo que tenía que salir para {nombre} queda en la cola hasta que el "
+                 "bot se configure."),
+        que_hacer=("Configurá el token del bot del espacio en el entorno del servidor y "
+                   "reinicialo, o desactivá el espacio si no se usa.")),
 }
 
 _EXPLICACION_GENERICA = ExplicacionDeEtapa(
