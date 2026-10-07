@@ -90,14 +90,14 @@ pasos:
         resultado: anotado
         tarea: COM
         prevision: "2026-11-04"
-        aviso_al_referente: {a: Ismael Soschinski, estado: guardado_sin_enviar,
-                             sale: "~2026-10-23T10:00"}
+        aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-23T10:00"}
     pregunta: null
     dice:
       - que quedó anotada la previsión del 4
       - que Ismael se va a enterar el viernes a las 10:00
     no_dice:
       - que Ismael ya se enteró
+      - que el aviso a Ismael está guardado, en cola o sin enviar
 
   - paso: 4
     quien: Marcos

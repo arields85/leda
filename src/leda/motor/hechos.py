@@ -21,7 +21,10 @@ Por eso:
 - **Un hecho sin significado es una falla del motor** en la corrida (`sin_significado`, que el
   corredor mira en cada pedido a la IA).
 
-Los significados describen datos, no casos: qué es cada cosa, nunca qué decir con ella.
+Los significados describen datos, no casos: qué es cada cosa, nunca qué decir con ella. Y lo
+que pasa después se describe como pasa en el mundo (usuario, 2026-10-06, de la prueba por
+Telegram real): a quién le llega qué y cuándo (`llega`), nunca el estado interno de un aviso
+(guardado, en cola, sin enviar), que la IA repetía.
 """
 
 from __future__ import annotations
@@ -64,10 +67,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "jugadas_posibles": "Las jugadas de la lista cerrada que se pueden elegir.",
     "nombre": "El nombre de una jugada.",
     "datos": "Los datos de una jugada, tal como se entendieron del mensaje.",
-    "estado": "El estado de una tarea; o, dentro de un efecto que pasa después (un aviso, un "
-              "pedido), si ya pasó o todavía no, con su código; como motivo, que el estado de "
-              "la tarea no lo permite; o, para elegir jugadas, la pregunta abierta y las que "
-              "quedaron para después.",
+    "estado": "El estado de una tarea; como motivo, que el estado de la tarea no lo permite; "
+              "o, para elegir jugadas, la pregunta abierta y las que quedaron para después.",
     "pregunta_abierta": "La pregunta de Leda que la persona tiene abierta ahora: lo que Leda "
                         "espera que conteste.",
     "para_despues": "Preguntas de Leda que quedaron para después, sin cerrar; como resultado, "
@@ -98,7 +99,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "puede_ser": "Las respuestas que sirven para el dato que falta.",
     "coinciden": "Los nombres que coinciden con lo que dijo la persona, cuando es más de uno.",
     "motivo": "Por qué: en una previsión, el porqué que dio la persona, con sus palabras; en "
-              "algo que no se hizo o no salió, la razón, con su código.",
+              "algo que no se hizo o que ya no va a pasar, la razón, con su código.",
     "causa": "Lo que traba la tarea, como lo dijo la persona.",
     "prevision": "La fecha para la que la persona prevé terminar la tarea. No cambia la fecha "
                  "comprometida.",
@@ -120,12 +121,13 @@ SIGNIFICADOS: Mapping[str, str] = {
     "desconocido": "El sistema no lo sabe.",
     "no_puede_arrancar_hasta_que_termine": "Esa tarea dependiente no puede arrancar hasta que "
                                            "termine ésta.",
-    "aviso_al_referente": "El aviso a quien aprueba el trabajo de la persona, con a quién, su "
-                          "estado y cuándo sale (o, si se retiró, por qué); vacío si no hay "
-                          "aviso.",
+    "aviso_al_referente": "Lo que se le avisa a quien aprueba el trabajo de la persona: a quién "
+                          "(a) y cuándo se entera (llega); vacío si no se le avisa.",
     "sin_aviso": "Por qué no hay aviso al referente, con su código.",
     "a": "A quién va un aviso.",
-    "sale": "Cuándo sale un aviso guardado: todavía no salió.",
+    "llega": "Cuándo se entera quien recibe el aviso (a; sin a, la persona a la que Leda le "
+             "escribe): una fecha y hora es el momento en que le llega, que todavía no pasó; "
+             "si no, su código dice si ya le llegó, si no le va a llegar o si no le llegó.",
     "quien_destraba": "Quién puede destrabar el bloqueo: como dato, lo que dijo la persona; "
                       "como tipo de pregunta, Leda pregunta quién lo puede destrabar y espera "
                       "un nombre, que no sabe, o que le toca a la persona que escribe "
@@ -142,15 +144,14 @@ SIGNIFICADOS: Mapping[str, str] = {
     "avance": "Lo que la persona contó de cómo viene la tarea, sin un hecho cierto.",
     "dijo": "Lo que dijo la persona, con sus palabras.",
     "el_pedido_de_estado": "Si Leda sigue esperando saber cómo viene la tarea.",
-    "vuelve_a_pedir_el_estado": "El pedido del estado de la tarea que Leda guardó para volver "
-                                "a pedírselo, con su estado: si sigue guardado, cuándo sale "
-                                "(todavía no pasó); si se retiró, no va a salir y motivo dice "
-                                "por qué.",
+    "vuelve_a_pedir_el_estado": "Cuándo Leda le vuelve a pedir el estado de la tarea a la "
+                                "persona (llega, todavía no pasó); o que ya no se lo va a "
+                                "pedir, y motivo dice por qué.",
     "veces_sin_algo_cierto": "Cuántas respuestas seguidas sin un hecho cierto lleva este "
                              "pedido de estado.",
     "no_vuelve_a_pedir_el_estado": "Por qué Leda no vuelve a pedirle el estado.",
-    "escalado_a": "A quiénes ya se les avisó que la persona no contestaba, con el estado de "
-                  "cada aviso.",
+    "escalado_a": "A quiénes se les avisó que la persona no contestaba, y si les llegó "
+                  "(llega).",
     "vencida": "La tarea pasó su fecha de seguimiento: la fecha comprometida, el atraso de hoy "
                "y, si la había, la previsión que también pasó.",
     "prevision_vencida": "La previsión que la tarea también pasó.",
@@ -161,15 +162,16 @@ SIGNIFICADOS: Mapping[str, str] = {
                              "con otra persona, con su código.",
     "solo_si_pregunta": "Algo cierto que Leda sabe y dice sólo si la persona lo pregunta.",
     "aviso_al_administrador": "El aviso al administrador de que se pidió algo que no está en "
-                              "la lista, con su estado.",
+                              "la lista, con cuándo le llega.",
     "vuelve_a": "Cómo quedó la tarea después de corregir: su estado, su previsión o su fecha "
                 "comprometida.",
     "prevision_corregida": "La previsión que se corrigió: ya no vale.",
-    "aviso_de_la_prevision_corregida": "Qué pasó con el aviso de la previsión que se corrigió.",
+    "aviso_de_la_prevision_corregida": "Si el referente se entera de la previsión que se "
+                                       "corrigió (llega).",
     "correccion_al_referente": "El aviso al referente de que una previsión que ya recibió no "
-                               "vale, con su estado.",
-    "aviso_de_la_prevision_anterior": "El aviso de la previsión que vuelve a valer, con su "
-                                      "estado.",
+                               "vale: a quién y cuándo se entera.",
+    "aviso_de_la_prevision_anterior": "El aviso al referente de la previsión que vuelve a "
+                                      "valer: a quién y cuándo se entera.",
     "prevision_que_no_vale": "La previsión que el referente recibió y ya no vale.",
     "corrige": "La jugada anotada que la persona dijo que estuvo mal.",
     "tarea_correcta": "La tarea en la que sí iba lo anotado.",
@@ -182,15 +184,14 @@ SIGNIFICADOS: Mapping[str, str] = {
                              "(otra jugada las contestó o las dejó sin efecto): no se hacen.",
     "lo_que_sigue": "Lo próximo que Leda hace en el seguimiento de esa tarea, como quedó al "
                     "terminar este mensaje. Todavía no pasó.",
-    "proximo_aviso": "El próximo aviso que Leda tiene guardado para la persona sobre esa "
-                     "tarea, con qué aviso es, su estado y cuándo sale.",
+    "proximo_aviso": "Lo próximo que Leda le va a escribir a la persona sobre esa tarea: qué "
+                     "aviso es y cuándo le llega.",
     "seguimiento": "Cómo sigue el seguimiento de la tarea, con su código.",
     "detenido_mientras_siga_trabada": "Mientras la tarea siga trabada, Leda no le pide el "
                                       "estado: el seguimiento vuelve cuando la persona cuenta "
                                       "que se destrabó.",
-    "ya_no_sale": "Lo que Leda le contó a la persona en un mensaje anterior que iba a pasar y "
-                  "ya no va a pasar: se retiró sin salir, con su motivo. La persona lo sigue "
-                  "esperando.",
+    "ya_no_va_a_pasar": "Lo que Leda le contó a la persona en un mensaje anterior que iba a "
+                        "pasar y ya no va a pasar, con su motivo.",
     "anuncio": "Lo que se había anunciado, con el nombre del dato con que se contó.",
     # --- Los datos de una jugada, como se entendieron del mensaje -----------------------------
     "palabras": "Lo que la persona contó de cómo viene la tarea, con sus palabras.",
@@ -208,12 +209,13 @@ SIGNIFICADOS: Mapping[str, str] = {
     "numero": "Qué número de pedido es, en la cuenta de pedidos sin respuesta.",
     "responsable": "La persona responsable de la tarea.",
     "prevision_vigente": "La previsión vigente de la tarea: su fecha, el atraso que tendrá si "
-                         "se cumple, su porqué y el estado de su aviso al referente.",
+                         "se cumple, su porqué y si el referente ya se enteró o cuándo se "
+                         "entera.",
     "fecha": "Una fecha.",
     "pide_el_estado_el": "El día en que Leda va a pedirle el estado: todavía no pasó.",
-    "si_no_hay_respuesta": "Lo que pasa si la persona no contesta: a quién se le avisa. "
-                           "Todavía no pasó.",
-    "se_avisa_a": "A quiénes se les avisa.",
+    "si_no_hay_respuesta": "Lo que va a pasar si la persona no contesta: a quién se le va a "
+                           "avisar. Todavía no pasó.",
+    "se_avisa_a": "A quiénes se les va a avisar.",
     "avance_anterior": "Lo que la persona contestó antes sin un hecho cierto, y cuándo.",
     "el": "El día en que pasó.",
     "espera_algo_cierto": "Lo que Leda necesita saber de la tarea: un hecho cierto.",
@@ -235,7 +237,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "preguntas_sin_respuesta": "Cuántas veces se hizo la pregunta sin respuesta.",
     "preguntado_el": "Cuándo se hizo la pregunta por primera vez.",
     "lo_pendiente": "Lo que tenía el aviso que no salió.",
-    "aviso_que_no_salio": "El aviso que no pudo salir: a quién iba y qué era.",
+    "aviso_que_no_salio": "El aviso que no le llegó a quien iba: a quién y qué era.",
     # --- Códigos: cómo terminó una jugada ------------------------------------------------------
     "anotado": "Quedó anotado.",
     "falta_dato": "No se hizo: falta un dato (falta dice cuál).",
@@ -276,18 +278,15 @@ SIGNIFICADOS: Mapping[str, str] = {
                                 "cambia nada.",
     "sin_referente": "La persona no tiene a alguien que apruebe su trabajo.",
     "se_anoto_en_la_tarea_equivocada": "Se había anotado en la tarea equivocada.",
-    # --- Códigos: el estado de un efecto que pasa después --------------------------------------
+    # --- Códigos: si un aviso le llega a quien lo recibe ---------------------------------------
     "ninguna_definida": "No hay ninguna definida todavía.",
-    "guardado_sin_enviar": "Guardado, todavía sin enviar: sale cuando dice sale.",
-    "en_cola_sin_enviar": "En la cola de su canal, todavía sin enviar: sale enseguida.",
-    "retirado_sin_enviar": "Se retiró sin enviarse: nunca salió.",
-    "enviado": "Ya salió.",
-    "no_salio": "No salió.",
-    "todavia_no": "Todavía no pasó.",
+    "ya_le_llego": "Ya le llegó: quien lo recibe ya lo sabe.",
+    "no_le_va_a_llegar": "No le va a llegar: ya no hace falta (motivo dice por qué).",
+    "no_le_llego": "No le llegó: quien lo iba a recibir no lo sabe por este aviso.",
     "sigue_abierto": "Sigue abierto: Leda sigue esperando.",
     "ya_contesto": "Ya no sigue abierto: la persona ya contestó con algo cierto y Leda no "
                    "espera más esa respuesta.",
-    # --- Códigos: por qué se retiró un aviso que no salió --------------------------------------
+    # --- Códigos: por qué ya no va a pasar algo anunciado --------------------------------------
     "ya_respondio": "La persona ya contestó lo que el aviso iba a pedir.",
     "hay_una_prevision_mas_nueva": "Hay una previsión más nueva: el aviso era de una anterior.",
     "volvio_a_la_fecha_comprometida": "La previsión volvió a la fecha comprometida.",
@@ -344,8 +343,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "nueva_prevision": "Aviso al referente: la persona responsable dio una previsión nueva "
                        "para su tarea. Es información para él; no pide respuesta.",
     "correccion_de_prevision": "Aviso al referente: una previsión que ya recibió no vale.",
-    "falla_de_aviso": "Un aviso que la persona causó no pudo salir.",
-    "no_salio_un_aviso": "Un aviso que la persona causó no pudo salir.",
+    "falla_de_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
+    "no_salio_un_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
 }
 
 

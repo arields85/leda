@@ -30,8 +30,7 @@ def test_un_toque_corre_el_mismo_camino_que_la_eleccion_escrita(conn, mundo, dud
     assert r.hechos == [{"jugada": "anotar_inicio", "resultado": "anotado",
                          "estado": "en_curso", "tarea": T2,
                          "eligio": {"opcion": "O2", "etiqueta": T2["titulo"], "tarea": T2},
-                         "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-16",
-                                                                "estado": "todavia_no"}}}]
+                         "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-16"}}}]
     assert estado_de(conn, duda["T2"]) == "en_curso"
     assert estado_de(conn, duda["T1"]) == "asignada"
     [turno] = _turnos_de_toque(conn)

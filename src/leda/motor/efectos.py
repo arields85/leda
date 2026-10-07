@@ -12,9 +12,11 @@ de la base y pone en el hecho cómo quedó cada uno. Un solo paso para todas las
 rama por jugada:
 
 - **Un aviso** guardado se mira con la misma regla con que se mira al salir (`avisos.TIPOS`):
-  si ya no corresponde, se retira ahora con su motivo (no saldría) y el hecho lo dice
-  (`retirado_sin_enviar` y `motivo`, sin `sale`); si corresponde, el hecho queda como estaba. Uno
-  que otra jugada ya retiró, salió o falló, con su estado.
+  si ya no corresponde, se retira ahora con su motivo (no saldría) y el hecho dice que no le va
+  a llegar a quien iba (`llega`: `no_le_va_a_llegar`, con `motivo`); si corresponde, el hecho
+  queda como estaba, con cuándo le llega. Si otra jugada ya lo retiró, o si salió o falló, el
+  hecho lo dice igual: que no le va a llegar, que ya le llegó o que no le llegó. Siempre lo que
+  pasa en el mundo, nunca el estado interno del aviso (usuario, 2026-10-06).
 - **Una espera** dice si Leda sigue esperando (`sigue_abierto`), si la persona ya contestó con
   algo cierto (`ya_contesto`) o si ya se escaló.
 - **Una pregunta** se nombra como quedó: la que se hace ahora (`pregunta`), una que quedó para
@@ -28,8 +30,9 @@ nombraron) lo puede dejar atrás un turno siguiente, aunque ninguna de sus jugad
 fecha contesta la espera y el pedido del estado que anunció el turno de antes ya no sale. Cada
 turno guarda aparte, en su resultado registrado (`ANUNCIADOS`, fuera de los hechos), las ids de
 lo que quedó anunciado y pendiente; el turno siguiente las vuelve a leer con la misma regla, y lo
-que ya no va a pasar lo dice (`YA_NO_SALE`, junto a los hechos) una sola vez: lo que sigue
-pendiente pasa al turno siguiente, y lo que ya no, no.
+que ya no va a pasar lo dice (`YA_NO_VA_A_PASAR`, junto a los hechos) una sola vez: lo que
+sigue pendiente pasa al turno siguiente, y lo que ya no, no. La redacción lo cuenta sólo si a
+la persona le sirve (usuario, 2026-10-06).
 
 **Lo que sigue** (la misma vuelta: el próximo paso de cada mensaje): el último hecho anotado de
 cada tarea de la persona dice lo próximo que Leda hace en su seguimiento, como quedó al terminar
@@ -45,11 +48,11 @@ from typing import Any
 
 from . import preguntas
 from .ancla import anclaje
-from .avisos import ENVIADO, NO_SALIO, TIPOS, Momento, ausente, leer_tarea, omitir
-from .fichas import (AVISO, EFECTOS, ESPERA, GUARDADO_SIN_ENVIAR, OTRAS_PARA_DESPUES, PREGUNTA,
-                     Contexto, nombrar_tipo_de_pregunta)
+from .avisos import TIPOS, Momento, ausente, leer_tarea, omitir
+from .fichas import (AVISO, EFECTOS, ESPERA, LLEGA, NO_LE_LLEGO, NO_LE_VA_A_LLEGAR,
+                     OTRAS_PARA_DESPUES, PREGUNTA, YA_LE_LLEGO, Contexto,
+                     nombrar_tipo_de_pregunta)
 
-RETIRADO_SIN_ENVIAR = "retirado_sin_enviar"
 SIGUE_ABIERTO = "sigue_abierto"
 YA_CONTESTO = "ya_contesto"
 YA_SE_ESCALO = "ya_se_escalo"
@@ -60,7 +63,7 @@ _CLAVES_DE_PREGUNTA = ("pregunta", "pregunta_para_despues", OTRAS_PARA_DESPUES)
 # En el resultado registrado del turno, fuera de los hechos: lo anunciado que sigue pendiente.
 ANUNCIADOS = "anunciados"
 # Junto a los hechos del pedido de redacción: lo anunciado antes que ya no va a pasar.
-YA_NO_SALE = "ya_no_sale"
+YA_NO_VA_A_PASAR = "ya_no_va_a_pasar"
 # En el último hecho anotado de cada tarea: lo próximo del seguimiento.
 LO_QUE_SIGUE = "lo_que_sigue"
 DETENIDO_MIENTRAS_SIGA_TRABADA = "detenido_mientras_siga_trabada"
@@ -125,13 +128,12 @@ def _aviso(m: Momento, hecho: dict[str, Any], efecto: dict[str, str]) -> bool:
         return False
     estado, motivo = _vigencia(m, aviso)
     if estado == "guardado":
-        return True                 # sigue guardado: el hecho ya dice su estado y cuándo sale
-    sin_sale = {k: v for k, v in dicho.items() if k != "sale"}
+        return True                 # sigue pendiente: el hecho ya dice cuándo le llega
     if estado == "omitido":
-        hecho[efecto["clave"]] = {**sin_sale, "estado": RETIRADO_SIN_ENVIAR, "motivo": motivo}
+        hecho[efecto["clave"]] = {**dicho, LLEGA: NO_LE_VA_A_LLEGAR, "motivo": motivo}
     else:
-        hecho[efecto["clave"]] = {**sin_sale,
-                                  "estado": ENVIADO if estado == "enviado" else NO_SALIO}
+        hecho[efecto["clave"]] = {**dicho,
+                                  LLEGA: YA_LE_LLEGO if estado == "enviado" else NO_LE_LLEGO}
     return False
 
 
@@ -184,7 +186,7 @@ def _lo_anunciado_antes(m: Momento, ctx: Contexto, nombrados: set[str]
         elif estado == "omitido":
             ya_no_sale.append({"anuncio": anunciado["clave"],
                                **{k: anunciado[k] for k in ("tarea", "a") if k in anunciado},
-                               "estado": RETIRADO_SIN_ENVIAR, "motivo": motivo})
+                               LLEGA: NO_LE_VA_A_LLEGAR, "motivo": motivo})
     return ya_no_sale, siguen
 
 
@@ -226,15 +228,15 @@ def _que_sigue(m: Momento, ctx: Contexto, task_id: str,
         tipo = TIPOS.get(aviso["tipo"])
         if tipo is not None and tipo.vigente(m, aviso)[0] is None:
             return {"proximo_aviso": {
-                "aviso": aviso["tipo"], "estado": GUARDADO_SIN_ENVIAR,
-                "sale": aviso["programado_para"].astimezone(m.cal.zona).isoformat()}}
+                "aviso": aviso["tipo"],
+                LLEGA: aviso["programado_para"].astimezone(m.cal.zona).isoformat()}}
     if tarea["bloqueada"] or tarea["estado"] == "bloqueada":
         return {"seguimiento": DETENIDO_MIENTRAS_SIGA_TRABADA}
     if tarea["fecha_objetivo"] is None:
         return None
     de = anclaje(m.cur, task_id, m.fecha(tarea["fecha_objetivo"]))
     if m.hoy < de.fecha:
-        return {"pide_el_estado_el": {"fecha": de.fecha.isoformat(), "estado": "todavia_no"}}
+        return {"pide_el_estado_el": {"fecha": de.fecha.isoformat()}}
     return None
 
 

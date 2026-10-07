@@ -142,11 +142,17 @@ class Ficha:
 # que es la jugada de la nueva previsión.
 SALIDAS_DE_UN_BLOQUEO = ("que_alguien_ayude", "anotar_prevision")
 
-# El estado de un efecto que pasa después (un aviso a otra persona), que su hecho dice siempre,
-# explícito: la redacción nunca puede contarlo como hecho (constitución §4). Primer contacto
-# real, 2026-10-05: un aviso con sólo `a` y `sale` se contó como enviado.
-GUARDADO_SIN_ENVIAR = "guardado_sin_enviar"     # guardado; sale a la hora de `sale`
-EN_COLA_SIN_ENVIAR = "en_cola_sin_enviar"       # en la cola de su canal; sale enseguida
+# Lo que pasa después se cuenta como pasa en el mundo: a quién le llega y cuándo (`llega`, con
+# la fecha y hora en que se entera, que todavía no pasó), o que ya le llegó, que no le va a
+# llegar o que no le llegó. Nunca el estado interno de un aviso (guardado, en cola, sin enviar):
+# en la prueba por Telegram real Leda lo repetía ("el aviso a Ismael está guardado, todavía no
+# salió"), y el usuario decidió el 2026-10-06 que Leda habla del mundo y no de la cocina. La
+# honestidad sigue (constitución §4; primer contacto real, 2026-10-05, un aviso con sólo `a` y
+# su hora se contó como enviado): lo que todavía no pasó trae cuándo pasa, nunca se da por hecho.
+LLEGA = "llega"
+YA_LE_LLEGO = "ya_le_llego"
+NO_LE_VA_A_LLEGAR = "no_le_va_a_llegar"
+NO_LE_LLEGO = "no_le_llego"
 
 # Un avance sin un hecho cierto (`informar_avance`, decisión del usuario, 2026-10-05): la espera
 # sigue abierta y Leda vuelve a pedir el estado el día hábil siguiente con un aviso de la
@@ -540,8 +546,7 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
          sale, f"motor:nueva_prevision:{prevision_id}", ctx.ahora))
     aviso_id = str(cur.fetchone()["id"])
     ctx.avisos_guardados.append(aviso_id)
-    hecho["aviso_al_referente"] = {"a": quien_aprueba["nombre"], "estado": GUARDADO_SIN_ENVIAR,
-                                   "sale": sale.isoformat()}
+    hecho["aviso_al_referente"] = {"a": quien_aprueba["nombre"], LLEGA: sale.isoformat()}
     nombrar_efecto(hecho, "aviso_al_referente", AVISO, aviso_id)
     return hecho
 
@@ -804,15 +809,14 @@ def _seguir_pidiendo(ctx: Contexto, tarea: dict[str, Any], espera: dict[str, Any
          sale, clave, ctx.ahora))
     cur.execute("select id from scheduled_notice where workspace_id = %s and dedupe_key = %s",
                 (ctx.quien.workspace_id, clave))
-    pidiendo = {"vuelve_a_pedir_el_estado": {"estado": GUARDADO_SIN_ENVIAR,
-                                             "sale": sale.isoformat()},
+    pidiendo = {"vuelve_a_pedir_el_estado": {LLEGA: sale.isoformat()},
                 "veces_sin_algo_cierto": veces}
     nombrar_efecto(pidiendo, "vuelve_a_pedir_el_estado", AVISO, cur.fetchone()["id"])
     return pidiendo
 
 
 def _escalado_a(cur, escalon: list[dict[str, Any]]) -> list[dict[str, str]]:
-    """A quiénes llegó el escalamiento de la escalera, con el estado de su aviso."""
+    """A quiénes se les avisó por el escalamiento de la escalera, y si les llegó."""
     ids = [str(p["id"]) for p in escalon
            if p["tipo"] == "escalamiento" and p["estado"] in ("enviado", "fallido")]
     if not ids:
@@ -820,7 +824,7 @@ def _escalado_a(cur, escalon: list[dict[str, Any]]) -> list[dict[str, str]]:
     cur.execute("""select i.nombre, a.estado from scheduled_notice a
                      join integrante i on i.membership_id = a.destinatario_membership_id
                     where a.id = any(%s::uuid[]) order by i.nombre""", (ids,))
-    return [{"a": f["nombre"], "estado": "enviado" if f["estado"] == "enviado" else "no_salio"}
+    return [{"a": f["nombre"], LLEGA: YA_LE_LLEGO if f["estado"] == "enviado" else NO_LE_LLEGO}
             for f in cur.fetchall()]
 
 
@@ -927,7 +931,9 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
                           set estado = 'omitido', motivo_omision = 'prevision_corregida',
                               resuelto_en = %s
                         where id = %s""", (ctx.ahora, aviso["id"]))
-        hechos["aviso_de_la_prevision_corregida"] = {"estado": "retirado_sin_enviar"}
+        hechos["aviso_de_la_prevision_corregida"] = {
+            **({"a": quien_aprueba["nombre"]} if quien_aprueba is not None else {}),
+            LLEGA: NO_LE_VA_A_LLEGAR}
     elif aviso is not None and aviso["estado"] == "enviado" and quien_aprueba is not None:
         sale = sale_a_la_hora(cal, ctx.ahora)
         cur.execute(
@@ -945,8 +951,7 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
         correccion_aviso = str(cur.fetchone()["id"])
         ctx.avisos_guardados.append(correccion_aviso)
         hechos["correccion_al_referente"] = {"a": quien_aprueba["nombre"],
-                                             "estado": GUARDADO_SIN_ENVIAR,
-                                             "sale": sale.isoformat()}
+                                             LLEGA: sale.isoformat()}
         nombrar_efecto(hechos, "correccion_al_referente", AVISO, correccion_aviso)
     if (anterior is not None and quien_aprueba is not None
             and (aviso is None or aviso["estado"] != "enviado")):
@@ -997,8 +1002,7 @@ def _rearmar_aviso_de_la_anterior(ctx: Contexto, tarea: dict, anterior: dict,
          sale, f"motor:nueva_prevision:{correccion_id}", ctx.ahora))
     aviso_id = str(cur.fetchone()["id"])
     ctx.avisos_guardados.append(aviso_id)
-    return aviso_id, {"a": quien_aprueba["nombre"], "estado": GUARDADO_SIN_ENVIAR,
-                      "sale": sale.isoformat()}
+    return aviso_id, {"a": quien_aprueba["nombre"], LLEGA: sale.isoformat()}
 
 
 def _deshacer_bloqueo(ctx: Contexto, tarea: dict) -> dict | None:

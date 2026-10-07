@@ -111,8 +111,7 @@ def test_sin_respuesta_la_escalera_avanza_un_dia_habil_por_paso_y_escala(conn, m
     assert "si_no_hay_respuesta" not in v1["hechos"][0]
     [v2] = dias.ciclo(octubre(14, 10))
     assert v2["hechos"][0]["numero"] == 3
-    assert v2["hechos"][0]["si_no_hay_respuesta"] == {"se_avisa_a": ["Ismael"],
-                                                      "estado": "todavia_no"}
+    assert v2["hechos"][0]["si_no_hay_respuesta"] == {"se_avisa_a": ["Ismael"]}
     assert espera_del_estado(conn)["recordatorios"] == 3
 
     [v3] = dias.ciclo(octubre(15, 10))
@@ -151,7 +150,7 @@ def test_los_recordatorios_dicen_la_prevision_y_lo_que_depende(conn, mundo, dias
     assert hechos["prevision_vigente"] == {
         "fecha": "2026-10-14", "motivo": "el proveedor",
         "atraso_si_se_cumple_la_prevision_dias_habiles": 2,
-        "aviso_al_referente": {"a": "Ismael", "estado": "enviado"}}
+        "aviso_al_referente": {"a": "Ismael", "llega": "ya_le_llego"}}
     assert hechos["dependientes"] == [{"tarea": "Probar las comunicaciones",
                                        "no_puede_arrancar_hasta_que_termine": True}]
 

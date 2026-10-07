@@ -10,8 +10,9 @@ del espacio (9e), `enviar_avisos`:
 1. vuelve a leer la tarea y comprueba que el aviso todavía corresponda, con la regla de su
    tipo (`TIPOS`); si ya no corresponde, queda `omitido` con su motivo, nunca en silencio;
 2. le pide a la IA que lo redacte desde los hechos de ese momento, que quedan guardados como
-   los que se mandaron; un efecto que pasa después dice siempre su estado (primer contacto
-   real, 2026-10-05);
+   los que se mandaron; un efecto que pasa después dice siempre a quién le llega y cuándo,
+   o si ya le llegó (primer contacto real, 2026-10-05; hablar del mundo y no de la cocina,
+   usuario, 2026-10-06);
 3. lo encola en el outbox, lo marca `enviado`, lo audita como un envío de Leda, con la versión
    de las reglas (`auditoria.py`), y lo deja en el registro de turnos de quien lo recibe, como
    su último aviso. Si pide el estado de la tarea, abre la pregunta y cuenta el recordatorio
@@ -59,7 +60,8 @@ from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, ancl
                     clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
 from .auditoria import auditar
-from .fichas import ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, GUARDADO_SIN_ENVIAR
+from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, LLEGA, NO_LE_LLEGO,
+                     YA_LE_LLEGO)
 from .ia import IA
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
 from .tiempo import Reloj
@@ -82,11 +84,9 @@ REPREGUNTA = "repregunta"
 ESCALAMIENTO_DE_UNA_PREGUNTA = "escalamiento_de_una_pregunta"
 
 ABIERTOS = ("asignada", "en_curso")     # en la escalera: comprometida, sin entregar
-ENVIADO = "enviado"                     # el estado de un aviso que ya salió, en un hecho
 # De menos a más urgente (mecánica §11): el tipo de un envío que junta varios avisos es el del
 # más urgente.
 URGENCIA = ("informativo", "normal", "seguimiento", "prioritario", "urgente")
-NO_SALIO = "no_salio"                   # un aviso que quedó fallido
 
 
 @dataclass(frozen=True)
@@ -424,7 +424,7 @@ def _un_aviso_que_fallo(m: Momento, aviso, destinatario, falla: Exception,
                 destinatario=str(causante["membership_id"]),
                 hechos={"aviso": "no_salio_un_aviso",
                         "aviso_que_no_salio": {"a": destinatario["nombre"],
-                                               "estado": NO_SALIO,
+                                               LLEGA: NO_LE_LLEGO,
                                                "lo_pendiente": aviso["hechos"]},
                         "necesita_respuesta": False},
                 programado_para=m.ahora, clave=f"motor:falla_de_aviso:{aviso_id}",
@@ -513,8 +513,8 @@ def quienes_escalan(cur, tarea: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def prevision_vigente(m: Momento, tarea: dict[str, Any]) -> dict[str, Any] | None:
-    """La última previsión de la tarea, si no es la fecha comprometida, con el estado de su
-    aviso al referente (un efecto que pasa después dice su estado)."""
+    """La última previsión de la tarea, si no es la fecha comprometida, con su aviso al
+    referente: a quién, y si ya le llegó o cuándo le llega (`fichas.LLEGA`)."""
     f = _prevision_vigente(m.cur, tarea["id"])
     if f is None or f["fecha_prevista"] == m.fecha(tarea["fecha_objetivo"]):
         return None
@@ -523,15 +523,16 @@ def prevision_vigente(m: Momento, tarea: dict[str, Any]) -> dict[str, Any] | Non
                              ATRASO_SI_SE_CUMPLE: f["atraso_dias_habiles"]}
     if f["motivo"]:
         dicha["motivo"] = f["motivo"]
-    m.cur.execute("""select a.estado, i.nombre from scheduled_notice a
+    m.cur.execute("""select a.estado, a.programado_para, i.nombre from scheduled_notice a
                        join integrante i on i.membership_id = a.destinatario_membership_id
                       where a.workspace_id = %s and a.dedupe_key = %s""",
                   (m.workspace_id, f"motor:nueva_prevision:{f['id']}"))
     aviso = m.cur.fetchone()
-    estados = {"enviado": ENVIADO, "guardado": GUARDADO_SIN_ENVIAR, "fallido": NO_SALIO}
-    if aviso is not None and aviso["estado"] in estados:
-        dicha["aviso_al_referente"] = {"a": aviso["nombre"],
-                                       "estado": estados[aviso["estado"]]}
+    if aviso is not None and aviso["estado"] in ("enviado", "guardado", "fallido"):
+        llega = (YA_LE_LLEGO if aviso["estado"] == "enviado"
+                 else NO_LE_LLEGO if aviso["estado"] == "fallido"
+                 else aviso["programado_para"].astimezone(m.cal.zona).isoformat())
+        dicha["aviso_al_referente"] = {"a": aviso["nombre"], LLEGA: llega}
     return dicha
 
 
@@ -620,11 +621,11 @@ def hechos_de_la_escalera(m: Momento, tipo: str, tarea: dict[str, Any],
         hechos["espera_algo_cierto"] = espera_saber(tarea["estado"], hechos.get("espera_a", []))
     if tipo == VENCIMIENTO_CON_PREVISION:   # un efecto que pasa después: cuándo pide el estado
         hasta = ancla(m.cur, tarea["id"], m.fecha(vence))
-        hechos["pide_el_estado_el"] = {"fecha": hasta.isoformat(), "estado": "todavia_no"}
+        hechos["pide_el_estado_el"] = {"fecha": hasta.isoformat()}
     if base.get(AVISA_QUE_VA_A_ESCALAR):
         a_quienes = [d["nombre"] for d in quienes_escalan(m.cur, tarea)]
         if a_quienes:       # un efecto que pasa después: todavía no, y a quién
-            hechos["si_no_hay_respuesta"] = {"se_avisa_a": a_quienes, "estado": "todavia_no"}
+            hechos["si_no_hay_respuesta"] = {"se_avisa_a": a_quienes}
     return hechos
 
 
@@ -697,7 +698,7 @@ def hechos_de_una_pregunta(m: Momento, tarea: dict[str, Any],
     if base.get(AVISA_QUE_VA_A_ESCALAR):
         a_quienes = [d["nombre"] for d in quienes_escalan(m.cur, tarea)]
         if a_quienes:       # un efecto que pasa después: todavía no, y a quién
-            hechos["si_no_hay_respuesta"] = {"se_avisa_a": a_quienes, "estado": "todavia_no"}
+            hechos["si_no_hay_respuesta"] = {"se_avisa_a": a_quienes}
     if base.get("aviso") == "falta_de_respuesta":
         responsable = integrante(m.cur, tarea["responsable_membership_id"])
         hechos["responsable"] = responsable["nombre"] if responsable else None

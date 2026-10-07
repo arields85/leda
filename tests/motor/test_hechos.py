@@ -17,8 +17,8 @@ import json
 
 from leda.db import admin
 from leda.motor import avisos, hechos, preguntas
-from leda.motor.fichas import (EN_COLA_SIN_ENVIAR, ESPERA_ALGO_CIERTO, FICHAS, GUARDADO_SIN_ENVIAR,
-                               SALIDAS_DE_UN_BLOQUEO)
+from leda.motor.fichas import (ESPERA_ALGO_CIERTO, FICHAS, LLEGA, NO_LE_LLEGO, NO_LE_VA_A_LLEGAR,
+                               SALIDAS_DE_UN_BLOQUEO, YA_LE_LLEGO)
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.ia_real import DATOS, DIAS_PROXIMOS
 from leda.motor.instrucciones import INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION
@@ -35,13 +35,25 @@ from tests.motor.ayudantes import (AHORA, SITUACION, ProveedorFalso, ia_real_fal
 # --- El vocabulario ---------------------------------------------------------------------------
 
 def test_cada_codigo_del_motor_tiene_su_significado():
-    """Las jugadas y sus datos, los tipos de pregunta y de aviso, los estados de un efecto que
-    pasa después, las salidas y lo que Leda espera saber: lo que un hecho nombra con un código,
-    la IA lo lee con su significado."""
+    """Las jugadas y sus datos, los tipos de pregunta y de aviso, si un aviso le llega a quien
+    lo recibe, las salidas y lo que Leda espera saber: lo que un hecho nombra con un código, la
+    IA lo lee con su significado."""
     codigos = (set(FICHAS) | set(preguntas.TIPOS) | set(avisos.TIPOS) | set(DATOS)
-               | {GUARDADO_SIN_ENVIAR, EN_COLA_SIN_ENVIAR} | set(SALIDAS_DE_UN_BLOQUEO)
-               | set(ESPERA_ALGO_CIERTO))
+               | {LLEGA, YA_LE_LLEGO, NO_LE_VA_A_LLEGAR, NO_LE_LLEGO}
+               | set(SALIDAS_DE_UN_BLOQUEO) | set(ESPERA_ALGO_CIERTO))
     assert not {c for c in codigos if not hechos.significado(c)}, codigos
+
+
+def test_lo_que_pasa_despues_se_cuenta_como_pasa_en_el_mundo():
+    """Hablar del mundo y no de la cocina (usuario, 2026-10-06, de la prueba por Telegram real:
+    "el aviso a Ismael está guardado, todavía no salió"). Ningún código ni significado describe
+    el estado interno de un aviso: lo que la IA lee, lo repite."""
+    for codigo in ("guardado_sin_enviar", "en_cola_sin_enviar", "retirado_sin_enviar",
+                   "enviado", "no_salio", "todavia_no", "sale", "ya_no_sale"):
+        assert hechos.significado(codigo) is None, codigo
+    for nombre, texto in hechos.SIGNIFICADOS.items():
+        for palabra in ("guardad", "en cola", "sin enviar", "enviarse"):
+            assert palabra not in texto.lower(), (nombre, palabra)
 
 
 def test_dos_atrasos_distintos_tienen_dos_claves_distintas():
@@ -64,13 +76,13 @@ def test_sin_significado_nombra_lo_que_no_esta_en_el_vocabulario():
 def test_el_bloque_de_significados_trae_solo_lo_que_el_pedido_usa():
     pedido = {"hechos": [{"jugada": "anotar_prevision", "resultado": "anotado",
                           "atraso_si_se_cumple_la_prevision_dias_habiles": 3,
-                          "aviso_al_referente": {"estado": GUARDADO_SIN_ENVIAR}}]}
+                          "aviso_al_referente": {"a": "Ismael", LLEGA: YA_LE_LLEGO}}]}
 
     bloque = hechos.bloque(pedido)
 
-    for clave in ("hechos", "jugada", "resultado", "aviso_al_referente", "estado",
+    for clave in ("hechos", "jugada", "resultado", "aviso_al_referente", "a", LLEGA,
                   "atraso_si_se_cumple_la_prevision_dias_habiles", "anotar_prevision",
-                  "anotado", GUARDADO_SIN_ENVIAR):
+                  "anotado", YA_LE_LLEGO):
         assert f"- {clave}: {hechos.significado(clave)}" in bloque, clave
     assert "- atraso_dias_habiles:" not in bloque
     assert "- anotar_bloqueo:" not in bloque

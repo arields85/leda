@@ -92,9 +92,9 @@ respuesta ambigua, no puede quedar así"), y 9j.
      guardado para el jueves no sale (se omite con su motivo: ya contestó). El seguimiento se mueve al
      martes 3, la fecha que dio Marcos (9i).
    - La respuesta dice: que anotó que la termina el martes 3; que la fecha comprometida sigue siendo el
-     martes 27; lo del aviso a Ismael según su estado (guardado, todavía no salió, o cuándo sale).
-   - La respuesta no dice: que la fecha comprometida cambió; que Ismael ya lo sabe si el aviso no salió;
-     otra pregunta.
+     martes 27; que Ismael se va a enterar, y cuándo si lo dice, como algo que todavía no pasó.
+   - La respuesta no dice: que la fecha comprometida cambió; que Ismael ya lo sabe; que el aviso a
+     Ismael está guardado, en cola o sin enviar (conversación 18); otra pregunta.
    - Estado después: sin tema abierto, nada para después; ninguna espera abierta.
 
 7. **Nadie** escribe; del miércoles 28 al lunes 2, Leda no le escribe a Marcos sobre la tarea del PLC.

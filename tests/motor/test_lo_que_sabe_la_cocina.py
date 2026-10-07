@@ -65,8 +65,8 @@ def test_el_pedido_que_sigue_a_un_avance_dice_la_hora_en_que_de_verdad_sale(conn
     r = dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "voy bien"}),
              at=octubre(9, 11))
 
-    sale = r.hechos[0]["vuelve_a_pedir_el_estado"]["sale"]
-    assert datetime.fromisoformat(sale) == octubre(13, 10)     # el lunes 12 es feriado
+    llega = r.hechos[0]["vuelve_a_pedir_el_estado"]["llega"]
+    assert datetime.fromisoformat(llega) == octubre(13, 10)    # el lunes 12 es feriado
     [pedido] = avisos_guardados(conn, "repregunta_de_estado")
     assert pedido["programado_para"] == octubre(13, 10)
 
@@ -75,8 +75,8 @@ def test_el_aviso_al_referente_fuera_de_horario_sale_a_la_hora_de_salida(conn, m
     r = dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14"}),
              at=octubre(5, 17, 20))
 
-    sale = r.hechos[0]["aviso_al_referente"]["sale"]
-    assert datetime.fromisoformat(sale) == octubre(6, 10)
+    llega = r.hechos[0]["aviso_al_referente"]["llega"]
+    assert datetime.fromisoformat(llega) == octubre(6, 10)
 
 
 # --- 2. Desde cuándo está en su estado ---------------------------------------------------------

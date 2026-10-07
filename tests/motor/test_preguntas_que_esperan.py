@@ -65,8 +65,7 @@ def test_sin_respuesta_la_pregunta_se_repite_y_sigue_la_escalera_hasta_escalar(
 
     [tercera] = dias.ciclo(octubre(7, 10))
     assert tercera["hechos"][0]["numero"] == 3
-    assert tercera["hechos"][0]["si_no_hay_respuesta"] == {"se_avisa_a": ["Ismael"],
-                                                           "estado": "todavia_no"}
+    assert tercera["hechos"][0]["si_no_hay_respuesta"] == {"se_avisa_a": ["Ismael"]}
 
     [escalamiento] = dias.ciclo(octubre(8, 10))
     hechos = escalamiento["hechos"][0]

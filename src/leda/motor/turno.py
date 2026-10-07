@@ -56,8 +56,8 @@ from ..incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
 from ..salida import enqueue_outbox
 
 from . import cambios_de_estado, preguntas, registro
-from .efectos import ANUNCIADOS, YA_NO_SALE, al_final_del_turno
-from .fichas import EN_COLA_SIN_ENVIAR, JUGADAS, Contexto, Manejador, lo_que_puede_hacer
+from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
+from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
 from .situaciones import elegir_opcion
@@ -86,7 +86,9 @@ class ResultadoTurno:
     error: str | None = None
     repetido: bool = False      # el mensaje (o el toque) ya tenía su turno: no se hizo nada
     pregunta: dict[str, Any] | None = None      # la única que se hace en la respuesta
-    # Lo que un turno anterior anunció y ya no va a pasar, que la redacción recibió (9m.3).
+    # Lo que un turno anterior anunció y ya no va a pasar, que la redacción recibió (9m.3), en
+    # `ya_no_va_a_pasar`. El atributo conserva su nombre: el corredor de las conversaciones lo
+    # lee igual en los dos motores.
     ya_no_sale: list[dict[str, Any]] = dataclasses.field(default_factory=list)
 
 
@@ -167,7 +169,7 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
     # Lo anunciado y pendiente va en el resultado, fuera de los hechos: la IA no lo recibe en
     # los últimos turnos (sólo los hechos), y el turno siguiente lo vuelve a mirar.
     resultado = {"hechos": hechos, **({"pregunta": pregunta} if pregunta else {}),
-                 **({YA_NO_SALE: final.ya_no_sale} if final.ya_no_sale else {}),
+                 **({YA_NO_VA_A_PASAR: final.ya_no_sale} if final.ya_no_sale else {}),
                  **({ANUNCIADOS: final.anunciados} if final.anunciados else {}),
                  **({cambios_de_estado.CLAVE: cambios} if cambios else {})}
     turno = _registrar_entrada(cur, ctx, reloj.ahora(), elegidas, resultado, ia.nombre,
@@ -284,12 +286,12 @@ def _pedido_de_redaccion(ctx: Contexto, hechos: list[dict[str, Any]],
                          ya_no_sale: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Lo que la IA recibe para redactar: hoy, a quién le escribe, su mensaje (o la opción que
     tocó), los hechos (con lo que se dice sólo si se pregunta, `SOLO_SI_PREGUNTA`), lo que un
-    mensaje anterior anunció y ya no va a pasar (`ya_no_sale`, si hay), la única pregunta que
-    se hace, si hay, y los últimos turnos."""
+    mensaje anterior anunció y ya no va a pasar (`ya_no_va_a_pasar`, si hay), la única
+    pregunta que se hace, si hay, y los últimos turnos."""
     return {"hoy": _hoy(ctx), "persona": ctx.quien.nombre,
             "mensaje": ctx.texto if ctx.toque is None else None,
             **({"toco": ctx.toque} if ctx.toque is not None else {}),
-            "hechos": hechos, **({"ya_no_sale": ya_no_sale} if ya_no_sale else {}),
+            "hechos": hechos, **({YA_NO_VA_A_PASAR: ya_no_sale} if ya_no_sale else {}),
             "pregunta": pregunta, "ultimos_turnos": list(ctx.ultimos_turnos)}
 
 
@@ -314,11 +316,12 @@ def _manejar(ctx: Contexto, jugada: Jugada, jugadas: Mapping[str, Manejador]) ->
     if manejador is None:
         # Que se avisó al administrador es cierto, pero se dice sólo si la persona lo
         # pregunta (9g): va en `solo_si_pregunta`, que la redacción trata siempre igual. Con
-        # su estado, como todo aviso: queda en la cola del bot de administración.
+        # cuándo le llega, como todo aviso: sale enseguida por el bot de administración.
         return {"jugada": jugada.nombre, "resultado": "fuera_de_la_lista",
                 "lo_que_puede_hacer": lo_que_puede_hacer(jugadas),
                 SOLO_SI_PREGUNTA: {
-                    "aviso_al_administrador": {"estado": EN_COLA_SIN_ENVIAR}}}
+                    "aviso_al_administrador": {
+                        LLEGA: ctx.ahora.astimezone(ctx.calendario.zona).isoformat()}}}
     return manejador(ctx, jugada)
 
 

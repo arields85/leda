@@ -57,8 +57,8 @@ def test_un_inicio_con_la_tarea_vencida_se_anota_y_pregunta_para_cuando(conn, mu
     assert r.pregunta["tipo"] == FECHA and _abierta(conn) == FECHA
     # No es algo cierto sobre cuándo: la espera sigue y mañana se vuelve a pedir el estado.
     assert _esperas_abiertas(conn) == 1
-    assert hecho["vuelve_a_pedir_el_estado"]["estado"] == "guardado_sin_enviar"
-    assert hecho["vuelve_a_pedir_el_estado"]["sale"].startswith("2026-10-14")
+    assert list(hecho["vuelve_a_pedir_el_estado"]) == ["llega"]
+    assert hecho["vuelve_a_pedir_el_estado"]["llega"].startswith("2026-10-14")
     [repregunta] = avisos_guardados(conn, "repregunta_de_estado")
     assert repregunta["estado"] == "guardado"
 

@@ -144,7 +144,7 @@ class ResultadoPaso:
     jugadas: list[dict[str, Any]] = field(default_factory=list)
     hechos: list[Any] = field(default_factory=list)
     pregunta: Any = None
-    ya_no_sale: list[Any] = field(default_factory=list)   # lo anunciado antes que ya no sale
+    ya_no_sale: list[Any] = field(default_factory=list)   # lo anunciado que ya no va a pasar
     salidas: list[Salida] = field(default_factory=list)
     latencia_ms: int | None = None
     fallas: list[cp.Falla] = field(default_factory=list)

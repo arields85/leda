@@ -147,8 +147,9 @@ def test_corregir_y_volver_a_una_prevision_anterior_rearma_su_aviso(conn, mundo,
 
     [hecho] = r.hechos
     assert hecho["vuelve_a"] == {"prevision": "2026-10-14"}
-    assert hecho["aviso_de_la_prevision_corregida"] == {"estado": "retirado_sin_enviar"}
-    assert hecho["aviso_de_la_prevision_anterior"]["estado"] == "guardado_sin_enviar"
+    assert hecho["aviso_de_la_prevision_corregida"] == {"a": "Ismael",
+                                                        "llega": "no_le_va_a_llegar"}
+    assert hecho["aviso_de_la_prevision_anterior"]["llega"].startswith("2026-10-06T10:00")
     ia = IAGuionada(redacciones=["Aviso del 14.", "Aviso de T2."])
     assert enviar(conn, mundo, ia, octubre(6, 10)) == {"enviado": 2}
     de_t1 = [p["hechos"][0] for p in ia.pedidos_de_redaccion
@@ -203,7 +204,7 @@ def test_si_la_ia_no_redacta_se_reintenta_a_los_1_2_4_y_8_minutos(conn, mundo, e
     assert falla["tipo"] == "falla_de_aviso"
     assert str(falla["destinatario_membership_id"]) == marcos["membership_id"]
     assert falla["hechos"]["aviso_que_no_salio"]["a"] == "Ismael"
-    assert falla["hechos"]["aviso_que_no_salio"]["estado"] == "no_salio"
+    assert falla["hechos"]["aviso_que_no_salio"]["llega"] == "no_le_llego"
     assert falla["hechos"]["aviso_que_no_salio"]["lo_pendiente"] == aviso["hechos"]
     assert cuantas(conn, "message_outbox", "not es_respuesta") == 0   # ningún texto fijo
 

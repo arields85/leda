@@ -21,7 +21,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from leda.motor.escalera import correr_escalera
-from leda.motor.fichas import GUARDADO_SIN_ENVIAR
+from leda.motor.fichas import LLEGA, NO_LE_VA_A_LLEGAR
 from leda.motor.hechos import sin_significado
 from leda.motor.ia import Jugada
 from leda.motor.tiempo import RelojFijo
@@ -30,7 +30,6 @@ from tests.motor.ayudantes import avisos_guardados, dice, espera_del_estado, oct
 
 
 VAGO = "voy bien, la tengo casi lista"
-RETIRADO = "retirado_sin_enviar"
 DE_UNA_PREGUNTA = ("repregunta", "escalamiento_de_una_pregunta")
 
 
@@ -65,16 +64,16 @@ def test_avance_y_fecha_en_un_mensaje_no_dicen_que_vuelve_a_pedir_el_estado(conn
 
     avance, prevision = resultado.hechos
     assert avance["jugada"] == "informar_avance"
-    # El pedido del día hábil siguiente quedó retirado por la fecha: nunca va a salir.
+    # El pedido del día hábil siguiente quedó retirado por la fecha: ya no va a pasar.
     vuelve = avance["vuelve_a_pedir_el_estado"]
-    assert vuelve["estado"] == RETIRADO and "sale" not in vuelve
+    assert vuelve[LLEGA] == NO_LE_VA_A_LLEGAR
     assert vuelve["motivo"] == "ya_respondio"
     assert avance["el_pedido_de_estado"] != "sigue_abierto"
     assert espera_del_estado(conn)["satisfecho_en"] is not None
     [repregunta] = avisos_guardados(conn, "repregunta_de_estado")
     assert (repregunta["estado"], repregunta["motivo_omision"]) == ("omitido", "ya_respondio")
-    # La fecha sigue diciendo lo suyo: su aviso al referente sigue guardado.
-    assert prevision["aviso_al_referente"]["estado"] == GUARDADO_SIN_ENVIAR
+    # La fecha sigue diciendo lo suyo: su aviso al referente le llega a la hora de salida.
+    assert prevision["aviso_al_referente"][LLEGA].startswith("2026-10-09")
     # Lo que va a la IA y al registro no lleva ids de la base, y todo tiene su significado.
     assert sin_significado(resultado.hechos) == set()
     registrado = uno(conn, """select resultado from conversation_turn
@@ -92,7 +91,7 @@ def test_destrabar_y_fecha_en_un_mensaje_no_dicen_que_vuelve_a_pedir_el_estado(c
     destrabe, prevision = resultado.hechos
     assert destrabe["jugada"] == "destrabar" and destrabe["resultado"] == "anotado"
     vuelve = destrabe["vuelve_a_pedir_el_estado"]
-    assert vuelve["estado"] == RETIRADO and "sale" not in vuelve
+    assert vuelve[LLEGA] == NO_LE_VA_A_LLEGAR
     assert prevision["resultado"] == "anotado"
     assert all(a["estado"] == "omitido" for a in avisos_guardados(conn, "repregunta_de_estado"))
     assert sin_significado(resultado.hechos) == set()
@@ -122,8 +121,8 @@ def test_una_sola_jugada_deja_su_efecto_como_estaba(conn, mundo, dias, escribe):
 
     [hecho] = resultado.hechos
     vuelve = hecho["vuelve_a_pedir_el_estado"]
-    assert vuelve["estado"] == GUARDADO_SIN_ENVIAR
-    assert datetime.fromisoformat(vuelve["sale"]) == octubre(13, 10)
+    assert set(vuelve) == {LLEGA}
+    assert datetime.fromisoformat(vuelve[LLEGA]) == octubre(13, 10)
     assert hecho["el_pedido_de_estado"] == "sigue_abierto"
     [repregunta] = avisos_guardados(conn, "repregunta_de_estado")
     assert repregunta["estado"] == "guardado"
@@ -137,10 +136,9 @@ def test_dos_fechas_en_un_mensaje_retiran_el_aviso_de_la_primera(conn, mundo, es
                      at=octubre(6, 10))
 
     primera, segunda = resultado.hechos
-    assert primera["aviso_al_referente"]["estado"] == RETIRADO
+    assert primera["aviso_al_referente"][LLEGA] == NO_LE_VA_A_LLEGAR
     assert primera["aviso_al_referente"]["motivo"] == "hay_una_prevision_mas_nueva"
-    assert "sale" not in primera["aviso_al_referente"]
-    assert segunda["aviso_al_referente"]["estado"] == GUARDADO_SIN_ENVIAR
+    assert segunda["aviso_al_referente"][LLEGA].startswith("2026-10-06")
     assert sin_significado(resultado.hechos) == set()
 
 

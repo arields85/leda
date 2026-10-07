@@ -1,8 +1,9 @@
 """Las instrucciones de la IA del motor.
 
 Las que pasaron la prueba real de la Etapa 2 (E2-3b; `odd/tasks/prueba-chica-del-motor.md`,
-sección 4), sin cambios; ADR 0018, decisión 1; `AGENTS.md`, la regla
-del mozo con su enmienda: las instrucciones describen el trabajo de la IA, sin frases de
+sección 4), con un solo cambio en la redacción, de la prueba por Telegram real: Leda cuenta lo
+que pasa en el mundo, no el estado de la cocina (usuario, 2026-10-06; conversación 18); ADR
+0018, decisión 1; `AGENTS.md`, la regla del mozo con su enmienda: las instrucciones describen el trabajo de la IA, sin frases de
 ejemplo, sin formas de pregunta y sin reglas para casos. Dos trabajos, dos instrucciones:
 
 - elegir las jugadas de la lista cerrada, con sus datos (`INSTRUCCIONES_JUGADAS`);
@@ -94,9 +95,10 @@ ayer, mañana o pasado mañana: los decís así, sin calcularlos.
 su título. Todo lo que un hecho dice que quedó anotado o cambió se cuenta; decís que algo \
 quedó anotado, cambió o se va a avisar sólo si un hecho lo dice; no agregás datos, fechas, \
 efectos ni promesas que los hechos no traen.
-- Un hecho sobre algo que pasa después, como un aviso a otra persona, trae su estado. Lo \
-contás según ese estado: lo que está guardado o en cola todavía no pasó, y no lo das por \
-hecho; si trae cuándo sale, podés decirlo.
+- Contás lo que pasa en el mundo: quién se entera de qué y cuándo, y lo que la persona va a \
+ver pasar. Nunca contás cómo el sistema guarda, ordena o manda lo que pasa después. Lo que \
+todavía no pasó lo contás en futuro y nunca lo das por hecho; que algo ya pasó lo decís sólo \
+si un hecho lo dice.
 - Si un hecho dice que falta un dato o que algo no se puede, decís qué y, si hace falta, \
 pedís lo que falta. Si trae salidas, las proponés para que la persona elija. Nunca más de una \
 pregunta por mensaje.
@@ -116,11 +118,12 @@ persona lo pregunta.
 - Sin hechos nuevos, la persona dijo o preguntó algo que no pide una jugada: le contestás \
 desde los últimos turnos y sus hechos (lo de solo_si_pregunta también, porque lo preguntó); \
 lo que no está ahí, decís que no lo sabés.
-- Lo que un mensaje anterior le contó que iba a pasar y los datos traen en ya_no_sale, lo \
-decís: ya no va a pasar, para que no lo siga esperando.
+- Lo que un mensaje anterior le contó que iba a pasar y los datos traen en ya_no_va_a_pasar \
+nunca lo volvés a anunciar. Lo decís sólo si a la persona le sirve saberlo; si lo que sí va a \
+pasar ya lo deja claro, alcanza con contar eso.
 - Todo mensaje termina con un próximo paso concreto, dicho una vez y en pocas palabras: lo \
-que vas a hacer y cuándo, sólo si un hecho lo dice (lo_que_sigue, o cuándo sale algo \
-guardado); o lo que la persona puede hacer, según lo que los hechos dicen que falta o que se \
+que vas a hacer y cuándo, sólo si un hecho lo dice (lo_que_sigue, o cuándo le llega algo \
+a la persona); o lo que la persona puede hacer, según lo que los hechos dicen que falta o que se \
 espera de la persona; o, si no queda nada pendiente, eso junto con lo que sigue. Si hacés una \
 pregunta, la pregunta es el próximo paso y va al final. Decir sólo que no hace falta responder \
 no es un próximo paso; en un aviso que no pide respuesta (necesita_respuesta falso), decirlo \

@@ -244,8 +244,7 @@ def test_elegir_escribiendo_completa_la_jugada_que_esperaba(conn, tareas, marcos
     assert r.hechos == [{"jugada": "anotar_inicio", "resultado": "anotado",
                          "estado": "en_curso", "tarea": T1,
                          "eligio": {"opcion": "O1", "etiqueta": T1["titulo"], "tarea": T1},
-                         "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-09",
-                                                                "estado": "todavia_no"}}}]
+                         "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-09"}}}]
     assert estado_de(conn, tareas["T1"]) == "en_curso"
     assert estado_de(conn, tareas["T2"]) == "asignada"
     pregunta = uno(conn, "select cierre, cierre_detalle from conversation_question")
@@ -394,7 +393,8 @@ def test_corregir_una_prevision_retira_su_aviso_y_la_anota_en_la_correcta(conn, 
     assert hecho["resultado"] == "corregido"
     assert hecho["vuelve_a"] == {"fecha_comprometida": "2026-10-09"}
     assert hecho["prevision_corregida"] == "2026-10-21"
-    assert hecho["aviso_de_la_prevision_corregida"] == {"estado": "retirado_sin_enviar"}
+    assert hecho["aviso_de_la_prevision_corregida"] == {"a": "Ismael",
+                                                        "llega": "no_le_va_a_llegar"}
     assert hecho["aplicado"]["resultado"] == "anotado" and hecho["aplicado"]["tarea"] == T2
     equivocada, correccion = todos(
         conn, """select id, fecha_prevista, es_correccion, reemplaza_id, atraso_dias_habiles
@@ -425,7 +425,7 @@ def test_corregir_una_prevision_cuyo_aviso_ya_salio_guarda_una_correccion(conn, 
     r = marcos.dice(Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1"}))
 
     assert r.hechos[0]["correccion_al_referente"]["a"] == "Ismael"
-    assert r.hechos[0]["correccion_al_referente"]["estado"] == "guardado_sin_enviar"
+    assert set(r.hechos[0]["correccion_al_referente"]) == {"a", "llega"}
     aviso = uno(conn, """select destinatario_membership_id, hechos, estado
                             from scheduled_notice where tipo = 'correccion_de_prevision'""")
     assert str(aviso["destinatario_membership_id"]) == \

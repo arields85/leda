@@ -156,7 +156,7 @@ def transcripciones(corridas: list[Corrida], *, ronda: str) -> str:
                     lineas.append(f"- jugadas: `{_json(p.jugadas)}`")
                     lineas.append(f"- hechos: `{_json(p.hechos)}`")
                     if p.ya_no_sale:
-                        lineas.append(f"- ya no sale: `{_json(p.ya_no_sale)}`")
+                        lineas.append(f"- ya no va a pasar: `{_json(p.ya_no_sale)}`")
                     if p.pregunta:
                         lineas.append(f"- pregunta: `{_json(p.pregunta)}`")
                     if p.latencia_ms is not None:

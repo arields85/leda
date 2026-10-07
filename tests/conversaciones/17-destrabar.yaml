@@ -131,7 +131,7 @@ pasos:
         tarea: PLC
         bloqueo_resuelto: {causa: "se quemo la fuente"}
         estado: en_curso
-        vuelve_a_pedir_el_estado: {estado: guardado_sin_enviar, sale: "~2026-10-26"}
+        vuelve_a_pedir_el_estado: {llega: "~2026-10-26"}
         veces_sin_algo_cierto: 1
         vencida: ausente
         pregunta: ausente

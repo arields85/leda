@@ -139,8 +139,7 @@ def test_el_inicio_pasa_la_tarea_a_en_curso_y_contesta_su_espera(conn, mundo, es
 
     assert hecho == {"jugada": "anotar_inicio", "resultado": "anotado", "estado": "en_curso",
                      "tarea": {"alias": "T1", "titulo": "Revisar el tablero"},
-                     "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-09",
-                                                            "estado": "todavia_no"}}}
+                     "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-09"}}}
     assert _estado_de(conn, mundo["tarea"]) == "en_curso"
     evento = _uno(conn, """select estado_anterior, estado_nuevo, actor_app_user_id
                              from task_state_event where task_id = %s""", mundo["tarea"])
@@ -215,11 +214,11 @@ def test_la_prevision_anota_el_atraso_en_dias_habiles_y_guarda_el_aviso(conn, mu
         # El atraso que tendrá la tarea si se cumple la previsión, nunca el de hoy (ronda 1).
         "atraso_si_se_cumple_la_prevision_dias_habiles": 1,
         "dependientes": ["Probar el tablero"],
-        # Guardado y todavía sin enviar, y cuándo sale, en la hora del espacio (9e).
-        "aviso_al_referente": {"a": "Ismael", "estado": "guardado_sin_enviar",
-                               "sale": "2026-10-05T10:00:00-03:00"},
+        # A quién le llega y cuándo se entera, en la hora del espacio (9e): lo que pasa en el
+        # mundo, nunca el estado interno del aviso (usuario, 2026-10-06).
+        "aviso_al_referente": {"a": "Ismael", "llega": "2026-10-05T10:00:00-03:00"},
         # El seguimiento pasa a la previsión (9i): Leda pide el estado el día previsto.
-        "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-13", "estado": "todavia_no"}}}
+        "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-13"}}}
     prevision = _uno(conn, "select * from task_forecast")
     assert prevision["fecha_prevista"] == date(2026, 10, 13)
     assert prevision["fecha_comprometida"] == VIERNES_9
@@ -250,9 +249,10 @@ def test_la_prevision_anota_el_atraso_en_dias_habiles_y_guarda_el_aviso(conn, mu
     assert aviso["turno_id"] == turno["id"]
 
 
-def test_la_redaccion_recibe_que_el_aviso_al_referente_todavia_no_salio(conn, mundo, escribe):
-    """Primer contacto real (2026-10-05): con sólo `a` y `sale`, la IA dijo que Ismael ya
-    estaba avisado. Todo hecho de un efecto que pasa después dice su estado, explícito."""
+def test_la_redaccion_recibe_cuando_se_entera_el_referente(conn, mundo, escribe):
+    """Primer contacto real (2026-10-05): con sólo `a` y su hora, la IA dijo que Ismael ya
+    estaba avisado. Prueba por Telegram real (2026-10-06): con el estado interno del aviso, la
+    IA lo repetía. El hecho dice cuándo se entera (`llega`), que todavía no pasó, y nada más."""
     quien, entrante = escribe("Marcos", "llego el 13, el proveedor se demoró")
     ia = IAGuionada(jugadas=[[Jugada("anotar_prevision", {"tarea": "T1",
                                                           "fecha": "2026-10-13"})]],
@@ -261,7 +261,7 @@ def test_la_redaccion_recibe_que_el_aviso_al_referente_todavia_no_salio(conn, mu
     conn.commit()
 
     [hecho] = ia.pedidos_de_redaccion[0]["hechos"]
-    assert hecho["aviso_al_referente"]["estado"] == "guardado_sin_enviar"
+    assert hecho["aviso_al_referente"] == {"a": "Ismael", "llega": "2026-10-05T10:00:00-03:00"}
     # Y es cierto: el aviso está guardado y nada salió para Ismael.
     assert _uno(conn, "select estado from scheduled_notice")["estado"] == "guardado"
     assert _cuantas(conn, "message_outbox") == 1          # sólo la respuesta a Marcos
@@ -490,8 +490,7 @@ def test_destrabar_cierra_el_bloqueo_y_la_tarea_vuelve_a_su_estado_de_antes(conn
     # Antes de su fecha, la escalera sigue sola: no se guarda ningún pedido.
     assert hecho == {"jugada": "destrabar", "resultado": "anotado", "tarea": T1,
                      "bloqueo_resuelto": {"causa": "espero el switch"}, "estado": antes,
-                     "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-09",
-                                                            "estado": "todavia_no"}}}
+                     "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-09"}}}
     assert _estado_de(conn, mundo["tarea"]) == antes
     bloqueo = _uno(conn, "select resuelto_en, resolucion from blocker")
     assert bloqueo["resuelto_en"] is not None
@@ -562,8 +561,8 @@ def test_destrabar_el_dia_del_vencimiento_vuelve_a_pedir_el_estado(conn, mundo, 
                      texto="ya cambie la fuente, sigo")
 
     assert hecho["resultado"] == "anotado" and hecho["estado"] == "asignada"
-    assert hecho["vuelve_a_pedir_el_estado"]["estado"] == "guardado_sin_enviar"
-    assert hecho["vuelve_a_pedir_el_estado"]["sale"].startswith("2026-10-06")
+    assert list(hecho["vuelve_a_pedir_el_estado"]) == ["llega"]
+    assert hecho["vuelve_a_pedir_el_estado"]["llega"].startswith("2026-10-06")
     assert hecho["veces_sin_algo_cierto"] == 1
     assert "vencida" not in hecho and "pregunta" not in hecho
     [pedido] = _todos(conn, "select tipo, estado, hechos from scheduled_notice")
@@ -585,7 +584,7 @@ def test_destrabar_una_tarea_vencida_pregunta_para_cuando(conn, mundo, escribe):
 
     assert hecho["vencida"]["atraso_dias_habiles"] == 1
     assert hecho["pregunta"] == "fecha_de_la_tarea"
-    assert hecho["vuelve_a_pedir_el_estado"]["sale"].startswith("2026-10-06")
+    assert hecho["vuelve_a_pedir_el_estado"]["llega"].startswith("2026-10-06")
     assert _cuantas(conn, "scheduled_notice where tipo = 'repregunta_de_estado'") == 1
 
 
@@ -662,8 +661,8 @@ def test_lo_que_no_esta_en_la_lista_no_hace_nada_y_avisa_al_administrador(conn, 
         {"jugada": nombre, "resultado": "fuera_de_la_lista",
          "lo_que_puede_hacer": [FICHAS[n].para_que for n in sorted(OFRECIDAS)],
          # Leda lo sabe, pero lo dice sólo si la persona lo pregunta (9g).
-         # El aviso queda en la cola del bot de administración: todavía no salió.
-         "solo_si_pregunta": {"aviso_al_administrador": {"estado": "en_cola_sin_enviar"}}}
+         # El aviso sale enseguida por el bot de administración: cuándo le llega.
+         "solo_si_pregunta": {"aviso_al_administrador": {"llega": "2026-10-05T10:00:00-03:00"}}}
         for nombre in ("recordar_algo_personal", "otra_cosa_nueva")]
     assert _estado_de(conn, mundo["tarea"]) == "asignada"
     # Un solo aviso por mensaje, que apunta al mensaje que lo provocó.
@@ -687,7 +686,7 @@ def test_lo_que_no_esta_en_la_lista_no_hace_nada_y_avisa_al_administrador(conn, 
     [entrada] = [t for t in ia.pedidos_de_jugadas[0]["ultimos_turnos"]
                  if t["sentido"] == "entrada"]
     assert entrada["hechos"][0]["solo_si_pregunta"] == {
-        "aviso_al_administrador": {"estado": "en_cola_sin_enviar"}}
+        "aviso_al_administrador": {"llega": "2026-10-05T10:00:00-03:00"}}
 
 
 # --- Aislamiento ----------------------------------------------------------------------------

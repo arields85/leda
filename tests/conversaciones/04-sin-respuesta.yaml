@@ -104,7 +104,7 @@ pasos:
         tipo: pedido_de_estado
         tarea: PLC
         hechos: {numero: 3, atraso_dias_habiles: 2,
-                 si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski], estado: todavia_no}}
+                 si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski]}}
     dice:
       - que la tarea del PLC venció el martes
       - que si no hay novedades se le va a avisar a Ismael

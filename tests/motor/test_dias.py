@@ -26,7 +26,7 @@ from tests.motor.ayudantes import (SITUACION, ProveedorFalso, ia_real_falsa, lla
 def test_cada_fecha_del_pedido_lleva_su_dia_y_su_relacion_con_hoy():
     pedido = {"hoy": "2026-10-26", "hechos": [
         {"vencida": {"fecha_comprometida": "2026-10-23"},
-         "vuelve_a_pedir_el_estado": {"sale": "2026-10-27T09:00:00-03:00"},
+         "vuelve_a_pedir_el_estado": {"llega": "2026-10-27T09:00:00-03:00"},
          "prevision": "2026-10-28"}],
         "ultimos_turnos": [{"at": "2026-10-25T10:00:00-03:00"}]}
 

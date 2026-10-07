@@ -63,7 +63,7 @@ pasos:
         tarea: PLC
         avance: {dijo: presente}
         el_pedido_de_estado: sigue_abierto
-        vuelve_a_pedir_el_estado: {estado: guardado_sin_enviar, sale: "~2026-10-28"}
+        vuelve_a_pedir_el_estado: {llega: "~2026-10-28"}
         veces_sin_algo_cierto: 1
         vencida: ausente
         pregunta: ausente
@@ -121,7 +121,7 @@ pasos:
         resultado: anotado
         tarea: PLC
         veces_sin_algo_cierto: 2
-        vuelve_a_pedir_el_estado: {estado: guardado_sin_enviar, sale: "~2026-10-29"}
+        vuelve_a_pedir_el_estado: {llega: "~2026-10-29"}
         vencida: {fecha_comprometida: "2026-10-27", atraso_dias_habiles: 1}
         pregunta: fecha_de_la_tarea
     pregunta: {tipo: fecha_de_la_tarea, tarea: PLC}
@@ -156,7 +156,7 @@ pasos:
     hechos:
       - {jugada: anotar_prevision, resultado: anotado, tarea: PLC, prevision: "2026-11-03",
          fecha_comprometida: "2026-10-27", atraso_si_se_cumple_la_prevision_dias_habiles: 5,
-         aviso_al_referente: {a: Ismael Soschinski, estado: guardado_sin_enviar}}
+         aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-28T10:45"}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
@@ -165,10 +165,11 @@ pasos:
     dice:
       - que anotó que la termina el martes 3
       - que la fecha comprometida sigue siendo el martes 27
-      - lo del aviso a Ismael según su estado
+      - que Ismael se va a enterar, y cuándo si lo dice, como algo que todavía no pasó
     no_dice:
       - que la fecha comprometida cambió
-      - que Ismael ya lo sabe si el aviso no salió
+      - que Ismael ya lo sabe
+      - que el aviso a Ismael está guardado, en cola o sin enviar
       - otra pregunta
 
   - paso: 7

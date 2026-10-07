@@ -219,8 +219,8 @@ def test_con_una_prevision_el_vencimiento_lleva_un_recordatorio_y_la_escalera_va
     assert hechos["prevision_vigente"] == {
         "fecha": "2026-10-15", "motivo": "el proveedor",
         "atraso_si_se_cumple_la_prevision_dias_habiles": 3,
-        "aviso_al_referente": {"a": "Ismael", "estado": "enviado"}}
-    assert hechos["pide_el_estado_el"] == {"fecha": "2026-10-15", "estado": "todavia_no"}
+        "aviso_al_referente": {"a": "Ismael", "llega": "ya_le_llego"}}
+    assert hechos["pide_el_estado_el"] == {"fecha": "2026-10-15"}
     assert espera_del_estado(conn) is None
     assert cuantas(conn, "conversation_question", "cerrada_en is null") == 0
     # Uno solo, y nada cada día hasta la previsión (el lunes 12 es feriado).

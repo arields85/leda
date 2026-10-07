@@ -65,7 +65,7 @@ pasos:
         prevision: "2026-10-27"
         fecha_comprometida: "2026-10-23"
         atraso_si_se_cumple_la_prevision_dias_habiles: 2
-        aviso_al_referente: {a: Ismael Soschinski, estado: guardado_sin_enviar}
+        aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-20T15:40"}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
@@ -73,10 +73,11 @@ pasos:
     dice:
       - la previsión del 27 y su motivo
       - que la fecha comprometida sigue siendo el 23
-      - que Ismael se entera, sólo si el código informa que el aviso quedó guardado
+      - que Ismael se va a enterar, y cuándo si lo dice, como algo que todavía no pasó
     no_dice:
       - que la fecha cambió
       - que Ismael aceptó
+      - que el aviso a Ismael está guardado, en cola o sin enviar
       - que la tarea está bloqueada
 
   - paso: 3
@@ -117,14 +118,14 @@ pasos:
           prevision_vigente:
             fecha: "2026-10-27"
             atraso_si_se_cumple_la_prevision_dias_habiles: 2
-            aviso_al_referente: {a: Ismael Soschinski, estado: enviado}
-          pide_el_estado_el: {fecha: "2026-10-27", estado: todavia_no}
+            aviso_al_referente: {a: Ismael Soschinski, llega: ya_le_llego}
+          pide_el_estado_el: {fecha: "2026-10-27"}
     estado_despues:
       pregunta_abierta: null
       esperas_abiertas: []
     dice:
       - que la tarea del PLC vencía hoy
-      - que Marcos dio el 27 como previsión y que Ismael está al tanto (según el estado de su aviso)
+      - que Marcos dio el 27 como previsión y que Ismael está al tanto (ya le llegó el aviso)
       - que el martes 27 le va a pedir el estado, como algo que todavía no pasó
     no_dice:
       - que la fecha cambió
@@ -178,7 +179,7 @@ pasos:
         tipo: pedido_de_estado
         tarea: PLC
         hechos: {numero: 3, seguimiento_por: prevision,
-                 si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski], estado: todavia_no}}
+                 si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski]}}
       - a: Ismael
         el: "2026-10-30"
         tipo: escalamiento

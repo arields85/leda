@@ -20,7 +20,7 @@ from datetime import date, datetime
 from leda.db import admin, conectar
 from leda.motor.ancla import candado, fecha_de_la_clave
 from leda.motor.escalera import correr_escalera
-from leda.motor.fichas import GUARDADO_SIN_ENVIAR
+from leda.motor.fichas import LLEGA, YA_LE_LLEGO
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import procesar_turno
@@ -60,13 +60,14 @@ def test_un_avance_se_anota_con_sus_palabras_y_la_espera_sigue_abierta(conn, mun
     resultado = _escribe(conn, escribe, VAGO, _avance(VAGO), at=octubre(9, 10, 30))
 
     [hecho] = resultado.hechos
-    sale = hecho.pop("vuelve_a_pedir_el_estado")
+    vuelve = hecho.pop("vuelve_a_pedir_el_estado")
     assert hecho == {"jugada": "informar_avance", "resultado": "anotado", "tarea": T1,
                      "avance": {"dijo": VAGO}, "el_pedido_de_estado": "sigue_abierto",
                      "veces_sin_algo_cierto": 1}
-    # Un efecto que pasa después, con su estado: el día hábil siguiente (el lunes es feriado).
-    assert sale["estado"] == GUARDADO_SIN_ENVIAR
-    assert datetime.fromisoformat(sale["sale"]) == octubre(13, 10)  # a la hora de salida
+    # Lo que pasa después, como pasa en el mundo: cuándo le llega, el día hábil siguiente (el
+    # lunes es feriado), a la hora de salida. Nunca el estado interno del aviso.
+    assert set(vuelve) == {LLEGA}
+    assert datetime.fromisoformat(vuelve[LLEGA]) == octubre(13, 10)
     assert resultado.pregunta is None                           # la primera vez, no pregunta
     # Ni estado, ni fecha, ni previsión, ni aviso a Ismael.
     assert str(uno(conn, "select estado from task")["estado"]) == "asignada"
@@ -193,7 +194,7 @@ def test_a_la_segunda_pregunta_la_fecha_y_con_la_fecha_es_una_prevision(conn, mu
 
     [hecho] = resultado.hechos
     assert hecho["veces_sin_algo_cierto"] == 2 and hecho["pregunta"] == "fecha_de_la_tarea"
-    assert hecho["vuelve_a_pedir_el_estado"]["estado"] == GUARDADO_SIN_ENVIAR
+    assert hecho["vuelve_a_pedir_el_estado"][LLEGA].startswith("2026-10-14")
     assert resultado.pregunta["tipo"] == "fecha_de_la_tarea"   # la única de la respuesta
     assert resultado.pregunta["tarea"] == T1
     assert espera_del_estado(conn)["satisfecho_en"] is None
@@ -283,7 +284,7 @@ def test_un_avance_despues_de_escalar_no_vuelve_a_pedir_y_lo_dice(conn, mundo, d
     [hecho] = resultado.hechos
     assert hecho["resultado"] == "anotado" and "vuelve_a_pedir_el_estado" not in hecho
     assert hecho["no_vuelve_a_pedir_el_estado"] == {
-        "motivo": "ya_se_escalo", "escalado_a": [{"a": "Ismael", "estado": "enviado"}]}
+        "motivo": "ya_se_escalo", "escalado_a": [{"a": "Ismael", LLEGA: YA_LE_LLEGO}]}
     assert _repreguntas(conn) == []
     for dia in (16, 19, 20):
         assert dias.ciclo(octubre(dia, 10)) == []
@@ -300,7 +301,7 @@ def test_con_el_ancla_en_una_prevision_el_avance_vuelve_a_pedir_en_su_escalera(c
 
     resultado = _escribe(conn, escribe, VAGO, _avance(VAGO), at=octubre(15, 12, 30))
 
-    assert resultado.hechos[0]["vuelve_a_pedir_el_estado"]["estado"] == GUARDADO_SIN_ENVIAR
+    assert resultado.hechos[0]["vuelve_a_pedir_el_estado"][LLEGA].startswith("2026-10-16")
     [repregunta] = _repreguntas(conn)
     # El anclaje de la previsión del 15 (la fecha y la previsión que lo empezó, `ancla.py`).
     assert fecha_de_la_clave(repregunta) == date(2026, 10, 15)

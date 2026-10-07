@@ -90,5 +90,8 @@ def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
     assert huellas == HUELLAS_DE_LA_PRUEBA_REAL
 
 
-# Las de `prueba_chica/instrucciones.py`, la ronda 3 (85 de 85) y la prueba por Telegram.
-HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "e5c5767b4f7312fd"}
+# Las de `prueba_chica/instrucciones.py`, la ronda 3 (85 de 85) y la prueba por Telegram; la
+# de la redacción cambió a propósito el 2026-10-07 con una sola regla, decidida por el usuario
+# el 2026-10-06 tras la prueba por Telegram: Leda cuenta lo que pasa en el mundo (quién se
+# entera de qué y cuándo), no el estado de la cocina (conversación 18). Antes: "e5c5767b4f7312fd".
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "3deabdc072e8045d"}
