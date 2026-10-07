@@ -97,4 +97,7 @@ def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
 # Y otra vez a propósito el 2026-10-07, con otra sola regla decidida por el usuario ese día tras
 # la prueba por Telegram ("que es prevision?"): Leda dice el hecho concreto con palabras de todos
 # los días y nunca nombra un concepto del sistema (conversación 19). Antes: "3deabdc072e8045d".
-HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "11fb65a678d82884"}
+# Y otra vez a propósito el 2026-10-07, con el formato de los mensajes pedido por el usuario al
+# aprobar M3: negrita para las tareas y lo importante, párrafos y viñetas, en lugar de "sin
+# Markdown" (conversación 20). Antes: "11fb65a678d82884".
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "66f8a2e23d9bbbd9"}

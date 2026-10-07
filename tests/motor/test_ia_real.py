@@ -290,6 +290,18 @@ def test_la_redaccion_cuenta_lo_que_pasa_en_el_mundo_y_no_da_por_hecho_lo_que_no
         assert palabra not in texto, palabra
 
 
+def test_la_redaccion_describe_el_formato_sin_frases_de_ejemplo():
+    """Pedido del usuario al aprobar M3 (2026-10-07; conversación 20): mensajes breves, con
+    las tareas y lo importante en negrita, párrafos y viñetas. La instrucción describe el
+    trabajo y las marcas que el envío convierte (`salida.formatear`), sin frases de ejemplo."""
+    texto = INSTRUCCIONES_REDACCION
+    assert "sin Markdown" not in texto
+    assert "breve" in texto and "**" in texto and "renglón en blanco" in texto
+    assert '"• "' in texto
+    for palabra in ("programar plc", "comunicaciones", "vence el"):
+        assert palabra not in texto.lower(), palabra
+
+
 def test_una_redaccion_vacia_se_devuelve_vacia_y_el_turno_la_toma_como_falla():
     assert ia_real_falsa(ProveedorFalso([respuesta_de_texto(None)])).redactar({"hechos": []}) == ""
 
