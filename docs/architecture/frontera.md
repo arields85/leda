@@ -21,9 +21,9 @@ resulta más fácil escribirla. Eso ya ocurrió en este proyecto.
 
 Dos ejercicios progresivos fallaron porque el modelo no iniciaba de forma confiable
 el circuito de creación de tareas. En ambos casos la corrección movió autoridad hacia
-el servidor. El resultado acumulado es que `src/leda/ingreso_tareas.py` tiene 1218
+el servidor. El resultado acumulado fue que `src/leda/ingreso_tareas.py` llegó a 1218
 líneas, más que `src/leda/agente.py` (290) y `src/leda/herramientas.py` (573)
-sumados.
+sumados. Los dos primeros se borraron con los flujos A y B (E3-4).
 
 Cada una de esas correcciones fue técnicamente razonable. Ninguna fue una decisión
 de arquitectura tomada de frente. La frontera existe para que la próxima corrección
@@ -94,10 +94,10 @@ Un puerto es un contrato que el núcleo define y un adaptador implementa.
 | Adaptador | Estado | Evidencia |
 |---|---|---|
 | Telegram | Existe | `src/leda/despachador.py:66` |
-| Proveedores LLM | Existen | `src/leda/llm.py` |
-| Jev (decisión con duda) | Existe | `src/leda/jev.py`; hoy sólo resuelve referencias a tareas. |
+| Proveedores LLM | Existe uno, descartable | El cliente de la prueba chica (`prueba_chica/ia_real.py`), compatible con OpenAI; `src/leda/llm.py` guarda sólo las direcciones de los proveedores y el tiempo máximo. Los proveedores de los flujos A y B se borraron (E3-3). |
+| Jev (decisión con duda) | No existe | `src/leda/jev.py` se borró con los flujos A y B (E3-4); la prueba chica lo dejó fuera ([`ADR 0018`](../decisions/0018-motor-de-conversacion.md), nota de la decisión 7). |
 | Importador de paquetes | Existe | `src/leda/importador.py:211` |
-| Tablero de cliente | Existe en parte | La lectura: `GET /tablero/{token}` (`src/leda/gateway.py`, `_servir_tablero`), con enlace personal, consume el puerto de Lectura. La parte que consume el de Configuración no existe. Alcanza un solo espacio. |
+| Tablero de cliente | Existe en parte | La lectura: `GET /tablero/{token}` (`src/leda/entrada.py`), con enlace personal, consume el puerto de Lectura. La parte que consume el de Configuración no existe. Alcanza un solo espacio. |
 | Panel de plataforma | No existe | Alcanza todos los espacios: da de alta clientes y conduce la entrevista de alta (que no aplica en esta etapa: ADR 0017, decisión 7). Su autenticación es una decisión abierta. |
 | Plataforma web de tareas | No existe | [`ADR 0017`](../decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisión 5: carga de tareas con un formulario, su estado, cambio de fechas por retrasos e integrantes. Lleva su propio ADR antes del código; si es parte del tablero, del panel o una superficie aparte, y cómo cumple el [`ADR 0004`](../decisions/0004-dos-superficies-separadas.md), está `PENDIENTE` en ese ADR. |
 | Aplicación móvil | No existe | — |
@@ -151,7 +151,7 @@ incumplidas hoy, y una es parcial.
 |---|---|---|
 | 1. Aislamiento entre clientes | **Cumplida** | Migración `0003`: ambas tablas de eventos llevan `workspace_id`, con RLS forzado y política de aislamiento. El valor lo deriva un disparador `before insert` desde la fila padre, con privilegios del llamador, de modo que una tarea de otro espacio y una inexistente fallan idéntico. Migración `0004`: las cuatro funciones `security definer` pertenecen a `leda_owner`, que no inicia sesión, no tiene miembros y no saltea la RLS. Migración `0005`: `audit_log`, `incident` y `absence` quedan bajo política; el espacio de la auditoría lo fija la sesión, nunca quien escribe. |
 | 2. El núcleo no conoce el transporte | **Incumplida** | `message_outbox` tiene `chat_id` y `telegram_message_id` y no tiene columna de canal (`db/esquema.sql:533,548`). |
-| 3. Límites de transporte fuera del negocio | **Incumplida** | `telegram_utf16_units` (`src/leda/salida.py:39`) se usa para decidir la validez de datos de negocio en `src/leda/ingreso_tareas.py:532,547,554,1118`. |
+| 3. Límites de transporte fuera del negocio | **Incumplida** | `telegram_utf16_units` (`src/leda/salida.py:39`) se usa para decidir la validez de datos de negocio en `herramientas.crear_borrador_tarea` (límites de los campos y de la evidencia); antes, también en `ingreso_tareas.py`, borrado en la E3-4. |
 | 4. Estado por eventos | **Cumplida** | `bloquear_estado_directo()` impide el `update` directo sobre la tarea (`db/esquema.sql:1231`); el estado es proyección. |
 | 5. Configuración como dato versionado | **Cumplida** | `area` y `rol` son tablas con alcance de espacio (`db/esquema.sql:106,114`); el importador de paquetes es genérico (`src/leda/importador.py:211`). |
 | 6. Autoridad revalidada en la frontera | **Parcial** | Existe la resolución de identidad y autoridad (`src/leda/autoridad.py`) y el límite dedicado de conversión. Falta el grafo de transiciones: `actualizar_estado` acepta cualquier destino del tipo enumerado sin validar que la transición sea legítima (`src/leda/herramientas.py:464-491`). |

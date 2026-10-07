@@ -39,22 +39,40 @@ src/leda/
   config.py            Credenciales y rutas. Nada de política.
   db.py                Conexión, rol y espacio activo
   importador.py        Pack YAML → base, con las validaciones del alta
+  siembra.py           Datos ficticios para probar (python -m leda sembrar)
   calendario.py        Días hábiles y feriados
   escalera.py          Recordatorios anclados al vencimiento
   reloj.py             Cadencia y planificador
+  ciclo.py             El ciclo de fondo: cadencias, escalera, despacho, huérfanos
+  salida.py            Lo que sale: validación del texto y la cola (outbox)
   despachador.py       Cola de salida hacia Telegram
+  saludo.py            El saludo del día, una vez por persona
   autoridad.py         Permisos, verificados del lado del servidor
   onboarding.py        Enlaces de activación individuales
   herramientas.py      Lo único que Leda puede hacer en el mundo
-  contexto.py          Núcleo, espacio y momento, en ese orden
-  llm.py               Proveedor de modelo detrás de una interfaz
-  agente.py            El turno: mensaje entra, respuesta a la cola
-  entrada.py           Aplicación HTTP: webhook, tablero y salud
-  gateway.py           La conversación del webhook, un bot por espacio
+  pendientes.py        Acciones congeladas hasta que una persona confirma o elige
+  menu_tarea.py        Los cambios pedidos vigentes de una tarea
+  lectura.py           Lecturas del estado de un espacio
+  huerfanos.py         Aviso neutro a un mensaje que quedó sin respuesta
+  incidentes.py        Incidentes sanitizados y aviso a la administración
+  llm.py               Direcciones de los proveedores y tiempo máximo de la IA
+  entrada.py           Aplicación HTTP: tablero y salud
+  tablero.py           El tablero de sólo lectura de un espacio
+  tablero_vista.py     Su página
   cli.py               python -m leda …
 ```
 
+La conversación de los flujos A y B (`gateway`, `agente`, `contexto`, `ingreso_tareas`
+y sus módulos) se borró en la Etapa 3 del Motor (`docs/STATUS.md`). Hasta que entre el
+motor de conversación definitivo (tarea E3-7), Leda no recibe mensajes: no hay ruta de
+webhook. El motor de la prueba chica, descartable, vive en `prueba_chica/` y se escucha
+con `python -m prueba_chica.escuchar <espacio>` (`PRUEBA-LOCAL.md`).
+
 ## El turno del agente
+
+> El turno que describe esta sección era el de los flujos A y B, que se borraron (E3-3 y
+> E3-4). El principio sigue: el motor de conversación definitivo pide herramientas y el
+> servidor las valida (ADR 0018).
 
 El modelo no escribe en la base. Pide una herramienta; la herramienta valida la
 autoridad de quien la pidió y recién ahí toca algo. Es la diferencia entre una
@@ -86,7 +104,7 @@ python -m leda esquema
 python -m leda importar corework            # revisar advertencias
 python -m leda feriados corework
 python -m leda importar corework --activar
-python -m leda servir
+python -m leda servir     # tablero, salud y ciclo de fondo; sin conversación hasta la E3-7
 ```
 
 Después, el alta de cada persona:
@@ -180,13 +198,11 @@ personas: la autoridad del espacio **autoriza**, el administrador de plataforma
 - Cola de salida: no escribe fuera de horario, reintenta, abre incidente al
   agotar intentos y respeta el tope de mensajes por persona.
 - Autoridad verificada del lado del servidor, con los dos ejes de rol.
-- Turno del agente completo: webhook, contexto, herramientas validadas,
-  corrección de vocabulario y respuesta por la cola.
+- Herramientas validadas en el servidor y respuesta por la cola. El turno del
+  agente de los flujos A y B se borró; vuelve con el motor de conversación (E3-7).
 - Acciones pendientes: una herramienta con sus argumentos queda congelada
   hasta que la persona confirma o elige. El toque de un botón la ejecuta; el
   de otro integrante, no. Dos toques ejecutan una sola vez.
-- Memoria de la conversación: el turno trae lo que se dijeron en las últimas
-  horas de ese chat. De su propio lado sólo cuenta lo que efectivamente salió.
 
 ## Qué falta
 

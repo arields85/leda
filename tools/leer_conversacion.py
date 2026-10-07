@@ -3,7 +3,9 @@ botones que ofreció cada mensaje y la etiqueta de cada toque.
 
 Herramienta de desarrollo para leer las pruebas por Telegram sin capturas. Usa la base
 de `LEDA_DB_URL` del checkout desde el que se corre (worktree con `PYTHONPATH=src`
-para `leda_flujo`; checkout principal para `leda`). Sólo lee.
+para `leda_flujo`; checkout principal para `leda`). Sólo lee. Las etiquetas de los botones
+del alta guiada ya no se muestran: sus tablas se borraron con la migración 0032; para
+`leda_flujo` o `leda`, correrla desde esos checkouts.
 
 Uso: python tools/leer_conversacion.py [minutos] [desde HH:MM] [--completo]
 
@@ -30,8 +32,6 @@ select cuando, quien, texto, botones from (
          coalesce(i.texto,
                   (select '«' || o.etiqueta || '»' from leda.pending_action_option o
                     where o.token = substr(i.boton_callback, 3) limit 1),
-                  (select '«' || ch.etiqueta || '»' from leda.task_intake_choice ch
-                    where ch.token = substr(i.boton_callback, 3) limit 1),
                   i.boton_callback) texto,
          '' botones
     from leda.inbound_message i left join leda.app_user u on u.id = i.app_user_id
@@ -42,8 +42,6 @@ select cuando, quien, texto, botones from (
          coalesce(
            (select string_agg(op.etiqueta, ' | ' order by op.orden)
               from leda.pending_action_option op where op.pending_action_id = o.pending_action_id),
-           (select string_agg(ch.etiqueta, ' | ' order by ch.orden)
-              from leda.task_intake_choice ch where ch.choice_set_id = o.intake_choice_set_id),
            '')
     from leda.message_outbox o
     left join leda.membership m on m.id = o.destinatario_membership_id

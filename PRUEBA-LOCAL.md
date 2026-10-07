@@ -59,7 +59,7 @@ El modelo no va en el pack ni en el núcleo: es configuración, y se cambia sin
 tocar un archivo. Para ver cuáles ofrece un proveedor, `python -m leda
 modelos --proveedor anthropic`; sin argumentos, `python -m leda modelo`
 muestra el que está activo. La credencial depende del proveedor: `openrouter`
-usa `LEDA_OPENROUTER_API_KEY` (la misma de Jev) y los demás
+usa `LEDA_OPENROUTER_API_KEY` y los demás
 `LEDA_LLM_API_KEY`; si falta la que corresponde, Leda lo registra como
 incidente en vez de usar la otra.
 
@@ -68,6 +68,8 @@ para que un pedido colgado del proveedor no deje esperando a la persona más de 
 razonable. Se ajustan en `parametros` de `model_config` con `timeout_s` (por
 defecto 20 segundos) y `reintentos` (por defecto 2). Un timeout que agota los
 reintentos se trata como cualquier otro error del proveedor: incidente y disculpa.
+El cliente de la prueba chica (`prueba_chica/ia_real.py`) usa `timeout_s`; no reintenta
+por su cuenta: el reintento, uno solo, lo hace el turno.
 
 ## 3. Dar de alta a los tres
 
@@ -84,18 +86,18 @@ existen, tienen tareas y cuentan para cerrar objetivos, pero no reciben nada.
 
 ## 4. Escuchar
 
-```bash
-python -m leda escuchar corework
-```
+> `python -m leda escuchar` y `python -m leda correr` se borraron con la conversación de
+> los flujos A y B (Etapa 3 del Motor, `docs/STATUS.md`). La entrada de mensajes vuelve
+> con el motor de conversación definitivo (tarea E3-7); hasta entonces, `python -m leda`
+> no recibe mensajes.
 
-Ese proceso hace todo: recibe mensajes, contesta, dispara las cadencias que
-ya vencieron, corre la escalera de recordatorios y despacha la cola. Ctrl+C
-para cortar. Para probar sin que dispare cadencias automáticas (por ejemplo,
-para no mezclar los mensajes de una cadencia con lo que se está probando a
-mano), agregá `--sin-cadencias`; la escalera y el despacho siguen igual:
+El motor de la prueba chica (descartable, `prueba_chica/`) tiene su propio escuchador,
+con el `.venv` de la carpeta: recibe mensajes, contesta, corre su ciclo (despacho, avisos
+a la administración y, con el seguimiento prendido, la escalera) y despacha la cola.
+Ctrl+C para cortar:
 
 ```bash
-python -m leda escuchar corework --sin-cadencias
+python -m prueba_chica.escuchar corework
 ```
 
 En otra terminal, para ver cómo va:
@@ -175,13 +177,13 @@ Ese contraste es lo que muestra que la cadena es por persona y no por área.
 
 ### Cadencias sin esperar al lunes
 
-Con `escuchar` (o `servir`) corriendo, cada cadencia se dispara sola apenas
-vence su horario -- no hace falta reiniciar el proceso ni volver a importar
-el pack para que un horario editado tome efecto. Para no esperar ni eso:
+Con `servir` corriendo, cada cadencia se dispara sola apenas vence su horario
+-- no hace falta reiniciar el proceso ni volver a importar el pack para que un
+horario editado tome efecto. Para no esperar ni eso:
 
 ```bash
-python -m leda correr corework objetivos_semanales
-python -m leda correr corework resumen_grupal
+python -m leda cadencia corework objetivos_semanales
+python -m leda cadencia corework resumen_grupal
 ```
 
 ### Escalera de recordatorios
@@ -320,11 +322,11 @@ arriba; sin `--solo`, genera el enlace de las siete:
 python -m leda enlaces corework --solo <nombres>
 ```
 
-**7. Arrancar el proceso** que escucha Telegram, igual que en las sesiones
-anteriores:
+**7. Arrancar el proceso** que escucha Telegram. Desde la Etapa 3 del Motor es el
+de la prueba chica (punto 4):
 
 ```bash
-python -m leda escuchar corework
+python -m prueba_chica.escuchar corework
 ```
 
 La semilla deja, para probar entrega con evidencia y "Pedir cambios" (ADR
@@ -361,7 +363,7 @@ ya lo tenía. Si todavía no activó su cuenta de Telegram, igual se lo otorga
 -- pero avisa que los incidentes no le van a llegar hasta que la active y
 escriba una vez al bot de administración.
 
-Con `python -m leda escuchar corework` corriendo (punto 7 -- ahora también
+Con `python -m prueba_chica.escuchar corework` corriendo (punto 7 -- también
 sondea el bot de administración, sin bloquear, si `LEDA_BOT_TOKEN_ADMIN`
 está puesto), esa persona le escribe **una vez** cualquier cosa al bot de
 administración. Sin ese mensaje no hay a qué `chat_id` mandarle nada.
@@ -371,7 +373,7 @@ con el listener apagado se puede perder.
 
 **Nunca pongas en `LEDA_BOT_TOKEN_ADMIN` el token de un bot de
 administración que ya está servido por webhook en otro lado** (p. ej. el
-de producción, el que atiende `servir`): antes de sondear, `escuchar`
+de producción): antes de sondear, el escuchador
 CONSULTA si el bot ya tiene un webhook puesto -- si lo tiene, nunca lo toca
 ni lo sondea, para no robarle los updates a quien lo está sirviendo; sólo
 avisa por consola, una vez. Si ese aviso aparece y el webhook es un resto
