@@ -297,18 +297,6 @@ def _cerrar_best_effort(conn) -> None:
         pass
 
 
-def _resumen_vacio() -> dict:
-    """Resumen sin ningún efecto -- lo usa quien necesita seguir el resto
-    del ciclo (reportar cadencias rotas, avisar admin) después de una
-    pasada que falló entera y no llegó a construir uno real (R2-003,
-    revisión 2026-09-28+1)."""
-    return {"enviados": 0, "pospuestos": 0, "fallidos": 0, "descartados": 0,
-            "retenidos": 0,
-            "cadencias_encoladas": 0, "escalera_encoladas": 0,
-            "huerfanos_avisados": 0, "huerfanos_fallo": None,
-            "cadencias_fallidas": [], "cadencias_ok": []}
-
-
 def reportar_fallo(conn, supresor: SupresorDeRepetidos, workspace_id: str | None,
                    clave: str, descripcion: str, error: Exception) -> bool:
     """Un incidente por `(workspace_id, clave)` mientras esa falla persiste.

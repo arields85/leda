@@ -589,6 +589,14 @@ def test_el_barrido_usa_el_reloj_de_la_base_para_la_cota_de_24_horas(
 
 # --- El reporte de la falla del barrido y el despacho que sigue ---------------------
 
+def _resumen_vacio() -> dict:
+    """El resumen de una pasada del ciclo sin ningún efecto."""
+    return {"enviados": 0, "pospuestos": 0, "fallidos": 0, "descartados": 0,
+            "cadencias_encoladas": 0, "escalera_encoladas": 0,
+            "huerfanos_avisados": 0, "huerfanos_fallo": None,
+            "cadencias_fallidas": [], "cadencias_ok": []}
+
+
 def test_el_reporte_de_una_falla_del_barrido_es_deduplicado_y_no_deja_la_excepcion(
         corework, conn):
     ws = corework.workspace_id
@@ -596,7 +604,7 @@ def test_el_reporte_de_una_falla_del_barrido_es_deduplicado_y_no_deja_la_excepci
     impreso = []
 
     def resumen():
-        r = ciclo._resumen_vacio()
+        r = _resumen_vacio()
         r["huerfanos_fallo"] = RuntimeError("falla del barrido")
         return r
 
@@ -618,18 +626,18 @@ def test_un_barrido_que_se_recupera_limpia_la_marca_y_una_falla_nueva_se_reporta
     ws = corework.workspace_id
     supresor = ciclo.SupresorDeRepetidos()
     impreso = []
-    con_fallo = ciclo._resumen_vacio()
+    con_fallo = _resumen_vacio()
     con_fallo["huerfanos_fallo"] = RuntimeError("x")
     ciclo.reportar_cadencias_rotas(conn, supresor, ws, "corework", con_fallo,
                                    imprimir=impreso.append)
 
-    sano = ciclo._resumen_vacio()
+    sano = _resumen_vacio()
     ciclo.reportar_cadencias_rotas(conn, supresor, ws, "corework", sano,
                                    imprimir=impreso.append)
     assert not supresor.activa((ws, "barrido_huerfanos"))
     assert "huerfanos_fallo" not in sano
 
-    otra = ciclo._resumen_vacio()
+    otra = _resumen_vacio()
     otra["huerfanos_fallo"] = RuntimeError("y")
     ciclo.reportar_cadencias_rotas(conn, supresor, ws, "corework", otra,
                                    imprimir=impreso.append)

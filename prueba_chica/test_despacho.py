@@ -1,10 +1,10 @@
-"""El despachador no retiene los mensajes del motor en `leda_motor` (E2-2).
+"""El despachador manda los mensajes del motor en `leda_motor` (E2-2).
 
-`odd/tasks/prueba-chica-del-motor.md`, sección 11: `despachador` retiene lo que Leda inicia
-mientras la persona tiene abierta una rama de los flujos congelados (enredo 2,
-`_rama_activa_de` → `pendientes.ver_rama_abierta`). En `leda_motor` esas tablas quedan vacías:
-con las tablas del motor en uso (una pregunta abierta, un turno recién registrado) y la persona
-activa en el chat, sale todo.
+`odd/tasks/prueba-chica-del-motor.md`, sección 11: `despachador` retenía lo que Leda inicia
+mientras la persona tenía abierta una rama de los flujos congelados (enredo 2). Esa retención
+se retiró con ellos (E3-3); las tablas de esas ramas quedan vacías en `leda_motor`, y con las
+tablas del motor en uso (una pregunta abierta, un turno recién registrado) y la persona activa
+en el chat, sale todo.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def test_el_despachador_manda_la_respuesta_y_lo_que_leda_inicia(conn, mundo, esc
                             Calendario.desde_base(cur, mundo["id"]), ahora=AHORA)
     conn.commit()
 
-    assert resumen["retenidos"] == 0 and resumen["enviados"] == 2
+    assert resumen["enviados"] == 2
     assert sorted(e.texto for e in transporte.enviados) == [
         "Anotado.", "Mañana vence Revisar el tablero."]
     assert {e.chat_id for e in transporte.enviados} == {marcos["telegram"]}

@@ -64,6 +64,19 @@ PROMESAS_SIN_CUMPLIR = {
         "incidente (`admin_notice`). El despacho manda por chat_id, sin "
         "necesitarla; queda para auditoría o soporte (\"¿le llegó a Ariel?\"), "
         "igual que otorgado_por en platform_role.",
+    "confirmado_por":
+        "Quién confirmó un mensaje que esperaba confirmación humana en la cola "
+        "(`message_outbox`, estado `esperando_confirmacion`, mecánica §12). La "
+        "función que lo confirmaba (`despachador.confirmar`) nadie la llamaba y se "
+        "retiró en la E3-3; vuelve con el primer mensaje que necesite confirmarse.",
+    "confirmado_en":
+        "Cuándo se confirmó ese mensaje (ver `confirmado_por`).",
+    "resuelta_por":
+        "Quién resolvió una acción pendiente. La escribe `resolver_pendiente`, en "
+        "la base; el código de `src/leda` que la leía era de los flujos A y B "
+        "(E3-3).",
+    "resuelta_en":
+        "Cuándo se resolvió una acción pendiente (ver `resuelta_por`).",
     "telegram_bot_id":
         "El bot que recibió el mensaje entrante, para que una reentrega de "
         "Telegram entre una sola vez (migración 0031). La usa el escuchador de "

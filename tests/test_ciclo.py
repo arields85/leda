@@ -1422,27 +1422,6 @@ def test_texto_error_seguro_no_retraduce_un_error_ya_traducido():
     assert desp.texto_error_seguro(ya_traducido) == str(ya_traducido)
 
 
-def test_acusar_toque_traduce_el_error_sin_filtrar_el_token():
-    from leda import despachador as desp
-
-    class _ClienteQueFalla:
-        def post(self, url, json=None):
-            pedido = httpx.Request("POST", url)
-            raise httpx.HTTPStatusError(
-                "fallo", request=pedido,
-                response=httpx.Response(
-                    400, request=pedido,
-                    json={"ok": False, "description": "Bad Request: query is too old"}))
-
-    with pytest.raises(desp.ErrorTelegram) as info:
-        desp.acusar_toque(TOKEN_FALSO, "callback-1", cliente=_ClienteQueFalla())
-
-    error = info.value
-    filtra = TOKEN_FALSO in str(error) or TOKEN_FALSO in repr(error)
-    assert not filtra, "acusar_toque filtra el token del bot al fallar"
-    assert "400" in str(error)
-
-
 def test_mantener_chat_activo_traduce_el_error_del_ping_de_typing(monkeypatch):
     """El `sendChatAction` de fondo hoy descarta su error entero (es
     cosmético) -- pero pasa por el mismo traductor que el resto de las

@@ -16,7 +16,6 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from leda import herramientas as H
-from leda import pendientes as P
 from leda.autoridad import Canal, identificar
 from leda.calendario import Calendario
 from leda.db import admin, espacio
@@ -169,29 +168,6 @@ def test_un_aviso_de_coordinacion_no_consume_la_cuota_de_los_seguimientos(
     assert len([t for t in _enviados_a(transporte, tg)
                 if t.startswith("Seguimiento")]) == 3
     assert resumen["pospuestos"] == 1
-
-
-def test_la_retencion_por_rama_abierta_alcanza_a_los_dos_tipos(corework, conn, reloj):
-    """T9-R1d-2: mientras la persona está activa en una rama abierta, lo que Leda
-    le inicia espera, sea seguimiento o aviso de coordinación."""
-    ws = corework.workspace_id
-    nahuel, tg = _nahuel(conn, ws)
-    ahora = datetime.now(timezone.utc)
-    with espacio(conn, ws) as cur:
-        cur.execute(
-            """insert into inbound_message (workspace_id, chat_id, app_user_id, texto)
-               values (%s, %s, %s, 'hola')""", (ws, tg, nahuel.app_user_id))
-        P.registrar(cur, nahuel, herramienta="actualizar_estado", args={},
-                    resumen="¿Qué estado?", vence_en=ahora + timedelta(hours=8),
-                    campo="estado", chat_id=tg)
-        _seguimientos(cur, ws, tg, nahuel.membership_id, 1, prefijo="rama")
-        _avisos(cur, ws, nahuel, nahuel.membership_id, 1, prefijo="rama")
-    conn.commit()
-
-    resumen, transporte = _pasada(conn, ws, reloj.en_horario())
-
-    assert resumen["retenidos"] == 2
-    assert _enviados_a(transporte, tg) == []
 
 
 def test_las_herramientas_que_avisan_de_un_acto_ajeno_marcan_el_aviso(

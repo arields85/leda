@@ -23,7 +23,6 @@ from datetime import datetime, timedelta, timezone
 from typing import NamedTuple, Protocol
 
 import psycopg
-from psycopg.types.json import Jsonb
 
 from . import saludo
 from .calendario import Calendario
@@ -429,38 +428,6 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                     _reportar_falla_retiro(cur, workspace_id, e)
 
 
-def acusar_toque(token: str, callback_id: str, cliente=None) -> None:
-    """Le avisa a Telegram que el toque de un botón llegó.
-
-    **Es la única llamada a Telegram que no pasa por la cola, y tiene que
-    seguir siéndolo.**
-
-    La regla del proyecto es que Leda escribe en `message_outbox` y un
-    worker entrega. Eso da reintentos, auditoría e idempotencia, y vale para
-    todo lo que Leda le dice a una persona.
-
-    Esto no es eso. Es un acuse del protocolo, entre máquinas: no aparece en
-    el chat, nadie lo lee, y Telegram lo exige en un par de segundos o le deja
-    el reloj girando a quien apretó. La cola corre cada treinta: por ahí no
-    llega a tiempo.
-
-    Lo que la limita, y lo que hay que sostener si mañana aparece otro caso
-    parecido:
-
-      - no lleva contenido: sólo dice "llegó";
-      - no cambia nada en la base;
-      - si falla, no se pierde trabajo — quien llama la ignora.
-
-    Todo lo que la persona sí tiene que leer sigue saliendo por la cola.
-    """
-    import httpx
-
-    cliente = cliente or httpx.Client(timeout=5)
-    pedido_telegram(
-        cliente.post, f"https://api.telegram.org/bot{token}/answerCallbackQuery",
-        json={"callback_query_id": callback_id})
-
-
 MAX_INTENTOS = 5
 
 # Backoff entre reintentos de un aviso admin -- hallazgo de la revisión
@@ -503,12 +470,11 @@ def _botones(cur, m) -> list[Boton]:
 
 def _preview_vigente(cur, m, ahora: datetime) -> bool:
     """Si la vista previa que lleva `m` sigue siendo la vigente al `ahora` de la
-    pasada: el mismo reloj que decide el vencimiento del mensaje y lo que se
-    retendría (`_SE_RETENDRIA`)."""
+    pasada: el mismo reloj que decide el vencimiento del mensaje."""
     if not m["pending_action_id"]:
         return True
     cur.execute(
-        """select p.estado, p.draft_id, p.membership_id, p.herramienta,
+        """select p.estado, p.draft_id, p.membership_id,
                   p.vence_en > %s as no_vencida,
                   d.responsable_membership_id
              from pending_action p
@@ -519,26 +485,6 @@ def _preview_vigente(cur, m, ahora: datetime) -> bool:
     accion = cur.fetchone()
     if not accion or accion["draft_id"] is None:
         return True
-    from .pendientes import HERRAMIENTA_REVISION_BORRADOR
-
-    if accion["herramienta"] == HERRAMIENTA_REVISION_BORRADOR:
-        # El resumen de quien pidió el borrador (T9-R1c-4) es suyo aunque no sea
-        # quien aprueba: sigue vigente mientras espera, sin vencer, y su dueño
-        # esté activo.
-        cur.execute("select activo from membership where id = %s for share",
-                    (accion["membership_id"],))
-        dueno = cur.fetchone()
-        vigente = (accion["estado"] == "esperando" and accion["no_vencida"]
-                   and bool(dueno and dueno["activo"]))
-        if not vigente:
-            cur.execute(
-                """update pending_action set estado = 'vencida'
-                    where id = %s and estado = 'esperando'""",
-                (m["pending_action_id"],))
-            cur.execute(
-                "update message_outbox set estado = 'descartado' where id = %s",
-                (m["id"],))
-        return vigente
     cur.execute(
         """select destinatario.activo as destinatario_activo,
                   responsable.aprobador_membership_id as aprobador_actual
@@ -590,198 +536,44 @@ def _tope_diario(cur, workspace_id: str) -> int | None:
     return valor.get("max_mensajes_automaticos_por_persona_por_dia")
 
 
-VENTANA_DE_ACTIVIDAD = timedelta(minutes=30)
-"""Cuánto cuenta como "activa en la rama" una persona que escribió o tocó algo en
-ese chat (T9-R1d-2b, ADR 0013 regla 1, "Precisión (2026-09-29, decisión del
-usuario)"): lo que Leda inicia se retiene sólo mientras haya pasado menos que
-esto desde su última actividad. Una rama abandonada no retiene nada, ni un aviso
-urgente: sale en el momento y la rama sigue abierta para cuando vuelva."""
-
-
-def _activa_en_el_chat(cur, workspace_id: str, app_user_id: str, chat_id: int,
-                       ahora: datetime) -> bool:
-    """Si la persona escribió o tocó algo en ese chat dentro de
-    `VENTANA_DE_ACTIVIDAD`. La actividad es lo que ya guarda `inbound_message`:
-    su mensaje (`gateway.procesar_update`) o su toque (`gateway._registrar_toque`,
-    una fila sin texto)."""
-    cur.execute(
-        """select 1 from inbound_message
-            where workspace_id = %s and chat_id = %s and app_user_id = %s
-              and at >= %s
-            limit 1""",
-        (workspace_id, chat_id, app_user_id, ahora - VENTANA_DE_ACTIVIDAD))
-    return cur.fetchone() is not None
-
-
-def _rama_activa_de(cur, m, ahora: datetime):
-    """La rama abierta del destinatario de `m` en el chat de `m`
-    (`pendientes.ver_rama_abierta`, la misma definición que usaba la conversación
-    de los flujos A y B), pero sólo si él está activo en ese chat
-    (`VENTANA_DE_ACTIVIDAD`); si no, `None`.
-
-    Sin la fila de su membresía (no visible en el espacio o ya no existe) no hay a
-    quién atribuirle una rama: se decide `None`, es decir, no se retiene. Retener
-    a nombre de un `Solicitante` vacío dejaría un mensaje esperando por una rama
-    que nadie puede cerrar; sale, como antes de que existiera la retención."""
-    from . import herramientas as H
-    from .autoridad import Canal, Solicitante
-    from .pendientes import ver_rama_abierta
-
-    cur.execute("select app_user_id from membership where id = %s",
-                (m["destinatario_membership_id"],))
-    persona = cur.fetchone()
-    if persona is None:
-        return None
-    workspace_id = str(m["workspace_id"])
-    app_user_id = str(persona["app_user_id"])
-    if not _activa_en_el_chat(cur, workspace_id, app_user_id, m["chat_id"], ahora):
-        return None
-    quien = Solicitante(
-        app_user_id=app_user_id, canal=Canal.ESPACIO, workspace_id=workspace_id,
-        membership_id=str(m["destinatario_membership_id"]))
-    return ver_rama_abierta(cur, quien, m["chat_id"], ahora, H.REGISTRO)
-
-
-def _rama_que_retiene(cur, m, ahora: datetime, cache: dict):
-    """La rama abierta que retiene a `m`, o `None` si `m` sale (T9-R1d-2 y
-    T9-R1d-2b, ADR 0013 regla 1, enmienda "una sola rama abierta"). Sólo un
-    mensaje que inicia Leda a una persona se retiene, y mientras ella esté
-    activa en la rama (`VENTANA_DE_ACTIVIDAD`): una respuesta nunca. El mensaje
-    que muestra la propia rama (`pending_action_id` o `intake_choice_set_id` igual
-    al de la pregunta abierta) no espera a su propio cierre. Se consulta una vez
-    por persona y chat en cada pasada (`cache`)."""
-    if m["es_respuesta"]:
-        return None
-    membership_id = m["destinatario_membership_id"]
-    if not membership_id:
-        return None
-    clave = (str(membership_id), m["chat_id"])
-    if clave not in cache:
-        cache[clave] = _rama_activa_de(cur, m, ahora)
-    rama = cache[clave]
-    if rama is None:
-        return None
-    propia = rama.id in (str(m["pending_action_id"] or ""),
-                         str(m["intake_choice_set_id"] or ""))
-    return None if propia else rama
-
-
-@dataclass
-class _Pasada:
-    """Lo que una pasada de `despachar` va aprendiendo: las filas ya examinadas,
-    la rama de cada persona y chat, y a quién dejó de pedirle filas porque lo que
-    Leda le inicia se retiene."""
-    vistos: list[str] = field(default_factory=list)
-    ramas: dict = field(default_factory=dict)
-    retenidos: list[dict] = field(default_factory=list)
-
-
-# Lo que, al examinarlo, se retendría en vez de descartarse: no vencido (la regla de
-# `_despachar_fila`: `vence_en < ahora` se descarta) y, si es la vista previa de un
-# borrador, todavía la vigente (`_preview_vigente`: esperando y sin vencer; el cambio
-# de aprobador sólo lo ve el examen). Ambos con el `ahora` de la pasada: un solo reloj
-# para la cuenta, la exclusión y el examen. Lo vencido de alguien retenido no espera a que
-# se libere: se examina y se descarta como siempre, y no se cuenta como retenido
-# (T9-R1c-3, seguimiento de `review-3ebe127d376a4d18`).
-_SE_RETENDRIA = """
-                and (message_outbox.vence_en is null
-                     or message_outbox.vence_en >= %(ahora)s)
-                and not exists (
-                      select 1 from pending_action p
-                       where p.id = message_outbox.pending_action_id
-                         and p.draft_id is not null
-                         and not (p.estado = 'esperando'
-                                  and p.vence_en > %(ahora)s))"""
-
-# Lo retenido sigue `listo` y encabezaría la cola de siempre. Para que no deje sin
-# servicio a lo que viene detrás sin agrandar la pasada, la primera fila que se
-# retiene de una persona en un chat la excluye del resto de la pasada (salvo sus
-# respuestas, la pregunta de la propia rama y lo que se descartaría al examinarlo,
-# que nunca se retienen): esa fila cuesta una del lote y lo demás suyo ya no se pide.
-_SIN_LO_RETENIDO = f"""
-       and not exists (
-             select 1 from jsonb_to_recordset(%(retenidos)s::jsonb)
-                      as x(m uuid, c bigint, rama text)
-              where not message_outbox.es_respuesta
-                and x.m = message_outbox.destinatario_membership_id
-                and x.c = message_outbox.chat_id
-                and message_outbox.pending_action_id::text is distinct from x.rama
-                and message_outbox.intake_choice_set_id::text is distinct from x.rama
-                {_SE_RETENDRIA})
-"""
-
-
 def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
               cal: Calendario, ahora: datetime | None = None,
               lote: int = 50) -> dict[str, int]:
-    """Una pasada del despachador: examina a lo sumo `lote` filas, de a una,
-    retenidas o no. Lo que queda por despachar sale en la pasada siguiente."""
+    """Una pasada del despachador: examina a lo sumo `lote` filas, de a una. Lo
+    que queda por despachar sale en la pasada siguiente."""
     ahora = ahora or datetime.now(timezone.utc)
     tope = _tope_diario(cur, workspace_id)
-    resumen = {"enviados": 0, "pospuestos": 0, "fallidos": 0, "descartados": 0,
-               "retenidos": 0}
-    pasada = _Pasada()
-    while len(pasada.vistos) < lote:
+    resumen = {"enviados": 0, "pospuestos": 0, "fallidos": 0, "descartados": 0}
+    vistos: list[str] = []
+    while len(vistos) < lote:
         cur.execute(
-            f"""
+            """
              select id, workspace_id, chat_id, cuerpo, tipo,
                     destinatario_membership_id, intentos,
-                    vence_en, es_respuesta, pending_action_id, intake_choice_set_id,
+                    vence_en, es_respuesta, pending_action_id,
                     es_bienvenida, bloque_copiable, es_coordinacion
               from message_outbox
              where workspace_id = %(ws)s
                and estado = 'listo'
                and programado_para <= %(ahora)s
                and id <> all(%(vistos)s::uuid[])
-               {_SIN_LO_RETENIDO}
              order by programado_para
              limit 1
              for update skip locked
             """,
-            {"ws": workspace_id, "ahora": ahora, "vistos": pasada.vistos,
-             "retenidos": Jsonb(pasada.retenidos)})
+            {"ws": workspace_id, "ahora": ahora, "vistos": vistos})
         m = cur.fetchone()
         if m is None:
             break
-        pasada.vistos.append(str(m["id"]))
+        vistos.append(str(m["id"]))
         _despachar_fila(cur, workspace_id, transporte, cal, ahora, tope, m,
-                        resumen, pasada)
+                        resumen)
     return resumen
 
 
-def _retener(cur, workspace_id: str, ahora: datetime, m, rama, resumen: dict,
-             pasada: _Pasada) -> None:
-    """`m` no se envía ni se descarta: sigue `listo` en su lugar de la cola y se
-    cuenta en `retenidos`. La primera vez que se retiene a una persona en un chat
-    se cuenta también lo suyo que la consulta ya no va a pedir, y sólo lo que de
-    verdad se retendría (`_SE_RETENDRIA`) y no está bloqueado por otro despachador:
-    con `skip locked` la cuenta no incluye lo que esa otra pasada tiene en sus manos
-    (y lo que cuenta queda bloqueado hasta cerrar esta pasada, como lo examinado)."""
-    resumen["retenidos"] += 1
-    clave = {"m": str(m["destinatario_membership_id"]), "c": m["chat_id"],
-             "rama": rama.id}
-    if clave in pasada.retenidos:
-        return
-    pasada.retenidos.append(clave)
-    cur.execute(
-        f"""select count(*) n from (
-              select 1 from message_outbox
-               where workspace_id = %(ws)s and estado = 'listo'
-                 and programado_para <= %(ahora)s
-                 and id <> all(%(vistos)s::uuid[])
-                 and destinatario_membership_id = %(m)s and chat_id = %(c)s
-                 and not es_respuesta
-                 and pending_action_id::text is distinct from %(rama)s
-                 and intake_choice_set_id::text is distinct from %(rama)s
-                 {_SE_RETENDRIA}
-                 for update skip locked) retenidas""",
-        {"ws": workspace_id, "ahora": ahora, "vistos": pasada.vistos, **clave})
-    resumen["retenidos"] += cur.fetchone()["n"]
-
-
 def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
-                    cal: Calendario, ahora: datetime, tope, m, resumen: dict,
-                    pasada: _Pasada) -> None:
+                    cal: Calendario, ahora: datetime, tope, m,
+                    resumen: dict) -> None:
     if not _preview_vigente(cur, m, ahora):
         resumen["descartados"] += 1
         return
@@ -800,14 +592,6 @@ def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
             "update message_outbox set estado = 'descartado' where id = %s",
             (m["id"],))
         resumen["descartados"] += 1
-        return
-
-    # Lo que inicia Leda espera mientras su destinatario esté activo en una rama
-    # abierta en ese chat (T9-R1d-2, T9-R1d-2b): no se envía ni se descarta, sigue
-    # `listo` en su lugar de la cola y se cuenta en `retenidos`.
-    rama = _rama_que_retiene(cur, m, ahora, pasada.ramas)
-    if rama is not None:
-        _retener(cur, workspace_id, ahora, m, rama, resumen, pasada)
         return
 
     # Fuera de horario se pospone, no se descarta. La urgencia autorizada
@@ -1094,17 +878,3 @@ def _ya_recibio(cur, membership_id: str, ahora: datetime) -> int:
         """,
         (membership_id, ahora.date()))
     return cur.fetchone()["n"]
-
-
-def confirmar(cur: psycopg.Cursor, outbox_id: str, app_user_id: str) -> bool:
-    """Pasa un mensaje de 'esperando_confirmacion' a 'listo'.
-
-    Las acciones que el núcleo obliga a confirmar entran a la cola en ese
-    estado y no salen hasta que una persona las aprueba.
-    """
-    cur.execute(
-        """update message_outbox
-              set estado = 'listo', confirmado_por = %s, confirmado_en = now()
-            where id = %s and estado = 'esperando_confirmacion'""",
-        (app_user_id, outbox_id))
-    return cur.rowcount > 0
