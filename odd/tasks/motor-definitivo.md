@@ -414,7 +414,8 @@ y no por la API.
   - `7356bd0`: el corredor con `--ia sol-suscripcion`.
   - Revisiones `review-24340405ed89989c` y `review-92398477f4ec8cf8`, aprobadas.
   - Suite completa: 1162.
-  - Falta que el usuario inicie sesión y medir con la IA real.
+  - El usuario inició sesión (2026-10-07). `166a508` (`reasoning.context` y flujo sin tipo): la regresión dio
+    90 de 90 y 90 de 90 en garantías. `leda_motor` usa `chatgpt / gpt-6-sol`.
   - `PENDIENTE`: un candado sobre el archivo de sesión. Si dos procesos renuevan a la vez, uno puede invalidar
     al otro; mientras tanto, no se corren juntos el escuchador y una ronda.
 - **Alcance** (usuario, el mismo día): es para el uso personal de ahora. Cuando Leda sea comercial, cada

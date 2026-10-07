@@ -45,8 +45,9 @@ aceptó el ADR 0018 el mismo día.
   - **Decisiones del usuario para cerrar M3:**
     1. Las fechas a más de dos semanas: hecho; la lista se amplió a ocho semanas (2026-10-07). La regresión
        completa espera crédito en OpenRouter.
-    2. Autorizar que se recree `leda_motor` para su prueba por Telegram. La guía está en
-       `odd/tasks/motor-definitivo.md`, sección 4b.
+    2. `leda_motor` recreada (autorizado, 2026-10-07), con sol por la suscripción de ChatGPT del usuario: la
+       regresión dio 90 de 90. Falta su prueba por Telegram, con la guía de `odd/tasks/motor-definitivo.md`,
+       sección 4b.
   - Decisiones del usuario: los circuitos 5, 7, 8 y la persecución 3a, después de M3; la plataforma web,
     después de M3; no hay equipo real hasta que el usuario lo diga.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`

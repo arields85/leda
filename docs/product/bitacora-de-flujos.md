@@ -265,6 +265,15 @@ código", aplicada más lejos (`aec4b0e`, revisión `review-2c521db7ea334a0b`). 
 primero. Con GPT-6 sol, la 05 y la 08 dieron 5 de 5 cada una. La regresión completa queda pendiente
 hasta cargar crédito en OpenRouter.
 
+**GPT-6 sol por la suscripción de ChatGPT del usuario (2026-10-07).** Es la misma IA, por el inicio de sesión
+de Codex (proveedor `chatgpt`, decisión del usuario).
+- En la primera llamada real el servicio exigió `reasoning.context: all_turns` y mandó el flujo sin declarar
+  su tipo. Se corrigió en `166a508`, con las pruebas en rojo primero (revisión `review-01ccc28d686e86c1`).
+- **Regresión de las 18 conversaciones por 5, con la lista de días de ocho semanas:** **90 de 90** con todo lo
+  automático bien y 90 de 90 en garantías. Mediana de 6,6 s por turno y el peor de 43,1 s, un caso aislado.
+  Sin costo en OpenRouter.
+- Es el mejor resultado medido. `leda_motor` usa ahora este proveedor para la prueba por Telegram.
+
 **Conclusión vigente (2026-10-07): se queda GPT-6 sol.** Es el único que no hace efectos de más y el más
 rápido de los que entienden bien; cuesta unos USD 0,034 por conversación de prueba. Luna y luna pro no
 alcanzan con el motor nuevo, igual que en la ronda 1. Los flash de `nan` sin razonar son 15 veces más
