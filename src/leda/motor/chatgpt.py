@@ -474,6 +474,10 @@ def pedido_de_respuestas(modelo: str, cuerpo: dict[str, Any]) -> tuple[dict[str,
               "include": ["reasoning.encrypted_content"]}
     if herramientas and not lite:
         pedido["tools"] = herramientas
+    if lite:
+        # El servicio lo exige para "respuestas lite" (HTTP 400 sin él; primera llamada real,
+        # 2026-10-07). Lo que pida `cuerpo_extra` en `reasoning` se suma (`completar`).
+        pedido["reasoning"] = {"context": "all_turns"}
     return pedido, lite
 
 
@@ -609,6 +613,8 @@ class ClienteChatGPT(ClienteCompatible):
         plazo = float(self.parametros.get("plazo_s", PLAZO_S))
         extra = self.parametros.get("cuerpo_extra") or {}
         pedido, lite = pedido_de_respuestas(self.modelo, cuerpo)
+        if isinstance(extra.get("reasoning"), dict) and "reasoning" in pedido:
+            pedido = {**pedido, "reasoning": {**extra["reasoning"], **pedido["reasoning"]}}
 
         def pedir() -> dict[str, Any]:
             acceso, cuenta = self.sesion.credenciales()
@@ -624,7 +630,10 @@ class ClienteChatGPT(ClienteCompatible):
                         f"ChatGPT respondió HTTP {r.status_code}"
                         f"{' (' + codigo + ')' if codigo else ''}.",
                         request=r.request, response=r)
-                if "text/event-stream" in r.headers.get("content-type", ""):
+                # Sin `content-type`, lo pedido manda: el pedido siempre es un flujo (el servicio
+                # real no declara el tipo; primera llamada real, 2026-10-07).
+                tipo = r.headers.get("content-type", "")
+                if "text/event-stream" in tipo or (not tipo and pedido.get("stream")):
                     return respuesta_de_eventos(leer_eventos(r.iter_lines()))
                 r.read()
                 try:

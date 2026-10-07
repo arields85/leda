@@ -500,7 +500,7 @@ def test_los_campos_extra_viajan_y_no_pisan_lo_que_arma_el_codigo(tmp_path):
     ia = ia_por_suscripcion(tmp_path, codex, parametros={
         "cuerpo_extra": {"reasoning": {"effort": "low"}}, "timeout_s": 30})
     ia.redactar({"hoy": "2026-10-20"})
-    assert codex.pedidos[0]["cuerpo"]["reasoning"] == {"effort": "low"}
+    assert codex.pedidos[0]["cuerpo"]["reasoning"] == {"effort": "low", "context": "all_turns"}
     assert ia.cliente.http.timeout.read == 30
 
 
@@ -656,3 +656,23 @@ def test_parametros_que_la_suscripcion_no_recibe_son_un_modelo_no_configurado(
     _modelo(conn, "chatgpt", "gpt-6-sol", parametros={"temperature": 0.5})
     with espacio(conn, mundo["id"]) as cur, pytest.raises(LookupError, match="temperature"):
         desde_base(cur, mundo["id"], object())
+
+
+def test_un_flujo_sin_tipo_de_contenido_tambien_se_lee(tmp_path):
+    """Primera llamada real (2026-10-07): el servicio manda el flujo de eventos sin
+    `content-type`; leerlo como JSON lo daba por ilegible."""
+    flujo = sse({"type": "response.output_text.delta", "delta": "Hola."}, completada([]))
+    codex = Codex([httpx.Response(200, content=flujo)])
+    assert ia_por_suscripcion(tmp_path, codex).redactar({"hoy": "2026-10-20"}) == "Hola."
+
+
+def test_un_modelo_lite_pide_el_razonamiento_de_todos_los_turnos(tmp_path):
+    """Primera llamada real (2026-10-07): "Responses-Lite requires `reasoning.context` to be
+    `all_turns`" (HTTP 400). Va siempre, y un esfuerzo pedido por `cuerpo_extra` se conserva."""
+    codex = Codex([sse(completada([mensaje("Listo.")]))] * 2)
+    ia_por_suscripcion(tmp_path, codex).redactar({"hoy": "2026-10-20"})
+    ia_por_suscripcion(tmp_path, codex, parametros={
+        "cuerpo_extra": {"reasoning": {"effort": "low"}}}).redactar({"hoy": "2026-10-20"})
+
+    assert codex.pedidos[0]["cuerpo"]["reasoning"] == {"context": "all_turns"}
+    assert codex.pedidos[1]["cuerpo"]["reasoning"] == {"context": "all_turns", "effort": "low"}
