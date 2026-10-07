@@ -52,8 +52,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Preguntas al usuario (de a una)
 
-1. **Evidencia mientras no haya archivos:** ¿alcanza una explicación escrita, o Leda acepta fotos de
-   Telegram? `PENDIENTE`.
+1. **Evidencia:** decidida (usuario, 2026-10-07). Leda acepta texto, fotos y archivos. Se guardan en la
+   base, con su huella y atados a su espacio (después se puede mover el almacenamiento sin cambiar lo
+   demás). El aviso a quien aprueba lleva las fotos adjuntas y un enlace a una página de la tarea, de
+   sólo lectura, con su evidencia y su historia, como el tablero de hoy: enlace personal y sólo lo que esa
+   persona puede ver. La página es el primer pedazo de la plataforma: lleva su ADR corto antes del código.
+   Propuesta del usuario ("que se guarden en la plataforma y Leda envíe el enlace"), con los ajustes del
+   agente que aceptó: fotos adjuntas en el aviso, la base como almacenamiento y el ADR primero.
 2. **La aprobación escrita y ambigua:** "aprobado, pero que revise el cable", ¿es aprobar o pedir cambios?
    `PENDIENTE`.
 3. **Un aprobador que no contesta:** ¿recordatorio y escalamiento, y a quién? `PENDIENTE`.
@@ -79,7 +84,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Tareas
 
-- [ ] **C-1.** Las preguntas 1 a 3, decididas por el usuario.
+- [ ] **C-1.** Las preguntas 1 a 3, decididas por el usuario. La 1, decidida.
+- [ ] **C-1b.** El ADR de la evidencia y la página de la tarea, aceptado por el usuario.
 - [ ] **C-2.** Conversaciones de prueba de la entrega y la aprobación.
 - [ ] **C-3.** Fichas de la entrega y la aprobación, la confirmación escrita y los avisos por el motor.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
@@ -89,4 +95,4 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La pregunta 1.
+La pregunta 2.
