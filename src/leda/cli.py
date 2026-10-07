@@ -9,6 +9,8 @@
     python -m leda escuchar corework        el motor de conversación, por long polling
     python -m leda servir                   webhook + tablero + el ciclo del motor
     python -m leda webhooks                 registra el webhook de cada bot
+    python -m leda chatgpt login|estado|salir   la sesión de la suscripción de ChatGPT
+    python -m leda modelo gpt-6-sol --proveedor chatgpt
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import sys
 from .calendario import Calendario, cargar_feriados_ar
 from .config import config
 from .db import admin, conectar, espacio, registrar_auditoria
+from .llm import PROVEEDORES_CON_SESION
 from .saludo import verificar_migraciones
 
 
@@ -64,11 +67,14 @@ def _verificar_esquema_o_salir(conn) -> int | None:
     return 1
 
 
-def _parametros_del_modelo(texto: str | None) -> dict | None:
+def _parametros_del_modelo(texto: str | None, proveedor: str = "") -> dict | None:
     """Los parámetros de `modelo --parametros`, revisados como los lee el motor
-    (`leda.motor.ia_real.validar_parametros`); se guardan como se escribieron, sin los de
-    omisión. `None`, después de decir por qué, si no valen."""
+    (`leda.motor.ia_real.validar_parametros`, o los de la suscripción de ChatGPT); se guardan
+    como se escribieron, sin los de omisión. `None`, después de decir por qué, si no valen."""
     from .motor.ia_real import ParametrosInvalidos, validar_parametros
+
+    if proveedor in PROVEEDORES_CON_SESION:
+        from .motor.chatgpt import validar_parametros_chatgpt as validar_parametros
 
     if texto is None:
         return {}
@@ -228,6 +234,13 @@ def main(argv: list[str] | None = None) -> int:
 
     mds = sub.add_parser("modelos")   # pregunta al proveedor cuáles hay
     mds.add_argument("--proveedor", default="gemini")
+
+    # La suscripción de ChatGPT (`leda.motor.chatgpt`): la sesión se guarda fuera del
+    # repositorio y nunca se imprime.
+    gpt = sub.add_parser("chatgpt", help="la sesión de la suscripción de ChatGPT")
+    gpt.add_argument("accion", choices=("login", "estado", "salir"))
+    gpt.add_argument("--manual", action="store_true",
+                     help="sin servidor local: pegar la dirección a la que vuelve el navegador")
     sub.add_parser("estado").add_argument("slug")
     sub.add_parser("incidentes").add_argument("slug")
 
@@ -336,6 +349,27 @@ def main(argv: list[str] | None = None) -> int:
               "agregado y que alguien haya escrito.")
         return 1
 
+    if a.cmd == "chatgpt":
+        # No necesita base ni el `.env`: la sesión vive fuera del repositorio.
+        from .motor import chatgpt
+
+        if a.accion == "login":
+            return chatgpt.iniciar(manual=a.manual)
+        if a.accion == "estado":
+            return chatgpt.estado()
+        return chatgpt.salir()
+
+    if a.cmd == "modelos" and a.proveedor in PROVEEDORES_CON_SESION:
+        # La suscripción no tiene una lista que se pueda pedir con una clave: la del catálogo
+        # del cliente oficial de Codex.
+        from .motor.chatgpt import MODELOS_CONOCIDOS
+
+        for n in MODELOS_CONOCIDOS:
+            print(f"  {n}")
+        print("\nSon los del catálogo del cliente oficial de Codex. Elegí uno y corré:")
+        print(f"  python -m leda modelo <identificador> --proveedor {a.proveedor}")
+        return 0
+
     if a.cmd == "modelos":
         # No necesita base: le pregunta directo al proveedor.
         from .llm import BASE_URLS
@@ -388,7 +422,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "modelo" and a.nombre:
         # Los mismos parámetros que lee el motor, revisados igual, antes de tocar la base: uno
         # que no vale no se guarda y el modelo activo queda como estaba.
-        parametros = _parametros_del_modelo(a.parametros)
+        parametros = _parametros_del_modelo(a.parametros, a.proveedor)
         if parametros is None:
             return 1
 
@@ -423,7 +457,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Modelo configurado: {a.proveedor} / {a.nombre}")
         if parametros:
             print(f"  Parámetros: {json.dumps(parametros, ensure_ascii=False)}")
-        if not config.clave_llm(a.proveedor):
+        if a.proveedor in PROVEEDORES_CON_SESION:
+            # Sin clave: la sesión de la suscripción. Sólo se mira si hay una, nunca se muestra.
+            from .motor.chatgpt import ruta_de_la_sesion
+
+            try:
+                hay_sesion = ruta_de_la_sesion().exists()
+            except ValueError:
+                hay_sesion = False
+            if not hay_sesion:
+                print("Ojo: no hay sesión de ChatGPT iniciada (python -m leda chatgpt login).")
+        elif not config.clave_llm(a.proveedor):
             print(f"Ojo: {config.variable_clave_llm(a.proveedor)} está vacío "
                   "en .env.")
         return 0

@@ -61,4 +61,12 @@ BASE_URLS = {
     "openrouter": "https://openrouter.ai/api/v1",
     "nan":        "https://api.nan.builders/v1",
     "local":      "http://localhost:11434/v1",
+    # La suscripción de ChatGPT del usuario (decisión del 2026-10-07): el servicio de Codex,
+    # en el formato de respuestas, con la sesión de `python -m leda chatgpt login`
+    # (`leda.motor.chatgpt`).
+    "chatgpt":    "https://chatgpt.com/backend-api/codex",
 }
+
+# Los proveedores que usan una sesión iniciada en lugar de una clave del entorno: para ellos
+# `config.clave_llm` no se consulta.
+PROVEEDORES_CON_SESION = frozenset({"chatgpt"})

@@ -31,3 +31,8 @@ Thumbs.db
 .DS_Store
 tools/_rdd/
 tools/_mediciones/
+# La sesión de ChatGPT (python -m leda chatgpt login) vive fuera del repositorio y el código
+# se niega a guardarla dentro; por si una copia llegara acá, nunca se versiona.
+.leda/
+chatgpt.json
+chatgpt.json.tmp

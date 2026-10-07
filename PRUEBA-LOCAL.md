@@ -78,6 +78,25 @@ Un valor inválido se rechaza al guardarlo, y el modelo activo no cambia. El rei
 solo, lo hace el turno. Si la IA no responde, la persona recibe el texto fijo y queda un
 incidente.
 
+**Con la suscripción de ChatGPT** (decisión del usuario, 2026-10-07; los complementos que
+usan este ingreso dicen "sólo para uso personal de desarrollo"). No lleva clave: se entra una
+vez con la cuenta de ChatGPT, como el Codex CLI.
+
+```bash
+python -m leda chatgpt login        # abre el navegador; con --manual, se pega la dirección de vuelta
+python -m leda chatgpt estado       # cuenta enmascarada y cuándo vence el acceso
+python -m leda modelo gpt-6-sol --proveedor chatgpt
+python -m leda chatgpt salir        # borra la sesión guardada
+```
+
+La sesión se guarda fuera del repositorio, en `~/.leda/chatgpt.json` (o donde diga
+`LEDA_CHATGPT_AUTH`), se renueva sola y nunca se imprime. Si no se puede renovar, Leda lo
+registra como incidente y la persona recibe el texto fijo: hay que volver a entrar. Con este
+proveedor `temperature` no vale, los topes de salida no tienen efecto (el servicio no los
+recibe) y el razonamiento se ajusta con `cuerpo_extra`, por ejemplo
+`{"reasoning": {"effort": "low"}}`. Las conversaciones de prueba corren con
+`--ia sol-suscripcion` (o `--ia chatgpt/gpt-6-sol`) y anotan `precio: suscripción`.
+
 ## 3. Dar de alta a los tres
 
 ```bash

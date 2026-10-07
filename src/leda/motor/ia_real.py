@@ -19,7 +19,9 @@ Habla el protocolo de chat de OpenAI, que es el de GPT-6 sol por OpenRouter (el 
 espacio sale de `model_config`, como hacía `leda.llm.desde_base`, retirado en la E3-3; la
 clave, del entorno, nunca del código). Sin reintentos propios: el reintento es uno solo y lo
 hace el turno (decisión 8). Cada llamada tiene un plazo total, además del tiempo por fase del
-cliente HTTP.
+cliente HTTP. El proveedor `chatgpt` (la suscripción del usuario, 2026-10-07) no usa clave sino
+la sesión de `python -m leda chatgpt login`; su cliente (`chatgpt.ClienteChatGPT`) cumple el
+mismo contrato y traduce cada pedido al formato de respuestas del servicio de Codex.
 
 Cada modelo lleva sus parámetros (`model_config.parametros`, o un argumento para el corredor de
 las conversaciones; E3-8, la comparación de IA): el tiempo por fase (`timeout_s`), el plazo total
@@ -39,7 +41,7 @@ from typing import Any
 
 import httpx
 
-from ..llm import BASE_URLS, tiempos
+from ..llm import BASE_URLS, PROVEEDORES_CON_SESION, tiempos
 
 from . import hechos
 from .fichas import FICHAS
@@ -390,12 +392,25 @@ def desde_base(cur, workspace_id: str, claves) -> IAReal:
     if proveedor in ("anthropic", "gemini"):
         raise LookupError(f"El motor sólo habla el protocolo compatible con OpenAI; "
                           f"'{proveedor}' no lo usa.")
+    con_sesion = proveedor in PROVEEDORES_CON_SESION
+    if con_sesion:
+        # La suscripción de ChatGPT: sin clave, con la sesión guardada (`chatgpt.py`).
+        from .chatgpt import ClienteChatGPT, SesionChatGPT, validar_parametros_chatgpt
     try:
-        parametros = validar_parametros(parametros)
+        parametros = (validar_parametros_chatgpt if con_sesion else validar_parametros)(
+            parametros)
     except ParametrosInvalidos as e:
         # Para quien llama, la IA no está configurada (incidente y aviso neutro), con el porqué.
         raise LookupError(f"Los parámetros del modelo '{proveedor}/{fila['modelo']}' no "
                           f"valen: {e}") from None
+    if con_sesion:
+        try:
+            sesion = SesionChatGPT.abrir()      # sin sesión, `SesionChatGPTAusente`
+        except ValueError as e:                 # una ruta dentro del repositorio
+            raise LookupError(str(e)) from None
+        return IAReal(ClienteChatGPT.crear(fila["modelo"], sesion, parametros),
+                      tono_del_espacio(cur, workspace_id),
+                      nombre=f"{proveedor}/{fila['modelo']}")
     base = parametros.get("base_url") or BASE_URLS.get(proveedor)
     if not base:
         raise LookupError(f"No hay dirección para el proveedor '{proveedor}'.")
