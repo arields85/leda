@@ -147,8 +147,10 @@ de aviso; flujos C1 a C6 y migraciones `0026` a `0029`.
 | Rama del Motor, después de la E3-1 | suite completa | 2026-10-06 | 2310 passed, 333 deselected, 1 warning in 837.96s |
 | Rama del Motor, garantías limpias | `pytest tests/garantias` | 2026-10-06 | 84 passed in 95.36s |
 | Rama del Motor, después de la E3-2 | suite completa | 2026-10-06 | 2316 passed, 333 deselected, 1 warning in 845.33s |
+| Rama del Motor, sin los flujos A y B (E3-3 y E3-4) | suite completa | 2026-10-06 | 626 passed (sin banco: 0 deselected) |
+| Rama del Motor, garantías | `pytest tests/garantias` | 2026-10-06 | 139 passed in 137.87s |
 
-Los deselected son el banco real (`modelo_real`). La tercera fila es la línea base de garantías del Motor. Estas
+Los deselected eran el banco real (`modelo_real`), retirado con los flujos viejos (E3-4). La tercera fila es la línea base de garantías del Motor. Estas
 cifras miden el código: **una suite en verde no es evidencia de que la conversación funcione** (`AGENTS.md`,
 "Cómo pensamos juntos", punto 12).
 

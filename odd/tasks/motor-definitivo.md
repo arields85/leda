@@ -153,7 +153,7 @@ revisión por tramos.
         - Después de borrar la copia: garantías, una respuesta y huérfanos, `175 passed`.
       - Commits `3b5eb9f` y `09a1111`. Revisión `review-03c2a8fcefc22a0e`, aprobada y reconocida; base
         `24f8184`, el tramo incluye `d0dc25b` y `f063874`.
-- [ ] **E3-3. Enredos 1 y 2.** El despachador queda como transporte: sin botones ni retenciones de los
+- [x] **E3-3. Enredos 1 y 2.** El despachador queda como transporte: sin botones ni retenciones de los
       flujos viejos. La entrega deja de crear estado de conversación; se rediseña con los circuitos 7 y 8.
       **Se hace junto con la E3-4** (decisión del agente, 2026-10-06). Si se cortaran primero, los flujos
       viejos quedarían rotos y sus pruebas en rojo hasta borrarlos. Se borran los flujos y, en el mismo
@@ -164,9 +164,58 @@ revisión por tramos.
       - No afecta a nadie: no hay equipo real, y `main` no recibe nada hasta M3.
       - `prueba_chica/` sigue andando: lo que use de lo borrado (por ejemplo, Jev, ya retirado) se le
         quita.
-- [ ] **E3-4. Borrar los flujos A y B**, con sus pruebas (se retiran con su código) y una migración que
+- [x] **E3-4. Borrar los flujos A y B**, con sus pruebas (se retiran con su código) y una migración que
       borra las tablas `task_intake_*`, con rollback. El banco `tests/banco/` prueba los flujos viejos y se
       retira con ellos. Criterio: suite en verde y ningún import de lo borrado.
+      **E3-3 y E3-4 hechas (2026-10-06)**, delegadas a dos escritores, con un mapa previo de un
+      explorador.
+      - **Commits:**
+        - `fd919ed`: Jev fuera de la prueba chica.
+        - `6a0d9ee`: el banco viejo.
+        - `81da712` y `03c941e`: las pruebas de los flujos.
+        - `d002c99`: los ocho módulos, la ruta `/telegram`, el registro de webhooks y `cli escuchar` y
+          `correr`.
+        - `95f4c5a`, `b4ae70f`, `472ac22` y `6cf0782`: la limpieza de la capa sólida, partida en cuatro.
+        - `0a5390b`: la migración `0032`, que borra las cinco tablas `task_intake_*`, la columna del
+          outbox y su restricción, y redefine `confirmar_borrador_tarea`.
+        - `e7f2eed`: las pruebas de borradores, a `tests/garantias/test_borradores.py`.
+        - `52909f0`: README, PRUEBA-LOCAL, capacidades y frontera. Se borró `tools/medir_modelos.py`.
+      - **Qué quedó:**
+        - El despachador es transporte: sin retención por ramas, y con los botones de copiar y de
+          acción pendiente.
+        - El aviso de entrega al aprobador sale sin el menú viejo, como aviso de coordinación.
+        - `llm` conserva sólo lo que usan `cli` y la prueba chica.
+        - `huerfanos` se queda: es la garantía de no fallar en silencio, y queda inactivo hasta que el
+          motor vuelva a recibir mensajes.
+        - Hasta la E3-7, Leda no conversa.
+      - **Evidencia, la suite completa por porción:**
+        - 2316 al empezar.
+        - 1928 sin el banco (0 deselected).
+        - 1675 y 912 sin las pruebas de los flujos.
+        - 849 sin los módulos.
+        - 626 después de la limpieza.
+        - Al final, 626 passed; `tests/garantias` 139 (repetido por el agente principal); `prueba_chica`
+          410.
+      - **Revisiones:**
+        - `review-3ab131579ae22f62` (Jev).
+        - Limpieza: `review-4ba85c420eef8e2f`, `review-de6bef5bc667d393`, `review-1e436b587bf08e95` y
+          `review-dc5f902a0a66d06b`.
+        - Migración y borradores: `review-5bd666e70e446bd5`.
+        - Todas aprobadas y reconocidas.
+        - Los cuatro borrados puros quedan sin revisar, por decisión del usuario: RDD estuvo apagado
+          para ellos y se volvió a prender.
+        - La limpieza se partió en cuatro reescribiendo commits sin subir. El árbol final es idéntico
+          (etiqueta local `respaldo-antes-de-partir-limpieza`).
+      - **Pendientes:**
+        - Cancelar un borrador no deja fila de auditoría. Antes sólo la dejaba el camino del alta; ver
+          con la plataforma.
+        - `0032` se niega a correr con filas en `task_intake_request`, como la `0002`.
+        - `pending_action.modificar_pedido_en` y `modificacion_consumida_en` siguen, porque las escribe
+          `resolver_pendiente`.
+        - Cuatro columnas que sólo escribe el SQL quedaron declaradas en `test_capacidades`.
+        - `despachador._preview_vigente` todavía lee `task_draft`.
+        - El escalón del incidente de `pending_action` y las etapas viejas de `incidentes` quedan por
+          los incidentes históricos.
 
 **Fase B. El motor definitivo.**
 
