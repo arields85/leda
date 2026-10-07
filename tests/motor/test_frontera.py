@@ -34,7 +34,9 @@ PAQUETE = "motor"
 
 # Módulo de `leda` y, cuando sólo se permite una parte, los nombres permitidos. Sale de la
 # lista de la prueba chica (`prueba_chica/test_frontera.py`), más `versiones`, con la que el
-# motor audita lo que escribe directo (decisiones técnicas de la E3-5).
+# motor audita lo que escribe directo (decisiones técnicas de la E3-5), y, desde la entrada del
+# motor (E3-7), el barrido de los mensajes sin respuesta (`huerfanos`) y lo que la entrada
+# comparte con él: el candado por mensaje y el criterio de "ya tiene respuesta".
 PERMITIDOS: dict[str, set[str] | None] = {
     "db": None,
     "autoridad": None,
@@ -49,12 +51,15 @@ PERMITIDOS: dict[str, set[str] | None] = {
     "config": None,
     "onboarding": {"activar", "bienvenida", "ActivacionInvalida"},
     "versiones": None,
+    "huerfanos": {"barrer"},
+    "entrada": {"clave_de_candado_del_mensaje", "sql_respondido"},
 }
 
 # La escalera, el reloj y el ciclo viejos se retiran cuando el motor tenga los suyos (E3-7);
 # el resto son los módulos de los flujos A y B, borrados en la E3-4, por si volvieran.
+# `huerfanos` ya no: dejó de importar los flujos viejos (E3-2) y el ciclo del motor lo corre.
 PROHIBIDOS = {"escalera", "reloj", "ciclo", "gateway", "agente", "ingreso_tareas", "contexto",
-              "respuesta_unica", "huerfanos", "local"}
+              "respuesta_unica", "local"}
 
 # (módulo, función que importa adentro, prohibido al que llega): por qué no molesta.
 BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}

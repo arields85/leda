@@ -10,9 +10,13 @@ En cada vuelta del escuchador (a lo sumo unos 25 segundos):
 1. **la escalera** (`escalera.correr_escalera`) y **los avisos guardados**
    (`avisos.enviar_avisos`), una vez por minuto (`CADA_S`, contado con un reloj monótono real:
    adelantar el reloj de Leda no los acelera);
-2. **el despacho** del outbox (`despachador.despachar`), con el momento y el horario del reloj
+2. **los mensajes sin respuesta** (`huerfanos.barrer`), en cada vuelta: un mensaje recibido
+   que pasada la ventana del turno en curso no tiene ninguna respuesta (su turno murió) recibe
+   el aviso neutro y deja un incidente, antes del despacho, para que salga en esta misma vuelta.
+   Es la garantía de no fallar en silencio, con o sin seguimiento (E3-7);
+3. **el despacho** del outbox (`despachador.despachar`), con el momento y el horario del reloj
    de Leda: las respuestas salen enseguida y lo que Leda inicia, sólo en horario;
-3. **los avisos a la administración** (`despachador.despachar_avisos_admin`), con el reloj
+4. **los avisos a la administración** (`despachador.despachar_avisos_admin`), con el reloj
    real: `admin_notice` lo fecha la base y no tiene horario.
 
 Nunca importa `leda.ciclo`, `leda.reloj` ni `leda.escalera` (sus textos son fijos y corren
@@ -38,6 +42,7 @@ from ..calendario import Calendario
 from ..db import admin, espacio
 from ..despachador import (Transporte, despachar, despachar_avisos_admin,
                            texto_error_seguro)
+from ..huerfanos import barrer as barrer_huerfanos
 from ..incidentes import registrar_incidente
 
 from .avisos import enviar_avisos
@@ -80,6 +85,8 @@ class Ciclo:
                 "escalera", lambda: correr_escalera(self.conn, self.ws, self.reloj))
             resultados["avisos"] = self._paso(
                 "avisos", lambda: enviar_avisos(self.conn, self.ws, self.ia, self.reloj))
+        resultados["huerfanos"] = self._paso(
+            "huerfanos", lambda: barrer_huerfanos(self.conn, self.ws, self.reloj.ahora()))
         resultados["despacho"] = self._paso("despacho", self._despachar)
         if admin and self.transporte_admin is not None:
             resultados["avisos_admin"] = self._paso("avisos_admin", self._despachar_admin)
@@ -135,6 +142,9 @@ class Ciclo:
         for nombre in ("escalera", "avisos"):
             if resultados.get(nombre):
                 self.imprimir(f"  ⏱ {nombre}: {resultados[nombre]}")
+        if resultados.get("huerfanos"):
+            self.imprimir(f"  ! {resultados['huerfanos']} mensaje(s) sin respuesta: salió el "
+                          f"aviso neutro y quedó el incidente")
         pospuestos = (resultados.get("despacho") or {}).get("pospuestos")
         if pospuestos:
             self.imprimir(f"  … {pospuestos} pospuesto(s) hasta la próxima jornada")

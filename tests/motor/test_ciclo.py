@@ -70,10 +70,12 @@ def test_la_escalera_y_los_avisos_corren_cada_minuto_y_el_despacho_cada_vuelta(
                         "correr_escalera", "enviar_avisos", "despachar"]
 
 
-def test_sin_seguimiento_solo_despacha(conn, mundo, espacio_con_escalera):
+def test_sin_seguimiento_solo_despacha_y_barre_los_mensajes_sin_respuesta(
+        conn, mundo, espacio_con_escalera):
+    """El barrido de los mensajes sin respuesta no es seguimiento: corre siempre (E3-7)."""
     ciclo, salida = _ciclo(conn, mundo, octubre(9, 10), seguimiento=False)
 
-    assert set(ciclo.vuelta()) == {"despacho"}
+    assert set(ciclo.vuelta()) == {"huerfanos", "despacho"}
     assert cuantas(conn, "scheduled_notice") == 0 and salida.enviados == []
 
 
@@ -85,7 +87,8 @@ def test_los_avisos_a_la_administracion_salen_con_el_reloj_real(conn, mundo):
     salida_admin = TransporteDePrueba()
     ciclo, _ = _ciclo(conn, mundo, octubre(9, 10), transporte_admin=salida_admin)
 
-    assert ciclo.vuelta(admin=False).keys() == {"escalera", "avisos", "despacho"}
+    assert ciclo.vuelta(admin=False).keys() == {"escalera", "avisos", "huerfanos",
+                                                "despacho"}
     assert salida_admin.enviados == []
     assert ciclo.vuelta()["avisos_admin"]["enviados"] == 1
     assert [e.chat_id for e in salida_admin.enviados] == [90000]
@@ -93,7 +96,8 @@ def test_los_avisos_a_la_administracion_salen_con_el_reloj_real(conn, mundo):
 
 # --- Cada paso, aislado ---------------------------------------------------------------------
 
-PASOS = {"escalera": "correr_escalera", "avisos": "enviar_avisos", "despacho": "despachar",
+PASOS = {"escalera": "correr_escalera", "avisos": "enviar_avisos",
+         "huerfanos": "barrer_huerfanos", "despacho": "despachar",
          "avisos_admin": "despachar_avisos_admin"}
 
 

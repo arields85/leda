@@ -56,16 +56,16 @@ COTA_REENTREGA = timedelta(hours=24)
 def clave_de_candado_del_mensaje(workspace_id: str, chat_id: int,
                                  message_id: int) -> str:
     """La clave del candado de asesor de un mensaje de Telegram. La usa el barrido de
-    huérfanos (`huerfanos.barrer`) y la va a compartir la recuperación de la entrada del
-    motor (E3-7; la de `gateway` se retiró en la E3-4): así nunca actúan a la vez sobre
-    el mismo mensaje."""
+    huérfanos (`huerfanos.barrer`) y el turno de la entrada del motor
+    (`motor.recibir.Recepcion`, E3-7): así nunca actúan a la vez sobre el mismo mensaje."""
     return f"mensaje:{workspace_id}:{chat_id}:{message_id}"
 
 
 def sql_respondido(recibo: str) -> str:
     """Fragmento SQL: el recibo `recibo` (alias de una fila de `inbound_message`) ya
     tiene respuesta. Es el criterio único de "este turno no murió" (T9-H19f) de
-    `huerfanos.barrer`, y el de la recuperación de la entrada del motor (E3-7).
+    `huerfanos.barrer`, y el de la entrada del motor, que no vuelve a atender un mensaje
+    que ya tiene respuesta (`motor.recibir`, E3-7).
 
     Cuenta una fila de respuesta en CUALQUIER estado. Lo que el código descarta a
     propósito antes de enviar (un juego de opciones reemplazado, una vista previa que

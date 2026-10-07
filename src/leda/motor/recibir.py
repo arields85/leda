@@ -23,6 +23,14 @@ incidente y la persona recibe el texto fijo de la falla (nunca en silencio). Si 
 update (guardarlo, activar, atender un toque), quien llama deshace lo suyo y lo reintenta; a los
 `INTENTOS_POR_UPDATE` lo deja, con un incidente y el texto fijo a quien escribió o tocó
 (`recibir_update`).
+
+**Nunca en silencio** (con el barrido de `leda.huerfanos`, que corre en el ciclo): el mensaje se
+guarda con la hora de la base, que es con la que el barrido mide la ventana del turno en curso
+(el reloj de Leda puede estar adelantado días). El texto fijo de un turno caído queda atado al
+mensaje: es su respuesta, y el barrido no manda otro aviso. El turno toma el mismo candado por
+mensaje que el barrido (`entrada.clave_de_candado_del_mensaje`) y no corre si el mensaje ya tiene
+respuesta (`entrada.sql_respondido`; por ejemplo, el aviso neutro del barrido): el aviso y una
+respuesta tardía nunca salen los dos.
 """
 
 from __future__ import annotations
@@ -31,8 +39,9 @@ from collections.abc import Callable
 from typing import Any
 
 from ..autoridad import Canal, Denegado, identificar, identificar_en_espacio
-from ..db import admin, espacio, registrar_auditoria
+from ..db import admin, atar_al_entrante, espacio, registrar_auditoria
 from ..despachador import texto_error_seguro
+from ..entrada import clave_de_candado_del_mensaje, sql_respondido
 from ..incidentes import (ETAPA_TURNO_CONVERSACION, REFERENCIA_INBOUND_MESSAGE,
                           registrar_incidente)
 from ..onboarding import ActivacionInvalida, activar, bienvenida
@@ -131,8 +140,12 @@ class Recepcion:
         quien, entrante = guardado
         self.imprimir(f"  ← {quien.nombre}: {texto[:70]}")
         try:
-            resultado = procesar_turno(self.conn, quien, entrante, self.ia, self.reloj)
-            self.conn.commit()
+            # El candado por mensaje se suelta con el commit, al terminar el turno.
+            with self.conn.transaction():
+                if self._ya_respondido(entrante, chat_id, mensaje["message_id"]):
+                    self.imprimir("  (ese mensaje ya tiene respuesta: no se vuelve a atender)")
+                    return
+                resultado = procesar_turno(self.conn, quien, entrante, self.ia, self.reloj)
         except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
             self.conn.rollback()
             self._turno_caido(quien, chat_id, e, entrante=entrante,
@@ -140,6 +153,16 @@ class Recepcion:
             return
         if not resultado.repetido:
             self.imprimir(f"  → {resultado.texto[:70]}")
+
+    def _ya_respondido(self, entrante: str, chat_id: int, message_id: int) -> bool:
+        """Toma el candado del mensaje (el mismo del barrido de huérfanos; espera si el
+        barrido lo tiene) y dice si el mensaje ya tiene una respuesta, en cualquier estado."""
+        with espacio(self.conn, self.ws) as cur:
+            cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                        (clave_de_candado_del_mensaje(self.ws, chat_id, message_id),))
+            cur.execute(f"select {sql_respondido('i')} as respondido "
+                        f"from inbound_message i where i.id = %s", (entrante,))
+            return bool(cur.fetchone()["respondido"])
 
     def _toque(self, toque: dict[str, Any]) -> None:
         """Un botón tocado: primero la señal (el acuse que Telegram espera; si falla, no se
@@ -185,17 +208,19 @@ class Recepcion:
             except Denegado:
                 self.imprimir("  (un mensaje de alguien que no es del equipo: no se atiende)")
                 return None
+            # `at` es la hora de la base (el valor por omisión), no la del reloj de Leda: con
+            # ella mide el barrido de huérfanos.
             cur.execute(
                 """insert into inbound_message (workspace_id, telegram_bot_id,
                                                 telegram_message_id, chat_id, app_user_id,
-                                                texto, at)
-                   values (%s, %s, %s, %s, %s, %s, %s)
+                                                texto)
+                   values (%s, %s, %s, %s, %s, %s)
                    on conflict (workspace_id, telegram_bot_id, chat_id, telegram_message_id)
                       where telegram_bot_id is not null and telegram_message_id is not null
                       do nothing
                    returning id""",
                 (self.ws, self.bot_id, mensaje["message_id"], chat_id, quien.app_user_id,
-                 texto, self.reloj.ahora()))
+                 texto))
             fila = cur.fetchone()
             if fila is None:
                 cur.execute("""select id from inbound_message
@@ -221,6 +246,8 @@ class Recepcion:
                     referencia_tipo=REFERENCIA_INBOUND_MESSAGE if entrante else None,
                     referencia_id=entrante, chat_id=chat_id, app_user_id=quien.app_user_id,
                     notificado_en=ahora)
+                # El texto fijo es la respuesta de ese mensaje (`entrada.sql_respondido`).
+                atar_al_entrante(cur, entrante)
                 enqueue_outbox(cur, workspace_id=self.ws, chat_id=chat_id,
                                text=TEXTO_SI_LA_IA_FALLA, dedupe_key=clave,
                                recipient_membership_id=quien.membership_id, is_response=True,

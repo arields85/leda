@@ -5,8 +5,9 @@ significa "recibido", no "respondido". T9-H19d recupera un turno muerto cuando
 Telegram reentrega el mensaje pasada `VENTANA_TURNO_EN_CURSO`; si esa reentrega no
 llega (Telegram dejó de reintentar, o el proceso murió y nadie reintenta), el
 recibo quedaría sin respuesta para siempre. `barrer` es la red que lo cierra: cada
-pasada de fondo (`ciclo.ejecutar_pasada`, la de `servir` y la de `escuchar`,
-también la primera tras un arranque) busca los recibos viejos sin respuesta visible,
+vuelta del ciclo del motor (`leda.motor.ciclo`, la del escuchador y la del ciclo de fondo
+de `servir`, también la primera tras un arranque; E3-7) busca los recibos viejos sin
+respuesta visible,
 encola UN aviso neutro por cada uno (`NOTICIA_NEUTRA_INCIDENTE`, atado al recibo) y
 deja el incidente. No vuelve a correr el turno con contenido viejo: la persona
 reenvía si lo necesita.
