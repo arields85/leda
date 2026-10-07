@@ -599,7 +599,7 @@ def _actor(cur, world, workspace_slug="north-lab", person="Taylor Quinn"):
 
 
 def test_legacy_create_task_is_hidden_and_fails_closed(intake_world, conn):
-    assert "crear_tarea" not in {tool["name"] for tool in H.esquemas()}
+    assert "crear_tarea" not in H.REGISTRO
     ws = intake_world["north-lab"]["id"]
     with espacio(conn, ws) as cur:
         actor = _actor(cur, intake_world)

@@ -64,16 +64,6 @@ def atar_al_entrante(cur: psycopg.Cursor, entrante_id: str | None) -> None:
                     (str(entrante_id),))
 
 
-def entrante_atado(cur: psycopg.Cursor) -> str | None:
-    """El mensaje entrante o el toque al que quedó atado el turno en curso
-    (`atar_al_entrante`), o `None` fuera de uno. Es el evento que dispara lo que
-    se encole: sirve para derivar de él una clave de deduplicación, de modo que
-    una entrega repetida del mismo evento no repita lo encolado y cada evento
-    nuevo tenga su propia respuesta (T9-R4)."""
-    cur.execute("select nullif(current_setting('leda.entrante_id', true), '') as e")
-    return cur.fetchone()["e"]
-
-
 @contextlib.contextmanager
 def admin(conn: psycopg.Connection) -> Iterator[psycopg.Cursor]:
     """Transacción de administración: ve todos los espacios.

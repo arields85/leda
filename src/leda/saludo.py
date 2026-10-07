@@ -95,12 +95,11 @@ def reclamar_saludo(cur: psycopg.Cursor, *, workspace_id: str,
     Un `upsert` con `on conflict ... where` alcanza sin ningún bloqueo
     explícito: dos despachos concurrentes de la misma persona compiten por
     la fila real de `greeting_state`, PostgreSQL serializa el segundo detrás
-    del primero, y sólo gana el que de verdad avanza `ultima_fecha_local` --
-    el mismo problema y la misma forma que ya resuelve
-    `pendientes.reclamar_modificacion_abierta` para "una sola de dos
-    concurrentes gana". `>` en vez de `is distinct from`: un reintento con
-    una fecha ANTERIOR a la ya guardada (cruzando medianoche, por ejemplo)
-    nunca hace retroceder el estado ni reclama un saludo que ya salió."""
+    del primero, y sólo gana el que de verdad avanza `ultima_fecha_local`:
+    una sola de dos concurrentes gana. `>` en vez de `is distinct from`: un
+    reintento con una fecha ANTERIOR a la ya guardada (cruzando medianoche,
+    por ejemplo) nunca hace retroceder el estado ni reclama un saludo que ya
+    salió."""
     if not membership_id:
         return False
     cur.execute(
@@ -112,52 +111,6 @@ def reclamar_saludo(cur: psycopg.Cursor, *, workspace_id: str,
            returning true""",
         {"mid": membership_id, "ws": workspace_id, "fecha": fecha})
     return cur.fetchone() is not None
-
-
-def saludo_del_dia_pendiente(cur: psycopg.Cursor, *, membership_id: str | None,
-                             zona: ZoneInfo, ahora: datetime) -> str | None:
-    """El saludo que le toca a esta persona ahora (`👋 Buen día`, ...), o `None`
-    si ya recibió el de su fecha local. Sólo LEE `greeting_state`: la reserva
-    se sigue reclamando al despachar (`reclamar_y_anteponer`); acá se decide
-    únicamente cómo se arma el texto de una respuesta que va a ser lo primero
-    que la persona reciba hoy (`linea_de_saludo`). Sin `membership_id` o con
-    cualquier falla de lectura -- el saludo es decorativo, nunca tira abajo una
-    respuesta -- devuelve `None`."""
-    if not membership_id:
-        return None
-    try:
-        with cur.connection.transaction():
-            cur.execute(
-                "select ultima_fecha_local from greeting_state "
-                "where membership_id = %s", (membership_id,))
-            fila = cur.fetchone()
-            hoy = fecha_local(ahora, zona)
-            if fila is not None and fila["ultima_fecha_local"] >= hoy:
-                return None
-            # Una línea que ya lleva el saludo del día y todavía no salió: la
-            # reserva se reclama recién al despachar, así que un segundo saludo
-            # encolado antes también lo llevaría (el despachador no antepone nada a
-            # una fila marcada como su propio saludo). Sólo el primero lo lleva.
-            cur.execute(
-                "select 1 from message_outbox where destinatario_membership_id = %s "
-                "and es_bienvenida and estado in ('pendiente', 'listo') limit 1",
-                (membership_id,))
-            if cur.fetchone() is not None:
-                return None
-            return saludo_por_hora(ahora.astimezone(zona).hour)
-    except Exception:  # noqa: BLE001 -- decorativo, nunca tira el envío
-        return None
-
-
-def linea_de_saludo(nombre: str | None, saludo_del_dia: str | None) -> str:
-    """La respuesta a un saludo suelto, en UNA línea (R4-H1, decisión del
-    usuario, 2026-09-30): con el saludo del día por dar, "👋 Buen día Ariel, ¿en
-    qué te ayudo?"; si ya lo recibió, "Hola Ariel, ¿en qué te ayudo?". Sólo el
-    primer nombre; sin nombre no se inventa uno."""
-    primero = nombre.split()[0] if nombre and nombre.split() else None
-    apertura = saludo_del_dia or "Hola"
-    quien = f" {primero}" if primero else ""
-    return f"{apertura}{quien}, ¿en qué te ayudo?"
 
 
 def verificar_migraciones(cur: psycopg.Cursor) -> str | None:

@@ -64,12 +64,10 @@ def redactar_secreto_telegram(texto: str | None) -> str | None:
 
 # Qué tipo de fila referencia `incident.referencia_id` -- mismo patrón
 # polimórfico que `audit_log.sujeto_tipo`/`sujeto_id`, sin clave foránea:
-# apunta a texto o a un toque, nunca lo copia (docs/ROADMAP.md: la retención
-# de `inbound_message` es por cliente). Viven acá, no en `gateway.py`, porque
-# `_texto_disparador` también los necesita; `gateway` los sigue exponiendo
-# con el mismo nombre (los importa de acá) para no romper a quien ya los usa.
+# apunta a texto, nunca lo copia (docs/ROADMAP.md: la retención de
+# `inbound_message` es por cliente). La referencia a un toque
+# (`pending_action`) se retiró con los flujos A y B (E3-3).
 REFERENCIA_INBOUND_MESSAGE = "inbound_message"
-REFERENCIA_PENDING_ACTION = "pending_action"
 # Un aviso de `admin_notice` que agotó sus reintentos (T28, despachador.py
 # `despachar_avisos_admin`): apunta a esa fila, no a un mensaje ni una
 # acción -- `referencia_tipo` es texto libre, sin restricción en el esquema
@@ -88,14 +86,10 @@ NOTICIA_NEUTRA_INCIDENTE = (
 # Etapas de incidente propias de este módulo y de quien lo comparte (T10-2b): una
 # constante con nombre por cada punto donde el código registra un incidente, cada una
 # con su entrada en `EXPLICACION_POR_ETAPA`.
-ETAPA_RESUMEN_VIGENTE_SIN_FILA = "resumen_vigente_sin_fila"
 ETAPA_TURNO_CONVERSACION = "turno_conversacion"
-ETAPA_ENRUTAMIENTO = "enrutamiento"
-ETAPA_JEV_NO_CONFIGURADO = "jev_no_configurado"
 ETAPA_ENTREGA_MENSAJE = "entrega_mensaje"
 ETAPA_ENTREGA_AVISO_ADMIN = "entrega_aviso_admin"
 ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
-ETAPA_CONFIGURACION_ALTA = "configuracion_alta_invalida"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 # T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
@@ -119,8 +113,7 @@ def _quien_disparo(cur, app_user_id: str | None) -> str | None:
 
 def _texto_disparador(cur, referencia_tipo: str | None,
                       referencia_id: str | None) -> str:
-    """Qué disparó el incidente: el texto del mensaje, o la acción que se
-    estaba resolviendo cuando falló un toque. Nunca `referencia_cruda` --
+    """Qué disparó el incidente: el texto del mensaje. Nunca `referencia_cruda` --
     eso es la traza técnica, no el disparador, y puede traer algo parecido
     a un secreto."""
     texto = None
@@ -129,11 +122,6 @@ def _texto_disparador(cur, referencia_tipo: str | None,
                     (referencia_id,))
         fila = cur.fetchone()
         texto = fila["texto"] if fila else None
-    elif referencia_tipo == REFERENCIA_PENDING_ACTION and referencia_id:
-        cur.execute("select resumen from pending_action where id = %s",
-                    (referencia_id,))
-        fila = cur.fetchone()
-        texto = fila["resumen"] if fila else None
 
     if texto is None:
         return "(sin referencia al mensaje o la acción que lo disparó)"
@@ -159,8 +147,9 @@ class ExplicacionDeEtapa:
 _BUSCAR_DETALLE = "Buscá el detalle con `python -m leda incidentes <espacio>`"
 
 # Tabla determinista, nunca el modelo: una entrada por etapa con la que el código
-# registra un incidente (las constantes `ETAPA_*` de `gateway`, `respuesta_unica`
-# y `local`, más los literales de `ciclo`, `saludo` y `despachador`). Una etapa
+# registra un incidente (las constantes `ETAPA_*` de este módulo, más los literales
+# de `ciclo`, `saludo` y `despachador`, y algunos literales de los flujos A y B que
+# pueden seguir en incidentes ya registrados). Una etapa
 # sin entrada cae en `_EXPLICACION_GENERICA`;
 # `tests/test_aviso_incidente_legible.py` falla si una etapa conocida queda sin
 # entrada.
@@ -255,13 +244,6 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_vio="Nada: no le llegó el saludo.",
         que_hacer=(f"{_BUSCAR_DETALLE}. El saludo no sale hasta que se "
                    "corrija.")),
-    ETAPA_RESUMEN_VIGENTE_SIN_FILA: ExplicacionDeEtapa(
-        que_paso=("Se tocó Enviar a aprobación sobre un resumen que el borrador "
-                  "dejó atrás, y el resumen vigente no quedó encolado para "
-                  "{nombre}."),
-        que_vio=NOTICIA_NEUTRA_INCIDENTE,
-        que_hacer=(f"{_BUSCAR_DETALLE}. El borrador sigue vivo: pedile a "
-                   "{nombre} que lo retome desde su mensaje o que lo cancele.")),
     ETAPA_TURNO_CONVERSACION: ExplicacionDeEtapa(
         que_paso=("Falló el turno de conversación con {nombre}: el proveedor del "
                   "modelo, el armado del turno o una herramienta levantó un "
@@ -270,21 +252,6 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(_BUSCAR_DETALLE + " y corregí la causa (proveedor caído, "
                    "clave vencida o un defecto). Después {nombre} puede "
                    "reenviar el mensaje.")),
-    ETAPA_ENRUTAMIENTO: ExplicacionDeEtapa(
-        que_paso=("Falló el enrutamiento de un mensaje o de un toque de "
-                  "{nombre}: Leda no pudo decidir a qué paso de la "
-                  "conversación correspondía."),
-        que_vio=NOTICIA_NEUTRA_INCIDENTE,
-        que_hacer=(_BUSCAR_DETALLE + " y revisá que lo que {nombre} quería "
-                   "hacer no haya quedado a medias.")),
-    ETAPA_JEV_NO_CONFIGURADO: ExplicacionDeEtapa(
-        que_paso=("El mensaje de {nombre} nombraba una tarea, pero falta la "
-                  "credencial del modelo que la identifica "
-                  "(LEDA_OPENROUTER_API_KEY)."),
-        que_vio=("Una pregunta para aclarar de qué tarea habla, en vez de una "
-                 "respuesta adivinada."),
-        que_hacer=("Configurá la credencial y reiniciá el servicio. Hasta "
-                   "entonces Leda pregunta en vez de resolver la tarea.")),
     ETAPA_ENTREGA_MENSAJE: ExplicacionDeEtapa(
         que_paso=("Un mensaje para {nombre} no se pudo entregar por Telegram "
                   "después de varios intentos."),
@@ -306,14 +273,6 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=("Acortá la política de evidencia del área (menos ítems o "
                    "textos más cortos) y avisale a {nombre} que puede "
                    "reintentar.")),
-    ETAPA_CONFIGURACION_ALTA: ExplicacionDeEtapa(
-        que_paso=("Una opción configurada del alta de tareas (objetivo, "
-                  "responsable, área o evidencia) tiene más texto del que "
-                  "Telegram puede mostrar."),
-        que_vio=("Que no se puede mostrar una opción configurada, con el botón "
-                 "para cancelar el borrador."),
-        que_hacer=("Corregí o acortá la opción configurada. El borrador de "
-                   "{nombre} sigue abierto hasta que lo cancele.")),
     "indicador_actividad": ExplicacionDeEtapa(
         que_paso=("No se pudo retirar el borrador nativo del indicador de "
                   "actividad; puede haber quedado visible."),
