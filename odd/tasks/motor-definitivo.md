@@ -267,11 +267,11 @@ revisión por tramos.
         - Garantías y motor, después de `12e63d9`: 188.
         - `prueba_chica`: 410.
       - **Revisiones:** `review-fb5aae5abbb4e2a8` y `review-6e0da2c028ca5d98`, aprobadas y reconocidas.
-- [~] **E3-6. Mudar el diseño probado:** estado, registro de turnos, fichas de los circuitos probados,
+- [x] **E3-6. Mudar el diseño probado:** estado, registro de turnos, fichas de los circuitos probados,
       avisos guardados, escalera y reloj. Entran las dos entradas de la prueba real: hablar del mundo y no
       de la cocina, con su conversación de prueba escrita primero; y los efectos en `audit_log` con la
       versión de las reglas.
-      **Portado (2026-10-06 y 07), delegado a dos escritores.** Falta la regla de hablar del mundo.
+      **Portado (2026-10-06 y 07), delegado a dos escritores.**
       - **Capa 2:** `4e3c16d` (jugadas, situaciones y hechos), `fd8f833` (turno, avisos y efectos) y
         `8d6d195` (pruebas por el turno). Revisiones `review-9b72635703d52896`,
         `review-f713d77c04cb3163` y `review-4edb74708eee992b`.
@@ -288,8 +288,33 @@ revisión por tramos.
         falló primero: `assert '2026-10-06' == '2026-10-05'`.
       - **Evidencia:** `tests/motor` 363; suite completa 995, más 1 con el arreglo; `tests/garantias`
         146; `prueba_chica` 410.
+      - **Hablar del mundo y no de la cocina (2026-10-07):**
+        - `c0ccaf1`: la conversación de prueba 18, escrita primero.
+        - `9c83ead`: el arreglo en la cocina, como regla general.
+          - Los hechos de un aviso dicen `llega`: cuándo le llega a quien lo recibe, o `ya_le_llego`,
+            `no_le_va_a_llegar` (con su motivo) o `no_le_llego`. Desaparecen los estados internos y `sale`.
+          - Lo anunciado que ya no pasa se llama `ya_no_va_a_pasar`.
+          - La instrucción de redacción describe el trabajo: contar qué pasa en el mundo, nunca cómo
+            funciona el sistema por dentro, y en futuro lo que todavía no pasó.
+        - **Evidencia con GPT-6 sol:** en rojo, la 18 falló en las 5 corridas; en verde, 5 de 5. La
+          regresión de las 18 conversaciones dio 90 de 90 en garantías y 89 de 90 en comprensión, con
+          5,4 s de mediana y 12,9 s la más lenta.
+        - **La falla de la regresión, en la conversación 08:** una fecha a 15 días, cuando la lista de
+          días que recibe la IA llega a 14 (`DIAS_PROXIMOS`). Es previa al cambio; en la ronda 3 ese
+          paso dio 5 de 5. Queda para mirar en la comparación de IA.
+        - **Gasto:** unos USD 3,36. Quedan unos USD 6,2 de crédito en OpenRouter.
+        - **Revisiones:** `review-4398edb6b3eba398` y `review-08872659140a6e5d`, aprobadas. Quedan
+          tres advertencias de honestidad en casos de borde para mirar antes de M3: un aviso guardado
+          cuya hora ya pasó (`avisos.py`), el aviso al administrador y los códigos de `hechos`.
+      - **El corredor, mudado (2026-10-07):** está en `tests/conversaciones/`
+        (`python -m tests.conversaciones.correr`), con `--motor leda.motor|prueba_chica` y `--ia`
+        para cualquier proveedor y modelo. Lo de `nan` queda con precio desconocido.
+        - Commits `b94247e`, `34adf8f`, `fb4754a` y `4271efb` (informes).
+        - Ronda en seco con la IA guionada: 85 de 85 en los dos motores.
+        - Revisiones `review-00e186be5d35696a`, `review-b3cba4591a49db01` y
+          `review-3c1620b13c66e741`, aprobadas.
       - **Pendiente:**
-        - Dos pruebas del escuchador esperan la E3-7, y una del corredor, la mudanza del corredor.
+        - Dos pruebas del escuchador esperan la E3-7.
         - Una prueba de `prueba_chica` falló una vez sin explicación y pasó al repetirla
           (intermitente, sin identificar).
 - [ ] **E3-7. La entrada del motor:** escuchador y webhook propios, sin `gateway`.
