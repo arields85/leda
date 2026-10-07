@@ -143,8 +143,10 @@ Una tabla nueva, `archivo`, guarda el contenido de cada archivo recibido, separa
   `captura` ← imagen; `archivo` ← archivo, imagen o enlace; `resultado_de_prueba` ← texto, archivo,
   imagen o enlace (usuario, 2026-10-07: un resultado de prueba se puede contar por escrito).
 - **`evidencia_pendiente` cambia:** la política se cumple cuando cada tipo pedido tiene una pieza
-  propia del ciclo vigente, no retirada, de una clase que ese tipo acepta. Una pieza cubre un solo
-  tipo. Con eso, en electricidad una frase sola ya no alcanza: falta la foto. Es la regla de la
+  propia del ciclo vigente, no retirada, de una clase que ese tipo acepta. Un mismo texto puede cubrir
+  varios tipos ("terminé, lo probé 20 ciclos sin falla" es explicación y resultado de la prueba): la
+  vista previa de la entrega dice qué cubre cada pieza y la persona lo confirma o lo corrige (usuario,
+  2026-10-07). Con eso, en electricidad una frase sola ya no alcanza: falta la foto. Es la regla de la
   mecánica §6: no se acepta una afirmación cuando la política pide un artefacto.
 - **El código cuenta, la persona juzga.** Que haya una imagen no dice que la foto muestre el tablero
   terminado; eso lo decide quien aprueba (mecánica §5: la verificación determinista más la persona).

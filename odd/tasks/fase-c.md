@@ -66,7 +66,20 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 3. **Quien aprueba no contesta:** decidida (usuario, 2026-10-07). Un recordatorio al día hábil siguiente
    y otro al segundo. Al tercero, si tiene a alguien arriba (Marcos → Ismael), se le avisa a ese que la
    aprobación está trabada; si no hay nadie arriba, un recordatorio cordial por día. Al responsable no se
-   le avisa: no depende de él.
+   le avisa: no depende de él. **Precisada por el usuario el mismo día** (al escribir la conversación
+   24): el segundo recordatorio le avisa a quien aprueba que al día siguiente se entera quien está arriba.
+   El aviso a quien está arriba es **sólo informativo**: no le pide nada ni lo convierte en aprobador ("no
+   sobrecargar a Ismael; el responsable del sector se hace cargo de las tareas de su gente"). Quien aprueba
+   sigue con un recordatorio cordial por día hasta decidir, y cuando decide, a quien está arriba le llega
+   que se destrabó.
+   - **Una aprobación que todavía no puede cerrar** (por ejemplo, la tarea espera otra que no terminó):
+     queda registrada, y cuando lo que faltaba se resuelve, el código vuelve a comprobar y la cierra sola,
+     con aviso al responsable y a quien aprobó (usuario, 2026-10-07).
+   - **El aviso de una entrega ofrece los botones Aprobar y Pedir cambios** como atajos (usuario,
+     2026-10-07). "Aprobar" aprueba con un toque; "Pedir cambios" pregunta qué falta. Escribir vale igual.
+   - **Un mismo texto puede cubrir varios tipos de evidencia** ("terminé, lo probé 20 ciclos sin falla" es
+     explicación y resultado de la prueba): la vista previa de la entrega dice qué cubre cada pieza y la
+     persona lo confirma o lo corrige (usuario, 2026-10-07).
 4. **Escribirle a quien destraba:** ¿directo, o preguntándole antes a quien lo nombró (constitución §7,
    atribución)? `PENDIENTE`.
 5. **Quien destraba dice que no le corresponde:** ¿a quién va Leda? `PENDIENTE`.
