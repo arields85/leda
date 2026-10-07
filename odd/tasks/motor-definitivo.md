@@ -407,6 +407,8 @@ y no por la API.
   - la sesión se guarda fuera del repositorio y no se muestra nunca;
   - se renueva sola;
   - se verifica con las conversaciones de prueba antes de su prueba por Telegram.
+- **Alcance** (usuario, el mismo día): es para el uso personal de ahora. Cuando Leda sea comercial, cada
+  cliente paga su propio proveedor de IA, con su clave (`python -m leda modelo … --proveedor`).
 
 ## 4b. Guía de la prueba por Telegram (M3)
 
