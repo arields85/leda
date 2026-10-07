@@ -272,3 +272,18 @@ def test_la_ia_sabe_de_que_tarea_fue_el_ultimo_aviso(conn, mundo, escribe):
 
     assert ia.pedidos_de_jugadas[0]["ultimo_aviso"] == {"tipo": "aviso_previo", "tarea": "T1"}
     assert ia.pedidos_de_jugadas[0]["estado"] is None
+
+
+def test_hoy_es_la_fecha_del_espacio_y_no_la_de_utc(conn, mundo, escribe):
+    """A las 23:30 en Buenos Aires ya es el día siguiente en UTC: la IA recibe la fecha del
+    espacio, si no "mañana" se anotaría un día de más."""
+    from datetime import datetime, timezone
+
+    noche = datetime(2026, 10, 6, 2, 30, tzinfo=timezone.utc)   # lunes 5, 23:30 en Buenos Aires
+    quien, entrante = escribe("Marcos", "lo termino mañana")
+    ia = IAGuionada(jugadas=[[]], redacciones=["Anotado."])
+
+    procesar_turno(conn, quien, entrante, ia, RelojFijo(noche))
+
+    assert ia.pedidos_de_jugadas[0]["hoy"] == "2026-10-05"
+    assert ia.pedidos_de_redaccion[0]["hoy"] == "2026-10-05"

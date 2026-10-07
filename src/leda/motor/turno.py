@@ -242,6 +242,12 @@ def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None =
                     jugadas=jugadas)
 
 
+def _hoy(ctx: Contexto) -> str:
+    """La fecha de hoy en el espacio, no en UTC: de noche, en UTC ya es mañana y la IA
+    contaría un día de más."""
+    return ctx.ahora.astimezone(ctx.calendario.zona).date().isoformat()
+
+
 def _alias(tareas, task_id) -> str | None:
     return next((t["alias"] for t in tareas if t["id"] == str(task_id)), None)
 
@@ -263,7 +269,7 @@ def _ultimo_aviso(fila, tareas) -> dict[str, Any] | None:
 def _situacion(ctx: Contexto, jugadas: Mapping[str, Manejador]) -> dict[str, Any]:
     """Lo que la IA recibe para elegir: nunca un id de la base, sólo alias."""
     return {
-        "hoy": ctx.ahora.date().isoformat(),
+        "hoy": _hoy(ctx),
         "mensaje": ctx.texto,
         "estado": ctx.estado,       # la pregunta abierta, con sus opciones, y las de después
         "ultimo_aviso": ctx.ultimo_aviso,
@@ -280,7 +286,7 @@ def _pedido_de_redaccion(ctx: Contexto, hechos: list[dict[str, Any]],
     tocó), los hechos (con lo que se dice sólo si se pregunta, `SOLO_SI_PREGUNTA`), lo que un
     mensaje anterior anunció y ya no va a pasar (`ya_no_sale`, si hay), la única pregunta que
     se hace, si hay, y los últimos turnos."""
-    return {"hoy": ctx.ahora.date().isoformat(), "persona": ctx.quien.nombre,
+    return {"hoy": _hoy(ctx), "persona": ctx.quien.nombre,
             "mensaje": ctx.texto if ctx.toque is None else None,
             **({"toco": ctx.toque} if ctx.toque is not None else {}),
             "hechos": hechos, **({"ya_no_sale": ya_no_sale} if ya_no_sale else {}),
