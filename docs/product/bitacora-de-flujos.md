@@ -287,6 +287,20 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   en garantías. La IA usa el formato: las tareas y las fechas en negrita, un párrafo por cosa y viñetas para
   listar tareas.
 - **Falta:** el juicio del usuario, primero sobre ejemplos de las transcripciones y después por Telegram.
+- **Prueba por Telegram del usuario (primera vuelta):** mejoró, pero seguía siendo mucho bloque de texto y
+  la negrita casi no se notaba. Pidió, con capturas, un renglón por idea y emojis fijos.
+- **Segunda vuelta** (`c1b3042` a `96be1a3`, revisión `review-f216946c22e36f30`): sin negrita, un renglón
+  por idea, 📋 ✏️ 📅 ⚠️, fechas cortas ("vie 23/10") y el cierre aparte, con un chequeo automático del
+  formato en el corredor. Regresión de 20 por 5 con otra cuenta de ChatGPT del usuario (`86cef4a`):
+  garantías 100 de 100, comprensión 100 de 100 y **formato 79 de 100**. Las fallas, casi siempre dos ideas
+  en un renglón o dos preguntas en el cierre. Desde esta ronda, "todo bien" incluye el formato y no se
+  compara con las anteriores.
+- **Prueba por Telegram del usuario (segunda vuelta, 2026-10-07):** "quedó muy bien". Tres ajustes: 🗓️ en
+  vez de 📅 (Telegram dibuja 📅 con una fecha fija), en cada bloque primero la tarea y después lo anotado,
+  y "Ismael será notificado / fue notificado" en vez de "le voy a avisar a Ismael". En la prueba, saltar
+  días seguidos sin esperar la vuelta de un minuto del escuchador dejó sin salir los recordatorios de esos
+  días; la escalera no se saltea pasos y dejó el escalamiento para después del recordatorio que lo
+  anuncia, como pide la mecánica §9.
 
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
