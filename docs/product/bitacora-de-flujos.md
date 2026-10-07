@@ -301,6 +301,22 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   días seguidos sin esperar la vuelta de un minuto del escuchador dejó sin salir los recordatorios de esos
   días; la escalera no se saltea pasos y dejó el escalamiento para después del recordatorio que lo
   anuncia, como pide la mecánica §9.
+- **Tercera vuelta del formato y el "escribiendo…"** (`107b7fb`, `93b0ff3`, revisión
+  `review-1087d89630436954`; el indicador, la animación y el streaming: `f82804f`, `5720fdc`,
+  `review-62848d1507d6fd52`; sin demora al final: `fa52cb2`, `9a387da`, `review-99aaf83d8c79df29`). La
+  regresión (`3cf974f`) se cortó en la conversación 15: la cuenta de ChatGPT se quedó sin cupo (112
+  respuestas 429, que el rastro de los avisos mostró enseguida). En la 1 a la 14, comprensión 70 de 70 y
+  ninguna falla de las reglas nuevas (🗓️, la tarea primero, la marca al principio, "será notificado"); siguen
+  fallando a veces los renglones largos y el cierre.
+- **Prueba por Telegram del usuario (tercera vuelta, 2026-10-07):** "el formato, el '…' y el streaming
+  quedó perfecto". Al quitar el retiro del borrador, el mensaje final aparece enseguida, sin desaparecer,
+  como pide la API de Telegram para `sendMessageDraft`. **Hallazgo:** el usuario escribió a propósito sin
+  puntuación, "con el PLC estoy compliacdo, me falta el cable para programar comunicaciones estimo que la
+  tengo para el viernes 23", y la IA anotó el bloqueo y la fecha en el PLC, con "comunicaciones" dentro de la
+  causa y esa causa como motivo; comunicaciones quedó sin fecha, a Ismael le llegó un aviso equivocado y la
+  escalera persiguió comunicaciones hasta el escalamiento. Es comprensión, no código. Se escribe como
+  conversación de prueba 25 (todos los mensajes sin puntuación, pedido del usuario) y se mide con la IA real
+  antes de tocar nada; la regla que ya existe es la duda (conversación 09).
 
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
