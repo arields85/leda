@@ -5,10 +5,11 @@ La credencial sale del entorno (`config.clave_llm`). Ninguno de los dos está en
 pack ni en el núcleo.
 
 Los proveedores y el ruteo de intención de los flujos A y B se retiraron con ellos
-(E3-3). Quedan las direcciones de los proveedores (`cli modelos`, el motor y la prueba
-chica) y la validación del tiempo máximo y los reintentos (`tiempos`), que usa el
-cliente de la IA real del motor (`leda.motor.ia_real`). `_tiempos` es el mismo, con el
-nombre que usan la prueba chica y su prueba (`tests/test_tiempo_maximo_modelo.py`).
+(E3-3). Quedan las direcciones de los proveedores (`cli modelos` y el motor) y la
+validación del tiempo máximo y los reintentos (`tiempos`), que usa el cliente de la IA
+real del motor (`leda.motor.ia_real`). `_tiempos` es el mismo, con el nombre que usa su
+prueba (`tests/test_tiempo_maximo_modelo.py`); la prueba chica, que también lo usaba, se
+borró el 2026-10-07.
 """
 
 from __future__ import annotations

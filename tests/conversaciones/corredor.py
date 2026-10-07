@@ -18,8 +18,8 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
 
 El transporte es falso (`despachador.TransporteDePrueba`): nada sale a Telegram. La IA es la que
 se le pasa: la guionada con las jugadas esperadas (`grabar.IAPerfecta`), una real o una
-grabación (`grabar.IARepetida`). El motor de conversación es el que se le pasa (`motores.py`):
-el definitivo, por omisión, o el de la prueba chica; la corrida dice cuál corrió.
+grabación (`grabar.IARepetida`). El motor de conversación es el de `motores.py`: el definitivo
+(el de la prueba chica se borró el 2026-10-07); la corrida dice cuál corrió.
 """
 
 from __future__ import annotations
