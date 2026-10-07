@@ -274,6 +274,16 @@ revisión por tramos.
 - [ ] **E3-7. La entrada del motor:** escuchador y webhook propios, sin `gateway`.
 - [ ] **E3-8. Regresión y prueba real:** las 17 conversaciones, cinco veces con GPT-6 sol, y la guía de
       la E2-9 por Telegram. Después se borra `prueba_chica/`.
+      **Comparación de IA** (pedido del usuario, 2026-10-06; el gasto en IA real está autorizado):
+      - Las 17 conversaciones, cinco veces, sobre el motor definitivo terminado, con tres IA:
+        - GPT-6 sol, la referencia (85 de 85 en la ronda 3);
+        - GPT-6.1 luna, por OpenRouter;
+        - DeepSeek flash, por el proveedor `nan`, no por OpenRouter.
+      - El identificador de "4.1 flash" se confirma en `nan` antes de correr; en la bitácora figura
+        `deepseek-v4-flash`.
+      - Se miden garantías, comprensión, latencia y costo, y el resultado va a la bitácora.
+      - Luna se descartó en la ronda 1 (38 de 80), con el motor anterior a la revisión del contrato
+        (ADR 0018, 9k y 9m).
 
 **Fase C. Lo que la prueba chica no cubrió, después de M3** (usuario, 2026-10-06). Son los circuitos 7
 y 8 (entrega y aprobación), el 5 (cadencias) y la persecución completa (3a). Cada uno lleva primero sus
