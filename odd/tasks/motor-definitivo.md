@@ -76,6 +76,11 @@ revisión por tramos.
   E3-7 y E3-8, según su tamaño al llegar.
 - **Entrega:** `main` no recibe nada hasta M3 (usuario, 2026-10-06). Las porciones son los commits de
   cada tarea, revisados por tramos desde el último revisado.
+- **RDD apagado para los borrados puros** (usuario, 2026-10-06, `gentle-ai review mode disable --scope
+  clone`). Los commits que sólo borran código viejo (`6a0d9ee`, `81da712`, `03c941e` y `d002c99`) exceden
+  al revisor y aportan poco a la revisión. Quedan sin revisar por decisión del usuario. Se vuelve a
+  prender (`enable --scope clone`) para el código que agrega o cambia comportamiento: la migración 0032
+  y la Fase B.
 - **Previsión:** la Fase A borra mucho más de lo que escribe. La Fase B ronda las 4.000 líneas, por
   referencia a la prueba chica sin su andamiaje.
 
