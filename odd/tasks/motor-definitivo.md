@@ -481,6 +481,35 @@ varias cosas.
   `review-a55346b24f27d539`). Regresión de 20 conversaciones por 5: 100 de 100 (`b24fc64`). Falta la prueba
   por Telegram del usuario.
 
+- **Prueba por Telegram del usuario (2026-10-07):** mejoró, pero sigue siendo mucho bloque de texto, y la
+  negrita casi no se nota. Mandó capturas con cómo lo quiere: un renglón por idea, saltos de línea y emojis
+  para las tareas y para lo anotado, cada uno en su renglón.
+
+### El formato, segunda vuelta: renglones y emojis (2026-10-07)
+
+- **Decisiones del usuario:**
+  - sin negrita;
+  - un renglón por idea y un renglón en blanco entre bloques;
+  - emojis fijos al principio del renglón: 📋 una tarea (su nombre solo), ✏️ lo que Leda anotó, 📅 una tarea
+    con su vencimiento en una lista, ⚠️ una consecuencia (un atraso, una tarea que espera a otra);
+  - lo importante primero: el primer renglón dice lo que pasó o lo que se pide;
+  - fechas cortas ("vie 23/10");
+  - el nombre completo de una tarea, una sola vez por mensaje (después, corto); las personas, por el nombre;
+  - el cierre aparte, al final: la pregunta o "No hace falta que respondas".
+- **Diseño:** la instrucción de redacción describe ese trabajo, sin frases de ejemplo. Los días con nombre
+  que da el código (regla 9m) pasan a la forma corta. El corredor suma un chequeo automático del formato
+  (tareas en su renglón con 📋 o 📅, sin renglones largos, sin `**`, el cierre solo al final), para que la
+  regresión lo mida en vez de depender de leer transcripciones. La conversión de `**` a negrita queda en
+  la salida, inofensiva.
+- **Chequeo de rumbo.**
+  - *Clase:* forma de la salida, igual que la primera vuelta. Es la misma instrucción tocada dos veces
+    seguidas, pero no por una falla: el usuario cambió lo que pide después de verlo en Telegram, y el
+    diseño lo eligió él.
+  - *Cocina o frases al mozo:* el mozo arma el mensaje con un formato fijo; la cocina da las fechas cortas
+    y el chequeo mide que el formato se cumpla.
+  - *Qué lo demuestra:* el chequeo nuevo en rojo con la instrucción actual, en verde con la nueva, y la
+    próxima prueba por Telegram.
+
 ### Borrar `prueba_chica/` (2026-10-07)
 
 - `8fbd549` (el lector de turnos, `python -m leda.motor.leer`), `c21064e` (el corredor sólo con el motor
