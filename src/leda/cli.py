@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 from .calendario import Calendario, cargar_feriados_ar
@@ -61,6 +62,30 @@ def _verificar_esquema_o_salir(conn) -> int | None:
     print(f"Falta aplicar la migración '{falta}'. Ejecutá "
           f"'python -m leda esquema' antes de arrancar.")
     return 1
+
+
+def _parametros_del_modelo(texto: str | None) -> dict | None:
+    """Los parámetros de `modelo --parametros`, revisados como los lee el motor
+    (`leda.motor.ia_real.validar_parametros`); se guardan como se escribieron, sin los de
+    omisión. `None`, después de decir por qué, si no valen."""
+    from .motor.ia_real import ParametrosInvalidos, validar_parametros
+
+    if texto is None:
+        return {}
+    try:
+        parametros = json.loads(texto)
+    except ValueError as e:
+        print(f"--parametros no es JSON ({e}).")
+        return None
+    if not isinstance(parametros, dict):
+        print(f"--parametros tiene que ser un objeto JSON; vino {texto!r}.")
+        return None
+    try:
+        validar_parametros(parametros)
+    except ParametrosInvalidos as e:
+        print(f"Los parámetros no valen: {e}")
+        return None
+    return parametros
 
 
 def _resolver_integrante(cur, ws: str, nombre: str) -> list[dict]:
@@ -197,6 +222,9 @@ def main(argv: list[str] | None = None) -> int:
     mod = sub.add_parser("modelo")
     mod.add_argument("nombre", nargs="?", help="identificador del modelo")
     mod.add_argument("--proveedor", default="gemini")
+    mod.add_argument("--parametros", metavar="JSON",
+                     help="parámetros del modelo (timeout_s, plazo_s, tope_jugadas, "
+                          "tope_redaccion, cuerpo_extra...)")
 
     mds = sub.add_parser("modelos")   # pregunta al proveedor cuáles hay
     mds.add_argument("--proveedor", default="gemini")
@@ -354,13 +382,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  python -m leda modelo <identificador> --proveedor {a.proveedor}")
         return 0
 
+    if a.cmd == "modelo" and not a.nombre and a.parametros is not None:
+        print("--parametros va con el identificador del modelo que se configura.")
+        return 1
+    if a.cmd == "modelo" and a.nombre:
+        # Los mismos parámetros que lee el motor, revisados igual, antes de tocar la base: uno
+        # que no vale no se guarda y el modelo activo queda como estaba.
+        parametros = _parametros_del_modelo(a.parametros)
+        if parametros is None:
+            return 1
+
     conn = conectar()
 
     if a.cmd == "modelo":
         with admin(conn) as cur:
             if not a.nombre:
                 cur.execute(
-                    "select proveedor, modelo, activo from model_config "
+                    "select proveedor, modelo, parametros, activo from model_config "
                     "where ambito = 'global'")
                 filas = cur.fetchall()
                 if not filas:
@@ -369,18 +407,22 @@ def main(argv: list[str] | None = None) -> int:
                     return 1
                 for f in filas:
                     marca = "activo" if f["activo"] else "inactivo"
-                    print(f"  {f['proveedor']:12s} {f['modelo']:32s} {marca}")
+                    print(f"  {f['proveedor']:12s} {f['modelo']:32s} {marca}"
+                          + (f"  {json.dumps(f['parametros'], ensure_ascii=False)}"
+                             if f["parametros"] else ""))
                 return 0
 
             # Un solo modelo global activo por vez.
             cur.execute(
                 "update model_config set activo = false where ambito = 'global'")
             cur.execute(
-                """insert into model_config (ambito, proveedor, modelo, activo)
-                   values ('global', %s, %s, true)""",
-                (a.proveedor, a.nombre))
+                """insert into model_config (ambito, proveedor, modelo, parametros, activo)
+                   values ('global', %s, %s, %s, true)""",
+                (a.proveedor, a.nombre, json.dumps(parametros)))
         conn.commit()
         print(f"Modelo configurado: {a.proveedor} / {a.nombre}")
+        if parametros:
+            print(f"  Parámetros: {json.dumps(parametros, ensure_ascii=False)}")
         if not config.clave_llm(a.proveedor):
             print(f"Ojo: {config.variable_clave_llm(a.proveedor)} está vacío "
                   "en .env.")
