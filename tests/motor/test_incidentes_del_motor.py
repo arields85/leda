@@ -29,6 +29,8 @@ from tests.motor.ayudantes import administrador, uno
      "La escalera de recordatorios del motor"),
     (ETAPA_AVISO_GUARDADO, "Un aviso de Leda no salió",
      "La IA no redactó un aviso guardado"),
+    ("motor_aviso_reintento", "Un aviso de Leda se demoró",
+     "La IA no redactó un aviso guardado en uno de sus intentos"),
     (ETAPA_CICLO, "Se cayó una parte del ciclo del motor",
      "Una parte del ciclo que corre cada minuto"),
     (ETAPA_SIN_BOT, "Un espacio activo no tiene su bot configurado",

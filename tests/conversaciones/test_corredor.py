@@ -18,7 +18,7 @@ import pytest
 from leda.db import admin
 
 from tests.conversaciones import comprobar as cp
-from tests.conversaciones import motores
+from tests.conversaciones import informe, motores
 from tests.conversaciones.carga import cargar
 from tests.conversaciones.corredor import CARPETA, correr_conversacion, elegir, leer, todas
 from tests.conversaciones.grabar import IAPerfecta, IAQueGraba, IARepetida
@@ -185,6 +185,42 @@ def test_una_grabacion_repite_la_corrida(conn):
 
     assert repetida.error is None
     assert _sin_corridas_variables(repetida) == _sin_corridas_variables(grabada)
+
+
+class _ProveedorCaido(Exception):
+    """Una falla del proveedor de la IA, con un texto que no puede llegar al informe."""
+
+
+def test_un_aviso_que_la_ia_no_redacto_a_su_hora_se_informa_sin_el_texto_de_la_falla(conn):
+    """Usuario, 2026-10-07: en las rondas con la IA real, a veces un aviso no salía a su hora y
+    no quedaba rastro de por qué. El intento fallido deja su incidente, y el informe lo dice
+    con la clase de la falla y su código HTTP, nunca con su texto: los informes se publican."""
+    [conv] = elegir(["01"])
+    ia = _perfecta(conv)
+    redactar = ia.ia.redactar
+    pendientes = [_ProveedorCaido("ChatGPT respondió HTTP 503 (texto crudo del proveedor).")]
+
+    def una_vez_no(pedido):
+        if pendientes:
+            raise pendientes.pop()
+        return redactar(pedido)
+
+    ia.ia.redactar = una_vez_no
+
+    corrida = correr_conversacion(conn, conv, ia)
+
+    assert corrida.error is None and not pendientes
+    primero = corrida.pasos[0].paso
+    del_paso = [f for p, f in corrida.fallas() if p == primero]
+    [rastro] = [f for f in del_paso if f.que == cp.AVISO_SIN_REDACTAR]
+    assert rastro.que == "el aviso no salió a su hora: la IA no lo redactó"
+    assert (rastro.clase, rastro.real) == (cp.MOTOR, {"falla": "_ProveedorCaido", "http": 503})
+    assert any(f.que == "no salió lo esperado" for f in del_paso)
+    assert not any(f.que == "incidente" for f in del_paso)     # no se cuenta dos veces
+    texto = (informe.resumen([corrida], ronda="r", cabecera={}, transcripciones="t.md")
+             + informe.transcripciones([corrida], ronda="r"))
+    assert "la IA no lo redactó" in texto and "_ProveedorCaido" in texto and "503" in texto
+    assert "texto crudo" not in texto and "ChatGPT respondió" not in texto
 
 
 def test_un_boton_que_no_esta_es_una_falla_de_la_corrida_no_una_caida(conn):

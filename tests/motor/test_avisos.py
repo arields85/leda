@@ -14,10 +14,12 @@ from datetime import timedelta
 import pytest
 
 from leda.db import admin
+from leda.motor import avisos
+from leda.motor.avisos import ETAPA_AVISO_GUARDADO
 from leda.motor.ia import IAGuionada, Jugada
 
-from tests.motor.ayudantes import (AHORA, T1, cuantas, dice, enviar, jugada_prevision,
-                                   nueva_tarea, octubre, todos, uno)
+from tests.motor.ayudantes import (AHORA, T1, administrador, cuantas, dice, enviar,
+                                   jugada_prevision, nueva_tarea, octubre, todos, uno)
 
 
 def _avisos(conn) -> list[dict]:
@@ -197,7 +199,7 @@ def test_si_la_ia_no_redacta_se_reintenta_a_los_1_2_4_y_8_minutos(conn, mundo, e
     assert (aviso["estado"], aviso["intentos"]) == ("fallido", 5)
     assert aviso["resuelto_en"] == momento and aviso["outbox_id"] is None
     assert aviso["hechos"]["prevision"] == "2026-10-14"        # queda con sus hechos
-    incidente = uno(conn, "select * from incident")
+    incidente = uno(conn, "select * from incident where etapa = %s", ETAPA_AVISO_GUARDADO)
     assert incidente["etapa"] == "motor_aviso_guardado"
     assert "Marcos" in incidente["resumen_sanitizado"]
     # A quien lo causó le llega el aviso de la falla, que también redacta la IA.
@@ -224,7 +226,38 @@ def test_si_tampoco_sale_el_aviso_de_la_falla_queda_el_incidente(conn, mundo, es
 
     estados = [(a["tipo"], a["estado"]) for a in _avisos(conn)]
     assert estados == [("nueva_prevision", "fallido"), ("falla_de_aviso", "fallido")]
-    assert cuantas(conn, "incident") == 2
+    assert cuantas(conn, "incident", "etapa = %s", ETAPA_AVISO_GUARDADO) == 2
+    # Y cada intento que se reintentó dejó su rastro: cuatro de cada aviso.
+    assert cuantas(conn, "incident", "etapa = %s", avisos.ETAPA_AVISO_REINTENTO) == 8
+
+
+def test_un_intento_que_falla_deja_su_rastro_sin_avisar_a_la_administracion(conn, mundo,
+                                                                             escribe):
+    """Usuario, 2026-10-07: un aviso que no sale a su hora porque la IA no lo redactó se
+    reintenta sin dejar rastro, y la causa no se puede probar. Cada intento fallido que se
+    reintenta deja un incidente de severidad baja, con la falla en la referencia técnica; a la
+    administración no se la avisa (el quinto fallo sí, como siempre)."""
+    administrador(conn)         # alcanzable: si se la avisara, quedaría su aviso
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    ia = IAGuionada(redacciones=[RuntimeError("caída"), "Marcos prevé terminar el miércoles 14."])
+
+    assert enviar(conn, mundo, ia, AHORA) == {"reintento": 1}
+
+    [incidente] = todos(conn, "select * from incident")
+    assert incidente["etapa"] == avisos.ETAPA_AVISO_REINTENTO == "motor_aviso_reintento"
+    assert incidente["severidad"] == "baja"
+    assert incidente["referencia_cruda"] == "RuntimeError: caída"
+    assert incidente["notificado_admin_en"] is None and cuantas(conn, "admin_notice") == 0
+    resumen = incidente["resumen_sanitizado"]
+    assert "intento 1" in resumen and "Ismael" in resumen and "nueva_prevision" in resumen
+    assert "10:01" in resumen                       # cuándo se reintenta, en la hora del espacio
+    assert "justamente el que falló" not in resumen   # la nota de otro caso sería mentir
+
+    # El aviso sale en el reintento, sin otro incidente.
+    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=1)) == {"enviado": 1}
+    assert cuantas(conn, "incident") == 1
+    assert uno(conn, "select cuerpo from message_outbox where not es_respuesta")[
+        "cuerpo"] == "Marcos prevé terminar el miércoles 14."
 
 
 # --- Ausencias (mecánica §9) -----------------------------------------------------------------
