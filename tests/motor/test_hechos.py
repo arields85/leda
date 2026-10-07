@@ -56,6 +56,19 @@ def test_lo_que_pasa_despues_se_cuenta_como_pasa_en_el_mundo():
             assert palabra not in texto.lower(), (nombre, palabra)
 
 
+def test_los_significados_dicen_el_hecho_con_palabras_de_todos_los_dias():
+    """Leda no nombra los conceptos del sistema: dice el hecho concreto (usuario, 2026-10-07, de
+    la prueba por Telegram real: "que es prevision?"; conversación 19). Lo que la IA lee como
+    significado de un dato o de una jugada, lo repite; por eso ningún significado nombra el
+    dato con el nombre que tiene en la cocina: dice qué es para la persona."""
+    textos = {**hechos.SIGNIFICADOS, **{n: f.para_que for n, f in FICHAS.items()}}
+    for nombre, texto in textos.items():
+        for palabra in ("previs", "comprometid", "referente", "pedido de estado",
+                        "pedidos de estado", "escal", "dependiente"):
+            assert palabra not in texto.lower(), (nombre, palabra)
+    assert "palabras de todos los días" in INSTRUCCIONES_REDACCION
+
+
 def test_dos_atrasos_distintos_tienen_dos_claves_distintas():
     """El de hoy (desde la fecha comprometida) y el que tendrá la tarea si se cumple una
     previsión: con una sola clave, la IA contó uno como el otro (ronda 1)."""

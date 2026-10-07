@@ -1038,7 +1038,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona dice que empezó a trabajar en una tarea. Es sólo el comienzo: no "
              "trae la fecha para la que la termina ni dice que no puede avanzar. Seguir con "
              "una tarea que estaba trabada no es empezarla: es salir del bloqueo."),
-    Ficha("anotar_prevision", "anotar para cuándo prevé terminar una tarea, y por qué",
+    Ficha("anotar_prevision", "anotar para cuándo va a terminar una tarea, y por qué",
           necesita=("tarea", "fecha"), opcional=("motivo",),
           comprueba="que sea el responsable, que la tarea esté abierta y tenga fecha "
                     "comprometida",
