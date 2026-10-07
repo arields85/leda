@@ -1,7 +1,7 @@
 """Las reglas de comparación del corredor, sin base (revisión de la E2-7).
 
-`tests/conversaciones/comprobar.py`: lo esperado de un paso contra lo que pasó, y cómo se clasifica cada
-diferencia (garantía, comprensión o motor).
+`tests/conversaciones/comprobar.py`: lo esperado de un paso contra lo que pasó, y cómo se
+clasifica cada diferencia (garantía, comprensión o motor).
 """
 
 from __future__ import annotations

@@ -4,14 +4,19 @@
 acercarse y, al llegar, se le pregunta al usuario antes de seguir. El corredor (E2-7) lleva la
 cuenta:
 
-- **La libreta** (`tests/conversaciones/resultados/gasto.json`, versionada: no tiene nada sensible) suma
-  cada corrida real: cuándo, qué IA, qué conversación, cuántas llamadas, los tokens y lo que
-  costó. Se escribe después de cada corrida, así un corte no pierde la cuenta.
+- **La libreta** (`tests/conversaciones/resultados/gasto.json`, versionada: no tiene nada
+  sensible) suma cada corrida real: cuándo, qué motor, qué proveedor y qué IA, qué conversación,
+  cuántas llamadas, los tokens y lo que costó. Se escribe después de cada corrida, así un corte
+  no pierde la cuenta.
 - **El costo** es el que informa el proveedor (OpenRouter, con `usage.include`); si no lo
   informa, una estimación por llamada (`USD_POR_LLAMADA`), marcada como estimada; una llamada
   que falló (error HTTP, plazo, sin respuesta) no se cobra ni se estima. Las corridas viejas
   con Jev (retirado de la prueba, ADR 0018, decisión 7) guardan su costo estimado en `jev_usd`,
   y el total lo sigue sumando.
+- **Precio desconocido** (E3-8, la comparación de IA): un proveedor que no es OpenRouter (`nan`)
+  no informa el costo y no tiene precio en esta libreta. Sus llamadas se anotan con sus tokens y
+  `precio: desconocido`, cuestan 0 en la cuenta (nunca una cifra inventada), y la ronda no se
+  estima ni cuenta para el techo.
 - **El techo:** antes de cada corrida se estima lo que va a costar; si con eso se pasa del techo,
   no corre (`TechoAlcanzado`) salvo con `pasar_el_techo`, que el agente pasa sólo con el OK del
   usuario. Al llegar al 80 % avisa.
@@ -42,8 +47,15 @@ RUTA = Path(__file__).resolve().parent / "resultados" / "gasto.json"
 # Estimación por llamada cuando el proveedor no informa el costo, a partir del banco del
 # 2026-10-03 (bitácora de flujos, "Modelos": sol, USD 0,016 por mensaje; luna, 0,0007). Se usa
 # la cifra por mensaje como cifra por llamada: queda del lado alto.
-USD_POR_LLAMADA = {"openai/gpt-6-sol": 0.016, "openai/gpt-6-luna": 0.0015}
+# Luna pro cuesta por token lo mismo que luna en OpenRouter (USD 0,10 de entrada y 0,50 de salida
+# por millón; el de sol, 2,00 y 10,00; verificado el 2026-10-06).
+USD_POR_LLAMADA = {"openai/gpt-6-sol": 0.016, "openai/gpt-6-luna": 0.0015,
+                   "openai/gpt-6-luna-pro": 0.0015}
 USD_POR_LLAMADA_DESCONOCIDA = 0.02
+# Los proveedores que informan lo que costó cada llamada. Con los demás, el precio es
+# desconocido: no se estima (`precio_conocido`).
+INFORMAN_EL_COSTO = frozenset({"openrouter"})
+PRECIO_DESCONOCIDO = "desconocido"
 # Lo que se le pide a la IA en una corrida se cuenta con lo esperado (`corredor.
 # llamadas_previstas`); lo que Leda manda sobre otras tareas o de más no está ahí: un margen.
 MARGEN_DE_LA_ESTIMACION = 1.25
@@ -130,24 +142,36 @@ class ClienteQueCuenta(ClienteCompatible):
         return respuesta
 
 
-def modelo_de(ia_nombre: str) -> str:
-    """`openrouter/openai/gpt-6-sol` → `openai/gpt-6-sol`."""
-    return ia_nombre.split("/", 1)[1] if ia_nombre.count("/") >= 2 else ia_nombre
+def precio_conocido(proveedor: str) -> bool:
+    """Si el gasto con ese proveedor se puede estimar: el proveedor informa lo que costó."""
+    return proveedor in INFORMAN_EL_COSTO
 
 
-def costo_de_las_llamadas(llamadas: list[dict[str, Any]], modelo: str) -> dict[str, Any]:
+def costo_de_las_llamadas(llamadas: list[dict[str, Any]], modelo: str, *,
+                          proveedor: str = "openrouter") -> dict[str, Any]:
     """Lo que costaron las llamadas grabadas (`grabar.IAQueGraba`): lo informado, y lo estimado
     para las que respondieron sin traerlo. Una llamada que falló (error HTTP, como el 402 de la
     ronda 2 sin crédito; plazo agotado; sin respuesta) no se cobra: cuesta 0 y no se estima. Sólo
-    cuenta lo que haya respondido antes del error (sus `usos`)."""
-    usd, estimadas, entrada, salida = 0.0, 0, 0, 0
+    cuenta lo que haya respondido antes del error (sus `usos`). Con un proveedor de precio
+    desconocido, lo que no trae su costo no se estima: se cuenta en `llamadas_sin_precio` y el
+    resultado lo dice (`precio`)."""
+    conocido = precio_conocido(proveedor)
+    usd, estimadas, sin_precio, entrada, salida = 0.0, 0, 0, 0, 0
     por_llamada = USD_POR_LLAMADA.get(modelo, USD_POR_LLAMADA_DESCONOCIDA)
+
+    def sin_costo_informado() -> None:
+        nonlocal usd, estimadas, sin_precio
+        if conocido:
+            usd += por_llamada
+            estimadas += 1
+        else:
+            sin_precio += 1
+
     for ll in llamadas:
         usos = ll.get("usos")
         if not usos:
             if "error" not in ll:       # respondió, pero el proveedor no informó el uso
-                usd += por_llamada
-                estimadas += 1
+                sin_costo_informado()
             continue
         for u in usos:
             entrada += u.get("prompt_tokens") or 0
@@ -155,10 +179,12 @@ def costo_de_las_llamadas(llamadas: list[dict[str, Any]], modelo: str) -> dict[s
             if u.get("cost") is not None:
                 usd += float(u["cost"])
             else:
-                usd += por_llamada
-                estimadas += 1
-    return {"llamadas": len(llamadas), "tokens_entrada": entrada, "tokens_salida": salida,
-            "usd": round(usd, 6), "llamadas_estimadas": estimadas}
+                sin_costo_informado()
+    costo = {"llamadas": len(llamadas), "tokens_entrada": entrada, "tokens_salida": salida,
+             "usd": round(usd, 6), "llamadas_estimadas": estimadas}
+    if not conocido:
+        costo.update(precio=PRECIO_DESCONOCIDO, llamadas_sin_precio=sin_precio)
+    return costo
 
 
 @dataclass
@@ -179,10 +205,13 @@ class Gasto:
     def total(self) -> float:
         return round(sum(c["usd"] + c.get("jev_usd", 0.0) for c in self.leer()["corridas"]), 6)
 
-    def por_llamada(self, modelo: str) -> float:
+    def por_llamada(self, modelo: str, proveedor: str = "openrouter") -> float:
         """El costo medio medido de una llamada de ese modelo, si ya hay bastantes; si no, la
-        estimación."""
-        corridas = [c for c in self.leer()["corridas"] if c["modelo"] == modelo]
+        estimación. Con un proveedor de precio desconocido, 0: no se estima."""
+        if not precio_conocido(proveedor):
+            return 0.0
+        corridas = [c for c in self.leer()["corridas"] if c["modelo"] == modelo
+                    and c.get("proveedor", "openrouter") == proveedor]
         medidas = sum(c["llamadas"] - c["llamadas_estimadas"] for c in corridas)
         if medidas >= MINIMO_PARA_PROMEDIAR:
             usd = sum(c["usd"] for c in corridas)

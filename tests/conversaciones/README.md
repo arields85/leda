@@ -75,16 +75,24 @@ libreta del gasto y cada grabación dicen qué motor corrió. Cuando se borre `p
 python -m tests.conversaciones.correr --ia guionada --veces 1          # en seco, sin gasto
 python -m tests.conversaciones.correr --ia guionada --veces 1 --motor prueba_chica
 python -m tests.conversaciones.correr --ia sol --veces 5 --paralelo 5 --grabar tests/conversaciones/grabaciones
+python -m tests.conversaciones.correr --ia nan/deepseek-v4-flash --veces 5 --paralelo 5
 python -m tests.conversaciones.correr --repetir tests/conversaciones/grabaciones/03-leda.motor-sol-2.json
 ```
+
+**La IA:** `--ia PROVEEDOR/MODELO`, con cualquier proveedor de `leda.llm.BASE_URLS`, o un nombre corto:
+`sol`, `luna` y `luna-pro` (GPT-6 sol, luna y luna pro, por OpenRouter), `deepseek-flash` y `glm-flash`
+(`deepseek-v4-flash` y `glm5.3-flash`, por `nan`), `sol61` y `sonnet`. La clave es la del proveedor:
+`LEDA_OPENROUTER_API_KEY` para OpenRouter y `LEDA_LLM_API_KEY` para los demás.
 
 Cada corrida va en una base nueva del servidor de `LEDA_TEST_DB_URL` (`.env.test`), copia de una
 plantilla, y se borra al terminar; nunca toca `leda`, `leda_flujo` ni `leda_motor`. El transporte es
 falso. Con una IA real la clave sale del entorno y nunca se imprime. **El techo:** antes de empezar se
 estima la ronda; si con eso el gasto pasa de USD 30, no corre (`--pasar-el-techo`, sólo con el OK del
-usuario); avisa desde el 80 %. **El crédito:** antes de empezar se pregunta a OpenRouter cuánto le queda
-a la cuenta y, si no alcanza, no corre (sale con 3); un HTTP 402 a mitad de ronda la corta (sale con 3)
-y las corridas que lo tuvieron quedan inválidas, aparte en el informe. La cuenta queda en
+usuario); avisa desde el 80 %. Con un proveedor que no informa el costo (`nan`), la ronda no se estima
+ni cuenta para el techo, y la libreta anota los tokens con el precio desconocido. **El crédito:** en una
+ronda por OpenRouter, antes de empezar se le pregunta cuánto le queda a la cuenta y, si no alcanza, no
+corre (sale con 3); un HTTP 402 a mitad de ronda la corta (sale con 3) y las corridas que lo tuvieron
+quedan inválidas, aparte en el informe. La cuenta queda en
 `resultados/gasto.json` y el informe de la ronda, con sus transcripciones, en `resultados/` (las
 grabaciones crudas, en `grabaciones/`, no se versionan). La comprensión automática del informe es
 provisional: la que vale es la lectura del usuario.

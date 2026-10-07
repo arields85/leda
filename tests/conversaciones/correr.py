@@ -1,15 +1,21 @@
 """Corre las conversaciones de prueba: `python -m tests.conversaciones.correr` (E2-7).
 
-`odd/tasks/prueba-chica-del-motor.md`, sección 6 y decisiones 10.3 y 10.4. Uso:
+`odd/tasks/prueba-chica-del-motor.md`, sección 6 y decisiones 10.3 y 10.4; para el motor y la IA,
+`odd/tasks/motor-definitivo.md`, E3-8. Uso:
 
-    python -m tests.conversaciones.correr [--conversacion NN ...] [--veces 5] [--ia sol|sol61|sonnet|luna|guionada]
-                                  [--grabar CARPETA] [--repetir ARCHIVO] [--paralelo N]
-                                  [--ronda NOMBRE] [--sin-informe] [--pasar-el-techo]
+    python -m tests.conversaciones.correr [--conversacion NN ...] [--veces 5]
+                                          [--motor leda.motor|prueba_chica]
+                                          [--ia guionada|ALIAS|PROVEEDOR/MODELO]
+                                          [--grabar CARPETA] [--repetir ARCHIVO] [--paralelo N]
+                                          [--ronda NOMBRE] [--sin-informe] [--pasar-el-techo]
 
+- `--motor` elige el motor de conversación (`motores.py`): el definitivo, por omisión, o el de
+  la prueba chica.
 - `--ia guionada` (por omisión) elige las jugadas que cada paso espera: la corrida en seco, sin
-  gasto. `sol` y `luna` son GPT-6 sol y luna por OpenRouter (decisión 6); `sol61` y `sonnet`,
-  GPT-6.1 sol y Claude Sonnet 5.5, para la segunda ronda (usuario, 2026-10-05). Todos con la
-  clave del entorno, que nunca se imprime.
+  gasto. Una IA real es `PROVEEDOR/MODELO`, con cualquier proveedor de `leda.llm.BASE_URLS`
+  (`openrouter/openai/gpt-6-luna-pro`, `nan/deepseek-v4-flash`), o uno de los nombres cortos de
+  `ALIAS` (`sol`, `luna`, `luna-pro`, `deepseek-flash`, `glm-flash`...). La clave es la del
+  proveedor en el entorno (`leda.config.clave_llm`), que nunca se imprime.
 - `--grabar CARPETA` guarda lo que respondió la IA en cada corrida; `--repetir ARCHIVO` corre esa
   grabación otra vez con la IA guionada que la repite, para mirar una falla.
 - `--paralelo N` corre N corridas a la vez, cada una en su base.
@@ -21,19 +27,21 @@
   empezar la siguiente; ninguna otra.
 - **El techo de gasto** (USD 30 para la etapa, 10.4): antes de empezar se estima la ronda; si se
   pasa, no corre (sale con 2), salvo con `--pasar-el-techo`, que se usa sólo con el OK del
-  usuario. Avisa al llegar al 80 %. La cuenta queda en `tests/conversaciones/resultados/gasto.json`.
+  usuario. Avisa al llegar al 80 %. La cuenta queda en `resultados/gasto.json`.
 - **Una ronda cortada** (revisión de la E2-7): si una corrida llega al techo a mitad de la ronda,
   o se cae por otra cosa, lo que la IA ya gastó queda igual en la libreta (marcado `cortada`, con
   el motivo), el informe lo dice en "Ronda cortada" y la ejecución sale con error: 2 por el
   techo, 1 por otra cosa. Nunca termina en 0 con corridas que no corrieron.
+- **Precio desconocido:** con un proveedor que no informa el costo (`nan`), la ronda no se estima
+  ni cuenta para el techo; la libreta anota los tokens y que el precio es desconocido.
 - **Sin crédito en el proveedor** (rondas 2 y 3: la cuenta se quedó sin crédito a mitad de ronda y
-  el corredor siguió): antes de una ronda real se pregunta cuánto crédito le queda a la cuenta y,
-  si no alcanza para lo estimado, no corre (imprime sólo las dos cifras). Si no se puede
-  preguntar, avisa y sigue. Si una llamada a la IA choca con un 402 a mitad de ronda, no empieza
-  ninguna corrida más, las que lo tuvieron son **inválidas** (fuera de la tabla, aparte en el
-  informe) y la ronda queda cortada por "sin crédito en el proveedor"; sale con 3
-  (`SALIDA_SIN_CREDITO`). Las que terminaron antes valen.
-- El informe de la ronda queda en `tests/conversaciones/resultados/` (`informe.py`).
+  el corredor siguió): antes de una ronda real por OpenRouter se pregunta cuánto crédito le queda a
+  la cuenta y, si no alcanza para lo estimado, no corre (imprime sólo las dos cifras). Si no se
+  puede preguntar, avisa y sigue. Con otro proveedor no se pregunta. Si una llamada a la IA
+  choca con un 402 a mitad de ronda, no empieza ninguna corrida más, las que lo tuvieron son
+  **inválidas** (fuera de la tabla, aparte en el informe) y la ronda queda cortada por "sin
+  crédito en el proveedor"; sale con 3 (`SALIDA_SIN_CREDITO`). Las que terminaron antes valen.
+- El informe de la ronda queda en `resultados/` (`informe.py`), con el motor y la IA.
 """
 
 from __future__ import annotations
@@ -55,8 +63,15 @@ from pathlib import Path
 from .motores import MOTORES, POR_OMISION
 
 RAIZ = Path(__file__).resolve().parents[2]
-MODELOS = {"sol": "openai/gpt-6-sol", "luna": "openai/gpt-6-luna",
-           "sol61": "openai/gpt-6.1-sol", "sonnet": "anthropic/claude-sonnet-5.5"}
+GUIONADA = "guionada"
+# Los nombres cortos de las IA de las rondas, `PROVEEDOR/MODELO`. Sol y luna por OpenRouter
+# (decisión 6); sol61 y sonnet, de la segunda ronda (usuario, 2026-10-05); luna pro y los dos de
+# `nan`, de la comparación de IA de la E3-8 (usuario, 2026-10-06).
+ALIAS = {"sol": "openrouter/openai/gpt-6-sol", "luna": "openrouter/openai/gpt-6-luna",
+         "luna-pro": "openrouter/openai/gpt-6-luna-pro",
+         "sol61": "openrouter/openai/gpt-6.1-sol",
+         "sonnet": "openrouter/anthropic/claude-sonnet-5.5",
+         "deepseek-flash": "nan/deepseek-v4-flash", "glm-flash": "nan/glm5.3-flash"}
 PROHIBIDAS = frozenset({"leda", "leda_flujo", "leda_motor"})
 PREFIJO = "leda_corrida_"
 # Lo que devuelve una ronda sin crédito en el proveedor: distinto del techo (2) y de una caída (1).
@@ -169,19 +184,41 @@ def _commit() -> str:
         return "?"
 
 
-def _ia_real(modelo: str, motor):
-    """La IA real del `motor` (`motores.Motor`), con el cliente que cuenta lo que gasta."""
+def ia_pedida(texto: str) -> tuple[str, str] | None:
+    """`(proveedor, modelo)` de lo que dice `--ia` (un nombre de `ALIAS` o `PROVEEDOR/MODELO`), o
+    `None` para la guionada. Un proveedor que no está en `leda.llm.BASE_URLS` es un error."""
+    if texto == GUIONADA:
+        return None
+    from leda.llm import BASE_URLS
+
+    proveedor, _, modelo = ALIAS.get(texto, texto).partition("/")
+    if proveedor not in BASE_URLS or not modelo:
+        raise ValueError(f"--ia {texto!r}: tiene que ser {GUIONADA}, uno de "
+                         f"{', '.join(ALIAS)} o PROVEEDOR/MODELO, con un proveedor de "
+                         f"{', '.join(BASE_URLS)}.")
+    return proveedor, modelo
+
+
+def _nombre_de_archivo(texto: str) -> str:
+    """Un nombre que sirve en un archivo: `openrouter/openai/gpt-6-sol` →
+    `openrouter-openai-gpt-6-sol`."""
+    return re.sub(r"[^\w.-]+", "-", texto)
+
+
+def _ia_real(proveedor: str, modelo: str, motor):
+    """La IA real del `motor` (`motores.Motor`) en ese proveedor, con el cliente que cuenta lo
+    que gasta. La clave es la de ese proveedor y nunca se imprime."""
     from leda.config import config
     from leda.llm import BASE_URLS
 
     from .carga import TONO
     from .gasto import ClienteQueCuenta
 
-    clave = config.clave_llm("openrouter")
+    clave = config.clave_llm(proveedor)
     if not clave:
-        raise SystemExit(f"Falta {config.variable_clave_llm('openrouter')} en el entorno.")
-    cliente = ClienteQueCuenta.crear(modelo, clave, BASE_URLS["openrouter"], {})
-    return motor.IAReal(cliente, motor.Tono(**TONO), nombre=f"openrouter/{modelo}")
+        raise SystemExit(f"Falta {config.variable_clave_llm(proveedor)} en el entorno.")
+    cliente = ClienteQueCuenta.crear(modelo, clave, BASE_URLS[proveedor], {})
+    return motor.IAReal(cliente, motor.Tono(**TONO), nombre=f"{proveedor}/{modelo}")
 
 
 def _credito_restante() -> float | None:
@@ -203,7 +240,8 @@ def main(argv: list[str] | None = None) -> int:
                                 description="Corre las conversaciones de prueba del Motor.")
     p.add_argument("--conversacion", nargs="*", metavar="NN")
     p.add_argument("--veces", type=int, default=5)
-    p.add_argument("--ia", choices=["guionada", *MODELOS], default="guionada")
+    p.add_argument("--ia", default=GUIONADA, metavar="guionada|ALIAS|PROVEEDOR/MODELO",
+                   help=f"la IA de la ronda; nombres cortos: {', '.join(ALIAS)}")
     p.add_argument("--motor", choices=MOTORES, default=POR_OMISION,
                    help="el motor de conversación que corre (por omisión, el definitivo)")
     p.add_argument("--grabar", type=Path, metavar="CARPETA")
@@ -216,16 +254,22 @@ def main(argv: list[str] | None = None) -> int:
     if not sys.stdout.isatty() and hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")     # una consola de Windows queda como está
 
-    real = a.ia in MODELOS
+    # Una repetición no llama a la IA: no gasta.
+    real = a.ia != GUIONADA and not a.repetir
     if not real:
         # Sin IA real no hace falta ninguna clave: el `.env` de la carpeta no se carga.
         os.environ["LEDA_LOAD_DOTENV"] = "0"
+    try:
+        pedida = ia_pedida(a.ia)
+    except ValueError as e:
+        p.error(str(e))
+    proveedor, modelo = pedida or ("-", "-")
 
     from . import informe
     from .motores import cargar as cargar_motor
     from .corredor import correr_conversacion, elegir, llamadas_previstas
     from .gasto import (MARGEN_DE_LA_ESTIMACION, SIN_CREDITO, Gasto, TechoAlcanzado,
-                        costo_de_las_llamadas, llamadas_sin_credito, modelo_de)
+                        costo_de_las_llamadas, llamadas_sin_credito, precio_conocido)
     from .grabar import IAPerfecta, IAQueGraba, IARepetida
 
     motor = cargar_motor(a.motor)
@@ -240,33 +284,41 @@ def main(argv: list[str] | None = None) -> int:
     def nueva_ia(conv):
         if a.repetir:
             return IAQueGraba(IARepetida.desde_archivo(a.repetir, jugada=motor.Jugada))
-        if a.ia == "guionada":
+        if pedida is None:
             return IAQueGraba(IAPerfecta({k: t["titulo"] for k, t in conv["tareas"].items()},
                                          jugada=motor.Jugada))
-        return IAQueGraba(_ia_real(MODELOS[a.ia], motor))
+        return IAQueGraba(_ia_real(proveedor, modelo, motor))
 
     gasto = Gasto()
-    modelo = MODELOS.get(a.ia, a.ia)
 
     def estimado(conv) -> float:
         usd = 0.0
-        if a.ia in MODELOS and not a.repetir:
+        if real:
             usd += (llamadas_previstas(conv) * MARGEN_DE_LA_ESTIMACION
-                    * gasto.por_llamada(modelo))
+                    * gasto.por_llamada(modelo, proveedor))
         return usd
 
-    if real and not a.repetir:
+    if real:
         total = sum(estimado(c) for c, _ in trabajos)
-        print(f"Estimado de la ronda: USD {total:.2f}; gastado en la etapa: USD "
-              f"{gasto.total():.2f}; techo: USD {gasto.techo:.2f}.")
+        if precio_conocido(proveedor):
+            print(f"Estimado de la ronda: USD {total:.2f}; gastado en la etapa: USD "
+                  f"{gasto.total():.2f}; techo: USD {gasto.techo:.2f}.")
+        else:
+            print(f"Precio desconocido en {proveedor}: la ronda no se estima ni cuenta para el "
+                  f"techo; la libreta anota los tokens. Gastado en la etapa: USD "
+                  f"{gasto.total():.2f}; techo: USD {gasto.techo:.2f}.")
         try:
             gasto.reservar(total, pasar_el_techo=a.pasar_el_techo)
             gasto.liberar(total)
         except TechoAlcanzado as e:
             print(e)
             return 2
-        restante = _credito_restante()
-        if restante is None:
+        # El crédito se le pregunta sólo a OpenRouter: es el único que lo informa.
+        restante = _credito_restante() if proveedor == "openrouter" else None
+        if proveedor != "openrouter":
+            print(f"Crédito en el proveedor: {proveedor} no lo informa; la ronda sigue sin esa "
+                  "comprobación.")
+        elif restante is None:
             print("Aviso: no se pudo consultar el crédito en el proveedor; la ronda sigue sin "
                   "esa comprobación.")
         else:
@@ -291,15 +343,15 @@ def main(argv: list[str] | None = None) -> int:
         """Lo que la IA gastó en la corrida, aunque se haya cortado: nunca se pierde."""
         llamadas = (corrida.llamadas if corrida is not None
                     else list(getattr(ia, "llamadas", None) or []))
-        costo = (costo_de_las_llamadas(llamadas, modelo_de(ia.nombre))
-                 if a.ia in MODELOS and ia is not None
+        costo = (costo_de_las_llamadas(llamadas, modelo, proveedor=proveedor)
+                 if ia is not None
                  else {"llamadas": 0, "tokens_entrada": 0, "tokens_salida": 0, "usd": 0.0,
                        "llamadas_estimadas": 0})
         if corrida is not None:
             corrida.costo = costo
         gasto.anotar({"cuando": datetime.now().isoformat(timespec="seconds"),
-                      "ronda": ronda, "motor": motor.nombre,
-                      "modelo": modelo if a.ia in MODELOS else "-",
+                      "ronda": ronda, "motor": motor.nombre, "proveedor": proveedor,
+                      "modelo": modelo,
                       "conversacion": str(conv["numero"]).zfill(2), "vez": vez, **costo,
                       **({"cortada": cortada} if cortada else {}),
                       **({"invalida": invalida} if invalida else {})},
@@ -326,7 +378,7 @@ def main(argv: list[str] | None = None) -> int:
         if sin_credito.is_set():
             cortar(numero, vez, SIN_CREDITO, techo=False, credito=True)
             return None
-        reservado = estimado(conv) if real and not a.repetir else 0.0
+        reservado = estimado(conv) if real else 0.0
         if reservado:
             try:
                 gasto.reservar(reservado, pasar_el_techo=a.pasar_el_techo)
@@ -357,7 +409,7 @@ def main(argv: list[str] | None = None) -> int:
             n_402 = con_402(ia, corrida)
             if n_402:
                 sin_credito.set()
-            if real and not a.repetir:
+            if real:
                 anotar_el_gasto(conv, vez, ia, corrida, reservado, cortada,
                                 SIN_CREDITO if n_402 else None)
         if n_402:
@@ -368,7 +420,8 @@ def main(argv: list[str] | None = None) -> int:
             return None
         if a.grabar:
             a.grabar.mkdir(parents=True, exist_ok=True)
-            (a.grabar / f"{corrida.numero}-{motor.nombre}-{a.ia}-{vez}.json").write_text(
+            nombre_ia = _nombre_de_archivo(a.ia)
+            (a.grabar / f"{corrida.numero}-{motor.nombre}-{nombre_ia}-{vez}.json").write_text(
                 json.dumps({"conversacion": corrida.numero, "vez": vez, "ia": corrida.ia,
                             "motor": motor.nombre, "llamadas": corrida.llamadas},
                 ensure_ascii=False, indent=1, default=str), "utf-8")
@@ -378,7 +431,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {corrida.numero} vez {vez}: {estado}", flush=True)
         return corrida
 
-    ronda = a.ronda or (f"{datetime.now():%Y-%m-%d-%H%M}-{motor.nombre}-{a.ia}"
+    ronda = a.ronda or (f"{datetime.now():%Y-%m-%d-%H%M}-{motor.nombre}-"
+                        f"{_nombre_de_archivo(a.ia)}"
                         + ("-repeticion" if a.repetir else ""))
     bases = Bases(os.environ["LEDA_TEST_DB_URL"])
     for vieja in bases.limpiar_viejas():

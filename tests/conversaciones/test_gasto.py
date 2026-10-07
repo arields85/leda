@@ -431,3 +431,132 @@ def test_la_grabacion_de_un_402_dice_que_fue_sin_credito():
                 {"tipo": "redaccion", "error": "PlazoAgotado: sin respuesta en 40 s"}]
 
     assert llamadas_sin_credito(llamadas) == 2
+
+# --- Cualquier proveedor y cualquier modelo (E3-8, la comparación de IA) ----------------------
+#
+# Las cinco IA de la comparación: GPT-6 sol, luna y luna pro por OpenRouter; DeepSeek flash y
+# GLM 5.3 flash por `nan`, que no informa el costo. Ninguna prueba llama a un proveedor.
+
+@pytest.mark.parametrize(("ia", "esperada"), [
+    ("sol", ("openrouter", "openai/gpt-6-sol")),
+    ("luna", ("openrouter", "openai/gpt-6-luna")),
+    ("luna-pro", ("openrouter", "openai/gpt-6-luna-pro")),
+    ("openrouter/openai/gpt-6-luna-pro", ("openrouter", "openai/gpt-6-luna-pro")),
+    ("deepseek-flash", ("nan", "deepseek-v4-flash")),
+    ("nan/deepseek-v4-flash", ("nan", "deepseek-v4-flash")),
+    ("glm-flash", ("nan", "glm5.3-flash")),
+    ("nan/glm5.3-flash", ("nan", "glm5.3-flash")),
+    ("guionada", None),
+])
+def test_la_ia_se_pide_por_su_nombre_corto_o_por_proveedor_y_modelo(ia, esperada):
+    assert correr.ia_pedida(ia) == esperada
+
+
+@pytest.mark.parametrize("ia", ["nadie/un-modelo", "openrouter/", "gpt-6-sol"])
+def test_un_proveedor_que_no_existe_o_sin_modelo_no_corre(ia, capsys):
+    with pytest.raises(ValueError, match="PROVEEDOR/MODELO"):
+        correr.ia_pedida(ia)
+    with pytest.raises(SystemExit):
+        correr.main(["--ia", ia, "--conversacion", "01", "--veces", "1"])
+    assert "PROVEEDOR/MODELO" in capsys.readouterr().err
+
+
+def test_la_ia_real_usa_el_proveedor_y_la_clave_de_ese_proveedor(monkeypatch):
+    import types
+
+    import leda.config
+    from leda.llm import BASE_URLS
+
+    from tests.conversaciones import motores
+
+    pedidas = []
+    real = leda.config.config
+
+    def clave_llm(proveedor):
+        pedidas.append(proveedor)
+        return "clave-falsa"
+
+    monkeypatch.setattr(leda.config, "config", types.SimpleNamespace(
+        clave_llm=clave_llm, variable_clave_llm=real.variable_clave_llm))
+
+    ia = correr._ia_real("nan", "glm5.3-flash", motores.cargar())
+
+    assert pedidas == ["nan"]
+    assert ia.nombre == "nan/glm5.3-flash"
+    assert (ia.cliente.modelo, ia.cliente.base_url) == ("glm5.3-flash",
+                                                        BASE_URLS["nan"].rstrip("/"))
+    assert type(ia).__module__ == "leda.motor.ia_real"
+
+    monkeypatch.setattr(leda.config, "config", types.SimpleNamespace(
+        clave_llm=lambda proveedor: "", variable_clave_llm=real.variable_clave_llm))
+    with pytest.raises(SystemExit, match=real.variable_clave_llm("nan")):
+        correr._ia_real("nan", "deepseek-v4-flash", motores.cargar())
+
+
+def test_sin_precio_conocido_se_anotan_los_tokens_y_nunca_un_costo_inventado():
+    llamadas = [{"tipo": "jugadas", "usos": [{"prompt_tokens": 100, "completion_tokens": 20,
+                                               "cost": None}]},
+                {"tipo": "redaccion", "usos": []},          # respondió sin decir el uso
+                {"tipo": "redaccion", "usos": [], "error": "PlazoAgotado: 40 s"}]
+
+    costo = costo_de_las_llamadas(llamadas, "deepseek-v4-flash", proveedor="nan")
+
+    assert costo["tokens_entrada"] == 100 and costo["tokens_salida"] == 20
+    assert costo["usd"] == 0.0 and costo["llamadas_estimadas"] == 0
+    assert costo["precio"] == gasto.PRECIO_DESCONOCIDO
+    assert costo["llamadas_sin_precio"] == 2         # la que falló no cuenta
+    # Si el proveedor sí dice lo que costó una llamada, eso vale.
+    con_costo = [{"tipo": "jugadas", "usos": [{"prompt_tokens": 1, "completion_tokens": 1,
+                                                "cost": 0.001}]}]
+    assert costo_de_las_llamadas(con_costo, "glm5.3-flash", proveedor="nan")["usd"] == \
+        pytest.approx(0.001)
+    # Con OpenRouter, nada cambia: lo que falta se estima.
+    assert "precio" not in costo_de_las_llamadas(llamadas, "openai/gpt-6-luna-pro")
+
+
+def test_sin_precio_conocido_no_se_estima_ni_cuenta_para_el_techo(tmp_path):
+    libreta = Gasto(tmp_path / "gasto.json")
+    libreta.anotar({**_corrida(0.0, llamadas=50), "modelo": "deepseek-v4-flash",
+                    "proveedor": "nan", "precio": "desconocido", "llamadas_sin_precio": 50})
+
+    assert libreta.por_llamada("deepseek-v4-flash", "nan") == 0.0
+    assert libreta.por_llamada("openai/gpt-6-luna-pro") == \
+        gasto.USD_POR_LLAMADA["openai/gpt-6-luna-pro"]
+
+
+class _IAEnNan:
+    nombre = "nan/deepseek-v4-flash"
+
+
+def test_una_ronda_por_nan_anota_tokens_y_no_pregunta_el_credito(tmp_path, monkeypatch, capsys):
+    from tests.conversaciones.corredor import Corrida
+
+    def bien(conn, conv, ia, *, vez=1, motor=None):
+        ia.llamadas.append({"tipo": "jugadas", "usos": [{"prompt_tokens": 70,
+                                                          "completion_tokens": 7}]})
+        return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
+                       "garantias", llamadas=list(ia.llamadas), motor_usado=motor.nombre)
+
+    _ronda_sin_servidor(monkeypatch, tmp_path, bien)
+    creadas = []
+    monkeypatch.setattr(correr, "_ia_real",
+                        lambda proveedor, modelo, motor: creadas.append(
+                            (proveedor, modelo, motor.nombre)) or _IAEnNan())
+    monkeypatch.setattr(correr, "_credito_restante",
+                        lambda: pytest.fail("el crédito se le pregunta sólo a OpenRouter"))
+
+    codigo = correr.main(["--ia", "deepseek-flash", "--conversacion", "01", "--veces", "1",
+                          "--ronda", "nan"])
+
+    assert codigo == 0
+    assert creadas == [("nan", "deepseek-v4-flash", "leda.motor")]
+    salida = capsys.readouterr().out
+    assert "Precio desconocido en nan" in salida and "nan no lo informa" in salida
+    [anotada] = Gasto(tmp_path / "gasto.json").leer()["corridas"]
+    assert (anotada["proveedor"], anotada["modelo"], anotada["motor"]) == (
+        "nan", "deepseek-v4-flash", "leda.motor")
+    assert anotada["precio"] == "desconocido" and anotada["usd"] == 0.0
+    assert (anotada["tokens_entrada"], anotada["tokens_salida"]) == (70, 7)
+    informe = (tmp_path / "resultados" / "nan.md").read_text("utf-8")
+    assert "**Precio desconocido:** 1 llamada(s)" in informe
+    assert "- **IA:** nan/deepseek-v4-flash" in informe

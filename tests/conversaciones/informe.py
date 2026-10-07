@@ -1,7 +1,8 @@
 """El informe de una ronda de conversaciones de prueba (E2-7).
 
 `odd/tasks/prueba-chica-del-motor.md`, secciones 6 y 10.3. Dos archivos Markdown por ronda en
-`tests/conversaciones/resultados/`, versionados porque son la evidencia (las grabaciones crudas, no):
+`tests/conversaciones/resultados/`, versionados porque son la evidencia (las grabaciones crudas,
+no):
 
 - **el resumen** (`<ronda>.md`): la tabla de conversaciones por corridas con lo que se comprobó
   solo (garantías, comprensión provisional y lo del código), las fallas con su diferencia, la
@@ -128,6 +129,10 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
                    f"{sum(x['tokens_entrada'] for x in costos)}, de salida "
                    f"{sum(x['tokens_salida'] for x in costos)}.",
                    f"- **Total de la ronda: USD {usd:.4f}.**"]
+        sin_precio = sum(x.get("llamadas_sin_precio", 0) for x in costos)
+        if sin_precio:
+            lineas.append(f"- **Precio desconocido:** {sin_precio} llamada(s) sin el costo "
+                          "informado por el proveedor; el total en USD no las incluye.")
     else:
         lineas.append("Sin gasto: la IA no es un proveedor real.")
     return "\n".join(lineas) + "\n"
