@@ -174,6 +174,8 @@ intermitente del indicador de escritura; adaptar `tools/medir_modelos.py`; `pyth
 
 ## Próximo paso
 
-La Etapa 2, [`prueba-chica-del-motor.md`](prueba-chica-del-motor.md), terminó: la ronda 3 dio 85 de 85
-con GPT-6 sol y la prueba por Telegram real pasó (2026-10-06). Con eso se cumple **M2**. Sigue la Etapa 3,
-con su plan propio, que se escribe al llegar.
+La Etapa 2 terminó con M2 (2026-10-06) y la Etapa 3 con M3 (2026-10-07; plan y evidencia en
+[`motor-definitivo.md`](motor-definitivo.md)). Sus cierres están hechos: las palabras de todos los días, el
+formato de los mensajes (aprobado por el usuario en Telegram), el "escribiendo…" con streaming, el margen para
+corregir, el motivo de una fecha que atrasa, `prueba_chica/` borrada y `main` con el motor. Sigue la **Fase C**,
+con su plan en [`fase-c.md`](fase-c.md). El punto exacto para retomar está en `docs/STATUS.md`.

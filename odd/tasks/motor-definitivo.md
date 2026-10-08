@@ -592,15 +592,14 @@ se borra `prueba_chica/` hasta entender por qué.
 
 ## 7. Próximo paso
 
-M3 se cumplió el 2026-10-07. El punto exacto para retomar está en `docs/STATUS.md`. En orden:
+M3 se cumplió el 2026-10-07 y sus cierres están hechos (2026-10-07 y 08, evidencia en la bitácora de flujos):
 
-1. **Cerrar las palabras de todos los días.** Ya están commiteados `098bc80`, `28f29fc` y `230cf7e`. Falta
-   comprobar la regresión completa con `--ia sol-suscripcion` (correrla si falta), revisar esos commits por
-   tramos y registrarlo en la bitácora.
-2. **Llevar la rama a `main`,** autorizado: avance rápido desde la carpeta de `main` y push.
-3. **El formato de los mensajes,** pedido del usuario: breves, con negrita, párrafos y viñetas. La IA marca
-   un formato simple y la cocina lo convierte para Telegram, con su conversación de prueba y su prueba de
-   contrato de salida.
-4. **Borrar `prueba_chica/`.** Antes, sacarla de `tests/conversaciones/motores.py` y reemplazar su lector de
-   turnos.
-5. **La Fase C y la plataforma web.**
+1. ~~Cerrar las palabras de todos los días~~: "previsión" en 0 de 500 mensajes (`9b7c6f4`).
+2. ~~Llevar la rama a `main`~~: `origin/main` en `f2a769c`.
+3. ~~El formato de los mensajes~~: tres vueltas, aprobado por el usuario en Telegram (hasta `93b0ff3`); el
+   "escribiendo…", la animación y el streaming, sin demora al final (`5720fdc`, `9a387da`).
+4. ~~Borrar `prueba_chica/`~~ (`c43e3e5`); el lector de turnos es `leda.motor.leer`.
+5. Además, de la prueba con mensajes sin puntuación: el margen de 10 minutos para corregir (`c568cb3`) y el
+   motivo de una fecha que atrasa (`1bebd75`, `5f4ee4f`; ADR 0018, 9n).
+
+Sigue la Fase C, en [`fase-c.md`](fase-c.md). El punto exacto para retomar está en `docs/STATUS.md`.

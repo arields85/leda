@@ -141,6 +141,22 @@ Esa prueba funciona en los dos sentidos. Si alguien implementa una de esas
 capacidades, falla y pide que se saque de la lista. Si alguien agrega esquema
 nuevo que nadie usa, falla y obliga a decidir si es deuda aceptada o un olvido.
 
+## Lo que agregó el motor después de M3 (2026-10-07 y 08)
+
+Código en `src/leda/motor/`, `src/leda/salida.py` y `src/leda/despachador.py`; evidencia en la bitácora de flujos.
+
+| Capacidad | Dónde |
+|---|---|
+| Los datos que lee la IA al redactar tienen nombres de todos los días, sin conceptos del sistema | `hechos.para_redactar` |
+| Formato de los mensajes: un renglón por idea, 📋 ✏️ 🗓️ ⚠️ al principio del renglón, fechas cortas, cierre aparte; medido por el corredor | `instrucciones.py`, `tests/conversaciones/comprobar.py` |
+| Negrita por entidades de Telegram, sin `parse_mode` (hoy la instrucción no la pide) | `salida.formatear` |
+| "Escribiendo…", borrador "…" y el texto de la respuesta en vivo; el mensaje final sale enseguida | `despachador.py`, `recibir.py` |
+| Rastro de cada intento fallido de redactar un aviso (incidente de severidad baja) | `avisos.py` |
+| Margen de 10 minutos antes de los avisos a otra persona, para que una corrección retire el equivocado | `margen.py` |
+| Una fecha que atrasa sin motivo: Leda lo pregunta y el aviso espera la respuesta o sale al final del día | `fichas.py` |
+| Recibir y guardar fotos, documentos, videos y álbumes (sin evidencia todavía), con límites por contenido | `archivos.py`, migración `0033` |
+| El lector de turnos y avisos guardados | `leda.motor.leer` |
+
 ## Vigencia
 
 Levantado el 2026-09-22 auditando `nucleo/`, la especificación funcional y el
