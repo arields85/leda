@@ -156,6 +156,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     chat, así que el margen sólo la demoraría. Si un día se puede corregir una decisión por chat, se suma
     el margen con esa función. Pedido del usuario para la plataforma: poder ajustar el margen para
     corregir (`docs/product/plataforma-pendientes.md`).
+20. **Cómo probar el enlace a la página:** decidida (usuario, 2026-10-08). En la PC, con Telegram Desktop
+    o Web, `LEDA_BASE_URL=http://localhost:8000` y `python -m leda servir` en otra terminal: nada queda
+    expuesto. Leda y la plataforma van a correr en un VPS; ahí sólo cambia `LEDA_BASE_URL`
+    (`docs/product/plataforma-pendientes.md`, "Acceso y operación").
 
 ## Chequeo de rumbo (2026-10-07)
 

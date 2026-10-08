@@ -41,6 +41,7 @@ agrega acá con dónde vive hoy.
 | Enlaces de activación individuales, entregados uno a uno | `python -m leda enlaces <espacio> --solo <nombres>` | alta de equipo, bloque 8 |
 | Ver incidentes: dónde falla y qué lo hizo fallar, con acceso a la conversación que lo causó | `python -m leda incidentes <espacio>` | ROADMAP, "Panel de plataforma" |
 | Respaldo, restauración y migraciones | Consola y `db/respaldos/` | constitución §2 |
+| Dónde corre: Leda y la plataforma van en un VPS (usuario, 2026-10-08) | Hoy, la PC del usuario; las pruebas del enlace a la página de la tarea, con `LEDA_BASE_URL=http://localhost:8000` y Telegram en la misma PC | Hace falta, antes de subir: dominio con HTTPS (la dirección del enlace), secretos fuera del repositorio, respaldo y restauración, el webhook atendiendo más de un mensaje a la vez, registros sin datos sensibles. Subir es una operación remota: la autoriza el usuario, con su plan |
 
 ## Configuración global
 
