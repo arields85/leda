@@ -463,9 +463,30 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
   - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-3d.** Lo que decidió el usuario el 2026-10-08 (preguntas 10 a 20), en este orden. Route de
   cada una: delegada (escritor único, 2+ archivos no triviales), una por vez, revisión RDD por commit.
-  - [ ] **D1.** El comparador del corredor: la garantía es "lo escrito es lo confirmado"; mostrar lo
+  - [x] **D1.** El comparador del corredor: la garantía es "lo escrito es lo confirmado"; mostrar lo
     escrito completo; aflojar en los YAML de la 21 a la 23 lo que la ficha permite; criterios de
-    aceptación reales en las tareas de prueba (`carga.py`).
+    aceptación reales en las tareas de prueba (`carga.py`). Route: delegada (escritor único, 2+
+    archivos no triviales). Hecha el 2026-10-08, sin tocar `src/`:
+    - **Criterios** (`f59b42c`): cada tarea de las 25 conversaciones lleva el suyo, concreto y
+      comprobable, en el YAML y en el estado inicial del `.md` (también la 26); `carga.py` deja uno
+      de reserva, también concreto. Rojo primero: la prueba del cargador falló en las 25.
+    - **El comparador** (`71d7739`): el corredor lee las vistas previas confirmadas en el paso
+      (`confirmadas`) y la evidencia escrita que es lo confirmado cumple la garantía; si difiere del
+      YAML es de comprensión (del motor, con las jugadas esperadas). Siguen de garantía lo que no es
+      lo confirmado y lo de una tarea que nadie confirmó. Toda falla de filas muestra lo escrito
+      entero. Rojo primero: seis pruebas de `test_comprobar.py` y una de `test_corredor.py`, que
+      repite la falsa alarma de la 21 con la IA real (dio `[garantia] efecto de más: evidencia`).
+    - **`puede_traer`** acepta sólo datos que la ficha declara opcionales (si no, es un error del
+      YAML) y, con un valor, lo exige si el dato viene. La 21 y la 22 aceptan la tarea en
+      `confirmar`; la 23, el comentario en `aprobar` (pasos 1 y 8); la 22 espera `entregar` en los
+      pasos 5 y 6, que es lo que dice la ficha (sin jugada también está bien y se lee en la
+      transcripción, como en la 25). No se tocaron el paso 1 de la 21 (hallazgo 1, D3) ni el 9 de
+      la 23 (decisión 12, D4).
+    - **Pruebas:** `pytest tests/conversaciones`, 127 passed; `pytest tests/motor
+      tests/conversaciones`, 786 passed (sin la intermitente); en seco, `correr --ia guionada
+      --veces 1 --ronda seco-d1`, 25 de 25 bien (informes borrados).
+    - `PENDIENTE`: en la 22, paso 1, si la IA elige `guardar_para_la_entrega` sin la tarea, los
+      hechos salen repetidos (la jugada y lo que trajo el mensaje): es del motor y queda para D3.
   - [ ] **D2.** Las palabras (decisiones 11 y 18): no nombrar por su cuenta a quien aprueba ni al
     referente (y decir el nombre si se pregunta); "revisar" para lo que espera; "describir" en la
     entrega. Cambian los hechos, sus significados y las conversaciones que esperan "Ismael será
