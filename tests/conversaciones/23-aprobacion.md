@@ -13,7 +13,9 @@ Circuito 8 (ADR 0017, decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7;
 **Corre desde la porción 3b de la C-3** (`23-aprobacion.yaml`). El YAML suma tres pasos de Leda que
 el hilo da por hechos (4b, 9b y 9c: los avisos que salen enseguida y el aviso previo del martes) y
 corre el paso 10 aparte, por el motor y sin comprobarlo. El enlace a la página de la tarea de los
-pasos 3, 7 y 11 es de la porción 4: todavía no se espera.
+pasos 3, 7 y 11 es de la porción 4: todavía no se espera. Desde la porción 3c, el lunes 26 a las 10:30
+Ismael recibe además el primer recordatorio de las tres entregas que siguen esperando su decisión
+(conversación 24): el YAML lo espera en el paso 3, sin que sea parte de lo que mide ésta.
 
 ## Estado inicial
 

@@ -71,6 +71,24 @@ fecha esperan con el pedido de estado: las repite la escalera de la tarea, no é
 cuya pregunta se cerró sin contestarse (una corrección la dejó sin efecto) ya no espera nada y
 se cierra. Una ausencia la pausa, como a la de la tarea.
 
+**La espera de una decisión: quien aprueba no contesta** (porción 3c de la C-3; usuario,
+2026-10-07, `odd/tasks/fase-c.md`, pregunta 3; conversación 24). Una entrega que espera la
+decisión de quien la aprueba tiene su propia escalera, contada en días hábiles desde que salió
+el aviso de la entrega (`entrega_para_aprobar`): ése es el pedido, y no hace falta otra espera
+(`pending_reply`), porque la decisión ya está registrada en él y se corta sola cuando quien
+aprueba decide (una aprobación que todavía no cierra también es su decisión). El día hábil
+siguiente, un recordatorio a quien aprueba; al otro, el segundo, que avisa que al día
+siguiente se entera quien está arriba (quien aprueba su trabajo, si hay alguien); al
+siguiente, a quien está arriba le llega un aviso sólo informativo de que la aprobación está
+trabada, una sola vez. Quien aprueba sigue con un recordatorio cordial por día hábil, sin
+tope, hasta decidir; cuando decide, a quien está arriba le llega que se destrabó
+(`aprobacion.py`). Sin nadie arriba, un recordatorio por día hábil y nada más. Al responsable
+nunca le llega nada de esto (no depende de él), ni aunque fuera quien está arriba. Los
+recordatorios recuerdan la decisión que ofreció el aviso de la entrega: sin botones (9b) y sin
+abrir otra pregunta (`avisos.TipoDeAviso.recuerda`). Un paso por día hábil, y una ausencia de
+quien aprueba la pausa; al salir, cada aviso se vuelve a leer (`avisos._vigencia_de_una_
+decision`). Una entrega nueva de la misma tarea empieza su cuenta de cero.
+
 **Sin `aviso_previo_dias_habiles`** (el plan lo dejó `PENDIENTE`): se usa el mínimo del núcleo,
 un día hábil (mecánica §9), y cada aviso previo que sale con él deja un incidente de severidad
 baja para el administrador: nunca en silencio, y sin escribir la configuración por su cuenta.
@@ -93,9 +111,12 @@ from ..incidentes import registrar_incidente
 from .ancla import (NO_DADOS, REEMPLAZADO, REPREGUNTA_DE_ESTADO, TIPOS_DE_LA_ESCALERA,
                     VENCIMIENTO_CON_PREVISION, Anclaje, al_mediodia, anclaje, candado, escalo,
                     pasos)
-from .avisos import (ABIERTOS, ESCALAMIENTO_DE_UNA_PREGUNTA, ESPERA_DE_ESTADO, REPREGUNTA,
-                     Momento, ausente, espera_abierta, guardar, hechos_de_la_escalera,
-                     hechos_de_una_pregunta, leer_tarea, omitir, quienes_escalan)
+from .avisos import (ABIERTOS, APROBACION_TRABADA, ESCALAMIENTO_DE_UNA_PREGUNTA,
+                     ESPERA_DE_ESTADO, RECORDATORIO_DE_LA_DECISION, REPREGUNTA, Momento,
+                     aprobacion_vigente, ausente, aviso_de_la_entrega, espera_abierta, guardar,
+                     hechos_de_la_escalera, hechos_de_una_decision, hechos_de_una_pregunta,
+                     integrante, leer_tarea, omitir, quien_esta_arriba, quienes_escalan)
+from .preguntas import DECISION_DE_LA_ENTREGA
 from .tiempo import Reloj, sale
 
 ETAPA_ESCALERA = "motor_escalera"
@@ -156,6 +177,14 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
             guardado = _un_paso_de_una_pregunta(m, espera)
             if guardado:
                 resumen[guardado] += 1
+        # Las entregas que esperan la decisión de quien las aprueba (porción 3c).
+        cur.execute("""select t.id, m.aprobador_membership_id from task t
+                         join membership m on m.id = t.responsable_membership_id
+                        where t.estado = 'en_revision' and m.aprobador_membership_id is not null
+                        order by t.titulo, t.id""")
+        for fila in cur.fetchall():
+            resumen.update(_un_paso_de_una_decision(m, str(fila["id"]),
+                                                    str(fila["aprobador_membership_id"])))
     return dict(resumen)
 
 
@@ -483,6 +512,72 @@ def _guardar_de_una_pregunta(m: Momento, tipo: str, tarea, base: dict[str, Any],
         programado_para=sale(m.cal, m.ahora),
         clave=":".join(["motor", tipo, str(tarea["id"]), de, *map(str, resto)]), ahora=m.ahora)
     return aviso_id
+
+
+# --- La espera de una decisión: quien aprueba no contesta (porción 3c) ----------------------------
+
+def _un_paso_de_una_decision(m: Momento, task_id: str, aprobador: str) -> list[str]:
+    """Lo que toca de la espera de la decisión sobre una entrega, contada en días hábiles desde
+    que salió su aviso a quien aprueba (`entrega_para_aprobar`; ver el módulo): el recordatorio
+    del día, a quien aprueba, y, al día hábil siguiente del segundo, el aviso a quien está
+    arriba, una sola vez. Nada si ya decidió, si el aviso de la entrega todavía no salió o si
+    quien aprueba está ausente."""
+    cur = m.cur
+    if not candado(cur, task_id, esperar=False):
+        return []                       # un turno la tiene tomada: la vuelta siguiente
+    if ausente(cur, aprobador, m.hoy):
+        return []                       # pausada: no avanza mientras no está
+    entrega_aviso = aviso_de_la_entrega(cur, task_id)
+    if entrega_aviso is None or entrega_aviso["estado"] != "enviado"             or str(entrega_aviso["destinatario_membership_id"]) != aprobador:
+        return []                       # todavía no se le preguntó (o no a quien aprueba hoy)
+    if aprobacion_vigente(cur, task_id, aprobador) is not None:
+        return []                       # ya decidió: espera que se resuelva lo que falta
+    de = str(entrega_aviso["id"])
+    cur.execute("""select * from scheduled_notice
+                    where task_id = %s and tipo = any(%s)
+                      and split_part(dedupe_key, ':', 3) = %s
+                    order by creado_en, dedupe_key""",
+                (task_id, [RECORDATORIO_DE_LA_DECISION, APROBACION_TRABADA], de))
+    pasos_dados = cur.fetchall()
+    tarea = leer_tarea(cur, task_id)
+    arriba = quien_esta_arriba(cur, aprobador, tarea)
+    recordatorios = [a for a in pasos_dados if a["tipo"] == RECORDATORIO_DE_LA_DECISION]
+    guardados: list[str] = []
+    # Al día hábil siguiente del segundo recordatorio, quien está arriba se entera, una vez.
+    segundo = next((a for a in recordatorios if a["estado"] != "guardado"
+                    and a["hechos"].get("veces_que_se_lo_recuerda") == 2), None)
+    if (arriba is not None and segundo is not None
+            and not any(a["tipo"] == APROBACION_TRABADA for a in pasos_dados)
+            and m.cal.habiles_entre(segundo["resuelto_en"], m.ahora) >= 1):
+        base = {"aviso": APROBACION_TRABADA, "necesita_respuesta": False,
+                "quien_aprueba": integrante(cur, aprobador)["nombre"],
+                "leda_se_lo_sigue_recordando": True, "se_le_avisa_cuando_decida": True}
+        guardar(cur, m.workspace_id, APROBACION_TRABADA, task_id=task_id,
+                destinatario=arriba["membership_id"],
+                hechos=hechos_de_una_decision(m, tarea, entrega_aviso, base),
+                programado_para=sale(m.cal, m.ahora),
+                clave=f"motor:{APROBACION_TRABADA}:{de}", ahora=m.ahora)
+        guardados.append(APROBACION_TRABADA)
+    # El recordatorio del día: uno por día hábil desde el siguiente al del aviso de la entrega,
+    # nunca dos el mismo día hábil, y el que sigue sólo cuando salió el anterior.
+    if any(a["estado"] == "guardado" for a in recordatorios):
+        return guardados
+    ultimo = max((a["resuelto_en"] for a in recordatorios), default=entrega_aviso["resuelto_en"])
+    if m.cal.habiles_entre(ultimo, m.ahora) < 1:
+        return guardados
+    siguiente = len(recordatorios) + 1
+    base = {"aviso": RECORDATORIO_DE_LA_DECISION, "necesita_respuesta": True,
+            "pregunta": DECISION_DE_LA_ENTREGA, "veces_que_se_lo_recuerda": siguiente}
+    if siguiente == 2 and arriba is not None:     # un efecto que pasa después: a quién y cuándo
+        base["si_sigue_sin_decidir"] = {
+            "se_avisa_a": [arriba["nombre"]],
+            "fecha": m.cal.proximo_habil(m.hoy + timedelta(days=1)).isoformat()}
+    guardar(cur, m.workspace_id, RECORDATORIO_DE_LA_DECISION, task_id=task_id,
+            destinatario=aprobador, hechos=hechos_de_una_decision(m, tarea, entrega_aviso, base),
+            programado_para=sale(m.cal, m.ahora),
+            clave=f"motor:{RECORDATORIO_DE_LA_DECISION}:{de}:{siguiente}", ahora=m.ahora)
+    guardados.append(RECORDATORIO_DE_LA_DECISION)
+    return guardados
 
 
 def _vuelta_de_una_ausencia(m: Momento, persona: str, inicio: date) -> dict[str, Any] | None:

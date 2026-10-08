@@ -42,6 +42,11 @@ el sistema vuelve a comprobar el cierre y la cierra solo, sin otra aprobación
 (`cerrar_las_que_ya_pueden`, en cada vuelta del ciclo; la cocina, `cerrar_tarea_aprobada`), con
 aviso al responsable y a quien aprobó. Es una regla general: vale para lo que se haya resuelto
 (una dependencia que terminó o se canceló, un bloqueo que se cerró) y por el camino que sea.
+
+**Cuando quien aprueba no contesta** (porción 3c), la escalera le recuerda la decisión y, al
+tercer día hábil, quien está arriba se entera, sólo para que lo sepa (`escalera.py`). Una
+decisión, aprobar o pedir cambios, corta los recordatorios y, si quien está arriba ya se había
+enterado, le llega que se destrabó (`aprobacion_destrabada`), de coordinación y enseguida.
 """
 
 from __future__ import annotations
@@ -57,7 +62,8 @@ from ..db import espacio
 from ..herramientas import ejecutar
 
 from . import entrega, fichas, preguntas
-from .avisos import (CERRADA_CON_LA_APROBACION, PEDIDO_DE_CAMBIOS, TAREA_APROBADA, guardar)
+from .avisos import (APROBACION_DESTRABADA, APROBACION_TRABADA, CERRADA_CON_LA_APROBACION,
+                     PEDIDO_DE_CAMBIOS, TAREA_APROBADA, aprobacion_vigente, guardar)
 from .tiempo import Reloj, sale
 
 # Los códigos de por qué no se decide.
@@ -115,21 +121,6 @@ def lo_que_entrego(cur, task_id: str, zona) -> list[dict[str, Any]]:
     return vistas
 
 
-def aprobacion_vigente(cur, task_id: str, aprobador: str) -> dict[str, Any] | None:
-    """La última aprobación de esa persona sobre la tarea que ningún pedido de cambios suyo
-    posterior dejó sin efecto (la misma regla que `motivo_no_cierra_tarea`)."""
-    cur.execute("""select a.id, a.at from approval a
-                    where a.sujeto_tipo = 'tarea' and a.sujeto_id = %s
-                      and a.decision = 'aprobado' and a.aprobador_membership_id = %s
-                      and not exists (select 1 from approval r
-                                       where r.sujeto_tipo = 'tarea'
-                                         and r.sujeto_id = a.sujeto_id
-                                         and r.aprobador_membership_id = %s
-                                         and r.decision = 'rechazado' and r.at >= a.at)
-                    order by a.at desc limit 1""", (task_id, aprobador, aprobador))
-    return cur.fetchone()
-
-
 def aprobada_el(cur, aprobacion: dict[str, Any], zona) -> str:
     """El día en que se dio una aprobación, en el reloj del motor: el del aviso que la contó al
     responsable (lo guardó el turno que la anotó); sin él, el de la fila, que fecha la base."""
@@ -180,6 +171,10 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
     _avisar_al_responsable(ctx, hecho, TAREA_APROBADA, tarea, responsable,
                            {"aprobada_por": ctx.quien.nombre, **del_aviso},
                            clave=f"motor:{TAREA_APROBADA}:{r['aprobacion_id']}")
+    _avisar_que_se_destrabo(ctx, hecho, tarea, responsable,
+                            {"aprobada_por": ctx.quien.nombre,
+                             **{k: v for k, v in del_aviso.items()
+                                if k in ("quedo_terminada", "no_se_cierra_todavia")}})
     return hecho
 
 
@@ -205,10 +200,13 @@ def pedir_cambios(ctx, datos: dict, tarea: dict | None) -> dict:
         return fichas.no_hecho(r, tarea)
     hecho = {"resultado": "anotado", "tarea": _tarea(tarea), "comentario": comentario,
              "estado": r["estado"]}
-    _avisar_al_responsable(ctx, hecho, PEDIDO_DE_CAMBIOS, tarea, _responsable(cur, tarea["id"]),
+    responsable = _responsable(cur, tarea["id"])
+    _avisar_al_responsable(ctx, hecho, PEDIDO_DE_CAMBIOS, tarea, responsable,
                            {"pidio_cambios": ctx.quien.nombre, "comentario": comentario,
                             "puede_volver_a_entregarla": True},
                            clave=f"motor:{PEDIDO_DE_CAMBIOS}:{r['decision_id']}")
+    _avisar_que_se_destrabo(ctx, hecho, tarea, responsable,
+                            {"pidio_cambios": ctx.quien.nombre, "estado": r["estado"]})
     return hecho
 
 
@@ -347,6 +345,40 @@ def _avisar_al_responsable(ctx, hecho: dict, tipo: str, tarea: dict, responsable
     hecho["aviso_al_responsable"] = {"a": responsable["nombre"],
                                      fichas.LLEGA: cuando.isoformat()}
     fichas.nombrar_efecto(hecho, "aviso_al_responsable", fichas.AVISO, aviso_id)
+
+
+def _avisar_que_se_destrabo(ctx, hecho: dict, tarea: dict, responsable: dict,
+                            decision: dict[str, Any]) -> None:
+    """Si quien está arriba ya sabía que la aprobación estaba trabada (le llegó el aviso,
+    porción 3c), le llega que quien aprueba decidió: de coordinación, enseguida dentro del
+    horario, uno por persona, y el hecho dice cuándo se entera. Sólo informativo, como aquél."""
+    cur = ctx.cur
+    cur.execute("""select a.id, a.destinatario_membership_id, i.nombre
+                     from scheduled_notice a
+                     join integrante i on i.membership_id = a.destinatario_membership_id
+                    where a.task_id = %s and a.tipo = %s and a.estado = 'enviado'
+                      and not exists (select 1 from scheduled_notice d
+                                       where d.task_id = a.task_id and d.tipo = %s
+                                         and d.destinatario_membership_id
+                                             = a.destinatario_membership_id
+                                         and d.creado_en >= a.creado_en)
+                    order by a.creado_en desc""",
+                (tarea["id"], APROBACION_TRABADA, APROBACION_DESTRABADA))
+    a_quienes = {str(f["destinatario_membership_id"]): f for f in reversed(cur.fetchall())}
+    cuando = sale(ctx.calendario, ctx.ahora)
+    for persona, trabada in a_quienes.items():
+        aviso_id, _ = guardar(
+            cur, ctx.quien.workspace_id, APROBACION_DESTRABADA, task_id=tarea["id"],
+            destinatario=persona,
+            hechos={"aviso": APROBACION_DESTRABADA, "necesita_respuesta": False,
+                    "tarea": tarea["titulo"], "responsable": responsable["nombre"],
+                    "quien_aprueba": ctx.quien.nombre, **decision},
+            programado_para=cuando, clave=f"motor:{APROBACION_DESTRABADA}:{trabada['id']}",
+            ahora=ctx.ahora)
+        ctx.avisos_guardados.append(aviso_id)
+        hecho["aviso_de_que_se_destrabo"] = {"a": trabada["nombre"],
+                                             fichas.LLEGA: cuando.isoformat()}
+        fichas.nombrar_efecto(hecho, "aviso_de_que_se_destrabo", fichas.AVISO, aviso_id)
 
 
 def _comentario(datos: dict) -> str | None:

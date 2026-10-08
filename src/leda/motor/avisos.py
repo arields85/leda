@@ -60,6 +60,16 @@ mensaje. No es un tema abierto: quien aprueba no le debe una respuesta a la conv
 decisión de quien aprueba le llega al responsable en su propio aviso (`tarea_aprobada`,
 `pedido_de_cambios`), y el cierre que hace el sistema cuando se resuelve lo que faltaba, al
 responsable y a quien aprobó (`cerrada_con_la_aprobacion`; `aprobacion.py`).
+
+**Quien aprueba no contesta** (porción 3c): los recordatorios a quien aprueba
+(`recordatorio_de_la_decision`) recuerdan la decisión que ofreció el aviso de la entrega
+(`TipoDeAviso.recuerda`): la redacción la recibe como la pregunta del mensaje, ya hecha antes,
+y al salir no abren otra ni llevan botones. El aviso a quien está arriba
+(`aprobacion_trabada`) es sólo informativo. Los dos son seguimiento que Leda hace por su cuenta:
+cuentan para el tope diario y salen en un envío por persona. Se omiten al salir si quien aprueba
+ya decidió, si la entrega ya no espera o hay una más nueva, o si cambió quién aprueba o quién
+está arriba. Que se destrabó (`aprobacion_destrabada`) lo causa la decisión: es de coordinación.
+Cuándo se guardan, `escalera.py`.
 """
 
 from __future__ import annotations
@@ -152,6 +162,11 @@ class TipoDeAviso:
     # La decisión que ofrece al salir: las jugadas cuyas opciones lleva como botones
     # (`Ficha.boton`). Sólo un aviso de coordinación, que sale solo (porción 3b).
     ofrece: tuple[str, ...] = ()
+    # La decisión que recuerda (el tipo de su pregunta): la ofreció otro aviso y sigue sin
+    # cerrar. Al salir no abre ninguna pregunta ni lleva botones (9b): la redacción la recibe
+    # como la pregunta del mensaje, ya hecha antes, y se contesta escribiendo o con los botones
+    # de aquel aviso (porción 3c).
+    recuerda: str | None = None
 
 
 # --- Guardar --------------------------------------------------------------------------------
@@ -347,6 +362,8 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     for x, q in zip(envio, preguntas_de):
         if q is not None and x.tipo.ofrece:
             _ofrecer_la_decision(m, turno, x.aviso, x.tipo)
+        elif q is not None and x.tipo.recuerda:
+            pass                # la decisión sigue abierta desde el aviso que la ofreció
         elif q is not None:
             _abrir_la_pregunta(m, turno, x.aviso)
         if x.tipo.escala:
@@ -395,6 +412,8 @@ def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, 
     tipo = TIPOS.get(aviso["tipo"])
     if tipo is not None and tipo.ofrece:
         pregunta["opciones"] = [{"etiqueta": FICHAS[n].boton} for n in tipo.ofrece]
+    if tipo is not None and tipo.recuerda:
+        pregunta["desde_antes"] = True      # la hizo el aviso que la ofreció
     return pregunta
 
 
@@ -983,6 +1002,91 @@ def _vigencia_de_un_pedido_de_cambios(m: Momento, aviso) -> tuple[str | None, di
     return None, hechos
 
 
+# --- Quien aprueba no contesta (porción 3c; `escalera.py`, "La espera de una decisión") ---------
+
+RECORDATORIO_DE_LA_DECISION = "recordatorio_de_la_decision"
+APROBACION_TRABADA = "aprobacion_trabada"
+APROBACION_DESTRABADA = "aprobacion_destrabada"
+# Por qué ya no sale: quien aprueba ya decidió (una aprobación que todavía no cierra también es
+# su decisión), o cambió quién aprueba el trabajo de quien aprueba.
+YA_DECIDIO = "ya_decidio"
+CAMBIO_QUIEN_ESTA_ARRIBA = "cambio_quien_esta_arriba"
+
+
+def aprobacion_vigente(cur, task_id: str, aprobador: str) -> dict[str, Any] | None:
+    """La última aprobación de esa persona sobre la tarea que ningún pedido de cambios suyo
+    posterior dejó sin efecto (la misma regla que `motivo_no_cierra_tarea`)."""
+    cur.execute("""select a.id, a.at from approval a
+                    where a.sujeto_tipo = 'tarea' and a.sujeto_id = %s
+                      and a.decision = 'aprobado' and a.aprobador_membership_id = %s
+                      and not exists (select 1 from approval r
+                                       where r.sujeto_tipo = 'tarea'
+                                         and r.sujeto_id = a.sujeto_id
+                                         and r.aprobador_membership_id = %s
+                                         and r.decision = 'rechazado' and r.at >= a.at)
+                    order by a.at desc limit 1""", (str(task_id), aprobador, aprobador))
+    return cur.fetchone()
+
+
+def aviso_de_la_entrega(cur, task_id) -> dict[str, Any] | None:
+    """El aviso de la última entrega de la tarea a quien la aprueba, salga o no: el que vale. La
+    espera de la decisión se cuenta desde que ése salió."""
+    cur.execute("""select * from scheduled_notice where task_id = %s and tipo = %s
+                    order by creado_en desc, id desc limit 1""",
+                (str(task_id), ENTREGA_PARA_APROBAR))
+    return cur.fetchone()
+
+
+def quien_esta_arriba(cur, aprobador: str, tarea: dict[str, Any]) -> dict[str, str] | None:
+    """Quien aprueba el trabajo de quien aprueba la entrega (Nahuel → Marcos → Ismael), si hay
+    alguien y no es el responsable de la tarea: a él nunca le llega nada de la espera de su
+    decisión (no depende de él)."""
+    arriba = referente(cur, aprobador)
+    if arriba is None or arriba["membership_id"] == str(tarea["responsable_membership_id"]):
+        return None
+    return arriba
+
+
+def hechos_de_una_decision(m: Momento, tarea: dict[str, Any], entrega_aviso: dict[str, Any],
+                           base: dict[str, Any]) -> dict[str, Any]:
+    """Lo fijo de `base` y lo de este momento: la tarea, quién la entregó y qué día (el del
+    aviso de la entrega: lo guardó la confirmación)."""
+    responsable = integrante(m.cur, tarea["responsable_membership_id"])
+    return {**base, "tarea": tarea["titulo"],
+            "responsable": responsable["nombre"] if responsable else None,
+            "entregada_el": m.fecha(entrega_aviso["creado_en"]).isoformat()}
+
+
+def _vigencia_de_una_decision(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    """Un recordatorio a quien aprueba, o el aviso a quien está arriba de que la aprobación está
+    trabada, corresponde mientras la entrega de su clave sea la que espera y quien aprueba no
+    haya decidido; cada uno, mientras vaya a quien es ahora quien aprueba o quien está arriba."""
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return "tarea_inexistente", {}
+    if tarea["estado"] in ("terminada", "cancelada"):
+        return "tarea_cerrada", {}
+    if tarea["estado"] != "en_revision":
+        return YA_NO_ESTA_ENTREGADA, {}
+    entrega_aviso = aviso_de_la_entrega(m.cur, tarea["id"])
+    if entrega_aviso is None or str(entrega_aviso["id"]) != aviso["dedupe_key"].split(":")[2]:
+        return HAY_UNA_ENTREGA_MAS_NUEVA, {}
+    aprobador = referente(m.cur, str(tarea["responsable_membership_id"]))
+    if aprobador is None or \
+            aprobador["membership_id"] != str(entrega_aviso["destinatario_membership_id"]):
+        return CAMBIO_QUIEN_APRUEBA, {}
+    if aprobacion_vigente(m.cur, str(tarea["id"]), aprobador["membership_id"]) is not None:
+        return YA_DECIDIO, {}
+    destinatario = str(aviso["destinatario_membership_id"])
+    if aviso["tipo"] == APROBACION_TRABADA:
+        arriba = quien_esta_arriba(m.cur, aprobador["membership_id"], tarea)
+        if arriba is None or arriba["membership_id"] != destinatario:
+            return CAMBIO_QUIEN_ESTA_ARRIBA, {}
+    elif destinatario != aprobador["membership_id"]:
+        return CAMBIO_QUIEN_APRUEBA, {}
+    return None, hechos_de_una_decision(m, tarea, entrega_aviso, dict(aviso["hechos"]))
+
+
 TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # La escalera (mecánica §9; 9b): sin botones, siempre privados.
     TipoDeAviso("aviso_previo", "informativo", _vigencia_de_la_escalera),
@@ -1011,6 +1115,15 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso(PEDIDO_DE_CAMBIOS, "normal", _vigencia_de_un_pedido_de_cambios,
                 es_coordinacion=True),
     TipoDeAviso(CERRADA_CON_LA_APROBACION, "informativo", _siempre, es_coordinacion=True),
+    # Quien aprueba no contesta (porción 3c): el seguimiento que Leda hace por su cuenta, dentro
+    # del tope diario y en un envío por persona (mecánica §10). El recordatorio recuerda la
+    # decisión que ofreció el aviso de la entrega, sin botones (9b); el aviso a quien está
+    # arriba es sólo informativo. Que se destrabó lo causa la decisión de quien aprueba: es de
+    # coordinación, como el aviso de la decisión al responsable.
+    TipoDeAviso(RECORDATORIO_DE_LA_DECISION, "seguimiento", _vigencia_de_una_decision,
+                recuerda=preguntas.DECISION_DE_LA_ENTREGA),
+    TipoDeAviso(APROBACION_TRABADA, "informativo", _vigencia_de_una_decision),
+    TipoDeAviso(APROBACION_DESTRABADA, "informativo", _siempre, es_coordinacion=True),
 )})
 
 

@@ -260,6 +260,30 @@ SIGNIFICADOS: Mapping[str, str] = {
     "hay_una_decision_mas_nueva": "Después de esa aprobación, quien aprueba pidió cambios: ya "
                                   "no vale.",
     "se_cerro_despues": "La tarea quedó terminada después: otro aviso lo cuenta.",
+    # --- Quien aprueba no contesta (porción 3c de la C-3) ------------------------------------
+    "recordatorio_de_la_decision": "Leda le recuerda a quien aprueba que una entrega espera su "
+                                   "decisión: aprobarla o pedirle cambios; lo puede contestar "
+                                   "escribiendo.",
+    "veces_que_se_lo_recuerda": "Cuántas veces, contando ésta, Leda le recuerda a quien aprueba "
+                                "que esa entrega espera su decisión.",
+    "entregada_el": "El día en que la persona responsable entregó la tarea.",
+    "si_sigue_sin_decidir": "Lo que va a pasar si quien aprueba sigue sin decidir: a quién se le "
+                            "avisa (se_avisa_a), sólo para que lo sepa, y qué día (fecha). "
+                            "Todavía no pasó.",
+    "aprobacion_trabada": "Aviso a quien aprueba el trabajo de quien aprueba una entrega: esa "
+                          "entrega espera desde hace días la decisión de quien_aprueba. Es sólo "
+                          "para que lo sepa: no le pide nada y no la decide él; la decide "
+                          "quien_aprueba. No pide respuesta.",
+    "leda_se_lo_sigue_recordando": "Leda le sigue recordando a quien aprueba, un día hábil por "
+                                   "vez, que la entrega espera su decisión.",
+    "se_le_avisa_cuando_decida": "Cuando quien aprueba decida, Leda le avisa a quien recibe "
+                                 "este aviso. Todavía no pasó.",
+    "aprobacion_destrabada": "Aviso a quien sabía que una entrega esperaba la decisión de "
+                             "quien_aprueba: ya decidió. No pide respuesta.",
+    "aviso_de_que_se_destrabo": "Lo que se le avisa a quien sabía que esa entrega esperaba "
+                                "esta decisión: a quién (a) y cuándo se entera (llega).",
+    "ya_decidio": "Quien aprueba ya decidió sobre esa entrega.",
+    "cambio_quien_esta_arriba": "Cambió quién aprueba el trabajo de quien aprueba la entrega.",
     # --- Lo que dice un hecho ------------------------------------------------------------------
     "jugada": "Qué entendió el sistema que dijo o pidió la persona (una jugada de la lista); "
               "dentro de un aviso, la jugada que lo causó.",

@@ -134,6 +134,14 @@ pasos:
         tarea: PLC
         hechos: {aprobada_por: Ismael Soschinski, comentario: presente, quedo_terminada: true,
                  necesita_respuesta: false}
+      # El lunes es el día hábil siguiente al de las entregas: a Ismael, el primer recordatorio
+      # de las tres que siguen esperando su decisión, en un envío (porción 3c; la 24). No es
+      # parte de lo que mide esta conversación.
+      - a: Ismael
+        tipo: recordatorio_de_la_decision
+        tareas: [COM, DASH, TAB]
+        hechos: {veces_que_se_lo_recuerda: 1, entregada_el: "2026-10-23",
+                 necesita_respuesta: true}
     estado_despues:
       de: Marcos
       pregunta_abierta: null

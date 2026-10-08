@@ -20,6 +20,7 @@ import dataclasses
 import hashlib
 import json
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -73,10 +74,12 @@ class IAPerfecta:
         distintos, textos distintos (la huella de los hechos), para enlazar cada mensaje
         entregado con su fila. El corredor mide el formato de todos los mensajes, también de
         éstos (2026-10-07): un solo renglón corto, sin títulos de tareas, sin pregunta y sin
-        negrita, así que la corrida en seco no tiene fallas de formato."""
+        negrita, así que la corrida en seco no tiene fallas de formato. Un envío que junta
+        varios avisos del mismo tipo los nombra una vez, con cuántos son (porción 3c)."""
         hechos = pedido.get("hechos") or []
         pregunta = pedido.get("pregunta")
-        resumen = ", ".join(str(h.get("aviso") or h.get("jugada") or "?") for h in hechos)
+        cuantos = Counter(str(h.get("aviso") or h.get("jugada") or "?") for h in hechos)
+        resumen = ", ".join(n if k == 1 else f"{n} ×{k}" for n, k in cuantos.items())
         huella = hashlib.sha1(json.dumps([pedido.get("persona"), hechos, pregunta],
                                          sort_keys=True, ensure_ascii=False,
                                          default=str).encode()).hexdigest()[:6]
