@@ -27,6 +27,12 @@ cuenta:
   402 dentro de la respuesta, es `SinCredito`; el corredor corta la ronda y marca inválidas las
   corridas que lo tuvieron (`llamadas_sin_credito`). Antes de una ronda real, `credito_restante`
   pregunta cuánto le queda a la cuenta, sin imprimir la clave.
+- **Sin cuota** (regresión D6, 2026-10-08: la suscripción se agotó y 145 corridas se anotaron
+  fallidas, sin tokens): el HTTP 429 `usage_limit_reached` de la suscripción de ChatGPT, o ese
+  código dentro del flujo, es `SinCuota`, con cuándo se renueva si el servicio lo dice
+  (`resets_in_seconds` o `resets_at`). El corredor corta la ronda como con el 402
+  (`llamadas_sin_cuota`, `motivo_sin_cuota`). Un 429 con otro código es un límite pasajero: sigue
+  como estaba, sin cortar.
 """
 
 from __future__ import annotations
@@ -35,12 +41,13 @@ import json
 import os
 import threading
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
 import httpx
 
-from leda.motor.chatgpt import ClienteChatGPT
+from leda.motor.chatgpt import ClienteChatGPT, ErrorDeChatGPT
 from leda.motor.ia_real import ClienteCompatible
 
 TECHO_USD = 30.0
@@ -80,6 +87,15 @@ class SinCredito(RuntimeError):
     """El proveedor dice que la cuenta no tiene crédito (HTTP 402)."""
 
 
+SIN_CUOTA = "la suscripción llegó a su límite de uso"
+LIMITE_DE_USO = "usage_limit_reached"
+
+
+class SinCuota(RuntimeError):
+    """La suscripción llegó a su límite de uso (HTTP 429 `usage_limit_reached`): no es pasajero,
+    hasta que se renueva ninguna llamada va a responder."""
+
+
 def _sin_credito_en_la_respuesta(respuesta: Any) -> bool:
     error = respuesta.get("error") if isinstance(respuesta, dict) else None
     return isinstance(error, dict) and str(error.get("code")) == "402"
@@ -95,6 +111,79 @@ def es_sin_credito(error: str | None) -> bool:
 def llamadas_sin_credito(llamadas: list[dict[str, Any]]) -> int:
     """Cuántas llamadas grabadas (`grabar.IAQueGraba`) chocaron con la cuenta sin crédito."""
     return sum(es_sin_credito(ll.get("error")) for ll in llamadas)
+
+
+def _duracion(segundos: float) -> str:
+    minutos = max(0, round(segundos / 60))
+    dias, minutos = divmod(minutos, 24 * 60)
+    horas, minutos = divmod(minutos, 60)
+    partes = ([f"{dias} d"] if dias else []) + ([f"{horas} h"] if horas else [])
+    return " ".join(partes + [f"{minutos} min"])
+
+
+def cuando_se_renueva(error: dict[str, Any], ahora: datetime | None = None) -> str:
+    """Cuándo se renueva la cuota, con lo que diga el servicio: `resets_in_seconds` (lo que
+    falta) o `resets_at` (el momento, en segundos desde 1970)."""
+    ahora = ahora or datetime.now().astimezone()
+
+    def numero(valor: Any) -> float | None:
+        return (float(valor) if isinstance(valor, (int, float)) and not isinstance(valor, bool)
+                else None)
+
+    if (falta := numero(error.get("resets_in_seconds"))) is not None:
+        momento = ahora + timedelta(seconds=max(0.0, falta))
+    elif (cuando := numero(error.get("resets_at"))) is not None:
+        try:
+            momento = max(ahora, datetime.fromtimestamp(cuando).astimezone(ahora.tzinfo))
+        except (OverflowError, OSError, ValueError):
+            return "no dijo cuándo se renueva"
+    else:
+        return "no dijo cuándo se renueva"
+    return (f"se renueva en {_duracion((momento - ahora).total_seconds())} "
+            f"(hacia el {momento:%Y-%m-%d %H:%M})")
+
+
+def sin_cuota(e: Exception, ahora: datetime | None = None) -> SinCuota | None:
+    """El `SinCuota` de un error del cliente, si es el límite de uso de la suscripción: el HTTP
+    429 `usage_limit_reached` o ese código dentro del flujo (`chatgpt.ErrorDeChatGPT`). Un 429
+    con otro código es pasajero: `None`."""
+    if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
+        try:
+            error = e.response.json().get("error")
+        except (ValueError, AttributeError, httpx.ResponseNotRead):
+            return None
+        if not isinstance(error, dict) or LIMITE_DE_USO not in (error.get("type"),
+                                                                 error.get("code")):
+            return None
+        return SinCuota(f"{SIN_CUOTA} (HTTP 429 {LIMITE_DE_USO}); "
+                        f"{cuando_se_renueva(error, ahora)}")
+    if isinstance(e, ErrorDeChatGPT) and f"({LIMITE_DE_USO}" in str(e):
+        return SinCuota(f"{SIN_CUOTA} ({LIMITE_DE_USO}); no dijo cuándo se renueva")
+    return None
+
+
+def es_sin_cuota(error: str | None) -> bool:
+    """Si el error grabado de una llamada es el límite de uso: el de `SinCuota` o, en las
+    grabaciones de antes de él, el del cliente."""
+    return bool(error) and (error.startswith(f"{SinCuota.__name__}:")
+                            or f"HTTP 429 ({LIMITE_DE_USO})" in error)
+
+
+def llamadas_sin_cuota(llamadas: list[dict[str, Any]]) -> int:
+    """Cuántas llamadas grabadas chocaron con el límite de uso de la suscripción."""
+    return sum(es_sin_cuota(ll.get("error")) for ll in llamadas)
+
+
+def motivo_sin_cuota(llamadas: list[dict[str, Any]]) -> str | None:
+    """El motivo del corte para el informe, con cuándo se renueva si lo dijo el servicio: el de
+    la primera llamada grabada que chocó con el límite de uso."""
+    for ll in llamadas:
+        error = ll.get("error")
+        if es_sin_cuota(error):
+            prefijo = f"{SinCuota.__name__}: "
+            return (error[len(prefijo):] if error.startswith(prefijo)
+                    else f"{SIN_CUOTA} (HTTP 429 {LIMITE_DE_USO}); no dijo cuándo se renueva")
+    return None
 
 
 def credito_restante(clave: str, base_url: str, *,
@@ -140,6 +229,12 @@ class ClienteQueCuenta(ClienteCompatible):
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 402:
                 raise SinCredito("el proveedor no tiene crédito (HTTP 402)") from None
+            if (cuota := sin_cuota(e)) is not None:
+                raise cuota from None
+            raise
+        except ErrorDeChatGPT as e:
+            if (cuota := sin_cuota(e)) is not None:
+                raise cuota from None
             raise
         if _sin_credito_en_la_respuesta(respuesta):
             raise SinCredito("el proveedor no tiene crédito (error 402 en la respuesta)")

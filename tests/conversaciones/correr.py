@@ -51,6 +51,11 @@
   choca con un 402 a mitad de ronda, no empieza ninguna corrida más, las que lo tuvieron son
   **inválidas** (fuera de la tabla, aparte en el informe) y la ronda queda cortada por "sin
   crédito en el proveedor"; sale con 3 (`SALIDA_SIN_CREDITO`). Las que terminaron antes valen.
+- **Sin cuota en la suscripción** (regresión D6, 2026-10-08: la suscripción de ChatGPT se agotó y
+  el corredor anotó 145 corridas fallidas, sin tokens): una llamada que choca con el HTTP 429
+  `usage_limit_reached` (`gasto.SinCuota`) corta la ronda igual que un 402: no empieza ninguna
+  corrida más, las que lo tuvieron son inválidas, el informe dice el motivo y cuándo se renueva
+  la cuota, y sale con 4 (`SALIDA_SIN_CUOTA`). Un 429 con otro código no corta.
 - El informe de la ronda queda en `resultados/` (`informe.py`), con el motor y la IA.
 """
 
@@ -103,6 +108,8 @@ PROHIBIDAS = frozenset({"leda", "leda_flujo", "leda_motor"})
 PREFIJO = "leda_corrida_"
 # Lo que devuelve una ronda sin crédito en el proveedor: distinto del techo (2) y de una caída (1).
 SALIDA_SIN_CREDITO = 3
+# Lo que devuelve una ronda cortada por el límite de uso de la suscripción (HTTP 429).
+SALIDA_SIN_CUOTA = 4
 # Una base del corredor más vieja que esto es de una ejecución que murió sin borrarla: ninguna
 # ronda dura tanto. La fecha va en el nombre (`_nombre`), en UTC.
 VIEJA = timedelta(hours=12)
@@ -350,9 +357,9 @@ def main(argv: list[str] | None = None) -> int:
     from . import informe
     from .motores import cargar as cargar_motor
     from .corredor import correr_conversacion, elegir, llamadas_previstas
-    from .gasto import (MARGEN_DE_LA_ESTIMACION, POR_SUSCRIPCION, SIN_CREDITO, Gasto,
+    from .gasto import (MARGEN_DE_LA_ESTIMACION, POR_SUSCRIPCION, SIN_CREDITO, SIN_CUOTA, Gasto,
                         TechoAlcanzado, costo_de_las_llamadas, llamadas_sin_credito,
-                        precio_conocido)
+                        llamadas_sin_cuota, motivo_sin_cuota, precio_conocido)
     from .grabar import IAPerfecta, IAQueGraba, IARepetida
 
     motor = cargar_motor(a.motor)
@@ -421,8 +428,11 @@ def main(argv: list[str] | None = None) -> int:
 
     corridas = []
     cortes: list[dict] = []         # las corridas que no corrieron o no terminaron, y por qué
-    invalidas: list = []            # (corrida, llamadas con 402): chocaron con la cuenta sin crédito
-    sin_credito = threading.Event()     # algún 402: no empieza ninguna corrida más
+    invalidas: list = []            # (corrida, llamadas que chocaron con el proveedor)
+    # Un 402 o el límite de uso de la suscripción: no empieza ninguna corrida más. El corte que
+    # llegó primero manda (motivo, salida y cómo se dice en el informe).
+    cortada_por_el_proveedor = threading.Event()
+    corte_del_proveedor: dict = {}
     imprimir = threading.Lock()
 
     def anotar_el_gasto(conv, vez, ia, corrida, reservado: float, cortada: str | None,
@@ -454,17 +464,27 @@ def main(argv: list[str] | None = None) -> int:
                    "no corrió" if credito else "se cortó")
             print(f"  {numero} vez {vez}: {que} ({motivo})", flush=True)
 
-    def con_402(ia, corrida) -> int:
-        """Cuántas llamadas de la corrida a la IA chocaron con un 402."""
+    def con_corte(ia, corrida) -> tuple[int, dict | None]:
+        """Cuántas llamadas de la corrida a la IA chocaron con el proveedor (un 402 o el límite
+        de uso de la suscripción) y qué corte es."""
         llamadas = list(getattr(ia, "llamadas", None) or
                         (corrida.llamadas if corrida is not None else []))
-        return llamadas_sin_credito(llamadas)
+        if n := llamadas_sin_credito(llamadas):
+            return n, {"motivo": SIN_CREDITO, "anotada": SIN_CREDITO,
+                       "salida": SALIDA_SIN_CREDITO, "con": "con 402",
+                       "invalidas_por": informe.SIN_CREDITO_HTTP}
+        if n := llamadas_sin_cuota(llamadas):
+            return n, {"motivo": motivo_sin_cuota(llamadas), "anotada": SIN_CUOTA,
+                       "salida": SALIDA_SIN_CUOTA, "con": "con el límite de uso",
+                       "invalidas_por": "el límite de uso de la suscripción (HTTP 429 "
+                                        "usage_limit_reached)"}
+        return 0, None
 
     def correr(trabajo):
         conv, vez = trabajo
         numero = str(conv["numero"]).zfill(2)
-        if sin_credito.is_set():
-            cortar(numero, vez, SIN_CREDITO, techo=False, credito=True)
+        if cortada_por_el_proveedor.is_set():
+            cortar(numero, vez, corte_del_proveedor["motivo"], techo=False, credito=True)
             return None
         reservado = estimado(conv) if real else 0.0
         if reservado:
@@ -475,7 +495,7 @@ def main(argv: list[str] | None = None) -> int:
                 return None
         ia = corrida = None
         cortada: str | None = None
-        n_402 = 0
+        n_cortadas, corte = 0, None
         try:
             nombre, url = bases.nueva()
             try:
@@ -494,17 +514,20 @@ def main(argv: list[str] | None = None) -> int:
             cortar(numero, vez, cortada, techo=False)
             return None
         finally:
-            n_402 = con_402(ia, corrida)
-            if n_402:
-                sin_credito.set()
+            n_cortadas, corte = con_corte(ia, corrida)
+            if n_cortadas:
+                with imprimir:
+                    if not corte_del_proveedor:
+                        corte_del_proveedor.update(corte)
+                cortada_por_el_proveedor.set()
             if real:
                 anotar_el_gasto(conv, vez, ia, corrida, reservado, cortada,
-                                SIN_CREDITO if n_402 else None)
-        if n_402:
-            invalidas.append((corrida, n_402))
+                                corte["anotada"] if n_cortadas else None)
+        if n_cortadas:
+            invalidas.append((corrida, n_cortadas))
             with imprimir:
-                print(f"  {corrida.numero} vez {vez}: INVÁLIDA, {SIN_CREDITO} ({n_402} "
-                      f"llamada(s) con 402)", flush=True)
+                print(f"  {corrida.numero} vez {vez}: INVÁLIDA, {corte['anotada']} ({n_cortadas} "
+                      f"llamada(s) {corte['con']})", flush=True)
             return None
         if a.grabar:
             a.grabar.mkdir(parents=True, exist_ok=True)
@@ -545,9 +568,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Corridas: {len(corridas)}; todo lo automático bien: {bien}; con fallas: "
           f"{len(corridas) - bien}; garantías bien: {sum(c.garantias for c in corridas)}.")
     if invalidas:
-        print(f"Inválidas ({SIN_CREDITO}): {len(invalidas)}.")
-    if sin_credito.is_set():
-        print(f"Ronda cortada: {SIN_CREDITO}.")
+        print(f"Inválidas ({corte_del_proveedor['anotada']}): {len(invalidas)}.")
+    if cortada_por_el_proveedor.is_set():
+        print(f"Ronda cortada: {corte_del_proveedor['motivo']}.")
     if cortes:
         print(f"Ronda cortada: {len(cortes)} corrida(s) no corrieron o no terminaron.")
     if not a.sin_informe and (corridas or cortes or invalidas):
@@ -566,10 +589,12 @@ def main(argv: list[str] | None = None) -> int:
             cabecera["Caché del proveedor"] = NOTA_DE_CACHE
         resumen, _ = informe.escribir(
             corridas, ronda=ronda, cabecera=cabecera, cortes=cortes, invalidas=invalidas,
-            motivo_del_corte=SIN_CREDITO if sin_credito.is_set() else None)
+            motivo_del_corte=corte_del_proveedor.get("motivo"),
+            **({"invalidas_por": corte_del_proveedor["invalidas_por"]}
+               if corte_del_proveedor else {}))
         print(f"Informe: {_relativa(resumen)}")
-    if sin_credito.is_set():
-        return SALIDA_SIN_CREDITO
+    if cortada_por_el_proveedor.is_set():
+        return corte_del_proveedor["salida"]
     if any(c["techo"] for c in cortes):
         return 2
     return 0 if corridas and not cortes and all(c.error is None for c in corridas) else 1

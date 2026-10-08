@@ -765,3 +765,105 @@ def test_el_informe_dice_que_la_ronda_fue_por_suscripcion():
 
     assert "**Por suscripción:** 1 llamada(s)" in texto
     assert "Precio desconocido" not in texto
+
+
+# --- Sin cuota en la suscripción (HTTP 429 `usage_limit_reached`; regresión D6, 2026-10-08) ----
+#
+# Con la suscripción de ChatGPT agotada, el servicio contesta 429 `usage_limit_reached` (con
+# `resets_in_seconds`) y el corredor siguió: 145 corridas se anotaron como fallidas, sin tokens.
+# Ahora el límite de uso corta la ronda como el 402: no empieza ninguna corrida más, las que lo
+# tuvieron son inválidas, el informe dice cuándo se renueva y la ejecución sale con error.
+
+def _cliente_por_suscripcion(tmp_path, respuestas: list):
+    from tests.conversaciones.gasto import ClienteChatGPTQueCuenta
+    from tests.motor.test_chatgpt import Codex, sesion_guardada
+
+    sesion = sesion_guardada(tmp_path / "s.json")
+    return ClienteChatGPTQueCuenta.crear("gpt-6-sol", sesion, {"plazo_s": 5},
+                                         transporte=httpx.MockTransport(Codex(respuestas)))
+
+
+def test_el_limite_de_uso_de_la_suscripcion_es_sin_cuota_con_cuando_se_renueva(tmp_path):
+    from tests.conversaciones.gasto import SinCuota
+
+    cliente = _cliente_por_suscripcion(tmp_path, [httpx.Response(429, json={"error": {
+        "type": "usage_limit_reached", "message": "límite", "resets_in_seconds": 8000}})])
+
+    with pytest.raises(SinCuota, match="se renueva en 2 h 13 min") as e:
+        cliente.completar({"messages": []})
+    assert "usage_limit_reached" in str(e.value)
+
+
+def test_el_limite_de_uso_dentro_del_flujo_tambien_es_sin_cuota(tmp_path):
+    from tests.conversaciones.gasto import SinCuota
+    from tests.motor.test_chatgpt import sse
+
+    cliente = _cliente_por_suscripcion(tmp_path, [sse({"type": "response.failed", "response": {
+        "status": "failed", "error": {"code": "usage_limit_reached", "message": "límite"}}})])
+
+    with pytest.raises(SinCuota, match="no dijo cuándo se renueva"):
+        cliente.completar({"messages": []})
+
+
+def test_un_429_pasajero_no_es_sin_cuota_y_sigue_como_estaba(tmp_path):
+    from tests.conversaciones.gasto import SinCuota
+
+    cliente = _cliente_por_suscripcion(tmp_path, [httpx.Response(429, json={"error": {
+        "type": "rate_limit_exceeded", "message": "despacio"}})])
+
+    with pytest.raises(httpx.HTTPStatusError) as e:
+        cliente.completar({"messages": []})
+    assert not isinstance(e.value, SinCuota) and e.value.response.status_code == 429
+
+
+def test_la_grabacion_del_limite_de_uso_dice_que_fue_sin_cuota():
+    from tests.conversaciones.gasto import (llamadas_sin_credito, llamadas_sin_cuota,
+                                            motivo_sin_cuota)
+
+    llamadas = [{"tipo": "jugadas", "respuesta": []},
+                {"tipo": "jugadas", "error": "SinCuota: la suscripción llegó a su límite de uso "
+                                             "(HTTP 429 usage_limit_reached); se renueva en 5 min"},
+                # una grabación de antes de este cambio: el error crudo del cliente
+                {"tipo": "redaccion", "error": "HTTPStatusError: ChatGPT respondió HTTP 429 "
+                                               "(usage_limit_reached)."},
+                {"tipo": "redaccion", "error": "HTTPStatusError: ChatGPT respondió HTTP 429 "
+                                               "(rate_limit_exceeded)."}]
+
+    assert llamadas_sin_cuota(llamadas) == 2
+    assert llamadas_sin_credito(llamadas) == 0
+    assert motivo_sin_cuota(llamadas).endswith("se renueva en 5 min")
+
+
+def test_el_limite_de_uso_a_mitad_de_la_ronda_la_corta_y_dice_cuando_se_renueva(
+        tmp_path, monkeypatch, capsys):
+    from tests.conversaciones.corredor import Corrida
+
+    def primera_bien_despues_sin_cuota(conn, conv, ia, *, vez=1, motor=None):
+        _llamada_que_costo(ia, 0.0)
+        if vez == 2:
+            ia.llamadas.append({"tipo": "redaccion", "error": (
+                "SinCuota: la suscripción llegó a su límite de uso (HTTP 429 "
+                "usage_limit_reached); se renueva en 2 h 13 min (hacia el 2026-10-09 01:40)")})
+        return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
+                       "garantias", llamadas=list(ia.llamadas))
+
+    _ronda_sin_servidor(monkeypatch, tmp_path, primera_bien_despues_sin_cuota)
+
+    codigo = correr.main(["--ia", "sol", "--conversacion", "01", "--veces", "4",
+                          "--ronda", "sin-cuota"])
+
+    assert codigo == correr.SALIDA_SIN_CUOTA
+    assert codigo not in (0, 1, 2, correr.SALIDA_SIN_CREDITO)
+    salida = capsys.readouterr().out
+    assert "límite de uso" in salida and "se renueva en 2 h 13 min" in salida
+    informe = (tmp_path / "resultados" / "sin-cuota.md").read_text("utf-8")
+    cortada, _, resto = informe.partition("## Resultado por conversación")
+    assert "límite de uso" in cortada and "se renueva en 2 h 13 min" in cortada
+    assert "sin crédito" not in cortada
+    assert "## Corridas inválidas" in cortada and "01, vez 2" in cortada
+    assert "01, vez 3" in cortada and "01, vez 4" in cortada     # no empezaron
+    fila = next(linea for linea in resto.splitlines() if linea.startswith("| 01 "))
+    assert "1/1" in fila                    # la que terminó antes vale
+    anotadas = Gasto(tmp_path / "gasto.json").leer()["corridas"]
+    assert [c["vez"] for c in anotadas] == [1, 2]
+    assert anotadas[1]["invalida"] == gasto.SIN_CUOTA

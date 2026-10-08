@@ -27,6 +27,8 @@ from typing import Any
 from .corredor import Corrida
 
 RESULTADOS = Path(__file__).resolve().parent / "resultados"
+# Con qué chocaron las corridas inválidas, si no se dice otra cosa: la cuenta sin crédito.
+SIN_CREDITO_HTTP = "la cuenta sin crédito (HTTP 402)"
 
 
 def _ok(valor: bool) -> str:
@@ -47,7 +49,8 @@ def _json(valor: Any) -> str:
 def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
             transcripciones: str, cortes: list[dict[str, Any]] | None = None,
             invalidas: list[tuple[Corrida, int]] | None = None,
-            motivo_del_corte: str | None = None) -> str:
+            motivo_del_corte: str | None = None,
+            invalidas_por: str = SIN_CREDITO_HTTP) -> str:
     por_conv: dict[str, list[Corrida]] = defaultdict(list)
     for c in sorted(corridas, key=lambda c: (c.numero, c.vez)):
         por_conv[c.numero].append(c)
@@ -70,11 +73,12 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
                        + f"`{c['motivo']}`" for c in cortes]
             lineas.append("")
     if invalidas:
-        # Chocaron con la cuenta sin crédito: no se puntúan ni entran en la tabla.
+        # Chocaron con el proveedor (la cuenta sin crédito o el límite de uso de la
+        # suscripción): no se puntúan ni entran en la tabla.
         lineas += ["## Corridas inválidas", "",
-                   "Alguna llamada a la IA chocó con la cuenta sin crédito (HTTP 402): la "
+                   f"Alguna llamada a la IA chocó con {invalidas_por}: la "
                    "corrida no mide nada y queda fuera de la tabla y de las fallas.", ""]
-        lineas += [f"- **{c.numero}, vez {c.vez}:** {n} llamada(s) sin crédito (HTTP 402)."
+        lineas += [f"- **{c.numero}, vez {c.vez}:** {n} llamada(s) con {invalidas_por}."
                    for c, n in sorted(invalidas, key=lambda x: (x[0].numero, x[0].vez))]
         lineas.append("")
     lineas += ["## Resultado por conversación", "",
@@ -212,7 +216,8 @@ def escribir(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
              carpeta: Path | None = None,
              cortes: list[dict[str, Any]] | None = None,
              invalidas: list[tuple[Corrida, int]] | None = None,
-             motivo_del_corte: str | None = None) -> tuple[Path, Path]:
+             motivo_del_corte: str | None = None,
+             invalidas_por: str | None = None) -> tuple[Path, Path]:
     carpeta = carpeta or RESULTADOS
     carpeta.mkdir(parents=True, exist_ok=True)
     nombre_t = f"{ronda}-transcripciones.md"
@@ -220,6 +225,7 @@ def escribir(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
     ruta_t.write_text(transcripciones(corridas, ronda=ronda), "utf-8", newline="\n")
     ruta_r.write_text(resumen(corridas, ronda=ronda, cabecera=cabecera,
                               transcripciones=nombre_t, cortes=cortes, invalidas=invalidas,
-                              motivo_del_corte=motivo_del_corte), "utf-8",
+                              motivo_del_corte=motivo_del_corte,
+                              invalidas_por=invalidas_por or SIN_CREDITO_HTTP), "utf-8",
                       newline="\n")
     return ruta_r, ruta_t
