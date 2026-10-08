@@ -52,7 +52,9 @@ pasos:
         el_texto_cubre: [explicacion, resultado_de_prueba]
         lo_descrito_cubre: []
         # El ejemplo lo escribe la IA con sus palabras (sacado del criterio; la cocina lo verifica).
-        puede_traer: [lo_descrito_cubre, ejemplo]
+        # Lo que cubre el texto y lo descrito pueden faltar (la ficha los declara opcionales; un
+        # texto cubre siempre lo que sólo un texto puede cubrir); si vienen, son éstos.
+        puede_traer: [el_texto_cubre, lo_descrito_cubre, ejemplo]
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: PLC,
@@ -172,17 +174,19 @@ pasos:
     a_las: "2026-10-22 15:15"
     escribe: "y esta del tablero cerrado. dale mandala"
     manda: [{que: foto}]
-    # La tarea es un dato opcional de confirmar (su ficha): puede venir, y si viene es la del PLC.
+    # Suma algo a la entrega que se está mostrando: `entregar` (su ficha; con la IA real, 5 de 5 en
+    # la ronda D7). Lo que escribe es una pieza más, y la vista previa nueva espera su confirmación.
     jugadas:
-      - {nombre: confirmar, tarea: PLC, puede_traer: [tarea]}
+      - {nombre: entregar, tarea: PLC, puede_traer: [el_texto_cubre, lo_descrito_cubre]}
     efectos: {}
     hechos:
-      - {jugada: confirmar, resultado: no_vale_la_confirmacion, motivo: llego_algo_despues,
-         como_queda: para_confirmar, tarea: PLC, sumo: [P5], pregunta: confirmar_la_entrega,
+      - {jugada: entregar, resultado: para_confirmar, tarea: PLC, sumo: [P5, P6],
+         pregunta: confirmar_la_entrega,
          entrega: [{pieza: P1, es: lo_que_escribio}, {pieza: P2, es: una_foto},
                    {pieza: P3, es: una_foto}, {pieza: P4, es: el_ejemplo_que_acepto},
-                   {pieza: P5, es: una_foto},
-                   {pieza: P6, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}]}
+                   {pieza: P5, es: lo_que_escribio, dice: "y esta del tablero cerrado. dale mandala"},
+                   {pieza: P6, es: una_foto},
+                   {pieza: P7, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}]}
     pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
     botones: [Confirmar]
     estado_despues:
@@ -208,6 +212,8 @@ pasos:
         - {tarea: PLC, clase: imagen, cubre: [captura]}
         - {tarea: PLC, clase: imagen, cubre: [captura]}
         # El ejemplo que aceptó, con lo que describe del criterio.
+        - {tarea: PLC, clase: texto, cubre: [explicacion]}
+        # Lo que escribió con la foto del tablero (paso 5).
         - {tarea: PLC, clase: texto, cubre: [explicacion]}
         - {tarea: PLC, clase: imagen, cubre: [captura]}
         - {tarea: PLC, clase: archivo, cubre: [archivo]}
@@ -269,6 +275,7 @@ pasos:
             - {es: lo_que_escribio}
             - {es: una_foto, va_adjunta: true}
             - {es: una_foto, va_adjunta: true}
+            - {es: lo_que_escribio}
             - {es: lo_que_escribio}
             - {es: una_foto, va_adjunta: true}
             - {es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}

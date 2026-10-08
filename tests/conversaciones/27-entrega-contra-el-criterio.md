@@ -81,7 +81,8 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
 
 4. **Marcos** escribe (15:05): "si, eso"
    →
-   - Jugadas: `entregar`, la tarea del PLC, aceptando el ejemplo (`acepta_el_ejemplo`).
+   - Jugadas: `entregar`, la tarea del PLC, aceptando el ejemplo (`acepta_el_ejemplo`); lo que cubre
+     el texto y lo descrito pueden venir o no (la ficha los declara opcionales; C-3d, D7b).
    - Efecto: el ejemplo pasa a ser lo que describe Marcos, una pieza más, con el punto del criterio que
      dice. La entrega está completa: se guarda la vista previa con su huella. La tarea sigue `en_curso`.
    - La respuesta dice: la tarea del PLC en su renglón con 📋; una pieza por renglón (lo que escribió, la
@@ -127,7 +128,8 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
 
 9. **Marcos** manda (15:30) otra foto, sin texto.
    →
-   - Jugadas: ninguna (o `entregar`): la foto se suma a la entrega que Leda está esperando.
+   - Jugadas: `entregar`, la tarea del PLC (con la IA real, 5 de 5 en la ronda D7; el YAML lo espera
+     desde la D7b); sin jugada es lo mismo: la foto se suma a la entrega que Leda está esperando.
    - Efecto: con la foto, la entrega queda completa; se guarda la vista previa con su huella.
    - La respuesta dice: que sumó la foto y que con eso la entrega queda completa; el cierre, aparte:
      si la suma así.

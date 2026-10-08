@@ -149,7 +149,9 @@ def test_la_entrega_confirmada_por_otro_camino_no_es_una_falla_de_garantia(conn)
     por_paso[1]["jugadas"] = [{"nombre": "entregar", "tarea": "PLC",
                                "el_texto_cubre": ["resultado_de_prueba"],
                                "lo_descrito_cubre": ["C1"]}]
-    por_paso[5]["jugadas"] = [{"nombre": "entregar", "tarea": "PLC"}]
+    # Desde la D7b el paso 5 espera `entregar` (suma la foto y lo que escribe); el otro camino es
+    # `confirmar`, que suma sólo la foto.
+    por_paso[5]["jugadas"] = [{"nombre": "confirmar", "tarea": "PLC"}]
     por_paso[6]["jugadas"] = [{"nombre": "confirmar", "tarea": "PLC"}]
     ia.ia.preparar = lambda paso: setattr(ia.ia, "paso", por_paso.get(paso.get("paso"), paso))
 
@@ -163,8 +165,8 @@ def test_la_entrega_confirmada_por_otro_camino_no_es_una_falla_de_garantia(conn)
     # Lo escrito, en el orden en que se escribió; lo confirmado, en el de la vista previa.
     assert cp._mismas(escrito.real["escrito"], escrito.real["confirmado"])
     # Desde la D7 la 21 tiene un paso más, el 2: sin un ejemplo propuesto, su "si va asi" es un
-    # texto más de la entrega.
-    assert len(escrito.real["escrito"]) == 7
+    # texto más de la entrega; por `confirmar`, lo que escribió con la foto del paso 5 no entra.
+    assert len(escrito.real["escrito"]) == 6
 
 
 def test_la_aprobacion_corre_entera_con_los_botones_del_aviso_y_el_cierre_que_esperaba(conn):

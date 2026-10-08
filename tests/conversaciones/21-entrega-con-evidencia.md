@@ -108,25 +108,26 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
 5. **Marcos** manda (15:15) una foto (el tablero cerrado) con el texto: "y esta del tablero cerrado. dale
    mandala"
    →
-   - Jugadas: `confirmar` (con la tarea del PLC o sin ella). La foto se suma a la entrega abierta
-     (ADR 0019, decisión 4).
-   - Efecto: ninguno sobre la tarea. La guarda falla: llegó una pieza después de la vista previa, así que
-     lo que Marcos confirma ya no es lo último (ADR 0018, decisión 2; ADR 0019, decisión 5). Se guarda la
-     vista previa nueva, con la foto, y huella nueva; la anterior queda registrada como reemplazada. El
-     texto de este mensaje no es otra explicación: es la confirmación.
+   - Jugadas: `entregar`, la tarea del PLC: suma algo a la entrega que se está mostrando (su ficha;
+     con la IA real, 5 de 5 en la ronda D7, la C-3d, D7b). Lo que escribe y la foto se suman a la
+     entrega abierta (ADR 0019, decisión 4). Hasta la D7b se esperaba `confirmar`, que suma sólo la
+     foto y tampoco entrega (llegó algo después de la vista previa).
+   - Efecto: ninguno sobre la tarea. Lo que llegó cambia la vista previa, así que no hay nada que
+     confirmar todavía (ADR 0018, decisión 2; ADR 0019, decisión 5): se guarda la vista previa nueva,
+     con lo que escribió y la foto, y huella nueva; la anterior queda registrada como reemplazada.
    - La respuesta dice: que sumó la foto del tablero cerrado; cómo queda la entrega, una pieza por renglón;
      el cierre, aparte: que la confirme así.
    - La respuesta no dice: que la entregó; que Ismael se enteró.
    - Botones: los de la confirmación, nuevos.
-   - Estado después: lo último mostrado para confirmar: la entrega con seis piezas (el texto, el ejemplo
-     que aceptó, tres fotos de hoy y `comprimidora_v3.zip`).
+   - Estado después: lo último mostrado para confirmar: la entrega con siete piezas (lo que escribió en
+     el paso 1 y en éste, el ejemplo que aceptó, tres fotos de hoy y `comprimidora_v3.zip`).
 
 6. **Marcos** escribe (15:16), sin tocar el botón: "dale"
    →
    - Jugadas: `confirmar` (con la tarea del PLC o sin ella). La guarda pasa: es lo último que Marcos
      vio y no cambió.
-   - Efecto, en un solo acto: las seis filas de evidencia (el ejemplo aceptado, con lo que describe del
-     criterio), cada una con su clase, lo que cubre, quién la
+   - Efecto, en un solo acto: las siete filas de evidencia (el ejemplo aceptado, con lo que describe del
+     criterio, y lo que escribió con la foto del tablero), cada una con su clase, lo que cubre, quién la
      mandó y cuándo; la tarea del PLC pasa de `en_curso` a `en_revision`, con evento de Marcos y auditoría. Nunca
      `terminada`. El aviso a Ismael queda guardado como hechos y sale terminado el margen para
      corregir, a las 15:26 (ADR 0018, 9n: es un aviso a otra persona por lo que dijo Marcos).
@@ -153,7 +154,7 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
    - Efecto: al salir, el código relee la tarea y la evidencia vigente; la IA redacta desde esos hechos.
      Dos filas de la misma respuesta: el texto y, después, las tres fotos de hoy como álbum (nunca antes
      que el texto). Es un aviso de coordinación: fuera del tope diario (mecánica §10).
-   - El mensaje dice: primero, que Marcos entregó; la tarea del PLC en su renglón con 📋; lo que escribió
+   - El mensaje dice: primero, que Marcos entregó; la tarea del PLC en su renglón con 📋; lo que describió
      Marcos, en pocas palabras (20 ciclos sin una falla); que van tres fotos adjuntas y que
      `comprimidora_v3.zip` está en la página; el cierre, aparte: que puede aprobarla o pedir cambios, con
      los botones o contestando. Al final del texto, un enlace a la página de la tarea, que agrega el
@@ -173,7 +174,7 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
 
 - **Garantías:** no hace sin confirmación lo que la requiere (ni el botón viejo del paso 4 ni el "dale"
   del paso 5 entregan nada); confirma sólo lo último que la persona vio (el paso 6 entrega exactamente
-  seis piezas, sin la foto del martes); "terminé" lleva a revisión, nunca a terminada (constitución
+  siete piezas, sin la foto del martes); "terminé" lleva a revisión, nunca a terminada (constitución
   §11); nada entra a la evidencia sin que Marcos lo vea, ni lo que cubre cada pieza (el texto cuenta como
   explicación y como resultado de la prueba, y la vista previa lo dice); no inventa (el aviso dice lo que mandó Marcos,
   no lo que muestran las fotos); el enlace nunca pasa por la IA.

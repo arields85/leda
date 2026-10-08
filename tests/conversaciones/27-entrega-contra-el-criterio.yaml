@@ -118,7 +118,7 @@ pasos:
     escribe: "si, eso"
     jugadas:
       - {nombre: entregar, tarea: PLC, acepta_el_ejemplo: true, lo_descrito_cubre: [C1],
-         puede_traer: [lo_descrito_cubre]}
+         puede_traer: [lo_descrito_cubre, el_texto_cubre]}
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
@@ -241,7 +241,10 @@ pasos:
     quien: Marcos
     a_las: "2026-10-22 15:30"
     manda: [{que: foto}]
-    jugadas: []
+    # Suma la foto a la entrega abierta: `entregar` (su ficha; con la IA real, 5 de 5 en la ronda
+    # D7). Sin jugada, la cocina la suma igual (lo que trajo el mensaje, `entrega.para_la_duda`).
+    jugadas:
+      - {nombre: entregar, tarea: PLC, puede_traer: [lo_descrito_cubre, el_texto_cubre]}
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
