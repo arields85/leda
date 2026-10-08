@@ -787,6 +787,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       recibe el aviso sigue escribiendo después, sale más tarde que lo dicho. Lo ya hablado reconoce
       la tarea por su título, como `_siguio_en_la_tarea`: dos tareas de la persona con el mismo
       título se confunden.
+    - **Revisión RDD por commit, aprobadas y reconocidas:** `53ee594` `review-1479340d13f12f6c`,
+      `daaf8a9` `review-7fe30214e4f17f66`, `878e244` `review-9b5e458148257a72`. Advertencias
+      abiertas (casos de borde): `no_interrumpir.py:45` (un valor enorme de la espera),
+      `no_interrumpir.py:68` (un mensaje viejo corre la ventana siguiente), `no_interrumpir.py:97` y
+      `avisos.py:335` (del tema abierto), y sugerencias de pruebas en `efectos.py` y `avisos.py:1084`.
   - [ ] **D6.** La regresión con la IA real, `leda_motor` al día (autorizado por el usuario de
     antemano, con respaldo) y el guion de la prueba por Telegram (el enlace con `localhost`,
     decisión 20).
