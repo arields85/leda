@@ -596,6 +596,17 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       medirá la D6); los recordatorios a quien aprueba no esperan mientras la entrega está
       incompleta; tras un retiro, el ejemplo es el punto del criterio tal cual (`corregir` no trae
       el de la IA); `leda_motor` necesita la `0038` (D6).
+    - **Revisión RDD por commit, aprobadas y reconocidas:** `2cba3bd` `review-cd732b2fc3f2ce71`,
+      `1113cba` `review-a595576282a67fd4`, `ea2278e` `review-f307c08e72372635`, `a3dbb33`
+      `review-7f6439e18bf3b142`, `f96f071` `review-ca70ebd0113ecefa`. Advertencias abiertas (casos de
+      borde): `fichas.py:1315` (la duda de `entregar` sin prueba), `herramientas.py:1783` (lo que
+      describe un texto sin validar contra los puntos), `entrega.py:342` (el juicio de la IA puede
+      pisar un ejemplo aceptado), `entrega.py:636` (lo que falta del criterio desactualizado),
+      `entrega.py:469` (huella de entregas viejas), `entrega.py:309` (retiro y criterio sin prueba),
+      `entrega.py:659` (la vista previa de una tarea sin arrancar no mira la dependencia),
+      `aprobacion.py:141` (aprobar mezcla la política y el criterio incompletos) y
+      `herramientas.py:1829` (sumar a una entrega acepta cualquier tarea en revisión). Las de
+      `entrega.py:342` y `herramientas.py:1829` se miran al empezar la D4.
   - [ ] **D4.** La aprobación (decisiones 12, 16 y 17): "¿cuál de las dos?" una sola vez; el aviso a
     quien aprueba al salir (si cambió); las entregas y los recordatorios en listas con un botón por
     tarea, y lo que queda por revisar después de decidir una.
