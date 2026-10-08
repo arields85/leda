@@ -9,9 +9,8 @@ por el motor, con las fotos adjuntas y un enlace a la página de la tarea. Circu
 constitución §7 y §11. Toma los pasos "Para la prueba de la entrega" de las conversaciones 10 y 11.
 
 **Corre desde la porción 2 de la C-3** (`odd/tasks/fase-c.md`), con su YAML, del paso 1 al 5; el paso 6,
-desde la porción 3a: el aviso redactado por el motor, con las fotos adjuntas. Del paso 6 quedan
-pendientes los botones Aprobar y Pedir cambios (porción 3b) y el enlace a la página de la tarea
-(porción 4): hasta entonces el aviso no los lleva, ni dice que `comprimidora_v3.zip` está en la página.
+desde la porción 3a: el aviso redactado por el motor, con las fotos adjuntas; desde la 3b, con los
+botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la tarea.
 
 ## Estado inicial
 
@@ -123,9 +122,8 @@ pendientes los botones Aprobar y Pedir cambios (porción 3b) y el enlace a la p�
      código: la IA no lo ve ni lo escribe.
    - El mensaje no dice: la foto del martes; que la tarea está terminada; un juicio sobre las fotos; un
      identificador o una huella.
-   - Desde la porción 3a corre todo lo de arriba salvo el enlace y lo que dice del zip en la página
-     (porción 4), y el cierre, los botones y el estado de Ismael (porción 3b): hasta entonces, el
-     aviso dice que `comprimidora_v3.zip` quedó con la entrega y no le pide nada.
+   - El enlace sale sin vista previa, para que Telegram no abra la página por su cuenta; en la base
+     queda sólo su hash, y ni la salida ni el registro de turnos lo guardan (ADR 0019, decisión 6).
    - Botones: dos atajos, "Aprobar" y "Pedir cambios" (`odd/tasks/fase-c.md`, decisión 3; ADR 0018,
      decisión 2). "Aprobar" aprueba con un toque, sin confirmación, porque es la decisión de quien
      aprueba; "Pedir cambios" pregunta qué falta. Escribir vale igual: la conversación 23 contesta casi

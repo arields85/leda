@@ -34,7 +34,10 @@ class ConOpciones:
     def enviar(self, chat_id: int, texto: str, botones: list[Boton] | None = None,
                **mas: Any) -> int:
         if not botones:
-            botones = self._opciones(chat_id, texto)
+            # El enlace a la página de la tarea (ADR 0019, decisión 6) es el último renglón de
+            # lo que se entrega y no está en la salida: se busca la fila sin él.
+            sin_enlace = texto.rsplit("\n", 1)[0] if mas.get("sin_vista_previa") else texto
+            botones = self._opciones(chat_id, sin_enlace)
         return self.transporte.enviar(chat_id, texto, botones, **mas)
 
     def enviar_album(self, chat_id: int, adjuntos: list) -> int:

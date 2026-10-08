@@ -34,7 +34,9 @@ grabación (`grabar.IARepetida`). El motor de conversación es el de `motores.py
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import re
 import time
 import traceback
 import uuid
@@ -63,6 +65,12 @@ RAIZ = Path(__file__).resolve().parents[2]
 # Lo que deja bajar el canal, como el adaptador de Telegram (`recibir.LIMITE_DE_TELEGRAM`): un
 # archivo más grande llega como rechazado, y la IA recibe este límite.
 LIMITE_DEL_CANAL = 20 * MB
+
+# La dirección pública de una corrida (`_con_la_direccion_de_prueba`): un dominio reservado, que
+# no es de nadie. El enlace a la página de una tarea que el despachador agrega al final de un
+# mensaje (ADR 0019, decisión 6) se reconoce por ella.
+DIRECCION_DE_PRUEBA = "https://leda.invalid"
+ENLACE_DE_PRUEBA = re.compile(r"\n" + re.escape(DIRECCION_DE_PRUEBA) + r"/tarea/[A-Za-z0-9_-]+$")
 
 
 # La definición del usuario (2026-10-06; ADR 0018, decisión 9, tercera vuelta): todo mensaje de
@@ -156,6 +164,10 @@ class Salida:
     # álbum que salió sin su texto antes es una falla de garantía (`album_suelto`).
     fotos: int = 0
     album_suelto: bool = False
+    # El enlace a la página de la tarea, que el despachador agrega al final al mandar (ADR 0019,
+    # decisión 6), y si salió sin vista previa. El texto de la salida nunca lo lleva.
+    enlace: bool = False
+    sin_vista_previa: bool = False
 
 
 @dataclass
@@ -460,20 +472,24 @@ class _Corredor:
                     salidas.append(Salida(quien, "", [], False, el=cp.dia(self.reloj.ahora()),
                                           fotos=len(e.fotos), album_suelto=True))
                 continue
+            # El enlace a la página de la tarea va al final de lo que se entregó, nunca en la
+            # salida: se compara sin él.
+            enlace = ENLACE_DE_PRUEBA.search(e.texto)
+            entregado = e.texto[:enlace.start()] if enlace else e.texto
             # El outbox guarda el texto con las marcas de formato de la IA y el transporte
             # entrega el texto plano (`salida.formatear`): se comparan ya convertidos.
             fila_id = next((k for k, s in despues["salidas"].items()
                             if k not in usados and s["a"] == quien
-                            and e.texto.endswith(formatear(s["cuerpo"])[0])), None)
+                            and entregado.endswith(formatear(s["cuerpo"])[0])), None)
             if fila_id is not None:
                 usados.add(fila_id)
             fila = despues["salidas"].get(fila_id, {})
-            texto = e.texto
+            texto = entregado
             if fila:
                 # La transcripción muestra lo que escribió la IA, con sus marcas, después
                 # del saludo del día si lo hubo.
                 plano = formatear(fila["cuerpo"])[0]
-                texto = e.texto[:len(e.texto) - len(plano)] + fila["cuerpo"]
+                texto = entregado[:len(entregado) - len(plano)] + fila["cuerpo"]
             avisos, hechos = _avisos_del_envio(avisos_de.get(fila_id, []), self.mundo.titulos)
             tipos = sorted({a["tipo"] for a in avisos})
             botones = [self.mundo.clave_de_titulo(b.etiqueta) or b.etiqueta for b in e.botones]
@@ -483,7 +499,8 @@ class _Corredor:
                 tareas=list(dict.fromkeys(a["tarea"] for a in avisos if a["tarea"])),
                 hechos=(hechos[0] if len(hechos) == 1 else hechos) if hechos else None,
                 el=cp.dia(self.reloj.ahora()), tipos=tipos,
-                avisos=avisos, redactado=fila.get("cuerpo")))
+                avisos=avisos, redactado=fila.get("cuerpo"), enlace=enlace is not None,
+                sin_vista_previa=e.sin_vista_previa))
         return salidas
 
     # -- lo que se comprueba ------------------------------------------------------------------
@@ -532,6 +549,12 @@ class _Corredor:
                 c.falla(cp.GARANTIA, "el álbum sale después de su texto", "texto y álbum",
                         _resumen(s))
                 continue
+            if s.enlace and not s.sin_vista_previa:
+                c.falla(cp.GARANTIA, "el enlace a la página sale sin vista previa",
+                        "sin vista previa", _resumen(s))
+            if s.redactado is not None and "/tarea/" in s.redactado:
+                c.falla(cp.GARANTIA, "el enlace a la página no queda en la salida",
+                        "sin el enlace", _resumen(s))
             cp.comprobar_formato(c, s.redactado if s.redactado is not None else s.texto,
                                  titulos.values(), a=s.a)
         return c
@@ -648,6 +671,8 @@ def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -
         return False
     if "botones" in e and list(e["botones"] or []) != s.botones:
         return False
+    if "enlace" in e and bool(e["enlace"]) != s.enlace:
+        return False
     if "hechos" not in e:
         return True
     if not s.avisos:        # un envío sin avisos guardados detrás: sus hechos, como vinieron
@@ -662,7 +687,8 @@ def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -
 
 def _resumen(s: Salida) -> dict[str, Any]:
     return {"a": s.a, "tipo": s.tipo or s.tipos, "tareas": s.tareas, "el": s.el,
-            "hechos": s.hechos, **({"fotos": s.fotos} if s.fotos else {})}
+            "hechos": s.hechos, **({"fotos": s.fotos} if s.fotos else {}),
+            **({"enlace": True} if s.enlace else {})}
 
 
 def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1,
@@ -670,6 +696,28 @@ def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1,
     """Una corrida de la conversación sobre la base de `conn`, que tiene que estar vacía, con el
     motor de conversación `motor` (por omisión, el definitivo)."""
     motor = motor or cargar_motor()
+    with _con_la_direccion_de_prueba():
+        return _correr_conversacion(conn, conv, ia, vez=vez, motor=motor)
+
+
+@contextlib.contextmanager
+def _con_la_direccion_de_prueba():
+    """La dirección pública de la corrida: la de prueba, que no es de nadie (`.invalid`), así el
+    enlace a la página de una tarea sale y se puede comprobar, y nunca apunta a un servidor."""
+    import dataclasses
+
+    from leda import config as config_mod
+
+    antes = config_mod.config
+    config_mod.config = dataclasses.replace(antes, base_url=DIRECCION_DE_PRUEBA)
+    try:
+        yield
+    finally:
+        config_mod.config = antes
+
+
+def _correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int,
+                         motor: Motor) -> Corrida:
     corrida = Corrida(str(conv["numero"]).zfill(2), conv["titulo"], conv["fuente"], vez,
                       ia.nombre, conv.get("mide", "garantias"), motor_usado=motor.nombre)
     try:

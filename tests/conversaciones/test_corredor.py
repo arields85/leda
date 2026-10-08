@@ -121,6 +121,9 @@ def test_el_aviso_de_una_entrega_cuenta_las_fotos_del_album_que_sigue_al_texto(c
     [aviso] = corrida.pasos[-1].salidas
     assert (aviso.a, aviso.tipo, aviso.fotos, aviso.album_suelto) == (
         "Ismael", "entrega_para_aprobar", 3, False)
+    # Porción 4: el enlace a la página de la tarea, al final, sin vista previa y nunca en la salida.
+    assert aviso.enlace and aviso.sin_vista_previa
+    assert "/tarea/" not in aviso.redactado and "/tarea/" not in aviso.texto
 
     _limpiar(conn)
     otra = copy.deepcopy(conv)

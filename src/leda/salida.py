@@ -548,6 +548,17 @@ def _prefix_index(text: str, max_units: int) -> int:
     return low
 
 
+def reserva_del_enlace() -> int:
+    """Lo que ocupa, con su salto de renglón, el enlace a la página de una tarea que el
+    despachador agrega al final de un mensaje (`enqueue_outbox`, `enlace_de_tarea`): la dirección
+    pública configurada, el camino y el token. Importado adentro, como el saludo."""
+    from . import pagina_de_tarea
+    from .config import config
+
+    return (1 + len(config.base_url.rstrip("/")) + len(pagina_de_tarea.CAMINO)
+            + pagina_de_tarea.LARGO_DEL_TOKEN)
+
+
 def margen_saludo(*, personal: bool) -> int:
     """Cuánto hay que reservarle al saludo diario en el presupuesto de un
     mensaje -- `saludo.MARGEN_SALUDO` si `personal` (tiene
@@ -581,7 +592,8 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    bloque_copiable: str | None = None,
                    grupo_respuesta: str | None = None,
                    es_coordinacion: bool = False,
-                   adjuntos: Sequence[str] = ()) -> int:
+                   adjuntos: Sequence[str] = (),
+                   enlace_de_tarea: tuple[str, str] | None = None) -> int:
     """Encola un mensaje visible. `es_coordinacion` marca el aviso causado
     directamente por el acto de otra persona sobre trabajo compartido (una
     entrega para revisar, cambios pedidos, una aprobación, un borrador para
@@ -601,8 +613,19 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     dominio, nunca a un identificador del canal; cómo se mandan lo decide el despachador. Una
     fila con adjuntos no se parte ni lleva botones, y su texto es sólo el registro de lo que
     lleva: el álbum sale sin texto, después del texto de su respuesta (`grupo_respuesta`). Si la
-    fila ya existía (la misma clave), no se le agrega nada: encolarla de nuevo no duplica."""
+    fila ya existía (la misma clave), no se le agrega nada: encolarla de nuevo no duplica.
+
+    `enlace_de_tarea` (ADR 0019, decisiones 6 y 7a; migración 0036), `(tarea, persona)`: la fila
+    lleva al final el enlace a la página de esa tarea para esa persona. No se guarda el enlace,
+    sólo esa marca (`message_outbox_enlace`): el despachador lo emite al mandar y la base guarda
+    sólo su hash. El texto le reserva su lugar. Un mensaje con enlace no se parte, no lleva
+    adjuntos ni bloque copiable: el enlace va al final de su único texto."""
     adjuntos = [str(a) for a in adjuntos]
+    if enlace_de_tarea is not None and (adjuntos or allow_split
+                                        or bloque_copiable is not None):
+        raise PayloadValidationError(
+            "Un mensaje con el enlace de una tarea no se parte, no lleva adjuntos ni bloque "
+            "copiable.")
     if adjuntos and (len(adjuntos) > MAX_ADJUNTOS or allow_split
                      or pending_action_id is not None or bloque_copiable is not None):
         raise PayloadValidationError(
@@ -623,6 +646,8 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     # ANTES de partir/recortar -- `despachador._intentar_envio` decide recién
     # al enviar si de verdad le antepone el saludo (revisión 2026-09-28+2).
     margen = margen_saludo(personal=recipient_membership_id is not None)
+    if enlace_de_tarea is not None:
+        margen += reserva_del_enlace()
     payloads = prepare_payload(
         text, dedupe_key=dedupe_key, has_buttons=has_buttons,
         allow_split=allow_split, margen=margen,
@@ -663,6 +688,13 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
              bloque_copiable, grupo_respuesta, es_coordinacion),
         )
         fila = cur.fetchone()
+        if fila is not None and enlace_de_tarea is not None:
+            outbox_id = fila["id"] if isinstance(fila, dict) else fila[0]
+            cur.execute(
+                """insert into message_outbox_enlace (workspace_id, outbox_id, task_id,
+                                                    membership_id)
+                   values (%s, %s, %s, %s)""",
+                (workspace_id, outbox_id, str(enlace_de_tarea[0]), str(enlace_de_tarea[1])))
         if fila is not None and adjuntos:
             outbox_id = fila["id"] if isinstance(fila, dict) else fila[0]
             for orden, archivo_id in enumerate(adjuntos, 1):

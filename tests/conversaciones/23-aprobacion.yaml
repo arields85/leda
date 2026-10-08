@@ -132,6 +132,7 @@ pasos:
       - a: Marcos
         tipo: tarea_aprobada
         tarea: PLC
+        enlace: true
         hechos: {aprobada_por: Ismael Soschinski, comentario: presente, quedo_terminada: true,
                  necesita_respuesta: false}
       # El lunes es el día hábil siguiente al de las entregas: a Ismael, el primer recordatorio
@@ -150,7 +151,6 @@ pasos:
       - la tarea del PLC en su renglón con 📋
       - el comentario de Ismael
       - que no hace falta que responda, solo en el último renglón
-    # El enlace a la página de la tarea (ADR 0019, decisión 7a) es de la porción 4.
 
   - paso: 4
     a_las: "2026-10-26 10:35"
@@ -188,6 +188,7 @@ pasos:
       - a: Marcos
         tipo: tarea_aprobada
         tarea: COM
+        enlace: true
         hechos: {aprobada_por: Ismael Soschinski, quedo_terminada: ausente,
                  no_se_cierra_todavia: {espera_que_terminen: [{tarea: SW}]},
                  necesita_respuesta: false}
@@ -249,6 +250,7 @@ pasos:
       - a: Mariano
         tipo: pedido_de_cambios
         tarea: TAB
+        enlace: true
         hechos: {pidio_cambios: Ismael Soschinski, comentario: presente, estado: en_curso,
                  vence: "2026-10-30", necesita_respuesta: false}
     dice:
@@ -312,6 +314,7 @@ pasos:
       - a: Ariel
         tipo: tarea_aprobada
         tarea: DASH
+        enlace: true
         hechos: {aprobada_por: Ismael Soschinski, comentario: presente, quedo_terminada: true}
     dice:
       - que Ismael la aprobó y quedó terminada, en su renglón con 📋
@@ -356,12 +359,15 @@ pasos:
       - a: Marcos
         tipo: cerrada_con_la_aprobacion
         tarea: COM
+        enlace: true
         hechos: {aprobada_por: Ismael Soschinski, aprobada_el: "2026-10-26",
                  quedo_terminada: true, necesita_respuesta: false,
                  se_resolvio: {tareas_que_esperaba: [{tarea: SW, estado: terminada}]}}
       - a: Ismael
         tipo: cerrada_con_la_aprobacion
         tarea: COM
+        # A quien aprobó, sin enlace: ya lo tiene del aviso de la entrega.
+        enlace: false
         hechos: {aprobada_por: Ismael Soschinski, aprobada_el: "2026-10-26",
                  quedo_terminada: true}
     estado_despues:

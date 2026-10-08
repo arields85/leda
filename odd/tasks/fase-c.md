@@ -303,7 +303,62 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         - **Quien aprueba ausente:** la cuenta se pausa y quien está arriba no se entera de que
           la entrega espera a alguien que no está (la mecánica §9 pide avisar al referente del
           área de las tareas sin cobertura; no está construido).
-  - [ ] Porción 4: la página de la tarea y su enlace.
+  - [x] Porción 4: la página de la tarea y su enlace (2026-10-08). Route: delegada (escritor
+    único, 2+ archivos no triviales).
+    - **Commits:** `364ed7d` (migración `0036`: `acceso_tarea`, sólo el hash del token, sin
+      vencimiento y revocable; `vista_de_tarea`, cada vista y cada descarga, sin dirección ni
+      navegador; `message_outbox_enlace`, la marca de la fila de la salida que lleva el enlace; las
+      tres con RLS forzado, y `acceso_tarea` con una política más, de lectura y sólo para
+      `leda_owner`, por el hash; `area.referente_membership_id`, cargado del pack con
+      `areas[].referente`; las funciones `puede_ver_tarea`, `emitir_acceso_tarea`,
+      `acceso_tarea_vigente`, `leer_pagina_de_tarea` y `leer_archivo_de_tarea`, de `leda_owner`,
+      con `leda_app` sin privilegios sobre los accesos ni las vistas), `3c3e29d` (la página
+      `GET /tarea/{token}` y sus archivos `GET /tarea/{token}/evidencia/{id}`, `tarea_vista.py`,
+      con su propia conexión y candado) y el commit que registra esto (el enlace en los avisos: la
+      marca `enlace_de_tarea` en `enqueue_outbox`, el despachador que lo emite al mandar y lo manda
+      sin vista previa, `TipoDeAviso.enlace`, el hecho `lleva_el_enlace_a_la_pagina_de_la_tarea`
+      para la IA, `_enlace_portal_tarea` que da la marca y nunca una dirección; la 21 y la 23
+      esperan el enlace con `enlace: true` y el corredor lo comprueba con una dirección de prueba
+      que no es de nadie, `https://leda.invalid`).
+    - **Quién ve** (en SQL, revalidado en cada pedido): el responsable, quien aprueba su trabajo
+      hoy y quien ya decidió sobre la tarea, el referente del área y la autoridad final. Quién
+      recibe el enlace: quien aprueba, en el aviso de la entrega; el responsable, en
+      `tarea_aprobada`, `pedido_de_cambios` y `cerrada_con_la_aprobacion` (a quien aprobó, no).
+    - **Test primero:** `tests/garantias/test_pagina_de_la_tarea.py` se vio en rojo (25 de 25: no
+      existían las funciones) antes de la migración; las dos del referente en el pack, sin rojo
+      observado. `test_pagina_web_de_la_tarea.py` se vio en rojo (14 de 14, sin las rutas: error
+      de la fixture, no aserción por aserción). `test_enlace_de_la_tarea.py` en rojo (9 de 9) antes
+      de la salida y el despachador; en `tests/motor/test_entrega.py`, la del aviso con el enlace en
+      rojo y la de sin dirección pasaba desde antes (mira que algo no pase).
+    - **Chequeos** (2026-10-08, sobre la punta de la porción): `pytest tests/garantias` 315 passed;
+      `pytest tests/motor tests/conversaciones` 777 passed; suite completa 1519 passed; corrida en
+      seco con la IA guionada (`--ronda seco-4`): 25 de 25 bien, la 21 y la 23 con el enlace (sus
+      informes no se guardaron: `seco-4` ya era el nombre de una ronda versionada de la E3, que
+      quedó como estaba). Sin la IA real: es de la C-4.
+    - **Las instrucciones de la IA no cambiaron** (la huella de `test_contratos.py` sigue): el
+      hecho nuevo llega con su significado (`hechos.py`).
+    - **Una corrección del camino:** los botones de un aviso (`botones.ConOpciones`) buscaban su
+      fila por el final del texto; con el enlace al final, buscan sin el último renglón.
+    - `PENDIENTE`:
+      - **Pedir el enlace por chat** (ADR 0019, 7a: una jugada nueva de la lista cerrada, para
+        cualquiera que pueda ver la tarea): queda como el próximo ítem. Cambia la lista de
+        jugadas (y su huella en `test_contratos.py`) y lleva su conversación de prueba primero.
+      - **Operación:** el enlace sólo sale con `LEDA_BASE_URL` configurada; para abrirlo desde el
+        teléfono, esa dirección tiene que llegar al servidor (`python -m leda servir`). Hoy la
+        prueba por Telegram corre con el escuchador, sin servidor: decidir con el usuario cómo se
+        prueba (sin la dirección, los avisos salen sin enlace y no lo prometen).
+      - **Las bases que ya existen** (`leda_motor`): aplicar la `0036` y volver a importar el
+        pack para cargar los referentes. No se tocó ninguna base real.
+      - **Si la persona ya no puede ver la tarea al salir el mensaje** (cambió quién aprueba entre
+        la redacción y el envío), sale sin el enlace con un incidente de severidad baja, y el
+        texto de la IA pudo haberlo anunciado: caso de borde.
+      - **Revocar los enlaces** de una persona o de una tarea (7a) existe en la base
+        (`acceso_tarea.revocado_en`), sin comando todavía: va con la porción 5.
+    - **Para la porción 5** (el acceso del administrador por el bot de administración): un acceso
+      atado al usuario de plataforma y no a una membresía (`acceso_tarea.membership_id` es
+      obligatorio: otra tabla o una columna nueva), cada vista también en `audit_log`, el comando
+      para revocar y el retiro de contenido por la administración ("retirado por la
+      administración" en la página).
   - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
 - [ ] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).
@@ -312,5 +367,6 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La regresión con la IA real de todas (con la 21, la 23 y la 24 enteras), y después la porción 4
-de la C-3: la página de la tarea y su enlace (`docs/STATUS.md`, "Punto exacto para retomar").
+La regresión con la IA real de todas (con la 21, la 23 y la 24 enteras, y el enlace), pedir el enlace
+por chat (la jugada que quedó de la porción 4) y la porción 5 de la C-3: el acceso del administrador
+(`docs/STATUS.md`, "Punto exacto para retomar").

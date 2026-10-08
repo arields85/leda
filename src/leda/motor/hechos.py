@@ -568,6 +568,10 @@ SIGNIFICADOS: Mapping[str, str] = {
                             "entregó la tarea, que espera su decisión: aprobarla o pedirle "
                             "cambios, con un botón o escribiendo.",
     "falla_de_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
+    "lleva_el_enlace_a_la_pagina_de_la_tarea":
+        "Al final de este mensaje, el código agrega un enlace personal a la página de la "
+        "tarea, de sólo lectura, con la tarea, lo que fue pasando y lo que se entregó. La IA no "
+        "lo ve ni lo escribe: no hay ninguna dirección para escribir.",
     "no_salio_un_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
 }
 

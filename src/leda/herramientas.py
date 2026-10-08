@@ -2227,14 +2227,23 @@ def _avisar(cur, quien: Solicitante, destinatario_membership_id, texto, *,
         message_type=tipo, dedupe_key=dedupe_key, es_coordinacion=True)
 
 
-def _enlace_portal_tarea(tarea_id) -> str | None:
-    """Enlace a una vista de esta tarea en particular, para sumar al aviso
-    de entrega (ADR 0009, 'pendiente'). Hoy no existe: sólo hay un tablero
-    de sólo lectura por espacio (`/tablero/{token}`, sin una tarea puntual).
-    Punto de enganche a propósito -- cuando exista esa vista,
-    `_notificar_entrega_al_aprobador` suma lo que devuelva acá sin que nada
-    más cambie; hasta entonces, ninguna URL se inventa (constitución §4)."""
-    return None
+def _enlace_portal_tarea(cur, tarea_id, membership_id) -> tuple[str, str] | None:
+    """El enlace a la página de esta tarea para esta persona, para sumar al
+    aviso de entrega (ADR 0009, 'pendiente'; ADR 0019, decisión 7, migración
+    0036): devuelve la marca `(tarea, persona)` que lleva la fila de la salida
+    (`enqueue_outbox(enlace_de_tarea=...)`), nunca una dirección. El enlace lo
+    emite el despachador al mandar y la base guarda sólo su hash; el texto de la
+    salida no lo lleva. `None` sin la dirección pública configurada o si la
+    persona no puede ver la tarea (la regla vive en la base, `puede_ver_tarea`):
+    ninguna URL se inventa (constitución §4)."""
+    from .config import config
+
+    if not config.base_url:
+        return None
+    cur.execute("select puede_ver_tarea(%s, %s) as ve",
+                (str(membership_id), str(tarea_id)))
+    fila = cur.fetchone()
+    return (str(tarea_id), str(membership_id)) if fila and fila["ve"] else None
 
 
 def _evidencia_vigente(cur, tarea_id) -> list[dict]:
@@ -2294,9 +2303,7 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
     if evidencias:
         texto += "\nEvidencia:\n" + "\n".join(
             f"- ({e['tipo']}) {e['uri'] or 'sin detalle'}" for e in evidencias)
-    enlace = _enlace_portal_tarea(tarea_id)
-    if enlace:
-        texto += f"\n{enlace}"
+    enlace = _enlace_portal_tarea(cur, tarea_id, aprobador_membership_id)
 
     # T6d/T6h: dos entregas dentro de la misma transacción comparten esta clave
     # y `enqueue_outbox` descarta la segunda (`on conflict (dedupe_key) do
@@ -2305,7 +2312,7 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
         cur, workspace_id=quien.workspace_id, chat_id=aprobador["telegram_user_id"],
         text=texto, recipient_membership_id=str(aprobador_membership_id),
         scheduled_for=ahora, dedupe_key=f"{quien.workspace_id}:entrega:{dedupe_id}",
-        es_coordinacion=True)
+        es_coordinacion=True, enlace_de_tarea=enlace)
 
 
 def _avisar_evidencia_nueva_en_revision(cur, quien: Solicitante, tarea_id, titulo,

@@ -49,8 +49,15 @@ aprobación, queda omitido con su motivo. Es de coordinación: fuera del tope di
 la evidencia van adjuntas, hasta diez, como un álbum que sale después del texto, en otra fila de
 la misma respuesta (`adjuntos` del tipo; `message_outbox_adjunto`); los demás archivos sólo se
 nombran. Una entrega nueva de la misma tarea retira el aviso que todavía espera y guarda otro
-con toda la evidencia vigente (ADR 0009, enmienda T6i). Todavía sin el enlace a la página de la
-tarea (porción 4).
+con toda la evidencia vigente (ADR 0009, enmienda T6i).
+
+**El enlace a la página de la tarea** (ADR 0019, decisiones 6 y 7a; porción 4): lo llevan el
+aviso de una entrega, a quien la aprueba, y los de la decisión (`tarea_aprobada`,
+`pedido_de_cambios` y `cerrada_con_la_aprobacion`), al responsable (`TipoDeAviso.enlace`). La IA
+sabe que el mensaje lo lleva (`LLEVA_EL_ENLACE`), nunca lo ve: la fila de la salida lleva la
+marca (`enlace_de_tarea`) y el despachador lo emite al mandar, sin vista previa. Sólo con la
+dirección pública configurada y si la persona puede ver la tarea (`puede_ver_tarea`, en la base):
+nunca se promete un enlace que no va a salir.
 
 **Lo que ofrece decidir** (porción 3b): el aviso de una entrega le pide a quien aprueba que
 decida, con los botones "Aprobar" y "Pedir cambios" como atajos (`TipoDeAviso.ofrece`). Al salir
@@ -77,7 +84,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from types import MappingProxyType, SimpleNamespace
 from typing import Any
@@ -167,6 +174,14 @@ class TipoDeAviso:
     # como la pregunta del mensaje, ya hecha antes, y se contesta escribiendo o con los botones
     # de aquel aviso (porción 3c).
     recuerda: str | None = None
+    # A quién le lleva el enlace a la página de su tarea (ADR 0019, 7a): `destinatario`, siempre
+    # a quien lo recibe; `responsable`, sólo si quien lo recibe es el responsable de la tarea.
+    # Sólo un aviso de coordinación, que sale solo.
+    enlace: str | None = None
+
+
+# El hecho que le dice a la IA que el mensaje lleva al final el enlace a la página de la tarea.
+LLEVA_EL_ENLACE = "lleva_el_enlace_a_la_pagina_de_la_tarea"
 
 
 # --- Guardar --------------------------------------------------------------------------------
@@ -297,6 +312,10 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     cur = m.cur
     destinatario = envio[0].destinatario
     persona = str(destinatario["membership_id"])
+    enlace = _enlace_del_envio(m, envio)
+    if enlace is not None:
+        envio = [replace(envio[0], hechos={**envio[0].hechos, LLEVA_EL_ENLACE: True}),
+                 *envio[1:]]
     preguntas_de = [_pregunta_del_aviso(m, x.aviso, x.hechos) for x in envio]
     pregunta = next((q for q in preguntas_de if q is not None), None)
     pedido = {"hoy": m.hoy.isoformat(), "persona": destinatario["nombre"], "mensaje": None,
@@ -320,7 +339,7 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                        chat_id=destinatario["telegram_user_id"], text=texto, dedupe_key=clave,
                        recipient_membership_id=persona, message_type=tipo_de_mensaje,
                        es_coordinacion=tipo.es_coordinacion, scheduled_for=m.ahora,
-                       grupo_respuesta=clave if adjuntos else None)
+                       grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace)
         if adjuntos:
             # El texto de la fila del álbum es sólo el registro de lo que lleva: el álbum sale
             # sin texto (`salida.enqueue_outbox`, `adjuntos`).
@@ -373,6 +392,26 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                               and satisfecho_en is null and escalado_en is null""",
                         (m.ahora, x.aviso["task_id"], _espera_del_aviso(x.hechos)))
     return ["enviado"] * len(envio)
+
+
+def _enlace_del_envio(m: Momento, envio: list[_Listo]) -> tuple[str, str] | None:
+    """La tarea y la persona del enlace a la página que lleva el envío, o `None`: sólo un aviso
+    de un tipo que lo lleva (`TipoDeAviso.enlace`) y sale solo, con la dirección pública
+    configurada, y si quien lo recibe puede ver la tarea (la regla vive en la base)."""
+    x = envio[0]
+    if len(envio) != 1 or x.tipo.enlace is None or x.aviso["task_id"] is None:
+        return None
+    from ..config import config
+
+    if not config.base_url:
+        return None
+    task_id, persona = str(x.aviso["task_id"]), str(x.destinatario["membership_id"])
+    if x.tipo.enlace == "responsable":
+        tarea = leer_tarea(m.cur, task_id)
+        if tarea is None or str(tarea["responsable_membership_id"]) != persona:
+            return None
+    m.cur.execute("select puede_ver_tarea(%s, %s) as ve", (persona, task_id))
+    return (task_id, persona) if m.cur.fetchone()["ve"] else None
 
 
 def _auditar_el_envio(m: Momento, aviso: dict[str, Any], persona: str, outbox_id: str,
@@ -1108,13 +1147,15 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso("falla_de_aviso", "informativo", _siempre, es_coordinacion=True),
     # La entrega de una tarea, a quien la aprueba, con las fotos adjuntas (ADR 0019, decisión 6).
     TipoDeAviso(ENTREGA_PARA_APROBAR, "normal", _vigencia_de_la_entrega, es_coordinacion=True,
-                adjuntos=_adjuntos_de_la_entrega, ofrece=("aprobar", "pedir_cambios")),
+                adjuntos=_adjuntos_de_la_entrega, ofrece=("aprobar", "pedir_cambios"),
+                enlace="destinatario"),
     # La decisión de quien aprueba, al responsable, y el cierre que hace el sistema (porción 3b).
     TipoDeAviso(TAREA_APROBADA, "informativo", _vigencia_de_una_aprobacion,
-                es_coordinacion=True),
+                es_coordinacion=True, enlace="responsable"),
     TipoDeAviso(PEDIDO_DE_CAMBIOS, "normal", _vigencia_de_un_pedido_de_cambios,
-                es_coordinacion=True),
-    TipoDeAviso(CERRADA_CON_LA_APROBACION, "informativo", _siempre, es_coordinacion=True),
+                es_coordinacion=True, enlace="responsable"),
+    TipoDeAviso(CERRADA_CON_LA_APROBACION, "informativo", _siempre, es_coordinacion=True,
+                enlace="responsable"),
     # Quien aprueba no contesta (porción 3c): el seguimiento que Leda hace por su cuenta, dentro
     # del tope diario y en un envío por persona (mecánica §10). El recordatorio recuerda la
     # decisión que ofreció el aviso de la entrega, sin botones (9b); el aviso a quien está

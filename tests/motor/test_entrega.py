@@ -586,3 +586,85 @@ def test_una_entrega_nueva_reemplaza_al_aviso_que_espera(conn, mundo, marcos):
       "tamano": 10}, False)])
 def test_va_adjunta_la_foto_que_el_canal_muestra_como_foto(pieza, va):
     assert avisos._es_foto_adjunta(pieza) is va
+
+
+# --- El enlace a la página de la tarea (ADR 0019, decisiones 6 y 7a; porción 4) ---------------
+
+DIRECCION = "https://leda.invalid"
+
+
+@pytest.fixture
+def con_direccion(monkeypatch):
+    import dataclasses
+
+    from leda import config as config_mod
+
+    monkeypatch.setattr(config_mod, "config",
+                        dataclasses.replace(config_mod.config, base_url=DIRECCION))
+
+
+def _despachar(conn, mundo, at):
+    from leda.despachador import TransporteDePrueba, despachar
+
+    transporte = TransporteDePrueba()
+    with espacio(conn, mundo["id"]) as cur:
+        despachar(cur, mundo["id"], transporte, Calendario.desde_base(cur, mundo["id"]), at)
+    conn.commit()
+    return transporte
+
+
+def test_el_aviso_lleva_el_enlace_a_la_pagina_sin_que_la_ia_lo_vea(conn, mundo, marcos,
+                                                                   con_direccion):
+    """La IA sabe que el mensaje lleva el enlace; el código lo agrega al mandar. Ni el pedido a
+    la IA, ni la salida, ni el registro de turnos tienen el enlace."""
+    import re
+
+    from leda import pagina_de_tarea
+    from leda.db import sin_espacio
+
+    tarea = _tarea(conn, mundo)
+    _entregada(marcos)
+    ia = IAQueRedacta()
+    enviar(conn, mundo, ia, AHORA + timedelta(minutes=13))
+    [pedido] = ia.pedidos_de_redaccion
+    assert pedido["hechos"][0]["lleva_el_enlace_a_la_pagina_de_la_tarea"] is True
+    assert DIRECCION not in json.dumps(pedido, ensure_ascii=False, default=str)
+
+    texto, _album = _salida_de(conn, mundo, "Ismael")
+    marca = uno(conn, "select * from message_outbox_enlace")
+    assert str(marca["outbox_id"]) == str(texto["id"]) and str(marca["task_id"]) == tarea
+    assert str(marca["membership_id"]) == mundo["personas"]["Ismael"]["membership_id"]
+    [aviso] = avisos_guardados(conn, "entrega_para_aprobar")
+    assert aviso["hechos"]["lleva_el_enlace_a_la_pagina_de_la_tarea"] is True
+
+    transporte = _despachar(conn, mundo, AHORA + timedelta(minutes=13))
+    [mensaje] = [e for e in transporte.enviados if e.fotos is None
+                 and e.chat_id == mundo["personas"]["Ismael"]["telegram"]]
+    encontrado = re.search(r"\n" + re.escape(DIRECCION) + r"/tarea/([\w-]+)$", mensaje.texto)
+    assert encontrado and mensaje.sin_vista_previa
+    token = encontrado.group(1)
+    registro = todos(conn, """select coalesce(o.cuerpo, '') cuerpo, t.jugadas
+                                from conversation_turn t
+                                left join message_outbox o on o.id = t.outbox_id""")
+    assert registro and token not in json.dumps(registro, default=str)
+    assert DIRECCION not in json.dumps(registro, default=str)
+    with sin_espacio(conn) as cur:
+        assert pagina_de_tarea.leer(cur, token)["tarea"]["titulo"] == "Armar el tablero"
+    conn.commit()
+
+
+def test_sin_direccion_publica_el_aviso_no_promete_ningun_enlace(conn, mundo, marcos,
+                                                                  monkeypatch):
+    import dataclasses
+
+    from leda import config as config_mod
+
+    monkeypatch.setattr(config_mod, "config",
+                        dataclasses.replace(config_mod.config, base_url=""))
+    _tarea(conn, mundo)
+    _entregada(marcos)
+    ia = IAQueRedacta()
+    enviar(conn, mundo, ia, AHORA + timedelta(minutes=13))
+    [pedido] = ia.pedidos_de_redaccion
+    assert "lleva_el_enlace_a_la_pagina_de_la_tarea" not in pedido["hechos"][0]
+    assert cuantas(conn, "message_outbox_enlace") == 0

@@ -108,6 +108,8 @@ class Entregado(NamedTuple):
     bloque: str | None = None
     entidades: list[dict] | None = None
     fotos: list[str | None] | None = None
+    # Si salió con la vista previa de los enlaces desactivada (el de la página de una tarea).
+    sin_vista_previa: bool = False
 
 
 class Adjunto(NamedTuple):
@@ -126,7 +128,9 @@ class Transporte(Protocol):
                botones: list[Boton] | None = None) -> int:
         """Devuelve el identificador del mensaje entregado. Un mensaje con un
         bloque copiable (T9-R1c-3) se entrega con `bloque=...` además: sólo los
-        mensajes que lo llevan pasan ese argumento."""
+        mensajes que lo llevan pasan ese argumento. Uno que lleva el enlace a la
+        página de una tarea (ADR 0019, decisión 6) se entrega con
+        `sin_vista_previa=True`: sólo ésos lo pasan."""
 
     def enviar_album(self, chat_id: int, adjuntos: list[Adjunto]) -> int:
         """Manda las fotos de una fila con adjuntos, sin texto, y devuelve el identificador
@@ -141,7 +145,7 @@ class TransporteDePrueba:
 
     def enviar(self, chat_id: int, texto: str,
                botones: list[Boton] | None = None,
-               bloque: str | None = None) -> int:
+               bloque: str | None = None, sin_vista_previa: bool = False) -> int:
         prepared_buttons = prepare_buttons(botones or [])
         payload = prepare_payload(
             texto, dedupe_key="transport", has_buttons=bool(prepared_buttons),
@@ -151,7 +155,7 @@ class TransporteDePrueba:
             raise ConnectionError(f"no se pudo entregar a {chat_id}")
         self.enviados.append(Entregado(
             chat_id, plano, [Boton(*button) for button in prepared_buttons],
-            bloque, entidades or None))
+            bloque, entidades or None, sin_vista_previa=sin_vista_previa))
         return len(self.enviados)
 
     def enviar_album(self, chat_id: int, adjuntos: list[Adjunto]) -> int:
@@ -171,7 +175,7 @@ class TransporteTelegram:
 
     def enviar(self, chat_id: int, texto: str,
                botones: list[Boton] | None = None,
-               bloque: str | None = None) -> int:
+               bloque: str | None = None, sin_vista_previa: bool = False) -> int:
         prepared_buttons = prepare_buttons(botones or [])
         payload = prepare_payload(
             texto, dedupe_key="transport", has_buttons=bool(prepared_buttons),
@@ -185,6 +189,10 @@ class TransporteTelegram:
                          "disable_notification": False}
         if entidades:
             cuerpo["entities"] = entidades
+        if sin_vista_previa:
+            # El enlace a la página de una tarea (ADR 0019, decisión 6): que Telegram no la
+            # abra por su cuenta para armar una vista previa.
+            cuerpo["link_preview_options"] = {"is_disabled": True}
         if prepared_buttons:
             # Uno por fila: las etiquetas son nombres de personas o frases
             # cortas, y en el teléfono dos por fila se cortan.
@@ -870,7 +878,11 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
                     es_bienvenida, bloque_copiable, es_coordinacion, respuesta_grupo,
                     array(select a.archivo_id from message_outbox_adjunto a
                            where a.outbox_id = message_outbox.id
-                           order by a.orden) as adjuntos
+                           order by a.orden) as adjuntos,
+                    (select e.task_id from message_outbox_enlace e
+                      where e.outbox_id = message_outbox.id) as enlace_tarea,
+                    (select e.membership_id from message_outbox_enlace e
+                      where e.outbox_id = message_outbox.id) as enlace_persona
               from message_outbox
              where workspace_id = %(ws)s
                and estado = 'listo'
@@ -1002,6 +1014,35 @@ def _adjuntos(cur, m) -> list[Adjunto]:
             for f in cur.fetchall()]
 
 
+ETAPA_ENLACE_DE_TAREA = "enlace_de_tarea"
+
+
+def _enlace_de_la_tarea(cur, workspace_id: str, m) -> str | None:
+    """El enlace a la página de la tarea que lleva la fila (`message_outbox_enlace`), emitido
+    ahora para esa persona (ADR 0019, decisiones 6 y 7a): la base guarda sólo su hash, y como se
+    emite dentro del punto de retorno del envío, un envío que falla no deja ningún acceso. Sin la
+    dirección pública configurada, ninguno: nunca se inventa una dirección (constitución §4).
+    Si la persona ya no puede ver la tarea, el mensaje sale sin enlace y queda un incidente, sin
+    avisar a la administración: el mensaje salió."""
+    if not m.get("enlace_tarea"):
+        return None
+    from . import pagina_de_tarea
+    from .config import config
+
+    if not config.base_url:
+        return None
+    token = pagina_de_tarea.emitir(cur, m["enlace_persona"], m["enlace_tarea"])
+    if token is None:
+        registrar_incidente(
+            cur, workspace_id,
+            "Un mensaje salió sin el enlace a la página de su tarea: la persona ya no la ve.",
+            severidad="baja", etapa=ETAPA_ENLACE_DE_TAREA, referencia_tipo="message_outbox",
+            referencia_id=str(m["id"]), avisar_admin=False,
+            sin_avisar_porque="el mensaje salió igual; sólo le falta el enlace")
+        return None
+    return pagina_de_tarea.enlace(config.base_url, token)
+
+
 def _marcar_enviado(cur: psycopg.Cursor, ahora: datetime, outbox_id) -> None:
     """El cambio de estado durable: se llama ANTES de intentar el envío
     (ver `_intentar_envio`), no después."""
@@ -1075,14 +1116,21 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
                           f"{m['id']} ({type(exc_id).__name__}).")
                 return True
             botones = _botones(cur, m)
+            # El enlace a la página de la tarea, si la fila lo lleva: al final del texto, nunca
+            # en la salida ni en el registro de turnos (ADR 0019, decisión 6).
+            enlace = _enlace_de_la_tarea(cur, workspace_id, m)
+            cuerpo = f"{m['cuerpo']}\n{enlace}" if enlace else m["cuerpo"]
             texto, falla_saludo = saludo.reclamar_y_anteponer(
                 cur, workspace_id=workspace_id,
                 membership_id=m["destinatario_membership_id"], zona=cal.zona,
-                ahora=ahora, texto=m["cuerpo"], has_buttons=bool(botones),
+                ahora=ahora, texto=cuerpo, has_buttons=bool(botones),
                 es_bienvenida=m["es_bienvenida"])
             if m["bloque_copiable"]:
                 tg_id = transporte.enviar(m["chat_id"], texto, botones,
                                           bloque=m["bloque_copiable"])
+            elif enlace:
+                tg_id = transporte.enviar(m["chat_id"], texto, botones,
+                                          sin_vista_previa=True)
             else:
                 tg_id = transporte.enviar(m["chat_id"], texto, botones)
             try:

@@ -259,3 +259,11 @@ que espera y guarda otro, que al salir lleva toda la evidencia vigente. `_notifi
 queda sólo para las entregas de la cocina que ningún circuito del chat alcanza (`actualizar_estado` a
 revisión y `adjuntar_evidencia`). Los botones Aprobar y Pedir cambios vuelven con la porción 3b, y el
 enlace, con la 4.
+
+**Porción 4 del ADR 0019 (decisión 7; 2026-10-08).** El pendiente del enlace al detalle de la tarea
+quedó resuelto: existe la página de una tarea (`GET /tarea/{token}`, migración `0036`), de sólo lectura
+y con un enlace personal que no vence. El aviso de la entrega a quien aprueba, y los de la decisión al
+responsable, llevan al final el enlace, que agrega el despachador al mandar y sale sin vista previa; la
+base guarda sólo su hash. `_enlace_portal_tarea` ya no devuelve nada que se escriba: da la marca de la
+salida (`message_outbox_enlace`) para las entregas de la cocina que todavía usan el texto fijo, y nunca
+una dirección (constitución §4).
