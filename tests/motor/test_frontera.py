@@ -80,14 +80,17 @@ BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 # modelo configurado del espacio o el global (`model_config`, la IA real). La entrada (E3-7):
 # el nombre de quien se activa o ya está vinculado (`app_user`, en la activación). Los archivos
 # recibidos (ADR 0019, decisiones 2 a 4): el contenido y lo que trajo cada mensaje
-# (`archivos.py`).
+# (`archivos.py`). La entrega (ADR 0019, decisiones 4 y 5; `entrega.py`): lo que pide la tarea
+# (`task_evidence_policy`), lo entregado y lo retirado (sólo lee: escribe la cocina), los
+# archivos dichos de una tarea y el último pedido de cambios, que abre el ciclo (`approval`,
+# sólo lee).
 TABLAS_PERMITIDAS = {
-    "absence", "app_user", "archivo", "archivo_de_mensaje",
+    "absence", "app_user", "approval", "archivo", "archivo_de_mensaje", "archivo_de_tarea",
     "blocker", "blocker_unblocker", "conversation_option", "conversation_question",
-    "conversation_state", "conversation_turn", "dependency", "escalation_route",
-    "inbound_message", "integrante", "membership", "message_outbox", "model_config",
-    "pending_reply", "persona_config", "scheduled_notice", "task", "task_forecast",
-    "workspace", "workspace_setting",
+    "conversation_state", "conversation_turn", "dependency", "escalation_route", "evidence",
+    "evidencia_retirada", "inbound_message", "integrante", "membership", "message_outbox",
+    "model_config", "pending_reply", "persona_config", "scheduled_notice", "task",
+    "task_evidence_policy", "task_forecast", "workspace", "workspace_setting",
 }
 
 _SQL = re.compile(r"\b(select|insert|update|delete)\b", re.IGNORECASE)

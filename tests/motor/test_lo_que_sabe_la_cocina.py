@@ -13,7 +13,8 @@ hecho correcto. Mecanismos generales, sin frases ni ramas por conversación:
 3. **El vencimiento** también en la escalera de una pregunta (la repregunta y su escalamiento).
 4. **El estado real** en un pedido de estado: lo que se espera saber depende del estado
    (`espera_algo_cierto`), y una tarea que espera a otra lo dice (`espera_a`).
-5. **Una entrega que no se recibe por chat** dice si hay otra forma definida de hacerla.
+5. **Una entrega** dice quién la aprueba cuando se confirme (antes de la porción 2 de la C-3,
+   que no se recibía por chat y que no había otra forma definida de hacerla).
 
 El reloj es el de `test_escalera.py`: "Revisar el tablero" (T1) de Marcos vence el viernes 9 de
 octubre de 2026; el lunes 12 es feriado.
@@ -166,15 +167,16 @@ def test_lo_que_espera_saber_un_pedido_de_estado_depende_del_estado(conn, mundo,
     assert esperando["espera_algo_cierto"] == ["para_cuando_la_termina", "si_esta_trabada"]
 
 
-# --- 5. Una entrega que no se recibe por chat -------------------------------------------------
+# --- 5. Una entrega dice quién la aprueba --------------------------------------------------
 
-def test_una_entrega_que_no_se_recibe_dice_que_no_hay_otra_forma_definida(conn, mundo, escribe):
+def test_una_entrega_dice_quien_la_aprueba_cuando_se_confirme(conn, mundo, escribe):
     """Conversación 12, paso 6: la IA dijo "presentala por fuera de este chat", un canal que
-    nadie definió. El hecho lo dice: no hay otra forma definida (ADR 0018, 9g)."""
+    nadie definió. Desde la porción 2 de la C-3 la entrega se recibe por chat (ADR 0019,
+    decisión 5): el hecho dice qué pasa al confirmarla, y a quién le toca aprobarla."""
     dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(6, 11))
 
     r = dice(conn, escribe, Jugada("entregar", {"tarea": "T1"}), at=octubre(6, 16))
 
-    assert r.hechos == [{"jugada": "entregar", "resultado": "no_por_chat",
-                         "motivo": "la_entrega_todavia_no_se_recibe_por_chat", "tarea": T1,
-                         "otra_forma_de_hacerlo": "ninguna_definida"}]
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "para_confirmar" and hecho["tarea"] == T1
+    assert hecho["al_confirmar"] == {"queda_esperando_la_aprobacion_de": "Ismael"}

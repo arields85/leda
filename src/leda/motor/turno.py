@@ -39,8 +39,8 @@ vive en `registro.py`, que también usan los avisos guardados.
 Los archivos que trajo el mensaje (ADR 0019, decisión 4): los dos pedidos a la IA reciben qué
 llegó (`archivos`: una foto, un video o un archivo con su nombre), nunca el contenido; lo que no
 se pudo recibir, con su motivo y lo que la persona puede hacer en cambio (`EN_CAMBIO_PUEDE`).
-La IA elige la jugada como con cualquier mensaje. Sumar un archivo a una entrega es de la
-porción siguiente; mientras tanto, queda guardado como parte de la conversación.
+La IA elige la jugada como con cualquier mensaje. Lo que trajo el mensaje y ninguna jugada tomó
+va a la entrega abierta o lleva la pregunta de para qué tarea es (`entrega.py`, porción 2).
 """
 
 from __future__ import annotations
@@ -53,6 +53,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import psycopg
 
@@ -62,7 +63,7 @@ from ..incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
                           REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
 from ..salida import enqueue_outbox
 
-from . import archivos, cambios_de_estado, preguntas, registro
+from . import archivos, cambios_de_estado, entrega, preguntas, registro
 from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
 from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
@@ -135,6 +136,9 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
 
         def manejar(elegidas: list[Jugada]) -> list[dict[str, Any]]:
             hechos = [_manejar(ctx, jugada, jugadas) for jugada in elegidas]
+            # Lo que trajo el mensaje y ninguna jugada tomó: a la entrega abierta, o la
+            # pregunta de para qué tarea es (ADR 0019, decisión 4).
+            hechos += entrega.al_terminar_las_jugadas(ctx)
             _avisar_fuera_de_la_lista(ctx, elegidas, jugadas)
             return hechos
 
@@ -266,10 +270,13 @@ def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None =
          "estado": str(t["estado"]),
          "fecha_objetivo": t["fecha_objetivo"].isoformat() if t["fecha_objetivo"] else None}
         for i, t in enumerate(cur.fetchall(), 1))
+    # Lo de la entrega de cada tarea: lo que pide una en curso y lo entregado de una en revisión.
+    cur.execute("select zona_horaria from workspace where id = %s", (quien.workspace_id,))
+    tareas = entrega.para_la_ia(cur, tareas, ZoneInfo(cur.fetchone()["zona_horaria"]))
 
     ultimos = leer_ultimos_turnos(cur, quien.membership_id)
     return Contexto(cur=cur, quien=quien, entrante_id=entrante_id, chat_id=chat_id,
-                    texto=texto, ahora=ahora,
+                    texto=texto, ahora=ahora, llegada=entrega.lo_que_trae(cur, entrante_id, texto),
                     estado=preguntas.estado_para_la_ia(cur, quien.membership_id, tareas),
                     tareas=tareas, ultimos_turnos=ultimos,
                     ultimo_aviso=_ultimo_aviso(estado, tareas), toque=toque,

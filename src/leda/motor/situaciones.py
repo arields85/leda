@@ -111,7 +111,10 @@ def _elegir_y_correr(ctx, opcion, pregunta_id: str, task_id, eligio: dict) -> di
     preguntas.cerrar(ctx, pregunta_id, "respondida",
                      {"opcion": str(opcion["id"]), "tarea": task_id})
     fichas = _fichas()
-    nombre = esperaba.get("nombre")
+    # Una opción puede correr su propia jugada (el "Confirmar" de una entrega), con sus datos y
+    # la pregunta que contesta; si no, corre la que esperaba la pregunta, con la tarea elegida.
+    valor = opcion["valor"] or {}
+    nombre = valor.get("jugada") or esperaba.get("nombre")
     if nombre is None:
         return {"jugada": "elegir", "resultado": "elegida", "eligio": eligio}
     # La jugada que esperaba corre por el manejador de la lista cerrada del turno, el mismo que
@@ -126,7 +129,9 @@ def _elegir_y_correr(ctx, opcion, pregunta_id: str, task_id, eligio: dict) -> di
         # La tarea ya no está abierta entre las de la persona.
         return {"jugada": nombre, "resultado": "no_se_puede", "motivo": "tarea_cerrada",
                 "eligio": eligio}
-    hecho = manejador(ctx, Jugada(nombre, {**(esperaba.get("datos") or {}), "tarea": alias}))
+    datos = ({**(valor.get("datos") or {}), "de_la_pregunta": pregunta_id}
+             if valor.get("jugada") else dict(esperaba.get("datos") or {}))
+    hecho = manejador(ctx, Jugada(nombre, {**datos, "tarea": alias}))
     return {**hecho, "eligio": eligio}
 
 
@@ -158,6 +163,10 @@ def corregir(ctx, datos: dict, tarea: dict) -> dict:
     fichas = _fichas()
     corrige = str(datos["corrige"])
     ficha = fichas.FICHAS.get(corrige)
+    if ficha is not None and ficha.corregir is not None:
+        # Lo que se corrige es lo que la jugada dejó a la vista (una vista previa) o lo que ya
+        # escribió con ella: lo sabe su ficha (la entrega, `entrega.corregir`).
+        return ficha.corregir(ctx, datos, tarea)
     if ficha is None or ficha.deshacer is None:
         return {"resultado": "no_se_puede", "motivo": "no_se_corrige", "corrige": corrige}
     correcta = None if fichas.vacio(datos.get("tarea_correcta")) \

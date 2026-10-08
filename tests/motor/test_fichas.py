@@ -24,7 +24,7 @@ from tests.motor.ayudantes import AHORA
 
 VIERNES_9 = datetime(2026, 10, 9, 20, 0, tzinfo=timezone.utc)      # 17:00 en Buenos Aires
 OFRECIDAS = ("anotar_inicio", "anotar_prevision", "anotar_bloqueo", "anotar_quien_destraba",
-             "destrabar", "consultar_pendientes", "informar_avance")
+             "destrabar", "consultar_pendientes", "informar_avance", "entregar")
 
 
 # --- Ayudas ---------------------------------------------------------------------------------
@@ -117,7 +117,8 @@ def test_la_lista_cerrada_tiene_una_ficha_por_jugada_del_recordatorio():
     """Las del recordatorio y las de las situaciones generales (E2-4), que no se ofrecen como
     algo que Leda puede hacer."""
     assert sorted(JUGADAS) == sorted(FICHAS) == sorted(
-        OFRECIDAS + ("entregar", "pedir_reasignacion") + SITUACIONES)
+        OFRECIDAS + ("pedir_reasignacion",) + SITUACIONES
+        + ("confirmar", "guardar_para_la_entrega"))
     assert not any(FICHAS[n].se_ofrece for n in SITUACIONES)
     for ficha in FICHAS.values():
         assert ficha.para_que and ficha.comprueba and ficha.hace and ficha.despues
@@ -646,16 +647,27 @@ def test_consultar_pendientes_solo_lee(conn, mundo, escribe):
     assert {t: _cuantas(conn, t) for t in tablas} == antes
 
 
-def test_entregar_no_se_recibe_por_chat_y_no_avisa_a_nadie(conn, mundo, escribe):
+def test_entregar_muestra_la_entrega_y_no_escribe_ni_avisa_nada_hasta_confirmar(
+        conn, mundo, escribe):
+    """La entrega se recibe por chat desde la porción 2 de la C-3 (ADR 0019, decisión 5): sin
+    política de evidencia, lo que escribió es la entrega y espera la confirmación. Los detalles,
+    en `test_entrega.py`."""
     _tarea_nueva(conn, mundo, "Armar el tablero", estado="en_curso")
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada("entregar", {"tarea": "T1"}),
                      texto="ya la terminé")
 
-    assert hecho == {"jugada": "entregar", "resultado": "no_por_chat",
-                     "motivo": "la_entrega_todavia_no_se_recibe_por_chat",
-                     "tarea": {"alias": "T1", "titulo": "Armar el tablero"},
-                     "otra_forma_de_hacerlo": "ninguna_definida"}
+    assert hecho["jugada"] == "entregar" and hecho["resultado"] == "para_confirmar"
+    assert hecho["entrega"] == [{"pieza": "P1", "es": "lo_que_escribio",
+                                 "dice": "ya la terminé", "cubre": []}]
+    assert hecho["pregunta"] == "confirmar_la_entrega"
     assert _cuantas(conn, "task_state_event") == 0 and _cuantas(conn, "incident") == 0
+    assert _cuantas(conn, "evidence") == 0 and _cuantas(conn, "scheduled_notice") == 0
+
+
+def test_una_tarea_que_no_esta_en_curso_no_se_entrega(conn, mundo, escribe):
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("entregar", {"tarea": "T1"}),
+                     texto="ya la terminé")
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "estado"
 
 
 def test_una_reasignacion_dice_quien_decide_y_no_avisa_a_nadie(conn, mundo, escribe):

@@ -77,6 +77,12 @@ PROPUESTA = "propuesta"
 # cierra la ficha de la previsión (`fichas._anotar_prevision`), y la contesta otra previsión con
 # su porqué; el aviso al referente la espera hasta el final del día (`margen.py`).
 MOTIVO_DEL_ATRASO = "motivo_del_atraso"
+# La entrega en curso de una tarea (ADR 0019, decisiones 4 y 5; `entrega.py`): la vista previa
+# completa, que espera la confirmación (con el botón "Confirmar"), o la que espera lo que falta.
+# Su jugada guarda las piezas, la huella y lo que se le mostró a la persona (`muestra`). Se
+# pueden dejar: "dejá, no la entrego todavía" no anota nada.
+CONFIRMAR_ENTREGA = "confirmar_la_entrega"
+LO_QUE_FALTA_DE_LA_ENTREGA = "lo_que_falta_de_la_entrega"
 
 
 @dataclass(frozen=True)
@@ -101,6 +107,8 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(FECHA_DE_LA_TAREA, espera=ESTADO_DE_LA_TAREA),
     TipoDePregunta(QUIEN_DESTRABA, espera=QUIEN_DESTRABA),
     TipoDePregunta(MOTIVO_DEL_ATRASO, espera=MOTIVO_DEL_ATRASO),
+    TipoDePregunta(CONFIRMAR_ENTREGA),
+    TipoDePregunta(LO_QUE_FALTA_DE_LA_ENTREGA),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
@@ -175,18 +183,33 @@ def estado_para_la_ia(cur, membership_id: str, tareas) -> dict[str, Any] | None:
 
 
 def _para_la_ia(cur, q, tareas) -> dict[str, Any]:
-    dicha = {"tipo": q["tipo"], "tarea": _alias(tareas, q["task_id"]), **_lo_propuesto(q)}
+    dicha = {"tipo": q["tipo"], "tarea": _alias(tareas, q["task_id"]), **_lo_propuesto(q),
+             **_lo_mostrado(q)}
     ops = opciones(cur, q["id"])
     if ops:
         dicha["opciones"] = [{"opcion": alias_de_opcion(o["orden"]), "etiqueta": o["etiqueta"],
-                              "tarea": _alias(tareas, (o["valor"] or {}).get("tarea"))}
+                              **({"tarea": _alias(tareas, (o["valor"] or {}).get("tarea"))}
+                                 if not _corre_otra_jugada(o) else {})}
                              for o in ops]
     return dicha
+
+
+def _corre_otra_jugada(opcion) -> bool:
+    """Una opción que corre una jugada propia (el "Confirmar" de una entrega) no elige una
+    tarea: su tarea es la de la pregunta."""
+    return bool((opcion["valor"] or {}).get("jugada"))
 
 
 def _lo_propuesto(q) -> dict[str, Any]:
     propone = (q["jugada"] or {}).get("propone")
     return {"propone": list(propone)} if propone else {}
+
+
+def _lo_mostrado(q) -> dict[str, Any]:
+    """Lo que la pregunta le mostró a la persona, si lo guardó (`muestra`: las piezas de una
+    entrega, con sus alias): para elegir sobre eso y para volver a decirlo."""
+    muestra = (q["jugada"] or {}).get("muestra")
+    return {"lo_mostrado": list(muestra)} if muestra else {}
 
 
 def _alias(tareas, task_id) -> str | None:
@@ -208,9 +231,12 @@ def abrir(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
 
 
 def abrir_con_id(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
-                 opciones_de_tareas: Sequence[dict[str, Any]] = ()) -> tuple[bool, str]:
+                 opciones_de_tareas: Sequence[dict[str, Any]] = (),
+                 opciones: Sequence[tuple[str, dict[str, Any]]] = ()) -> tuple[bool, str]:
     """`abrir`, y además el id de la pregunta: el hecho que la nombra lo lleva para leerla al
-    terminar el turno (`fichas.EFECTOS`)."""
+    terminar el turno (`fichas.EFECTOS`). `opciones`: otras opciones que las tareas, cada una
+    con su etiqueta y su valor (la tarea, y la jugada que corre si se la elige, con sus datos;
+    `situaciones.elegir_opcion`)."""
     cur, persona = ctx.cur, ctx.quien.membership_id
     de_tipo = TIPOS[tipo]           # la lista es cerrada: un tipo sin declarar es un error
     se_puede_dejar = de_tipo.se_puede_dejar
@@ -233,13 +259,15 @@ def abrir_con_id(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
             (ctx.quien.workspace_id, persona, tipo, task_id, _json(jugada), se_puede_dejar,
              ctx.ahora))
         pregunta = str(cur.fetchone()["id"])
-        for orden, tarea in enumerate(opciones_de_tareas, 1):
+        todas = ([(t["titulo"], {"tarea": t["id"]}) for t in opciones_de_tareas]
+                 + list(opciones))
+        for orden, (etiqueta, valor) in enumerate(todas, 1):
             cur.execute(
                 """insert into conversation_option (workspace_id, question_id, token,
                                                     etiqueta, valor, orden)
                    values (%s, %s, %s, %s, %s, %s)""",
                 (ctx.quien.workspace_id, pregunta, secrets.token_urlsafe(9),
-                 _etiqueta(tarea["titulo"]), _json({"tarea": tarea["id"]}), orden))
+                 _etiqueta(etiqueta), _json(valor), orden))
 
     vigente = actual(cur, persona)
     if vigente is None or str(vigente["id"]) == pregunta:
@@ -389,6 +417,7 @@ def describir(ctx, q) -> dict[str, Any]:
     if q["task_id"] is not None:
         dicha["tarea"] = tarea_dicha(ctx, q["task_id"])
     dicha.update(_lo_propuesto(q))
+    dicha.update(_lo_mostrado(q))
     ops = opciones(ctx.cur, q["id"])
     if ops:
         dicha["opciones"] = [{"opcion": alias_de_opcion(o["orden"]), "etiqueta": o["etiqueta"],
@@ -407,6 +436,9 @@ def con_que_se_cerro(ctx, pregunta_id: str) -> dict[str, Any]:
                                  ctx.calendario.zona).date().isoformat()}
     if detalle.get("tarea"):
         dicho["tarea"] = tarea_dicha(ctx, detalle["tarea"])
+    if detalle.get("reemplazada"):
+        # Una vista previa que dejó de valer porque cambió lo que mostraba: la reemplazó otra.
+        dicho["reemplazada"] = True
     return dicho
 
 
@@ -422,7 +454,9 @@ def tarea_dicha(ctx, task_id) -> dict[str, str]:
 
 def _tarea_de_opcion(ctx, opcion) -> dict[str, Any]:
     task_id = (opcion["valor"] or {}).get("tarea")
-    return {"tarea": tarea_dicha(ctx, task_id)} if task_id else {}
+    if not task_id or _corre_otra_jugada(opcion):
+        return {}
+    return {"tarea": tarea_dicha(ctx, task_id)}
 
 
 def _que_sea_la_abierta(ctx, pregunta_id: str) -> None:

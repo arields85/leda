@@ -6,8 +6,10 @@ Diseño probado en la Etapa 2 (E2-3; `odd/tasks/prueba-chica-del-motor.md`, secc
 Cada jugada se declara con una ficha: qué datos necesita, qué comprueba el código, qué efecto
 hace y qué pasa después. La comprobación común (los datos que faltan, la tarea por su alias y
 los estados en que la jugada vale) la hace `correr` igual para todas; el manejador de cada
-ficha hace sólo lo suyo. Ninguna jugada confirma (9a): el efecto va directo, con
-`herramientas.ejecutar(..., ya_confirmada=True)`, que verifica la autoridad igual y lo audita.
+ficha hace sólo lo suyo. Las jugadas del recordatorio no confirman (9a): el efecto va directo,
+con `herramientas.ejecutar(..., ya_confirmada=True)`, que verifica la autoridad igual y lo
+audita. La entrega sí lleva confirmación (ADR 0018, decisión 4): `entregar` muestra la vista
+previa y `confirmar`, con la guarda de la decisión 2, la ejecuta (`entrega.py`).
 Lo que una ficha escribe directo, sin la cocina (una previsión y su corrección, quién destraba,
 un avance), lo audita ella, con la versión de las reglas (`auditoria.py`).
 
@@ -93,6 +95,9 @@ class Contexto:
     # La lista cerrada de este turno (nombre → manejador): una opción elegida corre la jugada que
     # esperaba por ella, como una jugada escrita. `None`: la de siempre (`JUGADAS`).
     jugadas: Mapping[str, Callable[..., dict[str, Any]]] | None = None
+    # Lo que trajo el mensaje y puede ir a una entrega (`entrega.lo_que_trae`): el texto sin sus
+    # enlaces, los enlaces y los archivos guardados; `tomada`, si una jugada ya lo sumó.
+    llegada: dict[str, Any] = field(default_factory=dict)
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
         return next((t for t in self.tareas if t["alias"] == alias), None)
@@ -134,6 +139,9 @@ class Ficha:
     # Lo que Leda le propone a la persona en sus hechos (las jugadas o salidas que puede elegir):
     # queda como tema abierto (`preguntas.PROPUESTA`). `None`: no propone nada.
     propone: Callable[[dict[str, Any]], list[str] | None] | None = None
+    # Cómo se corrige lo que la jugada mostró o escribió, si lo sabe ella (una vista previa que
+    # todavía no se confirmó, o piezas ya entregadas): `corregir` la llama en lugar de deshacer.
+    corregir: Callable[[Contexto, dict[str, Any], dict[str, Any]], dict[str, Any]] | None = None
     # Si lo que anota es algo cierto sobre la tarea (una fecha, un bloqueo): con la tarea
     # vencida, lo que no lo es lleva la pregunta de para cuándo (9j).
     algo_cierto: bool = False
@@ -968,17 +976,27 @@ def _consultar_pendientes(ctx: Contexto, datos: dict, tarea: dict | None) -> dic
     return {"resultado": "leido", "tareas": tareas}
 
 
-# Lo que no se hace por chat y no tiene otra forma definida de hacerse en esta etapa: el hecho lo
-# dice, para que la redacción no invente un canal (ronda 3, conversación 12, paso 6: "presentala
-# por fuera de este chat"). Qué hace la persona con una tarea terminada mientras la entrega no
-# se recibe por chat no está decidido (ADR 0018, 9g): `PENDIENTE` del usuario.
-NINGUNA_DEFINIDA = "ninguna_definida"
+# La entrega (ADR 0019, decisiones 4 y 5; porción 2 de la C-3): sus jugadas están en
+# `entrega.py`, que importa este módulo.
+
+def _entregar(ctx: Contexto, datos: dict, tarea: dict) -> dict:
+    from . import entrega
+    return entrega.entregar(ctx, datos, tarea)
 
 
-def _entregar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
-    return {"resultado": "no_por_chat", "motivo": "la_entrega_todavia_no_se_recibe_por_chat",
-            **({"tarea": _tarea(tarea)} if tarea else {}),
-            "otra_forma_de_hacerlo": NINGUNA_DEFINIDA}
+def _confirmar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import entrega
+    return entrega.confirmar(ctx, datos, tarea)
+
+
+def _guardar_para_la_entrega(ctx: Contexto, datos: dict, tarea: dict) -> dict:
+    from . import entrega
+    return entrega.guardar_para_la_entrega(ctx, datos, tarea)
+
+
+def _corregir_la_entrega(ctx: Contexto, datos: dict, tarea: dict) -> dict:
+    from . import entrega
+    return entrega.corregir(ctx, datos, tarea)
 
 
 def _pedir_reasignacion(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
@@ -1251,12 +1269,44 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="nada", manejar=_consultar_pendientes,
           es="La persona pregunta qué tareas tiene pendientes, o cómo están sus tareas. Leda "
              "las lee de la base."),
-    Ficha("entregar", "recibir la entrega de una tarea",
+    Ficha("entregar", "recibir la entrega de una tarea con su evidencia",
+          necesita=("tarea",), opcional=("el_texto_cubre",),
+          comprueba="que sea el responsable y que la tarea esté en curso; qué cubre cada "
+                    "pieza de lo que pide la política y qué falta (la base)",
+          hace="muestra la entrega, pieza por pieza (también lo que mandó antes, que entra "
+               "sólo si queda), con qué cubre cada una y qué falta; nada se escribe en la "
+               "tarea todavía",
+          despues="con la política completa, espera la confirmación (botón o escrito); si falta "
+                  "algo, lo dice y espera lo que falta",
+          manejar=_entregar, del_responsable=True, estados=frozenset({"en_curso"}),
+          corregir=_corregir_la_entrega,
+          es="La persona dice que terminó una tarea, o suma algo a la entrega de una tarea que "
+             "ya está mostrando (lo que escribe, fotos, archivos o enlaces). Terminarla no es "
+             "contar que le falta poco: eso es un avance. Lo que escribe puede contar de qué "
+             "trabajo se trata y cómo se probó: el_texto_cubre nombra lo que dice de lo que "
+             "pide la tarea."),
+    Ficha("confirmar", "confirmar lo último que Leda mostró para confirmar",
           necesita=(), opcional=("tarea",),
-          comprueba="nada", hace="nada: todavía no se recibe por chat (9g)",
-          despues="sin aviso al administrador", manejar=_entregar, se_ofrece=False,
-          es="La persona dice que terminó una tarea. Terminarla no es contar que le falta "
-             "poco: eso es un avance."),
+          comprueba="la guarda: que lo que confirma sea lo último que la persona vio, en un "
+                    "mensaje anterior, y que no haya cambiado desde entonces (su huella)",
+          hace="entrega la tarea: las piezas de evidencia y el paso a revisión en un solo acto "
+               "(entregar_tarea); nunca a terminada",
+          despues="quien aprueba se entera; si la guarda falla, muestra lo nuevo y no entrega",
+          manejar=_confirmar, se_ofrece=False,
+          es="La persona confirma, sin dudas, lo último que Leda le mostró para confirmar (la "
+             "entrega de una tarea), escribiendo en lugar de tocar el botón. Una respuesta con "
+             "un pero, una pregunta o un cambio no es una confirmación."),
+    Ficha("guardar_para_la_entrega", "dejar un archivo para cuando entregue una tarea",
+          necesita=("tarea",), opcional=(),
+          comprueba="que sea el responsable y que la tarea esté abierta, sin entregar",
+          hace="deja dicho de qué tarea son los archivos del mensaje (o los de la pregunta que "
+               "contesta), sin que sean evidencia",
+          despues="los muestra en la vista previa cuando entregue esa tarea, aparte, y entran "
+                  "sólo si los deja",
+          manejar=_guardar_para_la_entrega, del_responsable=True,
+          estados=frozenset({"asignada", "en_curso", "bloqueada"}), se_ofrece=False,
+          es="La persona dice de qué tarea es una foto, un video o un archivo que mandó, sin "
+             "decir que la terminó."),
     Ficha("pedir_reasignacion", "pasarle una tarea a otra persona",
           necesita=(), opcional=("tarea", "a"),
           comprueba="nada", hace="nada: cambiar el responsable no es por chat (9g)",
@@ -1278,7 +1328,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "las jugadas que Leda le propuso), tocando o escribiendo. Sin una pregunta abierta "
              "con opciones, no es esta jugada."),
     Ficha("corregir", "corregir algo ya anotado que era de otra tarea o que no pasó",
-          necesita=("corrige", "tarea"), opcional=("tarea_correcta",),
+          necesita=("corrige", "tarea"), opcional=("tarea_correcta", "saca", "el_texto_cubre"),
           comprueba="que sea el responsable y que eso haya quedado anotado en esa tarea en "
                     "sus últimos turnos",
           hace="agrega un hecho de corrección: la tarea vuelve a como estaba y, si la dice, "
@@ -1288,7 +1338,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           manejar=situaciones.corregir, del_responsable=True, se_ofrece=False,
           es="La persona dice que algo que ya quedó anotado estaba mal: era de otra tarea o no "
              "pasó. Dar un hecho nuevo que reemplaza al de antes no es corregir: es la jugada "
-             "de ese hecho."),
+             "de ese hecho. En una entrega (corrige: entregar), sacar una pieza de lo mostrado o "
+             "de lo ya entregado (saca, por su alias), o decir qué cubre lo que escribió "
+             "(el_texto_cubre)."),
     Ficha("cancelar", "dejar sin efecto la pregunta abierta",
           necesita=(), opcional=(),
           comprueba="que haya una pregunta abierta y que se pueda dejar (la de quién destraba "
@@ -1324,6 +1376,9 @@ def lo_que_puede_hacer(jugadas: Mapping[str, Manejador]) -> list[str]:
     return [FICHAS[n].para_que for n in sorted(jugadas) if n in FICHAS and FICHAS[n].se_ofrece]
 
 
-# Para las situaciones generales (`situaciones.py`).
+# Para las situaciones generales (`situaciones.py`) y la entrega (`entrega.py`).
 vacio = _vacio
 tarea_hecho = _tarea
+nombrar_pregunta = _nombrar_pregunta
+no_hecho = _no_hecho
+cerrar_esperas = _cerrar_esperas

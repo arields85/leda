@@ -116,6 +116,73 @@ SIGNIFICADOS: Mapping[str, str] = {
     "mandar_uno_mas_chico": "Mandar uno más chico o más corto.",
     "mandar_un_enlace": "Mandar un enlace para verlo o bajarlo de otro lado (por ejemplo, de "
                         "una carpeta compartida).",
+    # --- La entrega de una tarea con su evidencia (ADR 0019, decisiones 4 y 5) -----------------
+    "evidencia_que_pide": "Lo que la tarea pide para entregarla, cada cosa con su código (para "
+                          "nombrarla en una jugada) y cómo se le dice a la persona.",
+    "tipo_de_evidencia": "El código de una cosa que pide la tarea para entregarla: sirve para "
+                         "nombrarla en una jugada; a la persona se le dice con sus palabras.",
+    "en_palabras": "Cómo se le dice a la persona esa cosa que pide la tarea.",
+    "el_texto_cubre": "Los códigos de lo que pide la tarea que la persona cuenta con lo que "
+                      "escribió (por ejemplo, cómo quedó y cómo lo probó).",
+    "saca": "Las piezas (por su alias) que la persona saca de su entrega.",
+    "entrega": "La entrega de la tarea, pieza por pieza, como se le muestra a la persona: lo "
+               "que escribió, cada foto, video, archivo o enlace y lo que mandó antes durante la "
+               "tarea, que entra sólo si lo deja.",
+    "lo_mostrado": "Lo que Leda le mostró a la persona con esa pregunta: las piezas de la "
+                   "entrega, con su alias.",
+    "lo_entregado": "Lo que la persona ya entregó de esa tarea, pieza por pieza, con su alias "
+                    "(para sacar una).",
+    "pieza": "El alias de una pieza de la entrega (P1, P2...): es interno, nunca se le muestra "
+             "a la persona.",
+    "es": "Qué es la pieza, con su código.",
+    "dice": "Lo que la persona escribió en esa pieza, tal cual.",
+    "enlace": "El enlace que mandó la persona, tal cual.",
+    "cubre": "Lo que pide la tarea que cubre esa pieza, en palabras de todos los días. Una "
+             "pieza que no cubre nada va igual en la entrega.",
+    "mandado_antes_el": "La pieza la mandó antes, durante la tarea, ese día: entra en la "
+                        "entrega sólo si la persona la deja.",
+    "le_falta": "Lo que pide la tarea y todavía no está en la entrega, en palabras de todos "
+                "los días: sin eso no se puede entregar.",
+    "al_confirmar": "Lo que pasa cuando la persona confirme la entrega completa.",
+    "queda_esperando_la_aprobacion_de": "Quién tiene que aprobar la tarea entregada: hasta que "
+                                        "decida, la tarea espera su aprobación.",
+    "aviso_a_quien_aprueba": "Lo que se le avisa a quien aprueba la tarea: a quién (a) y cuándo "
+                             "se entera (llega).",
+    "sumo": "Las piezas (por su alias) que se sumaron a la entrega con este mensaje.",
+    "sacadas": "Las piezas que la persona sacó de la entrega antes de confirmarla: no van.",
+    "retiradas": "Las piezas ya entregadas que la persona retiró: dejan de contar, nada se "
+                 "borra.",
+    "como_queda": "Cómo queda la entrega después de esto, con su código.",
+    "reemplazada": "Esa vista de la entrega dejó de valer porque cambió lo que mostraba: la "
+                   "reemplazó otra.",
+    "para_cuando_la_entregue": "Lo que la persona mandó y queda en la conversación para "
+                               "mostrárselo cuando entregue esa tarea: no es parte de una "
+                               "entrega todavía.",
+    "lo_que_escribio": "Lo que la persona escribió.",
+    "una_foto": "Una foto.",
+    "un_video": "Un video.",
+    "un_archivo": "Un archivo.",
+    "un_enlace": "Un enlace.",
+    "para_confirmar": "La entrega tiene todo lo que pide la tarea: espera que la persona la "
+                      "confirme, con el botón o escribiendo.",
+    "le_falta_evidencia": "A la entrega le falta algo de lo que pide la tarea (le_falta dice "
+                          "qué): no se puede entregar todavía y la tarea no se movió.",
+    "entregada": "La tarea quedó entregada, esperando la aprobación de quien la aprueba. No "
+                 "está terminada ni aprobada.",
+    "no_vale_la_confirmacion": "La confirmación no vale (motivo dice por qué): no se entregó "
+                               "nada y se muestra la entrega como quedó.",
+    "llego_algo_despues": "Llegó algo nuevo para la entrega después de mostrarla: lo que la "
+                          "persona confirmaba ya no era lo último.",
+    "cambio_lo_que_se_mostro": "Lo que se le mostró a la persona cambió desde entonces.",
+    "no_es_lo_ultimo_que_vio": "Lo que se confirmaría no es lo último que la persona vio en "
+                               "un mensaje anterior.",
+    "nada_para_confirmar": "No hay nada mostrado que esté esperando una confirmación.",
+    "sin_archivos": "El mensaje no trajo ningún archivo para dejar.",
+    "ya_aprobada": "La tarea ya está aprobada: lo entregado ya no se saca.",
+    "confirmar_la_entrega": "Pregunta si la persona entrega la tarea así: espera que la "
+                            "confirme (con el botón o escribiendo) o que saque o corrija algo.",
+    "lo_que_falta_de_la_entrega": "Espera lo que le falta a la entrega de la tarea para "
+                                  "poder entregarla.",
     # --- Lo que dice un hecho ------------------------------------------------------------------
     "jugada": "Qué entendió el sistema que dijo o pidió la persona (una jugada de la lista); "
               "dentro de un aviso, la jugada que lo causó.",
@@ -467,6 +534,8 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "destrabar": "anotar_que_ya_puede_seguir",
     "elegir": "elegir_una_opcion",
     "entregar": "recibir_la_entrega",
+    "confirmar": "confirmar_lo_que_vio",
+    "guardar_para_la_entrega": "dejarlo_para_cuando_la_entregue",
     "informar_avance": "anotar_como_viene_sin_algo_cierto",
     "pedir_reasignacion": "pasarle_la_tarea_a_otra_persona",
 }
@@ -474,9 +543,12 @@ _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 
 # Lo que alguien escribió, tal cual: un mensaje entero nunca se traduce, ni el nombre que alguien
 # le puso a un archivo.
-_LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo"})
+_LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", "dice",
+                                      "enlace"})
 # El nombre de un archivo nunca es un código, aunque se escriba como uno (`informe_final`).
-_NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo"})
+# Ni lo que escribió en una pieza de una entrega, ni un enlace, ni el código de una cosa que
+# pide la tarea, que es dato del pack (va con sus palabras, `en_palabras`).
+_NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_evidencia"})
 
 
 def para_redactar(valor: Any) -> Any:

@@ -89,15 +89,12 @@ TABLAS_MUERTAS = ("conversation_access_log", "learning")
 # Que sus columnas no aparezcan en `src/` es la señal de que eso se respeta.
 TABLAS_POR_FUNCION = ("acceso_tablero",)
 
-# Las tablas del motor de conversación (migraciones 0030 y 0031). Nacieron con
-# la prueba chica, borrada el 2026-10-07, y hoy las usa `src/leda/motor/`.
-# Siguen exentas porque una columna todavía no la lee nadie
-# (`conversation_state.mostrado_para_confirmar`); sacarlas pide decidir qué
-# promete esa columna (`PROMESAS_SIN_CUMPLIR`) o borrarla.
-TABLAS_DEL_MOTOR = (
-    "conversation_state", "conversation_turn", "conversation_question",
-    "conversation_option", "scheduled_notice", "task_forecast",
-    "blocker_unblocker")
+# Las tablas del motor de conversación (migraciones 0030 y 0031) estuvieron
+# exentas mientras `conversation_state.mostrado_para_confirmar` no la leía nadie.
+# Desde la entrega con evidencia (porción 2 de la C-3, `motor/entrega.py`) es lo
+# último mostrado para confirmar, con su huella: la guarda de la confirmación
+# escrita (ADR 0018, decisión 2). Ya no hay ninguna exenta.
+TABLAS_DEL_MOTOR: tuple[str, ...] = ()
 
 
 def _fuente() -> str:

@@ -110,6 +110,11 @@ DATOS = {
     "tarea_correcta": ("string", "El alias de la tarea en la que sí va, si la persona la "
                                  "dice."),
     "que_pide": ("string", "Qué le pidió la persona a Leda, resumido."),
+    "el_texto_cubre": ("array", "Los códigos (tipo_de_evidencia) de lo que pide la tarea que la "
+                                "persona cuenta con lo que escribe, de evidencia_que_pide. Sólo "
+                                "lo que dice: contar que terminó no es contar cómo lo probó."),
+    "saca": ("array", "Los alias de las piezas (P1, P2...) que la persona saca de su entrega, "
+                      "de lo mostrado o de lo entregado."),
 }
 
 # Qué es lo que no está en la lista: sólo un pedido de hacer algo (revisión del contrato,
@@ -280,9 +285,17 @@ def esquema_de_jugadas(posibles: list[str]) -> dict[str, Any]:
 def _variante(nombre: str, es: str, datos: tuple[str, ...]) -> dict[str, Any]:
     return {"type": "object", "description": es,
             "properties": {"nombre": {"type": "string", "enum": [nombre]},
-                           **{d: {"type": DATOS[d][0], "description": DATOS[d][1]}
-                              for d in datos}},
+                           **{d: _dato(d) for d in datos}},
             "required": ["nombre"], "additionalProperties": False}
+
+
+def _dato(nombre: str) -> dict[str, Any]:
+    """El esquema de un dato: una lista lleva los suyos como textos."""
+    tipo, descripcion = DATOS[nombre]
+    esquema: dict[str, Any] = {"type": tipo, "description": descripcion}
+    if tipo == "array":
+        esquema["items"] = {"type": "string"}
+    return esquema
 
 
 def _datos_de(nombre: str, crudos: dict[str, Any]) -> dict[str, Any]:
