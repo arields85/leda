@@ -55,7 +55,10 @@ atajos).
 3. **Ismael** escribe (15:30): "esta bien pero que mariano revise el rotulo de los cables"
    →
    - Jugadas: `aprobar` y `pedir_cambios`, la tarea del tablero: admite dos lecturas (ADR 0018,
-     decisión 2), así que no se hace ninguna.
+     decisión 2), así que no se hace ninguna. Si la IA elige sólo `aprobar` con el comentario (la
+     ronda D7, 1 de 5), pasa lo mismo: una aprobación con un comentario para el responsable nunca
+     cierra directo (decisión 22 del usuario, 2026-10-08; lo decide el código). El corredor espera
+     las dos jugadas: no admite dos lecturas válidas para un paso.
    - Efecto: ninguno; la tarea sigue `en_revision`.
    - La respuesta dice: una sola pregunta, cuál de las dos: aprobarla y pasarle el comentario a
      Mariano, o pedirle el cambio primero.
@@ -64,7 +67,9 @@ atajos).
 
 4. **Ismael** escribe (15:31): "y bueno fijate vos"
    →
-   - Jugadas: ninguna de la lista: no elige.
+   - Jugadas: ninguna de la lista: no elige. La IA real la deja fuera de la lista como respuesta a
+     la pregunta abierta (`contesta_la_pregunta`, 4 de 5 en la ronda D7), y eso espera el YAML; sin
+     jugada es lo mismo.
    - Efecto: ninguno; la tarea sigue `en_revision`. La pregunta se cierra sin elegir: se hace una
      sola vez (decisión 12). Es la respuesta a la pregunta abierta, no un pedido nuevo: nunca le
      llega un aviso a la administración, aunque la IA la deje fuera de la lista (C-3d, D7: con la IA

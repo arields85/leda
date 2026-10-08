@@ -108,6 +108,7 @@ pasos:
   - paso: 3
     a_las: "2026-10-23 15:30"
     escribe: "esta bien pero que mariano revise el rotulo de los cables"
+    # Sólo `aprobar` con el comentario lleva a la misma pregunta (decisión 22; lo decide la cocina).
     jugadas:
       - {nombre: aprobar, tarea: TAB, comentario: "que mariano revise el rotulo de los cables",
          puede_traer: [comentario]}
@@ -130,10 +131,13 @@ pasos:
   - paso: 4
     a_las: "2026-10-23 15:31"
     escribe: "y bueno fijate vos"
-    # No elige. Si la IA lo deja fuera de la lista como respuesta a la pregunta abierta
-    # (`contesta_la_pregunta`), la maneja esa pregunta igual que sin jugada y no hay aviso a la
-    # administración (C-3d, D7).
-    jugadas: []
+    # No elige. La IA lo deja fuera de la lista como respuesta a la pregunta abierta
+    # (`contesta_la_pregunta`, 4 de 5 en la ronda D7): la maneja esa pregunta igual que sin jugada
+    # y no hay aviso a la administración (C-3d, D7).
+    jugadas:
+      # Lo que no está en la lista no tiene ficha: el corredor compara sólo que esté fuera de la
+      # lista (`comprobar.jugada_coincide`), y `contesta_la_pregunta` es para la corrida en seco.
+      - {nombre: fuera_de_la_lista, contesta_la_pregunta: true}
     efectos: {}
     hechos:
       - {resultado: no_eligio, pregunta_hecha_una_vez: cual_de_las_dos, tarea: TAB,

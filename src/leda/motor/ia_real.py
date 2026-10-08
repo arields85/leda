@@ -133,8 +133,9 @@ DATOS = {
                                      "entrega. Decirle que no al ejemplo, o pedir que la entrega "
                                      "vaya sin él, no es aceptarlo."),
     "comentario": ("string", "Lo que dice quien decide sobre una entrega, con sus palabras: al "
-                             "aprobar, un comentario si lo hace; al pedir cambios, lo que falta "
-                             "o hay que cambiar. Sólo si lo dijo."),
+                             "aprobar, lo que le pasa a la persona responsable para que lo tenga "
+                             "en cuenta; al pedir cambios, lo que falta o hay que cambiar. Sólo "
+                             "si lo dijo."),
     "de": ("string", "La persona cuyo trabajo se aprueba o se devuelve, como la nombró quien "
                      "escribe, cuando la tarea no está en la lista. Sólo si la nombró."),
     "saca": ("array", "Los alias de las piezas (P1, P2...) que la persona saca de su entrega, "

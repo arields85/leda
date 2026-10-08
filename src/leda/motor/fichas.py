@@ -1373,16 +1373,19 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           comprueba="que quien escribe sea quien aprueba el trabajo del responsable, que la "
                     "tarea esté entregada y que lo entregado cubra lo que pide (la cocina); con "
                     "el botón del aviso, que la entrega no haya cambiado desde que se mostró",
-          hace="anota la aprobación con su comentario (aprobar_tarea) y, si el sistema "
-               "comprueba que se cumple todo lo demás, la tarea queda terminada en el mismo "
-               "acto; si algo más frena el cierre, la aprobación queda anotada",
+          hace="anota la aprobación (aprobar_tarea) y, si el sistema comprueba que se cumple "
+               "todo lo demás, la tarea queda terminada en el mismo acto; si algo más frena el "
+               "cierre, la aprobación queda anotada. Con un comentario, antes pregunta una sola "
+               "vez cuál de las dos (aprobarla con el comentario o pedir el cambio), salvo que "
+               "sea la respuesta a esa pregunta: nada cambia hasta que elija",
           despues="le avisa al responsable enseguida; si no se cerró, el sistema la cierra solo "
                   "cuando se resuelve lo que faltaba y les avisa a los dos",
           manejar=_aprobar, boton="Aprobar", opuesta="pedir_cambios",
           contesta=(preguntas.DECISION_DE_LA_ENTREGA, preguntas.QUE_CAMBIOS_PIDE,
                     preguntas.CUAL_DE_LAS_DOS),
           es="La persona que escribe aprueba el trabajo entregado de una tarea que espera su "
-             "decisión, sin pedir que se cambie nada; puede sumar un comentario. Si además pide "
+             "decisión, sin pedir que se cambie nada; puede sumar un comentario, lo que le pasa "
+             "a la persona responsable para que lo tenga en cuenta. Si además pide "
              "que se cambie o se revise algo, eso es también pedir cambios: van las dos "
              "jugadas, salvo cuando contesta la pregunta de cuál de las dos: entonces lo que "
              "elige es una sola decisión (elegir, o esta jugada con lo demás como comentario). "

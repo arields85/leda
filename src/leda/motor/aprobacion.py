@@ -23,6 +23,11 @@ entregarla. "Terminé" nunca llega acá: la entrega lleva a revisión (constituc
 **Lo que admite dos lecturas** ("aprobado, pero que revise el cable") son dos jugadas opuestas
 sobre la misma tarea en un mensaje: ninguna se hace y Leda pregunta una sola vez cuál, con dos
 botones (`fichas.dos_lecturas`, una regla general para toda ficha que declara su opuesta).
+También una aprobación con un comentario para el responsable (decisión 22 del usuario,
+2026-10-08): lo decide la cocina, no la IA, que sólo dice que trae un comentario; cerrar por
+error es peor que un toque más. No pregunta cuando es la elección: una opción de una pregunta, o
+la respuesta escrita a la de cuál de las dos (decisión 12: "aprobala nomás y pasale lo de los
+colores" aprueba y pasa el comentario).
 
 **El aviso de una entrega ofrece los botones** "Aprobar" y "Pedir cambios" como atajos
 (`avisos`, `entrega_para_aprobar`, `preguntas.DECISION_DE_LA_ENTREGA`); escribir vale igual. El
@@ -71,6 +76,7 @@ from ..herramientas import ejecutar
 from . import entrega, fichas, preguntas
 from ..salida import MAX_ADJUNTOS
 
+from .ia import Jugada
 from .avisos import (APROBACION_DESTRABADA, APROBACION_TRABADA, CERRADA_CON_LA_APROBACION,
                      LLEVA_EL_ENLACE, PEDIDO_DE_CAMBIOS, TAREA_APROBADA, aprobacion_vigente,
                      boton_para_ver, enlace_a_la_pagina, guardar, lo_entregado_para_revisar)
@@ -162,6 +168,9 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
                 "ya_la_aprobo_el": aprobada_el(cur, vigente, ctx.calendario.zona),
                 **_frena(cur, tarea["id"])}
     comentario = _comentario(datos)
+    if comentario is not None and _antes_pregunta_cual(ctx, datos, tarea):
+        # Una aprobación con un comentario para el responsable no cierra directo (decisión 22).
+        return _cual_de_las_dos(ctx, datos, tarea, comentario)
     r = ejecutar(cur, ctx.quien, "aprobar_tarea",
                  {"tarea_id": tarea["id"], **({"comentario": comentario} if comentario else {})},
                  ya_confirmada=True)
@@ -187,6 +196,30 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
                                 if k in ("quedo_terminada", "no_se_cierra_todavia")}})
     _lo_que_queda(ctx, hecho, tarea["id"])
     return hecho
+
+
+def _antes_pregunta_cual(ctx, datos: dict, tarea: dict) -> bool:
+    """Si una aprobación con comentario tiene que preguntar antes cuál de las dos (decisión 22
+    del usuario, 2026-10-08): sí, salvo que sea la elección. Elige una opción tocada o escrita
+    (la de una pregunta: `de_la_pregunta`) o la respuesta escrita a la pregunta de cuál de las dos
+    sobre esta tarea, que la persona vio en un mensaje anterior (decisión 12)."""
+    if datos.get("de_la_pregunta"):
+        return False
+    ctx.cur.execute("""select 1 from conversation_question
+                        where membership_id = %s and tipo = %s and task_id = %s
+                          and cerrada_en is null and not (id = any(%s::uuid[]))""",
+                    (ctx.quien.membership_id, preguntas.CUAL_DE_LAS_DOS, tarea["id"],
+                     list(ctx.preguntas_del_turno)))
+    return ctx.cur.fetchone() is None
+
+
+def _cual_de_las_dos(ctx, datos: dict, tarea: dict, comentario: str) -> dict:
+    """La pregunta de una sola vez de lo que admite dos lecturas (`fichas.dos_lecturas`): aprobar
+    con el comentario, o pedir el cambio con él. Nada cambia hasta que elija."""
+    alias = tarea["alias"]
+    return fichas.dos_lecturas(
+        ctx, Jugada("aprobar", {**datos, "tarea": alias}),
+        Jugada("pedir_cambios", {"tarea": alias, "comentario": comentario}))
 
 
 def pedir_cambios(ctx, datos: dict, tarea: dict | None) -> dict:

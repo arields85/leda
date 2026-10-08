@@ -212,13 +212,13 @@ def test_quien_aprueba_ve_las_entregas_que_esperan_su_decision(conn, mundo, turn
 
 def test_lo_claro_va_directo_cierra_la_tarea_y_avisa_al_responsable(conn, mundo, turnos):
     tarea = _entregada(conn, mundo, turnos)
-    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": "impecable"}),
-                    texto="aprobado, impecable")
+    # Sin comentario: con uno, antes pregunta cuál de las dos (decisión 22, más abajo).
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
 
     hecho = _hecho(r, "aprobar")
     assert hecho["resultado"] == "anotado" and hecho["quedo_terminada"] is True
     assert estado_de(conn, tarea) == "terminada"
-    assert _decisiones(conn, tarea) == [("aprobado", "impecable")]
+    assert _decisiones(conn, tarea) == [("aprobado", None)]
     # El aviso al responsable lo redacta el motor y sale enseguida; ningún texto fijo.
     [aviso] = avisos_guardados(conn, "tarea_aprobada")
     assert str(aviso["destinatario_membership_id"]) == mundo["personas"]["Marcos"]["membership_id"]
@@ -231,7 +231,7 @@ def test_lo_claro_va_directo_cierra_la_tarea_y_avisa_al_responsable(conn, mundo,
         "enviado", 0) >= 1
     hechos = next(h for p in ia.pedidos_de_redaccion for h in p["hechos"]
                   if h["aviso"] == "tarea_aprobada")
-    assert hechos["aprobada_por"] == "Ismael" and hechos["comentario"] == "impecable"
+    assert hechos["aprobada_por"] == "Ismael" and "comentario" not in hechos
     assert hechos["quedo_terminada"] is True and hechos["necesita_respuesta"] is False
 
 
@@ -539,6 +539,85 @@ def test_aprobar_y_pedir_cambios_juntos_no_hacen_nada_y_preguntan_cual(conn, mun
     [aviso] = avisos_guardados(conn, "tarea_aprobada")
     assert aviso["hechos"]["comentario"] == comentario
     assert avisos_guardados(conn, "pedido_de_cambios") == []
+
+
+# --- Aprobar con un comentario (decisión 22 del usuario, 2026-10-08) --------------------------
+
+def test_aprobar_con_un_comentario_pregunta_cual_de_las_dos_antes_de_cerrar(conn, mundo,
+                                                                            turnos):
+    """D7 (la 28, paso 3, 1 de 5 con la IA real): "esta bien pero que mariano revise el rotulo de
+    los cables" llegó como `aprobar` con su comentario, sin `pedir_cambios`, y la tarea quedó
+    terminada. Lo decide la cocina, no la IA: una aprobación que trae un comentario para el
+    responsable nunca cierra directo; Leda pregunta una vez cuál de las dos."""
+    tarea = _entregada(conn, mundo, turnos)
+    comentario = "que revise el rotulo de los cables"
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": comentario}),
+                    texto="esta bien pero que revise el rotulo de los cables")
+    [hecho] = r.hechos
+    assert hecho["jugada"] == "aprobar" and hecho["resultado"] == "dos_lecturas"
+    assert hecho["lecturas"] == ["aprobar", "pedir_cambios"]
+    assert r.pregunta["tipo"] == preguntas.CUAL_DE_LAS_DOS
+    assert [o["etiqueta"] for o in r.pregunta["opciones"]] == ["Aprobar", "Pedir cambios"]
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+    assert avisos_guardados(conn, "tarea_aprobada") == []
+
+    # La respuesta es la elección: el botón Aprobar aprueba con el comentario, sin otra pregunta.
+    r = turnos.toca("Ismael", _token(conn, "Aprobar", tarea))
+    assert _hecho(r, "aprobar")["resultado"] == "anotado"
+    assert estado_de(conn, tarea) == "terminada"
+    assert _decisiones(conn, tarea) == [("aprobado", comentario)]
+    [aviso] = avisos_guardados(conn, "tarea_aprobada")
+    assert aviso["hechos"]["comentario"] == comentario
+
+
+def test_la_pregunta_de_un_comentario_tambien_deja_pedir_el_cambio(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    comentario = "que revise el rotulo de los cables"
+    turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": comentario}),
+                texto="esta bien pero que revise el rotulo de los cables")
+    r = turnos.dice("Ismael", Jugada("elegir", {"opcion": "O2"}), texto="pedile el cambio")
+    assert _hecho(r, "pedir_cambios")["resultado"] == "anotado"
+    assert _decisiones(conn, tarea) == [("rechazado", comentario)]
+    assert avisos_guardados(conn, "tarea_aprobada") == []
+
+
+@pytest.mark.parametrize("dos_jugadas", [True, False])
+def test_aprobar_con_un_comentario_que_contesta_cual_de_las_dos_aprueba_directo(
+        conn, mundo, turnos, dos_jugadas):
+    """Decisión 12: "aprobala nomás y pasale lo de los colores", escrito como `aprobar` con su
+    comentario, es la respuesta a la pregunta abierta: aprueba y pasa el comentario, sin otra
+    pregunta. Igual si la pregunta la abrieron las dos jugadas o una aprobación con comentario."""
+    tarea = _entregada(conn, mundo, turnos)
+    jugadas = [Jugada("aprobar", {"tarea": "T1", "comentario": "que revise los colores"})]
+    if dos_jugadas:
+        jugadas.append(Jugada("pedir_cambios",
+                              {"tarea": "T1", "comentario": "que revise los colores"}))
+    r = turnos.dice("Ismael", *jugadas, texto="aprobado, pero que revise los colores")
+    assert r.pregunta["tipo"] == preguntas.CUAL_DE_LAS_DOS
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1",
+                                                 "comentario": "pasale lo de los colores"}),
+                    texto="aprobala nomas y pasale lo de los colores")
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "anotado" and hecho["quedo_terminada"] is True
+    assert r.pregunta is None
+    assert estado_de(conn, tarea) == "terminada"
+    assert _decisiones(conn, tarea) == [("aprobado", "pasale lo de los colores")]
+    assert cuantas(conn, "conversation_question",
+                   "tipo = %s and cerrada_en is null", preguntas.CUAL_DE_LAS_DOS) == 0
+
+
+def test_aprobar_sin_comentario_sigue_yendo_directo(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
+    assert _hecho(r, "aprobar")["resultado"] == "anotado" and r.pregunta is None
+    assert estado_de(conn, tarea) == "terminada"
+
+
+def test_el_comentario_de_una_aprobacion_es_algo_para_el_responsable():
+    """La IA sólo dice que la aprobación trae un comentario (decisión 22): el dato dice qué es."""
+    from leda.motor.ia_real import DATOS
+    assert "persona responsable" in DATOS["comentario"][1]
+    assert "persona responsable" in FICHAS["aprobar"].es
 
 
 def _botones_de_la_respuesta(conn, mundo, at, nombre: str = "Ismael") -> list[str]:
