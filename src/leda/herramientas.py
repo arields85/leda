@@ -1060,17 +1060,18 @@ def _tipos_que_faltan(cur, tarea_id, piezas: list[dict] | None = None) -> list[s
 
 def _insertar_evidencia(cur, quien: Solicitante, tarea_id, pieza: dict) -> str:
     """Una fila de `evidence` para una pieza ya resuelta (`clase`, `cubre` y su
-    contenido: `texto`, `uri` o `archivo_id`). `tipo` es igual a la clase."""
+    contenido: `texto`, `uri` o `archivo_id`; un texto, también los puntos del criterio
+    de aceptación que describe, `describe`). `tipo` es igual a la clase."""
     # T6f (seguimiento del orquestador): `at` explícito con `clock_timestamp()` --
     # ver el comentario de `_bloquear_tarea`.
     cur.execute(
         """insert into evidence (workspace_id, task_id, tipo, clase, texto, uri,
-                                 archivo_id, cubre, entregado_por, at)
-           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, clock_timestamp())
+                                 archivo_id, cubre, describe_del_criterio, entregado_por, at)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, clock_timestamp())
            returning id""",
         (quien.workspace_id, tarea_id, pieza["clase"], pieza["clase"],
          pieza.get("texto"), pieza.get("uri"), pieza.get("archivo_id"),
-         list(pieza["cubre"]), quien.membership_id))
+         list(pieza["cubre"]), list(pieza.get("describe") or []), quien.membership_id))
     return str(cur.fetchone()["id"])
 
 
@@ -1776,7 +1777,13 @@ def _resolver_piezas(cur, tarea_id, piezas: list[dict]) -> list[dict]:
             resueltas.append({"clase": clase, "archivo_id": str(pieza["archivo_id"]),
                               "cubre": [t for t in aceptados if t in cubre]})
         elif (pieza.get("texto") or "").strip():
-            resueltas.append(_pieza_de_texto(cur, tarea_id, pieza["texto"], cubre=cubre))
+            resuelta = _pieza_de_texto(cur, tarea_id, pieza["texto"], cubre=cubre)
+            # Lo que describe del criterio de aceptación (C-3d, D3): sólo un texto lo dice; un
+            # enlace, como una foto o un archivo, no lo certifica.
+            if resuelta["clase"] == "texto":
+                resuelta["describe"] = [str(d) for d in pieza.get("describe") or []
+                                        if str(d).strip()]
+            resueltas.append(resuelta)
         else:
             raise ValueError("contenido")
     return resueltas

@@ -568,6 +568,10 @@ create table evidence (
   texto          text,
   archivo_id     uuid,
   cubre          text[] not null default '{}',
+  -- C-3d, D3 (migración 0038): los puntos del criterio de aceptación que la persona confirmó
+  -- que describe este texto, tal cual el criterio los decía al entregar. Sólo un texto
+  -- describe el criterio; las filas de antes de la 0038, `{}`.
+  describe_del_criterio text[] not null default '{}',
   constraint evidence_workspace_id_unique unique (workspace_id, id),
   constraint evidence_task_workspace
     foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
@@ -577,7 +581,9 @@ create table evidence (
       when 'texto' then archivo_id is null
       when 'enlace' then archivo_id is null and uri is not null
       else archivo_id is not null
-    end)
+    end),
+  constraint evidence_describe_solo_un_texto
+    check (clase = 'texto' or describe_del_criterio = '{}')
 );
 
 comment on column evidence.clase is

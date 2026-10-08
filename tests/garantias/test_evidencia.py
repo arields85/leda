@@ -533,3 +533,60 @@ def test_no_se_retira_una_evidencia_de_una_tarea_aprobada(corework, conn):
     assert r["retirada"] is False
     with admin(conn) as cur:
         assert _cuantas(cur, "evidencia_retirada") == 0
+
+
+# --- Lo que describe cada pieza del criterio de aceptación (migración 0038; C-3d, D3) --------
+
+def test_entregar_guarda_lo_que_describe_cada_texto_del_criterio(corework, conn):
+    """Decisión 10 del usuario (2026-10-08): la entrega se compara con el criterio de aceptación.
+    Cada texto guarda los puntos del criterio que la persona confirmó que describe, tal cual el
+    criterio los decía; una foto o un archivo no describen nada (la clase la fija la cocina)."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws)
+        foto = _archivo(cur, ws, _membresia(cur, ws, "Mariano Naim"))
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, ws, "Mariano Naim")
+        r = H.ejecutar(cur, quien, "entregar_tarea", {"tarea_id": tarea, "piezas": [
+            {"texto": "Quedó cerrado y probado", "cubre": ["explicacion"],
+             "describe": ["Tablero cerrado y probado"]},
+            {"archivo_id": foto, "cubre": ["foto"], "describe": ["Tablero cerrado y probado"]}]},
+            ya_confirmada=True)
+    assert r["estado"] == "en_revision"
+    with admin(conn) as cur:
+        cur.execute("""select clase, describe_del_criterio d from evidence
+                        where task_id = %s order by at""", (tarea,))
+        assert [(f["clase"], list(f["d"])) for f in cur.fetchall()] == [
+            ("texto", ["Tablero cerrado y probado"]), ("imagen", [])]
+
+
+def test_la_base_no_deja_que_una_foto_describa_el_criterio(corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws)
+        foto = _archivo(cur, ws, _membresia(cur, ws, "Mariano Naim"))
+        with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():
+            cur.execute("""insert into evidence (workspace_id, task_id, tipo, clase, archivo_id,
+                                                 describe_del_criterio)
+                           values (%s, %s, 'imagen', 'imagen', %s, %s)""",
+                        (ws, tarea, foto, ["Tablero cerrado y probado"]))
+
+
+def test_el_rollback_de_la_0038_se_niega_si_una_pieza_describe_el_criterio(corework, conn):
+    """Deshacerla borraría lo que la persona confirmó que describe cada texto."""
+    script = (Path(__file__).resolve().parents[2] / "db" / "rollbacks"
+              / "0038_lo_que_describe_cada_pieza.sql").read_text("utf-8")
+    guarda = re.search(r"do \$\$.*?end \$\$;", script, re.S).group(0)
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws)
+        cur.execute("""insert into evidence (workspace_id, task_id, tipo, clase, texto, cubre,
+                                             describe_del_criterio)
+                       values (%s, %s, 'texto', 'texto', 'Quedó probado', '{explicacion}',
+                               '{Tablero cerrado y probado}')""", (ws, tarea))
+        with pytest.raises(psycopg.errors.RaiseException, match="0038 rollback refused"), \
+                conn.transaction():
+            cur.execute("set local search_path = leda, public")
+            cur.execute(guarda)
+        assert _cuantas(cur, "evidence") == 1
