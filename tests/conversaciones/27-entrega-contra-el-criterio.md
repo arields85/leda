@@ -3,12 +3,13 @@
 **Qué prueba:** Marcos entrega la tarea del PLC y lo que escribe no dice todo lo que pide su criterio de
 aceptación. Leda le dice qué falta, en palabras simples y hablando de la tarea, con un ejemplo sacado
 del criterio; le vuelve a dar el ejemplo cuando pregunta qué poner; no la entrega aunque Marcos insista;
-y cuando Marcos acepta el ejemplo, la entrega se confirma como siempre. Al día siguiente entrega la de
-comunicaciones, que nunca había arrancado, describiendo lo que pide su criterio: se recibe sin
-preguntas y la historia dice que arrancó y se entregó en ese momento. Decisiones 10 y 14 del usuario
-(2026-10-08; `odd/tasks/fase-c.md`, C-3d, unidad D3); constitución §4 y §8 ("lo propone en lugar de
-sólo pedirlo"); mecánica §3, §5, §6 y §13; ADR 0019, decisión 5; regla del mozo (`AGENTS.md`, punto
-11).
+y cuando Marcos acepta el ejemplo, la entrega se confirma como siempre. Después retira la foto: Leda le
+pide la correcta, la revisión espera (Ismael toca Aprobar y no cambia nada) y, con la foto nueva, a
+Ismael le llega un aviso nuevo con todo. Al día siguiente entrega la de comunicaciones, que nunca había
+arrancado, describiendo lo que pide su criterio: se recibe sin preguntas y la historia dice que arrancó
+y se entregó en ese momento. Decisiones 10, 14 y 15 del usuario (2026-10-08; `odd/tasks/fase-c.md`,
+C-3d, unidad D3); constitución §4 y §8 ("lo propone en lugar de sólo pedirlo"); mecánica §3, §5, §6 y
+§13; ADR 0009, enmienda T6i; ADR 0019, decisión 5; regla del mozo (`AGENTS.md`, punto 11).
 
 **Comparar es leer; decidir es del código.** La IA que elige la jugada juzga, punto por punto del
 criterio, si lo que Marcos describe lo dice (`lo_descrito_cubre`), y escribe el ejemplo (`ejemplo`).
@@ -93,7 +94,51 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
    - La respuesta no dice: el nombre de Ismael; que la tarea está terminada o aprobada.
    - Estado después: sin tema abierto, nada mostrado para confirmar.
 
-6. **Marcos** manda (viernes 23, 10:00) una foto con el texto: "lo de comunicaciones ya esta, los equipos
+6. **Leda**, por su cuenta, a Ismael (jueves 22, 15:16, terminado el margen para corregir): el aviso
+   de la entrega, con la foto adjunta y los botones "Aprobar" y "Pedir cambios", como en la
+   conversación 21. A Marcos, nada.
+
+7. **Marcos** escribe (15:20): "la foto sacala, era de otra maquina"
+   →
+   - Jugadas: `corregir`, sobre lo entregado: retira la foto.
+   - Efecto: se agrega el retiro de la foto; nada se borra. La entrega queda sin la captura que pide
+     la política: Leda lo resuelve en el momento (decisión 15 del usuario, 2026-10-08). La tarea sigue
+     `en_revision`, pero la revisión espera a que se complete.
+   - La respuesta dice: que sacó la foto; que para revisar la tarea falta una foto o una captura de la
+     pantalla, y que la revisión espera hasta que esté; el cierre, aparte: que mande la foto correcta.
+   - La respuesta no dice: que la tarea dejó de estar entregada o volvió a en curso; el nombre de Ismael.
+   - Estado después: tema abierto, lo que falta de la entrega del PLC.
+
+8. **Ismael** toca (15:25) "Aprobar" en el aviso que le llegó a las 15:16.
+   →
+   - Efecto: ninguno. La entrega se está completando: no se aprueba, y cuando esté completa a Ismael
+     le llega un aviso nuevo con todo.
+   - La respuesta dice: que Marcos está completando la entrega de la tarea del PLC y que le avisa
+     cuando esté completa.
+   - La respuesta no dice: que la aprobó o que quedó terminada; qué foto se retiró o por qué.
+
+9. **Marcos** manda (15:30) otra foto, sin texto.
+   →
+   - Jugadas: ninguna (o `entregar`): la foto se suma a la entrega que Leda está esperando.
+   - Efecto: con la foto, la entrega queda completa; se guarda la vista previa con su huella.
+   - La respuesta dice: que sumó la foto y que con eso la entrega queda completa; el cierre, aparte:
+     si la suma así.
+   - Botones: los de la confirmación.
+
+10. **Marcos** escribe (15:31): "dale"
+    →
+    - Jugadas: `confirmar` (con la tarea del PLC o sin ella).
+    - Efecto: la foto pasa a ser evidencia; la tarea sigue `en_revision`, sin otro cambio de estado.
+      A Ismael le llega un aviso nuevo con todo lo vigente, terminado el margen para corregir (ADR
+      0009, enmienda T6i).
+    - La respuesta dice: que la entrega quedó completa y sigue en revisión; que le avisa cuando la
+      revisen o si hace falta algo más.
+    - La respuesta no dice: el nombre de Ismael; que la tarea está terminada o aprobada.
+
+11. **Leda**, por su cuenta, a Ismael (15:41): el aviso nuevo de la entrega, con lo que describió
+    Marcos, la foto nueva adjunta y los botones. Nunca la foto retirada.
+
+12. **Marcos** manda (viernes 23, 10:00) una foto con el texto: "lo de comunicaciones ya esta, los equipos
    se comunicaron con el plc por la red de planta una hora sin errores"
    →
    - Jugadas: `entregar`, la tarea de comunicaciones, que nunca se arrancó: se recibe igual, con su
@@ -108,7 +153,7 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
    - Botones: los de la confirmación.
    - Estado después: lo último mostrado para confirmar: la entrega con dos piezas.
 
-7. **Marcos** escribe (10:01): "dale"
+13. **Marcos** escribe (10:01): "dale"
    →
    - Jugadas: `confirmar` (con la tarea de comunicaciones o sin ella).
    - Efecto, en un solo acto: las dos filas de evidencia; la historia dice que arrancó y se entregó en
@@ -127,7 +172,8 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
   cuenta como lo descrito sólo si la persona lo acepta; el ejemplo no inventa datos (lo verifica el
   código); no deja sin salida (cada respuesta dice qué falta y cómo describirlo); "la terminé" lleva a
   revisión, nunca a terminada, aunque la tarea no figure como arrancada, y no inventa una fecha de
-  inicio.
+  inicio; mientras a una entrega le falta lo que se retiró, nadie la aprueba ni le llega un aviso de
+  ella; nada se borra.
 - **El formato:** el de la conversación 20 en cada mensaje.
 - **Falla de comprensión:** que la IA dé por cubierto el criterio con "ya arranca desde el plc", que lea
   "y que pongo?" como una descripción, que lea "no, asi esta, mandala" como la aceptación del ejemplo o

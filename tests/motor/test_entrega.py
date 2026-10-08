@@ -170,8 +170,9 @@ def _entregar(tarea: str = "T2", **datos) -> Jugada:
 # --- La lista cerrada -----------------------------------------------------------------------
 
 def test_la_entrega_es_una_ficha_con_su_confirmacion():
-    # Sin arrancar también (decisión 14 del usuario, 2026-10-08).
-    assert FICHAS["entregar"].estados == frozenset({"asignada", "en_curso"})
+    # Sin arrancar también (decisión 14 del usuario, 2026-10-08), y en revisión sólo para
+    # completar lo que falta después de retirar algo (decisión 15).
+    assert FICHAS["entregar"].estados == frozenset({"asignada", "en_curso", "en_revision"})
     assert FICHAS["entregar"].se_ofrece
     assert "el_texto_cubre" in FICHAS["entregar"].opcional
     assert not FICHAS["confirmar"].se_ofrece and not FICHAS["guardar_para_la_entrega"].se_ofrece
@@ -907,3 +908,79 @@ def test_la_ia_recibe_lo_que_pide_la_tarea_sin_arrancar(conn, mundo, marcos):
     tarea = next(t for t in marcos.situacion["tareas"] if t["alias"] == "T2")
     assert [t["tipo_de_evidencia"] for t in tarea["evidencia_que_pide"]] == ["explicacion", "foto"]
     assert [p["punto"] for p in tarea["criterio_de_aceptacion"]] == ["C1", "C2"]
+
+
+# --- Una pieza retirada que deja la entrega incompleta (decisión 15 del usuario; D3) ---------
+
+def test_retirar_lo_que_cubria_la_politica_pide_la_pieza_y_el_aviso_no_sale(conn, mundo,
+                                                                            marcos):
+    """Leda lo resuelve con la persona en el momento: dice qué falta y pide la pieza correcta.
+    Mientras falta, la revisión espera: el aviso a quien aprueba que todavía no salió no sale."""
+    tarea = _tarea(conn, mundo)
+    _entregada(marcos, [(JPEG, "foto", None)])
+    r = marcos.manda(Jugada("corregir", {"corrige": "entregar", "tarea": "T2", "saca": ["P2"]}),
+                     texto="no, esa foto no era")
+    hecho = _hecho(r, "corregir")
+    assert hecho["resultado"] == "corregido" and hecho["retiradas"][0]["es"] == "una_foto"
+    assert hecho["como_queda"] == "le_falta_evidencia"
+    assert hecho["le_falta"] == ["una foto del trabajo terminado"]
+    assert hecho["la_revision_espera"] is True
+    assert r.pregunta["tipo"] == "lo_que_falta_de_la_entrega"
+    [aviso] = avisos_guardados(conn, "entrega_para_aprobar")
+    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "la_entrega_esta_incompleta")
+    assert estado_de(conn, tarea) == "en_revision"
+
+    # La pieza correcta completa la entrega: se confirma como siempre y a quien aprueba le llega
+    # un aviso nuevo con todo lo vigente (ADR 0009, enmienda T6i).
+    nueva = marcos.manda(archivos=[(JPEG, "foto", None)])
+    [vista] = nueva.hechos
+    assert vista["resultado"] == "para_confirmar" and vista["sumo"] == ["P1"]
+    hecho = _hecho(marcos.manda(Jugada("confirmar", {}), texto="dale"), "confirmar")
+    assert hecho["resultado"] == "entrega_completa" and "aviso_a_quien_aprueba" in hecho
+    assert estado_de(conn, tarea) == "en_revision"
+    assert cuantas(conn, "evidence") == 3 and cuantas(conn, "evidencia_retirada") == 1
+    assert [a["estado"] for a in avisos_guardados(conn, "entrega_para_aprobar")] == [
+        "omitido", "guardado"]
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=30)) == {"enviado": 1}
+    [hechos] = ia.pedidos_de_redaccion[0]["hechos"]
+    assert [p["es"] for p in hechos["lo_que_entrego"]] == ["lo_que_escribio", "una_foto"]
+
+
+def test_retirar_el_texto_que_decia_el_criterio_lo_pide_con_un_ejemplo(conn, mundo, marcos):
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"]), texto="quedo cerrado y rotulado")
+    marcos.manda(_entregar(lo_descrito_cubre=["C1", "C2"]), texto="y paso la aislacion con 500 V")
+    marcos.manda(Jugada("confirmar", {}), texto="dale")
+    r = marcos.manda(Jugada("corregir", {"corrige": "entregar", "tarea": "T2", "saca": ["P2"]}),
+                     texto="lo segundo sacalo, estaba mal")
+    hecho = _hecho(r, "corregir")
+    assert hecho["le_falta_del_criterio"] == [AISLACION]
+    assert hecho["ejemplo"] == f"{AISLACION}."
+    assert "le_falta" not in hecho                      # la explicación la sigue cubriendo P1
+    assert r.pregunta["tipo"] == "lo_que_falta_de_la_entrega"
+
+
+def test_entregada_y_completa_no_se_vuelve_a_entregar(conn, mundo, marcos):
+    _tarea(conn, mundo)
+    _entregada(marcos)
+    r = marcos.manda(_entregar(), texto="ya la termine")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "estado"
+    assert hecho["estado"] == "en_revision"
+
+
+def test_el_aviso_que_sale_con_la_entrega_incompleta_no_sale(conn, mundo, marcos):
+    """Si al salir la entrega no cubre lo que pide la tarea (se retiró algo y el turno no lo
+    omitió), no sale: la revisión espera a que se complete."""
+    tarea = _tarea(conn, mundo)
+    _entregada(marcos, [(JPEG, "foto", None)])
+    with admin(conn) as cur:
+        cur.execute("""insert into evidencia_retirada (workspace_id, evidence_id,
+                                                       retirada_por_membership_id, at)
+                       select workspace_id, id, entregado_por, clock_timestamp() from evidence
+                        where task_id = %s and clase = 'imagen'""", (tarea,))
+    conn.commit()
+    assert enviar(conn, mundo, IAQueRedacta(), AHORA + timedelta(minutes=13)) == {"omitido": 1}
+    [aviso] = avisos_guardados(conn, "entrega_para_aprobar")
+    assert aviso["motivo_omision"] == "la_entrega_esta_incompleta"

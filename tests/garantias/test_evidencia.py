@@ -460,7 +460,7 @@ def test_entregar_escribe_las_piezas_y_pasa_a_revision_en_un_solo_acto(corework,
     assert r["entrega"] == r["evidencias"][0]
 
 
-@pytest.mark.parametrize("estado", ["bloqueada", "en_revision"])
+@pytest.mark.parametrize("estado", ["bloqueada"])
 def test_entregar_solo_desde_en_curso_o_sin_arrancar(corework, conn, estado):
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -634,3 +634,27 @@ def test_una_tarea_sin_arrancar_que_espera_otra_no_se_entrega(corework, conn):
     assert r["en_revision"] is False and r["no_arranca"]
     with admin(conn) as cur:
         assert _cuantas(cur, "evidence", "task_id = %s", tarea) == 0
+
+
+# --- Completar la entrega de una tarea en revisión (decisión 15 del usuario; D3) -------------
+
+def test_completar_una_entrega_en_revision_suma_las_piezas_sin_moverla(corework, conn):
+    """Se retiró una pieza y la entrega quedó incompleta: la pieza correcta se suma a la tarea en
+    revisión, que no cambia de estado (ni vuelve a en curso, ni a terminada)."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws, estado="en_revision")
+        mariano = _membresia(cur, ws, "Mariano Naim")
+        _pieza(cur, ws, tarea, cubre=["explicacion"], por=mariano)
+        foto = _archivo(cur, ws, mariano)
+        cur.execute("select count(*) n from task_state_event where task_id = %s", (tarea,))
+        eventos = cur.fetchone()["n"]
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, ws, "Mariano Naim")
+        r = H.ejecutar(cur, quien, "entregar_tarea", {"tarea_id": tarea, "piezas": [
+            {"archivo_id": foto, "cubre": ["foto"]}]}, ya_confirmada=True)
+    assert r["estado"] == "en_revision" and r["completa"] is True and len(r["evidencias"]) == 1
+    with admin(conn) as cur:
+        assert _cuantas(cur, "evidence", "task_id = %s", tarea) == 2
+        assert _cuantas(cur, "task_state_event", "task_id = %s", tarea) == eventos

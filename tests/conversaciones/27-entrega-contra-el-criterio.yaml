@@ -159,9 +159,142 @@ pasos:
       - el nombre de Ismael
       - que la tarea está terminada o aprobada
 
+  # El aviso a Ismael sale terminado el margen para corregir, con la foto adjunta.
+  - paso: 6
+    quien: Leda
+    relojes: ["2026-10-22 15:16"]
+    salen:
+      - a: Ismael
+        tipo: entrega_para_aprobar
+        tarea: PLC
+        fotos: 1
+        botones: [Aprobar, Pedir cambios]
+        hechos:
+          necesita_respuesta: true
+          pregunta: decision_de_la_entrega
+          lo_que_entrego:
+            - {es: lo_que_escribio}
+            - {es: una_foto, va_adjunta: true}
+            - {es: lo_que_escribio}
+    dice:
+      - que Marcos entregó la tarea del PLC, en su renglón con 📋
+      - lo que describió Marcos, en pocas palabras
+      - que va una foto adjunta
+      - "el cierre, aparte: si la aprueba o le pide cambios, con los botones o escribiendo"
+
+  # La foto que retira Marcos deja la entrega sin la captura (decisión 15 del usuario,
+  # 2026-10-08): Leda pide la pieza correcta y la revisión espera.
+  - paso: 7
+    quien: Marcos
+    a_las: "2026-10-22 15:20"
+    escribe: "la foto sacala, era de otra maquina"
+    jugadas:
+      - {nombre: corregir, corrige: entregar, tarea: PLC, saca: [P2]}
+    efectos:
+      retiradas: [{tarea: PLC, clase: imagen}]
+    hechos:
+      - {jugada: corregir, resultado: corregido, corrige: entregar, tarea: PLC,
+         retiradas: [{es: una_foto}], como_queda: le_falta_evidencia,
+         le_falta: ["una foto o una captura de la pantalla"], la_revision_espera: true,
+         pregunta: lo_que_falta_de_la_entrega}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    dice:
+      - que sacó la foto
+      - que para revisar la tarea falta una foto o una captura de la pantalla, y que la revisión espera hasta que esté
+      - "el cierre, aparte: que mande la foto correcta"
+    no_dice:
+      - que la tarea dejó de estar entregada o volvió a en curso
+      - el nombre de Ismael
+
+  # Ismael toca Aprobar en el aviso que ya le llegó: no cambia nada.
+  - paso: 8
+    quien: Ismael
+    a_las: "2026-10-22 15:25"
+    toca: Aprobar
+    de_la_tarea: PLC
+    efectos: {}
+    hechos:
+      - {jugada: aprobar, resultado: no_se_puede, motivo: la_entrega_se_esta_completando,
+         tarea: PLC, se_le_avisa_cuando_este_completa: true}
+    dice:
+      - que Marcos está completando la entrega de la tarea del PLC
+      - que le avisa cuando esté completa
+    no_dice:
+      - que la aprobó o que quedó terminada
+      - qué foto se retiró o por qué
+
+  # La foto correcta completa la entrega: se confirma como siempre.
+  - paso: 9
+    quien: Marcos
+    a_las: "2026-10-22 15:30"
+    manda: [{que: foto}]
+    jugadas: []
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
+         sumo: [P1], entrega: [{pieza: P1, es: una_foto}]}
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
+    dice:
+      - que sumó la foto y que con eso la entrega queda completa
+      - "el cierre, aparte: si la suma así"
+
+  - paso: 10
+    quien: Marcos
+    a_las: "2026-10-22 15:31"
+    escribe: "dale"
+    jugadas:
+      - {nombre: confirmar, tarea: PLC, puede_traer: [tarea]}
+    efectos:
+      evidencias:
+        - {tarea: PLC, clase: imagen, cubre: [captura]}
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: PLC, a: Ismael, estado: guardado}
+    hechos:
+      - {jugada: confirmar, resultado: entrega_completa, tarea: PLC, estado: en_revision,
+         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-22T15:41"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la entrega quedó completa y sigue en revisión
+      - que le avisa cuando la revisen o si hace falta algo más
+    no_dice:
+      - el nombre de Ismael
+      - que la tarea está terminada o aprobada
+
+  # A Ismael le llega un aviso nuevo con todo lo vigente (ADR 0009, enmienda T6i).
+  - paso: 11
+    quien: Leda
+    relojes: ["2026-10-22 15:41"]
+    salen:
+      - a: Ismael
+        tipo: entrega_para_aprobar
+        tarea: PLC
+        fotos: 1
+        botones: [Aprobar, Pedir cambios]
+        hechos:
+          necesita_respuesta: true
+          pregunta: decision_de_la_entrega
+          lo_que_entrego:
+            - {es: lo_que_escribio}
+            - {es: lo_que_escribio}
+            - {es: una_foto, va_adjunta: true}
+    dice:
+      - que Marcos completó la entrega de la tarea del PLC, en su renglón con 📋
+      - que va la foto nueva adjunta
+      - "el cierre, aparte: si la aprueba o le pide cambios, con los botones o escribiendo"
+    no_dice:
+      - la foto retirada
+
   # Comunicaciones nunca se arrancó: "ya está" se recibe igual (decisión 14 del usuario,
   # 2026-10-08), y lo escrito dice lo que pide su criterio, así que no se pregunta nada.
-  - paso: 6
+  - paso: 12
     quien: Marcos
     a_las: "2026-10-23 10:00"
     escribe: "lo de comunicaciones ya esta, los equipos se comunicaron con el plc por la red de planta una hora sin errores"
@@ -186,7 +319,7 @@ pasos:
       - que le falta arrancarla o que no figura como arrancada
       - qué falta del criterio
 
-  - paso: 7
+  - paso: 13
     quien: Marcos
     a_las: "2026-10-23 10:01"
     escribe: "dale"

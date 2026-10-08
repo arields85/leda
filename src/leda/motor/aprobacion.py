@@ -72,7 +72,7 @@ NO_ES_QUIEN_APRUEBA = "no_es_quien_aprueba"
 NADA_PARA_DECIDIR = "nada_para_decidir"
 PERSONA_DESCONOCIDA = "persona_desconocida"
 YA_LA_APROBO = "ya_la_aprobo"
-FALTA_EVIDENCIA = "falta_evidencia"
+SE_ESTA_COMPLETANDO = "la_entrega_se_esta_completando"
 CAMBIO_LA_ENTREGA = "cambio_la_entrega"
 # Lo que se resolvió cuando el sistema cierra solo una tarea aprobada.
 TAREAS_QUE_ESPERABA = "tareas_que_esperaba"
@@ -137,20 +137,20 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
     tarea, no = _la_tarea(ctx, "aprobar", datos, tarea)
     if no is not None:
         return no
+    cur = ctx.cur
+    if entrega.falta_algo_de_lo_entregado(cur, tarea["id"]):
+        # El responsable retiró algo y está completando la entrega: no cambia nada, y cuando
+        # esté completa a quien aprueba le llega un aviso nuevo (decisión 15 del usuario).
+        return {"resultado": "no_se_puede", "motivo": SE_ESTA_COMPLETANDO,
+                "tarea": _tarea(tarea), "se_le_avisa_cuando_este_completa": True}
     no = _la_guarda(ctx, datos, tarea)
     if no is not None:
         return no
-    cur = ctx.cur
     vigente = aprobacion_vigente(cur, tarea["id"], ctx.quien.membership_id)
     if vigente is not None:
         return {"resultado": "no_se_puede", "motivo": YA_LA_APROBO, "tarea": _tarea(tarea),
                 "ya_la_aprobo_el": aprobada_el(cur, vigente, ctx.calendario.zona),
                 **_frena(cur, tarea["id"])}
-    faltan = entrega._faltan(cur, tarea["id"], [])
-    if faltan:
-        pol = entrega.politica(cur, tarea["id"])
-        return {"resultado": "no_se_puede", "motivo": FALTA_EVIDENCIA, "tarea": _tarea(tarea),
-                "todavia_le_falta": [pol.en_palabras(t) for t in faltan]}
     comentario = _comentario(datos)
     r = ejecutar(cur, ctx.quien, "aprobar_tarea",
                  {"tarea_id": tarea["id"], **({"comentario": comentario} if comentario else {})},

@@ -1793,7 +1793,8 @@ def _resolver_piezas(cur, tarea_id, piezas: list[dict]) -> list[dict]:
     "entregar_tarea", "actualizar_estado",
     "Entrega una tarea en curso, o una asignada que nunca se arrancó, con sus piezas de "
     "evidencia: en un solo acto escribe cada pieza y pasa la tarea a revisión. Sólo si la "
-    "evidencia cubre la política de la tarea.",
+    "evidencia cubre la política de la tarea. Sobre una tarea en revisión, completa su entrega "
+    "con las piezas nuevas, sin moverla.",
     {"tarea_id": {"type": "string", "requerido": True},
      "piezas": {"type": "array", "requerido": True}})
 def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
@@ -1808,6 +1809,10 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
     (`arranco`), y el arranque cumple la regla de siempre: no con una dependencia bloqueante
     sin terminar (mecánica §4; `motivo_no_arranca_tarea`).
 
+    Sobre una tarea `en_revision` completa su entrega (decisión 15 del usuario, 2026-10-08): la
+    persona retiró una pieza y suma la correcta. Las piezas se escriben y la tarea no se mueve
+    (`completa`); el aviso nuevo a quien aprueba, con todo lo vigente, lo guarda el motor.
+
     Porción 3a de la C-3 (ADR 0019, decisión 6): el aviso a quien aprueba ya no sale de acá,
     con texto fijo. Lo guarda el motor, que lo redacta desde los hechos de su hora
     (`motor.avisos`, `entrega_para_aprobar`); la cocina devuelve la identidad del acto
@@ -1821,9 +1826,10 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
         return {"error": "esa tarea no existe en este equipo"}
     if str(fila["responsable_membership_id"]) != str(quien.membership_id):
         raise Denegado("No podés entregar una tarea que no es tuya.")
-    if fila["estado"] not in ("en_curso", "asignada"):
+    if fila["estado"] not in ("en_curso", "asignada", "en_revision"):
         return {"en_revision": False, "estado": str(fila["estado"]),
                 "error": "la tarea no está en curso"}
+    completa = fila["estado"] == "en_revision"
     arranca = fila["estado"] == "asignada"
     if arranca:
         cur.execute("select motivo_no_arranca_tarea(%s) as m", (tarea_id,))
@@ -1846,6 +1852,12 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
                        'arrancó al entregarla', clock_timestamp())""",
             (tarea_id, quien.app_user_id))
     ids = [_insertar_evidencia(cur, quien, tarea_id, p) for p in resueltas]
+    if completa:
+        if not ids:
+            return {"en_revision": True, "estado": "en_revision",
+                    "error": "no hay piezas para completar la entrega"}
+        return {"estado": "en_revision", "evidencias": ids, "entrega": str(ids[0]),
+                "completa": True}
     cur.execute(
         """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
                                          actor_kind, actor_app_user_id, motivo, at)

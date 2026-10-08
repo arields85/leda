@@ -188,9 +188,14 @@ SIGNIFICADOS: Mapping[str, str] = {
                   "éste. Lo que no va adjunto sólo se nombra: está con la entrega.",
     "fotos_adjuntas": "Cuántas fotos van adjuntas, en un mensaje aparte que sale enseguida "
                       "después de éste.",
-    "todavia_le_falta": "Lo que pide la tarea y ya no está entre lo entregado, porque la persona "
-                        "sacó algo después de entregarla, en palabras de todos los días: así "
-                        "todavía no se puede aprobar.",
+    "la_revision_espera": "La persona sacó algo después de entregarla y a la entrega le falta "
+                          "lo que se dice: mientras falte, la revisión espera; cuando esté "
+                          "completa, quien la revisa recibe un aviso nuevo con todo.",
+    "entrega_completa": "La entrega de la tarea, que ya estaba en revisión, quedó completa otra "
+                        "vez: sigue en revisión, y quien la revisa recibe un aviso nuevo con "
+                        "todo lo entregado.",
+    "la_entrega_esta_incompleta": "A la entrega le falta algo porque la persona sacó una pieza "
+                                  "después de entregarla: la revisión espera a que se complete.",
     "sumo": "Las piezas (por su alias) que se sumaron a la entrega con este mensaje.",
     "sacadas": "Las piezas que la persona sacó de la entrega antes de confirmarla: no van.",
     "retiradas": "Las piezas ya entregadas que la persona retiró: dejan de contar, nada se "
@@ -274,8 +279,11 @@ SIGNIFICADOS: Mapping[str, str] = {
                          "escribe.",
     "persona_desconocida": "No hay nadie en el equipo con ese nombre.",
     "ya_la_aprobo": "La persona que escribe ya la había aprobado: no se anota otra vez.",
-    "falta_evidencia": "Lo entregado no cubre lo que pide la tarea (todavia_le_falta dice qué): "
-                       "así no se aprueba.",
+    "la_entrega_se_esta_completando": "La persona responsable sacó algo de lo que entregó y "
+                                      "está completando la entrega: así todavía no se aprueba "
+                                      "y no cambió nada.",
+    "se_le_avisa_cuando_este_completa": "Cuando la entrega esté completa, a quien la revisa le "
+                                        "llega un aviso nuevo con todo. Todavía no pasó.",
     "cambio_la_entrega": "La entrega cambió desde el aviso que tenía ese botón: el botón ya no "
                          "vale; se decide sobre lo que vale ahora.",
     "decision_de_la_entrega": "Pregunta si quien aprueba aprueba la entrega o le pide cambios: "

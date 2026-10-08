@@ -141,10 +141,11 @@ def turnos(conn, mundo) -> Turnos:
     return Turnos(conn, mundo)
 
 
-def _entregada(conn, mundo, turnos, titulo: str = ENTREGADA, alias: str = "T2") -> str:
+def _entregada(conn, mundo, turnos, titulo: str = ENTREGADA, alias: str = "T2",
+               **de_la_tarea) -> str:
     """Marcos entrega `titulo`, con lo que describe el criterio de aceptación (C-3d, D3), y la
     confirma por escrito; la tarea queda en revisión."""
-    tarea = _tarea(conn, mundo, titulo)
+    tarea = _tarea(conn, mundo, titulo, **de_la_tarea)
     turnos.dice("Marcos", Jugada("entregar", {"tarea": alias, "lo_descrito_cubre": ["C1"]}),
                 texto="termine, quedo armado y probado")
     turnos.dice("Marcos", Jugada("confirmar", {}), texto="dale")
@@ -261,7 +262,8 @@ def test_sin_tarea_con_una_sola_entrega_de_esa_persona_es_esa(conn, mundo, turno
 
 def test_aprobar_exige_la_evidencia_que_pide_la_politica(conn, mundo, turnos):
     """La política de evidencia se cumple con lo entregado vigente: lo retirado no cuenta, y sin
-    eso no se aprueba (mecánica §5)."""
+    eso no se aprueba (mecánica §5). A quien aprueba se le dice que la entrega se está
+    completando y que se le avisa (decisión 15 del usuario, 2026-10-08)."""
     with admin(conn) as cur:
         cur.execute("""insert into task_evidence_policy (workspace_id, area_id,
                                                          evidencia_requerida, tipos)
@@ -278,8 +280,9 @@ def test_aprobar_exige_la_evidencia_que_pide_la_politica(conn, mundo, turnos):
                                              "saca": ["P1"]}), texto="no, eso no va")
     r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
     hecho = _hecho(r, "aprobar")
-    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "falta_evidencia"
-    assert hecho["todavia_le_falta"] == ["cómo quedó"]
+    assert hecho["resultado"] == "no_se_puede"
+    assert hecho["motivo"] == "la_entrega_se_esta_completando"
+    assert hecho["se_le_avisa_cuando_este_completa"] is True
     assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
 
 
@@ -469,12 +472,29 @@ def test_el_boton_de_una_entrega_ya_decidida_no_hace_nada_y_lo_dice(conn, mundo,
 def test_el_boton_de_un_aviso_cuya_entrega_cambio_no_vale(conn, mundo, turnos):
     """La guarda (ADR 0018, decisión 2): lo que se aprueba con el botón es lo que mostró el
     aviso. Si la entrega cambió desde entonces, el toque no aprueba."""
-    tarea, _ = _con_el_aviso(conn, mundo, turnos)
+    # Sin criterio de aceptación ni política: retirar lo escrito cambia la entrega y no la deja
+    # incompleta (eso es la decisión 15, abajo).
+    tarea, _ = _con_el_aviso(conn, mundo, turnos, criterio=None)
     turnos.dice("Marcos", Jugada("corregir", {"corrige": "entregar", "tarea": "T2",
                                              "saca": ["P1"]}), texto="eso no iba")
     r = turnos.toca("Ismael", _token(conn, "Aprobar", tarea))
     hecho = _hecho(r, "aprobar")
     assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "cambio_la_entrega"
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+
+
+def test_aprobar_mientras_la_entrega_se_completa_no_cambia_nada_y_lo_dice(conn, mundo, turnos):
+    """Decisión 15 del usuario (2026-10-08): el aviso ya salió y Marcos retiró lo que decía el
+    criterio. Tocar Aprobar no cambia nada: la entrega se está completando, y a quien aprueba le
+    llega un aviso nuevo cuando esté completa."""
+    tarea, _ = _con_el_aviso(conn, mundo, turnos)
+    turnos.dice("Marcos", Jugada("corregir", {"corrige": "entregar", "tarea": "T2",
+                                             "saca": ["P1"]}), texto="eso no iba")
+    r = turnos.toca("Ismael", _token(conn, "Aprobar", tarea))
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "no_se_puede"
+    assert hecho["motivo"] == "la_entrega_se_esta_completando"
+    assert hecho["se_le_avisa_cuando_este_completa"] is True
     assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
 
 

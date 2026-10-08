@@ -965,8 +965,8 @@ def _lo_entregado_para_aprobar(m: Momento, task_id) -> tuple[list[dict[str, Any]
 
 def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     """El aviso de una entrega corresponde mientras la tarea espere la aprobación de quien lo
-    recibe. Sus hechos son los de ahora: lo entregado vigente, cuántas fotos van adjuntas y, si
-    después de entregar se retiró algo y la política quedó incompleta, qué falta."""
+    recibe y su entrega esté completa. Sus hechos son los de ahora: lo entregado vigente y
+    cuántas fotos van adjuntas."""
     tarea = leer_tarea(m.cur, aviso["task_id"])
     if tarea is None:
         return "tarea_inexistente", {}
@@ -977,14 +977,14 @@ def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, An
     quien = referente(m.cur, str(tarea["responsable_membership_id"]))
     if quien is None or quien["membership_id"] != str(aviso["destinatario_membership_id"]):
         return CAMBIO_QUIEN_APRUEBA, {}
+    if entrega.falta_algo_de_lo_entregado(m.cur, str(tarea["id"])):
+        # Se retiró algo y la entrega quedó incompleta: la revisión espera; cuando esté completa
+        # sale un aviso nuevo con todo (decisión 15 del usuario, 2026-10-08).
+        return entrega.LA_ENTREGA_ESTA_INCOMPLETA, {}
     vistas, adjuntas = _lo_entregado_para_aprobar(m, tarea["id"])
     hechos = {k: v for k, v in dict(aviso["hechos"]).items()
               if k in ("aviso", "necesita_respuesta", "pregunta", "responsable")}
     hechos.update(tarea=tarea["titulo"], lo_que_entrego=vistas, fotos_adjuntas=len(adjuntas))
-    faltan = entrega._faltan(m.cur, str(tarea["id"]), [])
-    if faltan:
-        pol = entrega.politica(m.cur, str(tarea["id"]))
-        hechos["todavia_le_falta"] = [pol.en_palabras(t) for t in faltan]
     return None, hechos
 
 

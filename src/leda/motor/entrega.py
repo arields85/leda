@@ -56,6 +56,16 @@ previa qué describe cada texto y lo puede corregir (`corregir`, con `lo_descrit
 **Corregir** (`corregir`, situación general 3): "la foto del martes sacala" saca una pieza de la
 vista previa; después de entregada, la retira (`herramientas.retirar_evidencia`): se agrega un
 retiro, nada se borra (9f).
+
+**Una pieza retirada que deja la entrega incompleta** (decisión 15 del usuario, 2026-10-08): si
+después de entregar la persona retira lo que cubría la política o lo que decía un punto del
+criterio, Leda se lo resuelve en el momento: dice qué falta y pide la pieza correcta, con la
+misma ayuda que en la entrega (el tema abierto de lo que falta, con su ejemplo). Mientras falta,
+la revisión espera: el aviso a quien aprueba que todavía no salió no sale (queda omitido, y al
+salir se relee: `avisos._vigencia_de_la_entrega`), y si ya salió, aprobar no cambia nada
+(`aprobacion.aprobar`). Con la pieza nueva confirmada, la entrega vuelve a estar completa
+(`herramientas.entregar_tarea` sobre la tarea en revisión) y a quien aprueba le llega un aviso
+nuevo con todo lo vigente (ADR 0009, enmienda T6i).
 """
 
 from __future__ import annotations
@@ -85,6 +95,8 @@ LO_QUE_ESCRIBIO, UNA_FOTO, UN_VIDEO, UN_ARCHIVO, UN_ENLACE = (
 PARA_CONFIRMAR = "para_confirmar"
 LE_FALTA_EVIDENCIA = "le_falta_evidencia"
 ENTREGADA = "entregada"
+ENTREGA_COMPLETA = "entrega_completa"
+LA_ENTREGA_ESTA_INCOMPLETA = "la_entrega_esta_incompleta"
 NO_VALE_LA_CONFIRMACION = "no_vale_la_confirmacion"
 LLEGO_ALGO_DESPUES = "llego_algo_despues"
 CAMBIO_LO_QUE_SE_MOSTRO = "cambio_lo_que_se_mostro"
@@ -305,6 +317,13 @@ def _lo_dicho_de_lo_entregado(cur, task_id: str) -> tuple[set[str], set[str]]:
     for f in cur.fetchall():
         (retirado if f["retirada"] else vigente).update(f["d"] or [])
     return vigente, retirado
+
+
+def falta_algo_de_lo_entregado(cur, task_id: str) -> bool:
+    """Si a la entrega vigente de una tarea en revisión le falta algo de lo que pide (la
+    política o un punto del criterio que dejó de estar dicho): la revisión espera (decisión 15
+    del usuario, 2026-10-08)."""
+    return bool(_faltan(cur, task_id, []) or falta_del_criterio_de_lo_entregado(cur, task_id))
 
 
 def falta_del_criterio_de_lo_entregado(cur, task_id: str) -> list[str]:
@@ -705,7 +724,14 @@ def entregar(ctx, datos: dict, tarea: dict) -> dict:
     lo que escribió) sumado a la entrega abierta de esa tarea o, si no hay, a lo que mandó antes
     durante la tarea. Nada se escribe en la tarea hasta confirmar."""
     vieja = abierta(ctx, tarea["id"])
-    piezas = _piezas_de(vieja) if vieja is not None else _mandado_antes(ctx, tarea["id"])
+    if tarea["estado"] == "en_revision":
+        # Entregada: sólo se completa lo que le falta después de retirar algo (decisión 15).
+        if vieja is None and not falta_algo_de_lo_entregado(ctx.cur, tarea["id"]):
+            return {"resultado": "no_se_puede", "motivo": "estado", "estado": "en_revision",
+                    "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]}}
+        piezas = _piezas_de(vieja)
+    else:
+        piezas = _piezas_de(vieja) if vieja is not None else _mandado_antes(ctx, tarea["id"])
     dicho = datos.get("el_texto_cubre")
     dicho = [str(t) for t in dicho] if isinstance(dicho, list) else None
     juzgado = _de_los_codigos(criterio(ctx.cur, tarea["id"]), datos.get("lo_descrito_cubre"))
@@ -884,6 +910,7 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
     r = ejecutar(cur, ctx.quien, "entregar_tarea",
                  {"tarea_id": tarea_q["id"], "piezas": [_para_la_cocina(p) for p in piezas]},
                  ya_confirmada=True)
+    completa = bool(r.get("completa"))
     fichas = _fichas()
     if r.get("no_arranca"):
         # Una tarea sin arrancar que espera que terminen otras de las que depende (mecánica §4).
@@ -898,7 +925,7 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
     fichas.cerrar_esperas(ctx, tarea_q["id"])
     pol = politica(cur, tarea_q["id"])
     hecho: dict[str, Any] = {
-        "resultado": ENTREGADA,
+        "resultado": ENTREGA_COMPLETA if completa else ENTREGADA,
         "tarea": {"alias": tarea_q["alias"], "titulo": tarea_q["titulo"]},
         "estado": "en_revision", "entrega": mostrar(_ordenar(piezas), pol, ctx.calendario.zona),
         **({"arranco_al_entregarla": True} if r.get("arranco") else {})}
@@ -919,6 +946,22 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
                                               fichas.LLEGA: sale.isoformat()}
             fichas.nombrar_efecto(hecho, "aviso_a_quien_aprueba", fichas.AVISO, aviso_id)
     return hecho
+
+
+def _la_entrega_queda_incompleta(ctx, tarea: Mapping[str, Any]) -> dict[str, Any]:
+    """Lo que pasa cuando un retiro deja incompleta la entrega de una tarea en revisión
+    (decisión 15 del usuario, 2026-10-08): el aviso a quien aprueba que todavía no salió ya no
+    sale (cuando esté completa le llega uno nuevo con todo) y Leda pide lo que falta, con la
+    misma ayuda que en la entrega: el tema abierto de lo que falta, con su ejemplo."""
+    from . import avisos        # avisos importa fichas, que importa este módulo
+    ctx.cur.execute("""update scheduled_notice
+                          set estado = 'omitido', motivo_omision = %s, resuelto_en = %s,
+                              proximo_intento_en = null
+                        where task_id = %s and tipo = %s and estado = 'guardado'""",
+                    (LA_ENTREGA_ESTA_INCOMPLETA, ctx.ahora, tarea["id"],
+                     avisos.ENTREGA_PARA_APROBAR))
+    hecho = _mostrar_la_entrega(ctx, _tarea_de(ctx, tarea["id"]), [], abierta(ctx, tarea["id"]))
+    return {**hecho, "como_queda": hecho["resultado"], "la_revision_espera": True}
 
 
 def _para_la_cocina(p: Mapping[str, Any]) -> dict[str, Any]:
@@ -965,7 +1008,7 @@ def corregir(ctx, datos: dict, tarea: dict) -> dict:
             return {"resultado": "falta_dato", "falta": ["saca"], **base}
         pol = politica(ctx.cur, tarea["id"])
         vistas = mostrar(entregado, pol, ctx.calendario.zona)
-        retiradas, faltan = [], []
+        retiradas = []
         for a in saca:
             r = ejecutar(ctx.cur, ctx.quien, "retirar_evidencia",
                          {"evidencia_id": por_alias[a]["evidencia_id"],
@@ -973,7 +1016,8 @@ def corregir(ctx, datos: dict, tarea: dict) -> dict:
             if not r.get("retirada"):
                 return {"resultado": "no_se_puede", "motivo": "ya_aprobada", **base}
             retiradas.append(vistas[entregado.index(por_alias[a])])
-            faltan = r.get("faltan") or []
-        return {"resultado": "corregido", **base, "retiradas": retiradas,
-                **({"le_falta": [pol.en_palabras(t) for t in faltan]} if faltan else {})}
+        if not falta_algo_de_lo_entregado(ctx.cur, tarea["id"]):
+            return {"resultado": "corregido", **base, "retiradas": retiradas}
+        return {**_la_entrega_queda_incompleta(ctx, tarea), "resultado": "corregido", **base,
+                "retiradas": retiradas}
     return {"resultado": "no_se_puede", "motivo": "nada_que_corregir", **base}
