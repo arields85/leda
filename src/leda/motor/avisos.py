@@ -40,6 +40,17 @@ camino de envío es uno para todos. Cuándo se guardan los de la escalera es de 
 los de una previsión y su corrección, de sus fichas (`fichas.py`), que los guardan para después
 del margen para corregir (`margen.py`): lo que una persona dijo le llega a otra sólo cuando ya
 tuvo tiempo de corregirlo.
+
+**El aviso de una entrega a quien la aprueba** (`entrega_para_aprobar`; ADR 0019, decisión 6;
+porción 3a de la C-3) reemplaza al texto fijo de la cocina. Lo guarda la confirmación de la
+entrega (`guardar_aviso_de_entrega`), con el margen para corregir. Al salir, el código relee la
+tarea y la evidencia vigente (la del ciclo, sin lo retirado): si la tarea ya no espera la
+aprobación, queda omitido con su motivo. Es de coordinación: fuera del tope diario. Las fotos de
+la evidencia van adjuntas, hasta diez, como un álbum que sale después del texto, en otra fila de
+la misma respuesta (`adjuntos` del tipo; `message_outbox_adjunto`); los demás archivos sólo se
+nombran. Una entrega nueva de la misma tarea retira el aviso que todavía espera y guarda otro
+con toda la evidencia vigente (ADR 0009, enmienda T6i). Todavía sin los botones Aprobar y Pedir
+cambios (porción 3b) ni el enlace a la página de la tarea (porción 4).
 """
 
 from __future__ import annotations
@@ -57,15 +68,16 @@ import psycopg
 from ..calendario import Calendario
 from ..db import espacio
 from ..incidentes import registrar_incidente
-from ..salida import PayloadValidationError, enqueue_outbox
+from ..salida import MAX_ADJUNTOS, PayloadValidationError, enqueue_outbox
 
-from . import cambios_de_estado, preguntas
+from . import cambios_de_estado, entrega, preguntas
 from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, anclaje,
                     clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
 from .auditoria import auditar
 from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, LLEGA, NO_LE_LLEGO,
-                     YA_LE_LLEGO)
+                     YA_LE_LLEGO, referente)
+from .margen import sale_con_margen
 from .ia import IA
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
 from .tiempo import Reloj
@@ -113,6 +125,8 @@ class Momento:
 
 
 Vigencia = Callable[[Momento, dict[str, Any]], tuple[str | None, dict[str, Any]]]
+# Los archivos que un aviso lleva adjuntos al salir, en orden (ADR 0019, decisión 6).
+Adjuntos = Callable[[Momento, dict[str, Any]], list[str]]
 
 
 @dataclass(frozen=True)
@@ -125,6 +139,7 @@ class TipoDeAviso:
     vigente: Vigencia
     es_coordinacion: bool = False   # lo causa el acto de otra persona (mecánica §10)
     escala: bool = False            # al salir, la espera queda escalada
+    adjuntos: Adjuntos | None = None    # sólo un aviso de coordinación, que sale solo
 
 
 # --- Guardar --------------------------------------------------------------------------------
@@ -267,13 +282,27 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
 
     primero = str(envio[0].aviso["id"])
     clave = f"motor:aviso:{primero}"
+    # Lo que lleva adjunto (las fotos de una entrega): otra fila de la misma respuesta, que el
+    # despachador manda después del texto. Sólo el aviso de coordinación que sale solo.
+    tipo = envio[0].tipo
+    adjuntos = (tipo.adjuntos(m, envio[0].aviso)
+                if tipo.adjuntos is not None and len(envio) == 1 else [])
+    tipo_de_mensaje = max((x.tipo.tipo_de_mensaje for x in envio), key=URGENCIA.index)
     try:
         enqueue_outbox(cur, workspace_id=m.workspace_id,
                        chat_id=destinatario["telegram_user_id"], text=texto, dedupe_key=clave,
-                       recipient_membership_id=persona,
-                       message_type=max((x.tipo.tipo_de_mensaje for x in envio),
-                                        key=URGENCIA.index),
-                       es_coordinacion=envio[0].tipo.es_coordinacion, scheduled_for=m.ahora)
+                       recipient_membership_id=persona, message_type=tipo_de_mensaje,
+                       es_coordinacion=tipo.es_coordinacion, scheduled_for=m.ahora,
+                       grupo_respuesta=clave if adjuntos else None)
+        if adjuntos:
+            # El texto de la fila del álbum es sólo el registro de lo que lleva: el álbum sale
+            # sin texto (`salida.enqueue_outbox`, `adjuntos`).
+            enqueue_outbox(cur, workspace_id=m.workspace_id,
+                           chat_id=destinatario["telegram_user_id"],
+                           text=f"(adjuntos: {len(adjuntos)})", dedupe_key=f"{clave}:adjuntos",
+                           recipient_membership_id=persona, message_type=tipo_de_mensaje,
+                           es_coordinacion=tipo.es_coordinacion, scheduled_for=m.ahora,
+                           grupo_respuesta=clave, adjuntos=adjuntos)
     except PayloadValidationError as falla:
         # Un texto que el canal no lleva (más largo que su límite: un envío que junta varios
         # avisos lo hace más probable) no es una redacción: se reintenta como si la IA no lo
@@ -287,7 +316,7 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                           set estado = 'enviado', outbox_id = %s, resuelto_en = %s, hechos = %s,
                               intentos = intentos + 1, proximo_intento_en = null
                         where id = %s""", (outbox_id, m.ahora, _json(x.hechos), x.aviso["id"]))
-        _auditar_el_envio(m, x.aviso, persona, outbox_id)
+        _auditar_el_envio(m, x.aviso, persona, outbox_id, len(adjuntos))
     registrar_salida(cur, m.workspace_id, persona, outbox_id, ia.nombre, m.ahora)
     # El último aviso es el envío: el primero de sus avisos; los demás comparten su fila.
     cur.execute(
@@ -315,15 +344,18 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     return ["enviado"] * len(envio)
 
 
-def _auditar_el_envio(m: Momento, aviso: dict[str, Any], persona: str, outbox_id: str) -> None:
+def _auditar_el_envio(m: Momento, aviso: dict[str, Any], persona: str, outbox_id: str,
+                      adjuntos: int = 0) -> None:
     """Un aviso que sale es un envío de Leda (constitución §12): una fila por aviso, sobre su
-    tarea, con la versión de las reglas (`auditoria`). El texto queda en el outbox."""
+    tarea, con la versión de las reglas (`auditoria`). El texto queda en el outbox, y lo que
+    lleva adjunto, en `message_outbox_adjunto`."""
     sujeto = ("task", aviso["task_id"]) if aviso["task_id"] is not None \
         else ("scheduled_notice", aviso["id"])
     auditar(m.cur, accion="enviar_aviso", workspace_id=m.workspace_id,
             sujeto_tipo=sujeto[0], sujeto_id=sujeto[1],
             detalle={"aviso_id": aviso["id"], "tipo": aviso["tipo"],
                      "destinatario_membership_id": persona, "outbox_id": outbox_id,
+                     **({"adjuntos": adjuntos} if adjuntos else {}),
                      "at": m.ahora.isoformat()})
 
 
@@ -775,6 +807,102 @@ def _vigencia_de_la_prevision(m: Momento, aviso) -> tuple[str | None, dict[str, 
     return None, dict(aviso["hechos"])
 
 
+# --- El aviso de una entrega a quien la aprueba (ADR 0019, decisión 6) --------------------------
+
+ENTREGA_PARA_APROBAR = "entrega_para_aprobar"
+# Por qué ya no sale: la tarea ya no espera la aprobación (le pidieron cambios, volvió atrás),
+# cambió quién aprueba el trabajo del responsable, o hubo una entrega más nueva (T6i).
+YA_NO_ESTA_ENTREGADA = "ya_no_esta_entregada"
+CAMBIO_QUIEN_APRUEBA = "cambio_quien_aprueba"
+HAY_UNA_ENTREGA_MAS_NUEVA = "hay_una_entrega_mas_nueva"
+# Una foto se adjunta si el canal la muestra como foto: sin HEIC (Telegram no la muestra) y de
+# hasta 10 MB (lo que Telegram deja subir como foto). Las demás se nombran, como los archivos.
+_NO_SE_MUESTRA_COMO_FOTO = frozenset({"image/heic"})
+_FOTO_HASTA = 10 * 1024 * 1024
+
+
+def guardar_aviso_de_entrega(ctx, tarea: dict[str, Any], entrega_id: str
+                             ) -> tuple[str, datetime] | None:
+    """El aviso de una entrega confirmada a quien aprueba el trabajo del responsable: sale
+    terminado el margen para corregir (`margen.py`), como todo aviso a otra persona que causa lo
+    que alguien dijo. Su clave se ata al acto de la entrega (`entrega_id`, de la cocina). Un aviso
+    de una entrega anterior de la misma tarea que todavía espera queda omitido: lo reemplaza éste,
+    que al salir lleva toda la evidencia vigente (ADR 0009, enmienda T6i). (id, cuándo sale), o
+    `None` si nadie aprueba su trabajo."""
+    cur = ctx.cur
+    quien = referente(cur, ctx.quien.membership_id)
+    if quien is None:
+        return None
+    cur.execute("""update scheduled_notice
+                      set estado = 'omitido', motivo_omision = %s, resuelto_en = %s,
+                          proximo_intento_en = null
+                    where task_id = %s and tipo = %s and estado = 'guardado'""",
+                (HAY_UNA_ENTREGA_MAS_NUEVA, ctx.ahora, tarea["id"], ENTREGA_PARA_APROBAR))
+    sale = sale_con_margen(cur, ctx.calendario, ctx.quien.workspace_id, ctx.ahora)
+    aviso_id, _ = guardar(
+        cur, ctx.quien.workspace_id, ENTREGA_PARA_APROBAR, task_id=tarea["id"],
+        destinatario=quien["membership_id"],
+        hechos={"aviso": ENTREGA_PARA_APROBAR, "necesita_respuesta": False,
+                "tarea": tarea["titulo"], "responsable": ctx.quien.nombre},
+        programado_para=sale, clave=f"motor:{ENTREGA_PARA_APROBAR}:{entrega_id}",
+        ahora=ctx.ahora)
+    return aviso_id, sale
+
+
+def _es_foto_adjunta(p: dict[str, Any]) -> bool:
+    return (p["clase"] == "imagen" and p.get("archivo_id") is not None
+            and p.get("tipo_del_archivo") not in _NO_SE_MUESTRA_COMO_FOTO
+            and (p.get("tamano") or 0) <= _FOTO_HASTA)
+
+
+def _lo_entregado_para_aprobar(m: Momento, task_id) -> tuple[list[dict[str, Any]], list[str]]:
+    """Lo que entregó el responsable, releído ahora (la evidencia del ciclo vigente, sin lo
+    retirado: `entrega._lo_entregado`), pieza por pieza como lo recibe la IA, y las fotos que van
+    adjuntas: las primeras diez que el canal muestra como foto."""
+    piezas = entrega._lo_entregado(m.cur, str(task_id))
+    pol = entrega.politica(m.cur, str(task_id))
+    adjuntas: list[str] = []
+    vistas = []
+    for p, vista in zip(piezas, entrega.mostrar(piezas, pol, m.cal.zona)):
+        vista.pop("pieza", None)            # el alias es para sacar una pieza: acá no sirve
+        if p["clase"] == "imagen":
+            va = _es_foto_adjunta(p) and len(adjuntas) < MAX_ADJUNTOS
+            if va:
+                adjuntas.append(p["archivo_id"])
+            vista["va_adjunta"] = va
+        vistas.append(vista)
+    return vistas, adjuntas
+
+
+def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    """El aviso de una entrega corresponde mientras la tarea espere la aprobación de quien lo
+    recibe. Sus hechos son los de ahora: lo entregado vigente, cuántas fotos van adjuntas y, si
+    después de entregar se retiró algo y la política quedó incompleta, qué falta."""
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return "tarea_inexistente", {}
+    if tarea["estado"] in ("terminada", "cancelada"):
+        return "tarea_cerrada", {}
+    if tarea["estado"] != "en_revision":
+        return YA_NO_ESTA_ENTREGADA, {}
+    quien = referente(m.cur, str(tarea["responsable_membership_id"]))
+    if quien is None or quien["membership_id"] != str(aviso["destinatario_membership_id"]):
+        return CAMBIO_QUIEN_APRUEBA, {}
+    vistas, adjuntas = _lo_entregado_para_aprobar(m, tarea["id"])
+    hechos = {k: v for k, v in dict(aviso["hechos"]).items()
+              if k in ("aviso", "necesita_respuesta", "responsable")}
+    hechos.update(tarea=tarea["titulo"], lo_que_entrego=vistas, fotos_adjuntas=len(adjuntas))
+    faltan = entrega._faltan(m.cur, str(tarea["id"]), [])
+    if faltan:
+        pol = entrega.politica(m.cur, str(tarea["id"]))
+        hechos["todavia_le_falta"] = [pol.en_palabras(t) for t in faltan]
+    return None, hechos
+
+
+def _adjuntos_de_la_entrega(m: Momento, aviso) -> list[str]:
+    return _lo_entregado_para_aprobar(m, aviso["task_id"])[1]
+
+
 def _siempre(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     return None, dict(aviso["hechos"])
 
@@ -798,6 +926,9 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso("correccion_de_prevision", "normal", _vigencia_de_la_prevision,
                 es_coordinacion=True),
     TipoDeAviso("falla_de_aviso", "informativo", _siempre, es_coordinacion=True),
+    # La entrega de una tarea, a quien la aprueba, con las fotos adjuntas (ADR 0019, decisión 6).
+    TipoDeAviso(ENTREGA_PARA_APROBAR, "normal", _vigencia_de_la_entrega, es_coordinacion=True,
+                adjuntos=_adjuntos_de_la_entrega),
 )})
 
 

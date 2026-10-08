@@ -16,17 +16,21 @@ import hashlib
 import json
 import uuid
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
 from leda.autoridad import identificar_en_espacio
+from leda.calendario import Calendario
 from leda.db import admin, espacio
+from leda.motor import avisos
 from leda.motor.fichas import FICHAS
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import procesar_toque, procesar_turno
 
-from tests.motor.ayudantes import AHORA, VIERNES_16, cuantas, estado_de, todos, uno
+from tests.motor.ayudantes import (AHORA, VIERNES_16, IAQueRedacta, avisos_guardados, cuantas,
+                                   enviar, estado_de, todos, uno)
 
 TIPOS = {"explicacion": {"clases": ["texto"], "en_palabras": "cómo quedó el trabajo"},
          "foto": {"clases": ["imagen"], "en_palabras": "una foto del trabajo terminado"},
@@ -252,9 +256,16 @@ def test_la_confirmacion_escrita_entrega_en_un_solo_acto_y_nunca_a_terminada(con
     assert cuantas(conn, "audit_log", "accion = 'herramienta:entregar_tarea'") == 1
     assert cuantas(conn, "conversation_question", "cerrada_en is null") == 0
     assert uno(conn, "select mostrado_para_confirmar m from conversation_state")["m"] is None
-    # Quien aprueba se entera (el aviso de la cocina, hasta la porción 3).
-    assert cuantas(conn, "message_outbox", "chat_id = %s and not es_respuesta",
-                   mundo["personas"]["Ismael"]["telegram"]) == 1
+    # Quien aprueba se entera por el aviso del motor, guardado con sus hechos y con el margen
+    # para corregir (porción 3a): en el turno no sale nada más que la respuesta.
+    assert cuantas(conn, "message_outbox", "not es_respuesta") == 0
+    [aviso] = avisos_guardados(conn, "entrega_para_aprobar")
+    assert aviso["estado"] == "guardado"
+    assert str(aviso["destinatario_membership_id"]) == \
+        mundo["personas"]["Ismael"]["membership_id"]
+    confirmado = AHORA + timedelta(minutes=2)
+    assert aviso["programado_para"] == confirmado + timedelta(minutes=10)
+    assert hecho["aviso_a_quien_aprueba"]["llega"] == aviso["programado_para"].isoformat()
 
 
 def test_una_pieza_que_llega_con_la_confirmacion_la_deja_sin_valor(conn, mundo, marcos):
@@ -435,3 +446,125 @@ def test_cada_pieza_cubre_lo_que_solo_ella_puede_cubrir(conn, mundo, marcos):
         ("una_foto", ["una foto del trabajo terminado"]),
         ("una_foto", ["una foto del trabajo terminado"]),
         ("un_archivo", ["un archivo del trabajo"])]
+
+
+# --- El aviso a quien aprueba (ADR 0019, decisión 6; porción 3a) -----------------------------
+
+def _entregada(marcos, archivos=((JPEG, "foto", None), (JPEG, "foto", None))):
+    """Marcos entrega con su texto y `archivos`, y confirma por escrito."""
+    marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero",
+                 archivos=list(archivos))
+    return marcos.manda(Jugada("confirmar", {}), texto="dale")
+
+
+def _salida_de(conn, mundo, nombre: str) -> list[dict]:
+    return todos(conn, """select o.id, o.cuerpo, o.es_coordinacion, o.respuesta_grupo,
+                                 o.dedupe_key,
+                                 (select count(*) from message_outbox_adjunto a
+                                   where a.outbox_id = o.id) as adjuntos
+                            from message_outbox o
+                           where not o.es_respuesta and o.chat_id = %s
+                           order by o.dedupe_key""", mundo["personas"][nombre]["telegram"])
+
+
+def test_el_aviso_sale_al_terminar_el_margen_con_la_evidencia_de_ese_momento(conn, mundo,
+                                                                            marcos):
+    """Al salir, el código relee la evidencia vigente: la foto que Marcos retiró dentro del
+    margen no le llega a Ismael. Las fotos van adjuntas, en otra fila de la misma respuesta; un
+    archivo sólo se nombra."""
+    _tarea(conn, mundo)
+    _entregada(marcos, [(JPEG, "foto", None), (JPEG, "foto", None),
+                        (ZIP, "archivo", "programa.zip")])
+    marcos.manda(Jugada("corregir", {"corrige": "entregar", "tarea": "T2", "saca": ["P3"]}),
+                 texto="no, esa foto no era")
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=5)).get("enviado") is None
+
+    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=13)) == {"enviado": 1}
+    [pedido] = ia.pedidos_de_redaccion
+    [hechos] = pedido["hechos"]
+    assert hechos["aviso"] == "entrega_para_aprobar" and hechos["responsable"] == "Marcos"
+    assert hechos["necesita_respuesta"] is False and hechos["fotos_adjuntas"] == 1
+    assert [(p["es"], p.get("va_adjunta")) for p in hechos["lo_que_entrego"]] == [
+        ("lo_que_escribio", None), ("una_foto", True), ("un_archivo", None)]
+    assert hechos["lo_que_entrego"][2]["nombre_del_archivo"] == "programa.zip"
+    assert all("pieza" not in p for p in hechos["lo_que_entrego"])
+    assert "todavia_le_falta" not in hechos
+
+    texto, album = _salida_de(conn, mundo, "Ismael")
+    assert texto["adjuntos"] == 0 and album["adjuntos"] == 1
+    assert texto["es_coordinacion"] and album["es_coordinacion"]    # fuera del tope (§10)
+    assert texto["respuesta_grupo"] == album["respuesta_grupo"] == texto["dedupe_key"]
+    adjunta = uno(conn, "select archivo_id from message_outbox_adjunto")["archivo_id"]
+    assert uno(conn, "select clase from evidence where archivo_id = %s",
+               adjunta)["clase"] == "imagen"
+    [aviso] = avisos_guardados(conn, "entrega_para_aprobar")
+    assert aviso["estado"] == "enviado" and str(aviso["outbox_id"]) == str(texto["id"])
+    detalle = uno(conn, """select detalle from audit_log where accion = 'enviar_aviso'""")
+    assert detalle["detalle"]["adjuntos"] == 1
+
+
+def test_repetir_el_aviso_no_duplica_filas(conn, mundo, marcos):
+    _tarea(conn, mundo)
+    _entregada(marcos)
+    ia = IAQueRedacta()
+    enviar(conn, mundo, ia, AHORA + timedelta(minutes=13))
+    enviar(conn, mundo, ia, AHORA + timedelta(minutes=14))
+    assert len(ia.pedidos_de_redaccion) == 1
+    assert len(_salida_de(conn, mundo, "Ismael")) == 2
+    assert cuantas(conn, "message_outbox_adjunto") == 2
+    assert len(avisos_guardados(conn, "entrega_para_aprobar")) == 1
+
+
+def test_si_la_tarea_ya_no_espera_la_aprobacion_el_aviso_no_sale_y_dice_por_que(conn, mundo,
+                                                                               marcos):
+    tarea = _tarea(conn, mundo)
+    _entregada(marcos)
+    with admin(conn) as cur:
+        cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                     actor_kind)
+                       values (%s, 'en_revision', 'asignada', 'leda')""", (tarea,))
+    conn.commit()
+    assert enviar(conn, mundo, IAQueRedacta(), AHORA + timedelta(minutes=13)) == {"omitido": 1}
+    [aviso] = avisos_guardados(conn, "entrega_para_aprobar")
+    assert aviso["motivo_omision"] == "ya_no_esta_entregada"
+    assert _salida_de(conn, mundo, "Ismael") == []
+
+
+def test_una_entrega_nueva_reemplaza_al_aviso_que_espera(conn, mundo, marcos):
+    """ADR 0009, enmienda T6i: evidencia nueva sobre la tarea retira el aviso que espera y
+    guarda otro, que al salir lleva toda la evidencia vigente."""
+    tarea = _tarea(conn, mundo)
+    _entregada(marcos)
+    [primero] = avisos_guardados(conn, "entrega_para_aprobar")
+    persona = mundo["personas"]["Marcos"]
+    with espacio(conn, mundo["id"]) as cur:
+        ctx = SimpleNamespace(
+            cur=cur, ahora=AHORA + timedelta(minutes=4),
+            calendario=Calendario.desde_base(cur, mundo["id"]),
+            quien=SimpleNamespace(workspace_id=mundo["id"], nombre="Marcos",
+                                  membership_id=persona["membership_id"]))
+        avisos.guardar_aviso_de_entrega(ctx, {"id": tarea, "titulo": "Armar el tablero"},
+                                        "otra-entrega")
+    conn.commit()
+    viejo, nuevo = avisos_guardados(conn, "entrega_para_aprobar")
+    assert viejo["id"] == primero["id"] and viejo["estado"] == "omitido"
+    assert viejo["motivo_omision"] == "hay_una_entrega_mas_nueva"
+    assert nuevo["estado"] == "guardado"
+    assert nuevo["dedupe_key"] == "motor:entrega_para_aprobar:otra-entrega"
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=15)) == {"enviado": 1}
+    assert len(ia.pedidos_de_redaccion[0]["hechos"][0]["lo_que_entrego"]) == 3
+
+
+@pytest.mark.parametrize("pieza, va", [
+    ({"clase": "imagen", "archivo_id": "a", "tipo_del_archivo": "image/jpeg", "tamano": 10},
+     True),
+    ({"clase": "imagen", "archivo_id": "a", "tipo_del_archivo": "image/heic", "tamano": 10},
+     False),
+    ({"clase": "imagen", "archivo_id": "a", "tipo_del_archivo": "image/png",
+      "tamano": 11 * 1024 * 1024}, False),
+    ({"clase": "archivo", "archivo_id": "a", "tipo_del_archivo": "application/zip",
+      "tamano": 10}, False)])
+def test_va_adjunta_la_foto_que_el_canal_muestra_como_foto(pieza, va):
+    assert avisos._es_foto_adjunta(pieza) is va

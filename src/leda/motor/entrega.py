@@ -344,7 +344,8 @@ def _lo_entregado(cur, task_id: str) -> list[dict[str, Any]]:
     desde = _ciclo_desde(cur, task_id)
     cur.execute(
         """select e.id, e.clase, e.texto, e.uri, e.cubre, e.at, a.nombre_original,
-                  a.clase as clase_del_archivo, a.sha256
+                  a.clase as clase_del_archivo, a.sha256, e.archivo_id,
+                  a.tipo as tipo_del_archivo, a.tamano
              from evidence e
              left join archivo a on a.workspace_id = e.workspace_id and a.id = e.archivo_id
             where e.task_id = %s
@@ -359,7 +360,9 @@ def _lo_entregado(cur, task_id: str) -> list[dict[str, Any]]:
                        "es": es, "texto": f["texto"], "uri": f["uri"],
                        "nombre": f["nombre_original"], "sha256": f["sha256"],
                        "cubre": list(f["cubre"] or []), "llego_el": f["at"].isoformat(),
-                       "antes": False})
+                       "antes": False,
+                       "archivo_id": str(f["archivo_id"]) if f["archivo_id"] else None,
+                       "tipo_del_archivo": f["tipo_del_archivo"], "tamano": f["tamano"]})
     return piezas
 
 
@@ -621,9 +624,16 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
     quien = _quien_aprueba(ctx)
     if quien is not None:
         hecho["queda_esperando_la_aprobacion_de"] = quien["nombre"]
-        hecho["aviso_a_quien_aprueba"] = {
-            "a": quien["nombre"],
-            fichas.LLEGA: ctx.calendario.dentro_de_jornada(ctx.ahora).isoformat()}
+        # El aviso a quien aprueba, del motor (ADR 0019, decisión 6; porción 3a): guardado con
+        # sus hechos, sale terminado el margen para corregir, y el hecho dice esa hora, la real.
+        from . import avisos        # avisos importa fichas, que importa este módulo
+        guardado = avisos.guardar_aviso_de_entrega(ctx, tarea_q, r["entrega"])
+        if guardado is not None:
+            aviso_id, sale = guardado
+            ctx.avisos_guardados.append(aviso_id)
+            hecho["aviso_a_quien_aprueba"] = {"a": quien["nombre"],
+                                              fichas.LLEGA: sale.isoformat()}
+            fichas.nombrar_efecto(hecho, "aviso_a_quien_aprueba", fichas.AVISO, aviso_id)
     return hecho
 
 

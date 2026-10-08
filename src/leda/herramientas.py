@@ -1792,8 +1792,12 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
     """ADR 0019, decisión 5 (con el patrón del ADR 0009): las filas de evidencia y el paso a
     `en_revision` se escriben en el mismo acto, sólo desde `en_curso` y sólo si las piezas,
     con la evidencia vigente, cubren cada tipo que pide la política. Nunca `terminada`
-    (constitución §11). Quien aprueba se entera como en la entrega de la cocina
-    (`_notificar_entrega_al_aprobador`); la porción 3 lo reemplaza por el aviso del motor."""
+    (constitución §11).
+
+    Porción 3a de la C-3 (ADR 0019, decisión 6): el aviso a quien aprueba ya no sale de acá,
+    con texto fijo. Lo guarda el motor, que lo redacta desde los hechos de su hora
+    (`motor.avisos`, `entrega_para_aprobar`); la cocina devuelve la identidad del acto
+    (`entrega`), a la que se ata la clave del aviso."""
     _bloquear_tarea(cur, tarea_id)
     cur.execute(
         "select estado, titulo, responsable_membership_id from task where id = %s",
@@ -1822,21 +1826,14 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
                    clock_timestamp())""",
         (tarea_id, quien.app_user_id))
     _avisar_dependencia_informativa(cur, quien, tarea_id, "en_revision", uuid.uuid4())
-    cur.execute("select aprobador_membership_id from membership where id = %s",
-                (fila["responsable_membership_id"],))
-    aprob = cur.fetchone()
-    if aprob and aprob["aprobador_membership_id"]:
-        # La clave del aviso: la primera pieza escrita o, sin piezas (una política que no
-        # pide evidencia), la transacción del acto (el mismo criterio que `_actualizar_estado`).
-        if ids:
-            dedupe_id = ids[0]
-        else:
-            cur.execute("select pg_current_xact_id()::text as x")
-            dedupe_id = f"{tarea_id}:{cur.fetchone()['x']}"
-        _notificar_entrega_al_aprobador(
-            cur, quien, tarea_id, fila["titulo"], aprob["aprobador_membership_id"],
-            dedupe_id, datetime.now(timezone.utc))
-    return {"estado": "en_revision", "evidencias": ids}
+    # La identidad del acto: la primera pieza escrita o, sin piezas (una política que no pide
+    # evidencia), la transacción del acto (el mismo criterio que `_actualizar_estado`).
+    if ids:
+        entrega = str(ids[0])
+    else:
+        cur.execute("select pg_current_xact_id()::text as x")
+        entrega = f"{tarea_id}:{cur.fetchone()['x']}"
+    return {"estado": "en_revision", "evidencias": ids, "entrega": entrega}
 
 
 @herramienta(

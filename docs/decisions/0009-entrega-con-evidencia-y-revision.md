@@ -249,3 +249,13 @@ ni se borra: una pieza equivocada se retira. La entrega por chat la recibe el mo
 0019: el aviso a quien aprueba sigue siendo el de texto fijo de `_notificar_entrega_al_aprobador`, sin
 las fotos (porción 3), y `_enlace_portal_tarea` sigue sin inventar ninguna URL hasta que exista la página
 de la tarea (porción 4; constitución §4).
+
+**Porción 3a del ADR 0019 (decisión 6; 2026-10-08).** La entrega por chat ya no usa el texto fijo: la
+cocina (`entregar_tarea`) devuelve la identidad del acto y el motor guarda el aviso a quien aprueba como
+hechos (`entrega_para_aprobar`, `src/leda/motor/avisos.py`), que salen terminado el margen para
+corregir, releídos al salir y redactados por la IA, con las fotos adjuntas como álbum
+(`message_outbox_adjunto`, migración `0035`). La enmienda T6i sigue: una entrega nueva retira el aviso
+que espera y guarda otro, que al salir lleva toda la evidencia vigente. `_notificar_entrega_al_aprobador`
+queda sólo para las entregas de la cocina que ningún circuito del chat alcanza (`actualizar_estado` a
+revisión y `adjuntar_evidencia`). Los botones Aprobar y Pedir cambios vuelven con la porción 3b, y el
+enlace, con la 4.

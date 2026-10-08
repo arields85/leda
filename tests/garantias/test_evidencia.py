@@ -433,7 +433,8 @@ def test_entregar_sin_la_politica_completa_no_escribe_nada(corework, conn):
 
 
 def test_entregar_escribe_las_piezas_y_pasa_a_revision_en_un_solo_acto(corework, conn):
-    """Nunca `terminada` (constitución §11), y quien aprueba se entera (ADR 0009)."""
+    """Nunca `terminada` (constitución §11). Quien aprueba se entera por el aviso del motor
+    (ADR 0019, decisión 6), no por un texto fijo de la cocina."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tarea = _tarea(cur, ws)
@@ -453,10 +454,10 @@ def test_entregar_escribe_las_piezas_y_pasa_a_revision_en_un_solo_acto(corework,
         assert dict(cur.fetchone()) == {"estado_anterior": "en_curso",
                                         "estado_nuevo": "en_revision"}
         assert _cuantas(cur, "audit_log", "accion = 'herramienta:entregar_tarea'") == 1
-        cur.execute("""select cuerpo from message_outbox o join app_user u
-                         on u.telegram_user_id = o.chat_id
-                        where u.nombre = 'Ismael Soschinski'""")
-        assert "Armar el tablero" in cur.fetchone()["cuerpo"]
+        # El aviso a quien aprueba ya no es un texto fijo de la cocina: lo guarda el motor,
+        # atado a la identidad del acto que devuelve la cocina (porción 3a de la C-3).
+        assert _cuantas(cur, "message_outbox") == 0
+    assert r["entrega"] == r["evidencias"][0]
 
 
 @pytest.mark.parametrize("estado", ["asignada", "bloqueada", "en_revision"])

@@ -148,6 +148,17 @@ SIGNIFICADOS: Mapping[str, str] = {
                                         "decida, la tarea espera su aprobación.",
     "aviso_a_quien_aprueba": "Lo que se le avisa a quien aprueba la tarea: a quién (a) y cuándo "
                              "se entera (llega).",
+    "lo_que_entrego": "Lo que entregó la persona responsable, pieza por pieza: lo que escribió, "
+                      "cada foto, video, archivo o enlace, y lo que cubre de lo que pide la "
+                      "tarea. El sistema sabe qué llegó y nunca su contenido: qué muestra una "
+                      "foto o qué dice un archivo no se sabe.",
+    "va_adjunta": "Si esa foto va adjunta, en un mensaje aparte que sale enseguida después de "
+                  "éste. Lo que no va adjunto sólo se nombra: está con la entrega.",
+    "fotos_adjuntas": "Cuántas fotos van adjuntas, en un mensaje aparte que sale enseguida "
+                      "después de éste.",
+    "todavia_le_falta": "Lo que pide la tarea y ya no está entre lo entregado, porque la persona "
+                        "sacó algo después de entregarla, en palabras de todos los días: así "
+                        "todavía no se puede aprobar.",
     "sumo": "Las piezas (por su alias) que se sumaron a la entrega con este mensaje.",
     "sacadas": "Las piezas que la persona sacó de la entrega antes de confirmarla: no van.",
     "retiradas": "Las piezas ya entregadas que la persona retiró: dejan de contar, nada se "
@@ -412,6 +423,10 @@ SIGNIFICADOS: Mapping[str, str] = {
     "destinatario_inactivo": "Quien lo iba a recibir ya no está activo en el equipo.",
     "destinatario_sin_telegram": "Quien lo iba a recibir no tiene un chat con Leda.",
     "tipo_sin_declarar": "El aviso no es de un tipo que Leda manda.",
+    "ya_no_esta_entregada": "La tarea ya no está entregada esperando la aprobación.",
+    "cambio_quien_aprueba": "Cambió quién aprueba el trabajo de la persona responsable.",
+    "hay_una_entrega_mas_nueva": "La tarea tiene una entrega más nueva: sale otro aviso, con "
+                                 "lo que vale ahora.",
     # --- Códigos: el estado de una tarea -------------------------------------------------------
     "asignada": "Asignada a la persona, todavía sin empezar.",
     "en_curso": "En curso: la persona la empezó.",
@@ -459,6 +474,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                        "respuesta.",
     "correccion_de_prevision": "Aviso a quien aprueba el trabajo de la persona responsable: "
                                "el día para terminar la tarea que ya recibió no vale.",
+    "entrega_para_aprobar": "Aviso a quien aprueba el trabajo de la persona responsable: "
+                            "entregó la tarea, que espera su aprobación. No pide respuesta en "
+                            "este mensaje.",
     "falla_de_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
     "no_salio_un_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
 }

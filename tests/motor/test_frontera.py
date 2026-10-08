@@ -45,7 +45,7 @@ PERMITIDOS: dict[str, set[str] | None] = {
     "herramientas": {"ejecutar", "NecesitaConfirmacion", "EstadoCambio", "NecesitaElegir",
                      "NecesitaOpciones"},
     "calendario": None,
-    "salida": {"enqueue_outbox", "PayloadValidationError"},
+    "salida": {"enqueue_outbox", "PayloadValidationError", "MAX_ADJUNTOS"},
     "despachador": None,
     "incidentes": {"registrar_incidente", "NOTICIA_NEUTRA_INCIDENTE",
                    "ETAPA_TURNO_CONVERSACION", "REFERENCIA_INBOUND_MESSAGE"},

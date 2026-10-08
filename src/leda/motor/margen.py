@@ -8,7 +8,10 @@ mecanismo general de la cocina, no una regla para la IA ni un caso para ese mens
 
 **Qué espera el margen:** los avisos guardados a otra persona que causa lo que dijo alguien en
 un turno: el aviso al referente de una previsión nueva (`nueva_prevision`, también el que una
-corrección vuelve a guardar) y el de su corrección (`correccion_de_prevision`). Lo demás no:
+corrección vuelve a guardar) y el de su corrección (`correccion_de_prevision`); y el aviso de una
+entrega a quien la aprueba (`entrega_para_aprobar`, ADR 0019, decisión 6): una pieza que la
+persona retira dentro del margen ya no le llega, porque el aviso relee la evidencia al salir.
+Lo demás no:
 
 - las respuestas de Leda salen enseguida (ADR 0011, decisión 1);
 - lo que Leda manda por su cuenta (la escalera, sus repreguntas y escalamientos, el pedido que
