@@ -3,8 +3,8 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-07, después de M3: palabras de todos los días, formato de los
-mensajes, `prueba_chica/` borrada y `main` con el motor.
+**Última actualización documental:** 2026-10-08, al cerrar la sesión: formato de los mensajes aprobado, el
+"escribiendo…" con streaming, el margen para corregir, el motivo de un atraso y la Fase C empezada.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -29,53 +29,58 @@ usamos"): la IA elige jugadas de una lista cerrada y el código las ejecuta (ADR
 
 Hoy Leda conversa con `python -m leda escuchar corework`, con GPT-6 sol por la suscripción de ChatGPT del
 usuario (proveedor `chatgpt`; uso personal, decisión del usuario). La regresión de las 20 conversaciones de
-prueba dio 100 de 100 (2026-10-07, con el formato de los mensajes).
+prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); la regla del motivo de un
+atraso todavía no tiene regresión con la IA real.
 
-## Punto exacto para retomar (2026-10-07; espera la prueba por Telegram del formato)
+## Punto exacto para retomar (2026-10-08, cierre de sesión)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
-(reglas en [`../AGENTS.md`](../AGENTS.md)). El plan de la etapa es
-[`../odd/tasks/motor-definitivo.md`](../odd/tasks/motor-definitivo.md).
+(reglas en [`../AGENTS.md`](../AGENTS.md)). Planes: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (lo que
+sigue) y [`../odd/tasks/motor-definitivo.md`](../odd/tasks/motor-definitivo.md) (la etapa 3, con sus cierres).
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`); al cerrar la sesión se apaga. Si
 está caído, levantarlo con `levantar-postgres.bat` (o `pg_ctl ... start`, que el agente corre fuera del
 sandbox, porque dentro no puede escribir su registro). Si `pg_ctl` dice que otro servidor puede estar en
-ejecución, cerrar los procesos `postgres` colgados (también un `io_worker` huérfano) y reintentar.
+ejecución, cerrar los procesos `postgres` colgados (también un `io_worker` huérfano) y reintentar. Comprobar
+también que no quede un escuchador viejo corriendo (`python -m leda escuchar`): el 2026-10-08 quedó uno de
+la prueba anterior, con el código viejo.
 
-**1. Lo que espera: la prueba por Telegram del formato de los mensajes.**
-- **Hecho el 2026-10-07:**
-  - las palabras de todos los días, con los nombres de los datos que recibe la IA traducidos; "previsión"
-    quedó en 0 de 500 mensajes;
-  - el rastro de cada intento fallido de redactar un aviso;
-  - el formato de los mensajes (negrita, párrafos y viñetas): regresión de 20 conversaciones por 5, 100 de
-    100.
-  - Evidencia en la bitácora y en el plan.
-- **Lo que notó el agente, para la prueba:** hay mucha negrita (casi todas las tareas y fechas), y los
-  mensajes con varias cosas siguen siendo largos aunque estén en párrafos. No se cambió nada antes del juicio
-  del usuario.
-- **Después de la prueba:** registrarla en la bitácora; si el usuario pide ajustes, cada uno es primero una
-  conversación de prueba.
+**1. Lo primero de la próxima sesión, en este orden:**
+1. **La regresión completa con la IA real** sobre la punta (`--ia sol-suscripcion --veces 5 --paralelo 2`,
+   21 conversaciones): la regla del motivo de un atraso (`4c045d5` a `5f4ee4f`) no tiene regresión con la IA
+   real, porque se cortó por falta de cupo. Antes, `leda chatgpt estado`: el usuario rota entre cuentas de
+   ChatGPT cuando una se queda sin cupo (un 429 en el informe lo muestra).
+2. **Un aviso automático en medio de una conversación** (hallazgo de la prueba del 2026-10-08): el aviso de
+   que comunicaciones vence en 3 días salió justo después de una respuesta, repitiendo lo que se hablaba. El
+   usuario: tiene que esperar a que se cierre el tema, o salir después de un rato sin respuesta. Primero una
+   conversación de prueba, después una regla general en la cocina (los avisos de Leda a una persona esperan
+   mientras está conversando; si ya se habló de eso, se juntan o no salen). Hay que acordar con el usuario
+   cuánto es "un rato sin actividad".
+3. **La Fase C, C-3 desde la porción 2** (`odd/tasks/fase-c.md`): la entrega con evidencia y la política por
+   tipo; después el aviso a quien aprueba con fotos y botones, la página de la tarea y el acceso del
+   administrador (ADR 0019, aceptado). La porción 1 (recibir y guardar archivos, migración `0033`) está
+   hecha.
 
 **2. Después:**
-- **Llevar a `main` lo nuevo de la rama:** `main` ya tiene el motor (`origin/main` en `f2a769c`, avance
-  rápido autorizado por el usuario). Lo posterior va por avance rápido desde `D:\Proyectos\Leda-PM`, después
-  de la prueba del formato, comprobando antes que no haya líneas de atribución ni secretos.
-- La Fase C del plan, después de M3:
-  - los circuitos 7 y 8 (entrega y aprobación), el 5 (cadencias) y la persecución completa de un bloqueo (3a);
-  - **delegar por chat**, ya decidido en parte (`docs/ROADMAP.md`, "Anotado para más adelante");
-  - el ADR de la plataforma web, antes de su código.
+- **Llevar a `main` lo nuevo de la rama**, por avance rápido desde `D:\Proyectos\Leda-PM`, cuando la
+  regresión del punto 1 dé bien (`origin/main` en `f2a769c`; avance rápido autorizado por el usuario).
+  Comprobar antes que no haya líneas de atribución ni secretos.
+- El resto de la Fase C: la persecución del bloqueo (3a), las cadencias, delegar. Y la plataforma web.
 
 **Comandos de la prueba por Telegram** (`.venv\Scripts\python.exe -m …`, desde la carpeta del Motor):
 - `leda escuchar corework`: el escuchador.
-- `leda.motor.reloj corework adelantar|estado|volver`, y `hora HH:MM` para ir a una hora del mismo día.
+- `leda.motor.reloj corework adelantar|estado|volver`, y `hora HH:MM` para ir a una hora del mismo día. Entre
+  salto y salto, esperar 2 minutos: los avisos se revisan una vez por minuto real.
 - `leda chatgpt login|estado|salir` y `leda modelo gpt-6-sol --proveedor chatgpt`.
-- `leda.motor.leer corework --completo`: el registro de turnos.
-- **Ojo:** nunca correr el escuchador y una ronda del corredor a la vez. Comparten la sesión de ChatGPT, y una
-  renovación simultánea puede invalidarla.
+- `leda.motor.leer corework --completo`: el registro de turnos y los avisos guardados.
+- **Ojo:** nunca correr el escuchador y una ronda del corredor a la vez, y nunca una ronda con la IA real
+  mientras un escritor edita `src/` o `db/` en la misma carpeta (el 2026-10-07 una medición corrió con
+  código a medio editar).
 
-**`leda_motor`:** tiene los datos de la prueba de M3 y el reloj en tiempo real. La semilla se cargó con el
-vencimiento a 9 días, para que cayera en un día hábil. Respaldo previo:
-`db/respaldos/leda_motor-antes-m3-b-20261007.dump`. El modelo activo es `chatgpt / gpt-6-sol`.
+**`leda_motor`:** tiene los datos de la prueba del 2026-10-08 (tareas que vencen el viernes 16, semilla a 8
+días) y el reloj de Leda puede haber quedado adelantado (`reloj corework volver`). Respaldo previo:
+`db/respaldos/leda_motor-antes-motivo-20261008.dump`. Para una prueba nueva se recrea con respaldo previo
+(autorización del usuario). El modelo activo es `chatgpt / gpt-6-sol`.
 
 **Acuerdos de trabajo** (detalle en la memoria del agente):
 - **Autonomía:** el agente encadena todo el trabajo técnico sin preguntar y sólo para ante decisiones de
@@ -95,8 +100,7 @@ vencimiento a 9 días, para que cayera en un día hábil. Respaldo previo:
 
 **Etapa 3** (limpieza y motor definitivo): terminada, M3 (2026-10-07). Plan y evidencia en
 `odd/tasks/motor-definitivo.md`. Sus cierres están hechos (2026-10-07): las palabras de todos los días, el
-formato de los mensajes (falta la prueba por Telegram del usuario), `prueba_chica/` borrada y `main` con el
-motor.
+formato de los mensajes (aprobado por el usuario), `prueba_chica/` borrada y `main` con el motor.
 
 **Después:** la Fase C y la plataforma web (decisiones del usuario: van después de M3). No hay equipo real
 hasta que el usuario lo diga.
@@ -174,12 +178,16 @@ validador de invariantes. Destino de cada uno:
 | Rama del Motor, con el formato y sin `prueba_chica/` | suite completa | 2026-10-07 | 1209 passed |
 | Rama del Motor | `pytest tests/motor tests/conversaciones` | 2026-10-07 | 595 passed |
 | Rama del Motor | `pytest tests/garantias` | 2026-10-07 | 187 passed |
+| Rama del Motor, con la porción 1 de C-3 y el margen | suite completa | 2026-10-07 | 1317 passed |
+| Rama del Motor, con el motivo de un atraso | `pytest tests/motor tests/conversaciones` | 2026-10-08 | 707 passed |
+| Rama del Motor | `pytest tests/garantias` | 2026-10-08 | 220 passed |
 
 **Conversaciones con la IA real** (bitácora de flujos):
 - La ronda 3 de la prueba chica dio 85 de 85.
 - La regresión del motor definitivo con sol por OpenRouter dio 89 de 90.
 - Con sol por la suscripción dio 90 de 90; con las palabras de todos los días, 94 de 95 y 95 de 95; con el
-  formato de los mensajes, 100 de 100 (20 conversaciones).
+  formato de los mensajes, 100 de 100 (20 conversaciones); con el margen para corregir, 100 de 100 en las 01 a 20
+  y la corrección de la 25 bien 5 de 5. El mensaje sin puntuación del usuario se lee mal 5 de 5.
 
 Las cifras de pruebas miden el código: **una suite en verde no es evidencia de que la conversación funcione**
 (`AGENTS.md`, punto 12).
@@ -242,3 +250,9 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
   tablas del motor (`TABLAS_DEL_MOTOR`). Decidir para qué es o borrarla.
 - **Una prueba intermitente** en `tests/motor tests/conversaciones` (una falla sin nombre en una corrida, dos
   repeticiones en verde, 2026-10-07); quizás la del indicador de escritura.
+- **Advertencias de RDD sin arreglar** (2026-10-07 y 08), casos de borde: el borrador del streaming puede
+  quedar visible si falla el envío inmediato del mensaje final; un valor raro del margen vuelve a 10 minutos;
+  los álbumes por el webhook; una corrección después de dado el motivo; cómo se decide "en el medio se habló
+  de otra cosa".
+- **Formato:** a veces la IA junta dos ideas en un renglón o hace dos preguntas al cierre (el chequeo del
+  corredor lo mide).

@@ -111,7 +111,17 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
   `24-quien-aprueba-no-contesta.md`, listadas en su README. Sólo el `.md`, sin YAML: no corren hasta
   la C-3. `pytest tests/conversaciones`: 105 passed. Los `PENDIENTE` que dejan están marcados en cada
   paso.
-- [ ] **C-3.** Fichas de la entrega y la aprobación, la confirmación escrita y los avisos por el motor.
+- [ ] **C-3.** Fichas de la entrega y la aprobación, la confirmación escrita y los avisos por el motor, en
+  las cinco porciones del ADR 0019.
+  - [x] Porción 1, recibir y guardar archivos (2026-10-07): `cdf7cfe`, `c21b1af` (migración `0033`,
+    tablas `archivo` y `archivo_de_mensaje`, RLS forzado, sólo agregar), `a003c72`, `22988ee` (fotos,
+    documentos, videos y álbumes por Telegram, límites de tamaño y de tipo por el contenido). Revisiones
+    `review-bd65d58fcfca3c13` y `review-0a9143b546985a4f`. Suite completa 1317. Route: delegada (escritor
+    único, 2+ archivos). La evidencia de la entrega va en otra migración.
+  - [ ] Porción 2: la entrega con evidencia y la política por tipo.
+  - [ ] Porción 3: el aviso a quien aprueba con fotos y botones.
+  - [ ] Porción 4: la página de la tarea y su enlace.
+  - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
 - [ ] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).
 - [ ] **C-6.** Las cadencias (pregunta 8).
@@ -119,5 +129,5 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-El ADR de la evidencia y la página de la tarea (C-1b), y en paralelo las conversaciones de prueba de la
-entrega y la aprobación (C-2).
+La porción 2 de C-3, después de la regresión pendiente y del hallazgo del aviso en medio de una
+conversación (`docs/STATUS.md`, "Punto exacto para retomar").

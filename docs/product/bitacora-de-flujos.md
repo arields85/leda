@@ -318,6 +318,31 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   conversación de prueba 25 (todos los mensajes sin puntuación, pedido del usuario) y se mide con la IA real
   antes de tocar nada; la regla que ya existe es la duda (conversación 09).
 
+## Mensajes sin puntuación, el margen para corregir y el motivo de un atraso (2026-10-07 y 08)
+
+- **Medición** (conversación 25, todos los mensajes sin puntuación, pedido del usuario): el mensaje del
+  usuario se lee mal **5 de 5**, siempre igual (la fecha y la causa en el PLC); los otros dos mensajes sin
+  puntuación, bien 5 de 5. No es la falta de puntuación en general: es una frase con dos lecturas, y la IA
+  nunca se da cuenta de que duda (`7898ce6`).
+- **Decisión del usuario: un margen antes de avisar** (`80195d9`, `c568cb3`, revisión
+  `review-681edff9caaf9741`; ADR 0018, 9n): los avisos a otra persona que salen de algo que alguien dijo
+  esperan 10 minutos, y una corrección dentro del margen retira el equivocado. Con la IA real, la corrección
+  funcionó 5 de 5 y las conversaciones 01 a 20 dieron 100 de 100 (`afdcbe8`).
+- **Hallazgo y decisión: una fecha que atrasa lleva su explicación.** La corrección movía el motivo
+  equivocado a la otra tarea. El usuario: "pasar una fecha sin motivo no es una buena idea, tiene que haber
+  una explicación". Si la fecha atrasa y no hay motivo, Leda lo pregunta; el aviso espera la respuesta (o
+  sale al final del día diciendo que falta); una corrección mueve sólo la fecha; un motivo ya dado se
+  mantiene sólo si pasó menos de una hora y en el medio no se habló de otra cosa (`4c045d5` a `5f4ee4f`,
+  revisiones `review-c35be62163024cb8` y `review-0b2732c3f4bee906`).
+- **La regresión con la IA real de esta última parte quedó sin hacer:** se cortó por falta de cupo de la
+  cuenta de ChatGPT. Es lo primero de la próxima sesión.
+- **Prueba por Telegram del usuario (2026-10-08):** el mismo mensaje se leyó mal, Marcos corrigió, Leda
+  preguntó el motivo de comunicaciones y a Ismael le llegó **un solo aviso, el correcto**, con el motivo de
+  Marcos; el del PLC quedó retirado sin salir. **Hallazgo nuevo:** un aviso automático de Leda (el de que
+  comunicaciones vence en 3 días) salió en medio de la conversación, repitiendo lo que se estaba hablando.
+  El usuario: debería esperar a que se cierre el tema, o salir después de un rato sin respuesta. Queda como
+  primera tarea de la próxima sesión, primero como conversación de prueba.
+
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
 Tarea E3-8 de `odd/tasks/motor-definitivo.md`. Las 18 conversaciones de prueba (las 17 de la Etapa 2 y la
