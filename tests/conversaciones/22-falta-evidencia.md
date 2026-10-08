@@ -84,7 +84,9 @@ porción 3.
 
 5. **Marcos** escribe (15:25): "https://drive.google.com/file/d/prueba-comunicaciones/view"
    →
-   - Jugadas: ninguna nueva: el enlace se suma a la entrega abierta.
+   - Jugadas: `entregar`, la tarea de comunicaciones: sumar algo a la entrega que Leda está mostrando
+     es esa jugada (su ficha). Sin ninguna jugada también está bien: el enlace se suma igual a la
+     entrega abierta, con los mismos hechos (se juzga leyendo la transcripción).
    - Efecto: el enlace queda como pieza de la clase enlace; cubre el resultado de la prueba. Falta el
      archivo.
    - La respuesta dice: que sumó el enlace al video; que falta un archivo; el cierre, aparte: que lo mande.
@@ -92,7 +94,8 @@ porción 3.
 
 6. **Marcos** manda (15:30) el archivo `config-switch-planta.txt`, sin texto.
    →
-   - Jugadas: ninguna nueva: el archivo se suma a la entrega abierta.
+   - Jugadas: `entregar`, la tarea de comunicaciones, como en el paso 5 (o ninguna: el archivo se
+     suma igual a la entrega abierta).
    - Efecto: la política está completa (texto, foto del lunes, enlace y archivo). Se guarda la vista
      previa con su huella; la tarea sigue `en_curso`.
    - La respuesta dice: la tarea de comunicaciones en su renglón con 📋; una pieza por renglón, con lo que
@@ -103,7 +106,8 @@ porción 3.
 
 7. **Marcos** escribe (15:31): "si"
    →
-   - Jugadas: `confirmar`; la guarda pasa.
+   - Jugadas: `confirmar` (con la tarea de comunicaciones o sin ella: la tarea es un dato opcional);
+     la guarda pasa.
    - Efecto: las cuatro filas de evidencia y el paso a `en_revision`, en un solo acto, con evento de
      Marcos y auditoría; el aviso a Ismael, como en la conversación 21 (la foto del lunes adjunta, el
      archivo y el enlace al video en la página).

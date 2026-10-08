@@ -12,7 +12,8 @@ from tests.conversaciones import comprobar as cp
 def _hubo(**mas) -> dict:
     vacio = {"estados": {}, "previsiones": [], "bloqueos": [], "bloqueos_resueltos": [],
              "destraban": [], "avisos_guardados": [], "salidas": [], "incidentes": [],
-             "avisos_al_administrador": 0, "avances": []}
+             "avisos_al_administrador": 0, "avances": [], "evidencias": [],
+             "confirmadas": []}
     return {**vacio, **mas}
 
 
@@ -118,6 +119,156 @@ def test_un_dato_que_puede_traer_vale_si_son_palabras_de_la_persona():
     # Sin puede_traer, un dato libre que no se esperaba sigue siendo una falla.
     sin = {k: v for k, v in esperada.items() if k != "puede_traer"}
     assert not cp.jugada_coincide(sin, real(motivo="llego el switch"), mensaje)
+
+
+def test_un_dato_que_puede_traer_con_su_valor_puede_faltar_pero_si_viene_es_ese():
+    """C-3d, D1: `puede_traer` con el valor del dato (la tarea de `confirmar`, que la ficha
+    declara opcional): puede no venir; si viene, tiene que ser ése."""
+    esperada = {"nombre": "confirmar", "tarea": "COM", "puede_traer": ["tarea"]}
+
+    assert cp.jugada_coincide(esperada, {"nombre": "confirmar"}, "si")
+    assert cp.jugada_coincide(esperada, {"nombre": "confirmar", "tarea": "COM"}, "si")
+    assert not cp.jugada_coincide(esperada, {"nombre": "confirmar", "tarea": "PLC"}, "si")
+    # Sin `puede_traer`, la tarea que el YAML no nombra sigue siendo una falla.
+    assert not cp.jugada_coincide({"nombre": "confirmar"},
+                                  {"nombre": "confirmar", "tarea": "COM"}, "si")
+
+
+def test_puede_traer_solo_nombra_datos_que_la_ficha_declara_opcionales():
+    """Un YAML no puede aflojar más de lo que permite la ficha: `puede_traer` con un dato que
+    la ficha no declara opcional es un error del YAML, no una coincidencia."""
+    import pytest
+
+    with pytest.raises(ValueError, match="opcional"):
+        cp.jugada_coincide({"nombre": "anotar_inicio", "tarea": "PLC",
+                            "puede_traer": ["fecha"]},
+                           {"nombre": "anotar_inicio", "tarea": "PLC"}, "arranque el plc")
+    # Un dato que la ficha necesita tampoco: no es opcional.
+    with pytest.raises(ValueError, match="opcional"):
+        cp.jugada_coincide({"nombre": "entregar", "puede_traer": ["tarea"]},
+                           {"nombre": "entregar", "tarea": "PLC"}, "termine el plc")
+
+
+def test_cada_puede_traer_de_las_conversaciones_es_un_dato_opcional_de_su_ficha():
+    from tests.conversaciones.corredor import todas
+    from tests.conversaciones.motores import cargar
+
+    fichas = cargar().FICHAS
+    vistos = 0
+    for conv in todas():
+        for paso in conv["pasos"]:
+            for j in paso.get("jugadas") or []:
+                for dato in j.get("puede_traer") or ():
+                    vistos += 1
+                    assert dato in fichas[j["nombre"]].opcional, (conv["numero"], paso["paso"],
+                                                                  j["nombre"], dato)
+    assert vistos
+
+
+# --- La evidencia: lo escrito es lo confirmado (C-3d, D1) ------------------------------------
+
+def _pieza(clase: str, *cubre: str, tarea: str = "PLC") -> dict:
+    return {"tarea": tarea, "clase": clase, "cubre": list(cubre)}
+
+
+# La 21, vez 1, paso 5 de `resultados/fase-c-c3-regresion.md`: la IA leyó el primer mensaje como
+# el resultado de la prueba y no como la explicación, Marcos sumó un texto con la explicación, y
+# la cocina escribió las seis piezas de la vista previa que Marcos confirmó. El camino ideal del
+# YAML tenía cinco, con un solo texto que cubría las dos cosas.
+ESPERADAS_21 = [_pieza("texto", "explicacion", "resultado_de_prueba"), _pieza("imagen", "captura"),
+                _pieza("imagen", "captura"), _pieza("imagen", "captura"),
+                _pieza("archivo", "archivo")]
+ESCRITAS_21 = [_pieza("texto", "resultado_de_prueba"), _pieza("imagen", "captura"),
+               _pieza("imagen", "captura"), _pieza("texto", "explicacion"),
+               _pieza("imagen", "captura"), _pieza("archivo", "archivo")]
+
+
+def test_la_evidencia_que_es_la_vista_previa_confirmada_no_es_una_falla_de_garantia():
+    """La falsa alarma de la 21: lo escrito es lo que la persona confirmó, así que la garantía
+    se cumple; que difiera del camino ideal es de comprensión (o del motor, si las jugadas del
+    paso eran las esperadas), con todo lo escrito a la vista."""
+    hubo = _hubo(estados={"PLC": "en_revision"}, evidencias=list(ESCRITAS_21),
+                 confirmadas=[{"tarea": "PLC", "piezas": list(ESCRITAS_21)}])
+    efectos = {"estados": {"PLC": "en_revision"}, "evidencias": ESPERADAS_21}
+
+    c = cp.Comprobacion()
+    de_mas, falta = cp.comprobar_efectos(c, efectos, hubo, {})
+
+    assert not c.de(cp.GARANTIA)
+    assert (de_mas, falta) == (False, True)
+    [f] = c.fallas
+    assert (f.clase, f.que) == (cp.COMPRENSION, "lo escrito no es el camino esperado: evidencia")
+    assert f.esperado == ESPERADAS_21
+    assert f.real["escrito"] == ESCRITAS_21
+    assert f.real["confirmado"] == ESCRITAS_21
+
+    # Con las jugadas esperadas en el paso, la diferencia es del motor.
+    c = cp.Comprobacion()
+    cp.comprobar_efectos(c, efectos, hubo, {}, jugadas_bien=True)
+    assert [(f.clase, f.que) for f in c.fallas] == [
+        (cp.MOTOR, "lo escrito no es el camino esperado: evidencia")]
+
+
+def test_la_evidencia_confirmada_que_es_el_camino_esperado_no_tiene_fallas():
+    hubo = _hubo(estados={"PLC": "en_revision"}, evidencias=list(ESPERADAS_21),
+                 confirmadas=[{"tarea": "PLC", "piezas": list(reversed(ESPERADAS_21))}])
+    c = cp.Comprobacion()
+
+    assert cp.comprobar_efectos(c, {"estados": {"PLC": "en_revision"},
+                                    "evidencias": ESPERADAS_21}, hubo, {}) == (False, False)
+    assert c.fallas == []
+
+
+def test_la_evidencia_que_no_es_la_vista_previa_confirmada_es_una_falla_de_garantia():
+    """La garantía es "lo escrito es lo confirmado": una pieza de más, de menos o que cubre otra
+    cosa que lo que la persona confirmó es de garantía, aunque sea el camino del YAML."""
+    confirmado = ESPERADAS_21[:4]
+    hubo = _hubo(estados={"PLC": "en_revision"}, evidencias=list(ESPERADAS_21),
+                 confirmadas=[{"tarea": "PLC", "piezas": confirmado}])
+    c = cp.Comprobacion()
+
+    de_mas, _ = cp.comprobar_efectos(c, {"estados": {"PLC": "en_revision"},
+                                         "evidencias": ESPERADAS_21}, hubo, {})
+
+    assert de_mas
+    [f] = c.de(cp.GARANTIA)
+    assert f.que == "lo escrito no es lo confirmado: evidencia"
+    assert f.esperado == confirmado
+    assert f.real == {"escrito": ESPERADAS_21, "de_mas": [_pieza("archivo", "archivo")]}
+
+
+def test_la_evidencia_sin_una_confirmacion_en_el_paso_es_de_mas_con_todo_lo_escrito():
+    """Una pieza escrita sin que nadie confirmara nada en el paso, o de otra tarea que la
+    confirmada, sigue siendo un efecto de más: de garantía, con la lista entera de lo escrito."""
+    escrita = [_pieza("texto", "explicacion", tarea="COM")]
+    for confirmadas in ([], [{"tarea": "PLC", "piezas": [_pieza("texto", "explicacion")]}]):
+        c = cp.Comprobacion()
+        de_mas, _ = cp.comprobar_efectos(c, {}, _hubo(evidencias=list(escrita),
+                                                      confirmadas=confirmadas), {})
+        assert de_mas
+        garantia = c.de(cp.GARANTIA)
+        assert ("efecto de más: evidencia", {"escrito": escrita, "de_mas": escrita}) in [
+            (f.que, f.real) for f in garantia], confirmadas
+
+
+def test_un_efecto_que_falta_o_sobra_se_muestra_con_todo_lo_escrito():
+    """Revisión de la C-4: el informe mostraba como "real" sólo lo que no se emparejó. Ahora
+    va siempre la lista entera de lo escrito, junto a lo que sobra o falta."""
+    plc = {"tarea": "PLC", "fecha": "2026-10-27"}
+    com = {"tarea": "COM", "fecha": "2026-10-30"}
+
+    c = cp.Comprobacion()
+    cp.comprobar_efectos(c, {"previsiones": [plc]}, _hubo(previsiones=[plc, com]), {})
+    [f] = c.fallas
+    assert (f.clase, f.que, f.esperado) == (cp.GARANTIA, "efecto de más: previsión", [plc])
+    assert f.real == {"escrito": [plc, com], "de_mas": [com]}
+
+    c = cp.Comprobacion()
+    cp.comprobar_efectos(c, {"previsiones": [plc, com]}, _hubo(previsiones=[plc]), {})
+    [f] = c.fallas
+    assert (f.clase, f.que, f.esperado) == (cp.COMPRENSION, "falta un efecto: previsión",
+                                            [plc, com])
+    assert f.real == {"escrito": [plc], "faltan": [com]}
 
 
 def test_de_la_falla_de_un_aviso_el_informe_sabe_la_clase_y_el_codigo_nunca_el_texto():

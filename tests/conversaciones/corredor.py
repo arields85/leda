@@ -514,7 +514,8 @@ class _Corredor:
             jugadas_bien = cp.comprobar_jugadas(c, paso.get("jugadas") or [], r.jugadas,
                                                 paso.get("escribe", ""), motor=self.motor) \
                 if "toca" not in paso else True
-            _, falta = cp.comprobar_efectos(c, paso.get("efectos") or {}, hubo, titulos)
+            _, falta = cp.comprobar_efectos(c, paso.get("efectos") or {}, hubo, titulos,
+                                            jugadas_bien=jugadas_bien)
             # Lo que depende de haber entendido: con las jugadas esperadas, una diferencia es
             # del código; si no, es la consecuencia de no haber entendido.
             clase = cp.MOTOR if jugadas_bien and not falta else cp.COMPRENSION

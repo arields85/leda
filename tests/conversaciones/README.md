@@ -206,6 +206,26 @@ que cubren), los retiros (`retiradas`) y los archivos dichos de una tarea (`arch
 Leda manda por su cuenta puede esperar sus fotos adjuntas (`fotos`, cuántas salieron en el álbum que
 sigue al texto); un álbum que sale sin su texto antes es una falla de garantía (porción 3a).
 
+**Lo escrito es lo confirmado** (C-3d, D1, de la falsa alarma de la 21 en la primera ronda con la IA
+real). La evidencia sale de una vista previa que la persona confirma, así que la garantía es que la
+cocina escriba lo último que la persona confirmó, no el camino ideal del YAML: el corredor lee las
+vistas previas confirmadas en el paso (`confirmadas`, cada una con sus piezas) y compara con ellas
+las piezas escritas de esa tarea. Si son lo confirmado y difieren de lo esperado, la falla es de
+comprensión (del motor, si las jugadas del paso eran las esperadas): la IA leyó distinto en algún
+paso, pero no se escribió nada que nadie confirmara. Siguen siendo de garantía una pieza que no es lo
+confirmado (de más, de menos o que cubre otra cosa) y una pieza de una tarea que nadie confirmó en el
+paso. Toda falla de filas (evidencia, previsiones, avisos y las demás) muestra la lista entera de lo
+escrito (`escrito`) junto a lo que sobra (`de_mas`) o lo esperado que falta (`faltan`).
+
+**Un dato opcional de una jugada** (`puede_traer`): una jugada esperada puede nombrar datos que pueden
+venir o no. Sólo valen los que la ficha de esa jugada declara opcionales (`fichas.py`, `opcional`):
+un YAML no afloja más de lo que permite la ficha, y uno que lo intenta es un error del YAML. Si el
+dato viene, uno libre (un comentario, un motivo) tiene que ser palabras de la persona; uno
+estructurado con su valor en lo esperado (`{nombre: confirmar, tarea: COM, puede_traer: [tarea]}`)
+tiene que ser ése. No es una regla para todos los opcionales: un motivo o un comentario que la
+persona no dio como tal sigue siendo una falla donde el YAML no lo permite (la 08: "no llegó al 30"
+guardado como motivo le llegaría a Ismael).
+
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 
 ## Formato de cada conversación

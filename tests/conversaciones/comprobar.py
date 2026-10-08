@@ -17,7 +17,9 @@ Una vez para todas las conversaciones: ninguna regla sabe de qué conversación 
 
 - `garantia`: un efecto que no estaba esperado (otra tarea, otra fecha, un aviso o un aviso al
   administrador de más), botones de más, más o menos de una respuesta por mensaje, o un mensaje
-  de Leda de más sobre una tarea de la conversación;
+  de Leda de más sobre una tarea de la conversación. La evidencia, que sale de una vista previa
+  confirmada, es de garantía sólo si no es lo que la persona confirmó (C-3d, D1); si lo es y
+  difiere del YAML, es de comprensión o del motor (`comprobar_efectos`);
 - `comprension`: las jugadas no son las esperadas o falta un efecto esperado, sin ningún efecto
   de más (no entendió, pero no hizo otra cosa: que haya preguntado lo lee una persona);
 - `motor`: con las jugadas esperadas, algo que el código hace distinto de lo esperado (los
@@ -29,6 +31,7 @@ Una vez para todas las conversaciones: ninguna regla sabe de qué conversación 
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -168,6 +171,20 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                                        "decision": f["decision"],
                                        "de": persona(f["aprobador_membership_id"])}
                         for f in cur.fetchall()}
+        # Las vistas previas que la persona confirmó (C-3d, D1): cada pregunta de confirmar una
+        # entrega que se cerró con la confirmación, con las piezas que mostraba. Las que ya eran
+        # evidencia (tienen su id) no se vuelven a escribir.
+        cur.execute("""select id, task_id, jugada from conversation_question
+                        where workspace_id = %s and tipo = 'confirmar_la_entrega'
+                          and cierre = 'respondida'
+                          and cierre_detalle ->> 'jugada' = 'confirmar'""", (ws,))
+        confirmadas = {str(f["id"]): {
+            "tarea": tarea(f["task_id"]),
+            "piezas": [{"tarea": tarea(f["task_id"]), "clase": p["clase"],
+                        "cubre": list(p.get("cubre") or [])}
+                       for p in (f["jugada"] or {}).get("piezas") or []
+                       if not p.get("evidencia_id")]}
+            for f in cur.fetchall()}
         cur.execute("""select id, task_id from archivo_de_tarea where workspace_id = %s""",
                     (ws,))
         archivos_de_tarea = {str(f["id"]): {"tarea": tarea(f["task_id"])}
@@ -211,7 +228,7 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
             "incidentes": incidentes, "avisos_admin": avisos_admin, "avances": avances,
             "esperas": esperas, "preguntas": preguntas, "ultimo_aviso": ultimo_aviso,
             "evidencias": evidencias, "archivos_de_tarea": archivos_de_tarea,
-            "aprobaciones": aprobaciones}
+            "aprobaciones": aprobaciones, "confirmadas": confirmadas}
 
 
 def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
@@ -240,6 +257,7 @@ def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
                       if v["retirada"] and not antes["evidencias"].get(k, {}).get("retirada")],
         "archivos_de_tarea": nuevas("archivos_de_tarea"),
         "aprobaciones": nuevas("aprobaciones"),
+        "confirmadas": nuevas("confirmadas"),
     }
 
 
@@ -314,24 +332,39 @@ def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any],
                     mensaje: str | None = None, *, motor: Motor | None = None) -> bool:
     """Una jugada elegida contra la esperada: el nombre (`fuera_de_la_lista` es cualquiera que
     no esté en la lista del `motor`), los datos estructurados iguales, y los libres presentes si
-    y sólo si se esperan (salvo los de `puede_traer`, que pueden venir si son palabras de la
-    persona: todas las del dato están en su `mensaje`, sin importar mayúsculas ni acentos)."""
+    y sólo si se esperan.
+
+    Los de `puede_traer` pueden venir o no, y sólo pueden ser datos que la ficha declara
+    opcionales (un YAML no afloja más de lo que permite la ficha; si no, es un error del YAML).
+    Si vienen: uno libre, sólo con palabras de la persona (todas las del dato están en su
+    `mensaje`, sin importar mayúsculas ni acentos); uno estructurado con su valor en lo
+    esperado, igual a ése (C-3d, D1: la tarea de `confirmar` puede faltar, pero si viene es la
+    de la entrega)."""
     motor = motor or cargar_motor()
     FICHAS, palabras = motor.FICHAS, motor.palabras     # noqa: N806 -- los nombres del motor
 
     nombre = esperada["nombre"]
     if nombre == FUERA_DE_LA_LISTA:
         return real["nombre"] not in FICHAS
+    libres = set(esperada.get("puede_traer") or ())
+    no_opcionales = libres - set(FICHAS[nombre].opcional) if nombre in FICHAS else libres
+    if no_opcionales:
+        raise ValueError(f"puede_traer de {nombre} nombra {sorted(no_opcionales)}, que su ficha "
+                         "no declara opcional")
     if real["nombre"] != nombre:
         return False
-    libres = set(esperada.get("puede_traer") or ())
     datos_e = {k: v for k, v in esperada.items() if k not in ("nombre", "puede_traer")}
     datos_r = {k: v for k, v in real.items() if k != "nombre"}
     for k in set(datos_e) | set(datos_r):
         if k in libres:
-            r = datos_r.get(k)
-            if (mensaje is not None and k in DATOS_LIBRES and isinstance(r, str)
-                    and not set(palabras(r)) <= set(palabras(mensaje))):
+            e, r = datos_e.get(k), datos_r.get(k)
+            if r in (None, ""):
+                continue
+            if k in DATOS_LIBRES:
+                if (mensaje is not None and isinstance(r, str)
+                        and not set(palabras(r)) <= set(palabras(mensaje))):
+                    return False
+            elif e is not None and not coincide(e, r):
                 return False
             continue
         e, r = datos_e.get(k), datos_r.get(k)
@@ -386,11 +419,40 @@ def _emparejar(esperados: list[dict], reales: list[dict]) -> tuple[list[dict], l
             [r for j, r in enumerate(reales) if j not in de_real])
 
 
+def _mismas(a: list[dict], b: list[dict]) -> bool:
+    """Si dos listas de filas tienen las mismas, sin importar el orden de las filas ni el de
+    sus datos."""
+    def cuenta(filas: list[dict]) -> dict[str, int]:
+        return _cuenta([json.dumps(f, sort_keys=True, ensure_ascii=False) for f in filas])
+
+    return cuenta(a) == cuenta(b)
+
+
+def _como_fue(escrito: list[dict], *, de_mas: list[dict] = (), faltan: list[dict] = ()
+              ) -> dict[str, list[dict]]:
+    """Lo real de una falla de filas: todo lo escrito, y lo que sobra o lo esperado que falta
+    (revisión de la C-4: antes iba sólo lo que no se emparejó)."""
+    real: dict[str, list[dict]] = {"escrito": list(escrito)}
+    if de_mas:
+        real["de_mas"] = list(de_mas)
+    if faltan:
+        real["faltan"] = list(faltan)
+    return real
+
+
 def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str, Any],
-                      titulos: dict[str, str]) -> tuple[bool, bool]:
+                      titulos: dict[str, str], *, jugadas_bien: bool = False
+                      ) -> tuple[bool, bool]:
     """Los efectos del turno contra los esperados. Devuelve (hubo uno de más, faltó uno). Lo que
     no se nombra en lo esperado se espera vacío. Los avisos que el turno retiró sin salir no son
-    efectos (no pasó nada): se miran en el estado (`estado_avisos`)."""
+    efectos (no pasó nada): se miran en el estado (`estado_avisos`).
+
+    **La evidencia sale de una vista previa confirmada** (C-3d, D1): la garantía es que lo
+    escrito sea lo último que la persona confirmó (`confirmadas`), no el camino ideal del YAML.
+    Las piezas de una tarea con su confirmación en el paso que son lo confirmado cumplen la
+    garantía; si difieren de lo esperado, es de comprensión (del motor, con las `jugadas_bien`
+    del paso). Las que no son lo confirmado, o las de una tarea que nadie confirmó en el paso,
+    son de garantía."""
     de_mas = falta = False
     esperados = esperados or {}
     estados_e = esperados.get("estados") or {}
@@ -404,18 +466,50 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
             if not extra:
                 c.falla(COMPRENSION, "falta un efecto: estado", estados_e, hubo["estados"])
 
-    def filas(nombre: str, reales: list[dict], que: str) -> None:
+    def filas(nombre: str, reales: list[dict], que: str,
+              esperadas: list[dict] | None = None) -> None:
         nonlocal de_mas, falta
-        esperadas = esperados.get(nombre) or []
+        esperadas = (esperados.get(nombre) or []) if esperadas is None else esperadas
         reales = [normalizar(r, titulos) for r in reales]
         faltan, sobran = _emparejar(esperadas, reales)
         if sobran:
             de_mas = True
-            c.falla(GARANTIA, f"efecto de más: {que}", esperadas, sobran)
+            c.falla(GARANTIA, f"efecto de más: {que}", esperadas,
+                    _como_fue(reales, de_mas=sobran))
         if faltan:
             falta = True
             if not sobran:
-                c.falla(COMPRENSION, f"falta un efecto: {que}", faltan, reales)
+                c.falla(COMPRENSION, f"falta un efecto: {que}", esperadas,
+                        _como_fue(reales, faltan=faltan))
+
+    def evidencias(reales: list[dict]) -> None:
+        """Las piezas de cada tarea con su vista previa confirmada en el paso, contra lo
+        confirmado; las demás, como cualquier fila."""
+        nonlocal de_mas, falta
+        esperadas = list(esperados.get("evidencias") or [])
+        reales = [normalizar(r, titulos) for r in reales]
+        sueltas = list(reales)
+        for confirmada in hubo.get("confirmadas") or []:
+            tarea = confirmada["tarea"]
+            escritas = [r for r in reales if r.get("tarea") == tarea]
+            sueltas = [r for r in sueltas if r.get("tarea") != tarea]
+            de_la_tarea = [e for e in esperadas if e.get("tarea") == tarea]
+            esperadas = [e for e in esperadas if e.get("tarea") != tarea]
+            confirmado = list(confirmada["piezas"])
+            if not _mismas(escritas, confirmado):
+                de_mas = True
+                faltan, sobran = _emparejar(confirmado, escritas)
+                c.falla(GARANTIA, "lo escrito no es lo confirmado: evidencia", confirmado,
+                        _como_fue(escritas, de_mas=sobran, faltan=faltan))
+                continue
+            faltan, sobran = _emparejar(de_la_tarea, escritas)
+            if faltan or sobran:
+                falta = True
+                real = _como_fue(escritas, de_mas=sobran, faltan=faltan)
+                real["confirmado"] = confirmado
+                c.falla(MOTOR if jugadas_bien else COMPRENSION,
+                        "lo escrito no es el camino esperado: evidencia", de_la_tarea, real)
+        filas("evidencias", sueltas, "evidencia", esperadas)
 
     filas("previsiones", hubo["previsiones"], "previsión")
     filas("bloqueos", hubo["bloqueos"], "bloqueo")
@@ -426,7 +520,7 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
     # de la E2-7: antes, los dos eran de garantía).
     filas("bloqueos_resueltos", hubo["bloqueos_resueltos"], "bloqueo resuelto")
     # La entrega (ADR 0019): unos efectos armados a mano pueden no traerlos.
-    filas("evidencias", hubo.get("evidencias") or [], "evidencia")
+    evidencias(hubo.get("evidencias") or [])
     filas("retiradas", hubo.get("retiradas") or [], "evidencia retirada")
     filas("archivos_de_tarea", hubo.get("archivos_de_tarea") or [], "archivo dicho de una tarea")
     # La decisión de quien aprueba (porción 3b): una de más es de garantía (nadie aprueba sin

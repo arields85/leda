@@ -50,8 +50,8 @@ Ismael recibe además el primer recordatorio de las tres entregas que siguen esp
 1. **Marcos** escribe (lunes 26, 10:20): "che el tablero de la maquina 3 de mariano ya lo vi yo, esta
    joya. aprobalo asi avanza"
    →
-   - Jugadas: `aprobar`, la tarea de Mariano. La jugada existe pero Marcos no puede hacerla: no es quien
-     aprueba el trabajo de Mariano (`puede_aprobar_tarea`).
+   - Jugadas: `aprobar`, la tarea de Mariano, con o sin lo que dijo como comentario. La jugada existe
+     pero Marcos no puede hacerla: no es quien aprueba el trabajo de Mariano (`puede_aprobar_tarea`).
    - Efecto: ninguno; la tarea sigue `en_revision`. Ningún aviso al administrador (es una jugada que no se
      puede hacer, no una situación nueva; ADR 0018, decisión 1) y ninguno a Ismael ni a Mariano.
    - La respuesta dice: que esa aprobación no la puede hacer él; que la decide Ismael, tomado de los datos.

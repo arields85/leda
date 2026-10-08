@@ -131,7 +131,11 @@ pasos:
     quien: Marcos
     a_las: "2026-10-28 15:25"
     escribe: "https://drive.google.com/file/d/prueba-comunicaciones/view"
-    jugadas: []
+    # Sumar algo a la entrega que Leda está mostrando es la jugada entregar (su ficha); sin
+    # ninguna jugada, el código lo suma igual a la entrega abierta, con los mismos hechos. El YAML
+    # espera la lectura de la ficha y la otra se juzga leyendo la transcripción (README, la 25).
+    jugadas:
+      - {nombre: entregar, tarea: COM}
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM, sumo: [P2],
@@ -153,7 +157,9 @@ pasos:
     quien: Marcos
     a_las: "2026-10-28 15:30"
     manda: [{que: archivo, nombre: config-switch-planta.txt}]
-    jugadas: []
+    # Como en el paso 5: la lectura de la ficha es entregar.
+    jugadas:
+      - {nombre: entregar, tarea: COM}
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: para_confirmar, tarea: COM, sumo: [P3],
@@ -179,8 +185,9 @@ pasos:
     quien: Marcos
     a_las: "2026-10-28 15:31"
     escribe: "si"
+    # La tarea es un dato opcional de confirmar (su ficha): puede venir, y si viene es ésta.
     jugadas:
-      - {nombre: confirmar}
+      - {nombre: confirmar, tarea: COM, puede_traer: [tarea]}
     efectos:
       estados: {COM: en_revision}
       evidencias:

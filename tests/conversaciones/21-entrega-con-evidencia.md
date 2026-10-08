@@ -87,7 +87,8 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
 4. **Marcos** manda (15:15) una foto (el tablero cerrado) con el texto: "y esta del tablero cerrado. dale
    mandala"
    →
-   - Jugadas: `confirmar`. La foto se suma a la entrega abierta (ADR 0019, decisión 4).
+   - Jugadas: `confirmar` (con la tarea del PLC o sin ella). La foto se suma a la entrega abierta
+     (ADR 0019, decisión 4).
    - Efecto: ninguno sobre la tarea. La guarda falla: llegó una pieza después de la vista previa, así que
      lo que Marcos confirma ya no es lo último (ADR 0018, decisión 2; ADR 0019, decisión 5). Se guarda la
      vista previa nueva, con la foto, y huella nueva; la anterior queda registrada como reemplazada. El
@@ -101,7 +102,8 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
 
 5. **Marcos** escribe (15:16), sin tocar el botón: "dale"
    →
-   - Jugadas: `confirmar`. La guarda pasa: es lo último que Marcos vio y no cambió.
+   - Jugadas: `confirmar` (con la tarea del PLC o sin ella). La guarda pasa: es lo último que Marcos
+     vio y no cambió.
    - Efecto, en un solo acto: las cinco filas de evidencia, cada una con su clase, lo que cubre, quién la
      mandó y cuándo; la tarea del PLC pasa de `en_curso` a `en_revision`, con evento de Marcos y auditoría. Nunca
      `terminada`. El aviso a Ismael queda guardado como hechos y sale terminado el margen para

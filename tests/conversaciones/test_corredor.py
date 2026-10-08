@@ -135,6 +135,33 @@ def test_el_aviso_de_una_entrega_cuenta_las_fotos_del_album_que_sigue_al_texto(c
         (6, cp.MOTOR, "no salió lo esperado"), (6, cp.MOTOR, "salió algo de más")]
 
 
+def test_la_entrega_confirmada_por_otro_camino_no_es_una_falla_de_garantia(conn):
+    """La falsa alarma de la 21 con la IA real (`resultados/fase-c-c3-regresion.md`, vez 1): la
+    IA lee el primer mensaje sólo como el resultado de la prueba, Marcos suma un texto con la
+    explicación y confirma nombrando la tarea. La cocina escribe lo que Marcos confirmó, que no
+    es el camino ideal del YAML: es de comprensión o del motor, nunca de garantía."""
+    [conv] = elegir(["21"])
+    ia = _perfecta(conv)
+    guion = copy.deepcopy(conv)
+    por_paso = {p.get("paso"): p for p in guion["pasos"]}
+    por_paso[1]["jugadas"] = [{"nombre": "entregar", "tarea": "PLC",
+                               "el_texto_cubre": ["resultado_de_prueba"]}]
+    por_paso[4]["jugadas"] = [{"nombre": "entregar", "tarea": "PLC"}]
+    por_paso[5]["jugadas"] = [{"nombre": "confirmar", "tarea": "PLC"}]
+    ia.ia.preparar = lambda paso: setattr(ia.ia, "paso", por_paso.get(paso.get("paso"), paso))
+
+    corrida = correr_conversacion(conn, conv, ia)
+
+    assert corrida.error is None
+    assert corrida.garantias, [str(f) for _, f in corrida.fallas(cp.GARANTIA)]
+    [escrito] = [f for paso, f in corrida.fallas() if paso == 5 and f.que.startswith("lo escrito")]
+    assert escrito.que == "lo escrito no es el camino esperado: evidencia"
+    assert escrito.clase in (cp.COMPRENSION, cp.MOTOR)
+    # Lo escrito, en el orden en que se escribió; lo confirmado, en el de la vista previa.
+    assert cp._mismas(escrito.real["escrito"], escrito.real["confirmado"])
+    assert len(escrito.real["escrito"]) == 6
+
+
 def test_la_aprobacion_corre_entera_con_los_botones_del_aviso_y_el_cierre_que_esperaba(conn):
     """Porción 3b de la C-3: el botón del aviso de una de varias entregas (`de_la_tarea`), lo que
     pasa aparte sin comprobarse (`aparte`) y el cierre que hace el sistema cuando se resuelve lo

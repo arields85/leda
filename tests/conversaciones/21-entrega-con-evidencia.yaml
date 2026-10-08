@@ -130,8 +130,9 @@ pasos:
     a_las: "2026-10-22 15:15"
     escribe: "y esta del tablero cerrado. dale mandala"
     manda: [{que: foto}]
+    # La tarea es un dato opcional de confirmar (su ficha): puede venir, y si viene es la del PLC.
     jugadas:
-      - {nombre: confirmar}
+      - {nombre: confirmar, tarea: PLC, puede_traer: [tarea]}
     efectos: {}
     hechos:
       - {jugada: confirmar, resultado: no_vale_la_confirmacion, motivo: llego_algo_despues,
@@ -156,7 +157,7 @@ pasos:
     a_las: "2026-10-22 15:16"
     escribe: "dale"
     jugadas:
-      - {nombre: confirmar}
+      - {nombre: confirmar, tarea: PLC, puede_traer: [tarea]}
     efectos:
       estados: {PLC: en_revision}
       evidencias:

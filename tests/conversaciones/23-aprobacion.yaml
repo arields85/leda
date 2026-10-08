@@ -88,8 +88,9 @@ pasos:
     quien: Marcos
     a_las: "2026-10-26 10:20"
     escribe: "che el tablero de la maquina 3 de mariano ya lo vi yo, esta joya. aprobalo asi avanza"
+    # El comentario es un dato opcional de aprobar (su ficha): puede venir, con sus palabras.
     jugadas:
-      - {nombre: aprobar, de: mariano}
+      - {nombre: aprobar, de: mariano, puede_traer: [comentario]}
     efectos: {}
     hechos:
       - {jugada: aprobar, resultado: no_se_puede, motivo: no_es_quien_aprueba,
@@ -272,7 +273,9 @@ pasos:
     a_las: "2026-10-26 10:45"
     escribe: "lo de ariel aprobado, pero que revise los colores del grafico de lotes"
     jugadas:
-      - {nombre: aprobar, tarea: DASH, comentario: "que revise los colores del gráfico de lotes"}
+      # El comentario puede ir con la aprobación, con el pedido de cambios o con los dos.
+      - {nombre: aprobar, tarea: DASH, comentario: "que revise los colores del gráfico de lotes",
+         puede_traer: [comentario]}
       - {nombre: pedir_cambios, tarea: DASH,
          comentario: "que revise los colores del gráfico de lotes"}
     efectos: {}
