@@ -47,11 +47,12 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_veintitres_conversaciones_y_cada_una_nombra_su_fuente():
-    # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega); la 23, la 24 y la 26
-    # tienen sólo el .md: sus circuitos o su regla no están construidos (README).
+def test_hay_veinticuatro_conversaciones_y_cada_una_nombra_su_fuente():
+    # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega) y la 23 desde la 3b (la
+    # aprobación); la 24 y la 26 tienen sólo el .md: su circuito o su regla no están
+    # construidos (README).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in [*range(1, 23), 25]]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in [*range(1, 24), 25]]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]
@@ -127,6 +128,24 @@ def test_el_aviso_de_una_entrega_cuenta_las_fotos_del_album_que_sigue_al_texto(c
     corrida = correr_conversacion(conn, otra, _perfecta(otra))
     assert [(paso, f.clase, f.que) for paso, f in corrida.fallas()] == [
         (6, cp.MOTOR, "no salió lo esperado"), (6, cp.MOTOR, "salió algo de más")]
+
+
+def test_la_aprobacion_corre_entera_con_los_botones_del_aviso_y_el_cierre_que_esperaba(conn):
+    """Porción 3b de la C-3: el botón del aviso de una de varias entregas (`de_la_tarea`), lo que
+    pasa aparte sin comprobarse (`aparte`) y el cierre que hace el sistema cuando se resuelve lo
+    que faltaba, con su aviso a los dos."""
+    [conv] = elegir(["23"])
+
+    corrida = correr_conversacion(conn, conv, _perfecta(conv))
+
+    assert corrida.error is None and corrida.fallas() == []
+    del_viernes = [s for p in corrida.pasos if p.preludio for s in p.salidas
+                   if s.tipo == "entrega_para_aprobar"]
+    assert len(del_viernes) == 4
+    assert all(s.botones == ["Aprobar", "Pedir cambios"] for s in del_viernes)
+    cierre = next(p for p in corrida.pasos if p.paso == 11)
+    assert sorted(s.a for s in cierre.salidas
+                  if s.tipo == "cerrada_con_la_aprobacion") == ["Ismael", "Marcos"]
 
 
 def test_otra_tarea_es_una_falla_de_garantia_con_su_diferencia(conn):

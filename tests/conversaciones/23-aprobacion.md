@@ -10,7 +10,10 @@ sola pregunta con dos botones. Y alguien que no aprueba esa tarea no puede aprob
 directo, sin vista previa: es la decisión de quien aprueba (`odd/tasks/fase-c.md`, decisiones 2 y 3).
 Circuito 8 (ADR 0017, decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7; constitución §3 y §11.
 
-**Todavía no corre:** el circuito no está construido (`odd/tasks/fase-c.md`, tarea C-3). No tiene YAML.
+**Corre desde la porción 3b de la C-3** (`23-aprobacion.yaml`). El YAML suma tres pasos de Leda que
+el hilo da por hechos (4b, 9b y 9c: los avisos que salen enseguida y el aviso previo del martes) y
+corre el paso 10 aparte, por el motor y sin comprobarlo. El enlace a la página de la tarea de los
+pasos 3, 7 y 11 es de la porción 4: todavía no se espera.
 
 ## Estado inicial
 
@@ -75,6 +78,13 @@ Circuito 8 (ADR 0017, decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7;
      tener que volver a aprobarla.
    - Estado después: quedan dos entregas esperando a Ismael.
 
+4b. **Leda**, por su cuenta, a Marcos (10:35): el aviso de la aprobación anotada.
+   →
+   - El mensaje dice: que Ismael aprobó la tarea de comunicaciones, en su renglón con 📋; que todavía no
+     queda terminada porque espera la del switch de Lucas, y que queda terminada sola cuando ésa
+     termine; que no hace falta que responda, solo en el último renglón.
+   - El mensaje no dice: que quedó terminada.
+
 5. **Ismael** toca (10:39) "Pedir cambios" en el aviso de la entrega de Mariano, el del viernes.
    →
    - Jugadas: `pedir_cambios`, la tarea de Mariano, todavía sin comentario. El botón es un atajo y la
@@ -126,6 +136,12 @@ Circuito 8 (ADR 0017, decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7;
      comentario.
    - Estado después: sin tema abierto; ninguna entrega esperando a Ismael (la de comunicaciones ya tiene
      su aprobación y espera la del switch).
+
+9b. **Leda**, por su cuenta, a Ariel (10:46): el aviso de la aprobación, con el comentario de los
+    colores como algo para mirar, no como un cambio pendiente; que no hace falta que responda.
+
+9c. **Leda**, por su cuenta, a Mariano (martes 27, 10:00): el aviso previo de la tarea del tablero, que
+    volvió a estar en curso y vence el vie 30/10 (la escalera de siempre).
 
 10. **La tarea del switch de Lucas** queda `terminada` (miércoles 28, 11:00), con su entrega y su
     aprobación, que no son parte de esta conversación.

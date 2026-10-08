@@ -201,8 +201,53 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         del despachador con álbumes; las ramas de vigencia del aviso sin probar; un álbum suelto sin
         prueba en el corredor; y las fotos se descartarían si el aviso saliera junto con otros (hoy
         no pasa: un aviso de coordinación sale siempre solo, `avisos._envios`).
-    - [ ] **3b, la hoja de aprobación** con los botones Aprobar y Pedir cambios, como atajos
-      (conversación 23).
+    - [x] **3b, la hoja de aprobación** con los botones Aprobar y Pedir cambios, como atajos
+      (conversación 23; 2026-10-08). Route: delegada (escritor único, 2+ archivos no triviales).
+      - **Commits:** `a2f209d` (las jugadas `aprobar` y `pedir_cambios`, con la duda, el no de
+        quien no aprueba ese trabajo y lo que admite dos lecturas, `fichas.dos_lecturas`; las
+        entregas que esperan la decisión de quien escribe, `aprobacion.para_decidir`; el aviso
+        de la entrega con sus botones, `preguntas.ofrecer`, `botones.ConOpciones`, con la
+        guarda de lo que mostró, `entrega.huella_de_lo_entregado`; los avisos al responsable,
+        `tarea_aprobada` y `pedido_de_cambios`, redactados por el motor; la cocina deja de
+        mandar sus textos fijos en `aprobar_tarea` y `pedir_cambios_tarea` y devuelve la
+        identidad del acto; el cierre que esperaba, `cerrar_tarea_aprobada` en la cocina y
+        `aprobacion.cerrar_las_que_ya_pueden` en cada vuelta del ciclo, con su aviso
+        `cerrada_con_la_aprobacion` a los dos) y el commit que registra esto (el YAML de la 23,
+        la 21 con los botones del aviso y el corredor: `aparte`, `de_la_tarea`, `botones` en
+        lo que sale, las `aprobaciones` en los efectos, Mariano y Lucas, y un criterio de
+        aceptación de la prueba en cada tarea). Sin migración: el esquema ya tenía lo que hace
+        falta (`approval`, `motivo_no_cierra_tarea`).
+      - **Test primero:** `tests/motor/test_aprobacion.py` se escribió antes que el código y se
+        vio en rojo (no existía `leda.motor.aprobacion`: falla de colección, no prueba por
+        prueba). Las garantías de la cocina (`tests/garantias/test_cierre_con_aprobacion.py`)
+        se escribieron después de `cerrar_tarea_aprobada`, sin rojo observado.
+      - **Chequeos** (2026-10-08): `pytest tests/garantias` 264 passed; `pytest tests/motor
+        tests/conversaciones` 760 passed (una corrida anterior, 1 falla sin nombre que no se repitió: la intermitente conocida); suite completa 1451 passed;
+        corrida en seco de las 24 conversaciones con la IA guionada (`--ronda seco-3b`): 24 de
+        24 bien, la 23 entera (sus informes se borraron). Sin la IA real: es de la C-4.
+      - **Cómo quedó lo decidido:** lo claro va directo, sin vista previa; la cocina comprueba el
+        cierre en el mismo acto y, si algo lo frena, la aprobación queda anotada y los hechos
+        dicen qué (`no_se_cierra_todavia`); el sistema la cierra solo, sin otra aprobación,
+        cuando se resuelve (un evento del sistema que nombra la aprobación, auditado como de
+        Leda a nombre de quien aprobó). Aprobar y pedir cambios juntos sobre la misma tarea no
+        hacen nada y llevan una sola pregunta con dos botones (la misma, si se repite). El
+        botón "Pedir cambios" pregunta qué falta (`que_cambios_pide`). La decisión que ofrece el
+        aviso no es un tema abierto: quien aprueba no le debe una respuesta a la conversación
+        (sus recordatorios son de la 3c), como dice el estado inicial de la 23.
+      - **Los avisos de la decisión salen enseguida, sin el margen para corregir** (lo dice la
+        23, pasos 2, 4 y 6): una decisión no se corrige por chat, así que el margen sólo la
+        demoraría. Si el usuario quiere margen también acá, es la misma regla de `margen.py`.
+      - **Las instrucciones de la IA no cambiaron** (son las que pasaron la prueba real): las
+        entregas para decidir llegan en la lista de tareas con `para_decidir` y su responsable,
+        con su significado, y las fichas dicen qué es cada jugada.
+      - `PENDIENTE`: el enlace a la página de la tarea en los avisos al responsable (ADR 0019,
+        7a) es de la porción 4 (`_enlace_portal_tarea` sigue sin inventar ninguna URL).
+      - **Para la 3c:** los recordatorios a quien aprueba pueden contar las entregas que esperan
+        con `aprobacion.para_decidir` (o la decisión ofrecida sin cerrar,
+        `preguntas.DECISION_DE_LA_ENTREGA`, atada a su aviso por `del_aviso`); la decisión se
+        cierra sola al decidir, por escrito o con el botón (`Ficha.contesta`), y un aviso nuevo
+        de la misma tarea la reemplaza. Hoy no tiene espera (`pending_reply`): la 3c decide si
+        la suma o si cuenta por el aviso.
     - [ ] **3c, los recordatorios a quien aprueba** (conversación 24).
   - [ ] Porción 4: la página de la tarea y su enlace.
   - [ ] Porción 5: el acceso del administrador.
@@ -213,7 +258,6 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La regresión con la IA real de todas (con la 21 entera, desde la porción 3a), y después la porción 3b
-de la C-3: la hoja de aprobación con los botones Aprobar y Pedir cambios (conversación 23), que abre
-la pregunta de quien aprueba sobre el aviso de la 3a (`docs/STATUS.md`, "Punto exacto para
+La regresión con la IA real de todas (con la 21 y la 23 enteras), y después la porción 3c de la
+C-3: los recordatorios a quien aprueba (conversación 24; `docs/STATUS.md`, "Punto exacto para
 retomar").

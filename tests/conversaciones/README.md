@@ -96,17 +96,25 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
 con su YAML para los pasos que esa porción cubre:
 
 - **La 21**, entera desde la porción 3a: el paso 6 es el aviso a Ismael redactado por el motor, con las
-  fotos adjuntas en el álbum que sigue al texto. Sus botones Aprobar y Pedir cambios (porción 3b) y el
-  enlace a la página de la tarea (porción 4) quedan anotados en el YAML, sin esperarse todavía.
+  fotos adjuntas en el álbum que sigue al texto y, desde la porción 3b, los botones Aprobar y Pedir
+  cambios con el texto. El enlace a la página de la tarea (porción 4) queda anotado en el YAML, sin
+  esperarse todavía.
 - **La 22**, entera, con una diferencia anotada en su YAML: en el paso 5 el enlace solo cubre el archivo
   y falta cómo se probó (el reparto es por las clases; con el archivo del paso 6 queda como dice el
   `.md`). En el paso 7, el aviso a Ismael queda guardado y sale terminado el margen para corregir;
   el `.md` todavía dice que se entera "ahora".
 
-**La 23 y la 24 todavía no corren:** la aprobación no está construida (tarea C-3 de la Fase C). Tienen sólo
-el `.md`; el corredor carga los `*.yaml`, así que cada una recibe su YAML cuando su ficha exista. Lo que
-dejan `PENDIENTE` está marcado en cada paso. Usan más personas que Marcos e Ismael: Nahuel (lo aprueba
-Marcos), Mariano y Ariel (los aprueba Ismael) y Lucas.
+**La 23 corre desde la porción 3b de la C-3** (la hoja de aprobación), entera, con tres pasos de Leda que
+el hilo da por hechos (4b, 9b y 9c) y el paso 10 aparte (`aparte: true`: por el motor y sin
+comprobarlo). Usa más personas que Marcos e Ismael: Mariano y Ariel (los aprueba Ismael) y Lucas (lo
+aprueba Martín). **La 24 todavía no corre:** sus recordatorios a quien aprueba son de la porción 3c.
+Tiene sólo el `.md`; el corredor carga los `*.yaml`, así que recibe su YAML cuando su regla exista.
+
+**La hoja de aprobación** (porción 3b): un paso puede tocar el botón del aviso de una de varias entregas
+(`toca: Pedir cambios` con `de_la_tarea`); lo que Leda manda por su cuenta puede esperar sus botones
+(`botones`), y los efectos suman las decisiones de quien aprueba (`aprobaciones`: la tarea, la decisión
+y de quién). Cada tarea lleva un criterio de aceptación de la prueba (`criterio`, si la conversación
+no dice otro): sin él, ninguna se podría cerrar al aprobarla.
 
 **La 12 (paso 6) y la 25 (paso 8) esperan todavía que la entrega no se reciba por chat** (`no_por_chat`):
 desde la porción 2 la entrega muestra la vista previa (o, en la 25, no se puede porque la tarea de

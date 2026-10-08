@@ -1,0 +1,367 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/23-aprobacion.md
+numero: "23"
+titulo: "Quien aprueba decide"
+mide: garantias
+persona: Ismael
+inicio: "2026-10-23 14:00"
+
+# Sin política de evidencia: la evidencia está completa según la de cada área. Cada tarea lleva
+# el criterio de aceptación de la prueba (`carga.py`).
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  SW:
+    titulo: Cambiar switch industrial de la sala de servidores
+    responsable: Lucas
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+    # Agregada con la de comunicaciones ya en curso, como en la semilla.
+    depende_de: SW
+  TAB:
+    titulo: Cablear tablero de la máquina 3
+    responsable: Mariano
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  DASH:
+    titulo: Dashboard de lotes en CoreLabs
+    responsable: Ariel
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+
+# La del switch es de Lucas y no es parte de la conversación: lo que le llega a él no se mira.
+foco: [PLC, COM, TAB, DASH]
+
+# El viernes 23: las cuatro entregas, confirmadas, y sus avisos a Ismael, con los botones.
+preludio:
+  - quien: Marcos
+    a_las: "2026-10-23 15:00"
+    escribe: "termine el plc"
+    jugadas: [{nombre: entregar, tarea: PLC}]
+  - quien: Marcos
+    a_las: "2026-10-23 15:01"
+    toca: Confirmar
+  - quien: Marcos
+    a_las: "2026-10-23 15:02"
+    escribe: "termine lo de comunicaciones"
+    jugadas: [{nombre: entregar, tarea: COM}]
+  - quien: Marcos
+    a_las: "2026-10-23 15:03"
+    toca: Confirmar
+  - quien: Mariano
+    a_las: "2026-10-23 15:05"
+    escribe: "termine el tablero de la 3"
+    jugadas: [{nombre: entregar, tarea: TAB}]
+  - quien: Mariano
+    a_las: "2026-10-23 15:06"
+    toca: Confirmar
+  - quien: Ariel
+    a_las: "2026-10-23 15:08"
+    escribe: "termine el dashboard"
+    jugadas: [{nombre: entregar, tarea: DASH}]
+  - quien: Ariel
+    a_las: "2026-10-23 15:09"
+    toca: Confirmar
+  - quien: Leda
+    relojes: ["2026-10-23 15:30"]
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-26 10:20"
+    escribe: "che el tablero de la maquina 3 de mariano ya lo vi yo, esta joya. aprobalo asi avanza"
+    jugadas:
+      - {nombre: aprobar, de: mariano}
+    efectos: {}
+    hechos:
+      - {jugada: aprobar, resultado: no_se_puede, motivo: no_es_quien_aprueba,
+         responsable: Mariano Naim, quien_aprueba: Ismael Soschinski}
+    pregunta: null
+    estado_despues:
+      de: Marcos
+      pregunta_abierta: null
+    dice:
+      - que esa aprobación no la puede hacer él
+      - que la decide Ismael
+    no_dice:
+      - que la aprobó
+      - que le pasa a Ismael lo que dijo Marcos
+      - nombres de jugadas
+
+  - paso: 2
+    a_las: "2026-10-26 10:30"
+    escribe: "el plc de marcos aprobado, impecable"
+    jugadas:
+      - {nombre: aprobar, tarea: PLC, comentario: impecable}
+    efectos:
+      estados: {PLC: terminada}
+      aprobaciones:
+        - {tarea: PLC, decision: aprobado, de: Ismael}
+      avisos_guardados:
+        - {tipo: tarea_aprobada, tarea: PLC, a: Marcos, estado: guardado}
+    hechos:
+      - {jugada: aprobar, resultado: anotado, tarea: PLC, comentario: presente,
+         quedo_terminada: true, no_se_cierra_todavia: ausente,
+         aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-10-26T10:30"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la tarea del PLC quedó terminada
+      - que Marcos se va a enterar ahora
+    no_dice:
+      - que falta otra aprobación
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-26 10:30"]
+    salen:
+      - a: Marcos
+        tipo: tarea_aprobada
+        tarea: PLC
+        hechos: {aprobada_por: Ismael Soschinski, comentario: presente, quedo_terminada: true,
+                 necesita_respuesta: false}
+    estado_despues:
+      de: Marcos
+      pregunta_abierta: null
+    dice:
+      - que Ismael la aprobó y quedó terminada
+      - la tarea del PLC en su renglón con 📋
+      - el comentario de Ismael
+      - que no hace falta que responda, solo en el último renglón
+    # El enlace a la página de la tarea (ADR 0019, decisión 7a) es de la porción 4.
+
+  - paso: 4
+    a_las: "2026-10-26 10:35"
+    escribe: "lo de comunicaciones tambien aprobado"
+    jugadas:
+      - {nombre: aprobar, tarea: COM}
+    efectos:
+      aprobaciones:
+        - {tarea: COM, decision: aprobado, de: Ismael}
+      avisos_guardados:
+        - {tipo: tarea_aprobada, tarea: COM, a: Marcos, estado: guardado}
+    hechos:
+      - {jugada: aprobar, resultado: anotado, tarea: COM, quedo_terminada: ausente,
+         no_se_cierra_todavia: {espera_que_terminen: [
+           {tarea: SW, estado: en_curso, responsable: Lucas Natuche}]},
+         se_cierra_sola: {se_avisa_a: [Marcos Tarquini, Ismael Soschinski]},
+         aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-10-26T10:35"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la aprobación quedó anotada pero la tarea todavía no queda terminada
+      - que espera que se termine la del switch de Lucas
+      - que queda terminada sola cuando se termine la del switch, y que les avisa a él y a Marcos
+    no_dice:
+      - que quedó terminada
+      - que la del switch está atrasada
+      - que va a tener que volver a aprobarla
+
+  # El aviso a Marcos de la aprobación anotada, que el paso 4 del .md dice que sale enseguida.
+  - paso: 4b
+    quien: Leda
+    relojes: ["2026-10-26 10:36"]
+    salen:
+      - a: Marcos
+        tipo: tarea_aprobada
+        tarea: COM
+        hechos: {aprobada_por: Ismael Soschinski, quedo_terminada: ausente,
+                 no_se_cierra_todavia: {espera_que_terminen: [{tarea: SW}]},
+                 necesita_respuesta: false}
+    dice:
+      - que Ismael aprobó la tarea de comunicaciones, en su renglón con 📋
+      - que todavía no queda terminada porque espera la del switch de Lucas, y que queda terminada sola cuando ésa termine
+      - que no hace falta que responda, solo en el último renglón
+    no_dice:
+      - que quedó terminada
+
+  - paso: 5
+    a_las: "2026-10-26 10:39"
+    # El botón del aviso de la entrega de Mariano, del viernes (situación general 6).
+    toca: Pedir cambios
+    de_la_tarea: TAB
+    efectos: {}
+    hechos:
+      - {jugada: pedir_cambios, resultado: falta_dato, falta: [comentario], tarea: TAB,
+         pregunta: que_cambios_pide}
+    pregunta: {tipo: que_cambios_pide, tarea: TAB}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: que_cambios_pide, tarea: TAB}
+    dice:
+      - la tarea de Mariano en su renglón con 📋
+      - una pregunta, qué le falta
+    no_dice:
+      - que ya le pidió el cambio a Mariano
+
+  - paso: 6
+    a_las: "2026-10-26 10:40"
+    escribe: "le falta el diagrama del tablero, que lo suba y lo vemos"
+    jugadas:
+      - {nombre: pedir_cambios, tarea: TAB, comentario: "falta el diagrama del tablero"}
+    efectos:
+      estados: {TAB: en_curso}
+      aprobaciones:
+        - {tarea: TAB, decision: rechazado, de: Ismael}
+      avisos_guardados:
+        - {tipo: pedido_de_cambios, tarea: TAB, a: Mariano, estado: guardado}
+    hechos:
+      - {jugada: pedir_cambios, resultado: anotado, tarea: TAB, estado: en_curso,
+         comentario: presente,
+         aviso_al_responsable: {a: Mariano Naim, llega: "~2026-10-26T10:40"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que le pidió el cambio a Mariano con su comentario
+      - que Mariano se va a enterar ahora
+      - que la vuelve a recibir cuando Mariano la entregue
+    no_dice:
+      - que la tarea quedó rechazada o cancelada
+
+  - paso: 7
+    quien: Leda
+    relojes: ["2026-10-26 10:40"]
+    salen:
+      - a: Mariano
+        tipo: pedido_de_cambios
+        tarea: TAB
+        hechos: {pidio_cambios: Ismael Soschinski, comentario: presente, estado: en_curso,
+                 vence: "2026-10-30", necesita_respuesta: false}
+    dice:
+      - que Ismael pidió un cambio
+      - la tarea en su renglón con 📋
+      - lo que pidió, con sus palabras (falta el diagrama del tablero)
+      - que la tarea sigue en curso y vence el vie 30/10
+      - "el cierre, aparte: que la vuelva a entregar cuando lo tenga"
+    no_dice:
+      - que la tarea fue rechazada
+      - un juicio sobre su trabajo
+
+  - paso: 8
+    a_las: "2026-10-26 10:45"
+    escribe: "lo de ariel aprobado, pero que revise los colores del grafico de lotes"
+    jugadas:
+      - {nombre: aprobar, tarea: DASH, comentario: "que revise los colores del gráfico de lotes"}
+      - {nombre: pedir_cambios, tarea: DASH,
+         comentario: "que revise los colores del gráfico de lotes"}
+    efectos: {}
+    hechos:
+      - {jugada: aprobar, resultado: dos_lecturas, tarea: DASH,
+         lecturas: [aprobar, pedir_cambios], pregunta: cual_de_las_dos}
+    pregunta: {tipo: cual_de_las_dos, tarea: DASH}
+    botones: [Aprobar, Pedir cambios]
+    estado_despues:
+      pregunta_abierta: {tipo: cual_de_las_dos, tarea: DASH}
+    dice:
+      - "una sola pregunta, cuál de las dos: aprobarla y pasarle el comentario a Ariel, o pedirle el cambio primero"
+    no_dice:
+      - que la aprobó
+      - que le pidió el cambio a Ariel
+
+  - paso: 9
+    a_las: "2026-10-26 10:46"
+    escribe: "aprobala nomas y pasale lo de los colores"
+    jugadas:
+      - {nombre: elegir, opcion: O1}
+    efectos:
+      estados: {DASH: terminada}
+      aprobaciones:
+        - {tarea: DASH, decision: aprobado, de: Ismael}
+      avisos_guardados:
+        - {tipo: tarea_aprobada, tarea: DASH, a: Ariel, estado: guardado}
+    hechos:
+      - {jugada: aprobar, resultado: anotado, tarea: DASH, comentario: presente,
+         quedo_terminada: true,
+         aviso_al_responsable: {a: Ariel De Simone, llega: "~2026-10-26T10:46"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la tarea de Ariel quedó terminada
+      - que Ariel se va a enterar ahora, con el comentario
+
+  # El aviso a Ariel, que el paso 9 del .md dice que sale enseguida.
+  - paso: 9b
+    quien: Leda
+    relojes: ["2026-10-26 10:47"]
+    salen:
+      - a: Ariel
+        tipo: tarea_aprobada
+        tarea: DASH
+        hechos: {aprobada_por: Ismael Soschinski, comentario: presente, quedo_terminada: true}
+    dice:
+      - que Ismael la aprobó y quedó terminada, en su renglón con 📋
+      - el comentario de los colores como algo para mirar, no como un cambio pendiente
+      - que no hace falta que responda, solo en el último renglón
+
+  # El martes 27, el aviso previo de la tarea de Mariano, que volvió a estar en curso con su
+  # vencimiento del viernes 30: la escalera de siempre (paso 6 del .md).
+  - paso: 9c
+    quien: Leda
+    relojes: ["2026-10-27 10:00"]
+    salen:
+      - {a: Mariano, tipo: aviso_previo, tarea: TAB}
+    dice:
+      - que la tarea de Mariano vence el vie 30/10, en su renglón con 📋
+      - que no hace falta que responda, solo en el último renglón
+
+  # El paso 10 del .md: la tarea del switch de Lucas queda terminada, con su entrega y su
+  # aprobación, que no son parte de esta conversación (`aparte`: por el motor, sin comprobar).
+  - paso: 10a
+    aparte: true
+    quien: Lucas
+    a_las: "2026-10-28 10:50"
+    escribe: "termine el switch"
+    jugadas: [{nombre: entregar, tarea: SW}]
+  - paso: 10b
+    aparte: true
+    quien: Lucas
+    a_las: "2026-10-28 10:51"
+    toca: Confirmar
+  - paso: 10c
+    aparte: true
+    quien: Martin
+    a_las: "2026-10-28 10:58"
+    escribe: "lo del switch de lucas aprobado"
+    jugadas: [{nombre: aprobar, tarea: SW}]
+
+  - paso: 11
+    quien: Leda
+    relojes: ["2026-10-28 11:00"]
+    salen:
+      - a: Marcos
+        tipo: cerrada_con_la_aprobacion
+        tarea: COM
+        hechos: {aprobada_por: Ismael Soschinski, aprobada_el: "2026-10-26",
+                 quedo_terminada: true, necesita_respuesta: false,
+                 se_resolvio: {tareas_que_esperaba: [{tarea: SW, estado: terminada}]}}
+      - a: Ismael
+        tipo: cerrada_con_la_aprobacion
+        tarea: COM
+        hechos: {aprobada_por: Ismael Soschinski, aprobada_el: "2026-10-26",
+                 quedo_terminada: true}
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - "a Marcos: que la tarea de comunicaciones quedó terminada, en su renglón con 📋; que Ismael la había aprobado el lun 26/10 y faltaba que se terminara la del switch de Lucas, que ya está"
+      - "a Ismael, breve: que la tarea de comunicaciones de Marcos quedó terminada con la aprobación que dio el lun 26/10, ahora que se terminó la del switch"
+      - que no hace falta que responda, solo en el último renglón
+    no_dice:
+      - que Leda la aprobó o la cerró por su cuenta
+      - que hace falta otra aprobación
