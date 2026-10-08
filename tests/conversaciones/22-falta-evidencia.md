@@ -111,8 +111,9 @@ porción 3.
    - Efecto: las cuatro filas de evidencia y el paso a `en_revision`, en un solo acto, con evento de
      Marcos y auditoría; el aviso a Ismael, como en la conversación 21 (la foto del lunes adjunta, el
      archivo y el enlace al video en la página).
-   - La respuesta dice: que la entregó y queda esperando la aprobación de Ismael, que se va a enterar
-     a las 15:41, cuando termina el margen para corregir (ADR 0018, 9n).
+   - La respuesta dice: que quedó entregada y pasa a revisión, y que le avisa cuando la revisen o si
+     hace falta algo más, sin nombrar a Ismael (decisiones 11 y 18 del 2026-10-08). El aviso a Ismael
+     sale a las 15:41, cuando termina el margen para corregir (ADR 0018, 9n).
    - Estado después: sin tema abierto, nada mostrado para confirmar.
 
 ## Qué mide

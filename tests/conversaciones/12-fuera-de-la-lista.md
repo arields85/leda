@@ -86,8 +86,8 @@ y 9g.
    - Efecto: ninguno todavía. La tarea sigue `en_curso` hasta que Marcos confirme. Ningún aviso al
      administrador: la entrega es conocida, no una situación nueva. En este espacio de prueba la tarea no
      pide evidencia, así que no falta nada.
-   - La respuesta dice: lo que va a entregar (lo que escribió), que al confirmar queda esperando la
-     aprobación de Ismael, y le pide que lo confirme, con el botón Confirmar.
+   - La respuesta dice: lo que va a entregar (lo que escribió), que al confirmar pasa a revisión (sin
+     nombrar a Ismael), y le pide que lo confirme, con el botón Confirmar.
    - La respuesta no dice: que la tarea ya quedó entregada, en revisión o terminada; que Ismael ya se
      enteró.
    - Estado después: tema abierto, la confirmación de la entrega.

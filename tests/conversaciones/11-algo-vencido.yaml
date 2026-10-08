@@ -96,7 +96,7 @@ pasos:
     pregunta: null
     dice:
       - que quedó anotada la previsión del 4
-      - que Ismael se va a enterar el viernes a las 10:00
+      - que la fecha nueva queda informada el viernes a las 10:00, sin nombrar a Ismael
     no_dice:
       - que Ismael ya se enteró
       - que el aviso a Ismael está guardado, en cola o sin enviar

@@ -8,7 +8,7 @@ por el motor, con las fotos adjuntas y un enlace a la página de la tarea. Circu
 3b); ADR 0018, decisiones 2 y 4 (situaciones generales 3, 6 y 7); ADR 0019, decisiones 4 a 6;
 constitución §7 y §11. Toma los pasos "Para la prueba de la entrega" de las conversaciones 10 y 11.
 
-**Corre desde la porción 2 de la C-3** (`odd/tasks/fase-c.md`), con su YAML, del paso 1 al 5; el paso 6,
+**Corre desde la porción 2 de la C-3** (`odd/tasks/fase-c.md`), con su YAML, del paso 1 al 6; el paso 7,
 desde la porción 3a: el aviso redactado por el motor, con las fotos adjuntas; desde la 3b, con los
 botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la tarea.
 
@@ -54,7 +54,7 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
    - La respuesta dice: la tarea del PLC en su renglón con 📋; una pieza por renglón, con lo que cubre
      cada una en palabras de todos los días: lo que escribió (cómo quedó y la prueba de 20 ciclos), las
      dos fotos de hoy, y aparte, como mandadas antes, la foto del mar 20/10 y `comprimidora_v3.zip` del mié
-     21/10, que entran sólo si las deja; que al confirmar la tarea queda esperando la aprobación de Ismael;
+     21/10, que entran sólo si las deja; que al confirmar la tarea pasa a revisión, sin nombrar a Ismael;
      el cierre, aparte: si la entrega así, o si saca o corrige algo.
    - La respuesta no dice: que la tarea quedó entregada, en revisión o terminada; que Ismael se enteró;
      qué muestran las fotos (la IA no las mira); los nombres de los tipos de la política; que falta el
@@ -108,13 +108,24 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
      mandó y cuándo; la tarea del PLC pasa de `en_curso` a `en_revision`, con evento de Marcos y auditoría. Nunca
      `terminada`. El aviso a Ismael queda guardado como hechos y sale terminado el margen para
      corregir, a las 15:26 (ADR 0018, 9n: es un aviso a otra persona por lo que dijo Marcos).
-   - La respuesta dice: que la entregó y queda esperando la aprobación de Ismael; que Ismael se va a
-     enterar a las 15:26, con las fotos; el próximo paso: que le avisa cuando Ismael decida.
-   - La respuesta no dice: que la tarea está terminada o aprobada; que Ismael ya la vio; la foto del
-     martes.
+   - La respuesta dice: que quedó entregada y pasa a revisión; el próximo paso: que le avisa cuando la
+     revisen o si hace falta algo más (decisiones 11 y 18 del 2026-10-08).
+   - La respuesta no dice: el nombre de Ismael (Marcos no lo preguntó); que la tarea está terminada o
+     aprobada; que Ismael ya la vio; la foto del martes.
    - Estado después: sin tema abierto, nada mostrado para confirmar.
 
-6. **Leda**, por su cuenta, a Ismael (jueves 22, 15:26, terminado el margen para corregir): el aviso de
+6. **Marcos** escribe (15:20): "a quien le avisaste?"
+   →
+   - Jugadas: ninguna. Es una pregunta sobre lo que Leda hizo: se contesta desde los últimos turnos.
+   - Efecto: ninguno; el turno queda en el registro.
+   - La respuesta dice: que a Ismael, y que le llega hoy a las 15:26, como algo que todavía no pasó. El
+     nombre lo tiene la redacción en lo que se dice sólo si la persona lo pregunta (decisión 11 del
+     2026-10-08, `odd/tasks/fase-c.md`), y Marcos lo preguntó.
+   - La respuesta no dice: que Ismael ya la vio o ya se enteró; que la tarea está terminada o aprobada;
+     una pregunta.
+   - Estado después: sin tema abierto.
+
+7. **Leda**, por su cuenta, a Ismael (jueves 22, 15:26, terminado el margen para corregir): el aviso de
    la entrega. A Marcos, nada más.
    →
    - Efecto: al salir, el código relee la tarea y la evidencia vigente; la IA redacta desde esos hechos.

@@ -132,7 +132,7 @@ def test_el_aviso_de_una_entrega_cuenta_las_fotos_del_album_que_sigue_al_texto(c
     otra["pasos"][-1]["salen"][0]["fotos"] = 2
     corrida = correr_conversacion(conn, otra, _perfecta(otra))
     assert [(paso, f.clase, f.que) for paso, f in corrida.fallas()] == [
-        (6, cp.MOTOR, "no salió lo esperado"), (6, cp.MOTOR, "salió algo de más")]
+        (7, cp.MOTOR, "no salió lo esperado"), (7, cp.MOTOR, "salió algo de más")]
 
 
 def test_la_entrega_confirmada_por_otro_camino_no_es_una_falla_de_garantia(conn):

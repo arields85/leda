@@ -57,8 +57,8 @@ del día; acá llega antes (paso 6) y a Ismael le llega un solo aviso, con el po
      vez, 9n y 9d). La respuesta dice: cada tarea en su
      bloque, primero su renglón con 📋 y su nombre solo, y debajo, con ✏️, lo anotado (la del PLC está
      trabada porque le falta el cable para programar; la de comunicaciones la termina el vie 23/10); con
-     ⚠️, la consecuencia de la de comunicaciones (vence el jue 22/10: un día hábil de atraso); que Ismael
-     será notificado, en pasiva sobre él y en futuro; y una sola pregunta, sola en el último renglón:
+     ⚠️, la consecuencia de la de comunicaciones (vence el jue 22/10: un día hábil de atraso); que la
+     fecha nueva queda informada, en pasiva y en futuro, sin nombrar a Ismael; y una sola pregunta, sola en el último renglón:
      quién puede destrabar la del PLC (decisión 9c). Estado después: tema abierto, quién destraba la del
      PLC; para después, qué atrasa la de comunicaciones.
    - **(b) La duda.** Si la IA no puede saber a qué tarea va la fecha (o el cable), pregunta cuál, con las
@@ -81,8 +81,8 @@ del día; acá llega antes (paso 6) y a Ismael le llega un solo aviso, con el po
      otro igual, que sigue esperando el porqué hasta el final del día; el bloqueo del PLC no cambia. Como
      Marcos habla de la de comunicaciones, la pregunta de qué la atrasa pasa a ser la de ahora y la de
      quién destraba la del PLC queda para después (9d). La respuesta dice: en el bloque de la de
-     comunicaciones, con 📋 primero y ✏️ debajo, que la termina el vie 23/10; que Ismael será notificado
-     hoy, en pasiva y en futuro; y una sola pregunta, sola en el último renglón: qué atrasa la de
+     comunicaciones, con 📋 primero y ✏️ debajo, que la termina el vie 23/10; que la fecha nueva queda
+     informada hoy, en pasiva y en futuro, sin nombrar a Ismael; y una sola pregunta, sola en el último renglón: qué atrasa la de
      comunicaciones. Es lo que espera el YAML.
    - **Después de la lectura equivocada** de la prueba real (la fecha del viernes 23 en la tarea del PLC):
      Jugadas: `corregir` la previsión de la tarea del PLC, que era de la de comunicaciones (situación
@@ -122,8 +122,8 @@ del día; acá llega antes (paso 6) y a Ismael le llega un solo aviso, con el po
      éste).
    - La respuesta dice: cada tarea en su bloque con 📋 primero; en la del PLC, con ✏️, que Martín de compras
      consigue el cable; en la de comunicaciones, con ✏️, que la termina el lun 26/10 porque le falta el
-     switch, y con ⚠️ la consecuencia (vence el jue 22/10: dos días hábiles de atraso); que Ismael será
-     notificado, en pasiva y en futuro; el próximo paso, aparte y al final.
+     switch, y con ⚠️ la consecuencia (vence el jue 22/10: dos días hábiles de atraso); que la fecha
+     nueva queda informada, en pasiva y en futuro, sin nombrar a Ismael; el próximo paso, aparte y al final.
    - La respuesta no dice: el switch como causa del bloqueo del PLC; Martín en la tarea de comunicaciones;
      que Leda le escribió a Martín o lo va a seguir; otra vez la pregunta de quién destraba o la de qué
      atrasa la de comunicaciones.

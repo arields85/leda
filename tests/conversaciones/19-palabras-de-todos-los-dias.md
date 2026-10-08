@@ -76,7 +76,7 @@ Decisión del usuario del 2026-10-07, de la prueba por Telegram real (Marcos pre
    fecha.
    →
    - El mensaje dice: que la tarea del PLC vence hoy; que tiene anotado que la termina el martes 27 y que
-     Ismael ya lo sabe; que el martes 27 le pregunta cómo viene; que no hace falta contestar.
+     ya quedó informada, sin nombrar a Ismael; que el martes 27 le pregunta cómo viene; que no hace falta contestar.
    - El mensaje no dice: "previsión", "fecha comprometida", "pedido de estado", "referente", "dependiente"
      ni otro nombre de un dato o de una jugada; un reproche; una pregunta.
 

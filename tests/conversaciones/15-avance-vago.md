@@ -97,8 +97,8 @@ respuesta ambigua, no puede quedar así"), y 9j.
      guardado para el jueves no sale (se omite con su motivo: ya contestó). El seguimiento se mueve al
      martes 3, la fecha que dio Marcos (9i).
    - La respuesta dice: que anotó que la termina el martes 3, con su motivo; que la fecha comprometida
-     sigue siendo el martes 27; que Ismael se va a enterar, y cuándo si lo dice, como algo que todavía no
-     pasó.
+     sigue siendo el martes 27; que la fecha nueva queda informada, y cuándo si lo dice, como algo que
+     todavía no pasó, sin nombrar a Ismael.
    - La respuesta no dice: que la fecha comprometida cambió; que Ismael ya lo sabe; que el aviso a
      Ismael está guardado, en cola o sin enviar (conversación 18); otra pregunta.
    - Estado después: sin tema abierto, nada para después; ninguna espera abierta.

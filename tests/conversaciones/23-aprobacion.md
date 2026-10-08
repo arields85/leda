@@ -70,8 +70,9 @@ Ismael recibe además el primer recordatorio de las tres entregas que siguen esp
 
 3. **Leda**, por su cuenta, a Marcos (10:30): el aviso de la aprobación.
    →
-   - El mensaje dice: que Ismael la aprobó y quedó terminada; la tarea del PLC en su renglón con 📋; el
-     comentario de Ismael; que no hace falta que responda, solo en el último renglón. Al final, un enlace
+   - El mensaje dice: que quedó aprobada y terminada, sin nombrar a Ismael (decisión 11 del
+     2026-10-08: el nombre, sólo si Marcos pregunta); la tarea del PLC en su renglón con 📋; el
+     comentario que dejó al aprobarla; que no hace falta que responda, solo en el último renglón. Al final, un enlace
      a la página de la tarea, que agrega el código (ADR 0019, decisión 7a).
    - Estado de Marcos después: sin tema abierto.
 
@@ -121,7 +122,7 @@ Ismael recibe además el primer recordatorio de las tres entregas que siguen esp
 
 7. **Leda**, por su cuenta, a Mariano (10:40): el aviso del pedido de cambios.
    →
-   - El mensaje dice: que Ismael pidió un cambio; la tarea en su renglón con 📋; lo que pidió, con sus
+   - El mensaje dice: que le pidieron un cambio, sin nombrar a Ismael; la tarea en su renglón con 📋; lo que pidió, con sus
      palabras (falta el diagrama del tablero); que la tarea sigue en curso y vence el vie 30/10; el
      cierre, aparte: que la vuelva a entregar cuando lo tenga. Al final, un enlace a la página de la
      tarea, que agrega el código.
@@ -165,8 +166,8 @@ Ismael recibe además el primer recordatorio de las tres entregas que siguen esp
 11. **Leda**, por su cuenta (miércoles 28, 11:00), a Marcos y a Ismael: el aviso del cierre.
     →
     - A Marcos, el mensaje dice: que la tarea de comunicaciones quedó terminada, en su renglón con 📋;
-      que Ismael la había aprobado el lun 26/10 y faltaba que se terminara la del switch de Lucas, que ya
-      está; que no hace falta que responda, solo en el último renglón. Al final, un enlace a la página de
+      que la había aprobado el lun 26/10 y faltaba que se terminara la del switch de Lucas, que ya está,
+      sin nombrar a Ismael; que no hace falta que responda, solo en el último renglón. Al final, un enlace a la página de
       la tarea, que agrega el código.
     - A Ismael, lo mismo, breve: que la tarea de comunicaciones de Marcos quedó terminada con la
       aprobación que dio el lun 26/10, ahora que se terminó la del switch; que no hace falta que

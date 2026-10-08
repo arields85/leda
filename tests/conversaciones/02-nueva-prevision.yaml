@@ -75,10 +75,11 @@ pasos:
     dice:
       - la previsión del 27 y su motivo
       - que la fecha comprometida sigue siendo el 23
-      - que Ismael se va a enterar, y cuándo si lo dice, como algo que todavía no pasó
+      - que la fecha nueva queda informada, y cuándo si lo dice, como algo que todavía no pasó, sin nombrar a Ismael
     no_dice:
       - que la fecha cambió
       - que Ismael aceptó
+      - el nombre de Ismael (no lo preguntó)
       - que el aviso a Ismael está guardado, en cola o sin enviar
       - que la tarea está bloqueada
 
@@ -127,7 +128,7 @@ pasos:
       esperas_abiertas: []
     dice:
       - que la tarea del PLC vencía hoy
-      - que Marcos dio el 27 como previsión y que Ismael está al tanto (ya le llegó el aviso)
+      - que Marcos dio el 27 como previsión y que ya quedó informada (ya le llegó el aviso), sin nombrar a Ismael
       - que el martes 27 le va a pedir el estado, como algo que todavía no pasó
     no_dice:
       - que la fecha cambió
@@ -190,7 +191,7 @@ pasos:
                  atraso_dias_habiles: 5, pedido_desde: "2026-10-27",
                  prevision_vigente: {fecha: "2026-10-27"}}
     dice:
-      - "el 28, el segundo pedido; el 29, el tercero, que avisa que se le va a avisar a Ismael"
+      - "el 28, el segundo pedido; el 29, el tercero, que avisa que sin respuesta se va a informar, sin nombrar a Ismael"
       - "el 30, a Ismael: la falta de respuesta, con la previsión, la fecha comprometida y el atraso"
     no_dice:
       - "a Ismael: que persiga o resuelva algo (es información)"

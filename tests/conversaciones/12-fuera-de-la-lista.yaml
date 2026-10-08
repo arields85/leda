@@ -142,7 +142,7 @@ pasos:
     estado_despues:
       pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
     dice:
-      - "lo que va a entregar (lo que escribió) y que, al confirmar, queda esperando la aprobación de Ismael"
+      - "lo que va a entregar (lo que escribió) y que, al confirmar, pasa a revisión, sin nombrar a Ismael"
       - que lo confirme
     no_dice:
       - que la tarea ya quedó entregada, en revisión o terminada

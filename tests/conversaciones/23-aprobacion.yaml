@@ -153,9 +153,9 @@ pasos:
       de: Marcos
       pregunta_abierta: null
     dice:
-      - que Ismael la aprobó y quedó terminada
+      - que quedó aprobada y terminada, sin nombrar a Ismael
       - la tarea del PLC en su renglón con 📋
-      - el comentario de Ismael
+      - el comentario que dejó al aprobarla
       - que no hace falta que responda, solo en el último renglón
 
   - paso: 4
@@ -199,7 +199,7 @@ pasos:
                  no_se_cierra_todavia: {espera_que_terminen: [{tarea: SW}]},
                  necesita_respuesta: false}
     dice:
-      - que Ismael aprobó la tarea de comunicaciones, en su renglón con 📋
+      - que la tarea de comunicaciones quedó aprobada, en su renglón con 📋, sin nombrar a Ismael
       - que todavía no queda terminada porque espera la del switch de Lucas, y que queda terminada sola cuando ésa termine
       - que no hace falta que responda, solo en el último renglón
     no_dice:
@@ -260,7 +260,7 @@ pasos:
         hechos: {pidio_cambios: Ismael Soschinski, comentario: presente, estado: en_curso,
                  vence: "2026-10-30", necesita_respuesta: false}
     dice:
-      - que Ismael pidió un cambio
+      - que le pidieron un cambio, sin nombrar a Ismael
       - la tarea en su renglón con 📋
       - lo que pidió, con sus palabras (falta el diagrama del tablero)
       - que la tarea sigue en curso y vence el vie 30/10
@@ -325,7 +325,7 @@ pasos:
         enlace: true
         hechos: {aprobada_por: Ismael Soschinski, comentario: presente, quedo_terminada: true}
     dice:
-      - que Ismael la aprobó y quedó terminada, en su renglón con 📋
+      - que quedó aprobada y terminada, en su renglón con 📋, sin nombrar a Ismael
       - el comentario de los colores como algo para mirar, no como un cambio pendiente
       - que no hace falta que responda, solo en el último renglón
 
@@ -381,7 +381,7 @@ pasos:
     estado_despues:
       pregunta_abierta: null
     dice:
-      - "a Marcos: que la tarea de comunicaciones quedó terminada, en su renglón con 📋; que Ismael la había aprobado el lun 26/10 y faltaba que se terminara la del switch de Lucas, que ya está"
+      - "a Marcos: que la tarea de comunicaciones quedó terminada, en su renglón con 📋; que la había aprobado el lun 26/10 y faltaba que se terminara la del switch de Lucas, que ya está, sin nombrar a Ismael"
       - "a Ismael, breve: que la tarea de comunicaciones de Marcos quedó terminada con la aprobación que dio el lun 26/10, ahora que se terminó la del switch"
       - que no hace falta que responda, solo en el último renglón
     no_dice:

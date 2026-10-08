@@ -98,7 +98,7 @@ pasos:
     dice:
       - "lo que falta, en palabras de todos los días: cómo la probó y un archivo"
       - que la foto del lunes va a estar en la entrega
-      - que la tarea pasa a esperar la aprobación de Ismael cuando esté todo
+      - que la tarea pasa a revisión cuando esté todo, sin nombrar a Ismael
       - "el cierre, aparte: que mande lo que falta"
     no_dice:
       - que la entregó, que está en revisión o terminada
@@ -206,6 +206,6 @@ pasos:
     estado_despues:
       pregunta_abierta: null
     dice:
-      - que la entregó y queda esperando la aprobación de Ismael, que se va a enterar a las 15:41
+      - que quedó entregada y pasa a revisión, y que le avisa cuando la revisen o si hace falta algo más, sin nombrar a Ismael
     no_dice:
       - que la tarea está terminada o aprobada

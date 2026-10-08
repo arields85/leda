@@ -12,8 +12,11 @@ el pedido del usuario al aprobar M3. Tercera vuelta (usuario, 2026-10-07, despu�
 por Telegram): 🗓️ en vez de 📅, que Telegram dibuja con una fecha fija; en un bloque con una tarea, su
 renglón con 📋 es el primero y todo lo de esa tarea, también quién dijo qué, va debajo; una marca va
 siempre al principio de su renglón, nunca en el medio; y cuando otra persona se entera, Leda lo dice en
-pasiva sobre esa persona ("Ismael será notificado", "Ismael fue notificado"), en futuro mientras no pasó,
-nunca como algo que ella le avisa.
+pasiva, en futuro mientras no pasó, nunca como algo que ella le avisa. **Desde el 2026-10-08 (decisión 11
+del usuario, `odd/tasks/fase-c.md`):** a quien aprueba el trabajo de la persona no se lo nombra por su
+cuenta, así que la pasiva va sobre lo que se informa ("La nueva fecha queda informada"), no sobre él
+("Ismael será notificado" quedó superado); si la persona pregunta a quién se le avisa, Leda le dice el
+nombre.
 
 ## Estado inicial
 
@@ -57,13 +60,14 @@ nunca como algo que ella le avisa.
    - La respuesta dice: primero, en un renglón, lo que anotó; cada tarea en su bloque, separado por un
      renglón en blanco: primero un renglón con 📋 y su nombre solo, y debajo, con ✏️, lo anotado (arrancó
      la del PLC; la de comunicaciones la termina el mié 4/11 porque espera el switch nuevo), con ⚠️ la
-     consecuencia (vence el vie 30/10: tres días hábiles de atraso) y que Ismael será notificado hoy,
-     dicho en pasiva sobre él y en futuro, como algo que todavía no pasó; el próximo paso, en pocas
+     consecuencia (vence el vie 30/10: tres días hábiles de atraso) y que la fecha nueva queda
+     informada hoy, dicho en pasiva sobre lo que se informa y en futuro, como algo que todavía no pasó,
+     sin nombrar a Ismael; el próximo paso, en pocas
      palabras, aparte y al final.
    - La respuesta no dice: los dos hechos mezclados en un renglón o en un párrafo corrido; lo anotado
      antes que el renglón de su tarea; que la fecha de la tarea de comunicaciones cambió; el nombre
-     completo de una tarea dos veces; que Leda le avisa a Ismael ("le voy a avisar", "le avisé");
-     negrita.
+     completo de una tarea dos veces; que Leda le avisa a Ismael ("le voy a avisar", "le avisé"); el
+     nombre de Ismael; negrita.
    - Estado después: sin tema abierto, nada para después.
 
 3. **Leda**, por su cuenta, a Ismael (martes 20, a la hora que dicen los hechos): el aviso de la fecha

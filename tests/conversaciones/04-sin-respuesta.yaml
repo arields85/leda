@@ -109,7 +109,7 @@ pasos:
                  si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski]}}
     dice:
       - que la tarea del PLC venció el martes
-      - que si no hay novedades se le va a avisar a Ismael
+      - que si no hay novedades se va a informar, sin nombrar a Ismael
       - pide el estado
     no_dice:
       - una amenaza ni un reproche

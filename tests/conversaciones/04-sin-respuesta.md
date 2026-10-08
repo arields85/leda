@@ -64,8 +64,8 @@ Ismael. ADR 0018, decisión 5a, cuarta respuesta, y decisión 9b; mecánica §9.
 
 7. **Leda**, por su cuenta, a Marcos (jueves 29, 10:00): el tercer recordatorio (mecánica §9).
    →
-   - El mensaje dice: que la tarea del PLC venció el martes; que si no hay novedades se le va a avisar a
-     Ismael; pide el estado.
+   - El mensaje dice: que la tarea del PLC venció el martes; que si no hay novedades se va a informar, sin
+     nombrar a Ismael (decisión 11 del 2026-10-08); pide el estado.
    - El mensaje no dice: una amenaza ni un reproche (constitución §8); que ya se avisó a Ismael.
 
 8. **Nadie** escribe el jueves 29.

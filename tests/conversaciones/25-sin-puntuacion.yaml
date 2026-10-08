@@ -80,7 +80,7 @@ pasos:
     dice:
       - "cada tarea en su bloque, primero su renglón con 📋 y su nombre solo y debajo, con ✏️, lo anotado: la del PLC está trabada porque le falta el cable para programar; la de comunicaciones la termina el vie 23/10"
       - "con ⚠️, la consecuencia de la de comunicaciones: vence el jue 22/10, un día hábil de atraso"
-      - que Ismael será notificado, en pasiva sobre él y en futuro
+      - que la fecha nueva queda informada, en pasiva y en futuro, sin nombrar a Ismael
       - "una sola pregunta, sola y en el último renglón: quién puede destrabar la del PLC"
     no_dice:
       - una causa del bloqueo que nombre las comunicaciones
@@ -121,7 +121,7 @@ pasos:
       para_despues: [{tipo: quien_destraba, tarea: PLC}]
     dice:
       - "en el bloque de la de comunicaciones, con 📋 primero y ✏️ debajo: que la termina el vie 23/10"
-      - que Ismael será notificado hoy, en pasiva sobre él y en futuro
+      - que la fecha nueva queda informada hoy, en pasiva y en futuro, sin nombrar a Ismael
       - "una sola pregunta, sola y en el último renglón: qué atrasa la de comunicaciones"
     no_dice:
       - la fecha del viernes 23 en la tarea del PLC
@@ -176,7 +176,7 @@ pasos:
     dice:
       - "cada tarea en su bloque con 📋 primero: en la del PLC, con ✏️, que Martín de compras consigue el cable; en la de comunicaciones, con ✏️, que la termina el lun 26/10 porque le falta el switch"
       - "con ⚠️, la consecuencia de la de comunicaciones: vence el jue 22/10, dos días hábiles de atraso"
-      - que Ismael será notificado, en pasiva sobre él y en futuro
+      - que la fecha nueva queda informada, en pasiva y en futuro, sin nombrar a Ismael
       - el próximo paso, aparte y al final
     no_dice:
       - el switch como causa del bloqueo del PLC

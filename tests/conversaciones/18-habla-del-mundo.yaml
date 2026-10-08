@@ -125,7 +125,7 @@ pasos:
     dice:
       - que anotó que la tiene el miércoles 28
       - que la fecha comprometida sigue siendo el viernes 23
-      - "que Ismael se va a enterar hoy a la tarde, como algo que todavía no pasó, y antes y con el motivo si Marcos lo cuenta"
+      - "que la fecha nueva queda informada hoy a la tarde, como algo que todavía no pasó, y antes y con el motivo si Marcos lo cuenta, sin nombrar a Ismael"
       - "una sola pregunta, en el último renglón: qué la atrasa"
     no_dice:
       - que el aviso a Ismael está guardado, en cola, programado o todavía sin enviar
@@ -201,7 +201,7 @@ pasos:
       esperas_abiertas: []
     dice:
       - que anotó el motivo
-      - que Ismael se va a enterar del motivo hoy, como algo que todavía no pasó
+      - que el motivo queda informado hoy, como algo que todavía no pasó, sin nombrar a Ismael
       - "el próximo paso concreto: que Leda le pide el estado el miércoles 28"
     no_dice:
       - que el aviso a Ismael está guardado, en cola, programado o todavía sin enviar

@@ -52,8 +52,8 @@ aviso de la aprobación a Nahuel sale con el de Ismael (paso 10) y los dos días
 3. **Leda**, por su cuenta (miércoles 28, 10:00), el segundo recordatorio a cada uno.
    →
    - A Marcos, por la entrega de Nahuel, el mensaje dice: lo mismo que el primero, breve, con que la
-     entrega espera desde el lun 26/10; y, aparte, que si mañana sigue sin decidir se va a enterar
-     Ismael (como el tercer recordatorio de la mecánica §9).
+     entrega espera desde el lun 26/10; y, aparte, que si mañana sigue sin decidir se va a informar,
+     sin nombrar a Ismael (como el tercer recordatorio de la mecánica §9; decisión 11 del 2026-10-08).
    - A Ismael, por la entrega de Marcos, el mensaje dice: lo mismo que el primero, breve, con que la
      entrega espera desde el lun 26/10.
    - El mensaje no dice: un reproche; a Marcos, que Ismael va a decidir la tarea de Nahuel; a Ismael,
@@ -118,8 +118,8 @@ aviso de la aprobación a Nahuel sale con el de Ismael (paso 10) y los dos días
      Marcos y auditoría; la espera de Marcos se cierra y no sale ningún recordatorio más. Salen
      enseguida el aviso de la aprobación a Nahuel (como en la conversación 23) y el de que se destrabó a
      Ismael.
-   - La respuesta dice: que la tarea de los planos de la paila 2 quedó terminada; que Nahuel e Ismael se
-     van a enterar ahora.
+   - La respuesta dice: que la tarea de los planos de la paila 2 quedó terminada; que Nahuel se va a
+     enterar ahora; si dice que se informa que ya decidió, sin nombrar a Ismael.
    - La respuesta no dice: nada sobre la demora de Marcos.
    - Estado después: sin tema abierto.
 

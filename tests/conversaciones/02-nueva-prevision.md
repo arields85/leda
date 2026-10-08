@@ -41,8 +41,10 @@ desde esa fecha. ADR 0018, decisión 5a, segunda respuesta, y decisiones 9a, 9b 
      informa un atraso con fecha, no que no puede avanzar (constitución §8 distingue bloqueo de atraso).
    - Confirmación: ninguna; la previsión y su aviso se anotan directo (decisión 9a).
    - La respuesta dice: la previsión del 27 y su motivo; que la fecha comprometida sigue siendo el 23; que
-     Ismael se va a enterar, y cuándo si lo dice, como algo que todavía no pasó.
-   - La respuesta no dice: que la fecha cambió; que Ismael aceptó; que la tarea está bloqueada; que
+     la fecha nueva queda informada, y cuándo si lo dice, como algo que todavía no pasó, sin nombrar a
+     Ismael (decisión 11 del 2026-10-08: el nombre, sólo si Marcos pregunta).
+   - La respuesta no dice: el nombre de Ismael; que la fecha cambió; que Ismael aceptó; que la tarea
+     está bloqueada; que
      el aviso a Ismael está guardado, en cola o sin enviar (conversación 18).
    - Botones: ninguno.
    - Estado después: sin tema abierto, nada para después.
@@ -67,8 +69,8 @@ desde esa fecha. ADR 0018, decisión 5a, segunda respuesta, y decisiones 9a, 9b 
    →
    - Efecto: un mensaje privado en el outbox para Marcos. No abre una espera ni una pregunta: no pide nada.
      Ninguno a Ismael (ya está al tanto por el aviso del paso 3).
-   - El mensaje dice: que la tarea del PLC vencía hoy; que Marcos dio el 27 como previsión y que Ismael está
-     al tanto (ya le llegó el aviso); que el martes 27 le va a pedir el estado, como algo que todavía
+   - El mensaje dice: que la tarea del PLC vencía hoy; que Marcos dio el 27 como previsión y que ya quedó
+     informada (ya le llegó el aviso), sin nombrar a Ismael; que el martes 27 le va a pedir el estado, como algo que todavía
      no pasó.
    - El mensaje no dice: que la fecha cambió; nada que trate a Marcos como si no hubiera avisado; que va a
      escalar; una pregunta.
@@ -93,7 +95,7 @@ desde esa fecha. ADR 0018, decisión 5a, segunda respuesta, y decisiones 9a, 9b 
 7. **Nadie** escribe del martes 27 al viernes 30.
    →
    - Efecto: la escalera sigue desde el 27, como la de la conversación 04 desde el vencimiento: el miércoles
-     28, el segundo pedido; el jueves 29, el tercero, que avisa que se le va a avisar a Ismael; el viernes
+     28, el segundo pedido; el jueves 29, el tercero, que avisa que sin respuesta se va a informar, sin nombrar a Ismael; el viernes
      30, el escalamiento a Ismael por falta de respuesta, con la previsión, la fecha comprometida y el
      atraso del código. Es información: no le pide a Ismael que persiga ni que resuelva nada.
 

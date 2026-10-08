@@ -96,7 +96,8 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
 
-- **La 21**, entera desde la porción 3a: el paso 6 es el aviso a Ismael redactado por el motor, con las
+- **La 21**, entera desde la porción 3a: el paso 7 (el 6 hasta el 2026-10-08, cuando se sumó la
+  pregunta de a quién se le avisó) es el aviso a Ismael redactado por el motor, con las
   fotos adjuntas en el álbum que sigue al texto y, desde la porción 3b, los botones Aprobar y Pedir
   cambios con el texto. El enlace a la página de la tarea (porción 4) queda anotado en el YAML, sin
   esperarse todavía.

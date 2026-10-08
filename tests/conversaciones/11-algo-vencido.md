@@ -55,7 +55,7 @@ confirma, queda abajo, en "Para la prueba de la entrega".
      Leda manda por su cuenta (README, "Datos ficticios"): es un mensaje a otra persona y Leda no lo manda
      fuera del horario (decisión 9e).
    - La respuesta, enseguida, aunque sea fuera del horario (decisión 9e): dice que quedó anotada la
-     previsión del 4 y que Ismael se va a enterar el viernes a las 10:00.
+     previsión del 4 y que queda informada el viernes a las 10:00, sin nombrar a Ismael.
    - La respuesta no dice: que Ismael ya se enteró.
    - Estado después: sin tema abierto.
 

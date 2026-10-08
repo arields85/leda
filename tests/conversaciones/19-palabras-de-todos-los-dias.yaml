@@ -81,7 +81,7 @@ pasos:
     dice:
       - que anotó que la del PLC la termina el martes 27, con su motivo
       - que el vencimiento sigue siendo el viernes 23, dicho como el día para el que estaba
-      - que Ismael se va a enterar hoy, como algo que todavía no pasó
+      - que la fecha nueva queda informada hoy, como algo que todavía no pasó, sin nombrar a Ismael
       - "el próximo paso concreto: que el martes 27 le pregunta cómo viene"
     no_dice:
       - '"previsión", "fecha comprometida", "referente", "dependiente" ni otro nombre de un dato o de una jugada'
@@ -144,7 +144,7 @@ pasos:
       esperas_abiertas: []
     dice:
       - que la tarea del PLC vence hoy
-      - que tiene anotado que la termina el martes 27 y que Ismael ya lo sabe
+      - que tiene anotado que la termina el martes 27 y que ya quedó informada, sin nombrar a Ismael
       - que el martes 27 le pregunta cómo viene, como algo que todavía no pasó
       - que no hace falta contestar
     no_dice:

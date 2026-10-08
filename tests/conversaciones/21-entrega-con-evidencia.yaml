@@ -35,7 +35,7 @@ preludio:
     relojes: ["2026-10-20 10:00"]
     salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
 
-# El paso 6 corre desde la porción 3a de la C-3: el aviso a Ismael redactado por el motor, con las
+# El paso 7 corre desde la porción 3a de la C-3: el aviso a Ismael redactado por el motor, con las
 # fotos adjuntas; desde la 3b, con los botones Aprobar y Pedir cambios; desde la 4, con el enlace
 # a la página de la tarea al final, que agrega el despachador y sale sin vista previa (`enlace`).
 pasos:
@@ -71,7 +71,7 @@ pasos:
       - "la tarea del PLC en su renglón con 📋"
       - "una pieza por renglón, con lo que cubre cada una en palabras de todos los días: lo que escribió (cómo quedó y la prueba de 20 ciclos) y las dos fotos de hoy"
       - "aparte, como mandadas antes, la foto del mar 20/10 y comprimidora_v3.zip del mié 21/10, que entran sólo si las deja"
-      - que al confirmar la tarea queda esperando la aprobación de Ismael
+      - que al confirmar la tarea pasa a revisión, sin nombrar a Ismael
       - "el cierre, aparte: si la entrega así, o si saca o corrige algo"
     no_dice:
       - que la tarea quedó entregada, en revisión o terminada
@@ -177,14 +177,33 @@ pasos:
     estado_despues:
       pregunta_abierta: null
     dice:
-      - que la entregó y queda esperando la aprobación de Ismael
-      - que Ismael se va a enterar a las 15:26
+      - que quedó entregada y pasa a revisión
+      - que le avisa cuando la revisen o si hace falta algo más
     no_dice:
       - que la tarea está terminada o aprobada
       - que Ismael ya la vio
+      - el nombre de Ismael (no lo preguntó)
       - la foto del martes
 
+  # La pregunta de a quién se le avisó (decisión 11 del usuario, 2026-10-08): no lleva jugada y
+  # se contesta del registro, con el nombre que la redacción tiene sólo para si lo pregunta.
   - paso: 6
+    quien: Marcos
+    a_las: "2026-10-22 15:20"
+    escribe: "a quien le avisaste?"
+    jugadas: []
+    efectos: {}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que a Ismael, y que le llega hoy a las 15:26, como algo que todavía no pasó
+    no_dice:
+      - que Ismael ya la vio o ya se enteró
+      - que la tarea está terminada o aprobada
+      - una pregunta
+
+  - paso: 7
     quien: Leda
     relojes: ["2026-10-22 15:26"]
     salen:

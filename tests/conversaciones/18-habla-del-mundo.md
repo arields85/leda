@@ -60,8 +60,8 @@ del día y sale diciendo que todavía no la dio, y el porqué que llega después
      día de trabajo (16:30). La fecha contesta la espera del estado: el pedido que el paso 2 anunció para
      hoy ya no va a pasar, y el seguimiento se mueve a la previsión (9i).
    - La respuesta dice: que anotó que la tiene el miércoles 28; que la fecha comprometida sigue siendo el
-     viernes 23; que Ismael se va a enterar hoy a la tarde, como algo que todavía no pasó, y antes y con
-     el motivo si Marcos lo cuenta; una sola pregunta, en el último renglón: qué la atrasa.
+     viernes 23; que la fecha nueva queda informada hoy a la tarde, como algo que todavía no pasó, y
+     antes y con el motivo si Marcos lo cuenta, sin nombrar a Ismael; una sola pregunta, en el último renglón: qué la atrasa.
    - La respuesta no dice: que el aviso a Ismael está guardado, en cola, programado o todavía sin enviar;
      que Ismael ya se enteró; que un pedido o un aviso "ya no sale", "se retiró" o "quedó sin efecto"
      (si lo dice, lo dice como lo que va a pasar: que hoy no le vuelve a preguntar); que hoy le vuelve a
@@ -86,8 +86,8 @@ del día y sale diciendo que todavía no la dio, y el porqué que llega después
      fecha, el miércoles 28, y su motivo, con las palabras de Marcos.
    - Efecto: la misma fecha, ahora con su porqué; la pregunta y su espera se cierran. Ismael se va a
      enterar del porqué en otro aviso, terminado el margen para corregir (16:55).
-   - La respuesta dice: que anotó el motivo; que Ismael se va a enterar del motivo hoy, como algo que
-     todavía no pasó; el próximo paso concreto: que Leda le pide el estado el miércoles 28.
+   - La respuesta dice: que anotó el motivo; que el motivo queda informado hoy, como algo que todavía
+     no pasó, sin nombrar a Ismael; el próximo paso concreto: que Leda le pide el estado el miércoles 28.
    - La respuesta no dice: que el aviso a Ismael está guardado, en cola, programado o todavía sin enviar;
      que Ismael ya sabe el motivo; que la fecha cambió; otra pregunta.
    - Estado después: sin tema abierto, nada para después; ninguna espera abierta.

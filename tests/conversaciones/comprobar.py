@@ -592,8 +592,9 @@ def comprobar_avisos_en_estado(c: Comprobacion, esperados: list[dict], f: dict[s
 # responder) solo en su renglón, aparte y al final. Tercera vuelta (usuario, 2026-10-07, después
 # de la segunda prueba por Telegram): 🗓️ en vez de 📅, que Telegram dibuja con una fecha fija; en
 # un bloque con una tarea, su renglón con 📋 es el primero y todo lo de la tarea va debajo; una
-# marca va sólo al principio de su renglón; y cuando otra persona se entera, se dice en pasiva
-# sobre ella, nunca con Leda como quien le avisa. Se
+# marca va sólo al principio de su renglón; y cuando otra persona se entera, se dice en pasiva,
+# nunca con Leda como quien le avisa (desde el 2026-10-08, decisión 11, sobre lo que se informa
+# cuando no se nombra a quien aprueba el trabajo de la persona). Se
 # mide solo, en cada mensaje de una corrida, para no depender de leer las transcripciones. Se
 # comprueba sobre el texto que escribió la IA, sin el saludo del día que agrega el sistema. Lo
 # que no se puede medir sin juzgar el texto (que el primer renglón diga lo que pasó, que una idea
@@ -628,8 +629,8 @@ MARCA_DE_LA_LISTA = "una tarea con su vencimiento, con 🗓️: nunca 📅"
 TAREA_PRIMERO = ("en un bloque con una tarea, su renglón con 📋 es el primero: todo lo de la "
                  "tarea va debajo")
 MARCA_AL_PRINCIPIO = "una marca (📋 🗓️ ✏️ ⚠️) sólo al principio de su renglón, nunca en el medio"
-NOTIFICADO_EN_PASIVA = ("cuando otra persona se entera, dicho en pasiva sobre ella: nunca que "
-                        "Leda le avisa o la notifica")
+NOTIFICADO_EN_PASIVA = ("cuando otra persona se entera, dicho en pasiva: nunca que Leda le "
+                        "avisa o la notifica")
 
 _MESES = ("enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|"
           "noviembre|diciembre")
