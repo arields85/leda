@@ -11,7 +11,9 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   el trabajo de cada una (Ismael aprueba el de Marcos), y un administrador de plataforma con el
   bot de administración alcanzable;
 - **las tareas** de la conversación: título, responsable, vencimiento (17:00 del día, el fin de
-  la jornada), estado (un inicio, como el evento del día que dice) y dependencias;
+  la jornada), estado (un inicio, como el evento del día que dice), dependencias y su criterio
+  de aceptación (uno de la prueba si la conversación no lo dice: sin él, ninguna se podría
+  cerrar al aprobarla; mecánica §5);
 - **la política de evidencia** (`evidencia`, por área), si la conversación la nombra: lo que pide
   cada área y, por tipo, las clases que lo cubren y cómo se dice, de `espacios/corework.yaml`
   (ADR 0019, decisión 5); cada tarea pide lo de su área;
@@ -49,9 +51,13 @@ PERSONAS = {
     "Martin": ("Martín Forte", "referente", "it", "Ismael"),
     "Marcos": ("Marcos Tarquini", "referente", "ot", "Ismael"),
     "Nahuel": ("Nahuel Gimenez", "integrante", "ot", "Marcos"),
+    "Mariano": ("Mariano Naim", "referente", "electricidad", "Ismael"),
+    "Lucas": ("Lucas Natuche", "integrante", "it", "Martin"),
 }
 AREAS = {"direccion": "Dirección", "ot": "OT y automatización", "it": "Infraestructura IT",
-         "corelabs": "Software e interfaz HMI"}
+         "corelabs": "Software e interfaz HMI",
+         "electricidad": "Sistemas eléctricos y tableros"}
+CRITERIO_DE_LA_PRUEBA = "El trabajo hecho y revisado por quien lo aprueba"
 ROLES = {"direccion": ("Dirección", True), "referente": ("Referente técnico de área", False),
          "integrante": ("Integrante", False)}
 OBJETIVO = "Conectar y automatizar equipos para que produzcan y entreguen datos"
@@ -242,11 +248,11 @@ def _tareas(cur, mundo: Mundo, objetivo: str, tareas: dict[str, dict[str, Any]],
         cur.execute(
             """insert into task (workspace_id, objective_id, titulo, area_id,
                                  responsable_membership_id, estado, fecha_objetivo,
-                                 evidencia_requerida)
-               values (%s, %s, %s, %s, %s, 'asignada', %s, %s) returning id""",
+                                 evidencia_requerida, criterio_aceptacion)
+               values (%s, %s, %s, %s, %s, 'asignada', %s, %s, %s) returning id""",
             (mundo.workspace_id, objetivo, t["titulo"], persona["area_id"],
              persona["membership_id"], fin_del_dia(str(t["vence"])),
-             pide.get(persona["area"], [])))
+             pide.get(persona["area"], []), t.get("criterio", CRITERIO_DE_LA_PRUEBA)))
         task_id = str(cur.fetchone()["id"])
         mundo.tareas[clave], mundo.titulos[clave] = task_id, t["titulo"]
         estado = t.get("estado", "asignada")

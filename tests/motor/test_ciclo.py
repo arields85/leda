@@ -87,7 +87,7 @@ def test_los_avisos_a_la_administracion_salen_con_el_reloj_real(conn, mundo):
     salida_admin = TransporteDePrueba()
     ciclo, _ = _ciclo(conn, mundo, octubre(9, 10), transporte_admin=salida_admin)
 
-    assert ciclo.vuelta(admin=False).keys() == {"escalera", "avisos", "huerfanos",
+    assert ciclo.vuelta(admin=False).keys() == {"escalera", "cierres", "avisos", "huerfanos",
                                                 "despacho"}
     assert salida_admin.enviados == []
     assert ciclo.vuelta()["avisos_admin"]["enviados"] == 1

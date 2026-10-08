@@ -8,7 +8,10 @@ agrega: al entregar una respuesta, si su destinatario tiene abierta una pregunta
 desde antes de que se escribiera esa respuesta, salen sus opciones, cada una con su token como
 `callback_data` (`preguntas.callback`). Se leen al entregar, no al encolar, como hace el
 despachador: si la pregunta se cerró en el medio, ya no salen. Lo que Leda manda por su cuenta
-nunca lleva botones (9b).
+no lleva botones (9b), salvo un aviso que ofrece decidir algo (el de una entrega a quien la
+aprueba, con "Aprobar" y "Pedir cambios"; porción 3b de la C-3): lleva las opciones de la
+decisión que abrió al salir (`avisos.TipoDeAviso.ofrece`), si sigue sin cerrar. Van con el
+texto del aviso; su álbum sale sin botones.
 """
 
 from __future__ import annotations
@@ -42,15 +45,26 @@ class ConOpciones:
         with self.cur.connection.cursor() as cur:
             # La respuesta que se está entregando: el despachador ya la marcó enviada y todavía
             # no guardó su id de Telegram. El texto que llega puede llevar el saludo adelante.
-            cur.execute("""select cuerpo, destinatario_membership_id, programado_para
+            cur.execute("""select id, cuerpo, destinatario_membership_id, programado_para,
+                                  es_respuesta
                              from message_outbox
-                            where chat_id = %s and estado = 'enviado' and es_respuesta
+                            where chat_id = %s and estado = 'enviado'
                               and telegram_message_id is null
                               and destinatario_membership_id is not null
                             order by enviado_en desc""", (chat_id,))
             fila = next((f for f in cur.fetchall() if texto.endswith(f["cuerpo"])), None)
             if fila is None:
                 return []
+            if not fila["es_respuesta"]:
+                # Un aviso: las opciones de lo que ofrece decidir, si sigue sin cerrar.
+                cur.execute("""select o.etiqueta, o.token
+                                 from scheduled_notice a
+                                 join conversation_question q
+                                   on q.jugada ->> 'del_aviso' = a.id::text
+                                 join conversation_option o on o.question_id = q.id
+                                where a.outbox_id = %s and q.cerrada_en is null
+                                order by o.orden""", (fila["id"],))
+                return [Boton(o["etiqueta"], callback(o["token"])) for o in cur.fetchall()]
             cur.execute("""select o.etiqueta, o.token
                              from conversation_state s
                              join conversation_question q on q.id = s.pregunta_abierta_id

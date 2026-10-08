@@ -194,6 +194,72 @@ SIGNIFICADOS: Mapping[str, str] = {
                             "confirme (con el botón o escribiendo) o que saque o corrija algo.",
     "lo_que_falta_de_la_entrega": "Espera lo que le falta a la entrega de la tarea para "
                                   "poder entregarla.",
+    # --- La decisión de quien aprueba una entrega (circuito 8; porción 3b de la C-3) -----------
+    "para_decidir": "Una tarea de otra persona, entregada, que espera que la persona que "
+                    "escribe la apruebe o le pida cambios: no es una tarea suya.",
+    "ya_la_aprobo_el": "La persona que escribe ya la aprobó ese día: espera que se resuelva lo "
+                       "que falta para cerrarse, sin otra aprobación.",
+    "comentario": "Lo que dijo quien decide sobre la entrega, con sus palabras: en un pedido de "
+                  "cambios, lo que falta o hay que cambiar.",
+    "de": "La persona cuyo trabajo se aprueba o se devuelve, como la nombró quien escribe.",
+    "quien_aprueba": "Quién aprueba el trabajo de esa persona: quien decide sobre su entrega.",
+    "quedo_terminada": "La tarea quedó terminada: aprobada y con todo lo demás que pide el "
+                       "cierre, comprobado por el sistema.",
+    "no_se_cierra_todavia": "La aprobación quedó anotada, pero la tarea todavía no queda "
+                            "terminada: lo que falta para cerrarla, según el sistema.",
+    "espera_que_terminen": "Las tareas que tienen que terminar antes de que ésta pueda "
+                           "cerrarse, con su estado y su responsable.",
+    "bloqueos_abiertos": "Lo que traba la tarea, como lo dijo la persona responsable: mientras "
+                         "siga, no se cierra.",
+    "falta_el_criterio_de_aceptacion": "A la tarea le falta decir qué tiene que cumplir para "
+                                       "darla por terminada: así no se cierra.",
+    "falta_algo_mas": "Falta algo más para cerrarla, que el sistema no detalla.",
+    "se_cierra_sola": "Cuando se resuelva lo que falta, el sistema la cierra solo, sin otra "
+                      "aprobación, y se les avisa a esas personas (se_avisa_a). Todavía no "
+                      "pasó.",
+    "aviso_al_responsable": "Lo que se le avisa a la persona responsable de la tarea: a quién "
+                            "(a) y cuándo se entera (llega).",
+    "lecturas": "Las dos cosas que puede querer decir el mensaje sobre la misma tarea: no se "
+                "hizo ninguna y Leda pregunta cuál.",
+    "aprobada_por": "Quién aprobó la tarea.",
+    "aprobada_el": "El día en que quien aprueba dio esa aprobación.",
+    "pidio_cambios": "Quién le pidió cambios a la entrega.",
+    "puede_volver_a_entregarla": "La persona responsable la vuelve a entregar cuando tenga lo "
+                                 "que le pidieron.",
+    "se_resolvio": "Lo que faltaba para cerrar la tarea y ya se resolvió.",
+    "tareas_que_esperaba": "Las tareas que tenían que terminar antes de que ésta se cerrara, "
+                           "con el estado en que quedaron.",
+    "bloqueos_que_se_cerraron": "Lo que trababa la tarea y ya se resolvió.",
+    "dos_lecturas": "El mensaje dice a la vez dos cosas opuestas sobre la misma tarea "
+                    "(lecturas): no se hizo ninguna y Leda pregunta cuál de las dos.",
+    "su_propio_trabajo": "Es trabajo de la persona que escribe: no lo puede aprobar ni devolver "
+                         "ella; lo decide quien aprueba su trabajo.",
+    "no_es_quien_aprueba": "La persona que escribe no es quien aprueba ese trabajo: lo decide "
+                           "otra persona (quien_aprueba), y no cambió nada.",
+    "nada_para_decidir": "No hay una entrega de esa persona esperando la decisión de quien "
+                         "escribe.",
+    "persona_desconocida": "No hay nadie en el equipo con ese nombre.",
+    "ya_la_aprobo": "La persona que escribe ya la había aprobado: no se anota otra vez.",
+    "falta_evidencia": "Lo entregado no cubre lo que pide la tarea (todavia_le_falta dice qué): "
+                       "así no se aprueba.",
+    "cambio_la_entrega": "La entrega cambió desde el aviso que tenía ese botón: el botón ya no "
+                         "vale; se decide sobre lo que vale ahora.",
+    "decision_de_la_entrega": "Pregunta si quien aprueba aprueba la entrega o le pide cambios: "
+                              "lo puede tocar o escribir.",
+    "que_cambios_pide": "Pregunta qué le falta o qué hay que cambiar de la entrega: espera lo "
+                        "que pide quien la aprueba.",
+    "cual_de_las_dos": "Pregunta cuál de las dos cosas quiso decir la persona sobre la tarea: "
+                       "espera que elija una de las opciones.",
+    "tarea_aprobada": "Aviso a la persona responsable: quien aprueba su trabajo aprobó la "
+                      "tarea. No pide respuesta.",
+    "pedido_de_cambios": "Aviso a la persona responsable: quien aprueba su trabajo le pidió "
+                         "cambios a la entrega, con lo que pidió. No pide respuesta.",
+    "cerrada_con_la_aprobacion": "Aviso de que la tarea quedó terminada sola con la aprobación "
+                                 "que ya tenía, porque se resolvió lo que faltaba. No pide "
+                                 "respuesta.",
+    "hay_una_decision_mas_nueva": "Después de esa aprobación, quien aprueba pidió cambios: ya "
+                                  "no vale.",
+    "se_cerro_despues": "La tarea quedó terminada después: otro aviso lo cuenta.",
     # --- Lo que dice un hecho ------------------------------------------------------------------
     "jugada": "Qué entendió el sistema que dijo o pidió la persona (una jugada de la lista); "
               "dentro de un aviso, la jugada que lo causó.",
@@ -475,8 +541,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "correccion_de_prevision": "Aviso a quien aprueba el trabajo de la persona responsable: "
                                "el día para terminar la tarea que ya recibió no vale.",
     "entrega_para_aprobar": "Aviso a quien aprueba el trabajo de la persona responsable: "
-                            "entregó la tarea, que espera su aprobación. No pide respuesta en "
-                            "este mensaje.",
+                            "entregó la tarea, que espera su decisión: aprobarla o pedirle "
+                            "cambios, con un botón o escribiendo.",
     "falla_de_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
     "no_salio_un_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
 }
@@ -556,6 +622,8 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "guardar_para_la_entrega": "dejarlo_para_cuando_la_entregue",
     "informar_avance": "anotar_como_viene_sin_algo_cierto",
     "pedir_reasignacion": "pasarle_la_tarea_a_otra_persona",
+    "aprobar": "aprobar_la_entrega",
+    "pedir_cambios": "devolver_la_entrega_con_cambios",
 }
 _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 

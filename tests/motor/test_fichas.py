@@ -24,7 +24,8 @@ from tests.motor.ayudantes import AHORA
 
 VIERNES_9 = datetime(2026, 10, 9, 20, 0, tzinfo=timezone.utc)      # 17:00 en Buenos Aires
 OFRECIDAS = ("anotar_inicio", "anotar_prevision", "anotar_bloqueo", "anotar_quien_destraba",
-             "destrabar", "consultar_pendientes", "informar_avance", "entregar")
+             "destrabar", "consultar_pendientes", "informar_avance", "entregar", "aprobar",
+             "pedir_cambios")
 
 
 # --- Ayudas ---------------------------------------------------------------------------------

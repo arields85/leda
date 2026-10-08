@@ -1,0 +1,516 @@
+"""La hoja de aprobación (circuito 8; `leda.motor.aprobacion`; porción 3b de la C-3).
+
+Decidido por el usuario (`odd/tasks/fase-c.md`, preguntas 2 y 3): lo claro va directo, sin vista
+previa, porque es la decisión de quien aprueba; lo que mezcla aprobar y pedir un cambio lleva una
+sola pregunta con dos botones; el aviso de la entrega ofrece "Aprobar" y "Pedir cambios" como
+atajos (escribir vale igual); una aprobación que todavía no puede cerrar queda anotada y, cuando
+se resuelve lo que faltaba, el código vuelve a comprobar y la cierra sola, con aviso al
+responsable y a quien aprobó. Sólo quien aprueba ese trabajo decide; Leda nunca aprueba; el
+cierre lo comprueba el sistema (mecánica §5), y "terminé" nunca llega a terminada.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timedelta
+
+import pytest
+
+from leda.autoridad import identificar_en_espacio
+from leda.db import admin, espacio
+from leda.despachador import TransporteDePrueba
+from leda.motor import aprobacion, preguntas
+from leda.motor.ciclo import Ciclo
+from leda.motor.fichas import FICHAS
+from leda.motor.ia import IAGuionada, Jugada
+from leda.motor.tiempo import RelojFijo
+from leda.motor.turno import procesar_toque, procesar_turno
+
+from tests.motor.ayudantes import (AHORA, VIERNES_16, IAQueRedacta, avisos_guardados, cuantas,
+                                   enviar, estado_de, todos, uno)
+
+ENTREGADA = "Armar el tablero"
+DESPUES_DEL_MARGEN = AHORA + timedelta(minutes=20)
+
+
+# --- Ayudas ---------------------------------------------------------------------------------
+
+def _tarea(conn, mundo, titulo: str = ENTREGADA, quien: str = "Marcos",
+           estado: str = "en_curso", pide: tuple[str, ...] = (),
+           criterio: str | None = "El tablero armado y probado") -> str:
+    persona = mundo["personas"][quien]
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into task (workspace_id, objective_id, titulo, area_id,
+                                 responsable_membership_id, estado, fecha_objetivo,
+                                 evidencia_requerida, criterio_aceptacion)
+               values (%s, %s, %s, %s, %s, 'asignada', %s, %s, %s) returning id""",
+            (mundo["id"], mundo["objetivo"], titulo, mundo["area"], persona["membership_id"],
+             VIERNES_16, list(pide), criterio))
+        tarea = str(cur.fetchone()["id"])
+        if estado != "asignada":
+            cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                         actor_kind, motivo, at)
+                           values (%s, 'asignada', %s, 'persona', 'prueba', %s)""",
+                        (tarea, estado, AHORA - timedelta(days=3)))
+    conn.commit()
+    return tarea
+
+
+def _nahuel(conn, mundo) -> None:
+    """Otra persona del espacio, cuyo trabajo aprueba Marcos: no aprueba el de Marcos."""
+    with admin(conn) as cur:
+        cur.execute("select rol_id from membership where id = %s",
+                    (mundo["personas"]["Marcos"]["membership_id"],))
+        rol = cur.fetchone()["rol_id"]
+        cur.execute("""insert into app_user (telegram_user_id, nombre)
+                       values (81009, 'Nahuel Gimenez') returning id""")
+        usuario = str(cur.fetchone()["id"])
+        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id,
+                                               aprobador_membership_id)
+                       values (%s, %s, %s, %s, %s) returning id""",
+                    (mundo["id"], usuario, mundo["area"], rol,
+                     mundo["personas"]["Marcos"]["membership_id"]))
+        mundo["personas"]["Nahuel"] = {"app_user_id": usuario, "telegram": 81009,
+                                       "membership_id": str(cur.fetchone()["id"])}
+        cur.execute("""insert into greeting_state (membership_id, workspace_id, ultima_fecha_local)
+                       values (%s, %s, date '9999-12-31')""",
+                    (mundo["personas"]["Nahuel"]["membership_id"], mundo["id"]))
+    conn.commit()
+
+
+class Turnos:
+    """Los mensajes y los toques de cualquier persona del mundo, con la IA guionada."""
+
+    def __init__(self, conn, mundo) -> None:
+        self.conn, self.mundo = conn, mundo
+        self.minuto = 0
+        self.ia: IAGuionada | None = None
+
+    def _quien(self, nombre: str):
+        with espacio(self.conn, self.mundo["id"]) as cur:
+            quien = identificar_en_espacio(cur, self.mundo["personas"][nombre]["telegram"],
+                                           self.mundo["id"])
+        self.conn.commit()
+        return quien
+
+    def _at(self, at: datetime | None) -> datetime:
+        self.minuto += 1
+        return at or AHORA + timedelta(minutes=self.minuto)
+
+    def dice(self, nombre: str, *jugadas: Jugada, texto: str = "-",
+             at: datetime | None = None):
+        at = self._at(at)
+        quien = self._quien(nombre)
+        persona = self.mundo["personas"][nombre]
+        with espacio(self.conn, self.mundo["id"]) as cur:
+            cur.execute(
+                """insert into inbound_message (workspace_id, telegram_message_id, chat_id,
+                                                app_user_id, texto, at)
+                   values (%s, %s, %s, %s, %s, %s) returning id""",
+                (self.mundo["id"], uuid.uuid4().int % 1_000_000, persona["telegram"],
+                 persona["app_user_id"], texto, at))
+            entrante = str(cur.fetchone()["id"])
+        self.conn.commit()
+        self.ia = IAGuionada(jugadas=[list(jugadas)], redacciones=["Listo."])
+        r = procesar_turno(self.conn, quien, entrante, self.ia, RelojFijo(at))
+        self.conn.commit()
+        assert r.error is None, r.error
+        return r
+
+    def toca(self, nombre: str, token: str, at: datetime | None = None):
+        at = self._at(at)
+        quien = self._quien(nombre)
+        self.ia = IAGuionada(redacciones=["Listo."])
+        r = procesar_toque(self.conn, quien, token, self.mundo["personas"][nombre]["telegram"],
+                           self.ia, RelojFijo(at))
+        self.conn.commit()
+        return r
+
+    @property
+    def situacion(self) -> dict:
+        return self.ia.pedidos_de_jugadas[-1]
+
+    @property
+    def redaccion(self) -> dict:
+        return self.ia.pedidos_de_redaccion[-1]
+
+
+@pytest.fixture
+def turnos(conn, mundo) -> Turnos:
+    return Turnos(conn, mundo)
+
+
+def _entregada(conn, mundo, turnos, titulo: str = ENTREGADA, alias: str = "T2") -> str:
+    """Marcos entrega `titulo` y la confirma por escrito; la tarea queda en revisión."""
+    tarea = _tarea(conn, mundo, titulo)
+    turnos.dice("Marcos", Jugada("entregar", {"tarea": alias}), texto="termine")
+    turnos.dice("Marcos", Jugada("confirmar", {}), texto="dale")
+    assert estado_de(conn, tarea) == "en_revision"
+    return tarea
+
+
+def _con_el_aviso(conn, mundo, turnos, **kw) -> tuple[str, IAQueRedacta]:
+    """La entrega y su aviso a Ismael, ya salido (terminado el margen para corregir)."""
+    tarea = _entregada(conn, mundo, turnos, **kw)
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, DESPUES_DEL_MARGEN) == {"enviado": 1}
+    return tarea, ia
+
+
+def _hecho(r, jugada: str) -> dict:
+    return next(h for h in r.hechos if h.get("jugada") == jugada)
+
+
+def _token(conn, etiqueta: str, tarea: str | None = None) -> str:
+    filas = todos(conn, """select o.token from conversation_option o
+                             join conversation_question q on q.id = o.question_id
+                            where o.etiqueta = %s
+                              and (%s::uuid is null or o.valor ->> 'tarea' = %s::text)
+                            order by q.abierta_en desc""", etiqueta, tarea, tarea)
+    return filas[0]["token"]
+
+
+def _decisiones(conn, tarea: str) -> list[tuple[str, str | None]]:
+    return [(f["decision"], f["comentario"]) for f in todos(
+        conn, """select decision::text decision, comentario from approval
+                  where sujeto_id = %s order by at""", tarea)]
+
+
+def _salida_para(conn, mundo, nombre: str) -> list[dict]:
+    return todos(conn, """select cuerpo, es_respuesta from message_outbox
+                           where chat_id = %s and not es_respuesta order by dedupe_key""",
+                 mundo["personas"][nombre]["telegram"])
+
+
+# --- La lista cerrada -----------------------------------------------------------------------
+
+def test_aprobar_y_pedir_cambios_son_fichas_de_la_lista_cerrada():
+    for nombre, boton in (("aprobar", "Aprobar"), ("pedir_cambios", "Pedir cambios")):
+        ficha = FICHAS[nombre]
+        assert ficha.se_ofrece and ficha.boton == boton
+        assert {"tarea", "comentario", "de"} <= set(ficha.opcional)
+        assert preguntas.DECISION_DE_LA_ENTREGA in ficha.contesta
+    assert FICHAS["aprobar"].opuesta == "pedir_cambios"
+    assert FICHAS["pedir_cambios"].opuesta == "aprobar"
+
+
+def test_quien_aprueba_ve_las_entregas_que_esperan_su_decision(conn, mundo, turnos):
+    _entregada(conn, mundo, turnos)
+    turnos.dice("Ismael", texto="hola")
+    [entrega] = [t for t in turnos.situacion["tareas"] if t["titulo"] == ENTREGADA]
+    assert entrega["para_decidir"] is True and entrega["responsable"] == "Marcos"
+    assert "id" not in entrega
+    turnos.dice("Marcos", texto="hola")
+    assert not any(t.get("para_decidir") for t in turnos.situacion["tareas"])
+
+
+# --- Aprobar --------------------------------------------------------------------------------
+
+def test_lo_claro_va_directo_cierra_la_tarea_y_avisa_al_responsable(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": "impecable"}),
+                    texto="aprobado, impecable")
+
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "anotado" and hecho["quedo_terminada"] is True
+    assert estado_de(conn, tarea) == "terminada"
+    assert _decisiones(conn, tarea) == [("aprobado", "impecable")]
+    # El aviso al responsable lo redacta el motor y sale enseguida; ningún texto fijo.
+    [aviso] = avisos_guardados(conn, "tarea_aprobada")
+    assert str(aviso["destinatario_membership_id"]) == mundo["personas"]["Marcos"]["membership_id"]
+    assert hecho["aviso_al_responsable"]["a"] == "Marcos"
+    assert _salida_para(conn, mundo, "Marcos") == []
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, turnos._at(None)).get("enviado", 0) >= 1
+    hechos = next(h for p in ia.pedidos_de_redaccion for h in p["hechos"]
+                  if h["aviso"] == "tarea_aprobada")
+    assert hechos["aprobada_por"] == "Ismael" and hechos["comentario"] == "impecable"
+    assert hechos["quedo_terminada"] is True and hechos["necesita_respuesta"] is False
+
+
+def test_el_responsable_no_aprueba_su_propio_trabajo(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    r = turnos.dice("Marcos", Jugada("aprobar", {"tarea": "T2"}), texto="aprobada")
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "su_propio_trabajo"
+    assert hecho["quien_aprueba"] == "Ismael"
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+
+
+def test_quien_no_aprueba_ese_trabajo_recibe_un_no_y_nada_cambia(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    _nahuel(conn, mundo)
+    r = turnos.dice("Nahuel", Jugada("aprobar", {"de": "marcos"}),
+                    texto="lo de marcos aprobalo")
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "no_es_quien_aprueba"
+    assert hecho["quien_aprueba"] == "Ismael"
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+    assert avisos_guardados(conn, "tarea_aprobada") == []
+    assert cuantas(conn, "incident", "etapa = 'motor_fuera_de_la_lista'") == 0
+
+
+def test_sin_tarea_con_una_sola_entrega_de_esa_persona_es_esa(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    turnos.dice("Ismael", Jugada("aprobar", {"de": "Marcos"}), texto="lo de marcos aprobado")
+    assert estado_de(conn, tarea) == "terminada"
+
+
+def test_aprobar_exige_la_evidencia_que_pide_la_politica(conn, mundo, turnos):
+    """La política de evidencia se cumple con lo entregado vigente: lo retirado no cuenta, y sin
+    eso no se aprueba (mecánica §5)."""
+    with admin(conn) as cur:
+        cur.execute("""insert into task_evidence_policy (workspace_id, area_id,
+                                                         evidencia_requerida, tipos)
+                       values (%s, %s, '{explicacion}', %s)""",
+                    (mundo["id"], mundo["area"],
+                     '{"explicacion": {"clases": ["texto"], "en_palabras": "cómo quedó"}}'))
+    conn.commit()
+    tarea = _tarea(conn, mundo, pide=("explicacion",))
+    turnos.dice("Marcos", Jugada("entregar", {"tarea": "T2", "el_texto_cubre": ["explicacion"]}),
+                texto="quedo armado y probado")
+    turnos.dice("Marcos", Jugada("confirmar", {}), texto="dale")
+    turnos.dice("Marcos", Jugada("corregir", {"corrige": "entregar", "tarea": "T2",
+                                             "saca": ["P1"]}), texto="no, eso no va")
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "falta_evidencia"
+    assert hecho["todavia_le_falta"] == ["cómo quedó"]
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+
+
+def test_una_tarea_que_no_esta_entregada_no_se_aprueba(conn, mundo, turnos):
+    _tarea(conn, mundo)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"de": "Marcos"}), texto="aprobado lo de marcos")
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "nada_para_decidir"
+
+
+# --- La aprobación que todavía no puede cerrar ----------------------------------------------
+
+def _con_una_dependencia(conn, mundo, tarea: str) -> str:
+    """La tarea espera, con una dependencia bloqueante, otra de Nahuel que está en curso."""
+    _nahuel(conn, mundo)
+    origen = _tarea(conn, mundo, "Cambiar el switch", quien="Nahuel")
+    with admin(conn) as cur:
+        cur.execute("""insert into dependency (workspace_id, origen_task_id, destino_task_id,
+                                               tipo)
+                       values (%s, %s, %s, 'bloqueante')""", (mundo["id"], origen, tarea))
+    conn.commit()
+    return origen
+
+
+def _terminar(conn, tarea: str) -> None:
+    with admin(conn) as cur:
+        cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                     actor_kind, motivo)
+                       values (%s, 'en_curso', 'cancelada', 'persona', 'prueba')""", (tarea,))
+    conn.commit()
+
+
+def test_una_aprobacion_que_no_puede_cerrar_queda_anotada_y_lo_dice(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    _con_una_dependencia(conn, mundo, tarea)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "anotado" and "quedo_terminada" not in hecho
+    assert hecho["no_se_cierra_todavia"]["espera_que_terminen"] == [
+        {"tarea": "Cambiar el switch", "estado": "en_curso", "responsable": "Nahuel Gimenez"}]
+    assert hecho["se_cierra_sola"]["se_avisa_a"] == ["Marcos", "Ismael"]
+    assert estado_de(conn, tarea) == "en_revision"
+    assert _decisiones(conn, tarea) == [("aprobado", None)]
+    # Otra vez "aprobado": ya la aprobó, no se anota dos veces.
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
+    assert _hecho(r, "aprobar")["motivo"] == "ya_la_aprobo"
+    assert len(_decisiones(conn, tarea)) == 1
+
+
+def test_cuando_se_resuelve_lo_que_faltaba_el_codigo_la_cierra_solo(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    origen = _con_una_dependencia(conn, mundo, tarea)
+    turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
+    cuando = turnos._at(None)
+    assert aprobacion.cerrar_las_que_ya_pueden(conn, mundo["id"], RelojFijo(cuando)) == 0
+    conn.commit()
+    assert estado_de(conn, tarea) == "en_revision"
+
+    _terminar(conn, origen)
+    assert aprobacion.cerrar_las_que_ya_pueden(conn, mundo["id"], RelojFijo(cuando)) == 1
+    conn.commit()
+    assert estado_de(conn, tarea) == "terminada"
+    assert len(_decisiones(conn, tarea)) == 1          # nadie tuvo que volver a aprobarla
+    cierre = uno(conn, """select actor_kind::text actor, motivo from task_state_event
+                           where task_id = %s and estado_nuevo = 'terminada'""", tarea)
+    assert cierre["actor"] == "sistema"
+    auditado = uno(conn, """select actor_kind::text actor, detalle from audit_log
+                             where accion = 'herramienta:cerrar_tarea_aprobada'""")
+    assert auditado["actor"] == "leda"
+    avisos = avisos_guardados(conn, "cerrada_con_la_aprobacion")
+    destinos = sorted(str(a["destinatario_membership_id"]) for a in avisos)
+    assert destinos == sorted([mundo["personas"]["Marcos"]["membership_id"],
+                               mundo["personas"]["Ismael"]["membership_id"]])
+    # Una segunda vuelta no la vuelve a cerrar ni a avisar.
+    assert aprobacion.cerrar_las_que_ya_pueden(conn, mundo["id"], RelojFijo(cuando)) == 0
+    conn.commit()
+    assert len(avisos_guardados(conn, "cerrada_con_la_aprobacion")) == 2
+    ia = IAQueRedacta()
+    enviar(conn, mundo, ia, cuando)
+    hechos = [h for p in ia.pedidos_de_redaccion for h in p["hechos"]
+              if h["aviso"] == "cerrada_con_la_aprobacion"]
+    assert len(hechos) == 2
+    assert all(h["aprobada_por"] == "Ismael" and h["quedo_terminada"] is True for h in hechos)
+    assert all(h["se_resolvio"] == {"tareas_que_esperaba": [
+        {"tarea": "Cambiar el switch", "estado": "cancelada"}]} for h in hechos)
+
+
+def test_sin_aprobacion_el_codigo_nunca_cierra_una_tarea_entregada(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    assert aprobacion.cerrar_las_que_ya_pueden(conn, mundo["id"], RelojFijo(AHORA)) == 0
+    conn.commit()
+    assert estado_de(conn, tarea) == "en_revision"
+
+
+def test_un_pedido_de_cambios_deja_sin_efecto_la_aprobacion_anotada(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    origen = _con_una_dependencia(conn, mundo, tarea)
+    turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
+    turnos.dice("Ismael", Jugada("pedir_cambios", {"tarea": "T1", "comentario": "falta la foto"}),
+                texto="mejor no, falta la foto")
+    _terminar(conn, origen)
+    assert aprobacion.cerrar_las_que_ya_pueden(conn, mundo["id"], RelojFijo(AHORA)) == 0
+    conn.commit()
+    assert estado_de(conn, tarea) == "en_curso"
+
+
+# --- Pedir cambios --------------------------------------------------------------------------
+
+def test_pedir_cambios_con_su_comentario_devuelve_la_tarea_y_avisa(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    r = turnos.dice("Ismael", Jugada("pedir_cambios", {"tarea": "T1",
+                                                      "comentario": "falta el diagrama"}),
+                    texto="le falta el diagrama")
+    hecho = _hecho(r, "pedir_cambios")
+    assert hecho["resultado"] == "anotado" and hecho["estado"] == "en_curso"
+    assert estado_de(conn, tarea) == "en_curso"
+    assert _decisiones(conn, tarea) == [("rechazado", "falta el diagrama")]
+    assert _salida_para(conn, mundo, "Marcos") == []
+    ia = IAQueRedacta()
+    enviar(conn, mundo, ia, turnos._at(None))
+    hechos = next(h for p in ia.pedidos_de_redaccion for h in p["hechos"]
+                  if h["aviso"] == "pedido_de_cambios")
+    assert hechos["pidio_cambios"] == "Ismael" and hechos["comentario"] == "falta el diagrama"
+    assert hechos["estado"] == "en_curso" and hechos["vence"] == "2026-10-16"
+
+
+def test_pedir_cambios_sin_decir_que_falta_lo_pregunta_y_no_cambia_nada(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    r = turnos.dice("Ismael", Jugada("pedir_cambios", {"tarea": "T1"}), texto="pedile cambios")
+    hecho = _hecho(r, "pedir_cambios")
+    assert hecho["resultado"] == "falta_dato" and hecho["falta"] == ["comentario"]
+    assert hecho["pregunta"] == preguntas.QUE_CAMBIOS_PIDE
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+    r = turnos.dice("Ismael", Jugada("pedir_cambios", {"tarea": "T1", "comentario": "el cable"}),
+                    texto="que revise el cable")
+    assert estado_de(conn, tarea) == "en_curso"
+    assert preguntas.QUE_CAMBIOS_PIDE not in {
+        f["tipo"] for f in todos(conn, "select tipo from conversation_question "
+                                       "where cerrada_en is null")}
+
+
+# --- El aviso de la entrega, con sus botones -----------------------------------------------
+
+def test_el_aviso_de_la_entrega_ofrece_aprobar_y_pedir_cambios(conn, mundo, turnos):
+    tarea, ia = _con_el_aviso(conn, mundo, turnos)
+    [pedido] = ia.pedidos_de_redaccion
+    [hechos] = pedido["hechos"]
+    assert hechos["necesita_respuesta"] is True
+    assert hechos["pregunta"] == preguntas.DECISION_DE_LA_ENTREGA
+    assert pedido["pregunta"]["tipo"] == preguntas.DECISION_DE_LA_ENTREGA
+    assert [o["etiqueta"] for o in pedido["pregunta"]["opciones"]] == ["Aprobar",
+                                                                       "Pedir cambios"]
+    # Lo ofrecido no es un tema abierto: Ismael no le debe una respuesta a la conversación.
+    ofrecida = uno(conn, "select * from conversation_question where tipo = %s",
+                   preguntas.DECISION_DE_LA_ENTREGA)
+    assert ofrecida["para_despues_en"] is None and ofrecida["cerrada_en"] is None
+    assert uno(conn, "select pregunta_abierta_id from conversation_state where membership_id = %s",
+               mundo["personas"]["Ismael"]["membership_id"])["pregunta_abierta_id"] is None
+    # Los botones van con el texto del aviso.
+    transporte = TransporteDePrueba()
+    Ciclo(conn, mundo["id"], IAQueRedacta(), RelojFijo(DESPUES_DEL_MARGEN), transporte,
+          seguimiento=False).vuelta()
+    [entregado] = [e for e in transporte.enviados
+                   if e.chat_id == mundo["personas"]["Ismael"]["telegram"]]
+    assert [b.etiqueta for b in entregado.botones] == ["Aprobar", "Pedir cambios"]
+
+
+def test_tocar_aprobar_aprueba_una_sola_vez(conn, mundo, turnos):
+    tarea, _ = _con_el_aviso(conn, mundo, turnos)
+    token = _token(conn, "Aprobar", tarea)
+    r = turnos.toca("Ismael", token)
+    assert _hecho(r, "aprobar")["resultado"] == "anotado"
+    assert estado_de(conn, tarea) == "terminada"
+    assert turnos.toca("Ismael", token).repetido
+    assert _decisiones(conn, tarea) == [("aprobado", None)]
+
+
+def test_el_boton_de_una_entrega_ya_decidida_no_hace_nada_y_lo_dice(conn, mundo, turnos):
+    tarea, _ = _con_el_aviso(conn, mundo, turnos)
+    turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
+    r = turnos.toca("Ismael", _token(conn, "Aprobar", tarea))
+    hecho = r.hechos[0]
+    assert hecho["resultado"] == "sin_efecto" and hecho["motivo"] == "pregunta_cerrada"
+    assert _decisiones(conn, tarea) == [("aprobado", None)]
+
+
+def test_el_boton_de_un_aviso_cuya_entrega_cambio_no_vale(conn, mundo, turnos):
+    """La guarda (ADR 0018, decisión 2): lo que se aprueba con el botón es lo que mostró el
+    aviso. Si la entrega cambió desde entonces, el toque no aprueba."""
+    tarea, _ = _con_el_aviso(conn, mundo, turnos)
+    turnos.dice("Marcos", Jugada("corregir", {"corrige": "entregar", "tarea": "T2",
+                                             "saca": ["P1"]}), texto="eso no iba")
+    r = turnos.toca("Ismael", _token(conn, "Aprobar", tarea))
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "cambio_la_entrega"
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+
+
+def test_tocar_pedir_cambios_pregunta_que_falta_y_lo_escrito_lo_completa(conn, mundo, turnos):
+    tarea, _ = _con_el_aviso(conn, mundo, turnos)
+    r = turnos.toca("Ismael", _token(conn, "Pedir cambios", tarea))
+    hecho = _hecho(r, "pedir_cambios")
+    assert hecho["resultado"] == "falta_dato" and hecho["pregunta"] == preguntas.QUE_CAMBIOS_PIDE
+    assert estado_de(conn, tarea) == "en_revision"
+    assert r.pregunta["tipo"] == preguntas.QUE_CAMBIOS_PIDE and "opciones" not in r.pregunta
+    turnos.dice("Ismael", Jugada("pedir_cambios", {"tarea": "T1",
+                                                  "comentario": "falta el diagrama"}),
+                texto="le falta el diagrama")
+    assert estado_de(conn, tarea) == "en_curso"
+    assert _decisiones(conn, tarea) == [("rechazado", "falta el diagrama")]
+
+
+# --- Lo que admite dos lecturas -------------------------------------------------------------
+
+def test_aprobar_y_pedir_cambios_juntos_no_hacen_nada_y_preguntan_cual(conn, mundo, turnos):
+    tarea = _entregada(conn, mundo, turnos)
+    comentario = "que revise los colores"
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": comentario}),
+                    Jugada("pedir_cambios", {"tarea": "T1", "comentario": comentario}),
+                    texto="aprobado, pero que revise los colores")
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "dos_lecturas"
+    assert hecho["lecturas"] == ["aprobar", "pedir_cambios"]
+    assert r.pregunta["tipo"] == preguntas.CUAL_DE_LAS_DOS
+    assert [o["etiqueta"] for o in r.pregunta["opciones"]] == ["Aprobar", "Pedir cambios"]
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+
+    # Otra vez lo mismo: es la misma pregunta, no una segunda.
+    turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": comentario}),
+                Jugada("pedir_cambios", {"tarea": "T1", "comentario": comentario}),
+                texto="aprobado pero que revise")
+    assert cuantas(conn, "conversation_question", "tipo = %s", preguntas.CUAL_DE_LAS_DOS) == 1
+
+    # Escrito vale igual que el botón: la primera lectura aprueba con el comentario.
+    r = turnos.dice("Ismael", Jugada("elegir", {"opcion": "O1"}), texto="aprobala nomas")
+    assert estado_de(conn, tarea) == "terminada"
+    assert _decisiones(conn, tarea) == [("aprobado", comentario)]

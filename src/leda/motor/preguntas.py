@@ -83,6 +83,19 @@ MOTIVO_DEL_ATRASO = "motivo_del_atraso"
 # pueden dejar: "dejá, no la entrego todavía" no anota nada.
 CONFIRMAR_ENTREGA = "confirmar_la_entrega"
 LO_QUE_FALTA_DE_LA_ENTREGA = "lo_que_falta_de_la_entrega"
+# La decisión que ofrece el aviso de una entrega a quien la aprueba (porción 3b de la C-3;
+# `aprobacion.py`): "Aprobar" y "Pedir cambios" como atajos. No es un tema abierto: quien aprueba
+# no le debe una respuesta a la conversación (sus recordatorios son de la 3c), así que no se
+# ordena con las demás (`ofrecer`). Vale mientras el aviso sea el vigente; un aviso más nuevo de
+# la misma tarea la reemplaza, y la decisión, tocada o escrita, la contesta.
+DECISION_DE_LA_ENTREGA = "decision_de_la_entrega"
+# Qué le falta a una entrega a la que quien aprueba le pide cambios sin decirlo ("Pedir cambios"
+# tocado): un tema abierto, que contesta el pedido de cambios con su comentario.
+QUE_CAMBIOS_PIDE = "que_cambios_pide"
+# Un mensaje que hace a la vez dos jugadas opuestas sobre la misma tarea (aprobar y pedir
+# cambios) admite dos lecturas: ninguna se hace y Leda pregunta cuál, con las dos como opciones
+# (constitución §8; ADR 0018, decisión 2). Una sola vez: la misma pregunta no se repite.
+CUAL_DE_LAS_DOS = "cual_de_las_dos"
 
 
 @dataclass(frozen=True)
@@ -109,6 +122,9 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(MOTIVO_DEL_ATRASO, espera=MOTIVO_DEL_ATRASO),
     TipoDePregunta(CONFIRMAR_ENTREGA),
     TipoDePregunta(LO_QUE_FALTA_DE_LA_ENTREGA),
+    TipoDePregunta(DECISION_DE_LA_ENTREGA),
+    TipoDePregunta(QUE_CAMBIOS_PIDE),
+    TipoDePregunta(CUAL_DE_LAS_DOS),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
@@ -218,6 +234,12 @@ def _alias(tareas, task_id) -> str | None:
     return next((t["alias"] for t in tareas if t["id"] == str(task_id)), None)
 
 
+def _todas(ctx) -> tuple:
+    """Las tareas que la persona nombra por su alias: las suyas y las entregas que esperan su
+    decisión (`fichas.Contexto.para_aprobar`)."""
+    return tuple(ctx.tareas) + tuple(getattr(ctx, "para_aprobar", ()) or ())
+
+
 # --- Abrir, cerrar y retomar ------------------------------------------------------------------
 
 def abrir(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
@@ -285,6 +307,35 @@ def abrir_con_id(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
     if pregunta not in ctx.preguntas_del_turno:
         ctx.preguntas_del_turno.append(pregunta)
     return ahora_si, pregunta
+
+
+def ofrecer(ctx, tipo: str, task_id: str, *, jugada: dict[str, Any],
+            opciones: Sequence[tuple[str, dict[str, Any]]]) -> str:
+    """Una decisión que ofrece un aviso, con sus opciones como botones (`DECISION_DE_LA_ENTREGA`):
+    queda sin cerrar, para que sus botones valgan, pero no es un tema abierto ni queda para
+    después (no se ordena con las demás ni vuelve sola). La que ofrecía otro aviso de la misma
+    tarea queda reemplazada (situación general 7). Devuelve su id."""
+    ctx.cur.execute("""select id from conversation_question
+                        where membership_id = %s and tipo = %s and task_id = %s
+                          and cerrada_en is null""",
+                    (ctx.quien.membership_id, tipo, task_id))
+    for vieja in ctx.cur.fetchall():
+        cerrar(ctx, str(vieja["id"]), "sin_efecto", {"reemplazada": True, "tarea": task_id})
+    ctx.cur.execute(
+        """insert into conversation_question (workspace_id, membership_id, tipo, task_id,
+                                              jugada, se_puede_dejar, abierta_en)
+           values (%s, %s, %s, %s, %s, %s, %s) returning id""",
+        (ctx.quien.workspace_id, ctx.quien.membership_id, tipo, task_id, _json(jugada),
+         TIPOS[tipo].se_puede_dejar, ctx.ahora))
+    pregunta = str(ctx.cur.fetchone()["id"])
+    for orden, (etiqueta, valor) in enumerate(opciones, 1):
+        ctx.cur.execute(
+            """insert into conversation_option (workspace_id, question_id, token, etiqueta,
+                                                valor, orden)
+               values (%s, %s, %s, %s, %s, %s)""",
+            (ctx.quien.workspace_id, pregunta, secrets.token_urlsafe(9), _etiqueta(etiqueta),
+             _json(valor), orden))
+    return pregunta
 
 
 def _esperar_respuesta(ctx, tipo: str, task_id) -> None:
@@ -444,7 +495,7 @@ def con_que_se_cerro(ctx, pregunta_id: str) -> dict[str, Any]:
 
 def tarea_dicha(ctx, task_id) -> dict[str, str]:
     """Una tarea para los hechos: su alias si está entre las de la persona, y su título."""
-    tarea = next((t for t in ctx.tareas if t["id"] == str(task_id)), None)
+    tarea = next((t for t in _todas(ctx) if t["id"] == str(task_id)), None)
     if tarea is not None:
         return {"alias": tarea["alias"], "titulo": tarea["titulo"]}
     ctx.cur.execute("select titulo from task where id = %s", (str(task_id),))

@@ -49,8 +49,17 @@ aprobación, queda omitido con su motivo. Es de coordinación: fuera del tope di
 la evidencia van adjuntas, hasta diez, como un álbum que sale después del texto, en otra fila de
 la misma respuesta (`adjuntos` del tipo; `message_outbox_adjunto`); los demás archivos sólo se
 nombran. Una entrega nueva de la misma tarea retira el aviso que todavía espera y guarda otro
-con toda la evidencia vigente (ADR 0009, enmienda T6i). Todavía sin los botones Aprobar y Pedir
-cambios (porción 3b) ni el enlace a la página de la tarea (porción 4).
+con toda la evidencia vigente (ADR 0009, enmienda T6i). Todavía sin el enlace a la página de la
+tarea (porción 4).
+
+**Lo que ofrece decidir** (porción 3b): el aviso de una entrega le pide a quien aprueba que
+decida, con los botones "Aprobar" y "Pedir cambios" como atajos (`TipoDeAviso.ofrece`). Al salir
+abre la decisión con sus opciones (`preguntas.ofrecer`): sus botones van con el texto del aviso,
+nunca con su álbum (`botones.ConOpciones`), y la redacción la recibe como la única pregunta del
+mensaje. No es un tema abierto: quien aprueba no le debe una respuesta a la conversación. La
+decisión de quien aprueba le llega al responsable en su propio aviso (`tarea_aprobada`,
+`pedido_de_cambios`), y el cierre que hace el sistema cuando se resuelve lo que faltaba, al
+responsable y a quien aprobó (`cerrada_con_la_aprobacion`; `aprobacion.py`).
 """
 
 from __future__ import annotations
@@ -75,7 +84,7 @@ from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, ancl
                     clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
 from .auditoria import auditar
-from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, LLEGA, NO_LE_LLEGO,
+from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, FICHAS, LLEGA, NO_LE_LLEGO,
                      YA_LE_LLEGO, referente)
 from .margen import sale_con_margen
 from .ia import IA
@@ -140,6 +149,9 @@ class TipoDeAviso:
     es_coordinacion: bool = False   # lo causa el acto de otra persona (mecánica §10)
     escala: bool = False            # al salir, la espera queda escalada
     adjuntos: Adjuntos | None = None    # sólo un aviso de coordinación, que sale solo
+    # La decisión que ofrece al salir: las jugadas cuyas opciones lleva como botones
+    # (`Ficha.boton`). Sólo un aviso de coordinación, que sale solo (porción 3b).
+    ofrece: tuple[str, ...] = ()
 
 
 # --- Guardar --------------------------------------------------------------------------------
@@ -333,7 +345,9 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                             quien=SimpleNamespace(workspace_id=m.workspace_id,
                                                   membership_id=persona))
     for x, q in zip(envio, preguntas_de):
-        if q is not None:
+        if q is not None and x.tipo.ofrece:
+            _ofrecer_la_decision(m, turno, x.aviso, x.tipo)
+        elif q is not None:
             _abrir_la_pregunta(m, turno, x.aviso)
         if x.tipo.escala:
             # La espera que escala: la de su pregunta, o la del estado de la tarea.
@@ -376,8 +390,24 @@ def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, 
     se hace en él (la misma regla que en una respuesta)."""
     if hechos.get("necesita_respuesta") is not True or aviso["task_id"] is None:
         return None
-    return {"tipo": hechos.get("pregunta") or ESPERA_DE_ESTADO,
-            "tarea": {"titulo": hechos.get("tarea")}, "desde_antes": False}
+    pregunta: dict[str, Any] = {"tipo": hechos.get("pregunta") or ESPERA_DE_ESTADO,
+                                "tarea": {"titulo": hechos.get("tarea")}, "desde_antes": False}
+    tipo = TIPOS.get(aviso["tipo"])
+    if tipo is not None and tipo.ofrece:
+        pregunta["opciones"] = [{"etiqueta": FICHAS[n].boton} for n in tipo.ofrece]
+    return pregunta
+
+
+def _ofrecer_la_decision(m: Momento, turno, aviso: dict[str, Any], tipo: TipoDeAviso) -> None:
+    """La decisión que ofrece el aviso, con una opción por jugada (su botón), atada a lo que el
+    aviso mostró (la huella de lo entregado: la guarda del botón, ADR 0018, decisión 2). La que
+    ofrecía un aviso anterior de la misma tarea queda reemplazada."""
+    task_id = str(aviso["task_id"])
+    preguntas.ofrecer(
+        turno, preguntas.DECISION_DE_LA_ENTREGA, task_id,
+        jugada={"nombre": "decidir_la_entrega", "del_aviso": str(aviso["id"]),
+                "huella": entrega.huella_de_lo_entregado(m.cur, task_id)},
+        opciones=[(FICHAS[n].boton, {"tarea": task_id, "jugada": n}) for n in tipo.ofrece])
 
 
 def _abrir_la_pregunta(m: Momento, turno, aviso: dict[str, Any]) -> None:
@@ -842,7 +872,8 @@ def guardar_aviso_de_entrega(ctx, tarea: dict[str, Any], entrega_id: str
     aviso_id, _ = guardar(
         cur, ctx.quien.workspace_id, ENTREGA_PARA_APROBAR, task_id=tarea["id"],
         destinatario=quien["membership_id"],
-        hechos={"aviso": ENTREGA_PARA_APROBAR, "necesita_respuesta": False,
+        hechos={"aviso": ENTREGA_PARA_APROBAR, "necesita_respuesta": True,
+                "pregunta": preguntas.DECISION_DE_LA_ENTREGA,
                 "tarea": tarea["titulo"], "responsable": ctx.quien.nombre},
         programado_para=sale, clave=f"motor:{ENTREGA_PARA_APROBAR}:{entrega_id}",
         ahora=ctx.ahora)
@@ -890,7 +921,7 @@ def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, An
         return CAMBIO_QUIEN_APRUEBA, {}
     vistas, adjuntas = _lo_entregado_para_aprobar(m, tarea["id"])
     hechos = {k: v for k, v in dict(aviso["hechos"]).items()
-              if k in ("aviso", "necesita_respuesta", "responsable")}
+              if k in ("aviso", "necesita_respuesta", "pregunta", "responsable")}
     hechos.update(tarea=tarea["titulo"], lo_que_entrego=vistas, fotos_adjuntas=len(adjuntas))
     faltan = entrega._faltan(m.cur, str(tarea["id"]), [])
     if faltan:
@@ -905,6 +936,51 @@ def _adjuntos_de_la_entrega(m: Momento, aviso) -> list[str]:
 
 def _siempre(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     return None, dict(aviso["hechos"])
+
+
+# --- Los avisos de la decisión de quien aprueba (porción 3b; `aprobacion.py`) -------------------
+
+TAREA_APROBADA = "tarea_aprobada"
+PEDIDO_DE_CAMBIOS = "pedido_de_cambios"
+CERRADA_CON_LA_APROBACION = "cerrada_con_la_aprobacion"
+# Por qué ya no sale: después de la aprobación hubo un pedido de cambios, o la tarea se cerró
+# después y el aviso del cierre lo cuenta.
+HAY_UNA_DECISION_MAS_NUEVA = "hay_una_decision_mas_nueva"
+SE_CERRO_DESPUES = "se_cerro_despues"
+
+
+def _vigencia_de_una_aprobacion(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    """El aviso de una aprobación corresponde mientras esa aprobación (la última parte de su
+    clave) siga valiendo; el de una que no alcanzaba para cerrar, mientras la tarea no se haya
+    cerrado después (ése lo cuenta el aviso del cierre)."""
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return "tarea_inexistente", {}
+    aprobacion_id = aviso["dedupe_key"].rsplit(":", 1)[-1]
+    m.cur.execute("""select 1 from approval a
+                       join approval r on r.sujeto_id = a.sujeto_id
+                                      and r.decision = 'rechazado'
+                                      and r.aprobador_membership_id = a.aprobador_membership_id
+                                      and r.at >= a.at
+                      where a.id = %s limit 1""", (aprobacion_id,))
+    if m.cur.fetchone() is not None:
+        return HAY_UNA_DECISION_MAS_NUEVA, {}
+    hechos = dict(aviso["hechos"])
+    if not hechos.get("quedo_terminada") and tarea["estado"] == "terminada":
+        return SE_CERRO_DESPUES, {}
+    return None, hechos
+
+
+def _vigencia_de_un_pedido_de_cambios(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    """El aviso de un pedido de cambios, con el estado y el vencimiento de la tarea de ahora."""
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return "tarea_inexistente", {}
+    hechos = dict(aviso["hechos"])
+    hechos["estado"] = tarea["estado"]
+    if tarea["fecha_objetivo"] is not None:
+        hechos["vence"] = m.fecha(tarea["fecha_objetivo"]).isoformat()
+    return None, hechos
 
 
 TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
@@ -928,7 +1004,13 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso("falla_de_aviso", "informativo", _siempre, es_coordinacion=True),
     # La entrega de una tarea, a quien la aprueba, con las fotos adjuntas (ADR 0019, decisión 6).
     TipoDeAviso(ENTREGA_PARA_APROBAR, "normal", _vigencia_de_la_entrega, es_coordinacion=True,
-                adjuntos=_adjuntos_de_la_entrega),
+                adjuntos=_adjuntos_de_la_entrega, ofrece=("aprobar", "pedir_cambios")),
+    # La decisión de quien aprueba, al responsable, y el cierre que hace el sistema (porción 3b).
+    TipoDeAviso(TAREA_APROBADA, "informativo", _vigencia_de_una_aprobacion,
+                es_coordinacion=True),
+    TipoDeAviso(PEDIDO_DE_CAMBIOS, "normal", _vigencia_de_un_pedido_de_cambios,
+                es_coordinacion=True),
+    TipoDeAviso(CERRADA_CON_LA_APROBACION, "informativo", _siempre, es_coordinacion=True),
 )})
 
 

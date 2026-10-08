@@ -81,6 +81,7 @@ def test_aprobar_tarea_cierra_cuando_las_condiciones_estan(corework, conn):
         resultado = H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
                                ya_confirmada=True)
 
+    aprobacion_id = resultado.pop("aprobacion_id")
     assert resultado == {"aprobada": True, "cerrada": True, "falta": None,
                          "titulo": "Programar HMI línea 2"}
 
@@ -94,15 +95,16 @@ def test_aprobar_tarea_cierra_cuando_las_condiciones_estan(corework, conn):
                 where task_id = %s and estado_nuevo = 'terminada'""", (tid,))
         assert cur.fetchone()["n"] == 1
 
+        cur.execute("select id from approval where sujeto_id = %s", (tid,))
+        assert str(cur.fetchone()["id"]) == aprobacion_id
+        # Porción 3b de la C-3: el aviso a Nahuel ya no sale de la cocina con texto fijo; lo
+        # guarda y lo redacta el motor (`motor.aprobacion`), atado a esta aprobación.
         cur.execute("select telegram_user_id from app_user where nombre = %s",
                    ("Nahuel Gimenez",))
         tg_nahuel = cur.fetchone()["telegram_user_id"]
-        cur.execute(
-            """select cuerpo from message_outbox
-                where workspace_id = %s and chat_id = %s
-               order by programado_para desc limit 1""", (ws, tg_nahuel))
-        aviso = cur.fetchone()["cuerpo"]
-    assert aviso == "Marcos Tarquini aprobó «Programar HMI línea 2»; quedó terminada."
+        cur.execute("""select count(*) n from message_outbox
+                        where workspace_id = %s and chat_id = %s""", (ws, tg_nahuel))
+        assert cur.fetchone()["n"] == 0
 
 
 def test_aprobar_tarea_rechaza_si_falta_la_evidencia_que_exige(corework, conn):

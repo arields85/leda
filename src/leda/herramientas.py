@@ -2005,22 +2005,14 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
         # un id real de negocio a mano, el de esta misma aprobación.
         _avisar_dependencia_informativa(cur, quien, tarea_id, "terminada", aprobacion_id)
 
-    # Constitución §3: "no persiguen avances ni administran estados
-    # intermedios" es sobre el responsable, no sobre enterarse de un hecho
-    # que lo involucra -- sesión 2 por Telegram, 2026-09-27, hallazgo 5:
-    # Ismael aprobó y nadie le avisó a Ariel. `_avisar` ya omite en silencio
-    # si el responsable no tiene chat vinculado (mismo patrón que el resto
-    # de los avisos automáticos); el dedupe es por esta aprobación, nunca
-    # por la hora.
-    _avisar(
-        cur, quien, fila["responsable_membership_id"],
-        (f"{quien.nombre} aprobó «{fila['titulo']}»; quedó terminada."
-         if cerrada else
-         f"{quien.nombre} aprobó «{fila['titulo']}»; para cerrarla todavía: {falta}"),
-        dedupe_key=f"{quien.workspace_id}:aprobacion:{aprobacion_id}")
-
+    # Constitución §3: el responsable se entera de la decisión (sesión 2 por
+    # Telegram, 2026-09-27, hallazgo 5: Ismael aprobó y nadie le avisó a
+    # Ariel). Porción 3b de la C-3: ese aviso ya no sale de acá, con texto
+    # fijo. Lo guarda el motor, que lo redacta desde los hechos
+    # (`motor.avisos`, `tarea_aprobada`); la cocina devuelve la identidad del
+    # acto (`aprobacion_id`), a la que se ata la clave del aviso.
     return {"aprobada": True, "cerrada": cerrada, "falta": falta,
-           "titulo": fila["titulo"]}
+            "titulo": fila["titulo"], "aprobacion_id": str(aprobacion_id)}
 
 
 def _exigir_puede_pedirse_cambios(cur, fila) -> None:
@@ -2144,13 +2136,66 @@ def _pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
            values (%s, %s, %s, 'persona', %s, %s, clock_timestamp())""",
         (tarea_id, fila["estado"], destino, quien.app_user_id, comentario))
 
-    _avisar(
-        cur, quien, fila["responsable_membership_id"],
-        (f"{quien.nombre} pidió cambios en «{fila['titulo']}»: {comentario}\n"
-         f"La tarea vuelve a {_estar(destino)}."),
-        dedupe_key=f"{quien.workspace_id}:pedir_cambios:{decision_id}")
+    # Porción 3b de la C-3: el aviso al responsable, con el comentario, lo
+    # guarda y lo redacta el motor (`motor.avisos`, `pedido_de_cambios`); la
+    # cocina devuelve la identidad del acto y a qué estado volvió la tarea.
+    return {"pedido": True, "titulo": fila["titulo"], "decision_id": str(decision_id),
+            "estado": destino}
 
-    return {"pedido": True, "titulo": fila["titulo"]}
+
+@herramienta(
+    "cerrar_tarea_aprobada", "aprobar_tarea",
+    "Cierra una tarea en revisión que ya tiene la aprobación de quien revisa ese trabajo, "
+    "cuando se resolvió lo que faltaba para cerrarla. No aprueba nada: usa la aprobación ya "
+    "dada.",
+    {"tarea_id": {"type": "string", "requerido": True}},
+    valida_en_handler=True)
+def _cerrar_tarea_aprobada(cur, quien: Solicitante, tarea_id):
+    """Porción 3b de la C-3 (decisión del usuario, 2026-10-07; mecánica §5): una aprobación que
+    no alcanzó para cerrar (una dependencia bloqueante abierta, un bloqueo) queda anotada, y
+    cuando lo que faltaba se resuelve, el sistema vuelve a comprobar el cierre y la cierra sola,
+    sin otra aprobación. Corre a nombre de quien aprobó (`quien`): su decisión es la que cierra;
+    el cambio de estado es del sistema (`actor_kind = 'sistema'`), porque es la comprobación
+    determinista la que lo hace, y su motivo nombra la aprobación que lo origina.
+
+    La comprobación es la de siempre (`motivo_no_cierra_tarea`, y el disparador que la exige):
+    sólo cuenta la última decisión vigente de quien revisa ese trabajo, así que un pedido de
+    cambios posterior deja la aprobación sin efecto. Nunca cuenta a Leda como aprobadora."""
+    _bloquear_tarea(cur, tarea_id)
+    cur.execute(
+        "select titulo, estado, responsable_membership_id from task where id = %s",
+        (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"cerrada": False, "error": "esa tarea no existe en este equipo"}
+    if fila["responsable_membership_id"] is None or not puede_aprobar_tarea(
+            cur, quien, fila["responsable_membership_id"]):
+        raise Denegado("No sos quien revisa el trabajo de esa persona.")
+    if fila["estado"] != "en_revision":
+        return {"cerrada": False, "error": "la tarea no está en revisión"}
+    cur.execute(
+        """select a.id, a.at from approval a
+            where a.sujeto_tipo = 'tarea' and a.sujeto_id = %s and a.decision = 'aprobado'
+              and a.aprobador_membership_id = %s
+              and not exists (select 1 from approval r
+                               where r.sujeto_tipo = 'tarea' and r.sujeto_id = a.sujeto_id
+                                 and r.aprobador_membership_id = a.aprobador_membership_id
+                                 and r.decision = 'rechazado' and r.at >= a.at)
+            order by a.at desc limit 1""", (tarea_id, quien.membership_id))
+    aprobacion = cur.fetchone()
+    cur.execute("select motivo_no_cierra_tarea(%s) as m", (tarea_id,))
+    falta = cur.fetchone()["m"]
+    if aprobacion is None or falta is not None:
+        return {"cerrada": False, "falta": falta or _MOTIVO_FALTA_APROBACION}
+    cur.execute(
+        """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                         actor_kind, actor_app_user_id, motivo, at)
+           values (%s, 'en_revision', 'terminada', 'sistema', %s, %s, clock_timestamp())""",
+        (tarea_id, quien.app_user_id,
+         f"cierre con la aprobación {aprobacion['id']}: se resolvió lo que faltaba"))
+    _avisar_dependencia_informativa(cur, quien, tarea_id, "terminada", aprobacion["id"])
+    return {"cerrada": True, "titulo": fila["titulo"], "aprobacion_id": str(aprobacion["id"]),
+            "aprobada_en": aprobacion["at"].isoformat()}
 
 
 # ---------------------------------------------------------------------------

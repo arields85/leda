@@ -14,10 +14,14 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
      su rechazo) y corre el turno como con un mensaje escrito;
    - **una persona toca** una opción (`toca`): `turno.procesar_toque` con el token de esa opción
      (de una tarea, por su clave; si no, por su etiqueta, y `vieja` toca la de la pregunta
-     anterior que la ofreció, un botón viejo);
+     anterior que la ofreció, un botón viejo; con `de_la_tarea`, la de esa tarea: el botón del
+     aviso de una de varias entregas);
    - **Leda por su cuenta o nadie escribe** (`relojes`): en cada momento, una vuelta del ciclo
-     (`ciclo.Ciclo`): la escalera, los avisos guardados, el despacho y los avisos a la
-     administración;
+     (`ciclo.Ciclo`): la escalera, los cierres que esperaban, los avisos guardados, el despacho
+     y los avisos a la administración;
+   - **lo que pasa aparte** (`aparte: true`): un paso que la conversación da por pasado en el
+     medio sin mirarlo (la entrega y la aprobación de otra tarea), corrido por el motor como el
+     preludio, con las jugadas del YAML, y sin comprobar;
 3. compara lo que pasó con lo esperado (`comprobar.py`), mide el formato de cada mensaje de Leda
    (`comprobar.fallas_de_formato`) y guarda lo que la persona que lee la
    corrida necesita: lo que dijo cada uno, las jugadas, los hechos y la latencia.
@@ -119,7 +123,7 @@ def llamadas_previstas(conv: dict[str, Any]) -> int:
     n = 0
     for paso in (conv.get("preludio") or []) + (conv.get("pasos") or []):
         if "escribe" in paso or "manda" in paso:
-            n += 2 if paso in (conv.get("pasos") or []) else 1
+            n += 2 if paso in (conv.get("pasos") or []) and not paso.get("aparte") else 1
         elif "toca" in paso:
             n += 1
         n += len(paso.get("salen") or [])
@@ -317,7 +321,8 @@ class _Corredor:
             latencia = self._latencia(persona["membership_id"])
         else:
             token, etiqueta = self._token(persona["membership_id"], paso["toca"],
-                                          vieja=bool(paso.get("vieja")))
+                                          vieja=bool(paso.get("vieja")),
+                                          de_la_tarea=paso.get("de_la_tarea"))
             texto = f"[toca] {etiqueta}"
             resultado = self.motor.procesar_toque(self.conn, quien, token, persona["telegram"],
                                                   ia_que_mira, self.reloj)
@@ -377,11 +382,13 @@ class _Corredor:
         self.conn.commit()
         return entrante
 
-    def _token(self, membership_id: str, clave: str, *, vieja: bool = False) -> tuple[str, str]:
+    def _token(self, membership_id: str, clave: str, *, vieja: bool = False,
+               de_la_tarea: str | None = None) -> tuple[str, str]:
         """El token de la opción de esa tarea en la última pregunta con opciones de la persona
         (abierta o ya cerrada: tocar un botón viejo es la situación general 7). Si `clave` no es
-        una tarea, la opción con esa etiqueta (el "Confirmar" de una entrega); con `vieja`, la
-        de la pregunta anterior que la ofreció."""
+        una tarea, la opción con esa etiqueta (el "Confirmar" de una entrega), de la tarea
+        `de_la_tarea` si se la nombra (el "Pedir cambios" del aviso de una de varias entregas);
+        con `vieja`, la de la pregunta anterior que la ofreció."""
         with espacio(self.conn, self.mundo.workspace_id) as cur:
             if clave in self.mundo.tareas:
                 cur.execute("""select o.token, o.etiqueta from conversation_option o
@@ -391,11 +398,13 @@ class _Corredor:
                                 order by q.abierta_en desc limit 1 offset %s""",
                             (membership_id, self.mundo.tareas[clave], int(vieja)))
             else:
+                tarea = self.mundo.tareas[de_la_tarea] if de_la_tarea else None
                 cur.execute("""select o.token, o.etiqueta from conversation_option o
                                  join conversation_question q on q.id = o.question_id
                                 where q.membership_id = %s and o.etiqueta = %s
+                                  and (%s::text is null or o.valor ->> 'tarea' = %s::text)
                                 order by q.abierta_en desc limit 1 offset %s""",
-                            (membership_id, clave, int(vieja)))
+                            (membership_id, clave, tarea, tarea, int(vieja)))
             fila = cur.fetchone()
         self.conn.commit()
         if fila is None:
@@ -417,7 +426,9 @@ class _Corredor:
         de_alias = {t["alias"]: self.mundo.clave_de_titulo(t["titulo"])
                     for t in situacion.get("tareas") or []}
         abierta = ((situacion.get("estado") or {}).get("pregunta_abierta") or {})
-        de_opcion = {o["opcion"]: de_alias.get(o.get("tarea"), o.get("etiqueta"))
+        # La opción de una tarea, por la clave de su tarea; la que corre su propia jugada (el
+        # "Aprobar" de una pregunta de dos lecturas), por su alias, como la nombra el YAML.
+        de_opcion = {o["opcion"]: de_alias.get(o.get("tarea"), o["opcion"])
                      for o in abierta.get("opciones") or []}
         salida = {"nombre": nombre}
         for k, v in (datos or {}).items():
@@ -581,11 +592,40 @@ class _QueMira:
     def elegir_jugadas(self, situacion):
         self.situaciones.append(situacion)
         self.faltan |= self.buscar(situacion)
+        if _elige_el_guion(self.ia):
+            return self.ia.elegir_jugadas(_para_el_guion(situacion))
         return self.ia.elegir_jugadas(situacion)
+
 
     def redactar(self, pedido):
         self.faltan |= self.buscar(pedido)
         return self.ia.redactar(pedido)
+
+
+def _elige_el_guion(ia) -> bool:
+    """Si las jugadas las elige la IA guionada, aunque vaya envuelta (la que graba, la mixta)."""
+    while not isinstance(ia, IAPerfecta):
+        if isinstance(ia, IAMixta):
+            ia = ia.jugadas_de
+        elif hasattr(ia, "ia"):
+            ia = ia.ia
+        else:
+            return False
+    return True
+
+
+def _para_el_guion(situacion: dict[str, Any]) -> dict[str, Any]:
+    """La situación para la IA guionada: cada opción de la pregunta abierta que no elige una
+    tarea (la que corre su propia jugada, como el "Aprobar" de una pregunta de dos lecturas)
+    lleva una marca propia en lugar de la tarea, para que el guion la nombre por su alias (O1)
+    y no la confunda con otra sin tarea. Sólo la guionada: una IA real recibe la de siempre."""
+    abierta = (situacion.get("estado") or {}).get("pregunta_abierta") or {}
+    if not any("tarea" not in o for o in abierta.get("opciones") or []):
+        return situacion
+    opciones = [o if "tarea" in o else {**o, "tarea": f"opcion:{o['opcion']}"}
+                for o in abierta["opciones"]]
+    return {**situacion, "estado": {**situacion["estado"],
+                                    "pregunta_abierta": {**abierta, "opciones": opciones}}}
 
 
 def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -> bool:
@@ -605,6 +645,8 @@ def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -
     if e.get("el") and e["el"] != s.el:
         return False
     if "fotos" in e and e["fotos"] != s.fotos:
+        return False
+    if "botones" in e and list(e["botones"] or []) != s.botones:
         return False
     if "hechos" not in e:
         return True
@@ -635,7 +677,7 @@ def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1,
         for paso in conv.get("preludio") or []:
             corrida.pasos.append(corredor.correr(paso, preludio=True))
         for paso in conv["pasos"]:
-            corrida.pasos.append(corredor.correr(paso))
+            corrida.pasos.append(corredor.correr(paso, preludio=bool(paso.get("aparte"))))
     except Exception as e:      # una corrida que se cae se informa entera, nunca se pierde
         conn.rollback()
         corrida.error = "".join(traceback.format_exception_only(type(e), e)).strip()

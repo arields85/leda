@@ -34,8 +34,8 @@ preludio:
     salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
 
 # El paso 6 corre desde la porción 3a de la C-3: el aviso a Ismael redactado por el motor, con las
-# fotos adjuntas. Sus botones Aprobar y Pedir cambios son de la 3b, y el enlace a la página de la
-# tarea, de la 4: todavía no se esperan.
+# fotos adjuntas; desde la 3b, con los botones Aprobar y Pedir cambios. El enlace a la página de
+# la tarea es de la 4: todavía no se espera.
 pasos:
   - paso: 1
     quien: Marcos
@@ -188,10 +188,13 @@ pasos:
       - a: Ismael
         tipo: entrega_para_aprobar
         tarea: PLC
-        # Las tres fotos de hoy, adjuntas en el álbum que sale después del texto.
+        # Las tres fotos de hoy, adjuntas en el álbum que sigue al texto; los botones, con el
+        # texto (porción 3b).
         fotos: 3
+        botones: [Aprobar, Pedir cambios]
         hechos:
-          necesita_respuesta: false
+          necesita_respuesta: true
+          pregunta: decision_de_la_entrega
           fotos_adjuntas: 3
           lo_que_entrego:
             - {es: lo_que_escribio}
@@ -204,8 +207,8 @@ pasos:
       - que Marcos entregó la tarea del PLC, en su renglón con 📋
       - lo que escribió Marcos, en pocas palabras (20 ciclos sin una falla)
       - que van tres fotos adjuntas y que comprimidora_v3.zip quedó con la entrega
-    # El cierre que ofrece aprobar o pedir cambios, con sus botones, es de la porción 3b; el
-    # enlace a la página de la tarea, de la 4.
+      - "el cierre, aparte: si la aprueba o le pide cambios, con los botones o escribiendo"
+    # El enlace a la página de la tarea es de la porción 4.
     no_dice:
       - la foto del martes
       - que la tarea está terminada

@@ -46,7 +46,8 @@ GARANTIA, COMPRENSION, MOTOR, FORMATO = "garantia", "comprension", "motor", "for
 # Los datos de una jugada que son palabras de la persona: se compara sólo si están. Con
 # `puede_traer`, pueden venir, pero sólo con las palabras de la persona (revisión del contrato,
 # 2026-10-05): uno inventado sigue siendo una falla.
-DATOS_LIBRES = frozenset({"motivo", "causa", "palabras", "quien", "a", "que_pide"})
+DATOS_LIBRES = frozenset({"motivo", "causa", "palabras", "quien", "a", "que_pide",
+                          "comentario", "de"})
 FUERA_DE_LA_LISTA = "fuera_de_la_lista"
 ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
 # Un aviso cuya redacción falló y se reintenta (usuario, 2026-10-07): en la corrida es un aviso
@@ -159,6 +160,14 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                                      "cubre": list(f["cubre"] or []),
                                      "retirada": f["retirada"]}
                       for f in cur.fetchall()}
+        # Las decisiones de quien aprueba (porción 3b): sobre qué tarea, cuál y de quién.
+        cur.execute("""select id, sujeto_id, decision::text decision, aprobador_membership_id
+                         from approval where workspace_id = %s and sujeto_tipo = 'tarea'""",
+                    (ws,))
+        aprobaciones = {str(f["id"]): {"tarea": tarea(f["sujeto_id"]),
+                                       "decision": f["decision"],
+                                       "de": persona(f["aprobador_membership_id"])}
+                        for f in cur.fetchall()}
         cur.execute("""select id, task_id from archivo_de_tarea where workspace_id = %s""",
                     (ws,))
         archivos_de_tarea = {str(f["id"]): {"tarea": tarea(f["task_id"])}
@@ -201,13 +210,14 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
             "destraban": destraban, "avisos": avisos, "salidas": salidas,
             "incidentes": incidentes, "avisos_admin": avisos_admin, "avances": avances,
             "esperas": esperas, "preguntas": preguntas, "ultimo_aviso": ultimo_aviso,
-            "evidencias": evidencias, "archivos_de_tarea": archivos_de_tarea}
+            "evidencias": evidencias, "archivos_de_tarea": archivos_de_tarea,
+            "aprobaciones": aprobaciones}
 
 
 def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
     """Lo nuevo de un paso: lo que cambió en las tareas y las filas que aparecieron."""
     def nuevas(tabla: str) -> list[dict[str, Any]]:
-        return [v for k, v in despues[tabla].items() if k not in antes[tabla]]
+        return [v for k, v in despues.get(tabla, {}).items() if k not in antes.get(tabla, {})]
 
     return {
         "estados": {k: v for k, v in despues["estados"].items()
@@ -229,6 +239,7 @@ def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
                       for k, v in despues["evidencias"].items()
                       if v["retirada"] and not antes["evidencias"].get(k, {}).get("retirada")],
         "archivos_de_tarea": nuevas("archivos_de_tarea"),
+        "aprobaciones": nuevas("aprobaciones"),
     }
 
 
@@ -418,6 +429,9 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
     filas("evidencias", hubo.get("evidencias") or [], "evidencia")
     filas("retiradas", hubo.get("retiradas") or [], "evidencia retirada")
     filas("archivos_de_tarea", hubo.get("archivos_de_tarea") or [], "archivo dicho de una tarea")
+    # La decisión de quien aprueba (porción 3b): una de más es de garantía (nadie aprueba sin
+    # haberlo dicho).
+    filas("aprobaciones", hubo.get("aprobaciones") or [], "decisión sobre una entrega")
     al_admin_e = esperados.get("avisos_al_administrador", 0)
     fuera = [i for i in hubo["incidentes"] if i["etapa"] == ETAPA_FUERA_DE_LA_LISTA]
     if len(fuera) != al_admin_e:

@@ -199,7 +199,7 @@ def _lo_que_sigue(m: Momento, ctx: Contexto, hechos: list[dict[str, Any]],
             continue
         tarea = hecho.get("tarea")
         alias = tarea.get("alias") if isinstance(tarea, dict) else None
-        suya = ctx.tarea(alias) if alias else None
+        suya = ctx.suya(alias) if alias else None
         if suya is None or alias in vistas:
             continue
         vistas.add(alias)

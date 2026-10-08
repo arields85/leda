@@ -7,9 +7,11 @@ proceso sería otro despachador sobre la misma cola y otro comando para el usuar
 
 En cada vuelta del escuchador (a lo sumo unos 25 segundos):
 
-1. **la escalera** (`escalera.correr_escalera`) y **los avisos guardados**
-   (`avisos.enviar_avisos`), una vez por minuto (`CADA_S`, contado con un reloj monótono real:
-   adelantar el reloj de Leda no los acelera);
+1. **la escalera** (`escalera.correr_escalera`), **los cierres que esperaban** (`aprobacion.
+   cerrar_las_que_ya_pueden`: una tarea aprobada que todavía no podía cerrar, cuando se resolvió
+   lo que faltaba; porción 3b de la C-3) y **los avisos guardados** (`avisos.enviar_avisos`), una
+   vez por minuto (`CADA_S`, contado con un reloj monótono real: adelantar el reloj de Leda no
+   los acelera). Los cierres van antes que los avisos, así sus avisos salen en la misma vuelta;
 2. **los mensajes sin respuesta** (`huerfanos.barrer`), en cada vuelta: un mensaje recibido
    que pasada la ventana del turno en curso no tiene ninguna respuesta (su turno murió) recibe
    el aviso neutro y deja un incidente, antes del despacho, para que salga en esta misma vuelta.
@@ -46,6 +48,7 @@ from ..despachador import (Transporte, despachar, despachar_avisos_admin,
 from ..huerfanos import barrer as barrer_huerfanos
 from ..incidentes import registrar_incidente
 
+from .aprobacion import cerrar_las_que_ya_pueden
 from .avisos import enviar_avisos
 from .botones import ConOpciones
 from .escalera import correr_escalera
@@ -84,6 +87,8 @@ class Ciclo:
             self._ultima = self.monotono()
             resultados["escalera"] = self._paso(
                 "escalera", lambda: correr_escalera(self.conn, self.ws, self.reloj))
+            resultados["cierres"] = self._paso(
+                "cierres", lambda: cerrar_las_que_ya_pueden(self.conn, self.ws, self.reloj))
             resultados["avisos"] = self._paso(
                 "avisos", lambda: enviar_avisos(self.conn, self.ws, self.ia, self.reloj))
         resultados["huerfanos"] = self._paso(
@@ -140,7 +145,7 @@ class Ciclo:
 
     def _contar(self, resultados: dict[str, Any]) -> None:
         """Lo que hizo la vuelta, en la consola del escuchador, sólo si hizo algo."""
-        for nombre in ("escalera", "avisos"):
+        for nombre in ("escalera", "cierres", "avisos"):
             if resultados.get(nombre):
                 self.imprimir(f"  ⏱ {nombre}: {resultados[nombre]}")
         if resultados.get("huerfanos"):

@@ -41,6 +41,11 @@ llegó (`archivos`: una foto, un video o un archivo con su nombre), nunca el con
 se pudo recibir, con su motivo y lo que la persona puede hacer en cambio (`EN_CAMBIO_PUEDE`).
 La IA elige la jugada como con cualquier mensaje. Lo que trajo el mensaje y ninguna jugada tomó
 va a la entrega abierta o lleva la pregunta de para qué tarea es (`entrega.py`, porción 2).
+
+Quien aprueba el trabajo de otras personas lee, además de sus tareas, las entregas que esperan su
+decisión (`aprobacion.para_decidir`, porción 3b), con su alias después de las suyas. Dos jugadas
+opuestas sobre la misma tarea en un mensaje (aprobar y pedir cambios) no se hacen: Leda pregunta
+cuál (`fichas.dos_lecturas`), una regla general para toda ficha que declara su opuesta.
 """
 
 from __future__ import annotations
@@ -63,7 +68,7 @@ from ..incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
                           REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
 from ..salida import enqueue_outbox
 
-from . import archivos, cambios_de_estado, entrega, preguntas, registro
+from . import aprobacion, archivos, cambios_de_estado, entrega, fichas, preguntas, registro
 from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
 from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
@@ -135,7 +140,7 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
                 lambda: ia.elegir_jugadas({**_situacion(ctx, jugadas), **llegaron}))
 
         def manejar(elegidas: list[Jugada]) -> list[dict[str, Any]]:
-            hechos = [_manejar(ctx, jugada, jugadas) for jugada in elegidas]
+            hechos = _manejar_todas(ctx, elegidas, jugadas)
             # Lo que trajo el mensaje y ninguna jugada tomó: a la entrega abierta, o la
             # pregunta de para qué tarea es (ADR 0019, decisión 4).
             hechos += entrega.al_terminar_las_jugadas(ctx)
@@ -272,15 +277,19 @@ def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None =
         for i, t in enumerate(cur.fetchall(), 1))
     # Lo de la entrega de cada tarea: lo que pide una en curso y lo entregado de una en revisión.
     cur.execute("select zona_horaria from workspace where id = %s", (quien.workspace_id,))
-    tareas = entrega.para_la_ia(cur, tareas, ZoneInfo(cur.fetchone()["zona_horaria"]))
+    zona = ZoneInfo(cur.fetchone()["zona_horaria"])
+    tareas = entrega.para_la_ia(cur, tareas, zona)
+    # Las entregas que esperan su decisión, si aprueba el trabajo de alguien (porción 3b).
+    para_aprobar = aprobacion.para_decidir(cur, quien, len(tareas), zona)
 
     ultimos = leer_ultimos_turnos(cur, quien.membership_id)
     return Contexto(cur=cur, quien=quien, entrante_id=entrante_id, chat_id=chat_id,
                     texto=texto, ahora=ahora, llegada=entrega.lo_que_trae(cur, entrante_id, texto),
-                    estado=preguntas.estado_para_la_ia(cur, quien.membership_id, tareas),
+                    estado=preguntas.estado_para_la_ia(cur, quien.membership_id,
+                                                       tareas + para_aprobar),
                     tareas=tareas, ultimos_turnos=ultimos,
-                    ultimo_aviso=_ultimo_aviso(estado, tareas), toque=toque,
-                    jugadas=jugadas)
+                    ultimo_aviso=_ultimo_aviso(estado, tareas + para_aprobar), toque=toque,
+                    jugadas=jugadas, para_aprobar=para_aprobar)
 
 
 def _lo_que_llego(cur, workspace_id: str, entrante_id: str,
@@ -339,7 +348,8 @@ def _situacion(ctx: Contexto, jugadas: Mapping[str, Manejador]) -> dict[str, Any
         "mensaje": ctx.texto,
         "estado": ctx.estado,       # la pregunta abierta, con sus opciones, y las de después
         "ultimo_aviso": ctx.ultimo_aviso,
-        "tareas": [{k: v for k, v in t.items() if k != "id"} for t in ctx.tareas],
+        "tareas": [{k: v for k, v in t.items() if k != "id"}
+                   for t in ctx.tareas + ctx.para_aprobar],
         "ultimos_turnos": list(ctx.ultimos_turnos),
         "jugadas_posibles": sorted(jugadas),
     }
@@ -387,6 +397,22 @@ def _redactar(ia: IA, pedido: dict[str, Any],
 
 
 # --- (3) y (4) Las jugadas ----------------------------------------------------------------
+
+def _manejar_todas(ctx: Contexto, elegidas: list[Jugada],
+                   jugadas: Mapping[str, Manejador]) -> list[dict[str, Any]]:
+    """Cada jugada, en el orden en que la persona las dijo (9m.1); un par de jugadas opuestas
+    sobre la misma tarea, en un solo hecho que pregunta cuál de las dos (`fichas.dos_lecturas`)."""
+    pares = {i: j for i, j in fichas.opuestas(elegidas).items()
+             if elegidas[i].nombre in jugadas and elegidas[j].nombre in jugadas}
+    segundas = set(pares.values())
+    hechos = []
+    for i, jugada in enumerate(elegidas):
+        if i in pares:
+            hechos.append(fichas.dos_lecturas(ctx, jugada, elegidas[pares[i]]))
+        elif i not in segundas:
+            hechos.append(_manejar(ctx, jugada, jugadas))
+    return hechos
+
 
 def _manejar(ctx: Contexto, jugada: Jugada, jugadas: Mapping[str, Manejador]) -> dict:
     manejador = jugadas.get(jugada.nombre)

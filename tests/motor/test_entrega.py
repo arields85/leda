@@ -501,7 +501,8 @@ def test_el_aviso_sale_al_terminar_el_margen_con_la_evidencia_de_ese_momento(con
     [pedido] = ia.pedidos_de_redaccion
     [hechos] = pedido["hechos"]
     assert hechos["aviso"] == "entrega_para_aprobar" and hechos["responsable"] == "Marcos"
-    assert hechos["necesita_respuesta"] is False and hechos["fotos_adjuntas"] == 1
+    assert hechos["necesita_respuesta"] is True and hechos["fotos_adjuntas"] == 1
+    assert hechos["pregunta"] == "decision_de_la_entrega"   # aprobar o pedir cambios (3b)
     assert [(p["es"], p.get("va_adjunta")) for p in hechos["lo_que_entrego"]] == [
         ("lo_que_escribio", None), ("una_foto", True), ("un_archivo", None)]
     assert hechos["lo_que_entrego"][2]["nombre_del_archivo"] == "programa.zip"

@@ -98,8 +98,16 @@ class Contexto:
     # Lo que trajo el mensaje y puede ir a una entrega (`entrega.lo_que_trae`): el texto sin sus
     # enlaces, los enlaces y los archivos guardados; `tomada`, si una jugada ya lo sumó.
     llegada: dict[str, Any] = field(default_factory=dict)
+    # Las entregas de otras personas que esperan la decisión de quien escribe (porción 3b de la
+    # C-3; `aprobacion.para_decidir`), con su alias, después de las suyas: no son tareas suyas.
+    para_aprobar: tuple[dict[str, Any], ...] = ()
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
+        """Una tarea por su alias: de las suyas o de las que esperan su decisión."""
+        return next((t for t in self.tareas + self.para_aprobar if t["alias"] == alias), None)
+
+    def suya(self, alias: str) -> dict[str, Any] | None:
+        """Una tarea suya por su alias: de la que es responsable."""
         return next((t for t in self.tareas if t["alias"] == alias), None)
 
     @cached_property
@@ -153,6 +161,11 @@ class Ficha:
     # herramienta, junto a sus datos (revisión del contrato, 2026-10-05). Describe la jugada,
     # nunca un caso ni una frase.
     es: str = ""
+    # La etiqueta con que se ofrece como opción (un botón), si se ofrece.
+    boton: str | None = None
+    # La jugada que dice lo contrario sobre la misma tarea: las dos juntas en un mensaje admiten
+    # dos lecturas y ninguna se hace (`dos_lecturas`).
+    opuesta: str | None = None
 
 
 # Lo que Leda propone cuando no hay otra persona que destrabe el bloqueo (la persona no sabe
@@ -999,6 +1012,19 @@ def _corregir_la_entrega(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     return entrega.corregir(ctx, datos, tarea)
 
 
+# La aprobación (circuito 8; porción 3b de la C-3): sus jugadas están en `aprobacion.py`, que
+# importa este módulo.
+
+def _aprobar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import aprobacion
+    return aprobacion.aprobar(ctx, datos, tarea)
+
+
+def _pedir_cambios(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import aprobacion
+    return aprobacion.pedir_cambios(ctx, datos, tarea)
+
+
 def _pedir_reasignacion(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     decide = referente(ctx.cur, ctx.quien.membership_id)
     return {"resultado": "no_por_chat", "motivo": "cambiar_el_responsable_no_es_por_chat",
@@ -1307,6 +1333,38 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           estados=frozenset({"asignada", "en_curso", "bloqueada"}), se_ofrece=False,
           es="La persona dice de qué tarea es una foto, un video o un archivo que mandó, sin "
              "decir que la terminó."),
+    Ficha("aprobar", "aprobar la entrega de una tarea que espera su decisión",
+          necesita=(), opcional=("tarea", "comentario", "de"),
+          comprueba="que quien escribe sea quien aprueba el trabajo del responsable, que la "
+                    "tarea esté entregada y que lo entregado cubra lo que pide (la cocina); con "
+                    "el botón del aviso, que la entrega no haya cambiado desde que se mostró",
+          hace="anota la aprobación con su comentario (aprobar_tarea) y, si el sistema "
+               "comprueba que se cumple todo lo demás, la tarea queda terminada en el mismo "
+               "acto; si algo más frena el cierre, la aprobación queda anotada",
+          despues="le avisa al responsable enseguida; si no se cerró, el sistema la cierra solo "
+                  "cuando se resuelve lo que faltaba y les avisa a los dos",
+          manejar=_aprobar, boton="Aprobar", opuesta="pedir_cambios",
+          contesta=(preguntas.DECISION_DE_LA_ENTREGA, preguntas.QUE_CAMBIOS_PIDE,
+                    preguntas.CUAL_DE_LAS_DOS),
+          es="La persona que escribe aprueba el trabajo entregado de una tarea que espera su "
+             "decisión, sin pedir que se cambie nada; puede sumar un comentario. Si además pide "
+             "que se cambie o se revise algo, eso es también pedir cambios: van las dos "
+             "jugadas. Una tarea que no está en la lista se nombra por su responsable (de)."),
+    Ficha("pedir_cambios", "pedirle cambios a la entrega de una tarea que espera su decisión",
+          necesita=(), opcional=("tarea", "comentario", "de"),
+          comprueba="que quien escribe sea quien aprueba el trabajo del responsable y que la "
+                    "tarea esté entregada (la cocina)",
+          hace="sin decir qué falta, nada: lo pregunta; con lo que falta, anota el pedido de "
+               "cambios (pedir_cambios_tarea) y la tarea vuelve al estado que tenía antes de "
+               "entregarla",
+          despues="le avisa al responsable enseguida, con lo que pidió",
+          manejar=_pedir_cambios, boton="Pedir cambios", opuesta="aprobar",
+          contesta=(preguntas.DECISION_DE_LA_ENTREGA, preguntas.QUE_CAMBIOS_PIDE,
+                    preguntas.CUAL_DE_LAS_DOS),
+          es="La persona que escribe le pide al responsable que cambie, complete o revise algo "
+             "de lo que entregó en una tarea que espera su decisión, con lo que falta "
+             "(comentario) si lo dice. Lo que falta, cuando Leda lo pregunta, también es esta "
+             "jugada. Una tarea que no está en la lista se nombra por su responsable (de)."),
     Ficha("pedir_reasignacion", "pasarle una tarea a otra persona",
           necesita=(), opcional=("tarea", "a"),
           comprueba="nada", hace="nada: cambiar el responsable no es por chat (9g)",
@@ -1366,6 +1424,50 @@ def _manejador(ficha: Ficha) -> Manejador:
     return lambda ctx, jugada: correr(ficha, ctx, jugada)
 
 
+# --- Lo que admite dos lecturas ------------------------------------------------------------
+
+def opuestas(jugadas: list[Jugada]) -> dict[int, int]:
+    """Las jugadas del mensaje que dicen lo contrario de otra sobre la misma tarea (`Ficha.
+    opuesta`): de cada par, la primera → la segunda. Una tarea sin nombrar no forma un par."""
+    pares: dict[int, int] = {}
+    usadas: set[int] = set()
+    for i, a in enumerate(jugadas):
+        ficha = FICHAS.get(a.nombre)
+        alias = (a.datos or {}).get("tarea")
+        if ficha is None or ficha.opuesta is None or _vacio(alias) or i in usadas:
+            continue
+        j = next((j for j, b in enumerate(jugadas) if j > i and j not in usadas
+                  and b.nombre == ficha.opuesta and (b.datos or {}).get("tarea") == alias), None)
+        if j is not None:
+            pares[i] = j
+            usadas.update((i, j))
+    return pares
+
+
+def dos_lecturas(ctx: Contexto, a: Jugada, b: Jugada) -> dict[str, Any]:
+    """Dos jugadas opuestas sobre la misma tarea en un mensaje ("aprobado, pero que revise el
+    cable"): ninguna se hace. Leda pregunta una sola vez cuál de las dos, con las dos como
+    opciones (constitución §8: algo con más de una lectura); cada opción corre su jugada, con los
+    datos que la persona dio (lo que dijo con una sirve para la otra). Si la tarea no existe, la
+    primera jugada corre sola y dice por qué no se puede."""
+    tarea = ctx.tarea(str(a.datos["tarea"]))
+    if tarea is None:
+        return correr(FICHAS[a.nombre], ctx, a)
+    opciones = []
+    for una, otra in ((a, b), (b, a)):
+        datos = {k: v for k, v in {**(otra.datos or {}), **(una.datos or {})}.items()
+                 if k != "tarea" and not _vacio(v)}
+        opciones.append((FICHAS[una.nombre].boton or una.nombre,
+                         {"tarea": tarea["id"], "jugada": una.nombre, "datos": datos}))
+    hecho = {"jugada": a.nombre, "resultado": "dos_lecturas", "tarea": _tarea(tarea),
+             "lecturas": [a.nombre, b.nombre]}
+    ahora, pregunta_id = preguntas.abrir_con_id(
+        ctx, preguntas.CUAL_DE_LAS_DOS, tarea["id"], jugada={"nombre": a.nombre},
+        opciones=opciones)
+    _nombrar_pregunta(hecho, _clave_de_pregunta(ahora), preguntas.CUAL_DE_LAS_DOS, pregunta_id)
+    return hecho
+
+
 # La lista cerrada: nombre de la jugada → su manejador.
 JUGADAS: Mapping[str, Manejador] = MappingProxyType(
     {nombre: _manejador(ficha) for nombre, ficha in FICHAS.items()})
@@ -1376,9 +1478,11 @@ def lo_que_puede_hacer(jugadas: Mapping[str, Manejador]) -> list[str]:
     return [FICHAS[n].para_que for n in sorted(jugadas) if n in FICHAS and FICHAS[n].se_ofrece]
 
 
-# Para las situaciones generales (`situaciones.py`) y la entrega (`entrega.py`).
+# Para las situaciones generales (`situaciones.py`), la entrega (`entrega.py`) y la aprobación
+# (`aprobacion.py`).
 vacio = _vacio
 tarea_hecho = _tarea
 nombrar_pregunta = _nombrar_pregunta
 no_hecho = _no_hecho
 cerrar_esperas = _cerrar_esperas
+abrir_pregunta = _abrir_pregunta

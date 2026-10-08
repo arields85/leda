@@ -267,6 +267,17 @@ def _huella(task_id: str, estado: str, pol: Politica, piezas: Sequence[dict]) ->
     return hashlib.sha256(json.dumps(datos, ensure_ascii=False).encode()).hexdigest()
 
 
+def huella_de_lo_entregado(cur, task_id: str) -> str:
+    """La huella de la entrega vigente de una tarea (la del ciclo, sin lo retirado), cada pieza
+    con su contenido y lo que cubre: lo que el aviso a quien aprueba muestra. Si cambia, un botón
+    de ese aviso ya no decide sobre lo mismo (ADR 0018, decisión 2; porción 3b)."""
+    piezas = _lo_entregado(cur, task_id)
+    datos = [task_id, [[p["evidencia_id"], p["clase"],
+                        p.get("sha256") or p.get("texto") or p.get("uri"), p["cubre"]]
+                       for p in piezas]]
+    return hashlib.sha256(json.dumps(datos, ensure_ascii=False).encode()).hexdigest()
+
+
 def _ordenar(piezas: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Las de esta entrega primero, en el orden en que llegaron; las mandadas antes, aparte."""
     return ([p for p in piezas if not p.get("antes")]

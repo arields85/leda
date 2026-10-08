@@ -89,6 +89,21 @@ def _evidencia(cur, ws, tarea_id, *, tipo="explicacion"):
         (ws, tarea_id, tipo, tarea_id))
 
 
+def _sin_el_acto(resultado: dict) -> dict:
+    """El resultado de `aprobar_tarea` o `pedir_cambios_tarea` sin la identidad del acto ni el
+    estado al que volvió la tarea (porción 3b de la C-3: los usa el motor para su aviso)."""
+    return {k: v for k, v in resultado.items()
+            if k not in ("aprobacion_id", "decision_id", "estado")}
+
+
+def _sin_aviso_fijo(cur, ws, tg) -> None:
+    """Porción 3b de la C-3: la decisión ya no le llega al responsable con un texto fijo de la
+    cocina; el aviso lo guarda y lo redacta el motor (`motor.aprobacion`)."""
+    cur.execute("""select count(*) n from message_outbox
+                    where workspace_id = %s and chat_id = %s""", (ws, tg))
+    assert cur.fetchone()["n"] == 0
+
+
 def _outbox_ultimo(cur, ws, tg) -> str:
     cur.execute(
         """select cuerpo from message_outbox
@@ -293,7 +308,7 @@ def test_pedir_cambios_devuelve_a_en_curso_con_el_comentario_y_avisa(corework, c
             {"tarea_id": tid, "comentario": "Falta probarlo con carga real."},
             ya_confirmada=True)
 
-    assert resultado == {"pedido": True, "titulo": "Programar HMI línea 2"}
+    assert _sin_el_acto(resultado) == {"pedido": True, "titulo": "Programar HMI línea 2"}
 
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
@@ -309,10 +324,8 @@ def test_pedir_cambios_devuelve_a_en_curso_con_el_comentario_y_avisa(corework, c
                order by at desc limit 1""", (tid,))
         assert cur.fetchone()["motivo"] == "Falta probarlo con carga real."
 
-        tg_nahuel = _tg(cur, "Nahuel Gimenez")
-        cuerpo = _outbox_ultimo(cur, ws, tg_nahuel)
-    assert "Marcos Tarquini pidió cambios" in cuerpo
-    assert "Falta probarlo con carga real." in cuerpo
+        _sin_aviso_fijo(cur, ws, _tg(cur, "Nahuel Gimenez"))
+    assert resultado["estado"] == "en_curso"
 
 
 def test_pedir_cambios_rechaza_si_la_tarea_no_esta_en_revision(corework, conn):
@@ -374,9 +387,8 @@ def test_aprobar_tarea_no_repite_la_palabra_falta_en_el_mensaje(corework, conn):
     assert resultado["cerrada"] is False
     assert "criterio" in resultado["falta"].lower()
     with admin(conn) as cur:
-        tg_nahuel = _tg(cur, "Nahuel Gimenez")
-        cuerpo = _outbox_ultimo(cur, ws, tg_nahuel)
-    assert cuerpo.lower().count("falta") == 1
+        _sin_aviso_fijo(cur, ws, _tg(cur, "Nahuel Gimenez"))
+    assert resultado["falta"].lower().count("falta") == 1
 
 
 # ---------------------------------------------------------------------------
@@ -465,7 +477,7 @@ def test_pedir_cambios_invalida_una_aprobacion_anterior_que_no_habia_cerrado(
         marcos = _quien(cur, "Marcos Tarquini", ws)
         resultado = H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
                                ya_confirmada=True)
-    assert resultado == {"aprobada": True, "cerrada": True, "falta": None,
+    assert _sin_el_acto(resultado) == {"aprobada": True, "cerrada": True, "falta": None,
                          "titulo": "Programar HMI línea 2"}
 
     with admin(conn) as cur:
@@ -529,7 +541,7 @@ def test_aprobar_tarea_plana_sigue_alcanzando_para_cerrar(corework, conn):
         marcos = _quien(cur, "Marcos Tarquini", ws)
         resultado = H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
                                ya_confirmada=True)
-    assert resultado == {"aprobada": True, "cerrada": True, "falta": None,
+    assert _sin_el_acto(resultado) == {"aprobada": True, "cerrada": True, "falta": None,
                          "titulo": "Programar HMI línea 2"}
 
 
@@ -891,15 +903,14 @@ def test_pedir_cambios_con_dependencia_bloqueante_abierta_vuelve_a_en_curso(
             cur, marcos, "pedir_cambios_tarea",
             {"tarea_id": tid, "comentario": "Falta ajustar el HMI."},
             ya_confirmada=True)
-    assert resultado == {"pedido": True, "titulo": "Programar HMI línea 2"}
+    assert _sin_el_acto(resultado) == {"pedido": True, "titulo": "Programar HMI línea 2"}
 
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
         assert cur.fetchone()["estado"] == "en_curso"
 
-        tg_nahuel = _tg(cur, "Nahuel Gimenez")
-        cuerpo = _outbox_ultimo(cur, ws, tg_nahuel)
-    assert "vuelve a estar en curso" in cuerpo.lower()
+        _sin_aviso_fijo(cur, ws, _tg(cur, "Nahuel Gimenez"))
+    assert resultado["estado"] == "en_curso"
 
 
 def test_pedir_cambios_entregada_sin_arrancar_con_dependencia_abierta_vuelve_a_asignada(
@@ -928,7 +939,7 @@ def test_pedir_cambios_entregada_sin_arrancar_con_dependencia_abierta_vuelve_a_a
             cur, marcos, "pedir_cambios_tarea",
             {"tarea_id": tid, "comentario": "Todavía falta empezar bien."},
             ya_confirmada=True)
-    assert resultado == {"pedido": True, "titulo": "Programar HMI línea 2"}
+    assert _sin_el_acto(resultado) == {"pedido": True, "titulo": "Programar HMI línea 2"}
 
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
@@ -966,7 +977,7 @@ def test_pedir_cambios_sin_dependencia_sigue_volviendo_a_en_curso(corework, conn
         resultado = H.ejecutar(cur, marcos, "pedir_cambios_tarea",
                                {"tarea_id": tid, "comentario": "Ajustar algo."},
                                ya_confirmada=True)
-    assert resultado == {"pedido": True, "titulo": "Programar HMI línea 2"}
+    assert _sin_el_acto(resultado) == {"pedido": True, "titulo": "Programar HMI línea 2"}
 
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
@@ -1189,7 +1200,7 @@ def test_pedir_cambios_tras_entrega_repetida_en_en_revision_sigue_volviendo_a_en
         resultado = H.ejecutar(cur, marcos, "pedir_cambios_tarea",
                                {"tarea_id": tid, "comentario": "Ajustar algo."},
                                ya_confirmada=True)
-    assert resultado == {"pedido": True, "titulo": "Programar HMI línea 2"}
+    assert _sin_el_acto(resultado) == {"pedido": True, "titulo": "Programar HMI línea 2"}
 
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
@@ -1227,7 +1238,7 @@ def test_pedir_cambios_con_previo_en_revision_nulo_vuelve_a_asignada(corework, c
         resultado = H.ejecutar(cur, marcos, "pedir_cambios_tarea",
                                {"tarea_id": tid, "comentario": "Ajustar algo."},
                                ya_confirmada=True)
-    assert resultado == {"pedido": True, "titulo": "Cablear tablero"}
+    assert _sin_el_acto(resultado) == {"pedido": True, "titulo": "Cablear tablero"}
 
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
