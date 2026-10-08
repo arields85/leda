@@ -1,7 +1,8 @@
 """La entrada HTTP de Leda (E3-2, enredos 3 y 4 de `odd/tasks/motor-definitivo.md`; E3-7).
 
 La contraparte de `salida.py`: lo que llega de afuera. La aplicación (`app`), sus rutas
-(`POST /telegram/{slug}`, `GET /tablero/{token}`, `GET /salud`), el registro de los webhooks
+(`POST /telegram/{slug}`, `GET /tablero/{token}`, `GET /tarea/{token}`, `GET /salud`), el registro
+de los webhooks
 (`registrar_webhooks`, `python -m leda webhooks`) y lo que la recuperación de un mensaje sin
 respuesta comparte con el barrido de huérfanos (`huerfanos.py`): la ventana del turno en curso,
 la cota de reentrega, el candado por mensaje y el criterio de "este mensaje ya tiene respuesta".
@@ -14,6 +15,11 @@ el webhook; cada bot tiene el suyo, derivado de `LEDA_WEBHOOK_SECRET` y del espa
 configurado, el webhook no atiende a nadie. La respuesta de cada update sale al atenderlo, por
 el bot que lo recibió (`recibir.Recepcion.despachar_ahora`); el ciclo de fondo de `servir`
 (`leda.motor.fondo`) despacha lo demás, y lo que no haya salido ahí.
+
+**La página de una tarea** (ADR 0019, decisión 7): de sólo lectura, con un enlace personal que
+no vence. Lee sólo por las funciones de la base que reciben el hash del token y deciden quién ve
+qué (`pagina_de_tarea.py`); usa su propia conexión, bajo su propio candado, para no esperar a un
+turno de la conversación ni compartir su transacción.
 
 **Un álbum** (ADR 0019, decisión 4): cada foto llega en un update aparte y se guarda al
 atenderlo; el turno del álbum corre una vez. Después de guardar una foto de un álbum, el pedido
@@ -36,7 +42,7 @@ from typing import Any
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from .config import config
 from .db import admin, conectar, espacio
@@ -312,6 +318,101 @@ def _servir_tablero(conn, token: str) -> HTMLResponse:
 
     return HTMLResponse(
         pagina(datos, espacio=nombre_espacio, persona=persona))
+
+
+# --- La página de una tarea (ADR 0019, decisión 7) ------------------------------------------
+
+# Las páginas se leen de a una, con su conexión: no comparten la del webhook ni esperan a un turno.
+_PAGINAS = threading.Lock()
+
+# Lo que lleva toda respuesta de la página, también la genérica (7a y 7c): que nada la guarde ni
+# la indexe, que no diga de dónde viene quien sigue un enlace, que el navegador no adivine el
+# tipo y que no se ejecute nada.
+CABECERAS_DE_LA_PAGINA = {
+    "Cache-Control": "no-store",
+    "Referrer-Policy": "no-referrer",
+    "X-Robots-Tag": "noindex, nofollow",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": ("default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; "
+                                "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"),
+}
+# Un archivo no es una página: no carga nada y, si un navegador lo abriera como una, queda aislado.
+POLITICA_DE_UN_ARCHIVO = "default-src 'none'; sandbox"
+
+
+def _conn_de_paginas():
+    """La conexión de las páginas, una por proceso y reabierta si se cerró."""
+    if not hasattr(_conn_de_paginas, "_c") or _conn_de_paginas._c.closed:
+        _conn_de_paginas._c = conectar()
+    return _conn_de_paginas._c
+
+
+def _no_se_puede_abrir(status_code: int = 404) -> HTMLResponse:
+    from .tarea_vista import no_se_puede_abrir
+
+    return HTMLResponse(no_se_puede_abrir(), status_code=status_code,
+                        headers=CABECERAS_DE_LA_PAGINA)
+
+
+@router.get("/tarea/{token}", response_class=HTMLResponse)
+def pagina_de_tarea_web(token: str):
+    """La página de una tarea. La tarea, el espacio y la persona salen del token, y de ningún
+    otro lado. Un token inexistente, revocado o de alguien que ya no puede verla devuelven lo
+    mismo."""
+    from . import pagina_de_tarea
+    from .db import sin_espacio
+    from .tarea_vista import pagina
+
+    with _PAGINAS:
+        conn = _conn_de_paginas()
+        try:
+            with sin_espacio(conn) as cur:
+                datos = pagina_de_tarea.leer(cur, token)
+        except Exception as falla:  # noqa: BLE001 -- la página nunca muestra un error técnico
+            _sin_transaccion(conn)
+            _imprimir(f"  ! la página de una tarea no se pudo leer ({type(falla).__name__}).")
+            return _no_se_puede_abrir(503)
+    if datos is None:
+        return _no_se_puede_abrir()
+    return HTMLResponse(pagina(datos, token=token), headers=CABECERAS_DE_LA_PAGINA)
+
+
+@router.get("/tarea/{token}/evidencia/{evidencia}")
+def archivo_de_tarea_web(token: str, evidencia: str):
+    """El archivo de una evidencia de la tarea del token, con el tipo que detectó el código: una
+    imagen que el navegador muestra, para verla; lo demás, como adjunto para bajar. La evidencia
+    de otra tarea, o de otro espacio, devuelve la misma página que un enlace que no sirve."""
+    from urllib.parse import quote
+
+    from . import pagina_de_tarea
+    from .db import sin_espacio
+    from .tarea_vista import IMAGENES_QUE_SE_VEN
+
+    with _PAGINAS:
+        conn = _conn_de_paginas()
+        try:
+            with sin_espacio(conn) as cur:
+                archivo = pagina_de_tarea.leer_archivo(cur, token, evidencia)
+        except Exception as falla:  # noqa: BLE001 -- la página nunca muestra un error técnico
+            _sin_transaccion(conn)
+            _imprimir(f"  ! un archivo de una tarea no se pudo leer ({type(falla).__name__}).")
+            return _no_se_puede_abrir(503)
+    if archivo is None:
+        return _no_se_puede_abrir()
+    modo = "inline" if archivo["tipo"] in IMAGENES_QUE_SE_VEN else "attachment"
+    nombre = archivo["nombre"] or "archivo"
+    return Response(archivo["contenido"], media_type=archivo["tipo"], headers={
+        **CABECERAS_DE_LA_PAGINA,
+        "Content-Security-Policy": POLITICA_DE_UN_ARCHIVO,
+        "Content-Disposition": f"{modo}; filename*=UTF-8''{quote(nombre, safe='')}"})
+
+
+def _sin_transaccion(conn) -> None:
+    """Después de una falla, la conexión de las páginas vuelve a quedar lista."""
+    try:
+        conn.rollback()
+    except Exception:  # noqa: BLE001 -- una conexión rota se reabre en el próximo pedido
+        pass
 
 
 @router.get("/salud")
