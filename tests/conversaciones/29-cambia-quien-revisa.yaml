@@ -1,0 +1,117 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/29-cambia-quien-revisa.md
+numero: "29"
+titulo: "Cambia quién revisa"
+mide: garantias
+persona: Ismael
+inicio: "2026-10-23 14:00"
+
+tareas:
+  TAB:
+    titulo: Cablear tablero de la máquina 3
+    criterio: "El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba de continuidad y de aislación"
+    responsable: Mariano
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  MOT:
+    titulo: Revisar el motor de la cinta 2
+    criterio: "El motor de la cinta 2 gira sin ruidos y su consumo queda dentro de lo que dice su placa"
+    responsable: Mariano
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+
+preludio:
+  - quien: Mariano
+    a_las: "2026-10-23 15:00"
+    escribe: "termine el tablero de la 3, cableado segun el diagrama y paso continuidad y aislacion"
+    jugadas: [{nombre: entregar, tarea: TAB, lo_descrito_cubre: [C1]}]
+  - quien: Mariano
+    a_las: "2026-10-23 15:01"
+    toca: Confirmar
+  - quien: Leda
+    relojes: ["2026-10-23 15:20"]
+  - quien: Mariano
+    a_las: "2026-10-23 15:30"
+    escribe: "listo el motor de la cinta 2, gira sin ruidos y el consumo esta dentro de la placa"
+    jugadas: [{nombre: entregar, tarea: MOT, lo_descrito_cubre: [C1]}]
+  - quien: Mariano
+    a_las: "2026-10-23 15:31"
+    toca: Confirmar
+
+pasos:
+  # La plataforma cambia quién aprueba el trabajo de Mariano (`cambia_quien_aprueba`), y en la
+  # vuelta siguiente del ciclo a Marcos le llega lo que ya esperaba la revisión de Ismael.
+  - paso: 1-2
+    quien: Leda
+    a_las: "2026-10-23 15:35"
+    cambia_quien_aprueba: {de: Mariano, a: Marcos}
+    relojes: ["2026-10-23 15:36"]
+    salen:
+      - a: Marcos
+        tipo: entrega_para_aprobar
+        tarea: TAB
+        botones: [Aprobar, Pedir cambios]
+        enlace: true
+        hechos: {antes_la_revisaba_otra_persona: true, responsable: Mariano Naim}
+    dice:
+      - la tarea del tablero en su renglón con 📋
+      - que la entregó Mariano y lo que describió
+      - que la entrega ya esperaba y ahora la revisa él
+      - "el cierre: que puede aprobarla o pedir cambios"
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-23 15:42"]
+    salen:
+      - a: Marcos
+        tipo: entrega_para_aprobar
+        tarea: MOT
+        botones: [Aprobar, Pedir cambios]
+        enlace: true
+        hechos: {responsable: Mariano Naim, antes_la_revisaba_otra_persona: ausente}
+    estado_avisos:
+      - {tipo: entrega_para_aprobar, tarea: MOT, a: Marcos, estado: enviado}
+
+  - paso: 4
+    a_las: "2026-10-23 15:50"
+    # El "Aprobar" del aviso de las 15:20, que le había llegado a Ismael.
+    toca: Aprobar
+    de_la_tarea: TAB
+    efectos: {}
+    hechos:
+      - {jugada: aprobar, resultado: no_se_puede, motivo: ya_no_le_corresponde,
+         tarea: TAB, estado: en_revision, la_revisa_otra_persona: true}
+    pregunta: null
+    botones: []
+    dice:
+      - que esa tarea ya no la revisa él
+      - que no cambió nada
+    no_dice:
+      - que la aprobó
+      - quién la revisa ahora
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-23 16:00"
+    escribe: "lo del tablero de mariano aprobado"
+    jugadas:
+      - {nombre: aprobar, tarea: TAB}
+    efectos:
+      estados: {TAB: terminada}
+      aprobaciones:
+        - {tarea: TAB, decision: aprobado, de: Marcos}
+      avisos_guardados:
+        - {tipo: tarea_aprobada, tarea: TAB, a: Mariano, estado: guardado}
+    hechos:
+      - {jugada: aprobar, resultado: anotado, tarea: TAB, quedo_terminada: true,
+         queda_por_revisar: [{tarea: MOT, responsable: Mariano Naim}]}
+    pregunta: null
+    botones: [Ver MOT]
+    estado_despues:
+      de: Marcos
+      pregunta_abierta: null
+    dice:
+      - que la del tablero quedó terminada y que Mariano se entera ahora
+      - que le queda por revisar la del motor

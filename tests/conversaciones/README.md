@@ -105,6 +105,10 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
     no decide ni la repite: la entrega sigue esperando con los dos botones; después de decidir una,
     lo que queda por revisar, y al día hábil siguiente, los recordatorios en una lista (decisiones
     12, 17 y 18 del usuario, 2026-10-08; C-3d, D4).
+29. [`29-cambia-quien-revisa.md`](29-cambia-quien-revisa.md): la plataforma cambia quién aprueba el
+    trabajo de Mariano mientras dos entregas esperan; el aviso que no había salido le llega al nuevo,
+    al nuevo le llega también el que ya había salido, y el botón del aviso viejo le dice al anterior
+    que esa tarea ya no la revisa él, sin cambiar nada (decisión 16 del usuario, 2026-10-08; D4).
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
@@ -135,7 +139,7 @@ motor. Suma tres momentos que el hilo da por hechos: el lunes 2 a las 09:00, cua
 guardó los recordatorios del día (así el de Ismael se omite al decidir), el aviso de la aprobación a
 Nahuel (paso 10) y los dos días siguientes sin nada (paso 10b).
 
-**La 28 corre desde la D4 de la C-3d**, entera. Un botón que muestra una entrega se nombra
+**La 28 y la 29 corren desde la D4 de la C-3d**, enteras. Un botón que muestra una entrega se nombra
 en el YAML por la clave de su tarea (`Ver TAB`, para "Ver Cablear tablero de la máquina 3"), al
 esperarlo y al tocarlo; un paso escrito o tocado puede esperar las fotos y el enlace de su respuesta
 (`fotos`, `enlace`), como lo que Leda manda por su cuenta; y un paso puede cambiar quién aprueba el

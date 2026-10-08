@@ -89,6 +89,13 @@ abrir otra pregunta (`avisos.TipoDeAviso.recuerda`). Un paso por día hábil, y 
 quien aprueba la pausa; al salir, cada aviso se vuelve a leer (`avisos._vigencia_de_una_
 decision`). Una entrega nueva de la misma tarea empieza su cuenta de cero.
 
+**Si cambia quién aprueba** después de que el aviso de la entrega salió (decisión 16 del usuario,
+2026-10-08; C-3d, D4): al nuevo le llega el aviso de lo que espera su decisión, una vez, como el
+de la entrega (con lo entregado, las fotos, el enlace y los botones), y su cuenta empieza cuando
+sale. Al anterior no le llega nada; si toca un botón del aviso viejo, Leda le dice que esa tarea
+ya no la revisa él (`situaciones`, `ya_no_le_corresponde`). Si cambió antes de que saliera, el
+aviso va al nuevo al salir (`avisos.TipoDeAviso.va_a`).
+
 **Sin `aviso_previo_dias_habiles`** (el plan lo dejó `PENDIENTE`): se usa el mínimo del núcleo,
 un día hábil (mecánica §9), y cada aviso previo que sale con él deja un incidente de severidad
 baja para el administrador: nunca en silencio, y sin escribir la configuración por su cuenta.
@@ -111,7 +118,8 @@ from ..incidentes import registrar_incidente
 from .ancla import (NO_DADOS, REEMPLAZADO, REPREGUNTA_DE_ESTADO, TIPOS_DE_LA_ESCALERA,
                     VENCIMIENTO_CON_PREVISION, Anclaje, al_mediodia, anclaje, candado, escalo,
                     pasos)
-from .avisos import (ABIERTOS, APROBACION_TRABADA, ESCALAMIENTO_DE_UNA_PREGUNTA,
+from .avisos import (ABIERTOS, ANTES_LA_REVISABA_OTRA_PERSONA, APROBACION_TRABADA,
+                     ENTREGA_PARA_APROBAR, ESCALAMIENTO_DE_UNA_PREGUNTA,
                      ESPERA_DE_ESTADO, RECORDATORIO_DE_LA_DECISION, REPREGUNTA, Momento,
                      aprobacion_vigente, ausente, aviso_de_la_entrega, espera_abierta, guardar,
                      hechos_de_la_escalera, hechos_de_una_decision, hechos_de_una_pregunta,
@@ -528,8 +536,11 @@ def _un_paso_de_una_decision(m: Momento, task_id: str, aprobador: str) -> list[s
     if ausente(cur, aprobador, m.hoy):
         return []                       # pausada: no avanza mientras no está
     entrega_aviso = aviso_de_la_entrega(cur, task_id)
-    if entrega_aviso is None or entrega_aviso["estado"] != "enviado"             or str(entrega_aviso["destinatario_membership_id"]) != aprobador:
-        return []                       # todavía no se le preguntó (o no a quien aprueba hoy)
+    if entrega_aviso is None or entrega_aviso["estado"] != "enviado":
+        return []                       # todavía no se le preguntó
+    if str(entrega_aviso["destinatario_membership_id"]) != aprobador:
+        # Cambió quién aprueba después de que salió (decisión 16): al nuevo, lo que espera.
+        return _a_quien_aprueba_ahora(m, task_id, entrega_aviso, aprobador)
     if aprobacion_vigente(cur, task_id, aprobador) is not None:
         return []                       # ya decidió: espera que se resuelva lo que falta
     de = str(entrega_aviso["id"])
@@ -578,6 +589,22 @@ def _un_paso_de_una_decision(m: Momento, task_id: str, aprobador: str) -> list[s
             clave=f"motor:{RECORDATORIO_DE_LA_DECISION}:{de}:{siguiente}", ahora=m.ahora)
     guardados.append(RECORDATORIO_DE_LA_DECISION)
     return guardados
+
+
+def _a_quien_aprueba_ahora(m: Momento, task_id: str, entrega_aviso: dict[str, Any],
+                           aprobador: str) -> list[str]:
+    """El aviso de la entrega a quien pasó a aprobar el trabajo del responsable cuando el de
+    antes ya había salido (decisión 16): el mismo tipo de aviso, con lo que dicen los hechos de
+    aquél y que la entrega ya esperaba la revisión de otra persona. Sale enseguida (es de
+    coordinación: no cuenta para el tope); una sola vez por persona y por aviso (su clave)."""
+    hechos = {k: v for k, v in dict(entrega_aviso["hechos"]).items()
+              if k in ("aviso", "necesita_respuesta", "pregunta", "tarea", "responsable")}
+    _, nuevo = guardar(m.cur, m.workspace_id, ENTREGA_PARA_APROBAR, task_id=task_id,
+                       destinatario=aprobador,
+                       hechos={**hechos, ANTES_LA_REVISABA_OTRA_PERSONA: True},
+                       programado_para=sale(m.cal, m.ahora),
+                       clave=f"{entrega_aviso['dedupe_key']}:{aprobador}", ahora=m.ahora)
+    return [ENTREGA_PARA_APROBAR] if nuevo else []
 
 
 def _vuelta_de_una_ausencia(m: Momento, persona: str, inicio: date) -> dict[str, Any] | None:

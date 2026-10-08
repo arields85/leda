@@ -723,3 +723,33 @@ def test_el_aviso_de_la_entrega_va_a_quien_aprueba_al_salir(conn, mundo, turnos)
     assert aviso["estado"] == "enviado"
     assert _salida_para(conn, mundo, "Ismael") == []
 
+
+def test_si_cambia_despues_al_nuevo_le_llega_lo_que_espera_su_decision(conn, mundo, turnos):
+    from leda.motor.escalera import correr_escalera
+
+    _nahuel(conn, mundo)
+    tarea, _ = _con_el_aviso(conn, mundo, turnos)            # ya le llegó a Ismael
+    _ahora_lo_aprueba(conn, mundo, "Marcos", "Nahuel")
+    luego = DESPUES_DEL_MARGEN + timedelta(minutes=5)
+    correr_escalera(conn, mundo["id"], RelojFijo(luego))
+    conn.commit()
+    nuevo = [a for a in avisos_guardados(conn, "entrega_para_aprobar")
+             if str(a["destinatario_membership_id"])
+             == mundo["personas"]["Nahuel"]["membership_id"]]
+    assert len(nuevo) == 1 and nuevo[0]["hechos"]["antes_la_revisaba_otra_persona"] is True
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, luego) == {"enviado": 1}
+    # Una vez: otra vuelta de la escalera no guarda otro.
+    correr_escalera(conn, mundo["id"], RelojFijo(luego + timedelta(minutes=1)))
+    conn.commit()
+    assert len(avisos_guardados(conn, "entrega_para_aprobar")) == 2
+    # El botón del aviso viejo le dice a Ismael que ya no la revisa él, y no cambia nada.
+    [viejo] = todos(conn, """select o.token from conversation_option o
+                               join conversation_question q on q.id = o.question_id
+                              where o.etiqueta = 'Aprobar' and q.membership_id = %s""",
+                    mundo["personas"]["Ismael"]["membership_id"])
+    r = turnos.toca("Ismael", viejo["token"], at=luego)
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "ya_no_le_corresponde"
+    assert hecho["la_revisa_otra_persona"] is True and hecho["estado"] == "en_revision"
+    assert _decisiones(conn, tarea) == [] and estado_de(conn, tarea) == "en_revision"
