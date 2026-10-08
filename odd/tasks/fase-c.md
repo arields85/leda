@@ -968,6 +968,86 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         siempre su propia confirmación.
       - `aviso_que_no_salio` (el aviso de la falla a quien causó un aviso) nombra a quien iba, que
         puede ser quien aprueba su trabajo, a la vista: no estaba en lo pedido y no se tocó.
+  - [x] **D7b.** Lo que dejó la ronda de la D7 con la IA real (`resultados/fase-c-d7.md`, sobre
+    `46cf49c`: la 11, la 21, la 27 y la 28, 5 veces) y la decisión 22 (2026-10-08, de noche). Route:
+    delegada (escritor único, 2+ archivos no triviales). Sin la IA real: su chequeo lo corre el
+    coordinador.
+    - **1. Decisión 22, aprobar con un comentario** (`902c629`; la 28, paso 3, vez 5: "esta bien pero
+      que mariano revise el rotulo de los cables" llegó como `aprobar` con su comentario, sin
+      `pedir_cambios`, y la tarea quedó terminada). Lo decide la cocina con los datos de la jugada
+      (`aprobacion._antes_pregunta_cual`): un `aprobar` con comentario no cierra directo y abre la
+      pregunta de una sola vez de "¿cuál de las dos?" (`fichas.dos_lecturas`, con las mismas dos
+      opciones y el comentario en cada una), salvo que sea la elección: una opción tocada o escrita
+      (`de_la_pregunta`) o la respuesta escrita a la de cuál de las dos sobre esa tarea, que la
+      persona vio en un mensaje anterior (decisión 12: "aprobala nomás y pasale lo de los colores"
+      aprueba directo). La IA sólo dice que trae un comentario: el dato `comentario` y la ficha de
+      `aprobar` dicen que es lo que se le pasa a la persona responsable para que lo tenga en cuenta;
+      el significado de `dos_lecturas` cubre los dos casos. La ficha sigue pidiendo las dos jugadas
+      cuando además pide un cambio (las dos lecturas llevan a la misma pregunta). Conversaciones: la
+      23, paso 2 ("el plc de marcos aprobado, impecable") ahora pregunta, y el paso nuevo 2b toca
+      Aprobar (cierra con el comentario; el aviso a Marcos pasa a las 10:31); la 28 lo anota en el
+      paso 3, y su paso 4 espera `fuera_de_la_lista` con `contesta_la_pregunta` (4 de 5 en la ronda;
+      sin `puede_traer`: lo que no está en la lista no tiene ficha y el corredor no compara sus
+      datos, `test_comprobar` lo exige). `docs/capacidades.md`. Rojo primero: tres de las pruebas
+      nuevas de `test_aprobacion.py` (`anotado` en lugar de `dos_lecturas`) y la del dato.
+    - **2. "Contar"** (`1bb9342`; 6 de 10 mensajes del paso 1 decían "contaste" o "contarlo", y los
+      avisos a Ismael "Marcos contó…"). Las instrucciones de la redacción usaban "contás" como el
+      verbo de Leda (18 veces "contar" o "se cuenta"); pasan a "decir" ("lo que la persona contó",
+      "lo que dijo"), sin ninguna regla nueva ni frases. La ficha de `entregar` dice "describir", y
+      los significados de `tarea`, `hechos`, `retiradas`, `el_ejemplo_que_acepto` y el encabezado de
+      la lista de significados dejan "contar" y "cuenta". **La huella de la redacción cambió a
+      propósito**: `3f267a24d030de4a` → `9e419fe6bbcc420a` (`test_contratos.py`, con el porqué); la de
+      las jugadas no cambió. Rojo primero: `test_nada_de_lo_que_lee_la_ia_sobre_la_entrega_dice_
+      contar`.
+    - **3. Que todavía no se entrega, una sola vez** (`1bb9342`; "Para entregar el trabajo falta… por
+      ahora sigue como estaba"). Lo dice sólo el nombre del resultado (`para_entregarla_falta`): el
+      significado de `le_falta_evidencia` dejó "hasta entonces no se entrega y la tarea sigue como
+      estaba", y el de la pregunta `lo_que_falta_de_la_entrega`, "para poder entregarla". La prueba
+      recorre los nombres y los significados de una entrega incompleta, con el criterio. Rojo
+      primero: `test_que_todavia_no_se_entrega_lo_dice_un_solo_hecho` (lo decían el significado y la
+      pregunta, además del nombre).
+    - **4. Los YAML que pedían más que la ficha** (`5582d39`), mirados contra las transcripciones y
+      las fichas: la 21, paso 1, `puede_traer: [el_texto_cubre, lo_descrito_cubre, ejemplo]`; la 21,
+      paso 5, `entregar` (5 de 5) con `puede_traer: [el_texto_cubre, lo_descrito_cubre]` y los hechos
+      `para_confirmar`, `sumo: [P5, P6]` (lo que escribe es una pieza más), con la fila de texto de
+      más en el paso 6 y `lo_que_escribio` de más en el aviso del paso 8; la 27, paso 4,
+      `puede_traer: [lo_descrito_cubre, el_texto_cubre]`; la 27, paso 9, `entregar` (5 de 5) con el
+      mismo `puede_traer`; la 28, paso 4, en el punto 1. La prueba del corredor del otro camino de
+      la 21 toma ahora `confirmar` en el paso 5 (6 filas escritas). Los `.md` cambian con su YAML.
+    - **5. El corredor en paralelo** (`15c1e65`; la 28, vez 5, sin el enlace desde el paso 2):
+      `_con_la_direccion_de_prueba` cambiaba la configuración del proceso y devolvía la que vio al
+      entrar; con `--paralelo`, la corrida que terminaba primero la vaciaba. Ahora la pone la primera
+      corrida que arranca y la devuelve la última que termina, con un candado. Rojo primero:
+      `test_la_direccion_de_prueba_vale_mientras_corra_alguna_corrida` (`''` en lugar de
+      `https://leda.invalid`).
+    - **Chequeos** (2026-10-08, sobre `15c1e65`): `pytest tests/motor tests/conversaciones`, 884
+      passed y 1 failed, `test_un_envio_por_dia.py::test_dos_pedidos_de_estado_juntos_preguntan_de_a_
+      uno`, que pasó solo tres veces (intermitente, no la conocida del corredor); `pytest
+      tests/garantias`, 323 passed; en seco, `correr --ia guionada --veces 1 --ronda seco-d7b`, 29 de
+      29 bien (informes borrados, `gasto.json` sin tocar).
+    - `PENDIENTE`:
+      - **La IA real** sobre la 21, la 23, la 27 y la 28 (el coordinador).
+      - **"Impecable" ahora pregunta** (la 23, paso 2): la regla de la decisión 22 vale para todo
+        comentario, también un elogio, así que "aprobado, impecable" lleva un toque más. Si el usuario
+        quiere que un elogio cierre directo, hace falta otra decisión (por ejemplo, que el comentario
+        de una aprobación sea sólo lo que le pide algo al responsable, y un elogio no se guarde como
+        comentario).
+      - **La 21, paso 1, vez 2** (`el_texto_cubre: [resultado_de_prueba]`, sin la explicación) sigue
+        marcando comprensión: con `puede_traer`, un dato estructurado que viene tiene que ser el
+        esperado (la regla de la D1); los hechos son los mismos porque un texto cubre siempre la
+        explicación. Aflojarlo es cambiar esa regla del comparador.
+      - **El corredor no admite dos jugadas válidas para un paso** (sigue de la D7): la 28, paso 3,
+        con sólo `aprobar` y su comentario; la 21, paso 5, y la 27, paso 9, con `entregar` y
+        `confirmar` juntos.
+      - La 27, paso 4, vez 4: "si, eso" guardado como un texto que describe C1 en lugar de
+        `acepta_el_ejemplo` (se ve en la vista previa, no se inventa nada).
+      - La 28, paso 4: ninguna vez dice que Leda no decide por él.
+      - La 21, el cierre "¿Confirmás esa frase?" frente al "¿Va así?" del modelo.
+      - En la 21, paso 5, lo que escribió con la foto ("y esta del tablero cerrado. dale mandala")
+        entra como una descripción más y le llega a Ismael; antes el `.md` decía que era la
+        confirmación.
+      - `consultar_pendientes` se redacta como `contar_sus_tareas_pendientes`, y las instrucciones
+        de las jugadas dicen "con lo que contó" de un avance: no son de la entrega y no se tocaron.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
@@ -992,8 +1072,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La D7 está hecha; su ronda con la IA real (la 11, la 21, la 27 y la 28, 5 veces) espera a que vuelva
-el cupo. La prueba
+La D7 y la D7b están hechas; el chequeo de la D7b con la IA real (la 21, la 23, la 27 y la 28) lo
+corre el coordinador. La prueba
 por Telegram del usuario con el guion de la D6 y las decisiones que dejó la D6 (insistir en
 mandar algo incompleto y quién juzga lo que cubre un texto); después, pedir el enlace por chat (la jugada que quedó de la porción 4) y la porción 5 de la C-3: el acceso del administrador
 (`docs/STATUS.md`, "Punto exacto para retomar").
