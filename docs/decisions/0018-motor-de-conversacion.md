@@ -645,6 +645,26 @@ generales y ningún caso (5c.1); la tercera ronda corre sólo con GPT-6 sol.
 
 La prueba chica pasó el 2026-10-06 y el usuario aceptó el ADR ese día.
 
+#### 9n. Una fecha que atrasa lleva su explicación, y un aviso a otro espera para poder corregir (usuario, 2026-10-07)
+
+De la prueba por Telegram del 2026-10-07: "con el PLC estoy compliacdo, me falta el cable para programar
+comunicaciones estimo que la tengo para el viernes 23", sin puntuación a propósito, se leyó 5 de 5 con la
+fecha en el PLC y la causa del bloqueo como motivo, y el aviso equivocado le llegaba a Ismael un minuto
+después (conversación de prueba 25).
+
+- **Un margen antes de los avisos a otra persona** que salen de algo que alguien dijo (la nueva
+  previsión y sus correcciones): 10 minutos, valor del espacio (`margen_para_corregir_minutos`). Si la
+  persona corrige dentro del margen, el aviso equivocado se retira y sólo sale el correcto. Los hechos
+  dicen la hora real en que se entera la otra persona. Con la IA real, la corrección funcionó 5 de 5.
+- **Una fecha que atrasa lleva su explicación.** Reemplaza lo de esta decisión que dejaba una previsión sin
+  motivo cuando la persona no lo daba: si la fecha nueva queda después del vencimiento y no hay motivo,
+  Leda anota la fecha y pregunta qué la atrasa; el aviso al referente espera la respuesta y sale con ella,
+  en palabras de la persona. Si no contesta, el aviso sale al terminar el día de trabajo y dice que todavía
+  no dio el motivo; Leda nunca lo inventa. En palabras del usuario: "pasar una fecha sin motivo no es una
+  buena idea, tiene que haber una explicación".
+- **Una corrección que pasa una fecha a otra tarea mueve sólo la fecha.** El motivo y la causa se dijeron
+  de la otra tarea y no viajan; si la fecha atrasa la tarea correcta, se pregunta su motivo.
+
 ## Consecuencias
 
 - **Decisión 1:** cada jugada de la lista y cada situación general se declaran y se prueban una
