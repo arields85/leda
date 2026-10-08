@@ -306,8 +306,11 @@ pasos:
   - paso: 9
     a_las: "2026-10-26 10:46"
     escribe: "aprobala nomas y pasale lo de los colores"
+    # Decisión 12 del usuario: la respuesta se lee como la elección, con `elegir` o con `aprobar`
+    # y lo demás como comentario (los dos valen; el significado de `cual_de_las_dos` lo dice). La
+    # IA real elige `aprobar` 5 de 5 (ronda fase-c-d6): el comentario es libre y se pide presente.
     jugadas:
-      - {nombre: elegir, opcion: O1}
+      - {nombre: aprobar, tarea: DASH, comentario: "pasale lo de los colores"}
     efectos:
       estados: {DASH: terminada}
       aprobaciones:

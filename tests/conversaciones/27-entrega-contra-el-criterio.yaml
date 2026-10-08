@@ -38,13 +38,15 @@ pasos:
         tarea: PLC
         el_texto_cubre: [explicacion]
         lo_descrito_cubre: []
-        ejemplo: "La comprimidora completó los 20 ciclos sin fallas."
+        # El ejemplo lo escribe la IA con sus palabras (sacado del criterio; la cocina lo verifica):
+        # puede venir con cualquier texto, y si no viene la cocina propone el punto tal cual.
+        puede_traer: [lo_descrito_cubre, ejemplo]
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: PLC,
          pregunta: lo_que_falta_de_la_entrega, sumo: [P1, P2], le_falta: ausente,
          le_falta_del_criterio: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
-         ejemplo: "La comprimidora completó los 20 ciclos sin fallas.",
+         ejemplo: presente,
          entrega: [{pieza: P1, es: lo_que_escribio, describe: ausente},
                    {pieza: P2, es: una_foto}]}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
@@ -69,7 +71,7 @@ pasos:
     jugadas: []
     efectos: {}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC, desde_antes: true,
-               ejemplo: "La comprimidora completó los 20 ciclos sin fallas."}
+               ejemplo: presente}
     botones: []
     estado_despues:
       pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
@@ -91,7 +93,7 @@ pasos:
       - {jugada: confirmar, resultado: no_vale_la_confirmacion, motivo: le_falta_algo,
          como_queda: le_falta_evidencia, tarea: PLC, pregunta: lo_que_falta_de_la_entrega,
          le_falta_del_criterio: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
-         ejemplo: "La comprimidora completó los 20 ciclos sin fallas."}
+         ejemplo: presente}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
     botones: []
     estado_despues:
@@ -110,7 +112,8 @@ pasos:
     a_las: "2026-10-22 15:05"
     escribe: "si, eso"
     jugadas:
-      - {nombre: entregar, tarea: PLC, acepta_el_ejemplo: true}
+      - {nombre: entregar, tarea: PLC, acepta_el_ejemplo: true, lo_descrito_cubre: [C1],
+         puede_traer: [lo_descrito_cubre]}
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
@@ -119,7 +122,7 @@ pasos:
            {pieza: P1, es: lo_que_escribio, dice: "termine el plc, ya arranca desde el plc"},
            {pieza: P2, es: una_foto},
            {pieza: P3, es: lo_que_escribio,
-            dice: "La comprimidora completó los 20 ciclos sin fallas.",
+            dice: presente,
             describe: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"]}]}
     pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
     botones: [Confirmar]

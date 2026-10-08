@@ -135,14 +135,16 @@ pasos:
       - nombre: entregar
         tarea: PLC
         lo_descrito_cubre: []
-        ejemplo: "La comprimidora arranca desde el PLC y completó los 20 ciclos sin fallas."
+        # El ejemplo lo escribe la IA con sus palabras (sacado del criterio; la cocina lo verifica):
+        # puede venir con cualquier texto, y si no viene la cocina propone el punto tal cual.
+        puede_traer: [lo_descrito_cubre, ejemplo]
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: PLC,
          pregunta: lo_que_falta_de_la_entrega, sumo: [P1],
          entrega: [{pieza: P1, es: lo_que_escribio}],
          le_falta_del_criterio: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
-         ejemplo: "La comprimidora arranca desde el PLC y completó los 20 ciclos sin fallas.",
+         ejemplo: presente,
          al_confirmar: {queda_esperando_la_aprobacion_de: Ismael Soschinski}}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
     botones: []

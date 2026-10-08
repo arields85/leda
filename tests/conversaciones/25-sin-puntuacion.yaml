@@ -213,7 +213,9 @@ pasos:
       - nombre: entregar
         tarea: COM
         lo_descrito_cubre: []
-        ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora."
+        # El ejemplo lo escribe la IA con sus palabras (sacado del criterio; la cocina lo verifica):
+        # puede venir con cualquier texto, y si no viene la cocina propone el punto tal cual.
+        puede_traer: [lo_descrito_cubre, ejemplo]
     efectos:
       estados: {PLC: en_curso}
       bloqueos_resueltos: [PLC]
@@ -224,7 +226,7 @@ pasos:
       # lo escrito no dice lo que pide su criterio de aceptación (decisión 10; C-3d, D3).
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM,
          pregunta: lo_que_falta_de_la_entrega,
-         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora.",
+         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: presente,
          al_confirmar: {arranca_al_entregarla: true}}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
     estado_despues:

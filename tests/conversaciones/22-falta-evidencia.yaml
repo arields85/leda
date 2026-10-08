@@ -84,13 +84,15 @@ pasos:
         tarea: COM
         el_texto_cubre: [explicacion]
         lo_descrito_cubre: []
-        ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora."
+        # El ejemplo lo escribe la IA con sus palabras (sacado del criterio; la cocina lo verifica):
+        # puede venir con cualquier texto, y si no viene la cocina propone el punto tal cual.
+        puede_traer: [lo_descrito_cubre, ejemplo]
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM, sumo: [P1],
          pregunta: lo_que_falta_de_la_entrega,
          le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"],
-         ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora.",
+         ejemplo: presente,
          entrega: [
            {pieza: P1, es: lo_que_escribio,
             cubre: ["cómo quedó el trabajo, descrito por quien lo hizo"]},
@@ -154,7 +156,7 @@ pasos:
                     enlace: "https://drive.google.com/file/d/prueba-comunicaciones/view"},
                    {pieza: P3, es: una_foto}],
          le_falta: ["cómo se probó y qué dio la prueba"],
-         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora."}
+         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: presente}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
     botones: []
     estado_despues:
@@ -177,7 +179,7 @@ pasos:
     hechos:
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM, sumo: [P3],
          pregunta: lo_que_falta_de_la_entrega, le_falta: ausente,
-         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora.",
+         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: presente,
          entrega: [
            {pieza: P1, es: lo_que_escribio,
             cubre: ["cómo quedó el trabajo, descrito por quien lo hizo"]},
@@ -202,7 +204,8 @@ pasos:
     a_las: "2026-10-28 15:31"
     escribe: "si"
     jugadas:
-      - {nombre: entregar, tarea: COM, acepta_el_ejemplo: true}
+      - {nombre: entregar, tarea: COM, acepta_el_ejemplo: true, lo_descrito_cubre: [C1],
+         puede_traer: [lo_descrito_cubre]}
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: para_confirmar, tarea: COM,
@@ -211,7 +214,7 @@ pasos:
            {pieza: P1, es: lo_que_escribio},
            {pieza: P2, es: un_enlace},
            {pieza: P3, es: un_archivo, nombre_del_archivo: config-switch-planta.txt},
-           {pieza: P4, es: lo_que_escribio, dice: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora.", describe: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"]},
+           {pieza: P4, es: lo_que_escribio, dice: presente, describe: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"]},
            {pieza: P5, es: una_foto, mandado_antes_el: "2026-10-26"}]}
     pregunta: {tipo: confirmar_la_entrega, tarea: COM}
     botones: [Confirmar]
