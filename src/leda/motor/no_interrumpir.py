@@ -21,7 +21,12 @@ conversando aunque Marcos sí). Vale para todos los avisos a la persona, tambié
 coordinación. No es el margen para corregir (`margen.py`): el margen demora el aviso a otra
 persona para que quien habló pueda corregirse; esta regla demora el aviso a quien está hablando.
 
-La espera vive en el envío (`avisos._preparar`).
+**Lo ya hablado** (`hablo_de_la_tarea`): la persona habló de una tarea si alguno de los hechos de
+un mensaje suyo la nombra, la misma lectura de los turnos que usa el motivo de un atraso
+(`fichas._siguio_en_la_tarea`). Lo que manda Leda no cuenta.
+
+El resto de la regla (un tema a la vez con una pregunta sin contestar, y qué se omite por lo ya
+hablado) vive en el envío (`avisos.enviar_avisos`, `avisos._preparar`).
 """
 
 from __future__ import annotations
@@ -33,6 +38,8 @@ from .tiempo import sale
 
 CLAVE = "no_interrumpir_minutos"
 ESPERA_POR_OMISION = timedelta(minutes=30)
+# Por qué un aviso no salió: la persona habló de esa tarea después de que se guardó.
+YA_SE_HABLO = "ya_se_hablo_de_la_tarea"
 
 
 def espera_sin_interrumpir(cur, workspace_id: str) -> timedelta:
@@ -86,3 +93,23 @@ def conversando(cur, cal, workspace_id: str, persona: str, ahora: datetime) -> b
     libre = libre_desde(cur, cal, workspace_id, persona)
     return libre is not None and ahora < libre
 
+
+def hablo_de_la_tarea(cur, persona: str, titulo: str, desde: datetime) -> bool:
+    """Si, después de `desde`, algún hecho de un mensaje de la persona nombra esa tarea."""
+    cur.execute("""select resultado -> 'hechos' as hechos from conversation_turn
+                    where membership_id = %s and sentido = 'entrada' and at > %s
+                    order by numero""", (persona, desde))
+    for turno in cur.fetchall():
+        hechos = turno["hechos"] if isinstance(turno["hechos"], list) else []
+        if any(_tarea_del_hecho(h) == titulo for h in hechos):
+            return True
+    return False
+
+
+def _tarea_del_hecho(hecho: Any) -> str | None:
+    if not isinstance(hecho, dict):
+        return None
+    tarea = hecho.get("tarea")
+    if isinstance(tarea, dict):
+        return tarea.get("titulo")
+    return tarea if isinstance(tarea, str) else None

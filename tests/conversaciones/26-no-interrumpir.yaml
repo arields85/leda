@@ -1,0 +1,168 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+# El hilo principal; las variantes 1 a 3 las prueban las pruebas del motor
+# (`tests/motor/test_no_interrumpir.py`), porque cada una arranca del mismo estado inicial.
+fuente: tests/conversaciones/26-no-interrumpir.md
+numero: "26"
+titulo: "No interrumpir una conversación"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-27 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-26"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-26"
+
+# Lo ya guardado del estado inicial: la escalera guarda a las 09:00 el aviso previo de las dos
+# tareas, para las 10:00 (la hora en que Leda escribe por su cuenta). Todavía no sale nada.
+preludio:
+  - quien: nadie
+    relojes: ["2026-10-27 09:00"]
+    salen: []
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-27 09:56"
+    escribe: "lo de comunicaciones se me va al miercoles 4"
+    jugadas:
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-04"}
+    efectos:
+      previsiones: [{tarea: COM, fecha: "2026-11-04", motivo: ausente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          estado: guardado
+          hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 3,
+                   sin_motivo_todavia: true}
+    hechos:
+      - jugada: anotar_prevision
+        resultado: anotado
+        tarea: COM
+        prevision: "2026-11-04"
+        fecha_comprometida: "2026-10-30"
+        atraso_si_se_cumple_la_prevision_dias_habiles: 3
+        pregunta: motivo_del_atraso
+    pregunta: {tipo: motivo_del_atraso, tarea: COM}
+    estado_despues:
+      pregunta_abierta: {tipo: motivo_del_atraso, tarea: COM}
+      para_despues: []
+    estado_avisos:
+      - {tipo: aviso_previo, tarea: PLC, a: Marcos, estado: guardado}
+      - {tipo: aviso_previo, tarea: COM, a: Marcos, estado: guardado}
+    dice:
+      - que anotó que la de comunicaciones llega el miércoles 4
+      - "una sola pregunta, en el último renglón: qué la atrasa"
+    no_dice:
+      - que la tarea del PLC vence el viernes
+      - un motivo que Marcos no dio
+
+  - paso: 2
+    quien: nadie
+    # Marcos escribió hace 4 minutos: está conversando. El aviso previo espera (regla, punto 1).
+    relojes: ["2026-10-27 10:00"]
+    salen: []
+    estado_avisos:
+      - {tipo: aviso_previo, tarea: PLC, a: Marcos, estado: guardado}
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-27 10:02"
+    escribe: "espero el switch, no llego"
+    jugadas:
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-04", motivo: "espero el switch"}
+    efectos:
+      previsiones: [{tarea: COM, fecha: "2026-11-04", motivo: presente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          estado: guardado
+          hechos: {prevision: "2026-11-04", motivo: presente, sin_motivo_todavia: ausente}
+    hechos:
+      - jugada: anotar_prevision
+        resultado: anotado
+        tarea: COM
+        prevision: "2026-11-04"
+        motivo: presente
+        aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-27T10:12",
+                             espera_el_motivo: ausente}
+        pregunta: ausente
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que anotó el motivo
+      - que la nueva fecha queda informada, sin nombrar a Ismael
+    no_dice:
+      - que comunicaciones vence en 3 días
+      - nada del aviso previo
+      - el nombre de Ismael (no lo preguntó)
+
+  - paso: 4
+    quien: Leda
+    # El aviso a Ismael sale a su hora: Ismael no está conversando, aunque Marcos sí (punto 6).
+    # El aviso previo de Marcos sigue esperando: escribió hace 10 minutos.
+    relojes: ["2026-10-27 10:12"]
+    salen:
+      - a: Ismael
+        tipo: nueva_prevision
+        tarea: COM
+        hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 3, motivo: presente}
+    estado_avisos:
+      - {tipo: aviso_previo, tarea: PLC, a: Marcos, estado: guardado}
+    estado_despues:
+      de: Ismael
+      pregunta_abierta: null
+    dice:
+      - que Marcos prevé terminar la de comunicaciones el miércoles 4, en lugar del viernes 30
+      - que espera el switch
+    no_dice:
+      - que Ismael tiene que hacer algo
+
+  - paso: 5
+    quien: nadie
+    # Marcos escribió hace 13 minutos: el aviso previo sigue esperando.
+    relojes: ["2026-10-27 10:15"]
+    salen: []
+    estado_avisos:
+      - {tipo: aviso_previo, tarea: PLC, a: Marcos, estado: guardado}
+
+  - paso: 6
+    quien: Leda
+    # 30 minutos sin que Marcos escriba: el aviso previo sale, releído. La parte de
+    # comunicaciones no sale: ya no corresponde (Marcos dio otra fecha) y, además, Marcos habló
+    # de esa tarea después de que se guardó (punto 5). Queda omitida con su motivo.
+    relojes: ["2026-10-27 10:32"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        hechos: {vence: "2026-10-30", necesita_respuesta: false}
+    estado_avisos:
+      - {tipo: aviso_previo, tarea: COM, a: Marcos, estado: omitido, motivo: presente}
+      - {tipo: aviso_previo, tarea: PLC, a: Marcos, estado: enviado}
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la tarea del PLC vence el viernes 30
+      - que no hace falta contestar
+    no_dice:
+      - que comunicaciones vence
+      - nada de lo que Marcos acaba de contar
+      - una pregunta

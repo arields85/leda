@@ -399,7 +399,12 @@ def test_sin_el_aviso_previo_configurado_usa_el_minimo_y_lo_registra(conn, mundo
 def test_un_vencimiento_nuevo_empieza_su_propia_escalera_despues_de_escalar(conn, mundo, dias):
     """Mecánica §9: la escalera se ancla a su vencimiento y termina al escalar. Si la persona
     nunca contestó, la espera queda abierta y escalada; con un vencimiento nuevo la escalera
-    empieza de cero, con su aviso previo, y no la frena el escalamiento del anterior."""
+    empieza de cero y no la frena el escalamiento del anterior.
+
+    El aviso previo del vencimiento nuevo se guarda, pero espera: la pregunta del estado de la
+    tarea sigue sin contestar y, de ese tema, sólo le llega la pregunta cuando Leda la repite
+    (no interrumpir, decisión 13, punto 2; `PENDIENTE` del usuario en `odd/tasks/fase-c.md`,
+    D5). El pedido del vencimiento nuevo es esa misma pregunta, repetida: sale solo."""
     for dia in (6, 9, 13, 14, 15):
         dias.ciclo(octubre(dia, 10))
     assert espera_del_estado(conn)["escalado_en"] == octubre(15, 10)
@@ -407,9 +412,10 @@ def test_un_vencimiento_nuevo_empieza_su_propia_escalera_despues_de_escalar(conn
 
     cambiar_el_vencimiento(conn, mundo, datetime(2026, 10, 23, 20, 0, tzinfo=timezone.utc))
 
-    [previo] = dias.ciclo(octubre(20, 10))                 # faltan 3 días hábiles
-    assert previo["hechos"][0]["aviso"] == "vencimiento_proximo"
-    assert previo["hechos"][0]["vence"] == "2026-10-23"
+    assert dias.ciclo(octubre(20, 10)) == []               # faltan 3 días hábiles
+    [previo] = [a for a in avisos_guardados(conn, "aviso_previo")
+                if a["hechos"]["vence"] == "2026-10-23"]
+    assert previo["estado"] == "guardado"
     [v] = dias.ciclo(octubre(23, 10))
     assert v["hechos"][0]["aviso"] == "pedido_de_estado" and v["hechos"][0]["numero"] == 1
     # La espera de esta escalera es nueva: la del vencimiento anterior quedó escalada.

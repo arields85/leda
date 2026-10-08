@@ -72,8 +72,9 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 26. [`26-no-interrumpir.md`](26-no-interrumpir.md): el aviso previo de dos tareas llega a su hora mientras
     Marcos cuenta que una se atrasa; el aviso espera 30 minutos sin que Marcos escriba, nunca sale junto
     con una pregunta sin contestar, el de otra tarea sale aparte y no repite lo que se acaba de hablar.
-    Hallazgo de la prueba por Telegram real del 2026-10-08; la regla la decidió el usuario el mismo día y
-    todavía no está construida, así que no tiene YAML.
+    Hallazgo de la prueba por Telegram real del 2026-10-08; la regla la decidió el usuario el mismo día.
+    Corre desde la D5 de la C-3d: el hilo principal, con su YAML; sus variantes las prueban las pruebas
+    del motor (`tests/motor/test_no_interrumpir.py`).
 
 La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 1 a 3, y ADR 0019):
 
@@ -340,6 +341,12 @@ Personas, roles y tareas salen de `espacios/corework.yaml` y `espacios/corework.
   dentro de ese margen lo retira antes de que llegue. Por eso, en las conversaciones, el aviso a Ismael sale
   diez minutos después del mensaje de Marcos, y los hechos dicen esa hora (`leda.motor.margen`). Lo que Leda
   manda por su cuenta no lo espera.
+- **No interrumpir una conversación** (decisión del usuario, 2026-10-08; conversación 26): lo que Leda manda
+  por su cuenta a una persona espera 30 minutos desde lo último que esa persona escribió o tocó (o los del
+  espacio, `no_interrumpir_minutos`), con el horario encima; con una pregunta de Leda sin contestar, ningún
+  aviso sale junto con ella. Por eso, en una conversación, un aviso a quien acaba de escribir sale recién
+  cuando pasan esos 30 minutos, y los hechos dicen esa hora (`leda.motor.no_interrumpir`). A otra persona
+  no la demora.
 
 ### Calendario de referencia
 

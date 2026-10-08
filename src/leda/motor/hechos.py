@@ -587,6 +587,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "cambio_quien_aprueba": "Cambió quién aprueba el trabajo de la persona responsable.",
     "hay_una_entrega_mas_nueva": "La tarea tiene una entrega más nueva: sale otro aviso, con "
                                  "lo que vale ahora.",
+    "ya_se_hablo_de_la_tarea": "La persona habló de esa tarea con Leda después de que el "
+                               "aviso se guardó: ya está al tanto, y el aviso no se lo repite.",
     # --- Códigos: el estado de una tarea -------------------------------------------------------
     "asignada": "Asignada a la persona, todavía sin empezar.",
     "en_curso": "En curso: la persona la empezó.",

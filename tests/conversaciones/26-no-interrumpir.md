@@ -8,7 +8,9 @@ en medio de la conversación, repitiendo lo que se estaba hablando (bitácora de
 (Leda conversa con fluidez y no agrega mensajes que no aportan), mecánica §10 y la regla de un tema a la
 vez (ADR 0018, decisión 4).
 
-**Todavía no corre:** la regla está acordada y no está construida. No tiene YAML.
+**Corre desde la D5 de la C-3d** (`odd/tasks/fase-c.md`): el hilo principal, con su YAML; las variantes
+1 a 3 arrancan del mismo estado inicial y las prueban las pruebas del motor
+(`tests/motor/test_no_interrumpir.py`).
 
 ## La regla (decidida por el usuario, 2026-10-08)
 
@@ -35,14 +37,30 @@ Una regla general de la cocina, para todos los avisos y todos los circuitos, no 
 7. **No es el margen para corregir:** el margen (ADR 0018, 9n) demora el aviso a **otra** persona para que
    quien habló pueda corregirse; esta regla demora el aviso a **la persona que está hablando**.
 
-Dónde va en la cocina (relevamiento del 2026-10-08): la comprobación antes de mandar cada aviso
-(`avisos._preparar`, que hoy ya deja esperando el aviso de alguien ausente) y la omisión de lo ya hablado
-con la misma lectura de los turnos que usa el motivo de un atraso (`fichas._siguio_en_la_tarea`). Los 30
-minutos, en `workspace_setting`, como el margen para corregir.
+Dónde va en la cocina (construido en la D5, 2026-10-08; `leda.motor.no_interrumpir`): la comprobación
+antes de mandar cada aviso (`avisos._preparar`, que ya dejaba esperando el aviso de alguien ausente), el
+reparto de lo que sale con una pregunta abierta (`avisos.enviar_avisos`) y la omisión de lo ya hablado con
+la misma lectura de los turnos que usa el motivo de un atraso (los hechos de cada mensaje de la persona
+que nombran la tarea). Los 30 minutos, en `workspace_setting` (`no_interrumpir_minutos`), como el margen
+para corregir.
+
+Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/fase-c.md`, D5; en cada
+caso, la lectura que no interrumpe y no pierde nada):
+
+- **Qué es "pide respuesta":** un aviso que hace una pregunta (el pedido de estado, la repregunta, el
+  recordatorio de una decisión) o que ofrece decidir (la entrega para revisar). Espera a que se cierre la
+  pregunta abierta, aunque pase de un día a otro. La pregunta abierta misma, cuando la escalera la
+  repite, sale sola.
+- **Lo ya hablado** (punto 5) omite sólo los avisos que recuerdan algo de la propia tarea de la persona y
+  no traen nada nuevo (el aviso previo y el recordatorio del vencimiento con una previsión). Los que traen
+  el acto de otra persona (una decisión, una previsión, un escalamiento) o piden algo no se omiten:
+  esperan y salen releídos.
+- **Un aviso que no pide respuesta, de la misma tarea que la pregunta abierta,** espera a que se cierre
+  (lo único que le llega de ese tema es la pregunta).
 
 ## Estado inicial
 
-- **Día:** D = martes 27, dentro del horario, hasta las 18:00.
+- **Día:** D = martes 27, dentro del horario, hasta las 17:00.
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 30; `en_curso`; sin bloqueos ni
     dependencias; sin previsiones anotadas.
@@ -82,21 +100,23 @@ minutos, en `workspace_setting`, como el margen para corregir.
    - La respuesta no dice: que comunicaciones vence en 3 días; nada del aviso previo; el nombre de Ismael.
    - Estado después: sin tema abierto.
 
-4. **Leda**, a las 10:15 del martes 27, vuelve a revisar los avisos.
+4. **Leda**, a las 10:12 del martes 27, manda el aviso a Ismael.
    →
-   - Efecto: Marcos escribió hace 13 minutos: el aviso previo sigue esperando. Ningún mensaje para Marcos.
-
-5. **Leda**, a las 10:12 del martes 27, manda el aviso a Ismael.
-   →
-   - Efecto: sale como hoy: Ismael no está conversando. La regla no lo demora.
+   - Efecto: sale como hoy: Ismael no está conversando. La regla no lo demora. El aviso previo de Marcos
+     sigue esperando: escribió hace 10 minutos.
    - El mensaje a Ismael dice: que Marcos prevé terminar la de comunicaciones el miércoles 4, en lugar del
      viernes 30, porque espera el switch.
 
+5. **Leda**, a las 10:15 del martes 27, vuelve a revisar los avisos.
+   →
+   - Efecto: Marcos escribió hace 13 minutos: el aviso previo sigue esperando. Ningún mensaje para Marcos.
+
 6. **Leda**, a las 10:32 del martes 27 (30 minutos sin que Marcos escriba), vuelve a revisar los avisos.
    →
-   - Efecto: Marcos ya no está conversando y el aviso previo sale. El código vuelve a leer: después de
-     guardado el aviso, Marcos habló de la tarea de comunicaciones (le dio otra fecha y su motivo), así que
-     esa parte no sale y queda omitida con su motivo (regla, punto 5). Sale sólo la del PLC.
+   - Efecto: Marcos ya no está conversando y el aviso previo sale. El código vuelve a leer: la parte de
+     comunicaciones ya no corresponde (Marcos le dio otra fecha, y el seguimiento se movió a ella) y,
+     además, Marcos habló de esa tarea después de que el aviso se guardó (regla, punto 5): no sale y queda
+     omitida con su motivo. Sale sólo la del PLC.
    - El mensaje a Marcos dice: que la tarea del PLC vence el viernes 30, sin exigir respuesta (mecánica
      §9: el aviso previo es cordial y no pide nada).
    - El mensaje no dice: que comunicaciones vence; nada de lo que Marcos acaba de contar.
@@ -125,7 +145,7 @@ la contesta y pasan los 30 minutos, con los datos de ese momento.
 
 ## Variante 3: la conversación llega al cierre del horario
 
-Marcos conversa con Leda hasta las 17:50 del martes 27. El aviso que esperaba no sale a las 18:20, fuera
+Marcos conversa con Leda hasta las 16:50 del martes 27. El aviso que esperaba no sale a las 17:20, fuera
 del horario: sale el miércoles 28 a la hora en que Leda escribe por su cuenta, con lo que el código lea ese
 día (regla, punto 4). Un "vence mañana" que llega al día del vencimiento queda reemplazado por el
 recordatorio de ese día.

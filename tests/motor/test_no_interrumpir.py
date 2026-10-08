@@ -27,14 +27,17 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from leda.db import admin, espacio
+from leda.motor import preguntas
+from leda.motor.avisos import TIPOS
 from leda.motor.escalera import correr_escalera
-from leda.motor.ia import IAGuionada
-from leda.motor.no_interrumpir import CLAVE, ESPERA_POR_OMISION, espera_sin_interrumpir
+from leda.motor.ia import IAGuionada, Jugada
+from leda.motor.no_interrumpir import (CLAVE, ESPERA_POR_OMISION, YA_SE_HABLO,
+                                       espera_sin_interrumpir)
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import procesar_toque, procesar_turno
 
-from tests.motor.ayudantes import (IAQueRedacta, dice, enviar, jugada_prevision, nueva_tarea,
-                                   octubre, solicitante)
+from tests.motor.ayudantes import (IAQueRedacta, avisos_guardados, contexto, dice, enviar,
+                                   jugada_prevision, nueva_tarea, octubre, solicitante, todos)
 
 VIERNES_9 = datetime(2026, 10, 9, 20, 0, tzinfo=timezone.utc)
 
@@ -66,10 +69,29 @@ def _hola(conn, escribe, at: datetime, nombre: str = "Marcos") -> None:
     assert r.error is None
 
 
+def _estados(conn, tipo: str) -> list[tuple[str, str | None]]:
+    return [(a["estado"], a["motivo_omision"]) for a in avisos_guardados(conn, tipo)]
+
+
 def _configurar(conn, mundo, valor: str) -> None:
     with admin(conn) as cur:
         cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
                        values (%s, %s, %s)""", (mundo["id"], CLAVE, valor))
+    conn.commit()
+
+
+def _abrir(conn, mundo, tipo: str, task_id: str, at: datetime) -> str:
+    """Una pregunta de Leda a Marcos sobre esa tarea, abierta (como la deja un turno)."""
+    with espacio(conn, mundo["id"]) as cur:
+        ctx = contexto(cur, mundo, ahora=at)
+        _, pregunta = preguntas.abrir_con_id(ctx, tipo, task_id, jugada={"nombre": "prueba"})
+    conn.commit()
+    return pregunta
+
+
+def _cerrar(conn, mundo, pregunta: str, at: datetime) -> None:
+    with espacio(conn, mundo["id"]) as cur:
+        preguntas.cerrar(contexto(cur, mundo, ahora=at), pregunta, "respondida", {})
     conn.commit()
 
 
@@ -177,6 +199,114 @@ def test_si_la_espera_cruza_el_cierre_sale_el_dia_habil_siguiente(conn, mundo, e
     assert enviar(conn, mundo, ia, octubre(7, 10)) == {"enviado": 2}
     [pedido] = ia.pedidos_de_redaccion
     assert {h["dias_habiles_hasta_el_vencimiento"] for h in pedido["hechos"]} == {2}
+
+
+# --- 2 y 3. Con una pregunta sin contestar ------------------------------------------------------
+
+def test_con_una_pregunta_abierta_el_de_otra_tarea_sale_aparte_sin_pregunta(
+        conn, mundo, escribe, dos_del_viernes_9):
+    """Variante 1: la pregunta de una tarea sigue abierta; el aviso de la otra, que no pide
+    respuesta, sale en su propio mensaje, sin repetirla ni abrir otra."""
+    _escalera(conn, mundo, octubre(6, 9))
+    pregunta = _abrir(conn, mundo, preguntas.PROPUESTA, dos_del_viernes_9["T2"], octubre(5, 15))
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, octubre(6, 10)) == {"enviado": 1, "en_espera": 1}
+    [pedido] = ia.pedidos_de_redaccion
+    assert [h["tarea"] for h in pedido["hechos"]] == ["Revisar el tablero"]
+    assert pedido["pregunta"] is None
+    assert str(preguntas_abierta(conn)) == pregunta
+    # La de la misma tarea que la pregunta espera a que se cierre (lo único que le llega de ese
+    # tema es la pregunta), y entonces sale, releída.
+    _cerrar(conn, mundo, pregunta, octubre(6, 11))
+    assert enviar(conn, mundo, ia, octubre(6, 11, 1)) == {"enviado": 1}
+    assert [h["tarea"] for h in ia.pedidos_de_redaccion[-1]["hechos"]] == [
+        "Probar las comunicaciones"]
+
+
+def preguntas_abierta(conn) -> str | None:
+    fila = todos(conn, """select q.id from conversation_state s
+                            join conversation_question q on q.id = s.pregunta_abierta_id
+                           where q.cerrada_en is null""")
+    return str(fila[0]["id"]) if fila else None
+
+
+def test_un_aviso_que_pide_respuesta_espera_a_que_se_cierre_la_pregunta(conn, mundo, escribe,
+                                                                         dos):
+    """Variante 2: con la pregunta del motivo de T2 abierta, el pedido de estado de T1 no sale;
+    sale cuando Marcos contesta y pasan los 30 minutos, con los datos de ese momento."""
+    dice(conn, escribe, jugada_prevision("T2", "2026-10-20"), at=octubre(9, 9, 40))
+    assert preguntas_abierta(conn) is not None
+    _escalera(conn, mundo, octubre(9, 10))          # el pedido de estado de T1, el día que vence
+    ia = IAQueRedacta()
+    resumen = enviar(conn, mundo, ia, octubre(9, 10, 15))
+    assert resumen.get("en_espera") == 1 and not resumen.get("enviado")
+    assert _estados(conn, "pedido_de_estado") == [("guardado", None)]
+    dice(conn, escribe, jugada_prevision("T2", "2026-10-20", "falta el switch"),
+         at=octubre(9, 10, 20))
+    assert preguntas_abierta(conn) is None
+    assert enviar(conn, mundo, ia, octubre(9, 10, 45)).get("en_espera") == 1
+    assert enviar(conn, mundo, ia, octubre(9, 10, 50)).get("enviado") == 1
+    pedido = next(p for p in ia.pedidos_de_redaccion if p["persona"] == "Marcos")
+    assert pedido["pregunta"]["tipo"] == preguntas.ESTADO_DE_LA_TAREA
+    assert [h["tarea"] for h in pedido["hechos"]] == ["Revisar el tablero"]
+
+
+def test_la_pregunta_abierta_cuando_la_repite_la_escalera_sale_sola(conn, mundo, escribe, dos):
+    """Variante 1, paso 3: la repregunta del motivo sale en su propio mensaje; el aviso previo
+    de la otra tarea, del mismo momento, sale aparte."""
+    dice(conn, escribe, jugada_prevision("T2", "2026-10-20"), at=octubre(5, 11))
+    abierta = preguntas_abierta(conn)
+    enviar(conn, mundo, IAQueRedacta(), octubre(5, 16, 30))     # el aviso a Ismael, sin motivo
+    _escalera(conn, mundo, octubre(6, 10))          # la repregunta del motivo y el aviso previo
+    assert {a["tipo"] for a in avisos_guardados(conn) if a["estado"] == "guardado"} == {
+        "repregunta", "aviso_previo"}
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, octubre(6, 10)) == {"enviado": 2}
+    assert len(ia.pedidos_de_redaccion) == 2
+    repregunta = next(p for p in ia.pedidos_de_redaccion if p["pregunta"] is not None)
+    otro = next(p for p in ia.pedidos_de_redaccion if p["pregunta"] is None)
+    assert [h["tarea"] for h in repregunta["hechos"]] == ["Probar las comunicaciones"]
+    assert repregunta["pregunta"]["tipo"] == preguntas.MOTIVO_DEL_ATRASO
+    assert [h["tarea"] for h in otro["hechos"]] == ["Revisar el tablero"]
+    assert preguntas_abierta(conn) == abierta
+    salidas = todos(conn, "select id from message_outbox where not es_respuesta and chat_id = %s",
+                    mundo["personas"]["Marcos"]["telegram"])
+    assert len(salidas) >= 2
+
+
+# --- 5. Lo ya hablado no se repite ----------------------------------------------------------
+
+def test_lo_ya_hablado_de_una_tarea_no_se_repite(conn, mundo, escribe, dos_del_viernes_9):
+    _escalera(conn, mundo, octubre(6, 9))
+    r = dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T2"}), at=octubre(6, 9, 50))
+    hablada = r.hechos[0]["tarea"]["titulo"]
+    [otra] = {"Revisar el tablero", "Probar las comunicaciones"} - {hablada}
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, octubre(6, 10, 20)) == {"enviado": 1, "omitido": 1}
+    [pedido] = ia.pedidos_de_redaccion
+    assert [h["tarea"] for h in pedido["hechos"]] == [otra]
+    [omitido] = [a for a in avisos_guardados(conn, "aviso_previo") if a["estado"] == "omitido"]
+    assert omitido["motivo_omision"] == YA_SE_HABLO
+    assert omitido["hechos"]["tarea"] == hablada
+
+
+def test_lo_hablado_antes_de_que_se_guardara_no_cuenta(conn, mundo, escribe, dos_del_viernes_9):
+    dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T2"}), at=octubre(6, 8, 20))
+    _escalera(conn, mundo, octubre(6, 9))
+    assert enviar(conn, mundo, IAQueRedacta(), octubre(6, 10)) == {"enviado": 2}
+
+
+def test_lo_ya_hablado_omite_solo_lo_que_no_trae_nada_nuevo():
+    """Lo omiten sólo los recordatorios de la propia tarea que no piden nada: los que traen el
+    acto de otra persona o piden algo esperan y salen releídos (`PENDIENTE` del usuario)."""
+    omiten = {n for n, t in TIPOS.items() if t.se_omite_si_ya_se_hablo}
+    assert omiten == {"aviso_previo", "vencimiento_con_prevision"}
+
+
+def test_el_motivo_de_la_omision_tiene_su_significado():
+    from leda.motor.hechos import significado
+
+    assert significado(YA_SE_HABLO) is not None
 
 
 # --- Lo que se le cuenta a otra persona: cuándo se entera de verdad ---------------------------

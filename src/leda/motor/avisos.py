@@ -93,8 +93,12 @@ al nuevo le guarda un aviso la escalera (`escalera._un_paso_de_una_decision`).
 **No interrumpir una conversación** (decisión 13 del usuario, 2026-10-08; conversación 26;
 C-3d, D5): un aviso a una persona que está conversando con Leda espera (`_preparar`,
 `no_interrumpir.conversando`: 30 minutos desde lo último que escribió o tocó, con el horario
-encima), también uno de coordinación; a otra persona no la demora. Los que esperan siguen
-guardados, con su hora; los que vencen juntos salen juntos, como siempre.
+encima), también uno de coordinación; a otra persona no la demora. Con una pregunta de Leda sin
+contestar, ningún aviso sale junto con ella (`_un_tema_a_la_vez`): la pregunta repetida sale sola,
+uno de otra tarea que no pide respuesta sale aparte y los demás esperan a que se cierre. Al salir,
+el aviso previo y el recordatorio del vencimiento de una tarea de la que la persona habló después
+de que se guardaron no salen (`TipoDeAviso.se_omite_si_ya_se_hablo`): lo ya hablado no se repite.
+Los que esperan siguen guardados, con su hora; los que vencen juntos salen juntos, como siempre.
 """
 
 from __future__ import annotations
@@ -205,6 +209,10 @@ class TipoDeAviso:
     # A quién va al salir, releído (decisión 16): si cambió, el aviso va al de ahora; `None`, a
     # nadie (se omite con el motivo de su vigencia).
     va_a: Callable[["Momento", dict[str, Any]], str | None] | None = None
+    # Si lo omite lo ya hablado (decisión 13, punto 5): un recordatorio de la propia tarea de la
+    # persona que no pide nada ni trae el acto de otra persona. Si la persona habló de esa tarea
+    # después de que se guardó, ya está al tanto: no sale (`no_interrumpir.YA_SE_HABLO`).
+    se_omite_si_ya_se_hablo: bool = False
 
 
 # El hecho que le dice a la IA que el mensaje lleva al final el enlace a la página de la tarea.
@@ -273,6 +281,9 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
                 resumen[listo] += 1
             else:
                 listos.append(listo)
+        listos, esperan = _un_tema_a_la_vez(m, listos)
+        if esperan:
+            resumen["en_espera"] += esperan
         for envio in _envios(listos):
             for resultado in _enviar(m, envio, ia):
                 resumen[resultado] += 1
@@ -287,15 +298,64 @@ class _Listo:
     tipo: TipoDeAviso
     destinatario: dict[str, Any]
     hechos: dict[str, Any]
+    # La pregunta abierta de la persona, repetida (la de la escalera de esa pregunta, o el pedido
+    # de estado de su tarea): sale sola, sin ningún aviso de otro tema (decisión 13, punto 2).
+    solo: bool = False
+
+
+def _un_tema_a_la_vez(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], int]:
+    """Con una pregunta de Leda sin contestar (la abierta de la persona, `preguntas.actual`),
+    ningún aviso sale junto con ella (decisión 13 del usuario, 2026-10-08; conversación 26):
+
+    - la pregunta misma, cuando se repite, sale sola (`_Listo.solo`);
+    - uno que pide respuesta (una pregunta, o decidir) espera a que se cierre: la persona nunca
+      tiene dos preguntas de Leda abiertas a la vez;
+    - uno de la misma tarea que no pide respuesta, también: de ese tema sólo le llega la pregunta;
+    - uno de otra tarea que no pide respuesta sale aparte, sin pregunta.
+
+    Los que esperan siguen guardados y se vuelven a mirar en cada vuelta. Lo que sale y cuántos
+    esperan."""
+    abiertas: dict[str, dict[str, Any] | None] = {}
+    salen: list[_Listo] = []
+    esperan = 0
+    for x in listos:
+        persona = str(x.destinatario["membership_id"])
+        if persona not in abiertas:
+            abiertas[persona] = preguntas.actual(m.cur, persona)
+        abierta = abiertas[persona]
+        if abierta is None:
+            salen.append(x)
+            continue
+        pregunta = _pregunta_del_aviso(m, x.aviso, x.hechos)
+        de_la_tarea = (x.aviso["task_id"] is not None and abierta["task_id"] is not None
+                       and str(x.aviso["task_id"]) == str(abierta["task_id"]))
+        if pregunta is not None and de_la_tarea and _es_la_misma(pregunta["tipo"],
+                                                               abierta["tipo"]):
+            salen.append(replace(x, solo=True))
+        elif pregunta is not None or de_la_tarea:
+            esperan += 1
+        else:
+            salen.append(x)
+    return salen, esperan
+
+
+def _es_la_misma(tipo: str, abierta: str) -> bool:
+    """Si la pregunta de un aviso es la abierta, repetida: el mismo tipo, o la misma espera (el
+    pedido de estado repite también la pregunta de la fecha de la tarea, que espera con él)."""
+    if tipo == abierta:
+        return True
+    a, b = preguntas.TIPOS.get(tipo), preguntas.TIPOS.get(abierta)
+    return a is not None and b is not None and a.espera is not None and a.espera == b.espera
 
 
 def _envios(listos: list[_Listo]) -> list[list[_Listo]]:
     """Los envíos: uno por persona con sus avisos automáticos, en el orden en que se guardaron,
-    y uno por cada aviso de coordinación (mecánica §10)."""
+    y uno por cada aviso de coordinación (mecánica §10) y por la pregunta abierta repetida
+    (`_Listo.solo`)."""
     envios: list[list[_Listo]] = []
     de_la_persona: dict[tuple[str, str | None], list[_Listo]] = {}
     for listo in listos:
-        if listo.tipo.es_coordinacion and not listo.tipo.se_agrupa:
+        if listo.solo or (listo.tipo.es_coordinacion and not listo.tipo.se_agrupa):
             envios.append([listo])
             continue
         # Los de coordinación que se agrupan, en su propia lista por persona y por tipo
@@ -360,7 +420,18 @@ def _preparar(m: Momento, aviso: dict[str, Any]) -> _Listo | str:
     if motivo is not None:
         omitir(cur, aviso_id, motivo, m.ahora)
         return "omitido"
+    if tipo.se_omite_si_ya_se_hablo and _ya_se_hablo(m, aviso):
+        omitir(cur, aviso_id, no_interrumpir.YA_SE_HABLO, m.ahora)
+        return "omitido"
     return _Listo(aviso, tipo, destinatario, hechos)
+
+
+def _ya_se_hablo(m: Momento, aviso: dict[str, Any]) -> bool:
+    """Si la persona habló de la tarea del aviso después de que se guardó (decisión 13, punto
+    5): lo que ya se habló no se repite."""
+    tarea = leer_tarea(m.cur, aviso["task_id"]) if aviso["task_id"] is not None else None
+    return tarea is not None and no_interrumpir.hablo_de_la_tarea(
+        m.cur, str(aviso["destinatario_membership_id"]), tarea["titulo"], aviso["creado_en"])
 
 
 def _a_quien_va_ahora(m: Momento, aviso: dict[str, Any], tipo: TipoDeAviso) -> dict[str, Any]:
@@ -1259,9 +1330,13 @@ def _vigencia_de_una_decision(m: Momento, aviso) -> tuple[str | None, dict[str, 
 
 TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # La escalera (mecánica §9; 9b): sin botones, siempre privados.
-    TipoDeAviso("aviso_previo", "informativo", _vigencia_de_la_escalera),
+    # El aviso previo y el recordatorio del vencimiento no piden nada: lo ya hablado de su
+    # tarea los omite (decisión 13, punto 5).
+    TipoDeAviso("aviso_previo", "informativo", _vigencia_de_la_escalera,
+                se_omite_si_ya_se_hablo=True),
     # Con el ancla en una previsión, el único aviso del vencimiento: no pide nada (9i).
-    TipoDeAviso(VENCIMIENTO_CON_PREVISION, "informativo", _vigencia_de_la_escalera),
+    TipoDeAviso(VENCIMIENTO_CON_PREVISION, "informativo", _vigencia_de_la_escalera,
+                se_omite_si_ya_se_hablo=True),
     TipoDeAviso("pedido_de_estado", "seguimiento", _vigencia_de_la_escalera),
     TipoDeAviso("reencuadre", "seguimiento", _vigencia_de_la_escalera),
     TipoDeAviso("escalamiento", "prioritario", _vigencia_de_la_escalera, escala=True),
