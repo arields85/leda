@@ -80,15 +80,41 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
    - **Un mismo texto puede cubrir varios tipos de evidencia** ("terminé, lo probé 20 ciclos sin falla" es
      explicación y resultado de la prueba): la vista previa de la entrega dice qué cubre cada pieza y la
      persona lo confirma o lo corrige (usuario, 2026-10-07).
-4. **Escribirle a quien destraba:** ¿directo, o preguntándole antes a quien lo nombró (constitución §7,
-   atribución)? `PENDIENTE`.
-5. **Quien destraba dice que no le corresponde:** ¿a quién va Leda? `PENDIENTE`.
-6. **Bloqueos encadenados:** ¿se enlazan solos, con aviso hacia abajo al destrabar? `PENDIENTE`.
-7. **El bloqueo viejo:** ¿vuelve el escalamiento a los 5 días, o alcanza la escalera de quien destraba?
-   `PENDIENTE`.
-8. **Cadencias:** ¿un mensaje por persona o uno por tarea, y reemplazan o se suman a la escalera de cada
-   tarea? `PENDIENTE`.
-9. **Delegar:** ¿el referente confirma o sólo se entera? `PENDIENTE`.
+4. **Escribirle a quien destraba:** decidida (usuario, 2026-10-08, opción A). Leda le escribe directo,
+   como Leda y no en nombre de quien está trabado, y a éste le dice en el mismo mensaje que le pregunta y
+   le avisa apenas sepa algo; si contesta "no le escribas, ya hablé", no le escribe. Si quien destraba
+   dice que ya habló con el trabado, Leda le pregunta qué arreglaron y para cuándo lo destraba, para que
+   quede asentado.
+5. **Quien destraba dice que no le corresponde:** decidida (usuario, 2026-10-08, opción A con límite).
+   Leda le pregunta quién se encarga y sigue con esa persona. Si la segunda también dice que no le
+   corresponde, que no sabe o nombra a otro, Leda no da más vueltas: le informa al referente con toda la
+   cadena ("Marcos está trabado; dijo que le toca a Juan, Juan que a Pedro, y Pedro dijo tal cosa") para
+   que determine quién lo resuelve. Va al referente del sector de lo que falta cuando se sabe cuál es; si
+   no, al de la tarea trabada.
+6. **Bloqueos encadenados:** decidida (usuario, 2026-10-08). Se enlazan solos (Marcos ← Juan ← Pedro) y
+   Leda avisa hacia abajo al destrabar. Quien está más lejos se entera de todo avance del medio con
+   avisos informativos que no piden respuesta (llegó el repuesto, Juan da fecha, Juan terminó): "son
+   mensajes informativos y aportan mucho".
+7. **El bloqueo viejo:** decidida (usuario, 2026-10-08, opción A). A los `bloqueos.escala_solo_a_los_dias`
+   días hábiles (5 en CoreWork, ajustable desde la plataforma) Leda le informa al referente aunque la
+   cadena se mueva, con la historia y las fechas dichas. "El silencio y no informar es peor que avisos
+   informativos útiles."
+8. **Cadencias:** decidida (usuario, 2026-10-08, opción A). Un pedido de estado por persona con la lista
+   de sus tareas; el recordatorio de vencimiento del día entra en la lista ("vence hoy") y no sale
+   aparte, y lo contestado cuenta para la escalera de esa tarea. Si contesta sólo una, Leda anota esa y
+   pregunta una vez por las otras en la misma respuesta; si no contesta, rige la decisión 21. Primero una
+   conversación de prueba con las tres tareas en un mensaje, con la IA real. Las cadencias del pack
+   quedan como están para probar; después se prenden, apagan y ajustan desde la plataforma
+   (`docs/product/plataforma-pendientes.md`). El informe al grupo informa avances y problemas, no juzga:
+   un atraso no hablado en privado no figura (constitución §8). Modelo aprobado:
+   "📋 Semana del equipo / • Terminadas: … / • En curso: …, vence el vie 16/10 / • Trabadas: …,
+   esperando un repuesto que llega el lunes". Hoy las cadencias no corren en el motor (retiradas en la
+   E3-7; vuelven con la C-6).
+9. **Delegar:** decidida (usuario, 2026-10-08, opción C). Marcos, encargado del sector, decide; quien
+   recibe acepta; Leda le avisa a Marcos. A Ismael no le llega ningún aviso: "a Ismael no le interesa
+   quién lo haga mientras se haga". La re-aprobación de un cambio de responsable (mecánica §7) la da
+   quien manda sobre el que recibe, declarado en el pack, y queda en la auditoría; el trabajo lo sigue
+   revisando el aprobador de la tarea original. Antes del código, su enmienda al ADR 0017 (decisión 2).
 10. **Lo que describe la entrega frente al criterio:** decidida (usuario, 2026-10-08, del hallazgo de la
     primera ronda con la IA real). La causa no estaba en la entrega sino en la creación de la tarea: sin
     un criterio de aceptación concreto, la IA no sabe qué tiene que describir la persona (las tareas de
