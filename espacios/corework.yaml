@@ -61,17 +61,24 @@ glosario:
 # Áreas
 # ---------------------------------------------------------------------------
 
+# `referente`: quién es el referente técnico de cada área, por el id de su persona (ADR 0019,
+# decisión 7b). Ve la página de cada tarea de su área aunque no la apruebe.
 areas:
   - slug: direccion
     nombre: Dirección
+    referente: ismael
   - slug: ot
     nombre: OT y automatización        # Marcos (referente) y Nahuel
+    referente: marcos
   - slug: it
     nombre: Infraestructura IT         # Martín (referente) y Lucas
+    referente: martin
   - slug: electricidad
     nombre: Sistemas eléctricos y tableros
+    referente: mariano
   - slug: corelabs
     nombre: Software e interfaz HMI
+    referente: ariel
   - slug: gestion
     nombre: Gestión
 

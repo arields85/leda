@@ -64,14 +64,21 @@ def _sql_script(path: Path) -> str:
 # recibidos (migración 0033; ADR 0019): sus dos tablas y el rango del tamaño máximo en
 # `workspace_setting`. La evidencia de la entrega (migración 0034): las columnas nuevas de
 # `evidence` y de `task_evidence_policy`, y sus dos tablas nuevas. La salida con adjuntos
-# (migración 0035): su tabla.
+# (migración 0035): su tabla. La página de la tarea (migración 0036): sus tres tablas y el
+# referente de `area`.
 TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "conversation_question", "conversation_option",
                     "scheduled_notice", "task_forecast", "blocker_unblocker",
                     "task", "blocker", "workspace_setting",
                     "archivo", "archivo_de_mensaje",
                     "evidence", "task_evidence_policy", "evidencia_retirada",
-                    "archivo_de_tarea", "message_outbox_adjunto")
+                    "archivo_de_tarea", "message_outbox_adjunto",
+                    "area", "acceso_tarea", "vista_de_tarea", "message_outbox_enlace")
+
+# Las políticas de más de una tabla, además de la de aislamiento: `acceso_tarea` (migración
+# 0036) se encuentra por el hash del token antes de saber su espacio, sólo desde las funciones
+# de `leda_owner`.
+POLITICAS_DE_MAS = {"acceso_tarea": ["resolver_por_token"]}
 
 
 def _retrato_de_aislamiento(url, tablas):
@@ -286,8 +293,8 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
         for tabla in con_politica:
             assert limpia[tabla]["seguridad"]["relrowsecurity"]
             assert limpia[tabla]["seguridad"]["relforcerowsecurity"]
-            assert [p["polname"] for p in limpia[tabla]["politicas"]] == [
-                "aislamiento_espacio"]
+            assert [p["polname"] for p in limpia[tabla]["politicas"]] == sorted(
+                ["aislamiento_espacio"] + POLITICAS_DE_MAS.get(tabla, []))
 
         # `audit_log` e `incident` admiten espacio nulo para los hechos de
         # alcance global; el resto no tiene esa excepción.
@@ -766,7 +773,11 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
 
             # Lo que sigue ejercita la vuelta atrás de la 0002, que necesita las
             # tablas del alta guiada: se deshace la 0032 (las recrea vacías) y la
-            # base queda donde esa vuelta atrás espera encontrarla.
+            # base queda donde esa vuelta atrás espera encontrarla. Antes, la 0036, cuyas
+            # claves compuestas por espacio apuntan a la restricción única de `membership`
+            # que la vuelta atrás de la 0002 borra.
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0036_pagina_de_la_tarea.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0032_borrar_el_alta_guiada.sql"))
 

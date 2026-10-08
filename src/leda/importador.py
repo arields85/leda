@@ -111,6 +111,13 @@ def validar(pack: dict[str, Any]) -> tuple[list[str], list[str]]:
 
     # Cadena de aprobación: cada persona declara quién revisa su trabajo.
     ids = {p.get("id") for p in personas if p.get("id")}
+
+    # El referente de cada área (ADR 0019, decisión 7b): una persona del pack, por su id.
+    for a in pack.get("areas") or []:
+        if a.get("referente") is not None and a["referente"] not in ids:
+            bloqueantes.append(
+                f"El área '{a.get('slug')}' declara un referente que no existe: "
+                f"'{a['referente']}'.")
     raices = []
     for p in personas:
         jefe = p.get("aprobado_por")
@@ -419,6 +426,13 @@ def _importar_personas(cur, ws, pack) -> None:
         cur.execute(
             "update membership set aprobador_membership_id = %s where id = %s",
             (jefe, por_id[p["id"]]))
+
+    # El referente de cada área (ADR 0019, decisión 7b; migración 0036): un dato del espacio,
+    # no el nombre de un rol. Un área sin `referente` queda sin él (también al reimportar).
+    for a in pack.get("areas") or []:
+        cur.execute(
+            "update area set referente_membership_id = %s where workspace_id = %s and slug = %s",
+            (por_id.get(a.get("referente")) if a.get("referente") else None, ws, a["slug"]))
 
 
 def _importar_politica(cur, ws, pack) -> None:
