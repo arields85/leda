@@ -54,30 +54,34 @@ pasos:
   - paso: 3
     quien: Marcos
     a_las: "2026-10-20 10:43"
-    escribe: "che y lo de comunicaciones no llego al 30, necesito hasta el miercoles 4"
+    # Con su porqué (usuario, 2026-10-07; ADR 0018, 9n): sin él, Leda preguntaría qué la atrasa
+    # y esa pregunta iría primero (9d), y el mensaje del paso 5 ya no contestaría sólo la causa.
+    escribe: "che y lo de comunicaciones no llego al 30 porque esta semana me mandaron a otra obra, necesito hasta el miercoles 4"
     jugadas:
-      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-04"}
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-04",
+         motivo: "esta semana me mandaron a otra obra"}
     efectos:
-      previsiones: [{tarea: COM, fecha: "2026-11-04", motivo: ausente}]
+      previsiones: [{tarea: COM, fecha: "2026-11-04", motivo: presente}]
       avisos_guardados:
         - tipo: nueva_prevision
           tarea: COM
           a: Ismael
           hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
-                   atraso_si_se_cumple_la_prevision_dias_habiles: 3, motivo: ausente}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 3, motivo: presente}
     hechos:
-      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-04"}
+      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-04",
+         motivo: presente, pregunta: ausente}
     # La vuelta a la pregunta pendiente, en la misma respuesta (retomarla, 9d).
     pregunta: {tipo: causa_del_bloqueo, tarea: PLC, desde_antes: true}
     estado_despues:
       pregunta_abierta: {tipo: causa_del_bloqueo, tarea: PLC}
     dice:
-      - que quedó anotada la previsión del miércoles 4 en la tarea de comunicaciones
+      - que quedó anotada la previsión del miércoles 4 en la tarea de comunicaciones, con su motivo
       - la vuelta a la pregunta pendiente, la causa del bloqueo de la tarea del PLC, sin pedirle que repita que está trabado
     no_dice:
       - un menú con las salidas (seguir, dejar para después, cancelar)
       - otra pregunta además de la pendiente
-      - nada que trate la fecha como la causa del bloqueo
+      - nada que trate la fecha o su motivo como la causa del bloqueo
       - que la tarea del PLC está bloqueada
 
   - paso: 4
@@ -88,14 +92,14 @@ pasos:
         tipo: nueva_prevision
         tarea: COM
         hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
-                 atraso_si_se_cumple_la_prevision_dias_habiles: 3, motivo: ausente}
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 3, motivo: presente}
     dice:
       - la tarea de comunicaciones
-      - la previsión del miércoles 4, sin motivo porque Marcos no lo dio
+      - la previsión del miércoles 4 y su motivo, con las palabras de Marcos
       - la fecha comprometida, el viernes 30
       - el atraso, tres días hábiles
     no_dice:
-      - un motivo inventado
+      - otro motivo que el que dio Marcos
       - nada del bloqueo de la tarea del PLC, que todavía no se anotó
 
   - paso: 5

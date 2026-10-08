@@ -36,14 +36,16 @@ Decisión del usuario del 2026-10-07, de la prueba por Telegram real (Marcos pre
      Nahuel.
    - Estado después: tema abierto, lo que Leda ofreció.
 
-2. **Marcos** escribe (martes 20, 11:05): "dale, para el martes 27"
+2. **Marcos** escribe (martes 20, 11:05): "dale, para el martes 27, estoy tapado con la puesta en marcha"
    →
-   - Jugadas: `anotar_prevision` sobre la tarea del PLC, con fecha martes 27.
+   - Jugadas: `anotar_prevision` sobre la tarea del PLC, con fecha martes 27 y su motivo, con las palabras
+     de Marcos. (Trae su porqué desde el 2026-10-07: una fecha que atrasa sin él abre la pregunta de qué la
+     atrasa, ADR 0018, 9n, que no es lo que mide esta conversación.)
    - Efecto: una previsión al martes 27; la fecha comprometida sigue siendo el viernes 23. Ismael se entera
      hoy, con la fecha nueva, la del vencimiento, el atraso y lo que depende de la tarea.
-   - La respuesta dice: que anotó que la del PLC la termina el martes 27; que el vencimiento sigue siendo
-     el viernes 23, dicho como el día para el que estaba; que Ismael se va a enterar hoy; el próximo paso
-     concreto: que el martes 27 le pregunta cómo viene.
+   - La respuesta dice: que anotó que la del PLC la termina el martes 27, con su motivo; que el
+     vencimiento sigue siendo el viernes 23, dicho como el día para el que estaba; que Ismael se va a
+     enterar hoy; el próximo paso concreto: que el martes 27 le pregunta cómo viene.
    - La respuesta no dice: "previsión", "fecha comprometida", "referente", "dependiente" ni otro nombre de
      un dato o de una jugada; que la fecha de la tarea cambió.
    - Estado después: sin tema abierto, nada para después.

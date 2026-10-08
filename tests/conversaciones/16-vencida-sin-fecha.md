@@ -49,18 +49,20 @@ eso"), no una regla del inicio; con la decisión 9i (el seguimiento sigue a la p
    - Botones: ninguno.
    - Estado después: tema abierto, la pregunta de la fecha de la tarea del PLC; la espera sigue abierta.
 
-3. **Marcos** escribe (lunes 26, 10:25): "para el miercoles la tengo"
+3. **Marcos** escribe (lunes 26, 10:25): "para el miercoles la tengo, arranque tarde por la otra obra"
    →
-   - Jugadas: `anotar_prevision` sobre la tarea del PLC, con fecha miércoles 28 y sin motivo.
+   - Jugadas: `anotar_prevision` sobre la tarea del PLC, con fecha miércoles 28 y su motivo, con las
+     palabras de Marcos. (Trae su porqué desde el 2026-10-07: una fecha que atrasa sin él abre la pregunta
+     de qué la atrasa, ADR 0018, 9n, que no es lo que mide esta conversación.)
    - Efecto: una previsión al miércoles 28; la fecha comprometida sigue siendo el viernes 23; el atraso,
      tres días hábiles contra ella (lo calcula el código). Queda guardado el aviso a Ismael con la tarea, la
      previsión, la fecha comprometida, el atraso y lo que depende de ella (la de comunicaciones). La espera
      se cierra y la pregunta de la fecha queda contestada.
-   - La respuesta dice: que anotó que la tiene el miércoles 28; que la fecha comprometida sigue siendo el
-     viernes 23; que Ismael se va a enterar, y cuándo si lo dice, como algo que todavía no pasó; el
-     próximo paso concreto: que Leda le pide el estado el miércoles 28. Lo que el paso 2 anunció para el
-     martes (la fecha lo contestó) lo dice sólo si a Marcos le sirve, como lo que va a pasar y no como un
-     pedido que no sale (usuario, 2026-10-06; conversación 18).
+   - La respuesta dice: que anotó que la tiene el miércoles 28, con su motivo; que la fecha comprometida
+     sigue siendo el viernes 23; que Ismael se va a enterar, y cuándo si lo dice, como algo que todavía no
+     pasó; el próximo paso concreto: que Leda le pide el estado el miércoles 28. Lo que el paso 2 anunció
+     para el martes (la fecha lo contestó) lo dice sólo si a Marcos le sirve, como lo que va a pasar y no
+     como un pedido que no sale (usuario, 2026-10-06; conversación 18).
    - La respuesta no dice: que la fecha comprometida cambió; que Ismael ya lo sabe; que el aviso a
      Ismael está guardado, en cola o sin enviar; otra pregunta; que mañana le vuelve a pedir el estado (ronda 2, vez 5: un turno anterior lo anunció y
      esta fecha lo dejó atrás; tercera vuelta de ajuste, 2026-10-06).

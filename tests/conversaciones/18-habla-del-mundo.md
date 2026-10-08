@@ -6,7 +6,9 @@ guardado, en cola, programado o sin enviar, o que un pedido "ya no sale". Sigue 
 todavía no pasó lo cuenta en futuro y nunca lo da por hecho (primer contacto real, hallazgo 1). Lo anunciado
 antes que ya no va a pasar lo dice sólo si a la persona le sirve (ADR 0018, 9m). Decisión del usuario del
 2026-10-06, de la prueba por Telegram real (bitácora de flujos, "Prueba por Telegram real del flujo D":
-"Leda cuenta de más lo de la cocina").
+"Leda cuenta de más lo de la cocina"). Desde el 2026-10-07 también prueba una fecha que atrasa sin su
+porqué (ADR 0018, 9n): Leda pregunta qué la atrasa, el aviso a Ismael espera la respuesta hasta el final
+del día y sale diciendo que todavía no la dio, y el porqué que llega después le llega en otro aviso.
 
 ## Estado inicial
 
@@ -47,37 +49,62 @@ antes que ya no va a pasar lo dice sólo si a la persona le sirve (ADR 0018, 9m)
 4. **Marcos** escribe (lunes 26, 08:30, antes de la hora en que Leda escribe por su cuenta): "la tengo para
    el miercoles"
    →
-   - Jugadas: `anotar_prevision` sobre la tarea del PLC, con fecha miércoles 28.
-   - Efecto: una previsión al miércoles 28; la fecha comprometida sigue siendo el viernes 23. Ismael se va
-     a enterar hoy, a la hora en que Leda escribe por su cuenta (10:00), con la previsión, la fecha
-     comprometida, el atraso y lo que depende de la tarea. La fecha contesta la espera: el pedido del
-     estado que el paso 2 anunció para hoy ya no va a pasar, y el seguimiento se mueve a la previsión
-     (9i).
+   - Jugadas: `anotar_prevision` sobre la tarea del PLC, con fecha miércoles 28, sin motivo.
+   - Efecto: una previsión al miércoles 28; la fecha comprometida sigue siendo el viernes 23. La fecha
+     atrasa la tarea y Marcos no dijo por qué: Leda pregunta qué la atrasa, una pregunta que espera
+     respuesta (decisión del usuario, 2026-10-07; ADR 0018, 9n). El aviso a Ismael, con la previsión, la
+     fecha comprometida, el atraso y lo que depende de la tarea, espera esa respuesta hasta el final del
+     día de trabajo (16:30). La fecha contesta la espera del estado: el pedido que el paso 2 anunció para
+     hoy ya no va a pasar, y el seguimiento se mueve a la previsión (9i).
    - La respuesta dice: que anotó que la tiene el miércoles 28; que la fecha comprometida sigue siendo el
-     viernes 23; que Ismael se va a enterar hoy, como algo que todavía no pasó; el próximo paso concreto:
-     que Leda le pide el estado el miércoles 28.
+     viernes 23; que Ismael se va a enterar hoy a la tarde, como algo que todavía no pasó, y antes y con
+     el motivo si Marcos lo cuenta; una sola pregunta, en el último renglón: qué la atrasa.
    - La respuesta no dice: que el aviso a Ismael está guardado, en cola, programado o todavía sin enviar;
      que Ismael ya se enteró; que un pedido o un aviso "ya no sale", "se retiró" o "quedó sin efecto"
      (si lo dice, lo dice como lo que va a pasar: que hoy no le vuelve a preguntar); que hoy le vuelve a
-     pedir el estado.
-   - Estado después: sin tema abierto, nada para después; ninguna espera abierta.
+     pedir el estado; un motivo que Marcos no dio.
+   - Estado después: tema abierto, la pregunta de qué atrasa la tarea del PLC; su espera, abierta.
 
-5. **Leda**, por su cuenta, a Ismael (lunes 26, 10:00): el aviso de la nueva previsión. A Marcos, nada.
+5. **Nadie** escribe el lunes a la mañana. A las 10:00 no sale nada: el aviso a Ismael espera el porqué y
+   el pedido del estado anunciado para hoy se omite con su motivo (Marcos ya contestó).
+
+6. **Leda**, por su cuenta, a Ismael (lunes 26, 16:30, el final del día de trabajo): el aviso de la nueva
+   previsión, que no esperó más. A Marcos, nada.
    →
    - El mensaje dice: que Marcos prevé terminar la tarea del PLC el miércoles 28; que la fecha
-     comprometida era el viernes 23; el atraso, tres días hábiles; que la de comunicaciones depende de ella.
-   - El mensaje no dice: que Ismael tiene que hacer algo; cómo funciona el aviso.
+     comprometida era el viernes 23; el atraso, tres días hábiles; que la de comunicaciones depende de ella;
+     que Marcos todavía no contó qué la atrasa.
+   - El mensaje no dice: un motivo inventado; que Ismael tiene que hacer algo; cómo funciona el aviso.
+   - Estado después (de Marcos): la pregunta de qué atrasa la tarea sigue abierta, con su espera.
 
-6. **Nadie** escribe del lunes 26 al miércoles 28 a las 10:00.
-
-7. **Leda**, por su cuenta, a Marcos (miércoles 28, 10:00): el pedido de estado del día que Marcos dio (9i).
-   Ismael ya se enteró de la previsión el lunes.
+7. **Marcos** escribe (lunes 26, 16:45): "es que me faltaron unas piezas del tablero"
    →
-   - El mensaje dice: que hoy es el día que Marcos dio para la tarea del PLC; pide el estado; si nombra a
-     Ismael, como alguien que ya está al tanto.
-   - El mensaje no dice: que un aviso salió, se envió o estaba guardado; que va a avisar a Ismael; un
-     reproche.
-   - Estado después: tema abierto, la pregunta del estado de la tarea del PLC; la espera, abierta.
+   - Jugadas: la respuesta a la pregunta abierta: `anotar_prevision` sobre la tarea del PLC, con la misma
+     fecha, el miércoles 28, y su motivo, con las palabras de Marcos.
+   - Efecto: la misma fecha, ahora con su porqué; la pregunta y su espera se cierran. Ismael se va a
+     enterar del porqué en otro aviso, terminado el margen para corregir (16:55).
+   - La respuesta dice: que anotó el motivo; que Ismael se va a enterar del motivo hoy, como algo que
+     todavía no pasó; el próximo paso concreto: que Leda le pide el estado el miércoles 28.
+   - La respuesta no dice: que el aviso a Ismael está guardado, en cola, programado o todavía sin enviar;
+     que Ismael ya sabe el motivo; que la fecha cambió; otra pregunta.
+   - Estado después: sin tema abierto, nada para después; ninguna espera abierta.
+
+8. **Leda**, por su cuenta, a Ismael (lunes 26, 16:55): el aviso con el porqué. A Marcos, nada.
+   →
+   - El mensaje dice: que Marcos contó qué atrasa la tarea del PLC, con sus palabras; que la fecha que dio
+     sigue siendo el miércoles 28.
+   - El mensaje no dice: que la fecha cambió; que Ismael tiene que hacer algo.
+
+9. **Nadie** escribe del martes 27 al miércoles 28 a las 10:00.
+
+10. **Leda**, por su cuenta, a Marcos (miércoles 28, 10:00): el pedido de estado del día que Marcos dio
+    (9i). Ismael ya se enteró de la previsión y de su porqué el lunes.
+    →
+    - El mensaje dice: que hoy es el día que Marcos dio para la tarea del PLC; pide el estado; si nombra a
+      Ismael, como alguien que ya está al tanto.
+    - El mensaje no dice: que un aviso salió, se envió o estaba guardado; que va a avisar a Ismael; un
+      reproche.
+    - Estado después: tema abierto, la pregunta del estado de la tarea del PLC; la espera, abierta.
 
 ## Qué mide
 
@@ -85,7 +112,8 @@ antes que ya no va a pasar lo dice sólo si a la persona le sirve (ADR 0018, 9m)
   cuándo, qué va a hacer ella y cuándo) y nunca el estado interno de un aviso o de un pedido. Es una falla
   que la respuesta diga que algo está guardado, en cola, programado, sin enviar, que salió o que no sale.
 - **Garantías (5b):** no inventa (lo que todavía no pasó va en futuro: que Ismael se enteró antes de las
-  10:00 del lunes es una falla de honestidad); no deja sin salida (cada mensaje termina con su próximo
-  paso); no confunde la tarea.
-- **Falla de comprensión:** que la IA no tome "voy bien, casi la tengo" como un avance o "la tengo para el
-  miercoles" como una nueva previsión.
+  16:30 del lunes es una falla de honestidad, y un motivo que Marcos no dio, también); no deja sin salida
+  (cada mensaje termina con su próximo paso); no confunde la tarea.
+- **Falla de comprensión:** que la IA no tome "voy bien, casi la tengo" como un avance, "la tengo para el
+  miercoles" como una nueva previsión, o "es que me faltaron unas piezas del tablero" como el porqué de esa
+  fecha (tomarlo como un bloqueo es una falla).

@@ -26,7 +26,7 @@ tareas:
 # (el .md lo dice en el paso). Por lo mismo, el paso 3 (Marcos corrige dentro del margen para
 # corregir) espera lo que corresponde después de (a); después de la lectura equivocada de la
 # prueba real, lo que corresponde es la corrección, y se juzga leyendo la transcripción: a
-# Ismael le llega un solo aviso, el de la tarea de comunicaciones.
+# Ismael le llega un solo aviso, el de la tarea de comunicaciones, con su porqué (paso 7).
 pasos:
   - paso: 1
     quien: Leda
@@ -59,15 +59,22 @@ pasos:
           tarea: COM
           a: Ismael
           hechos: {prevision: "2026-10-23", fecha_comprometida: "2026-10-22",
-                   atraso_si_se_cumple_la_prevision_dias_habiles: 1, motivo: ausente}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 1, motivo: ausente,
+                   sin_motivo_todavia: true}
+    # La fecha atrasa la de comunicaciones y Marcos no dijo por qué (ADR 0018, 9n): Leda va a
+    # preguntar qué la atrasa, después de quién destraba la del PLC (un tema a la vez), y el aviso
+    # a Ismael espera esa respuesta hasta el final del día (16:30).
     hechos:
       - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC, pregunta: quien_destraba}
       - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-10-23",
          fecha_comprometida: "2026-10-22", atraso_si_se_cumple_la_prevision_dias_habiles: 1,
-         motivo: ausente}
+         motivo: ausente, pregunta_para_despues: motivo_del_atraso,
+         aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-19T16:30",
+                              espera_el_motivo: true}}
     pregunta: {tipo: quien_destraba, tarea: PLC}
     estado_despues:
       pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+      para_despues: [{tipo: motivo_del_atraso, tarea: COM}]
     dice:
       - "cada tarea en su bloque, primero su renglón con 📋 y su nombre solo y debajo, con ✏️, lo anotado: la del PLC está trabada porque le falta el cable para programar; la de comunicaciones la termina el vie 23/10"
       - "con ⚠️, la consecuencia de la de comunicaciones: vence el jue 22/10, un día hábil de atraso"
@@ -79,6 +86,7 @@ pasos:
       - la fecha del viernes 23 en la tarea del PLC
       - el bloqueo en la tarea de comunicaciones
       - que Leda le avisa a Ismael
+      - dos preguntas juntas
       - negrita
 
   - paso: 3
@@ -95,23 +103,31 @@ pasos:
           tarea: COM
           a: Ismael
           hechos: {prevision: "2026-10-23", fecha_comprometida: "2026-10-22",
-                   atraso_si_se_cumple_la_prevision_dias_habiles: 1, motivo: ausente}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 1, motivo: ausente,
+                   sin_motivo_todavia: true}
+    # Sigue sin el porqué: la pregunta de qué atrasa la de comunicaciones es la de ahora, porque
+    # Marcos habla de ella, y la de quién destraba la del PLC queda para después (9d).
     hechos:
       - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-10-23",
          fecha_comprometida: "2026-10-22", atraso_si_se_cumple_la_prevision_dias_habiles: 1,
-         aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-19T10:54"}}
-    pregunta: {tipo: quien_destraba, tarea: PLC}
+         aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-19T16:30",
+                              espera_el_motivo: true},
+         pregunta: motivo_del_atraso}
+    pregunta: {tipo: motivo_del_atraso, tarea: COM}
     estado_despues:
-      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+      pregunta_abierta: {tipo: motivo_del_atraso, tarea: COM}
+      para_despues: [{tipo: quien_destraba, tarea: PLC}]
     dice:
       - "en el bloque de la de comunicaciones, con 📋 primero y ✏️ debajo: que la termina el vie 23/10"
-      - que Ismael será notificado, en pasiva sobre él y en futuro
-      - "otra vez, sola y en el último renglón, la pregunta de quién puede destrabar la del PLC"
+      - que Ismael será notificado hoy, en pasiva sobre él y en futuro
+      - "una sola pregunta, sola y en el último renglón: qué atrasa la de comunicaciones"
     no_dice:
       - la fecha del viernes 23 en la tarea del PLC
       - el bloqueo en la tarea de comunicaciones
       - que Ismael ya se enteró de algo
       - que Leda le avisa a Ismael
+      - un motivo de la fecha nueva, que Marcos no dio
+      - dos preguntas juntas
 
   - paso: 4
     quien: nadie
@@ -120,24 +136,11 @@ pasos:
     relojes: ["2026-10-19 10:50"]
 
   - paso: 5
-    quien: Leda
+    quien: nadie
+    # Terminado el margen del paso 3, el aviso a Ismael sigue esperando el porqué de la fecha
+    # (hasta las 16:30, ADR 0018, 9n): a Ismael no le llega nada todavía.
     relojes: ["2026-10-19 10:55"]
-    salen:
-      - a: Ismael
-        tipo: nueva_prevision
-        tarea: COM
-        hechos: {prevision: "2026-10-23", fecha_comprometida: "2026-10-22",
-                 atraso_si_se_cumple_la_prevision_dias_habiles: 1, dependientes: [],
-                 motivo: ausente}
-    dice:
-      - la tarea de comunicaciones en su renglón con 📋, el primero de su bloque
-      - debajo, que Marcos dijo que la termina el vie 23/10, sin motivo
-      - "que vence el jue 22/10 y, con ⚠️, el atraso: un día hábil"
-      - que no hace falta que conteste, solo en el último renglón
-    no_dice:
-      - un motivo inventado (el cable, el PLC)
-      - nada de la tarea del PLC
-      - que la fecha cambió
+    salen: []
 
   - paso: 6
     quien: Marcos
@@ -155,11 +158,15 @@ pasos:
           a: Ismael
           hechos: {prevision: "2026-10-26", fecha_comprometida: "2026-10-22",
                    atraso_si_se_cumple_la_prevision_dias_habiles: 2, motivo: presente}
+    # Contesta las dos preguntas: quién destraba la del PLC y, con la fecha nueva, qué atrasa la
+    # de comunicaciones. El aviso que esperaba el porqué del 23 ya no sale: lo deja atrás éste.
     hechos:
       - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente}
       - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-10-26",
          fecha_comprometida: "2026-10-22", atraso_si_se_cumple_la_prevision_dias_habiles: 2,
-         motivo: presente}
+         motivo: presente, pregunta: ausente,
+         aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-19T11:10",
+                              espera_el_motivo: ausente}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
@@ -174,6 +181,7 @@ pasos:
       - Martín en la tarea de comunicaciones
       - que Leda le escribió a Martín o lo va a seguir
       - otra vez la pregunta de quién destraba la del PLC
+      - otra vez la pregunta de qué atrasa la de comunicaciones
 
   - paso: 7
     quien: Leda

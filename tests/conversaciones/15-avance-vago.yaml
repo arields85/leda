@@ -142,17 +142,21 @@ pasos:
   - paso: 6
     quien: Marcos
     a_las: "2026-10-28 10:45"
-    escribe: "para el martes 3 la tengo"
+    # Con su porqué (usuario, 2026-10-07; ADR 0018, 9n): una fecha que atrasa sin él abre la
+    # pregunta de qué la atrasa, que no es lo que mide esta conversación.
+    escribe: "para el martes 3 la tengo, me atrase con las pruebas"
     jugadas:
-      - {nombre: anotar_prevision, tarea: PLC, fecha: "2026-11-03"}
+      - {nombre: anotar_prevision, tarea: PLC, fecha: "2026-11-03",
+         motivo: "me atrase con las pruebas"}
     efectos:
-      previsiones: [{tarea: PLC, fecha: "2026-11-03", motivo: ausente}]
+      previsiones: [{tarea: PLC, fecha: "2026-11-03", motivo: presente}]
       avisos_guardados:
         - tipo: nueva_prevision
           tarea: PLC
           a: Ismael
           hechos: {prevision: "2026-11-03", fecha_comprometida: "2026-10-27",
-                   atraso_si_se_cumple_la_prevision_dias_habiles: 5, dependientes: [COM]}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 5, dependientes: [COM],
+                   motivo: presente}
     hechos:
       - {jugada: anotar_prevision, resultado: anotado, tarea: PLC, prevision: "2026-11-03",
          fecha_comprometida: "2026-10-27", atraso_si_se_cumple_la_prevision_dias_habiles: 5,
@@ -163,7 +167,7 @@ pasos:
       para_despues: []
       esperas_abiertas: []
     dice:
-      - que anotó que la termina el martes 3
+      - que anotó que la termina el martes 3, con su motivo
       - que la fecha comprometida sigue siendo el martes 27
       - que Ismael se va a enterar, y cuándo si lo dice, como algo que todavía no pasó
     no_dice:
