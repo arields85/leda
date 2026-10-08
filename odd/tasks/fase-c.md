@@ -248,7 +248,61 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         cierra sola al decidir, por escrito o con el botón (`Ficha.contesta`), y un aviso nuevo
         de la misma tarea la reemplaza. Hoy no tiene espera (`pending_reply`): la 3c decide si
         la suma o si cuenta por el aviso.
-    - [ ] **3c, los recordatorios a quien aprueba** (conversación 24).
+    - [x] **3c, los recordatorios a quien aprueba** (conversación 24; 2026-10-08). Route: delegada
+      (escritor único, 2+ archivos no triviales).
+      - **Commits:** `281c34e` (la escalera de una decisión que espera, `escalera.
+        _un_paso_de_una_decision`; los avisos `recordatorio_de_la_decision`, `aprobacion_trabada`
+        y `aprobacion_destrabada`, con su vigencia al salir; `TipoDeAviso.recuerda`: el
+        recordatorio recuerda la decisión que ofreció el aviso de la entrega, sin botones ni otra
+        pregunta; `aprobacion_vigente` pasa a `avisos.py`; la 23 espera el recordatorio del lunes
+        26; la IA guionada nombra una vez los avisos repetidos de un envío) y el commit que
+        registra esto (el YAML de la 24, su prueba en el corredor y el README). Sin migración.
+      - **Cómo cuenta (elección de implementación):** desde que salió el aviso de la entrega
+        (`entrega_para_aprobar`), sin una espera nueva en `pending_reply`. Ese aviso ya es el
+        pedido: la decisión queda registrada en él (`decision_de_la_entrega`, `del_aviso`), y lo
+        que la corta es un hecho de la cocina (la aprobación vigente, la tarea que deja de estar
+        en revisión, una entrega más nueva), que se relee en cada vuelta y al salir. Una espera
+        nueva habría entrado en la escalera de las preguntas, que repite la pregunta como tema
+        abierto y escala por la ruta de falta de respuesta: otra regla que la decidida. Así se
+        reusan `avisos.guardar`, `TIPOS` con su vigencia, `sale`, el calendario y el candado de
+        la tarea, como la escalera de siempre.
+      - **Cómo quedó lo decidido:** un recordatorio por día hábil, sin tope, desde el siguiente
+        al del aviso de la entrega; el segundo dice que al día siguiente se entera quien está
+        arriba (`si_sigue_sin_decidir`), sólo si hay alguien; al día hábil siguiente del
+        segundo, quien está arriba recibe el aviso sólo informativo, una vez, sin pregunta ni
+        botones, y la tarea no entra en sus entregas para decidir (si intenta aprobarla, Leda le
+        dice que la decide Marcos). Una decisión (aprobar, también si todavía no cierra, o pedir
+        cambios) corta los recordatorios y, si quien está arriba ya se había enterado, le llega
+        que se destrabó, enseguida. Quien está arriba nunca es el responsable (si lo fuera, no
+        hay nadie arriba). Una ausencia de quien aprueba pausa la cuenta. Un recordatorio
+        guardado que ya no corresponde se omite al salir con su motivo (`ya_decidio`,
+        `tarea_cerrada`, `hay_una_entrega_mas_nueva`, `cambio_quien_aprueba`,
+        `cambio_quien_esta_arriba`).
+      - **Lectura del tope diario (mecánica §10), para que la confirme el usuario:** los
+        recordatorios y el aviso a quien está arriba son seguimiento que Leda inicia por su
+        cuenta (no los causa el acto de otra persona ese día): cuentan para el tope y salen en un
+        envío por persona; el aviso de que se destrabó lo causa la decisión de quien aprueba, así
+        que es de coordinación (fuera del tope), como el aviso de la decisión al responsable.
+      - **Test primero:** `tests/motor/test_recordatorios_de_la_decision.py` se escribió antes que
+        el código y se vio en rojo (9 de 13; las otras 4 miran que algo no pase y ya pasaban);
+        después, 13 de 13. La 24 corrió en seco entera con el YAML recién escrito.
+      - **Chequeos** (2026-10-08, sobre la punta de la porción): `pytest tests/garantias` 264
+        passed (sobre `281c34e`); `pytest tests/motor tests/conversaciones` 775 passed; suite
+        completa 1466 passed; corrida en seco de las 25 conversaciones con la IA guionada
+        (`--ronda seco-3c`): 25 de 25 bien, la 24 entera (sus informes se borraron). Sin la IA
+        real: es de la C-4.
+      - **Las instrucciones de la IA no cambiaron** (la huella de `test_contratos.py` sigue): los
+        avisos nuevos llegan con sus hechos y sus significados (`hechos.py`).
+      - **La 23** recibe ahora, el lunes 26 a las 10:30, el primer recordatorio de las tres
+        entregas del viernes mientras Ismael está decidiendo: es la regla, y es también lo que
+        pide resolver la 26 (no interrumpir), `PENDIENTE` con el usuario.
+      - `PENDIENTE`:
+        - **Un aviso de la entrega que no salió** (fallido tras los cinco intentos) no empieza la
+          cuenta: queda su incidente y el aviso de la falla, como desde la 3a. ¿Se le recuerda
+          igual a quien aprueba?
+        - **Quien aprueba ausente:** la cuenta se pausa y quien está arriba no se entera de que
+          la entrega espera a alguien que no está (la mecánica §9 pide avisar al referente del
+          área de las tareas sin cobertura; no está construido).
   - [ ] Porción 4: la página de la tarea y su enlace.
   - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
@@ -258,6 +312,5 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La regresión con la IA real de todas (con la 21 y la 23 enteras), y después la porción 3c de la
-C-3: los recordatorios a quien aprueba (conversación 24; `docs/STATUS.md`, "Punto exacto para
-retomar").
+La regresión con la IA real de todas (con la 21, la 23 y la 24 enteras), y después la porción 4
+de la C-3: la página de la tarea y su enlace (`docs/STATUS.md`, "Punto exacto para retomar").

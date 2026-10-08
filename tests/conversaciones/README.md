@@ -88,9 +88,10 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
 23. [`23-aprobacion.md`](23-aprobacion.md): "aprobado" que cierra; "aprobado" que no cierra porque falta
     otra cosa, dicho con honestidad; un pedido de cambios con su comentario; "aprobado, pero que
     revise…", con una sola pregunta y dos botones; y quien no aprueba esa tarea intenta aprobarla.
-24. [`24-quien-aprueba-no-contesta.md`](24-quien-aprueba-no-contesta.md): recordatorios a quien aprueba
-    el primer y el segundo día hábil; al tercero, el aviso a quien está arriba (Marcos → Ismael) o, sin
-    nadie arriba, un recordatorio cordial por día; al responsable, nada.
+24. [`24-quien-aprueba-no-contesta.md`](24-quien-aprueba-no-contesta.md): un recordatorio a quien aprueba
+    por día hábil hasta que decide; el segundo avisa que al día siguiente se entera quien está arriba
+    (Marcos → Ismael), que al tercero recibe un aviso sólo informativo, una vez, y después que se
+    destrabó; sin nadie arriba, sólo el recordatorio; al responsable, nada.
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
@@ -107,8 +108,15 @@ con su YAML para los pasos que esa porción cubre:
 **La 23 corre desde la porción 3b de la C-3** (la hoja de aprobación), entera, con tres pasos de Leda que
 el hilo da por hechos (4b, 9b y 9c) y el paso 10 aparte (`aparte: true`: por el motor y sin
 comprobarlo). Usa más personas que Marcos e Ismael: Mariano y Ariel (los aprueba Ismael) y Lucas (lo
-aprueba Martín). **La 24 todavía no corre:** sus recordatorios a quien aprueba son de la porción 3c.
-Tiene sólo el `.md`; el corredor carga los `*.yaml`, así que recibe su YAML cuando su regla exista.
+aprueba Martín). Desde la porción 3c, el paso 3 espera también el primer recordatorio a Ismael de las
+tres entregas que siguen esperando (el lunes es el día hábil siguiente al de las entregas).
+
+**La 24 corre desde la porción 3c de la C-3** (quien aprueba no contesta), entera, con Nahuel (lo
+aprueba Marcos). El aviso a Ismael del tercer día sale en un envío con su propio recordatorio
+(mecánica §10): el YAML mira el aviso de la trabada, y el recordatorio lo miran las pruebas del
+motor. Suma tres momentos que el hilo da por hechos: el lunes 2 a las 09:00, cuando la escalera ya
+guardó los recordatorios del día (así el de Ismael se omite al decidir), el aviso de la aprobación a
+Nahuel (paso 10) y los dos días siguientes sin nada (paso 10b).
 
 **La hoja de aprobación** (porción 3b): un paso puede tocar el botón del aviso de una de varias entregas
 (`toca: Pedir cambios` con `de_la_tarea`); lo que Leda manda por su cuenta puede esperar sus botones

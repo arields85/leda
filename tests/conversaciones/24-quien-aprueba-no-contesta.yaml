@@ -1,0 +1,263 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/24-quien-aprueba-no-contesta.md
+numero: "24"
+titulo: "Quien aprueba no contesta"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-26 10:30"
+
+# Sin política de evidencia: la evidencia está completa según la de cada área. Cada tarea lleva
+# el criterio de aceptación de la prueba (`carga.py`).
+tareas:
+  PAILA:
+    titulo: Actualizar planos eléctricos de la paila 2
+    responsable: Nahuel
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+
+# El lunes 26: las dos entregas, confirmadas, y sus avisos (a Marcos, el de Nahuel; a Ismael,
+# el de Marcos), que salen terminado el margen para corregir.
+preludio:
+  - quien: Nahuel
+    a_las: "2026-10-26 11:00"
+    escribe: "termine los planos de la paila 2"
+    jugadas: [{nombre: entregar, tarea: PAILA}]
+  - quien: Nahuel
+    a_las: "2026-10-26 11:01"
+    toca: Confirmar
+  - quien: Marcos
+    a_las: "2026-10-26 11:30"
+    escribe: "termine el plc"
+    jugadas: [{nombre: entregar, tarea: PLC}]
+  - quien: Marcos
+    a_las: "2026-10-26 11:31"
+    toca: Confirmar
+  - quien: Leda
+    relojes: ["2026-10-26 11:15", "2026-10-26 11:45"]
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-26 13:00", "2026-10-26 16:30"]
+    salen: []
+
+  - paso: 2
+    quien: Leda
+    relojes: ["2026-10-27 10:00"]
+    salen:
+      - a: Marcos
+        tipo: recordatorio_de_la_decision
+        tarea: PAILA
+        botones: []
+        hechos: {veces_que_se_lo_recuerda: 1, responsable: Nahuel Gimenez,
+                 entregada_el: "2026-10-26", necesita_respuesta: true,
+                 si_sigue_sin_decidir: ausente}
+      - a: Ismael
+        tipo: recordatorio_de_la_decision
+        tarea: PLC
+        botones: []
+        hechos: {veces_que_se_lo_recuerda: 1, responsable: Marcos Tarquini,
+                 entregada_el: "2026-10-26", necesita_respuesta: true,
+                 si_sigue_sin_decidir: ausente}
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - la tarea en su renglón con 📋
+      - quién la entregó y cuándo (lun 26/10)
+      - que espera su decisión
+      - "el cierre, aparte: que puede aprobarla o pedir cambios contestando"
+    no_dice:
+      - un reproche
+      - que va a avisarle a otra persona
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-28 10:00"]
+    salen:
+      - a: Marcos
+        tipo: recordatorio_de_la_decision
+        tarea: PAILA
+        botones: []
+        hechos: {veces_que_se_lo_recuerda: 2,
+                 si_sigue_sin_decidir: {se_avisa_a: [Ismael Soschinski], fecha: "2026-10-29"}}
+      - a: Ismael
+        tipo: recordatorio_de_la_decision
+        tarea: PLC
+        botones: []
+        hechos: {veces_que_se_lo_recuerda: 2, si_sigue_sin_decidir: ausente}
+    dice:
+      - lo mismo que el primero, breve, con que la entrega espera desde el lun 26/10
+      - "a Marcos, aparte: que si mañana sigue sin decidir se va a enterar Ismael"
+    no_dice:
+      - un reproche
+      - a Marcos, que Ismael va a decidir la tarea de Nahuel
+      - a Ismael, que va a avisarle a otra persona
+
+  # A Ismael le llegan en un envío el aviso de que la de Nahuel está trabada y el recordatorio
+  # de la del PLC (mecánica §10): lo esperado mira el aviso de la trabada; el recordatorio, con
+  # sus hechos, lo miran las pruebas del motor (`tests/motor/test_recordatorios_de_la_decision.py`).
+  - paso: 4
+    quien: Leda
+    relojes: ["2026-10-29 10:00"]
+    salen:
+      - a: Ismael
+        tipo: aprobacion_trabada
+        tareas: [PAILA, PLC]
+        botones: []
+        hechos: {quien_aprueba: Marcos Tarquini, responsable: Nahuel Gimenez,
+                 entregada_el: "2026-10-26", necesita_respuesta: false,
+                 leda_se_lo_sigue_recordando: true, se_le_avisa_cuando_decida: true}
+      - a: Marcos
+        tipo: recordatorio_de_la_decision
+        tarea: PAILA
+        botones: []
+        hechos: {veces_que_se_lo_recuerda: 3, si_sigue_sin_decidir: ausente}
+    dice:
+      - "a Ismael, sólo informativo: que Nahuel entregó la tarea de los planos de la paila 2 el lun 26/10, con 📋; que Marcos todavía no decidió y que Leda se lo sigue recordando; que le avisa cuando se destrabe; que no hace falta que responda, solo en el último renglón"
+      - "a Ismael, la tarea del PLC con 📋, que Marcos la entregó el lun 26/10 y que espera su decisión; el cierre, aparte, con las dos salidas"
+      - "a Marcos, la tarea con 📋, que Nahuel la entregó el lun 26/10 y que espera su decisión; el cierre, aparte, con las dos salidas"
+      - cada tarea en su bloque y con lo suyo
+    no_dice:
+      - a Ismael, que puede aprobar o pedir cambios sobre la tarea de Nahuel
+      - a Ismael, que haga algo con Marcos
+      - un reproche a Marcos
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-30 10:00"]
+    salen:
+      - a: Marcos
+        tipo: recordatorio_de_la_decision
+        tarea: PAILA
+        botones: []
+        hechos: {veces_que_se_lo_recuerda: 4, si_sigue_sin_decidir: ausente}
+      - a: Ismael
+        tipo: recordatorio_de_la_decision
+        tarea: PLC
+        botones: []
+        hechos: {veces_que_se_lo_recuerda: 4}
+    dice:
+      - lo mismo, breve y cordial, con la entrega del lun 26/10
+    no_dice:
+      - un reproche
+      - que va a avisarle a otra persona
+
+  # El lunes 2 a las 09:00 la escalera ya guarda los recordatorios del día, para las 10:00: el
+  # de Ismael queda sin salir cuando él decide (paso 7).
+  - paso: 6
+    quien: Leda
+    relojes: ["2026-10-31 10:00", "2026-11-01 10:00", "2026-11-02 09:00"]
+    salen: []
+
+  - paso: 7
+    quien: Ismael
+    a_las: "2026-11-02 09:20"
+    escribe: "perdon, estuve a mil. el plc aprobado"
+    jugadas:
+      - {nombre: aprobar, tarea: PLC}
+    efectos:
+      estados: {PLC: terminada}
+      aprobaciones:
+        - {tarea: PLC, decision: aprobado, de: Ismael}
+      avisos_guardados:
+        - {tipo: tarea_aprobada, tarea: PLC, a: Marcos, estado: guardado}
+    hechos:
+      - {jugada: aprobar, resultado: anotado, tarea: PLC, quedo_terminada: true,
+         aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-11-02T10:00"},
+         aviso_de_que_se_destrabo: ausente}
+    pregunta: null
+    estado_despues:
+      de: Ismael
+      pregunta_abierta: null
+    dice:
+      - que la tarea del PLC quedó terminada
+      - que Marcos se va a enterar a las 10:00
+    no_dice:
+      - nada sobre la demora de Ismael
+      - nada sobre la entrega de Nahuel
+
+  - paso: 8
+    quien: Leda
+    relojes: ["2026-11-02 10:00"]
+    salen:
+      - a: Marcos
+        tipo: tarea_aprobada
+        tarea: PLC
+        hechos: {aprobada_por: Ismael Soschinski, quedo_terminada: true,
+                 necesita_respuesta: false}
+      - a: Marcos
+        tipo: recordatorio_de_la_decision
+        tarea: PAILA
+        botones: []
+        hechos: {veces_que_se_lo_recuerda: 5}
+    estado_avisos:
+      - {tipo: recordatorio_de_la_decision, tarea: PLC, a: Ismael, estado: omitido,
+         motivo: tarea_cerrada}
+    dice:
+      - cada tarea en su bloque y con lo suyo
+      - el recordatorio, breve y cordial, con la entrega del lun 26/10
+    no_dice:
+      - un reproche
+
+  - paso: 9
+    quien: Marcos
+    a_las: "2026-11-02 10:40"
+    escribe: "uh perdon, se me paso. lo de nahuel aprobado"
+    jugadas:
+      - {nombre: aprobar, tarea: PAILA}
+    efectos:
+      estados: {PAILA: terminada}
+      aprobaciones:
+        - {tarea: PAILA, decision: aprobado, de: Marcos}
+      avisos_guardados:
+        - {tipo: tarea_aprobada, tarea: PAILA, a: Nahuel, estado: guardado}
+        - {tipo: aprobacion_destrabada, tarea: PAILA, a: Ismael, estado: guardado}
+    hechos:
+      - {jugada: aprobar, resultado: anotado, tarea: PAILA, quedo_terminada: true,
+         aviso_al_responsable: {a: Nahuel Gimenez, llega: "~2026-11-02T10:40"},
+         aviso_de_que_se_destrabo: {a: Ismael Soschinski, llega: "~2026-11-02T10:40"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la tarea de los planos de la paila 2 quedó terminada
+      - que Nahuel e Ismael se van a enterar ahora
+    no_dice:
+      - nada sobre la demora de Marcos
+
+  - paso: 10
+    quien: Leda
+    relojes: ["2026-11-02 10:41"]
+    salen:
+      - a: Ismael
+        tipo: aprobacion_destrabada
+        tarea: PAILA
+        botones: []
+        hechos: {quien_aprueba: Marcos Tarquini, aprobada_por: Marcos Tarquini,
+                 responsable: Nahuel Gimenez, quedo_terminada: true, necesita_respuesta: false}
+      # El aviso de la aprobación a Nahuel, como en la 23: el .md lo da por hecho en el paso 9.
+      - a: Nahuel
+        tipo: tarea_aprobada
+        tarea: PAILA
+        hechos: {aprobada_por: Marcos Tarquini, quedo_terminada: true}
+    estado_despues:
+      de: Ismael
+      pregunta_abierta: null
+    dice:
+      - "a Ismael, breve: que Marcos aprobó la tarea de los planos de la paila 2 de Nahuel, con 📋, y que quedó terminada; que no hace falta que responda, solo en el último renglón"
+    no_dice:
+      - un reproche a Marcos
+      - cuánto tardó
+
+  # Lo que dicen los pasos 7 y 9 del .md: ningún recordatorio más de esas entregas.
+  - paso: 10b
+    quien: Leda
+    relojes: ["2026-11-03 10:00", "2026-11-04 10:00"]
+    salen: []

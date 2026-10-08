@@ -9,7 +9,9 @@ destrabó. Si no hay nadie arriba (Ismael), un recordatorio cordial por día há
 avisa nada: no depende de él (`odd/tasks/fase-c.md`, decisión 3). Circuito 8 (ADR 0017, decisión 3b); mecánica §7 y §9; constitución
 §8 (persistente sin ser hostil).
 
-**Todavía no corre:** el circuito no está construido (`odd/tasks/fase-c.md`, tarea C-3). No tiene YAML.
+**Corre desde la porción 3c de la C-3** (`24-quien-aprueba-no-contesta.yaml`; `odd/tasks/fase-c.md`). El YAML
+suma lo que el hilo da por hecho: el lunes 2 a las 09:00 la escalera ya guardó los recordatorios del día, el
+aviso de la aprobación a Nahuel sale con el de Ismael (paso 10) y los dos días siguientes no sale nada.
 
 ## Estado inicial
 

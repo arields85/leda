@@ -47,12 +47,12 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_veinticuatro_conversaciones_y_cada_una_nombra_su_fuente():
-    # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega) y la 23 desde la 3b (la
-    # aprobación); la 24 y la 26 tienen sólo el .md: su circuito o su regla no están
-    # construidos (README).
+def test_hay_veinticinco_conversaciones_y_cada_una_nombra_su_fuente():
+    # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega), la 23 desde la 3b (la
+    # aprobación) y la 24 desde la 3c (quien aprueba no contesta); la 26 tiene sólo el .md: su
+    # regla no está construida (README).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in [*range(1, 24), 25]]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 26)]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]
@@ -407,3 +407,17 @@ def test_el_informe_y_la_grabacion_dicen_que_motor_corrio(conn, tmp_path, monkey
     assert f"Motor: `{nombre}`" in transcripciones
     [grabacion] = (tmp_path / "g").glob(f"01-{nombre}-guionada-1.json")
     assert json.loads(grabacion.read_text("utf-8"))["motor"] == nombre
+
+
+def test_quien_aprueba_no_contesta_corre_entera_dia_por_dia(conn):
+    """Porción 3c de la C-3: los recordatorios a quien aprueba, el aviso a quien está arriba
+    (en un envío con lo suyo), los días sin nada (el fin de semana), el recordatorio guardado que
+    se omite porque ya decidió y que se destrabó."""
+    [conv] = elegir(["24"])
+
+    corrida = correr_conversacion(conn, conv, _perfecta(conv))
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    al_responsable = [s for p in corrida.pasos if not p.preludio for s in p.salidas
+                      if s.a == "Nahuel" and not s.es_respuesta]
+    assert [s.tipo for s in al_responsable] == ["tarea_aprobada"]
