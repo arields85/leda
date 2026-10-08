@@ -296,7 +296,10 @@ def main(argv: list[str] | None = None) -> int:
         # El ciclo del motor (escalera, avisos guardados, despacho, mensajes sin respuesta)
         # para cada espacio activo con su bot, en un hilo de fondo (`leda.motor.fondo`).
         montar(lambda: conectar()).start()
-        uvicorn.run("leda.entrada:app", host="0.0.0.0", port=a.puerto)
+        # Sin el registro de accesos: las direcciones del tablero y de la página de una tarea
+        # llevan la credencial en el camino, y ese registro las escribe enteras, con la
+        # dirección IP de quien las abrió (ADR 0019, 7e). Las fallas se imprimen igual.
+        uvicorn.run("leda.entrada:app", host="0.0.0.0", port=a.puerto, access_log=False)
         return 0
 
     if a.cmd == "webhooks":

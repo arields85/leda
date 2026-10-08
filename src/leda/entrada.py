@@ -363,18 +363,22 @@ def pagina_de_tarea_web(token: str):
     from .db import sin_espacio
     from .tarea_vista import pagina
 
+    # La página se arma dentro de la misma transacción que la lee: si algo falla al leerla o al
+    # armarla, la persona ve la página genérica (constitución §10) y la vista no queda
+    # registrada, porque no se sirvió (7e).
     with _PAGINAS:
         conn = _conn_de_paginas()
         try:
             with sin_espacio(conn) as cur:
                 datos = pagina_de_tarea.leer(cur, token)
+                html = None if datos is None else pagina(datos, token=token)
         except Exception as falla:  # noqa: BLE001 -- la página nunca muestra un error técnico
             _sin_transaccion(conn)
-            _imprimir(f"  ! la página de una tarea no se pudo leer ({type(falla).__name__}).")
+            _imprimir(f"  ! la página de una tarea no se pudo abrir ({type(falla).__name__}).")
             return _no_se_puede_abrir(503)
-    if datos is None:
+    if html is None:
         return _no_se_puede_abrir()
-    return HTMLResponse(pagina(datos, token=token), headers=CABECERAS_DE_LA_PAGINA)
+    return HTMLResponse(html, headers=CABECERAS_DE_LA_PAGINA)
 
 
 @router.get("/tarea/{token}/evidencia/{evidencia}")
@@ -382,23 +386,29 @@ def archivo_de_tarea_web(token: str, evidencia: str):
     """El archivo de una evidencia de la tarea del token, con el tipo que detectó el código: una
     imagen que el navegador muestra, para verla; lo demás, como adjunto para bajar. La evidencia
     de otra tarea, o de otro espacio, devuelve la misma página que un enlace que no sirve."""
-    from urllib.parse import quote
-
     from . import pagina_de_tarea
     from .db import sin_espacio
-    from .tarea_vista import IMAGENES_QUE_SE_VEN
 
+    # Como la página: la respuesta se arma dentro de la transacción que lee el archivo.
     with _PAGINAS:
         conn = _conn_de_paginas()
         try:
             with sin_espacio(conn) as cur:
                 archivo = pagina_de_tarea.leer_archivo(cur, token, evidencia)
+                respuesta = None if archivo is None else _respuesta_de_archivo(archivo)
         except Exception as falla:  # noqa: BLE001 -- la página nunca muestra un error técnico
             _sin_transaccion(conn)
-            _imprimir(f"  ! un archivo de una tarea no se pudo leer ({type(falla).__name__}).")
+            _imprimir(f"  ! un archivo de una tarea no se pudo abrir ({type(falla).__name__}).")
             return _no_se_puede_abrir(503)
-    if archivo is None:
-        return _no_se_puede_abrir()
+    return _no_se_puede_abrir() if respuesta is None else respuesta
+
+
+def _respuesta_de_archivo(archivo: dict[str, Any]) -> Response:
+    """El archivo con el tipo que detectó el código: una imagen que se ve; lo demás, adjunto."""
+    from urllib.parse import quote
+
+    from .tarea_vista import IMAGENES_QUE_SE_VEN
+
     modo = "inline" if archivo["tipo"] in IMAGENES_QUE_SE_VEN else "attachment"
     nombre = archivo["nombre"] or "archivo"
     return Response(archivo["contenido"], media_type=archivo["tipo"], headers={

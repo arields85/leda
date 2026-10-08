@@ -157,6 +157,74 @@ def test_una_pieza_retirada_figura_como_retirada_y_no_se_ofrece(web, conn, mundo
     assert f'{token}/evidencia/{mundo["norte"]["piezas"]["foto"]}' not in r.text
 
 
+def test_una_pieza_retirada_no_muestra_su_contenido_ni_se_sirve(web, conn, mundo):
+    """ADR 0019, decisión 3: una pieza retirada figura como retirada, y nada más. Ni lo que
+    decía un texto, ni la dirección de un enlace, ni el nombre o el contenido de un archivo: si
+    se retiró porque no tenía que estar, la página no lo sigue mostrando."""
+    norte, ws = mundo["norte"], mundo["north-lab"]["id"]
+    sam = _persona(mundo, "Sam Noble")
+    with admin(conn) as cur:
+        cur.execute("""insert into evidence (workspace_id, task_id, tipo, clase, uri,
+                                             entregado_por)
+                       values (%s, %s, 'enlace', 'enlace',
+                               'https://ejemplo.invalid/clave-que-no-iba', %s)
+                       returning id""", (ws, norte["id"], sam))
+        enlace = str(cur.fetchone()["id"])
+        for pieza in (*norte["piezas"].values(), enlace):
+            cur.execute("""insert into evidencia_retirada (workspace_id, evidence_id,
+                                                           retirada_por_membership_id)
+                           values (%s, %s, %s)""", (ws, pieza, sam))
+    conn.commit()
+    token = _emitir(conn, mundo, "Taylor Quinn")
+    r = web.get(f"/tarea/{token}")
+    assert r.status_code == 200
+    for contenido in ("Quedó andando", "pantalla.jpg", "informe.pdf", "clave-que-no-iba",
+                      "/evidencia/"):
+        assert contenido not in r.text, contenido
+    assert r.text.count("Retirada el") == 4
+    for pieza in (norte["piezas"]["foto"], norte["piezas"]["pdf"]):
+        _generica(web, f"/tarea/{token}/evidencia/{pieza}")
+
+
+def test_una_falla_al_armar_la_pagina_recibe_la_pagina_generica(web, conn, mundo, monkeypatch,
+                                                                capsys):
+    """Constitución §10: si algo falla al armar la página, la persona ve la página genérica,
+    nunca un error del servidor. En la consola queda una línea sin el token ni el detalle, y la
+    vista no queda registrada, porque no se sirvió (7e)."""
+    from leda import tarea_vista
+
+    def se_rompe(*a, **k):
+        raise RuntimeError("detalle interno")
+
+    monkeypatch.setattr(tarea_vista, "pagina", se_rompe)
+    token = _emitir(conn, mundo, "Taylor Quinn")
+    r = web.get(f"/tarea/{token}")
+    assert r.status_code == 503
+    assert "no se puede abrir" in r.text and "detalle interno" not in r.text
+    _tiene_las_cabeceras(r)
+    consola = capsys.readouterr().out
+    assert "RuntimeError" in consola
+    assert token not in consola and "detalle interno" not in consola
+    with admin(conn) as cur:
+        cur.execute("select count(*) as n from vista_de_tarea")
+        assert cur.fetchone()["n"] == 0
+
+
+def test_una_falla_al_servir_un_archivo_recibe_la_pagina_generica(web, conn, mundo,
+                                                                  monkeypatch, capsys):
+    from leda import pagina_de_tarea
+
+    monkeypatch.setattr(pagina_de_tarea, "leer_archivo",
+                        lambda cur, token, evidencia: {"contenido": b"x"})
+    token = _emitir(conn, mundo, "Taylor Quinn")
+    r = web.get(f"/tarea/{token}/evidencia/{mundo['norte']['piezas']['pdf']}")
+    assert r.status_code == 503
+    assert "no se puede abrir" in r.text
+    _tiene_las_cabeceras(r)
+    consola = capsys.readouterr().out
+    assert "KeyError" in consola and token not in consola
+
+
 # --- Un enlace que no sirve ----------------------------------------------------------------
 
 def test_un_token_inventado_recibe_la_pagina_generica(web, conn, mundo):

@@ -38,6 +38,10 @@ _DIAS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
 # Las imágenes que un navegador muestra; las demás (HEIC) se bajan.
 IMAGENES_QUE_SE_VEN = ("image/jpeg", "image/png", "image/webp")
 
+# Lo único que se dice de una pieza retirada: qué clase de cosa era.
+QUE_ERA = {"texto": "Un texto", "enlace": "Un enlace", "imagen": "Una foto",
+           "archivo": "Un archivo"}
+
 _ESTILO = """
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
@@ -121,20 +125,22 @@ def _hecho(h: dict[str, Any], zona: ZoneInfo) -> str:
 
 def _pieza(p: dict[str, Any], token: str, palabras: dict[str, str], zona: ZoneInfo) -> str:
     """Una pieza de la evidencia, ya escapada: qué es, quién la mandó y cuándo, y qué cubre. Una
-    imagen se ve; otro archivo se baja; una pieza retirada sólo figura como retirada."""
+    imagen se ve; otro archivo se baja; una pieza retirada sólo figura como retirada (ADR 0019,
+    decisión 3): ni su texto, ni su enlace, ni el nombre o el contenido de su archivo. Se mira
+    primero, antes que la clase, para que ninguna clase muestre lo retirado."""
     clase, retirada = p.get("clase"), bool(p.get("retirada"))
     archivo = f'{_e(token)}/evidencia/{_e(p.get("id"))}'
     nombre = _e(p.get("nombre"))
-    if clase == "texto":
+    if retirada:
+        contenido = f"{QUE_ERA.get(clase, 'Una pieza')} que se retiró"
+    elif clase == "texto":
         contenido = f"Lo que escribió: «{_e(p.get('texto'))}»"
     elif clase == "enlace":
         enlace = p.get("enlace") or ""
         contenido = f"Un enlace: {_e(enlace)}"
-        if not retirada and enlace.startswith(("https://", "http://")):
+        if enlace.startswith(("https://", "http://")):
             contenido = (f'Un enlace: <a href="{_e(enlace)}" rel="noopener noreferrer nofollow">'
                          f"{_e(enlace)}</a>")
-    elif retirada:
-        contenido = f"{'Una foto' if clase == 'imagen' else 'Un archivo'}: {nombre}"
     elif clase == "imagen" and p.get("tipo_de_archivo") in IMAGENES_QUE_SE_VEN:
         contenido = (f'Una foto: {nombre}<img src="{archivo}" alt="{nombre or "foto"}" '
                      f'loading="lazy">')

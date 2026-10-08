@@ -41,6 +41,25 @@ def test_servir_arranca_el_ciclo_del_motor_y_el_servidor(monkeypatch):
     assert llamadas == [{}, ("leda.entrada:app",)]
 
 
+def test_servir_no_escribe_el_registro_de_accesos(monkeypatch):
+    """Las direcciones del tablero y de la página de una tarea llevan la credencial en el camino
+    (`/tablero/<token>`, `/tarea/<token>`): el registro de accesos de uvicorn las escribiría
+    enteras en la consola, con la dirección de quien las abrió (ADR 0019, 7e: sin dirección IP).
+    El servidor arranca sin ese registro."""
+    import uvicorn
+
+    from leda.motor import fondo
+
+    argumentos = []
+    monkeypatch.setattr(cli, "conectar", lambda *a, **k: _ConnFalsa())
+    monkeypatch.setattr(cli, "_verificar_esquema_o_salir", lambda conn: None)
+    monkeypatch.setattr(fondo, "montar", lambda *a, **k: _SchedulerFalso())
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: argumentos.append(k))
+
+    assert cli.main(["servir"]) == 0
+    assert argumentos and argumentos[0].get("access_log") is False
+
+
 def test_servir_rechaza_arrancar_si_falta_una_migracion(monkeypatch):
     """R4-003 (revisión 2026-09-28+3): sin `greeting_state`/`message_outbox.
     es_bienvenida`, todo el mensajería rompe con UndefinedTable/
