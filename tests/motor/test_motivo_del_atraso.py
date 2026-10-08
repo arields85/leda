@@ -8,8 +8,11 @@ mensaje:
 1. Si la fecha nueva queda después del vencimiento y la persona no dio el porqué, Leda anota la
    fecha y pregunta qué la atrasa (`preguntas.MOTIVO_DEL_ATRASO`, una pregunta que espera
    respuesta, con su escalera). Si la fecha no atrasa la tarea, no pregunta nada. Si corre otra
-   vez una fecha que ya atrasaba la tarea y cuyo porqué ya dio, ése sigue siendo el porqué del
-   atraso: no se le vuelve a preguntar (constitución §8; conversación 05, paso 4).
+   vez una fecha que ya atrasaba la tarea y cuyo porqué dio hace menos de una hora, ése sigue
+   siendo el porqué del atraso: no se le vuelve a preguntar (constitución §8; conversación 05,
+   paso 4). Si pasó más, se le pregunta otra vez (usuario, 2026-10-07: "para Leda es difícil
+   saber que se refiere a ese motivo; hay que poner un límite de tiempo más corto"). Los minutos
+   son del espacio (`motivo_vale_minutos`, 60 por omisión) y se cuentan desde que lo dijo.
 2. El aviso al referente espera esa respuesta y sale con el porqué, en palabras de la persona,
    después del margen para corregir y dentro del horario.
 3. Si no contesta, el aviso no espera para siempre: sale al terminar el día de trabajo
@@ -150,7 +153,7 @@ def test_una_fecha_que_atrasa_con_su_porque_no_pregunta_nada(conn, mundo, escrib
 def test_correr_otra_vez_un_atraso_ya_explicado_conserva_su_porque(conn, mundo, escribe):
     _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
     [hecho], pedido = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"),
-                             at=octubre(5, 11))
+                             at=octubre(5, 10, 30))
 
     assert hecho["motivo"] == "faltan los cables"
     assert "pregunta" not in hecho and pedido["pregunta"] is None
@@ -159,11 +162,64 @@ def test_correr_otra_vez_un_atraso_ya_explicado_conserva_su_porque(conn, mundo, 
     assert segunda["motivo"] == "faltan los cables"
     _, con_porque = avisos_guardados(conn, "nueva_prevision")
     assert con_porque["hechos"]["motivo"] == "faltan los cables"
-    assert con_porque["programado_para"] == octubre(5, 11, 10)
+    assert con_porque["programado_para"] == octubre(5, 10, 40)
     # La auditoría separa lo que dijo ahora de lo que había dicho antes.
     auditado = uno(conn, """select detalle from audit_log where accion = 'anotar_prevision'
                              order by at desc, id desc limit 1""")
     assert auditado["detalle"]["motivo_dicho_antes"] is True
+
+
+def _vale_minutos(conn, mundo, valor: str) -> None:
+    from leda.db import admin
+    with admin(conn) as cur:
+        cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                       values (%s, 'motivo_vale_minutos', %s)""", (mundo["id"], valor))
+    conn.commit()
+
+
+def test_un_porque_de_hace_mas_de_una_hora_no_explica_la_fecha_nueva(conn, mundo, escribe):
+    """Pasó más de una hora: puede no referirse a ese porqué, así que Leda lo pregunta otra vez."""
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+    [hecho], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"), at=octubre(5, 11, 1))
+
+    assert hecho["motivo"] is None and hecho["pregunta"] == MOTIVO
+    assert hecho["aviso_al_referente"]["espera_el_motivo"] is True
+
+
+def test_la_hora_se_cuenta_desde_que_lo_dijo_no_desde_la_ultima_fecha(conn, mundo, escribe):
+    """El porqué que se conservó no vuelve a empezar la cuenta: a las 11:10 lo dijo hace 70
+    minutos, aunque la última fecha fue a las 10:30."""
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+    [conservado], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"),
+                             at=octubre(5, 10, 30))
+    [otra_vez], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-15"),
+                           at=octubre(5, 11, 10))
+
+    assert conservado["motivo"] == "faltan los cables"
+    assert otra_vez["motivo"] is None and otra_vez["pregunta"] == MOTIVO
+
+
+def test_el_espacio_cambia_cuantos_minutos_vale_un_porque(conn, mundo, escribe):
+    _vale_minutos(conn, mundo, "120")
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+
+    [a_la_hora_y_media], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"),
+                                    at=octubre(5, 11, 30))
+    assert a_la_hora_y_media["motivo"] == "faltan los cables"
+    [pasadas_dos_horas], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-15"),
+                                    at=octubre(5, 12, 1))
+    assert pasadas_dos_horas["motivo"] is None and pasadas_dos_horas["pregunta"] == MOTIVO
+
+
+@pytest.mark.parametrize("valor", ['"uno"', "-1", "true", "null", "1.5"])
+def test_un_valor_que_no_vale_usa_la_hora_del_producto(conn, mundo, escribe, valor):
+    _vale_minutos(conn, mundo, valor)
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+    [dentro], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"), at=octubre(5, 10, 30))
+    [fuera], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-15"), at=octubre(5, 11, 1))
+
+    assert dentro["motivo"] == "faltan los cables"
+    assert fuera["motivo"] is None and fuera["pregunta"] == MOTIVO
 
 
 def test_el_porque_de_una_fecha_que_no_atrasaba_no_explica_un_atraso(conn, mundo, escribe):
