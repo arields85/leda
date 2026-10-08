@@ -18,8 +18,11 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": área OT; la aprueba Ismael; vence el viernes 23; `en_curso` desde
     el lunes 19; sin bloqueos ni dependencias.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": área OT; la aprueba Ismael; vence el viernes
     30; `asignada`; sin bloqueos ni dependencias.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Lo que pide la política de OT** (`espacios/corework.yaml`, `evidencia.por_area`, con las clases del ADR
   0019, decisión 5): una explicación (texto), un resultado de prueba (texto, archivo, imagen o enlace), una
   captura (imagen) y un archivo (archivo, imagen o enlace). Un mismo texto puede cubrir varios tipos (la

@@ -26,13 +26,21 @@ Ismael recibe además el primer recordatorio de las tres entregas que siguen esp
 - **Tareas esperando la decisión de Ismael**, todas `en_revision` desde el viernes 23, con la evidencia
   completa según la política de su área y el aviso de la entrega ya enviado a Ismael el viernes:
   - "Programar PLC de la comprimidora" (Marcos, OT): sin bloqueos ni dependencias.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora" (Marcos, OT): depende, con una dependencia
     bloqueante, de "Cambiar switch industrial de la sala de servidores" (Lucas, IT), que está `en_curso`
     y vence el viernes 30. La dependencia se agregó cuando la de comunicaciones ya estaba en curso, como
     en la semilla.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora". El del switch: "El switch nuevo queda instalado y todos los equipos
+    de la sala de servidores se conectan a la red sin cortes durante una hora".
   - "Cablear tablero de la máquina 3" (Mariano, electricidad): vence el viernes 30; sin bloqueos ni
     dependencias.
+    Criterio de aceptación: "El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba
+    de continuidad y de aislación".
   - "Dashboard de lotes en CoreLabs" (Ariel, CoreLabs): sin bloqueos ni dependencias.
+    Criterio de aceptación: "El dashboard muestra los lotes del día con su cantidad y su estado, y
+    coinciden con el registro de producción".
 - **Estado de la conversación de Ismael:** sin tema abierto; las cuatro entregas, esperando su decisión.
   **De Marcos, Mariano y Ariel:** sin tema abierto.
 - **Ya enviado:** a Ismael, los cuatro avisos de entrega, el viernes 23.

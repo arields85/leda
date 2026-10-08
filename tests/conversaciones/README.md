@@ -121,8 +121,11 @@ Nahuel (paso 10) y los dos días siguientes sin nada (paso 10b).
 **La hoja de aprobación** (porción 3b): un paso puede tocar el botón del aviso de una de varias entregas
 (`toca: Pedir cambios` con `de_la_tarea`); lo que Leda manda por su cuenta puede esperar sus botones
 (`botones`), y los efectos suman las decisiones de quien aprueba (`aprobaciones`: la tarea, la decisión
-y de quién). Cada tarea lleva un criterio de aceptación de la prueba (`criterio`, si la conversación
-no dice otro): sin él, ninguna se podría cerrar al aprobarla.
+y de quién). Cada tarea lleva su criterio de aceptación (`criterio`, en el YAML y en el estado inicial
+del `.md`), concreto y comprobable como lo pide la mecánica §13 (C-3d, D1): sin él, ninguna se podría
+cerrar al aprobarla, y la entrega lo va a comparar con lo que la persona describe (decisión 10 de
+`odd/tasks/fase-c.md`). `carga.py` tiene uno de reserva, también concreto, para una tarea que no
+diga el suyo.
 
 **La 12 (paso 6) y la 25 (paso 8) esperan todavía que la entrega no se reciba por chat** (`no_por_chat`):
 desde la porción 2 la entrega muestra la vista previa (o, en la 25, no se puede porque la tarea de

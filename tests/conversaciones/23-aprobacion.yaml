@@ -7,22 +7,25 @@ persona: Ismael
 inicio: "2026-10-23 14:00"
 
 # Sin política de evidencia: la evidencia está completa según la de cada área. Cada tarea lleva
-# el criterio de aceptación de la prueba (`carga.py`).
+# su criterio de aceptación (`criterio`), concreto y comprobable.
 tareas:
   PLC:
     titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
     responsable: Marcos
     vence: "2026-10-30"
     estado: en_curso
     desde: "2026-10-19"
   SW:
     titulo: Cambiar switch industrial de la sala de servidores
+    criterio: "El switch nuevo queda instalado y todos los equipos de la sala de servidores se conectan a la red sin cortes durante una hora"
     responsable: Lucas
     vence: "2026-10-30"
     estado: en_curso
     desde: "2026-10-19"
   COM:
     titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
     responsable: Marcos
     vence: "2026-10-30"
     estado: en_curso
@@ -31,12 +34,14 @@ tareas:
     depende_de: SW
   TAB:
     titulo: Cablear tablero de la máquina 3
+    criterio: "El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba de continuidad y de aislación"
     responsable: Mariano
     vence: "2026-10-30"
     estado: en_curso
     desde: "2026-10-19"
   DASH:
     titulo: Dashboard de lotes en CoreLabs
+    criterio: "El dashboard muestra los lotes del día con su cantidad y su estado, y coinciden con el registro de producción"
     responsable: Ariel
     vence: "2026-11-06"
     estado: en_curso

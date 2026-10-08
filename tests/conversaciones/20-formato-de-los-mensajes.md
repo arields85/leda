@@ -21,8 +21,11 @@ nunca como algo que ella le avisa.
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 23 (tres días hábiles después
     de D); `asignada`; sin bloqueos ni dependencias.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 30;
     `en_curso` desde el lunes 19; sin bloqueos ni dependencias; sin previsiones anotadas.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para
   confirmar. **De Ismael:** igual.
 - **Ya enviado:** a Marcos, el aviso previo de la tarea del PLC (martes 20, 10:00), que no pide respuesta.

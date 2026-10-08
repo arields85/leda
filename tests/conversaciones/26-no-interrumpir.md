@@ -46,8 +46,11 @@ minutos, en `workspace_setting`, como el margen para corregir.
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 30; `en_curso`; sin bloqueos ni
     dependencias; sin previsiones anotadas.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 30;
     `en_curso`; sin bloqueos ni dependencias; sin previsiones anotadas.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para
   confirmar. **De Ismael:** igual.
 - **Ya guardado:** el aviso previo de las dos tareas (vencen en 3 días hábiles), para hoy, martes 27, a las

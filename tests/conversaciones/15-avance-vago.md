@@ -17,9 +17,12 @@ respuesta ambigua, no puede quedar así"), y 9j.
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence hoy, martes 27; `en_curso` desde el
     martes 20; sin bloqueos ni previsiones.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 6 de
     noviembre (su aviso previo sale el martes 3); `asignada`; depende de la del PLC con una dependencia
     bloqueante (la de la semilla).
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Estado de la conversación de Marcos:** sin tema abierto; nada para después; nada mostrado para
   confirmar.
 - **Ya enviado:** a Marcos, el aviso previo de la tarea del PLC (jueves 22), que no pide respuesta. Ninguna

@@ -16,8 +16,11 @@ depende de Jev.
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 23 (tres días hábiles
     después de D); `asignada`; sin bloqueos.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 30;
     `asignada`; sin bloqueos. En esta conversación no hay dependencia entre las dos.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para
   confirmar.
 - **Ya enviado:** nada a Marcos en la semana.

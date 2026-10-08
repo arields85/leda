@@ -15,8 +15,11 @@ jugada nueva `destrabar` (ADR 0018, decisión 9l), que resuelve el `PENDIENTE` d
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 23 (dos días hábiles después
     de D); `en_curso` desde el lunes 19 hasta el martes 20, cuando Marcos escribió "estoy trabado,
     espero el switch": desde entonces, `bloqueada`, con un bloqueo abierto con esa causa.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 30;
     `asignada`; depende de la del PLC con una dependencia bloqueante (la de la semilla).
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Estado de la conversación de Marcos:** tema abierto, la pregunta de quién puede destrabar el
   bloqueo de la tarea del PLC, hecha el martes 20 a las 10:20; su espera está abierta (9c, paso 2);
   nada para después; nada mostrado para confirmar. **De Ismael:** sin tema abierto.

@@ -21,8 +21,11 @@ aviso de la aprobación a Nahuel sale con el de Ismael (paso 10) y los dos días
 - **Tareas:**
   - "Actualizar planos eléctricos de la paila 2": de Nahuel, OT; la aprueba Marcos; vence el viernes 30;
     `en_curso`; sin bloqueos ni dependencias.
+    Criterio de aceptación: "Los planos eléctricos de la paila 2 coinciden con la instalación actual y
+    quedan cargados en la carpeta de planos".
   - "Programar PLC de la comprimidora": de Marcos, OT; la aprueba Ismael; vence el viernes 30;
     `en_curso`; sin bloqueos ni dependencias.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
 - **Estado de la conversación de las tres personas:** sin tema abierto, nada para después, nada mostrado
   para confirmar.
 - **Ya enviado:** nada en la semana sobre estas tareas.

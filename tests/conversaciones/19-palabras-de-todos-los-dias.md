@@ -13,9 +13,12 @@ Decisión del usuario del 2026-10-07, de la prueba por Telegram real (Marcos pre
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 23; `en_curso` desde el lunes 19;
     sin bloqueos ni previsiones.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 6 de
     noviembre (su aviso previo sale el martes 3, fuera de este hilo); `asignada`; depende de la del PLC con
     una dependencia bloqueante (la de la semilla).
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Personas:** Nahuel Gimenez es integrante de OT. Ismael aprueba el trabajo de Marcos.
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para
   confirmar. **De Ismael:** igual.

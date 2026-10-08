@@ -66,7 +66,7 @@ def test_el_cargador_escribe_el_estado_inicial_de_cada_conversacion(conn, ruta):
     mundo = cargar(conn, conv)
 
     with admin(conn) as cur:
-        cur.execute("""select t.titulo, t.estado::text estado, u.nombre,
+        cur.execute("""select t.titulo, t.estado::text estado, u.nombre, t.criterio_aceptacion,
                               (t.fecha_objetivo at time zone 'America/Argentina/Buenos_Aires')::date
                               vence
                          from task t join membership m on m.id = t.responsable_membership_id
@@ -90,6 +90,8 @@ def test_el_cargador_escribe_el_estado_inicial_de_cada_conversacion(conn, ruta):
         assert fila["estado"] == t.get("estado", "asignada")
         assert fila["vence"].isoformat() == t["vence"]
         assert fila["nombre"].split()[0].startswith(t["responsable"][:4])
+        # C-3d, D1: cada tarea, con un criterio de aceptación concreto, el de su YAML.
+        assert t.get("criterio") and fila["criterio_aceptacion"] == t["criterio"], t["titulo"]
     assert dependencias == {(conv["tareas"][t["depende_de"]]["titulo"], t["titulo"])
                             for t in conv["tareas"].values() if t.get("depende_de")}
 

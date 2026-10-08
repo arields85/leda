@@ -7,16 +7,18 @@ persona: Marcos
 inicio: "2026-10-26 10:30"
 
 # Sin política de evidencia: la evidencia está completa según la de cada área. Cada tarea lleva
-# el criterio de aceptación de la prueba (`carga.py`).
+# su criterio de aceptación (`criterio`), concreto y comprobable.
 tareas:
   PAILA:
     titulo: Actualizar planos eléctricos de la paila 2
+    criterio: "Los planos eléctricos de la paila 2 coinciden con la instalación actual y quedan cargados en la carpeta de planos"
     responsable: Nahuel
     vence: "2026-10-30"
     estado: en_curso
     desde: "2026-10-19"
   PLC:
     titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
     responsable: Marcos
     vence: "2026-10-30"
     estado: en_curso

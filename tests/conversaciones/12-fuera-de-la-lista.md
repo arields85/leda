@@ -13,8 +13,11 @@ y 9g.
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 23 (tres días hábiles después
     de D); `en_curso` desde el lunes 19; sin bloqueos ni dependencias.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 30;
     `asignada`; sin bloqueos ni dependencias.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Personas:** Nahuel Gimenez es integrante de OT. Ismael aprueba el trabajo de Marcos y es la autoridad
   del espacio. El administrador de plataforma está en los datos, con el bot de administración.
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para

@@ -19,8 +19,11 @@ porción 3.
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": área OT; la aprueba Ismael; vence el viernes 30; `en_curso` desde
     el lunes 19; sin bloqueos ni dependencias.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": área OT; la aprueba Ismael; vence el
     viernes 30; `en_curso` desde el miércoles 21; sin bloqueos ni dependencias.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Lo que pide la política de OT:** una explicación (texto), un resultado de prueba (texto, archivo,
   imagen o enlace), una captura (imagen) y un archivo (archivo, imagen o enlace). Un mismo texto puede
   cubrir varios tipos, si lo dice (la explicación y cómo se probó); la vista previa dice qué cubre cada

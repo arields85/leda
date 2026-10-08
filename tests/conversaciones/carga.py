@@ -12,8 +12,10 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   bot de administración alcanzable;
 - **las tareas** de la conversación: título, responsable, vencimiento (17:00 del día, el fin de
   la jornada), estado (un inicio, como el evento del día que dice), dependencias y su criterio
-  de aceptación (uno de la prueba si la conversación no lo dice: sin él, ninguna se podría
-  cerrar al aprobarla; mecánica §5);
+  de aceptación (`criterio`): concreto y comprobable, como lo pide la mecánica §13, porque la
+  entrega lo compara con lo que la persona describe (`odd/tasks/fase-c.md`, decisión 10). Si la
+  conversación no lo dice, va uno de reserva, también concreto: sin criterio, ninguna tarea se
+  podría cerrar al aprobarla (mecánica §5);
 - **la política de evidencia** (`evidencia`, por área), si la conversación la nombra: lo que pide
   cada área y, por tipo, las clases que lo cubren y cómo se dice, de `espacios/corework.yaml`
   (ADR 0019, decisión 5); cada tarea pide lo de su área;
@@ -57,7 +59,10 @@ PERSONAS = {
 AREAS = {"direccion": "Dirección", "ot": "OT y automatización", "it": "Infraestructura IT",
          "corelabs": "Software e interfaz HMI",
          "electricidad": "Sistemas eléctricos y tableros"}
-CRITERIO_DE_LA_PRUEBA = "El trabajo hecho y revisado por quien lo aprueba"
+# El de reserva, para una tarea cuya conversación no dice el suyo (C-3d, D1: cada tarea de las
+# conversaciones lleva uno propio en su YAML).
+CRITERIO_DE_LA_PRUEBA = ("Lo que pide el título de la tarea queda hecho y probado, y quien lo hizo "
+                         "describe cómo lo probó y qué dio la prueba")
 ROLES = {"direccion": ("Dirección", True), "referente": ("Referente técnico de área", False),
          "integrante": ("Integrante", False)}
 OBJETIVO = "Conectar y automatizar equipos para que produzcan y entreguen datos"

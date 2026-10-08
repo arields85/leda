@@ -9,12 +9,14 @@ inicio: "2026-10-22 09:00"
 tareas:
   PLC:
     titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
     responsable: Marcos
     vence: "2026-10-27"
     estado: en_curso
     desde: "2026-10-20"
   COM:
     titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
     responsable: Marcos
     vence: "2026-11-06"
     estado: asignada

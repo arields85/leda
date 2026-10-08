@@ -14,9 +14,12 @@ eso"), no una regla del inicio; con la decisión 9i (el seguimiento sigue a la p
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 23 (venció hace un día
     hábil); `asignada`: Marcos todavía no dijo que arrancó; sin bloqueos ni previsiones.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 6 de
     noviembre (su aviso previo sale el martes 3); `asignada`; depende de la del PLC con una dependencia
     bloqueante (la de la semilla).
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Estado de la conversación de Marcos:** la pregunta del estado de la tarea del PLC, abierta desde el
   viernes 23; nada para después; nada mostrado para confirmar.
 - **Ya enviado:** a Marcos, el aviso previo de la tarea del PLC (martes 20) y el primer pedido de estado

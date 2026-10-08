@@ -11,10 +11,13 @@ Ismael. ADR 0018, decisión 5a, cuarta respuesta, y decisión 9b; mecánica §9.
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el martes 27 (tres días hábiles después de
     D); `en_curso` desde el martes 20; sin bloqueos.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 6 de
     noviembre (su aviso previo sale el martes 3, fuera de esta conversación); `asignada`; depende de la del
     PLC con una dependencia bloqueante (la de la semilla): no puede pasar a `en_curso` hasta que la del PLC
     esté terminada.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para
   confirmar.
 - **Ya enviado:** nada a Marcos en la semana sobre estas tareas.

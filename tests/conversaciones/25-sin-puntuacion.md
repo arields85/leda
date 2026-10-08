@@ -24,8 +24,11 @@ del día; acá llega antes (paso 6) y a Ismael le llega un solo aviso, con el po
 - **Tareas de Marcos** (las dos vencen el mismo día, como las cargó la semilla en la prueba real):
   - "Programar PLC de la comprimidora": referente Ismael; vence el jueves 22; `en_curso` desde el lunes 19;
     sin bloqueos ni previsiones.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el jueves 22;
     `asignada`; depende de la del PLC con una dependencia bloqueante (la de la semilla); sin previsiones.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para
   confirmar. **De Ismael:** igual.
 - **Ya enviado:** nada a Marcos ni a Ismael en la semana.

@@ -15,11 +15,16 @@ principal comete sola, se queda; si no, se retira. Nada de lo que Leda hace o di
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 23 (tres días hábiles
     después de D); `asignada`; sin bloqueos.
+    Criterio de aceptación: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas".
   - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 23;
     `asignada`; sin bloqueos. En esta conversación no hay dependencia entre las dos, para que
     las dos se puedan arrancar.
+    Criterio de aceptación: "Los equipos de la comprimidora se comunican con el PLC por la red de planta
+    sin errores durante una hora".
 - **Tarea de otra persona:** "Integrar datos de la comprimidora en CoreLabs", de Ariel; vence el viernes
   23; `asignada`. No es de Marcos.
+  Criterio de aceptación: "CoreLabs muestra los datos de producción de la comprimidora, actualizados cada
+  minuto, durante un turno completo".
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para
   confirmar.
 - **Ya enviado:** nada a Marcos en la semana.

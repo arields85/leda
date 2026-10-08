@@ -12,16 +12,19 @@ foco: [PLC, COM]
 tareas:
   PLC:
     titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
     responsable: Marcos
     vence: "2026-10-23"
     estado: asignada
   COM:
     titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
     responsable: Marcos
     vence: "2026-10-23"
     estado: asignada
   ARI:
     titulo: Integrar datos de la comprimidora en CoreLabs
+    criterio: "CoreLabs muestra los datos de producción de la comprimidora, actualizados cada minuto, durante un turno completo"
     responsable: Ariel
     vence: "2026-10-23"
     estado: asignada
