@@ -96,6 +96,11 @@ QUE_CAMBIOS_PIDE = "que_cambios_pide"
 # cambios) admite dos lecturas: ninguna se hace y Leda pregunta cuál, con las dos como opciones
 # (constitución §8; ADR 0018, decisión 2). Una sola vez: la misma pregunta no se repite.
 CUAL_DE_LAS_DOS = "cual_de_las_dos"
+# Un botón que muestra la entrega de una tarea que espera la decisión de la persona (decisión 17
+# del usuario, 2026-10-08): lo ofrece una lista de entregas, un recordatorio o lo que queda por
+# revisar después de decidir una. No es un tema abierto, sólo muestra: uno nuevo no reemplaza a
+# otro (`ofrecer`, `reemplaza=False`), y tocarlo corre `ver_entrega`, como escribirlo.
+VER_LA_ENTREGA = "ver_la_entrega"
 
 
 @dataclass(frozen=True)
@@ -129,6 +134,7 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(DECISION_DE_LA_ENTREGA),
     TipoDePregunta(QUE_CAMBIOS_PIDE),
     TipoDePregunta(CUAL_DE_LAS_DOS, sin_elegir_queda=DECISION_DE_LA_ENTREGA),
+    TipoDePregunta(VER_LA_ENTREGA),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token

@@ -16,7 +16,12 @@ corre el paso 10 aparte, por el motor y sin comprobarlo. Desde la porción 4, lo
 de los pasos 3, 4b, 7, 9b y 11 llevan al final el enlace a la página de la tarea, que agrega el
 código y sale sin vista previa; el de Ismael del paso 11, no. Desde la porción 3c, el lunes 26 a las 10:30
 Ismael recibe además el primer recordatorio de las tres entregas que siguen esperando su decisión
-(conversación 24): el YAML lo espera en el paso 3, sin que sea parte de lo que mide ésta.
+(conversación 24): el YAML lo espera en el paso 3, sin que sea parte de lo que mide ésta. Desde la
+D4 de la C-3d: los cuatro avisos del viernes salen de a uno, cada uno al terminar su margen para
+corregir (los que salen juntos irían en una lista, la conversación 28), y después de cada decisión
+(pasos 2, 4 y 6) la respuesta dice lo que le queda por revisar a Ismael, con un botón por tarea para
+verla (decisión 17 del usuario, 2026-10-08). En el paso 9, "pasale lo de los colores" es lo que la
+decisión 12 llama el comentario: va con la aprobación, no como un pedido de cambios.
 
 ## Estado inicial
 

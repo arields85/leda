@@ -12,6 +12,12 @@ no lleva botones (9b), salvo un aviso que ofrece decidir algo (el de una entrega
 aprueba, con "Aprobar" y "Pedir cambios"; porción 3b de la C-3): lleva las opciones de la
 decisión que abrió al salir (`avisos.TipoDeAviso.ofrece`), si sigue sin cerrar. Van con el
 texto del aviso; su álbum sale sin botones.
+
+Desde la D4 de la C-3d (decisiones 12 y 17 del usuario, 2026-10-08): un aviso puede llevar un botón
+por tarea para ver su entrega (una lista, un recordatorio), en el orden de sus avisos; y una
+respuesta lleva, después de las opciones de la pregunta abierta, las decisiones que su turno
+ofreció en ella sin que sean un tema abierto (`preguntas.ofrecer_en_la_respuesta`): Aprobar y
+Pedir cambios al ver una entrega o cuando la persona no eligió, y lo que queda por revisar.
 """
 
 from __future__ import annotations
@@ -59,14 +65,17 @@ class ConOpciones:
             if fila is None:
                 return []
             if not fila["es_respuesta"]:
-                # Un aviso: las opciones de lo que ofrece decidir, si sigue sin cerrar.
+                # Un aviso: las opciones de lo que ofrece decidir o ver, si siguen sin cerrar; de
+                # un envío que junta varios (una lista, decisión 17), en el orden de sus avisos.
                 cur.execute("""select o.etiqueta, o.token
                                  from scheduled_notice a
+                                 left join task t on t.id = a.task_id
                                  join conversation_question q
                                    on q.jugada ->> 'del_aviso' = a.id::text
                                  join conversation_option o on o.question_id = q.id
                                 where a.outbox_id = %s and q.cerrada_en is null
-                                order by o.orden""", (fila["id"],))
+                                order by a.programado_para, a.creado_en, t.titulo,
+                                         a.dedupe_key, o.orden""", (fila["id"],))
                 return [Boton(o["etiqueta"], callback(o["token"])) for o in cur.fetchall()]
             cur.execute("""select o.etiqueta, o.token
                              from conversation_state s

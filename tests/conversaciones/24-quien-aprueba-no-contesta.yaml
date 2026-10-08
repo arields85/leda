@@ -57,14 +57,14 @@ pasos:
       - a: Marcos
         tipo: recordatorio_de_la_decision
         tarea: PAILA
-        botones: []
+        botones: [Ver PAILA]
         hechos: {veces_que_se_lo_recuerda: 1, responsable: Nahuel Gimenez,
                  entregada_el: "2026-10-26", necesita_respuesta: true,
                  si_sigue_sin_decidir: ausente}
       - a: Ismael
         tipo: recordatorio_de_la_decision
         tarea: PLC
-        botones: []
+        botones: [Ver PLC]
         hechos: {veces_que_se_lo_recuerda: 1, responsable: Marcos Tarquini,
                  entregada_el: "2026-10-26", necesita_respuesta: true,
                  si_sigue_sin_decidir: ausente}
@@ -86,13 +86,13 @@ pasos:
       - a: Marcos
         tipo: recordatorio_de_la_decision
         tarea: PAILA
-        botones: []
+        botones: [Ver PAILA]
         hechos: {veces_que_se_lo_recuerda: 2,
                  si_sigue_sin_decidir: {se_avisa_a: [Ismael Soschinski], fecha: "2026-10-29"}}
       - a: Ismael
         tipo: recordatorio_de_la_decision
         tarea: PLC
-        botones: []
+        botones: [Ver PLC]
         hechos: {veces_que_se_lo_recuerda: 2, si_sigue_sin_decidir: ausente}
     dice:
       - lo mismo que el primero, breve, con que la entrega espera desde el lun 26/10
@@ -112,14 +112,14 @@ pasos:
       - a: Ismael
         tipo: aprobacion_trabada
         tareas: [PAILA, PLC]
-        botones: []
+        botones: [Ver PLC]
         hechos: {quien_aprueba: Marcos Tarquini, responsable: Nahuel Gimenez,
                  entregada_el: "2026-10-26", necesita_respuesta: false,
                  leda_se_lo_sigue_recordando: true, se_le_avisa_cuando_decida: true}
       - a: Marcos
         tipo: recordatorio_de_la_decision
         tarea: PAILA
-        botones: []
+        botones: [Ver PAILA]
         hechos: {veces_que_se_lo_recuerda: 3, si_sigue_sin_decidir: ausente}
     dice:
       - "a Ismael, sólo informativo: que Nahuel entregó la tarea de los planos de la paila 2 el lun 26/10, con 📋; que Marcos todavía no decidió y que Leda se lo sigue recordando; que le avisa cuando se destrabe; que no hace falta que responda, solo en el último renglón"
@@ -138,12 +138,12 @@ pasos:
       - a: Marcos
         tipo: recordatorio_de_la_decision
         tarea: PAILA
-        botones: []
+        botones: [Ver PAILA]
         hechos: {veces_que_se_lo_recuerda: 4, si_sigue_sin_decidir: ausente}
       - a: Ismael
         tipo: recordatorio_de_la_decision
         tarea: PLC
-        botones: []
+        botones: [Ver PLC]
         hechos: {veces_que_se_lo_recuerda: 4}
     dice:
       - lo mismo, breve y cordial, con la entrega del lun 26/10
@@ -197,7 +197,7 @@ pasos:
       - a: Marcos
         tipo: recordatorio_de_la_decision
         tarea: PAILA
-        botones: []
+        botones: [Ver PAILA]
         hechos: {veces_que_se_lo_recuerda: 5}
     estado_avisos:
       - {tipo: recordatorio_de_la_decision, tarea: PLC, a: Ismael, estado: omitido,

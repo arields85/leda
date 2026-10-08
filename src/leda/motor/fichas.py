@@ -104,6 +104,11 @@ class Contexto:
     # Las decisiones ofrecidas en la respuesta de este turno (`preguntas.ofrecer_en_la_
     # respuesta`): sus botones salen con ella, sin ser un tema abierto (C-3d, D4).
     ofrecidas: list[str] = field(default_factory=list)
+    # Lo que la respuesta lleva además de su texto cuando muestra una entrega (`aprobacion.
+    # ver_entrega`; decisión 17): las fotos, en un álbum después del texto, y el enlace a la
+    # página de la tarea, uno solo por mensaje: `(tarea, persona)`.
+    adjuntos_de_la_respuesta: list[str] = field(default_factory=list)
+    enlace_de_la_respuesta: list[tuple[str, str]] = field(default_factory=list)
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
         """Una tarea por su alias: de las suyas o de las que esperan su decisión."""
@@ -1035,6 +1040,11 @@ def _pedir_cambios(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     return aprobacion.pedir_cambios(ctx, datos, tarea)
 
 
+def _ver_entrega(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import aprobacion
+    return aprobacion.ver_entrega(ctx, datos, tarea)
+
+
 def _pedir_reasignacion(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     decide = referente(ctx.cur, ctx.quien.membership_id)
     return {"resultado": "no_por_chat", "motivo": "cambiar_el_responsable_no_es_por_chat",
@@ -1386,6 +1396,18 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "de lo que entregó en una tarea que espera su decisión, con lo que falta "
              "(comentario) si lo dice. Lo que falta, cuando Leda lo pregunta, también es esta "
              "jugada. Una tarea que no está en la lista se nombra por su responsable (de)."),
+    Ficha("ver_entrega", "mostrar la entrega de una tarea que espera su revisión",
+          necesita=(), opcional=("tarea", "de"),
+          comprueba="que quien escribe sea quien aprueba el trabajo del responsable y que la "
+                    "tarea esté entregada, esperando su decisión",
+          hace="lee lo entregado; no cambia nada",
+          despues="la muestra con sus fotos adjuntas y el enlace a la página de la tarea, con "
+                  "los botones Aprobar y Pedir cambios, sin que sea una pregunta",
+          manejar=_ver_entrega,
+          es="La persona que revisa pide ver lo que se entregó de una tarea que espera su "
+             "decisión (lo que describió quien la hizo, sus fotos, archivos y enlaces), tocando "
+             "su botón o escribiéndolo. No decide nada: aprobarla o pedirle cambios son otras "
+             "jugadas. Una tarea que no está en la lista se nombra por su responsable (de)."),
     Ficha("pedir_reasignacion", "pasarle una tarea a otra persona",
           necesita=(), opcional=("tarea", "a"),
           comprueba="nada", hace="nada: cambiar el responsable no es por chat (9g)",

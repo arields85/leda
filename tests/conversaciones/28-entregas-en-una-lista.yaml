@@ -1,0 +1,236 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/28-entregas-en-una-lista.md
+numero: "28"
+titulo: "Las entregas para revisar, en una lista"
+mide: garantias
+persona: Ismael
+inicio: "2026-10-23 14:00"
+
+# Sin política de evidencia: lo entregado es lo que describe cada uno y sus fotos.
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  TAB:
+    titulo: Cablear tablero de la máquina 3
+    criterio: "El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba de continuidad y de aislación"
+    responsable: Mariano
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  DASH:
+    titulo: Dashboard de lotes en CoreLabs
+    criterio: "El dashboard muestra los lotes del día con su cantidad y su estado, y coinciden con el registro de producción"
+    responsable: Ariel
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+
+# El viernes 23: las tres entregas, confirmadas; sus avisos a Ismael esperan el margen para
+# corregir y salen juntos en el paso 1.
+preludio:
+  - quien: Marcos
+    a_las: "2026-10-23 15:00"
+    escribe: "termine el plc, arranca desde el plc y completo los 20 ciclos sin fallas"
+    manda: [{que: foto}]
+    jugadas: [{nombre: entregar, tarea: PLC, lo_descrito_cubre: [C1]}]
+  - quien: Marcos
+    a_las: "2026-10-23 15:01"
+    toca: Confirmar
+  - quien: Mariano
+    a_las: "2026-10-23 15:02"
+    escribe: "termine el tablero de la 3, cableado segun el diagrama y paso continuidad y aislacion"
+    manda: [{que: foto}, {que: foto}]
+    jugadas: [{nombre: entregar, tarea: TAB, lo_descrito_cubre: [C1]}]
+  - quien: Mariano
+    a_las: "2026-10-23 15:03"
+    toca: Confirmar
+  - quien: Ariel
+    a_las: "2026-10-23 15:05"
+    escribe: "termine el dashboard, muestra los lotes del dia con cantidad y estado y coinciden con el registro de produccion"
+    jugadas: [{nombre: entregar, tarea: DASH, lo_descrito_cubre: [C1]}]
+  - quien: Ariel
+    a_las: "2026-10-23 15:06"
+    toca: Confirmar
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-23 15:20"]
+    salen:
+      # Un solo mensaje con los tres avisos: una lista con un botón por tarea, sin fotos, sin
+      # enlace y sin Aprobar ni Pedir cambios (son de cada entrega).
+      - a: Ismael
+        tipo: entrega_para_aprobar
+        tareas: [PLC, TAB, DASH]
+        botones: [Ver PLC, Ver TAB, Ver DASH]
+        fotos: 0
+        enlace: false
+        hechos: {responsable: Mariano Naim, fotos_que_trae: 2, lo_que_entrego: ausente,
+                 fotos_adjuntas: ausente}
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que le entregaron 3 tareas para revisar
+      - cada una en su renglón con 📋, con quién la entregó y cuántas fotos trae
+      - "el cierre, aparte: que toque una para verla"
+    no_dice:
+      - para aprobar
+      - lo entregado pieza por pieza
+
+  - paso: 2
+    a_las: "2026-10-23 15:25"
+    toca: Ver TAB
+    efectos: {}
+    hechos:
+      - {jugada: ver_entrega, resultado: leido, tarea: TAB, responsable: Mariano Naim,
+         fotos_adjuntas: 2, lo_que_entrego: presente,
+         lleva_el_enlace_a_la_pagina_de_la_tarea: true,
+         botones: [Aprobar, Pedir cambios]}
+    pregunta: null
+    botones: [Aprobar, Pedir cambios]
+    fotos: 2
+    enlace: true
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - la tarea del tablero en su renglón con 📋
+      - que la entregó Mariano y lo que describió
+      - que van dos fotos adjuntas
+      - "el cierre: que puede aprobarla o pedir cambios"
+    no_dice:
+      - que ya la aprobó
+
+  - paso: 3
+    a_las: "2026-10-23 15:30"
+    escribe: "esta bien pero que mariano revise el rotulo de los cables"
+    jugadas:
+      - {nombre: aprobar, tarea: TAB, comentario: "que mariano revise el rotulo de los cables",
+         puede_traer: [comentario]}
+      - {nombre: pedir_cambios, tarea: TAB,
+         comentario: "que mariano revise el rotulo de los cables"}
+    efectos: {}
+    hechos:
+      - {jugada: aprobar, resultado: dos_lecturas, tarea: TAB,
+         lecturas: [aprobar, pedir_cambios], pregunta: cual_de_las_dos}
+    pregunta: {tipo: cual_de_las_dos, tarea: TAB}
+    botones: [Aprobar, Pedir cambios]
+    estado_despues:
+      pregunta_abierta: {tipo: cual_de_las_dos, tarea: TAB}
+    dice:
+      - "una sola pregunta, cuál de las dos: aprobarla y pasarle el comentario a Mariano, o pedirle el cambio primero"
+    no_dice:
+      - que la aprobó
+      - que le pidió el cambio
+
+  - paso: 4
+    a_las: "2026-10-23 15:31"
+    escribe: "y bueno fijate vos"
+    jugadas: []
+    efectos: {}
+    hechos:
+      - {resultado: no_eligio, pregunta_hecha_una_vez: cual_de_las_dos, tarea: TAB,
+         botones: [Aprobar, Pedir cambios]}
+    pregunta: null
+    botones: [Aprobar, Pedir cambios]
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que Leda no decide por él
+      - que la entrega del tablero sigue esperando su decisión, con los botones o escribiéndolo
+    no_dice:
+      - la misma pregunta otra vez
+      - que la aprobó
+      - que le pidió el cambio
+
+  - paso: 5
+    a_las: "2026-10-23 15:40"
+    # El "Aprobar" de la respuesta anterior: decide, con el comentario que había dicho.
+    toca: Aprobar
+    de_la_tarea: TAB
+    efectos:
+      estados: {TAB: terminada}
+      aprobaciones:
+        - {tarea: TAB, decision: aprobado, de: Ismael}
+      avisos_guardados:
+        - {tipo: tarea_aprobada, tarea: TAB, a: Mariano, estado: guardado}
+    hechos:
+      - {jugada: aprobar, resultado: anotado, tarea: TAB, comentario: presente,
+         quedo_terminada: true,
+         queda_por_revisar: [{tarea: PLC, responsable: Marcos Tarquini},
+                             {tarea: DASH, responsable: Ariel De Simone}]}
+    pregunta: null
+    botones: [Ver PLC, Ver DASH]
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la del tablero quedó terminada y que Mariano se entera ahora, con el comentario
+      - que le quedan por revisar la del PLC y la del dashboard
+    no_dice:
+      - que le pidió un cambio a Mariano
+
+  - paso: 6
+    quien: Leda
+    relojes: ["2026-10-23 15:41"]
+    salen:
+      - a: Mariano
+        tipo: tarea_aprobada
+        tarea: TAB
+        enlace: true
+        hechos: {aprobada_por: Ismael Soschinski, comentario: presente, quedo_terminada: true,
+                 necesita_respuesta: false}
+    dice:
+      - que quedó aprobada y terminada, en su renglón con 📋, sin nombrar a Ismael
+      - el comentario de los rótulos como algo para mirar, no como un cambio pendiente
+      - que no hace falta que responda, solo en el último renglón
+
+  - paso: 7
+    a_las: "2026-10-23 15:45"
+    escribe: "mostrame la del plc"
+    jugadas:
+      - {nombre: ver_entrega, tarea: PLC}
+    efectos: {}
+    hechos:
+      - {jugada: ver_entrega, resultado: leido, tarea: PLC, responsable: Marcos Tarquini,
+         fotos_adjuntas: 1, botones: [Aprobar, Pedir cambios]}
+    pregunta: null
+    botones: [Aprobar, Pedir cambios]
+    fotos: 1
+    enlace: true
+    dice:
+      - la del PLC, que la entregó Marcos y lo que describió
+      - que va una foto adjunta
+      - que puede aprobarla o pedir cambios
+
+  - paso: 8
+    quien: Leda
+    relojes: ["2026-10-26 10:00"]
+    salen:
+      - a: Ismael
+        tipo: recordatorio_de_la_decision
+        tareas: [DASH, PLC]
+        botones: [Ver DASH, Ver PLC]
+        hechos: {veces_que_se_lo_recuerda: 1, entregada_el: "2026-10-23",
+                 necesita_respuesta: true}
+    dice:
+      - que esperan su revisión desde el vie 23/10
+      - cada una en su renglón con 📋, con quién la entregó
+      - "el cierre: que puede tocar una para verla, o contestar"
+
+  - paso: 9
+    a_las: "2026-10-26 10:05"
+    toca: Ver DASH
+    efectos: {}
+    hechos:
+      - {jugada: ver_entrega, resultado: leido, tarea: DASH, responsable: Ariel De Simone,
+         fotos_adjuntas: ausente, botones: [Aprobar, Pedir cambios]}
+    botones: [Aprobar, Pedir cambios]
+    fotos: 0
+    enlace: true
+    dice:
+      - la del dashboard, que la entregó Ariel y lo que describió, sin fotos
+      - que puede aprobarla o pedir cambios

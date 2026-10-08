@@ -47,6 +47,13 @@ aviso al responsable y a quien aprobó. Es una regla general: vale para lo que s
 tercer día hábil, quien está arriba se entera, sólo para que lo sepa (`escalera.py`). Una
 decisión, aprobar o pedir cambios, corta los recordatorios y, si quien está arriba ya se había
 enterado, le llega que se destrabó (`aprobacion_destrabada`), de coordinación y enseguida.
+
+**Las entregas en listas** (decisión 17 del usuario, 2026-10-08; C-3d, D4): ver una entrega es
+una jugada (`ver_entrega`), tocada desde el botón de una lista o escrita ("mostrame la del
+tablero"): muestra lo entregado, con las fotos adjuntas y el enlace a la página de la tarea, y
+ofrece en la respuesta los botones Aprobar y Pedir cambios, sin ser un tema abierto. Después de
+decidir una, la respuesta dice lo que queda por revisar (`queda_por_revisar`), con un botón por
+tarea, sin insistir: lo que queda entra en los recordatorios del día hábil siguiente.
 """
 
 from __future__ import annotations
@@ -62,8 +69,11 @@ from ..db import espacio
 from ..herramientas import ejecutar
 
 from . import entrega, fichas, preguntas
+from ..salida import MAX_ADJUNTOS
+
 from .avisos import (APROBACION_DESTRABADA, APROBACION_TRABADA, CERRADA_CON_LA_APROBACION,
-                     PEDIDO_DE_CAMBIOS, TAREA_APROBADA, aprobacion_vigente, guardar)
+                     LLEVA_EL_ENLACE, PEDIDO_DE_CAMBIOS, TAREA_APROBADA, aprobacion_vigente,
+                     boton_para_ver, enlace_a_la_pagina, guardar, lo_entregado_para_revisar)
 from .tiempo import Reloj, sale
 
 # Los códigos de por qué no se decide.
@@ -175,6 +185,7 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
                             {"aprobada_por": ctx.quien.nombre,
                              **{k: v for k, v in del_aviso.items()
                                 if k in ("quedo_terminada", "no_se_cierra_todavia")}})
+    _lo_que_queda(ctx, hecho, tarea["id"])
     return hecho
 
 
@@ -207,7 +218,74 @@ def pedir_cambios(ctx, datos: dict, tarea: dict | None) -> dict:
                            clave=f"motor:{PEDIDO_DE_CAMBIOS}:{r['decision_id']}")
     _avisar_que_se_destrabo(ctx, hecho, tarea, responsable,
                             {"pidio_cambios": ctx.quien.nombre, "estado": r["estado"]})
+    _lo_que_queda(ctx, hecho, tarea["id"])
     return hecho
+
+
+def ver_entrega(ctx, datos: dict, tarea: dict | None) -> dict:
+    """Ver una entrega que espera la decisión de quien escribe, tocada o escrita (decisión 17):
+    lo entregado, las fotos adjuntas a la respuesta y el enlace a la página de la tarea, y los
+    botones Aprobar y Pedir cambios en la respuesta (sin ser un tema abierto), atados a lo que
+    se mostró (su huella; ADR 0018, decisión 2). Nada cambia. Si ya la aprobó, lo dice y lo que
+    frena el cierre, sin botones; si la entrega se está completando, también sin botones."""
+    tarea, no = _la_tarea(ctx, "ver_entrega", datos, tarea)
+    if no is not None:
+        return no
+    cur, zona = ctx.cur, ctx.calendario.zona
+    hecho: dict[str, Any] = {"resultado": "leido", "tarea": _tarea(tarea),
+                             "responsable": _responsable(cur, tarea["id"])["nombre"]}
+    if entrega.falta_algo_de_lo_entregado(cur, tarea["id"]):
+        return {**hecho, "la_entrega_se_esta_completando": True,
+                "se_le_avisa_cuando_este_completa": True}
+    vistas, adjuntas = lo_entregado_para_revisar(cur, tarea["id"], zona)
+    lugar = max(MAX_ADJUNTOS - len(ctx.adjuntos_de_la_respuesta), 0)
+    van = adjuntas[:lugar]
+    contadas = 0
+    for vista in vistas:
+        if vista.get("va_adjunta"):
+            # Si otra entrega del mismo mensaje ya llenó el álbum, las demás sólo se nombran.
+            contadas += 1
+            vista["va_adjunta"] = contadas <= len(van)
+    ctx.adjuntos_de_la_respuesta.extend(van)
+    hecho.update(lo_que_entrego=vistas, fotos_adjuntas=len(van))
+    if not ctx.enlace_de_la_respuesta:
+        enlace = enlace_a_la_pagina(cur, tarea["id"], ctx.quien.membership_id)
+        if enlace is not None:
+            ctx.enlace_de_la_respuesta.append(enlace)
+            hecho[LLEVA_EL_ENLACE] = True
+    vigente = aprobacion_vigente(cur, tarea["id"], ctx.quien.membership_id)
+    if vigente is not None:
+        hecho["ya_la_aprobo_el"] = aprobada_el(cur, vigente, zona)
+        hecho.update(_frena(cur, tarea["id"]))
+        return hecho
+    opciones = [(fichas.FICHAS[n].boton, {"tarea": tarea["id"], "jugada": n})
+                for n in ("aprobar", "pedir_cambios")]
+    preguntas.ofrecer_en_la_respuesta(
+        ctx, preguntas.DECISION_DE_LA_ENTREGA, tarea["id"],
+        jugada={"nombre": "decidir_la_entrega",
+                "huella": entrega.huella_de_lo_entregado(cur, tarea["id"])},
+        opciones=opciones, reemplaza=False)
+    hecho["botones"] = [etiqueta for etiqueta, _ in opciones]
+    return hecho
+
+
+def _lo_que_queda(ctx, hecho: dict, decidida: str) -> None:
+    """Después de decidir una entrega, lo que le queda por revisar a quien decide (decisión 17):
+    las otras que esperan su decisión y que todavía no aprobó, con quién las entregó, y un botón
+    por tarea para verla, en la respuesta. Sin insistir: ningún aviso nuevo; lo que queda entra
+    en los recordatorios del día hábil siguiente."""
+    quedan = [t for t in para_decidir(ctx.cur, ctx.quien, 0, ctx.calendario.zona)
+              if t["id"] != decidida and "ya_la_aprobo_el" not in t]
+    if not quedan:
+        return
+    hecho["queda_por_revisar"] = [{"tarea": t["titulo"], "responsable": t["responsable"]}
+                                  for t in quedan]
+    for t in quedan:
+        preguntas.ofrecer_en_la_respuesta(
+            ctx, preguntas.VER_LA_ENTREGA, t["id"], jugada={"nombre": "ver_entrega"},
+            opciones=[(boton_para_ver(t["titulo"]), {"tarea": t["id"], "jugada": "ver_entrega"})],
+            reemplaza=False)
+    hecho["botones"] = [boton_para_ver(t["titulo"]) for t in quedan]
 
 
 # --- Lo que comparten ----------------------------------------------------------------------

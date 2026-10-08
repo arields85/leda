@@ -12,6 +12,9 @@ avisa nada: no depende de él (`odd/tasks/fase-c.md`, decisión 3). Circuito 8 (
 **Corre desde la porción 3c de la C-3** (`24-quien-aprueba-no-contesta.yaml`; `odd/tasks/fase-c.md`). El YAML
 suma lo que el hilo da por hecho: el lunes 2 a las 09:00 la escalera ya guardó los recordatorios del día, el
 aviso de la aprobación a Nahuel sale con el de Ismael (paso 10) y los dos días siguientes no sale nada.
+Desde la D4 de la C-3d, cada recordatorio a quien aprueba lleva un botón para ver la entrega ("Ver" y
+la tarea; decisión 17 del usuario, 2026-10-08: la lista de recordatorios lleva un botón por tarea); el
+aviso a quien está arriba sigue sin botones.
 
 ## Estado inicial
 

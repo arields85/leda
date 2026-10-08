@@ -22,6 +22,9 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
    - **lo que pasa aparte** (`aparte: true`): un paso que la conversación da por pasado en el
      medio sin mirarlo (la entrega y la aprobación de otra tarea), corrido por el motor como el
      preludio, con las jugadas del YAML, y sin comprobar;
+   - **la plataforma cambia quién aprueba** el trabajo de una persona (`cambia_quien_aprueba`,
+     con `de` y `a`; C-3d, D4): se escribe como la escribiría la plataforma, en el momento del
+     paso, antes de sus relojes;
 3. compara lo que pasó con lo esperado (`comprobar.py`), mide el formato de cada mensaje de Leda
    (`comprobar.fallas_de_formato`) y guarda lo que la persona que lee la
    corrida necesita: lo que dijo cada uno, las jugadas, los hechos y la latencia.
@@ -70,6 +73,8 @@ LIMITE_DEL_CANAL = 20 * MB
 # no es de nadie. El enlace a la página de una tarea que el despachador agrega al final de un
 # mensaje (ADR 0019, decisión 6) se reconoce por ella.
 DIRECCION_DE_PRUEBA = "https://leda.invalid"
+# El botón que muestra la entrega de una tarea (`avisos.boton_para_ver`): en el YAML, "Ver <clave>".
+VER = "Ver "
 ENLACE_DE_PRUEBA = re.compile(r"\n" + re.escape(DIRECCION_DE_PRUEBA) + r"/tarea/[A-Za-z0-9_-]+$")
 
 
@@ -264,6 +269,9 @@ class _Corredor:
                           dice=list(paso.get("dice") or []),
                           no_dice=list(paso.get("no_dice") or []), preludio=preludio)
         resultado = None
+        if "cambia_quien_aprueba" in paso:
+            self.reloj.momento = momento(paso["a_las"])
+            self._cambiar_quien_aprueba(paso["cambia_quien_aprueba"])
         if "escribe" in paso or "toca" in paso or "manda" in paso:
             self.reloj.momento = momento(paso["a_las"])
             r.cuando = paso["a_las"]
@@ -288,12 +296,12 @@ class _Corredor:
                 return r
             self.despacho.vuelta()
         else:
-            for cuando in paso["relojes"]:
+            for cuando in paso.get("relojes") or []:
                 self.reloj.momento = momento(cuando)
                 self.ciclo.vuelta()
                 r.salidas += self._salidas(entregados, cp.foto(self.conn, self.mundo))
                 entregados = len(self.transporte.enviados)
-            r.cuando = ", ".join(paso["relojes"])
+            r.cuando = ", ".join(paso.get("relojes") or [paso.get("a_las", "")])
         despues = cp.foto(self.conn, self.mundo)
         if resultado is not None:
             r.salidas = self._salidas(entregados, despues)
@@ -349,6 +357,28 @@ class _Corredor:
                 self.conn.commit()
                 self._repetido = otra is not None and otra.repetido
         return resultado, texto, jugadas, latencia
+
+    def _cambiar_quien_aprueba(self, cambio: dict[str, Any]) -> None:
+        """Lo que hace la plataforma: el trabajo de `de` lo aprueba ahora `a`."""
+        from leda.db import admin
+
+        with admin(self.conn) as cur:
+            cur.execute("update membership set aprobador_membership_id = %s where id = %s",
+                        (self.mundo.personas[cambio["a"]]["membership_id"],
+                         self.mundo.personas[cambio["de"]]["membership_id"]))
+        self.conn.commit()
+
+    def _etiqueta(self, etiqueta: str) -> str:
+        """Un botón por su clave en el YAML: una tarea, por la suya; el que muestra la entrega de
+        una tarea ("Ver <título>", decisión 17), por "Ver <clave>"; los demás, tal cual."""
+        clave = self.mundo.clave_de_titulo(etiqueta)
+        if clave is not None:
+            return clave
+        if etiqueta.startswith(VER):
+            de_la_tarea = self.mundo.clave_de_titulo(etiqueta[len(VER):])
+            if de_la_tarea is not None:
+                return VER + de_la_tarea
+        return etiqueta
 
     def _guardar_mensaje(self, quien, persona, texto: str,
                          manda: list[dict[str, Any]] | None = None) -> str:
@@ -410,6 +440,8 @@ class _Corredor:
                                 order by q.abierta_en desc limit 1 offset %s""",
                             (membership_id, self.mundo.tareas[clave], int(vieja)))
             else:
+                if clave.startswith(VER) and clave[len(VER):] in self.mundo.titulos:
+                    clave = VER + self.mundo.titulos[clave[len(VER):]]
                 tarea = self.mundo.tareas[de_la_tarea] if de_la_tarea else None
                 cur.execute("""select o.token, o.etiqueta from conversation_option o
                                  join conversation_question q on q.id = o.question_id
@@ -492,7 +524,7 @@ class _Corredor:
                 texto = entregado[:len(entregado) - len(plano)] + fila["cuerpo"]
             avisos, hechos = _avisos_del_envio(avisos_de.get(fila_id, []), self.mundo.titulos)
             tipos = sorted({a["tipo"] for a in avisos})
-            botones = [self.mundo.clave_de_titulo(b.etiqueta) or b.etiqueta for b in e.botones]
+            botones = [self._etiqueta(b.etiqueta) for b in e.botones]
             salidas.append(Salida(
                 quien, texto, botones, bool(fila.get("es_respuesta")),
                 tipo=tipos[0] if len(tipos) == 1 else None,
@@ -525,6 +557,12 @@ class _Corredor:
             botones = respuestas[0].botones if respuestas else []
             if botones != list(paso.get("botones") or []):
                 c.falla(clase, "botones", list(paso.get("botones") or []), botones)
+            # Lo que lleva la respuesta además del texto, si el paso lo dice (C-3d, D4): las fotos
+            # del álbum que sigue al texto y el enlace a la página de la tarea.
+            for que in ("fotos", "enlace"):
+                if que in paso and respuestas and paso[que] != getattr(respuestas[0], que):
+                    c.falla(clase, f"{que} de la respuesta", paso[que],
+                            getattr(respuestas[0], que))
             if "pregunta" in paso:
                 e = paso["pregunta"]
                 if (e is None) != (r.pregunta is None) or (

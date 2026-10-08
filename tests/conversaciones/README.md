@@ -98,6 +98,13 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
     ejemplo aceptado la entrega se confirma; una foto retirada deja la entrega incompleta y Leda pide
     la correcta mientras la revisión espera; la de una tarea que nunca se arrancó se recibe igual y
     queda arrancada al entregarla (decisiones 10, 14 y 15 del usuario, 2026-10-08; C-3d, D3).
+28. [`28-entregas-en-una-lista.md`](28-entregas-en-una-lista.md): tres entregas que salen juntas van
+    en un solo mensaje, una lista con un botón por tarea ("Ver" y la tarea); al tocar uno, o al
+    escribir "mostrame la del plc", aparece esa entrega con sus fotos, el enlace y Aprobar y Pedir
+    cambios; "aprobado pero que revise…" lleva una sola pregunta y, si la respuesta no elige, Leda
+    no decide ni la repite: la entrega sigue esperando con los dos botones; después de decidir una,
+    lo que queda por revisar, y al día hábil siguiente, los recordatorios en una lista (decisiones
+    12, 17 y 18 del usuario, 2026-10-08; C-3d, D4).
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
@@ -127,6 +134,13 @@ aprueba Marcos). El aviso a Ismael del tercer día sale en un envío con su prop
 motor. Suma tres momentos que el hilo da por hechos: el lunes 2 a las 09:00, cuando la escalera ya
 guardó los recordatorios del día (así el de Ismael se omite al decidir), el aviso de la aprobación a
 Nahuel (paso 10) y los dos días siguientes sin nada (paso 10b).
+
+**La 28 corre desde la D4 de la C-3d**, entera. Un botón que muestra una entrega se nombra
+en el YAML por la clave de su tarea (`Ver TAB`, para "Ver Cablear tablero de la máquina 3"), al
+esperarlo y al tocarlo; un paso escrito o tocado puede esperar las fotos y el enlace de su respuesta
+(`fotos`, `enlace`), como lo que Leda manda por su cuenta; y un paso puede cambiar quién aprueba el
+trabajo de una persona, como lo haría la plataforma (`cambia_quien_aprueba`, con `de` y `a`), antes
+de sus relojes.
 
 **La hoja de aprobación** (porción 3b): un paso puede tocar el botón del aviso de una de varias entregas
 (`toca: Pedir cambios` con `de_la_tarea`); lo que Leda manda por su cuenta puede esperar sus botones

@@ -221,7 +221,8 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
     if ctx.avisos_guardados:
         cur.execute("update scheduled_notice set turno_id = %s where id = any(%s)",
                     (turno, ctx.avisos_guardados))
-    outbox_id = _responder(cur, ctx, texto, reloj.ahora(), ia.nombre, clave_respuesta)
+    outbox_id = _responder(cur, ctx, texto, reloj.ahora(), ia.nombre, clave_respuesta,
+                           con_lo_mostrado=True)
     # Las decisiones ofrecidas en el turno salen con esta respuesta (`botones.py`).
     preguntas.atar_a_la_respuesta(cur, ctx.ofrecidas, outbox_id)
     return ResultadoTurno(texto, elegidas, hechos, pregunta=pregunta,
@@ -474,11 +475,24 @@ def _si_la_ia_falla(cur, ctx: Contexto, ia: IA, reloj: Reloj, inicio: float,
 
 
 def _responder(cur, ctx: Contexto, texto: str, ahora: datetime, ia_nombre: str | None,
-               clave: str) -> str:
-    """La respuesta, por el outbox, en el registro de turnos. Devuelve su fila."""
+               clave: str, *, con_lo_mostrado: bool = False) -> str:
+    """La respuesta, por el outbox, en el registro de turnos. Devuelve su fila. Con
+    `con_lo_mostrado`, lo que muestra una entrega (decisión 17): el enlace a la página de la
+    tarea al final del texto y las fotos en otra fila de la misma respuesta, que el despachador
+    manda después del texto (como en el aviso de una entrega). Sin la redacción de la IA (el
+    texto fijo), nada de eso: lo que hicieron las jugadas se deshizo."""
+    enlace = (ctx.enlace_de_la_respuesta[0]
+              if con_lo_mostrado and ctx.enlace_de_la_respuesta else None)
+    adjuntos = list(ctx.adjuntos_de_la_respuesta) if con_lo_mostrado else []
     enqueue_outbox(cur, workspace_id=ctx.quien.workspace_id, chat_id=ctx.chat_id, text=texto,
                    dedupe_key=clave, recipient_membership_id=ctx.quien.membership_id,
-                   is_response=True, scheduled_for=ahora)
+                   is_response=True, scheduled_for=ahora,
+                   grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace)
+    if adjuntos:
+        enqueue_outbox(cur, workspace_id=ctx.quien.workspace_id, chat_id=ctx.chat_id,
+                       text=f"(adjuntos: {len(adjuntos)})", dedupe_key=f"{clave}:adjuntos",
+                       recipient_membership_id=ctx.quien.membership_id, is_response=True,
+                       scheduled_for=ahora, grupo_respuesta=clave, adjuntos=adjuntos)
     cur.execute("select id from message_outbox where dedupe_key = %s", (clave,))
     outbox_id = str(cur.fetchone()["id"])
     registrar_salida(cur, ctx.quien.workspace_id, ctx.quien.membership_id, outbox_id, ia_nombre,

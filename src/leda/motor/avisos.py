@@ -71,12 +71,24 @@ responsable y a quien aprobó (`cerrada_con_la_aprobacion`; `aprobacion.py`).
 **Quien aprueba no contesta** (porción 3c): los recordatorios a quien aprueba
 (`recordatorio_de_la_decision`) recuerdan la decisión que ofreció el aviso de la entrega
 (`TipoDeAviso.recuerda`): la redacción la recibe como la pregunta del mensaje, ya hecha antes,
-y al salir no abren otra ni llevan botones. El aviso a quien está arriba
+y al salir no abren otra; desde la D4 de la C-3d llevan un botón por tarea para verla
+(`TipoDeAviso.ofrece_ver`). El aviso a quien está arriba
 (`aprobacion_trabada`) es sólo informativo. Los dos son seguimiento que Leda hace por su cuenta:
 cuentan para el tope diario y salen en un envío por persona. Se omiten al salir si quien aprueba
 ya decidió, si la entrega ya no espera o hay una más nueva, o si cambió quién aprueba o quién
 está arriba. Que se destrabó (`aprobacion_destrabada`) lo causa la decisión: es de coordinación.
 Cuándo se guardan, `escalera.py`.
+
+**Las entregas para revisar, en una lista** (decisión 17 del usuario, 2026-10-08; C-3d, D4): los
+avisos de entrega a una misma persona que salen juntos van en un solo mensaje
+(`TipoDeAviso.se_agrupa`), una lista con cada tarea, quién la entregó y cuántas fotos trae, y un
+botón por tarea para verla (`ofrece_ver`; la jugada `ver_entrega`, que muestra lo entregado, las
+fotos, el enlace y los botones Aprobar y Pedir cambios). Uno solo sale como siempre. El tope
+diario cuenta mensajes, y un aviso de coordinación nunca cuenta, agrupado o no (mecánica §10).
+
+**El aviso de una entrega va a quien aprueba al salir** (decisión 16 del usuario, 2026-10-08): se
+relee (`TipoDeAviso.va_a`); si cambió antes de que saliera, le llega al nuevo. Si cambió después,
+al nuevo le guarda un aviso la escalera (`escalera._un_paso_de_una_decision`).
 """
 
 from __future__ import annotations
@@ -178,6 +190,15 @@ class TipoDeAviso:
     # a quien lo recibe; `responsable`, sólo si quien lo recibe es el responsable de la tarea.
     # Sólo un aviso de coordinación, que sale solo.
     enlace: str | None = None
+    # Si los de este tipo a una misma persona que salen juntos van en un solo mensaje, una lista
+    # (decisión 17): cada uno con un botón para verlo, sin adjuntos, sin enlace y sin lo que
+    # ofrece decidir (`_hechos_en_la_lista`). Uno solo sale como siempre.
+    se_agrupa: bool = False
+    # Si lleva un botón para ver la entrega de su tarea (`preguntas.VER_LA_ENTREGA`).
+    ofrece_ver: bool = False
+    # A quién va al salir, releído (decisión 16): si cambió, el aviso va al de ahora; `None`, a
+    # nadie (se omite con el motivo de su vigencia).
+    va_a: Callable[["Momento", dict[str, Any]], str | None] | None = None
 
 
 # El hecho que le dice a la IA que el mensaje lleva al final el enlace a la página de la tarea.
@@ -229,12 +250,15 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
         if not m.cal.en_horario(ahora):
             return {"fuera_de_horario": 1}
         cur.execute(
-            """select * from scheduled_notice
-                where estado = 'guardado' and programado_para <= %s
-                  and (%s or proximo_intento_en is null or proximo_intento_en <= %s)
-                  and (%s::uuid is null or id = %s::uuid)
-                order by programado_para, creado_en
-                for update skip locked""",
+            # Los de un mismo momento, por el título de su tarea: el orden de un envío que junta
+            # varios (sus hechos y sus botones, `botones.py`) es siempre el mismo.
+            """select a.* from scheduled_notice a
+                 left join task t on t.id = a.task_id
+                where a.estado = 'guardado' and a.programado_para <= %s
+                  and (%s or a.proximo_intento_en is null or a.proximo_intento_en <= %s)
+                  and (%s::uuid is null or a.id = %s::uuid)
+                order by a.programado_para, a.creado_en, t.titulo, a.dedupe_key
+                for update of a skip locked""",
             (ahora, forzar, ahora, solo, solo))
         listos: list[_Listo] = []
         for aviso in cur.fetchall():
@@ -263,17 +287,40 @@ def _envios(listos: list[_Listo]) -> list[list[_Listo]]:
     """Los envíos: uno por persona con sus avisos automáticos, en el orden en que se guardaron,
     y uno por cada aviso de coordinación (mecánica §10)."""
     envios: list[list[_Listo]] = []
-    de_la_persona: dict[str, list[_Listo]] = {}
+    de_la_persona: dict[tuple[str, str | None], list[_Listo]] = {}
     for listo in listos:
-        if listo.tipo.es_coordinacion:
+        if listo.tipo.es_coordinacion and not listo.tipo.se_agrupa:
             envios.append([listo])
             continue
-        persona = str(listo.destinatario["membership_id"])
-        if persona not in de_la_persona:
-            de_la_persona[persona] = []
-            envios.append(de_la_persona[persona])
-        de_la_persona[persona].append(listo)
+        # Los de coordinación que se agrupan, en su propia lista por persona y por tipo
+        # (decisión 17): nunca mezclados con el seguimiento, que cuenta para el tope.
+        clave = (str(listo.destinatario["membership_id"]),
+                 listo.tipo.nombre if listo.tipo.es_coordinacion else None)
+        if clave not in de_la_persona:
+            de_la_persona[clave] = []
+            envios.append(de_la_persona[clave])
+        de_la_persona[clave].append(listo)
     return envios
+
+
+def _en_la_lista(envio: list[_Listo]) -> bool:
+    """Si el envío es una lista de avisos que se agrupan (más de uno)."""
+    return len(envio) > 1 and all(x.tipo.se_agrupa for x in envio)
+
+
+def _hechos_en_la_lista(hechos: dict[str, Any]) -> dict[str, Any]:
+    """Un aviso de entrega dentro de una lista: la tarea, quién la entregó y cuántas fotos trae;
+    lo entregado se ve al tocar su botón (`ver_entrega`). Sin pregunta: la lista no pide decidir
+    ahí."""
+    fotos = sum(1 for v in hechos.get("lo_que_entrego") or [] if "va_adjunta" in v)
+    return {**{k: v for k, v in hechos.items()
+               if k not in ("lo_que_entrego", "fotos_adjuntas", "pregunta")},
+            "fotos_que_trae": fotos}
+
+
+def boton_para_ver(titulo: str) -> str:
+    """La etiqueta del botón que muestra la entrega de una tarea (decisión 17)."""
+    return f"Ver {titulo}"
 
 
 def _preparar(m: Momento, aviso: dict[str, Any]) -> _Listo | str:
@@ -281,6 +328,9 @@ def _preparar(m: Momento, aviso: dict[str, Any]) -> _Listo | str:
     `en_espera`)."""
     cur = m.cur
     aviso_id = str(aviso["id"])
+    tipo = TIPOS.get(aviso["tipo"])
+    if tipo is not None and tipo.va_a is not None:
+        aviso = _a_quien_va_ahora(m, aviso, tipo)
     destinatario = integrante(cur, aviso["destinatario_membership_id"])
     if destinatario is None or not destinatario["activo"]:
         omitir(cur, aviso_id, "destinatario_inactivo", m.ahora)
@@ -290,7 +340,6 @@ def _preparar(m: Momento, aviso: dict[str, Any]) -> _Listo | str:
         return "omitido"
     if ausente(cur, str(aviso["destinatario_membership_id"]), m.hoy):
         return "en_espera"          # vuelve a mirarse cuando vuelva (mecánica §9, ausencias)
-    tipo = TIPOS.get(aviso["tipo"])
     if tipo is None:
         omitir(cur, aviso_id, "tipo_sin_declarar", m.ahora)
         return "omitido"
@@ -305,6 +354,19 @@ def _preparar(m: Momento, aviso: dict[str, Any]) -> _Listo | str:
     return _Listo(aviso, tipo, destinatario, hechos)
 
 
+def _a_quien_va_ahora(m: Momento, aviso: dict[str, Any], tipo: TipoDeAviso) -> dict[str, Any]:
+    """El aviso dirigido a quien corresponde ahora (`TipoDeAviso.va_a`, decisión 16): si cambió
+    desde que se guardó, va al de ahora, con la misma clave (es el mismo aviso: nunca dos), y la
+    auditoría de su envío nombra a quien lo recibió. Si ya no hay nadie, queda como estaba y su
+    vigencia lo omite."""
+    ahora = tipo.va_a(m, aviso)
+    if ahora is None or ahora == str(aviso["destinatario_membership_id"]):
+        return aviso
+    m.cur.execute("""update scheduled_notice set destinatario_membership_id = %s
+                      where id = %s returning *""", (ahora, aviso["id"]))
+    return m.cur.fetchone()
+
+
 def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     """Un envío: la IA redacta un mensaje desde los hechos de todos sus avisos, con una sola
     pregunta (la del primero que pide respuesta); sale por el outbox una vez y cada aviso queda
@@ -312,11 +374,19 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     cur = m.cur
     destinatario = envio[0].destinatario
     persona = str(destinatario["membership_id"])
+    en_lista = _en_la_lista(envio)
+    if en_lista:
+        envio = [replace(x, hechos=_hechos_en_la_lista(x.hechos)) for x in envio]
+    # Lo que lleva un botón para ver la entrega de su tarea lo dice en sus hechos.
+    envio = [replace(x, hechos={**x.hechos, "botones": [boton_para_ver(x.hechos["tarea"])]})
+             if (en_lista or x.tipo.ofrece_ver) and x.hechos.get("tarea") else x
+             for x in envio]
     enlace = _enlace_del_envio(m, envio)
     if enlace is not None:
         envio = [replace(envio[0], hechos={**envio[0].hechos, LLEVA_EL_ENLACE: True}),
                  *envio[1:]]
-    preguntas_de = [_pregunta_del_aviso(m, x.aviso, x.hechos) for x in envio]
+    preguntas_de = [None if en_lista else _pregunta_del_aviso(m, x.aviso, x.hechos)
+                    for x in envio]
     pregunta = next((q for q in preguntas_de if q is not None), None)
     pedido = {"hoy": m.hoy.isoformat(), "persona": destinatario["nombre"], "mensaje": None,
               "hechos": [x.hechos for x in envio], "pregunta": pregunta,
@@ -379,6 +449,9 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                             quien=SimpleNamespace(workspace_id=m.workspace_id,
                                                   membership_id=persona))
     for x, q in zip(envio, preguntas_de):
+        if (en_lista or x.tipo.ofrece_ver) and x.hechos.get("tarea"):
+            _ofrecer_ver(turno, x.aviso, x.hechos["tarea"],
+                         reemplaza_la_decision=en_lista and bool(x.tipo.ofrece))
         if q is not None and x.tipo.ofrece:
             _ofrecer_la_decision(m, turno, x.aviso, x.tipo)
         elif q is not None and x.tipo.recuerda:
@@ -401,17 +474,24 @@ def _enlace_del_envio(m: Momento, envio: list[_Listo]) -> tuple[str, str] | None
     x = envio[0]
     if len(envio) != 1 or x.tipo.enlace is None or x.aviso["task_id"] is None:
         return None
-    from ..config import config
-
-    if not config.base_url:
-        return None
     task_id, persona = str(x.aviso["task_id"]), str(x.destinatario["membership_id"])
     if x.tipo.enlace == "responsable":
         tarea = leer_tarea(m.cur, task_id)
         if tarea is None or str(tarea["responsable_membership_id"]) != persona:
             return None
-    m.cur.execute("select puede_ver_tarea(%s, %s) as ve", (persona, task_id))
-    return (task_id, persona) if m.cur.fetchone()["ve"] else None
+    return enlace_a_la_pagina(m.cur, task_id, persona)
+
+
+def enlace_a_la_pagina(cur, task_id: str, persona: str) -> tuple[str, str] | None:
+    """La tarea y la persona del enlace a la página de la tarea, o `None`: sólo con la dirección
+    pública configurada y si la persona puede ver la tarea (la regla vive en la base). También
+    para una respuesta que muestra una entrega (`aprobacion.ver_entrega`)."""
+    from ..config import config
+
+    if not config.base_url:
+        return None
+    cur.execute("select puede_ver_tarea(%s, %s) as ve", (persona, task_id))
+    return (task_id, persona) if cur.fetchone()["ve"] else None
 
 
 def _auditar_el_envio(m: Momento, aviso: dict[str, Any], persona: str, outbox_id: str,
@@ -466,6 +546,22 @@ def _ofrecer_la_decision(m: Momento, turno, aviso: dict[str, Any], tipo: TipoDeA
         jugada={"nombre": "decidir_la_entrega", "del_aviso": str(aviso["id"]),
                 "huella": entrega.huella_de_lo_entregado(m.cur, task_id)},
         opciones=[(FICHAS[n].boton, {"tarea": task_id, "jugada": n}) for n in tipo.ofrece])
+
+
+def _ofrecer_ver(turno, aviso: dict[str, Any], titulo: str, *,
+                 reemplaza_la_decision: bool = False) -> None:
+    """El botón que muestra la entrega de la tarea del aviso (decisión 17): sólo muestra, así que
+    no reemplaza otro botón para verla (`reemplaza=False`). En una lista, la decisión que ofrecía
+    un aviso anterior de la misma tarea queda reemplazada: se decide sobre lo que se muestre."""
+    task_id = str(aviso["task_id"])
+    if reemplaza_la_decision:
+        preguntas.cerrar_de_tipo(turno, preguntas.DECISION_DE_LA_ENTREGA, task_id, "sin_efecto",
+                                 {"reemplazada": True, "tarea": task_id})
+    preguntas.ofrecer(turno, preguntas.VER_LA_ENTREGA, task_id,
+                      jugada={"nombre": "ver_entrega", "del_aviso": str(aviso["id"])},
+                      opciones=[(boton_para_ver(titulo), {"tarea": task_id,
+                                                          "jugada": "ver_entrega"})],
+                      reemplaza=False)
 
 
 def _abrir_la_pregunta(m: Momento, turno, aviso: dict[str, Any]) -> None:
@@ -903,6 +999,9 @@ ENTREGA_PARA_APROBAR = "entrega_para_aprobar"
 YA_NO_ESTA_ENTREGADA = "ya_no_esta_entregada"
 CAMBIO_QUIEN_APRUEBA = "cambio_quien_aprueba"
 HAY_UNA_ENTREGA_MAS_NUEVA = "hay_una_entrega_mas_nueva"
+# En el aviso que la escalera le guarda a quien pasó a aprobar el trabajo del responsable cuando
+# la entrega ya le había llegado al anterior (decisión 16).
+ANTES_LA_REVISABA_OTRA_PERSONA = "antes_la_revisaba_otra_persona"
 # Una foto se adjunta si el canal la muestra como foto: sin HEIC (Telegram no la muestra) y de
 # hasta 10 MB (lo que Telegram deja subir como foto). Las demás se nombran, como los archivos.
 _NO_SE_MUESTRA_COMO_FOTO = frozenset({"image/heic"})
@@ -945,14 +1044,19 @@ def _es_foto_adjunta(p: dict[str, Any]) -> bool:
 
 
 def _lo_entregado_para_aprobar(m: Momento, task_id) -> tuple[list[dict[str, Any]], list[str]]:
+    return lo_entregado_para_revisar(m.cur, task_id, m.cal.zona)
+
+
+def lo_entregado_para_revisar(cur, task_id, zona) -> tuple[list[dict[str, Any]], list[str]]:
     """Lo que entregó el responsable, releído ahora (la evidencia del ciclo vigente, sin lo
     retirado: `entrega._lo_entregado`), pieza por pieza como lo recibe la IA, y las fotos que van
-    adjuntas: las primeras diez que el canal muestra como foto."""
-    piezas = entrega._lo_entregado(m.cur, str(task_id))
-    pol = entrega.politica(m.cur, str(task_id))
+    adjuntas: las primeras diez que el canal muestra como foto. También para mostrar una entrega
+    en una respuesta (`aprobacion.ver_entrega`)."""
+    piezas = entrega._lo_entregado(cur, str(task_id))
+    pol = entrega.politica(cur, str(task_id))
     adjuntas: list[str] = []
     vistas = []
-    for p, vista in zip(piezas, entrega.mostrar(piezas, pol, m.cal.zona)):
+    for p, vista in zip(piezas, entrega.mostrar(piezas, pol, zona)):
         vista.pop("pieza", None)            # el alias es para sacar una pieza: acá no sirve
         if p["clase"] == "imagen":
             va = _es_foto_adjunta(p) and len(adjuntas) < MAX_ADJUNTOS
@@ -983,9 +1087,19 @@ def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, An
         return entrega.LA_ENTREGA_ESTA_INCOMPLETA, {}
     vistas, adjuntas = _lo_entregado_para_aprobar(m, tarea["id"])
     hechos = {k: v for k, v in dict(aviso["hechos"]).items()
-              if k in ("aviso", "necesita_respuesta", "pregunta", "responsable")}
+              if k in ("aviso", "necesita_respuesta", "pregunta", "responsable",
+                       ANTES_LA_REVISABA_OTRA_PERSONA)}
     hechos.update(tarea=tarea["titulo"], lo_que_entrego=vistas, fotos_adjuntas=len(adjuntas))
     return None, hechos
+
+
+def _quien_la_revisa(m: Momento, aviso) -> str | None:
+    """Quien aprueba hoy el trabajo del responsable de la tarea del aviso (decisión 16)."""
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return None
+    quien = referente(m.cur, str(tarea["responsable_membership_id"]))
+    return quien["membership_id"] if quien is not None else None
 
 
 def _adjuntos_de_la_entrega(m: Momento, aviso) -> list[str]:
@@ -1146,9 +1260,11 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
                 es_coordinacion=True),
     TipoDeAviso("falla_de_aviso", "informativo", _siempre, es_coordinacion=True),
     # La entrega de una tarea, a quien la aprueba, con las fotos adjuntas (ADR 0019, decisión 6).
+    # Los que salen juntos a una persona, en una lista (decisión 17); va a quien aprueba al
+    # salir (decisión 16).
     TipoDeAviso(ENTREGA_PARA_APROBAR, "normal", _vigencia_de_la_entrega, es_coordinacion=True,
                 adjuntos=_adjuntos_de_la_entrega, ofrece=("aprobar", "pedir_cambios"),
-                enlace="destinatario"),
+                enlace="destinatario", se_agrupa=True, va_a=_quien_la_revisa),
     # La decisión de quien aprueba, al responsable, y el cierre que hace el sistema (porción 3b).
     TipoDeAviso(TAREA_APROBADA, "informativo", _vigencia_de_una_aprobacion,
                 es_coordinacion=True, enlace="responsable"),
@@ -1162,7 +1278,7 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # arriba es sólo informativo. Que se destrabó lo causa la decisión de quien aprueba: es de
     # coordinación, como el aviso de la decisión al responsable.
     TipoDeAviso(RECORDATORIO_DE_LA_DECISION, "seguimiento", _vigencia_de_una_decision,
-                recuerda=preguntas.DECISION_DE_LA_ENTREGA),
+                recuerda=preguntas.DECISION_DE_LA_ENTREGA, ofrece_ver=True),
     TipoDeAviso(APROBACION_TRABADA, "informativo", _vigencia_de_una_decision),
     TipoDeAviso(APROBACION_DESTRABADA, "informativo", _siempre, es_coordinacion=True),
 )})

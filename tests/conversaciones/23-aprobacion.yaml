@@ -80,8 +80,10 @@ preludio:
   - quien: Ariel
     a_las: "2026-10-23 15:09"
     toca: Confirmar
+  # Cada aviso sale cuando termina su margen para corregir, uno por vez: así cada uno lleva sus
+  # botones (desde la D4, los que salen juntos van en una lista: la conversación 28).
   - quien: Leda
-    relojes: ["2026-10-23 15:30"]
+    relojes: ["2026-10-23 15:12", "2026-10-23 15:14", "2026-10-23 15:17", "2026-10-23 15:20"]
 
 pasos:
   - paso: 1
@@ -121,13 +123,17 @@ pasos:
     hechos:
       - {jugada: aprobar, resultado: anotado, tarea: PLC, comentario: presente,
          quedo_terminada: true, no_se_cierra_todavia: ausente,
-         aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-10-26T10:30"}}
+         aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-10-26T10:30"},
+         queda_por_revisar: [{tarea: TAB}, {tarea: COM}, {tarea: DASH}]}
     pregunta: null
+    # Lo que queda por revisar, con un botón por tarea (decisión 17, D4).
+    botones: [Ver TAB, Ver COM, Ver DASH]
     estado_despues:
       pregunta_abierta: null
     dice:
       - que la tarea del PLC quedó terminada
       - que Marcos se va a enterar ahora
+      - que le quedan tres por revisar
     no_dice:
       - que falta otra aprobación
 
@@ -173,8 +179,10 @@ pasos:
          no_se_cierra_todavia: {espera_que_terminen: [
            {tarea: SW, estado: en_curso, responsable: Lucas Natuche}]},
          se_cierra_sola: {se_avisa_a: [Marcos Tarquini, Ismael Soschinski]},
-         aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-10-26T10:35"}}
+         aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-10-26T10:35"},
+         queda_por_revisar: [{tarea: TAB}, {tarea: DASH}]}
     pregunta: null
+    botones: [Ver TAB, Ver DASH]
     estado_despues:
       pregunta_abierta: null
     dice:
@@ -238,8 +246,10 @@ pasos:
     hechos:
       - {jugada: pedir_cambios, resultado: anotado, tarea: TAB, estado: en_curso,
          comentario: presente,
-         aviso_al_responsable: {a: Mariano Naim, llega: "~2026-10-26T10:40"}}
+         aviso_al_responsable: {a: Mariano Naim, llega: "~2026-10-26T10:40"},
+         queda_por_revisar: [{tarea: DASH}]}
     pregunta: null
+    botones: [Ver DASH]
     estado_despues:
       pregunta_abierta: null
     dice:
@@ -305,7 +315,7 @@ pasos:
         - {tipo: tarea_aprobada, tarea: DASH, a: Ariel, estado: guardado}
     hechos:
       - {jugada: aprobar, resultado: anotado, tarea: DASH, comentario: presente,
-         quedo_terminada: true,
+         quedo_terminada: true, queda_por_revisar: ausente,
          aviso_al_responsable: {a: Ariel De Simone, llega: "~2026-10-26T10:46"}}
     pregunta: null
     estado_despues:

@@ -304,6 +304,22 @@ SIGNIFICADOS: Mapping[str, str] = {
     "botones": "Los botones que lleva este mensaje, por lo que dicen: atajos para cuando la "
                "persona quiera, que también se pueden escribir. No son una pregunta que espere "
                "respuesta.",
+    # --- Las entregas en listas (decisión 17 del usuario, 2026-10-08; C-3d, D4) --------------
+    "queda_por_revisar": "Las otras entregas que esperan la revisión de la persona que escribe, "
+                         "cada una con quién la entregó: le quedan por revisar. Leda no insiste "
+                         "hoy; mañana se las recuerda.",
+    "fotos_que_trae": "Cuántas fotos trae esa entrega: se ven al abrirla con su botón; en este "
+                      "mensaje no van.",
+    "ver_la_entrega": "El botón que muestra la entrega de una tarea que espera la revisión de la "
+                      "persona.",
+    # --- Si cambia quién aprueba (decisión 16 del usuario, 2026-10-08; C-3d, D4) --------------
+    "antes_la_revisaba_otra_persona": "La entrega ya esperaba la revisión de otra persona: ahora "
+                                      "la revisa y la decide la persona que recibe este aviso.",
+    "ya_no_le_corresponde": "La tarea ya no está entre las de la persona ni entre las que "
+                            "esperan su decisión (cambió quién la tiene o quién la revisa, o ya "
+                            "se decidió): no cambió nada. estado dice cómo está ahora.",
+    "la_revisa_otra_persona": "La entrega sigue esperando una revisión, pero ya no la de la "
+                              "persona que escribe: la revisa otra.",
     "tarea_aprobada": "Aviso a la persona responsable: quien aprueba su trabajo aprobó la "
                       "tarea. No pide respuesta.",
     "pedido_de_cambios": "Aviso a la persona responsable: quien aprueba su trabajo le pidió "
@@ -716,6 +732,7 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "pedir_reasignacion": "pasarle_la_tarea_a_otra_persona",
     "aprobar": "aprobar_la_entrega",
     "pedir_cambios": "devolver_la_entrega_con_cambios",
+    "ver_entrega": "mostrar_la_entrega_para_revisar",
 }
 _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 

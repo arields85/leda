@@ -126,13 +126,34 @@ def _elegir_y_correr(ctx, opcion, pregunta_id: str, task_id, eligio: dict) -> di
                 "eligio": eligio}
     alias = eligio.get("tarea", {}).get("alias")
     if alias is None:
-        # La tarea ya no está abierta entre las de la persona.
-        return {"jugada": nombre, "resultado": "no_se_puede", "motivo": "tarea_cerrada",
-                "eligio": eligio}
+        return {"jugada": nombre, "resultado": "no_se_puede",
+                **_por_que_ya_no_esta(ctx, task_id), "eligio": eligio}
     datos = ({**(valor.get("datos") or {}), "de_la_pregunta": pregunta_id}
              if valor.get("jugada") else dict(esperaba.get("datos") or {}))
     hecho = manejador(ctx, Jugada(nombre, {**datos, "tarea": alias}))
     return {**hecho, "eligio": eligio}
+
+
+def _por_que_ya_no_esta(ctx, task_id) -> dict[str, Any]:
+    """Por qué la tarea de una opción ya no está entre las de la persona ni entre las que
+    esperan su decisión: cerrada, o sigue abierta pero ya no le corresponde (cambió quién la
+    tiene o quién la revisa, o ya se decidió; decisión 16 del usuario, 2026-10-08), con cómo está
+    ahora y, si espera una revisión, que la revisa otra persona. Nada cambia."""
+    if not task_id:
+        return {"motivo": "tarea_cerrada"}
+    ctx.cur.execute("""select t.estado::text estado, m.aprobador_membership_id
+                         from task t join membership m on m.id = t.responsable_membership_id
+                        where t.id = %s""", (str(task_id),))
+    fila = ctx.cur.fetchone()
+    if fila is None or fila["estado"] in ("terminada", "cancelada"):
+        return {"motivo": "tarea_cerrada"}
+    dicho: dict[str, Any] = {"motivo": "ya_no_le_corresponde",
+                             "tarea": preguntas.tarea_dicha(ctx, task_id),
+                             "estado": fila["estado"]}
+    if fila["estado"] == "en_revision" and \
+            str(fila["aprobador_membership_id"]) != ctx.quien.membership_id:
+        dicho["la_revisa_otra_persona"] = True
+    return dicho
 
 
 # --- Una pregunta que se hace una sola vez (decisión 12 del usuario, 2026-10-08) ------------
@@ -164,7 +185,7 @@ def no_eligio(ctx, q: dict[str, Any]) -> dict[str, Any]:
             ctx, tipo.sin_elegir_queda, task_id,
             jugada={"nombre": esperaba.get("nombre"), "sin_elegir_en": str(q["id"]),
                     **({"huella": esperaba["huella"]} if "huella" in esperaba else {})},
-            opciones=opciones)
+            opciones=opciones, reemplaza=False)
     hecho: dict[str, Any] = {"resultado": "no_eligio", "pregunta_hecha_una_vez": q["tipo"],
                              "botones": [etiqueta for etiqueta, _ in opciones]}
     if task_id is not None:

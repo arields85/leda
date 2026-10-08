@@ -606,3 +606,120 @@ def test_lo_que_no_elige_en_el_mismo_mensaje_no_cierra_la_pregunta(conn, mundo, 
     _cual_de_las_dos(conn, mundo, turnos, "que revise los colores")
     assert cuantas(conn, "conversation_question",
                    "tipo = %s and cerrada_en is null", preguntas.CUAL_DE_LAS_DOS) == 1
+
+
+# --- Las entregas en listas (decisión 17 del usuario, 2026-10-08; C-3d, D4) ------------------
+
+OTRA = "Cablear la bomba"
+
+
+def _dos_entregadas(conn, mundo, turnos) -> tuple[str, str]:
+    """Marcos entrega dos tareas, una detrás de otra: sus avisos a Ismael salen juntos."""
+    primera = _entregada(conn, mundo, turnos)
+    segunda = _entregada(conn, mundo, turnos, titulo=OTRA, alias="T3")
+    return primera, segunda
+
+
+def test_ver_una_entrega_es_una_ficha_de_la_lista_cerrada():
+    ficha = FICHAS["ver_entrega"]
+    assert ficha.se_ofrece and {"tarea", "de"} <= set(ficha.opcional)
+
+
+def test_las_entregas_que_salen_juntas_van_en_una_lista_con_un_boton_por_tarea(conn, mundo,
+                                                                               turnos):
+    _dos_entregadas(conn, mundo, turnos)
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, DESPUES_DEL_MARGEN) == {"enviado": 2}
+    [pedido] = ia.pedidos_de_redaccion          # un solo mensaje
+    for hechos in pedido["hechos"]:
+        assert hechos["aviso"] == "entrega_para_aprobar"
+        assert hechos["fotos_que_trae"] == 0 and hechos["responsable"] == "Marcos"
+        assert "lo_que_entrego" not in hechos and "fotos_adjuntas" not in hechos
+        assert "lleva_el_enlace_a_la_pagina_de_la_tarea" not in hechos
+        assert hechos["botones"] == [f"Ver {hechos['tarea']}"]
+    assert pedido["pregunta"] is None
+    assert cuantas(conn, "message_outbox", "not es_respuesta") == 1
+    # Sin Aprobar ni Pedir cambios en la lista: se ofrecen al ver cada una.
+    assert cuantas(conn, "conversation_question", "tipo = %s",
+                   preguntas.DECISION_DE_LA_ENTREGA) == 0
+    transporte = TransporteDePrueba()
+    Ciclo(conn, mundo["id"], IAQueRedacta(), RelojFijo(DESPUES_DEL_MARGEN), transporte,
+          seguimiento=False).vuelta()
+    [entregado] = [e for e in transporte.enviados
+                   if e.chat_id == mundo["personas"]["Ismael"]["telegram"]]
+    assert [b.etiqueta for b in entregado.botones] == [f"Ver {ENTREGADA}", f"Ver {OTRA}"]
+
+
+def test_ver_una_entrega_la_muestra_con_los_botones_para_decidir(conn, mundo, turnos):
+    primera, _ = _dos_entregadas(conn, mundo, turnos)
+    enviar(conn, mundo, IAQueRedacta(), DESPUES_DEL_MARGEN)
+    # La lista ya salió, con sus botones; lo que sigue es la respuesta al toque.
+    assert _botones_de_la_respuesta(conn, mundo, DESPUES_DEL_MARGEN) == [f"Ver {ENTREGADA}",
+                                                                         f"Ver {OTRA}"]
+    r = turnos.toca("Ismael", _token(conn, f"Ver {ENTREGADA}"), at=DESPUES_DEL_MARGEN)
+    hecho = _hecho(r, "ver_entrega")
+    assert hecho["resultado"] == "leido" and hecho["tarea"]["titulo"] == ENTREGADA
+    assert hecho["responsable"] == "Marcos" and hecho["lo_que_entrego"]
+    assert hecho["fotos_adjuntas"] == 0 and hecho["botones"] == ["Aprobar", "Pedir cambios"]
+    assert r.pregunta is None
+    assert estado_de(conn, primera) == "en_revision" and _decisiones(conn, primera) == []
+    assert _botones_de_la_respuesta(conn, mundo, DESPUES_DEL_MARGEN) == ["Aprobar",
+                                                                         "Pedir cambios"]
+    # El botón de esa respuesta decide sobre lo que mostró.
+    turnos.toca("Ismael", _token(conn, "Aprobar", primera))
+    assert estado_de(conn, primera) == "terminada"
+
+
+def test_escribir_que_la_muestre_vale_igual_que_el_boton(conn, mundo, turnos):
+    _dos_entregadas(conn, mundo, turnos)
+    enviar(conn, mundo, IAQueRedacta(), DESPUES_DEL_MARGEN)
+    r = turnos.dice("Ismael", Jugada("ver_entrega", {"tarea": "T2"}),
+                    texto="mostrame la de la bomba", at=DESPUES_DEL_MARGEN)
+    hecho = _hecho(r, "ver_entrega")
+    assert hecho["resultado"] == "leido" and hecho["tarea"]["titulo"] == OTRA
+
+
+def test_quien_no_la_revisa_no_ve_la_entrega(conn, mundo, turnos):
+    _entregada(conn, mundo, turnos)
+    r = turnos.dice("Marcos", Jugada("ver_entrega", {"tarea": "T2"}), texto="mostrame")
+    assert _hecho(r, "ver_entrega")["resultado"] == "no_se_puede"
+
+
+def test_despues_de_decidir_una_muestra_lo_que_queda_por_revisar(conn, mundo, turnos):
+    primera, segunda = _dos_entregadas(conn, mundo, turnos)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="lo del tablero ok",
+                    at=DESPUES_DEL_MARGEN)
+    hecho = _hecho(r, "aprobar")
+    assert hecho["quedo_terminada"] is True
+    assert hecho["queda_por_revisar"] == [{"tarea": OTRA, "responsable": "Marcos"}]
+    assert _botones_de_la_respuesta(conn, mundo, DESPUES_DEL_MARGEN) == [f"Ver {OTRA}"]
+    # Sin insistir: ningún aviso nuevo a Ismael por lo que queda.
+    assert [a["tipo"] for a in avisos_guardados(conn)
+            if str(a["destinatario_membership_id"])
+            == mundo["personas"]["Ismael"]["membership_id"]] == ["entrega_para_aprobar"] * 2
+    # Lo ya aprobado que espera otra cosa no queda "por revisar".
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="la bomba ok",
+                    at=DESPUES_DEL_MARGEN)
+    assert "queda_por_revisar" not in _hecho(r, "aprobar")
+
+
+# --- Si cambia quién aprueba (decisión 16 del usuario, 2026-10-08; C-3d, D4) -----------------
+
+def _ahora_lo_aprueba(conn, mundo, de: str, a: str) -> None:
+    """Lo que hace la plataforma: el trabajo de `de` lo aprueba ahora `a`."""
+    with admin(conn) as cur:
+        cur.execute("update membership set aprobador_membership_id = %s where id = %s",
+                    (mundo["personas"][a]["membership_id"], mundo["personas"][de]["membership_id"]))
+    conn.commit()
+
+
+def test_el_aviso_de_la_entrega_va_a_quien_aprueba_al_salir(conn, mundo, turnos):
+    _nahuel(conn, mundo)
+    _entregada(conn, mundo, turnos)
+    _ahora_lo_aprueba(conn, mundo, "Marcos", "Nahuel")      # antes de que salga el aviso
+    assert enviar(conn, mundo, IAQueRedacta(), DESPUES_DEL_MARGEN) == {"enviado": 1}
+    [aviso] = avisos_guardados(conn, "entrega_para_aprobar")
+    assert str(aviso["destinatario_membership_id"]) == mundo["personas"]["Nahuel"]["membership_id"]
+    assert aviso["estado"] == "enviado"
+    assert _salida_para(conn, mundo, "Ismael") == []
+

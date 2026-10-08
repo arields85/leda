@@ -166,16 +166,20 @@ def test_el_primer_dia_habil_un_recordatorio_a_cada_uno_que_no_abre_otra_pregunt
     assert uno(conn, "select 1 from conversation_state where pregunta_abierta_id is not null") \
         is None
     assert todos(conn, "select * from pending_reply") == []
-    [decision] = todos(conn, """select * from conversation_question
-                                 where task_id = %s and cerrada_en is null""",
-                       mundo["de_nahuel"])
-    assert decision["tipo"] == preguntas.DECISION_DE_LA_ENTREGA
-    # Ningún botón en el recordatorio: los de la decisión van con el aviso de la entrega.
-    assert len(todos(conn, """select o.id from scheduled_notice a
+    abiertas = todos(conn, """select * from conversation_question
+                               where task_id = %s and cerrada_en is null order by tipo""",
+                     mundo["de_nahuel"])
+    assert [q["tipo"] for q in abiertas] == [preguntas.DECISION_DE_LA_ENTREGA,
+                                             preguntas.VER_LA_ENTREGA]
+    # El recordatorio no ofrece decidir (los botones de la decisión van con el aviso de la
+    # entrega): lleva un botón para ver la entrega (decisión 17, C-3d, D4).
+    assert [f["etiqueta"] for f in todos(conn, """select o.etiqueta from scheduled_notice a
                                 join conversation_question q
                                   on q.jugada ->> 'del_aviso' = a.id::text
                                 join conversation_option o on o.question_id = q.id
-                               where a.tipo = %s""", RECORDATORIO)) == 0
+                               where a.tipo = %s and a.task_id = %s""",
+                                          RECORDATORIO, mundo["de_nahuel"])] == [
+        f"Ver {DE_NAHUEL}"]
 
 
 def test_el_segundo_avisa_que_manana_se_entera_quien_esta_arriba_solo_si_hay_alguien(
