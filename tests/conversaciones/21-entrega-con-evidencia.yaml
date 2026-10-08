@@ -1,0 +1,181 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/21-entrega-con-evidencia.md
+numero: "21"
+titulo: "La entrega con su evidencia"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-19 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+
+# Lo que pide OT (`espacios/corework.yaml`, con las clases de cada tipo del ADR 0019, decisión 5).
+evidencia:
+  ot: [explicacion, resultado_de_prueba, captura, archivo]
+
+# Lo que Marcos mandó durante la tarea y dijo que era del PLC (cómo se llega a esto es la 22).
+mandado_antes:
+  - {tarea: PLC, que: foto, el: "2026-10-20 11:05"}
+  - {tarea: PLC, que: archivo, nombre: comprimidora_v3.zip, el: "2026-10-21 16:00"}
+
+preludio:
+  - quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
+
+# El paso 6 (el aviso a Ismael redactado por el motor, con las fotos adjuntas, los botones Aprobar
+# y Pedir cambios y el enlace a la página de la tarea) es de las porciones 3 y 4 de la C-3: hasta
+# entonces a Ismael le llega, en el paso 5, el aviso de texto fijo de la cocina
+# (`avisos_de_la_cocina`), y ese paso no está acá.
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-22 15:10"
+    escribe: "termine el plc!! ahi va la pantalla y el contador, 20 ciclos sin una falla"
+    manda: [{que: foto}, {que: foto}]
+    jugadas:
+      - {nombre: entregar, tarea: PLC, el_texto_cubre: [explicacion, resultado_de_prueba]}
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
+         sumo: [P1, P2, P3],
+         entrega: [
+           {pieza: P1, es: lo_que_escribio,
+            cubre: ["cómo quedó el trabajo, contado por quien lo hizo",
+                    "cómo se probó y qué dio la prueba"]},
+           {pieza: P2, es: una_foto, cubre: ["una foto o una captura de la pantalla"]},
+           {pieza: P3, es: una_foto, cubre: ["una foto o una captura de la pantalla"]},
+           {pieza: P4, es: una_foto, mandado_antes_el: "2026-10-20",
+            cubre: ["una foto o una captura de la pantalla"]},
+           {pieza: P5, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip,
+            mandado_antes_el: "2026-10-21",
+            cubre: ["un archivo del trabajo, por ejemplo el programa o la configuración"]}],
+         le_falta: ausente,
+         al_confirmar: {queda_esperando_la_aprobacion_de: Ismael Soschinski}}
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
+    dice:
+      - "la tarea del PLC en su renglón con 📋"
+      - "una pieza por renglón, con lo que cubre cada una en palabras de todos los días: lo que escribió (cómo quedó y la prueba de 20 ciclos) y las dos fotos de hoy"
+      - "aparte, como mandadas antes, la foto del mar 20/10 y comprimidora_v3.zip del mié 21/10, que entran sólo si las deja"
+      - que al confirmar la tarea queda esperando la aprobación de Ismael
+      - "el cierre, aparte: si la entrega así, o si saca o corrige algo"
+    no_dice:
+      - que la tarea quedó entregada, en revisión o terminada
+      - que Ismael se enteró
+      - qué muestran las fotos
+      - los nombres de los tipos de la política
+      - que falta el resultado de la prueba o que lo mande aparte
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-22 15:12"
+    escribe: "la foto del martes sacala, esa era del cableado viejo"
+    jugadas:
+      - {nombre: corregir, corrige: entregar, tarea: PLC, saca: [P4]}
+    efectos: {}
+    hechos:
+      - {jugada: corregir, resultado: corregido, corrige: entregar, tarea: PLC,
+         como_queda: para_confirmar, pregunta: confirmar_la_entrega,
+         sacadas: [{es: una_foto, mandado_antes_el: "2026-10-20"}],
+         entrega: [{pieza: P1, es: lo_que_escribio}, {pieza: P2, es: una_foto},
+                   {pieza: P3, es: una_foto},
+                   {pieza: P4, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}]}
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
+    dice:
+      - que sacó la foto del martes
+      - cómo queda la entrega, una pieza por renglón
+      - "el cierre, aparte: si la entrega así"
+    no_dice:
+      - que la tarea quedó entregada
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-22 15:13"
+    # El botón de la vista previa del paso 1, que la del paso 2 reemplazó (situación general 7).
+    toca: Confirmar
+    vieja: true
+    efectos: {}
+    hechos:
+      - {jugada: elegir, resultado: sin_efecto, motivo: pregunta_cerrada,
+         cerrada_con: {reemplazada: true, tarea: PLC}}
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC, desde_antes: true}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
+    dice:
+      - que esa vista previa fue reemplazada por la que no tiene la foto del martes, que sigue esperando su confirmación
+    no_dice:
+      - que la entregó
+      - nada técnico sobre botones o huellas
+
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-22 15:15"
+    escribe: "y esta del tablero cerrado. dale mandala"
+    manda: [{que: foto}]
+    jugadas:
+      - {nombre: confirmar}
+    efectos: {}
+    hechos:
+      - {jugada: confirmar, resultado: no_vale_la_confirmacion, motivo: llego_algo_despues,
+         como_queda: para_confirmar, tarea: PLC, sumo: [P4], pregunta: confirmar_la_entrega,
+         entrega: [{pieza: P1, es: lo_que_escribio}, {pieza: P2, es: una_foto},
+                   {pieza: P3, es: una_foto}, {pieza: P4, es: una_foto},
+                   {pieza: P5, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}]}
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
+    dice:
+      - que sumó la foto del tablero cerrado
+      - cómo queda la entrega, una pieza por renglón
+      - "el cierre, aparte: que la confirme así"
+    no_dice:
+      - que la entregó
+      - que Ismael se enteró
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-22 15:16"
+    escribe: "dale"
+    jugadas:
+      - {nombre: confirmar}
+    efectos:
+      estados: {PLC: en_revision}
+      evidencias:
+        - {tarea: PLC, clase: texto, cubre: [explicacion, resultado_de_prueba]}
+        - {tarea: PLC, clase: imagen, cubre: [captura]}
+        - {tarea: PLC, clase: imagen, cubre: [captura]}
+        - {tarea: PLC, clase: imagen, cubre: [captura]}
+        - {tarea: PLC, clase: archivo, cubre: [archivo]}
+      avisos_de_la_cocina: [{a: Ismael}]
+    hechos:
+      - {jugada: confirmar, resultado: entregada, tarea: PLC, estado: en_revision,
+         queda_esperando_la_aprobacion_de: Ismael Soschinski,
+         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-22T15:16"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la entregó y queda esperando la aprobación de Ismael
+      - que Ismael se va a enterar ahora
+    no_dice:
+      - que la tarea está terminada o aprobada
+      - que Ismael ya la vio
+      - la foto del martes

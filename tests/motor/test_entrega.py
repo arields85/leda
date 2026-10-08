@@ -420,3 +420,18 @@ def test_la_redaccion_no_recibe_ni_ids_ni_huellas_ni_codigos_de_la_politica(conn
     assert huella not in texto and archivo not in texto
     for codigo in ('"explicacion"', "tipo_de_evidencia", "evidencia_que_pide"):
         assert codigo not in texto, codigo
+
+
+def test_cada_pieza_cubre_lo_que_solo_ella_puede_cubrir(conn, mundo, marcos):
+    """Una foto puede contar como archivo, pero si hay un archivo, la foto cubre la foto y el
+    archivo, el archivo (`entrega.cubrir`: las piezas que sirven para menos van primero)."""
+    _tarea(conn, mundo, pide=("explicacion", "foto", "archivo"))
+    r = marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero",
+                     archivos=[(JPEG, "foto", None), (JPEG, "foto", None),
+                               (ZIP, "archivo", "programa.zip")])
+    hecho = _hecho(r, "entregar")
+    assert [(p["es"], p["cubre"]) for p in hecho["entrega"]] == [
+        ("lo_que_escribio", ["cómo quedó el trabajo"]),
+        ("una_foto", ["una foto del trabajo terminado"]),
+        ("una_foto", ["una foto del trabajo terminado"]),
+        ("un_archivo", ["un archivo del trabajo"])]

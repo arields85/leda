@@ -206,8 +206,10 @@ def cubrir(piezas: list[dict[str, Any]], pol: Politica) -> None:
     """Pone en cada pieza los tipos de la política que cubre (`cubre`). Un texto, los que la
     persona dice con él, si un texto los cubre; sin decirlo, sólo los que nada más un texto
     puede cubrir. Cada foto, archivo o enlace, un tipo que su clase acepta: primero se reparten
-    para cubrir lo más posible (los tipos más exigentes primero, las piezas de esta entrega
-    antes que las mandadas antes); las que sobran cubren lo mismo que la primera de su clase."""
+    para cubrir lo más posible (los tipos más exigentes primero y, para cada uno, primero las
+    piezas que sirven para menos tipos: un archivo cubre el archivo antes que una foto que
+    también podría; entre las que sirven para lo mismo, las de esta entrega antes que las
+    mandadas antes); las que sobran cubren lo mismo que la primera de su clase."""
     textos = [p for p in piezas if p["clase"] == "texto"]
     for p in textos:
         dicho = p.get("cubre_dicho")
@@ -219,10 +221,14 @@ def cubrir(piezas: list[dict[str, Any]], pol: Politica) -> None:
                    key=lambda t: (len(pol.clases(t)), pol.pide.index(t)))
     otras = ([p for p in piezas if p["clase"] != "texto" and not p.get("antes")]
              + [p for p in piezas if p["clase"] != "texto" and p.get("antes")])
+    sirve_para = [sum(p["clase"] in pol.clases(t) for t in tipos) for p in otras]
+    orden = sorted(range(len(otras)),
+                   key=lambda i: (sirve_para[i], bool(otras[i].get("antes")), i))
     de_pieza: dict[int, str] = {}
 
     def asignar(tipo: str, vistas: set[int]) -> bool:
-        for i, p in enumerate(otras):
+        for i in orden:
+            p = otras[i]
             if i in vistas or p["clase"] not in pol.clases(tipo):
                 continue
             vistas.add(i)

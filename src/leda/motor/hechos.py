@@ -548,7 +548,8 @@ _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", 
 # El nombre de un archivo nunca es un código, aunque se escriba como uno (`informe_final`).
 # Ni lo que escribió en una pieza de una entrega, ni un enlace, ni el código de una cosa que
 # pide la tarea, que es dato del pack (va con sus palabras, `en_palabras`).
-_NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_evidencia"})
+_NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_evidencia",
+                              "el_texto_cubre"})
 
 
 def para_redactar(valor: Any) -> Any:

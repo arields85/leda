@@ -7,7 +7,11 @@ días, y no pasa la tarea a revisión. Un video más grande de lo que hoy se pue
 propone otra forma, nunca lo descarta en silencio. Circuito 7 (ADR 0017, decisión 3b); ADR 0019,
 decisiones 2, 4 y 5; ADR 0018, decisión 4 (situación general 5); mecánica §6.
 
-**Todavía no corre:** el circuito no está construido (`odd/tasks/fase-c.md`, tarea C-3). No tiene YAML.
+**Corre desde la porción 2 de la C-3** (`odd/tasks/fase-c.md`), con su YAML. En el paso 5, con el
+enlace solo, el código lo cuenta como el archivo y falta cómo se probó (un enlace sirve para los dos;
+el reparto es por las clases, no por lo que dice el enlace); con el archivo del paso 6 el reparto cambia
+y queda como dice este hilo. En el paso 7, el aviso a Ismael es el de texto fijo de la cocina hasta la
+porción 3.
 
 ## Estado inicial
 

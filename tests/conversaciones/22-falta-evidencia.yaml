@@ -1,0 +1,199 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/22-falta-evidencia.md
+numero: "22"
+titulo: "Lo que falta, una foto sin entrega y un video que no entra"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-26 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-21"
+
+# Lo que pide OT (`espacios/corework.yaml`, con las clases de cada tipo del ADR 0019, decisión 5).
+evidencia:
+  ot: [explicacion, resultado_de_prueba, captura, archivo]
+
+# El paso 5 difiere del .md en lo que cubre el enlace mientras falta el archivo: un enlace sirve
+# tanto para el archivo como para el resultado de la prueba, y el código lo reparte por las
+# clases, no por lo que dice el enlace. Con el enlace solo, cubre el archivo y falta cómo se
+# probó; al llegar el archivo del paso 6, el reparto cambia y el enlace cubre el resultado de la
+# prueba, como dice el .md (la persona puede corregirlo en la vista previa). En el paso 7, el
+# aviso a Ismael es el de texto fijo de la cocina hasta la porción 3 de la C-3.
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-26 09:40"
+    manda: [{que: foto}]
+    jugadas: []
+    efectos: {}
+    hechos:
+      - {jugada: guardar_para_la_entrega, resultado: falta_dato, falta: [tarea],
+         pregunta: cual_tarea}
+    pregunta: {tipo: cual_tarea}
+    botones: [PLC, COM]
+    estado_despues:
+      pregunta_abierta: {tipo: cual_tarea, tarea: null}
+    dice:
+      - que le llegó la foto
+      - "una pregunta: para qué es"
+    no_dice:
+      - qué muestra la foto
+      - que la anotó como entrega
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-26 09:42"
+    escribe: "es de comunicaciones, la pantalla del switch con todos los puertos arriba. todavia no la termine eh"
+    jugadas:
+      - {nombre: elegir, opcion: COM}
+    efectos:
+      archivos_de_tarea: [{tarea: COM}]
+    hechos:
+      - {jugada: guardar_para_la_entrega, resultado: anotado, tarea: COM,
+         para_cuando_la_entregue: [{es: una_foto}]}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la guarda y que se la va a mostrar cuando entregue esa tarea, para que decida si va
+    no_dice:
+      - que la tarea quedó entregada o en revisión
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-28 15:00"
+    escribe: "listo lo de comunicaciones, quedo andando todo"
+    jugadas:
+      - {nombre: entregar, tarea: COM, el_texto_cubre: [explicacion]}
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM, sumo: [P1],
+         pregunta: lo_que_falta_de_la_entrega,
+         entrega: [
+           {pieza: P1, es: lo_que_escribio,
+            cubre: ["cómo quedó el trabajo, contado por quien lo hizo"]},
+           {pieza: P2, es: una_foto, mandado_antes_el: "2026-10-26",
+            cubre: ["una foto o una captura de la pantalla"]}],
+         le_falta: ["cómo se probó y qué dio la prueba",
+                    "un archivo del trabajo, por ejemplo el programa o la configuración"],
+         al_confirmar: {queda_esperando_la_aprobacion_de: Ismael Soschinski}}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
+    dice:
+      - "lo que falta, en palabras de todos los días: cómo la probó y un archivo"
+      - que la foto del lunes va a estar en la entrega
+      - que la tarea pasa a esperar la aprobación de Ismael cuando esté todo
+      - "el cierre, aparte: que mande lo que falta"
+    no_dice:
+      - que la entregó, que está en revisión o terminada
+      - los nombres de los tipos de la política
+      - que Ismael se enteró
+
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-28 15:20"
+    manda: [{que: video, mb: 48}]
+    jugadas: []
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM, sumo: ausente,
+         le_falta: ["cómo se probó y qué dio la prueba",
+                    "un archivo del trabajo, por ejemplo el programa o la configuración"]}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
+    dice:
+      - que el video es muy pesado para recibirlo por acá
+      - qué puede hacer, mandar uno más corto o un enlace al video
+      - que sigue faltando un archivo
+    no_dice:
+      - que lo recibió
+      - el límite en términos técnicos o un error
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-28 15:25"
+    escribe: "https://drive.google.com/file/d/prueba-comunicaciones/view"
+    jugadas: []
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM, sumo: [P2],
+         entrega: [{pieza: P1, es: lo_que_escribio},
+                   {pieza: P2, es: un_enlace,
+                    enlace: "https://drive.google.com/file/d/prueba-comunicaciones/view"},
+                   {pieza: P3, es: una_foto}],
+         le_falta: ["cómo se probó y qué dio la prueba"]}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
+    dice:
+      - que sumó el enlace al video
+      - lo que sigue faltando
+      - "el cierre, aparte: que lo mande"
+
+  - paso: 6
+    quien: Marcos
+    a_las: "2026-10-28 15:30"
+    manda: [{que: archivo, nombre: config-switch-planta.txt}]
+    jugadas: []
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: COM, sumo: [P3],
+         pregunta: confirmar_la_entrega, le_falta: ausente,
+         entrega: [
+           {pieza: P1, es: lo_que_escribio,
+            cubre: ["cómo quedó el trabajo, contado por quien lo hizo"]},
+           {pieza: P2, es: un_enlace, cubre: ["cómo se probó y qué dio la prueba"]},
+           {pieza: P3, es: un_archivo, nombre_del_archivo: config-switch-planta.txt,
+            cubre: ["un archivo del trabajo, por ejemplo el programa o la configuración"]},
+           {pieza: P4, es: una_foto, mandado_antes_el: "2026-10-26",
+            cubre: ["una foto o una captura de la pantalla"]}]}
+    pregunta: {tipo: confirmar_la_entrega, tarea: COM}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: COM}
+    dice:
+      - "la tarea de comunicaciones en su renglón con 📋"
+      - "una pieza por renglón, con lo que cubre cada una en palabras de todos los días y la foto del lun 26/10 aparte, como mandada antes"
+      - "el cierre, aparte: si la entrega así, o si corrige algo"
+
+  - paso: 7
+    quien: Marcos
+    a_las: "2026-10-28 15:31"
+    escribe: "si"
+    jugadas:
+      - {nombre: confirmar}
+    efectos:
+      estados: {COM: en_revision}
+      evidencias:
+        - {tarea: COM, clase: texto, cubre: [explicacion]}
+        - {tarea: COM, clase: enlace, cubre: [resultado_de_prueba]}
+        - {tarea: COM, clase: archivo, cubre: [archivo]}
+        - {tarea: COM, clase: imagen, cubre: [captura]}
+      avisos_de_la_cocina: [{a: Ismael}]
+    hechos:
+      - {jugada: confirmar, resultado: entregada, tarea: COM, estado: en_revision,
+         queda_esperando_la_aprobacion_de: Ismael Soschinski,
+         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-28T15:31"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la entregó y queda esperando la aprobación de Ismael, que se va a enterar ahora
+    no_dice:
+      - que la tarea está terminada o aprobada

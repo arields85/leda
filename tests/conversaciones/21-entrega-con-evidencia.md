@@ -8,7 +8,9 @@ por el motor, con las fotos adjuntas y un enlace a la página de la tarea. Circu
 3b); ADR 0018, decisiones 2 y 4 (situaciones generales 3, 6 y 7); ADR 0019, decisiones 4 a 6;
 constitución §7 y §11. Toma los pasos "Para la prueba de la entrega" de las conversaciones 10 y 11.
 
-**Todavía no corre:** el circuito no está construido (`odd/tasks/fase-c.md`, tarea C-3). No tiene YAML.
+**Corre desde la porción 2 de la C-3** (`odd/tasks/fase-c.md`), con su YAML, del paso 1 al 5. El paso 6
+(el aviso redactado por el motor, con las fotos, los botones y el enlace) es de las porciones 3 y 4:
+hasta entonces, a Ismael le llega en el paso 5 el aviso de texto fijo de la cocina.
 
 ## Estado inicial
 

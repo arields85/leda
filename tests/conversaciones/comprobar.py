@@ -149,6 +149,20 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
         cur.execute("""select id, sujeto_id from audit_log
                         where workspace_id = %s and accion = 'informar_avance'""", (ws,))
         avances = {str(f["id"]): {"tarea": tarea(f["sujeto_id"])} for f in cur.fetchall()}
+        # La entrega (ADR 0019): las piezas de evidencia, por su clase y lo que cubren; los
+        # retiros; y los archivos dichos de una tarea antes de entregarla.
+        cur.execute("""select e.id, e.task_id, e.clase, e.cubre,
+                              exists (select 1 from evidencia_retirada w
+                                       where w.evidence_id = e.id) as retirada
+                         from evidence e where e.workspace_id = %s""", (ws,))
+        evidencias = {str(f["id"]): {"tarea": tarea(f["task_id"]), "clase": f["clase"],
+                                     "cubre": list(f["cubre"] or []),
+                                     "retirada": f["retirada"]}
+                      for f in cur.fetchall()}
+        cur.execute("""select id, task_id from archivo_de_tarea where workspace_id = %s""",
+                    (ws,))
+        archivos_de_tarea = {str(f["id"]): {"tarea": tarea(f["task_id"])}
+                             for f in cur.fetchall()}
         cur.execute("""select id, task_id, satisfecho_en, escalado_en from pending_reply
                         where workspace_id = %s""", (ws,))
         esperas = {str(f["id"]): {"tarea": tarea(f["task_id"]),
@@ -186,7 +200,8 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
     return {"estados": estados, "previsiones": previsiones, "bloqueos": bloqueos,
             "destraban": destraban, "avisos": avisos, "salidas": salidas,
             "incidentes": incidentes, "avisos_admin": avisos_admin, "avances": avances,
-            "esperas": esperas, "preguntas": preguntas, "ultimo_aviso": ultimo_aviso}
+            "esperas": esperas, "preguntas": preguntas, "ultimo_aviso": ultimo_aviso,
+            "evidencias": evidencias, "archivos_de_tarea": archivos_de_tarea}
 
 
 def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
@@ -208,6 +223,12 @@ def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
         "incidentes": nuevas("incidentes"),
         "avisos_al_administrador": despues["avisos_admin"] - antes["avisos_admin"],
         "avances": nuevas("avances"),
+        "evidencias": [{k: v for k, v in e.items() if k != "retirada"}
+                       for e in nuevas("evidencias")],
+        "retiradas": [{"tarea": v["tarea"], "clase": v["clase"]}
+                      for k, v in despues["evidencias"].items()
+                      if v["retirada"] and not antes["evidencias"].get(k, {}).get("retirada")],
+        "archivos_de_tarea": nuevas("archivos_de_tarea"),
     }
 
 
@@ -393,6 +414,10 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
     # Como las demás filas: uno de más es de garantía; uno que falta, de comprensión (revisión
     # de la E2-7: antes, los dos eran de garantía).
     filas("bloqueos_resueltos", hubo["bloqueos_resueltos"], "bloqueo resuelto")
+    # La entrega (ADR 0019): unos efectos armados a mano pueden no traerlos.
+    filas("evidencias", hubo.get("evidencias") or [], "evidencia")
+    filas("retiradas", hubo.get("retiradas") or [], "evidencia retirada")
+    filas("archivos_de_tarea", hubo.get("archivos_de_tarea") or [], "archivo dicho de una tarea")
     al_admin_e = esperados.get("avisos_al_administrador", 0)
     fuera = [i for i in hubo["incidentes"] if i["etapa"] == ETAPA_FUERA_DE_LA_LISTA]
     if len(fuera) != al_admin_e:
@@ -403,7 +428,13 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
             falta = True
             c.falla(COMPRENSION, "falta el aviso al administrador", al_admin_e, len(fuera))
     comprobar_incidentes(c, hubo["incidentes"])
+    # El aviso de una entrega a quien aprueba sale en el mismo turno, con el texto fijo de la
+    # cocina, hasta la porción 3 de la C-3: se espera por a quién (`avisos_de_la_cocina`).
     a_otros = [s for s in hubo["salidas"] if not s["es_respuesta"]]
+    faltan_cocina, a_otros = _emparejar(esperados.get("avisos_de_la_cocina") or [], a_otros)
+    if faltan_cocina:
+        falta = True
+        c.falla(MOTOR, "falta un aviso de la cocina", faltan_cocina, [])
     if a_otros:
         de_mas = True
         c.falla(GARANTIA, "mensaje de Leda por su cuenta en un turno", [], a_otros)

@@ -92,10 +92,25 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
     el primer y el segundo día hábil; al tercero, el aviso a quien está arriba (Marcos → Ismael) o, sin
     nadie arriba, un recordatorio cordial por día; al responsable, nada.
 
-**Las conversaciones 21 a 24 todavía no corren:** sus circuitos no están construidos (tarea C-3 de la
-Fase C). Tienen sólo el `.md`; el corredor carga los `*.yaml`, así que cada una recibe su YAML cuando su
-ficha exista. Lo que dejan `PENDIENTE` está marcado en cada paso. Usan más personas que Marcos e Ismael:
-Nahuel (lo aprueba Marcos), Mariano y Ariel (los aprueba Ismael) y Lucas.
+**La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
+con su YAML para los pasos que esa porción cubre:
+
+- **La 21**, del paso 1 al 5. El paso 6 (el aviso a Ismael redactado por el motor, con las fotos adjuntas,
+  los botones Aprobar y Pedir cambios y el enlace a la página de la tarea) es de las porciones 3 y 4 y
+  queda sólo en el `.md`; hasta entonces, a Ismael le llega en el paso 5 el aviso de texto fijo de la
+  cocina, que el YAML espera como `avisos_de_la_cocina`.
+- **La 22**, entera, con dos diferencias anotadas en su YAML: en el paso 5 el enlace solo cubre el archivo
+  y falta cómo se probó (el reparto es por las clases; con el archivo del paso 6 queda como dice el
+  `.md`), y en el paso 7 el aviso a Ismael es el de la cocina.
+
+**La 23 y la 24 todavía no corren:** la aprobación no está construida (tarea C-3 de la Fase C). Tienen sólo
+el `.md`; el corredor carga los `*.yaml`, así que cada una recibe su YAML cuando su ficha exista. Lo que
+dejan `PENDIENTE` está marcado en cada paso. Usan más personas que Marcos e Ismael: Nahuel (lo aprueba
+Marcos), Mariano y Ariel (los aprueba Ismael) y Lucas.
+
+**La 12 (paso 6) y la 25 (paso 8) esperan todavía que la entrega no se reciba por chat** (`no_por_chat`):
+desde la porción 2 la entrega muestra la vista previa (o, en la 25, no se puede porque la tarea de
+comunicaciones no arrancó). Sus YAML se actualizan con la porción 2: `PENDIENTE` (`odd/tasks/fase-c.md`).
 
 Las cuatro primeras son las cuatro respuestas de 5a; de la 5 a la 12, cada una aplica al recordatorio una
 de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `informar_avance` (decisión del
@@ -160,6 +175,17 @@ quedan inválidas, aparte en el informe. La cuenta queda en
 `resultados/gasto.json` y el informe de la ronda, con sus transcripciones, en `resultados/` (las
 grabaciones crudas, en `grabaciones/`, no se versionan). La comprensión automática del informe es
 provisional: la que vale es la lectura del usuario.
+
+**La entrega** (porción 2 de la C-3): un paso puede **mandar** fotos, videos o archivos (`manda`, con
+`que` y, si hace falta, `nombre` o `mb`; con o sin `escribe`), que se guardan como los guarda el adaptador
+(varias juntas son un álbum; lo que pasa de los 20 MB del canal llega rechazado); **tocar** un botón por
+su etiqueta (`toca: Confirmar`) y uno viejo (`vieja: true`, el de la pregunta anterior que lo ofreció). El
+estado inicial puede traer la política de evidencia por área (`evidencia`, con las clases y las palabras
+de cada tipo de `espacios/corework.yaml`) y lo que la persona dijo que era de una tarea antes de
+entregarla (`mandado_antes`). Los efectos suman las piezas de evidencia (`evidencias`, por su clase y lo
+que cubren), los retiros (`retiradas`), los archivos dichos de una tarea (`archivos_de_tarea`) y el aviso
+de texto fijo de la cocina a quien aprueba (`avisos_de_la_cocina`), que el formato no mide porque no lo
+escribe la IA.
 
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 
@@ -267,7 +293,10 @@ importa es el significado:
 - `anotar_bloqueo`: la persona dice que no puede avanzar y, si lo dice, por qué.
 - `elegir`: la persona elige una de las opciones que Leda le ofreció, tocando o escribiendo.
 - `confirmar`: la persona confirma lo último que Leda le mostró (decisión 2). Sólo en las partes "Para la
-  prueba de la entrega" y en la entrega (conversaciones 21 y 22): el recordatorio no confirma nada.
+  prueba de la entrega" y en la entrega (conversaciones 21 y 22): el recordatorio no confirma nada. El
+  código comprueba la guarda: lo último que la persona vio, en un mensaje anterior, y sin cambios.
+- `guardar_para_la_entrega`: la persona dice de qué tarea es una foto o un archivo que mandó sin
+  entregarla; queda para mostrárselo en la entrega, sin ser evidencia (conversación 22).
 - `corregir`: la persona corrige algo que acaba de decir o que Leda tomó mal.
 - `cancelar`: la persona deja sin efecto el tema abierto.
 - `dejar_para_despues`: la persona deja el tema abierto para más tarde. Con `cancelar` y contestar la

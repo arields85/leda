@@ -118,7 +118,37 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     documentos, videos y álbumes por Telegram, límites de tamaño y de tipo por el contenido). Revisiones
     `review-bd65d58fcfca3c13` y `review-0a9143b546985a4f`. Suite completa 1317. Route: delegada (escritor
     único, 2+ archivos). La evidencia de la entrega va en otra migración.
-  - [ ] Porción 2: la entrega con evidencia y la política por tipo.
+  - [x] Porción 2, la entrega con evidencia y la política por tipo (2026-10-08). Route: delegada
+    (escritor único, 2+ archivos no triviales).
+    - **Commits:** `0176300` (migración `0034`: la clase de cada pieza, lo que cubre, el archivo,
+      `evidencia_retirada` y `archivo_de_tarea`, sólo agregar y con RLS forzado; la política por
+      tipo en `tipos_de_evidencia_que_faltan`; `evidencia.tipos` en el pack; `entregar_tarea` y
+      `retirar_evidencia` en la cocina), `806e85f` (la ficha `entregar` con su vista previa,
+      `confirmar` con la guarda escrita, `guardar_para_la_entrega`, la corrección de la vista
+      previa y el retiro) y el commit de las conversaciones 21 y 22 (YAML, el corredor aprende
+      archivos, botones por etiqueta y la política de evidencia).
+    - **Test primero:** `tests/motor/test_entrega.py` se vio en rojo (17 de 17) antes de la ficha, y
+      el reparto de lo que cubre cada pieza también (`test_cada_pieza_cubre_lo_que_solo_ella_puede_
+      cubrir`). Las garantías de la base (`tests/garantias/test_evidencia.py`) se escribieron con la
+      migración, sin rojo observado.
+    - **Corridas en seco** (IA guionada, `correr_conversacion`, 2026-10-08): la 21 y la 22 sin fallas;
+      de las demás, sólo la 12 (pasos 6 y 7) y la 25 (paso 8) fallan, porque esperan que la entrega no
+      se reciba por chat.
+    - **El referente del área** no hace falta en esta porción: queda para la 4 (quién ve la página).
+    - `PENDIENTE`:
+      - **Actualizar el YAML (y el `.md`) de la 12 y la 25**, que quedan fuera de esta porción: en la
+        12, la entrega del PLC muestra la vista previa con "Confirmar"; en la 25, la de comunicaciones
+        no se puede entregar porque no arrancó.
+      - **Decisión del usuario: una pieza retirada después de entregar** deja la política incompleta:
+        la tarea sigue en revisión, no se puede aprobar y a quien aprueba no le llega nada; la salida
+        hoy es que pida cambios. ¿Vuelve a en curso, se le avisa a quien aprueba, o alcanza así?
+      - **Decisión del usuario: entregar sin haber arrancado.** La ficha entrega sólo desde en curso
+        (ADR 0018, decisión 4): "terminé" sobre una tarea asignada dice que no se puede (la 25, paso
+        8). ¿Se anota el inicio y se entrega en el mismo mensaje?
+      - **Las bases que ya existen:** después de la `0034` hay que volver a importar el pack para que
+        cada política tenga sus clases; hasta entonces ningún tipo se cubre (falla cerrado) y la
+        evidencia de antes no cubre nada.
+      - `db/pruebas.sql` inserta evidencia sin clase: quedó atrás de la `0034`.
   - [ ] Porción 3: el aviso a quien aprueba con fotos y botones.
   - [ ] Porción 4: la página de la tarea y su enlace.
   - [ ] Porción 5: el acceso del administrador.
@@ -129,5 +159,6 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La porción 2 de C-3, después de la regresión pendiente y del hallazgo del aviso en medio de una
-conversación (`docs/STATUS.md`, "Punto exacto para retomar").
+La regresión con la IA real de la 21 y la 22 (y de todas, con los YAML de la 12 y la 25 al día), y
+después la porción 3 de la C-3: el aviso a quien aprueba redactado por el motor, con las fotos y los
+botones (`docs/STATUS.md`, "Punto exacto para retomar").

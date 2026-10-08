@@ -9,7 +9,12 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
 2. corre cada paso por el código de verdad, con el reloj en el momento que dice el `.md`:
    - **una persona escribe** (`escribe`): se guarda como lo guarda el escuchador, corre el turno
      (`turno.procesar_turno`) y el despacho entrega la respuesta;
-   - **una persona toca** una opción (`toca`): `turno.procesar_toque` con el token de esa opción;
+   - **una persona manda** fotos o archivos (`manda`, con o sin `escribe`): se guardan como los
+     guarda el adaptador (`archivo` y `archivo_de_mensaje`; lo que el canal no deja bajar, con
+     su rechazo) y corre el turno como con un mensaje escrito;
+   - **una persona toca** una opción (`toca`): `turno.procesar_toque` con el token de esa opción
+     (de una tarea, por su clave; si no, por su etiqueta, y `vieja` toca la de la pregunta
+     anterior que la ofreció, un botón viejo);
    - **Leda por su cuenta o nadie escribe** (`relojes`): en cada momento, una vuelta del ciclo
      (`ciclo.Ciclo`): la escalera, los avisos guardados, el despacho y los avisos a la
      administración;
@@ -25,6 +30,7 @@ grabación (`grabar.IARepetida`). El motor de conversación es el de `motores.py
 
 from __future__ import annotations
 
+import hashlib
 import time
 import traceback
 import uuid
@@ -38,17 +44,21 @@ import yaml
 from leda.autoridad import identificar_en_espacio
 from leda.db import espacio
 from leda.despachador import TransporteDePrueba
+from leda.motor.archivos import MB
 from leda.motor.ia import IA
 from leda.salida import formatear
 
 from . import comprobar as cp
-from .carga import Mundo, cargar, momento
+from .carga import Mundo, cargar, contenido_de, momento
 from .grabar import IAMixta, IAPerfecta
 from .motores import POR_OMISION, Motor
 from .motores import cargar as cargar_motor
 
 CARPETA = Path(__file__).resolve().parent
 RAIZ = Path(__file__).resolve().parents[2]
+# Lo que deja bajar el canal, como el adaptador de Telegram (`recibir.LIMITE_DE_TELEGRAM`): un
+# archivo más grande llega como rechazado, y la IA recibe este límite.
+LIMITE_DEL_CANAL = 20 * MB
 
 
 # La definición del usuario (2026-10-06; ADR 0018, decisión 9, tercera vuelta): todo mensaje de
@@ -108,7 +118,7 @@ def llamadas_previstas(conv: dict[str, Any]) -> int:
     preludio, donde las jugadas son guionadas y los textos los redacta la IA)."""
     n = 0
     for paso in (conv.get("preludio") or []) + (conv.get("pasos") or []):
-        if "escribe" in paso:
+        if "escribe" in paso or "manda" in paso:
             n += 2 if paso in (conv.get("pasos") or []) else 1
         elif "toca" in paso:
             n += 1
@@ -234,7 +244,7 @@ class _Corredor:
                           dice=list(paso.get("dice") or []),
                           no_dice=list(paso.get("no_dice") or []), preludio=preludio)
         resultado = None
-        if "escribe" in paso or "toca" in paso:
+        if "escribe" in paso or "toca" in paso or "manda" in paso:
             self.reloj.momento = momento(paso["a_las"])
             r.cuando = paso["a_las"]
             ia = self.ia
@@ -291,17 +301,19 @@ class _Corredor:
         situaciones: list[dict[str, Any]] = []
         ia_que_mira = _QueMira(ia, situaciones, self.sin_significado,
                                self.motor.sin_significado)
-        if "escribe" in paso:
-            texto = paso["escribe"]
-            entrante = self._guardar_mensaje(quien, persona, texto)
+        if "escribe" in paso or "manda" in paso:
+            texto = paso.get("escribe", "")
+            entrante = self._guardar_mensaje(quien, persona, texto, paso.get("manda") or [])
             resultado = self.motor.procesar_turno(self.conn, quien, entrante, ia_que_mira,
-                                                  self.reloj)
+                                                  self.reloj, limite_del_canal=LIMITE_DEL_CANAL)
+            texto = texto + "".join(f" [{m['que']}]" for m in paso.get("manda") or [])
             self.conn.commit()
             jugadas = [self._jugada(j.nombre, j.datos, situaciones[-1] if situaciones else {})
                        for j in resultado.jugadas]
             latencia = self._latencia(persona["membership_id"])
         else:
-            token, etiqueta = self._token(persona["membership_id"], paso["toca"])
+            token, etiqueta = self._token(persona["membership_id"], paso["toca"],
+                                          vieja=bool(paso.get("vieja")))
             texto = f"[toca] {etiqueta}"
             resultado = self.motor.procesar_toque(self.conn, quien, token, persona["telegram"],
                                                   ia_que_mira, self.reloj)
@@ -317,7 +329,13 @@ class _Corredor:
                 self._repetido = otra is not None and otra.repetido
         return resultado, texto, jugadas, latencia
 
-    def _guardar_mensaje(self, quien, persona, texto: str) -> str:
+    def _guardar_mensaje(self, quien, persona, texto: str,
+                         manda: list[dict[str, Any]] | None = None) -> str:
+        """El mensaje, como lo guarda el escuchador, y lo que trajo, como lo guarda el adaptador
+        (`recibir.py`): cada archivo en `archivo`, atado al mensaje en `archivo_de_mensaje`; uno
+        más grande que lo que deja bajar el canal (`mb`), sólo anotado con su rechazo. Varias
+        fotos juntas son un álbum: un solo mensaje."""
+        manda = list(manda or [])
         with espacio(self.conn, self.mundo.workspace_id) as cur:
             cur.execute(
                 """insert into inbound_message (workspace_id, telegram_message_id, chat_id,
@@ -326,18 +344,54 @@ class _Corredor:
                 (self.mundo.workspace_id, uuid.uuid4().int % 2_000_000_000, persona["telegram"],
                  persona["app_user_id"], texto, self.reloj.ahora()))
             entrante = str(cur.fetchone()["id"])
+            album = f"album-{entrante}" if len(manda) > 1 else None
+            for i, m in enumerate(manda):
+                archivo, rechazo = None, None
+                if float(m.get("mb") or 0) * MB > LIMITE_DEL_CANAL:
+                    rechazo = "demasiado_grande"
+                else:
+                    contenido, clase = contenido_de(m["que"], m.get("nombre"), f"{entrante}-{i}")
+                    cur.execute(
+                        """insert into archivo (workspace_id, contenido, sha256, tamano, tipo,
+                                                clase, nombre_original,
+                                                enviado_por_membership_id, recibido_en)
+                           values (%s, %s, %s, %s, 'x', %s, %s, %s, %s) returning id""",
+                        (self.mundo.workspace_id, contenido,
+                         hashlib.sha256(contenido).hexdigest(), len(contenido), clase,
+                         m.get("nombre"), persona["membership_id"], self.reloj.ahora()))
+                    archivo = str(cur.fetchone()["id"])
+                cur.execute(
+                    """insert into archivo_de_mensaje (workspace_id, inbound_message_id,
+                                                       archivo_id, que_llego, nombre_original,
+                                                       rechazo, telegram_message_id,
+                                                       telegram_file_id,
+                                                       telegram_file_unique_id,
+                                                       telegram_media_group_id)
+                       values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (self.mundo.workspace_id, entrante, archivo, m["que"], m.get("nombre"),
+                     rechazo, i + 1, f"archivo-{i}", f"unico-{entrante}-{i}", album))
         self.conn.commit()
         return entrante
 
-    def _token(self, membership_id: str, clave: str) -> tuple[str, str]:
+    def _token(self, membership_id: str, clave: str, *, vieja: bool = False) -> tuple[str, str]:
         """El token de la opción de esa tarea en la última pregunta con opciones de la persona
-        (abierta o ya cerrada: tocar un botón viejo es la situación general 7)."""
+        (abierta o ya cerrada: tocar un botón viejo es la situación general 7). Si `clave` no es
+        una tarea, la opción con esa etiqueta (el "Confirmar" de una entrega); con `vieja`, la
+        de la pregunta anterior que la ofreció."""
         with espacio(self.conn, self.mundo.workspace_id) as cur:
-            cur.execute("""select o.token, o.etiqueta from conversation_option o
-                             join conversation_question q on q.id = o.question_id
-                            where q.membership_id = %s and o.valor ->> 'tarea' = %s
-                            order by q.abierta_en desc limit 1""",
-                        (membership_id, self.mundo.tareas[clave]))
+            if clave in self.mundo.tareas:
+                cur.execute("""select o.token, o.etiqueta from conversation_option o
+                                 join conversation_question q on q.id = o.question_id
+                                where q.membership_id = %s and o.valor ->> 'tarea' = %s
+                                  and not (o.valor ? 'jugada')
+                                order by q.abierta_en desc limit 1 offset %s""",
+                            (membership_id, self.mundo.tareas[clave], int(vieja)))
+            else:
+                cur.execute("""select o.token, o.etiqueta from conversation_option o
+                                 join conversation_question q on q.id = o.question_id
+                                where q.membership_id = %s and o.etiqueta = %s
+                                order by q.abierta_en desc limit 1 offset %s""",
+                            (membership_id, clave, int(vieja)))
             fila = cur.fetchone()
         self.conn.commit()
         if fila is None:
@@ -414,10 +468,10 @@ class _Corredor:
         hubo = cp.efectos(antes, despues)
         titulos = self.mundo.titulos
         quien = paso.get("quien", self.persona)
-        if "escribe" in paso or "toca" in paso:
+        if "escribe" in paso or "toca" in paso or "manda" in paso:
             jugadas_bien = cp.comprobar_jugadas(c, paso.get("jugadas") or [], r.jugadas,
-                                                paso["escribe"], motor=self.motor) \
-                if "escribe" in paso else True
+                                                paso.get("escribe", ""), motor=self.motor) \
+                if "toca" not in paso else True
             _, falta = cp.comprobar_efectos(c, paso.get("efectos") or {}, hubo, titulos)
             # Lo que depende de haber entendido: con las jugadas esperadas, una diferencia es
             # del código; si no, es la consecuencia de no haber entendido.
@@ -449,6 +503,10 @@ class _Corredor:
         # El formato de cada mensaje de Leda del paso, respuesta o aviso, a quien sea (segunda
         # vuelta del formato, 2026-10-07): sobre lo que escribió la IA, sin el saludo del día.
         for s in r.salidas:
+            if not s.es_respuesta and not s.avisos:
+                # Un texto fijo de la cocina (el aviso de una entrega a quien aprueba, hasta la
+                # porción 3 de la C-3): no lo escribió la IA, y el formato mide lo que escribe.
+                continue
             cp.comprobar_formato(c, s.redactado if s.redactado is not None else s.texto,
                                  titulos.values(), a=s.a)
         return c

@@ -47,10 +47,11 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_veintiuna_conversaciones_y_cada_una_nombra_su_fuente():
-    # De la 21 a la 24 tienen sólo el .md: sus circuitos no están construidos (README).
+def test_hay_veintitres_conversaciones_y_cada_una_nombra_su_fuente():
+    # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega); la 23, la 24 y la 26
+    # tienen sólo el .md: sus circuitos o su regla no están construidos (README).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in [*range(1, 21), 25]]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in [*range(1, 23), 25]]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]

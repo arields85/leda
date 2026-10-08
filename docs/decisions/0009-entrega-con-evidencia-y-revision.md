@@ -235,3 +235,17 @@ dos llaman a la misma función SQL.
    entregado (el transporte sólo manda, `despachador.Transporte.enviar`) --
    el mensaje viejo puede seguir visible en el chat, pero tocar sus botones
    ya no aplica nada.
+
+## Nota (2026-10-08): la evidencia por tipo y la entrega por el motor (ADR 0019)
+
+El [ADR 0019](0019-evidencia-y-pagina-de-la-tarea.md) (decisiones 3 y 5, migración `0034`) cambia lo
+que este ADR llamaba "la evidencia que exige su política": `evidencia_pendiente` sigue siendo la única
+fuente, pero la política se cumple por tipo (cada tipo pedido, una pieza propia del ciclo vigente, no
+retirada, de una clase que ese tipo acepta), así que una frase sola ya no cubre una foto. La evidencia
+deja de ser sólo texto (texto, imagen, archivo o enlace, con la clase que fija el código) y no se edita
+ni se borra: una pieza equivocada se retira. La entrega por chat la recibe el motor
+(`src/leda/motor/entrega.py`), con vista previa y confirmación, y la cocina la escribe en un solo acto
+(`entregar_tarea`). Lo que este ADR dejaba fuera sigue pendiente en las porciones siguientes del ADR
+0019: el aviso a quien aprueba sigue siendo el de texto fijo de `_notificar_entrega_al_aprobador`, sin
+las fotos (porción 3), y `_enlace_portal_tarea` sigue sin inventar ninguna URL hasta que exista la página
+de la tarea (porción 4; constitución §4).

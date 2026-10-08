@@ -11,7 +11,12 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   el trabajo de cada una (Ismael aprueba el de Marcos), y un administrador de plataforma con el
   bot de administración alcanzable;
 - **las tareas** de la conversación: título, responsable, vencimiento (17:00 del día, el fin de
-  la jornada), estado (un inicio, como el evento del día que dice) y dependencias.
+  la jornada), estado (un inicio, como el evento del día que dice) y dependencias;
+- **la política de evidencia** (`evidencia`, por área), si la conversación la nombra: lo que pide
+  cada área y, por tipo, las clases que lo cubren y cómo se dice, de `espacios/corework.yaml`
+  (ADR 0019, decisión 5); cada tarea pide lo de su área;
+- **lo mandado antes** (`mandado_antes`): fotos y archivos que la persona dijo que eran de una
+  tarea antes de entregarla (`archivo_de_tarea`), con el mensaje que los trajo.
 
 Lo que pasó antes en la conversación (avisos ya enviados, una pregunta ya contestada) no se
 escribe a mano: lo corre el motor mismo como **preludio** (`corredor.py`), así queda igual que
@@ -21,11 +26,15 @@ antepone y cada texto cambia.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+
+import yaml
 
 from leda.db import admin
 
@@ -46,6 +55,7 @@ AREAS = {"direccion": "Dirección", "ot": "OT y automatización", "it": "Infraes
 ROLES = {"direccion": ("Dirección", True), "referente": ("Referente técnico de área", False),
          "integrante": ("Integrante", False)}
 OBJETIVO = "Conectar y automatizar equipos para que produzcan y entreguen datos"
+PACK = Path(__file__).resolve().parents[2] / "espacios" / "corework.yaml"
 TELEGRAM_BASE = 70_001
 TELEGRAM_ADMIN = 79_999
 # El tono del pack (`persona` en `espacios/corework.yaml`).
@@ -60,6 +70,7 @@ class Mundo:
 
     workspace_id: str
     personas: dict[str, dict[str, Any]] = field(default_factory=dict)
+    areas: dict[str, str] = field(default_factory=dict)            # slug -> area_id
     tareas: dict[str, str] = field(default_factory=dict)          # clave -> task_id
     titulos: dict[str, str] = field(default_factory=dict)         # clave -> título
 
@@ -87,7 +98,9 @@ def cargar(conn, conversacion: dict[str, Any]) -> Mundo:
     """Escribe el estado inicial de la conversación y lo confirma."""
     with admin(conn) as cur:
         mundo, objetivo = _espacio(cur)
-        _tareas(cur, mundo, objetivo, conversacion.get("tareas") or {})
+        pide = _politica(cur, mundo, conversacion.get("evidencia") or {})
+        _tareas(cur, mundo, objetivo, conversacion.get("tareas") or {}, pide)
+        _mandado_antes(cur, mundo, conversacion.get("mandado_antes") or [])
     conn.commit()
     return mundo
 
@@ -122,6 +135,7 @@ def _espacio(cur) -> tuple[Mundo, str]:
                    values (%s, 'falta_persistente_de_respuesta', %s)""", (ws, roles["direccion"]))
 
     mundo = Mundo(ws)
+    mundo.areas = areas
     for i, (corto, (nombre, rol, area, aprobado_por)) in enumerate(PERSONAS.items()):
         telegram = TELEGRAM_BASE + i
         cur.execute("insert into app_user (telegram_user_id, nombre) values (%s, %s) returning id",
@@ -134,7 +148,8 @@ def _espacio(cur) -> tuple[Mundo, str]:
                     (ws, app_user, areas[area], roles[rol], aprobador))
         mundo.personas[corto] = {"nombre": nombre, "app_user_id": app_user,
                                  "membership_id": str(cur.fetchone()["id"]),
-                                 "telegram": telegram, "area_id": areas[area]}
+                                 "telegram": telegram, "area_id": areas[area],
+                                 "area": area}
     # Sin esto el despachador antepone el saludo del día y cada texto cambia.
     cur.execute("""insert into greeting_state (membership_id, workspace_id, ultima_fecha_local)
                    select id, workspace_id, date '9999-12-31' from membership
@@ -155,15 +170,83 @@ def _espacio(cur) -> tuple[Mundo, str]:
     return mundo, str(cur.fetchone()["id"])
 
 
-def _tareas(cur, mundo: Mundo, objetivo: str, tareas: dict[str, dict[str, Any]]) -> None:
+def _politica(cur, mundo: Mundo, por_area: dict[str, list[str]]) -> dict[str, list[str]]:
+    """La política de evidencia de las áreas que nombra la conversación, con las clases y las
+    palabras de cada tipo del pack de CoreWork; devuelve lo que pide cada área."""
+    if not por_area:
+        return {}
+    tipos = (yaml.safe_load(PACK.read_text("utf-8")).get("evidencia") or {}).get("tipos") or {}
+    for area, pide in por_area.items():
+        cur.execute("""insert into task_evidence_policy (workspace_id, area_id,
+                                                         evidencia_requerida, tipos)
+                       values (%s, %s, %s, %s)""",
+                    (mundo.workspace_id, mundo.areas[area], list(pide),
+                     json.dumps({t: tipos[t] for t in pide}, ensure_ascii=False)))
+    return {area: list(pide) for area, pide in por_area.items()}
+
+
+def _mandado_antes(cur, mundo: Mundo, mandado: list[dict[str, Any]]) -> None:
+    """Lo que la persona dijo que era de una tarea antes de entregarla: cada archivo, con el
+    mensaje que lo trajo y su anotación del lado del transporte, y dicho de esa tarea."""
+    for i, m in enumerate(mandado):
+        persona = mundo.personas[m.get("quien", "Marcos")]
+        el = momento(m["el"])
+        cur.execute(
+            """insert into inbound_message (workspace_id, telegram_message_id, chat_id,
+                                            app_user_id, texto, at)
+               values (%s, %s, %s, %s, '', %s) returning id""",
+            (mundo.workspace_id, 900_000 + i, persona["telegram"], persona["app_user_id"], el))
+        entrante = str(cur.fetchone()["id"])
+        contenido, clase = contenido_de(m["que"], m.get("nombre"), f"antes-{i}")
+        cur.execute(
+            """insert into archivo (workspace_id, contenido, sha256, tamano, tipo, clase,
+                                    nombre_original, enviado_por_membership_id, recibido_en)
+               values (%s, %s, %s, %s, 'x', %s, %s, %s, %s) returning id""",
+            (mundo.workspace_id, contenido, hashlib.sha256(contenido).hexdigest(),
+             len(contenido), clase, m.get("nombre"), persona["membership_id"], el))
+        archivo = str(cur.fetchone()["id"])
+        cur.execute(
+            """insert into archivo_de_mensaje (workspace_id, inbound_message_id, archivo_id,
+                                               que_llego, nombre_original, telegram_message_id,
+                                               telegram_file_id, telegram_file_unique_id)
+               values (%s, %s, %s, %s, %s, %s, 'antes', %s)""",
+            (mundo.workspace_id, entrante, archivo, m["que"], m.get("nombre"), 900_000 + i,
+             f"antes-{i}"))
+        cur.execute(
+            """insert into archivo_de_tarea (workspace_id, archivo_id, task_id,
+                                             dicho_por_membership_id, at)
+               values (%s, %s, %s, %s, %s)""",
+            (mundo.workspace_id, archivo, mundo.tareas[m["tarea"]], persona["membership_id"],
+             el))
+
+
+def contenido_de(que: str, nombre: str | None, semilla: str) -> tuple[bytes, str]:
+    """Un contenido ficticio de lo que llegó, distinto para cada semilla, y su clase (la que
+    detectaría `archivos.detectar`): una foto es un JPEG; un archivo, un comprimido o un texto
+    según su nombre."""
+    marca = semilla.encode("utf-8")
+    if que == "foto":
+        return b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + marca + b"\xff\xd9", "imagen"
+    if que == "video":
+        return b"\x00\x00\x00\x20ftypisom" + marca, "video"
+    if (nombre or "").lower().endswith((".zip", ".7z", ".rar")):
+        return b"PK\x03\x04" + marca, "comprimido"
+    return b"configuracion " + marca + b"\n", "texto"
+
+
+def _tareas(cur, mundo: Mundo, objetivo: str, tareas: dict[str, dict[str, Any]],
+            pide: dict[str, list[str]] | None = None) -> None:
+    pide = pide or {}
     for clave, t in tareas.items():
         persona = mundo.personas[t["responsable"]]
         cur.execute(
             """insert into task (workspace_id, objective_id, titulo, area_id,
-                                 responsable_membership_id, estado, fecha_objetivo)
-               values (%s, %s, %s, %s, %s, 'asignada', %s) returning id""",
+                                 responsable_membership_id, estado, fecha_objetivo,
+                                 evidencia_requerida)
+               values (%s, %s, %s, %s, %s, 'asignada', %s, %s) returning id""",
             (mundo.workspace_id, objetivo, t["titulo"], persona["area_id"],
-             persona["membership_id"], fin_del_dia(str(t["vence"]))))
+             persona["membership_id"], fin_del_dia(str(t["vence"])),
+             pide.get(persona["area"], [])))
         task_id = str(cur.fetchone()["id"])
         mundo.tareas[clave], mundo.titulos[clave] = task_id, t["titulo"]
         estado = t.get("estado", "asignada")
