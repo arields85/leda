@@ -342,6 +342,22 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   comunicaciones vence en 3 días) salió en medio de la conversación, repitiendo lo que se estaba hablando.
   El usuario: debería esperar a que se cierre el tema, o salir después de un rato sin respuesta. Queda como
   primera tarea de la próxima sesión, primero como conversación de prueba.
+- **Regresión con la IA real de la regla del motivo** (2026-10-08, de noche, sobre `4cbfbef`, sol por la
+  suscripción, 21 conversaciones, 5 veces; `resultados/2026-10-08-0032-leda.motor-sol-suscripcion.md`):
+  69 de 105 corridas con todo lo automático bien. Las fallas son de tres clases, ninguna de la regla:
+  - **El servicio de ChatGPT falló 16 veces** (`ErrorDeChatGPT`, `PlazoAgotado`, `RemoteProtocolError`; el
+    usuario comprobó que había cupo). Un aviso que la IA no redactó a su hora sale después, con reintento
+    e incidente, y descoloca los pasos siguientes: explica todas las fallas del motor de la 01 a la 07.
+    **Repetidas esas seis** (`resultados/motivo-repeticion-01-07.md`): 30 de 30 bien en garantías,
+    comprensión y motor; las 9 corridas con fallas lo son sólo de formato.
+  - **Formato:** renglones de más de 140 caracteres que juntan dos ideas ("⚠️ Si la terminás ese día,
+    tendrá 2 días hábiles de atraso. La revisión de… depende de esta tarea.") y el cierre sin su renglón
+    en blanco. No empeoró: la ronda del margen ya daba 0 de 5 en la 02, la 18 y la 19. Es la deuda del
+    formato registrada en `docs/STATUS.md`.
+  - **La 25 se sigue leyendo mal 5 de 5**, como en su medición: sus fallas de garantía son ésas (los
+    efectos caen en la tarea equivocada hasta que Marcos corrige).
+  - **Conclusión vigente:** la regla del motivo funciona con la IA real; la inestabilidad del servicio no
+    oficial de ChatGPT (riesgo 5) pesa en las rondas, aunque la cocina la maneja sin silencio.
 
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
