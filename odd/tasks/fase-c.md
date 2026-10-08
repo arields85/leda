@@ -685,6 +685,16 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       - Los botones "Ver" no se cierran al decidir: tocar uno de una tarea ya decidida dice que ya no
         le corresponde (o que está cerrada) y no cambia nada.
       - `fotos_que_trae` cuenta las imágenes de la entrega; los videos y archivos no.
+    - **Revisión RDD por commit, aprobadas y reconocidas:** `f58065b` `review-f31fb02f109ad5e9`,
+      `c519de1` `review-b31c4fb8cd3980e4`, `4102009` `review-9464addc613fbf91` (su advertencia de
+      que faltaba el cambio de aprobador después de salir la resuelve `8ff76e7`), `8ff76e7`
+      `review-4728a51e6739d0cf`. Advertencias abiertas (casos de borde): `entrega.py:367` (lo que
+      describe el ejemplo aceptado se suma sin normalizar), `fichas.py:1503` y `turno.py:224` (la
+      huella y los botones ofrecidos sólo en el camino feliz), `situaciones.py:137` ("ya no está" sin
+      prueba), `28-entregas-en-una-lista.yaml:229` (las fotos adjuntas sin comprobar),
+      `test_aprobacion.py:700` (el filtro de lo ya aprobado sin probar) y `escalera.py:541` y
+      `:594` (el aviso al aprobador nuevo no relee si la entrega sigue vigente; su escalera sin
+      prueba). La de `escalera.py:541` se mira al empezar la D5.
   - [ ] **D5.** No interrumpir (decisión 13, conversación 26 con su YAML).
   - [ ] **D6.** La regresión con la IA real, `leda_motor` al día (autorizado por el usuario de
     antemano, con respaldo) y el guion de la prueba por Telegram (el enlace con `localhost`,
