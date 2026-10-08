@@ -348,7 +348,7 @@ def test_la_redaccion_describe_la_tercera_vuelta_del_formato_sin_frases_de_ejemp
     assert "📅" not in texto
     assert "el primero del bloque" in texto and "va debajo" in texto
     assert "al principio de su renglón" in texto and "nunca en el medio" in texto
-    assert "voz pasiva" in texto and "Nunca lo contás como algo que hacés vos" in texto
+    assert "voz pasiva" in texto and "Nunca lo decís como algo que hacés vos" in texto
     # Decisión 11 (2026-10-08): a quien se entera se lo nombra sólo si un hecho lo nombra a la
     # vista; si no, el sujeto es lo que se informa.
     assert "fuera de solo_si_pregunta; si no, lo que se informa" in texto

@@ -60,8 +60,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "mensaje": "Lo que la persona escribió ahora; vacío si no escribió nada (tocó una opción "
                "o mandó sólo fotos o archivos) o si Leda escribe por su cuenta.",
     "toco": "La opción que la persona tocó, en lugar de escribir.",
-    "hechos": "Lo que el sistema hizo, comprobó o necesita en este turno: lo único que se "
-              "cuenta como hecho.",
+    "hechos": "Lo que el sistema hizo, comprobó o necesita en este turno: lo único que vale "
+              "como hecho.",
     "pregunta": "La única pregunta que se hace en este mensaje, con su tipo y su tarea; dentro "
                 "de un hecho, el tipo de pregunta que ese hecho abrió y se hace ahora.",
     "pregunta_para_despues": "El tipo de una pregunta que el hecho abrió y quedó para "
@@ -197,7 +197,7 @@ SIGNIFICADOS: Mapping[str, str] = {
                                   "después de entregarla: la revisión espera a que se complete.",
     "sumo": "Las piezas (por su alias) que se sumaron a la entrega con este mensaje.",
     "sacadas": "Las piezas que la persona sacó de la entrega antes de confirmarla: no van.",
-    "retiradas": "Las piezas ya entregadas que la persona retiró: dejan de contar, nada se "
+    "retiradas": "Las piezas ya entregadas que la persona retiró: dejan de valer, nada se "
                  "borra.",
     "como_queda": "Cómo queda la entrega después de esto, con su código.",
     "reemplazada": "Esa vista de la entrega dejó de valer porque cambió lo que mostraba: la "
@@ -207,7 +207,7 @@ SIGNIFICADOS: Mapping[str, str] = {
                                "entrega todavía.",
     "lo_que_escribio": "Lo que escribió quien entrega la tarea: su descripción del trabajo.",
     "el_ejemplo_que_acepto": "El ejemplo que Leda le propuso para lo que faltaba y la persona "
-                             "aceptó tal cual: cuenta como lo que describe, aunque no lo "
+                             "aceptó tal cual: vale como lo que describe, aunque no lo "
                              "escribió ella.",
     "una_foto": "Una foto.",
     "un_video": "Un video.",
@@ -215,9 +215,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "un_enlace": "Un enlace.",
     "para_confirmar": "La entrega tiene todo lo que pide la tarea: espera que la persona la "
                       "confirme, con el botón o escribiendo.",
-    "le_falta_evidencia": "A la entrega le falta algo de lo que pide la tarea (le_falta y "
-                          "le_falta_del_criterio dicen qué): para entregarla falta eso; hasta "
-                          "entonces no se entrega y la tarea sigue como estaba.",
+    "le_falta_evidencia": "A la entrega le falta algo de lo que pide la tarea: le_falta y "
+                          "le_falta_del_criterio dicen qué.",
     "entregada": "La tarea quedó entregada y pasa a revisión: espera que quien aprueba el "
                  "trabajo de la persona la revise y decida. No está terminada ni aprobada.",
     "no_vale_la_confirmacion": "La confirmación no vale (motivo dice por qué) y se muestra la "
@@ -232,8 +231,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "ya_aprobada": "La tarea ya está aprobada: lo entregado ya no se saca.",
     "confirmar_la_entrega": "Pregunta si la persona entrega la tarea así: espera que la "
                             "confirme (con el botón o escribiendo) o que saque o corrija algo.",
-    "lo_que_falta_de_la_entrega": "Espera lo que le falta a la entrega de la tarea para "
-                                  "poder entregarla.",
+    "lo_que_falta_de_la_entrega": "Espera lo que le falta a la entrega de la tarea.",
     # --- La decisión de quien aprueba una entrega (circuito 8; porción 3b de la C-3) -----------
     "para_decidir": "Una tarea de otra persona, entregada, que espera que la persona que "
                     "escribe la revise y decida: la apruebe o le pida cambios. No es una tarea "
@@ -362,7 +360,7 @@ SIGNIFICADOS: Mapping[str, str] = {
               "dentro de un aviso, la jugada que lo causó.",
     "resultado": "Cómo terminó la jugada, con su código.",
     "tarea": "La tarea de la que se habla: por su alias para elegir jugadas; por su título en "
-             "lo que se le cuenta a la persona.",
+             "lo que se le dice a la persona.",
     "falta": "Los datos que faltan para poder hacer la jugada.",
     "puede_ser": "Las respuestas que sirven para el dato que falta.",
     "coinciden": "Los nombres que coinciden con lo que dijo la persona, cuando es más de uno.",
@@ -987,7 +985,7 @@ def sin_significado(valor: Any) -> set[str]:
 # ronda 2 una línea de significado se le repitió a la persona (tercera vuelta, 2026-10-06).
 ENCABEZADO_DEL_BLOQUE = (
     "Lista de significados de los datos y códigos de este pedido. Es sólo para entender los "
-    "datos: nunca se le cuenta ni se le repite a la persona.")
+    "datos: nunca se le dice ni se le repite a la persona.")
 
 
 def bloque(valor: Any) -> str:

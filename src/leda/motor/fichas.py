@@ -1338,8 +1338,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona dice que terminó una tarea, suma algo a la entrega de una tarea que "
              "ya está mostrando (lo que escribe, fotos, archivos o enlaces) o acepta, tal cual, "
              "el ejemplo que Leda le propuso para lo que falta (acepta_el_ejemplo). Terminarla "
-             "no es contar que le falta poco: eso es un avance. Lo que escribe puede contar de "
-             "qué trabajo se trata y cómo se probó: el_texto_cubre nombra lo que dice de lo que "
+             "no es decir que le falta poco: eso es un avance. Lo que escribe puede describir "
+             "de qué trabajo se trata y cómo se probó: el_texto_cubre nombra lo que dice de lo que "
              "pide la tarea, y lo_descrito_cubre, los puntos de su criterio de aceptación que "
              "dice todo lo que describió en la entrega. Si le falta alguno, ejemplo es cómo "
              "podría describirlo la persona."),

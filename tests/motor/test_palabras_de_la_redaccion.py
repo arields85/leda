@@ -242,14 +242,23 @@ LO_QUE_FALTA_DE_UNA_ENTREGA = ("le_falta_evidencia", "le_falta", "le_falta_del_c
                                "dice", "sumo", "lo_que_falta_de_la_entrega")
 
 
+# Que todavía no se entrega, dicho de cualquier forma (D7 y D7b).
+DICE_QUE_NO_SE_ENTREGA = re.compile(r"revisi|no se (puede )?entreg|no pasa|sigue como estaba"
+                                    r"|para (poder )?entregarla|entregarla falta")
+
+
 def test_que_todavia_no_se_entrega_lo_dice_un_solo_hecho():
     """D7: la IA escribía "Todavía no se puede entregar… La tarea no pasó a revisión.": tres
     significados lo decían (lo que falta, lo que falta del criterio y el resultado) y la entrega
-    incompleta traía además qué pasa al confirmarla. Lo dice sólo el resultado."""
-    dicen_que_no = [n for n in LO_QUE_FALTA_DE_UNA_ENTREGA
-                    if re.search(r"revisi|no se (puede )?entreg|no pasa", hechos.significado(n))]
-    assert dicen_que_no == ["le_falta_evidencia"]
-    assert hechos.para_redactar("le_falta_evidencia") == "para_entregarla_falta"
+    incompleta traía además qué pasa al confirmarla. D7b: después, el nombre del resultado
+    (`para_entregarla_falta`) y su significado ("hasta entonces no se entrega y la tarea sigue
+    como estaba") lo decían dos veces, y la IA escribía "Para entregarla falta… por ahora sigue
+    como estaba". Lo dice sólo el nombre del resultado, una vez en total."""
+    nombres = LO_QUE_FALTA_DE_UNA_ENTREGA + ("criterio_de_aceptacion",)
+    lo_dicen = ([hechos.para_redactar(n) for n in nombres
+                 if DICE_QUE_NO_SE_ENTREGA.search(hechos.para_redactar(n).replace("_", " "))]
+                + [n for n in nombres if DICE_QUE_NO_SE_ENTREGA.search(hechos.significado(n))])
+    assert lo_dicen == ["para_entregarla_falta"]
 
 
 def test_lo_que_falta_de_una_entrega_se_lee_como_su_descripcion():
@@ -261,6 +270,25 @@ def test_lo_que_falta_de_una_entrega_se_lee_como_su_descripcion():
         assert not re.search(r"(?<![a-z])cont[aáoó]|sus palabras", significado), nombre
     assert hechos.para_redactar("lo_que_escribio") == "su_descripcion"
     assert "descripción" in hechos.significado("lo_que_escribio")
+
+
+# "Contar" en cualquier forma, menos "contestar" y "por su cuenta" (D7b: la IA seguía escribiendo
+# "contaste", "contarlo" y "Marcos contó…" en las entregas).
+CONTAR = re.compile(r"\b(?:cont(?:ar|ás|as|ó|o|aste|é|amos|ando|ado|ada)\w*"
+                    r"|(?<!por tu )(?<!por su )cuent(?:a|as|an|e|en|o)\b)", re.IGNORECASE)
+
+
+def test_nada_de_lo_que_lee_la_ia_sobre_la_entrega_dice_contar():
+    """D7b: 6 de 10 mensajes de la entrega decían "contaste" o "contarlo", y los avisos a quien
+    revisa, "Marcos contó…", aunque los significados de la entrega ya decían "describir". La
+    redacción usaba "contás" como el verbo de Leda, y la ficha de `entregar`, "lo que escribe
+    puede contar". Las palabras generales dicen "decir" y "describir"."""
+    assert [m.group(0) for m in CONTAR.finditer(INSTRUCCIONES_REDACCION)] == []
+    assert not CONTAR.search(hechos.ENCABEZADO_DEL_BLOQUE)
+    assert not CONTAR.search(FICHAS["entregar"].es)
+    for nombre in LO_QUE_FALTA_DE_UNA_ENTREGA + ("tarea", "hechos", "retiradas",
+                                                  "criterio_de_aceptacion", "lo_que_entrego"):
+        assert not CONTAR.search(hechos.significado(nombre)), nombre
 
 
 def test_lo_que_la_persona_entrega_lo_describe():
