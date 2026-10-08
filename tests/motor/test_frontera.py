@@ -54,7 +54,9 @@ PERMITIDOS: dict[str, set[str] | None] = {
     "onboarding": {"activar", "bienvenida", "ActivacionInvalida"},
     "versiones": None,
     "huerfanos": {"barrer"},
-    "entrada": {"clave_de_candado_del_mensaje", "sql_respondido"},
+    # La ventana del turno en curso: los álbumes que esperan su turno más que eso quedan para
+    # el barrido de huérfanos (ADR 0019, decisión 4).
+    "entrada": {"clave_de_candado_del_mensaje", "sql_respondido", "VENTANA_TURNO_EN_CURSO"},
 }
 
 # Los módulos de los flujos A y B, borrados en la E3-4, por si volvieran. La escalera, el reloj

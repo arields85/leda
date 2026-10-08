@@ -22,6 +22,11 @@ escuchar:
   despacha (decisión 1; `recibir.Recepcion.despachar_ahora`): no espera al resto del lote ni de
   la vuelta, y el indicador no la demora (el mensaje reemplaza al borrador, sin retiro). La
   consola dice cuánto tardó en salir desde que su texto estuvo listo.
+- **Los archivos** (`recibir.py`; ADR 0019, decisión 4): se bajan por la API del bot
+  (`BotTelegram.bajar`), cortando en el tamaño máximo. Mientras un álbum espera su turno, los
+  updates se piden con la espera del álbum (`recibir.ESPERA_ALBUM_S`) y, después de recibirlos,
+  se atienden los álbumes que ya esperaron (`recibir.Recepcion.atender_albumes`). Al arrancar
+  se mira si quedó alguno de antes.
 - **El ciclo** (`ciclo.py`): en cada vuelta, el despacho y los avisos a la administración; con
   `seguimiento` (el comando lo prende), la escalera y los avisos guardados una vez por minuto.
   Cada paso aislado: si uno se cae, un incidente y los demás siguen.
@@ -46,10 +51,11 @@ import httpx
 from ..db import admin, espacio
 from ..despachador import Transporte, pedido_telegram, texto_error_seguro
 
+from . import archivos, recibir
 from .ciclo import Ciclo
 from .ia import IA
-from .recibir import (INTENTOS_POR_UPDATE, AbrirIndicador, IntentosPorUpdate, Recepcion,
-                      recibir_update, registrar_admin)
+from .recibir import (INTENTOS_POR_UPDATE, AbrirIndicador, Bajar, IntentosPorUpdate,
+                      Recepcion, recibir_update, registrar_admin)
 from .tiempo import Reloj
 
 ESPERA_S = 25
@@ -62,6 +68,7 @@ class BotTelegram:
 
     def __init__(self, token: str, http: httpx.Client) -> None:
         self._base = f"https://api.telegram.org/bot{token}"
+        self._base_archivos = f"https://api.telegram.org/file/bot{token}"
         self._http = http
 
     def llamar(self, metodo: str, **parametros: Any) -> Any:
@@ -72,15 +79,46 @@ class BotTelegram:
             raise RuntimeError(f"Telegram respondió ok=false a {metodo}.")
         return cuerpo["result"]
 
+    def bajar(self, file_id: str, maximo: int) -> bytes:
+        """El contenido de un archivo recibido (`getFile` y su descarga; `recibir.Bajar`). Si
+        Telegram dice que pasa de `maximo`, o la descarga pasa de ahí, no se baja más:
+        `archivos.Rechazo(DEMASIADO_GRANDE)`. Los errores no llevan la dirección, que lleva el
+        token (`pedido_telegram`)."""
+        datos = self.llamar("getFile", file_id=file_id)
+        if (datos.get("file_size") or 0) > maximo:
+            raise archivos.Rechazo(archivos.DEMASIADO_GRANDE)
+        ruta = datos.get("file_path")
+        if not ruta:
+            raise RuntimeError("Telegram no dijo de dónde bajar el archivo.")
+
+        def leer() -> bytes | None:
+            partes, total = [], 0
+            with self._http.stream("GET", f"{self._base_archivos}/{ruta}") as r:
+                r.raise_for_status()
+                for trozo in r.iter_bytes():
+                    total += len(trozo)
+                    if total > maximo:
+                        return None
+                    partes.append(trozo)
+            return b"".join(partes)
+
+        contenido = pedido_telegram(leer)
+        if contenido is None:
+            raise archivos.Rechazo(archivos.DEMASIADO_GRANDE)
+        return contenido
+
 
 class Escucha(Recepcion):
     def __init__(self, conn, workspace_id: str, ia: IA, reloj: Reloj, *, bot: BotTelegram,
                  transporte: Transporte, bot_admin: BotTelegram | None = None,
                  transporte_admin: Transporte | None = None, seguimiento: bool = False,
                  imprimir: Callable[[str], None] = print,
-                 indicador: AbrirIndicador | None = None) -> None:
+                 indicador: AbrirIndicador | None = None, bajar: Bajar | None = None) -> None:
         super().__init__(conn, workspace_id, ia, reloj, bot_id=None, senal=self._senal,
-                         imprimir=imprimir, indicador=indicador, transporte=transporte)
+                         imprimir=imprimir, indicador=indicador, transporte=transporte,
+                         bajar=bajar or bot.bajar)
+        # Al arrancar se mira si quedó un álbum esperando su turno de antes.
+        self.albumes_en_espera = True
         self.bot = bot
         self.bot_admin = bot_admin
         self.transporte_admin = transporte_admin
@@ -114,7 +152,12 @@ class Escucha(Recepcion):
 
     def una_vuelta(self, espera: int = ESPERA_S) -> int:
         self.refrescar_reloj()
-        recibidos = self.recibir(espera)
+        # Con un álbum en espera, los updates se piden con la espera del álbum: al volver, se
+        # atiende el que ya esperó.
+        hay_album = self.albumes_en_espera
+        recibidos = self.recibir(min(espera, recibir.ESPERA_ALBUM_S) if hay_album else espera)
+        if self.albumes_en_espera:
+            self.atender_albumes()
         self.recibir_admin()
         self.despachar()
         return recibidos

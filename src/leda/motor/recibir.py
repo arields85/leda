@@ -17,8 +17,27 @@ servidor no cambie el comportamiento. Portado de `prueba_chica/escuchar.py`, bor
 - **El bot de administración** (`registrar_admin`): un administrador de plataforma que le
   escribe deja registrado su chat para los avisos de incidentes.
 
-Lo que no es un mensaje escrito de alguien del equipo (un grupo, un mensaje editado, una foto
-sin texto, un desconocido) no se atiende.
+- **Un archivo** (ADR 0019, decisión 4): una foto (la de mayor resolución), un documento o un
+  video, con o sin texto, de alguien del equipo. El adaptador lo baja antes del turno
+  (`bajar`), comprueba tamaño y tipo (`archivos.revisar`), lo guarda en `archivo` y lo ata al
+  mensaje entrante (`archivos.anotar`). El tamaño máximo es el del espacio o, si es menor, el
+  del canal: la API de bots de Telegram deja bajar hasta 20 MB (`LIMITE_DE_TELEGRAM`), un
+  límite del adaptador y no del negocio. Lo que no se puede recibir (demasiado grande, que ni
+  se baja si Telegram ya dice su tamaño, o de un tipo fuera de la lista) queda anotado con su
+  motivo, y el turno corre igual: la IA lo cuenta con lo que la persona puede hacer en cambio.
+  Si la descarga falla, es una falla al recibir el update, como cualquier otra (abajo). Un
+  archivo que vuelve a llegar no se vuelve a bajar.
+- **Un álbum es un solo mensaje** (decisión 4; ADR 0013, una respuesta por mensaje). Telegram
+  manda cada foto de un álbum como un update aparte, con el mismo grupo: la primera crea el
+  mensaje entrante y las demás se atan a él (y su texto, si lo traen, se le suma). El turno no
+  corre al recibirlas: corre una vez, en `atender_albumes`, cuando pasaron `ESPERA_ALBUM_S`
+  segundos (la hora de la base) desde la última foto del álbum. El escuchador la llama en cada
+  vuelta y, mientras hay un álbum en espera, pide los updates con esa espera; el webhook, al
+  terminar la espera, fuera del candado que atiende los updates. Una foto que llega cuando el
+  álbum ya tiene su turno empieza un mensaje nuevo: nunca se pierde.
+
+Lo que no es un mensaje de alguien del equipo (un grupo, un mensaje editado, un sticker, una nota
+de voz, un desconocido) no se atiende.
 
 **El indicador de actividad** (ADR 0011, decisión 2; pedido del usuario, 2026-10-07): mientras
 corre el turno de alguien del equipo (un mensaje o un toque), `indicador` muestra el
@@ -55,18 +74,20 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
+from datetime import timedelta
 from typing import Any
 
 from ..autoridad import Canal, Denegado, identificar, identificar_en_espacio
 from ..calendario import Calendario
 from ..db import admin, atar_al_entrante, espacio, registrar_auditoria
 from ..despachador import Transporte, despachar, texto_error_seguro
-from ..entrada import clave_de_candado_del_mensaje, sql_respondido
+from ..entrada import VENTANA_TURNO_EN_CURSO, clave_de_candado_del_mensaje, sql_respondido
 from ..incidentes import (ETAPA_TURNO_CONVERSACION, REFERENCIA_INBOUND_MESSAGE,
                           registrar_incidente)
 from ..onboarding import ActivacionInvalida, activar, bienvenida
 from ..salida import enqueue_outbox
 
+from . import archivos
 from .botones import ConOpciones
 from .ia import IA
 from .preguntas import token_de
@@ -75,9 +96,24 @@ from .turno import TEXTO_SI_LA_IA_FALLA, procesar_toque, procesar_turno
 
 INTENTOS_POR_UPDATE = 3     # un update que falla al recibirse se reintenta; después, se deja
 
+# Lo que deja bajar la API de bots de Telegram (core.telegram.org/bots/api, objeto `File`),
+# mientras no haya un servidor propio de esa API (ADR 0019, decisión 2).
+LIMITE_DE_TELEGRAM = 20 * archivos.MB
+
+# Cuánto se espera, desde la última foto de un álbum, antes de atenderlo como un solo mensaje
+# (ADR 0019, decisión 4, "el valor de la espera se fija en el plan"). Telegram manda las fotos
+# de un álbum casi juntas, en menos de un segundo; dos segundos las juntan y la respuesta no se
+# demora de más.
+ESPERA_ALBUM_S = 2
+
 # El indicador de un turno: con el chat, un contexto que lo muestra mientras dura y da algo con
 # `actualizar_borrador` y `admite_borrador` (`despachador.IndicadorDeActividad`), o `None`.
 AbrirIndicador = Callable[[int], AbstractContextManager[Any]]
+
+# La descarga de un archivo del canal: con su identificador y el tamaño máximo, el contenido.
+# Si pasa del máximo, `archivos.Rechazo(DEMASIADO_GRANDE)`; cualquier otra falla es una falla al
+# recibir el update.
+Bajar = Callable[[str, int], bytes]
 
 
 def bot_id_del_token(token: str) -> int:
@@ -161,13 +197,14 @@ class _ConHoraDeEnvio:
 class Recepcion:
     """Lo que se hace con un update del bot de un espacio, con la conexión, la IA y el reloj de
     quien recibe. `bot_id` es el del bot que lo recibió; `senal`, el acuse de un toque;
-    `transporte`, por dónde sale enseguida la respuesta (`despachar_ahora`)."""
+    `transporte`, por dónde sale enseguida la respuesta (`despachar_ahora`); `bajar`, cómo se
+    baja un archivo del canal (sin ella, un archivo es una falla al recibir el update)."""
 
     def __init__(self, conn, workspace_id: str, ia: IA, reloj: Reloj, *,
                  bot_id: int | None = None, senal: Callable[[str], Any] | None = None,
                  imprimir: Callable[[str], None] = print,
                  indicador: AbrirIndicador | None = None,
-                 transporte: Transporte | None = None) -> None:
+                 transporte: Transporte | None = None, bajar: Bajar | None = None) -> None:
         self.conn = conn
         self.ws = workspace_id
         self.ia = ia
@@ -177,6 +214,9 @@ class Recepcion:
         self.imprimir = imprimir
         self.indicador = indicador
         self.transporte = transporte
+        self.bajar = bajar
+        # Si quedó un álbum esperando su turno (`atender_albumes`): el escuchador espera poco.
+        self.albumes_en_espera = False
         # El chat y la hora (`time.monotonic`) en que estuvo listo el texto de la respuesta del
         # último turno, hasta que `despachar_ahora` la mide.
         self._listo: tuple[int, float] | None = None
@@ -188,31 +228,48 @@ class Recepcion:
         mensaje = u.get("message")
         if not mensaje or (mensaje.get("chat") or {}).get("type") != "private":
             return
-        texto = (mensaje.get("text") or "").strip()
-        if not texto:
+        llegada = _llegada(mensaje)
+        texto = (mensaje.get("text") or mensaje.get("caption") or "").strip()
+        if not texto and llegada is None:
             return
         tg_user = mensaje["from"]["id"]
         chat_id = mensaje["chat"]["id"]
-        if texto.startswith("/start"):
+        if llegada is None and texto.startswith("/start"):
             self._activar(texto, tg_user, chat_id, mensaje["message_id"])
             self.conn.commit()
             return
 
-        guardado = self._guardar(mensaje, tg_user, chat_id, texto)
+        if llegada is None:
+            guardado = self._guardar(mensaje, tg_user, chat_id, texto)
+        else:
+            guardado = self._guardar_con_archivo(mensaje, tg_user, chat_id, texto, llegada)
         if guardado is None:
             return
-        quien, entrante = guardado
-        self.imprimir(f"  ← {quien.nombre}: {texto[:70]}")
+        quien, entrante, message_id = guardado
+        if llegada is not None and llegada.media_group_id is not None:
+            # Un álbum: su turno corre una vez, después de la espera (`atender_albumes`).
+            self.albumes_en_espera = True
+            self.imprimir(f"  ← {quien.nombre}: {_que_llego(llegada)} de un álbum")
+            return
+        resumen = texto[:70] if llegada is None else f"{_que_llego(llegada)} {texto[:50]}"
+        self._atender(quien, chat_id, entrante, message_id, resumen)
+
+    def _atender(self, quien, chat_id: int, entrante: str, message_id: int,
+                 resumen: str) -> None:
+        """El turno de un mensaje guardado, con el indicador mientras dura. Si se cae, un
+        incidente y el texto fijo (`_turno_caido`)."""
+        self.imprimir(f"  ← {quien.nombre}: {resumen}")
         with self._indicador_del_turno(chat_id) as indicador:
             try:
                 # El candado por mensaje se suelta con el commit, al terminar el turno.
                 with self.conn.transaction():
-                    if self._ya_respondido(entrante, chat_id, mensaje["message_id"]):
+                    if self._ya_respondido(entrante, chat_id, message_id):
                         self.imprimir("  (ese mensaje ya tiene respuesta: no se vuelve a "
                                       "atender)")
                         return
                     resultado = procesar_turno(self.conn, quien, entrante, self.ia, self.reloj,
-                                               al_avanzar=indicador.al_avanzar)
+                                               al_avanzar=indicador.al_avanzar,
+                                               limite_del_canal=LIMITE_DE_TELEGRAM)
             except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
                 self.conn.rollback()
                 self._turno_caido(quien, chat_id, e, entrante=entrante,
@@ -224,6 +281,54 @@ class Recepcion:
                 self._sigue_la_respuesta(indicador, chat_id, resultado.listo_en)
         if not resultado.repetido:
             self.imprimir(f"  → {resultado.texto[:70]}")
+
+    def atender_albumes(self) -> int:
+        """Atiende, como un solo mensaje cada uno, los álbumes cuya última foto llegó hace
+        `ESPERA_ALBUM_S` segundos o más (la hora de la base) y que todavía no tienen turno ni
+        respuesta. Devuelve cuántos siguen en la espera. Los de más de
+        `entrada.VENTANA_TURNO_EN_CURSO` quedan para el barrido de huérfanos. Si falla la
+        lectura, queda en la consola y se vuelve a mirar en la vuelta siguiente."""
+        try:
+            with espacio(self.conn, self.ws) as cur:
+                cur.execute(
+                    f"""select i.id, i.chat_id, i.telegram_message_id, g.telegram_user_id,
+                               max(m.at) <= clock_timestamp() - %s as lista
+                          from inbound_message i
+                          join archivo_de_mensaje m on m.inbound_message_id = i.id
+                          join integrante g on g.app_user_id = i.app_user_id
+                         where m.telegram_media_group_id is not null
+                           and i.telegram_bot_id is not distinct from %s
+                           and i.at > clock_timestamp() - %s
+                           and not {sql_respondido('i')}
+                           and not exists (select 1 from conversation_turn t
+                                            where t.inbound_message_id = i.id
+                                              and t.sentido = 'entrada')
+                         group by i.id, i.chat_id, i.telegram_message_id, g.telegram_user_id
+                         order by min(m.at)""",
+                    (timedelta(seconds=ESPERA_ALBUM_S), self.bot_id, VENTANA_TURNO_EN_CURSO))
+                albumes = cur.fetchall()
+            self.conn.commit()
+        except Exception as e:  # noqa: BLE001 -- se vuelve a mirar en la vuelta siguiente
+            self.conn.rollback()
+            self.imprimir(f"  ! no se pudieron mirar los álbumes en espera: "
+                          f"{texto_error_seguro(e)}")
+            self.albumes_en_espera = True
+            return 1
+        en_espera = sum(1 for a in albumes if not a["lista"])
+        for album in albumes:
+            if not album["lista"]:
+                continue
+            with espacio(self.conn, self.ws) as cur:
+                try:
+                    quien = identificar_en_espacio(cur, album["telegram_user_id"], self.ws)
+                except Denegado:
+                    quien = None        # dejó el equipo en la espera: no se le responde
+            self.conn.commit()
+            if quien is not None:
+                self._atender(quien, album["chat_id"], str(album["id"]),
+                              album["telegram_message_id"], "un álbum")
+        self.albumes_en_espera = en_espera > 0
+        return en_espera
 
     def _sigue_la_respuesta(self, indicador: IndicadorDelTurno, chat_id: int,
                             listo_en: float | None) -> None:
@@ -321,36 +426,129 @@ class Recepcion:
             self.imprimir(f"  → {resultado.texto[:70]}")
 
     def _guardar(self, mensaje, tg_user: int, chat_id: int, texto: str):
-        """(quien, id del mensaje guardado), o `None` si no es de alguien del equipo. Un
-        mensaje repetido devuelve el que ya estaba: el turno decide si falta atenderlo."""
+        """(quien, id del mensaje guardado, su número en Telegram), o `None` si no es de alguien
+        del equipo. Un mensaje repetido devuelve el que ya estaba: el turno decide si falta
+        atenderlo."""
         with espacio(self.conn, self.ws) as cur:
             try:
                 quien = identificar_en_espacio(cur, tg_user, self.ws)
             except Denegado:
                 self.imprimir("  (un mensaje de alguien que no es del equipo: no se atiende)")
                 return None
-            # `at` es la hora de la base (el valor por omisión), no la del reloj de Leda: con
-            # ella mide el barrido de huérfanos.
-            cur.execute(
-                """insert into inbound_message (workspace_id, telegram_bot_id,
-                                                telegram_message_id, chat_id, app_user_id,
-                                                texto)
-                   values (%s, %s, %s, %s, %s, %s)
-                   on conflict (workspace_id, telegram_bot_id, chat_id, telegram_message_id)
-                      where telegram_bot_id is not null and telegram_message_id is not null
-                      do nothing
-                   returning id""",
-                (self.ws, self.bot_id, mensaje["message_id"], chat_id, quien.app_user_id,
-                 texto))
-            fila = cur.fetchone()
-            if fila is None:
-                cur.execute("""select id from inbound_message
-                                where workspace_id = %s and telegram_bot_id = %s
-                                  and chat_id = %s and telegram_message_id = %s""",
-                            (self.ws, self.bot_id, chat_id, mensaje["message_id"]))
-                fila = cur.fetchone()
+            entrante = self._insertar_entrante(cur, quien, mensaje["message_id"], chat_id,
+                                               texto)
         self.conn.commit()
-        return quien, str(fila["id"])
+        return quien, entrante, mensaje["message_id"]
+
+    def _insertar_entrante(self, cur, quien, message_id: int, chat_id: int, texto: str) -> str:
+        """El mensaje entrante, o el que ya estaba si Telegram lo vuelve a entregar."""
+        # `at` es la hora de la base (el valor por omisión), no la del reloj de Leda: con
+        # ella mide el barrido de huérfanos.
+        cur.execute(
+            """insert into inbound_message (workspace_id, telegram_bot_id,
+                                            telegram_message_id, chat_id, app_user_id,
+                                            texto)
+               values (%s, %s, %s, %s, %s, %s)
+               on conflict (workspace_id, telegram_bot_id, chat_id, telegram_message_id)
+                  where telegram_bot_id is not null and telegram_message_id is not null
+                  do nothing
+               returning id""",
+            (self.ws, self.bot_id, message_id, chat_id, quien.app_user_id, texto))
+        fila = cur.fetchone()
+        if fila is None:
+            cur.execute("""select id from inbound_message
+                            where workspace_id = %s and telegram_bot_id = %s
+                              and chat_id = %s and telegram_message_id = %s""",
+                        (self.ws, self.bot_id, chat_id, message_id))
+            fila = cur.fetchone()
+        return str(fila["id"])
+
+    def _guardar_con_archivo(self, mensaje, tg_user: int, chat_id: int, texto: str,
+                             llegada: archivos.Llegada):
+        """Como `_guardar`, para un mensaje que trae un archivo: lo baja (fuera de toda
+        transacción), lo revisa y, en una sola transacción, guarda el mensaje (o lo ata al de
+        su álbum), el archivo y lo que trajo el mensaje. A alguien que no es del equipo no se
+        le baja nada; un archivo que ya está atado no se vuelve a bajar. (quien, id del
+        mensaje, su número en Telegram), o `None`."""
+        with espacio(self.conn, self.ws) as cur:
+            try:
+                quien = identificar_en_espacio(cur, tg_user, self.ws)
+            except Denegado:
+                self.imprimir("  (un archivo de alguien que no es del equipo: no se atiende)")
+                return None
+            ya_estaba = self._entrante_con(cur, chat_id, llegada.message_id)
+            limite = min(archivos.limite(cur, self.ws), LIMITE_DE_TELEGRAM)
+        self.conn.commit()
+        if ya_estaba is not None:
+            return quien, ya_estaba[0], ya_estaba[1]
+
+        contenido, tipo, rechazo = None, None, None
+        if llegada.tamano_declarado is not None and llegada.tamano_declarado > limite:
+            rechazo = archivos.DEMASIADO_GRANDE
+        else:
+            if self.bajar is None:
+                raise RuntimeError("La entrada no tiene cómo bajar archivos del canal.")
+            try:
+                contenido = self.bajar(llegada.file_id, limite)
+                tipo = archivos.revisar(contenido, llegada.nombre, limite)
+            except archivos.Rechazo as r:
+                rechazo = r.motivo
+
+        with espacio(self.conn, self.ws) as cur:
+            entrante, message_id = self._entrante_del_mensaje(cur, quien, chat_id, texto,
+                                                              llegada)
+            archivo_id = None
+            if rechazo is None:
+                archivo_id = archivos.guardar(
+                    cur, workspace_id=self.ws, contenido=contenido, tipo=tipo,
+                    nombre=llegada.nombre, enviado_por=quien.membership_id,
+                    ahora=self.reloj.ahora())
+            archivos.anotar(cur, workspace_id=self.ws, entrante_id=entrante, llegada=llegada,
+                            archivo_id=archivo_id, rechazo=rechazo)
+        self.conn.commit()
+        return quien, entrante, message_id
+
+    def _entrante_con(self, cur, chat_id: int, message_id: int) -> tuple[str, int] | None:
+        """El mensaje entrante (y su número en Telegram) al que ya se ató el archivo de ese
+        mensaje de Telegram, si Telegram lo vuelve a entregar."""
+        cur.execute("""select i.id, i.telegram_message_id
+                         from archivo_de_mensaje m
+                         join inbound_message i on i.id = m.inbound_message_id
+                        where i.telegram_bot_id is not distinct from %s and i.chat_id = %s
+                          and m.telegram_message_id = %s
+                        limit 1""", (self.bot_id, chat_id, message_id))
+        fila = cur.fetchone()
+        return (str(fila["id"]), fila["telegram_message_id"]) if fila else None
+
+    def _entrante_del_mensaje(self, cur, quien, chat_id: int, texto: str,
+                              llegada: archivos.Llegada) -> tuple[str, int]:
+        """El mensaje entrante de un archivo: el de su álbum, si el álbum todavía espera su
+        turno (y su texto, si trae, se le suma), o uno nuevo. Las fotos de un mismo álbum se
+        atan de a una (un candado por álbum)."""
+        if llegada.media_group_id is not None:
+            cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                        (f"album:{self.ws}:{self.bot_id}:{chat_id}:{llegada.media_group_id}",))
+            cur.execute(
+                f"""select i.id, i.telegram_message_id
+                      from archivo_de_mensaje m
+                      join inbound_message i on i.id = m.inbound_message_id
+                     where m.telegram_media_group_id = %s and i.chat_id = %s
+                       and i.telegram_bot_id is not distinct from %s
+                       and not {sql_respondido('i')}
+                       and not exists (select 1 from conversation_turn t
+                                        where t.inbound_message_id = i.id
+                                          and t.sentido = 'entrada')
+                     limit 1""", (llegada.media_group_id, chat_id, self.bot_id))
+            fila = cur.fetchone()
+            if fila is not None:
+                if texto:
+                    cur.execute("""update inbound_message
+                                      set texto = case when coalesce(texto, '') = '' then %s
+                                                       else texto || E'\\n' || %s end
+                                    where id = %s""", (texto, texto, fila["id"]))
+                return str(fila["id"]), fila["telegram_message_id"]
+        return (self._insertar_entrante(cur, quien, llegada.message_id, chat_id, texto),
+                llegada.message_id)
 
     def _turno_caido(self, quien, chat_id: int, error: Exception, *, clave: str,
                      entrante: str | None = None,
@@ -533,6 +731,31 @@ def registrar_admin(conn, u: dict[str, Any], imprimir: Callable[[str], None] = p
     conn.commit()
     imprimir("  ← [admin] chat registrado para los avisos de incidentes")
     return True
+
+
+def _llegada(mensaje: dict[str, Any]) -> archivos.Llegada | None:
+    """El archivo que trae un mensaje de Telegram, o `None`: de una foto, la de mayor
+    resolución (Telegram manda varios tamaños de la misma); si no, el video o el documento."""
+    message_id, grupo = mensaje["message_id"], mensaje.get("media_group_id")
+    if mensaje.get("photo"):
+        mayor = max(mensaje["photo"],
+                    key=lambda p: ((p.get("width") or 0) * (p.get("height") or 0),
+                                   p.get("file_size") or 0))
+        return archivos.Llegada(archivos.FOTO, mayor["file_id"], mayor["file_unique_id"], None,
+                                mayor.get("file_size"), message_id, grupo)
+    for clave, que_llego in (("video", archivos.UN_VIDEO), ("document", archivos.UN_ARCHIVO)):
+        dato = mensaje.get(clave)
+        if dato:
+            return archivos.Llegada(que_llego, dato["file_id"], dato["file_unique_id"],
+                                    dato.get("file_name"), dato.get("file_size"), message_id,
+                                    grupo)
+    return None
+
+
+def _que_llego(llegada: archivos.Llegada) -> str:
+    """Para la consola, sin el nombre del archivo."""
+    return {archivos.FOTO: "una foto", archivos.UN_VIDEO: "un video"}.get(
+        llegada.que_llego, "un archivo")
 
 
 def _origen(u: dict[str, Any]) -> tuple[dict[str, Any], int | None]:

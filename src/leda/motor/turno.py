@@ -35,6 +35,12 @@ mensaje), no se le pide nada a la IA ni se ejecuta nada, y el resultado lo dice 
 la base lo asegura además con un índice único. Cada turno lleva su número en la conversación
 de la persona, que ordena los últimos turnos aunque tengan la misma hora; el registro de turnos
 vive en `registro.py`, que también usan los avisos guardados.
+
+Los archivos que trajo el mensaje (ADR 0019, decisión 4): los dos pedidos a la IA reciben qué
+llegó (`archivos`: una foto, un video o un archivo con su nombre), nunca el contenido; lo que no
+se pudo recibir, con su motivo y lo que la persona puede hacer en cambio (`EN_CAMBIO_PUEDE`).
+La IA elige la jugada como con cualquier mensaje. Sumar un archivo a una entrega es de la
+porción siguiente; mientras tanto, queda guardado como parte de la conversación.
 """
 
 from __future__ import annotations
@@ -56,7 +62,7 @@ from ..incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
                           REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
 from ..salida import enqueue_outbox
 
-from . import cambios_de_estado, preguntas, registro
+from . import archivos, cambios_de_estado, preguntas, registro
 from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
 from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
@@ -77,6 +83,13 @@ ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
 # Dentro de un hecho, lo que Leda sabe y dice sólo si la persona lo pregunta (decisión 9g;
 # la misma lógica que la constitución §9). Un mecanismo para cualquier hecho, no una frase.
 SOLO_SI_PREGUNTA = "solo_si_pregunta"
+
+# Lo que la persona puede hacer en lugar de mandar lo que no se pudo recibir (ADR 0019,
+# decisión 2): nunca se descarta en silencio, y Leda propone qué hacer.
+EN_CAMBIO_PUEDE: Mapping[str, tuple[str, ...]] = {
+    archivos.DEMASIADO_GRANDE: ("mandar_uno_mas_chico", "mandar_un_enlace"),
+    archivos.TIPO_NO_ADMITIDO: ("mandar_un_enlace",),
+}
 
 
 @dataclass
@@ -104,16 +117,21 @@ class IANoRespondio(RuntimeError):
 
 def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: str, ia: IA,
                    reloj: Reloj, jugadas: Mapping[str, Manejador] = JUGADAS, *,
-                   al_avanzar: Callable[[str], None] | None = None) -> ResultadoTurno:
-    """Un mensaje escrito. Con `al_avanzar`, la redacción se ve en vivo (`_redactar`)."""
+                   al_avanzar: Callable[[str], None] | None = None,
+                   limite_del_canal: int | None = None) -> ResultadoTurno:
+    """Un mensaje, escrito o con archivos. Con `al_avanzar`, la redacción se ve en vivo
+    (`_redactar`). `limite_del_canal`: el tamaño máximo que deja recibir el canal, si es menor
+    que el del espacio (lo que la IA dice de un archivo demasiado grande)."""
     with espacio(conn, quien.workspace_id) as cur:
         atar_al_entrante(cur, entrante_id)
         if _ya_tiene_turno(cur, quien, entrante_id):
             return ResultadoTurno("", [], [], repetido=True)
         ctx = _leer(cur, quien, reloj.ahora(), entrante_id=entrante_id, jugadas=jugadas)
+        llegaron = _lo_que_llego(cur, quien.workspace_id, entrante_id, limite_del_canal)
 
         def elegir() -> list[Jugada]:
-            return pedir_a_la_ia(lambda: ia.elegir_jugadas(_situacion(ctx, jugadas)))
+            return pedir_a_la_ia(
+                lambda: ia.elegir_jugadas({**_situacion(ctx, jugadas), **llegaron}))
 
         def manejar(elegidas: list[Jugada]) -> list[dict[str, Any]]:
             hechos = [_manejar(ctx, jugada, jugadas) for jugada in elegidas]
@@ -121,7 +139,8 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
             return hechos
 
         return _turno(conn, cur, ctx, ia, reloj, elegir, manejar,
-                      clave_respuesta=f"motor:respuesta:{entrante_id}", al_avanzar=al_avanzar)
+                      clave_respuesta=f"motor:respuesta:{entrante_id}", al_avanzar=al_avanzar,
+                      llegaron=llegaron)
 
 
 def procesar_toque(conn: psycopg.Connection, quien: Solicitante, token: str, chat_id: int,
@@ -152,8 +171,11 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
            elegir: Callable[[], list[Jugada]],
            manejar: Callable[[list[Jugada]], list[dict[str, Any]]], *,
            clave_respuesta: str, option_id: str | None = None,
-           al_avanzar: Callable[[str], None] | None = None) -> ResultadoTurno:
-    """(2) a (6), iguales para un mensaje y un toque."""
+           al_avanzar: Callable[[str], None] | None = None,
+           llegaron: Mapping[str, Any] | None = None) -> ResultadoTurno:
+    """(2) a (6), iguales para un mensaje y un toque. `llegaron`: los archivos que trajo el
+    mensaje (`_lo_que_llego`), que la redacción también recibe."""
+    llegaron = dict(llegaron or {})
     inicio = reloj.medir()
     elegidas: list[Jugada] | None = None    # None: la IA no llegó a elegir
     try:
@@ -169,7 +191,8 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
             # que sigue.
             final = al_final_del_turno(ctx, hechos)
             texto = pedir_a_la_ia(lambda: no_vacio(_redactar(
-                ia, _pedido_de_redaccion(ctx, hechos, pregunta, final.ya_no_sale), al_avanzar)))
+                ia, {**_pedido_de_redaccion(ctx, hechos, pregunta, final.ya_no_sale),
+                     **llegaron}, al_avanzar)))
             listo_en = time.monotonic()
     except IANoRespondio as falla:
         return _si_la_ia_falla(cur, ctx, ia, reloj, inicio, elegidas, falla, clave_respuesta,
@@ -177,7 +200,7 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
     latencia = _ms(reloj.medir() - inicio)
     # Lo anunciado y pendiente va en el resultado, fuera de los hechos: la IA no lo recibe en
     # los últimos turnos (sólo los hechos), y el turno siguiente lo vuelve a mirar.
-    resultado = {"hechos": hechos, **({"pregunta": pregunta} if pregunta else {}),
+    resultado = {"hechos": hechos, **llegaron, **({"pregunta": pregunta} if pregunta else {}),
                  **({YA_NO_VA_A_PASAR: final.ya_no_sale} if final.ya_no_sale else {}),
                  **({ANUNCIADOS: final.anunciados} if final.anunciados else {}),
                  **({cambios_de_estado.CLAVE: cambios} if cambios else {})}
@@ -251,6 +274,31 @@ def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None =
                     tareas=tareas, ultimos_turnos=ultimos,
                     ultimo_aviso=_ultimo_aviso(estado, tareas), toque=toque,
                     jugadas=jugadas)
+
+
+def _lo_que_llego(cur, workspace_id: str, entrante_id: str,
+                  limite_del_canal: int | None) -> dict[str, Any]:
+    """Los archivos que trajo el mensaje, como los recibe la IA (`{"archivos": [...]}`), o nada
+    si no trajo ninguno: qué llegó y con qué nombre; lo que no se pudo recibir, con su motivo,
+    el límite si era demasiado grande y lo que la persona puede hacer en cambio."""
+    filas = archivos.del_mensaje(cur, entrante_id)
+    if not filas:
+        return {}
+    limite = archivos.limite(cur, workspace_id)
+    if limite_del_canal is not None:
+        limite = min(limite, limite_del_canal)
+    lista = []
+    for fila in filas:
+        uno: dict[str, Any] = {"que_llego": fila["que_llego"]}
+        if fila["nombre_original"]:
+            uno["nombre_del_archivo"] = fila["nombre_original"]
+        if fila["rechazo"]:
+            uno["no_se_pudo_recibir"] = fila["rechazo"]
+            if fila["rechazo"] == archivos.DEMASIADO_GRANDE:
+                uno["limite_mb"] = limite // archivos.MB
+            uno["en_cambio_puede"] = list(EN_CAMBIO_PUEDE[fila["rechazo"]])
+        lista.append(uno)
+    return {"archivos": lista}
 
 
 def _hoy(ctx: Contexto) -> str:

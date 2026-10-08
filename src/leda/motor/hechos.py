@@ -57,8 +57,8 @@ SIGNIFICADOS: Mapping[str, str] = {
             "escribe) y, si corresponde, si es hoy, ayer, mañana o pasado mañana. Lo da el "
             "código: se usa tal cual, nunca se calcula.",
     "persona": "A quién le escribe Leda.",
-    "mensaje": "Lo que la persona escribió ahora; vacío si tocó una opción o si Leda escribe "
-               "por su cuenta.",
+    "mensaje": "Lo que la persona escribió ahora; vacío si no escribió nada (tocó una opción "
+               "o mandó sólo fotos o archivos) o si Leda escribe por su cuenta.",
     "toco": "La opción que la persona tocó, en lugar de escribir.",
     "hechos": "Lo que el sistema hizo, comprobó o necesita en este turno: lo único que se "
               "cuenta como hecho.",
@@ -100,6 +100,22 @@ SIGNIFICADOS: Mapping[str, str] = {
     "propone": "Lo que Leda le propuso a la persona para que elija.",
     "desde_antes": "La pregunta ya se había hecho en un mensaje anterior: se vuelve a esa pregunta sin "
                    "pedir que se repita lo que la persona ya dijo.",
+    # --- Lo que la persona mandó con su mensaje (ADR 0019, decisión 4) --------------------------
+    "archivos": "Las fotos, videos o archivos que la persona mandó con este mensaje. El "
+                "sistema sabe qué llegó y nunca su contenido: qué muestra una foto o qué dice "
+                "un archivo no se sabe.",
+    "que_llego": "Qué llegó: una foto, un video o un archivo.",
+    "nombre_del_archivo": "El nombre con que llegó, tal como lo puso quien lo mandó.",
+    "no_se_pudo_recibir": "Por qué no se pudo recibir lo que llegó, con su código: para el "
+                          "sistema es como si no hubiera llegado.",
+    "limite_mb": "El tamaño máximo que se puede recibir, en megabytes.",
+    "en_cambio_puede": "Lo que la persona puede hacer en lugar de eso, para que elija.",
+    "demasiado_grande": "Es más grande de lo que se puede recibir.",
+    "tipo_no_admitido": "Es de un tipo de archivo que no se recibe (por ejemplo, un programa "
+                        "o una página web).",
+    "mandar_uno_mas_chico": "Mandar uno más chico o más corto.",
+    "mandar_un_enlace": "Mandar un enlace para verlo o bajarlo de otro lado (por ejemplo, de "
+                        "una carpeta compartida).",
     # --- Lo que dice un hecho ------------------------------------------------------------------
     "jugada": "Qué entendió el sistema que dijo o pidió la persona (una jugada de la lista); "
               "dentro de un aviso, la jugada que lo causó.",
@@ -446,8 +462,11 @@ PARA_LA_REDACCION: Mapping[str, str] = {
 }
 _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 
-# Lo que alguien escribió, tal cual: un mensaje entero nunca se traduce.
-_LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto"})
+# Lo que alguien escribió, tal cual: un mensaje entero nunca se traduce, ni el nombre que alguien
+# le puso a un archivo.
+_LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo"})
+# El nombre de un archivo nunca es un código, aunque se escriba como uno (`informe_final`).
+_NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo"})
 
 
 def para_redactar(valor: Any) -> Any:
@@ -562,7 +581,8 @@ def _nombres(valor: Any) -> Iterator[str]:
     if isinstance(valor, Mapping):
         for k, v in valor.items():
             yield str(k)
-            yield from _nombres(v)
+            if k not in _NUNCA_UN_CODIGO:
+                yield from _nombres(v)
     elif isinstance(valor, (list, tuple)):
         for v in valor:
             yield from _nombres(v)

@@ -15,6 +15,13 @@ configurado, el webhook no atiende a nadie. La respuesta de cada update sale al 
 el bot que lo recibió (`recibir.Recepcion.despachar_ahora`); el ciclo de fondo de `servir`
 (`leda.motor.fondo`) despacha lo demás, y lo que no haya salido ahí.
 
+**Un álbum** (ADR 0019, decisión 4): cada foto llega en un update aparte y se guarda al
+atenderlo; el turno del álbum corre una vez. Después de guardar una foto de un álbum, el pedido
+espera `recibir.ESPERA_ALBUM_S` fuera del candado que atiende los updates (así entran las demás
+fotos) y vuelve a tomarlo para atender los álbumes que ya esperaron
+(`recibir.Recepcion.atender_albumes`): el de la última foto lo atiende; los demás no encuentran
+nada que hacer.
+
 Es de la capa sólida (`tests/garantias/test_frontera_de_la_entrada.py`).
 """
 
@@ -23,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -93,6 +101,8 @@ def _conn():
 _ATENCION = threading.Lock()
 # Las fallas al recibir cada update, por bot (`recibir.IntentosPorUpdate`).
 _INTENTOS: dict[str, Any] = {}
+# La espera de un álbum, fuera del candado (las pruebas la cambian).
+_esperar = time.sleep
 
 
 def secreto_del_bot(slug: str) -> str:
@@ -130,6 +140,7 @@ def atender_update(slug: str, update: dict[str, Any]) -> dict[str, bool]:
     """Lo que el webhook hace con un update, ya verificado su origen: el del bot de
     administración registra el chat de un administrador; el del bot de un espacio pasa por el
     motor (`recibir.recibir_update`), igual que en el escuchador."""
+    from .motor import recibir
     from .motor.recibir import (IntentosPorUpdate, Recepcion, bot_id_del_token,
                                 recibir_update, registrar_admin)
 
@@ -152,10 +163,17 @@ def atender_update(slug: str, update: dict[str, Any]) -> dict[str, bool]:
         recepcion = Recepcion(conn, ws, _ia_de(conn, ws), _reloj_de(conn, ws),
                               bot_id=bot_id_del_token(token), senal=_senal(token),
                               imprimir=_imprimir, indicador=_indicador(token),
-                              transporte=_transporte_de(token))
+                              transporte=_transporte_de(token), bajar=_bajar_de(token))
         intentos = _INTENTOS.setdefault(slug, IntentosPorUpdate())
         if not recibir_update(recepcion, intentos, update):
             raise HTTPException(status_code=503, detail="no se pudo recibir; reentregar")
+    if recepcion.albumes_en_espera:
+        # Una foto de un álbum: las demás entran mientras ésta espera, fuera del candado.
+        _esperar(recibir.ESPERA_ALBUM_S)
+        with _ATENCION:
+            recepcion.conn = _conn()
+            recepcion.atender_albumes()
+            recepcion.despachar_ahora()
     return {"ok": True}
 
 
@@ -229,6 +247,16 @@ def _transporte_de(token: str):
     from .despachador import TransporteTelegram
 
     return TransporteTelegram(token, cliente=_cliente_http())
+
+
+def _bajar_de(token: str):
+    """Cómo se baja un archivo recibido (`recibir.Bajar`): por el bot que lo recibió, con el
+    cliente HTTP de la aplicación."""
+    from .motor.escucha import BotTelegram
+
+    def bajar(file_id: str, maximo: int) -> bytes:
+        return BotTelegram(token, _cliente_http()).bajar(file_id, maximo)
+    return bajar
 
 
 def _imprimir(linea: str) -> None:

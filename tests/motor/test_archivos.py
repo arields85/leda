@@ -251,13 +251,23 @@ def test_el_webhook_junta_el_album_y_lo_atiende_una_vez(conn, mundo, monkeypatch
     monkeypatch.setattr(entrada, "_indicador", lambda token: None)
     monkeypatch.setattr(entrada, "_bajar_de", lambda token: bajadas)
     monkeypatch.setattr(recibir, "ESPERA_ALBUM_S", 0)
+    segunda = _foto(531, "A2", JPEG_2, album="g3")
     esperas: list[float] = []
-    monkeypatch.setattr(entrada, "_esperar", esperas.append)
+
+    def esperar(segundos: float) -> None:
+        """Mientras el pedido de la primera foto espera, fuera del candado, Telegram entrega
+        la segunda en otro pedido."""
+        esperas.append(segundos)
+        if len(esperas) == 1:
+            entrada.atender_update("prueba", segunda)
+
+    monkeypatch.setattr(entrada, "_esperar", esperar)
 
     entrada.atender_update("prueba", _foto(530, "A1", album="g3"))
-    entrada.atender_update("prueba", _foto(531, "A2", JPEG_2, album="g3"))
 
     assert esperas == [0, 0]
+    assert ia.pedidos_de_jugadas[0]["archivos"] == [{"que_llego": "foto"},
+                                                    {"que_llego": "foto"}]
     assert cuantas(conn, "inbound_message") == 1
     assert cuantas(conn, "conversation_turn", "sentido = 'entrada'") == 1
     assert [e.texto for e in salida.enviados] == ["Recibí las dos fotos."]
@@ -353,6 +363,38 @@ def test_una_descarga_que_falla_una_vez_se_recibe_al_reintentar(conn, mundo):
 
     assert cuantas(conn, "archivo") == 1 and cuantas(conn, "inbound_message") == 1
     assert cuantas(conn, "incident") == 0
+
+
+# --- La descarga por la API del bot -----------------------------------------------------------
+
+def test_la_descarga_por_la_api_del_bot_corta_en_el_maximo_y_nunca_muestra_el_token():
+    import httpx
+
+    descargas: list[str] = []
+
+    def responder(pedido: httpx.Request) -> httpx.Response:
+        if pedido.url.path.endswith("/getFile"):
+            file_id = json.loads(pedido.content)["file_id"]
+            tamano = 10 * MB if file_id == "pesado" else len(JPEG)
+            return httpx.Response(200, json={"ok": True, "result": {
+                "file_id": file_id, "file_size": tamano, "file_path": f"photos/{file_id}.jpg"}})
+        descargas.append(pedido.url.path)
+        if "falla" in pedido.url.path:
+            return httpx.Response(500)
+        return httpx.Response(200, content=JPEG)
+
+    bot = BotTelegram("123:secreto-del-bot", httpx.Client(transport=httpx.MockTransport(responder)))
+
+    assert bot.bajar("F1", 1000) == JPEG
+    assert descargas == ["/file/bot123:secreto-del-bot/photos/F1.jpg"]
+    with pytest.raises(archivos.Rechazo):           # lo dice Telegram: ni se baja
+        bot.bajar("pesado", 1000)
+    assert len(descargas) == 1
+    with pytest.raises(archivos.Rechazo):           # la descarga pasa del máximo
+        bot.bajar("F1", len(JPEG) - 1)
+    with pytest.raises(Exception) as error:
+        bot.bajar("falla", 1000)
+    assert "secreto" not in str(error.value) and "secreto" not in repr(error.value)
 
 
 # --- Lo que la IA lee -------------------------------------------------------------------------

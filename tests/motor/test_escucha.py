@@ -691,7 +691,7 @@ def test_un_borrador_lento_no_demora_la_respuesta(conn, mundo):
 
 
 def test_el_texto_fijo_de_un_turno_caido_tambien_sale_sin_retiro(conn, mundo, monkeypatch):
-    def se_cae(conn, quien, entrante, ia, reloj, *, al_avanzar=None):
+    def se_cae(conn, quien, entrante, ia, reloj, *, al_avanzar=None, **_):
         al_avanzar("Anoté que")
         time.sleep(0.1)
         raise RuntimeError("se cayó el turno")
