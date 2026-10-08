@@ -560,6 +560,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [ ] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).
 - [ ] **C-6.** Las cadencias (pregunta 8).
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
+  - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
+    sector, Leda le pregunta si la acepta y le avisa a quien delegó. Al construirlo cambian las
+    respuestas a "me la podés pasar a Nahuel" de las conversaciones 12 y 19, que hoy dicen que no se hace
+    por chat y quién lo decide (`quien_decide`; usuario, 2026-10-08: queda así hasta que exista delegar).
 
 ## Próximo paso
 
