@@ -159,7 +159,20 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 20. **Cómo probar el enlace a la página:** decidida (usuario, 2026-10-08). En la PC, con Telegram Desktop
     o Web, `LEDA_BASE_URL=http://localhost:8000` y `python -m leda servir` en otra terminal: nada queda
     expuesto. Leda y la plataforma van a correr en un VPS; ahí sólo cambia `LEDA_BASE_URL`
-    (`docs/product/plataforma-pendientes.md`, "Acceso y operación").
+    (`docs/product/plataforma-pendientes.md`, "Acceso y operación"). La D6 sirvió la página con
+    `uvicorn leda.entrada:app --host 127.0.0.1 --port 8000 --no-access-log` en vez de `servir`, que
+    además arranca un segundo ciclo de Leda y escucha en el 8080 (`PENDIENTE`: confirmarlo con el usuario).
+21. **Una pregunta de Leda sin contestar** (del `PENDIENTE` de la D5): decidida (usuario, 2026-10-08,
+    opción B). Frena los otros temas de la persona hasta que Leda la repite, una sola vez en el día, a las
+    4 horas (ajustable desde la plataforma, `docs/product/plataforma-pendientes.md`). Si 4 horas después
+    de la repetición sigue sin contestar y todavía es horario, sale aparte el tema siguiente más urgente
+    (08:55 la entrega del PLC, 12:55 su repetición, 16:55 "hoy vence el tablero"). La segunda pregunta
+    guarda la primera "para después": la persona contesta cualquiera, nombrando la tarea, y al cerrarse
+    una el código trae la otra enseguida, en un mensaje aparte (hoy la retoma la IA si le parece). Al día
+    siguiente sigue la escalera; varias cosas esperando van de a una, primero la más urgente. El aviso de
+    atraso es informar, sin nombrar a nadie ("Si mañana sigue igual, voy a informar que está atrasada"),
+    nunca "la paso para que te ayuden a destrabarla"; si preguntan a quién, Leda dice el nombre. Antes del
+    código, una conversación de prueba con los dos órdenes de respuesta, con la IA real (D5b).
 
 ## Chequeo de rumbo (2026-10-07)
 
