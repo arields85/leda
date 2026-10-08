@@ -47,19 +47,21 @@ decisión 4, situación general 2, con la precisión de la decisión 9d.
      Ninguna tarea depende de ella en esta conversación, así que no nombra ninguna.
    - El mensaje no dice: nada de la tarea del PLC (un inicio no genera aviso); que la fecha cambió.
 
-4. **Marcos** escribe (martes 20, 16:30): "me trabe con el plc. y lo de comunicaciones al final es el jueves
+4. **Marcos** escribe (martes 20, 10:50): "me trabe con el plc. y lo de comunicaciones al final es el jueves
    5, no el 4"
    →
    - Jugadas: dos. `anotar_bloqueo` sobre la tarea del PLC, sin causa; `anotar_prevision` sobre la de
      comunicaciones, con fecha jueves 5 de noviembre (reemplaza la del 4; el motivo sigue siendo el switch).
-   - Efecto: la previsión del jueves 5, directo, y un aviso nuevo a Ismael con ella (el atraso pasa a cuatro
-     días hábiles; el del 4 ya salió). El bloqueo, todavía no: sin causa no hay bloqueo (mecánica §3).
+   - Efecto: la previsión del jueves 5, directo, con el motivo del paso 2: Marcos lo dio hace menos de una
+     hora, así que Leda no se lo vuelve a preguntar (usuario, 2026-10-07; pasada la hora, preguntaría qué
+     la atrasa, ADR 0018, 9n); y un aviso nuevo a Ismael con ella (el atraso pasa a cuatro días hábiles;
+     el del 4 ya salió). El bloqueo, todavía no: sin causa no hay bloqueo (mecánica §3).
    - La respuesta dice: primero, que quedó anotada la previsión del jueves 5; después, una sola pregunta:
      la causa del bloqueo de la tarea del PLC (decisión 9d; decisión 9c, paso 1).
    - La respuesta no dice: que el bloqueo quedó anotado; dos preguntas juntas.
    - Estado después: tema abierto: el bloqueo de la tarea del PLC, esperando la causa.
 
-5. **Marcos** escribe (martes 20, 16:35): "falta que martin de IT me habilite el acceso a la red de planta"
+5. **Marcos** escribe (martes 20, 10:55): "falta que martin de IT me habilite el acceso a la red de planta"
    →
    - Jugadas: la respuesta a la pregunta abierta: la causa del bloqueo y, en el mismo mensaje, quién lo
      destraba (Martín, que Marcos nombra). La pregunta de quién lo destraba (9c, paso 2) queda contestada

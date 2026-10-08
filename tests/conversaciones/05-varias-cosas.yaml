@@ -89,19 +89,22 @@ pasos:
 
   - paso: 4
     quien: Marcos
-    a_las: "2026-10-20 16:30"
+    a_las: "2026-10-20 10:50"
+    # Antes de que pase una hora desde que dio el porqué (10:05): la fecha nueva lo conserva y
+    # Leda no se lo vuelve a preguntar (usuario, 2026-10-07; `motivo_vale_minutos`, 60). Pasada la
+    # hora, preguntaría qué la atrasa.
     escribe: "me trabe con el plc. y lo de comunicaciones al final es el jueves 5, no el 4"
     jugadas:
       - {nombre: anotar_bloqueo, tarea: PLC}
       - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-05", puede_traer: [motivo]}
     efectos:
-      previsiones: [{tarea: COM, fecha: "2026-11-05"}]
+      previsiones: [{tarea: COM, fecha: "2026-11-05", motivo: presente}]
       avisos_guardados:
         - tipo: nueva_prevision
           tarea: COM
           a: Ismael
           hechos: {prevision: "2026-11-05", fecha_comprometida: "2026-10-30",
-                   atraso_si_se_cumple_la_prevision_dias_habiles: 4}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 4, motivo: presente}
     hechos:
       - {jugada: anotar_bloqueo, resultado: falta_dato, falta: [causa], tarea: PLC,
          pregunta: causa_del_bloqueo}
@@ -119,7 +122,7 @@ pasos:
 
   - paso: 5
     quien: Marcos
-    a_las: "2026-10-20 16:35"
+    a_las: "2026-10-20 10:55"
     escribe: "falta que martin de IT me habilite el acceso a la red de planta"
     jugadas:
       - {nombre: anotar_bloqueo, tarea: PLC,

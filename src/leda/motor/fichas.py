@@ -30,7 +30,9 @@ si la previsión queda después del vencimiento y la persona no dio el porqué, 
 Leda pregunta qué la atrasa (`preguntas.MOTIVO_DEL_ATRASO`); el aviso al referente espera la
 respuesta hasta el final del día de trabajo (`margen.sale_esperando_el_motivo`) y, si sale sin
 ella, lo dice. El porqué llega como otra previsión de la misma fecha, que reemplaza el aviso.
-Una fecha que corre otra vez un atraso ya explicado de la misma tarea conserva ese porqué.
+Una fecha que corre otra vez un atraso de la misma tarea explicado hace menos de una hora, sin
+que la persona hablara de otra cosa en el medio, conserva ese porqué; si no, se pregunta de
+nuevo (`_el_porque_sigue_valiendo`).
 
 **Con la tarea vencida, una respuesta sin fecha lleva la pregunta de para cuándo** (decisión del
 usuario, 2026-10-05; ADR 0018, 9j; conversación 16), también común: si la tarea pasó su fecha de
@@ -177,6 +179,77 @@ ESPERA_ALGO_CIERTO = ("si_la_termino", "para_cuando_la_termina", "si_esta_trabad
 ESPERA_EL_MOTIVO = "espera_el_motivo"
 SIN_MOTIVO_TODAVIA = "sin_motivo_todavia"
 LLEGO_EL_MOTIVO = "llego_el_motivo"
+
+# Cuánto vale el porqué que la persona ya dio para el atraso de una tarea, cuando corre otra vez
+# la fecha sin decirlo (usuario, 2026-10-07: "Marcos habla con Leda a la mañana sobre el motivo,
+# durante el día tienen otras conversaciones o no, y al final del día dice directamente otra
+# fecha… para Leda es difícil saber que se refiere a ese motivo; hay que poner un límite de
+# tiempo más corto"): en minutos desde que lo dijo, del espacio en `workspace_setting`. 60 es el
+# valor del producto. Un valor que no es un número entero de minutos, 0 o más, usa el del
+# producto.
+CLAVE_MOTIVO_VALE = "motivo_vale_minutos"
+MOTIVO_VALE_POR_OMISION = timedelta(minutes=60)
+
+
+def motivo_vale(cur, workspace_id: str) -> timedelta:
+    """Cuánto vale un porqué ya dicho: el del espacio o, si no es un número entero de minutos,
+    0 o más, el del producto."""
+    cur.execute("select valor from workspace_setting where workspace_id = %s and clave = %s",
+                (workspace_id, CLAVE_MOTIVO_VALE))
+    fila = cur.fetchone()
+    valor = fila["valor"] if fila else None
+    if isinstance(valor, bool) or not isinstance(valor, int) or valor < 0:
+        return MOTIVO_VALE_POR_OMISION
+    return timedelta(minutes=valor)
+
+
+def _cuando_lo_dijo(cur, prevision: dict[str, Any]) -> datetime:
+    """Cuándo dio la persona el porqué de una previsión: la más vieja de la cadena que lleva el
+    mismo porqué sin interrupción. Así un porqué que se conservó no vuelve a empezar la cuenta."""
+    momento, f, vistas = prevision["at"], prevision, {str(prevision["id"])}
+    while f["reemplaza_id"] is not None and str(f["reemplaza_id"]) not in vistas:
+        cur.execute("""select id, motivo, at, reemplaza_id from task_forecast
+                        where id = %s""", (f["reemplaza_id"],))
+        antes = cur.fetchone()
+        if antes is None or antes["motivo"] != prevision["motivo"]:
+            break
+        vistas.add(str(antes["id"]))
+        momento, f = antes["at"], antes
+    return momento
+
+
+def _siguio_en_la_tarea(ctx: Contexto, titulo: str, desde: datetime) -> bool:
+    """Si, desde el mensaje en que la persona dio el porqué (el primero suyo registrado a partir
+    de `desde`), cada mensaje suyo habló sólo de esa tarea: cada hecho de su turno nombra esa
+    tarea. Un mensaje sobre otra tarea, una jugada sin tarea (contar sus pendientes) o uno sin
+    jugadas (una pregunta sobre otra cosa) cortan el hilo. Lo que manda Leda no cuenta: sólo los
+    turnos de entrada."""
+    ctx.cur.execute("""select resultado -> 'hechos' as hechos from conversation_turn
+                        where membership_id = %s and sentido = 'entrada' and at >= %s
+                        order by numero""", (ctx.quien.membership_id, desde))
+    despues = ctx.cur.fetchall()[1:]        # el primero es el que dio el porqué
+    for turno in despues:
+        hechos = turno["hechos"] if isinstance(turno["hechos"], list) else []
+        if not hechos or any(not isinstance(h, dict)
+                             or (h.get("tarea") or {}).get("titulo") != titulo
+                             for h in hechos):
+            return False
+    return True
+
+
+def _el_porque_sigue_valiendo(ctx: Contexto, tarea: dict[str, Any],
+                              anterior: dict[str, Any]) -> bool:
+    """Si el porqué de la previsión anterior todavía explica una fecha nueva de la misma tarea que
+    llega sin porqué (usuario, 2026-10-07). Valen las dos condiciones juntas:
+
+    1. lo dijo hace menos de una hora (`motivo_vale`, del espacio; se cuenta desde que lo dijo,
+       no desde la última fecha que lo conservó, `_cuando_lo_dijo`);
+    2. desde entonces la persona habló sólo de esa tarea (`_siguio_en_la_tarea`).
+
+    Si una falla, Leda no sabe si se refiere a ese porqué: lo pregunta otra vez (9n)."""
+    dicho_en = _cuando_lo_dijo(ctx.cur, anterior)
+    return (ctx.ahora - dicho_en <= motivo_vale(ctx.cur, ctx.quien.workspace_id)
+            and _siguio_en_la_tarea(ctx, tarea["titulo"], dicho_en))
 
 # El atraso que tendrá la tarea si se cumple una previsión: distinto del atraso de hoy
 # (`atraso_dias_habiles`), con su propia clave (revisión del contrato, 2026-10-05; ronda 1: el
@@ -505,18 +578,22 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     dicho = None if _vacio(datos.get("motivo")) else str(datos["motivo"]).strip()
 
     # La previsión vigente es la última de la cadena: la que ninguna otra reemplaza.
-    cur.execute("""select f.id, f.fecha_prevista, f.motivo from task_forecast f
+    cur.execute("""select f.id, f.fecha_prevista, f.motivo, f.at, f.reemplaza_id
+                     from task_forecast f
                     where f.task_id = %s
                       and not exists (select 1 from task_forecast g where g.reemplaza_id = f.id)
                     order by f.at desc limit 1""", (tarea["id"],))
     anterior = cur.fetchone()
     # Una fecha que atrasa lleva su explicación (9n). Si la persona corre otra vez una fecha que
-    # ya atrasaba la tarea y cuyo porqué ya dio, ese porqué sigue siendo el del atraso de esta
-    # tarea: no se le vuelve a preguntar (constitución §8: ninguna pregunta que no aporte). El
-    # porqué es de la tarea: nunca pasa de una tarea a otra (`_deshacer_prevision`).
+    # ya atrasaba la tarea, cuyo porqué dio hace menos de una hora y sin hablar de otra cosa en
+    # el medio (`_el_porque_sigue_valiendo`), ese porqué sigue siendo el del atraso de esta
+    # tarea: no se le vuelve a preguntar (constitución §8: ninguna pregunta que no aporte). Si
+    # no, puede no referirse a él: se pregunta. El porqué es de la tarea: nunca pasa de una
+    # tarea a otra (`_deshacer_prevision`).
     atrasa = prevista > vence
-    de_antes = (dicho is None and atrasa and anterior is not None and anterior["motivo"]
-                and anterior["fecha_prevista"] > vence)
+    de_antes = bool(dicho is None and atrasa and anterior is not None and anterior["motivo"]
+                    and anterior["fecha_prevista"] > vence
+                    and _el_porque_sigue_valiendo(ctx, tarea, anterior))
     motivo = anterior["motivo"] if de_antes else dicho
     cur.execute(
         """insert into task_forecast (task_id, fecha_prevista, motivo, fecha_comprometida,
