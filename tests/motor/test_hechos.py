@@ -28,8 +28,8 @@ from leda.motor.turno import SOLO_SI_PREGUNTA, procesar_turno
 from tests.conversaciones import motores
 from tests.conversaciones.corredor import correr_conversacion, elegir
 from tests.conversaciones.grabar import IAPerfecta
-from tests.motor.ayudantes import (AHORA, SITUACION, ProveedorFalso, ia_real_falsa,
-                                   llamada_de_jugadas, respuesta_de_texto)
+from tests.motor.ayudantes import (AHORA, SITUACION, ProveedorFalso, a_la_vista, ia_real_falsa,
+                                   llamada_de_jugadas, respuesta_de_texto, solo_si_pregunta)
 
 
 # --- El vocabulario ---------------------------------------------------------------------------
@@ -163,6 +163,26 @@ def test_una_pregunta_sobre_lo_hecho_no_lleva_jugada_ni_aviso_y_se_contesta_del_
     conn.commit()
     registro = json.dumps(ia.pedidos_de_redaccion[-1]["ultimos_turnos"], ensure_ascii=False)
     assert SOLO_SI_PREGUNTA in registro and "aviso_al_administrador" in registro
+
+
+def test_a_quien_se_le_aviso_se_contesta_del_registro_con_el_nombre(conn, mundo, escribe):
+    """Decisión 11 del usuario (2026-10-08): el día nuevo se cuenta sin nombrar a quien aprueba
+    el trabajo de la persona; si después pregunta a quién se le avisó, la pregunta no lleva
+    jugada y la redacción tiene el nombre en los últimos turnos, dentro de `solo_si_pregunta`
+    (que dice lo que se dice si la persona lo pregunta)."""
+    ia = IAGuionada(jugadas=[[Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-13",
+                                                          "motivo": "faltan cables"})], []],
+                    redacciones=["Quedó anotado.", "A Ismael."])
+    for texto in ("llego el 13, faltan cables", "a quien le avisaste?"):
+        quien, entrante = escribe("Marcos", texto)
+        assert procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA)).error is None
+        conn.commit()
+
+    primera, pregunta = (hechos.para_redactar(p) for p in ia.pedidos_de_redaccion)
+    assert "Ismael" not in a_la_vista(primera["hechos"])
+    assert pregunta["hechos"] == []
+    assert "Ismael" not in a_la_vista(pregunta["ultimos_turnos"])
+    assert "Ismael" in solo_si_pregunta(pregunta["ultimos_turnos"])
 
 
 # --- En la corrida, un hecho sin significado es una falla del motor --------------------------

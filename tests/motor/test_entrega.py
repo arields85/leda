@@ -23,14 +23,14 @@ import pytest
 from leda.autoridad import identificar_en_espacio
 from leda.calendario import Calendario
 from leda.db import admin, espacio
-from leda.motor import avisos
+from leda.motor import avisos, hechos
 from leda.motor.fichas import FICHAS
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import procesar_toque, procesar_turno
 
-from tests.motor.ayudantes import (AHORA, VIERNES_16, IAQueRedacta, avisos_guardados, cuantas,
-                                   enviar, estado_de, todos, uno)
+from tests.motor.ayudantes import (AHORA, VIERNES_16, IAQueRedacta, a_la_vista, avisos_guardados,
+                                   cuantas, enviar, estado_de, solo_si_pregunta, todos, uno)
 
 TIPOS = {"explicacion": {"clases": ["texto"], "en_palabras": "cómo quedó el trabajo"},
          "foto": {"clases": ["imagen"], "en_palabras": "una foto del trabajo terminado"},
@@ -189,7 +189,8 @@ def test_sin_la_politica_completa_dice_que_falta_y_no_mueve_la_tarea(conn, mundo
                                  "dice": "termine el tablero, quedo cerrado",
                                  "cubre": ["cómo quedó el trabajo"]}]
     assert hecho["pregunta"] == "lo_que_falta_de_la_entrega"
-    assert hecho["al_confirmar"] == {"queda_esperando_la_aprobacion_de": "Ismael"}
+    assert hecho["al_confirmar"] == {"estado": "en_revision",
+                                     "queda_esperando_la_aprobacion_de": "Ismael"}
     assert estado_de(conn, tarea) == "en_curso"
     assert cuantas(conn, "evidence") == 0
     assert cuantas(conn, "conversation_option") == 0      # nada para confirmar: sin botones
@@ -266,6 +267,35 @@ def test_la_confirmacion_escrita_entrega_en_un_solo_acto_y_nunca_a_terminada(con
     confirmado = AHORA + timedelta(minutes=2)
     assert aviso["programado_para"] == confirmado + timedelta(minutes=10)
     assert hecho["aviso_a_quien_aprueba"]["llega"] == aviso["programado_para"].isoformat()
+
+
+def test_la_redaccion_de_la_entrega_nombra_a_quien_la_revisa_solo_si_se_pregunta(conn, mundo,
+                                                                                marcos):
+    """Decisiones 11 y 18 del usuario (2026-10-08): Leda no nombra por su cuenta a quien aprueba
+    el trabajo de la persona ("Ismael será notificado" invitaba a usarlo como motivo); habla de
+    la tarea, que pasa a revisión, y de que la persona se entera cuando la revisen. El nombre
+    sigue en los hechos de la cocina y le llega a la redacción en `solo_si_pregunta`, para
+    contestar si la persona pregunta quién la revisa."""
+    _tarea(conn, mundo)
+    vista = marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero",
+                         archivos=[(JPEG, "foto", None)])
+    r = marcos.manda(Jugada("confirmar", {}), texto="dale")
+    mostrada, entregada = _hecho(vista, "entregar"), _hecho(r, "confirmar")
+
+    # La cocina guarda a quién va el aviso: lo leen las pruebas y la auditoría.
+    assert entregada["aviso_a_quien_aprueba"]["a"] == "Ismael"
+    for hecho in (mostrada, entregada):
+        redactado = hechos.para_redactar(hecho)
+        assert "Ismael" not in a_la_vista(redactado), redactado
+        assert "Ismael" in solo_si_pregunta(redactado), redactado
+    assert hechos.para_redactar(mostrada)["al_confirmar"] == {
+        "estado": "en_revision",
+        "solo_si_pregunta": {"queda_esperando_la_revision_de": "Ismael"}}
+    redactado = hechos.para_redactar(entregada)
+    assert redactado["estado"] == "en_revision"
+    assert redactado["se_le_avisa_cuando_decida"] is True
+    assert redactado["solo_si_pregunta"] == {"queda_esperando_la_revision_de": "Ismael"}
+    assert set(redactado["aviso_a_quien_aprueba"]) == {"llega", "solo_si_pregunta"}
 
 
 def test_una_pieza_que_llega_con_la_confirmacion_la_deja_sin_valor(conn, mundo, marcos):

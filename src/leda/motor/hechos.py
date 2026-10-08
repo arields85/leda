@@ -122,7 +122,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "tipo_de_evidencia": "El código de una cosa que pide la tarea para entregarla: sirve para "
                          "nombrarla en una jugada; a la persona se le dice con sus palabras.",
     "en_palabras": "Cómo se le dice a la persona esa cosa que pide la tarea.",
-    "el_texto_cubre": "Los códigos de lo que pide la tarea que la persona cuenta con lo que "
+    "el_texto_cubre": "Los códigos de lo que pide la tarea que la persona describe con lo que "
                       "escribió (por ejemplo, cómo quedó y cómo lo probó).",
     "saca": "Las piezas (por su alias) que la persona saca de su entrega.",
     "entrega": "La entrega de la tarea, pieza por pieza, como se le muestra a la persona: lo "
@@ -144,10 +144,11 @@ SIGNIFICADOS: Mapping[str, str] = {
     "le_falta": "Lo que pide la tarea y todavía no está en la entrega, en palabras de todos "
                 "los días: sin eso no se puede entregar.",
     "al_confirmar": "Lo que pasa cuando la persona confirme la entrega completa.",
-    "queda_esperando_la_aprobacion_de": "Quién tiene que aprobar la tarea entregada: hasta que "
-                                        "decida, la tarea espera su aprobación.",
-    "aviso_a_quien_aprueba": "Lo que se le avisa a quien aprueba la tarea: a quién (a) y cuándo "
-                             "se entera (llega).",
+    "queda_esperando_la_aprobacion_de": "Quién revisa la tarea entregada y decide si la aprueba "
+                                        "o le pide cambios: hasta que decida, la tarea está en "
+                                        "revisión.",
+    "aviso_a_quien_aprueba": "Lo que se le avisa a quien revisa la tarea entregada: a quién (a) "
+                             "y cuándo se entera (llega).",
     "lo_que_entrego": "Lo que entregó la persona responsable, pieza por pieza: lo que escribió, "
                       "cada foto, video, archivo o enlace, y lo que cubre de lo que pide la "
                       "tarea. El sistema sabe qué llegó y nunca su contenido: qué muestra una "
@@ -178,8 +179,8 @@ SIGNIFICADOS: Mapping[str, str] = {
                       "confirme, con el botón o escribiendo.",
     "le_falta_evidencia": "A la entrega le falta algo de lo que pide la tarea (le_falta dice "
                           "qué): no se puede entregar todavía y la tarea no se movió.",
-    "entregada": "La tarea quedó entregada, esperando la aprobación de quien la aprueba. No "
-                 "está terminada ni aprobada.",
+    "entregada": "La tarea quedó entregada y pasa a revisión: espera que quien aprueba el "
+                 "trabajo de la persona la revise y decida. No está terminada ni aprobada.",
     "no_vale_la_confirmacion": "La confirmación no vale (motivo dice por qué): no se entregó "
                                "nada y se muestra la entrega como quedó.",
     "llego_algo_despues": "Llegó algo nuevo para la entrega después de mostrarla: lo que la "
@@ -196,7 +197,8 @@ SIGNIFICADOS: Mapping[str, str] = {
                                   "poder entregarla.",
     # --- La decisión de quien aprueba una entrega (circuito 8; porción 3b de la C-3) -----------
     "para_decidir": "Una tarea de otra persona, entregada, que espera que la persona que "
-                    "escribe la apruebe o le pida cambios: no es una tarea suya.",
+                    "escribe la revise y decida: la apruebe o le pida cambios. No es una tarea "
+                    "suya.",
     "ya_la_aprobo_el": "La persona que escribe ya la aprobó ese día: espera que se resuelva lo "
                        "que falta para cerrarse, sin otra aprobación.",
     "comentario": "Lo que dijo quien decide sobre la entrega, con sus palabras: en un pedido de "
@@ -262,8 +264,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "se_cerro_despues": "La tarea quedó terminada después: otro aviso lo cuenta.",
     # --- Quien aprueba no contesta (porción 3c de la C-3) ------------------------------------
     "recordatorio_de_la_decision": "Leda le recuerda a quien aprueba que una entrega espera su "
-                                   "decisión: aprobarla o pedirle cambios; lo puede contestar "
-                                   "escribiendo.",
+                                   "revisión y su decisión: aprobarla o pedirle cambios; lo "
+                                   "puede contestar escribiendo.",
     "veces_que_se_lo_recuerda": "Cuántas veces, contando ésta, Leda le recuerda a quien aprueba "
                                 "que esa entrega espera su decisión.",
     "entregada_el": "El día en que la persona responsable entregó la tarea.",
@@ -271,14 +273,14 @@ SIGNIFICADOS: Mapping[str, str] = {
                             "avisa (se_avisa_a), sólo para que lo sepa, y qué día (fecha). "
                             "Todavía no pasó.",
     "aprobacion_trabada": "Aviso a quien aprueba el trabajo de quien aprueba una entrega: esa "
-                          "entrega espera desde hace días la decisión de quien_aprueba. Es sólo "
+                          "entrega espera desde hace días la revisión de quien_aprueba. Es sólo "
                           "para que lo sepa: no le pide nada y no la decide él; la decide "
                           "quien_aprueba. No pide respuesta.",
     "leda_se_lo_sigue_recordando": "Leda le sigue recordando a quien aprueba, un día hábil por "
                                    "vez, que la entrega espera su decisión.",
-    "se_le_avisa_cuando_decida": "Cuando quien aprueba decida, Leda le avisa a quien recibe "
-                                 "este aviso. Todavía no pasó.",
-    "aprobacion_destrabada": "Aviso a quien sabía que una entrega esperaba la decisión de "
+    "se_le_avisa_cuando_decida": "Cuando quien aprueba decida sobre la entrega, Leda se lo "
+                                 "avisa a la persona a la que le escribe. Todavía no pasó.",
+    "aprobacion_destrabada": "Aviso a quien sabía que una entrega esperaba la revisión de "
                              "quien_aprueba: ya decidió. No pide respuesta.",
     "aviso_de_que_se_destrabo": "Lo que se le avisa a quien sabía que esa entrega esperaba "
                                 "esta decisión: a quién (a) y cuándo se entera (llega).",
@@ -513,7 +515,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "destinatario_inactivo": "Quien lo iba a recibir ya no está activo en el equipo.",
     "destinatario_sin_telegram": "Quien lo iba a recibir no tiene un chat con Leda.",
     "tipo_sin_declarar": "El aviso no es de un tipo que Leda manda.",
-    "ya_no_esta_entregada": "La tarea ya no está entregada esperando la aprobación.",
+    "ya_no_esta_entregada": "La tarea ya no está entregada esperando su revisión.",
     "cambio_quien_aprueba": "Cambió quién aprueba el trabajo de la persona responsable.",
     "hay_una_entrega_mas_nueva": "La tarea tiene una entrega más nueva: sale otro aviso, con "
                                  "lo que vale ahora.",
@@ -565,8 +567,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "correccion_de_prevision": "Aviso a quien aprueba el trabajo de la persona responsable: "
                                "el día para terminar la tarea que ya recibió no vale.",
     "entrega_para_aprobar": "Aviso a quien aprueba el trabajo de la persona responsable: "
-                            "entregó la tarea, que espera su decisión: aprobarla o pedirle "
-                            "cambios, con un botón o escribiendo.",
+                            "entregó la tarea, que espera su revisión y su decisión: aprobarla "
+                            "o pedirle cambios, con un botón o escribiendo.",
     "falla_de_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
     "lleva_el_enlace_a_la_pagina_de_la_tarea":
         "Al final de este mensaje, el código agrega un enlace personal a la página de la "
@@ -580,8 +582,14 @@ SIGNIFICADOS: Mapping[str, str] = {
 #
 # Los conceptos de la cocina: un nombre que lleva uno de éstos, o que es el de una jugada
 # (`FICHAS`), nunca le llega a la IA que redacta.
+#
+# La espera de una decisión sobre una entrega es, para la persona, una revisión (decisión 18
+# del usuario, 2026-10-08: "para aprobar" inclina la respuesta); "aprobar" queda para la
+# decisión misma.
 CONCEPTOS_DE_LA_COCINA = ("prevision", "comprometid", "referente", "dependiente", "escal",
-                          "aviso_previo", "reencuadre", "repregunta", "de_estado", "el_estado")
+                          "aviso_previo", "reencuadre", "repregunta", "de_estado", "el_estado",
+                          "esperando_la_aprobacion", "para_aprobar", "aprobacion_trabada",
+                          "aprobacion_destrabada")
 
 
 def es_un_concepto_de_la_cocina(nombre: str) -> bool:
@@ -611,6 +619,7 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "aviso_de_la_prevision_anterior": "aviso_del_dia_para_terminarla_que_vuelve_a_valer",
     "prevision_que_no_vale": "dia_para_terminarla_que_ya_no_vale",
     "prevision_vigente": "dia_para_terminarla_que_vale_ahora",
+    "queda_esperando_la_aprobacion_de": "queda_esperando_la_revision_de",
     "pide_el_estado_el": "pregunta_como_viene_el",
     "pedidos_de_estado_sin_respuesta": "veces_que_pregunto_como_viene_sin_respuesta",
     "pedidos_de_estado_que_no_le_llegaron": "preguntas_de_como_viene_que_no_le_llegaron",
@@ -634,6 +643,9 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "escalamiento_de_una_pregunta": "aviso_de_una_pregunta_sin_respuesta",
     "nueva_prevision": "dio_otro_dia_para_terminar_su_tarea",
     "correccion_de_prevision": "el_dia_para_terminarla_que_recibio_ya_no_vale",
+    "entrega_para_aprobar": "entrega_para_revisar",
+    "aprobacion_trabada": "revision_trabada",
+    "aprobacion_destrabada": "revision_destrabada",
     # --- Las jugadas, por lo que hacen (su ficha) ----------------------------------------------
     "anotar_bloqueo": "anotar_que_esta_trabada",
     "anotar_inicio": "anotar_que_arranco",
@@ -667,22 +679,105 @@ _NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_e
 
 
 def para_redactar(valor: Any) -> Any:
-    """Una copia del pedido de redacción con cada clave y cada código de la cocina que nombra un
-    concepto cambiado por el suyo para redactar (`PARA_LA_REDACCION`) y cada día de `dias` en
-    la forma corta con que se escribe (segunda vuelta del formato, 2026-10-07); lo demás, tal
-    cual."""
+    """Una copia del pedido de redacción con el nombre de quien aprueba el trabajo de la persona
+    dentro de `solo_si_pregunta` (`NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`), cada clave y cada
+    código de la cocina que nombra un concepto cambiado por el suyo para redactar
+    (`PARA_LA_REDACCION`) y cada día de `dias` en la forma corta con que se escribe (segunda
+    vuelta del formato, 2026-10-07); lo demás, tal cual."""
+    return _traducir(_quien_aprueba_solo_si_pregunta(valor))
+
+
+def _traducir(valor: Any) -> Any:
     if isinstance(valor, Mapping):
         return {PARA_LA_REDACCION.get(k, k):
                 v if k in _LO_QUE_ALGUIEN_ESCRIBIO
                 else [_dia_para_redactar(d) for d in v]
                 if k == "dias" and isinstance(v, (list, tuple))
-                else para_redactar(v)
+                else _traducir(v)
                 for k, v in valor.items()}
     if isinstance(valor, (list, tuple)):
-        return [para_redactar(v) for v in valor]
+        return [_traducir(v) for v in valor]
     if isinstance(valor, str):
         return PARA_LA_REDACCION.get(valor, valor)
     return valor
+
+
+# --- Quien aprueba el trabajo de la persona, sólo si lo pregunta (usuario, 2026-10-08) -------
+#
+# Decisión 11: Leda no nombra por su cuenta a quien aprueba el trabajo de la persona a la que le
+# escribe (el referente de su área): ni como motivo (habla de la tarea) ni al contar un hecho
+# ("La nueva fecha queda informada", no que esa persona será notificada). Si la persona
+# pregunta a quién se le avisa o quién la revisa, Leda le dice el nombre.
+#
+# La IA escribe lo que dicen los hechos: el nombre a la vista invitaba a usarlo. Los hechos de
+# la cocina no cambian (la base, el registro de turnos, las pruebas y la auditoría lo leen);
+# en el borde, la redacción recibe el nombre dentro de `solo_si_pregunta`, en el mismo lugar
+# del dato que lo nombra. La redacción ya trata siempre igual ese dato: lo cierto que dice sólo
+# si la persona lo pregunta, también desde los últimos turnos. Lo demás del dato queda a la
+# vista (cuándo se entera). Es por dato y no por persona: cada uno de éstos nombra siempre a
+# quien aprueba el trabajo de la persona a la que Leda le escribe (a quien aprueba una entrega,
+# el aviso de que se destrabó y lo que pasa si sigue sin decidir le nombran a quien está
+# arriba, que aprueba su trabajo; quién aprobó o pidió cambios, en el aviso de la decisión a
+# la persona responsable, es quien aprueba su trabajo, y a quien aprobó, él mismo). Los datos
+# que nombran a otra persona quedan a la vista: a quien aprueba se le nombra a la persona
+# responsable (`aviso_al_responsable`, `responsable`); a quien está arriba, quién tiene trabada
+# la decisión (`quien_aprueba`); y a quien pide algo que decide otro, quién lo decide
+# (`quien_decide`, `quien_aprueba` en `no_es_quien_aprueba`): es la respuesta a lo que pidió.
+SOLO_SI_PREGUNTA = "solo_si_pregunta"
+
+# Cada dato de la cocina que nombra a quien aprueba el trabajo de la persona, con la clave que
+# lleva el nombre: la de un aviso (también en una lista de avisos), o `None` si el valor entero
+# es el nombre (entonces el dato pasa entero a `solo_si_pregunta` del hecho que lo trae).
+NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO: Mapping[str, str | None] = {
+    "aviso_al_referente": "a",
+    "aviso_a_quien_aprueba": "a",
+    "correccion_al_referente": "a",
+    "aviso_de_la_prevision_corregida": "a",
+    "aviso_de_la_prevision_anterior": "a",
+    "aviso_de_que_se_destrabo": "a",
+    "escalado_a": "a",
+    "si_no_hay_respuesta": "se_avisa_a",
+    "si_sigue_sin_decidir": "se_avisa_a",
+    "queda_esperando_la_aprobacion_de": None,
+    "aprobada_por": None,
+    "pidio_cambios": None,
+}
+
+
+def _quien_aprueba_solo_si_pregunta(valor: Any) -> Any:
+    """Una copia del valor con el nombre de quien aprueba el trabajo de la persona dentro de
+    `solo_si_pregunta`, en el mismo lugar del dato que lo nombra."""
+    if isinstance(valor, (list, tuple)):
+        return [_quien_aprueba_solo_si_pregunta(v) for v in valor]
+    if not isinstance(valor, Mapping):
+        return valor
+    copia: dict[str, Any] = {}
+    aparte: dict[str, Any] = {}
+    for k, v in valor.items():
+        if k in _LO_QUE_ALGUIEN_ESCRIBIO:
+            copia[k] = v
+            continue
+        if k in NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO:
+            clave = NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO[k]
+            if clave is None:
+                aparte[k] = v
+                continue
+            v = _nombre_aparte(v, clave)
+        copia[k] = _quien_aprueba_solo_si_pregunta(v)
+    if aparte:
+        copia[SOLO_SI_PREGUNTA] = {**copia.get(SOLO_SI_PREGUNTA, {}), **aparte}
+    return copia
+
+
+def _nombre_aparte(valor: Any, clave: str) -> Any:
+    """Un aviso (o una lista de avisos) con `clave` dentro de su `solo_si_pregunta`."""
+    if isinstance(valor, (list, tuple)):
+        return [_nombre_aparte(v, clave) for v in valor]
+    if not isinstance(valor, Mapping) or clave not in valor:
+        return valor
+    resto = {k: v for k, v in valor.items() if k != clave}
+    resto[SOLO_SI_PREGUNTA] = {**resto.get(SOLO_SI_PREGUNTA, {}), clave: valor[clave]}
+    return resto
 
 
 # --- Los días de las fechas (tercera vuelta de ajuste, usuario, 2026-10-06) ------------------

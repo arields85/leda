@@ -23,7 +23,8 @@ from leda.motor.fichas import (ESPERA_ALGO_CIERTO, FICHAS, LLEGA, NO_LE_LLEGO, N
 from leda.motor.ia_real import DATOS
 from leda.motor.instrucciones import INSTRUCCIONES_REDACCION
 
-from tests.motor.ayudantes import ProveedorFalso, ia_real_falsa, respuesta_de_texto
+from tests.motor.ayudantes import (ProveedorFalso, a_la_vista, ia_real_falsa, respuesta_de_texto,
+                                   solo_si_pregunta)
 
 NOMBRES = sorted(set(hechos.SIGNIFICADOS) | set(FICHAS) | set(preguntas.TIPOS)
                  | set(avisos.TIPOS) | set(DATOS)
@@ -110,3 +111,97 @@ def test_la_instruccion_de_redaccion_no_nombra_un_concepto_de_la_cocina():
     # Los verbos sueltos de algunas jugadas también son palabras de la instrucción.
     verbos = {"elegir", "corregir", "cancelar", "destrabar", "entregar"}
     assert not palabras & (set(hechos.PARA_LA_REDACCION) - verbos)
+
+
+# --- Quien aprueba el trabajo de la persona, sólo si lo pregunta (usuario, 2026-10-08) --------
+
+def test_quien_aprueba_el_trabajo_de_la_persona_llega_a_la_redaccion_solo_si_pregunta():
+    """Decisión 11: Leda no nombra por su cuenta a quien aprueba el trabajo de la persona a la
+    que le escribe, ni como motivo ni al contar un hecho. Cada dato de la cocina que lo nombra
+    le llega a la redacción con el nombre dentro de `solo_si_pregunta`, en el mismo lugar; lo
+    demás del dato, a la vista."""
+    aviso = {"a": "Ismael", "llega": "2026-10-20T15:50:00-03:00"}
+    pedido = {"hoy": "2026-10-20", "persona": "Marcos", "mensaje": None, "pregunta": None,
+              "hechos": [{"jugada": "anotar_prevision", "aviso_al_referente": aviso,
+                          "correccion_al_referente": aviso,
+                          "aviso_de_la_prevision_corregida": aviso,
+                          "aviso_de_la_prevision_anterior": aviso},
+                         {"jugada": "confirmar", "resultado": "entregada",
+                          "queda_esperando_la_aprobacion_de": "Ismael",
+                          "aviso_a_quien_aprueba": aviso},
+                         {"jugada": "aprobar", "aviso_de_que_se_destrabo": aviso},
+                         {"no_vuelve_a_pedir_el_estado": {
+                             "motivo": "ya_se_escalo",
+                             "escalado_a": [{"a": "Ismael", "llega": "ya_le_llego"}]}},
+                         {"aviso": "pedido_de_estado",
+                          "si_no_hay_respuesta": {"se_avisa_a": ["Ismael"]}},
+                         {"aviso": "recordatorio_de_la_decision",
+                          "si_sigue_sin_decidir": {"se_avisa_a": ["Ismael"],
+                                                   "fecha": "2026-10-21"}},
+                         {"aviso": "tarea_aprobada", "aprobada_por": "Ismael"},
+                         {"aviso": "pedido_de_cambios", "pidio_cambios": "Ismael",
+                          "comentario": "falta el diagrama"}],
+              "ultimos_turnos": [{"sentido": "entrada", "texto": "llego el 27",
+                                  "hechos": [{"aviso_al_referente": aviso}]}]}
+
+    recibido, _ = _lo_que_recibe_la_redaccion(pedido)
+
+    assert "Ismael" not in a_la_vista(recibido), a_la_vista(recibido)
+    assert solo_si_pregunta(recibido).count("Ismael") == 13
+    assert recibido["hechos"][0]["aviso_a_quien_aprueba_su_trabajo"] == {
+        "llega": "2026-10-20T15:50:00-03:00", "solo_si_pregunta": {"a": "Ismael"}}
+    assert recibido["hechos"][4]["si_no_hay_respuesta"] == {
+        "solo_si_pregunta": {"se_avisa_a": ["Ismael"]}}
+    assert recibido["hechos"][5]["si_sigue_sin_decidir"] == {
+        "fecha": "2026-10-21", "solo_si_pregunta": {"se_avisa_a": ["Ismael"]}}
+    assert recibido["hechos"][7]["solo_si_pregunta"] == {"pidio_cambios": "Ismael"}
+    assert recibido["hechos"][7]["comentario"] == "falta el diagrama"
+    assert pedido["hechos"][1]["queda_esperando_la_aprobacion_de"] == "Ismael"   # sin tocar
+
+
+def test_a_quien_aprueba_se_le_nombra_a_la_persona_responsable_y_a_terceros():
+    """La regla es sobre quien aprueba el trabajo de la persona a la que Leda le escribe: a quien
+    aprueba se le nombra a la persona responsable ("Marcos te entregó…", y que Marcos se va a
+    enterar de la decisión); a quien está arriba, quién tiene trabada la decisión; y a quien
+    pide algo que decide otro, quién lo decide."""
+    pedido = {"hoy": "2026-10-20", "persona": "Ismael", "mensaje": None, "pregunta": None,
+              "hechos": [{"jugada": "aprobar",
+                          "aviso_al_responsable": {"a": "Marcos", "llega": "ya_le_llego"}},
+                         {"aviso": "aprobacion_trabada", "quien_aprueba": "Marcos",
+                          "responsable": "Ariel"},
+                         {"jugada": "aprobar", "resultado": "no_se_puede",
+                          "motivo": "no_es_quien_aprueba", "quien_aprueba": "Marcos"},
+                         {"jugada": "pedir_reasignacion", "resultado": "no_por_chat",
+                          "quien_decide": "Marcos"}],
+              "ultimos_turnos": []}
+
+    recibido, _ = _lo_que_recibe_la_redaccion(pedido)
+
+    assert solo_si_pregunta(recibido) == "[]"
+    assert a_la_vista(recibido).count("Marcos") == 4
+
+
+def test_lo_que_espera_una_decision_se_dice_revision():
+    """Decisión 18: lo que espera es una revisión ("Te entregaron 2 tareas para revisar", "pasa a
+    revisión"); "aprobar" queda para la decisión misma. Los nombres de la cocina que dicen la
+    espera como aprobación son conceptos de la cocina y la redacción recibe el suyo."""
+    for de, para in (("queda_esperando_la_aprobacion_de", "queda_esperando_la_revision_de"),
+                     ("entrega_para_aprobar", "entrega_para_revisar"),
+                     ("aprobacion_trabada", "revision_trabada"),
+                     ("aprobacion_destrabada", "revision_destrabada")):
+        assert hechos.es_un_concepto_de_la_cocina(de), de
+        assert hechos.para_redactar(de) == para
+    for decision in ("aprobar", "tarea_aprobada", "cerrada_con_la_aprobacion", "ya_la_aprobo"):
+        assert "revis" not in hechos.para_redactar(decision), decision
+    for nombre in ("queda_esperando_la_aprobacion_de", "entregada", "ya_no_esta_entregada",
+                   "entrega_para_aprobar", "recordatorio_de_la_decision", "aprobacion_trabada",
+                   "aprobacion_destrabada", "para_decidir"):
+        assert "revis" in hechos.significado(nombre), nombre
+        assert "esperando la aprobación" not in hechos.significado(nombre), nombre
+        assert "espera su aprobación" not in hechos.significado(nombre), nombre
+
+
+def test_lo_que_la_persona_entrega_lo_describe():
+    """Decisión 10: "describir", no "contar", en lo que la IA lee sobre la entrega."""
+    for texto in (hechos.significado("el_texto_cubre"), DATOS["el_texto_cubre"][1]):
+        assert "describe" in texto and "cont" not in texto, texto

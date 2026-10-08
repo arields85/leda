@@ -6,11 +6,12 @@ HTML.
 
 - **Todo lo que viene de la base se escapa** (`_e`): un título, un comentario o el nombre de un
   archivo los escribió una persona.
-- **En palabras de todos los días** (decisión del usuario del 2026-10-07): "esperando
-  aprobación", no el nombre del estado en la base; sin identificadores, huellas, nombres de
-  herramientas ni errores técnicos (constitución §10). El único identificador que aparece es el
-  del archivo de una evidencia, dentro de la dirección que lo pide: la base comprueba que sea de
-  la tarea del enlace.
+- **En palabras de todos los días** (decisión del usuario del 2026-10-07): "en revisión"
+  (decisión 18 del 2026-10-08: primero se revisa y después se decide; corrige el "esperando
+  aprobación" del ADR 0019, 7c), no el nombre del estado en la base; sin identificadores,
+  huellas, nombres de herramientas ni errores técnicos (constitución §10). El único
+  identificador que aparece es el del archivo de una evidencia, dentro de la dirección que lo
+  pide: la base comprueba que sea de la tarea del enlace.
 - **Sólo lectura:** sin botones, formularios ni nada que se ejecute (la página sale con una
   política de contenido que no lo deja, `entrada.py`).
 - **No muestra la conversación:** sólo los hechos de la tarea.
@@ -30,7 +31,7 @@ ESTADOS = {
     "asignada": "asignada, sin empezar",
     "en_curso": "en curso",
     "bloqueada": "trabada",
-    "en_revision": "esperando aprobación",
+    "en_revision": "en revisión",
     "terminada": "terminada",
     "cancelada": "cancelada",
 }

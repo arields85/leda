@@ -111,8 +111,9 @@ DATOS = {
                                  "dice."),
     "que_pide": ("string", "Qué le pidió la persona a Leda, resumido."),
     "el_texto_cubre": ("array", "Los códigos (tipo_de_evidencia) de lo que pide la tarea que la "
-                                "persona cuenta con lo que escribe, de evidencia_que_pide. Sólo "
-                                "lo que dice: contar que terminó no es contar cómo lo probó."),
+                                "persona describe con lo que escribe, de evidencia_que_pide. "
+                                "Sólo lo que dice: describir que terminó no es describir cómo lo "
+                                "probó."),
     "comentario": ("string", "Lo que dice quien decide sobre una entrega, con sus palabras: al "
                              "aprobar, un comentario si lo hace; al pedir cambios, lo que falta "
                              "o hay que cambiar. Sólo si lo dijo."),

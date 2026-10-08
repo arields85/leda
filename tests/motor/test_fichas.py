@@ -15,12 +15,13 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 from leda.db import admin, espacio
+from leda.motor import hechos
 from leda.motor.fichas import FICHAS, JUGADAS, Contexto
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import ETAPA_FUERA_DE_LA_LISTA, procesar_turno
 
-from tests.motor.ayudantes import AHORA
+from tests.motor.ayudantes import AHORA, a_la_vista
 
 VIERNES_9 = datetime(2026, 10, 9, 20, 0, tzinfo=timezone.utc)      # 17:00 en Buenos Aires
 OFRECIDAS = ("anotar_inicio", "anotar_prevision", "anotar_bloqueo", "anotar_quien_destraba",
@@ -270,6 +271,21 @@ def test_la_redaccion_recibe_cuando_se_entera_el_referente(conn, mundo, escribe)
     # Y es cierto: el aviso está guardado y nada salió para Ismael.
     assert _uno(conn, "select estado from scheduled_notice")["estado"] == "guardado"
     assert _cuantas(conn, "message_outbox") == 1          # sólo la respuesta a Marcos
+
+
+def test_la_redaccion_de_un_dia_nuevo_nombra_a_quien_se_le_avisa_solo_si_se_pregunta(
+        conn, mundo, escribe):
+    """Decisión 11 del usuario (2026-10-08): "✏️ Quedó anotado que la terminás el mar 27/10. La
+    nueva fecha queda informada.", sin nombrar a quien aprueba su trabajo; si la persona
+    pregunta a quién se le avisó, el nombre está en `solo_si_pregunta`. La cocina lo guarda."""
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada(
+        "anotar_prevision", {"tarea": "T1", "fecha": "2026-10-13", "motivo": "faltan cables"}))
+
+    assert hecho["aviso_al_referente"]["a"] == "Ismael"
+    redactado = hechos.para_redactar(hecho)
+    assert "Ismael" not in a_la_vista(redactado)
+    assert redactado["aviso_a_quien_aprueba_su_trabajo"] == {
+        "llega": "2026-10-05T10:10:00-03:00", "solo_si_pregunta": {"a": "Ismael"}}
 
 
 def test_el_aviso_al_referente_espera_el_margen_del_espacio(conn, mundo, escribe):

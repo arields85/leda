@@ -112,4 +112,9 @@ def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
 # después de la segunda prueba por Telegram: 🗓️ en vez de 📅, el renglón de la tarea primero en su
 # bloque, las marcas sólo al principio del renglón y quien se entera, en voz pasiva (conversación
 # 20). Antes: "d546932a0f6b9262".
-HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "d8c6b0de58c4c2a3"}
+# Y otra vez a propósito el 2026-10-08, con la decisión 11 del usuario: Leda no nombra por su
+# cuenta a quien aprueba el trabajo de la persona, que le llega a la redacción en
+# `solo_si_pregunta`; la voz pasiva de quien se entera tiene como sujeto a esa persona sólo si
+# un hecho la nombra a la vista, y si no, lo que se informa (la regla anterior, "con esa
+# persona como sujeto del verbo notificar", pedía el nombre). Antes: "d8c6b0de58c4c2a3".
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "3f267a24d030de4a"}

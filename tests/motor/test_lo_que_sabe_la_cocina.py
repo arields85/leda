@@ -179,4 +179,5 @@ def test_una_entrega_dice_quien_la_aprueba_cuando_se_confirme(conn, mundo, escri
 
     [hecho] = r.hechos
     assert hecho["resultado"] == "para_confirmar" and hecho["tarea"] == T1
-    assert hecho["al_confirmar"] == {"queda_esperando_la_aprobacion_de": "Ismael"}
+    assert hecho["al_confirmar"] == {"estado": "en_revision",
+                                     "queda_esperando_la_aprobacion_de": "Ismael"}

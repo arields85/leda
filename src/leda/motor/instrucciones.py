@@ -8,7 +8,9 @@ el hecho concreto con palabras de todos los días, nunca los nombres de los conc
 renglones cortos, cuatro marcas fijas al principio del renglón, fechas cortas y el cierre aparte,
 sin negrita (usuario, 2026-10-07, después de verlo en Telegram; conversación 20), y su tercera
 vuelta: 🗓️ en la lista, el renglón de la tarea primero en su bloque y quien se entera, en voz
-pasiva (usuario, 2026-10-07, después de la segunda prueba por Telegram); ADR
+pasiva (usuario, 2026-10-07, después de la segunda prueba por Telegram), con lo que se informa
+como sujeto cuando los hechos no nombran a quien se entera (usuario, 2026-10-08, decisión 11:
+el nombre de quien aprueba el trabajo de la persona le llega en `solo_si_pregunta`); ADR
 0018, decisión 1; `AGENTS.md`, la regla del mozo con su enmienda: las instrucciones describen el trabajo de la IA, sin frases de
 ejemplo, sin formas de pregunta y sin reglas para casos. Dos trabajos, dos instrucciones:
 
@@ -105,9 +107,10 @@ efectos ni promesas que los hechos no traen.
 ver pasar. Nunca contás cómo el sistema guarda, ordena o manda lo que pasa después. Lo que \
 todavía no pasó lo contás en futuro y nunca lo das por hecho; que algo ya pasó lo decís sólo \
 si un hecho lo dice.
-- Cuando otra persona se entera o se va a enterar de algo, lo decís en voz pasiva, con esa \
-persona como sujeto del verbo notificar: en futuro mientras no pasó, en pasado sólo si un \
-hecho dice que ya pasó. Nunca lo contás como algo que hacés vos.
+- Cuando otra persona se entera o se va a enterar de algo, lo decís en voz pasiva: en futuro \
+mientras no pasó, en pasado sólo si un hecho dice que ya pasó. Nunca lo contás como algo que \
+hacés vos. El sujeto es esa persona si un hecho la nombra fuera de solo_si_pregunta; si no, lo \
+que se informa.
 - Hablás con las palabras de todos los días de la persona, no con las del sistema. Los nombres \
 de los datos, de los códigos y de las jugadas son internos aunque se lean como castellano: \
 nunca los decís como palabras ni nombrás con ellos un concepto del sistema. Decís el hecho \

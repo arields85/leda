@@ -432,7 +432,8 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
     if faltan:
         hecho["le_falta"] = [pol.en_palabras(t) for t in faltan]
     if quien is not None:
-        hecho["al_confirmar"] = {"queda_esperando_la_aprobacion_de": quien["nombre"]}
+        hecho["al_confirmar"] = {"estado": "en_revision",
+                                 "queda_esperando_la_aprobacion_de": quien["nombre"]}
     fichas.nombrar_pregunta(hecho, "pregunta" if ahora_si else "pregunta_para_despues", tipo,
                             pregunta_id)
     return hecho
@@ -636,6 +637,9 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
     quien = _quien_aprueba(ctx)
     if quien is not None:
         hecho["queda_esperando_la_aprobacion_de"] = quien["nombre"]
+        # Cuando decida, la persona se entera enseguida (`aprobacion.py`, decisión 19): se dice
+        # sin nombrar a quien la revisa (decisión 11; `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`).
+        hecho["se_le_avisa_cuando_decida"] = True
         # El aviso a quien aprueba, del motor (ADR 0019, decisión 6; porción 3a): guardado con
         # sus hechos, sale terminado el margen para corregir, y el hecho dice esa hora, la real.
         from . import avisos        # avisos importa fichas, que importa este módulo

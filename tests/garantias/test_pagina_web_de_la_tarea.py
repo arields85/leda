@@ -4,7 +4,7 @@ Lo que se prueba acá es la entrada HTTP sobre las funciones de la base (`test_p
 tarea.py` prueba quién ve qué), con `TestClient` y sin red:
 
 - **Sólo lectura, en palabras de todos los días.** La tarea, su historia y su evidencia, con
-  "esperando aprobación" y no el nombre del estado en la base; sin identificadores, huellas ni
+  "en revisión" y no el nombre del estado en la base; sin identificadores, huellas ni
   nombres de la cocina (constitución §10); todo lo que viene de la base, escapado; nunca la
   conversación.
 - **Un enlace que no sirve** (inexistente, revocado, de alguien que ya no puede ver la tarea, o
@@ -62,7 +62,7 @@ def test_la_pagina_muestra_la_tarea_en_palabras_de_todos_los_dias(web, conn, mun
     assert r.headers["content-type"].startswith("text/html")
     _tiene_las_cabeceras(r)
     assert "Calibrar la balanza" in r.text
-    assert "esperando aprobación" in r.text
+    assert "en revisión" in r.text and "esperando aprobación" not in r.text
     assert "en_revision" not in r.text and "en_curso" not in r.text
     assert "Quality Guild" in r.text and "Sam Noble 1" in r.text
     assert "Taylor Quinn 1" in r.text          # quién aprueba

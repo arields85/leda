@@ -412,3 +412,34 @@ def toque_de_telegram(update_id: int, data: str, de: int, callback_id: str | Non
         "id": callback_id or f"cb{update_id}", "from": {"id": de, "first_name": "X"},
         "data": data,
         "message": {"message_id": 1, "chat": {"id": de, "type": "private"}}}}
+
+
+def a_la_vista(valor: Any) -> str:
+    """Lo que un pedido de redacción deja decir por cuenta propia, como texto: todo menos lo que
+    va dentro de `solo_si_pregunta` (decisión 11 del usuario, 2026-10-08)."""
+    def sin(v: Any) -> Any:
+        if isinstance(v, dict):
+            return {k: sin(x) for k, x in v.items() if k != "solo_si_pregunta"}
+        if isinstance(v, (list, tuple)):
+            return [sin(x) for x in v]
+        return v
+    return json.dumps(sin(valor), ensure_ascii=False, default=str)
+
+
+def solo_si_pregunta(valor: Any) -> str:
+    """Lo que un pedido de redacción tiene dentro de `solo_si_pregunta`, en cualquier lugar,
+    como texto."""
+    encontrado: list[Any] = []
+
+    def buscar(v: Any) -> None:
+        if isinstance(v, dict):
+            for k, x in v.items():
+                if k == "solo_si_pregunta":
+                    encontrado.append(x)
+                else:
+                    buscar(x)
+        elif isinstance(v, (list, tuple)):
+            for x in v:
+                buscar(x)
+    buscar(valor)
+    return json.dumps(encontrado, ensure_ascii=False, default=str)
