@@ -303,6 +303,23 @@ def test_confirmar_en_el_mismo_mensaje_que_la_vista_previa_no_vale(conn, mundo, 
     assert cuantas(conn, "evidence") == 0
 
 
+def test_confirmar_nombrando_otra_tarea_no_entrega_la_que_espera(conn, mundo, marcos):
+    """Una confirmación sobre una tarea sin entrega para confirmar no confirma la de otra: eso
+    sería confundir la tarea. La vista previa que espera sigue abierta."""
+    tablero = _tarea(conn, mundo)
+    bomba = _tarea(conn, mundo, titulo="Cablear la bomba")
+    marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero",
+                 archivos=[(JPEG, "foto", None)])
+    r = marcos.manda(Jugada("confirmar", {"tarea": "T3"}), texto="dale, la de la bomba")
+
+    hecho = _hecho(r, "confirmar")
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "nada_para_confirmar"
+    assert estado_de(conn, tablero) == "en_curso" and estado_de(conn, bomba) == "en_curso"
+    assert cuantas(conn, "evidence") == 0
+    assert cuantas(conn, "conversation_question",
+                   "cerrada_en is null and tipo = 'confirmar_la_entrega'") == 1
+
+
 def test_confirmar_sin_nada_mostrado_no_hace_nada(conn, mundo, marcos):
     _tarea(conn, mundo)
     hecho = _hecho(marcos.manda(Jugada("confirmar", {}), texto="dale"), "confirmar")

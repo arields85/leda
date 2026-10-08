@@ -135,10 +135,20 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       de las demás, sólo la 12 (pasos 6 y 7) y la 25 (paso 8) fallan, porque esperan que la entrega no
       se reciba por chat.
     - **El referente del área** no hace falta en esta porción: queda para la 4 (quién ve la página).
+    - **Revisiones RDD** (2026-10-08, por commit, en carpetas temporales): `0176300` pidió una
+      corrección (CRITICAL: el rollback de la `0034` borraba `evidence.texto` sin negarse), hecha en
+      `1ebd31a` con su garantía en rojo y después en verde, validada y reconocida
+      (`review-bc98816c7dc942e0`); `806e85f` (`review-5558dced5f73dce3`) y `3d7871a`
+      (`review-55b5e057a39cce8a`), aprobadas. La 12 y la 25 se actualizaron en `dd11bf7`.
+    - **Una advertencia de la revisión resultó un error:** `confirmar` nombrando una tarea sin
+      entrega abierta confirmaba la entrega abierta de otra (confundir la tarea). Arreglado con su
+      prueba en rojo y después en verde (`test_confirmar_nombrando_otra_tarea_no_entrega_la_que_
+      espera`), en el commit que registra esto.
+    - **Advertencias sin arreglar** (casos de borde, de las revisiones): un archivo mandado para otra
+      jugada que se suma a la entrega; un retiro parcial; un enlace con puntuación pegada; la entrega
+      de una tarea que cambió entre la vista previa y la confirmación; en el corredor, un salto del
+      chequeo de formato demasiado amplio.
     - `PENDIENTE`:
-      - **Actualizar el YAML (y el `.md`) de la 12 y la 25**, que quedan fuera de esta porción: en la
-        12, la entrega del PLC muestra la vista previa con "Confirmar"; en la 25, la de comunicaciones
-        no se puede entregar porque no arrancó.
       - **Decisión del usuario: una pieza retirada después de entregar** deja la política incompleta:
         la tarea sigue en revisión, no se puede aprobar y a quien aprueba no le llega nada; la salida
         hoy es que pida cambios. ¿Vuelve a en curso, se le avisa a quien aprueba, o alcanza así?
@@ -184,8 +194,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       - `PENDIENTE` (decisión del usuario): **si cambia quién aprueba** mientras el aviso espera,
         hoy queda omitido con su motivo (`cambio_quien_aprueba`) y el nuevo aprobador no recibe
         nada. ¿Se le guarda uno al nuevo?
-      - `PENDIENTE`: el `.md` de la 22 (paso 7) todavía dice que Ismael se entera "ahora": con el
-        margen se entera a los 10 minutos (su YAML ya lo espera así).
+      - El `.md` de la 22 (paso 7) ya dice que Ismael se entera a los 10 minutos, con el margen.
+      - **Revisiones RDD** (2026-10-08): `2d86ee3` (`review-12fee547e7870e72`), `93a428d`
+        (`review-ff189c1a27aaeaca`) y `97470c5` (`review-44020d6e3b194e0b`), aprobadas, más los
+        commits chicos `1ebd31a..4327889` (`review-bb7ab94babd6588f`). Advertencias sin arreglar: dos
+        del despachador con álbumes; las ramas de vigencia del aviso sin probar; un álbum suelto sin
+        prueba en el corredor; y las fotos se descartarían si el aviso saliera junto con otros (hoy
+        no pasa: un aviso de coordinación sale siempre solo, `avisos._envios`).
     - [ ] **3b, la hoja de aprobación** con los botones Aprobar y Pedir cambios, como atajos
       (conversación 23).
     - [ ] **3c, los recordatorios a quien aprueba** (conversación 24).

@@ -105,7 +105,7 @@ porción 3.
      Marcos y auditoría; el aviso a Ismael, como en la conversación 21 (la foto del lunes adjunta, el
      archivo y el enlace al video en la página).
    - La respuesta dice: que la entregó y queda esperando la aprobación de Ismael, que se va a enterar
-     ahora.
+     a las 15:41, cuando termina el margen para corregir (ADR 0018, 9n).
    - Estado después: sin tema abierto, nada mostrado para confirmar.
 
 ## Qué mide

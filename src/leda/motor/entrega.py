@@ -570,7 +570,8 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
         cur.execute("select * from conversation_question where id = %s", (tocada,))
         q = cur.fetchone()
     else:
-        q = abierta(ctx, tarea["id"] if tarea else None) or abierta(ctx)
+        # Con una tarea nombrada vale sólo su entrega: la de otra tarea sería confundirla.
+        q = abierta(ctx, tarea["id"]) if tarea else abierta(ctx)
     if q is None:
         return {"resultado": "no_se_puede", "motivo": NADA_PARA_CONFIRMAR}
     tarea_q = _tarea_de(ctx, str(q["task_id"]))
