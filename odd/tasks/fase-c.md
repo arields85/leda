@@ -120,7 +120,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     junto con una pregunta de Leda sin contestar (un tema a la vez); el de otra tarea que no pide
     respuesta sale aparte, y el que pide respuesta espera a que se cierre la pregunta abierta; nunca fuera
     del horario; al salir se relee y no se repite lo ya hablado. La regla completa, en
-    `tests/conversaciones/26-no-interrumpir.md`.
+    `tests/conversaciones/26-no-interrumpir.md`. Construida en la D5 de la C-3d.
 14. **Entregar una tarea que nunca se arrancó:** decidida (usuario, 2026-10-08). "La terminé" sobre una
     tarea asignada se recibe igual, con su vista previa y su confirmación; al confirmar, la historia dice
     que arrancó y se entregó en ese momento, sin inventar una fecha de inicio. Es la persona la que dice
@@ -363,9 +363,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         real: es de la C-4.
       - **Las instrucciones de la IA no cambiaron** (la huella de `test_contratos.py` sigue): los
         avisos nuevos llegan con sus hechos y sus significados (`hechos.py`).
-      - **La 23** recibe ahora, el lunes 26 a las 10:30, el primer recordatorio de las tres
-        entregas del viernes mientras Ismael está decidiendo: es la regla, y es también lo que
-        pide resolver la 26 (no interrumpir), `PENDIENTE` con el usuario.
+      - **La 23** recibía, el lunes 26 a las 10:30, el primer recordatorio de las tres
+        entregas del viernes mientras Ismael estaba decidiendo: desde la D5 (no interrumpir)
+        espera mientras decide y, releído, queda omitido.
       - `PENDIENTE`:
         - **Un aviso de la entrega que no salió** (fallido tras los cinco intentos) no empieza la
           cuenta: queda su incidente y el aviso de la falla, como desde la 3a. ¿Se le recuerda
@@ -679,7 +679,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         corto como "Ver PLC": las tareas no tienen nombre corto (sería de la plataforma).
       - Una lista sale sólo con los avisos que vencen en la misma vuelta del ciclo: dos entregas
         confirmadas con minutos de diferencia salen por separado, salvo que la D5 (no interrumpir)
-        las demore juntas.
+        las demore juntas (desde la D5: si quien revisa conversa, esperan juntas y salen en una
+        lista).
       - Si en la misma respuesta vuelve una pregunta con opciones, sus botones y los de la decisión
         ofrecida salen juntos (los de la pregunta primero).
       - Los botones "Ver" no se cierran al decidir: tocar uno de una tarea ya decidida dice que ya no
@@ -694,8 +695,98 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       prueba), `28-entregas-en-una-lista.yaml:229` (las fotos adjuntas sin comprobar),
       `test_aprobacion.py:700` (el filtro de lo ya aprobado sin probar) y `escalera.py:541` y
       `:594` (el aviso al aprobador nuevo no relee si la entrega sigue vigente; su escalera sin
-      prueba). La de `escalera.py:541` se mira al empezar la D5.
-  - [ ] **D5.** No interrumpir (decisión 13, conversación 26 con su YAML).
+      prueba). La de `escalera.py:541` era un error, arreglado en la D5 (`53ee594`).
+  - [x] **D5.** No interrumpir (decisión 13, conversación 26 con su YAML). Route: delegada (escritor
+    único, 2+ archivos no triviales). Hecha el 2026-10-08:
+    - **La advertencia de la D4 (`escalera.py:541`) era un error** (`53ee594`): si cambiaba quién
+      aprueba después de que salió el aviso de la entrega, la escalera le guardaba al nuevo el aviso de
+      lo que espera su decisión antes de mirar si el nuevo ya la había aprobado (una aprobación que
+      todavía no cierra), y al salir el aviso no miraba esa aprobación. Ahora la escalera mira primero
+      si ya decidió, y el aviso de una entrega se omite al salir si quien lo recibe ya la aprobó
+      (`ya_decidio`). Rojo primero: `test_si_el_nuevo_ya_decidio_no_se_le_guarda_lo_que_espera_su_
+      decision` (el aviso guardado) y `test_si_el_nuevo_decide_antes_de_que_salga_el_aviso_se_omite`
+      (`enviado` en lugar de `omitido`).
+    - **La espera** (`daaf8a9`, `leda.motor.no_interrumpir`): un aviso a una persona espera 30
+      minutos desde lo último que escribió o tocó (su último turno de entrada), o los del espacio
+      (`no_interrumpir_minutos` en `workspace_setting`, 0 o más, como el margen; un valor que no
+      vale usa el del producto); cada mensaje vuelve a contar. La comprobación está en
+      `avisos._preparar`, después de a quién va (decisión 16) y de la ausencia: el aviso queda
+      `guardado` (`en_espera`) y se vuelve a mirar en cada vuelta. Vale para todos los avisos a esa
+      persona, también los de coordinación (punto 6), y nunca demora a otra persona. El fin de la
+      espera pasa por `tiempo.sale`: nunca antes de la hora de salida ni fuera del horario (si cruza
+      el cierre, sale el día hábil siguiente a las 10:00, releído). Sin migración: el valor por
+      omisión vive en el código, como el del margen; `docs/product/plataforma-pendientes.md` ya lo
+      tenía anotado y ahora dice que está construido.
+    - **Lo que se le cuenta a otra persona** (`daaf8a9`): los hechos dicen cuándo se entera de verdad
+      (`no_interrumpir.cuando_sale`): si quien recibe el aviso está conversando, la hora en que termina
+      su espera, en `efectos._aviso` (al final del turno), en el próximo aviso de la persona
+      (`efectos._lo_que_sigue`) y en la previsión vigente de la escalera (`avisos.prevision_vigente`).
+      Sin esto, la 27 le decía a Marcos que Ismael se enteraba a las 15:41, y salía a las 15:55.
+    - **Un tema a la vez y lo ya hablado** (`878e244`): con una pregunta de Leda sin contestar (la
+      abierta, `preguntas.actual`; la decisión que ofrece una entrega no lo es), en el envío
+      (`avisos._un_tema_a_la_vez`): la pregunta misma, repetida por su escalera (mismo tipo, o la
+      misma espera, y la misma tarea), sale sola; uno de otra tarea que no pide respuesta sale
+      aparte, sin pregunta; uno que pide respuesta (una pregunta, o decidir) y uno de la misma tarea
+      esperan a que se cierre. Al salir, el aviso previo y el recordatorio del vencimiento de una
+      tarea de la que la persona habló después de que se guardaron se omiten
+      (`ya_se_hablo_de_la_tarea`, con su significado): "habló" es que algún hecho de un mensaje suyo
+      nombra esa tarea, la lectura de `fichas._siguio_en_la_tarea`
+      (`TipoDeAviso.se_omite_si_ya_se_hablo`).
+    - **El `PENDIENTE` de la D4 (las listas):** avisos de entrega confirmados con minutos de
+      diferencia que esperan juntos porque quien revisa está conversando salen en una sola lista
+      (`test_las_entregas_que_esperan_mientras_quien_revisa_conversa_salen_en_una_lista`, escrita
+      después del código, sin rojo observado). Si quien revisa no está conversando, siguen saliendo
+      por separado.
+    - **Conversaciones:** la 26 tiene su YAML (el hilo principal; los pasos 4 y 5 del `.md` estaban
+      con las horas al revés y se ordenaron; el horario es hasta las 17:00; el `.md` dice cómo se
+      leyó lo que la regla no dice); sus variantes 1 a 3 las prueban las pruebas del motor
+      (`tests/motor/test_no_interrumpir.py`). En el README y en `test_corredor` (29). La 23: Marcos
+      escribe a las 09:40 (no a las 10:20) para que los avisos de sus aprobaciones le lleguen
+      enseguida, como dice el hilo, y el recordatorio del lunes a Ismael espera mientras decide y,
+      releído el martes, queda omitido: resuelve el `PENDIENTE` de la 3c sobre la 23. La 24: el
+      preludio corre cada reloj en su momento (antes, el de las 11:15 corría después del mensaje de
+      Marcos de las 11:30). La 27: el aviso nuevo a Ismael sale a las 15:55 (tocó Aprobar a las
+      15:25), y los hechos del paso 10 lo dicen.
+    - **Las pruebas que cambiaron por la regla** (la hora, no lo que miran): `test_ancla.py`,
+      `test_aprobacion.py` (tres), `test_avisos.py` (el aviso de la falla), `test_escalera.py` (el
+      aviso previo del vencimiento nuevo espera detrás de la pregunta del estado que nunca se
+      contestó; ver `PENDIENTE`) y la fixture de `test_recordatorios_de_la_decision.py`.
+    - **Test primero:** la 26 corrió en seco con su YAML antes del código: 5 fallas (pasos 2, 4, 5 y
+      6). `tests/motor/test_no_interrumpir.py`, con el módulo sólo con la espera configurable, 11 de
+      22 en rojo (las otras 11: la configuración y tres que miran que algo no pase); la de lo que se
+      le cuenta a otra persona, en rojo (10:11 en lugar de 10:30) antes de `cuando_sale`.
+    - **Las instrucciones de la IA no cambiaron** (las huellas de `test_contratos.py` siguen): el
+      motivo nuevo llega con su significado (`hechos.py`).
+    - **Chequeos** (2026-10-08, sobre `878e244`): `pytest tests/motor tests/conversaciones`, 856
+      passed; `pytest tests/garantias`, 323 passed; suite completa, 1607 passed; en seco, `correr
+      --ia guionada --veces 1 --ronda seco-d5`, 29 de 29 bien, la 26 entera (informes borrados).
+      En el estado intermedio (`daaf8a9`), `pytest tests/motor tests/conversaciones` dio 840 passed
+      más las 8 de la configuración, que fallaban por un ayudante que faltaba en la prueba; corregido
+      antes del commit (`test_no_interrumpir.py`, 17 passed). Sin la IA real (D6).
+    - `PENDIENTE` (decisiones del usuario; lo construido es la lectura que no interrumpe):
+      - **Una pregunta que nunca se contesta frena.** Mientras siga abierta, los avisos que piden
+        respuesta (de cualquier tarea) y los de su misma tarea esperan, aunque pasen días, y la
+        escalera de esas tareas no avanza. Ejemplo: el viernes Marcos deja sin confirmar la vista
+        previa de una entrega (o no contesta un pedido de estado que ya escaló); el lunes vence otra
+        tarea: el pedido de estado de ésa espera hasta que Marcos confirme o deje la vista previa, y
+        si no lo hace, a Ismael no le llega nada de esa otra tarea. ¿Se acota (por ejemplo, la
+        pregunta frena sólo el día en que se hizo, o hasta que escala)?
+      - **Lo ya hablado** omite sólo el aviso previo y el recordatorio del vencimiento (no piden nada
+        ni traen el acto de otra persona). Los demás (una previsión, una decisión, un escalamiento,
+        un pedido de estado) esperan y salen releídos: omitirlos perdería algo que la persona no
+        sabe. ¿Alcanza así?
+      - **Un aviso de la misma tarea que la pregunta abierta** espera aunque no pida respuesta ("de
+        ese tema sólo le llega la pregunta"): con la pregunta del estado sin contestar y ya escalada,
+        el aviso previo de un vencimiento nuevo de esa tarea no sale (`test_escalera.py`, antes
+        salía).
+      - **"Pide respuesta"** incluye el aviso de una entrega (ofrece decidir) y los recordatorios
+        de una decisión: esperan a que se cierre la pregunta abierta de quien revisa.
+      - **Los avisos de una decisión** (aprobada, cambios pedidos), que salen sin margen (decisión
+        19), esperan si el responsable está conversando (punto 6).
+    - **Advertencias** (casos de borde): la hora que dicen los hechos es la del turno; si quien
+      recibe el aviso sigue escribiendo después, sale más tarde que lo dicho. Lo ya hablado reconoce
+      la tarea por su título, como `_siguio_en_la_tarea`: dos tareas de la persona con el mismo
+      título se confunden.
   - [ ] **D6.** La regresión con la IA real, `leda_motor` al día (autorizado por el usuario de
     antemano, con respaldo) y el guion de la prueba por Telegram (el enlace con `localhost`,
     decisión 20).
