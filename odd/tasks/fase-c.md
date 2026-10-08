@@ -359,6 +359,36 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       obligatorio: otra tabla o una columna nueva), cada vista también en `audit_log`, el comando
       para revocar y el retiro de contenido por la administración ("retirado por la
       administración" en la página).
+    - **Impugnación de seguridad (2026-10-08).** Una revisión de sólo lectura de la porción
+      confirmó el aislamiento en sus puntos 1 a 3 y 5 (el token, la tarea y el espacio salen de
+      la base; un archivo de otra tarea o de otro espacio da la página genérica). Encontró cuatro
+      cosas, corregidas con su prueba vista en rojo antes:
+      - **Una pieza retirada mostraba su contenido** (el texto, el enlace y el nombre del
+        archivo): la página mira primero si se retiró y sólo dice qué clase de cosa era y cuándo
+        se retiró. Se corrigió sólo la página (`tarea_vista._pieza`), que alcanza para el ADR; la
+        función de la base sigue devolviendo el contenido a la página, que no lo usa. `bd51562`.
+      - **El token quedaba escrito en el registro de accesos** de uvicorn, con la dirección de
+        quien abría el enlace: `servir` arranca con `access_log=False`. `bd51562`.
+      - **Una falla al armar la página** daba un error del servidor: la página y la respuesta
+        de un archivo se arman dentro de la transacción que las lee; una falla da la página
+        genérica (503), una línea en la consola sin el token ni el detalle, y la vista no queda
+        registrada. `bd51562`.
+      - **`resolver_pendiente`** (de antes) era `security definer` sin `search_path` fijado y la
+        podía ejecutar `public`; `aplicar_evento_tarea` lo fijaba sin `pg_temp` (Postgres busca
+        primero las tablas temporales) y también era de `public`. Migración `0037`: las dos con
+        `leda, public, pg_temp`, sin `execute` para `public`, `resolver_pendiente` sólo para
+        `leda_app`; su vuelta atrás las recrea desde el catálogo para volver al privilegio de
+        omisión. La regla general, para toda función elevada del esquema, está en
+        `tests/garantias/test_aislamiento.py`, y la paridad entre la instalación limpia y la
+        migrada compara ahora también dueño, camino y privilegios de las funciones elevadas. El
+        commit que registra esto.
+      - `PENDIENTE`: diez tablas con `workspace_id` sin `row level security` (`acceso_tablero`,
+        `activation_token`, `admin_notice`, `conversation_access_log`, `holiday`, `learning`,
+        `model_config`, `persona_config`, `work_calendar` y `workspace_version`, leídas del
+        catálogo de una base de prueba): ver si son sólo de administración o si les falta,
+        contra la invariante de `AGENTS.md`.
+      - `PENDIENTE`: el tablero (`_servir_tablero`) arma su página fuera de una guarda, como la
+        página de la tarea antes de esto; no se tocó.
   - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
 - [ ] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).

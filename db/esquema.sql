@@ -852,7 +852,8 @@ create function resolver_pendiente(p_token text, p_app_user_id uuid,
                                    p_ahora timestamptz)
 returns table (resultado text, herramienta text, args jsonb,
                cancelada boolean, huella text)
-language plpgsql security definer as $$
+language plpgsql security definer
+set search_path = leda, public, pg_temp as $$
 declare
   o record;
   a record;
@@ -2336,7 +2337,7 @@ create trigger trg_derivar_espacio_incidente
 -- --- El estado es una proyección, no un campo editable -------------------
 
 create or replace function aplicar_evento_tarea() returns trigger
-security definer set search_path = leda, public as $$
+security definer set search_path = leda, public, pg_temp as $$
 declare espacio_anterior text := current_setting('leda.workspace_id', true);
 begin
   -- El dueño de esta función no saltea la RLS, así que este `update` queda
@@ -2965,6 +2966,11 @@ alter function estado_previo_a_bloqueo(uuid)
 alter function estado_previo_a_revision(uuid)
   owner to leda_owner;
 
+-- Ninguna función elevada la ejecuta `public` (migración 0037): `resolver_pendiente`, sólo
+-- `leda_app`; `aplicar_evento_tarea` es un disparador y no la llama nadie.
+revoke execute on function resolver_pendiente(text, uuid, timestamptz) from public;
+grant execute on function resolver_pendiente(text, uuid, timestamptz) to leda_app;
+revoke execute on function aplicar_evento_tarea() from public;
 revoke execute on function estado_previo_a_bloqueo(uuid) from public;
 grant execute on function estado_previo_a_bloqueo(uuid) to leda_app;
 revoke execute on function estado_previo_a_revision(uuid) from public;

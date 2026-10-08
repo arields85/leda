@@ -123,3 +123,44 @@ def test_ninguna_funcion_elevada_pertenece_a_un_rol_que_ignora_la_rls(conn):
                     f"{', superusuario' if f['rolsuper'] else ''}"
                     f"{', bypassrls' if f['rolbypassrls'] else ''})"
                     for f in ciegas))
+
+
+def test_ninguna_funcion_elevada_tiene_el_camino_abierto_ni_la_ejecuta_cualquiera(conn):
+    """Una función `security definer` fija su `search_path`, con `pg_temp` al final, y no la
+    ejecuta `public`.
+
+    Sin un `search_path` fijado, la función resuelve los nombres sin esquema con el camino de
+    quien la llama: `leda_app` puede crear tablas temporales, y una tabla temporal con el nombre
+    de una que la función usa la reemplazaría adentro, con los privilegios del dueño. Fijarlo no
+    alcanza si `pg_temp` no está nombrado: Postgres busca las tablas temporales antes que todo lo
+    que el camino nombra, salvo que se lo ponga explícitamente (al final). Y `execute` para
+    `public` (lo que da Postgres por omisión al crear una función) deja llamarla a cualquier rol
+    de la base, no sólo a los que la usan.
+
+    Es una regla de todas las funciones elevadas del esquema, no de una en particular: se lee el
+    catálogo efectivo.
+    """
+    with admin(conn) as cur:
+        cur.execute(
+            """select p.proname, p.proconfig,
+                      has_function_privilege('public', p.oid, 'execute') as de_public
+                 from pg_proc p
+                 join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'leda' and p.prosecdef
+                order by p.proname""")
+        elevadas = cur.fetchall()
+
+    assert elevadas, "no se encontró ninguna función security definer"
+
+    def camino(f) -> list[str]:
+        for c in f["proconfig"] or []:
+            if c.startswith("search_path="):
+                return [e.strip().strip('"') for e in c.removeprefix("search_path=").split(",")]
+        return []
+
+    sin_camino = [f["proname"] for f in elevadas if camino(f)[-1:] != ["pg_temp"]]
+    assert not sin_camino, ("funciones elevadas sin search_path fijado con pg_temp al final: "
+                            + ", ".join(sin_camino))
+    de_public = [f["proname"] for f in elevadas if f["de_public"]]
+    assert not de_public, ("funciones elevadas que puede ejecutar public: "
+                           + ", ".join(de_public))

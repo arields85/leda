@@ -133,7 +133,9 @@ La prueba chica de la Etapa 2 vive fuera de `src/leda` y no cambia esta frontera
 1. **El aislamiento entre clientes es la invariante número uno.** Toda tabla con
    alcance de espacio lleva `workspace_id`, tiene `row level security` forzado y una
    política de aislamiento. Ninguna función `security definer` queda sin propietario
-   explícito y verificado.
+   explícito y verificado, sin `search_path` fijado con `pg_temp` al final, ni con
+   `execute` para `public` (migración `0037`; la prueba general está en
+   `tests/garantias/test_aislamiento.py`).
 2. **El núcleo no conoce el transporte.** Ningún identificador propio de un canal
    cruza hacia el dominio ni hacia el modelo de datos de dominio.
 3. **Ningún límite de transporte decide la validez de un dato de negocio.** Los

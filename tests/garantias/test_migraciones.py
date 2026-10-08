@@ -172,6 +172,23 @@ def _retrato_de_funciones(url):
                 order by p.proname""").fetchall()
 
 
+def _seguridad_de_las_funciones_elevadas(url):
+    """Dueño, camino fijado y privilegios de cada función `security definer` (migración 0037):
+    una instalación limpia y una base migrada tienen que darles lo mismo."""
+    import psycopg
+    from psycopg.rows import dict_row
+
+    with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
+        return db.execute(
+            """select p.oid::regprocedure::text firma, r.rolname dueno,
+                      p.proconfig configuracion, p.proacl::text acl
+                 from pg_proc p
+                 join pg_roles r on r.oid = p.proowner
+                 join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'leda' and p.prosecdef
+                order by 1""").fetchall()
+
+
 def _retrato_migratorio(url, tablas):
     return {"tablas": _retrato_de_aislamiento(url, tablas),
             "funciones": _retrato_de_funciones(url)}
@@ -284,6 +301,12 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
 
         limpia = _retrato_de_aislamiento(urls["limpia"], tablas)
         migrada = _retrato_de_aislamiento(urls["migrada"], tablas)
+
+        elevadas = {clave: _seguridad_de_las_funciones_elevadas(url)
+                    for clave, url in urls.items()}
+        assert elevadas["limpia"] == elevadas["migrada"], (
+            "las funciones elevadas no quedan igual en la instalación limpia y en la migrada"
+            f"\nlimpia:  {elevadas['limpia']}\nmigrada: {elevadas['migrada']}")
 
         for tabla in tablas:
             assert limpia[tabla] == migrada[tabla], (
