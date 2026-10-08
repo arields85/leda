@@ -266,8 +266,9 @@ def test_propiedad_aprobar_tarea(corework, conn):
         tid = _tarea(cur, ws, titulo="Relevar plano", persona="Nahuel Gimenez",
                     estado_inicial="en_revision")
         cur.execute(
-            """insert into evidence (workspace_id, task_id, tipo, uri)
-               values (%s, %s, 'resultado_de_prueba', 'ok')""", (ws, tid))
+            """insert into evidence (workspace_id, task_id, tipo, clase, texto, cubre)
+               values (%s, %s, 'resultado_de_prueba', 'texto', 'ok',
+                       tipos_que_acepta_la_clase(%s, 'texto'))""", (ws, tid, tid))
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
 

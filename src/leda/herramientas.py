@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -603,6 +604,7 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
 # De qué trata cada operación, por el argumento que nombra su sujeto, en este
 # orden: el primero presente es el sujeto de la fila de auditoría.
 _SUJETO_POR_ARGUMENTO = (("tarea_id", "task"), ("bloqueo_id", "blocker"),
+                         ("evidencia_id", "evidence"),
                          ("dependencia_id", "dependency"),
                          ("origen_tarea_id", "task"))
 
@@ -619,6 +621,7 @@ def _es_rechazo(nombre: str, resultado: Any) -> bool:
     if nombre == "aprobar_tarea" and resultado.get("aprobada"):
         return False
     return bool(resultado.get("error")
+                or resultado.get("retirada") is False
                 or resultado.get("cerrada") is False
                 or resultado.get("iniciada") is False
                 or resultado.get("en_revision") is False)
@@ -1014,11 +1017,75 @@ _MOTIVO_FALTA_EVIDENCIA_ENTREGA = (
 FALTA_EVIDENCIA_DE_ENTREGA = "evidencia_de_entrega"
 
 
-def _falta_evidencia_de_entrega() -> dict:
+def _falta_evidencia_de_entrega(faltan: list[str] | None = None) -> dict:
     """El rechazo de pasar una tarea a revisión sin la evidencia que exige su
-    política (ADR 0009): `en_revision` no ocurrió y `falta_tipo` dice por qué."""
+    política (ADR 0009): `en_revision` no ocurrió y `falta_tipo` dice por qué.
+    `faltan`, si se sabe, son los tipos de la política que quedan sin cubrir
+    (ADR 0019, decisión 5)."""
     return {"en_revision": False, "falta": _MOTIVO_FALTA_EVIDENCIA_ENTREGA,
-            "falta_tipo": FALTA_EVIDENCIA_DE_ENTREGA}
+            "falta_tipo": FALTA_EVIDENCIA_DE_ENTREGA,
+            **({"faltan": list(faltan)} if faltan else {})}
+
+
+# --- Las piezas de evidencia (ADR 0019, decisiones 3 y 5; migración 0034) ---------
+#
+# La clase de cada pieza la fija el código por el contenido, nunca la IA: un texto
+# que es un enlace (y nada más) es `enlace`; otro texto, `texto`; un archivo guardado
+# es `imagen` si su contenido es una imagen y `archivo` si no (la base lo comprueba
+# contra `archivo.clase`). Lo que cubre cada pieza son tipos de la política que esa
+# clase acepta: `tipos_que_acepta_la_clase`, en la base.
+
+_ENLACE = re.compile(r"^https?://\S+$", re.IGNORECASE)
+
+
+def clase_de_un_texto(texto: str) -> str:
+    """`enlace` si el texto es un enlace y nada más; si no, `texto`."""
+    return "enlace" if _ENLACE.match(texto.strip()) else "texto"
+
+
+def _tipos_que_acepta(cur, tarea_id, clase: str) -> list[str]:
+    cur.execute("select tipos_que_acepta_la_clase(%s, %s) as t", (tarea_id, clase))
+    return list(cur.fetchone()["t"] or [])
+
+
+def _tipos_que_faltan(cur, tarea_id, piezas: list[dict] | None = None) -> list[str]:
+    """Los tipos de la política de la tarea que quedan sin cubrir con la evidencia
+    vigente y, si se pasan, con estas piezas todavía sin escribir (cada una con su
+    `clase` y su `cubre`). La regla vive en la base: `tipos_de_evidencia_que_faltan`."""
+    cur.execute("select tipos_de_evidencia_que_faltan(%s, %s) as t",
+                (tarea_id, Jsonb([{"clase": p["clase"], "cubre": list(p["cubre"])}
+                                  for p in piezas or []])))
+    return list(cur.fetchone()["t"] or [])
+
+
+def _insertar_evidencia(cur, quien: Solicitante, tarea_id, pieza: dict) -> str:
+    """Una fila de `evidence` para una pieza ya resuelta (`clase`, `cubre` y su
+    contenido: `texto`, `uri` o `archivo_id`). `tipo` es igual a la clase."""
+    # T6f (seguimiento del orquestador): `at` explícito con `clock_timestamp()` --
+    # ver el comentario de `_bloquear_tarea`.
+    cur.execute(
+        """insert into evidence (workspace_id, task_id, tipo, clase, texto, uri,
+                                 archivo_id, cubre, entregado_por, at)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, clock_timestamp())
+           returning id""",
+        (quien.workspace_id, tarea_id, pieza["clase"], pieza["clase"],
+         pieza.get("texto"), pieza.get("uri"), pieza.get("archivo_id"),
+         list(pieza["cubre"]), quien.membership_id))
+    return str(cur.fetchone()["id"])
+
+
+def _pieza_de_texto(cur, tarea_id, texto: str | None,
+                    cubre: list[str] | None = None) -> dict:
+    """Un texto como pieza: su clase por el contenido y, si no se dice qué cubre, todos
+    los tipos de la tarea que esa clase acepta (la entrega de antes de la porción 2,
+    con su vista previa de la cocina, `_preparar_actualizar_estado`). Sin texto, una
+    pieza `texto` vacía, como la que guardaba `adjuntar_evidencia` sin detalle."""
+    texto = (texto or "").strip()
+    clase = clase_de_un_texto(texto)
+    aceptados = _tipos_que_acepta(cur, tarea_id, clase)
+    cubre = aceptados if cubre is None else [t for t in aceptados if t in cubre]
+    contenido = {"uri": texto} if clase == "enlace" else {"texto": texto or None}
+    return {"clase": clase, "cubre": cubre, **contenido}
 
 
 # T6g (`odd/tasks/leda-orienta.md`; review-e719d807, review-09452c69):
@@ -1156,9 +1223,15 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
         # mismo pedido, se devuelve un `falta` verdadero y nunca se mueve la
         # tarea (constitución §4: nunca se da por entregado lo que nadie
         # entregó).
-        cur.execute("select evidencia_pendiente(%s) as f", (tarea_id,))
-        if cur.fetchone()["f"] and not (evidencia_texto or "").strip():
-            return _falta_evidencia_de_entrega()
+        #
+        # ADR 0019, decisión 5 (migración 0034): la política se cumple por tipo, así que el
+        # texto que llega en el mismo pedido cuenta sólo para los tipos que un texto cubre:
+        # una frase sola no cubre una foto.
+        texto = (evidencia_texto or "").strip()
+        faltan = _tipos_que_faltan(
+            cur, tarea_id, [_pieza_de_texto(cur, tarea_id, texto)] if texto else [])
+        if faltan:
+            return _falta_evidencia_de_entrega(faltan)
 
     if estado == "en_curso":
         restaura_en_curso = False
@@ -1243,15 +1316,8 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
             evidencia_texto = (evidencia_texto or "").strip()
             if not evidencia_texto:
                 return {"error": _AVISO_YA_EN_REVISION}
-            # T6f (seguimiento del orquestador): `at` explícito con
-            # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
-            cur.execute(
-                """insert into evidence (workspace_id, task_id, tipo, uri,
-                                         entregado_por, at)
-                   values (%s, %s, 'texto', %s, %s, clock_timestamp())
-                   returning id""",
-                (quien.workspace_id, tarea_id, evidencia_texto, quien.membership_id))
-            evidencia_id = cur.fetchone()["id"]
+            evidencia_id = _insertar_evidencia(
+                cur, quien, tarea_id, _pieza_de_texto(cur, tarea_id, evidencia_texto))
             # T6i (ADR 0009, enmienda 2026-09-27): esta entrega repetida es
             # evidencia nueva sobre una tarea ya en_revision -- si viene de
             # alguien que no es el aprobador, retira el aviso que tiene
@@ -1266,12 +1332,13 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         # Repetido acá por el mismo motivo que la autoridad de arriba: el
         # handler es la puerta real a la base, no depende de que `preparar`
         # haya corrido antes con los mismos argumentos.
-        cur.execute("select evidencia_pendiente(%s) as f", (tarea_id,))
-        pendiente = cur.fetchone()["f"]
+        # ADR 0019, decisión 5: con la regla por tipo, igual que `_preparar_actualizar_estado`.
         evidencia_texto = (evidencia_texto or "").strip()
-        if pendiente and not evidencia_texto:
-            return _falta_evidencia_de_entrega()
-        if evidencia_texto:
+        pieza = _pieza_de_texto(cur, tarea_id, evidencia_texto) if evidencia_texto else None
+        faltan = _tipos_que_faltan(cur, tarea_id, [pieza] if pieza else [])
+        if faltan:
+            return _falta_evidencia_de_entrega(faltan)
+        if pieza is not None:
             # T6b (`odd/tasks/leda-orienta.md`, decisión del usuario
             # 2026-09-27): antes, este insert corría sólo cuando
             # `evidencia_pendiente` era verdadero -- si la tarea ya tenía
@@ -1283,16 +1350,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
             # Ahora se registra siempre que llegue texto: dos hechos, dos
             # filas, un solo acto -- mismo patrón que `_aprobar_tarea`
             # (ADR 0008).
-            #
-            # T6f (seguimiento del orquestador): `at` explícito con
-            # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
-            cur.execute(
-                """insert into evidence (workspace_id, task_id, tipo, uri,
-                                         entregado_por, at)
-                   values (%s, %s, 'texto', %s, %s, clock_timestamp())
-                   returning id""",
-                (quien.workspace_id, tarea_id, evidencia_texto, quien.membership_id))
-            evidencia_id = cur.fetchone()["id"]
+            evidencia_id = _insertar_evidencia(cur, quien, tarea_id, pieza)
 
     if estado == "en_curso":
         # Chequeo proactivo, igual que el de arriba: sin esto, el disparador
@@ -1674,14 +1732,10 @@ def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
         raise Denegado(
             "No podés adjuntar evidencia a una tarea que no es tuya ni que revisás.")
 
-    # T6f (seguimiento del orquestador): `at` explícito con
-    # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
-    cur.execute(
-        """insert into evidence (workspace_id, task_id, tipo, uri, entregado_por, at)
-           values (%s, %s, %s, %s, %s, clock_timestamp()) returning id""",
-        (quien.workspace_id, tarea_id, tipo, uri or descripcion,
-         quien.membership_id))
-    evidencia_id = cur.fetchone()["id"]
+    # ADR 0019, decisión 5: la clase por el contenido; cubre el tipo que se nombra, si es
+    # uno de la política de la tarea que esa clase acepta.
+    evidencia_id = _insertar_evidencia(
+        cur, quien, tarea_id, _pieza_de_texto(cur, tarea_id, uri or descripcion, cubre=[tipo]))
 
     if fila["estado"] == "en_revision":
         # T6i (ADR 0009, enmienda 2026-09-27): mismo criterio que la entrega
@@ -1693,6 +1747,139 @@ def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
             evidencia_id, datetime.now(timezone.utc))
 
     return {"evidencia_id": str(evidencia_id)}
+
+
+# --- La entrega con evidencia (ADR 0019, decisión 5; porción 2) ----------------------
+
+def _clase_de_un_archivo(clase_del_archivo: str) -> str:
+    """La clase de evidencia de un archivo guardado, por su contenido (`archivo.clase`)."""
+    return "imagen" if clase_del_archivo == "imagen" else "archivo"
+
+
+def _resolver_piezas(cur, tarea_id, piezas: list[dict]) -> list[dict]:
+    """Las piezas de una entrega como filas a escribir: la clase la fija el código por el
+    contenido (un archivo, por el suyo; un texto, si es un enlace o no) y lo que cubre se
+    acota a los tipos de la tarea que esa clase acepta. Una pieza sin contenido, o con un
+    archivo que no es de este espacio, es un error: no se adivina."""
+    resueltas = []
+    for pieza in piezas or []:
+        if not isinstance(pieza, dict):
+            raise ValueError("pieza")
+        cubre = [str(t) for t in pieza.get("cubre") or []]
+        if pieza.get("archivo_id"):
+            cur.execute("select clase from archivo where id = %s", (str(pieza["archivo_id"]),))
+            fila = cur.fetchone()
+            if fila is None:
+                raise ValueError("archivo")
+            clase = _clase_de_un_archivo(fila["clase"])
+            aceptados = _tipos_que_acepta(cur, tarea_id, clase)
+            resueltas.append({"clase": clase, "archivo_id": str(pieza["archivo_id"]),
+                              "cubre": [t for t in aceptados if t in cubre]})
+        elif (pieza.get("texto") or "").strip():
+            resueltas.append(_pieza_de_texto(cur, tarea_id, pieza["texto"], cubre=cubre))
+        else:
+            raise ValueError("contenido")
+    return resueltas
+
+
+@herramienta(
+    "entregar_tarea", "actualizar_estado",
+    "Entrega una tarea en curso con sus piezas de evidencia: en un solo acto escribe cada "
+    "pieza y pasa la tarea a revisión. Sólo si la evidencia cubre la política de la tarea.",
+    {"tarea_id": {"type": "string", "requerido": True},
+     "piezas": {"type": "array", "requerido": True}})
+def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
+    """ADR 0019, decisión 5 (con el patrón del ADR 0009): las filas de evidencia y el paso a
+    `en_revision` se escriben en el mismo acto, sólo desde `en_curso` y sólo si las piezas,
+    con la evidencia vigente, cubren cada tipo que pide la política. Nunca `terminada`
+    (constitución §11). Quien aprueba se entera como en la entrega de la cocina
+    (`_notificar_entrega_al_aprobador`); la porción 3 lo reemplaza por el aviso del motor."""
+    _bloquear_tarea(cur, tarea_id)
+    cur.execute(
+        "select estado, titulo, responsable_membership_id from task where id = %s",
+        (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa tarea no existe en este equipo"}
+    if str(fila["responsable_membership_id"]) != str(quien.membership_id):
+        raise Denegado("No podés entregar una tarea que no es tuya.")
+    if fila["estado"] != "en_curso":
+        return {"en_revision": False, "estado": str(fila["estado"]),
+                "error": "la tarea no está en curso"}
+    try:
+        resueltas = _resolver_piezas(cur, tarea_id, piezas)
+    except ValueError as e:
+        return {"en_revision": False, "error": f"pieza inválida: {e}"}
+    faltan = _tipos_que_faltan(cur, tarea_id, resueltas)
+    if faltan:
+        return _falta_evidencia_de_entrega(faltan)
+
+    ids = [_insertar_evidencia(cur, quien, tarea_id, p) for p in resueltas]
+    cur.execute(
+        """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                         actor_kind, actor_app_user_id, motivo, at)
+           values (%s, 'en_curso', 'en_revision', 'persona', %s, 'entrega con evidencia',
+                   clock_timestamp())""",
+        (tarea_id, quien.app_user_id))
+    _avisar_dependencia_informativa(cur, quien, tarea_id, "en_revision", uuid.uuid4())
+    cur.execute("select aprobador_membership_id from membership where id = %s",
+                (fila["responsable_membership_id"],))
+    aprob = cur.fetchone()
+    if aprob and aprob["aprobador_membership_id"]:
+        # La clave del aviso: la primera pieza escrita o, sin piezas (una política que no
+        # pide evidencia), la transacción del acto (el mismo criterio que `_actualizar_estado`).
+        if ids:
+            dedupe_id = ids[0]
+        else:
+            cur.execute("select pg_current_xact_id()::text as x")
+            dedupe_id = f"{tarea_id}:{cur.fetchone()['x']}"
+        _notificar_entrega_al_aprobador(
+            cur, quien, tarea_id, fila["titulo"], aprob["aprobador_membership_id"],
+            dedupe_id, datetime.now(timezone.utc))
+    return {"estado": "en_revision", "evidencias": ids}
+
+
+@herramienta(
+    "retirar_evidencia", "adjuntar_evidencia",
+    "Retira una pieza de evidencia que entregó la misma persona, mientras la tarea no está "
+    "aprobada. No borra nada: la pieza deja de contar.",
+    {"evidencia_id": {"type": "string", "requerido": True},
+     "motivo": {"type": "string"}})
+def _retirar_evidencia(cur, quien: Solicitante, evidencia_id, motivo=None):
+    """ADR 0019, decisión 3: "no, esa foto no era" agrega un retiro; nada se edita ni se
+    borra. Sólo quien la entregó, y mientras la tarea no esté aprobada (ni terminada, ni con
+    una aprobación posterior a la pieza que un pedido de cambios no dejó sin efecto)."""
+    cur.execute("select task_id, entregado_por, at from evidence where id = %s",
+                (evidencia_id,))
+    pieza = cur.fetchone()
+    if pieza is None:
+        return {"retirada": False, "error": "esa evidencia no existe en este equipo"}
+    _bloquear_tarea(cur, pieza["task_id"])
+    if str(pieza["entregado_por"] or "") != str(quien.membership_id):
+        raise Denegado("Sólo quien entregó una evidencia la puede retirar.")
+    cur.execute("select estado from task where id = %s", (pieza["task_id"],))
+    tarea = cur.fetchone()
+    cur.execute(
+        """select 1 from approval a
+            where a.sujeto_tipo = 'tarea' and a.sujeto_id = %s and a.decision = 'aprobado'
+              and a.at > %s
+              and not exists (select 1 from approval r
+                               where r.sujeto_tipo = 'tarea' and r.sujeto_id = a.sujeto_id
+                                 and r.decision = 'rechazado' and r.at >= a.at)""",
+        (pieza["task_id"], pieza["at"]))
+    aprobada = cur.fetchone() is not None
+    if tarea is None or str(tarea["estado"]) in ("terminada", "cancelada") or aprobada:
+        return {"retirada": False, "error": "la tarea ya está aprobada o cerrada"}
+    cur.execute("select 1 from evidencia_retirada where evidence_id = %s", (evidencia_id,))
+    if cur.fetchone() is not None:
+        return {"retirada": False, "error": "esa evidencia ya estaba retirada"}
+    cur.execute(
+        """insert into evidencia_retirada (workspace_id, evidence_id,
+                                           retirada_por_membership_id, motivo, at)
+           values (%s, %s, %s, %s, clock_timestamp())""",
+        (quien.workspace_id, evidencia_id, quien.membership_id, motivo))
+    return {"retirada": True, "tarea_id": str(pieza["task_id"]),
+            "faltan": _tipos_que_faltan(cur, pieza["task_id"])}
 
 
 def _exigir_puede_aprobarse(cur, tarea_id, fila) -> None:
@@ -2018,13 +2205,17 @@ def _evidencia_vigente(cur, tarea_id) -> list[dict]:
     razón por la que `evidencia_pendiente` deja de contarla (ADR 0009,
     enmienda T6b)."""
     cur.execute(
-        """select tipo, uri from evidence e
+        """select e.tipo, coalesce(e.texto, e.uri, a.nombre_original) as uri
+             from evidence e
+             left join archivo a on a.workspace_id = e.workspace_id and a.id = e.archivo_id
             where e.task_id = %s
               and e.at > coalesce(
                 (select max(r.at) from approval r
                   where r.sujeto_tipo = 'tarea' and r.sujeto_id = e.task_id
                     and r.decision = 'rechazado'),
                 '-infinity'::timestamptz)
+              -- ADR 0019, decisión 3: una pieza retirada no va en el aviso.
+              and not exists (select 1 from evidencia_retirada w where w.evidence_id = e.id)
             order by e.at""",
         (tarea_id,))
     return cur.fetchall()

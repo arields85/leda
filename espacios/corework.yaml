@@ -231,8 +231,28 @@ evidencia:
     corelabs:     [explicacion, captura]
     direccion:    [explicacion]
     gestion:      [explicacion]
-  almacenamiento: google_drive
-  estructura_drive: PENDIENTE
+  # Qué clase de evidencia cubre cada tipo y cómo se le dice a la persona (ADR 0019,
+  # decisión 5). La clase la fija el código por el contenido: texto, imagen, archivo o
+  # enlace. Un resultado de prueba se puede contar por escrito (usuario, 2026-10-07).
+  tipos:
+    explicacion:
+      clases: [texto]
+      en_palabras: "cómo quedó el trabajo, contado por quien lo hizo"
+    resultado_de_prueba:
+      clases: [texto, archivo, imagen, enlace]
+      en_palabras: "cómo se probó y qué dio la prueba"
+    captura:
+      clases: [imagen]
+      en_palabras: "una foto o una captura de la pantalla"
+    foto:
+      clases: [imagen]
+      en_palabras: "una foto del trabajo terminado"
+    archivo:
+      clases: [archivo, imagen, enlace]
+      en_palabras: "un archivo del trabajo, por ejemplo el programa o la configuración"
+  # La evidencia se guarda en la base de Leda, atada a su espacio (ADR 0019, decisión 2,
+  # que reemplaza a Google Drive para la evidencia).
+  almacenamiento: base
 
 # ---------------------------------------------------------------------------
 # Calendario y cadencia
@@ -426,7 +446,6 @@ pendientes:
     - "LEDA_BOT_TOKEN_COREWORK en .env"
   # Rutas que pueden quedar en PENDIENTE sin impedir que el espacio arranque.
   no_bloqueantes:
-    - evidencia.estructura_drive
     - "inventario inicial de máquinas y equipos de Steigen"
     - "prioridades iniciales de Dirección"
     - "primer plan mensual aprobado"

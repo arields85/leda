@@ -318,16 +318,39 @@ create table workspace_setting (
     end)
 );
 
+-- ADR 0019, decisión 5 (migración 0034): por cada tipo de la política, las clases
+-- de evidencia que acepta y cómo se dice en palabras de todos los días.
+create or replace function tipos_de_evidencia_validos(p_tipos jsonb) returns boolean as $$
+  select jsonb_typeof(p_tipos) = 'object'
+     and not exists (
+       select 1 from jsonb_each(p_tipos) t
+        where jsonb_typeof(t.value) <> 'object'
+           or jsonb_typeof(t.value -> 'clases') <> 'array'
+           or jsonb_array_length(t.value -> 'clases') = 0
+           or exists (select 1 from jsonb_array_elements(t.value -> 'clases') c
+                       where jsonb_typeof(c) <> 'string'
+                          or c #>> '{}' not in ('texto', 'imagen', 'archivo', 'enlace'))
+           or jsonb_typeof(t.value -> 'en_palabras') <> 'string'
+           or btrim(t.value ->> 'en_palabras') = '');
+$$ language sql immutable;
+
 -- Policy imported from evidencia.por_area. An empty array is an explicit
 -- no-evidence policy; absence of a row means that policy is unresolved.
+-- `tipos` (migración 0034) son las clases que acepta cada tipo, del pack
+-- (`evidencia.tipos`): un tipo sin clases no lo cubre nada (falla cerrado).
 create table task_evidence_policy (
   workspace_id        uuid not null references workspace(id) on delete cascade,
   area_id             uuid not null references area(id) on delete cascade,
   evidencia_requerida text[] not null,
   version             integer not null default 1 check (version > 0),
   actualizado_en      timestamptz not null default now(),
-  primary key (workspace_id, area_id)
+  tipos               jsonb not null default '{}'::jsonb,
+  primary key (workspace_id, area_id),
+  constraint task_evidence_policy_tipos check (tipos_de_evidencia_validos(tipos))
 );
+
+comment on column task_evidence_policy.tipos is
+  'ADR 0019, decisión 5: por cada tipo de la política, las clases de evidencia que acepta (texto, imagen, archivo, enlace) y cómo se dice en palabras de todos los días. Dato del pack; cambia la versión de la política.';
 
 create table cadence_job (
   id              uuid primary key default gen_random_uuid(),
@@ -526,8 +549,33 @@ create table evidence (
   sha256         text,
   entregado_por  uuid references membership(id),
   -- T6j: mismo motivo que `task_state_event.at`, más arriba.
-  at             timestamptz not null default clock_timestamp()
+  at             timestamptz not null default clock_timestamp(),
+  -- ADR 0019, decisión 5 (migración 0034): la clase de la pieza, que fija el
+  -- código por el contenido; el texto, si es texto; el archivo (la clave foránea
+  -- con el espacio va después de `archivo`), si es una imagen o un archivo; y los
+  -- tipos de la política que cubre, como los vio la persona al confirmar.
+  clase          text not null,
+  texto          text,
+  archivo_id     uuid,
+  cubre          text[] not null default '{}',
+  constraint evidence_workspace_id_unique unique (workspace_id, id),
+  constraint evidence_task_workspace
+    foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
+  constraint evidence_clase check (clase in ('texto', 'imagen', 'archivo', 'enlace')),
+  constraint evidence_clase_y_contenido check (
+    case clase
+      when 'texto' then archivo_id is null
+      when 'enlace' then archivo_id is null and uri is not null
+      else archivo_id is not null
+    end)
 );
+
+comment on column evidence.clase is
+  'ADR 0019, decisión 5: texto, imagen, archivo o enlace. La fija el código por el contenido, nunca la IA; la de un archivo la comprueba un disparador contra archivo.clase.';
+comment on column evidence.cubre is
+  'ADR 0019, decisión 5: los tipos de la política que cubre esta pieza, como los vio la persona en la vista previa de la entrega. Un texto puede cubrir varios.';
+comment on column evidence.tipo is
+  'Legado: en las filas nuevas es igual a la clase. Los tipos de la política que cubre una pieza están en cubre.';
 
 create table approval (
   id                     uuid primary key default gen_random_uuid(),
@@ -1425,6 +1473,49 @@ comment on table archivo is
 comment on table archivo_de_mensaje is
   'ADR 0019, decisión 4: qué archivo trajo cada mensaje entrante, con los identificadores de Telegram, o por qué no se guardó. Un álbum es un solo mensaje.';
 
+-- La evidencia de la entrega (ADR 0019, decisiones 3 a 5; migración 0034). Una
+-- pieza que es una imagen o un archivo apunta a `archivo`, con el espacio.
+alter table evidence
+  add constraint evidence_archivo
+    foreign key (workspace_id, archivo_id) references archivo(workspace_id, id);
+
+-- "No, esa foto no era": el retiro de una pieza, por quien la entregó y mientras
+-- la tarea no está aprobada. Sólo se agrega: la pieza no se borra, deja de contar.
+create table evidencia_retirada (
+  id                          uuid primary key default gen_random_uuid(),
+  workspace_id                uuid not null references workspace(id) on delete cascade,
+  evidence_id                 uuid not null,
+  retirada_por_membership_id  uuid not null references membership(id),
+  motivo                      text,
+  at                          timestamptz not null default clock_timestamp(),
+  constraint evidencia_retirada_evidence
+    foreign key (workspace_id, evidence_id) references evidence(workspace_id, id)
+    on delete cascade,
+  constraint evidencia_retirada_una_vez unique (evidence_id)
+);
+
+-- Lo que la persona dijo que es de una tarea antes de entregarla ("es del PLC"). No
+-- es evidencia: la vista previa de la entrega lo muestra y entra sólo si queda.
+create table archivo_de_tarea (
+  id                       uuid primary key default gen_random_uuid(),
+  workspace_id             uuid not null references workspace(id) on delete cascade,
+  archivo_id               uuid not null,
+  task_id                  uuid not null,
+  dicho_por_membership_id  uuid not null references membership(id),
+  at                       timestamptz not null,
+  constraint archivo_de_tarea_archivo
+    foreign key (workspace_id, archivo_id) references archivo(workspace_id, id),
+  constraint archivo_de_tarea_task
+    foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade
+);
+
+create index archivo_de_tarea_de on archivo_de_tarea (task_id, at);
+
+comment on table evidencia_retirada is
+  'ADR 0019, decisión 3: una pieza de evidencia retirada por quien la entregó, mientras la tarea no está aprobada. Sólo se agrega; la evidencia no se borra y deja de contar para la política.';
+comment on table archivo_de_tarea is
+  'ADR 0019, decisión 4: un archivo que la persona dijo que es de una tarea antes de entregarla. No es evidencia: la vista previa de la entrega lo muestra y entra sólo si la persona lo deja.';
+
 -- =========================================================================
 -- Sistema
 -- =========================================================================
@@ -1857,6 +1948,59 @@ create trigger trg_rechazar_cambios_de_archivo
   before update or delete on archivo
   for each row execute function rechazar_cambios_de_archivo();
 
+-- La evidencia de la entrega (migración 0034): quien la entregó, quien la retiró y
+-- quien dijo de qué tarea es un archivo son del mismo espacio.
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on evidence
+  for each row execute function exigir_referencias_del_espacio(
+    'entregado_por', 'membership');
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on evidencia_retirada
+  for each row execute function exigir_referencias_del_espacio(
+    'retirada_por_membership_id', 'membership');
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on archivo_de_tarea
+  for each row execute function exigir_referencias_del_espacio(
+    'dicho_por_membership_id', 'membership');
+
+-- La clase de una pieza que apunta a un archivo es la del archivo (ADR 0019,
+-- decisión 5): `imagen` si el archivo es una imagen, `archivo` si no. La fija el
+-- código por el contenido; la base no deja que diga otra.
+create or replace function exigir_clase_de_la_evidencia() returns trigger as $$
+declare
+  del_archivo text;
+begin
+  if new.archivo_id is not null and new.clase in ('imagen', 'archivo') then
+    select clase into del_archivo from archivo
+     where workspace_id = new.workspace_id and id = new.archivo_id;
+    -- Un archivo que no es de este espacio lo rechaza la clave foránea.
+    if del_archivo is not null
+       and (del_archivo = 'imagen') is distinct from (new.clase = 'imagen') then
+      raise exception 'evidence: la clase % no es la del archivo', new.clase;
+    end if;
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_exigir_clase_de_la_evidencia
+  before insert or update on evidence
+  for each row execute function exigir_clase_de_la_evidencia();
+
+-- Una evidencia no se edita ni se borra (ADR 0019, decisión 3), como los eventos de
+-- estado: una pieza equivocada se retira (`evidencia_retirada`), y un retiro
+-- tampoco se deshace. Vale también para la conexión administrativa.
+create or replace function rechazar_cambios_de_evidencia() returns trigger as $$
+begin
+  raise exception '%: una evidencia no se modifica ni se borra', tg_table_name;
+end $$ language plpgsql;
+
+create trigger trg_rechazar_cambios_de_evidencia
+  before update or delete on evidence
+  for each row execute function rechazar_cambios_de_evidencia();
+create trigger trg_rechazar_cambios_de_evidencia
+  before update or delete on evidencia_retirada
+  for each row execute function rechazar_cambios_de_evidencia();
+
 -- La auditoría autoritativa es la evidencia que se le muestra a un cliente. Su
 -- espacio lo fija la sesión, nunca quien escribe: si otro cliente pudiera
 -- atribuirse una entrada, el registro dejaría de ser evidencia. Sin espacio en
@@ -2101,18 +2245,66 @@ create trigger trg_exigir_dependencias_resueltas
 -- tarea`, alcanza con que alguien haya pedido cambios); el empate (`evidence.
 -- at = rechazado.at`) falla cerrado, igual que el empate de 0013. Sin ningún
 -- 'rechazado', el comportamiento no cambia: cualquier evidencia cuenta.
+--
+-- Migración 0034 (ADR 0019, decisión 5): la política se cumple por tipo. Cada
+-- tipo que pide la tarea tiene que tener una pieza propia (su `cubre` lo nombra)
+-- del ciclo vigente, no retirada, de una clase que ese tipo acepta (las clases,
+-- del pack, en `task_evidence_policy.tipos`). Una frase sola ya no cubre una
+-- foto: es la mecánica §6, no se acepta una afirmación cuando la política pide un
+-- artefacto. `tipos_de_evidencia_que_faltan` es la fuente de "qué falta" y acepta
+-- también las piezas de una entrega todavía sin confirmar (`p_piezas`, cada una
+-- con su `clase` y su `cubre`), para decirlo antes de escribir nada.
+create or replace function clases_de_un_tipo_de_evidencia(p_task uuid, p_tipo text)
+returns text[] as $$
+  select coalesce((
+    select array(select jsonb_array_elements_text(p.tipos -> p_tipo -> 'clases'))
+      from task t
+      join task_evidence_policy p on p.workspace_id = t.workspace_id and p.area_id = t.area_id
+     where t.id = p_task
+       and jsonb_typeof(p.tipos -> p_tipo -> 'clases') = 'array'), '{}');
+$$ language sql stable;
+
+create or replace function tipos_que_acepta_la_clase(p_task uuid, p_clase text)
+returns text[] as $$
+  select coalesce(array(
+    select r.tipo
+      from task t, unnest(t.evidencia_requerida) with ordinality as r(tipo, orden)
+     where t.id = p_task
+       and p_clase = any(clases_de_un_tipo_de_evidencia(t.id, r.tipo))
+     order by r.orden), '{}');
+$$ language sql stable;
+
+create or replace function tipos_de_evidencia_que_faltan(p_task uuid,
+                                                         p_piezas jsonb default '[]'::jsonb)
+returns text[] as $$
+  select coalesce(array(
+    select r.tipo
+      from task t, unnest(t.evidencia_requerida) with ordinality as r(tipo, orden)
+     where t.id = p_task
+       and not exists (
+         select 1 from evidence e
+          where e.task_id = t.id
+            and r.tipo = any(e.cubre)
+            and e.clase = any(clases_de_un_tipo_de_evidencia(t.id, r.tipo))
+            and e.at > coalesce(
+              (select max(a.at) from approval a
+                where a.sujeto_tipo = 'tarea' and a.sujeto_id = t.id
+                  and a.decision = 'rechazado'),
+              '-infinity'::timestamptz)
+            and not exists (select 1 from evidencia_retirada w where w.evidence_id = e.id))
+       and not exists (
+         select 1 from jsonb_array_elements(
+                          case when jsonb_typeof(p_piezas) = 'array' then p_piezas
+                               else '[]'::jsonb end) p
+          where p ->> 'clase' = any(clases_de_un_tipo_de_evidencia(t.id, r.tipo))
+            and jsonb_typeof(p -> 'cubre') = 'array'
+            and p -> 'cubre' ? r.tipo)
+     order by r.orden), '{}');
+$$ language sql stable;
+
 create or replace function evidencia_pendiente(p_task uuid)
 returns boolean as $$
-  select array_length(t.evidencia_requerida, 1) is not null
-     and not exists (
-       select 1 from evidence e
-        where e.task_id = t.id
-          and e.at > coalesce(
-            (select max(r.at) from approval r
-              where r.sujeto_tipo = 'tarea' and r.sujeto_id = t.id
-                and r.decision = 'rechazado'),
-            '-infinity'::timestamptz))
-    from task t where t.id = p_task;
+  select cardinality(tipos_de_evidencia_que_faltan(p_task)) > 0;
 $$ language sql stable;
 
 create or replace function motivo_no_cierra_tarea(p_task uuid)
@@ -2357,7 +2549,7 @@ begin
     'workspace_setting','message_template','permission','greeting_state',
     'conversation_question','conversation_option','conversation_turn',
     'scheduled_notice','conversation_state','task_forecast','blocker_unblocker',
-    'archivo','archivo_de_mensaje']
+    'archivo','archivo_de_mensaje','evidencia_retirada','archivo_de_tarea']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -2395,6 +2587,9 @@ revoke delete on conversation_question, conversation_option, scheduled_notice
   from leda_app;
 -- Los archivos recibidos (migración 0033) sólo se agregan y se leen.
 revoke update, delete on archivo, archivo_de_mensaje from leda_app;
+-- La evidencia, sus retiros y los archivos dichos de una tarea (migración 0034),
+-- también: una pieza equivocada se retira, no se borra (ADR 0019, decisión 3).
+revoke update, delete on evidence, evidencia_retirada, archivo_de_tarea from leda_app;
 
 -- Registros auxiliares. Quedan fuera del bucle de arriba porque `audit_log` e
 -- `incident` admiten espacio nulo para los hechos de alcance global, que sólo

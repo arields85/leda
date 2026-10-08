@@ -62,12 +62,15 @@ def _sql_script(path: Path) -> str:
 # El Motor (migraciones 0030 y 0031): las tablas nuevas y las existentes que esas
 # migraciones tocan (restricciones únicas, el mínimo del aviso previo). Los archivos
 # recibidos (migración 0033; ADR 0019): sus dos tablas y el rango del tamaño máximo en
-# `workspace_setting`.
+# `workspace_setting`. La evidencia de la entrega (migración 0034): las columnas nuevas de
+# `evidence` y de `task_evidence_policy`, y sus dos tablas nuevas.
 TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "conversation_question", "conversation_option",
                     "scheduled_notice", "task_forecast", "blocker_unblocker",
                     "task", "blocker", "workspace_setting",
-                    "archivo", "archivo_de_mensaje")
+                    "archivo", "archivo_de_mensaje",
+                    "evidence", "task_evidence_policy", "evidencia_retirada",
+                    "archivo_de_tarea")
 
 
 def _retrato_de_aislamiento(url, tablas):

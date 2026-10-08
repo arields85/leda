@@ -378,8 +378,11 @@ def test_en_curso_se_libera_cuando_la_origen_termina(corework, conn):
                          persona="Marcos Tarquini")
         _dependencia(cur, ws, origen, destino)
         cur.execute(
-            """insert into evidence (workspace_id, task_id, tipo, entregado_por)
-               values (%s, %s, 'resultado_de_prueba', null)""", (ws, origen))
+            """insert into evidence (workspace_id, task_id, tipo, clase, cubre,
+                                     entregado_por)
+               values (%s, %s, 'resultado_de_prueba', 'texto',
+                       tipos_que_acepta_la_clase(%s, 'texto'), null)""",
+            (ws, origen, origen))
         # Marcos es el referente (aprobador) de Nahuel: hace falta su
         # aprobación para que `motivo_no_cierra_tarea` deje cerrar.
         cur.execute(

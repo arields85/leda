@@ -22,6 +22,7 @@ from typing import Any
 
 import psycopg
 import yaml
+from psycopg.types.json import Jsonb
 
 from .db import admin, registrar_auditoria
 
@@ -185,6 +186,8 @@ def validar(pack: dict[str, Any]) -> tuple[list[str], list[str]]:
             advertencias.append(
                 f"Con esta cadencia hay días que superan el tope de {tope} "
                 f"mensajes por persona: {excedidos}.")
+
+    bloqueantes.extend(_validar_tipos_de_evidencia(pack))
 
     tg = pack.get("telegram") or {}
     # El token NO se declara acá: es un secreto y vive en el entorno. El pack
@@ -473,6 +476,44 @@ def _importar_politica(cur, ws, pack) -> None:
               ws, _nombre_de(pack, destino), i + 1))
 
 
+# Las clases de evidencia que fija el código por el contenido (ADR 0019, decisión 5).
+CLASES_DE_EVIDENCIA = ("texto", "imagen", "archivo", "enlace")
+
+
+def _validar_tipos_de_evidencia(pack: dict[str, Any]) -> list[str]:
+    """Cada tipo que pide una política de evidencia declara qué clases lo cubren y cómo se le
+    dice a la persona (`evidencia.tipos`; ADR 0019, decisión 5). Sin eso, ninguna pieza lo
+    cubriría y la tarea no se podría entregar nunca: se rechaza al importar, no al entregar."""
+    evidencia = pack.get("evidencia") or {}
+    tipos = evidencia.get("tipos") or {}
+    errores = []
+    usados = {t for lista in (evidencia.get("por_area") or {}).values() for t in lista or []}
+    for tipo in sorted(usados):
+        definido = tipos.get(tipo)
+        clases = (definido or {}).get("clases") if isinstance(definido, dict) else None
+        palabras = (definido or {}).get("en_palabras") if isinstance(definido, dict) else None
+        if not isinstance(clases, list) or not clases:
+            errores.append(
+                f"El tipo de evidencia '{tipo}' no declara qué clases lo cubren "
+                f"(evidencia.tipos.{tipo}.clases).")
+        elif any(c not in CLASES_DE_EVIDENCIA for c in clases):
+            errores.append(
+                f"El tipo de evidencia '{tipo}' declara una clase que no existe; valen "
+                f"{', '.join(CLASES_DE_EVIDENCIA)}.")
+        if not isinstance(palabras, str) or not palabras.strip():
+            errores.append(
+                f"El tipo de evidencia '{tipo}' no dice cómo se le nombra a la persona "
+                f"(evidencia.tipos.{tipo}.en_palabras).")
+    return errores
+
+
+def _tipos_del_area(pack: dict[str, Any], evidencia: list[str]) -> dict[str, Any]:
+    """Las clases y las palabras de los tipos que pide la política de un área, del pack."""
+    tipos = (pack.get("evidencia") or {}).get("tipos") or {}
+    return {t: {"clases": list(tipos[t]["clases"]), "en_palabras": tipos[t]["en_palabras"]}
+            for t in evidencia if isinstance(tipos.get(t), dict)}
+
+
 def _importar_politica_evidencia(cur, ws, pack) -> None:
     por_area = (pack.get("evidencia") or {}).get("por_area") or {}
     cur.execute(
@@ -483,25 +524,31 @@ def _importar_politica_evidencia(cur, ws, pack) -> None:
                  where a.id = p.area_id and a.slug = any(%s))""",
         (ws, list(por_area)))
     for area_slug, evidencia in por_area.items():
+        # Las clases de cada tipo van con la política, y la versión cambia también si cambian
+        # ellas (ADR 0019, decisión 5: dato del pack, versionado con la política).
         cur.execute(
             """insert into task_evidence_policy
-                 (workspace_id, area_id, evidencia_requerida)
-               select %s, a.id, %s
+                 (workspace_id, area_id, evidencia_requerida, tipos)
+               select %s, a.id, %s, %s
                  from area a where a.workspace_id = %s and a.slug = %s
                on conflict (workspace_id, area_id) do update
                  set evidencia_requerida = excluded.evidencia_requerida,
+                     tipos = excluded.tipos,
                      version = case
                        when task_evidence_policy.evidencia_requerida is distinct from
                             excluded.evidencia_requerida
+                         or task_evidence_policy.tipos is distinct from excluded.tipos
                        then task_evidence_policy.version + 1
                        else task_evidence_policy.version
                      end,
                      actualizado_en = case
                        when task_evidence_policy.evidencia_requerida is distinct from
                             excluded.evidencia_requerida
+                         or task_evidence_policy.tipos is distinct from excluded.tipos
                        then now() else task_evidence_policy.actualizado_en
                      end""",
-            (ws, evidencia or [], ws, area_slug))
+            (ws, evidencia or [], Jsonb(_tipos_del_area(pack, evidencia or [])), ws,
+             area_slug))
 
 
 def _nombre_de(pack: dict, destino: str) -> str | None:

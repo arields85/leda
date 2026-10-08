@@ -155,6 +155,7 @@ Código en `src/leda/motor/`, `src/leda/salida.py` y `src/leda/despachador.py`; 
 | Margen de 10 minutos antes de los avisos a otra persona, para que una corrección retire el equivocado | `margen.py` |
 | Una fecha que atrasa sin motivo: Leda lo pregunta y el aviso espera la respuesta o sale al final del día | `fichas.py` |
 | Recibir y guardar fotos, documentos, videos y álbumes (sin evidencia todavía), con límites por contenido | `archivos.py`, migración `0033` |
+| La política de evidencia se cumple por tipo: cada tipo pedido, una pieza propia del ciclo vigente, no retirada, de una clase que ese tipo acepta (una frase sola no cubre una foto); la evidencia y sus retiros no se editan ni se borran; la cocina entrega con las piezas y el paso a revisión en un solo acto (`entregar_tarea`) y retira una pieza (`retirar_evidencia`) | migración `0034`, `herramientas.py`, `evidencia.tipos` del pack |
 | El lector de turnos y avisos guardados | `leda.motor.leer` |
 
 ## Vigencia

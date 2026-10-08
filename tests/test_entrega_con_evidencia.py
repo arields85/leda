@@ -80,9 +80,13 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", persona="Nahuel Gimenez"
 
 
 def _evidencia(cur, ws, tarea_id, *, tipo="explicacion"):
+    # Migración 0034 (ADR 0019, decisión 5): una pieza de texto que cubre todo lo que la
+    # política de la tarea acepta como texto.
     cur.execute(
-        """insert into evidence (workspace_id, task_id, tipo, uri)
-           values (%s, %s, %s, 'lista')""", (ws, tarea_id, tipo))
+        """insert into evidence (workspace_id, task_id, tipo, clase, texto, cubre)
+           values (%s, %s, %s, 'texto', 'lista',
+                   tipos_que_acepta_la_clase(%s, 'texto'))""",
+        (ws, tarea_id, tipo, tarea_id))
 
 
 def _outbox_ultimo(cur, ws, tg) -> str:
@@ -150,10 +154,10 @@ def test_actualizar_estado_a_en_revision_registra_evidencia_y_mueve_en_el_mismo_
         cur.execute("select estado from task where id = %s", (tid,))
         assert cur.fetchone()["estado"] == "en_revision"
         cur.execute(
-            "select tipo, uri, entregado_por from evidence where task_id = %s", (tid,))
+            "select tipo, texto, entregado_por from evidence where task_id = %s", (tid,))
         fila = cur.fetchone()
         assert fila["tipo"] == "texto"
-        assert fila["uri"] == "Ya lo probé en el HMI de la línea."
+        assert fila["texto"] == "Ya lo probé en el HMI de la línea."   # 0034: el texto
 
 
 def test_actualizar_estado_a_en_revision_sin_evidencia_requerida_no_pide_nada(
@@ -648,8 +652,9 @@ def test_aprobar_tarea_rechaza_tras_pedir_cambios_sin_evidencia_nueva(
 
     with admin(conn) as cur:
         cur.execute(
-            """insert into evidence (workspace_id, task_id, tipo, uri)
-               values (%s, %s, 'texto', 'Ahora sí, corregido.')""", (ws, tid))
+            """insert into evidence (workspace_id, task_id, tipo, clase, texto, cubre)
+               values (%s, %s, 'texto', 'texto', 'Ahora sí, corregido.',
+                       tipos_que_acepta_la_clase(%s, 'texto'))""", (ws, tid, tid))
     conn.commit()
 
     with espacio(conn, ws) as cur:
@@ -686,9 +691,9 @@ def test_evidencia_texto_se_registra_aunque_ya_exista_evidencia_sin_pedir_cambio
         cur.execute("select count(*) n from evidence where task_id = %s", (tid,))
         assert cur.fetchone()["n"] == 2
         cur.execute(
-            """select uri from evidence where task_id = %s order by at desc limit 1""",
+            """select texto from evidence where task_id = %s order by at desc limit 1""",
             (tid,))
-        assert cur.fetchone()["uri"] == "Mandé esto de nuevo, por si acaso."
+        assert cur.fetchone()["texto"] == "Mandé esto de nuevo, por si acaso."
 
 
 # ---------------------------------------------------------------------------
@@ -1123,9 +1128,9 @@ def test_actualizar_estado_repetido_sobre_en_revision_con_evidencia_suma_fila_si
         cur.execute("select count(*) n from evidence where task_id = %s", (tid,))
         assert cur.fetchone()["n"] == 2                     # la que ya tenía + la nueva
         cur.execute(
-            """select uri from evidence where task_id = %s order by at desc limit 1""",
+            """select texto from evidence where task_id = %s order by at desc limit 1""",
             (tid,))
-        assert cur.fetchone()["uri"] == "Una captura más, por si sirve."
+        assert cur.fetchone()["texto"] == "Una captura más, por si sirve."
         cur.execute("select estado from task where id = %s", (tid,))
         assert cur.fetchone()["estado"] == "en_revision"
         cur.execute("select count(*) n from task_state_event where task_id = %s", (tid,))
@@ -1281,8 +1286,10 @@ def test_evidencia_pendiente_empate_de_at_en_la_misma_transaccion_falla_cerrado(
                values (%s, 'tarea', %s, %s, 'rechazado', 'Ajustar algo', %s)""",
             (ws, tid, marcos_id, empate))
         cur.execute(
-            """insert into evidence (workspace_id, task_id, tipo, uri, at)
-               values (%s, %s, 'texto', 'Ya corregido.', %s)""", (ws, tid, empate))
+            """insert into evidence (workspace_id, task_id, tipo, clase, texto, cubre, at)
+               values (%s, %s, 'texto', 'texto', 'Ya corregido.',
+                       tipos_que_acepta_la_clase(%s, 'texto'), %s)""",
+            (ws, tid, tid, empate))
 
         # Confirma la premisa del empate antes de comprobar el resultado:
         # las dos filas comparten el mismo `at`, fijado a mano.
@@ -1688,8 +1695,9 @@ def test_evidencia_previa_a_un_rechazado_no_aparece_en_el_aviso_con_texto_distin
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_revision")
         cur.execute(
-            """insert into evidence (workspace_id, task_id, tipo, uri)
-               values (%s, %s, 'explicacion', %s)""", (ws, tid, marca))
+            """insert into evidence (workspace_id, task_id, tipo, clase, texto, cubre)
+               values (%s, %s, 'explicacion', 'texto', %s,
+                       tipos_que_acepta_la_clase(%s, 'texto'))""", (ws, tid, marca, tid))
     conn.commit()
 
     with espacio(conn, ws) as cur:

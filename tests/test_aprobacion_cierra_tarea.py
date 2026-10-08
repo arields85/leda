@@ -56,9 +56,13 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", persona="Nahuel Gimenez"
 
 
 def _evidencia(cur, ws, tarea_id, *, tipo="explicacion"):
+    # Migración 0034 (ADR 0019, decisión 5): una pieza de texto que cubre todo lo que la
+    # política de la tarea acepta como texto.
     cur.execute(
-        """insert into evidence (workspace_id, task_id, tipo, uri)
-           values (%s, %s, %s, 'lista')""", (ws, tarea_id, tipo))
+        """insert into evidence (workspace_id, task_id, tipo, clase, texto, cubre)
+           values (%s, %s, %s, 'texto', 'lista',
+                   tipos_que_acepta_la_clase(%s, 'texto'))""",
+        (ws, tarea_id, tipo, tarea_id))
 
 
 # ---------------------------------------------------------------------------
