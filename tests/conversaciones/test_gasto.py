@@ -867,3 +867,80 @@ def test_el_limite_de_uso_a_mitad_de_la_ronda_la_corta_y_dice_cuando_se_renueva(
     anotadas = Gasto(tmp_path / "gasto.json").leer()["corridas"]
     assert [c["vez"] for c in anotadas] == [1, 2]
     assert anotadas[1]["invalida"] == gasto.SIN_CUOTA
+
+
+# --- La libreta con el archivo tomado (Windows; regresión D6, 2026-10-08) ---------------------
+#
+# `os.replace` falla con `PermissionError` en Windows si otro proceso tiene abierto `gasto.json`,
+# y la caída se llevaba el informe de la ronda entera. Ahora reintenta un rato y, si sigue
+# tomado, guarda las corridas en un archivo aparte, avisa y sigue; nunca las pierde.
+
+_REPLACE_REAL = gasto.os.replace       # antes de cualquier `monkeypatch`
+
+
+def _replace_que_falla(veces: int):
+    original = _REPLACE_REAL
+    fallas = {"quedan": veces}
+
+    def reemplazar(origen, destino):
+        if fallas["quedan"]:
+            fallas["quedan"] -= 1
+            raise PermissionError(13, "El proceso no tiene acceso al archivo", str(destino))
+        return original(origen, destino)
+
+    return reemplazar
+
+
+def test_la_libreta_tomada_un_momento_se_escribe_al_reintentar(tmp_path, monkeypatch):
+    monkeypatch.setattr(gasto.os, "replace", _replace_que_falla(2))
+    avisos = []
+    libreta = Gasto(tmp_path / "gasto.json", avisar=avisos.append, espera=0)
+
+    libreta.anotar(_corrida(0.5))
+
+    assert Gasto(tmp_path / "gasto.json").total() == pytest.approx(0.5)
+    assert list(tmp_path.glob("gasto-pendiente-*.json")) == [] and avisos == []
+
+
+def test_la_libreta_tomada_guarda_aparte_avisa_y_no_pierde_nada(tmp_path, monkeypatch):
+    ruta = tmp_path / "gasto.json"
+    Gasto(ruta).anotar(_corrida(1.0))
+    monkeypatch.setattr(gasto.os, "replace", _replace_que_falla(1000))
+    avisos = []
+    libreta = Gasto(ruta, avisar=avisos.append, espera=0)
+
+    libreta.anotar(_corrida(0.5))
+    libreta.anotar(_corrida(0.25))
+
+    assert Gasto(ruta).total() == pytest.approx(1.0)        # la libreta quedó como estaba
+    [aparte] = tmp_path.glob("gasto-pendiente-*.json")
+    assert [c["usd"] for c in json.loads(aparte.read_text("utf-8"))["corridas"]] == [0.5, 0.25]
+    assert avisos and "gasto-pendiente-" in avisos[0]
+    assert libreta.total() == pytest.approx(1.75)           # el techo cuenta también lo aparte
+
+    # Cuando se libera, lo pendiente entra a la libreta y el archivo aparte se borra.
+    monkeypatch.setattr(gasto.os, "replace", _replace_que_falla(0))
+    libreta.anotar(_corrida(0.125))
+    assert [c["usd"] for c in Gasto(ruta).leer()["corridas"]] == [1.0, 0.5, 0.25, 0.125]
+    assert list(tmp_path.glob("gasto-pendiente-*.json")) == []
+
+
+def test_la_libreta_tomada_no_se_lleva_el_informe_de_la_ronda(tmp_path, monkeypatch):
+    from tests.conversaciones.corredor import Corrida
+
+    def bien(conn, conv, ia, *, vez=1, motor=None):
+        _llamada_que_costo(ia, 0.1)
+        return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
+                       "garantias", llamadas=list(ia.llamadas))
+
+    _ronda_sin_servidor(monkeypatch, tmp_path, bien)
+    monkeypatch.setattr(gasto, "ESPERA_S", 0)
+    monkeypatch.setattr(gasto.os, "replace", _replace_que_falla(1000))
+
+    codigo = correr.main(["--ia", "sol", "--conversacion", "01", "--veces", "1",
+                          "--ronda", "tomada"])
+
+    assert codigo == 0
+    assert (tmp_path / "resultados" / "tomada.md").exists()
+    [aparte] = tmp_path.glob("gasto-pendiente-*.json")
+    assert json.loads(aparte.read_text("utf-8"))["corridas"][0]["usd"] == pytest.approx(0.1)

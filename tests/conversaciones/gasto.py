@@ -33,6 +33,11 @@ cuenta:
   (`resets_in_seconds` o `resets_at`). El corredor corta la ronda como con el 402
   (`llamadas_sin_cuota`, `motivo_sin_cuota`). Un 429 con otro código es un límite pasajero: sigue
   como estaba, sin cortar.
+- **La libreta tomada** (regresión D6: en Windows, `os.replace` falla con `PermissionError` si
+  otro proceso tiene abierto `gasto.json`, y la caída se llevó el informe de la ronda): la
+  escritura reintenta un rato y, si sigue tomada, lo que no entró va a
+  `gasto-pendiente-<fecha>.json`, al lado, con un aviso; entra a la libreta en la próxima
+  escritura que pueda y el archivo aparte se borra. La ronda sigue y el informe se escribe.
 """
 
 from __future__ import annotations
@@ -40,6 +45,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -74,6 +80,10 @@ PRECIO_SUSCRIPCION = "suscripción"
 # llamadas_previstas`); lo que Leda manda sobre otras tareas o de más no está ahí: un margen.
 MARGEN_DE_LA_ESTIMACION = 1.25
 MINIMO_PARA_PROMEDIAR = 10      # llamadas con costo informado antes de usar su promedio
+# La libreta tomada por otro proceso (Windows): cuántas veces se intenta escribirla y la espera
+# base entre intentos (crece: 0,2 s, 0,4 s, ...; unos 2 s en total).
+REINTENTOS = 5
+ESPERA_S = 0.2
 
 
 SIN_CREDITO = "sin crédito en el proveedor"
@@ -304,8 +314,12 @@ class Gasto:
     ruta: Path = field(default_factory=lambda: RUTA)
     techo: float = TECHO_USD
     avisar: Callable[[str], None] = print
+    espera: float | None = None     # entre reintentos, si la libreta está tomada; `ESPERA_S`
     _candado: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _reservado: float = 0.0
+    # Lo que no se pudo anotar porque la libreta estaba tomada, y el archivo aparte que lo guarda.
+    _pendientes: list[dict[str, Any]] = field(default_factory=list, repr=False)
+    _aparte: Path | None = field(default=None, repr=False)
 
     def leer(self) -> dict[str, Any]:
         if not self.ruta.exists():
@@ -313,7 +327,9 @@ class Gasto:
         return json.loads(self.ruta.read_text("utf-8"))
 
     def total(self) -> float:
-        return round(sum(c["usd"] + c.get("jev_usd", 0.0) for c in self.leer()["corridas"]), 6)
+        """Lo gastado en la etapa: la libreta y lo que espera aparte para entrar."""
+        return round(sum(c["usd"] + c.get("jev_usd", 0.0)
+                         for c in [*self.leer()["corridas"], *self._pendientes]), 6)
 
     def por_llamada(self, modelo: str, proveedor: str = "openrouter") -> float:
         """El costo medio medido de una llamada de ese modelo, si ya hay bastantes; si no, la
@@ -344,16 +360,63 @@ class Gasto:
             self._reservado += estimado
 
     def anotar(self, entrada: dict[str, Any], *, reservado: float = 0.0) -> None:
-        """Suma una corrida real a la libreta y libera lo que tenía reservado."""
+        """Suma una corrida real a la libreta y libera lo que tenía reservado. Si la libreta está
+        tomada por otro proceso (Windows: `PermissionError` al reemplazarla), reintenta un rato;
+        si sigue tomada, lo que no se pudo anotar va a un archivo aparte
+        (`gasto-pendiente-<fecha>.json`), con un aviso, y entra a la libreta en la próxima
+        escritura que pueda. Nunca se pierde ni corta la ronda."""
         with self._candado:
-            datos = self.leer()
-            datos["techo_usd"] = self.techo
-            datos["corridas"].append(entrada)
-            self.ruta.parent.mkdir(parents=True, exist_ok=True)
-            temporal = self.ruta.with_suffix(".tmp")
-            temporal.write_text(json.dumps(datos, ensure_ascii=False, indent=1), "utf-8")
-            os.replace(temporal, self.ruta)
-            self._reservado = max(0.0, self._reservado - reservado)
+            self._pendientes.append(entrada)
+            try:
+                self._con_reintentos(self._escribir_la_libreta)
+            except PermissionError:
+                self._guardar_aparte()
+            else:
+                self._pendientes.clear()
+                if self._aparte is not None:
+                    self._aparte.unlink(missing_ok=True)
+                    self.avisar(f"Aviso: lo pendiente de {self._aparte.name} ya entró a la "
+                                f"libreta del gasto; el archivo aparte se borró.")
+                    self._aparte = None
+            finally:
+                self._reservado = max(0.0, self._reservado - reservado)
+
+    def _escribir_la_libreta(self) -> None:
+        datos = self.leer()
+        datos["techo_usd"] = self.techo
+        datos["corridas"].extend(self._pendientes)
+        self.ruta.parent.mkdir(parents=True, exist_ok=True)
+        temporal = self.ruta.with_suffix(".tmp")
+        temporal.write_text(json.dumps(datos, ensure_ascii=False, indent=1), "utf-8")
+        os.replace(temporal, self.ruta)
+
+    def _con_reintentos(self, escribir: Callable[[], None]) -> None:
+        for intento in range(REINTENTOS):
+            try:
+                return escribir()
+            except PermissionError:
+                if intento == REINTENTOS - 1:
+                    raise
+                time.sleep((ESPERA_S if self.espera is None else self.espera) * (intento + 1))
+
+    def _guardar_aparte(self) -> None:
+        if self._aparte is None:
+            self._aparte = self.ruta.with_name(
+                f"{self.ruta.stem}-pendiente-{datetime.now():%Y%m%d-%H%M%S-%f}.json")
+        datos = {"techo_usd": self.techo, "corridas": self._pendientes}
+        try:
+            self._aparte.write_text(json.dumps(datos, ensure_ascii=False, indent=1), "utf-8")
+        except OSError as e:
+            # Ni aparte: las corridas quedan en el aviso, para sumarlas a mano. La libreta no
+            # tiene nada sensible (está versionada).
+            self.avisar(f"Aviso: la libreta del gasto está tomada por otro proceso y tampoco se "
+                        f"pudo escribir aparte ({type(e).__name__}); lo pendiente, para "
+                        f"sumarlo a mano: {json.dumps(self._pendientes, ensure_ascii=False)}")
+            return
+        self.avisar(f"Aviso: la libreta del gasto ({self.ruta.name}) está tomada por otro "
+                    f"proceso; {len(self._pendientes)} corrida(s) quedaron en "
+                    f"{self._aparte.name} y entran a la libreta en la próxima escritura que "
+                    f"pueda (si la ronda termina antes, sumarlas a mano).")
 
     def liberar(self, reservado: float) -> None:
         with self._candado:
