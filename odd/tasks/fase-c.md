@@ -538,9 +538,64 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       quien lo hizo" (`en_palabras`, dato del pack, que la IA lee): cambiarlo a "descrito" es
       configuración del cliente y quedó fuera de esta unidad. La regresión con la IA real (D6) dirá
       si la IA escribe "queda informada" y contesta el nombre.
-  - [ ] **D3.** La entrega (decisiones 10, 14 y 15): comparar lo descrito con el criterio, preguntar
+  - [x] **D3.** La entrega (decisiones 10, 14 y 15): comparar lo descrito con el criterio, preguntar
     sólo lo que falta con un ejemplo sacado del criterio y no entregar hasta cubrirlo; entregar una
-    tarea sin arrancar; pedir la pieza correcta si una retirada deja la entrega incompleta.
+    tarea sin arrancar; pedir la pieza correcta si una retirada deja la entrega incompleta. Route:
+    delegada (escritor único, 2+ archivos no triviales). Hecha el 2026-10-08:
+    - **Lo que llegó, una sola vez** (`2cba3bd`, el `PENDIENTE` de la D1): una jugada que toma lo
+      que trajo el mensaje (`Ficha.toma_lo_que_llego`: `entregar`, `guardar_para_la_entrega`) y no
+      dice la tarea deja su duda con eso (`entrega.para_la_duda`) y lo marca atendido; al terminar
+      las jugadas no se vuelve a correr, y la elección usa lo de aquel mensaje. Regla general, no
+      de la 22. Rojo primero: los hechos salían dos veces.
+    - **Lo que describe cada texto** (`1113cba`, migración `0038` con su rollback, que se niega si
+      perdería datos, y su ensayo de paridad): `evidence.describe_del_criterio`, los puntos del
+      criterio que la persona confirmó que describe un texto, tal cual se decían; sólo un texto
+      (restricción). La cocina lo escribe al entregar. Rojo primero: dos pruebas de garantías.
+    - **El criterio como compuerta** (`ea2278e`, decisión 10). Diseño: el criterio se lee por
+      puntos (`entrega.puntos_del_criterio`: renglones, oraciones y punto y coma; una oración es un
+      punto aunque diga dos cosas, el código no parte por palabras). La IA que elige la jugada recibe
+      los puntos (`criterio_de_aceptacion`, C1, C2...) y juzga cuáles dice todo lo descrito
+      (`lo_descrito_cubre`, lista cerrada como `el_texto_cubre`); si falta alguno, escribe un
+      ejemplo (`ejemplo`). El código guarda en cada texto lo que describe, calcula qué falta y sólo
+      con la política y el criterio cubiertos ofrece Confirmar; lo no juzgado no está dicho; un
+      "mandala así" con algo pendiente no entrega (`le_falta_algo`) y vuelve a proponer. El ejemplo
+      pasa por un verificador (`problema_del_ejemplo`, como el `_problema_de_propuesta` del flujo C):
+      cada número y cada nombre o sigla tiene que estar en el criterio, la tarea o lo que escribió la
+      persona; si no, se propone el punto del criterio tal cual (nunca falta un ejemplo). El ejemplo
+      cuenta como descrito sólo si la persona lo acepta (`acepta_el_ejemplo` en `entregar`, y sólo
+      si se le propuso en un mensaje anterior); queda en la pregunta abierta, así que "¿y qué pongo?"
+      (sin jugada) lo vuelve a decir. La persona corrige la lectura en la vista previa (`corregir`
+      con `lo_descrito_cubre`). Hallazgo 1 de la bitácora: un texto cubre siempre lo que sólo un
+      texto puede cubrir, y `el_texto_cubre` suma. El pack dice "descrito por quien lo hizo". Las
+      instrucciones de la IA no cambiaron (huellas iguales): todo va en los datos de las fichas y en
+      los significados. Conversaciones: la 27 nueva (README, `test_corredor`); la 22 suma el
+      criterio, con el ejemplo aceptado en el paso 7 y la confirmación en el 8; la 12 pide lo que
+      falta del criterio; la 21, la 23 y la 24 describen el criterio en su entrega. Rojo primero:
+      doce pruebas de `test_entrega`.
+    - **Una tarea sin arrancar** (`a3dbb33`, decisión 14): `entregar` vale sobre una tarea asignada;
+      al confirmar, la cocina anota en el mismo acto que arrancó y se entregó en ese momento (dos
+      eventos de la persona, sin fecha de inicio inventada), con la regla de siempre para arrancar
+      (no con una dependencia bloqueante abierta). La 25, paso 8, deja de ser `PENDIENTE`. Rojo
+      primero: cinco pruebas.
+    - **Una pieza retirada** (`f96f071`, decisión 15): si un retiro deja la entrega sin lo que pide
+      la política o sin un punto que dejó de estar dicho (lo que describían las piezas retiradas y
+      ninguna de las que siguen), Leda pide la pieza correcta con el tema abierto de lo que falta y
+      su ejemplo; el aviso a quien aprueba que no salió queda omitido (`la_entrega_esta_incompleta`,
+      también al releerlo al salir), y aprobar no cambia nada (`la_entrega_se_esta_completando`, con
+      `se_le_avisa_cuando_este_completa`). Con la pieza nueva confirmada, la cocina la suma a la
+      tarea en revisión sin moverla (`entrega_completa`) y a quien aprueba le llega un aviso nuevo
+      con todo (T6i). Rojo primero: seis pruebas.
+    - **Pruebas:** `pytest tests/motor tests/conversaciones`, 813 passed y 1 failed, la
+      intermitente (`test_corredor.py::test_la_corrida_en_seco_por_linea_de_comandos_graba_y_repite`,
+      que pasó al repetirla sola); `pytest tests/garantias`, 323 passed; suite completa,
+      1565 passed; en seco, `correr --ia guionada --veces 1 --ronda seco-d3`, 26 de 26 bien
+      (informes borrados). Sin la IA real (D6).
+    - `PENDIENTE`: con un criterio de una sola oración, preguntar sólo la parte que falta queda a
+      cargo de la redacción (lo medirá la D6), y que la plataforma pida un punto por renglón es de
+      su ADR; si la IA real elige `confirmar` en lugar de `acepta_el_ejemplo` ante un "sí" (lo
+      medirá la D6); los recordatorios a quien aprueba no esperan mientras la entrega está
+      incompleta; tras un retiro, el ejemplo es el punto del criterio tal cual (`corregir` no trae
+      el de la IA); `leda_motor` necesita la `0038` (D6).
   - [ ] **D4.** La aprobación (decisiones 12, 16 y 17): "¿cuál de las dos?" una sola vez; el aviso a
     quien aprueba al salir (si cambió); las entregas y los recordatorios en listas con un botón por
     tarea, y lo que queda por revisar después de decidir una.
