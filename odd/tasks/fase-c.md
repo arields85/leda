@@ -858,6 +858,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         pueda y el archivo aparte se borra.
       - `pytest tests/conversaciones tests/motor/test_chatgpt.py`: 185 passed; en seco
         `--ronda seco-corredor`, 29 de 29 bien (informes borrados, `gasto.json` sin tocar).
+    - **Revisión RDD, aprobadas y reconocidas:** `eb0cd1a` (los YAML aflojados)
+      `review-bf5579572725ac35`, con advertencias: el texto del ejemplo aceptado no se comprueba en la
+      22 y la 27, y el comentario de la aprobación en la 23 se compara literal; `01c5ffe..29cd66d`
+      `review-ac5f83ca192bdccf`, con una advertencia en `gasto.py:402`.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
