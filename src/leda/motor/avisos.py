@@ -89,6 +89,12 @@ diario cuenta mensajes, y un aviso de coordinación nunca cuenta, agrupado o no 
 **El aviso de una entrega va a quien aprueba al salir** (decisión 16 del usuario, 2026-10-08): se
 relee (`TipoDeAviso.va_a`); si cambió antes de que saliera, le llega al nuevo. Si cambió después,
 al nuevo le guarda un aviso la escalera (`escalera._un_paso_de_una_decision`).
+
+**No interrumpir una conversación** (decisión 13 del usuario, 2026-10-08; conversación 26;
+C-3d, D5): un aviso a una persona que está conversando con Leda espera (`_preparar`,
+`no_interrumpir.conversando`: 30 minutos desde lo último que escribió o tocó, con el horario
+encima), también uno de coordinación; a otra persona no la demora. Los que esperan siguen
+guardados, con su hora; los que vencen juntos salen juntos, como siempre.
 """
 
 from __future__ import annotations
@@ -108,7 +114,7 @@ from ..db import espacio
 from ..incidentes import registrar_incidente
 from ..salida import MAX_ADJUNTOS, PayloadValidationError, enqueue_outbox
 
-from . import cambios_de_estado, entrega, preguntas
+from . import cambios_de_estado, entrega, no_interrumpir, preguntas
 from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, anclaje,
                     clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
@@ -340,6 +346,9 @@ def _preparar(m: Momento, aviso: dict[str, Any]) -> _Listo | str:
         return "omitido"
     if ausente(cur, str(aviso["destinatario_membership_id"]), m.hoy):
         return "en_espera"          # vuelve a mirarse cuando vuelva (mecánica §9, ausencias)
+    if no_interrumpir.conversando(cur, m.cal, m.workspace_id,
+                                  str(aviso["destinatario_membership_id"]), m.ahora):
+        return "en_espera"          # está hablando con Leda: no se la interrumpe (decisión 13)
     if tipo is None:
         omitir(cur, aviso_id, "tipo_sin_declarar", m.ahora)
         return "omitido"
@@ -769,15 +778,19 @@ def prevision_vigente(m: Momento, tarea: dict[str, Any]) -> dict[str, Any] | Non
                              ATRASO_SI_SE_CUMPLE: f["atraso_dias_habiles"]}
     if f["motivo"]:
         dicha["motivo"] = f["motivo"]
-    m.cur.execute("""select a.estado, a.programado_para, i.nombre from scheduled_notice a
+    m.cur.execute("""select a.estado, a.programado_para, a.destinatario_membership_id,
+                            i.nombre
+                       from scheduled_notice a
                        join integrante i on i.membership_id = a.destinatario_membership_id
                       where a.workspace_id = %s and a.dedupe_key = %s""",
                   (m.workspace_id, f"motor:nueva_prevision:{f['id']}"))
     aviso = m.cur.fetchone()
     if aviso is not None and aviso["estado"] in ("enviado", "guardado", "fallido"):
+        # Uno guardado le llega a su hora o, si está conversando, al terminar su espera.
         llega = (YA_LE_LLEGO if aviso["estado"] == "enviado"
                  else NO_LE_LLEGO if aviso["estado"] == "fallido"
-                 else aviso["programado_para"].astimezone(m.cal.zona).isoformat())
+                 else no_interrumpir.cuando_sale(m.cur, m.cal, m.workspace_id, aviso)
+                 .astimezone(m.cal.zona).isoformat())
         dicha["aviso_al_referente"] = {"a": aviso["nombre"], LLEGA: llega}
     return dicha
 

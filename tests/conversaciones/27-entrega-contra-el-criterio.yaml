@@ -257,7 +257,7 @@ pasos:
         - {tipo: entrega_para_aprobar, tarea: PLC, a: Ismael, estado: guardado}
     hechos:
       - {jugada: confirmar, resultado: entrega_completa, tarea: PLC, estado: en_revision,
-         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-22T15:41"}}
+         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-22T15:55"}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
@@ -268,10 +268,12 @@ pasos:
       - el nombre de Ismael
       - que la tarea está terminada o aprobada
 
-  # A Ismael le llega un aviso nuevo con todo lo vigente (ADR 0009, enmienda T6i).
+  # A Ismael le llega un aviso nuevo con todo lo vigente (ADR 0009, enmienda T6i): terminado el
+  # margen para corregir (15:41) y 30 minutos después de que tocó "Aprobar" (15:25; no
+  # interrumpir, D5, la 26). A las 15:41 todavía espera.
   - paso: 11
     quien: Leda
-    relojes: ["2026-10-22 15:41"]
+    relojes: ["2026-10-22 15:41", "2026-10-22 15:55"]
     salen:
       - a: Ismael
         tipo: entrega_para_aprobar

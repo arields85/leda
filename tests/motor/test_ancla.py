@@ -351,7 +351,8 @@ def test_volver_a_la_fecha_comprometida_despues_de_empezar_su_escalera_es_una_es
 
     dice_una_prevision(conn, escribe, "2026-10-09", at=octubre(13, 9, 40))  # vuelve a V, ya vencida
 
-    [otra_vez] = _de_marcos(dias.ciclo(octubre(13, 10)))
+    # Sin interrumpir la conversación (decisión 13): sale 30 minutos después de su mensaje.
+    [otra_vez] = _de_marcos(dias.ciclo(octubre(13, 10, 10)))
     hechos = otra_vez["hechos"][0]
     assert (hechos["aviso"], hechos["numero"]) == ("pedido_de_estado", 1)
     assert "seguimiento_por" not in hechos

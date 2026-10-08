@@ -121,7 +121,9 @@ def dias(conn, mundo) -> Dias:
     mundo["de_marcos"] = _tarea(conn, mundo, DE_MARCOS, "Marcos")
     _entrega(conn, mundo, "Marcos", minuto=30)
     d = Dias(conn, mundo)
-    salieron = d.ciclo(octubre(5, 12))
+    # Marcos confirmó a las 11:31: el aviso de la entrega de Nahuel le llega cuando pasan 30
+    # minutos sin que escriba (no interrumpir una conversación, decisión 13).
+    salieron = d.ciclo(octubre(5, 12, 5))
     assert sorted(a["aviso"] for p in salieron for a in p["hechos"]) == \
         ["entrega_para_aprobar"] * 2
     return d

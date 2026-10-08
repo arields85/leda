@@ -88,7 +88,9 @@ preludio:
 pasos:
   - paso: 1
     quien: Marcos
-    a_las: "2026-10-26 10:20"
+    # A las 09:40 (no a las 10:20, desde la D5): los avisos a Marcos de los pasos 3 y 4b le llegan
+    # enseguida porque ya pasaron 30 minutos desde su mensaje (no interrumpir, la 26).
+    a_las: "2026-10-26 09:40"
     escribe: "che el tablero de la maquina 3 de mariano ya lo vi yo, esta joya. aprobalo asi avanza"
     # El comentario es un dato opcional de aprobar (su ficha): puede venir, con sus palabras.
     jugadas:
@@ -147,14 +149,13 @@ pasos:
         enlace: true
         hechos: {aprobada_por: Ismael Soschinski, comentario: presente, quedo_terminada: true,
                  necesita_respuesta: false}
-      # El lunes es el día hábil siguiente al de las entregas: a Ismael, el primer recordatorio
-      # de las tres que siguen esperando su decisión, en un envío (porción 3c; la 24). No es
-      # parte de lo que mide esta conversación.
-      - a: Ismael
-        tipo: recordatorio_de_la_decision
-        tareas: [COM, DASH, TAB]
-        hechos: {veces_que_se_lo_recuerda: 1, entregada_el: "2026-10-23",
-                 necesita_respuesta: true}
+    # El lunes es el día hábil siguiente al de las entregas: la escalera le guarda a Ismael el
+    # primer recordatorio de las tres que siguen esperando su decisión (porción 3c; la 24), que
+    # espera mientras Ismael conversa (no interrumpir, D5; la 26).
+    estado_avisos:
+      - {tipo: recordatorio_de_la_decision, tarea: COM, a: Ismael, estado: guardado}
+      - {tipo: recordatorio_de_la_decision, tarea: DASH, a: Ismael, estado: guardado}
+      - {tipo: recordatorio_de_la_decision, tarea: TAB, a: Ismael, estado: guardado}
     estado_despues:
       de: Marcos
       pregunta_abierta: null
@@ -346,6 +347,15 @@ pasos:
     relojes: ["2026-10-27 10:00"]
     salen:
       - {a: Mariano, tipo: aviso_previo, tarea: TAB}
+    # El recordatorio del lunes a Ismael se relee al salir: las tres ya están decididas, así que
+    # no sale y queda omitido con su motivo (no interrumpir, D5; la 26).
+    estado_avisos:
+      - {tipo: recordatorio_de_la_decision, tarea: COM, a: Ismael, estado: omitido,
+         motivo: presente}
+      - {tipo: recordatorio_de_la_decision, tarea: DASH, a: Ismael, estado: omitido,
+         motivo: presente}
+      - {tipo: recordatorio_de_la_decision, tarea: TAB, a: Ismael, estado: omitido,
+         motivo: presente}
     dice:
       - que la tarea de Mariano vence el vie 30/10, en su renglón con 📋
       - que no hace falta que responda, solo en el último renglón

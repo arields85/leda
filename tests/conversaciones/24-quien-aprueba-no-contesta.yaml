@@ -34,6 +34,10 @@ preludio:
   - quien: Nahuel
     a_las: "2026-10-26 11:01"
     toca: Confirmar
+  # Cada reloj, en su momento: el aviso a Marcos sale a las 11:15, antes de que Marcos escriba
+  # (después tendría que esperar 30 minutos sin que escriba: no interrumpir, D5, la 26).
+  - quien: Leda
+    relojes: ["2026-10-26 11:15"]
   - quien: Marcos
     a_las: "2026-10-26 11:30"
     escribe: "termine el plc, arranca desde el plc y completo los 20 ciclos sin fallas"
@@ -42,7 +46,7 @@ preludio:
     a_las: "2026-10-26 11:31"
     toca: Confirmar
   - quien: Leda
-    relojes: ["2026-10-26 11:15", "2026-10-26 11:45"]
+    relojes: ["2026-10-26 11:45"]
 
 pasos:
   - paso: 1

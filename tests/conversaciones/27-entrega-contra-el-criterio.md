@@ -130,12 +130,13 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
     - Jugadas: `confirmar` (con la tarea del PLC o sin ella).
     - Efecto: la foto pasa a ser evidencia; la tarea sigue `en_revision`, sin otro cambio de estado.
       A Ismael le llega un aviso nuevo con todo lo vigente, terminado el margen para corregir (ADR
-      0009, enmienda T6i).
+      0009, enmienda T6i) y cuando pasan 30 minutos desde que tocó "Aprobar" (no interrumpir una
+      conversación, la 26): a las 15:55, y eso es lo que dicen los hechos.
     - La respuesta dice: que la entrega quedó completa y sigue en revisión; que le avisa cuando la
       revisen o si hace falta algo más.
     - La respuesta no dice: el nombre de Ismael; que la tarea está terminada o aprobada.
 
-11. **Leda**, por su cuenta, a Ismael (15:41): el aviso nuevo de la entrega, con lo que describió
+11. **Leda**, por su cuenta, a Ismael (15:55): el aviso nuevo de la entrega, con lo que describió
     Marcos, la foto nueva adjunta y los botones. Nunca la foto retirada.
 
 12. **Marcos** manda (viernes 23, 10:00) una foto con el texto: "lo de comunicaciones ya esta, los equipos

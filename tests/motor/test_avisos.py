@@ -223,7 +223,10 @@ def test_si_la_ia_no_redacta_se_reintenta_a_los_1_2_4_y_8_minutos(conn, mundo, e
     assert cuantas(conn, "message_outbox", "not es_respuesta") == 0   # ningún texto fijo
 
     ia = IAGuionada(redacciones=["No le pude avisar a Ismael."])
-    assert enviar(conn, mundo, ia, momento) == {"enviado": 1}
+    # Marcos escribió a las 10:00: el aviso de la falla le llega cuando pasan 30 minutos sin que
+    # escriba (no interrumpir una conversación, decisión 13).
+    assert enviar(conn, mundo, ia, momento) == {"en_espera": 1}
+    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=30)) == {"enviado": 1}
     assert uno(conn, "select chat_id from message_outbox where not es_respuesta")[
         "chat_id"] == marcos["telegram"]
 

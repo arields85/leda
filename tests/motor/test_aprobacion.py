@@ -225,7 +225,10 @@ def test_lo_claro_va_directo_cierra_la_tarea_y_avisa_al_responsable(conn, mundo,
     assert hecho["aviso_al_responsable"]["a"] == "Marcos"
     assert _salida_para(conn, mundo, "Marcos") == []
     ia = IAQueRedacta()
-    assert enviar(conn, mundo, ia, turnos._at(None)).get("enviado", 0) >= 1
+    # Marcos acaba de confirmar la entrega: el aviso le llega cuando pasan 30 minutos sin que
+    # escriba (no interrumpir una conversación, decisión 13).
+    assert enviar(conn, mundo, ia, turnos._at(None) + timedelta(minutes=30)).get(
+        "enviado", 0) >= 1
     hechos = next(h for p in ia.pedidos_de_redaccion for h in p["hechos"]
                   if h["aviso"] == "tarea_aprobada")
     assert hechos["aprobada_por"] == "Ismael" and hechos["comentario"] == "impecable"
@@ -361,7 +364,7 @@ def test_cuando_se_resuelve_lo_que_faltaba_el_codigo_la_cierra_solo(conn, mundo,
     conn.commit()
     assert len(avisos_guardados(conn, "cerrada_con_la_aprobacion")) == 2
     ia = IAQueRedacta()
-    enviar(conn, mundo, ia, cuando)
+    enviar(conn, mundo, ia, cuando + timedelta(minutes=30))     # sin interrumpir (decisión 13)
     hechos = [h for p in ia.pedidos_de_redaccion for h in p["hechos"]
               if h["aviso"] == "cerrada_con_la_aprobacion"]
     assert len(hechos) == 2
@@ -402,7 +405,7 @@ def test_pedir_cambios_con_su_comentario_devuelve_la_tarea_y_avisa(conn, mundo, 
     assert _decisiones(conn, tarea) == [("rechazado", "falta el diagrama")]
     assert _salida_para(conn, mundo, "Marcos") == []
     ia = IAQueRedacta()
-    enviar(conn, mundo, ia, turnos._at(None))
+    enviar(conn, mundo, ia, turnos._at(None) + timedelta(minutes=30))   # sin interrumpir
     hechos = next(h for p in ia.pedidos_de_redaccion for h in p["hechos"]
                   if h["aviso"] == "pedido_de_cambios")
     assert hechos["pidio_cambios"] == "Ismael" and hechos["comentario"] == "falta el diagrama"
@@ -648,6 +651,23 @@ def test_las_entregas_que_salen_juntas_van_en_una_lista_con_un_boton_por_tarea(c
     [entregado] = [e for e in transporte.enviados
                    if e.chat_id == mundo["personas"]["Ismael"]["telegram"]]
     assert [b.etiqueta for b in entregado.botones] == [f"Ver {ENTREGADA}", f"Ver {OTRA}"]
+
+
+def test_las_entregas_que_esperan_mientras_quien_revisa_conversa_salen_en_una_lista(
+        conn, mundo, turnos):
+    """Dos entregas confirmadas con minutos de diferencia, mientras Ismael conversa con Leda: sus
+    avisos esperan juntos (no interrumpir, decisión 13) y salen en una sola lista (decisión 17)
+    cuando termina la espera (el `PENDIENTE` de la D4, en la D5 de la C-3d)."""
+    turnos.dice("Ismael", texto="hola", at=AHORA)
+    _entregada(conn, mundo, turnos)                          # su aviso, a los 10 minutos
+    turnos.dice("Ismael", texto="y como viene todo", at=AHORA + timedelta(minutes=11))
+    _entregada(conn, mundo, turnos, titulo=OTRA, alias="T3")
+    ia = IAQueRedacta()
+    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=13)) == {"en_espera": 1}
+    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=30)) == {"en_espera": 2}
+    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=41)) == {"enviado": 2}
+    [pedido] = ia.pedidos_de_redaccion
+    assert sorted(h["tarea"] for h in pedido["hechos"]) == sorted([ENTREGADA, OTRA])
 
 
 def test_ver_una_entrega_la_muestra_con_los_botones_para_decidir(conn, mundo, turnos):

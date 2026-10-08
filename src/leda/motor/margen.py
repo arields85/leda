@@ -26,7 +26,8 @@ del producto: del lado seguro, nunca deja salir antes un aviso.
 **Cuándo sale:** al terminar el margen, con las reglas de siempre encima (`tiempo.sale`): nunca
 antes de la hora de salida del día ni fuera del horario del espacio (9e). Esa es la hora que se
 guarda en el aviso y, por eso, la que dicen los hechos (`llega`): lo que se le cuenta a la
-persona es cuándo se entera de verdad la otra.
+persona es cuándo se entera de verdad la otra. Si la otra está conversando con Leda, el aviso
+espera además a que termine (`no_interrumpir.py`), y los hechos dicen esa hora.
 
 **Una fecha que atrasa y llegó sin su porqué** (usuario, 2026-10-07; ADR 0018, 9n): su aviso
 espera además la respuesta a la pregunta de qué la atrasa, hasta el final del día de trabajo

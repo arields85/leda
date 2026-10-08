@@ -44,9 +44,10 @@ va a pedir el estado. Así la redacción cuenta el próximo paso sin inventarlo.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
-from . import preguntas
+from . import no_interrumpir, preguntas
 from .ancla import anclaje
 from .avisos import TIPOS, Momento, ausente, leer_tarea, omitir
 from .fichas import (AVISO, EFECTOS, ESPERA, LLEGA, NO_LE_LLEGO, NO_LE_VA_A_LLEGAR,
@@ -83,6 +84,7 @@ def al_final_del_turno(ctx: Contexto, hechos: list[dict[str, Any]]) -> AlFinal:
     """Pone en los hechos el estado final de cada efecto que nombran y les saca las ids; vuelve
     a leer lo que el turno anterior dejó anunciado y pendiente; y dice lo que sigue."""
     m = Momento(ctx.cur, ctx.quien.workspace_id, ctx.calendario, ctx.ahora)
+    escribe = (str(ctx.quien.membership_id), ctx.ahora)     # su mensaje, todavía sin registrar
     nombrados: set[str] = set()
     pendientes: list[dict[str, Any]] = []
     for arriba in hechos:
@@ -93,7 +95,7 @@ def al_final_del_turno(ctx: Contexto, hechos: list[dict[str, Any]]) -> AlFinal:
             for efecto in efectos:
                 nombrados.add(efecto["id"])
                 if efecto["de"] == AVISO:
-                    if _aviso(m, hecho, efecto):
+                    if _aviso(m, hecho, efecto, escribe=escribe):
                         pendientes.append(_anunciado(hecho, efecto, titulo))
                 elif efecto["de"] == ESPERA:
                     _espera(m, hecho, efecto)
@@ -118,9 +120,11 @@ def _con_efectos(valor: Any):
             yield from _con_efectos(v)
 
 
-def _aviso(m: Momento, hecho: dict[str, Any], efecto: dict[str, str]) -> bool:
+def _aviso(m: Momento, hecho: dict[str, Any], efecto: dict[str, str], *,
+           escribe: tuple[str, datetime] | None = None) -> bool:
     """Pone en el hecho el estado final de un aviso que nombra; `True` si sigue guardado
-    (anunciado y pendiente)."""
+    (anunciado y pendiente). Si quien lo recibe está conversando, cuándo le llega es cuando
+    termine su espera (no interrumpir, `no_interrumpir.cuando_sale`)."""
     m.cur.execute("select * from scheduled_notice where id = %s", (efecto["id"],))
     aviso = m.cur.fetchone()
     dicho = hecho.get(efecto["clave"])
@@ -128,7 +132,10 @@ def _aviso(m: Momento, hecho: dict[str, Any], efecto: dict[str, str]) -> bool:
         return False
     estado, motivo = _vigencia(m, aviso)
     if estado == "guardado":
-        return True                 # sigue pendiente: el hecho ya dice cuándo le llega
+        sale = no_interrumpir.cuando_sale(m.cur, m.cal, m.workspace_id, aviso, escribe=escribe)
+        if sale > aviso["programado_para"] and isinstance(dicho.get(LLEGA), str):
+            hecho[efecto["clave"]] = {**dicho, LLEGA: sale.astimezone(m.cal.zona).isoformat()}
+        return True                 # sigue pendiente: el hecho dice cuándo le llega
     if estado == "omitido":
         hecho[efecto["clave"]] = {**dicho, LLEGA: NO_LE_VA_A_LLEGAR, "motivo": motivo}
     else:
@@ -227,9 +234,11 @@ def _que_sigue(m: Momento, ctx: Contexto, task_id: str,
             return None
         tipo = TIPOS.get(aviso["tipo"])
         if tipo is not None and tipo.vigente(m, aviso)[0] is None:
+            # Le llega cuando termine de conversar (no interrumpir), si es más tarde.
+            sale = no_interrumpir.cuando_sale(m.cur, m.cal, m.workspace_id, aviso,
+                                              escribe=(persona, m.ahora))
             return {"proximo_aviso": {
-                "aviso": aviso["tipo"],
-                LLEGA: aviso["programado_para"].astimezone(m.cal.zona).isoformat()}}
+                "aviso": aviso["tipo"], LLEGA: sale.astimezone(m.cal.zona).isoformat()}}
     if tarea["bloqueada"] or tarea["estado"] == "bloqueada":
         return {"seguimiento": DETENIDO_MIENTRAS_SIGA_TRABADA}
     if tarea["fecha_objetivo"] is None:

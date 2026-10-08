@@ -14,9 +14,13 @@ Circuito 8 (ADR 0017, decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7;
 el hilo da por hechos (4b, 9b y 9c: los avisos que salen enseguida y el aviso previo del martes) y
 corre el paso 10 aparte, por el motor y sin comprobarlo. Desde la porción 4, los avisos al responsable
 de los pasos 3, 4b, 7, 9b y 11 llevan al final el enlace a la página de la tarea, que agrega el
-código y sale sin vista previa; el de Ismael del paso 11, no. Desde la porción 3c, el lunes 26 a las 10:30
-Ismael recibe además el primer recordatorio de las tres entregas que siguen esperando su decisión
-(conversación 24): el YAML lo espera en el paso 3, sin que sea parte de lo que mide ésta. Desde la
+código y sale sin vista previa; el de Ismael del paso 11, no. Desde la porción 3c, el lunes 26 la
+escalera le guarda a Ismael el primer recordatorio de las tres entregas que siguen esperando su
+decisión (conversación 24). Desde la D5 de la C-3d (no interrumpir, conversación 26) ese recordatorio
+espera mientras Ismael conversa con Leda decidiendo, y al salir se relee: como Ismael decidió las
+tres, no sale y queda omitido con su motivo. Por la misma regla, Marcos escribe a las 09:40 y no a las
+10:20: así los avisos de las aprobaciones de sus tareas le llegan enseguida, como dice el hilo, en
+lugar de esperar a que pasen 30 minutos desde su mensaje. Desde la
 D4 de la C-3d: los cuatro avisos del viernes salen de a uno, cada uno al terminar su margen para
 corregir (los que salen juntos irían en una lista, la conversación 28), y después de cada decisión
 (pasos 2, 4 y 6) la respuesta dice lo que le queda por revisar a Ismael, con un botón por tarea para
@@ -52,7 +56,7 @@ decisión 12 llama el comentario: va con la aprobación, no como un pedido de ca
 
 ## Hilo
 
-1. **Marcos** escribe (lunes 26, 10:20): "che el tablero de la maquina 3 de mariano ya lo vi yo, esta
+1. **Marcos** escribe (lunes 26, 09:40): "che el tablero de la maquina 3 de mariano ya lo vi yo, esta
    joya. aprobalo asi avanza"
    →
    - Jugadas: `aprobar`, la tarea de Mariano, con o sin lo que dijo como comentario. La jugada existe
