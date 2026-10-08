@@ -386,6 +386,76 @@ Primera ronda con la IA real de los circuitos nuevos (`resultados/fase-c-c3-regr
   comprensión de la entrega con la IA real todavía no está: falta decidir quién juzga lo que cubre un
   texto. No hay prueba por Telegram de estos circuitos.
 
+## La regresión de la C-3d con la IA real (Fase C, D6, 2026-10-08, de tarde)
+
+La ronda de las 29 conversaciones, 5 veces cada una, con sol por la suscripción, sobre `eec2b8a` (D1 a D5
+construidas). Comando: `.venv\Scripts\python.exe -m tests.conversaciones.correr --ia sol-suscripcion
+--veces 5 --paralelo 2 --conversacion …`, en tres tramos con resultado válido:
+`resultados/fase-c-d6-01-20.md`, `resultados/fase-c-d6-21-29.md` (vale sólo para la 21 y la 22) y
+`resultados/fase-c-d6-23-29.md`.
+
+- **Lo que no vale:** el primer intento (las 29) chocó con el cupo de la cuenta de ChatGPT en todas las
+  llamadas (HTTP 429, `usage_limit_reached`, sin tokens); se borró su informe. El segundo (21 a 29) terminó
+  sus corridas pero el corredor se cayó al anotar el gasto (`PermissionError` de Windows al reemplazar
+  `gasto.json`, que otro proceso tenía abierto) y no dejó informe. El tercero (21 a 29) se quedó sin cupo en
+  la 23, vez 3: de ahí en adelante, 429. El usuario cambió de cuenta y se repitieron la 23 a la 29 y la 01 a
+  la 20. Ninguna falla del servicio se cuenta como de Leda; quedó un solo `PlazoAgotado` (la 16, una vez:
+  un aviso que salió tarde).
+- **Garantías:** 5 de 5 en todas salvo la 25, la 27 y la 28 (0 de 5). La 25 es la lectura equivocada
+  conocida (los efectos caen en la otra tarea hasta que Marcos corrige). La 27 y la 28 son las fallas de
+  abajo.
+- **Comprensión:** 5 de 5 de la 01 a la 11, la 13 a la 20, la 24, la 26 y la 29; 0 de 5 en la 12, la 21 a
+  la 23, la 25, la 27 y la 28.
+- **Formato** (la deuda registrada): 0 de 5 en la 02, la 18, la 19, la 21 a la 23, la 25 y la 28; las demás,
+  entre 1 y 5 de 5.
+
+**Lo que es del YAML, no de Leda (aflojado, con la ficha que lo permite; corrida en seco 5 de 5):**
+
+- **El ejemplo con sus palabras** (la 12, paso 6; la 22, pasos 3 a 7; la 25; la 27, pasos 1 a 4): la IA
+  escribe el ejemplo sacado del criterio con su redacción, y el YAML pedía el texto exacto. Ahora el
+  ejemplo puede venir con cualquier texto (`puede_traer`) y los hechos piden que esté (`presente`);
+  `lo_descrito_cubre` vacío o ausente vale igual, y al aceptar el ejemplo puede traer `[C1]`.
+- **"aprobala nomas y pasale lo de los colores"** (la 23, paso 9): la IA elige `aprobar` con el comentario
+  5 de 5, que la decisión 12 da por válido igual que `elegir`; los efectos ya coincidían.
+
+**Las fallas de Leda (comprensión), de la más seria a la más leve:**
+
+1. **"no, asi esta, mandala" con algo pendiente** (la 27, paso 3): en 4 de 5 la IA lo lleva a
+   `fuera_de_la_lista` ("mandar la entrega tal como está"): no se entrega nada, pero cada vez le llega un
+   aviso a la administración. En 1 de 5 lo lee como que **acepta el ejemplo** que rechazó: la vista previa
+   suma "los 20 ciclos sin fallas", que Marcos nunca dijo, y su "si, eso" siguiente la entrega. La vista
+   previa lo mostraba y Marcos confirmó, pero Leda le puso palabras que había rechazado. La jugada esperada
+   era `confirmar` (la cocina se niega: `le_falta_algo`).
+2. **Lo que cubre un texto lo sigue juzgando la IA con más rigor que la persona** (la 21, paso 1, 5 de 5):
+   "termine el plc!! … 20 ciclos sin una falla" no le alcanza para "arranca desde el PLC y completa 20
+   ciclos sin fallas", y Leda pide que confirme que arrancó desde el PLC (con el criterio entero de
+   ejemplo); en 2 de 5 tampoco lo cuenta como explicación. Es la clase del hallazgo 1 de la primera ronda:
+   suma una vuelta, no rompe nada. Lo que sigue en la 21 es consecuencia.
+3. **"y bueno fijate vos"** (la 28, paso 4, 5 de 5): la IA lo lleva a `fuera_de_la_lista` y la
+   administración recibe un aviso cada vez. Lo que ve Ismael está bien: no decide por él, no repite la
+   pregunta y le deja los dos botones.
+4. **Nombrar a Ismael por su cuenta** (la 11, paso 4, 5 de 5): "Ismael no será informado del atraso que
+   habías previsto", al retirar un aviso. El YAML no lo mira. (El "lo decide Ismael" de la 12, la 19 y la
+   23 es `quien_decide`, a la vista a propósito: decisión pendiente del usuario.)
+
+**Lo que se medía de la D2 a la D5:**
+
+- **Un criterio de una sola oración** (la 27, paso 1, 5 de 5): Leda pregunta sólo lo que falta ("falta
+  saber si completó 20 ciclos sin fallas"); el ejemplo es la oración entera del criterio.
+- **"sí" frente a un ejemplo**: es `acepta_el_ejemplo` cuando lo pendiente es el ejemplo (la 22, paso 7,
+  5 de 5; la 27, paso 4, 4 de 4) y `confirmar` cuando lo que está abierto es la vista previa (la 27, vez 5).
+- **"aprobala nomas y pasale lo de los colores"**: una sola elección, 5 de 5 (`aprobar` con el
+  comentario). "¿Cuál de las dos?" se pregunta una vez (la 28, paso 3).
+- **"queda informada"**: aparece en las respuestas de la 01 a la 20 (45 veces en sus transcripciones), y a
+  "a quien le avisaste?" (la 21, paso 6) Leda contesta Ismael y la hora cuando la entrega salió (2 de 5) y,
+  honesta, que todavía nadie cuando no se confirmó (3 de 5).
+- **No interrumpir** (la 26) y **cambia quién revisa** (la 29): garantías y comprensión 5 de 5.
+- **Conclusión vigente:** la cocina de la entrega y la revisión hace lo que se confirma, y las reglas de la
+  D2 a la D5 se cumplen con la IA real. Quedan dos cosas de comprensión que son de diseño, no de frases:
+  qué hace Leda cuando la persona insiste en mandar algo incompleto (hoy cae fuera de la lista, o peor) y
+  quién juzga lo que cubre un texto. No hay todavía prueba por Telegram de estos circuitos (guion en
+  `guion-telegram-fase-c-parte-1.md`).
+
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
 Tarea E3-8 de `odd/tasks/motor-definitivo.md`. Las 18 conversaciones de prueba (las 17 de la Etapa 2 y la

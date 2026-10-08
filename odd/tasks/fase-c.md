@@ -792,9 +792,48 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       abiertas (casos de borde): `no_interrumpir.py:45` (un valor enorme de la espera),
       `no_interrumpir.py:68` (un mensaje viejo corre la ventana siguiente), `no_interrumpir.py:97` y
       `avisos.py:335` (del tema abierto), y sugerencias de pruebas en `efectos.py` y `avisos.py:1084`.
-  - [ ] **D6.** La regresión con la IA real, `leda_motor` al día (autorizado por el usuario de
+  - [x] **D6.** La regresión con la IA real, `leda_motor` al día (autorizado por el usuario de
     antemano, con respaldo) y el guion de la prueba por Telegram (el enlace con `localhost`,
-    decisión 20).
+    decisión 20). Route: delegada (un trabajador: la ronda, el diagnóstico, la base y el guion). Hecha el
+    2026-10-08:
+    - **La ronda** (sol por la suscripción, 29 conversaciones, 5 veces, sobre `eec2b8a`): válida en
+      tres tramos, `resultados/fase-c-d6-01-20.md`, `fase-c-d6-21-29.md` (sólo la 21 y la 22) y
+      `fase-c-d6-23-29.md`. Antes, un intento entero chocó con el cupo (429 en todas las llamadas,
+      informe borrado), uno se cayó al anotar el gasto (`PermissionError` de Windows sobre
+      `gasto.json`, sin informe) y el tercero se quedó sin cupo en la 23; el usuario cambió de cuenta.
+      Corridas empezadas: 370; válidas: 147 (las 29, 5 veces). Resultado y diagnóstico, en la bitácora
+      ("La regresión de la C-3d con la IA real"): garantías 5 de 5 salvo la 25 (la lectura equivocada
+      conocida), la 27 y la 28; comprensión 5 de 5 en 21 de las 29.
+    - **YAML aflojados** (lo que la ficha permite; en seco `--ronda seco-d6`, 5 de 5 bien, y
+      `pytest tests/conversaciones`, 131 passed): el ejemplo con las palabras de la IA en la 12, la 22,
+      la 25 y la 27 (`puede_traer: [lo_descrito_cubre, ejemplo]` y `ejemplo: presente`; al aceptar el
+      ejemplo puede venir `lo_descrito_cubre: [C1]`); la 23, paso 9, espera `aprobar` con el comentario
+      (decisión 12), que la IA elige 5 de 5.
+    - **`leda_motor`:** respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump` (283.721
+      bytes, `pg_restore --list` sin error); las migraciones `0034` a `0038` aplicadas en el lugar con
+      `psql -f` (todas sin error). Como `sembrar` no siembra en un espacio con tareas y las de la base
+      tenían el criterio de relleno, después se recreó (`esquema --recrear`, `importar corework
+      --activar`, `feriados`, `modelo gpt-6-sol --proveedor chatgpt`, `sembrar` con una copia temporal
+      de la semilla fuera del repositorio, `administrador corework Ariel` y `aviso_previo_dias_habiles`
+      = 3). Quedan 12 tareas (6 asignadas, 6 en curso) con criterios concretos que vencen el vie 16/10,
+      la política de evidencia con las clases de cada tipo (6 áreas, 12 tipos) y 5 áreas con su
+      referente; el reloj de Leda, en tiempo real. La semilla del repositorio sigue con el criterio de
+      relleno.
+    - **El guion:** `docs/product/guion-telegram-fase-c-parte-1.md` (`d54a041`). La página se sirve con
+      `uvicorn leda.entrada:app --host 127.0.0.1 --port 8000 --no-access-log` y no con `servir`, que
+      además arranca otro ciclo de Leda (avisos y la sesión de ChatGPT a la vez que el escuchador) y
+      escucha en el 8080.
+    - `PENDIENTE` (decisiones del usuario, con los ejemplos de la bitácora):
+      - **Insistir en mandar una entrega incompleta** ("no, asi esta, mandala"): la IA no lo lleva a
+        `confirmar` y cae fuera de la lista (aviso a la administración) o, una vez de cinco, lo toma como
+        que acepta el ejemplo que rechazó. Es de diseño: qué jugada es "mandala así" con algo pendiente.
+      - **Quién juzga lo que cubre un texto** (la 21, paso 1, 5 de 5): la IA pide confirmar que arrancó
+        desde el PLC a quien escribió "20 ciclos sin una falla".
+      - **"y bueno fijate vos"** cae fuera de la lista (la 28): ¿un aviso a la administración cada vez?
+      - **Nombrar a Ismael al retirar un aviso** (la 11, paso 4): "Ismael no será informado…".
+      - **Decisión 20:** el guion no usa `servir` (ver arriba); confirmar con el usuario.
+      - **El corredor** se cae si otro proceso tiene abierto `gasto.json` al anotar el gasto, y pierde
+        el informe de la ronda entera (`tests/conversaciones/gasto.py`, `anotar`).
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
@@ -804,6 +843,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     dos?" (hoy se repite, `fichas.dos_lecturas`). Después: arreglar el comparador, aflojar en los YAML lo
     que la ficha permite y repetir la ronda; la prueba por Telegram, con `leda_motor` al día (`0034` a
     `0037` y el pack).
+  - Segunda ronda (2026-10-08, de tarde, D6, sobre `eec2b8a`): las 29 conversaciones, 5 veces. Garantías
+    5 de 5 salvo la 25, la 27 y la 28; comprensión 5 de 5 en 21 de 29. Las decisiones del usuario 10 a 20
+    se cumplen con la IA real; quedan dos de diseño (insistir en mandar algo incompleto y quién juzga lo
+    que cubre un texto). `leda_motor` está al día y el guion de la prueba por Telegram, escrito
+    (`docs/product/guion-telegram-fase-c-parte-1.md`). Falta: la prueba por Telegram del usuario.
 - [ ] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).
 - [ ] **C-6.** Las cadencias (pregunta 8).
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
@@ -814,6 +858,6 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La regresión con la IA real de todas (con la 21, la 23 y la 24 enteras, y el enlace), pedir el enlace
-por chat (la jugada que quedó de la porción 4) y la porción 5 de la C-3: el acceso del administrador
+La prueba por Telegram del usuario con el guion de la D6 y las decisiones que dejó la D6 (insistir en
+mandar algo incompleto y quién juzga lo que cubre un texto); después, pedir el enlace por chat (la jugada que quedó de la porción 4) y la porción 5 de la C-3: el acceso del administrador
 (`docs/STATUS.md`, "Punto exacto para retomar").
