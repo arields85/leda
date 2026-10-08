@@ -359,6 +359,33 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   - **Conclusión vigente:** la regla del motivo funciona con la IA real; la inestabilidad del servicio no
     oficial de ChatGPT (riesgo 5) pesa en las rondas, aunque la cocina la maneja sin silencio.
 
+## La entrega y la aprobación con la IA real (Fase C, C-4, 2026-10-08, de noche)
+
+Primera ronda con la IA real de los circuitos nuevos (`resultados/fase-c-c3-regresion.md`, sobre
+`8b05495`, sol por la suscripción, 25 conversaciones, 5 veces): 69 de 125 con todo lo automático bien.
+
+- **De la 01 a la 20 y la 24, garantías y comprensión 5 de 5.** Las fallas que quedan ahí son de formato.
+- **La 21 marcó garantías 0 de 5, y es una falsa alarma del comparador:** la cocina escribió las seis
+  piezas que mostró la vista previa y que Marcos confirmó, y el aviso a Ismael dice lo mismo. El
+  comparador imprime como "real" sólo las filas que no emparejó y llama garantía a una fila que sobra
+  aunque sea lo confirmado (`tests/conversaciones/comprobar.py`, `filas`). Hay que arreglarlo: la
+  garantía es "lo escrito es lo confirmado", no "lo escrito es el camino ideal del YAML".
+- **Hallazgo 1, de diseño: la IA decide qué cubre cada texto** (`el_texto_cubre`) y eso puede trabar
+  la entrega. Leyó "termine el plc!! ahi va la pantalla y el contador, 20 ciclos sin una falla" como
+  resultado de la prueba y no como explicación; el código vio que faltaba la explicación y no ofreció
+  Confirmar, y Leda le pidió a Marcos que contara cómo quedó, sin decirle que lo escrito podía alcanzar.
+  El ADR 0019 (decisión 5) dice que la persona confirma o corrige lo que cubre cada pieza, no que lo
+  decida la IA. Se discute con el usuario antes de tocar nada.
+- **Hallazgo 2: "¿cuál de las dos?" se repite** (la 23, paso 9, 3 de 5): si quien aprueba vuelve a
+  mezclar aprobar y pedir cambios, Leda vuelve a preguntar; la decisión del usuario es preguntar una
+  sola vez. Se discute qué pasa después de esa única pregunta.
+- **La 22 y la 23 en comprensión:** sobre todo el YAML más estricto que la ficha (espera ninguna
+  jugada donde la IA elige `entregar`, que la ficha permite; o rechaza un dato opcional, como la tarea
+  en `confirmar` o un comentario). Sin errores del servicio.
+- **Conclusión vigente:** la cocina de la entrega y la aprobación hace lo que se confirma; la
+  comprensión de la entrega con la IA real todavía no está: falta decidir quién juzga lo que cubre un
+  texto. No hay prueba por Telegram de estos circuitos.
+
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
 Tarea E3-8 de `odd/tasks/motor-definitivo.md`. Las 18 conversaciones de prueba (las 17 de la Etapa 2 y la

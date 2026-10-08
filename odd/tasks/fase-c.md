@@ -391,6 +391,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         página de la tarea antes de esto; no se tocó.
   - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
+  - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
+    la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
+    y la aprobación con la IA real"): la falla de garantía de la 21 es del comparador (la cocina escribió lo
+    confirmado). `PENDIENTE`, decisiones del usuario: quién juzga lo que cubre un texto de la entrega (hoy
+    la IA, `el_texto_cubre`, y puede trabarla) y qué pasa después de la única pregunta de "¿cuál de las
+    dos?" (hoy se repite, `fichas.dos_lecturas`). Después: arreglar el comparador, aflojar en los YAML lo
+    que la ficha permite y repetir la ronda; la prueba por Telegram, con `leda_motor` al día (`0034` a
+    `0037` y el pack).
 - [ ] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).
 - [ ] **C-6.** Las cadencias (pregunta 8).
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).

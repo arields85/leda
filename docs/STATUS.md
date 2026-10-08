@@ -3,8 +3,9 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-08, al cerrar la sesión: formato de los mensajes aprobado, el
-"escribiendo…" con streaming, el margen para corregir, el motivo de un atraso y la Fase C empezada.
+**Última actualización documental:** 2026-10-08, de noche (sesión autónoma): la regresión del motivo con
+la IA real, `main` en `6ee287a`, la C-3 de la Fase C construida hasta la porción 4 y su primera ronda con
+la IA real.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -29,43 +30,54 @@ usamos"): la IA elige jugadas de una lista cerrada y el código las ejecuta (ADR
 
 Hoy Leda conversa con `python -m leda escuchar corework`, con GPT-6 sol por la suscripción de ChatGPT del
 usuario (proveedor `chatgpt`; uso personal, decisión del usuario). La regresión de las 20 conversaciones de
-prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); la regla del motivo de un
-atraso todavía no tiene regresión con la IA real.
+prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); con la regla del motivo de
+un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la aprobación por
+chat (Fase C) están construidas y todavía no pasan con la IA real (bitácora de flujos).
 
-## Punto exacto para retomar (2026-10-08, cierre de sesión)
+## Punto exacto para retomar (2026-10-08, de noche, sesión autónoma)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 (reglas en [`../AGENTS.md`](../AGENTS.md)). Planes: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (lo que
-sigue) y [`../odd/tasks/motor-definitivo.md`](../odd/tasks/motor-definitivo.md) (la etapa 3, con sus cierres).
+sigue, con el registro de cada porción) y [`../odd/tasks/motor-definitivo.md`](../odd/tasks/motor-definitivo.md).
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`); al cerrar la sesión se apaga. Si
 está caído, levantarlo con `levantar-postgres.bat` (o `pg_ctl ... start`, que el agente corre fuera del
 sandbox, porque dentro no puede escribir su registro). Si `pg_ctl` dice que otro servidor puede estar en
-ejecución, cerrar los procesos `postgres` colgados (también un `io_worker` huérfano) y reintentar. Comprobar
-también que no quede un escuchador viejo corriendo (`python -m leda escuchar`): el 2026-10-08 quedó uno de
-la prueba anterior, con el código viejo.
+ejecución, cerrar los procesos `postgres` colgados (el 2026-10-08 quedaron dos) y reintentar. Comprobar
+también que no quede un escuchador viejo corriendo (`python -m leda escuchar`).
 
-**1. Lo primero de la próxima sesión, en este orden:**
-1. **La regresión completa con la IA real** sobre la punta (`--ia sol-suscripcion --veces 5 --paralelo 2`,
-   21 conversaciones): la regla del motivo de un atraso (`4c045d5` a `5f4ee4f`) no tiene regresión con la IA
-   real, porque se cortó por falta de cupo. Antes, `leda chatgpt estado`: el usuario rota entre cuentas de
-   ChatGPT cuando una se queda sin cupo (un 429 en el informe lo muestra).
-2. **Un aviso automático en medio de una conversación** (hallazgo de la prueba del 2026-10-08): el aviso de
-   que comunicaciones vence en 3 días salió justo después de una respuesta, repitiendo lo que se hablaba. El
-   usuario: tiene que esperar a que se cierre el tema, o salir después de un rato sin respuesta. Primero una
-   conversación de prueba, después una regla general en la cocina (los avisos de Leda a una persona esperan
-   mientras está conversando; si ya se habló de eso, se juntan o no salen). Hay que acordar con el usuario
-   cuánto es "un rato sin actividad".
-3. **La Fase C, C-3 desde la porción 2** (`odd/tasks/fase-c.md`): la entrega con evidencia y la política por
-   tipo; después el aviso a quien aprueba con fotos y botones, la página de la tarea y el acceso del
-   administrador (ADR 0019, aceptado). La porción 1 (recibir y guardar archivos, migración `0033`) está
-   hecha.
+**Lo hecho en la sesión autónoma:** la regresión del motivo (funciona; `main` en `6ee287a`), la
+conversación 26 (sin código) y la C-3 hasta la porción 4, revisada por commit (`odd/tasks/fase-c.md`).
+
+**1. Lo primero de la próxima sesión: decisiones del usuario** (en `odd/tasks/fase-c.md`, `PENDIENTE`):
+1. **Quién juzga lo que cubre un texto de la entrega** (hallazgo de la ronda con la IA real): hoy lo
+   decide la IA y puede trabar la entrega. Opciones descritas en la bitácora ("La entrega y la aprobación
+   con la IA real"); el ADR 0019 dice que la persona confirma o corrige.
+2. **"¿Cuál de las dos?" se repite** cuando quien aprueba vuelve a mezclar aprobar y pedir cambios: qué
+   pasa después de la única pregunta.
+3. **El rato sin actividad** de la conversación 26 (propuesta: 5 minutos) y si la regla vale así.
+4. **"La terminé" sobre una tarea que nunca arrancó:** ¿se anota el inicio y se entrega en el mismo
+   mensaje? (hoy dice que no se puede).
+5. **Una pieza retirada después de entregar** deja la evidencia incompleta y la tarea trabada en revisión.
+6. **Si cambia quién aprueba** mientras el aviso espera, el nuevo no recibe nada.
+7. **El tope diario:** los recordatorios a quien aprueba y el aviso de "trabada" a quien está arriba se
+   contaron dentro del tope; "se destrabó", fuera. Confirmar.
+8. **Los avisos de una decisión** (aprobada, cambios pedidos) salen sin el margen para corregir. Confirmar.
+9. **Cómo probar el enlace a la página** por Telegram: hace falta `LEDA_BASE_URL` y que el servidor
+   (`servir`) sea alcanzable desde el celular.
 
 **2. Después:**
-- **Llevar a `main` lo nuevo de la rama**, por avance rápido desde `D:\Proyectos\Leda-PM`, cuando la
-  regresión del punto 1 dé bien (`origin/main` en `f2a769c`; avance rápido autorizado por el usuario).
-  Comprobar antes que no haya líneas de atribución ni secretos.
-- El resto de la Fase C: la persecución del bloqueo (3a), las cadencias, delegar. Y la plataforma web.
+- **El comparador del corredor** marca como garantía una fila que sobra aunque sea lo confirmado, e
+  imprime sólo las filas sin emparejar (`tests/conversaciones/comprobar.py`, `filas`): arreglarlo antes de
+  la próxima ronda. Y aflojar en los YAML de la 21 a la 23 lo que la ficha permite (`puede_traer`).
+- **La prueba por Telegram de la entrega y la aprobación**, con `leda_motor` puesto al día: aplicar las
+  migraciones `0034` a `0037` y volver a importar el pack (las clases de cada tipo y los referentes de
+  cada área), con respaldo previo y autorización del usuario.
+- **Lo que queda de la C-3:** pedir el enlace por chat (una jugada nueva, con su conversación de prueba
+  primero) y la porción 5, el acceso del administrador por el bot de administración.
+- **Diez tablas con `workspace_id` sin `row level security`** (lista en `odd/tasks/fase-c.md`): ver si son sólo de administración o si les falta, contra la
+  invariante de `AGENTS.md`.
+- El resto de la Fase C (la persecución del bloqueo, las cadencias, delegar), que espera sus preguntas.
 
 **Comandos de la prueba por Telegram** (`.venv\Scripts\python.exe -m …`, desde la carpeta del Motor):
 - `leda escuchar corework`: el escuchador.
@@ -122,7 +134,7 @@ validador de invariantes. Destino de cada uno:
   re-aprobación ante un cambio de responsable, y el usuario no quiere que la delegación dependa de que Ismael
   toque algo (`docs/ROADMAP.md`).
 - **El archivo global `~/.claude/CLAUDE.md`:** unos 71.000 caracteres, lo maneja gentle-ai. El proyecto carga
-  unos 76.000 (`LC_ALL=C.UTF-8 wc -m`, 2026-10-07).
+  unos 78.400 (`LC_ALL=C.UTF-8 wc -m`, 2026-10-08): con el global, unos 149.700, al límite de 150.000.
 - **`PENDIENTE` dentro de los ADR y del plan:**
   - si Leda avisa que se cargaron tareas (ADR 0017, decisión 2);
   - qué pasa si quien destraba dice que no le corresponde (3a);
@@ -156,10 +168,10 @@ validador de invariantes. Destino de cada uno:
 - **`prueba_chica/`** se borró el 2026-10-07 (`c43e3e5`); el lector de turnos es `leda.motor.leer`.
 
 **Git:**
-- Repositorio `arields85/leda` (público). `origin/main` está en `f2a769c`: el motor llegó a `main` por avance
+- Repositorio `arields85/leda` (público). `origin/main` está en `6ee287a` (2026-10-08); el motor llegó a `main` por avance
   rápido el 2026-10-07 (221 commits, sin atribuciones ni secretos).
-- La rama del Motor se sube al cerrar cada tramo; lo posterior a `f2a769c` llega a `main` después de la
-  prueba del formato.
+- La rama del Motor se sube al cerrar cada tramo; lo posterior a `6ee287a` llega a `main` cuando la
+  entrega y la aprobación pasen con la IA real.
 - Etiquetas: `respaldo-flujos-antes-de-d`, `respaldo-main-antes-de-d`, `respaldo-0-36-en-pausa`,
   `archivo-c4-medicion`, `archivo-flujo-c6`, `archivo-prueba-0-35` y `respaldo-antes-de-partir-limpieza`
   (todas locales salvo las del 2026-10-04).
@@ -173,14 +185,10 @@ validador de invariantes. Destino de cada uno:
 |---|---|---|---|
 | `main` | `.venv\Scripts\python.exe -m pytest -q` | 2026-09-30 | 2279 passed, 333 deselected |
 | Punto de partida del Motor (`respaldo-main-antes-de-d`) | suite completa | 2026-10-04 | 2286 passed, 333 deselected |
-| Rama del Motor, sin los flujos A y B (E3-4) | suite completa | 2026-10-06 | 626 passed |
-| Rama del Motor, con el proveedor `chatgpt` | suite completa | 2026-10-07 | 1162 passed |
-| Rama del Motor, con el formato y sin `prueba_chica/` | suite completa | 2026-10-07 | 1209 passed |
-| Rama del Motor | `pytest tests/motor tests/conversaciones` | 2026-10-07 | 595 passed |
-| Rama del Motor | `pytest tests/garantias` | 2026-10-07 | 187 passed |
 | Rama del Motor, con la porción 1 de C-3 y el margen | suite completa | 2026-10-07 | 1317 passed |
 | Rama del Motor, con el motivo de un atraso | `pytest tests/motor tests/conversaciones` | 2026-10-08 | 707 passed |
-| Rama del Motor | `pytest tests/garantias` | 2026-10-08 | 220 passed |
+| Rama del Motor, con la C-3 hasta la porción 4 y la `0037` | suite completa | 2026-10-08 | 1524 passed |
+| Rama del Motor | `pytest tests/garantias` | 2026-10-08 | 319 passed |
 
 **Conversaciones con la IA real** (bitácora de flujos):
 - La ronda 3 de la prueba chica dio 85 de 85.
@@ -254,5 +262,9 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
   quedar visible si falla el envío inmediato del mensaje final; un valor raro del margen vuelve a 10 minutos;
   los álbumes por el webhook; una corrección después de dado el motivo; cómo se decide "en el medio se habló
   de otra cosa".
+- **De la Fase C (revisiones y la impugnación del 2026-10-08):** el segundo recordatorio a quien aprueba
+  anuncia el día en que se entera quien está arriba contando desde que se guardó, no desde que salió; la
+  página del tablero se arma fuera de la guarda (la de la tarea ya no); advertencias de casos de borde de
+  cada porción, listadas en `odd/tasks/fase-c.md`.
 - **Formato:** a veces la IA junta dos ideas en un renglón o hace dos preguntas al cierre (el chequeo del
   corredor lo mide).
