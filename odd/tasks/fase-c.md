@@ -173,6 +173,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     atraso es informar, sin nombrar a nadie ("Si mañana sigue igual, voy a informar que está atrasada"),
     nunca "la paso para que te ayuden a destrabarla"; si preguntan a quién, Leda dice el nombre. Antes del
     código, una conversación de prueba con los dos órdenes de respuesta, con la IA real (D5b).
+22. **Aprobar con un comentario que le pide algo a alguien** (del hallazgo de la ronda D7, 28 paso 3, 1
+    de 5: "esta bien pero que mariano revise el rotulo de los cables" se aprobó y la tarea quedó
+    terminada): decidida (usuario, 2026-10-08, opción A). Antes de cerrar, Leda pregunta una vez "¿la
+    aprobás así o pedís cambios?"; cerrar por error es peor que un toque más. La respuesta a esa pregunta
+    es la elección (decisión 12: "aprobala nomás y pasale lo de los colores" aprueba y pasa el
+    comentario). Lo decide la cocina, no la IA: la IA sólo dice que la aprobación trae un comentario.
 
 ## Chequeo de rumbo (2026-10-07)
 
