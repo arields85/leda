@@ -70,10 +70,10 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     pregunta de duda se juzga leyendo la transcripción. Después, Marcos corrige dentro del margen para
     corregir y a Ismael le llega un solo aviso, el de la tarea correcta.
 26. [`26-no-interrumpir.md`](26-no-interrumpir.md): el aviso previo de dos tareas llega a su hora mientras
-    Marcos cuenta que una se atrasa; el aviso espera a que Marcos deje de escribir un rato y, al salir,
-    no repite la tarea de la que se acaba de hablar. Hallazgo de la prueba por Telegram real del
-    2026-10-08; la regla y el rato sin actividad quedan `PENDIENTE` de acuerdo con el usuario, así que
-    todavía no tiene YAML.
+    Marcos cuenta que una se atrasa; el aviso espera 30 minutos sin que Marcos escriba, nunca sale junto
+    con una pregunta sin contestar, el de otra tarea sale aparte y no repite lo que se acaba de hablar.
+    Hallazgo de la prueba por Telegram real del 2026-10-08; la regla la decidió el usuario el mismo día y
+    todavía no está construida, así que no tiene YAML.
 
 La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 1 a 3, y ADR 0019):
 

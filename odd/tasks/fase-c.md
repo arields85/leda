@@ -115,6 +115,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     ("aprobala nomás y pasale lo de los colores": se aprueba y se le pasa el comentario). Si la respuesta
     no elige ("y bueno, fijate vos"), Leda no decide: dice que la entrega queda esperando su decisión,
     con los dos botones, y no repite la pregunta. Hoy `fichas.dos_lecturas` la repite.
+13. **No interrumpir una conversación** (conversación 26, del hallazgo del 2026-10-08): decidida (usuario,
+    2026-10-08). Los avisos a una persona esperan 30 minutos desde lo último que escribió; ninguno sale
+    junto con una pregunta de Leda sin contestar (un tema a la vez); el de otra tarea que no pide
+    respuesta sale aparte, y el que pide respuesta espera a que se cierre la pregunta abierta; nunca fuera
+    del horario; al salir se relee y no se repite lo ya hablado. La regla completa, en
+    `tests/conversaciones/26-no-interrumpir.md`.
 
 ## Chequeo de rumbo (2026-10-07)
 
