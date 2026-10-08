@@ -121,6 +121,16 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     respuesta sale aparte, y el que pide respuesta espera a que se cierre la pregunta abierta; nunca fuera
     del horario; al salir se relee y no se repite lo ya hablado. La regla completa, en
     `tests/conversaciones/26-no-interrumpir.md`.
+14. **Entregar una tarea que nunca se arrancó:** decidida (usuario, 2026-10-08). "La terminé" sobre una
+    tarea asignada se recibe igual, con su vista previa y su confirmación; al confirmar, la historia dice
+    que arrancó y se entregó en ese momento, sin inventar una fecha de inicio. Es la persona la que dice
+    que la hizo (mecánica §3: "ya lo hice" lleva a revisión, nunca a terminada).
+15. **Una pieza retirada después de entregar deja la entrega incompleta:** decidida (usuario,
+    2026-10-08). Leda lo resuelve con la persona en el momento: dice qué falta para aprobar la tarea y
+    pide la pieza correcta, con la misma ayuda que en la entrega. Mientras falta, la aprobación espera:
+    si el aviso a quien aprueba no salió (el margen), no sale; si ya salió y quien aprueba toca Aprobar,
+    Leda le dice que la entrega se está completando y que le avisa. Con la pieza nueva, la entrega vuelve
+    a estar completa y a quien aprueba le llega un aviso nuevo con todo lo vigente.
 
 ## Chequeo de rumbo (2026-10-07)
 
