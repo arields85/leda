@@ -862,6 +862,100 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       `review-bf5579572725ac35`, con advertencias: el texto del ejemplo aceptado no se comprueba en la
       22 y la 27, y el comentario de la aprobación en la 23 se compara literal; `01c5ffe..29cd66d`
       `review-ac5f83ca192bdccf`, con una advertencia en `gasto.py:402`.
+  - [ ] **D7.** Las fallas de Leda de la ronda de la D6, con reglas ya decididas, cada una como mecanismo
+    general (2026-10-08, de noche). Route: delegada (escritor único, 2+ archivos no triviales). Hecha
+    salvo el punto 4, que necesita un archivo fuera de la superficie autorizada. Sin la IA real (el cupo
+    de ChatGPT está agotado): su chequeo es `PENDIENTE`.
+    - **1. El nombre de quien aprueba al retirar un aviso** (la 11, paso 4, 5 de 5: "Ismael no será
+      informado del atraso que habías previsto"; decisión 11). Lo anunciado que ya no va a pasar
+      (`ya_no_va_a_pasar`) dice con qué dato se contó (`anuncio`); si ese dato es uno de
+      `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`, el nombre va dentro de `solo_si_pregunta`, como en el
+      dato mismo, para cada aviso retirado o que ya no sale, también en los últimos turnos. `b792bdd`.
+      Rojo primero: `test_lo_anunciado_que_ya_no_va_a_pasar_nombra_a_quien_aprueba_solo_si_pregunta`
+      (Ismael a la vista). La 11, paso 4, suma `no_dice` del nombre.
+    - **2. Una respuesta a la pregunta abierta nunca es un pedido nuevo** (la 27, paso 3, 4 de 5, y la
+      28, paso 4, 5 de 5: aviso a la administración cada vez). Regla: mientras una pregunta de Leda está
+      abierta, el mensaje que la contesta sin ser una jugada lo maneja esa pregunta y nunca avisa a la
+      administración. Quién lee si contesta es la IA, con un dato nuevo de lo que no está en la lista
+      (`contesta_la_pregunta`, que describe el dato, sin casos ni frases); el código decide
+      (`turno.contesta_la_abierta`): con una pregunta abierta que la persona vio en un mensaje anterior,
+      esa jugada no corre, no hay aviso, y el turno sigue como un mensaje sin jugada (la de lo que falta
+      vuelve con su ejemplo; la de "¿cuál de las dos?" queda sin elegir, con los botones). Un pedido que
+      la IA no marca así, o uno marcado sin pregunta abierta, sigue fuera de la lista con su aviso (la 12
+      no cambia). Además, la ficha de `confirmar` dice que también es pedir que la entrega vaya como
+      está aunque le falte algo (la cocina se niega, `le_falta_algo`): era la jugada esperada de la 27 y
+      la ficha no la alcanzaba. `dde9b4e`. Rojo primero: tres de cuatro pruebas nuevas (`test_entrega`,
+      `test_aprobacion`, `test_ia_real`); la del pedido nuevo con una pregunta abierta mira que algo no
+      cambie y ya pasaba.
+    - **3. El ejemplo que no se aceptó** (la 27, paso 3, 1 de 5: "no, así está, mandala" se leyó como
+      `acepta_el_ejemplo` y la vista previa sumó "los 20 ciclos sin fallas"). Aceptar es sólo de la IA:
+      la cocina no puede saber, sin frases, que "no, así está" rechaza. Lo que sí hace ahora: si el mismo
+      mensaje también contesta la pregunta de otra forma (`entrega.OTRAS_RESPUESTAS`: pedir que vaya
+      así, dejarla sin efecto o para más tarde, o algo fuera de la lista), las dos lecturas se excluyen y
+      ni el ejemplo ni el mensaje se suman (la vez 2 de la ronda eligió `cancelar` y
+      `fuera_de_la_lista`); la pieza del ejemplo aceptado es `el_ejemplo_que_acepto`, nunca
+      `lo_que_escribio`, así la vista previa dice que se sumó por su sí y no que lo escribió; y el dato
+      `acepta_el_ejemplo` dice que decirle que no, o pedir que vaya sin él, no es aceptarlo. `5388cea`.
+      Rojo primero: las seis variantes de `test_el_ejemplo_no_se_suma_si_el_mensaje_tambien_contesta_
+      otra_cosa` y la de la pieza aceptada (`lo_que_escribio` en lugar de `el_ejemplo_que_acepto`). La
+      22 (paso 7) y la 27 (paso 4) esperan la pieza nueva y su `no_dice`.
+    - **4. La 21, paso 1, no es una falla de Leda** (5 de 5: pide sólo si arranca desde el PLC, que
+      Marcos no escribió; decisión 10). **Sin hacer:** cambiar la 21 para esperar esa pregunta y, al
+      aceptar o escribirlo, la vista previa, agrega un paso y corre los números de los demás, y
+      `tests/conversaciones/test_corredor.py` (fuera de la superficie autorizada) los nombra:
+      `test_el_aviso_de_una_entrega_cuenta_las_fotos_del_album_que_sigue_al_texto` espera las fallas en
+      el paso 7, y `test_la_entrega_confirmada_por_otro_camino_no_es_una_falla_de_garantia` reemplaza las
+      jugadas de los pasos 1, 4 y 5 y busca lo escrito en el 5. Propuesta: 1, la entrega con las dos
+      fotos (falta si arranca desde el PLC, con el ejemplo); 2 (nuevo), "si, va asi" (`entregar` con
+      `acepta_el_ejemplo`, la vista previa A con Confirmar); 3, saca la foto del martes (B); 4, toca el
+      Confirmar de A; 5, la foto con "dale mandala"; 6, "dale"; 7, "a quien le avisaste?"; 8, el aviso a
+      Ismael; y en `test_corredor.py`, el 7 pasa a 8 y los pasos 4 y 5 a 5 y 6. `PENDIENTE`: autorizar
+      ese archivo.
+    - **5. Cómo se dice lo que falta: el modelo que aprobó el usuario** (2026-10-08), referencia de lo
+      que tiene que salir de los hechos, nunca un texto para la IA:
+      > 📋 **Programar PLC de la comprimidora**
+      > ✏️ Sumé tu descripción y las dos fotos.
+      > ⚠️ Para entregarla falta saber si la comprimidora arranca desde el PLC.
+      >
+      > Por ejemplo: «Arranca desde el PLC y completó 20 ciclos sin fallas». ¿Va así?
+
+      La IA escribía "Sumé lo que contaste… Todavía no se puede entregar… La tarea no pasó a revisión… ¿La
+      confirmás o preferís contarlo con tus palabras?". Por la cocina (`82816ea`): lo que escribió quien
+      entrega le llega a la redacción como `su_descripcion` y la entrega incompleta como
+      `para_entregarla_falta` (dos conceptos de la cocina nuevos, `lo_que_escribio` y
+      `falta_evidencia`); que todavía no se entrega lo dice sólo ese resultado (los significados de
+      `le_falta`, `le_falta_del_criterio`, `le_falta_algo` y `no_vale_la_confirmacion` dejaron de
+      repetirlo); la entrega incompleta ya no trae `al_confirmar` (sólo la completa se confirma); lo que
+      falta del criterio es la parte que la descripción no dice, hablando de la tarea; y el ejemplo es
+      una descripción que Leda propone y la persona acepta o reemplaza por la suya ("con sus palabras"
+      desaparece). Rojo primero: `test_que_todavia_no_se_entrega_lo_dice_un_solo_hecho`,
+      `test_lo_que_falta_de_una_entrega_se_lee_como_su_descripcion` y `test_sin_la_politica_completa_
+      dice_que_falta_y_no_mueve_la_tarea` (`al_confirmar`). La 12 (paso 6), la 22, la 25 y la 27 (paso
+      1) suman a `dice` "una sola vez qué falta para entregarla" y a `no_dice` "contaste" o "contarlo";
+      los lee una persona: el corredor no mide texto fuera del formato (`comprobar.py`, fuera de la
+      superficie). La negrita del título y la pregunta en el mismo renglón del ejemplo, en el modelo,
+      chocan con el formato aprobado el 2026-10-07 (sin negrita; el cierre, solo en su renglón): no se
+      tocó el formato. `PENDIENTE`: confirmarlo con el usuario.
+    - **Las instrucciones de la IA no cambiaron** (las huellas de `test_contratos.py` siguen): todo va en
+      los datos de las jugadas (`ia_real.DATOS`, `FUERA_DE_LA_LISTA_ES`), las fichas, los nombres para
+      redactar y los significados.
+    - **Chequeos** (2026-10-08, sobre `82816ea`): `pytest tests/motor tests/conversaciones`, 877
+      passed (sin la intermitente); `pytest tests/garantias`, 323 passed; en seco, `correr --ia
+      guionada --veces 1 --ronda seco-d7`, 29 de 29 bien (informes borrados, `gasto.json` sin tocar).
+    - `PENDIENTE`:
+      - **La IA real**, cuando vuelva el cupo: una sola ronda de la 11, la 21 (después del punto 4), la
+        27 y la 28, 5 veces, sin repetir sin preguntar.
+      - **El corredor no admite dos jugadas válidas para un paso:** la 28, paso 4, espera ninguna jugada;
+        si la IA elige `fuera_de_la_lista` con `contesta_la_pregunta`, la garantía pasa (sin aviso) y la
+        comprensión marca falla, aunque lo que ve Ismael sea lo mismo. Igual en la 27, paso 3, frente a
+        `confirmar`.
+      - **Un "no" leído como aceptar, sin otra jugada en el mensaje** (la vez 5): la cocina no lo puede
+        frenar sin frases. Quedan la ficha de `confirmar`, el dato de `acepta_el_ejemplo` y la vista
+        previa que muestra el ejemplo como aceptado, antes de confirmar. Si vuelve a pasar con la IA
+        real, es de diseño (punto 4 de los disparadores): por ejemplo, que aceptar el ejemplo lleve
+        siempre su propia confirmación.
+      - `aviso_que_no_salio` (el aviso de la falla a quien causó un aviso) nombra a quien iba, que
+        puede ser quien aprueba su trabajo, a la vista: no estaba en lo pedido y no se tocó.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
@@ -886,6 +980,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La prueba por Telegram del usuario con el guion de la D6 y las decisiones que dejó la D6 (insistir en
+La D7 está hecha salvo el punto 4 (la 21, que necesita autorizar `tests/conversaciones/test_corredor.py`);
+su ronda con la IA real (la 11, la 21, la 27 y la 28, 5 veces) espera a que vuelva el cupo. La prueba
+por Telegram del usuario con el guion de la D6 y las decisiones que dejó la D6 (insistir en
 mandar algo incompleto y quién juzga lo que cubre un texto); después, pedir el enlace por chat (la jugada que quedó de la porción 4) y la porción 5 de la C-3: el acceso del administrador
 (`docs/STATUS.md`, "Punto exacto para retomar").
