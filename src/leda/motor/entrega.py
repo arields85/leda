@@ -90,6 +90,16 @@ DE_LA_ENTREGA = (preguntas.CONFIRMAR_ENTREGA, preguntas.LO_QUE_FALTA_DE_LA_ENTRE
 # Qué es cada pieza, como se le dice a la IA (`es`).
 LO_QUE_ESCRIBIO, UNA_FOTO, UN_VIDEO, UN_ARCHIVO, UN_ENLACE = (
     "lo_que_escribio", "una_foto", "un_video", "un_archivo", "un_enlace")
+# El ejemplo que la persona aceptó (`_el_ejemplo_aceptado`): un texto que no escribió ella, y la
+# vista previa lo dice así (D7: la IA leyó un rechazo como que lo aceptaba, y la vista previa lo
+# contó como algo dicho por la persona).
+EL_EJEMPLO_QUE_ACEPTO = "el_ejemplo_que_acepto"
+# Las otras respuestas a la pregunta de lo que falta (D7): pedir que la entrega vaya como está,
+# dejarla sin efecto o para más tarde, o algo que no está en la lista. Con una de ellas en el
+# mismo mensaje, aceptar el ejemplo es otra lectura del mensaje: se excluyen, y el ejemplo no se
+# suma (`_contesta_otra_cosa`). La IA es la que lee; el código no suma palabras que la persona
+# pudo haber rechazado.
+OTRAS_RESPUESTAS = frozenset({"confirmar", "cancelar", "dejar_para_despues"})
 
 # Los códigos de los hechos de una entrega.
 PARA_CONFIRMAR = "para_confirmar"
@@ -746,10 +756,14 @@ def entregar(ctx, datos: dict, tarea: dict) -> dict:
     dicho = datos.get("el_texto_cubre")
     dicho = [str(t) for t in dicho] if isinstance(dicho, list) else None
     juzgado = _de_los_codigos(criterio(ctx.cur, tarea["id"]), datos.get("lo_descrito_cubre"))
-    aceptado = _el_ejemplo_aceptado(ctx, vieja) if datos.get("acepta_el_ejemplo") else None
+    acepta = bool(datos.get("acepta_el_ejemplo"))
+    otra_lectura = acepta and _contesta_otra_cosa(ctx)
+    ofrecido = _el_ejemplo_aceptado(ctx, vieja) if acepta else None
+    aceptado = None if otra_lectura else ofrecido
     # Aceptar el ejemplo no es describir otra cosa: lo que escribió para aceptarlo no es una
-    # pieza. Sin un ejemplo que aceptar, lo que escribió es lo que describe.
-    suma = _piezas_del_mensaje(ctx, dicho, con_el_texto=aceptado is None,
+    # pieza, tampoco si la aceptación no vale porque el mensaje contesta también otra cosa. Sin
+    # un ejemplo que aceptar, lo que escribió es lo que describe.
+    suma = _piezas_del_mensaje(ctx, dicho, con_el_texto=ofrecido is None and not otra_lectura,
                                llegada=_la_llegada(ctx, datos))
     if aceptado is not None:
         suma.insert(0, aceptado)
@@ -779,10 +793,18 @@ def _el_ejemplo_aceptado(ctx, vieja: Mapping[str, Any] | None) -> dict[str, Any]
     if (vieja is None or not jugada.get("ejemplo")
             or str(vieja["id"]) in ctx.preguntas_del_turno):
         return None
-    return {"id": f"j:{vieja['id']}", "clase": "texto", "es": LO_QUE_ESCRIBIO,
+    return {"id": f"j:{vieja['id']}", "clase": "texto", "es": EL_EJEMPLO_QUE_ACEPTO,
             "texto": jugada["ejemplo"], "llego_el": ctx.ahora.isoformat(),
             "cubre_dicho": None, "describe": list(jugada.get("ejemplo_para") or []),
             "antes": False}
+
+
+def _contesta_otra_cosa(ctx) -> bool:
+    """Si el mismo mensaje también contesta la pregunta abierta de otra forma que aceptando el
+    ejemplo (`OTRAS_RESPUESTAS`, o algo que no está en la lista): son dos lecturas que se
+    excluyen."""
+    lista = ctx.jugadas if ctx.jugadas is not None else _fichas().JUGADAS
+    return any(n in OTRAS_RESPUESTAS or n not in lista for n in ctx.elegidas)
 
 
 def mostrar_sumadas(ctx, suma: Sequence[dict], hecho: dict) -> list[str]:

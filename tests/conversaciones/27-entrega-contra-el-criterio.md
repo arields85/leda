@@ -84,6 +84,9 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
      dice. La entrega está completa: se guarda la vista previa con su huella. La tarea sigue `en_curso`.
    - La respuesta dice: la tarea del PLC en su renglón con 📋; una pieza por renglón (lo que escribió, la
      foto y lo que aceptó); que al confirmar pasa a revisión; el cierre, aparte: si la entrega así.
+   - La respuesta no dice: que el ejemplo lo escribió o lo contó Marcos: es el que aceptó, y la vista
+     previa lo muestra así (C-3d, D7). Si el mismo mensaje hubiera contestado también de otra forma
+     (que vaya así, dejarla), aceptar no vale y el ejemplo no se suma: son dos lecturas que se excluyen.
    - Botones: los de la confirmación.
    - Estado después: lo último mostrado para confirmar: la entrega con tres piezas.
 

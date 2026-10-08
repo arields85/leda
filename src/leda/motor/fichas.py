@@ -109,6 +109,10 @@ class Contexto:
     # página de la tarea, uno solo por mensaje: `(tarea, persona)`.
     adjuntos_de_la_respuesta: list[str] = field(default_factory=list)
     enlace_de_la_respuesta: list[tuple[str, str]] = field(default_factory=list)
+    # Los nombres de las jugadas que la IA eligió para este mensaje, también las que quedan fuera
+    # de la lista: una jugada mira si el mensaje también dice otra cosa (`entrega.
+    # _contesta_otra_cosa`, D7).
+    elegidas: list[str] = field(default_factory=list)
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
         """Una tarea por su alias: de las suyas o de las que esperan su decisión."""

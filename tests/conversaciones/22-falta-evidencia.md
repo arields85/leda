@@ -121,6 +121,8 @@ porción 3.
    - La respuesta dice: la tarea de comunicaciones en su renglón con 📋; una pieza por renglón, con lo que
      cubre cada una en palabras de todos los días (también lo que aceptó) y la foto del lun 26/10
      aparte, como mandada antes; el cierre, aparte: si la entrega así, o si corrige algo.
+   - La respuesta no dice: que el ejemplo lo escribió o lo contó Marcos: es el que aceptó, y la vista
+     previa lo muestra así (C-3d, D7).
    - Botones: los de la confirmación.
    - Estado después: lo último mostrado para confirmar: la entrega con cinco piezas.
 

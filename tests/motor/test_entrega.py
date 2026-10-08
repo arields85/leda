@@ -805,7 +805,8 @@ def test_sin_el_juicio_de_la_ia_el_criterio_no_queda_cubierto(conn, mundo, marco
 
 def test_aceptar_el_ejemplo_lo_suma_como_lo_que_describe_la_persona(conn, mundo, marcos):
     """El ejemplo cuenta como lo descrito sólo si la persona lo acepta: entonces es una pieza
-    más, con lo que describe, y la entrega se confirma como siempre."""
+    más, con lo que describe, y la entrega se confirma como siempre. En la vista previa es el
+    ejemplo que aceptó, nunca algo que escribió (D7): la persona ve que se sumó por su sí."""
     tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
     marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
                  texto="quedo cerrado y rotulado")
@@ -814,7 +815,7 @@ def test_aceptar_el_ejemplo_lo_suma_como_lo_que_describe_la_persona(conn, mundo,
     assert hecho["resultado"] == "para_confirmar"
     assert [(p["es"], p.get("dice"), p.get("describe")) for p in hecho["entrega"]] == [
         ("lo_que_escribio", "quedo cerrado y rotulado", [CERRADO]),
-        ("lo_que_escribio", EJEMPLO, [AISLACION])]
+        ("el_ejemplo_que_acepto", EJEMPLO, [AISLACION])]
     marcos.manda(Jugada("confirmar", {}), texto="dale")
     assert estado_de(conn, tarea) == "en_revision"
     assert [(f["texto"], list(f["d"])) for f in todos(
@@ -835,8 +836,35 @@ def test_el_ejemplo_aceptado_no_lo_pisa_otro_juicio_de_la_ia(conn, mundo, marcos
     assert hecho["resultado"] == "para_confirmar"
     assert "le_falta_del_criterio" not in hecho
     textos = [(p.get("dice"), p.get("describe")) for p in hecho["entrega"]
-              if p["es"] == "lo_que_escribio"]
+              if p["es"] in ("lo_que_escribio", "el_ejemplo_que_acepto")]
     assert textos == [("quedo cerrado y rotulado", [CERRADO]), (EJEMPLO, [AISLACION])]
+
+
+@pytest.mark.parametrize("otra", [
+    Jugada("confirmar", {"tarea": "T2"}),
+    Jugada("cancelar", {}),
+    Jugada("fuera_de_la_lista", {"que_pide": "mandarla así", "contesta_la_pregunta": True})])
+@pytest.mark.parametrize("primero", [True, False])
+def test_el_ejemplo_no_se_suma_si_el_mensaje_tambien_contesta_otra_cosa(conn, mundo, marcos,
+                                                                       otra, primero):
+    """D7 (la 27, paso 3, 1 de 5 con la IA real): "no, así está, mandala" se leyó como que aceptaba
+    el ejemplo que estaba rechazando, y la vista previa sumó "los 20 ciclos sin fallas", que Marcos
+    nunca dijo. Aceptarlo es una respuesta a la pregunta abierta; si el mismo mensaje también la
+    contesta de otra forma (que vaya así, dejarla sin efecto, o algo fuera de la lista), las dos
+    lecturas se excluyen: el ejemplo no se suma, ni el mensaje como descripción, y nada se entrega."""
+    tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
+                 texto="quedo cerrado y rotulado")
+    acepta = _entregar(acepta_el_ejemplo=True)
+    r = marcos.manda(*((acepta, otra) if primero else (otra, acepta)),
+                     texto="no, asi esta, mandala")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "le_falta_evidencia"
+    dichos = [p.get("dice") for p in hecho["entrega"]]
+    assert EJEMPLO not in dichos and "no, asi esta, mandala" not in dichos
+    assert AISLACION in hecho["le_falta_del_criterio"]
+    assert "sumo" not in hecho
+    assert estado_de(conn, tarea) == "en_curso" and cuantas(conn, "evidence") == 0
 
 
 def test_el_ejemplo_no_se_acepta_en_el_mismo_mensaje_que_se_propone(conn, mundo, marcos):

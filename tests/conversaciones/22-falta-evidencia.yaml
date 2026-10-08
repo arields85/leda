@@ -214,7 +214,7 @@ pasos:
            {pieza: P1, es: lo_que_escribio},
            {pieza: P2, es: un_enlace},
            {pieza: P3, es: un_archivo, nombre_del_archivo: config-switch-planta.txt},
-           {pieza: P4, es: lo_que_escribio, dice: presente, describe: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"]},
+           {pieza: P4, es: el_ejemplo_que_acepto, dice: presente, describe: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"]},
            {pieza: P5, es: una_foto, mandado_antes_el: "2026-10-26"}]}
     pregunta: {tipo: confirmar_la_entrega, tarea: COM}
     botones: [Confirmar]
@@ -224,6 +224,8 @@ pasos:
       - "la tarea de comunicaciones en su renglón con 📋"
       - "una pieza por renglón, con lo que cubre cada una en palabras de todos los días (también lo que aceptó) y la foto del lun 26/10 aparte, como mandada antes"
       - "el cierre, aparte: si la entrega así, o si corrige algo"
+    no_dice:
+      - que el ejemplo lo escribió o lo contó Marcos (es el que aceptó)
 
   - paso: 8
     quien: Marcos

@@ -124,7 +124,8 @@ pasos:
          entrega: [
            {pieza: P1, es: lo_que_escribio, dice: "termine el plc, ya arranca desde el plc"},
            {pieza: P2, es: una_foto},
-           {pieza: P3, es: lo_que_escribio,
+           # El ejemplo que aceptó: no lo escribió él, y la vista previa lo dice así (C-3d, D7).
+           {pieza: P3, es: el_ejemplo_que_acepto,
             dice: presente,
             describe: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"]}]}
     pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
@@ -139,6 +140,7 @@ pasos:
     no_dice:
       - que la entregó
       - el nombre de Ismael
+      - que el ejemplo lo escribió o lo contó Marcos (es el que aceptó)
 
   - paso: 5
     quien: Marcos

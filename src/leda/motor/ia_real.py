@@ -130,7 +130,8 @@ DATOS = {
                           "persona lo acepta o lo reescribe."),
     "acepta_el_ejemplo": ("boolean", "Verdadero sólo si la persona acepta, tal cual, el ejemplo "
                                      "que Leda le propuso para describir lo que falta de la "
-                                     "entrega."),
+                                     "entrega. Decirle que no al ejemplo, o pedir que la entrega "
+                                     "vaya sin él, no es aceptarlo."),
     "comentario": ("string", "Lo que dice quien decide sobre una entrega, con sus palabras: al "
                              "aprobar, un comentario si lo hace; al pedir cambios, lo que falta "
                              "o hay que cambiar. Sólo si lo dijo."),

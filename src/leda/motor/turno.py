@@ -142,6 +142,7 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
         def manejar(elegidas: list[Jugada]) -> list[dict[str, Any]]:
             # La respuesta a la pregunta abierta que no es ninguna jugada la maneja esa
             # pregunta, como un mensaje sin jugada: no es un pedido nuevo (D7).
+            ctx.elegidas[:] = [j.nombre for j in elegidas]
             pedidos = [j for j in elegidas if not contesta_la_abierta(ctx, j, jugadas)]
             hechos = _manejar_todas(ctx, pedidos, jugadas)
             # Lo que trajo el mensaje y ninguna jugada tomó: a la entrega abierta, o la

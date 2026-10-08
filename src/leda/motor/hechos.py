@@ -207,6 +207,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                                "mostrárselo cuando entregue esa tarea: no es parte de una "
                                "entrega todavía.",
     "lo_que_escribio": "Lo que la persona escribió.",
+    "el_ejemplo_que_acepto": "El ejemplo que Leda le propuso para lo que faltaba y la persona "
+                             "aceptó tal cual: cuenta como lo que describe, aunque no lo "
+                             "escribió ella.",
     "una_foto": "Una foto.",
     "un_video": "Un video.",
     "un_archivo": "Un archivo.",
