@@ -78,14 +78,16 @@ y 9g.
 
 6. **Marcos** escribe (martes 20, 16:00): "listo, ya la termine a la del plc"
    →
-   - Jugadas: la entrega de la tarea del PLC, que la IA reconoce pero que no se ejecuta en la prueba chica
-     (decisión 9g).
-   - Efecto: ninguno. La tarea sigue `en_curso`. Ningún aviso al administrador: la entrega es conocida, no
-     una situación nueva.
-   - La respuesta dice, con honestidad: que todavía no puede recibir la entrega por acá.
-   - La respuesta no dice: que la tarea quedó entregada, en revisión o terminada; que le avisó a Ismael; que
-     la presente por fuera de este chat o a otra persona (no hay otra forma definida; constitución §4).
-   - Estado después: sin tema abierto.
+   - Jugadas: `entregar` sobre la tarea del PLC. Hasta la Fase C no se recibía por chat (decisión 9g);
+     desde la C-3, porción 2, sí: vista previa y confirmación (ADR 0019, decisión 5).
+   - Efecto: ninguno todavía. La tarea sigue `en_curso` hasta que Marcos confirme. Ningún aviso al
+     administrador: la entrega es conocida, no una situación nueva. En este espacio de prueba la tarea no
+     pide evidencia, así que no falta nada.
+   - La respuesta dice: lo que va a entregar (lo que escribió), que al confirmar queda esperando la
+     aprobación de Ismael, y le pide que lo confirme, con el botón Confirmar.
+   - La respuesta no dice: que la tarea ya quedó entregada, en revisión o terminada; que Ismael ya se
+     enteró.
+   - Estado después: tema abierto, la confirmación de la entrega.
 
 7. **Marcos** escribe (martes 20, 16:02): "y que mas tengo pendiente?"
    →
@@ -93,8 +95,10 @@ y 9g.
    - Efecto: ninguno; el turno queda en el registro.
    - La respuesta dice: sus dos tareas, con su estado y su fecha, como figuran en la base: la del PLC en
      curso, que vence el viernes 23; la de comunicaciones asignada, que vence el viernes 30.
+   - Con la confirmación de la entrega abierta, es otro tema (situación general 8): Leda contesta lo nuevo
+     y vuelve a la confirmación, con el botón Confirmar.
    - La respuesta no dice: tareas de otras personas; la del PLC como entregada.
-   - Estado después: sin tema abierto.
+   - Estado después: tema abierto, la misma confirmación de la entrega.
 
 ## Qué mide
 

@@ -128,17 +128,23 @@ pasos:
     escribe: "listo, ya la termine a la del plc"
     jugadas:
       - {nombre: entregar, tarea: PLC}
+    # Desde la Fase C (C-3, porción 2) la entrega se recibe por chat: vista previa y confirmación. En
+    # este espacio de prueba la tarea del PLC no pide evidencia, así que no falta nada.
     efectos: {}
     hechos:
-      - {jugada: entregar, resultado: no_por_chat, tarea: PLC,
-         otra_forma_de_hacerlo: ninguna_definida}
-    pregunta: null
+      - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
+         sumo: [P1], entrega: [{pieza: P1, es: lo_que_escribio}],
+         al_confirmar: {queda_esperando_la_aprobacion_de: Ismael Soschinski}}
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
     dice:
-      - "con honestidad: que todavía no puede recibir la entrega por acá"
+      - "lo que va a entregar (lo que escribió) y que, al confirmar, queda esperando la aprobación de Ismael"
+      - que lo confirme
     no_dice:
-      - que la tarea quedó entregada, en revisión o terminada
-      - que le avisó a Ismael
-      - que la presente por fuera de este chat o a otra persona (no hay otra forma definida)
+      - que la tarea ya quedó entregada, en revisión o terminada
+      - que Ismael ya se enteró
 
   - paso: 7
     quien: Marcos
@@ -153,9 +159,13 @@ pasos:
         tareas:
           - {titulo: PLC, estado: en_curso, vence: "2026-10-23"}
           - {titulo: COM, estado: asignada, vence: "2026-10-30"}
-    pregunta: null
+    # Otro tema con la confirmación de la entrega abierta (situación general 8): contesta lo nuevo y
+    # vuelve a la confirmación.
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC, desde_antes: true}
+    botones: [Confirmar]
     dice:
       - "sus dos tareas, con su estado y su fecha: la del PLC en curso, que vence el viernes 23; la de comunicaciones asignada, que vence el viernes 30"
+      - que la entrega de la del PLC sigue esperando que la confirme
     no_dice:
       - tareas de otras personas
       - la del PLC como entregada

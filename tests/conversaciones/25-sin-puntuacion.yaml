@@ -215,14 +215,17 @@ pasos:
     hechos:
       - {jugada: destrabar, resultado: anotado, tarea: PLC, estado: en_curso,
          vuelve_a_pedir_el_estado: ausente, pregunta: ausente}
-      - {jugada: entregar, resultado: no_por_chat, tarea: COM}
+      # Desde la Fase C (C-3, porción 2) la entrega se recibe sólo desde en curso, y comunicaciones
+      # nunca se arrancó. PENDIENTE (decisión del usuario, odd/tasks/fase-c.md): si "la terminé" sobre una
+      # tarea sin arrancar anota el inicio y entrega en el mismo mensaje.
+      - {jugada: entregar, resultado: no_se_puede, motivo: estado, tarea: COM, estado: asignada}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
       para_despues: []
     dice:
       - "en el bloque de la del PLC, con 📋 primero y ✏️ debajo: que quedó anotado que se destrabó y sigue en curso"
-      - "en el bloque de la de comunicaciones: con honestidad, que todavía no puede recibir la entrega por acá"
+      - "en el bloque de la de comunicaciones: con honestidad, que no puede recibir la entrega porque la tarea no figura como arrancada, y qué puede hacer"
       - el próximo paso, aparte y al final
     no_dice:
       - que la tarea de comunicaciones quedó entregada, en revisión o terminada
