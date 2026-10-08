@@ -110,6 +110,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     "✏️ Quedó anotado que la terminás el mar 27/10. La nueva fecha queda informada." Si la persona
     pregunta a quién se le informa, Leda le dice el nombre. Reemplaza el "Ismael será notificado" del
     formato de los mensajes (conversación 20): las conversaciones y los hechos que lo esperan cambian.
+12. **Después de la única pregunta de "¿cuál de las dos?":** decidida (usuario, 2026-10-08). La respuesta
+    se lee como la elección y lo demás va como comentario al responsable, sin ser un pedido de cambios
+    ("aprobala nomás y pasale lo de los colores": se aprueba y se le pasa el comentario). Si la respuesta
+    no elige ("y bueno, fijate vos"), Leda no decide: dice que la entrega queda esperando su decisión,
+    con los dos botones, y no repite la pregunta. Hoy `fichas.dos_lecturas` la repite.
 
 ## Chequeo de rumbo (2026-10-07)
 
