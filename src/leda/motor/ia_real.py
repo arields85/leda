@@ -114,6 +114,19 @@ DATOS = {
                                 "persona describe con lo que escribe, de evidencia_que_pide. "
                                 "Sólo lo que dice: describir que terminó no es describir cómo lo "
                                 "probó."),
+    "lo_descrito_cubre": ("array", "Los puntos (C1, C2...) del criterio_de_aceptacion de la "
+                                   "tarea que dice todo lo que la persona describió en la "
+                                   "entrega: lo que escribe ahora y lo que ya escribió en esta "
+                                   "entrega. Sólo los que dice; decir que terminó no es decir "
+                                   "lo que pide un punto."),
+    "ejemplo": ("string", "Si a lo descrito le falta algún punto del criterio de aceptación, cómo "
+                          "podría describirlo la persona, en una o dos oraciones: con las "
+                          "palabras de ese punto y de lo que la persona ya dijo, sin ningún "
+                          "número, nombre ni dato que no esté ahí. Leda se lo propone y la "
+                          "persona lo acepta o lo reescribe."),
+    "acepta_el_ejemplo": ("boolean", "Verdadero sólo si la persona acepta, tal cual, el ejemplo "
+                                     "que Leda le propuso para describir lo que falta de la "
+                                     "entrega."),
     "comentario": ("string", "Lo que dice quien decide sobre una entrega, con sus palabras: al "
                              "aprobar, un comentario si lo hace; al pedir cambios, lo que falta "
                              "o hay que cambiar. Sólo si lo dijo."),

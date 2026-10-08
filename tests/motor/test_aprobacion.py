@@ -142,9 +142,11 @@ def turnos(conn, mundo) -> Turnos:
 
 
 def _entregada(conn, mundo, turnos, titulo: str = ENTREGADA, alias: str = "T2") -> str:
-    """Marcos entrega `titulo` y la confirma por escrito; la tarea queda en revisión."""
+    """Marcos entrega `titulo`, con lo que describe el criterio de aceptación (C-3d, D3), y la
+    confirma por escrito; la tarea queda en revisión."""
     tarea = _tarea(conn, mundo, titulo)
-    turnos.dice("Marcos", Jugada("entregar", {"tarea": alias}), texto="termine")
+    turnos.dice("Marcos", Jugada("entregar", {"tarea": alias, "lo_descrito_cubre": ["C1"]}),
+                texto="termine, quedo armado y probado")
     turnos.dice("Marcos", Jugada("confirmar", {}), texto="dale")
     assert estado_de(conn, tarea) == "en_revision"
     return tarea
@@ -268,7 +270,8 @@ def test_aprobar_exige_la_evidencia_que_pide_la_politica(conn, mundo, turnos):
                      '{"explicacion": {"clases": ["texto"], "en_palabras": "cómo quedó"}}'))
     conn.commit()
     tarea = _tarea(conn, mundo, pide=("explicacion",))
-    turnos.dice("Marcos", Jugada("entregar", {"tarea": "T2", "el_texto_cubre": ["explicacion"]}),
+    turnos.dice("Marcos", Jugada("entregar", {"tarea": "T2", "el_texto_cubre": ["explicacion"],
+                                              "lo_descrito_cubre": ["C1"]}),
                 texto="quedo armado y probado")
     turnos.dice("Marcos", Jugada("confirmar", {}), texto="dale")
     turnos.dice("Marcos", Jugada("corregir", {"corrige": "entregar", "tarea": "T2",

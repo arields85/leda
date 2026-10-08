@@ -29,11 +29,29 @@ mostrado_para_confirmar`, mostrada en un mensaje anterior) y no cambió desde en
 que incluye la de cada archivo). Si en el mismo mensaje llegó una pieza, la entrega cambia antes
 de confirmar, la confirmación no vale y Leda muestra lo nuevo.
 
-**Qué cubre cada pieza** lo cuenta el código: un texto, los tipos que la persona dice con él (la
-IA los nombra en `el_texto_cubre`; sin decirlo, sólo los que nada más un texto puede cubrir);
-cada foto, archivo o enlace, un tipo que su clase acepta, repartidos para cubrir lo más posible
-(`cubrir`). La regla de qué falta es una sola, la de la base (`tipos_de_evidencia_que_faltan`).
-El código cuenta; quien aprueba juzga: que haya una foto no dice qué muestra (mecánica §5).
+**Qué cubre cada pieza** lo cuenta el código: un texto, siempre lo que nada más un texto puede
+cubrir y, además, los tipos que la persona dice con él (la IA los nombra en `el_texto_cubre`;
+hallazgo 1 de la bitácora: la IA no puede sacarle a un texto lo que sólo un texto cubre y trabar
+la entrega); cada foto, archivo o enlace, un tipo que su clase acepta, repartidos para cubrir lo
+más posible (`cubrir`). La regla de qué falta es una sola, la de la base
+(`tipos_de_evidencia_que_faltan`). El código cuenta; quien aprueba juzga: que haya una foto no
+dice qué muestra (mecánica §5).
+
+**Lo descrito frente al criterio de aceptación** (decisión 10 del usuario, 2026-10-08; C-3d,
+D3). El criterio de la tarea se lee por puntos (`puntos_del_criterio`: sus renglones, sus
+oraciones y lo separado con punto y coma) y la IA que elige la jugada juzga, punto por punto, si
+lo que la persona describe lo dice (`lo_descrito_cubre`, una lista cerrada de códigos C1, C2...,
+como `el_texto_cubre`). Comparar es leer, y leer es de la IA; decidir es del código: cada texto
+guarda los puntos que describe (`describe`), y el código calcula qué falta y si se ofrece
+Confirmar. Lo que no se juzgó no está dicho. Si falta un punto, la entrega no pasa a revisión
+aunque la persona insista (una foto no certifica lo que pide el criterio): Leda dice qué falta y
+le propone un ejemplo sacado del criterio (`ejemplo`, que escribe la IA al elegir la jugada), que
+la persona acepta tal cual (`acepta_el_ejemplo`: entonces es una pieza más, lo que describe la
+persona) o reescribe. El ejemplo pasa por un verificador (`problema_del_ejemplo`, como el
+`_problema_de_propuesta` del flujo C): cada número y cada nombre tiene que estar en el criterio,
+en la tarea o en lo que la persona escribió; si no, Leda propone el punto del criterio tal cual.
+Nunca un callejón sin salida: lo que falta siempre lleva su ejemplo. La persona ve en la vista
+previa qué describe cada texto y lo puede corregir (`corregir`, con `lo_descrito_cubre`).
 
 **Corregir** (`corregir`, situación general 3): "la foto del martes sacala" saca una pieza de la
 vista previa; después de entregada, la retira (`herramientas.retirar_evidencia`): se agrega un
@@ -45,6 +63,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -71,8 +90,12 @@ LLEGO_ALGO_DESPUES = "llego_algo_despues"
 CAMBIO_LO_QUE_SE_MOSTRO = "cambio_lo_que_se_mostro"
 NO_ES_LO_ULTIMO_QUE_VIO = "no_es_lo_ultimo_que_vio"
 NADA_PARA_CONFIRMAR = "nada_para_confirmar"
+LE_FALTA_ALGO = "le_falta_algo"
 
 _ENLACE = re.compile(r"https?://\S+", re.IGNORECASE)
+
+# El ejemplo que Leda propone para lo que falta del criterio: una o dos oraciones.
+LARGO_DEL_EJEMPLO = 300
 
 
 def _fichas():
@@ -204,11 +227,17 @@ def politica(cur, task_id: str) -> Politica:
 
 def para_la_ia(cur, tareas: Sequence[dict[str, Any]], zona) -> tuple[dict[str, Any], ...]:
     """Lo de la entrega que la IA necesita para elegir, en cada tarea: lo que pide una tarea en
-    curso (cada tipo con su código, para nombrarlo en `el_texto_cubre`, y sus palabras) y lo
-    entregado de una tarea en revisión, por pieza (para retirar una)."""
+    curso (cada tipo con su código, para nombrarlo en `el_texto_cubre`, y sus palabras), lo
+    entregado de una tarea en revisión, por pieza (para retirar una), y el criterio de
+    aceptación, punto por punto (para juzgar lo descrito en `lo_descrito_cubre`)."""
     con = []
     for t in tareas:
         t = dict(t)
+        if t["estado"] in ("en_curso", "en_revision"):
+            puntos = criterio(cur, t["id"])
+            if puntos:
+                t["criterio_de_aceptacion"] = [{"punto": f"C{i}", "lo_que_pide": punto}
+                                               for i, punto in enumerate(puntos, 1)]
         if t["estado"] == "en_curso":
             pol = politica(cur, t["id"])
             if pol.pide:
@@ -224,6 +253,157 @@ def para_la_ia(cur, tareas: Sequence[dict[str, Any]], zona) -> tuple[dict[str, A
     return tuple(con)
 
 
+# --- El criterio de aceptación, por puntos (decisión 10 del usuario, 2026-10-08) -------------
+
+_VINETA = re.compile(r"^\s*(?:[-•*]|\d+[.)])\s+")
+_FIN_DE_PUNTO = re.compile(r";|\.(?:\s+|$)")
+
+
+def puntos_del_criterio(texto: str | None) -> list[str]:
+    """Los puntos de un criterio de aceptación: sus renglones, sus oraciones y lo separado con
+    punto y coma, sin viñetas ni el punto final, en su orden. Una oración es un solo punto
+    aunque diga dos cosas: el código no parte lo que alguien escribió por sus palabras. `PENDIENTE`
+    (la plataforma, con su ADR): que quien carga la tarea escriba un punto por renglón."""
+    puntos: list[str] = []
+    for renglon in (texto or "").splitlines():
+        for parte in _FIN_DE_PUNTO.split(_VINETA.sub("", renglon)):
+            parte = " ".join(parte.split()).strip(" .;")
+            if parte and parte not in puntos:
+                puntos.append(parte)
+    return puntos
+
+
+def criterio(cur, task_id: str) -> list[str]:
+    """Los puntos del criterio de aceptación de la tarea, como está escrito hoy."""
+    cur.execute("select criterio_aceptacion from task where id = %s", (task_id,))
+    fila = cur.fetchone()
+    return puntos_del_criterio(fila["criterio_aceptacion"] if fila else None)
+
+
+def _de_los_codigos(puntos: Sequence[str], codigos: Any) -> list[str] | None:
+    """Los puntos que nombra la IA por su código (C1, C2...), en el orden del criterio; `None`
+    si no juzgó (el dato no vino). Un código que no es de un punto no nombra nada."""
+    if not isinstance(codigos, list):
+        return None
+    dichos = {str(c).strip().upper() for c in codigos}
+    return [p for i, p in enumerate(puntos, 1) if f"C{i}" in dichos]
+
+
+def _lo_dicho_de_lo_entregado(cur, task_id: str) -> tuple[set[str], set[str]]:
+    """Lo que dice del criterio la evidencia del ciclo vigente: lo de las piezas que siguen y lo
+    de las retiradas."""
+    desde = _ciclo_desde(cur, task_id)
+    cur.execute("""select e.describe_del_criterio d,
+                          exists (select 1 from evidencia_retirada w
+                                   where w.evidence_id = e.id) retirada
+                     from evidence e
+                    where e.task_id = %s
+                      and (%s::timestamptz is null or e.at > %s::timestamptz)""",
+                (task_id, desde, desde))
+    vigente, retirado = set(), set()
+    for f in cur.fetchall():
+        (retirado if f["retirada"] else vigente).update(f["d"] or [])
+    return vigente, retirado
+
+
+def falta_del_criterio_de_lo_entregado(cur, task_id: str) -> list[str]:
+    """Lo que la entrega de una tarea en revisión dejó de decir del criterio porque se retiró un
+    texto (decisión 15 del usuario, 2026-10-08): lo que describían las piezas retiradas y no
+    describe ninguna de las que siguen. Al entregarla, lo descrito cubría el criterio (la
+    entrega no sale sin eso); una entrega de antes de la 0038 no guarda lo que describía y no
+    se le pide nada."""
+    vigente, retirado = _lo_dicho_de_lo_entregado(cur, task_id)
+    puntos = criterio(cur, task_id)
+    faltan = retirado - vigente
+    return [p for p in puntos if p in faltan] + sorted(faltan - set(puntos))
+
+
+def _falta_del_criterio(cur, tarea: Mapping[str, Any],
+                        piezas: Sequence[dict[str, Any]]) -> list[str]:
+    """Los puntos del criterio que lo descrito todavía no dice: de una tarea en revisión, lo
+    que dejó de estar dicho al retirar algo; de una que se entrega, todo el criterio. Cuenta lo
+    que describen los textos de la entrega y la evidencia vigente."""
+    if tarea["estado"] == "en_revision":
+        pide = falta_del_criterio_de_lo_entregado(cur, tarea["id"])
+        vigente: set[str] = set()
+    else:
+        pide = criterio(cur, tarea["id"])
+        vigente = _lo_dicho_de_lo_entregado(cur, tarea["id"])[0]
+    dicho = vigente | {d for p in piezas if p["clase"] == "texto" for d in p.get("describe") or []}
+    return [p for p in pide if p not in dicho]
+
+
+def _aplicar_lo_descrito(piezas: list[dict[str, Any]], juzgado: list[str]) -> None:
+    """El juicio de la IA sobre todo lo descrito de una entrega, en sus textos: cada uno se
+    queda con lo suyo que el juicio confirma, y lo que ninguno decía va al último."""
+    textos = [p for p in piezas if p["clase"] == "texto"]
+    if not textos:
+        return
+    for p in textos:
+        p["describe"] = [d for d in p.get("describe") or [] if d in juzgado]
+    dicho = {d for p in textos for d in p["describe"]}
+    textos[-1]["describe"] += [d for d in juzgado if d not in dicho]
+
+
+# --- El ejemplo para lo que falta -------------------------------------------------------------
+
+_NUMERO = re.compile(r"\d+(?:[.,]\d+)?")
+_PALABRA = re.compile(r"[^\W_]+")
+_FIN_DE_ORACION = ".!?:;¿¡\n"
+
+
+def _normal(texto: str) -> str:
+    sin_marcas = "".join(c for c in unicodedata.normalize("NFD", texto)
+                         if unicodedata.category(c) != "Mn")
+    return " ".join(sin_marcas.casefold().split())
+
+
+def problema_del_ejemplo(ejemplo: Any, permitidos: Sequence[str]) -> str | None:
+    """`None` si el ejemplo sirve; si no, por qué (`familia: detalle`). Como el
+    `_problema_de_propuesta` del flujo C (`respaldo-flujos-antes-de-d`): no juzga el sentido,
+    comprueba lo que el código puede comprobar. Cada número y cada nombre (una palabra con
+    mayúscula que no empieza una oración, o una sigla) tiene que estar en `permitidos`: el
+    criterio, la tarea y lo que la persona escribió. Nunca un dato inventado."""
+    texto = " ".join(str(ejemplo or "").split())
+    if not texto:
+        return "vacio"
+    if len(texto) > LARGO_DEL_EJEMPLO:
+        return "largo"
+    base = _normal(" ".join(permitidos))
+    numeros = {n.replace(",", ".") for n in _NUMERO.findall(base)}
+    palabras = set(_PALABRA.findall(base))
+    for n in _NUMERO.findall(texto):
+        if n.replace(",", ".") not in numeros:
+            return f"dato: {n}"
+    for m in _PALABRA.finditer(texto):
+        palabra = m.group(0)
+        if palabra.isdigit() or not any(c.isupper() for c in palabra):
+            continue
+        antes = texto[:m.start()].rstrip()
+        sigla = len(palabra) > 1 and palabra.isupper()
+        if not sigla and (not antes or antes[-1] in _FIN_DE_ORACION):
+            continue
+        if _normal(palabra) not in palabras:
+            return f"nombre: {palabra}"
+    return None
+
+
+def _el_ejemplo(tarea: Mapping[str, Any], piezas: Sequence[dict[str, Any]],
+                falta: Sequence[str], ejemplo: Any, vieja: Mapping[str, Any] | None,
+                ctx) -> str:
+    """El ejemplo que Leda propone para lo que falta del criterio: el de la IA, si pasa el
+    verificador; si no, el que ya se propuso para lo mismo; si no, los puntos que faltan, tal
+    cual el criterio los dice. Nunca falta: ningún mensaje deja a la persona sin salida."""
+    permitidos = [*criterio(ctx.cur, tarea["id"]), *falta, tarea.get("titulo") or "",
+                  ctx.texto or "", *(p.get("texto") or "" for p in piezas)]
+    if ejemplo is not None and problema_del_ejemplo(ejemplo, permitidos) is None:
+        return " ".join(str(ejemplo).split())
+    anterior = ((vieja or {}).get("jugada") or {})
+    if anterior.get("ejemplo") and list(anterior.get("ejemplo_para") or []) == list(falta):
+        return anterior["ejemplo"]
+    return " ".join(f"{p}." for p in falta)
+
+
 # --- Qué cubre cada pieza --------------------------------------------------------------------
 
 def cubrir(piezas: list[dict[str, Any]], pol: Politica) -> None:
@@ -236,10 +416,9 @@ def cubrir(piezas: list[dict[str, Any]], pol: Politica) -> None:
     mandadas antes); las que sobran cubren lo mismo que la primera de su clase."""
     textos = [p for p in piezas if p["clase"] == "texto"]
     for p in textos:
-        dicho = p.get("cubre_dicho")
-        con_texto = [t for t in pol.pide if "texto" in pol.clases(t)]
-        p["cubre"] = ([t for t in con_texto if pol.clases(t) == ("texto",)] if dicho is None
-                      else [t for t in con_texto if t in dicho])
+        dicho = p.get("cubre_dicho") or []
+        p["cubre"] = [t for t in pol.pide if "texto" in pol.clases(t)
+                      and (pol.clases(t) == ("texto",) or t in dicho)]
     cubiertos = {t for p in textos for t in p["cubre"]}
     tipos = sorted((t for t in pol.pide if t not in cubiertos),
                    key=lambda t: (len(pol.clases(t)), pol.pide.index(t)))
@@ -284,10 +463,11 @@ def _faltan(cur, task_id: str, piezas: Sequence[dict[str, Any]]) -> list[str]:
 
 def _huella(task_id: str, estado: str, pol: Politica, piezas: Sequence[dict]) -> str:
     """La huella de lo que se muestra: la tarea y su estado, la versión de la política y cada
-    pieza con su contenido (la huella de cada archivo) y lo que cubre."""
+    pieza con su contenido (la huella de cada archivo), lo que cubre y lo que describe del
+    criterio."""
     datos = [task_id, estado, pol.version,
              [[p["id"], p["clase"], p.get("sha256") or p.get("texto") or p.get("uri"),
-               p["cubre"]] for p in piezas]]
+               p["cubre"], p.get("describe") or []] for p in piezas]]
     return hashlib.sha256(json.dumps(datos, ensure_ascii=False).encode()).hexdigest()
 
 
@@ -322,6 +502,8 @@ def mostrar(piezas: Sequence[dict[str, Any]], pol: Politica, zona) -> list[dict[
         if p.get("nombre"):
             una["nombre_del_archivo"] = p["nombre"]
         una["cubre"] = [pol.en_palabras(t) for t in p.get("cubre") or []]
+        if p.get("describe"):
+            una["describe"] = list(p["describe"])
         if p.get("antes"):
             una["mandado_antes_el"] = datetime.fromisoformat(p["llego_el"]).astimezone(
                 zona).date().isoformat()
@@ -378,7 +560,8 @@ def _lo_entregado(cur, task_id: str) -> list[dict[str, Any]]:
     la del ciclo vigente, sin las retiradas. Con su id, para retirar una."""
     desde = _ciclo_desde(cur, task_id)
     cur.execute(
-        """select e.id, e.clase, e.texto, e.uri, e.cubre, e.at, a.nombre_original,
+        """select e.id, e.clase, e.texto, e.uri, e.cubre, e.describe_del_criterio, e.at,
+                  a.nombre_original,
                   a.clase as clase_del_archivo, a.sha256, e.archivo_id,
                   a.tipo as tipo_del_archivo, a.tamano
              from evidence e
@@ -394,7 +577,9 @@ def _lo_entregado(cur, task_id: str) -> list[dict[str, Any]]:
         piezas.append({"evidencia_id": str(f["id"]), "id": f"v:{f['id']}", "clase": f["clase"],
                        "es": es, "texto": f["texto"], "uri": f["uri"],
                        "nombre": f["nombre_original"], "sha256": f["sha256"],
-                       "cubre": list(f["cubre"] or []), "llego_el": f["at"].isoformat(),
+                       "cubre": list(f["cubre"] or []),
+                       "describe": list(f["describe_del_criterio"] or []),
+                       "llego_el": f["at"].isoformat(),
                        "antes": False,
                        "archivo_id": str(f["archivo_id"]) if f["archivo_id"] else None,
                        "tipo_del_archivo": f["tipo_del_archivo"], "tamano": f["tamano"]})
@@ -416,19 +601,29 @@ def _quien_aprueba(ctx) -> dict[str, str] | None:
 
 
 def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]],
-                        vieja: dict[str, Any] | None) -> dict[str, Any]:
-    """Calcula la vista previa de la entrega (qué cubre cada pieza, qué falta y su huella), la
-    deja como el tema abierto y devuelve sus hechos. Si no cambió, la de antes sigue valiendo;
-    si cambió, la de antes queda reemplazada (situación general 7)."""
+                        vieja: dict[str, Any] | None, *, ejemplo: Any = None) -> dict[str, Any]:
+    """Calcula la vista previa de la entrega (qué cubre cada pieza, qué falta de la política y
+    del criterio, y su huella), la deja como el tema abierto y devuelve sus hechos. Si no
+    cambió, la de antes sigue valiendo; si cambió, la de antes queda reemplazada (situación
+    general 7). `ejemplo`: el que propuso la IA para lo que falta del criterio, si lo hizo."""
     cur = ctx.cur
     piezas = _ordenar(piezas)
     pol = politica(cur, tarea["id"])
     cubrir(piezas, pol)
     faltan = _faltan(cur, tarea["id"], piezas)
+    falta_criterio = _falta_del_criterio(cur, tarea, piezas)
     huella = _huella(tarea["id"], tarea["estado"], pol, piezas)
-    tipo = preguntas.LO_QUE_FALTA_DE_LA_ENTREGA if faltan else preguntas.CONFIRMAR_ENTREGA
+    completa = not faltan and not falta_criterio
+    tipo = preguntas.CONFIRMAR_ENTREGA if completa else preguntas.LO_QUE_FALTA_DE_LA_ENTREGA
     muestra = mostrar(piezas, pol, ctx.calendario.zona)
     fichas = _fichas()
+    lo_que_falta: dict[str, Any] = {}
+    if faltan:
+        lo_que_falta["le_falta"] = [pol.en_palabras(t) for t in faltan]
+    if falta_criterio:
+        lo_que_falta["le_falta_del_criterio"] = list(falta_criterio)
+        lo_que_falta["ejemplo"] = _el_ejemplo(tarea, piezas, falta_criterio, ejemplo, vieja,
+                                              ctx)
 
     sigue = (vieja is not None and vieja["tipo"] == tipo
              and (vieja["jugada"] or {}).get("huella") == huella)
@@ -438,23 +633,28 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
         vigente = preguntas.actual(cur, ctx.quien.membership_id)
         if vigente is None or str(vigente["id"]) != pregunta_id:
             preguntas.retomar(ctx, pregunta_id)
+        # La de antes sigue: lo que falta y su ejemplo son los que ya se le dijeron.
+        lo_que_falta = {k: v for k, v in (vieja["jugada"] or {}).items()
+                        if k in ("le_falta", "le_falta_del_criterio", "ejemplo")}
     else:
         if vieja is not None:
             preguntas.cerrar(ctx, str(vieja["id"]), "sin_efecto",
                              {"reemplazada": True, "tarea": tarea["id"]})
-        jugada = {"nombre": "entregar", "piezas": piezas, "huella": huella, "muestra": muestra}
+        jugada = {"nombre": "entregar", "piezas": piezas, "huella": huella, "muestra": muestra,
+                  **lo_que_falta}
+        if falta_criterio:
+            jugada["ejemplo_para"] = list(falta_criterio)
         opciones = ([(BOTON_CONFIRMAR, {"tarea": tarea["id"], "jugada": "confirmar"})]
-                    if not faltan else [])
+                    if completa else [])
         ahora_si, pregunta_id = preguntas.abrir_con_id(ctx, tipo, tarea["id"], jugada=jugada,
                                                        opciones=opciones)
-    _que_sea_lo_mostrado(ctx, pregunta_id if not faltan else None, huella)
+    _que_sea_lo_mostrado(ctx, pregunta_id if completa else None, huella)
 
     quien = _quien_aprueba(ctx)
     hecho: dict[str, Any] = {
-        "resultado": LE_FALTA_EVIDENCIA if faltan else PARA_CONFIRMAR,
-        "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]}, "entrega": muestra}
-    if faltan:
-        hecho["le_falta"] = [pol.en_palabras(t) for t in faltan]
+        "resultado": PARA_CONFIRMAR if completa else LE_FALTA_EVIDENCIA,
+        "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]}, "entrega": muestra,
+        **lo_que_falta}
     if quien is not None:
         hecho["al_confirmar"] = {"estado": "en_revision",
                                  "queda_esperando_la_aprobacion_de": quien["nombre"]}
@@ -501,17 +701,44 @@ def entregar(ctx, datos: dict, tarea: dict) -> dict:
     piezas = _piezas_de(vieja) if vieja is not None else _mandado_antes(ctx, tarea["id"])
     dicho = datos.get("el_texto_cubre")
     dicho = [str(t) for t in dicho] if isinstance(dicho, list) else None
-    suma = _piezas_del_mensaje(ctx, dicho, con_el_texto=True, llegada=_la_llegada(ctx, datos))
+    juzgado = _de_los_codigos(criterio(ctx.cur, tarea["id"]), datos.get("lo_descrito_cubre"))
+    aceptado = _el_ejemplo_aceptado(ctx, vieja) if datos.get("acepta_el_ejemplo") else None
+    # Aceptar el ejemplo no es describir otra cosa: lo que escribió para aceptarlo no es una
+    # pieza. Sin un ejemplo que aceptar, lo que escribió es lo que describe.
+    suma = _piezas_del_mensaje(ctx, dicho, con_el_texto=aceptado is None,
+                               llegada=_la_llegada(ctx, datos))
+    if aceptado is not None:
+        suma.insert(0, aceptado)
+    nuevos = [p for p in suma if p["clase"] == "texto" and p is not aceptado]
+    for p in nuevos:
+        p["describe"] = list(juzgado or [])
     piezas = _sin_repetidas(piezas + suma)
-    if dicho is not None and not any(p["clase"] == "texto" and p in suma for p in piezas):
+    if dicho is not None and not nuevos:
         # Lo que dice que cubre lo que escribió antes en esta entrega.
         for p in piezas:
             if p["clase"] == "texto":
                 p["cubre_dicho"] = list(dicho)
-    hecho = _mostrar_la_entrega(ctx, _tarea_de(ctx, tarea["id"]), piezas, vieja)
+    if juzgado is not None and not nuevos and aceptado is None:
+        _aplicar_lo_descrito(piezas, juzgado)
+    hecho = _mostrar_la_entrega(ctx, _tarea_de(ctx, tarea["id"]), piezas, vieja,
+                                ejemplo=datos.get("ejemplo"))
     if suma:
         hecho["sumo"] = mostrar_sumadas(ctx, suma, hecho)
     return hecho
+
+
+def _el_ejemplo_aceptado(ctx, vieja: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """El ejemplo que Leda propuso para lo que falta, como la pieza que describe la persona al
+    aceptarlo: sólo si se lo propuso en un mensaje anterior (lo vio) y la entrega sigue abierta.
+    Cuenta como lo descrito sólo así."""
+    jugada = (vieja or {}).get("jugada") or {}
+    if (vieja is None or not jugada.get("ejemplo")
+            or str(vieja["id"]) in ctx.preguntas_del_turno):
+        return None
+    return {"id": f"j:{vieja['id']}", "clase": "texto", "es": LO_QUE_ESCRIBIO,
+            "texto": jugada["ejemplo"], "llego_el": ctx.ahora.isoformat(),
+            "cubre_dicho": None, "describe": list(jugada.get("ejemplo_para") or []),
+            "antes": False}
 
 
 def mostrar_sumadas(ctx, suma: Sequence[dict], hecho: dict) -> list[str]:
@@ -620,6 +847,9 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
     motivo = None
     if suma:
         motivo = LLEGO_ALGO_DESPUES
+    elif q["tipo"] == preguntas.LO_QUE_FALTA_DE_LA_ENTREGA:
+        # Le falta algo: no se entrega aunque la persona lo pida (decisión 10 del usuario).
+        motivo = LE_FALTA_ALGO
     elif not tocada:
         mostrada, huella = _lo_mostrado(ctx)
         vigente = preguntas.actual(cur, ctx.quien.membership_id)
@@ -632,7 +862,8 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
         cubrir(piezas, pol)
         if (_huella(tarea_q["id"], tarea_q["estado"], pol, _ordenar(piezas))
                 != (q["jugada"] or {}).get("huella")
-                or _faltan(cur, tarea_q["id"], piezas)):
+                or _faltan(cur, tarea_q["id"], piezas)
+                or _falta_del_criterio(cur, tarea_q, piezas)):
             motivo = CAMBIO_LO_QUE_SE_MOSTRO
     if motivo is not None:
         vieja = q if q["cerrada_en"] is None else None
@@ -683,7 +914,8 @@ def _para_la_cocina(p: Mapping[str, Any]) -> dict[str, Any]:
     vuelve a fijar la cocina por el contenido."""
     if p.get("archivo_id"):
         return {"archivo_id": p["archivo_id"], "cubre": list(p["cubre"])}
-    return {"texto": p.get("texto") or p.get("uri"), "cubre": list(p["cubre"])}
+    return {"texto": p.get("texto") or p.get("uri"), "cubre": list(p["cubre"]),
+            "describe": list(p.get("describe") or [])}
 
 
 def corregir(ctx, datos: dict, tarea: dict) -> dict:
@@ -692,13 +924,14 @@ def corregir(ctx, datos: dict, tarea: dict) -> dict:
     entregada, retira las piezas que la persona saca (se agrega un retiro, nada se borra)."""
     saca = [str(a).strip().upper() for a in datos.get("saca") or []]
     dicho = datos.get("el_texto_cubre")
+    juzgado = _de_los_codigos(criterio(ctx.cur, tarea["id"]), datos.get("lo_descrito_cubre"))
     base = {"corrige": "entregar", "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]}}
     q = abierta(ctx, tarea["id"])
     if q is not None:
         piezas = _piezas_de(q)
         por_alias = {f"P{i}": p for i, p in enumerate(piezas, 1)}
         desconocidas = [a for a in saca if a not in por_alias]
-        if desconocidas or (not saca and not isinstance(dicho, list)):
+        if desconocidas or (not saca and not isinstance(dicho, list) and juzgado is None):
             return {"resultado": "falta_dato", "falta": ["saca"], **base}
         sacadas = [por_alias[a] for a in saca]
         pol = politica(ctx.cur, tarea["id"])
@@ -708,6 +941,8 @@ def corregir(ctx, datos: dict, tarea: dict) -> dict:
             for p in quedan:
                 if p["clase"] == "texto":
                     p["cubre_dicho"] = [str(t) for t in dicho]
+        if juzgado is not None:
+            _aplicar_lo_descrito(quedan, juzgado)
         hecho = _mostrar_la_entrega(ctx, _tarea_de(ctx, tarea["id"]), quedan, q)
         return {**hecho, "resultado": "corregido", "como_queda": hecho["resultado"], **base,
                 **({"sacadas": [vistas[piezas.index(p)] for p in sacadas]} if sacadas else {})}

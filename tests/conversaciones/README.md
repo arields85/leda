@@ -92,6 +92,10 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
     por día hábil hasta que decide; el segundo avisa que al día siguiente se entera quien está arriba
     (Marcos → Ismael), que al tercero recibe un aviso sólo informativo, una vez, y después que se
     destrabó; sin nadie arriba, sólo el recordatorio; al responsable, nada.
+27. [`27-entrega-contra-el-criterio.md`](27-entrega-contra-el-criterio.md): lo que Marcos describe al
+    entregar no dice todo el criterio de aceptación; Leda dice qué falta con un ejemplo sacado del
+    criterio, se lo vuelve a dar cuando pregunta qué poner, no la entrega aunque insista, y con el
+    ejemplo aceptado la entrega se confirma (decisión 10 del usuario, 2026-10-08; C-3d, D3).
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
@@ -103,8 +107,11 @@ con su YAML para los pasos que esa porción cubre:
   esperarse todavía.
 - **La 22**, entera, con una diferencia anotada en su YAML: en el paso 5 el enlace solo cubre el archivo
   y falta cómo se probó (el reparto es por las clases; con el archivo del paso 6 queda como dice el
-  `.md`). En el paso 7, el aviso a Ismael queda guardado y sale terminado el margen para corregir;
-  el `.md` todavía dice que se entera "ahora".
+  `.md`). En el paso 8, el aviso a Ismael queda guardado y sale terminado el margen para corregir.
+  Desde la D3 de la C-3d, el "listo" del paso 3 tampoco dice lo que pide el criterio de aceptación, y
+  Marcos acepta el ejemplo en el paso 7.
+- **La 27**, entera, desde la D3 de la C-3d. Su política de evidencia es más corta que la del pack
+  (`evidencia` en su YAML), para mirar sólo el criterio.
 
 **La 23 corre desde la porción 3b de la C-3** (la hoja de aprobación), entera, con tres pasos de Leda que
 el hilo da por hechos (4b, 9b y 9c) y el paso 10 aparte (`aparte: true`: por el motor y sin

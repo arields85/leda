@@ -45,14 +45,15 @@ pasos:
     escribe: "termine el plc!! ahi va la pantalla y el contador, 20 ciclos sin una falla"
     manda: [{que: foto}, {que: foto}]
     jugadas:
-      - {nombre: entregar, tarea: PLC, el_texto_cubre: [explicacion, resultado_de_prueba]}
+      - {nombre: entregar, tarea: PLC, el_texto_cubre: [explicacion, resultado_de_prueba],
+         lo_descrito_cubre: [C1]}
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
          sumo: [P1, P2, P3],
          entrega: [
            {pieza: P1, es: lo_que_escribio,
-            cubre: ["cómo quedó el trabajo, contado por quien lo hizo",
+            cubre: ["cómo quedó el trabajo, descrito por quien lo hizo",
                     "cómo se probó y qué dio la prueba"]},
            {pieza: P2, es: una_foto, cubre: ["una foto o una captura de la pantalla"]},
            {pieza: P3, es: una_foto, cubre: ["una foto o una captura de la pantalla"]},

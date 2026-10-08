@@ -54,29 +54,29 @@ foco: [PLC, COM, TAB, DASH]
 preludio:
   - quien: Marcos
     a_las: "2026-10-23 15:00"
-    escribe: "termine el plc"
-    jugadas: [{nombre: entregar, tarea: PLC}]
+    escribe: "termine el plc, arranca desde el plc y completo los 20 ciclos sin fallas"
+    jugadas: [{nombre: entregar, tarea: PLC, lo_descrito_cubre: [C1]}]
   - quien: Marcos
     a_las: "2026-10-23 15:01"
     toca: Confirmar
   - quien: Marcos
     a_las: "2026-10-23 15:02"
-    escribe: "termine lo de comunicaciones"
-    jugadas: [{nombre: entregar, tarea: COM}]
+    escribe: "termine lo de comunicaciones, los equipos hablan con el plc por la red de planta sin errores hace una hora"
+    jugadas: [{nombre: entregar, tarea: COM, lo_descrito_cubre: [C1]}]
   - quien: Marcos
     a_las: "2026-10-23 15:03"
     toca: Confirmar
   - quien: Mariano
     a_las: "2026-10-23 15:05"
-    escribe: "termine el tablero de la 3"
-    jugadas: [{nombre: entregar, tarea: TAB}]
+    escribe: "termine el tablero de la 3, cableado segun el diagrama y paso continuidad y aislacion"
+    jugadas: [{nombre: entregar, tarea: TAB, lo_descrito_cubre: [C1]}]
   - quien: Mariano
     a_las: "2026-10-23 15:06"
     toca: Confirmar
   - quien: Ariel
     a_las: "2026-10-23 15:08"
-    escribe: "termine el dashboard"
-    jugadas: [{nombre: entregar, tarea: DASH}]
+    escribe: "termine el dashboard, muestra los lotes del dia con cantidad y estado y coinciden con el registro de produccion"
+    jugadas: [{nombre: entregar, tarea: DASH, lo_descrito_cubre: [C1]}]
   - quien: Ariel
     a_las: "2026-10-23 15:09"
     toca: Confirmar
@@ -346,8 +346,8 @@ pasos:
     aparte: true
     quien: Lucas
     a_las: "2026-10-28 10:50"
-    escribe: "termine el switch"
-    jugadas: [{nombre: entregar, tarea: SW}]
+    escribe: "termine el switch, quedo instalado y la sala de servidores anduvo una hora sin cortes"
+    jugadas: [{nombre: entregar, tarea: SW, lo_descrito_cubre: [C1]}]
   - paso: 10b
     aparte: true
     quien: Lucas

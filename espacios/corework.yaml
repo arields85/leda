@@ -240,11 +240,11 @@ evidencia:
     gestion:      [explicacion]
   # Qué clase de evidencia cubre cada tipo y cómo se le dice a la persona (ADR 0019,
   # decisión 5). La clase la fija el código por el contenido: texto, imagen, archivo o
-  # enlace. Un resultado de prueba se puede contar por escrito (usuario, 2026-10-07).
+  # enlace. Un resultado de prueba se puede describir por escrito (usuario, 2026-10-07).
   tipos:
     explicacion:
       clases: [texto]
-      en_palabras: "cómo quedó el trabajo, contado por quien lo hizo"
+      en_palabras: "cómo quedó el trabajo, descrito por quien lo hizo"
     resultado_de_prueba:
       clases: [texto, archivo, imagen, enlace]
       en_palabras: "cómo se probó y qué dio la prueba"

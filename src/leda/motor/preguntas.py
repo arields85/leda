@@ -223,9 +223,17 @@ def _lo_propuesto(q) -> dict[str, Any]:
 
 def _lo_mostrado(q) -> dict[str, Any]:
     """Lo que la pregunta le mostró a la persona, si lo guardó (`muestra`: las piezas de una
-    entrega, con sus alias): para elegir sobre eso y para volver a decirlo."""
-    muestra = (q["jugada"] or {}).get("muestra")
-    return {"lo_mostrado": list(muestra)} if muestra else {}
+    entrega, con sus alias): para elegir sobre eso y para volver a decirlo. De una entrega a la
+    que le falta algo, también qué le falta y el ejemplo que Leda le propuso para lo que falta
+    del criterio (C-3d, D3): para aceptarlo y para volver a decirlo."""
+    jugada = q["jugada"] or {}
+    dicho: dict[str, Any] = {}
+    if jugada.get("muestra"):
+        dicho["lo_mostrado"] = list(jugada["muestra"])
+    for clave in ("le_falta", "le_falta_del_criterio", "ejemplo"):
+        if jugada.get(clave):
+            dicho[clave] = jugada[clave]
+    return dicho
 
 
 def _alias(tareas, task_id) -> str | None:

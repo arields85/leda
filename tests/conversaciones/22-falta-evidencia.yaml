@@ -30,7 +30,7 @@ evidencia:
 # tanto para el archivo como para el resultado de la prueba, y el código lo reparte por las
 # clases, no por lo que dice el enlace. Con el enlace solo, cubre el archivo y falta cómo se
 # probó; al llegar el archivo del paso 6, el reparto cambia y el enlace cubre el resultado de la
-# prueba, como dice el .md (la persona puede corregirlo en la vista previa). En el paso 7, el
+# prueba, como dice el .md (la persona puede corregirlo en la vista previa). En el paso 8, el
 # aviso a Ismael es el del motor (porción 3a de la C-3): queda guardado y sale terminado el margen
 # para corregir, no "ahora" como dice el .md.
 pasos:
@@ -77,15 +77,23 @@ pasos:
     quien: Marcos
     a_las: "2026-10-28 15:00"
     escribe: "listo lo de comunicaciones, quedo andando todo"
+    # "Quedó andando todo" no dice lo que pide el criterio de aceptación (C-3d, D3): la IA lo
+    # juzga punto por punto y propone un ejemplo sacado del criterio.
     jugadas:
-      - {nombre: entregar, tarea: COM, el_texto_cubre: [explicacion]}
+      - nombre: entregar
+        tarea: COM
+        el_texto_cubre: [explicacion]
+        lo_descrito_cubre: []
+        ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora."
     efectos: {}
     hechos:
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM, sumo: [P1],
          pregunta: lo_que_falta_de_la_entrega,
+         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"],
+         ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora.",
          entrega: [
            {pieza: P1, es: lo_que_escribio,
-            cubre: ["cómo quedó el trabajo, contado por quien lo hizo"]},
+            cubre: ["cómo quedó el trabajo, descrito por quien lo hizo"]},
            {pieza: P2, es: una_foto, mandado_antes_el: "2026-10-26",
             cubre: ["una foto o una captura de la pantalla"]}],
          le_falta: ["cómo se probó y qué dio la prueba",
@@ -97,6 +105,7 @@ pasos:
       pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
     dice:
       - "lo que falta, en palabras de todos los días: cómo la probó y un archivo"
+      - "que lo que escribió no dice lo que pide la tarea (que los equipos se comunican con el PLC por la red de planta sin errores durante una hora), con el ejemplo para que lo acepte o lo escriba con sus palabras"
       - que la foto del lunes va a estar en la entrega
       - que la tarea pasa a revisión cuando esté todo, sin nombrar a Ismael
       - "el cierre, aparte: que mande lo que falta"
@@ -114,7 +123,8 @@ pasos:
     hechos:
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM, sumo: ausente,
          le_falta: ["cómo se probó y qué dio la prueba",
-                    "un archivo del trabajo, por ejemplo el programa o la configuración"]}
+                    "un archivo del trabajo, por ejemplo el programa o la configuración"],
+         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"]}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
     botones: []
     estado_despues:
@@ -143,14 +153,15 @@ pasos:
                    {pieza: P2, es: un_enlace,
                     enlace: "https://drive.google.com/file/d/prueba-comunicaciones/view"},
                    {pieza: P3, es: una_foto}],
-         le_falta: ["cómo se probó y qué dio la prueba"]}
+         le_falta: ["cómo se probó y qué dio la prueba"],
+         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora."}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
     botones: []
     estado_despues:
       pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
     dice:
       - que sumó el enlace al video
-      - lo que sigue faltando
+      - lo que sigue faltando, también lo que pide la tarea que lo escrito no dice
       - "el cierre, aparte: que lo mande"
 
   - paso: 6
@@ -161,30 +172,60 @@ pasos:
     jugadas:
       - {nombre: entregar, tarea: COM}
     efectos: {}
+    # La política queda completa, pero lo escrito sigue sin decir lo que pide el criterio: no hay
+    # nada que confirmar todavía (C-3d, D3).
     hechos:
-      - {jugada: entregar, resultado: para_confirmar, tarea: COM, sumo: [P3],
-         pregunta: confirmar_la_entrega, le_falta: ausente,
+      - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM, sumo: [P3],
+         pregunta: lo_que_falta_de_la_entrega, le_falta: ausente,
+         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora.",
          entrega: [
            {pieza: P1, es: lo_que_escribio,
-            cubre: ["cómo quedó el trabajo, contado por quien lo hizo"]},
+            cubre: ["cómo quedó el trabajo, descrito por quien lo hizo"]},
            {pieza: P2, es: un_enlace, cubre: ["cómo se probó y qué dio la prueba"]},
            {pieza: P3, es: un_archivo, nombre_del_archivo: config-switch-planta.txt,
             cubre: ["un archivo del trabajo, por ejemplo el programa o la configuración"]},
            {pieza: P4, es: una_foto, mandado_antes_el: "2026-10-26",
             cubre: ["una foto o una captura de la pantalla"]}]}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
+    dice:
+      - que sumó el archivo y que está todo lo que pide la tarea salvo describir lo que pide su criterio
+      - "el ejemplo, para que lo acepte o lo escriba con sus palabras"
+    no_dice:
+      - que la puede confirmar o entregar así
+
+  # Marcos acepta el ejemplo: es lo que describe él (C-3d, D3), una pieza más de la entrega.
+  - paso: 7
+    quien: Marcos
+    a_las: "2026-10-28 15:31"
+    escribe: "si"
+    jugadas:
+      - {nombre: entregar, tarea: COM, acepta_el_ejemplo: true}
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: COM,
+         pregunta: confirmar_la_entrega, le_falta: ausente, le_falta_del_criterio: ausente,
+         entrega: [
+           {pieza: P1, es: lo_que_escribio},
+           {pieza: P2, es: un_enlace},
+           {pieza: P3, es: un_archivo, nombre_del_archivo: config-switch-planta.txt},
+           {pieza: P4, es: lo_que_escribio, dice: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora.", describe: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"]},
+           {pieza: P5, es: una_foto, mandado_antes_el: "2026-10-26"}]}
     pregunta: {tipo: confirmar_la_entrega, tarea: COM}
     botones: [Confirmar]
     estado_despues:
       pregunta_abierta: {tipo: confirmar_la_entrega, tarea: COM}
     dice:
       - "la tarea de comunicaciones en su renglón con 📋"
-      - "una pieza por renglón, con lo que cubre cada una en palabras de todos los días y la foto del lun 26/10 aparte, como mandada antes"
+      - "una pieza por renglón, con lo que cubre cada una en palabras de todos los días (también lo que aceptó) y la foto del lun 26/10 aparte, como mandada antes"
       - "el cierre, aparte: si la entrega así, o si corrige algo"
 
-  - paso: 7
+  - paso: 8
     quien: Marcos
-    a_las: "2026-10-28 15:31"
-    escribe: "si"
+    a_las: "2026-10-28 15:32"
+    escribe: "dale"
     # La tarea es un dato opcional de confirmar (su ficha): puede venir, y si viene es ésta.
     jugadas:
       - {nombre: confirmar, tarea: COM, puede_traer: [tarea]}
@@ -194,6 +235,7 @@ pasos:
         - {tarea: COM, clase: texto, cubre: [explicacion]}
         - {tarea: COM, clase: enlace, cubre: [resultado_de_prueba]}
         - {tarea: COM, clase: archivo, cubre: [archivo]}
+        - {tarea: COM, clase: texto, cubre: [explicacion]}
         - {tarea: COM, clase: imagen, cubre: [captura]}
       # El aviso a Ismael, del motor desde la porción 3a: sale terminado el margen para corregir.
       avisos_guardados:
@@ -201,7 +243,7 @@ pasos:
     hechos:
       - {jugada: confirmar, resultado: entregada, tarea: COM, estado: en_revision,
          queda_esperando_la_aprobacion_de: Ismael Soschinski,
-         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-28T15:41"}}
+         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-28T15:42"}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null

@@ -128,25 +128,33 @@ pasos:
     quien: Marcos
     a_las: "2026-10-20 16:00"
     escribe: "listo, ya la termine a la del plc"
-    jugadas:
-      - {nombre: entregar, tarea: PLC}
     # Desde la Fase C (C-3, porción 2) la entrega se recibe por chat: vista previa y confirmación. En
-    # este espacio de prueba la tarea del PLC no pide evidencia, así que no falta nada.
+    # este espacio de prueba la tarea del PLC no pide evidencia, pero lo escrito no dice lo que pide
+    # su criterio de aceptación (C-3d, D3): Leda lo pide con un ejemplo y no hay nada que confirmar.
+    jugadas:
+      - nombre: entregar
+        tarea: PLC
+        lo_descrito_cubre: []
+        ejemplo: "La comprimidora arranca desde el PLC y completó los 20 ciclos sin fallas."
     efectos: {}
     hechos:
-      - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
-         sumo: [P1], entrega: [{pieza: P1, es: lo_que_escribio}],
+      - {jugada: entregar, resultado: le_falta_evidencia, tarea: PLC,
+         pregunta: lo_que_falta_de_la_entrega, sumo: [P1],
+         entrega: [{pieza: P1, es: lo_que_escribio}],
+         le_falta_del_criterio: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
+         ejemplo: "La comprimidora arranca desde el PLC y completó los 20 ciclos sin fallas.",
          al_confirmar: {queda_esperando_la_aprobacion_de: Ismael Soschinski}}
-    pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
-    botones: [Confirmar]
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    botones: []
     estado_despues:
-      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
     dice:
-      - "lo que va a entregar (lo que escribió) y que, al confirmar, pasa a revisión, sin nombrar a Ismael"
-      - que lo confirme
+      - qué falta para revisar la tarea, en palabras simples y hablando de la tarea
+      - un ejemplo sacado del criterio, para que lo acepte o lo escriba con sus palabras
     no_dice:
       - que la tarea ya quedó entregada, en revisión o terminada
       - que Ismael ya se enteró
+      - un dato que no esté en el criterio ni en lo que escribió
 
   - paso: 7
     quien: Marcos
@@ -161,13 +169,13 @@ pasos:
         tareas:
           - {titulo: PLC, estado: en_curso, vence: "2026-10-23"}
           - {titulo: COM, estado: asignada, vence: "2026-10-30"}
-    # Otro tema con la confirmación de la entrega abierta (situación general 8): contesta lo nuevo y
-    # vuelve a la confirmación.
-    pregunta: {tipo: confirmar_la_entrega, tarea: PLC, desde_antes: true}
-    botones: [Confirmar]
+    # Otro tema con la entrega abierta (situación general 8): contesta lo nuevo y vuelve a lo que le
+    # falta a la entrega.
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC, desde_antes: true}
+    botones: []
     dice:
       - "sus dos tareas, con su estado y su fecha: la del PLC en curso, que vence el viernes 23; la de comunicaciones asignada, que vence el viernes 30"
-      - que la entrega de la del PLC sigue esperando que la confirme
+      - que la entrega de la del PLC sigue esperando lo que le falta
     no_dice:
       - tareas de otras personas
       - la del PLC como entregada

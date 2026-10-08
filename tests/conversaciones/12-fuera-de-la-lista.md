@@ -83,14 +83,17 @@ y 9g.
    →
    - Jugadas: `entregar` sobre la tarea del PLC. Hasta la Fase C no se recibía por chat (decisión 9g);
      desde la C-3, porción 2, sí: vista previa y confirmación (ADR 0019, decisión 5).
-   - Efecto: ninguno todavía. La tarea sigue `en_curso` hasta que Marcos confirme. Ningún aviso al
-     administrador: la entrega es conocida, no una situación nueva. En este espacio de prueba la tarea no
-     pide evidencia, así que no falta nada.
-   - La respuesta dice: lo que va a entregar (lo que escribió), que al confirmar pasa a revisión (sin
-     nombrar a Ismael), y le pide que lo confirme, con el botón Confirmar.
+   - Efecto: ninguno. La tarea sigue `en_curso`. Ningún aviso al administrador: la entrega es conocida,
+     no una situación nueva. En este espacio de prueba la tarea no pide evidencia, pero lo que escribió
+     no dice lo que pide su criterio de aceptación (que la comprimidora arranca desde el PLC y completa
+     20 ciclos sin fallas): sin eso no pasa a revisión (decisión 10 del usuario, 2026-10-08;
+     `odd/tasks/fase-c.md`).
+   - La respuesta dice: qué falta para revisar la tarea, en palabras simples y hablando de la tarea, y
+     un ejemplo sacado del criterio para que lo acepte o lo escriba con sus palabras.
    - La respuesta no dice: que la tarea ya quedó entregada, en revisión o terminada; que Ismael ya se
-     enteró.
-   - Estado después: tema abierto, la confirmación de la entrega.
+     enteró; un dato que no esté en el criterio ni en lo que escribió Marcos.
+   - Botones: ninguno: no hay nada para confirmar.
+   - Estado después: tema abierto, lo que falta de la entrega.
 
 7. **Marcos** escribe (martes 20, 16:02): "y que mas tengo pendiente?"
    →
@@ -98,10 +101,10 @@ y 9g.
    - Efecto: ninguno; el turno queda en el registro.
    - La respuesta dice: sus dos tareas, con su estado y su fecha, como figuran en la base: la del PLC en
      curso, que vence el viernes 23; la de comunicaciones asignada, que vence el viernes 30.
-   - Con la confirmación de la entrega abierta, es otro tema (situación general 8): Leda contesta lo nuevo
-     y vuelve a la confirmación, con el botón Confirmar.
+   - Con la entrega abierta, es otro tema (situación general 8): Leda contesta lo nuevo y vuelve a lo
+     que le falta a la entrega.
    - La respuesta no dice: tareas de otras personas; la del PLC como entregada.
-   - Estado después: tema abierto, la misma confirmación de la entrega.
+   - Estado después: tema abierto, lo que falta de la misma entrega.
 
 ## Qué mide
 

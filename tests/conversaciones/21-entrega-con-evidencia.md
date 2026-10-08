@@ -48,8 +48,11 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
    - Efecto: ninguno sobre la tarea todavía. El código junta las piezas: el texto, las dos fotos de hoy y
      lo que llegó durante la tarea (la foto del martes y `comprimidora_v3.zip`), y comprueba la política
      por tipo: el texto cubre la explicación y el resultado de la prueba (20 ciclos sin una falla), las
-     fotos de hoy cubren la captura y, con el archivo del miércoles, está completa. Guarda la vista previa
-     con su huella, que incluye la de cada archivo.
+     fotos de hoy cubren la captura y, con el archivo del miércoles, está completa. Lo escrito dice lo
+     que pide el criterio de aceptación (terminó el PLC y la comprimidora hizo 20 ciclos sin una falla):
+     la IA lo juzga y no se le pregunta nada (decisión 10 del usuario, 2026-10-08; la conversación 27
+     tiene lo que pasa cuando no lo dice). Guarda la vista previa con su huella, que incluye la de cada
+     archivo.
    - Confirmación: sí (ADR 0018, decisión 4; constitución §7).
    - La respuesta dice: la tarea del PLC en su renglón con 📋; una pieza por renglón, con lo que cubre
      cada una en palabras de todos los días: lo que escribió (cómo quedó y la prueba de 20 ciclos), las

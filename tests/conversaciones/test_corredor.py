@@ -47,12 +47,13 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_veinticinco_conversaciones_y_cada_una_nombra_su_fuente():
+def test_hay_veintiseis_conversaciones_y_cada_una_nombra_su_fuente():
     # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega), la 23 desde la 3b (la
-    # aprobación) y la 24 desde la 3c (quien aprueba no contesta); la 26 tiene sólo el .md: su
-    # regla no está construida (README).
+    # aprobación), la 24 desde la 3c (quien aprueba no contesta) y la 27 desde la D3 de la C-3d
+    # (la entrega frente al criterio); la 26 tiene sólo el .md: su regla no está construida
+    # (README).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 26)]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 26)] + ["27"]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]
@@ -144,8 +145,10 @@ def test_la_entrega_confirmada_por_otro_camino_no_es_una_falla_de_garantia(conn)
     ia = _perfecta(conv)
     guion = copy.deepcopy(conv)
     por_paso = {p.get("paso"): p for p in guion["pasos"]}
+    # Desde la D3 de la C-3d, lo descrito se juzga también frente al criterio de aceptación.
     por_paso[1]["jugadas"] = [{"nombre": "entregar", "tarea": "PLC",
-                               "el_texto_cubre": ["resultado_de_prueba"]}]
+                               "el_texto_cubre": ["resultado_de_prueba"],
+                               "lo_descrito_cubre": ["C1"]}]
     por_paso[4]["jugadas"] = [{"nombre": "entregar", "tarea": "PLC"}]
     por_paso[5]["jugadas"] = [{"nombre": "confirmar", "tarea": "PLC"}]
     ia.ia.preparar = lambda paso: setattr(ia.ia, "paso", por_paso.get(paso.get("paso"), paso))

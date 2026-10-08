@@ -23,7 +23,7 @@ import pytest
 from leda.autoridad import identificar_en_espacio
 from leda.calendario import Calendario
 from leda.db import admin, espacio
-from leda.motor import avisos, hechos
+from leda.motor import avisos, entrega, hechos
 from leda.motor.fichas import FICHAS
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.tiempo import RelojFijo
@@ -45,8 +45,9 @@ ZIP = b"PK\x03\x04" + b"\x00" * 40
 # --- Ayudas ---------------------------------------------------------------------------------
 
 def _tarea(conn, mundo, pide=("explicacion", "foto"), titulo="Armar el tablero",
-           estado="en_curso") -> str:
-    """Una tarea de Marcos que pide `pide`, con la política del área (sus clases, del pack)."""
+           estado="en_curso", criterio: str | None = None) -> str:
+    """Una tarea de Marcos que pide `pide`, con la política del área (sus clases, del pack) y,
+    si se da, su criterio de aceptación."""
     with admin(conn) as cur:
         cur.execute("""insert into task_evidence_policy (workspace_id, area_id,
                                                          evidencia_requerida, tipos)
@@ -57,10 +58,11 @@ def _tarea(conn, mundo, pide=("explicacion", "foto"), titulo="Armar el tablero",
         cur.execute(
             """insert into task (workspace_id, objective_id, titulo, area_id,
                                  responsable_membership_id, estado, fecha_objetivo,
-                                 evidencia_requerida)
-               values (%s, %s, %s, %s, %s, %s, %s, %s) returning id""",
+                                 evidencia_requerida, criterio_aceptacion)
+               values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id""",
             (mundo["id"], mundo["objetivo"], titulo, mundo["area"],
-             mundo["personas"]["Marcos"]["membership_id"], estado, VIERNES_16, list(pide)))
+             mundo["personas"]["Marcos"]["membership_id"], estado, VIERNES_16, list(pide),
+             criterio))
         tarea = str(cur.fetchone()["id"])
     conn.commit()
     return tarea
@@ -714,3 +716,164 @@ def test_sin_direccion_publica_el_aviso_no_promete_ningun_enlace(conn, mundo, ma
     [pedido] = ia.pedidos_de_redaccion
     assert "lleva_el_enlace_a_la_pagina_de_la_tarea" not in pedido["hechos"][0]
     assert cuantas(conn, "message_outbox_enlace") == 0
+
+
+# --- Lo descrito frente al criterio de aceptación (decisión 10 del usuario, 2026-10-08; D3) ---
+
+CRITERIO = "El tablero queda cerrado y rotulado; pasa la prueba de aislación con 500 V"
+CERRADO, AISLACION = ("El tablero queda cerrado y rotulado",
+                      "pasa la prueba de aislación con 500 V")
+EJEMPLO = "Pasó la prueba de aislación con 500 V."
+
+
+def test_el_criterio_se_lee_por_sus_renglones_y_sus_oraciones():
+    """Un punto por renglón, por oración o separado con punto y coma, sin viñetas; una oración
+    es un solo punto aunque diga dos cosas: el código no parte el criterio por sus palabras."""
+    assert entrega.puntos_del_criterio(CRITERIO) == [CERRADO, AISLACION]
+    assert entrega.puntos_del_criterio("- Arranca desde el PLC.\n2) Completa 20 ciclos.") == [
+        "Arranca desde el PLC", "Completa 20 ciclos"]
+    assert entrega.puntos_del_criterio("Mide 1.5 m y queda nivelado") == [
+        "Mide 1.5 m y queda nivelado"]
+    assert entrega.puntos_del_criterio(None) == entrega.puntos_del_criterio("  ") == []
+
+
+def test_la_ia_recibe_el_criterio_por_puntos_para_juzgar_lo_descrito(conn, mundo, marcos):
+    _tarea(conn, mundo, criterio=CRITERIO)
+    marcos.manda(texto="hola")
+    tarea = next(t for t in marcos.situacion["tareas"] if t["alias"] == "T2")
+    assert tarea["criterio_de_aceptacion"] == [{"punto": "C1", "lo_que_pide": CERRADO},
+                                               {"punto": "C2", "lo_que_pide": AISLACION}]
+
+
+def test_lo_descrito_que_cubre_el_criterio_va_a_la_vista_previa_sin_preguntar(conn, mundo,
+                                                                               marcos):
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    r = marcos.manda(_entregar(lo_descrito_cubre=["C1", "C2"]),
+                     texto="quedo cerrado y rotulado, paso la aislacion con 500 V")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "para_confirmar"
+    assert "le_falta_del_criterio" not in hecho and "ejemplo" not in hecho
+    assert hecho["entrega"][0]["describe"] == [CERRADO, AISLACION]
+    assert r.pregunta["tipo"] == "confirmar_la_entrega"
+    assert cuantas(conn, "conversation_option", "etiqueta = 'Confirmar'") == 1
+
+
+def test_lo_que_falta_del_criterio_se_pide_con_un_ejemplo_y_no_se_entrega(conn, mundo,
+                                                                          marcos):
+    tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    r = marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
+                     texto="termine el tablero, quedo cerrado y rotulado")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "le_falta_evidencia"
+    assert hecho["le_falta_del_criterio"] == [AISLACION]
+    assert hecho["ejemplo"] == EJEMPLO
+    assert "le_falta" not in hecho                      # la política está completa
+    assert hecho["pregunta"] == "lo_que_falta_de_la_entrega"
+    assert cuantas(conn, "conversation_option") == 0     # nada para confirmar: sin botones
+    assert estado_de(conn, tarea) == "en_curso" and cuantas(conn, "evidence") == 0
+    # La pregunta lo lleva: para volver a decirlo ("¿y qué pongo?") y para aceptarlo.
+    assert r.pregunta["ejemplo"] == EJEMPLO
+    assert r.pregunta["le_falta_del_criterio"] == [AISLACION]
+
+
+def test_un_ejemplo_con_un_dato_que_nadie_dijo_no_se_propone(conn, mundo, marcos):
+    """El verificador (como `_problema_de_propuesta` del flujo C): cada número y cada nombre del
+    ejemplo tiene que estar en el criterio, en la tarea o en lo que la persona escribió. Si no,
+    se propone el punto del criterio tal cual."""
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    r = marcos.manda(_entregar(lo_descrito_cubre=["C1"],
+                               ejemplo="Pasó la prueba de aislación con 1000 V en Siemens."),
+                     texto="quedo cerrado y rotulado")
+    assert _hecho(r, "entregar")["ejemplo"] == "pasa la prueba de aislación con 500 V."
+    assert entrega.problema_del_ejemplo("Pasó 20 ciclos", ["Completa 20 ciclos"]) is None
+    assert entrega.problema_del_ejemplo("Pasó 30 ciclos", ["Completa 20 ciclos"]) == "dato: 30"
+    assert entrega.problema_del_ejemplo("Arranca desde el PLC", ["arranca desde el plc"]) is None
+    assert entrega.problema_del_ejemplo("Lo probó con Juan", ["Lo probó"]) == "nombre: Juan"
+    assert entrega.problema_del_ejemplo("  ", ["x"]) == "vacio"
+
+
+def test_sin_el_juicio_de_la_ia_el_criterio_no_queda_cubierto(conn, mundo, marcos):
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    r = marcos.manda(_entregar(), texto="listo el tablero")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "le_falta_evidencia"
+    assert hecho["le_falta_del_criterio"] == [CERRADO, AISLACION]
+    assert hecho["ejemplo"] == f"{CERRADO}. {AISLACION}."
+
+
+def test_aceptar_el_ejemplo_lo_suma_como_lo_que_describe_la_persona(conn, mundo, marcos):
+    """El ejemplo cuenta como lo descrito sólo si la persona lo acepta: entonces es una pieza
+    más, con lo que describe, y la entrega se confirma como siempre."""
+    tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
+                 texto="quedo cerrado y rotulado")
+    r = marcos.manda(_entregar(acepta_el_ejemplo=True), texto="si")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "para_confirmar"
+    assert [(p["es"], p.get("dice"), p.get("describe")) for p in hecho["entrega"]] == [
+        ("lo_que_escribio", "quedo cerrado y rotulado", [CERRADO]),
+        ("lo_que_escribio", EJEMPLO, [AISLACION])]
+    marcos.manda(Jugada("confirmar", {}), texto="dale")
+    assert estado_de(conn, tarea) == "en_revision"
+    assert [(f["texto"], list(f["d"])) for f in todos(
+        conn, "select texto, describe_del_criterio d from evidence order by at")] == [
+        ("quedo cerrado y rotulado", [CERRADO]), (EJEMPLO, [AISLACION])]
+
+
+def test_el_ejemplo_no_se_acepta_en_el_mismo_mensaje_que_se_propone(conn, mundo, marcos):
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    r = marcos.manda(_entregar(lo_descrito_cubre=["C1"], acepta_el_ejemplo=True,
+                               ejemplo=EJEMPLO),
+                     texto="quedo cerrado y rotulado")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "le_falta_evidencia"
+    assert len(hecho["entrega"]) == 1
+
+
+def test_insistir_sin_cubrir_el_criterio_no_entrega_y_vuelve_a_proponer(conn, mundo, marcos):
+    tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
+                 texto="quedo cerrado y rotulado")
+    r = marcos.manda(Jugada("confirmar", {}), texto="no, asi esta, mandala")
+    hecho = _hecho(r, "confirmar")
+    assert hecho["resultado"] == "no_vale_la_confirmacion"
+    assert hecho["motivo"] == "le_falta_algo"
+    assert hecho["le_falta_del_criterio"] == [AISLACION]
+    assert hecho["ejemplo"] == EJEMPLO
+    assert estado_de(conn, tarea) == "en_curso" and cuantas(conn, "evidence") == 0
+
+
+def test_sin_jugada_la_pregunta_vuelve_con_su_ejemplo(conn, mundo, marcos):
+    """"¿Y qué pongo?" no es una jugada: la pregunta abierta vuelve con el ejemplo."""
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
+                 texto="quedo cerrado y rotulado")
+    r = marcos.manda(texto="y que pongo?")
+    assert r.pregunta["tipo"] == "lo_que_falta_de_la_entrega" and r.pregunta["desde_antes"]
+    assert r.pregunta["ejemplo"] == EJEMPLO
+    assert marcos.situacion["estado"]["pregunta_abierta"]["ejemplo"] == EJEMPLO
+
+
+def test_corregir_lo_que_describe_un_texto_rehace_la_vista_previa(conn, mundo, marcos):
+    """La lectura de la IA la corrige la persona en la vista previa."""
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
+                 texto="quedo cerrado y rotulado y paso la aislacion con 500 V")
+    r = marcos.manda(Jugada("corregir", {"corrige": "entregar", "tarea": "T2",
+                                         "lo_descrito_cubre": ["C1", "C2"]}),
+                     texto="ya te dije lo de la aislacion")
+    hecho = _hecho(r, "corregir")
+    assert hecho["resultado"] == "corregido" and hecho["como_queda"] == "para_confirmar"
+    assert hecho["entrega"][0]["describe"] == [CERRADO, AISLACION]
+
+
+def test_un_texto_siempre_cubre_lo_que_solo_un_texto_puede_cubrir(conn, mundo, marcos):
+    """Hallazgo 1 de la bitácora: la IA leyó un texto como resultado de la prueba y no como
+    explicación, y la entrega se trabó. Lo que sólo un texto puede cubrir lo cubre siempre; lo
+    que la IA dice que cubre se suma."""
+    _tarea(conn, mundo, pide=("explicacion", "resultado_de_prueba"))
+    r = marcos.manda(_entregar(el_texto_cubre=["resultado_de_prueba"]),
+                     texto="20 ciclos sin una falla")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "para_confirmar"
+    assert hecho["entrega"][0]["cubre"] == ["cómo quedó el trabajo", "cómo se probó"]

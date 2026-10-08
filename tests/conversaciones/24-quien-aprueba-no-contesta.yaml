@@ -29,15 +29,15 @@ tareas:
 preludio:
   - quien: Nahuel
     a_las: "2026-10-26 11:00"
-    escribe: "termine los planos de la paila 2"
-    jugadas: [{nombre: entregar, tarea: PAILA}]
+    escribe: "termine los planos de la paila 2, coinciden con la instalacion y ya estan en la carpeta de planos"
+    jugadas: [{nombre: entregar, tarea: PAILA, lo_descrito_cubre: [C1]}]
   - quien: Nahuel
     a_las: "2026-10-26 11:01"
     toca: Confirmar
   - quien: Marcos
     a_las: "2026-10-26 11:30"
-    escribe: "termine el plc"
-    jugadas: [{nombre: entregar, tarea: PLC}]
+    escribe: "termine el plc, arranca desde el plc y completo los 20 ciclos sin fallas"
+    jugadas: [{nombre: entregar, tarea: PLC, lo_descrito_cubre: [C1]}]
   - quien: Marcos
     a_las: "2026-10-26 11:31"
     toca: Confirmar

@@ -1303,21 +1303,27 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona pregunta qué tareas tiene pendientes, o cómo están sus tareas. Leda "
              "las lee de la base."),
     Ficha("entregar", "recibir la entrega de una tarea con su evidencia",
-          necesita=("tarea",), opcional=("el_texto_cubre",),
+          necesita=("tarea",),
+          opcional=("el_texto_cubre", "lo_descrito_cubre", "ejemplo", "acepta_el_ejemplo"),
           comprueba="que sea el responsable y que la tarea esté en curso; qué cubre cada "
-                    "pieza de lo que pide la política y qué falta (la base)",
+                    "pieza de lo que pide la política (la base), qué puntos del criterio de "
+                    "aceptación dice lo descrito y qué falta (el código)",
           hace="muestra la entrega, pieza por pieza (también lo que mandó antes, que entra "
-               "sólo si queda), con qué cubre cada una y qué falta; nada se escribe en la "
-               "tarea todavía",
-          despues="con la política completa, espera la confirmación (botón o escrito); si falta "
-                  "algo, lo dice y espera lo que falta",
+               "sólo si queda), con qué cubre cada una, qué describe del criterio y qué "
+               "falta; nada se escribe en la tarea todavía",
+          despues="con la política y el criterio completos, espera la confirmación (botón o "
+                  "escrito); si falta algo, lo dice, con un ejemplo para lo que falta del "
+                  "criterio, y espera lo que falta: no se entrega aunque la persona insista",
           manejar=_entregar, del_responsable=True, estados=frozenset({"en_curso"}),
           corregir=_corregir_la_entrega, toma_lo_que_llego=True,
-          es="La persona dice que terminó una tarea, o suma algo a la entrega de una tarea que "
-             "ya está mostrando (lo que escribe, fotos, archivos o enlaces). Terminarla no es "
-             "contar que le falta poco: eso es un avance. Lo que escribe puede contar de qué "
-             "trabajo se trata y cómo se probó: el_texto_cubre nombra lo que dice de lo que "
-             "pide la tarea."),
+          es="La persona dice que terminó una tarea, suma algo a la entrega de una tarea que "
+             "ya está mostrando (lo que escribe, fotos, archivos o enlaces) o acepta, tal cual, "
+             "el ejemplo que Leda le propuso para lo que falta (acepta_el_ejemplo). Terminarla "
+             "no es contar que le falta poco: eso es un avance. Lo que escribe puede contar de "
+             "qué trabajo se trata y cómo se probó: el_texto_cubre nombra lo que dice de lo que "
+             "pide la tarea, y lo_descrito_cubre, los puntos de su criterio de aceptación que "
+             "dice todo lo que describió en la entrega. Si le falta alguno, ejemplo es cómo "
+             "podría describirlo la persona."),
     Ficha("confirmar", "confirmar lo último que Leda mostró para confirmar",
           necesita=(), opcional=("tarea",),
           comprueba="la guarda: que lo que confirma sea lo último que la persona vio, en un "
@@ -1394,7 +1400,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "las jugadas que Leda le propuso), tocando o escribiendo. Sin una pregunta abierta "
              "con opciones, no es esta jugada."),
     Ficha("corregir", "corregir algo ya anotado que era de otra tarea o que no pasó",
-          necesita=("corrige", "tarea"), opcional=("tarea_correcta", "saca", "el_texto_cubre"),
+          necesita=("corrige", "tarea"),
+          opcional=("tarea_correcta", "saca", "el_texto_cubre", "lo_descrito_cubre"),
           comprueba="que sea el responsable y que eso haya quedado anotado en esa tarea en "
                     "sus últimos turnos",
           hace="agrega un hecho de corrección: la tarea vuelve a como estaba y, si la dice, "
@@ -1406,7 +1413,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "pasó. Dar un hecho nuevo que reemplaza al de antes no es corregir: es la jugada "
              "de ese hecho. En una entrega (corrige: entregar), sacar una pieza de lo mostrado o "
              "de lo ya entregado (saca, por su alias), o decir qué cubre lo que escribió "
-             "(el_texto_cubre)."),
+             "(el_texto_cubre) o qué dice del criterio de aceptación (lo_descrito_cubre)."),
     Ficha("cancelar", "dejar sin efecto la pregunta abierta",
           necesita=(), opcional=(),
           comprueba="que haya una pregunta abierta y que se pueda dejar (la de quién destraba "

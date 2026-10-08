@@ -1,0 +1,160 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/27-entrega-contra-el-criterio.md
+numero: "27"
+titulo: "La entrega frente al criterio de aceptación"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-19 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+
+# Más corta que la del pack, para mirar sólo el criterio de aceptación.
+evidencia:
+  ot: [explicacion, captura]
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-22 15:00"
+    escribe: "termine el plc, ya arranca desde el plc"
+    manda: [{que: foto}]
+    # La IA juzga lo descrito punto por punto y propone un ejemplo sacado del criterio; el código
+    # decide que falta y lo verifica (C-3d, D3).
+    jugadas:
+      - nombre: entregar
+        tarea: PLC
+        el_texto_cubre: [explicacion]
+        lo_descrito_cubre: []
+        ejemplo: "La comprimidora completó los 20 ciclos sin fallas."
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: le_falta_evidencia, tarea: PLC,
+         pregunta: lo_que_falta_de_la_entrega, sumo: [P1, P2], le_falta: ausente,
+         le_falta_del_criterio: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
+         ejemplo: "La comprimidora completó los 20 ciclos sin fallas.",
+         entrega: [{pieza: P1, es: lo_que_escribio, describe: ausente},
+                   {pieza: P2, es: una_foto}]}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    dice:
+      - que para revisar la tarea falta saber si la comprimidora completó los 20 ciclos sin fallas, en palabras simples y hablando de la tarea
+      - "el ejemplo, para que lo acepte o lo escriba con sus palabras"
+    no_dice:
+      - que la entregó o que está en revisión
+      - el nombre de Ismael
+      - que falta que arranque desde el PLC
+      - un número o un nombre que no estén en el criterio ni en lo que escribió
+
+  # Una pregunta sobre lo que Leda le pidió: no es una jugada, y la pregunta abierta vuelve con su
+  # ejemplo.
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-22 15:02"
+    escribe: "y que pongo?"
+    jugadas: []
+    efectos: {}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC, desde_antes: true,
+               ejemplo: "La comprimidora completó los 20 ciclos sin fallas."}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    dice:
+      - "el ejemplo, para que lo acepte tal cual o lo escriba con sus palabras"
+    no_dice:
+      - que la entregó
+      - un dato que no esté en el criterio ni en lo que escribió
+
+  # Insistir no la entrega: lo descrito no cubre el criterio (decisión 10 del usuario).
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-22 15:03"
+    escribe: "no, asi esta, mandala"
+    jugadas:
+      - {nombre: confirmar, tarea: PLC, puede_traer: [tarea]}
+    efectos: {}
+    hechos:
+      - {jugada: confirmar, resultado: no_vale_la_confirmacion, motivo: le_falta_algo,
+         como_queda: le_falta_evidencia, tarea: PLC, pregunta: lo_que_falta_de_la_entrega,
+         le_falta_del_criterio: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
+         ejemplo: "La comprimidora completó los 20 ciclos sin fallas."}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    dice:
+      - que todavía no la puede pasar a revisión porque falta saber si completó los 20 ciclos sin fallas
+      - "el ejemplo otra vez, como próximo paso"
+    no_dice:
+      - que la entregó
+      - que Ismael se enteró
+      - un reproche
+
+  # Marcos acepta el ejemplo: cuenta como lo que describe él, una pieza más (C-3d, D3).
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-22 15:05"
+    escribe: "si, eso"
+    jugadas:
+      - {nombre: entregar, tarea: PLC, acepta_el_ejemplo: true}
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
+         le_falta_del_criterio: ausente, ejemplo: ausente,
+         entrega: [
+           {pieza: P1, es: lo_que_escribio, dice: "termine el plc, ya arranca desde el plc"},
+           {pieza: P2, es: una_foto},
+           {pieza: P3, es: lo_que_escribio,
+            dice: "La comprimidora completó los 20 ciclos sin fallas.",
+            describe: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"]}]}
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
+    dice:
+      - "la tarea del PLC en su renglón con 📋"
+      - "una pieza por renglón: lo que escribió, la foto y lo que aceptó"
+      - que al confirmar pasa a revisión
+      - "el cierre, aparte: si la entrega así"
+    no_dice:
+      - que la entregó
+      - el nombre de Ismael
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-22 15:06"
+    toca: Confirmar
+    efectos:
+      estados: {PLC: en_revision}
+      evidencias:
+        - {tarea: PLC, clase: texto, cubre: [explicacion]}
+        - {tarea: PLC, clase: imagen, cubre: [captura]}
+        - {tarea: PLC, clase: texto, cubre: [explicacion]}
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: PLC, a: Ismael, estado: guardado}
+    hechos:
+      - {jugada: confirmar, resultado: entregada, tarea: PLC, estado: en_revision,
+         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-22T15:16"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que quedó entregada y pasa a revisión
+      - que le avisa cuando la revisen o si hace falta algo más
+    no_dice:
+      - el nombre de Ismael
+      - que la tarea está terminada o aprobada

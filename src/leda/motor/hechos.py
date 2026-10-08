@@ -143,6 +143,30 @@ SIGNIFICADOS: Mapping[str, str] = {
                         "entrega sólo si la persona la deja.",
     "le_falta": "Lo que pide la tarea y todavía no está en la entrega, en palabras de todos "
                 "los días: sin eso no se puede entregar.",
+    # --- Lo descrito frente al criterio de aceptación (decisión 10 del usuario, 2026-10-08) ----
+    "criterio_de_aceptacion": "Lo que tiene que cumplir la tarea para darla por terminada, "
+                              "punto por punto, como lo escribió quien la cargó: lo que la "
+                              "persona describe al entregarla tiene que decirlo.",
+    "punto": "El código de un punto del criterio de aceptación (C1, C2...): sirve para "
+             "nombrarlo en una jugada; nunca se le muestra a la persona.",
+    "lo_que_pide": "Lo que pide ese punto del criterio de aceptación, tal cual está escrito.",
+    "lo_descrito_cubre": "Los códigos de los puntos del criterio de aceptación que dice lo que "
+                         "la persona describió en la entrega.",
+    "acepta_el_ejemplo": "Si la persona aceptó, tal cual, el ejemplo que Leda le propuso para "
+                         "describir lo que falta de la entrega.",
+    "describe": "Los puntos del criterio de aceptación que dice lo que la persona escribió en "
+                "esa pieza, como se leyó: la persona lo ve en la entrega y lo puede corregir.",
+    "le_falta_del_criterio": "Los puntos del criterio de aceptación que lo que la persona "
+                             "describió en la entrega todavía no dice, tal cual están escritos: "
+                             "hasta que los diga, la tarea no pasa a revisión. Lo demás del "
+                             "criterio ya está dicho.",
+    "ejemplo": "Una forma de describir lo que falta del criterio de aceptación, sacada del "
+               "criterio y de lo que la persona ya dijo, sin ningún dato nuevo. Leda se la "
+               "propone tal cual, para que la acepte o lo describa con sus palabras; mientras no "
+               "la acepte, no es parte de la entrega.",
+    "le_falta_algo": "A la entrega todavía le falta algo de lo que pide la tarea (le_falta o "
+                     "le_falta_del_criterio dicen qué): así no pasa a revisión, aunque la "
+                     "persona lo pida.",
     "al_confirmar": "Lo que pasa cuando la persona confirme la entrega completa.",
     "queda_esperando_la_aprobacion_de": "Quién revisa la tarea entregada y decide si la aprueba "
                                         "o le pide cambios: hasta que decida, la tarea está en "
@@ -177,8 +201,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "un_enlace": "Un enlace.",
     "para_confirmar": "La entrega tiene todo lo que pide la tarea: espera que la persona la "
                       "confirme, con el botón o escribiendo.",
-    "le_falta_evidencia": "A la entrega le falta algo de lo que pide la tarea (le_falta dice "
-                          "qué): no se puede entregar todavía y la tarea no se movió.",
+    "le_falta_evidencia": "A la entrega le falta algo de lo que pide la tarea (le_falta y "
+                          "le_falta_del_criterio dicen qué): no se puede entregar todavía y la "
+                          "tarea no se movió.",
     "entregada": "La tarea quedó entregada y pasa a revisión: espera que quien aprueba el "
                  "trabajo de la persona la revise y decida. No está terminada ni aprobada.",
     "no_vale_la_confirmacion": "La confirmación no vale (motivo dice por qué): no se entregó "
@@ -670,12 +695,14 @@ _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 # Lo que alguien escribió, tal cual: un mensaje entero nunca se traduce, ni el nombre que alguien
 # le puso a un archivo.
 _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", "dice",
-                                      "enlace"})
+                                      "enlace", "lo_que_pide", "describe",
+                                      "le_falta_del_criterio", "ejemplo"})
 # El nombre de un archivo nunca es un código, aunque se escriba como uno (`informe_final`).
 # Ni lo que escribió en una pieza de una entrega, ni un enlace, ni el código de una cosa que
 # pide la tarea, que es dato del pack (va con sus palabras, `en_palabras`).
 _NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_evidencia",
-                              "el_texto_cubre"})
+                              "el_texto_cubre", "lo_que_pide", "describe",
+                              "le_falta_del_criterio", "ejemplo", "lo_descrito_cubre"})
 
 
 def para_redactar(valor: Any) -> Any:

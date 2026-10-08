@@ -101,9 +101,10 @@ def _dice(conn, mundo, nombre: str, *jugadas: Jugada, at: datetime, texto: str =
 
 
 def _entrega(conn, mundo, nombre: str, minuto: int = 0) -> None:
-    """La persona entrega su única tarea y la confirma, el lunes 5 a la mañana."""
-    _dice(conn, mundo, nombre, Jugada("entregar", {"tarea": "T1"}),
-          at=octubre(5, 11, minuto), texto="termine")
+    """La persona entrega su única tarea, con lo que describe su criterio de aceptación (C-3d,
+    D3), y la confirma, el lunes 5 a la mañana."""
+    _dice(conn, mundo, nombre, Jugada("entregar", {"tarea": "T1", "lo_descrito_cubre": ["C1"]}),
+          at=octubre(5, 11, minuto), texto="termine, quedo hecho y probado")
     _dice(conn, mundo, nombre, Jugada("confirmar", {}), at=octubre(5, 11, minuto + 1),
           texto="dale")
 
