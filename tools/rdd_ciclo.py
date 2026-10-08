@@ -63,6 +63,17 @@ for paso in range(20):
         continue
     nt = d.get("next_transition") or d.get("status_continuation") or {}
     tipo = nt.get("kind")
+    if not tipo and nt.get("command"):
+        # A `status_continuation` names its operation and exact command, without a kind.
+        d = correr(nt["command"])
+        continue
+    if tipo == "collect" and nt.get("reason_code") == "correction_plan_required":
+        # The correction is done by hand on the reviewed folder; print what to fix and stop.
+        print("CORRECCIÓN PEDIDA:", d.get("authority", {}).get("lineage_id"))
+        for f in nt.get("correction_request", {}).get("findings", []):
+            print("  hallazgo:", f.get("id"), f.get("severity"), f.get("location"))
+            print("   ", f.get("claim", "")[:700])
+        break
     if tipo == "execute":
         d = correr(nt["execute"]["command"])
         continue
