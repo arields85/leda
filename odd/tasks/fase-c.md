@@ -461,6 +461,25 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       - `PENDIENTE`: el tablero (`_servir_tablero`) arma su página fuera de una guarda, como la
         página de la tarea antes de esto; no se tocó.
   - [ ] Porción 5: el acceso del administrador.
+- [ ] **C-3d.** Lo que decidió el usuario el 2026-10-08 (preguntas 10 a 20), en este orden. Route de
+  cada una: delegada (escritor único, 2+ archivos no triviales), una por vez, revisión RDD por commit.
+  - [ ] **D1.** El comparador del corredor: la garantía es "lo escrito es lo confirmado"; mostrar lo
+    escrito completo; aflojar en los YAML de la 21 a la 23 lo que la ficha permite; criterios de
+    aceptación reales en las tareas de prueba (`carga.py`).
+  - [ ] **D2.** Las palabras (decisiones 11 y 18): no nombrar por su cuenta a quien aprueba ni al
+    referente (y decir el nombre si se pregunta); "revisar" para lo que espera; "describir" en la
+    entrega. Cambian los hechos, sus significados y las conversaciones que esperan "Ismael será
+    notificado".
+  - [ ] **D3.** La entrega (decisiones 10, 14 y 15): comparar lo descrito con el criterio, preguntar
+    sólo lo que falta con un ejemplo sacado del criterio y no entregar hasta cubrirlo; entregar una
+    tarea sin arrancar; pedir la pieza correcta si una retirada deja la entrega incompleta.
+  - [ ] **D4.** La aprobación (decisiones 12, 16 y 17): "¿cuál de las dos?" una sola vez; el aviso a
+    quien aprueba al salir (si cambió); las entregas y los recordatorios en listas con un botón por
+    tarea, y lo que queda por revisar después de decidir una.
+  - [ ] **D5.** No interrumpir (decisión 13, conversación 26 con su YAML).
+  - [ ] **D6.** La regresión con la IA real, `leda_motor` al día (autorizado por el usuario de
+    antemano, con respaldo) y el guion de la prueba por Telegram (el enlace con `localhost`,
+    decisión 20).
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
