@@ -262,9 +262,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         cocina que ningún circuito del chat alcanza (`actualizar_estado` a revisión y
         `adjuntar_evidencia`; `tests/test_entrega_con_evidencia.py`). Se retira cuando la 3b o la
         plataforma decidan qué hacer con esas herramientas.
-      - `PENDIENTE` (decisión del usuario): **si cambia quién aprueba** mientras el aviso espera,
-        hoy queda omitido con su motivo (`cambio_quien_aprueba`) y el nuevo aprobador no recibe
-        nada. ¿Se le guarda uno al nuevo?
+      - **Si cambia quién aprueba** mientras el aviso espera: decidido por el usuario (decisión
+        16) y construido en la D4: el aviso va a quien aprueba al salir.
       - El `.md` de la 22 (paso 7) ya dice que Ismael se entera a los 10 minutos, con el margen.
       - **Revisiones RDD** (2026-10-08): `2d86ee3` (`review-12fee547e7870e72`), `93a428d`
         (`review-ff189c1a27aaeaca`) y `97470c5` (`review-44020d6e3b194e0b`), aprobadas, más los
@@ -606,10 +605,86 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       `entrega.py:659` (la vista previa de una tarea sin arrancar no mira la dependencia),
       `aprobacion.py:141` (aprobar mezcla la política y el criterio incompletos) y
       `herramientas.py:1829` (sumar a una entrega acepta cualquier tarea en revisión). Las de
-      `entrega.py:342` y `herramientas.py:1829` se miran al empezar la D4.
-  - [ ] **D4.** La aprobación (decisiones 12, 16 y 17): "¿cuál de las dos?" una sola vez; el aviso a
+      `entrega.py:342` y `herramientas.py:1829` se miraron en la D4: la primera era un error
+      (arreglado, `f58065b`); la segunda, no.
+  - [x] **D4.** La aprobación (decisiones 12, 16 y 17): "¿cuál de las dos?" una sola vez; el aviso a
     quien aprueba al salir (si cambió); las entregas y los recordatorios en listas con un botón por
-    tarea, y lo que queda por revisar después de decidir una.
+    tarea, y lo que queda por revisar después de decidir una. Route: delegada (escritor único, 2+
+    archivos no triviales). Hecha el 2026-10-08:
+    - **Las dos advertencias de la D3:**
+      - `entrega.py` (el juicio de la IA pisaba un ejemplo aceptado) **era un error**: después de
+        aceptar el ejemplo, un `entregar` sin texto nuevo con un `lo_descrito_cubre` que lo olvidaba
+        le sacaba al ejemplo lo que describía, y Leda volvía a pedir lo que la persona ya había
+        aceptado. Ahora el ejemplo aceptado conserva lo suyo frente al juicio de la IA; la
+        corrección explícita de la persona (`corregir`) sí lo cambia. `f58065b`. Rojo primero:
+        `test_el_ejemplo_aceptado_no_lo_pisa_otro_juicio_de_la_ia` (`le_falta_evidencia` en lugar
+        de `para_confirmar`).
+      - `herramientas.py` (sumar a una entrega acepta cualquier tarea en revisión) **no es un
+        error**: la cocina exige que la tarea sea de quien entrega (`Denegado` si no) antes de
+        mirar el estado; el único camino que llega a completar una entrega en revisión es la
+        confirmación del motor, que sólo existe con la entrega incompleta (`entrega.entregar`,
+        `falta_algo_de_lo_entregado`), y sumar evidencia del responsable a una tarea en revisión es
+        lo que ya permite el dominio (`adjuntar_evidencia`, T6i). Sin cambio de código.
+    - **Decisión 12, "¿cuál de las dos?" una sola vez** (`c519de1`): el tipo de pregunta declara
+      que se hace una vez y qué queda si no se elige (`TipoDePregunta.sin_elegir_queda`). Si el
+      mensaje siguiente no la contesta (sin jugada, o otra vez las dos lecturas), Leda no decide ni
+      la repite: la cierra sin efecto y sus opciones, con lo que la persona había dicho y la huella
+      de lo entregado, quedan como la decisión de la entrega ofrecida en la respuesta
+      (`preguntas.ofrecer_en_la_respuesta`, atada a su fila del outbox; `botones.ConOpciones` las
+      suma a la respuesta), sin ser un tema abierto; los hechos lo dicen (`no_eligio`,
+      `pregunta_hecha_una_vez`, `botones`). Lo que elige sigue siendo de la IA (`elegir`, o
+      `aprobar` con lo demás como comentario): el significado de `cual_de_las_dos` y el `es` de
+      `aprobar` lo dicen, y el de `comentario` dice que en una aprobación no es un cambio
+      pendiente. Rojo primero: dos de las tres pruebas nuevas de `test_aprobacion.py`
+      (`dos_lecturas` en lugar de `no_eligio`).
+    - **Decisión 17, las listas** (`4102009`): los avisos de entrega a una persona que salen juntos
+      van en un solo mensaje (`TipoDeAviso.se_agrupa`): cada tarea con quién la entregó y cuántas
+      fotos trae (`fotos_que_trae`), sin fotos, sin enlace ni Aprobar y Pedir cambios, y un botón
+      por tarea, "Ver" y su título (`preguntas.VER_LA_ENTREGA`, que no reemplaza a otro). Uno solo
+      sale como antes. Ver una entrega es una jugada nueva de la lista cerrada (`ver_entrega`, para
+      quien la revisa), tocada o escrita: la respuesta trae lo entregado, las fotos en el álbum que
+      sigue al texto, el enlace a la página y Aprobar y Pedir cambios con su huella. Después de
+      decidir una, la respuesta dice lo que queda por revisar (`queda_por_revisar`, sin las ya
+      aprobadas que esperan otra cosa) con un botón por tarea, sin ningún aviso nuevo; los
+      recordatorios llevan su botón para verla (`ofrece_ver`). Los avisos de un mismo momento salen
+      ordenados por el título de su tarea, para que el texto y los botones vayan siempre en el mismo
+      orden. El tope diario no cambió: cuenta mensajes, y los de coordinación siguen fuera. El
+      mismo commit trae la primera parte de la decisión 16 (`TipoDeAviso.va_a`) y la respuesta a un
+      botón de una tarea que ya no es de la persona (`ya_no_le_corresponde`, con
+      `la_revisa_otra_persona`), que también usan las listas. Rojo primero: seis de las siete
+      pruebas nuevas (sin la ficha). Las instrucciones de la IA no cambiaron (huellas iguales).
+    - **Decisión 16, si cambia quién aprueba** (`8ff76e7`, y `va_a` en `4102009`): el aviso de la
+      entrega se relee al salir y va a quien aprueba en ese momento (la misma fila, la misma clave);
+      si el cambio es después de que salió, la escalera le guarda al nuevo, una vez, el aviso de lo
+      que espera su decisión (`antes_la_revisaba_otra_persona`), y su cuenta empieza cuando sale; el
+      botón del aviso viejo le dice al anterior que esa tarea ya no la revisa él, sin cambiar nada.
+      Rojo primero: `test_si_cambia_despues_al_nuevo_le_llega_lo_que_espera_su_decision` (ningún
+      aviso al nuevo); la de antes de salir se escribió después de `va_a`, sin rojo observado en la
+      prueba del motor (sí en la corrida en seco de la 29).
+    - **Conversaciones:** la 28 (las listas, la pregunta una sola vez y lo que queda) y la 29 (cambia
+      quién revisa), nuevas, con su YAML, en el README y en `test_corredor`; la 23 manda sus cuatro
+      avisos del viernes de a uno y espera lo que queda por revisar después de cada decisión; la 24,
+      el botón de cada recordatorio. El corredor aprende `Ver <clave>`, las fotos y el enlace de una
+      respuesta y `cambia_quien_aprueba`. Rojo primero, en seco y antes del código: la 23 con 6
+      fallas, la 28 con 20 y la 29 con 13.
+    - **Chequeos** (2026-10-08, sobre `8ff76e7`): `pytest tests/motor tests/conversaciones`, 828
+      passed; `pytest tests/garantias`, 323 passed; suite completa, 1579 passed; en seco,
+      `correr --ia guionada --veces 1 --ronda seco-d4`, 28 de 28 bien (informes borrados). Sin la
+      IA real (D6). Sin migración: el esquema ya tenía lo que hacía falta.
+    - `PENDIENTE`:
+      - Que la IA real elija la opción (o `aprobar` con el comentario) ante "aprobala nomás y pasale
+        lo de los colores" y no otra vez las dos jugadas: si las repite, Leda no decide (seguro,
+        pero no lo que quiso decir la persona). Lo mide la D6.
+      - Los botones dicen "Ver" y el título entero de la tarea (hasta 80 caracteres), no un nombre
+        corto como "Ver PLC": las tareas no tienen nombre corto (sería de la plataforma).
+      - Una lista sale sólo con los avisos que vencen en la misma vuelta del ciclo: dos entregas
+        confirmadas con minutos de diferencia salen por separado, salvo que la D5 (no interrumpir)
+        las demore juntas.
+      - Si en la misma respuesta vuelve una pregunta con opciones, sus botones y los de la decisión
+        ofrecida salen juntos (los de la pregunta primero).
+      - Los botones "Ver" no se cierran al decidir: tocar uno de una tarea ya decidida dice que ya no
+        le corresponde (o que está cerrada) y no cambia nada.
+      - `fotos_que_trae` cuenta las imágenes de la entrega; los videos y archivos no.
   - [ ] **D5.** No interrumpir (decisión 13, conversación 26 con su YAML).
   - [ ] **D6.** La regresión con la IA real, `leda_motor` al día (autorizado por el usuario de
     antemano, con respaldo) y el guion de la prueba por Telegram (el enlace con `localhost`,
