@@ -158,3 +158,57 @@ pasos:
     no_dice:
       - el nombre de Ismael
       - que la tarea está terminada o aprobada
+
+  # Comunicaciones nunca se arrancó: "ya está" se recibe igual (decisión 14 del usuario,
+  # 2026-10-08), y lo escrito dice lo que pide su criterio, así que no se pregunta nada.
+  - paso: 6
+    quien: Marcos
+    a_las: "2026-10-23 10:00"
+    escribe: "lo de comunicaciones ya esta, los equipos se comunicaron con el plc por la red de planta una hora sin errores"
+    manda: [{que: foto}]
+    jugadas:
+      - {nombre: entregar, tarea: COM, el_texto_cubre: [explicacion], lo_descrito_cubre: [C1]}
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: COM, pregunta: confirmar_la_entrega,
+         le_falta_del_criterio: ausente,
+         al_confirmar: {estado: en_revision, arranca_al_entregarla: true}}
+    pregunta: {tipo: confirmar_la_entrega, tarea: COM}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: COM}
+    dice:
+      - "la tarea de comunicaciones en su renglón con 📋"
+      - "una pieza por renglón: lo que escribió y la foto"
+      - que al confirmar pasa a revisión
+      - "el cierre, aparte: si la entrega así"
+    no_dice:
+      - que le falta arrancarla o que no figura como arrancada
+      - qué falta del criterio
+
+  - paso: 7
+    quien: Marcos
+    a_las: "2026-10-23 10:01"
+    escribe: "dale"
+    jugadas:
+      - {nombre: confirmar, tarea: COM, puede_traer: [tarea]}
+    efectos:
+      estados: {COM: en_revision}
+      evidencias:
+        - {tarea: COM, clase: texto, cubre: [explicacion]}
+        - {tarea: COM, clase: imagen, cubre: [captura]}
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: COM, a: Ismael, estado: guardado}
+    hechos:
+      - {jugada: confirmar, resultado: entregada, tarea: COM, estado: en_revision,
+         arranco_al_entregarla: true}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que quedó entregada y pasa a revisión
+      - que le avisa cuando la revisen o si hace falta algo más
+    no_dice:
+      - el nombre de Ismael
+      - que la tarea está terminada o aprobada
+      - una fecha de inicio anterior a hoy

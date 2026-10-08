@@ -210,24 +210,29 @@ pasos:
     escribe: "ya llego el cable sigo con el plc y lo de comunicaciones lo termine recien al final"
     jugadas:
       - {nombre: destrabar, tarea: PLC}
-      - {nombre: entregar, tarea: COM}
+      - nombre: entregar
+        tarea: COM
+        lo_descrito_cubre: []
+        ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora."
     efectos:
       estados: {PLC: en_curso}
       bloqueos_resueltos: [PLC]
     hechos:
       - {jugada: destrabar, resultado: anotado, tarea: PLC, estado: en_curso,
          vuelve_a_pedir_el_estado: ausente, pregunta: ausente}
-      # Desde la Fase C (C-3, porción 2) la entrega se recibe sólo desde en curso, y comunicaciones
-      # nunca se arrancó. PENDIENTE (decisión del usuario, odd/tasks/fase-c.md): si "la terminé" sobre una
-      # tarea sin arrancar anota el inicio y entrega en el mismo mensaje.
-      - {jugada: entregar, resultado: no_se_puede, motivo: estado, tarea: COM, estado: asignada}
-    pregunta: null
+      # Comunicaciones nunca se arrancó: se recibe igual (decisión 14 del usuario, 2026-10-08), y
+      # lo escrito no dice lo que pide su criterio de aceptación (decisión 10; C-3d, D3).
+      - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM,
+         pregunta: lo_que_falta_de_la_entrega,
+         le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: "Los equipos de la comprimidora se comunicaron con el PLC por la red de planta sin errores durante una hora.",
+         al_confirmar: {arranca_al_entregarla: true}}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
     estado_despues:
-      pregunta_abierta: null
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
       para_despues: []
     dice:
       - "en el bloque de la del PLC, con 📋 primero y ✏️ debajo: que quedó anotado que se destrabó y sigue en curso"
-      - "en el bloque de la de comunicaciones: con honestidad, que no puede recibir la entrega porque la tarea no figura como arrancada, y qué puede hacer"
+      - "en el bloque de la de comunicaciones: qué falta para revisarla, con un ejemplo sacado del criterio para que lo acepte o lo escriba con sus palabras"
       - el próximo paso, aparte y al final
     no_dice:
       - que la tarea de comunicaciones quedó entregada, en revisión o terminada

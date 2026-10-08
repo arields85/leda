@@ -681,10 +681,13 @@ def test_entregar_muestra_la_entrega_y_no_escribe_ni_avisa_nada_hasta_confirmar(
     assert _cuantas(conn, "evidence") == 0 and _cuantas(conn, "scheduled_notice") == 0
 
 
-def test_una_tarea_que_no_esta_en_curso_no_se_entrega(conn, mundo, escribe):
+def test_una_tarea_sin_arrancar_se_entrega_con_su_vista_previa(conn, mundo, escribe):
+    """Decisión 14 del usuario (2026-10-08): "la terminé" sobre una tarea asignada se recibe
+    igual; al confirmar, la historia dice que arrancó y se entregó en ese momento."""
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada("entregar", {"tarea": "T1"}),
                      texto="ya la terminé")
-    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "estado"
+    assert hecho["resultado"] == "para_confirmar"
+    assert hecho["al_confirmar"]["arranca_al_entregarla"] is True
 
 
 def test_una_reasignacion_dice_quien_decide_y_no_avisa_a_nadie(conn, mundo, escribe):

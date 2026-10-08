@@ -1305,16 +1305,17 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
     Ficha("entregar", "recibir la entrega de una tarea con su evidencia",
           necesita=("tarea",),
           opcional=("el_texto_cubre", "lo_descrito_cubre", "ejemplo", "acepta_el_ejemplo"),
-          comprueba="que sea el responsable y que la tarea esté en curso; qué cubre cada "
-                    "pieza de lo que pide la política (la base), qué puntos del criterio de "
-                    "aceptación dice lo descrito y qué falta (el código)",
+          comprueba="que sea el responsable y que la tarea esté en curso o sin arrancar; qué "
+                    "cubre cada pieza de lo que pide la política (la base), qué puntos del "
+                    "criterio de aceptación dice lo descrito y qué falta (el código)",
           hace="muestra la entrega, pieza por pieza (también lo que mandó antes, que entra "
                "sólo si queda), con qué cubre cada una, qué describe del criterio y qué "
                "falta; nada se escribe en la tarea todavía",
           despues="con la política y el criterio completos, espera la confirmación (botón o "
                   "escrito); si falta algo, lo dice, con un ejemplo para lo que falta del "
                   "criterio, y espera lo que falta: no se entrega aunque la persona insista",
-          manejar=_entregar, del_responsable=True, estados=frozenset({"en_curso"}),
+          manejar=_entregar, del_responsable=True,
+          estados=frozenset({"asignada", "en_curso"}),
           corregir=_corregir_la_entrega, toma_lo_que_llego=True,
           es="La persona dice que terminó una tarea, suma algo a la entrega de una tarea que "
              "ya está mostrando (lo que escribe, fotos, archivos o enlaces) o acepta, tal cual, "

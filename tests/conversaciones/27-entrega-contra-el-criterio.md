@@ -3,9 +3,12 @@
 **Qué prueba:** Marcos entrega la tarea del PLC y lo que escribe no dice todo lo que pide su criterio de
 aceptación. Leda le dice qué falta, en palabras simples y hablando de la tarea, con un ejemplo sacado
 del criterio; le vuelve a dar el ejemplo cuando pregunta qué poner; no la entrega aunque Marcos insista;
-y cuando Marcos acepta el ejemplo, la entrega se confirma como siempre. Decisión 10 del usuario
+y cuando Marcos acepta el ejemplo, la entrega se confirma como siempre. Al día siguiente entrega la de
+comunicaciones, que nunca había arrancado, describiendo lo que pide su criterio: se recibe sin
+preguntas y la historia dice que arrancó y se entregó en ese momento. Decisiones 10 y 14 del usuario
 (2026-10-08; `odd/tasks/fase-c.md`, C-3d, unidad D3); constitución §4 y §8 ("lo propone en lugar de
-sólo pedirlo"); mecánica §5, §6 y §13; ADR 0019, decisión 5; regla del mozo (`AGENTS.md`, punto 11).
+sólo pedirlo"); mecánica §3, §5, §6 y §13; ADR 0019, decisión 5; regla del mozo (`AGENTS.md`, punto
+11).
 
 **Comparar es leer; decidir es del código.** La IA que elige la jugada juzga, punto por punto del
 criterio, si lo que Marcos describe lo dice (`lo_descrito_cubre`), y escribe el ejemplo (`ejemplo`).
@@ -90,11 +93,41 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
    - La respuesta no dice: el nombre de Ismael; que la tarea está terminada o aprobada.
    - Estado después: sin tema abierto, nada mostrado para confirmar.
 
+6. **Marcos** manda (viernes 23, 10:00) una foto con el texto: "lo de comunicaciones ya esta, los equipos
+   se comunicaron con el plc por la red de planta una hora sin errores"
+   →
+   - Jugadas: `entregar`, la tarea de comunicaciones, que nunca se arrancó: se recibe igual, con su
+     vista previa y su confirmación (decisión 14 del usuario, 2026-10-08). Lo escrito dice lo que pide
+     su criterio: la IA lo juzga y no se pregunta nada.
+   - Efecto: ninguno sobre la tarea todavía, que sigue `asignada`. La entrega está completa: se guarda
+     la vista previa con su huella.
+   - La respuesta dice: la tarea de comunicaciones en su renglón con 📋; una pieza por renglón (lo que
+     escribió y la foto); que al confirmar pasa a revisión; el cierre, aparte: si la entrega así.
+   - La respuesta no dice: que no figura como arrancada o que tiene que arrancarla antes; qué falta del
+     criterio.
+   - Botones: los de la confirmación.
+   - Estado después: lo último mostrado para confirmar: la entrega con dos piezas.
+
+7. **Marcos** escribe (10:01): "dale"
+   →
+   - Jugadas: `confirmar` (con la tarea de comunicaciones o sin ella).
+   - Efecto, en un solo acto: las dos filas de evidencia; la historia dice que arrancó y se entregó en
+     ese momento (de `asignada` a `en_curso` y de ahí a `en_revision`, los dos con la hora de ahora y
+     de Marcos, sin una fecha de inicio inventada); auditoría. Nunca `terminada` (mecánica §3). El aviso
+     a Ismael queda guardado y sale terminado el margen para corregir.
+   - La respuesta dice: que quedó entregada y pasa a revisión; que le avisa cuando la revisen o si hace
+     falta algo más.
+   - La respuesta no dice: el nombre de Ismael; que la tarea está terminada o aprobada; una fecha de
+     inicio anterior a hoy.
+   - Estado después: sin tema abierto, nada mostrado para confirmar.
+
 ## Qué mide
 
 - **Garantías:** no pasa a revisión lo que no dice el criterio, aunque la persona insista; el ejemplo
   cuenta como lo descrito sólo si la persona lo acepta; el ejemplo no inventa datos (lo verifica el
-  código); no deja sin salida (cada respuesta dice qué falta y cómo describirlo).
+  código); no deja sin salida (cada respuesta dice qué falta y cómo describirlo); "la terminé" lleva a
+  revisión, nunca a terminada, aunque la tarea no figure como arrancada, y no inventa una fecha de
+  inicio.
 - **El formato:** el de la conversación 20 en cada mensaje.
 - **Falla de comprensión:** que la IA dé por cubierto el criterio con "ya arranca desde el plc", que lea
   "y que pongo?" como una descripción, que lea "no, asi esta, mandala" como la aceptación del ejemplo o

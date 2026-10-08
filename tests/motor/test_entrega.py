@@ -170,7 +170,8 @@ def _entregar(tarea: str = "T2", **datos) -> Jugada:
 # --- La lista cerrada -----------------------------------------------------------------------
 
 def test_la_entrega_es_una_ficha_con_su_confirmacion():
-    assert FICHAS["entregar"].estados == frozenset({"en_curso"})
+    # Sin arrancar también (decisión 14 del usuario, 2026-10-08).
+    assert FICHAS["entregar"].estados == frozenset({"asignada", "en_curso"})
     assert FICHAS["entregar"].se_ofrece
     assert "el_texto_cubre" in FICHAS["entregar"].opcional
     assert not FICHAS["confirmar"].se_ofrece and not FICHAS["guardar_para_la_entrega"].se_ofrece
@@ -877,3 +878,32 @@ def test_un_texto_siempre_cubre_lo_que_solo_un_texto_puede_cubrir(conn, mundo, m
     hecho = _hecho(r, "entregar")
     assert hecho["resultado"] == "para_confirmar"
     assert hecho["entrega"][0]["cubre"] == ["cómo quedó el trabajo", "cómo se probó"]
+
+
+# --- Una tarea que nunca se arrancó (decisión 14 del usuario, 2026-10-08; D3) ----------------
+
+def test_la_terminada_sin_arrancar_se_recibe_igual_y_queda_arrancada_al_entregarla(conn, mundo,
+                                                                                   marcos):
+    tarea = _tarea(conn, mundo, pide=("explicacion",), estado="asignada")
+    r = marcos.manda(_entregar(), texto="la termine, quedo cerrado")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "para_confirmar"
+    assert hecho["al_confirmar"]["arranca_al_entregarla"] is True
+    assert estado_de(conn, tarea) == "asignada"
+
+    r = marcos.manda(Jugada("confirmar", {}), texto="dale")
+    hecho = _hecho(r, "confirmar")
+    assert hecho["resultado"] == "entregada" and hecho["arranco_al_entregarla"] is True
+    assert estado_de(conn, tarea) == "en_revision"
+    assert [(e["estado_anterior"], e["estado_nuevo"]) for e in todos(
+        conn, """select estado_anterior, estado_nuevo from task_state_event
+                  where task_id = %s and estado_anterior is not null order by at""", tarea)] == [
+        ("asignada", "en_curso"), ("en_curso", "en_revision")]
+
+
+def test_la_ia_recibe_lo_que_pide_la_tarea_sin_arrancar(conn, mundo, marcos):
+    _tarea(conn, mundo, estado="asignada", criterio=CRITERIO)
+    marcos.manda(texto="hola")
+    tarea = next(t for t in marcos.situacion["tareas"] if t["alias"] == "T2")
+    assert [t["tipo_de_evidencia"] for t in tarea["evidencia_que_pide"]] == ["explicacion", "foto"]
+    assert [p["punto"] for p in tarea["criterio_de_aceptacion"]] == ["C1", "C2"]

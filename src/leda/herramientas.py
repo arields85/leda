@@ -1791,8 +1791,9 @@ def _resolver_piezas(cur, tarea_id, piezas: list[dict]) -> list[dict]:
 
 @herramienta(
     "entregar_tarea", "actualizar_estado",
-    "Entrega una tarea en curso con sus piezas de evidencia: en un solo acto escribe cada "
-    "pieza y pasa la tarea a revisión. Sólo si la evidencia cubre la política de la tarea.",
+    "Entrega una tarea en curso, o una asignada que nunca se arrancó, con sus piezas de "
+    "evidencia: en un solo acto escribe cada pieza y pasa la tarea a revisión. Sólo si la "
+    "evidencia cubre la política de la tarea.",
     {"tarea_id": {"type": "string", "requerido": True},
      "piezas": {"type": "array", "requerido": True}})
 def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
@@ -1800,6 +1801,12 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
     `en_revision` se escriben en el mismo acto, sólo desde `en_curso` y sólo si las piezas,
     con la evidencia vigente, cubren cada tipo que pide la política. Nunca `terminada`
     (constitución §11).
+
+    Una tarea `asignada` que nunca se arrancó se entrega igual (decisión 14 del usuario,
+    2026-10-08; C-3d, D3): es la persona la que dice que la hizo. La historia dice que arrancó
+    y se entregó en ese momento, en el mismo acto, sin una fecha de inicio inventada
+    (`arranco`), y el arranque cumple la regla de siempre: no con una dependencia bloqueante
+    sin terminar (mecánica §4; `motivo_no_arranca_tarea`).
 
     Porción 3a de la C-3 (ADR 0019, decisión 6): el aviso a quien aprueba ya no sale de acá,
     con texto fijo. Lo guarda el motor, que lo redacta desde los hechos de su hora
@@ -1814,9 +1821,15 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
         return {"error": "esa tarea no existe en este equipo"}
     if str(fila["responsable_membership_id"]) != str(quien.membership_id):
         raise Denegado("No podés entregar una tarea que no es tuya.")
-    if fila["estado"] != "en_curso":
+    if fila["estado"] not in ("en_curso", "asignada"):
         return {"en_revision": False, "estado": str(fila["estado"]),
                 "error": "la tarea no está en curso"}
+    arranca = fila["estado"] == "asignada"
+    if arranca:
+        cur.execute("select motivo_no_arranca_tarea(%s) as m", (tarea_id,))
+        motivo = cur.fetchone()["m"]
+        if motivo is not None:
+            return {"en_revision": False, "estado": "asignada", "no_arranca": motivo}
     try:
         resueltas = _resolver_piezas(cur, tarea_id, piezas)
     except ValueError as e:
@@ -1825,6 +1838,13 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
     if faltan:
         return _falta_evidencia_de_entrega(faltan)
 
+    if arranca:
+        cur.execute(
+            """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                             actor_kind, actor_app_user_id, motivo, at)
+               values (%s, 'asignada', 'en_curso', 'persona', %s,
+                       'arrancó al entregarla', clock_timestamp())""",
+            (tarea_id, quien.app_user_id))
     ids = [_insertar_evidencia(cur, quien, tarea_id, p) for p in resueltas]
     cur.execute(
         """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
@@ -1840,7 +1860,8 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
     else:
         cur.execute("select pg_current_xact_id()::text as x")
         entrega = f"{tarea_id}:{cur.fetchone()['x']}"
-    return {"estado": "en_revision", "evidencias": ids, "entrega": entrega}
+    return {"estado": "en_revision", "evidencias": ids, "entrega": entrega,
+            **({"arranco": True} if arranca else {})}
 
 
 @herramienta(

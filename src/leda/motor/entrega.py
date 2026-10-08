@@ -91,6 +91,7 @@ CAMBIO_LO_QUE_SE_MOSTRO = "cambio_lo_que_se_mostro"
 NO_ES_LO_ULTIMO_QUE_VIO = "no_es_lo_ultimo_que_vio"
 NADA_PARA_CONFIRMAR = "nada_para_confirmar"
 LE_FALTA_ALGO = "le_falta_algo"
+ESPERA_OTRAS_TAREAS = "espera_otras_tareas"
 
 _ENLACE = re.compile(r"https?://\S+", re.IGNORECASE)
 
@@ -233,12 +234,12 @@ def para_la_ia(cur, tareas: Sequence[dict[str, Any]], zona) -> tuple[dict[str, A
     con = []
     for t in tareas:
         t = dict(t)
-        if t["estado"] in ("en_curso", "en_revision"):
+        if t["estado"] in ("asignada", "en_curso", "en_revision"):
             puntos = criterio(cur, t["id"])
             if puntos:
                 t["criterio_de_aceptacion"] = [{"punto": f"C{i}", "lo_que_pide": punto}
                                                for i, punto in enumerate(puntos, 1)]
-        if t["estado"] == "en_curso":
+        if t["estado"] in ("asignada", "en_curso"):
             pol = politica(cur, t["id"])
             if pol.pide:
                 t["evidencia_que_pide"] = [{"tipo_de_evidencia": tipo,
@@ -655,9 +656,15 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
         "resultado": PARA_CONFIRMAR if completa else LE_FALTA_EVIDENCIA,
         "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]}, "entrega": muestra,
         **lo_que_falta}
+    al_confirmar: dict[str, Any] = {"estado": "en_revision"}
     if quien is not None:
-        hecho["al_confirmar"] = {"estado": "en_revision",
-                                 "queda_esperando_la_aprobacion_de": quien["nombre"]}
+        al_confirmar["queda_esperando_la_aprobacion_de"] = quien["nombre"]
+    if tarea["estado"] == "asignada":
+        # Nunca se arrancó: al confirmar, la historia dice que arrancó y se entregó en ese
+        # momento (decisión 14 del usuario, 2026-10-08).
+        al_confirmar["arranca_al_entregarla"] = True
+    if quien is not None or tarea["estado"] == "asignada":
+        hecho["al_confirmar"] = al_confirmar
     fichas.nombrar_pregunta(hecho, "pregunta" if ahora_si else "pregunta_para_despues", tipo,
                             pregunta_id)
     return hecho
@@ -878,6 +885,10 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
                  {"tarea_id": tarea_q["id"], "piezas": [_para_la_cocina(p) for p in piezas]},
                  ya_confirmada=True)
     fichas = _fichas()
+    if r.get("no_arranca"):
+        # Una tarea sin arrancar que espera que terminen otras de las que depende (mecánica §4).
+        return {"resultado": "no_se_puede", "motivo": ESPERA_OTRAS_TAREAS,
+                "tarea": {"alias": tarea_q["alias"], "titulo": tarea_q["titulo"]}}
     if r.get("estado") != "en_revision":
         return fichas.no_hecho(r, {"alias": tarea_q["alias"], "titulo": tarea_q["titulo"]})
     if q["cerrada_en"] is None:
@@ -889,7 +900,8 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
     hecho: dict[str, Any] = {
         "resultado": ENTREGADA,
         "tarea": {"alias": tarea_q["alias"], "titulo": tarea_q["titulo"]},
-        "estado": "en_revision", "entrega": mostrar(_ordenar(piezas), pol, ctx.calendario.zona)}
+        "estado": "en_revision", "entrega": mostrar(_ordenar(piezas), pol, ctx.calendario.zona),
+        **({"arranco_al_entregarla": True} if r.get("arranco") else {})}
     quien = _quien_aprueba(ctx)
     if quien is not None:
         hecho["queda_esperando_la_aprobacion_de"] = quien["nombre"]

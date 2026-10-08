@@ -95,7 +95,8 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
 27. [`27-entrega-contra-el-criterio.md`](27-entrega-contra-el-criterio.md): lo que Marcos describe al
     entregar no dice todo el criterio de aceptación; Leda dice qué falta con un ejemplo sacado del
     criterio, se lo vuelve a dar cuando pregunta qué poner, no la entrega aunque insista, y con el
-    ejemplo aceptado la entrega se confirma (decisión 10 del usuario, 2026-10-08; C-3d, D3).
+    ejemplo aceptado la entrega se confirma; la de una tarea que nunca se arrancó se recibe igual y
+    queda arrancada al entregarla (decisiones 10 y 14 del usuario, 2026-10-08; C-3d, D3).
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:

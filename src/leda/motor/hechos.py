@@ -164,6 +164,13 @@ SIGNIFICADOS: Mapping[str, str] = {
                "criterio y de lo que la persona ya dijo, sin ningún dato nuevo. Leda se la "
                "propone tal cual, para que la acepte o lo describa con sus palabras; mientras no "
                "la acepte, no es parte de la entrega.",
+    "arranca_al_entregarla": "La tarea no figura como arrancada: al confirmar la entrega, la "
+                             "historia dice que arrancó y se entregó en ese momento, sin otra "
+                             "fecha de inicio.",
+    "arranco_al_entregarla": "La tarea no figuraba como arrancada: la historia dice que arrancó "
+                             "y se entregó en este momento, sin otra fecha de inicio.",
+    "espera_otras_tareas": "La tarea no puede arrancar porque espera que terminen otras de las "
+                           "que depende: así no se entrega, y no cambió nada.",
     "le_falta_algo": "A la entrega todavía le falta algo de lo que pide la tarea (le_falta o "
                      "le_falta_del_criterio dicen qué): así no pasa a revisión, aunque la "
                      "persona lo pida.",

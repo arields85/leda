@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import psycopg
@@ -460,8 +460,8 @@ def test_entregar_escribe_las_piezas_y_pasa_a_revision_en_un_solo_acto(corework,
     assert r["entrega"] == r["evidencias"][0]
 
 
-@pytest.mark.parametrize("estado", ["asignada", "bloqueada", "en_revision"])
-def test_entregar_solo_desde_en_curso(corework, conn, estado):
+@pytest.mark.parametrize("estado", ["bloqueada", "en_revision"])
+def test_entregar_solo_desde_en_curso_o_sin_arrancar(corework, conn, estado):
     ws = corework.workspace_id
     with admin(conn) as cur:
         tarea = _tarea(cur, ws, pide=("explicacion",), estado=estado)
@@ -590,3 +590,47 @@ def test_el_rollback_de_la_0038_se_niega_si_una_pieza_describe_el_criterio(corew
             cur.execute("set local search_path = leda, public")
             cur.execute(guarda)
         assert _cuantas(cur, "evidence") == 1
+
+
+# --- Entregar una tarea que nunca se arrancó (decisión 14 del usuario, 2026-10-08; D3) ------
+
+def test_entregar_una_tarea_sin_arrancar_anota_el_inicio_y_la_entrega_en_ese_momento(
+        corework, conn):
+    """"La terminé" sobre una tarea asignada se recibe igual. La historia dice que arrancó y se
+    entregó en ese momento, sin una fecha de inicio inventada; nunca `terminada` (mecánica §3)."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws, pide=("explicacion",), estado="asignada")
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, ws, "Mariano Naim")
+        r = H.ejecutar(cur, quien, "entregar_tarea", {"tarea_id": tarea, "piezas": [
+            {"texto": "Quedó cerrado y probado", "cubre": ["explicacion"]}]}, ya_confirmada=True)
+    assert r["estado"] == "en_revision" and r["arranco"] is True
+    with admin(conn) as cur:
+        cur.execute("""select estado_anterior, estado_nuevo, actor_kind::text actor, at
+                         from task_state_event where task_id = %s order by at""", (tarea,))
+        eventos = cur.fetchall()
+        assert [(e["estado_anterior"], e["estado_nuevo"], e["actor"]) for e in eventos[1:]] == [
+            ("asignada", "en_curso", "persona"), ("en_curso", "en_revision", "persona")]
+        assert eventos[2]["at"] - eventos[1]["at"] < timedelta(seconds=5)
+        cur.execute("select estado from task where id = %s", (tarea,))
+        assert cur.fetchone()["estado"] == "en_revision"
+
+
+def test_una_tarea_sin_arrancar_que_espera_otra_no_se_entrega(corework, conn):
+    """Mecánica §4: no arranca con una dependencia bloqueante sin terminar."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws, pide=("explicacion",), estado="asignada")
+        antes = _tarea(cur, ws, pide=("explicacion",), estado="en_curso")
+        cur.execute("""insert into dependency (workspace_id, origen_task_id, destino_task_id, tipo)
+                       values (%s, %s, %s, 'bloqueante')""", (ws, antes, tarea))
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, ws, "Mariano Naim")
+        r = H.ejecutar(cur, quien, "entregar_tarea", {"tarea_id": tarea, "piezas": [
+            {"texto": "Listo", "cubre": ["explicacion"]}]}, ya_confirmada=True)
+    assert r["en_revision"] is False and r["no_arranca"]
+    with admin(conn) as cur:
+        assert _cuantas(cur, "evidence", "task_id = %s", tarea) == 0

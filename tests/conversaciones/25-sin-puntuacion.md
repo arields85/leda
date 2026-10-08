@@ -141,19 +141,20 @@ del día; acá llega antes (paso 6) y a Ismael le llega un solo aviso, con el po
    termine recien al final"
    →
    - Jugadas: dos. `destrabar` sobre la tarea del PLC (como en la conversación 17); `entregar` sobre la de
-     comunicaciones, que nunca se arrancó: desde la Fase C la entrega se recibe por chat, pero sólo de una
-     tarea en curso (ADR 0018, decisión 4).
+     comunicaciones, que nunca se arrancó: se recibe igual, con su vista previa y su confirmación, y al
+     confirmar la historia dice que arrancó y se entregó en ese momento (decisión 14 del usuario,
+     2026-10-08).
    - Efecto: el bloqueo de la del PLC se cierra y la tarea vuelve a `en_curso`; antes del vencimiento, la
-     escalera sigue sola. Sobre la de comunicaciones, ninguno.
+     escalera sigue sola. Sobre la de comunicaciones, ninguno todavía: "lo termine recien al final" no
+     dice lo que pide su criterio de aceptación (que los equipos se comunican con el PLC por la red de
+     planta sin errores durante una hora), así que no hay nada para confirmar (decisión 10).
    - La respuesta dice: en el bloque de la del PLC, con 📋 primero y ✏️ debajo, que quedó anotado que se
-     destrabó y sigue en curso; en el de la de comunicaciones, con honestidad, que no puede recibir la
-     entrega porque la tarea no figura como arrancada, y qué puede hacer; el próximo paso, aparte y al
+     destrabó y sigue en curso; en el de la de comunicaciones, qué falta para revisarla, con un ejemplo
+     sacado del criterio para que lo acepte o lo escriba con sus palabras; el próximo paso, aparte y al
      final.
-   - `PENDIENTE` (decisión del usuario, `odd/tasks/fase-c.md`): si "la terminé" sobre una tarea sin
-     arrancar anota el inicio y recibe la entrega en el mismo mensaje.
    - La respuesta no dice: que la de comunicaciones quedó entregada, en revisión o terminada; que Ismael se
      enteró o se va a enterar; que la del PLC está terminada; otra vez la pregunta de quién lo destraba.
-   - Estado después: sin tema abierto, nada para después.
+   - Estado después: tema abierto, la entrega de comunicaciones, esperando lo que falta.
 
 ## Qué mide
 
