@@ -76,4 +76,15 @@ class ConOpciones:
                               and q.abierta_en <= %s
                             order by o.orden""",
                         (fila["destinatario_membership_id"], fila["programado_para"]))
-            return [Boton(o["etiqueta"], callback(o["token"])) for o in cur.fetchall()]
+            de_la_pregunta = [Boton(o["etiqueta"], callback(o["token"])) for o in cur.fetchall()]
+            # Las decisiones que el turno ofreció en esta respuesta, sin ser un tema abierto
+            # (`preguntas.ofrecer_en_la_respuesta`): en el orden en que se ofrecieron.
+            cur.execute("""select o.etiqueta, o.token
+                             from conversation_question q
+                             join conversation_option o on o.question_id = q.id
+                            where q.jugada ->> 'de_la_respuesta' = %s::text
+                              and q.cerrada_en is null
+                            order by (q.jugada ->> 'orden_en_la_respuesta')::int, o.orden""",
+                        (str(fila["id"]),))
+            ofrecidas = [Boton(o["etiqueta"], callback(o["token"])) for o in cur.fetchall()]
+            return de_la_pregunta + ofrecidas

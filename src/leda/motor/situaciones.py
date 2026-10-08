@@ -135,6 +135,43 @@ def _elegir_y_correr(ctx, opcion, pregunta_id: str, task_id, eligio: dict) -> di
     return {**hecho, "eligio": eligio}
 
 
+# --- Una pregunta que se hace una sola vez (decisión 12 del usuario, 2026-10-08) ------------
+
+def sin_elegir(ctx) -> list[dict[str, Any]]:
+    """Al terminar las jugadas: si la pregunta abierta se hace una sola vez
+    (`TipoDePregunta.sin_elegir_queda`), salió en un mensaje anterior y este mensaje no la
+    contestó, la persona no eligió (`no_eligio`). Igual para todo tipo que lo declare."""
+    abierta = preguntas.actual(ctx.cur, ctx.quien.membership_id)
+    if (abierta is None or str(abierta["id"]) in ctx.preguntas_del_turno
+            or preguntas.TIPOS[abierta["tipo"]].sin_elegir_queda is None):
+        return []
+    return [no_eligio(ctx, abierta)]
+
+
+def no_eligio(ctx, q: dict[str, Any]) -> dict[str, Any]:
+    """Leda no decide por la persona ni repite la pregunta: la cierra sin efecto y sus opciones
+    quedan como la decisión que declara su tipo, ofrecida en esta respuesta, con lo que la persona
+    había dicho en cada una y la huella de lo que se decidía. Lo que esperaba esa decisión sigue
+    esperándola. Los hechos lo dicen, con los botones que lleva el mensaje."""
+    tipo = preguntas.TIPOS[q["tipo"]]
+    task_id = str(q["task_id"]) if q["task_id"] is not None else None
+    opciones = [(o["etiqueta"], dict(o["valor"] or {}))
+                for o in preguntas.opciones(ctx.cur, q["id"])]
+    preguntas.cerrar(ctx, str(q["id"]), "sin_efecto", {"no_eligio": True, "tarea": task_id})
+    esperaba = q["jugada"] or {}
+    if task_id is not None and tipo.sin_elegir_queda is not None:
+        preguntas.ofrecer_en_la_respuesta(
+            ctx, tipo.sin_elegir_queda, task_id,
+            jugada={"nombre": esperaba.get("nombre"), "sin_elegir_en": str(q["id"]),
+                    **({"huella": esperaba["huella"]} if "huella" in esperaba else {})},
+            opciones=opciones)
+    hecho: dict[str, Any] = {"resultado": "no_eligio", "pregunta_hecha_una_vez": q["tipo"],
+                             "botones": [etiqueta for etiqueta, _ in opciones]}
+    if task_id is not None:
+        hecho["tarea"] = preguntas.tarea_dicha(ctx, task_id)
+    return hecho
+
+
 # --- cancelar y dejar para después ----------------------------------------------------------
 
 def cancelar(ctx, datos: dict, tarea: dict | None) -> dict:

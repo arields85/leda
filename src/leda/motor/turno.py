@@ -73,7 +73,7 @@ from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
 from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
-from .situaciones import elegir_opcion
+from .situaciones import elegir_opcion, sin_elegir
 from .tiempo import Reloj
 
 # El único texto fijo del motor (ADR 0018, decisión 8): sin IA no hay quien lo escriba. Es el
@@ -191,6 +191,9 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
         elegidas = elegir()
         with conn.transaction():
             hechos = manejar(elegidas)
+            # Una pregunta que se hace una sola vez y este mensaje no contestó: no se repite
+            # (decisión 12 del usuario, 2026-10-08; `situaciones.sin_elegir`).
+            hechos += sin_elegir(ctx)
             # Desde cuándo cada tarea está en su estado lo sabe el motor por lo que anota
             # (`cambios_de_estado.py`): los cambios de este turno, fuera de los hechos.
             cambios = cambios_de_estado.del_turno(cur, ctx.tareas)
@@ -218,7 +221,9 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
     if ctx.avisos_guardados:
         cur.execute("update scheduled_notice set turno_id = %s where id = any(%s)",
                     (turno, ctx.avisos_guardados))
-    _responder(cur, ctx, texto, reloj.ahora(), ia.nombre, clave_respuesta)
+    outbox_id = _responder(cur, ctx, texto, reloj.ahora(), ia.nombre, clave_respuesta)
+    # Las decisiones ofrecidas en el turno salen con esta respuesta (`botones.py`).
+    preguntas.atar_a_la_respuesta(cur, ctx.ofrecidas, outbox_id)
     return ResultadoTurno(texto, elegidas, hechos, pregunta=pregunta,
                           ya_no_sale=final.ya_no_sale, listo_en=listo_en)
 
@@ -469,13 +474,16 @@ def _si_la_ia_falla(cur, ctx: Contexto, ia: IA, reloj: Reloj, inicio: float,
 
 
 def _responder(cur, ctx: Contexto, texto: str, ahora: datetime, ia_nombre: str | None,
-               clave: str) -> None:
+               clave: str) -> str:
+    """La respuesta, por el outbox, en el registro de turnos. Devuelve su fila."""
     enqueue_outbox(cur, workspace_id=ctx.quien.workspace_id, chat_id=ctx.chat_id, text=texto,
                    dedupe_key=clave, recipient_membership_id=ctx.quien.membership_id,
                    is_response=True, scheduled_for=ahora)
     cur.execute("select id from message_outbox where dedupe_key = %s", (clave,))
-    registrar_salida(cur, ctx.quien.workspace_id, ctx.quien.membership_id,
-                     str(cur.fetchone()["id"]), ia_nombre, ahora)
+    outbox_id = str(cur.fetchone()["id"])
+    registrar_salida(cur, ctx.quien.workspace_id, ctx.quien.membership_id, outbox_id, ia_nombre,
+                     ahora)
+    return outbox_id
 
 
 def _registrar_entrada(cur, ctx: Contexto, ahora: datetime, jugadas: list[Jugada] | None,

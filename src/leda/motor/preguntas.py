@@ -101,10 +101,14 @@ CUAL_DE_LAS_DOS = "cual_de_las_dos"
 @dataclass(frozen=True)
 class TipoDePregunta:
     """Un tipo de pregunta de Leda. `espera`: el tipo de la espera (`pending_reply.tipo`) con
-    que espera respuesta; `None` si se puede dejar sin efecto."""
+    que espera respuesta; `None` si se puede dejar sin efecto. `sin_elegir_queda`: si se hace
+    una sola vez, el tipo de la decisión que queda con sus opciones cuando la persona contesta
+    otra cosa sin elegir: la pregunta se cierra, no se repite, y sus opciones salen como botones
+    de la respuesta (`ofrecer_en_la_respuesta`), sin ser un tema abierto."""
 
     nombre: str
     espera: str | None = None
+    sin_elegir_queda: str | None = None
 
     @property
     def se_puede_dejar(self) -> bool:
@@ -124,7 +128,7 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(LO_QUE_FALTA_DE_LA_ENTREGA),
     TipoDePregunta(DECISION_DE_LA_ENTREGA),
     TipoDePregunta(QUE_CAMBIOS_PIDE),
-    TipoDePregunta(CUAL_DE_LAS_DOS),
+    TipoDePregunta(CUAL_DE_LAS_DOS, sin_elegir_queda=DECISION_DE_LA_ENTREGA),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
@@ -318,17 +322,19 @@ def abrir_con_id(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
 
 
 def ofrecer(ctx, tipo: str, task_id: str, *, jugada: dict[str, Any],
-            opciones: Sequence[tuple[str, dict[str, Any]]]) -> str:
+            opciones: Sequence[tuple[str, dict[str, Any]]], reemplaza: bool = True) -> str:
     """Una decisión que ofrece un aviso, con sus opciones como botones (`DECISION_DE_LA_ENTREGA`):
     queda sin cerrar, para que sus botones valgan, pero no es un tema abierto ni queda para
     después (no se ordena con las demás ni vuelve sola). La que ofrecía otro aviso de la misma
-    tarea queda reemplazada (situación general 7). Devuelve su id."""
-    ctx.cur.execute("""select id from conversation_question
-                        where membership_id = %s and tipo = %s and task_id = %s
-                          and cerrada_en is null""",
-                    (ctx.quien.membership_id, tipo, task_id))
-    for vieja in ctx.cur.fetchall():
-        cerrar(ctx, str(vieja["id"]), "sin_efecto", {"reemplazada": True, "tarea": task_id})
+    tarea queda reemplazada (situación general 7), salvo con `reemplaza=False` (lo que sólo
+    muestra algo, como ver una entrega: un botón viejo sigue valiendo). Devuelve su id."""
+    if reemplaza:
+        ctx.cur.execute("""select id from conversation_question
+                            where membership_id = %s and tipo = %s and task_id = %s
+                              and cerrada_en is null""",
+                        (ctx.quien.membership_id, tipo, task_id))
+        for vieja in ctx.cur.fetchall():
+            cerrar(ctx, str(vieja["id"]), "sin_efecto", {"reemplazada": True, "tarea": task_id})
     ctx.cur.execute(
         """insert into conversation_question (workspace_id, membership_id, tipo, task_id,
                                               jugada, se_puede_dejar, abierta_en)
@@ -344,6 +350,28 @@ def ofrecer(ctx, tipo: str, task_id: str, *, jugada: dict[str, Any],
             (ctx.quien.workspace_id, pregunta, secrets.token_urlsafe(9), _etiqueta(etiqueta),
              _json(valor), orden))
     return pregunta
+
+
+def ofrecer_en_la_respuesta(ctx, tipo: str, task_id: str, *, jugada: dict[str, Any],
+                            opciones: Sequence[tuple[str, dict[str, Any]]],
+                            reemplaza: bool = True) -> str:
+    """Una decisión ofrecida en la respuesta de este turno (`ofrecer`): sus botones salen con esa
+    respuesta (`botones.ConOpciones`), que el turno ata a la decisión al encolarla
+    (`de_la_respuesta`). No es un tema abierto. Devuelve su id."""
+    pregunta = ofrecer(ctx, tipo, task_id, jugada=jugada, opciones=opciones, reemplaza=reemplaza)
+    ctx.ofrecidas.append(pregunta)
+    return pregunta
+
+
+def atar_a_la_respuesta(cur, ofrecidas: Sequence[str], outbox_id: str) -> None:
+    """Las decisiones ofrecidas en un turno, atadas a la fila de su respuesta, con el orden en
+    que se ofrecieron (el de sus botones)."""
+    for orden, pregunta in enumerate(ofrecidas, 1):
+        cur.execute("""update conversation_question
+                          set jugada = coalesce(jugada, '{}'::jsonb)
+                                       || jsonb_build_object('de_la_respuesta', %s::text,
+                                                             'orden_en_la_respuesta', %s::int)
+                        where id = %s""", (outbox_id, orden, pregunta))
 
 
 def _esperar_respuesta(ctx, tipo: str, task_id) -> None:

@@ -527,13 +527,82 @@ def test_aprobar_y_pedir_cambios_juntos_no_hacen_nada_y_preguntan_cual(conn, mun
     assert [o["etiqueta"] for o in r.pregunta["opciones"]] == ["Aprobar", "Pedir cambios"]
     assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
 
-    # Otra vez lo mismo: es la misma pregunta, no una segunda.
-    turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": comentario}),
-                Jugada("pedir_cambios", {"tarea": "T1", "comentario": comentario}),
-                texto="aprobado pero que revise")
-    assert cuantas(conn, "conversation_question", "tipo = %s", preguntas.CUAL_DE_LAS_DOS) == 1
-
-    # Escrito vale igual que el botón: la primera lectura aprueba con el comentario.
-    r = turnos.dice("Ismael", Jugada("elegir", {"opcion": "O1"}), texto="aprobala nomas")
+    # Escrito vale igual que el botón: la primera lectura aprueba con el comentario, que va al
+    # responsable como comentario y no como un pedido de cambios (decisión 12).
+    r = turnos.dice("Ismael", Jugada("elegir", {"opcion": "O1"}),
+                    texto="aprobala nomas y pasale lo de los colores")
     assert estado_de(conn, tarea) == "terminada"
     assert _decisiones(conn, tarea) == [("aprobado", comentario)]
+    [aviso] = avisos_guardados(conn, "tarea_aprobada")
+    assert aviso["hechos"]["comentario"] == comentario
+    assert avisos_guardados(conn, "pedido_de_cambios") == []
+
+
+def _botones_de_la_respuesta(conn, mundo, at, nombre: str = "Ismael") -> list[str]:
+    transporte = TransporteDePrueba()
+    Ciclo(conn, mundo["id"], IAQueRedacta(), RelojFijo(at), transporte, seguimiento=False).vuelta()
+    respuestas = [e for e in transporte.enviados
+                  if e.chat_id == mundo["personas"][nombre]["telegram"]]
+    return [b.etiqueta for b in respuestas[-1].botones]
+
+
+def _cual_de_las_dos(conn, mundo, turnos, comentario: str) -> str:
+    tarea = _entregada(conn, mundo, turnos)
+    turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": comentario}),
+                Jugada("pedir_cambios", {"tarea": "T1", "comentario": comentario}),
+                texto="aprobado, pero que revise los colores")
+    return tarea
+
+
+def test_si_la_respuesta_no_elige_leda_no_decide_ni_repite_la_pregunta(conn, mundo, turnos):
+    """Decisión 12 del usuario (2026-10-08): "y bueno, fijate vos" no elige. Leda no decide: la
+    entrega sigue esperando su decisión, con los dos botones en la respuesta, y la pregunta no se
+    repite (se cierra sin elegir)."""
+    comentario = "que revise los colores"
+    tarea = _cual_de_las_dos(conn, mundo, turnos, comentario)
+    r = turnos.dice("Ismael", texto="y bueno, fijate vos")
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "no_eligio"
+    assert hecho["pregunta_hecha_una_vez"] == preguntas.CUAL_DE_LAS_DOS
+    assert hecho["tarea"]["titulo"] == ENTREGADA
+    assert hecho["botones"] == ["Aprobar", "Pedir cambios"]
+    assert r.pregunta is None
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+    cual = uno(conn, "select * from conversation_question where tipo = %s",
+               preguntas.CUAL_DE_LAS_DOS)
+    assert cual["cerrada_en"] is not None and cual["cierre"] == "sin_efecto"
+    # Los botones van con la respuesta, y no es un tema abierto.
+    assert _botones_de_la_respuesta(conn, mundo, turnos._at(None)) == ["Aprobar",
+                                                                       "Pedir cambios"]
+    assert uno(conn, "select pregunta_abierta_id from conversation_state where membership_id = %s",
+               mundo["personas"]["Ismael"]["membership_id"])["pregunta_abierta_id"] is None
+    # Otro mensaje sin elegir no vuelve a preguntar nada.
+    r = turnos.dice("Ismael", texto="ok")
+    assert r.pregunta is None and r.hechos == []
+    # Tocar uno de esos botones decide, con lo que había dicho.
+    r = turnos.toca("Ismael", _token(conn, "Aprobar", tarea))
+    assert _hecho(r, "aprobar")["resultado"] == "anotado"
+    assert _decisiones(conn, tarea) == [("aprobado", comentario)]
+
+
+def test_las_dos_lecturas_otra_vez_no_repiten_la_pregunta(conn, mundo, turnos):
+    """Si la respuesta vuelve a mezclar aprobar y pedir cambios, tampoco elige: no se repite la
+    pregunta, y la entrega sigue esperando con los botones."""
+    comentario = "que revise los colores"
+    tarea = _cual_de_las_dos(conn, mundo, turnos, comentario)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": comentario}),
+                    Jugada("pedir_cambios", {"tarea": "T1", "comentario": comentario}),
+                    texto="aprobado pero que revise")
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "no_eligio" and r.pregunta is None
+    assert cuantas(conn, "conversation_question", "tipo = %s", preguntas.CUAL_DE_LAS_DOS) == 1
+    assert cuantas(conn, "conversation_question",
+                   "tipo = %s and cerrada_en is null", preguntas.CUAL_DE_LAS_DOS) == 0
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+
+
+def test_lo_que_no_elige_en_el_mismo_mensaje_no_cierra_la_pregunta(conn, mundo, turnos):
+    """La pregunta se hace una vez: en el mensaje que la abre, todavía no se contestó."""
+    _cual_de_las_dos(conn, mundo, turnos, "que revise los colores")
+    assert cuantas(conn, "conversation_question",
+                   "tipo = %s and cerrada_en is null", preguntas.CUAL_DE_LAS_DOS) == 1

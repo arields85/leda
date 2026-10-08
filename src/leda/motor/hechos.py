@@ -239,7 +239,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "ya_la_aprobo_el": "La persona que escribe ya la aprobó ese día: espera que se resuelva lo "
                        "que falta para cerrarse, sin otra aprobación.",
     "comentario": "Lo que dijo quien decide sobre la entrega, con sus palabras: en un pedido de "
-                  "cambios, lo que falta o hay que cambiar.",
+                  "cambios, lo que falta o hay que cambiar; en una aprobación, algo que le pasa "
+                  "a la persona responsable para que lo tenga en cuenta, que no es un cambio "
+                  "pendiente: la tarea queda aprobada igual.",
     "de": "La persona cuyo trabajo se aprueba o se devuelve, como la nombró quien escribe.",
     "quien_aprueba": "Quién aprueba el trabajo de esa persona: quien decide sobre su entrega.",
     "quedo_terminada": "La tarea quedó terminada: aprobada y con todo lo demás que pide el "
@@ -290,8 +292,18 @@ SIGNIFICADOS: Mapping[str, str] = {
                               "lo puede tocar o escribir.",
     "que_cambios_pide": "Pregunta qué le falta o qué hay que cambiar de la entrega: espera lo "
                         "que pide quien la aprueba.",
-    "cual_de_las_dos": "Pregunta cuál de las dos cosas quiso decir la persona sobre la tarea: "
-                       "espera que elija una de las opciones.",
+    "cual_de_las_dos": "Pregunta, una sola vez, cuál de las dos cosas quiso decir la persona "
+                       "sobre la tarea: su respuesta elige una (una opción, o esa decisión "
+                       "escrita), y lo demás que diga es su comentario, no la otra cosa. Si no "
+                       "elige, no se vuelve a preguntar.",
+    "no_eligio": "La persona contestó sin elegir ninguna opción de una pregunta que Leda hace "
+                 "una sola vez: Leda no decide por ella ni la vuelve a preguntar. Lo que esperaba "
+                 "esa decisión sigue esperándola, y las opciones van como botones en este mensaje "
+                 "(botones), para cuando quiera; también lo puede escribir.",
+    "pregunta_hecha_una_vez": "La pregunta, ya hecha, que no se vuelve a hacer: su tipo.",
+    "botones": "Los botones que lleva este mensaje, por lo que dicen: atajos para cuando la "
+               "persona quiera, que también se pueden escribir. No son una pregunta que espere "
+               "respuesta.",
     "tarea_aprobada": "Aviso a la persona responsable: quien aprueba su trabajo aprobó la "
                       "tarea. No pide respuesta.",
     "pedido_de_cambios": "Aviso a la persona responsable: quien aprueba su trabajo le pidió "

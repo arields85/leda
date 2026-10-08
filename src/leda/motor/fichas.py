@@ -101,6 +101,9 @@ class Contexto:
     # Las entregas de otras personas que esperan la decisión de quien escribe (porción 3b de la
     # C-3; `aprobacion.para_decidir`), con su alias, después de las suyas: no son tareas suyas.
     para_aprobar: tuple[dict[str, Any], ...] = ()
+    # Las decisiones ofrecidas en la respuesta de este turno (`preguntas.ofrecer_en_la_
+    # respuesta`): sus botones salen con ella, sin ser un tema abierto (C-3d, D4).
+    ofrecidas: list[str] = field(default_factory=list)
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
         """Una tarea por su alias: de las suyas o de las que esperan su decisión."""
@@ -1365,7 +1368,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona que escribe aprueba el trabajo entregado de una tarea que espera su "
              "decisión, sin pedir que se cambie nada; puede sumar un comentario. Si además pide "
              "que se cambie o se revise algo, eso es también pedir cambios: van las dos "
-             "jugadas. Una tarea que no está en la lista se nombra por su responsable (de)."),
+             "jugadas, salvo cuando contesta la pregunta de cuál de las dos: entonces lo que "
+             "elige es una sola decisión (elegir, o esta jugada con lo demás como comentario). "
+             "Una tarea que no está en la lista se nombra por su responsable (de)."),
     Ficha("pedir_cambios", "pedirle cambios a la entrega de una tarea que espera su decisión",
           necesita=(), opcional=("tarea", "comentario", "de"),
           comprueba="que quien escribe sea quien aprueba el trabajo del responsable y que la "
@@ -1466,10 +1471,26 @@ def dos_lecturas(ctx: Contexto, a: Jugada, b: Jugada) -> dict[str, Any]:
     cable"): ninguna se hace. Leda pregunta una sola vez cuál de las dos, con las dos como
     opciones (constitución §8: algo con más de una lectura); cada opción corre su jugada, con los
     datos que la persona dio (lo que dijo con una sirve para la otra). Si la tarea no existe, la
-    primera jugada corre sola y dice por qué no se puede."""
+    primera jugada corre sola y dice por qué no se puede.
+
+    La pregunta se hace una sola vez (decisión 12 del usuario, 2026-10-08): si ya se hizo en un
+    mensaje anterior, volver a mezclar las dos tampoco elige, y no se repite: Leda no decide, y
+    la entrega sigue esperando con sus opciones como botones (`situaciones.no_eligio`). La
+    pregunta guarda la huella de lo entregado: lo que se elija decide sobre lo que valía al
+    preguntar (ADR 0018, decisión 2)."""
     tarea = ctx.tarea(str(a.datos["tarea"]))
     if tarea is None:
         return correr(FICHAS[a.nombre], ctx, a)
+    ctx.cur.execute("""select * from conversation_question
+                        where membership_id = %s and tipo = %s and task_id = %s
+                          and cerrada_en is null and not (id = any(%s::uuid[]))
+                        order by abierta_en limit 1""",
+                    (ctx.quien.membership_id, preguntas.CUAL_DE_LAS_DOS, tarea["id"],
+                     list(ctx.preguntas_del_turno)))
+    hecha = ctx.cur.fetchone()
+    if hecha is not None:
+        return {"jugada": a.nombre, **situaciones.no_eligio(ctx, hecha)}
+    from . import entrega        # entrega importa fichas
     opciones = []
     for una, otra in ((a, b), (b, a)):
         datos = {k: v for k, v in {**(otra.datos or {}), **(una.datos or {})}.items()
@@ -1479,7 +1500,9 @@ def dos_lecturas(ctx: Contexto, a: Jugada, b: Jugada) -> dict[str, Any]:
     hecho = {"jugada": a.nombre, "resultado": "dos_lecturas", "tarea": _tarea(tarea),
              "lecturas": [a.nombre, b.nombre]}
     ahora, pregunta_id = preguntas.abrir_con_id(
-        ctx, preguntas.CUAL_DE_LAS_DOS, tarea["id"], jugada={"nombre": a.nombre},
+        ctx, preguntas.CUAL_DE_LAS_DOS, tarea["id"],
+        jugada={"nombre": a.nombre,
+                "huella": entrega.huella_de_lo_entregado(ctx.cur, tarea["id"])},
         opciones=opciones)
     _nombrar_pregunta(hecho, _clave_de_pregunta(ahora), preguntas.CUAL_DE_LAS_DOS, pregunta_id)
     return hecho
