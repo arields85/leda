@@ -40,6 +40,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import re
+import threading
 import time
 import traceback
 import uuid
@@ -739,20 +740,38 @@ def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1,
         return _correr_conversacion(conn, conv, ia, vez=vez, motor=motor)
 
 
+# La configuración es una sola para todo el proceso, y con `--paralelo` varias corridas la usan a
+# la vez: la dirección de prueba se pone con la primera que arranca y la de antes vuelve cuando
+# termina la última (D7b: la que terminaba primero la vaciaba y a otra le faltaba el enlace).
+_DIRECCION = threading.Lock()
+_CORRIDAS_CON_LA_DIRECCION = 0
+_CONFIG_DE_ANTES = None
+
+
 @contextlib.contextmanager
 def _con_la_direccion_de_prueba():
     """La dirección pública de la corrida: la de prueba, que no es de nadie (`.invalid`), así el
-    enlace a la página de una tarea sale y se puede comprobar, y nunca apunta a un servidor."""
+    enlace a la página de una tarea sale y se puede comprobar, y nunca apunta a un servidor.
+    Vale mientras corra alguna corrida, también si corren varias a la vez."""
     import dataclasses
 
     from leda import config as config_mod
 
-    antes = config_mod.config
-    config_mod.config = dataclasses.replace(antes, base_url=DIRECCION_DE_PRUEBA)
+    global _CORRIDAS_CON_LA_DIRECCION, _CONFIG_DE_ANTES
+    with _DIRECCION:
+        if _CORRIDAS_CON_LA_DIRECCION == 0:
+            _CONFIG_DE_ANTES = config_mod.config
+            config_mod.config = dataclasses.replace(_CONFIG_DE_ANTES,
+                                                    base_url=DIRECCION_DE_PRUEBA)
+        _CORRIDAS_CON_LA_DIRECCION += 1
     try:
         yield
     finally:
-        config_mod.config = antes
+        with _DIRECCION:
+            _CORRIDAS_CON_LA_DIRECCION -= 1
+            if _CORRIDAS_CON_LA_DIRECCION == 0:
+                config_mod.config = _CONFIG_DE_ANTES
+                _CONFIG_DE_ANTES = None
 
 
 def _correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int,

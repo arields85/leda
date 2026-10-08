@@ -460,3 +460,24 @@ def test_quien_aprueba_no_contesta_corre_entera_dia_por_dia(conn):
     al_responsable = [s for p in corrida.pasos if not p.preludio for s in p.salidas
                       if s.a == "Nahuel" and not s.es_respuesta]
     assert [s.tipo for s in al_responsable] == ["tarea_aprobada"]
+
+
+def test_la_direccion_de_prueba_vale_mientras_corra_alguna_corrida():
+    """D7b (la 28, vez 5, con `--paralelo`): una corrida que terminaba primero devolvía la
+    dirección pública vacía mientras otra seguía, y a ésa le faltaba el enlace a la página de la
+    tarea desde el paso 2. Dos corridas que se pisan, en orden fijo: la dirección de prueba vale
+    hasta que termina la última, y después vuelve la de antes."""
+    from leda import config as config_mod
+    from tests.conversaciones import corredor
+
+    antes = config_mod.config.base_url
+    a = corredor._con_la_direccion_de_prueba()
+    b = corredor._con_la_direccion_de_prueba()
+    a.__enter__()
+    b.__enter__()
+    a.__exit__(None, None, None)
+    try:
+        assert config_mod.config.base_url == corredor.DIRECCION_DE_PRUEBA
+    finally:
+        b.__exit__(None, None, None)
+    assert config_mod.config.base_url == antes
