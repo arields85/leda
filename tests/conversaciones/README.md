@@ -78,7 +78,8 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 
 La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 1 a 3, y ADR 0019):
 
-21. [`21-entrega-con-evidencia.md`](21-entrega-con-evidencia.md): "termine el plc" con un álbum de fotos;
+21. [`21-entrega-con-evidencia.md`](21-entrega-con-evidencia.md): "termine el plc" con un álbum de fotos,
+    sin decir todo el criterio: Leda pregunta sólo lo que falta, con un ejemplo que Marcos acepta;
     la vista previa muestra también lo mandado durante la tarea, que entra sólo si queda; sacar una
     pieza, el botón de una vista previa vieja, una foto nueva con un "dale" que no vale (la guarda
     escrita) y el "dale" que sí; la tarea pasa a revisión y a Ismael le llega el aviso con las fotos y un

@@ -133,7 +133,7 @@ def test_el_aviso_de_una_entrega_cuenta_las_fotos_del_album_que_sigue_al_texto(c
     otra["pasos"][-1]["salen"][0]["fotos"] = 2
     corrida = correr_conversacion(conn, otra, _perfecta(otra))
     assert [(paso, f.clase, f.que) for paso, f in corrida.fallas()] == [
-        (7, cp.MOTOR, "no salió lo esperado"), (7, cp.MOTOR, "salió algo de más")]
+        (8, cp.MOTOR, "no salió lo esperado"), (8, cp.MOTOR, "salió algo de más")]
 
 
 def test_la_entrega_confirmada_por_otro_camino_no_es_una_falla_de_garantia(conn):
@@ -149,20 +149,22 @@ def test_la_entrega_confirmada_por_otro_camino_no_es_una_falla_de_garantia(conn)
     por_paso[1]["jugadas"] = [{"nombre": "entregar", "tarea": "PLC",
                                "el_texto_cubre": ["resultado_de_prueba"],
                                "lo_descrito_cubre": ["C1"]}]
-    por_paso[4]["jugadas"] = [{"nombre": "entregar", "tarea": "PLC"}]
-    por_paso[5]["jugadas"] = [{"nombre": "confirmar", "tarea": "PLC"}]
+    por_paso[5]["jugadas"] = [{"nombre": "entregar", "tarea": "PLC"}]
+    por_paso[6]["jugadas"] = [{"nombre": "confirmar", "tarea": "PLC"}]
     ia.ia.preparar = lambda paso: setattr(ia.ia, "paso", por_paso.get(paso.get("paso"), paso))
 
     corrida = correr_conversacion(conn, conv, ia)
 
     assert corrida.error is None
     assert corrida.garantias, [str(f) for _, f in corrida.fallas(cp.GARANTIA)]
-    [escrito] = [f for paso, f in corrida.fallas() if paso == 5 and f.que.startswith("lo escrito")]
+    [escrito] = [f for paso, f in corrida.fallas() if paso == 6 and f.que.startswith("lo escrito")]
     assert escrito.que == "lo escrito no es el camino esperado: evidencia"
     assert escrito.clase in (cp.COMPRENSION, cp.MOTOR)
     # Lo escrito, en el orden en que se escribió; lo confirmado, en el de la vista previa.
     assert cp._mismas(escrito.real["escrito"], escrito.real["confirmado"])
-    assert len(escrito.real["escrito"]) == 6
+    # Desde la D7 la 21 tiene un paso más, el 2: sin un ejemplo propuesto, su "si va asi" es un
+    # texto más de la entrega.
+    assert len(escrito.real["escrito"]) == 7
 
 
 def test_la_aprobacion_corre_entera_con_los_botones_del_aviso_y_el_cierre_que_esperaba(conn):

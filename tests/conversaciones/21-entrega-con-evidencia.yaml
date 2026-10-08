@@ -35,24 +35,30 @@ preludio:
     relojes: ["2026-10-20 10:00"]
     salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
 
-# El paso 7 corre desde la porción 3a de la C-3: el aviso a Ismael redactado por el motor, con las
+# El paso 8 corre desde la porción 3a de la C-3: el aviso a Ismael redactado por el motor, con las
 # fotos adjuntas; desde la 3b, con los botones Aprobar y Pedir cambios; desde la 4, con el enlace
 # a la página de la tarea al final, que agrega el despachador y sale sin vista previa (`enlace`).
 pasos:
+  # Lo escrito no dice todo el criterio (que arranca desde el PLC): Leda pregunta sólo esa parte,
+  # con un ejemplo, y no hay nada que confirmar (decisión 10; C-3d, D7: con la IA real, 5 de 5).
   - paso: 1
     quien: Marcos
     a_las: "2026-10-22 15:10"
     escribe: "termine el plc!! ahi va la pantalla y el contador, 20 ciclos sin una falla"
     manda: [{que: foto}, {que: foto}]
     jugadas:
-      - {nombre: entregar, tarea: PLC, el_texto_cubre: [explicacion, resultado_de_prueba],
-         lo_descrito_cubre: [C1]}
+      - nombre: entregar
+        tarea: PLC
+        el_texto_cubre: [explicacion, resultado_de_prueba]
+        lo_descrito_cubre: []
+        # El ejemplo lo escribe la IA con sus palabras (sacado del criterio; la cocina lo verifica).
+        puede_traer: [lo_descrito_cubre, ejemplo]
     efectos: {}
     hechos:
-      - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
-         sumo: [P1, P2, P3],
+      - {jugada: entregar, resultado: le_falta_evidencia, tarea: PLC,
+         pregunta: lo_que_falta_de_la_entrega, sumo: [P1, P2, P3],
          entrega: [
-           {pieza: P1, es: lo_que_escribio,
+           {pieza: P1, es: lo_que_escribio, describe: ausente,
             cubre: ["cómo quedó el trabajo, descrito por quien lo hizo",
                     "cómo se probó y qué dio la prueba"]},
            {pieza: P2, es: una_foto, cubre: ["una foto o una captura de la pantalla"]},
@@ -63,38 +69,73 @@ pasos:
             mandado_antes_el: "2026-10-21",
             cubre: ["un archivo del trabajo, por ejemplo el programa o la configuración"]}],
          le_falta: ausente,
+         le_falta_del_criterio: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
+         ejemplo: presente, al_confirmar: ausente}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    dice:
+      - "la tarea del PLC en su renglón con 📋"
+      - "que sumó su descripción (cómo quedó y la prueba de 20 ciclos) y las dos fotos de hoy, y aparte, como mandadas antes, la foto del mar 20/10 y comprimidora_v3.zip del mié 21/10, que entran sólo si las deja"
+      - "una sola vez qué falta para entregarla, hablando de la tarea: si la comprimidora arranca desde el PLC"
+      - "el ejemplo, para que lo acepte o lo escriba con sus palabras; el cierre, aparte: si va así"
+    no_dice:
+      - que la tarea quedó entregada, en revisión o terminada
+      - que falta saber si completó los 20 ciclos sin fallas (ya lo dijo)
+      - qué muestran las fotos
+      - los nombres de los tipos de la política
+      - que falta el resultado de la prueba o que lo mande aparte
+      - '"contaste" o "contarlo": lo que escribió es su descripción (decisión 10; D7)'
+
+  # Marcos acepta el ejemplo: cuenta como lo que describe, y la entrega se puede confirmar.
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-22 15:11"
+    escribe: "si va asi"
+    jugadas:
+      - {nombre: entregar, tarea: PLC, acepta_el_ejemplo: true, lo_descrito_cubre: [C1],
+         puede_traer: [lo_descrito_cubre]}
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
+         le_falta: ausente, le_falta_del_criterio: ausente, ejemplo: ausente,
+         entrega: [
+           {pieza: P1, es: lo_que_escribio},
+           {pieza: P2, es: una_foto},
+           {pieza: P3, es: una_foto},
+           {pieza: P4, es: el_ejemplo_que_acepto, dice: presente,
+            describe: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"]},
+           {pieza: P5, es: una_foto, mandado_antes_el: "2026-10-20"},
+           {pieza: P6, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}],
          al_confirmar: {queda_esperando_la_aprobacion_de: Ismael Soschinski}}
     pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
     botones: [Confirmar]
     estado_despues:
       pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
     dice:
-      - "la tarea del PLC en su renglón con 📋"
-      - "una pieza por renglón, con lo que cubre cada una en palabras de todos los días: lo que escribió (cómo quedó y la prueba de 20 ciclos) y las dos fotos de hoy"
-      - "aparte, como mandadas antes, la foto del mar 20/10 y comprimidora_v3.zip del mié 21/10, que entran sólo si las deja"
+      - "una pieza por renglón, con lo que cubre cada una en palabras de todos los días: su descripción, el ejemplo que aceptó, las dos fotos de hoy y, aparte, lo mandado antes"
       - que al confirmar la tarea pasa a revisión, sin nombrar a Ismael
       - "el cierre, aparte: si la entrega así, o si saca o corrige algo"
     no_dice:
       - que la tarea quedó entregada, en revisión o terminada
       - que Ismael se enteró
-      - qué muestran las fotos
-      - los nombres de los tipos de la política
-      - que falta el resultado de la prueba o que lo mande aparte
+      - que el ejemplo lo escribió o lo contó Marcos (es el que aceptó)
 
-  - paso: 2
+  - paso: 3
     quien: Marcos
     a_las: "2026-10-22 15:12"
     escribe: "la foto del martes sacala, esa era del cableado viejo"
     jugadas:
-      - {nombre: corregir, corrige: entregar, tarea: PLC, saca: [P4]}
+      - {nombre: corregir, corrige: entregar, tarea: PLC, saca: [P5]}
     efectos: {}
     hechos:
       - {jugada: corregir, resultado: corregido, corrige: entregar, tarea: PLC,
          como_queda: para_confirmar, pregunta: confirmar_la_entrega,
          sacadas: [{es: una_foto, mandado_antes_el: "2026-10-20"}],
          entrega: [{pieza: P1, es: lo_que_escribio}, {pieza: P2, es: una_foto},
-                   {pieza: P3, es: una_foto},
-                   {pieza: P4, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}]}
+                   {pieza: P3, es: una_foto}, {pieza: P4, es: el_ejemplo_que_acepto},
+                   {pieza: P5, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}]}
     pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
     botones: [Confirmar]
     estado_despues:
@@ -106,10 +147,10 @@ pasos:
     no_dice:
       - que la tarea quedó entregada
 
-  - paso: 3
+  - paso: 4
     quien: Marcos
     a_las: "2026-10-22 15:13"
-    # El botón de la vista previa del paso 1, que la del paso 2 reemplazó (situación general 7).
+    # El botón de la vista previa del paso 2, que la del paso 3 reemplazó (situación general 7).
     toca: Confirmar
     vieja: true
     efectos: {}
@@ -126,7 +167,7 @@ pasos:
       - que la entregó
       - nada técnico sobre botones o huellas
 
-  - paso: 4
+  - paso: 5
     quien: Marcos
     a_las: "2026-10-22 15:15"
     escribe: "y esta del tablero cerrado. dale mandala"
@@ -137,10 +178,11 @@ pasos:
     efectos: {}
     hechos:
       - {jugada: confirmar, resultado: no_vale_la_confirmacion, motivo: llego_algo_despues,
-         como_queda: para_confirmar, tarea: PLC, sumo: [P4], pregunta: confirmar_la_entrega,
+         como_queda: para_confirmar, tarea: PLC, sumo: [P5], pregunta: confirmar_la_entrega,
          entrega: [{pieza: P1, es: lo_que_escribio}, {pieza: P2, es: una_foto},
-                   {pieza: P3, es: una_foto}, {pieza: P4, es: una_foto},
-                   {pieza: P5, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}]}
+                   {pieza: P3, es: una_foto}, {pieza: P4, es: el_ejemplo_que_acepto},
+                   {pieza: P5, es: una_foto},
+                   {pieza: P6, es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}]}
     pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
     botones: [Confirmar]
     estado_despues:
@@ -153,7 +195,7 @@ pasos:
       - que la entregó
       - que Ismael se enteró
 
-  - paso: 5
+  - paso: 6
     quien: Marcos
     a_las: "2026-10-22 15:16"
     escribe: "dale"
@@ -165,6 +207,8 @@ pasos:
         - {tarea: PLC, clase: texto, cubre: [explicacion, resultado_de_prueba]}
         - {tarea: PLC, clase: imagen, cubre: [captura]}
         - {tarea: PLC, clase: imagen, cubre: [captura]}
+        # El ejemplo que aceptó, con lo que describe del criterio.
+        - {tarea: PLC, clase: texto, cubre: [explicacion]}
         - {tarea: PLC, clase: imagen, cubre: [captura]}
         - {tarea: PLC, clase: archivo, cubre: [archivo]}
       # El aviso a Ismael, guardado: sale terminado el margen para corregir (ADR 0018, 9n).
@@ -188,7 +232,7 @@ pasos:
 
   # La pregunta de a quién se le avisó (decisión 11 del usuario, 2026-10-08): no lleva jugada y
   # se contesta del registro, con el nombre que la redacción tiene sólo para si lo pregunta.
-  - paso: 6
+  - paso: 7
     quien: Marcos
     a_las: "2026-10-22 15:20"
     escribe: "a quien le avisaste?"
@@ -204,7 +248,7 @@ pasos:
       - que la tarea está terminada o aprobada
       - una pregunta
 
-  - paso: 7
+  - paso: 8
     quien: Leda
     relojes: ["2026-10-22 15:26"]
     salen:
@@ -225,12 +269,13 @@ pasos:
             - {es: lo_que_escribio}
             - {es: una_foto, va_adjunta: true}
             - {es: una_foto, va_adjunta: true}
+            - {es: lo_que_escribio}
             - {es: una_foto, va_adjunta: true}
             - {es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}
           todavia_le_falta: ausente
     dice:
       - que Marcos entregó la tarea del PLC, en su renglón con 📋
-      - lo que escribió Marcos, en pocas palabras (20 ciclos sin una falla)
+      - lo que describió Marcos, en pocas palabras (arranca desde el PLC y 20 ciclos sin una falla)
       - que van tres fotos adjuntas y que comprimidora_v3.zip está en la página de la tarea
       - "el cierre, aparte: si la aprueba o le pide cambios, con los botones o escribiendo"
     no_dice:
