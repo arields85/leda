@@ -406,6 +406,22 @@ def test_lo_mandado_antes_entra_aparte_y_solo_si_queda(conn, mundo, marcos):
     assert cuantas(conn, "evidence") == 0
 
 
+def test_lo_que_llego_y_tomo_una_jugada_no_se_vuelve_a_atender(conn, mundo, marcos):
+    """Hallazgo de la D1 (conversación 22, paso 1): si la IA elige guardar el archivo sin decir
+    de qué tarea es, la duda de esa jugada ya atendió lo que llegó. Al terminar las jugadas no
+    se vuelve a correr la misma jugada (los hechos salían dos veces), y la elección guarda el
+    archivo de aquel mensaje."""
+    tarea = _tarea(conn, mundo)
+    duda = marcos.manda(Jugada("guardar_para_la_entrega", {}), archivos=[(JPEG, "foto", None)])
+    assert [h["jugada"] for h in duda.hechos] == ["guardar_para_la_entrega"]
+    assert duda.hechos[0]["resultado"] == "falta_dato"
+    assert cuantas(conn, "conversation_question", "tipo = 'cual_tarea'") == 1
+
+    guardada = marcos.manda(Jugada("elegir", {"opcion": "O2"}), texto="es del tablero")
+    assert _hecho(guardada, "guardar_para_la_entrega")["resultado"] == "anotado"
+    assert cuantas(conn, "archivo_de_tarea", "task_id = %s", tarea) == 1
+
+
 def test_con_una_entrega_abierta_un_archivo_se_suma_solo(conn, mundo, marcos):
     _tarea(conn, mundo)
     marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero")

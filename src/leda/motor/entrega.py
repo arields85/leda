@@ -119,11 +119,35 @@ def _pieza_de_archivo(f: Mapping[str, Any], *, antes: bool = False) -> dict[str,
             "llego_el": f["recibido_en"].isoformat(), "antes": antes}
 
 
-def _piezas_del_mensaje(ctx, el_texto_cubre: Sequence[str] | None, *,
-                        con_el_texto: bool) -> list[dict[str, Any]]:
-    """Las piezas que trae el mensaje del turno, y lo marca tomado. El texto va sólo si
-    `con_el_texto` (la persona entrega o suma algo con lo que escribe)."""
+def para_la_duda(ctx) -> dict[str, Any]:
+    """Lo que trajo el mensaje, para la duda de una jugada que lo toma y no dice de qué tarea es
+    (`fichas._duda`): queda con la duda, y la jugada lo usa cuando la persona elige la tarea
+    (`lo_que_llego`). Lo marca tomado: ya lo atendió una jugada y no se vuelve a atender al
+    terminar las jugadas (hallazgo de la D1, conversación 22, paso 1)."""
     llegada = ctx.llegada
+    if not llegada or llegada.get("tomada"):
+        return {}
+    llegada["tomada"] = True
+    return {"lo_que_llego": {k: llegada.get(k) for k in ("texto", "enlaces", "archivos",
+                                                         "entrante")}}
+
+
+def _la_llegada(ctx, datos: Mapping[str, Any]) -> dict[str, Any]:
+    """Lo que trajo el mensaje para esta jugada: lo de la duda que contesta, si lo guardó
+    (`para_la_duda`), o lo de este mensaje."""
+    guardada = datos.get("lo_que_llego")
+    if isinstance(guardada, Mapping):
+        return {**guardada, "tomada": False}
+    return ctx.llegada
+
+
+def _piezas_del_mensaje(ctx, el_texto_cubre: Sequence[str] | None, *,
+                        con_el_texto: bool, llegada: dict[str, Any] | None = None
+                        ) -> list[dict[str, Any]]:
+    """Las piezas que trae el mensaje del turno (o `llegada`, la de la duda que contesta), y lo
+    marca tomado. El texto va sólo si `con_el_texto` (la persona entrega o suma algo con lo que
+    escribe)."""
+    llegada = ctx.llegada if llegada is None else llegada
     if not llegada or llegada.get("tomada"):
         return []
     llegada["tomada"] = True
@@ -477,7 +501,7 @@ def entregar(ctx, datos: dict, tarea: dict) -> dict:
     piezas = _piezas_de(vieja) if vieja is not None else _mandado_antes(ctx, tarea["id"])
     dicho = datos.get("el_texto_cubre")
     dicho = [str(t) for t in dicho] if isinstance(dicho, list) else None
-    suma = _piezas_del_mensaje(ctx, dicho, con_el_texto=True)
+    suma = _piezas_del_mensaje(ctx, dicho, con_el_texto=True, llegada=_la_llegada(ctx, datos))
     piezas = _sin_repetidas(piezas + suma)
     if dicho is not None and not any(p["clase"] == "texto" and p in suma for p in piezas):
         # Lo que dice que cubre lo que escribió antes en esta entrega.
@@ -545,7 +569,8 @@ def guardar_para_la_entrega(ctx, datos: dict, tarea: dict) -> dict:
     archivos son los de la pregunta que contesta o, si no, los de este mensaje."""
     archivos = [str(a) for a in datos.get("archivos") or []]
     if not archivos:
-        archivos = [p["archivo_id"] for p in _piezas_del_mensaje(ctx, None, con_el_texto=False)
+        archivos = [p["archivo_id"] for p in _piezas_del_mensaje(
+                        ctx, None, con_el_texto=False, llegada=_la_llegada(ctx, datos))
                     if p.get("archivo_id")]
     if not archivos:
         return {"resultado": "no_se_puede", "motivo": "sin_archivos",

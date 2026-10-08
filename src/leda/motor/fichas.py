@@ -166,6 +166,10 @@ class Ficha:
     # La jugada que dice lo contrario sobre la misma tarea: las dos juntas en un mensaje admiten
     # dos lecturas y ninguna se hace (`dos_lecturas`).
     opuesta: str | None = None
+    # Si toma lo que trajo el mensaje (sus archivos, sus enlaces y su texto: `entrega.py`). Si le
+    # falta la tarea, su duda se queda con eso (`_duda`): lo que una jugada ya atendió no se
+    # vuelve a atender al terminar las jugadas, y la elección lo usa.
+    toma_lo_que_llego: bool = False
 
 
 # Lo que Leda propone cuando no hay otra persona que destrabe el bloqueo (la persona no sabe
@@ -441,6 +445,9 @@ def _duda(ficha: Ficha, ctx: Contexto, datos: dict[str, Any]) -> dict[str, Any]:
     candidatas = [t for t in ctx.tareas if t["estado"] in ficha.estados]
     if not candidatas:
         return _hecho(ficha, "no_se_puede", motivo="ninguna_tarea_posible")
+    if ficha.toma_lo_que_llego:
+        from . import entrega        # entrega importa fichas
+        datos = {**datos, **entrega.para_la_duda(ctx)}
     ahora, pregunta_id = preguntas.abrir_con_id(
         ctx, preguntas.CUAL_TAREA, None, jugada={"nombre": ficha.nombre, "datos": datos},
         opciones_de_tareas=candidatas)
@@ -1305,7 +1312,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="con la política completa, espera la confirmación (botón o escrito); si falta "
                   "algo, lo dice y espera lo que falta",
           manejar=_entregar, del_responsable=True, estados=frozenset({"en_curso"}),
-          corregir=_corregir_la_entrega,
+          corregir=_corregir_la_entrega, toma_lo_que_llego=True,
           es="La persona dice que terminó una tarea, o suma algo a la entrega de una tarea que "
              "ya está mostrando (lo que escribe, fotos, archivos o enlaces). Terminarla no es "
              "contar que le falta poco: eso es un avance. Lo que escribe puede contar de qué "
@@ -1331,6 +1338,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "sólo si los deja",
           manejar=_guardar_para_la_entrega, del_responsable=True,
           estados=frozenset({"asignada", "en_curso", "bloqueada"}), se_ofrece=False,
+          toma_lo_que_llego=True,
           es="La persona dice de qué tarea es una foto, un video o un archivo que mandó, sin "
              "decir que la terminó."),
     Ficha("aprobar", "aprobar la entrega de una tarea que espera su decisión",
