@@ -9,17 +9,19 @@
 -- cualquiera del ciclo vigente). `leda_app` vuelve a tener `update` y `delete` sobre `evidence`.
 --
 -- Se niega a correr si se perdería algo que la regla vieja no sabe representar: una evidencia
+-- con texto (la columna `texto` se borra y la regla vieja leería la pieza vacía), una evidencia
 -- que apunta a un archivo, un retiro o un archivo dicho de una tarea. Antes de deshacerla en una
 -- base con datos, `pg_dump` de esas tablas y borrar esas filas a mano.
 begin;
 set search_path = leda, public;
 
 do $$ begin
-  if exists (select 1 from evidence where archivo_id is not null)
+  if exists (select 1 from evidence where texto is not null)
+     or exists (select 1 from evidence where archivo_id is not null)
      or exists (select 1 from evidencia_retirada)
      or exists (select 1 from archivo_de_tarea) then
-    raise exception '0034 rollback refused: hay evidencias con archivo, retiros o archivos '
-                    'dichos de una tarea; respaldalos y borralos primero';
+    raise exception '0034 rollback refused: hay evidencias con texto o con archivo, retiros o '
+                    'archivos dichos de una tarea; respaldalos y borralos primero';
   end if;
 end $$;
 

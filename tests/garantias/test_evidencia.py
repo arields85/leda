@@ -21,7 +21,9 @@ Lo que se prueba acá es la base y la cocina, no la conversación:
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -357,6 +359,23 @@ def test_una_evidencia_y_un_retiro_no_se_modifican_ni_con_la_administracion(core
             with pytest.raises(psycopg.errors.RaiseException), conn.transaction():
                 cur.execute(sql)
         assert _cuantas(cur, "evidence") == 1 and _cuantas(cur, "evidencia_retirada") == 1
+
+
+def test_el_rollback_de_la_0034_se_niega_con_una_evidencia_de_texto(corework, conn):
+    """El rollback borra la columna `texto`: con una entrega escrita, deshacerlo perdería lo que
+    la persona entregó sin avisar. Se ejercita la guarda tal como está escrita en el archivo."""
+    script = (Path(__file__).resolve().parents[2] / "db" / "rollbacks"
+              / "0034_evidencia_de_la_entrega.sql").read_text("utf-8")
+    guarda = re.search(r"do \$\$.*?end \$\$;", script, re.S).group(0)
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws)
+        _pieza(cur, ws, tarea, cubre=["explicacion"])
+        with pytest.raises(psycopg.errors.RaiseException, match="0034 rollback refused"), \
+                conn.transaction():
+            cur.execute("set local search_path = leda, public")
+            cur.execute(guarda)
+        assert _cuantas(cur, "evidence") == 1
 
 
 # --- Aislamiento ----------------------------------------------------------------------------
