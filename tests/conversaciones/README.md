@@ -95,13 +95,13 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
 
-- **La 21**, del paso 1 al 5. El paso 6 (el aviso a Ismael redactado por el motor, con las fotos adjuntas,
-  los botones Aprobar y Pedir cambios y el enlace a la página de la tarea) es de las porciones 3 y 4 y
-  queda sólo en el `.md`; hasta entonces, a Ismael le llega en el paso 5 el aviso de texto fijo de la
-  cocina, que el YAML espera como `avisos_de_la_cocina`.
-- **La 22**, entera, con dos diferencias anotadas en su YAML: en el paso 5 el enlace solo cubre el archivo
+- **La 21**, entera desde la porción 3a: el paso 6 es el aviso a Ismael redactado por el motor, con las
+  fotos adjuntas en el álbum que sigue al texto. Sus botones Aprobar y Pedir cambios (porción 3b) y el
+  enlace a la página de la tarea (porción 4) quedan anotados en el YAML, sin esperarse todavía.
+- **La 22**, entera, con una diferencia anotada en su YAML: en el paso 5 el enlace solo cubre el archivo
   y falta cómo se probó (el reparto es por las clases; con el archivo del paso 6 queda como dice el
-  `.md`), y en el paso 7 el aviso a Ismael es el de la cocina.
+  `.md`). En el paso 7, el aviso a Ismael queda guardado y sale terminado el margen para corregir;
+  el `.md` todavía dice que se entera "ahora".
 
 **La 23 y la 24 todavía no corren:** la aprobación no está construida (tarea C-3 de la Fase C). Tienen sólo
 el `.md`; el corredor carga los `*.yaml`, así que cada una recibe su YAML cuando su ficha exista. Lo que
@@ -183,9 +183,9 @@ su etiqueta (`toca: Confirmar`) y uno viejo (`vieja: true`, el de la pregunta an
 estado inicial puede traer la política de evidencia por área (`evidencia`, con las clases y las palabras
 de cada tipo de `espacios/corework.yaml`) y lo que la persona dijo que era de una tarea antes de
 entregarla (`mandado_antes`). Los efectos suman las piezas de evidencia (`evidencias`, por su clase y lo
-que cubren), los retiros (`retiradas`), los archivos dichos de una tarea (`archivos_de_tarea`) y el aviso
-de texto fijo de la cocina a quien aprueba (`avisos_de_la_cocina`), que el formato no mide porque no lo
-escribe la IA.
+que cubren), los retiros (`retiradas`) y los archivos dichos de una tarea (`archivos_de_tarea`). Lo que
+Leda manda por su cuenta puede esperar sus fotos adjuntas (`fotos`, cuántas salieron en el álbum que
+sigue al texto); un álbum que sale sin su texto antes es una falla de garantía (porción 3a).
 
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 

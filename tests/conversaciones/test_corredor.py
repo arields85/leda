@@ -109,6 +109,26 @@ def test_con_las_jugadas_esperadas_la_conversacion_pasa_entera(conn):
     assert corrida.pasos[1].jugadas == [{"nombre": "anotar_inicio", "tarea": "PLC"}]
 
 
+def test_el_aviso_de_una_entrega_cuenta_las_fotos_del_album_que_sigue_al_texto(conn):
+    """Porción 3a de la C-3: el álbum es parte del aviso que salió antes a la misma persona, y
+    lo esperado dice cuántas fotos lleva; otra cantidad es una falla del código."""
+    [conv] = elegir(["21"])
+
+    corrida = correr_conversacion(conn, conv, _perfecta(conv))
+
+    assert corrida.error is None and corrida.fallas() == []
+    [aviso] = corrida.pasos[-1].salidas
+    assert (aviso.a, aviso.tipo, aviso.fotos, aviso.album_suelto) == (
+        "Ismael", "entrega_para_aprobar", 3, False)
+
+    _limpiar(conn)
+    otra = copy.deepcopy(conv)
+    otra["pasos"][-1]["salen"][0]["fotos"] = 2
+    corrida = correr_conversacion(conn, otra, _perfecta(otra))
+    assert [(paso, f.clase, f.que) for paso, f in corrida.fallas()] == [
+        (6, cp.MOTOR, "no salió lo esperado"), (6, cp.MOTOR, "salió algo de más")]
+
+
 def test_otra_tarea_es_una_falla_de_garantia_con_su_diferencia(conn):
     [conv] = elegir(["01"])
     otra = copy.deepcopy(conv)

@@ -149,7 +149,46 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         cada política tenga sus clases; hasta entonces ningún tipo se cubre (falla cerrado) y la
         evidencia de antes no cubre nada.
       - `db/pruebas.sql` inserta evidencia sin clase: quedó atrás de la `0034`.
-  - [ ] Porción 3: el aviso a quien aprueba con fotos y botones.
+  - Porción 3, el aviso a quien aprueba, partida en tres (2026-10-08):
+    - [x] **3a, el aviso redactado por el motor con las fotos, sin el enlace** (2026-10-08). Route:
+      delegada (escritor único, 2+ archivos no triviales).
+      - **Commits:** `2d86ee3` (migración `0035`: `message_outbox_adjunto`, RLS forzado, claves
+        compuestas por espacio, sólo agregar, sin columnas nuevas en `message_outbox`; la salida
+        con adjuntos y el despachador que manda el álbum después de su texto, reusando el
+        identificador de Telegram de cada foto y, si no sirve, subiendo la copia), `93a428d`
+        (el aviso `entrega_para_aprobar` del motor: guardado al confirmar, con el margen para
+        corregir; releído al salir, omitido con su motivo si la tarea ya no espera la
+        aprobación; las fotos adjuntas y los demás archivos nombrados; una entrega nueva retira
+        el que espera, T6i; la cocina deja de mandar el texto fijo en `entregar_tarea`) y
+        el commit que registra esto (el corredor cuenta las fotos de un álbum y marca uno suelto; la 21 corre el
+        paso 6; la 21 y la 22 esperan el aviso guardado en lugar del de la cocina).
+      - **Test primero:** las garantías de la salida (`tests/garantias/test_salida_con_adjuntos.py`)
+        se vieron en rojo (no existía `Adjunto` ni la tabla) antes de la migración y del
+        despachador. Las del aviso del motor (`tests/motor/test_entrega.py`, sección "El aviso a
+        quien aprueba") se escribieron después del primer borrador del código, sin rojo
+        observado.
+      - **Chequeos** (2026-10-08, sobre la punta de la porción): `pytest tests/garantias` 259
+        passed; `pytest tests/motor tests/conversaciones` 737 passed; suite completa 1423 passed;
+        corrida en seco de las 23 conversaciones con la IA guionada (`--ronda seco-3a`): 23 de 23
+        bien, con el paso 6 de la 21 (sus informes se borraron). Sin la IA real: la regresión con
+        la IA real es de la C-4.
+      - **Cómo decide qué foto va adjunta:** las imágenes de la evidencia vigente que Telegram
+        muestra como foto (no HEIC y de hasta 10 MB), las primeras diez; las demás se nombran.
+      - **Sin botones:** el aviso sale sin Aprobar ni Pedir cambios (los trae la 3b) y su cierre
+        no ofrece aprobar, porque todavía no hay con qué. Sin enlace: `_enlace_portal_tarea` sigue
+        sin inventar ninguna URL (constitución §4).
+      - **Queda con texto fijo** `_notificar_entrega_al_aprobador`, sólo en las entregas de la
+        cocina que ningún circuito del chat alcanza (`actualizar_estado` a revisión y
+        `adjuntar_evidencia`; `tests/test_entrega_con_evidencia.py`). Se retira cuando la 3b o la
+        plataforma decidan qué hacer con esas herramientas.
+      - `PENDIENTE` (decisión del usuario): **si cambia quién aprueba** mientras el aviso espera,
+        hoy queda omitido con su motivo (`cambio_quien_aprueba`) y el nuevo aprobador no recibe
+        nada. ¿Se le guarda uno al nuevo?
+      - `PENDIENTE`: el `.md` de la 22 (paso 7) todavía dice que Ismael se entera "ahora": con el
+        margen se entera a los 10 minutos (su YAML ya lo espera así).
+    - [ ] **3b, la hoja de aprobación** con los botones Aprobar y Pedir cambios, como atajos
+      (conversación 23).
+    - [ ] **3c, los recordatorios a quien aprueba** (conversación 24).
   - [ ] Porción 4: la página de la tarea y su enlace.
   - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
@@ -159,6 +198,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La regresión con la IA real de la 21 y la 22 (y de todas, con los YAML de la 12 y la 25 al día), y
-después la porción 3 de la C-3: el aviso a quien aprueba redactado por el motor, con las fotos y los
-botones (`docs/STATUS.md`, "Punto exacto para retomar").
+La regresión con la IA real de todas (con la 21 entera, desde la porción 3a), y después la porción 3b
+de la C-3: la hoja de aprobación con los botones Aprobar y Pedir cambios (conversación 23), que abre
+la pregunta de quien aprueba sobre el aviso de la 3a (`docs/STATUS.md`, "Punto exacto para
+retomar").

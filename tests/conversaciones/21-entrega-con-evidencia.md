@@ -8,9 +8,10 @@ por el motor, con las fotos adjuntas y un enlace a la página de la tarea. Circu
 3b); ADR 0018, decisiones 2 y 4 (situaciones generales 3, 6 y 7); ADR 0019, decisiones 4 a 6;
 constitución §7 y §11. Toma los pasos "Para la prueba de la entrega" de las conversaciones 10 y 11.
 
-**Corre desde la porción 2 de la C-3** (`odd/tasks/fase-c.md`), con su YAML, del paso 1 al 5. El paso 6
-(el aviso redactado por el motor, con las fotos, los botones y el enlace) es de las porciones 3 y 4:
-hasta entonces, a Ismael le llega en el paso 5 el aviso de texto fijo de la cocina.
+**Corre desde la porción 2 de la C-3** (`odd/tasks/fase-c.md`), con su YAML, del paso 1 al 5; el paso 6,
+desde la porción 3a: el aviso redactado por el motor, con las fotos adjuntas. Del paso 6 quedan
+pendientes los botones Aprobar y Pedir cambios (porción 3b) y el enlace a la página de la tarea
+(porción 4): hasta entonces el aviso no los lleva, ni dice que `comprimidora_v3.zip` está en la página.
 
 ## Estado inicial
 
@@ -101,16 +102,16 @@ hasta entonces, a Ismael le llega en el paso 5 el aviso de texto fijo de la coci
    - Jugadas: `confirmar`. La guarda pasa: es lo último que Marcos vio y no cambió.
    - Efecto, en un solo acto: las cinco filas de evidencia, cada una con su clase, lo que cubre, quién la
      mandó y cuándo; la tarea del PLC pasa de `en_curso` a `en_revision`, con evento de Marcos y auditoría. Nunca
-     `terminada`. El aviso a Ismael queda guardado como hechos y sale enseguida (15:16 es dentro del
-     horario y después de las 10:00).
+     `terminada`. El aviso a Ismael queda guardado como hechos y sale terminado el margen para
+     corregir, a las 15:26 (ADR 0018, 9n: es un aviso a otra persona por lo que dijo Marcos).
    - La respuesta dice: que la entregó y queda esperando la aprobación de Ismael; que Ismael se va a
-     enterar ahora, con las fotos; el próximo paso: que le avisa cuando Ismael decida.
+     enterar a las 15:26, con las fotos; el próximo paso: que le avisa cuando Ismael decida.
    - La respuesta no dice: que la tarea está terminada o aprobada; que Ismael ya la vio; la foto del
      martes.
    - Estado después: sin tema abierto, nada mostrado para confirmar.
 
-6. **Leda**, por su cuenta, a Ismael (jueves 22, enseguida del paso 5): el aviso de la entrega. A Marcos,
-   nada más.
+6. **Leda**, por su cuenta, a Ismael (jueves 22, 15:26, terminado el margen para corregir): el aviso de
+   la entrega. A Marcos, nada más.
    →
    - Efecto: al salir, el código relee la tarea y la evidencia vigente; la IA redacta desde esos hechos.
      Dos filas de la misma respuesta: el texto y, después, las tres fotos de hoy como álbum (nunca antes
@@ -122,6 +123,9 @@ hasta entonces, a Ismael le llega en el paso 5 el aviso de texto fijo de la coci
      código: la IA no lo ve ni lo escribe.
    - El mensaje no dice: la foto del martes; que la tarea está terminada; un juicio sobre las fotos; un
      identificador o una huella.
+   - Desde la porción 3a corre todo lo de arriba salvo el enlace y lo que dice del zip en la página
+     (porción 4), y el cierre, los botones y el estado de Ismael (porción 3b): hasta entonces, el
+     aviso dice que `comprimidora_v3.zip` quedó con la entrega y no le pide nada.
    - Botones: dos atajos, "Aprobar" y "Pedir cambios" (`odd/tasks/fase-c.md`, decisión 3; ADR 0018,
      decisión 2). "Aprobar" aprueba con un toque, sin confirmación, porque es la decisión de quien
      aprueba; "Pedir cambios" pregunta qué falta. Escribir vale igual: la conversación 23 contesta casi

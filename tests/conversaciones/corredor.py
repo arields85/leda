@@ -148,6 +148,10 @@ class Salida:
     # Lo que escribió la IA, tal como quedó en el outbox: sin el saludo del día que antepone el
     # sistema. Es lo que mide el formato (`comprobar.fallas_de_formato`).
     redactado: str | None = None
+    # Las fotos que salieron adjuntas, en el álbum que sigue al texto (ADR 0019, decisión 6). Un
+    # álbum que salió sin su texto antes es una falla de garantía (`album_suelto`).
+    fotos: int = 0
+    album_suelto: bool = False
 
 
 @dataclass
@@ -435,6 +439,16 @@ class _Corredor:
                 avisos_de.setdefault(a["outbox_id"], []).append({**a, "id": aviso_id})
         for e in self.transporte.enviados[desde:]:
             quien = self.mundo.persona_de_chat(e.chat_id)
+            if e.fotos is not None:
+                # Un álbum es parte del mensaje de Leda que salió antes a la misma persona: el
+                # texto de su respuesta (`despachador`, `respuesta_grupo`). Sin ése, salió suelto.
+                previo = next((s for s in reversed(salidas) if s.a == quien), None)
+                if previo is not None and not previo.fotos:
+                    previo.fotos = len(e.fotos)
+                else:
+                    salidas.append(Salida(quien, "", [], False, el=cp.dia(self.reloj.ahora()),
+                                          fotos=len(e.fotos), album_suelto=True))
+                continue
             # El outbox guarda el texto con las marcas de formato de la IA y el transporte
             # entrega el texto plano (`salida.formatear`): se comparan ya convertidos.
             fila_id = next((k for k, s in despues["salidas"].items()
@@ -503,9 +517,9 @@ class _Corredor:
         # El formato de cada mensaje de Leda del paso, respuesta o aviso, a quien sea (segunda
         # vuelta del formato, 2026-10-07): sobre lo que escribió la IA, sin el saludo del día.
         for s in r.salidas:
-            if not s.es_respuesta and not s.avisos:
-                # Un texto fijo de la cocina (el aviso de una entrega a quien aprueba, hasta la
-                # porción 3 de la C-3): no lo escribió la IA, y el formato mide lo que escribe.
+            if s.album_suelto:
+                c.falla(cp.GARANTIA, "el álbum sale después de su texto", "texto y álbum",
+                        _resumen(s))
                 continue
             cp.comprobar_formato(c, s.redactado if s.redactado is not None else s.texto,
                                  titulos.values(), a=s.a)
@@ -590,6 +604,8 @@ def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -
         return False
     if e.get("el") and e["el"] != s.el:
         return False
+    if "fotos" in e and e["fotos"] != s.fotos:
+        return False
     if "hechos" not in e:
         return True
     if not s.avisos:        # un envío sin avisos guardados detrás: sus hechos, como vinieron
@@ -604,7 +620,7 @@ def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -
 
 def _resumen(s: Salida) -> dict[str, Any]:
     return {"a": s.a, "tipo": s.tipo or s.tipos, "tareas": s.tareas, "el": s.el,
-            "hechos": s.hechos}
+            "hechos": s.hechos, **({"fotos": s.fotos} if s.fotos else {})}
 
 
 def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1,

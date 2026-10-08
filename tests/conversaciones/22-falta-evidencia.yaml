@@ -29,7 +29,8 @@ evidencia:
 # clases, no por lo que dice el enlace. Con el enlace solo, cubre el archivo y falta cómo se
 # probó; al llegar el archivo del paso 6, el reparto cambia y el enlace cubre el resultado de la
 # prueba, como dice el .md (la persona puede corregirlo en la vista previa). En el paso 7, el
-# aviso a Ismael es el de texto fijo de la cocina hasta la porción 3 de la C-3.
+# aviso a Ismael es el del motor (porción 3a de la C-3): queda guardado y sale terminado el margen
+# para corregir, no "ahora" como dice el .md.
 pasos:
   - paso: 1
     quien: Marcos
@@ -185,15 +186,17 @@ pasos:
         - {tarea: COM, clase: enlace, cubre: [resultado_de_prueba]}
         - {tarea: COM, clase: archivo, cubre: [archivo]}
         - {tarea: COM, clase: imagen, cubre: [captura]}
-      avisos_de_la_cocina: [{a: Ismael}]
+      # El aviso a Ismael, del motor desde la porción 3a: sale terminado el margen para corregir.
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: COM, a: Ismael, estado: guardado}
     hechos:
       - {jugada: confirmar, resultado: entregada, tarea: COM, estado: en_revision,
          queda_esperando_la_aprobacion_de: Ismael Soschinski,
-         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-28T15:31"}}
+         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-28T15:41"}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
     dice:
-      - que la entregó y queda esperando la aprobación de Ismael, que se va a enterar ahora
+      - que la entregó y queda esperando la aprobación de Ismael, que se va a enterar a las 15:41
     no_dice:
       - que la tarea está terminada o aprobada

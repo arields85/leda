@@ -33,10 +33,9 @@ preludio:
     relojes: ["2026-10-20 10:00"]
     salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
 
-# El paso 6 (el aviso a Ismael redactado por el motor, con las fotos adjuntas, los botones Aprobar
-# y Pedir cambios y el enlace a la página de la tarea) es de las porciones 3 y 4 de la C-3: hasta
-# entonces a Ismael le llega, en el paso 5, el aviso de texto fijo de la cocina
-# (`avisos_de_la_cocina`), y ese paso no está acá.
+# El paso 6 corre desde la porción 3a de la C-3: el aviso a Ismael redactado por el motor, con las
+# fotos adjuntas. Sus botones Aprobar y Pedir cambios son de la 3b, y el enlace a la página de la
+# tarea, de la 4: todavía no se esperan.
 pasos:
   - paso: 1
     quien: Marcos
@@ -164,18 +163,51 @@ pasos:
         - {tarea: PLC, clase: imagen, cubre: [captura]}
         - {tarea: PLC, clase: imagen, cubre: [captura]}
         - {tarea: PLC, clase: archivo, cubre: [archivo]}
-      avisos_de_la_cocina: [{a: Ismael}]
+      # El aviso a Ismael, guardado: sale terminado el margen para corregir (ADR 0018, 9n).
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: PLC, a: Ismael, estado: guardado}
     hechos:
       - {jugada: confirmar, resultado: entregada, tarea: PLC, estado: en_revision,
          queda_esperando_la_aprobacion_de: Ismael Soschinski,
-         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-22T15:16"}}
+         aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-22T15:26"}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
     dice:
       - que la entregó y queda esperando la aprobación de Ismael
-      - que Ismael se va a enterar ahora
+      - que Ismael se va a enterar a las 15:26
     no_dice:
       - que la tarea está terminada o aprobada
       - que Ismael ya la vio
       - la foto del martes
+
+  - paso: 6
+    quien: Leda
+    relojes: ["2026-10-22 15:26"]
+    salen:
+      - a: Ismael
+        tipo: entrega_para_aprobar
+        tarea: PLC
+        # Las tres fotos de hoy, adjuntas en el álbum que sale después del texto.
+        fotos: 3
+        hechos:
+          necesita_respuesta: false
+          fotos_adjuntas: 3
+          lo_que_entrego:
+            - {es: lo_que_escribio}
+            - {es: una_foto, va_adjunta: true}
+            - {es: una_foto, va_adjunta: true}
+            - {es: una_foto, va_adjunta: true}
+            - {es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}
+          todavia_le_falta: ausente
+    dice:
+      - que Marcos entregó la tarea del PLC, en su renglón con 📋
+      - lo que escribió Marcos, en pocas palabras (20 ciclos sin una falla)
+      - que van tres fotos adjuntas y que comprimidora_v3.zip quedó con la entrega
+    # El cierre que ofrece aprobar o pedir cambios, con sus botones, es de la porción 3b; el
+    # enlace a la página de la tarea, de la 4.
+    no_dice:
+      - la foto del martes
+      - que la tarea está terminada
+      - un juicio sobre lo que muestran las fotos
+      - que comprimidora_v3.zip está en una página o en un enlace

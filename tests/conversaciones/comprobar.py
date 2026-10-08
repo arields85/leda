@@ -428,13 +428,10 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
             falta = True
             c.falla(COMPRENSION, "falta el aviso al administrador", al_admin_e, len(fuera))
     comprobar_incidentes(c, hubo["incidentes"])
-    # El aviso de una entrega a quien aprueba sale en el mismo turno, con el texto fijo de la
-    # cocina, hasta la porción 3 de la C-3: se espera por a quién (`avisos_de_la_cocina`).
+    # Lo que Leda manda a otra persona por lo que pasó en el turno se guarda como aviso y sale
+    # después, por el ciclo (también el de una entrega a quien la aprueba, desde la porción 3a
+    # de la C-3): en el turno, sólo la respuesta.
     a_otros = [s for s in hubo["salidas"] if not s["es_respuesta"]]
-    faltan_cocina, a_otros = _emparejar(esperados.get("avisos_de_la_cocina") or [], a_otros)
-    if faltan_cocina:
-        falta = True
-        c.falla(MOTOR, "falta un aviso de la cocina", faltan_cocina, [])
     if a_otros:
         de_mas = True
         c.falla(GARANTIA, "mensaje de Leda por su cuenta en un turno", [], a_otros)
