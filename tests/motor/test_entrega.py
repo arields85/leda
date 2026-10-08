@@ -822,6 +822,23 @@ def test_aceptar_el_ejemplo_lo_suma_como_lo_que_describe_la_persona(conn, mundo,
         ("quedo cerrado y rotulado", [CERRADO]), (EJEMPLO, [AISLACION])]
 
 
+def test_el_ejemplo_aceptado_no_lo_pisa_otro_juicio_de_la_ia(conn, mundo, marcos):
+    """Advertencia de la revisión de la D3 (`entrega.py`, el juicio de lo descrito): lo que la
+    persona aceptó como lo que describe no lo deshace un juicio posterior de la IA que lo
+    olvida. Si no, Leda le volvería a pedir algo que ya dijo (decisión 10)."""
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
+                 texto="quedo cerrado y rotulado")
+    marcos.manda(_entregar(acepta_el_ejemplo=True), texto="si")
+    r = marcos.manda(_entregar(lo_descrito_cubre=["C1"]), archivos=[(JPEG, "foto", None)])
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "para_confirmar"
+    assert "le_falta_del_criterio" not in hecho
+    textos = [(p.get("dice"), p.get("describe")) for p in hecho["entrega"]
+              if p["es"] == "lo_que_escribio"]
+    assert textos == [("quedo cerrado y rotulado", [CERRADO]), (EJEMPLO, [AISLACION])]
+
+
 def test_el_ejemplo_no_se_acepta_en_el_mismo_mensaje_que_se_propone(conn, mundo, marcos):
     _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
     r = marcos.manda(_entregar(lo_descrito_cubre=["C1"], acepta_el_ejemplo=True,

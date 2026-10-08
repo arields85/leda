@@ -353,16 +353,27 @@ def _falta_del_criterio(cur, tarea: Mapping[str, Any],
     return [p for p in pide if p not in dicho]
 
 
-def _aplicar_lo_descrito(piezas: list[dict[str, Any]], juzgado: list[str]) -> None:
+def _aplicar_lo_descrito(piezas: list[dict[str, Any]], juzgado: list[str], *,
+                         respeta_lo_aceptado: bool = False) -> None:
     """El juicio de la IA sobre todo lo descrito de una entrega, en sus textos: cada uno se
-    queda con lo suyo que el juicio confirma, y lo que ninguno decía va al último."""
+    queda con lo suyo que el juicio confirma, y lo que ninguno decía va al último. Con
+    `respeta_lo_aceptado`, el ejemplo que la persona aceptó conserva lo que describe: lo dijo ella
+    al aceptarlo, y un juicio posterior de la IA que lo olvida no lo deshace (advertencia de la
+    revisión de la D3). Su corrección explícita (`corregir`) sí lo cambia."""
     textos = [p for p in piezas if p["clase"] == "texto"]
     if not textos:
         return
     for p in textos:
+        if respeta_lo_aceptado and _es_el_ejemplo_aceptado(p):
+            continue
         p["describe"] = [d for d in p.get("describe") or [] if d in juzgado]
     dicho = {d for p in textos for d in p["describe"]}
     textos[-1]["describe"] += [d for d in juzgado if d not in dicho]
+
+
+def _es_el_ejemplo_aceptado(pieza: Mapping[str, Any]) -> bool:
+    """La pieza del ejemplo que la persona aceptó (`_el_ejemplo_aceptado`)."""
+    return str(pieza.get("id") or "").startswith("j:")
 
 
 # --- El ejemplo para lo que falta -------------------------------------------------------------
@@ -752,7 +763,7 @@ def entregar(ctx, datos: dict, tarea: dict) -> dict:
             if p["clase"] == "texto":
                 p["cubre_dicho"] = list(dicho)
     if juzgado is not None and not nuevos and aceptado is None:
-        _aplicar_lo_descrito(piezas, juzgado)
+        _aplicar_lo_descrito(piezas, juzgado, respeta_lo_aceptado=True)
     hecho = _mostrar_la_entrega(ctx, _tarea_de(ctx, tarea["id"]), piezas, vieja,
                                 ejemplo=datos.get("ejemplo"))
     if suma:
