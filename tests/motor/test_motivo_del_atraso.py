@@ -12,7 +12,9 @@ mensaje:
    siendo el porqué del atraso: no se le vuelve a preguntar (constitución §8; conversación 05,
    paso 4). Si pasó más, se le pregunta otra vez (usuario, 2026-10-07: "para Leda es difícil
    saber que se refiere a ese motivo; hay que poner un límite de tiempo más corto"). Los minutos
-   son del espacio (`motivo_vale_minutos`, 60 por omisión) y se cuentan desde que lo dijo.
+   son del espacio (`motivo_vale_minutos`, 60 por omisión) y se cuentan desde que lo dijo. Y
+   la conversación tiene que haber seguido en esa tarea: un mensaje de la persona en el medio
+   sobre otra tarea u otro tema corta el hilo, y Leda vuelve a preguntar (usuario, 2026-10-07).
 2. El aviso al referente espera esa respuesta y sale con el porqué, en palabras de la persona,
    después del margen para corregir y dentro del horario.
 3. Si no contesta, el aviso no espera para siempre: sale al terminar el día de trabajo
@@ -220,6 +222,57 @@ def test_un_valor_que_no_vale_usa_la_hora_del_producto(conn, mundo, escribe, val
 
     assert dentro["motivo"] == "faltan los cables"
     assert fuera["motivo"] is None and fuera["pregunta"] == MOTIVO
+
+
+def test_un_mensaje_sobre_otra_tarea_en_el_medio_corta_el_hilo(conn, mundo, escribe):
+    """10:00 el porqué de T1; 10:20 habla de T2; 10:40 otra fecha de T1: ya no se sobreentiende
+    que es el mismo porqué, aunque no pasó una hora."""
+    nueva_tarea(conn, mundo, "Probar las comunicaciones")
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+    _turno(conn, escribe, Jugada("anotar_inicio", {"tarea": "T2"}), at=octubre(5, 10, 20))
+    [hecho], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"),
+                        at=octubre(5, 10, 40))
+
+    assert hecho["motivo"] is None and hecho["pregunta"] == MOTIVO
+
+
+def test_un_mensaje_sin_tarea_en_el_medio_corta_el_hilo(conn, mundo, escribe):
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+    _turno(conn, escribe, Jugada("consultar_pendientes", {}), at=octubre(5, 10, 20))
+    [hecho], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"),
+                        at=octubre(5, 10, 40))
+
+    assert hecho["motivo"] is None and hecho["pregunta"] == MOTIVO
+
+
+def test_un_mensaje_sin_jugadas_en_el_medio_corta_el_hilo(conn, mundo, escribe):
+    """Una pregunta sobre otra cosa (sin jugadas) es otro tema."""
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+    _turno(conn, escribe, at=octubre(5, 10, 20))
+    [hecho], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"),
+                        at=octubre(5, 10, 40))
+
+    assert hecho["motivo"] is None and hecho["pregunta"] == MOTIVO
+
+
+def test_un_mensaje_sobre_la_misma_tarea_en_el_medio_no_corta_el_hilo(conn, mundo, escribe):
+    nueva_tarea(conn, mundo, "Probar las comunicaciones")
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+    _turno(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(5, 10, 20))
+    [hecho], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"),
+                        at=octubre(5, 10, 40))
+
+    assert hecho["motivo"] == "faltan los cables" and "pregunta" not in hecho
+
+
+def test_lo_que_leda_manda_en_el_medio_no_corta_el_hilo(conn, mundo, escribe):
+    """Sólo cuentan los mensajes de la persona: el aviso de Leda a Ismael no es un tema de ella."""
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+    enviar(conn, mundo, IAGuionada(redacciones=["Aviso."]), octubre(5, 10, 10))
+    [hecho], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"),
+                        at=octubre(5, 10, 40))
+
+    assert hecho["motivo"] == "faltan los cables"
 
 
 def test_el_porque_de_una_fecha_que_no_atrasaba_no_explica_un_atraso(conn, mundo, escribe):
