@@ -227,7 +227,7 @@ pasos:
       - {jugada: entregar, resultado: le_falta_evidencia, tarea: COM,
          pregunta: lo_que_falta_de_la_entrega,
          le_falta_del_criterio: ["Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"], ejemplo: presente,
-         al_confirmar: {arranca_al_entregarla: true}}
+         al_confirmar: ausente}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
     estado_despues:
       pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
@@ -241,3 +241,4 @@ pasos:
       - que Ismael se enteró o se va a enterar
       - que la del PLC está terminada
       - otra vez la pregunta de quién lo destraba
+      - '"contaste" o "contarlo": lo que escribió es su descripción (decisión 10; D7)'

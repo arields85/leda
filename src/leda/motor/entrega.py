@@ -703,7 +703,9 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
         # Nunca se arrancó: al confirmar, la historia dice que arrancó y se entregó en ese
         # momento (decisión 14 del usuario, 2026-10-08).
         al_confirmar["arranca_al_entregarla"] = True
-    if quien is not None or tarea["estado"] == "asignada":
+    # Qué pasa al confirmarla, sólo en la que se puede confirmar: en la incompleta, el resultado
+    # ya dice una vez que no se entrega (C-3d, D7: dicho dos veces, la IA lo repetía).
+    if completa and (quien is not None or tarea["estado"] == "asignada"):
         hecho["al_confirmar"] = al_confirmar
     fichas.nombrar_pregunta(hecho, "pregunta" if ahora_si else "pregunta_para_despues", tipo,
                             pregunta_id)

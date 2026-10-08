@@ -153,7 +153,8 @@ del día; acá llega antes (paso 6) y a Ismael le llega un solo aviso, con el po
      sacado del criterio para que lo acepte o lo escriba con sus palabras; el próximo paso, aparte y al
      final.
    - La respuesta no dice: que la de comunicaciones quedó entregada, en revisión o terminada; que Ismael se
-     enteró o se va a enterar; que la del PLC está terminada; otra vez la pregunta de quién lo destraba.
+     enteró o se va a enterar; que la del PLC está terminada; otra vez la pregunta de quién lo destraba;
+     "contaste" o "contarlo": lo que escribió es su descripción (decisión 10; C-3d, D7).
    - Estado después: tema abierto, la entrega de comunicaciones, esperando lo que falta.
 
 ## Qué mide

@@ -56,11 +56,13 @@ pasos:
     dice:
       - que para revisar la tarea falta saber si la comprimidora completó los 20 ciclos sin fallas, en palabras simples y hablando de la tarea
       - "el ejemplo, para que lo acepte o lo escriba con sus palabras"
+      - una sola vez qué falta para entregarla, sin repetir que todavía no se entrega o no pasa a revisión (D7)
     no_dice:
       - que la entregó o que está en revisión
       - el nombre de Ismael
       - que falta que arranque desde el PLC
       - un número o un nombre que no estén en el criterio ni en lo que escribió
+      - '"contaste" o "contarlo": lo que escribió es su descripción (decisión 10; D7)'
 
   # Una pregunta sobre lo que Leda le pidió: no es una jugada, y la pregunta abierta vuelve con su
   # ejemplo.

@@ -71,10 +71,12 @@ porción 3.
    - La respuesta dice: lo que falta, en palabras de todos los días, calculado por el código (cómo la
      probó y un archivo, por ejemplo la configuración del switch); que lo escrito no dice lo que pide la
      tarea, con un ejemplo sacado del criterio para que lo acepte o lo escriba con sus palabras (sin un
-     dato que nadie dijo); que la foto del lunes va a estar en la entrega; que la tarea pasa a revisión
-     cuando esté todo; el cierre, aparte: que mande lo que falta.
+     dato que nadie dijo); que la foto del lunes va a estar en la entrega; una sola vez qué falta para
+     entregarla, sin repetir que todavía no se entrega o no pasa a revisión (C-3d, D7: qué pasa al
+     confirmarla lo dice sólo la entrega completa); el cierre, aparte: que mande lo que falta.
    - La respuesta no dice: que la entregó, que está en revisión o terminada; los nombres de los tipos de
-     la política ("resultado_de_prueba", "captura"); que Ismael se enteró.
+     la política ("resultado_de_prueba", "captura"); que Ismael se enteró; "contaste" o "contarlo": lo
+     que escribió es su descripción (decisión 10; D7).
    - Botones: ninguno: no hay nada para confirmar.
    - Estado después: tema abierto, la entrega de comunicaciones, esperando lo que falta.
 

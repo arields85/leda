@@ -142,7 +142,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "mandado_antes_el": "La pieza la mandó antes, durante la tarea, ese día: entra en la "
                         "entrega sólo si la persona la deja.",
     "le_falta": "Lo que pide la tarea y todavía no está en la entrega, en palabras de todos "
-                "los días: sin eso no se puede entregar.",
+                "los días.",
     # --- Lo descrito frente al criterio de aceptación (decisión 10 del usuario, 2026-10-08) ----
     "criterio_de_aceptacion": "Lo que tiene que cumplir la tarea para darla por terminada, "
                               "punto por punto, como lo escribió quien la cargó: lo que la "
@@ -156,14 +156,14 @@ SIGNIFICADOS: Mapping[str, str] = {
                          "describir lo que falta de la entrega.",
     "describe": "Los puntos del criterio de aceptación que dice lo que la persona escribió en "
                 "esa pieza, como se leyó: la persona lo ve en la entrega y lo puede corregir.",
-    "le_falta_del_criterio": "Los puntos del criterio de aceptación que lo que la persona "
-                             "describió en la entrega todavía no dice, tal cual están escritos: "
-                             "hasta que los diga, la tarea no pasa a revisión. Lo demás del "
-                             "criterio ya está dicho.",
-    "ejemplo": "Una forma de describir lo que falta del criterio de aceptación, sacada del "
-               "criterio y de lo que la persona ya dijo, sin ningún dato nuevo. Leda se la "
-               "propone tal cual, para que la acepte o lo describa con sus palabras; mientras no "
-               "la acepte, no es parte de la entrega.",
+    "le_falta_del_criterio": "Los puntos del criterio de aceptación que la descripción de la "
+                             "persona todavía no dice entero, tal cual están escritos. De cada "
+                             "uno, lo que falta saber de la tarea es la parte que la descripción "
+                             "no dice; lo demás del criterio ya está dicho.",
+    "ejemplo": "Una descripción de lo que falta del criterio de aceptación, sacada del criterio "
+               "y de lo que la persona ya dijo, sin ningún dato nuevo. Leda se la propone tal "
+               "cual, como ejemplo: la persona la acepta o escribe la suya; mientras no la "
+               "acepte, no es parte de la entrega.",
     "arranca_al_entregarla": "La tarea no figura como arrancada: al confirmar la entrega, la "
                              "historia dice que arrancó y se entregó en ese momento, sin otra "
                              "fecha de inicio.",
@@ -171,9 +171,8 @@ SIGNIFICADOS: Mapping[str, str] = {
                              "y se entregó en este momento, sin otra fecha de inicio.",
     "espera_otras_tareas": "La tarea no puede arrancar porque espera que terminen otras de las "
                            "que depende: así no se entrega, y no cambió nada.",
-    "le_falta_algo": "A la entrega todavía le falta algo de lo que pide la tarea (le_falta o "
-                     "le_falta_del_criterio dicen qué): así no pasa a revisión, aunque la "
-                     "persona lo pida.",
+    "le_falta_algo": "La persona pidió que la entrega vaya así, pero le falta algo de lo que "
+                     "pide la tarea (como_queda y lo que falta dicen qué).",
     "al_confirmar": "Lo que pasa cuando la persona confirme la entrega completa.",
     "queda_esperando_la_aprobacion_de": "Quién revisa la tarea entregada y decide si la aprueba "
                                         "o le pide cambios: hasta que decida, la tarea está en "
@@ -206,7 +205,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "para_cuando_la_entregue": "Lo que la persona mandó y queda en la conversación para "
                                "mostrárselo cuando entregue esa tarea: no es parte de una "
                                "entrega todavía.",
-    "lo_que_escribio": "Lo que la persona escribió.",
+    "lo_que_escribio": "Lo que escribió quien entrega la tarea: su descripción del trabajo.",
     "el_ejemplo_que_acepto": "El ejemplo que Leda le propuso para lo que faltaba y la persona "
                              "aceptó tal cual: cuenta como lo que describe, aunque no lo "
                              "escribió ella.",
@@ -217,12 +216,12 @@ SIGNIFICADOS: Mapping[str, str] = {
     "para_confirmar": "La entrega tiene todo lo que pide la tarea: espera que la persona la "
                       "confirme, con el botón o escribiendo.",
     "le_falta_evidencia": "A la entrega le falta algo de lo que pide la tarea (le_falta y "
-                          "le_falta_del_criterio dicen qué): no se puede entregar todavía y la "
-                          "tarea no se movió.",
+                          "le_falta_del_criterio dicen qué): para entregarla falta eso; hasta "
+                          "entonces no se entrega y la tarea sigue como estaba.",
     "entregada": "La tarea quedó entregada y pasa a revisión: espera que quien aprueba el "
                  "trabajo de la persona la revise y decida. No está terminada ni aprobada.",
-    "no_vale_la_confirmacion": "La confirmación no vale (motivo dice por qué): no se entregó "
-                               "nada y se muestra la entrega como quedó.",
+    "no_vale_la_confirmacion": "La confirmación no vale (motivo dice por qué) y se muestra la "
+                               "entrega como quedó (como_queda).",
     "llego_algo_despues": "Llegó algo nuevo para la entrega después de mostrarla: lo que la "
                           "persona confirmaba ya no era lo último.",
     "cambio_lo_que_se_mostro": "Lo que se le mostró a la persona cambió desde entonces.",
@@ -661,10 +660,15 @@ SIGNIFICADOS: Mapping[str, str] = {
 # La espera de una decisión sobre una entrega es, para la persona, una revisión (decisión 18
 # del usuario, 2026-10-08: "para aprobar" inclina la respuesta); "aprobar" queda para la
 # decisión misma.
+#
+# Lo que escribe quien entrega es su descripción del trabajo (decisión 10: "describir", no
+# "contar"), y a una entrega incompleta le falta algo para entregarla, no "evidencia" (C-3d, D7:
+# la IA escribía "Sumé lo que contaste" y "Todavía no se puede entregar"; el modelo que aprobó
+# el usuario dice "Sumé tu descripción" y "Para entregarla falta saber…").
 CONCEPTOS_DE_LA_COCINA = ("prevision", "comprometid", "referente", "dependiente", "escal",
                           "aviso_previo", "reencuadre", "repregunta", "de_estado", "el_estado",
                           "esperando_la_aprobacion", "para_aprobar", "aprobacion_trabada",
-                          "aprobacion_destrabada")
+                          "aprobacion_destrabada", "lo_que_escribio", "falta_evidencia")
 
 
 def es_un_concepto_de_la_cocina(nombre: str) -> bool:
@@ -719,6 +723,8 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "nueva_prevision": "dio_otro_dia_para_terminar_su_tarea",
     "correccion_de_prevision": "el_dia_para_terminarla_que_recibio_ya_no_vale",
     "entrega_para_aprobar": "entrega_para_revisar",
+    "lo_que_escribio": "su_descripcion",
+    "le_falta_evidencia": "para_entregarla_falta",
     "aprobacion_trabada": "revision_trabada",
     "aprobacion_destrabada": "revision_destrabada",
     # --- Las jugadas, por lo que hacen (su ficha) ----------------------------------------------

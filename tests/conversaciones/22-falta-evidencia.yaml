@@ -100,7 +100,7 @@ pasos:
             cubre: ["una foto o una captura de la pantalla"]}],
          le_falta: ["cómo se probó y qué dio la prueba",
                     "un archivo del trabajo, por ejemplo el programa o la configuración"],
-         al_confirmar: {queda_esperando_la_aprobacion_de: Ismael Soschinski}}
+         al_confirmar: ausente}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: COM}
     botones: []
     estado_despues:
@@ -109,12 +109,13 @@ pasos:
       - "lo que falta, en palabras de todos los días: cómo la probó y un archivo"
       - "que lo que escribió no dice lo que pide la tarea (que los equipos se comunican con el PLC por la red de planta sin errores durante una hora), con el ejemplo para que lo acepte o lo escriba con sus palabras"
       - que la foto del lunes va a estar en la entrega
-      - que la tarea pasa a revisión cuando esté todo, sin nombrar a Ismael
       - "el cierre, aparte: que mande lo que falta"
+      - una sola vez qué falta para entregarla, sin repetir que todavía no se entrega o no pasa a revisión (D7)
     no_dice:
       - que la entregó, que está en revisión o terminada
       - los nombres de los tipos de la política
       - que Ismael se enteró
+      - '"contaste" o "contarlo": lo que escribió es su descripción (decisión 10; D7)'
 
   - paso: 4
     quien: Marcos

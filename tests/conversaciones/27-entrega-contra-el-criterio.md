@@ -47,10 +47,12 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
      foto), pero lo descrito no cubre el criterio: no hay vista previa para confirmar.
    - La respuesta dice: que para revisar la tarea falta saber si la comprimidora completó los 20 ciclos
      sin fallas, en palabras simples y hablando de la tarea; el ejemplo ("La comprimidora completó los 20
-     ciclos sin fallas"), para que lo acepte o lo escriba con sus palabras.
+     ciclos sin fallas"), para que lo acepte o lo escriba con sus palabras; una sola vez qué falta para
+     entregarla, sin repetir que todavía no se entrega o no pasa a revisión (C-3d, D7).
    - La respuesta no dice: que la entregó o que está en revisión; el nombre de Ismael (decisión 11 del
      2026-10-08); que falta que arranque desde el PLC (ya lo dijo); un número o un nombre que no estén en
-     el criterio ni en lo que escribió.
+     el criterio ni en lo que escribió; "contaste" o "contarlo": lo que escribió es su descripción
+     (decisión 10; D7).
    - Botones: ninguno: no hay nada para confirmar.
    - Estado después: tema abierto, la entrega del PLC, esperando lo que falta.
 

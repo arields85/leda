@@ -145,7 +145,7 @@ pasos:
          entrega: [{pieza: P1, es: lo_que_escribio}],
          le_falta_del_criterio: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
          ejemplo: presente,
-         al_confirmar: {queda_esperando_la_aprobacion_de: Ismael Soschinski}}
+         al_confirmar: ausente}
     pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
     botones: []
     estado_despues:
@@ -153,10 +153,12 @@ pasos:
     dice:
       - qué falta para revisar la tarea, en palabras simples y hablando de la tarea
       - un ejemplo sacado del criterio, para que lo acepte o lo escriba con sus palabras
+      - una sola vez qué falta para entregarla, sin repetir que todavía no se entrega o no pasa a revisión (D7)
     no_dice:
       - que la tarea ya quedó entregada, en revisión o terminada
       - que Ismael ya se enteró
       - un dato que no esté en el criterio ni en lo que escribió
+      - '"contaste" o "contarlo": lo que escribió es su descripción (decisión 10; D7)'
 
   - paso: 7
     quien: Marcos

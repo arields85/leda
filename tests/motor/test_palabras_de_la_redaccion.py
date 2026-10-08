@@ -232,6 +232,37 @@ def test_lo_que_espera_una_decision_se_dice_revision():
         assert "espera su aprobación" not in hechos.significado(nombre), nombre
 
 
+# El modelo que aprobó el usuario (2026-10-08, C-3d, D7) para lo que falta de una entrega: la
+# tarea; lo que se sumó ("tu descripción y las dos fotos"); una sola vez qué falta para entregarla,
+# hablando de la tarea; y el ejemplo como una propuesta que la persona acepta. No se le dicta a la
+# IA (regla del mozo): sale de los hechos y de sus significados.
+LO_QUE_FALTA_DE_UNA_ENTREGA = ("le_falta_evidencia", "le_falta", "le_falta_del_criterio",
+                               "ejemplo", "lo_que_escribio", "el_ejemplo_que_acepto",
+                               "le_falta_algo", "no_vale_la_confirmacion", "entrega", "cubre",
+                               "dice", "sumo", "lo_que_falta_de_la_entrega")
+
+
+def test_que_todavia_no_se_entrega_lo_dice_un_solo_hecho():
+    """D7: la IA escribía "Todavía no se puede entregar… La tarea no pasó a revisión.": tres
+    significados lo decían (lo que falta, lo que falta del criterio y el resultado) y la entrega
+    incompleta traía además qué pasa al confirmarla. Lo dice sólo el resultado."""
+    dicen_que_no = [n for n in LO_QUE_FALTA_DE_UNA_ENTREGA
+                    if re.search(r"revisi|no se (puede )?entreg|no pasa", hechos.significado(n))]
+    assert dicen_que_no == ["le_falta_evidencia"]
+    assert hechos.para_redactar("le_falta_evidencia") == "para_entregarla_falta"
+
+
+def test_lo_que_falta_de_una_entrega_se_lee_como_su_descripcion():
+    """D7 y decisión 10: "describir", no "contar" ("Sumé lo que contaste", "contarlo con tus
+    palabras"). Lo que escribió en una entrega es su descripción, y el ejemplo, una descripción que
+    acepta o reemplaza por la suya."""
+    for nombre in LO_QUE_FALTA_DE_UNA_ENTREGA:
+        significado = hechos.significado(nombre)
+        assert not re.search(r"(?<![a-z])cont[aáoó]|sus palabras", significado), nombre
+    assert hechos.para_redactar("lo_que_escribio") == "su_descripcion"
+    assert "descripción" in hechos.significado("lo_que_escribio")
+
+
 def test_lo_que_la_persona_entrega_lo_describe():
     """Decisión 10: "describir", no "contar", en lo que la IA lee sobre la entrega."""
     for texto in (hechos.significado("el_texto_cubre"), DATOS["el_texto_cubre"][1]):

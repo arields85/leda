@@ -193,8 +193,9 @@ def test_sin_la_politica_completa_dice_que_falta_y_no_mueve_la_tarea(conn, mundo
                                  "dice": "termine el tablero, quedo cerrado",
                                  "cubre": ["cómo quedó el trabajo"]}]
     assert hecho["pregunta"] == "lo_que_falta_de_la_entrega"
-    assert hecho["al_confirmar"] == {"estado": "en_revision",
-                                     "queda_esperando_la_aprobacion_de": "Ismael"}
+    # Qué pasa al confirmarla lo dice sólo la entrega completa: la incompleta no se confirma, y lo
+    # dicho dos veces la IA lo repetía ("La tarea no pasó a revisión", D7).
+    assert "al_confirmar" not in hecho
     assert estado_de(conn, tarea) == "en_curso"
     assert cuantas(conn, "evidence") == 0
     assert cuantas(conn, "conversation_option") == 0      # nada para confirmar: sin botones

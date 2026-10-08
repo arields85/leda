@@ -89,9 +89,11 @@ y 9g.
      20 ciclos sin fallas): sin eso no pasa a revisión (decisión 10 del usuario, 2026-10-08;
      `odd/tasks/fase-c.md`).
    - La respuesta dice: qué falta para revisar la tarea, en palabras simples y hablando de la tarea, y
-     un ejemplo sacado del criterio para que lo acepte o lo escriba con sus palabras.
+     un ejemplo sacado del criterio para que lo acepte o lo escriba con sus palabras; una sola vez qué
+     falta para entregarla, sin repetir que todavía no se entrega o no pasa a revisión (C-3d, D7).
    - La respuesta no dice: que la tarea ya quedó entregada, en revisión o terminada; que Ismael ya se
-     enteró; un dato que no esté en el criterio ni en lo que escribió Marcos.
+     enteró; un dato que no esté en el criterio ni en lo que escribió Marcos; "contaste" o "contarlo":
+     lo que escribió es su descripción (decisión 10; D7).
    - Botones: ninguno: no hay nada para confirmar.
    - Estado después: tema abierto, lo que falta de la entrega.
 
