@@ -56,7 +56,7 @@ def test_una_prevision_queda_auditada_con_la_version_de_las_reglas(conn, mundo, 
 
 
 def test_la_correccion_de_una_prevision_queda_auditada(conn, mundo, escribe):
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
     dice(conn, escribe, Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1"}))
 
     [fila] = _auditadas(conn, "corregir_prevision")
@@ -110,7 +110,7 @@ SALE = AHORA + timedelta(minutes=10)
 
 
 def test_cada_aviso_que_sale_queda_auditado_como_un_envio_de_leda(conn, mundo, escribe):
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
 
     assert enviar(conn, mundo, IAGuionada(redacciones=["Marcos prevé el 14."]), SALE) == {
         "enviado": 1}
@@ -128,7 +128,7 @@ def test_cada_aviso_que_sale_queda_auditado_como_un_envio_de_leda(conn, mundo, e
 
 def test_un_aviso_que_no_salio_no_se_audita_como_enviado(conn, mundo, escribe):
     """La IA no lo redactó: queda para reintentar, y nada se envió."""
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
 
     caida = IAGuionada(redacciones=[RuntimeError("sin servicio")])
     assert enviar(conn, mundo, caida, SALE) == {"reintento": 1}
@@ -145,7 +145,7 @@ def test_lo_que_se_deshace_se_deshace_con_su_auditoria(conn, mundo, escribe, mon
         raise psycopg.errors.RaiseException("una regla del trabajo")
 
     monkeypatch.setattr(fichas, "_proponer", regla_del_trabajo)
-    resultado = dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    resultado = dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
 
     assert resultado.hechos[0]["motivo"] == "regla_del_trabajo"
     assert cuantas(conn, "task_forecast") == 0

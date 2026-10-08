@@ -25,6 +25,13 @@ como opciones (situación general 5). Y lo que una jugada le propone a la person
 queda como tema abierto, una pregunta como cualquier otra (`preguntas.PROPUESTA`; decisión del
 usuario, 2026-10-05).
 
+**Una fecha que atrasa lleva su explicación** (decisión del usuario, 2026-10-07; ADR 0018, 9n):
+si la previsión queda después del vencimiento y la persona no dio el porqué, se anota igual y
+Leda pregunta qué la atrasa (`preguntas.MOTIVO_DEL_ATRASO`); el aviso al referente espera la
+respuesta hasta el final del día de trabajo (`margen.sale_esperando_el_motivo`) y, si sale sin
+ella, lo dice. El porqué llega como otra previsión de la misma fecha, que reemplaza el aviso.
+Una fecha que corre otra vez un atraso ya explicado de la misma tarea conserva ese porqué.
+
 **Con la tarea vencida, una respuesta sin fecha lleva la pregunta de para cuándo** (decisión del
 usuario, 2026-10-05; ADR 0018, 9j; conversación 16), también común: si la tarea pasó su fecha de
 seguimiento (la comprometida o, si es posterior, la previsión: el ancla, 9i), lo que la jugada
@@ -57,7 +64,7 @@ from .ancla import (REEMPLAZADO_POR_UN_AVANCE, REPREGUNTA_DE_ESTADO, anclaje, ca
                     pasos)
 from .auditoria import auditar
 from .ia import Jugada
-from .margen import sale_con_margen
+from .margen import sale_con_margen, sale_esperando_el_motivo
 from .tiempo import sale_el
 
 
@@ -162,6 +169,14 @@ NO_LE_LLEGO = "no_le_llego"
 # no es silencio. Lo que espera saber depende del estado de la tarea (`avisos.espera_saber`):
 # esto es lo de una tarea en curso.
 ESPERA_ALGO_CIERTO = ("si_la_termino", "para_cuando_la_termina", "si_esta_trabada")
+
+# Una fecha que atrasa y llegó sin su porqué (usuario, 2026-10-07; ADR 0018, 9n): su aviso al
+# referente lo espera (`ESPERA_EL_MOTIVO`, en el hecho de la persona) y, si sale sin él, lo dice
+# (`SIN_MOTIVO_TODAVIA`, en los hechos del aviso). Si el porqué llega antes, el aviso que lo
+# esperaba no sale (`LLEGO_EL_MOTIVO`): sale otro que lo lleva. Sus significados, en `hechos.py`.
+ESPERA_EL_MOTIVO = "espera_el_motivo"
+SIN_MOTIVO_TODAVIA = "sin_motivo_todavia"
+LLEGO_EL_MOTIVO = "llego_el_motivo"
 
 # El atraso que tendrá la tarea si se cumple una previsión: distinto del atraso de hoy
 # (`atraso_dias_habiles`), con su propia clave (revisión del contrato, 2026-10-05; ronda 1: el
@@ -485,15 +500,24 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         return {"resultado": "no_se_puede", "motivo": "sin_fecha_comprometida",
                 "tarea": _tarea(tarea)}
     comprometida = fila["fecha_objetivo"]
+    vence = comprometida.astimezone(cal.zona).date()
     atraso = cal.habiles_entre(comprometida, datetime.combine(prevista, time(12), cal.zona))
-    motivo = None if _vacio(datos.get("motivo")) else str(datos["motivo"]).strip()
+    dicho = None if _vacio(datos.get("motivo")) else str(datos["motivo"]).strip()
 
     # La previsión vigente es la última de la cadena: la que ninguna otra reemplaza.
-    cur.execute("""select f.id from task_forecast f
+    cur.execute("""select f.id, f.fecha_prevista, f.motivo from task_forecast f
                     where f.task_id = %s
                       and not exists (select 1 from task_forecast g where g.reemplaza_id = f.id)
                     order by f.at desc limit 1""", (tarea["id"],))
     anterior = cur.fetchone()
+    # Una fecha que atrasa lleva su explicación (9n). Si la persona corre otra vez una fecha que
+    # ya atrasaba la tarea y cuyo porqué ya dio, ese porqué sigue siendo el del atraso de esta
+    # tarea: no se le vuelve a preguntar (constitución §8: ninguna pregunta que no aporte). El
+    # porqué es de la tarea: nunca pasa de una tarea a otra (`_deshacer_prevision`).
+    atrasa = prevista > vence
+    de_antes = (dicho is None and atrasa and anterior is not None and anterior["motivo"]
+                and anterior["fecha_prevista"] > vence)
+    motivo = anterior["motivo"] if de_antes else dicho
     cur.execute(
         """insert into task_forecast (task_id, fecha_prevista, motivo, fecha_comprometida,
                                       atraso_dias_habiles, reemplaza_id,
@@ -506,17 +530,21 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         "prevision_id": prevision_id, "fecha_prevista": prevista,
         "fecha_comprometida": comprometida.astimezone(cal.zona).date(),
         "atraso_dias_habiles": atraso, "motivo": motivo,
+        **({"motivo_dicho_antes": True} if de_antes else {}),
         "reemplaza_id": anterior["id"] if anterior else None})
     _cerrar_esperas(ctx, tarea["id"])
 
     # Un aviso de previsión que todavía no salió queda atrás: lo reemplaza el de ésta, o
-    # ninguno si volvió a la fecha comprometida (9b). Nunca en silencio: con su motivo.
+    # ninguno si volvió a la fecha comprometida (9b). Nunca en silencio: con su motivo, que es
+    # otro si ésta trae el porqué de la misma fecha que esperaba el aviso (9n).
+    llego_el_motivo = (dicho is not None and anterior is not None and not anterior["motivo"]
+                       and anterior["fecha_prevista"] == prevista)
     cur.execute(
         """update scheduled_notice
-              set estado = 'omitido', motivo_omision = 'hay_una_prevision_mas_nueva',
-                  resuelto_en = %s
+              set estado = 'omitido', motivo_omision = %s, resuelto_en = %s
             where task_id = %s and tipo = 'nueva_prevision' and estado = 'guardado'""",
-        (ctx.ahora, tarea["id"]))
+        (LLEGO_EL_MOTIVO if llego_el_motivo else "hay_una_prevision_mas_nueva", ctx.ahora,
+         tarea["id"]))
 
     cur.execute("""select t.titulo from dependency d join task t on t.id = d.destino_task_id
                     where d.origen_task_id = %s and t.estado not in ('terminada', 'cancelada')
@@ -528,16 +556,34 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
              ATRASO_SI_SE_CUMPLE: atraso, "dependientes": dependientes,
              "aviso_al_referente": None}
 
+    # Sin el porqué de un atraso, Leda pregunta qué la atrasa (con su espera, como toda pregunta
+    # que espera respuesta). Con el porqué, o con una fecha que ya no atrasa, la pregunta que
+    # quedaba de antes se cierra.
+    sin_motivo = atrasa and motivo is None
+    if not sin_motivo:
+        preguntas.cerrar_de_tipo(ctx, preguntas.MOTIVO_DEL_ATRASO, tarea["id"],
+                                 "respondida" if motivo is not None else "sin_efecto",
+                                 {"jugada": "anotar_prevision", "tarea": tarea["id"]})
+    else:
+        _abrir_pregunta(ctx, hecho, preguntas.MOTIVO_DEL_ATRASO, tarea["id"],
+                        jugada={"nombre": "anotar_prevision",
+                                "datos": {"fecha": prevista.isoformat()}})
+
     quien_aprueba = referente(cur, str(fila["responsable_membership_id"]))
     if prevista == comprometida.astimezone(cal.zona).date():
         return {**hecho, "sin_aviso": "misma_fecha_comprometida"}
     if quien_aprueba is None:
         return {**hecho, "sin_aviso": "sin_referente"}
     # Le llega a otra persona por lo que dijo ésta: espera el margen para corregir, y el hecho
-    # dice esa hora, la real (`margen.py`; usuario, 2026-10-07).
-    sale = sale_con_margen(cur, cal, ctx.quien.workspace_id, ctx.ahora)
+    # dice esa hora, la real (`margen.py`; usuario, 2026-10-07). Sin el porqué de un atraso,
+    # espera además la respuesta hasta el final del día de trabajo y, si sale sin ella, lo dice
+    # (9n): nunca un porqué que nadie dio.
+    sale = (sale_esperando_el_motivo if sin_motivo else sale_con_margen)(
+        cur, cal, ctx.quien.workspace_id, ctx.ahora)
     hechos_del_aviso = {k: hecho[k] for k in ("prevision", "motivo", "fecha_comprometida",
                                               ATRASO_SI_SE_CUMPLE, "dependientes")}
+    if sin_motivo:
+        hechos_del_aviso[SIN_MOTIVO_TODAVIA] = True
     cur.execute(
         """insert into scheduled_notice (workspace_id, tipo, task_id,
                                          destinatario_membership_id, hechos, programado_para,
@@ -549,7 +595,8 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
          sale, f"motor:nueva_prevision:{prevision_id}", ctx.ahora))
     aviso_id = str(cur.fetchone()["id"])
     ctx.avisos_guardados.append(aviso_id)
-    hecho["aviso_al_referente"] = {"a": quien_aprueba["nombre"], LLEGA: sale.isoformat()}
+    hecho["aviso_al_referente"] = {"a": quien_aprueba["nombre"], LLEGA: sale.isoformat(),
+                                   **({ESPERA_EL_MOTIVO: True} if sin_motivo else {})}
     nombrar_efecto(hecho, "aviso_al_referente", AVISO, aviso_id)
     return hecho
 
@@ -890,7 +937,8 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
     """Una previsión de corrección que reemplaza a la equivocada con la de antes (o con la
     fecha comprometida, si no había). Su aviso al referente: si no salió, se retira; si salió,
     se guarda una corrección breve para él (9f). Si no salió y la de antes tenía un aviso que
-    se había retirado por ella, ése se vuelve a guardar (`_rearmar_aviso_de_la_anterior`)."""
+    se había retirado por ella, ése se vuelve a guardar (`_rearmar_aviso_de_la_anterior`). A la
+    tarea correcta pasa sólo la fecha: su porqué era de ésta (9n)."""
     cur, cal = ctx.cur, ctx.calendario
     cur.execute("""select * from task_forecast f
                     where f.task_id = %s
@@ -963,9 +1011,9 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
         if rearmado is not None:
             rearmado_id, hechos["aviso_de_la_prevision_anterior"] = rearmado
             nombrar_efecto(hechos, "aviso_de_la_prevision_anterior", AVISO, rearmado_id)
-    return {"hechos": hechos,
-            "datos": {"fecha": equivocada["fecha_prevista"].isoformat(),
-                      **({"motivo": equivocada["motivo"]} if equivocada["motivo"] else {})}}
+    # A la tarea correcta pasa sólo la fecha (usuario, 2026-10-07; ADR 0018, 9n): el porqué se
+    # dijo de esta tarea y no viaja. Si la fecha atrasa la otra, su ficha pregunta el suyo.
+    return {"hechos": hechos, "datos": {"fecha": equivocada["fecha_prevista"].isoformat()}}
 
 
 def _rearmar_aviso_de_la_anterior(ctx: Contexto, tarea: dict, anterior: dict,
@@ -1048,7 +1096,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           hace="anota la previsión con el atraso en días hábiles del espacio; la fecha "
                "comprometida no cambia",
           despues="guarda el aviso al referente, salvo que vuelva a la fecha comprometida; "
-                  "cierra la espera de esa tarea",
+                  "con una fecha que atrasa sin su porqué, pregunta qué la atrasa y el aviso "
+                  "espera la respuesta hasta el final del día de trabajo (9n); cierra la espera "
+                  "de esa tarea",
           manejar=_anotar_prevision, del_responsable=True,
           contesta=(preguntas.ESTADO_DE_LA_TAREA, preguntas.FECHA_DE_LA_TAREA),
           deshacer=_deshacer_prevision, algo_cierto=True,
@@ -1056,7 +1106,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "sin él. Es un atraso (o un adelanto) previsto, no un bloqueo: quien da una fecha "
              "dice cuándo va a terminar, aunque el porqué sea algo que espera, y no dice que "
              "no puede avanzar. Una fecha nueva que reemplaza otra que dio antes es otra "
-             "previsión, no una corrección."),
+             "previsión, no una corrección. El porqué de una fecha que ya dio, cuando Leda se "
+             "lo pregunta, también es esta jugada, con esa misma fecha."),
     Ficha("anotar_bloqueo", "anotar que una tarea está trabada y por qué",
           necesita=("tarea",), opcional=("causa",),
           comprueba="que sea el responsable y que la tarea esté abierta",

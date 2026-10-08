@@ -63,6 +63,25 @@ def sale_el(cal, dia) -> datetime:
     return cal.dentro_de_jornada(datetime.combine(dia, HORA_DE_SALIDA, tzinfo=cal.zona))
 
 
+# El final del día de trabajo (usuario, 2026-10-07; ADR 0018, 9n): lo que espera hasta que
+# termina el día sale media hora antes del cierre del horario del espacio. Así sale dentro del
+# horario aunque la vuelta del ciclo llegue tarde o la redacción se reintente (a los 1, 2, 4 y
+# 8 minutos, `avisos.ESPERAS_TRAS_UN_FALLO`): a la hora exacta del cierre ya no saldría hasta
+# el día hábil siguiente (`Calendario.en_horario`).
+ANTES_DEL_CIERRE = timedelta(minutes=30)
+
+
+def al_terminar_el_dia(cal, momento: datetime) -> datetime:
+    """El final del día de trabajo en que cae `momento` (o del próximo día hábil, si cae fuera
+    del horario): media hora antes del cierre, nunca antes del inicio del horario. Si ya pasó,
+    devuelve igual esa hora: quien llama la junta con la suya
+    (`margen.sale_esperando_el_motivo`)."""
+    dia = cal.dentro_de_jornada(momento).astimezone(cal.zona).date()
+    cierre = datetime.combine(dia, cal.hora_fin, tzinfo=cal.zona)
+    inicio = datetime.combine(dia, cal.hora_inicio, tzinfo=cal.zona)
+    return max(cierre - ANTES_DEL_CIERRE, inicio)
+
+
 def sale(cal, momento: datetime) -> datetime:
     """Cuándo sale lo que Leda guarda en `momento` para mandar por su cuenta: a la hora de
     salida de ese día hábil si todavía no llegó; enseguida, si ya pasó y sigue la jornada; si

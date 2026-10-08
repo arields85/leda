@@ -200,8 +200,10 @@ def test_a_la_segunda_pregunta_la_fecha_y_con_la_fecha_es_una_prevision(conn, mu
     assert espera_del_estado(conn)["satisfecho_en"] is None
     assert [r["estado"] for r in _repreguntas(conn)] == ["enviado", "guardado"]
 
-    con_fecha = _escribe(conn, escribe, "para el martes 20 la tengo",
-                         Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-20"}),
+    # Con su porqué: una fecha que atrasa sin él abre la pregunta de qué la atrasa (9n).
+    con_fecha = _escribe(conn, escribe, "para el martes 20 la tengo, me falta el repuesto",
+                         Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-20",
+                                                     "motivo": "me falta el repuesto"}),
                          at=octubre(13, 10, 45))
 
     assert con_fecha.hechos[0]["resultado"] == "anotado"
@@ -294,7 +296,8 @@ def test_con_el_ancla_en_una_prevision_el_avance_vuelve_a_pedir_en_su_escalera(c
                                                                               escribe):
     """9i: el día de la previsión se pide el estado; un avance vago vuelve a pedirlo al día
     hábil siguiente, dentro de la escalera de la previsión."""
-    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-15"}),
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-15",
+                                                    "motivo": "el proveedor"}),
          at=octubre(5, 11))
     for dia in (5, 9, 15):
         dias.ciclo(octubre(dia, 12))

@@ -70,6 +70,13 @@ CAUSA_DEL_BLOQUEO = "causa_del_bloqueo"
 QUIEN_DESTRABA = "quien_destraba"
 # Lo que Leda le propone a la persona: lo propuesto va en la jugada de la pregunta (`propone`).
 PROPUESTA = "propuesta"
+# Qué atrasa la tarea hasta la fecha que dio la persona, cuando queda después del vencimiento y
+# no dio el porqué (usuario, 2026-10-07: "pasar una fecha sin motivo no es una buena idea, tiene
+# que haber una explicación"; ADR 0018, 9n). Espera respuesta con su propia espera, como la de
+# quién destraba: no se deja sin efecto y la escalera de las preguntas la repite. La abre y la
+# cierra la ficha de la previsión (`fichas._anotar_prevision`), y la contesta otra previsión con
+# su porqué; el aviso al referente la espera hasta el final del día (`margen.py`).
+MOTIVO_DEL_ATRASO = "motivo_del_atraso"
 
 
 @dataclass(frozen=True)
@@ -93,6 +100,7 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     # Parte del pedido de estado: espera con él y la repite la escalera de la tarea.
     TipoDePregunta(FECHA_DE_LA_TAREA, espera=ESTADO_DE_LA_TAREA),
     TipoDePregunta(QUIEN_DESTRABA, espera=QUIEN_DESTRABA),
+    TipoDePregunta(MOTIVO_DEL_ATRASO, espera=MOTIVO_DEL_ATRASO),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token

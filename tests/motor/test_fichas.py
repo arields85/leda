@@ -257,7 +257,8 @@ def test_la_redaccion_recibe_cuando_se_entera_el_referente(conn, mundo, escribe)
     IA lo repetía. El hecho dice cuándo se entera (`llega`), que todavía no pasó, y nada más."""
     quien, entrante = escribe("Marcos", "llego el 13, el proveedor se demoró")
     ia = IAGuionada(jugadas=[[Jugada("anotar_prevision", {"tarea": "T1",
-                                                          "fecha": "2026-10-13"})]],
+                                                          "fecha": "2026-10-13",
+                                                          "motivo": "el proveedor se demoró"})]],
                     redacciones=["Listo."])
     procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
     conn.commit()
@@ -278,7 +279,7 @@ def test_el_aviso_al_referente_espera_el_margen_del_espacio(conn, mundo, escribe
     conn.commit()
 
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada(
-        "anotar_prevision", {"tarea": "T1", "fecha": "2026-10-13"}))
+        "anotar_prevision", {"tarea": "T1", "fecha": "2026-10-13", "motivo": "faltan cables"}))
 
     assert hecho["aviso_al_referente"] == {"a": "Ismael", "llega": "2026-10-05T10:03:00-03:00"}
     aviso = _uno(conn, "select programado_para from scheduled_notice")
@@ -293,7 +294,8 @@ def test_el_margen_que_termina_fuera_del_horario_espera_al_dia_habil_siguiente(c
     a_las = datetime(2026, 10, 5, 19, 55, tzinfo=timezone.utc)          # 16:55
     resultado = procesar_turno(
         conn, quien, entrante,
-        IAGuionada(jugadas=[[Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-13"})]],
+        IAGuionada(jugadas=[[Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-13",
+                                                         "motivo": "faltan cables"})]],
                    redacciones=["Listo."]), RelojFijo(a_las))
     conn.commit()
 

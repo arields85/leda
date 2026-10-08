@@ -87,7 +87,7 @@ def test_un_aviso_de_coordinacion_sale_aparte(conn, mundo, dias, dos_que_vencen_
     causa Marcos) le llegan a Ismael el mismo día en dos mensajes."""
     for dia in (6, 9, 13, 14):
         dias.ciclo(octubre(dia, 10))
-    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T2", "fecha": "2026-10-21"}),
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T2", "fecha": "2026-10-21", "motivo": "el proveedor"}),
          at=octubre(15, 9, 30))
 
     a_ismael = [p for p in dias.ciclo(octubre(15, 10)) if p["persona"] == "Ismael"]

@@ -82,7 +82,8 @@ def test_la_fecha_contesta_y_el_seguimiento_va_a_ella(conn, mundo, dias, escribe
     _vencida(dias)
     dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(13, 10, 20))
 
-    r = dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-16"}),
+    r = dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-16",
+                                                        "motivo": "el proveedor"}),
              at=octubre(13, 10, 25))
 
     assert r.hechos[0]["atraso_si_se_cumple_la_prevision_dias_habiles"] == 4
@@ -121,7 +122,8 @@ def test_con_una_prevision_la_tarea_vence_al_pasar_la_prevision(conn, mundo, dia
     """El ancla (9i): pasada la fecha comprometida pero no la prevista, la tarea no está vencida
     para esta regla; pasada la prevista, sí, y los hechos dicen cuál era la previsión. El atraso
     se sigue contando contra la fecha comprometida."""
-    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14"}),
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14",
+                                                    "motivo": "el proveedor"}),
          at=octubre(5, 10))
 
     r = dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(13, 10, 20))

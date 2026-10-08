@@ -24,13 +24,17 @@ del producto: del lado seguro, nunca deja salir antes un aviso.
 antes de la hora de salida del día ni fuera del horario del espacio (9e). Esa es la hora que se
 guarda en el aviso y, por eso, la que dicen los hechos (`llega`): lo que se le cuenta a la
 persona es cuándo se entera de verdad la otra.
+
+**Una fecha que atrasa y llegó sin su porqué** (usuario, 2026-10-07; ADR 0018, 9n): su aviso
+espera además la respuesta a la pregunta de qué la atrasa, hasta el final del día de trabajo
+(`sale_esperando_el_motivo`). Si el porqué llega antes, ése sale con el margen de siempre.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from .tiempo import sale
+from .tiempo import al_terminar_el_dia, sale
 
 CLAVE_MARGEN = "margen_para_corregir_minutos"
 MARGEN_POR_OMISION = timedelta(minutes=10)
@@ -52,3 +56,14 @@ def sale_con_margen(cur, cal, workspace_id: str, ahora: datetime) -> datetime:
     """Cuándo sale un aviso a otra persona que causa lo que alguien dijo en `ahora`: terminado
     el margen para corregir y dentro del horario (`tiempo.sale`)."""
     return sale(cal, ahora + margen_para_corregir(cur, workspace_id))
+
+
+def sale_esperando_el_motivo(cur, cal, workspace_id: str, ahora: datetime) -> datetime:
+    """Cuándo sale el aviso de una fecha que atrasa la tarea y llegó sin su porqué (usuario,
+    2026-10-07; ADR 0018, 9n): espera la respuesta de la persona hasta el final del día de
+    trabajo (`tiempo.al_terminar_el_dia`), y nunca antes del margen para corregir ni fuera del
+    horario. Si el porqué llega antes, sale otro aviso con él, con el margen de siempre
+    (`fichas._anotar_prevision`). Dicho cerca del cierre, gana el margen: si termina después
+    del cierre, el aviso espera al final del día hábil siguiente."""
+    con_margen = sale_con_margen(cur, cal, workspace_id, ahora)
+    return max(con_margen, al_terminar_el_dia(cal, con_margen))

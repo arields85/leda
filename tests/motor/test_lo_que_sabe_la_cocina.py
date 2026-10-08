@@ -72,7 +72,7 @@ def test_el_pedido_que_sigue_a_un_avance_dice_la_hora_en_que_de_verdad_sale(conn
 
 
 def test_el_aviso_al_referente_fuera_de_horario_sale_a_la_hora_de_salida(conn, mundo, escribe):
-    r = dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14"}),
+    r = dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14", "motivo": "el proveedor"}),
              at=octubre(5, 17, 20))
 
     llega = r.hechos[0]["aviso_al_referente"]["llega"]

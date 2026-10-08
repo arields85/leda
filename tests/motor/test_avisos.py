@@ -71,7 +71,7 @@ def test_el_aviso_al_referente_sale_redactado_desde_los_hechos_a_su_hora(conn, m
 def test_fuera_del_horario_no_sale_nada_que_leda_inicie(conn, mundo, escribe):
     """La respuesta sale enseguida; el aviso a Ismael espera a la hora de salida del día hábil
     siguiente (10:00, `tiempo.HORA_DE_SALIDA`) y, antes, ni se redacta."""
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"), at=octubre(5, 17, 20))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"), at=octubre(5, 17, 20))
     [aviso] = _avisos(conn)
     assert aviso["programado_para"] == octubre(6, 10)
     ia = IAGuionada(redacciones=["Aviso."])
@@ -86,7 +86,7 @@ def test_fuera_del_horario_no_sale_nada_que_leda_inicie(conn, mundo, escribe):
 
 
 def test_un_fin_de_semana_tampoco_sale(conn, mundo, escribe):
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
     sabado = octubre(10, 11)
 
     assert enviar(conn, mundo, IAGuionada(), sabado) == {"fuera_de_horario": 1}
@@ -112,7 +112,7 @@ def test_una_prevision_que_vuelve_a_la_fecha_comprometida_no_avisa_nada(conn, mu
 
 
 def test_un_aviso_cuya_tarea_se_cerro_antes_de_salir_se_omite(conn, mundo, escribe):
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"), at=octubre(5, 17, 20))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"), at=octubre(5, 17, 20))
     with admin(conn) as cur:
         cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
                                                      actor_kind, motivo)
@@ -130,7 +130,7 @@ def test_un_aviso_cuya_tarea_se_cerro_antes_de_salir_se_omite(conn, mundo, escri
 
 def test_la_correccion_al_referente_sale_por_el_mismo_camino(conn, mundo, escribe):
     nueva_tarea(conn, mundo, "Probar las comunicaciones")
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
     enviar(conn, mundo, IAGuionada(redacciones=["Previsión."]), SALE)
     dice(conn, escribe, Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1"}),
          at=SALE + timedelta(minutes=1))
@@ -150,7 +150,7 @@ def test_corregir_y_volver_a_una_prevision_anterior_rearma_su_aviso(conn, mundo,
     20; si el 20 era de otra tarea, Ismael tiene que enterarse del 14, que nunca le llegó."""
     nueva_tarea(conn, mundo, "Probar las comunicaciones")
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"), at=octubre(5, 17, 20))
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-20"), at=octubre(5, 17, 30))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-20", "el proveedor"), at=octubre(5, 17, 30))
 
     r = dice(conn, escribe, Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1",
                                                   "tarea_correcta": "T2"}),
@@ -161,8 +161,11 @@ def test_corregir_y_volver_a_una_prevision_anterior_rearma_su_aviso(conn, mundo,
     assert hecho["aviso_de_la_prevision_corregida"] == {"a": "Ismael",
                                                         "llega": "no_le_va_a_llegar"}
     assert hecho["aviso_de_la_prevision_anterior"]["llega"].startswith("2026-10-06T10:00")
-    ia = IAGuionada(redacciones=["Aviso del 14.", "Aviso de T2."])
-    assert enviar(conn, mundo, ia, octubre(6, 10)) == {"enviado": 2}
+    # A T2 pasa sólo la fecha (9n, usuario, 2026-10-07): el porqué era de T1, así que su aviso
+    # espera el de T2 hasta el final del día y sale a las 16:30, si no llega antes.
+    assert hecho["aplicado"]["aviso_al_referente"]["llega"].startswith("2026-10-06T16:30")
+    ia = IAGuionada(redacciones=["Aviso del 14."])
+    assert enviar(conn, mundo, ia, octubre(6, 10)) == {"enviado": 1}
     de_t1 = [p["hechos"][0] for p in ia.pedidos_de_redaccion
              if p["hechos"][0]["tarea"] == T1["titulo"]]
     assert de_t1 == [{"aviso": "nueva_prevision", "necesita_respuesta": False,
@@ -175,9 +178,9 @@ def test_corregir_y_volver_a_una_prevision_anterior_rearma_su_aviso(conn, mundo,
 
 def test_si_el_aviso_de_la_anterior_ya_habia_salido_no_se_repite(conn, mundo, escribe):
     nueva_tarea(conn, mundo, "Probar las comunicaciones")
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
     enviar(conn, mundo, IAGuionada(redacciones=["Aviso del 14."]), SALE)
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-16"), at=octubre(5, 17, 30))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-16", "el proveedor"), at=octubre(5, 17, 30))
 
     r = dice(conn, escribe, Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1"}),
              at=octubre(5, 17, 40))
@@ -190,7 +193,7 @@ def test_si_el_aviso_de_la_anterior_ya_habia_salido_no_se_repite(conn, mundo, es
 
 def test_si_la_ia_no_redacta_se_reintenta_a_los_1_2_4_y_8_minutos(conn, mundo, escribe):
     marcos = mundo["personas"]["Marcos"]
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
     caida = IAGuionada(redacciones=[RuntimeError("caída") for _ in range(5)])
     momento = SALE
     for espera in (1, 2, 4, 8):
@@ -226,7 +229,7 @@ def test_si_la_ia_no_redacta_se_reintenta_a_los_1_2_4_y_8_minutos(conn, mundo, e
 
 
 def test_si_tampoco_sale_el_aviso_de_la_falla_queda_el_incidente(conn, mundo, escribe):
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
     caida = IAGuionada(redacciones=[RuntimeError("caída") for _ in range(10)])
     momento = SALE
     for _ in range(10):
@@ -247,7 +250,7 @@ def test_un_intento_que_falla_deja_su_rastro_sin_avisar_a_la_administracion(conn
     reintenta deja un incidente de severidad baja, con la falla en la referencia técnica; a la
     administración no se la avisa (el quinto fallo sí, como siempre)."""
     administrador(conn)         # alcanzable: si se la avisara, quedaría su aviso
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
     ia = IAGuionada(redacciones=[RuntimeError("caída"), "Marcos prevé terminar el miércoles 14."])
 
     assert enviar(conn, mundo, ia, SALE) == {"reintento": 1}
@@ -277,7 +280,7 @@ def test_a_alguien_ausente_no_le_llega_nada_hasta_que_vuelve(conn, mundo, escrib
                        values (%s, %s, '2026-10-05', '2026-10-06')""",
                     (mundo["id"], mundo["personas"]["Ismael"]["membership_id"]))
     conn.commit()
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
     ia = IAGuionada(redacciones=["Aviso."])
 
     assert enviar(conn, mundo, ia, SALE) == {"en_espera": 1}
@@ -288,7 +291,7 @@ def test_a_alguien_ausente_no_le_llega_nada_hasta_que_vuelve(conn, mundo, escrib
 
 @pytest.mark.parametrize("columna, motivo", [("telegram_user_id", "destinatario_sin_telegram")])
 def test_un_destinatario_que_no_se_puede_alcanzar_se_dice(conn, mundo, escribe, columna, motivo):
-    dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
+    dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor"))
     with admin(conn) as cur:
         cur.execute(f"update app_user set {columna} = null where id = %s",
                     (mundo["personas"]["Ismael"]["app_user_id"],))

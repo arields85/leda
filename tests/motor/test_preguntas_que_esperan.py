@@ -139,7 +139,8 @@ def test_lo_propuesto_se_contesta_haciendolo(conn, tareas, marcos):
     assert r.hechos[0]["alternativa"] == "anotar_prevision"
     assert abierta(conn) == (preguntas.PROPUESTA, tareas["T1"])
 
-    r = marcos.dice(Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14"}))
+    r = marcos.dice(Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14",
+                                                "motivo": "el proveedor"}))
 
     assert r.hechos[0]["resultado"] == "anotado"
     assert r.pregunta is None and abierta(conn) is None

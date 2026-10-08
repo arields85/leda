@@ -49,7 +49,8 @@ def test_varias_cosas_directas_se_anotan_todas_en_una_respuesta(conn, tareas, ma
 
 def test_de_varias_cosas_se_anota_lo_directo_y_se_pregunta_una(conn, tareas, marcos):
     r = marcos.dice(jugada_bloqueo("T1"),
-                    Jugada("anotar_prevision", {"tarea": "T2", "fecha": "2026-10-22"}))
+                    Jugada("anotar_prevision", {"tarea": "T2", "fecha": "2026-10-22",
+                                                "motivo": "espera el switch nuevo"}))
 
     bloqueo, prevision = r.hechos
     assert prevision["resultado"] == "anotado"
@@ -101,7 +102,10 @@ def test_dos_cosas_que_preguntan_van_de_a_una_en_el_orden_dicho(conn, tareas, ma
 def test_un_cambio_de_tema_se_anota_y_vuelve_a_la_pregunta_pendiente(conn, tareas, marcos):
     marcos.dice(jugada_bloqueo("T1"))
 
-    r = marcos.dice(Jugada("anotar_prevision", {"tarea": "T2", "fecha": "2026-10-21"}))
+    # Con su porqué, como en la conversación 08: sin él, la pregunta de qué la atrasa iría
+    # primero y la del bloqueo quedaría para después (9n y 9d).
+    r = marcos.dice(Jugada("anotar_prevision", {"tarea": "T2", "fecha": "2026-10-21",
+                                                "motivo": "me mandaron a otra obra"}))
 
     assert [(h["jugada"], h["resultado"]) for h in r.hechos] == [("anotar_prevision", "anotado")]
     assert r.pregunta == {"tipo": "causa_del_bloqueo", "tarea": T1, "desde_antes": True}
@@ -406,10 +410,12 @@ def test_corregir_una_prevision_retira_su_aviso_y_la_anota_en_la_correcta(conn, 
     assert correccion["es_correccion"] and correccion["reemplaza_id"] == equivocada["id"]
     assert correccion["fecha_prevista"].isoformat() == "2026-10-09"
     assert correccion["atraso_dias_habiles"] == 0
+    # A la tarea correcta pasa sólo la fecha: el porqué se dijo de T1 (9n, usuario, 2026-10-07).
+    # La fecha atrasa T2, así que Leda pregunta su porqué.
     correcta = uno(conn, "select fecha_prevista, motivo from task_forecast where task_id = %s",
                    tareas["T2"])
-    assert (correcta["fecha_prevista"].isoformat(), correcta["motivo"]) == (
-        "2026-10-21", "espera el switch")
+    assert (correcta["fecha_prevista"].isoformat(), correcta["motivo"]) == ("2026-10-21", None)
+    assert hecho["aplicado"]["pregunta"] == "motivo_del_atraso"
     avisos = {str(a["task_id"]): a for a in todos(
         conn, "select task_id, estado, motivo_omision from scheduled_notice")}
     assert avisos[tareas["T1"]]["estado"] == "omitido"
@@ -422,9 +428,11 @@ def test_una_correccion_dentro_del_margen_no_deja_salir_el_aviso_equivocado(conn
     """La prueba por Telegram real del 2026-10-07 (conversación 25): la fecha quedó en la tarea
     equivocada y el aviso a Ismael salió antes de que Marcos pudiera corregirla. El aviso a otra
     persona espera el margen para corregir (`margen.py`): Marcos corrige cuatro minutos después,
-    el aviso equivocado se retira sin salir y a Ismael le llega sólo el de la tarea correcta,
-    con su propio margen desde la corrección."""
-    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-21"}),
+    el aviso equivocado se retira sin salir y a Ismael le llega sólo el de la tarea correcta.
+    A ella pasa sólo la fecha (9n, usuario, 2026-10-07): su aviso espera el porqué de T2, que
+    Marcos da enseguida, y sale con él, con su propio margen desde que lo dio."""
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-21",
+                                                    "motivo": "espera el switch"}),
          at=octubre(5, 10, 30))
     r = dice(conn, escribe, Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1",
                                                 "tarea_correcta": "T2"}),
@@ -434,21 +442,27 @@ def test_una_correccion_dentro_del_margen_no_deja_salir_el_aviso_equivocado(conn
     assert hecho["aviso_de_la_prevision_corregida"] == {"a": "Ismael",
                                                         "llega": "no_le_va_a_llegar"}
     assert hecho["aplicado"]["aviso_al_referente"] == {"a": "Ismael",
-                                                       "llega": "2026-10-05T10:44:00-03:00"}
+                                                       "llega": "2026-10-05T16:30:00-03:00",
+                                                       "espera_el_motivo": True}
+    r = dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T2", "fecha": "2026-10-21",
+                                                        "motivo": "espera el switch"}),
+             at=octubre(5, 10, 36))
+    assert r.hechos[0]["aviso_al_referente"] == {"a": "Ismael",
+                                                 "llega": "2026-10-05T10:46:00-03:00"}
     ia = IAQueRedacta()
-    for minuto in (40, 43):         # el margen de la equivocada ya pasó; el de la correcta, no
+    for minuto in (40, 45):         # el margen de la equivocada ya pasó; el de la correcta, no
         enviar_avisos(conn, mundo["id"], ia, RelojFijo(octubre(5, 10, minuto)))
         conn.commit()
     assert ia.pedidos_de_redaccion == []
     assert lo_que_salio_para(conn, mundo, "Ismael") == []
 
-    enviar_avisos(conn, mundo["id"], ia, RelojFijo(octubre(5, 10, 44)))
+    enviar_avisos(conn, mundo["id"], ia, RelojFijo(octubre(5, 10, 46)))
     conn.commit()
 
     [pedido] = ia.pedidos_de_redaccion
     assert pedido["persona"] == "Ismael"
-    assert [(h["aviso"], h["tarea"], h["prevision"]) for h in pedido["hechos"]] == [
-        ("nueva_prevision", "Probar las comunicaciones", "2026-10-21")]
+    assert [(h["aviso"], h["tarea"], h["prevision"], h["motivo"]) for h in pedido["hechos"]] == [
+        ("nueva_prevision", "Probar las comunicaciones", "2026-10-21", "espera el switch")]
     assert len(lo_que_salio_para(conn, mundo, "Ismael")) == 1
     equivocado = uno(conn, "select estado, motivo_omision from scheduled_notice "
                            "where task_id = %s", tareas["T1"])

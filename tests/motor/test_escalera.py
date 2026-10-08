@@ -179,7 +179,7 @@ def test_los_recordatorios_dicen_la_prevision_y_lo_que_depende(conn, mundo, dias
     Jugada("anotar_inicio", {"tarea": "T1"}),
     # Una previsión lleva la escalera a su fecha (9i, `test_ancla.py`): una posterior a los días
     # que mira esta prueba.
-    Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-20"}),
+    Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-20", "motivo": "el proveedor"}),
     Jugada("anotar_bloqueo", {"tarea": "T1", "causa": "falta el repuesto"}),
 ], ids=lambda j: j.nombre)
 def test_una_respuesta_cierra_la_espera_y_la_pregunta_y_detiene_la_escalera(conn, mundo, dias,

@@ -153,6 +153,11 @@ SIGNIFICADOS: Mapping[str, str] = {
                           "(a) y cuándo se entera (llega); vacío si no se le avisa.",
     "sin_aviso": "Por qué no se le avisa a quien aprueba el trabajo de la persona, con su "
                  "código.",
+    "espera_el_motivo": "El aviso espera el porqué que Leda le preguntó a la persona: si lo "
+                        "da antes, sale otro aviso que lo lleva; si no, sale a la hora de "
+                        "llega y dice que todavía no lo dio.",
+    "sin_motivo_todavia": "La persona todavía no dio el porqué de ese día: Leda se lo "
+                          "preguntó y espera la respuesta. No hay un porqué que contar.",
     "a": "A quién va un aviso.",
     "llega": "Cuándo se entera quien recibe el aviso (a; sin a, la persona a la que Leda le "
              "escribe): una fecha y hora es el momento en que le llega, que todavía no pasó; "
@@ -325,6 +330,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "ya_respondio": "La persona ya contestó lo que el aviso iba a pedir.",
     "hay_una_prevision_mas_nueva": "La persona dio después otro día para terminarla: el "
                                    "aviso era del anterior.",
+    "llego_el_motivo": "La persona dio después el porqué de ese mismo día: en lugar de este "
+                       "aviso sale otro que lo lleva.",
     "volvio_a_la_fecha_comprometida": "El día que la persona dio para terminarla volvió a ser "
                                       "el día en que vence.",
     "tarea_entregada": "La tarea ya se entregó.",
@@ -359,6 +366,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "estado_de_la_tarea": "Pregunta cómo viene la tarea: espera algo cierto, según su estado "
                           "(espera_algo_cierto dice qué, cuando viene).",
     "fecha_de_la_tarea": "Pregunta para qué día va a tener la tarea: espera una fecha.",
+    "motivo_del_atraso": "Pregunta qué atrasa la tarea hasta el día que la persona dio para "
+                         "terminarla, que queda después del día en que vence: espera el "
+                         "porqué de ese día, con sus palabras.",
     "propuesta": "Leda le propuso algo a la persona: espera que elija una de las propuestas o "
                  "la deje.",
     # --- Códigos: los avisos que Leda manda por su cuenta --------------------------------------

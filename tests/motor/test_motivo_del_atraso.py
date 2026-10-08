@@ -7,7 +7,9 @@ mensaje:
 
 1. Si la fecha nueva queda después del vencimiento y la persona no dio el porqué, Leda anota la
    fecha y pregunta qué la atrasa (`preguntas.MOTIVO_DEL_ATRASO`, una pregunta que espera
-   respuesta, con su escalera). Si la fecha no atrasa la tarea, no pregunta nada.
+   respuesta, con su escalera). Si la fecha no atrasa la tarea, no pregunta nada. Si corre otra
+   vez una fecha que ya atrasaba la tarea y cuyo porqué ya dio, ése sigue siendo el porqué del
+   atraso: no se le vuelve a preguntar (constitución §8; conversación 05, paso 4).
 2. El aviso al referente espera esa respuesta y sale con el porqué, en palabras de la persona,
    después del margen para corregir y dentro del horario.
 3. Si no contesta, el aviso no espera para siempre: sale al terminar el día de trabajo
@@ -145,6 +147,32 @@ def test_una_fecha_que_atrasa_con_su_porque_no_pregunta_nada(conn, mundo, escrib
     assert hecho["aviso_al_referente"] == {"a": "Ismael", "llega": "2026-10-05T10:10:00-03:00"}
 
 
+def test_correr_otra_vez_un_atraso_ya_explicado_conserva_su_porque(conn, mundo, escribe):
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+    [hecho], pedido = _turno(conn, escribe, jugada_prevision("T1", "2026-10-14"),
+                             at=octubre(5, 11))
+
+    assert hecho["motivo"] == "faltan los cables"
+    assert "pregunta" not in hecho and pedido["pregunta"] is None
+    assert _preguntas_sin_cerrar(conn) == []
+    segunda = uno(conn, "select motivo from task_forecast where fecha_prevista = '2026-10-14'")
+    assert segunda["motivo"] == "faltan los cables"
+    _, con_porque = avisos_guardados(conn, "nueva_prevision")
+    assert con_porque["hechos"]["motivo"] == "faltan los cables"
+    assert con_porque["programado_para"] == octubre(5, 11, 10)
+    # La auditoría separa lo que dijo ahora de lo que había dicho antes.
+    auditado = uno(conn, """select detalle from audit_log where accion = 'anotar_prevision'
+                             order by at desc, id desc limit 1""")
+    assert auditado["detalle"]["motivo_dicho_antes"] is True
+
+
+def test_el_porque_de_una_fecha_que_no_atrasaba_no_explica_un_atraso(conn, mundo, escribe):
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-08", "termino antes"))
+    [hecho], _ = _turno(conn, escribe, jugada_prevision("T1", "2026-10-13"), at=octubre(5, 11))
+
+    assert hecho["motivo"] is None and hecho["pregunta"] == MOTIVO
+
+
 # --- 2. El porqué llega: el aviso sale con él ---------------------------------------------------
 
 def test_el_porque_cierra_la_pregunta_y_el_aviso_sale_con_el_despues_del_margen(
@@ -255,16 +283,17 @@ def test_el_porque_despues_del_aviso_sin_porque_le_llega_a_quien_aprueba(conn, m
 
 def test_una_correccion_pasa_solo_la_fecha_y_pregunta_el_porque_si_atrasa_la_otra(
         conn, mundo, escribe):
+    # Vence el martes 13, después de T1 (los alias siguen el vencimiento): el 14 la atrasa.
     t2 = nueva_tarea(conn, mundo, "Probar las comunicaciones",
-                     fecha=datetime(2026, 10, 7, 20, 0, tzinfo=timezone.utc))   # miércoles 7
-    _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"))
+                     fecha=datetime(2026, 10, 13, 20, 0, tzinfo=timezone.utc))
+    _turno(conn, escribe, jugada_prevision("T1", "2026-10-14", "faltan los cables"))
 
     [hecho], pedido = _turno(conn, escribe, Jugada("corregir", {
         "corrige": "anotar_prevision", "tarea": "T1", "tarea_correcta": "T2"}),
         at=octubre(5, 10, 5))
 
     aplicado = hecho["aplicado"]
-    assert aplicado["resultado"] == "anotado" and aplicado["prevision"] == "2026-10-13"
+    assert aplicado["resultado"] == "anotado" and aplicado["prevision"] == "2026-10-14"
     # El porqué se dijo de la otra tarea: no viaja.
     assert aplicado["motivo"] is None
     en_t2 = uno(conn, "select * from task_forecast where task_id = %s", t2)
