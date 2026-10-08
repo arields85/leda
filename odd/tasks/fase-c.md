@@ -131,6 +131,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     si el aviso a quien aprueba no salió (el margen), no sale; si ya salió y quien aprueba toca Aprobar,
     Leda le dice que la entrega se está completando y que le avisa. Con la pieza nueva, la entrega vuelve
     a estar completa y a quien aprueba le llega un aviso nuevo con todo lo vigente.
+16. **Si cambia quién aprueba:** decidida (usuario, 2026-10-08). El aviso de una entrega va a quien
+    aprueba en el momento de salir (se relee). Si el cambio es antes de que salga, le llega al nuevo; si
+    es después, al nuevo le llega el aviso de lo que espera su decisión, y un botón del aviso viejo le
+    dice al anterior que esa tarea ya no la aprueba él, sin cambiar nada. Hoy queda omitido
+    (`cambio_quien_aprueba`) y el nuevo no recibe nada.
 
 ## Chequeo de rumbo (2026-10-07)
 
