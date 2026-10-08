@@ -538,11 +538,13 @@ def _un_paso_de_una_decision(m: Momento, task_id: str, aprobador: str) -> list[s
     entrega_aviso = aviso_de_la_entrega(cur, task_id)
     if entrega_aviso is None or entrega_aviso["estado"] != "enviado":
         return []                       # todavía no se le preguntó
+    if aprobacion_vigente(cur, task_id, aprobador) is not None:
+        # Ya decidió (también el nuevo, si cambió quién aprueba): espera que se resuelva lo que
+        # falta, y no hay nada que recordarle ni que contarle (C-3d, D5).
+        return []
     if str(entrega_aviso["destinatario_membership_id"]) != aprobador:
         # Cambió quién aprueba después de que salió (decisión 16): al nuevo, lo que espera.
         return _a_quien_aprueba_ahora(m, task_id, entrega_aviso, aprobador)
-    if aprobacion_vigente(cur, task_id, aprobador) is not None:
-        return []                       # ya decidió: espera que se resuelva lo que falta
     de = str(entrega_aviso["id"])
     cur.execute("""select * from scheduled_notice
                     where task_id = %s and tipo = any(%s)

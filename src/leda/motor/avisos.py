@@ -1069,7 +1069,7 @@ def lo_entregado_para_revisar(cur, task_id, zona) -> tuple[list[dict[str, Any]],
 
 def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     """El aviso de una entrega corresponde mientras la tarea espere la aprobación de quien lo
-    recibe y su entrega esté completa. Sus hechos son los de ahora: lo entregado vigente y
+    recibe, que todavía no la aprobó, y su entrega esté completa. Sus hechos son los de ahora: lo entregado vigente y
     cuántas fotos van adjuntas."""
     tarea = leer_tarea(m.cur, aviso["task_id"])
     if tarea is None:
@@ -1081,6 +1081,10 @@ def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, An
     quien = referente(m.cur, str(tarea["responsable_membership_id"]))
     if quien is None or quien["membership_id"] != str(aviso["destinatario_membership_id"]):
         return CAMBIO_QUIEN_APRUEBA, {}
+    if aprobacion_vigente(m.cur, str(tarea["id"]), quien["membership_id"]) is not None:
+        # Ya la aprobó y todavía no puede cerrar (la cierra el sistema cuando se resuelva lo que
+        # falta): no hay nada que pedirle (la revisión de la D4, en la D5 de la C-3d).
+        return YA_DECIDIO, {}
     if entrega.falta_algo_de_lo_entregado(m.cur, str(tarea["id"])):
         # Se retiró algo y la entrega quedó incompleta: la revisión espera; cuando esté completa
         # sale un aviso nuevo con todo (decisión 15 del usuario, 2026-10-08).

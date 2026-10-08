@@ -753,3 +753,47 @@ def test_si_cambia_despues_al_nuevo_le_llega_lo_que_espera_su_decision(conn, mun
     assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "ya_no_le_corresponde"
     assert hecho["la_revisa_otra_persona"] is True and hecho["estado"] == "en_revision"
     assert _decisiones(conn, tarea) == [] and estado_de(conn, tarea) == "en_revision"
+
+
+def _al_nuevo(conn, mundo) -> list[dict]:
+    return [a for a in avisos_guardados(conn, "entrega_para_aprobar")
+            if str(a["destinatario_membership_id"]) == mundo["personas"]["Nahuel"]["membership_id"]]
+
+
+def test_si_el_nuevo_ya_decidio_no_se_le_guarda_lo_que_espera_su_decision(conn, mundo, turnos):
+    """La advertencia de la revisión de la D4 (`escalera.py`): el aviso al nuevo se guardaba
+    aunque el nuevo ya hubiera aprobado una entrega que todavía no puede cerrar (C-3d, D5)."""
+    from leda.motor.escalera import correr_escalera
+
+    tarea, _ = _con_el_aviso(conn, mundo, turnos)            # ya le llegó a Ismael
+    _con_una_dependencia(conn, mundo, tarea)                 # y no puede cerrar todavía
+    _ahora_lo_aprueba(conn, mundo, "Marcos", "Nahuel")
+    luego = DESPUES_DEL_MARGEN + timedelta(minutes=5)
+    r = turnos.dice("Nahuel", Jugada("aprobar", {"de": "Marcos"}), texto="lo de marcos ok",
+                    at=luego)
+    assert _hecho(r, "aprobar")["resultado"] == "anotado"
+    assert estado_de(conn, tarea) == "en_revision"
+    correr_escalera(conn, mundo["id"], RelojFijo(luego + timedelta(minutes=1)))
+    conn.commit()
+    assert _al_nuevo(conn, mundo) == []
+
+
+def test_si_el_nuevo_decide_antes_de_que_salga_el_aviso_se_omite(conn, mundo, turnos):
+    """Al salir se relee (9b): si quien lo recibe ya decidió (una aprobación que todavía no
+    cierra también es su decisión), el aviso de lo que espera su decisión no sale."""
+    from leda.motor.escalera import correr_escalera
+
+    tarea, _ = _con_el_aviso(conn, mundo, turnos)
+    _con_una_dependencia(conn, mundo, tarea)
+    _ahora_lo_aprueba(conn, mundo, "Marcos", "Nahuel")
+    # Fuera del horario: la escalera lo guarda para el día hábil siguiente.
+    noche = AHORA + timedelta(hours=10)
+    correr_escalera(conn, mundo["id"], RelojFijo(noche))
+    conn.commit()
+    [guardado] = _al_nuevo(conn, mundo)
+    assert guardado["estado"] == "guardado"
+    turnos.dice("Nahuel", Jugada("aprobar", {"de": "Marcos"}), texto="lo de marcos ok",
+                at=noche + timedelta(minutes=1))
+    enviar(conn, mundo, IAQueRedacta(), guardado["programado_para"] + timedelta(hours=2))
+    [aviso] = _al_nuevo(conn, mundo)
+    assert aviso["estado"] == "omitido" and aviso["motivo_omision"] == "ya_decidio"
