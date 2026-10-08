@@ -487,10 +487,57 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       --veces 1 --ronda seco-d1`, 25 de 25 bien (informes borrados).
     - `PENDIENTE`: en la 22, paso 1, si la IA elige `guardar_para_la_entrega` sin la tarea, los
       hechos salen repetidos (la jugada y lo que trajo el mensaje): es del motor y queda para D3.
-  - [ ] **D2.** Las palabras (decisiones 11 y 18): no nombrar por su cuenta a quien aprueba ni al
+  - [x] **D2.** Las palabras (decisiones 11 y 18): no nombrar por su cuenta a quien aprueba ni al
     referente (y decir el nombre si se pregunta); "revisar" para lo que espera; "describir" en la
     entrega. Cambian los hechos, sus significados y las conversaciones que esperan "Ismael será
-    notificado".
+    notificado". Route: delegada (escritor único, 2+ archivos no triviales). Hecha el 2026-10-08:
+    - **El nombre, sólo si pregunta** (`f5fede8`). Elegido: en el borde de la redacción
+      (`hechos.para_redactar`), cada dato de la cocina que nombra a quien aprueba el trabajo de la
+      persona a la que Leda le escribe (`hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`: los avisos al
+      referente y a quien aprueba, sus correcciones, a quiénes se escaló, lo que pasa si no hay
+      respuesta o si sigue sin decidir, el aviso de que se destrabó, quién aprobó o pidió cambios y
+      `queda_esperando_la_aprobacion_de`) le llega con el nombre dentro de `solo_si_pregunta`, en
+      el mismo lugar; lo demás (cuándo se entera), a la vista. Por qué así: `solo_si_pregunta` ya
+      existía y la redacción ya lo trata igual en los hechos y en los últimos turnos, así que la
+      pregunta "¿a quién le avisaste?" se contesta del registro sin una jugada nueva; los hechos de
+      la cocina, la base, el registro de turnos, las pruebas y la auditoría no cambian; y es por
+      dato, una lista cerrada, no una heurística sobre nombres. La otra forma (que el nombre llegue
+      sólo cuando el mensaje lo pregunta) necesitaba que el código decidiera qué es una pregunta:
+      frases. Quedan a la vista los datos que nombran a otra persona: el responsable para quien
+      aprueba (`aviso_al_responsable`, `responsable`), quién tiene trabada la decisión para quien
+      está arriba (`quien_aprueba`), y quién decide lo que la persona pidió (`quien_decide`,
+      `quien_aprueba` en `no_es_quien_aprueba`), que es la respuesta a su pedido.
+    - **La cocina suma dos hechos ciertos:** la vista previa dice que al confirmar pasa a revisión
+      (`al_confirmar.estado`), y la entrega, que la persona se entera cuando quien la revisa decida
+      (`se_le_avisa_cuando_decida`; el aviso de la decisión sale enseguida, decisión 19): de ahí
+      sale "Te aviso cuando la revisen o si hace falta algo más" sin frases en las instrucciones.
+    - **La instrucción de la redacción cambió a propósito** (huella `d8c6b0de58c4c2a3` →
+      `3f267a24d030de4a`, `tests/motor/test_contratos.py`): "con esa persona como sujeto del verbo
+      notificar" pedía el nombre; ahora el sujeto es esa persona si un hecho la nombra a la vista, y
+      si no, lo que se informa ("La nueva fecha queda informada").
+    - **"Revisión" para lo que espera:** `queda_esperando_la_aprobacion_de`, `entrega_para_aprobar`,
+      `aprobacion_trabada` y `aprobacion_destrabada` son conceptos de la cocina y la redacción recibe
+      `queda_esperando_la_revision_de`, `entrega_para_revisar`, `revision_trabada` y
+      `revision_destrabada`; los significados de la espera dicen revisión; "aprobar" queda para la
+      decisión. La página de la tarea dice "en revisión" (`tarea_vista.ESTADOS`).
+    - **"Describir":** el significado y el dato `el_texto_cubre` (`hechos.py`, `ia_real.DATOS`).
+    - **Las conversaciones** (`7bf13f2`): 02, 04, 11, 12, 15, 16, 18 a 25 esperan la fecha
+      "informada", "pasa a revisión", "quedó aprobada" y "le pidieron un cambio" sin nombrar a
+      Ismael, con `no_dice` del nombre; la 21 suma el paso 6, "a quien le avisaste?", que se
+      contesta con el nombre y la hora (el aviso a Ismael pasa al 7). La 20 deja escrito que
+      "Ismael será notificado" quedó superado.
+    - **Rojo primero:** seis pruebas nuevas fallaron antes del cambio (`test_entrega`,
+      `test_fichas`, `test_hechos` y tres de `test_palabras_de_la_redaccion`: el nombre a la vista,
+      los nombres de la espera y "cuenta").
+    - **Pruebas:** `pytest tests/motor tests/conversaciones`, 793 passed (sin la intermitente);
+      `pytest tests/garantias`, 319 passed; en seco, `correr --ia guionada --veces 1 --ronda
+      seco-d2`, 25 de 25 bien (informes borrados). Sin la IA real (D6).
+    - `PENDIENTE` (del usuario): si "eso lo decide Ismael" ante un pedido de reasignación
+      (`quien_decide`, conversaciones 12 y 19) sigue valiendo: hoy queda a la vista, como respuesta
+      a lo que pidió. `PENDIENTE`: `espacios/corework.yaml` dice de la explicación "contado por
+      quien lo hizo" (`en_palabras`, dato del pack, que la IA lee): cambiarlo a "descrito" es
+      configuración del cliente y quedó fuera de esta unidad. La regresión con la IA real (D6) dirá
+      si la IA escribe "queda informada" y contesta el nombre.
   - [ ] **D3.** La entrega (decisiones 10, 14 y 15): comparar lo descrito con el criterio, preguntar
     sólo lo que falta con un ejemplo sacado del criterio y no entregar hasta cubrirlo; entregar una
     tarea sin arrancar; pedir la pieza correcta si una retirada deja la entrega incompleta.
