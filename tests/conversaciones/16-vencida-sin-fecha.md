@@ -66,8 +66,8 @@ eso"), no una regla del inicio; con la decisión 9i (el seguimiento sigue a la p
      esta fecha lo dejó atrás; tercera vuelta de ajuste, 2026-10-06).
    - Estado después: sin tema abierto, nada para después; ninguna espera abierta.
 
-4. **Leda**, por su cuenta, a Ismael (lunes 26, 10:30): el aviso de la nueva previsión (es de
-   coordinación: lo causa lo que dijo Marcos).
+4. **Leda**, por su cuenta, a Ismael (lunes 26, 10:35, terminado el margen para corregir): el aviso de
+   la nueva previsión (es de coordinación: lo causa lo que dijo Marcos).
    →
    - El mensaje dice: que Marcos prevé terminar la tarea del PLC el miércoles 28; que la fecha
      comprometida era el viernes 23; el atraso, tres días hábiles; que la de comunicaciones depende de ella.

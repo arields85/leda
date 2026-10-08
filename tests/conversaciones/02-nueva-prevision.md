@@ -44,8 +44,8 @@ desde esa fecha. ADR 0018, decisión 5a, segunda respuesta, y decisiones 9a, 9b 
    - Botones: ninguno.
    - Estado después: sin tema abierto, nada para después.
 
-3. **Leda**, por su cuenta, a Ismael (martes 20, enseguida, dentro del horario): el aviso de la nueva
-   previsión.
+3. **Leda**, por su cuenta, a Ismael (martes 20, 15:50, dentro del horario): el aviso de la nueva
+   previsión, terminado el margen para corregir, diez minutos después de lo que dijo Marcos.
    →
    - Efecto: un mensaje privado en el outbox para Ismael, redactado justo antes de enviarlo con los hechos
      de ese momento.

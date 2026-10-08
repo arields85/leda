@@ -23,7 +23,10 @@ tareas:
 # El corredor no sabe expresar "una cosa o la otra": cada paso espera una sola respuesta. En el
 # paso 2 espera el reparto correcto (a); la pregunta de duda (b) también es correcta y, si la IA
 # la elige, el corredor la marca como falla de comprensión y se juzga leyendo la transcripción
-# (el .md lo dice en el paso).
+# (el .md lo dice en el paso). Por lo mismo, el paso 3 (Marcos corrige dentro del margen para
+# corregir) espera lo que corresponde después de (a); después de la lectura equivocada de la
+# prueba real, lo que corresponde es la corrección, y se juzga leyendo la transcripción: a
+# Ismael le llega un solo aviso, el de la tarea de comunicaciones.
 pasos:
   - paso: 1
     quien: Leda
@@ -79,8 +82,46 @@ pasos:
       - negrita
 
   - paso: 3
+    quien: Marcos
+    a_las: "2026-10-19 10:44"
+    # Dentro del margen para corregir del aviso del paso 2 (10 minutos): todavía no salió.
+    escribe: "no el 23 es comunicaciones el plc esta trabado nomas"
+    jugadas:
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-10-23"}
+    efectos:
+      previsiones: [{tarea: COM, fecha: "2026-10-23", motivo: ausente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          hechos: {prevision: "2026-10-23", fecha_comprometida: "2026-10-22",
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 1, motivo: ausente}
+    hechos:
+      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-10-23",
+         fecha_comprometida: "2026-10-22", atraso_si_se_cumple_la_prevision_dias_habiles: 1,
+         aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-19T10:54"}}
+    pregunta: {tipo: quien_destraba, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+    dice:
+      - "en el bloque de la de comunicaciones, con 📋 primero y ✏️ debajo: que la termina el vie 23/10"
+      - que Ismael será notificado, en pasiva sobre él y en futuro
+      - "otra vez, sola y en el último renglón, la pregunta de quién puede destrabar la del PLC"
+    no_dice:
+      - la fecha del viernes 23 en la tarea del PLC
+      - el bloqueo en la tarea de comunicaciones
+      - que Ismael ya se enteró de algo
+      - que Leda le avisa a Ismael
+
+  - paso: 4
+    quien: nadie
+    # A las 10:50 habría salido el aviso del paso 2: la fecha que Marcos dijo después lo dejó
+    # atrás, así que a Ismael no le llega nada todavía.
+    relojes: ["2026-10-19 10:50"]
+
+  - paso: 5
     quien: Leda
-    relojes: ["2026-10-19 10:41"]
+    relojes: ["2026-10-19 10:55"]
     salen:
       - a: Ismael
         tipo: nueva_prevision
@@ -98,9 +139,9 @@ pasos:
       - nada de la tarea del PLC
       - que la fecha cambió
 
-  - paso: 4
+  - paso: 6
     quien: Marcos
-    a_las: "2026-10-19 10:50"
+    a_las: "2026-10-19 11:00"
     escribe: "el cable lo consigue martin de compras y comunicaciones al final es el lunes 26 xq me falta el switch tmb"
     jugadas:
       - {nombre: anotar_quien_destraba, quien: "martin de compras", puede_traer: [tarea]}
@@ -134,9 +175,9 @@ pasos:
       - que Leda le escribió a Martín o lo va a seguir
       - otra vez la pregunta de quién destraba la del PLC
 
-  - paso: 5
+  - paso: 7
     quien: Leda
-    relojes: ["2026-10-19 10:51"]
+    relojes: ["2026-10-19 11:11"]
     salen:
       - a: Ismael
         tipo: nueva_prevision
@@ -153,7 +194,7 @@ pasos:
       - el cable o Martín
       - que la fecha cambió
 
-  - paso: 6
+  - paso: 8
     quien: Marcos
     a_las: "2026-10-20 15:00"
     escribe: "ya llego el cable sigo con el plc y lo de comunicaciones lo termine recien al final"

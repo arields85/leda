@@ -57,7 +57,8 @@ from .ancla import (REEMPLAZADO_POR_UN_AVANCE, REPREGUNTA_DE_ESTADO, anclaje, ca
                     pasos)
 from .auditoria import auditar
 from .ia import Jugada
-from .tiempo import sale as sale_a_la_hora, sale_el
+from .margen import sale_con_margen
+from .tiempo import sale_el
 
 
 @dataclass(frozen=True)
@@ -532,7 +533,9 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         return {**hecho, "sin_aviso": "misma_fecha_comprometida"}
     if quien_aprueba is None:
         return {**hecho, "sin_aviso": "sin_referente"}
-    sale = sale_a_la_hora(cal, ctx.ahora)
+    # Le llega a otra persona por lo que dijo ésta: espera el margen para corregir, y el hecho
+    # dice esa hora, la real (`margen.py`; usuario, 2026-10-07).
+    sale = sale_con_margen(cur, cal, ctx.quien.workspace_id, ctx.ahora)
     hechos_del_aviso = {k: hecho[k] for k in ("prevision", "motivo", "fecha_comprometida",
                                               ATRASO_SI_SE_CUMPLE, "dependientes")}
     cur.execute(
@@ -935,7 +938,7 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
             **({"a": quien_aprueba["nombre"]} if quien_aprueba is not None else {}),
             LLEGA: NO_LE_VA_A_LLEGAR}
     elif aviso is not None and aviso["estado"] == "enviado" and quien_aprueba is not None:
-        sale = sale_a_la_hora(cal, ctx.ahora)
+        sale = sale_con_margen(cur, cal, ctx.quien.workspace_id, ctx.ahora)
         cur.execute(
             """insert into scheduled_notice (workspace_id, tipo, task_id,
                                              destinatario_membership_id, hechos,
@@ -984,7 +987,7 @@ def _rearmar_aviso_de_la_anterior(ctx: Contexto, tarea: dict, anterior: dict,
     cur.execute("""select t.titulo from dependency d join task t on t.id = d.destino_task_id
                     where d.origen_task_id = %s and t.estado not in ('terminada', 'cancelada')
                     order by t.titulo""", (tarea["id"],))
-    sale = sale_a_la_hora(cal, ctx.ahora)
+    sale = sale_con_margen(cur, cal, ctx.quien.workspace_id, ctx.ahora)
     cur.execute(
         """insert into scheduled_notice (workspace_id, tipo, task_id,
                                          destinatario_membership_id, hechos, programado_para,

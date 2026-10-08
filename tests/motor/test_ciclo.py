@@ -166,7 +166,7 @@ def test_un_paso_que_vuelve_a_andar_y_se_cae_de_nuevo_deja_otro_incidente(
 def test_lo_que_causa_un_turno_sale_con_el_ciclo(conn, mundo, escribe):
     """El aviso al referente de una previsión lo manda el ciclo, no el comando."""
     dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14"}))
-    ciclo, salida = _ciclo(conn, mundo, octubre(5, 10, 1))
+    ciclo, salida = _ciclo(conn, mundo, octubre(5, 10, 10))
 
     ciclo.vuelta()
 

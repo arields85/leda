@@ -99,8 +99,8 @@ respuesta ambigua, no puede quedar así"), y 9j.
 
 7. **Nadie** escribe; del miércoles 28 al lunes 2, Leda no le escribe a Marcos sobre la tarea del PLC.
    →
-   - Efecto: el aviso de la previsión le llega a Ismael enseguida (es de coordinación, dentro del horario);
-     ningún escalamiento. El pedido guardado para el jueves se omite con su motivo (Marcos ya contestó),
+   - Efecto: el aviso de la previsión le llega a Ismael a las 10:55, terminado el margen para corregir
+     (es de coordinación, dentro del horario); ningún escalamiento. El pedido guardado para el jueves se omite con su motivo (Marcos ya contestó),
      nunca en silencio, y no hay pedidos cada día hasta la fecha que dio (9i).
 
 8. **Leda**, por su cuenta, a Marcos (martes 3, 10:00): el pedido de estado del día que Marcos dio (9i),

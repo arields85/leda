@@ -22,6 +22,11 @@ from tests.motor.ayudantes import (AHORA, T1, administrador, cuantas, dice, envi
                                    jugada_prevision, nueva_tarea, octubre, todos, uno)
 
 
+# Un aviso a otra persona por lo que dijo alguien sale terminado el margen para corregir
+# (`margen.py`; usuario, 2026-10-07): 10 minutos después del turno de las 10:00.
+SALE = AHORA + timedelta(minutes=10)
+
+
 def _avisos(conn) -> list[dict]:
     return todos(conn, "select * from scheduled_notice order by creado_en, dedupe_key")
 
@@ -33,7 +38,8 @@ def test_el_aviso_al_referente_sale_redactado_desde_los_hechos_a_su_hora(conn, m
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14", "el proveedor se demoró"))
     ia = IAGuionada(redacciones=["Marcos prevé terminar el miércoles 14."])
 
-    resumen = enviar(conn, mundo, ia, AHORA)
+    assert enviar(conn, mundo, ia, SALE - timedelta(minutes=1)) == {}   # dentro del margen
+    resumen = enviar(conn, mundo, ia, SALE)
 
     assert resumen == {"enviado": 1}
     [pedido] = ia.pedidos_de_redaccion
@@ -46,7 +52,7 @@ def test_el_aviso_al_referente_sale_redactado_desde_los_hechos_a_su_hora(conn, m
         "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": []}]
     [aviso] = _avisos(conn)
     assert aviso["estado"] == "enviado" and aviso["intentos"] == 1
-    assert aviso["resuelto_en"] == AHORA and aviso["turno_id"] is not None
+    assert aviso["resuelto_en"] == SALE and aviso["turno_id"] is not None
     salida = uno(conn, "select * from message_outbox where id = %s", aviso["outbox_id"])
     assert salida["cuerpo"] == "Marcos prevé terminar el miércoles 14."
     assert salida["chat_id"] == ismael["telegram"] and salida["es_respuesta"] is False
@@ -57,7 +63,7 @@ def test_el_aviso_al_referente_sale_redactado_desde_los_hechos_a_su_hora(conn, m
     assert uno(conn, "select ultimo_aviso_id from conversation_state where membership_id = %s",
                ismael["membership_id"])["ultimo_aviso_id"] == aviso["id"]
 
-    assert enviar(conn, mundo, IAGuionada(), AHORA) == {}       # nada sale dos veces
+    assert enviar(conn, mundo, IAGuionada(), SALE) == {}        # nada sale dos veces
 
 
 # --- Horario (9e; conversación 11, paso 3) -----------------------------------------------------
@@ -125,11 +131,14 @@ def test_un_aviso_cuya_tarea_se_cerro_antes_de_salir_se_omite(conn, mundo, escri
 def test_la_correccion_al_referente_sale_por_el_mismo_camino(conn, mundo, escribe):
     nueva_tarea(conn, mundo, "Probar las comunicaciones")
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
-    enviar(conn, mundo, IAGuionada(redacciones=["Previsión."]), AHORA)
-    dice(conn, escribe, Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1"}))
+    enviar(conn, mundo, IAGuionada(redacciones=["Previsión."]), SALE)
+    dice(conn, escribe, Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1"}),
+         at=SALE + timedelta(minutes=1))
     ia = IAGuionada(redacciones=["Corrección."])
 
-    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=1)) == {"enviado": 1}
+    # La corrección también espera su margen: otra corrección podría retirarla.
+    assert enviar(conn, mundo, ia, SALE + timedelta(minutes=10)) == {}
+    assert enviar(conn, mundo, ia, SALE + timedelta(minutes=11)) == {"enviado": 1}
     [pedido] = ia.pedidos_de_redaccion
     assert pedido["persona"] == "Ismael"
     assert pedido["hechos"][0]["prevision_que_no_vale"] == "2026-10-14"
@@ -167,7 +176,7 @@ def test_corregir_y_volver_a_una_prevision_anterior_rearma_su_aviso(conn, mundo,
 def test_si_el_aviso_de_la_anterior_ya_habia_salido_no_se_repite(conn, mundo, escribe):
     nueva_tarea(conn, mundo, "Probar las comunicaciones")
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
-    enviar(conn, mundo, IAGuionada(redacciones=["Aviso del 14."]), AHORA)
+    enviar(conn, mundo, IAGuionada(redacciones=["Aviso del 14."]), SALE)
     dice(conn, escribe, jugada_prevision("T1", "2026-10-16"), at=octubre(5, 17, 30))
 
     r = dice(conn, escribe, Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1"}),
@@ -183,7 +192,7 @@ def test_si_la_ia_no_redacta_se_reintenta_a_los_1_2_4_y_8_minutos(conn, mundo, e
     marcos = mundo["personas"]["Marcos"]
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
     caida = IAGuionada(redacciones=[RuntimeError("caída") for _ in range(5)])
-    momento = AHORA
+    momento = SALE
     for espera in (1, 2, 4, 8):
         assert enviar(conn, mundo, caida, momento) == {"reintento": 1}
         aviso = _avisos(conn)[0]
@@ -219,7 +228,7 @@ def test_si_la_ia_no_redacta_se_reintenta_a_los_1_2_4_y_8_minutos(conn, mundo, e
 def test_si_tampoco_sale_el_aviso_de_la_falla_queda_el_incidente(conn, mundo, escribe):
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
     caida = IAGuionada(redacciones=[RuntimeError("caída") for _ in range(10)])
-    momento = AHORA
+    momento = SALE
     for _ in range(10):
         enviar(conn, mundo, caida, momento)
         momento += timedelta(minutes=10)
@@ -241,7 +250,7 @@ def test_un_intento_que_falla_deja_su_rastro_sin_avisar_a_la_administracion(conn
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
     ia = IAGuionada(redacciones=[RuntimeError("caída"), "Marcos prevé terminar el miércoles 14."])
 
-    assert enviar(conn, mundo, ia, AHORA) == {"reintento": 1}
+    assert enviar(conn, mundo, ia, SALE) == {"reintento": 1}
 
     [incidente] = todos(conn, "select * from incident")
     assert incidente["etapa"] == avisos.ETAPA_AVISO_REINTENTO == "motor_aviso_reintento"
@@ -250,11 +259,11 @@ def test_un_intento_que_falla_deja_su_rastro_sin_avisar_a_la_administracion(conn
     assert incidente["notificado_admin_en"] is None and cuantas(conn, "admin_notice") == 0
     resumen = incidente["resumen_sanitizado"]
     assert "intento 1" in resumen and "Ismael" in resumen and "nueva_prevision" in resumen
-    assert "10:01" in resumen                       # cuándo se reintenta, en la hora del espacio
+    assert "10:11" in resumen                       # cuándo se reintenta, en la hora del espacio
     assert "justamente el que falló" not in resumen   # la nota de otro caso sería mentir
 
     # El aviso sale en el reintento, sin otro incidente.
-    assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=1)) == {"enviado": 1}
+    assert enviar(conn, mundo, ia, SALE + timedelta(minutes=1)) == {"enviado": 1}
     assert cuantas(conn, "incident") == 1
     assert uno(conn, "select cuerpo from message_outbox where not es_respuesta")[
         "cuerpo"] == "Marcos prevé terminar el miércoles 14."
@@ -271,7 +280,7 @@ def test_a_alguien_ausente_no_le_llega_nada_hasta_que_vuelve(conn, mundo, escrib
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
     ia = IAGuionada(redacciones=["Aviso."])
 
-    assert enviar(conn, mundo, ia, AHORA) == {"en_espera": 1}
+    assert enviar(conn, mundo, ia, SALE) == {"en_espera": 1}
     assert enviar(conn, mundo, ia, octubre(6, 10)) == {"en_espera": 1}
     assert ia.pedidos_de_redaccion == []
     assert enviar(conn, mundo, ia, octubre(7, 9)) == {"enviado": 1}
@@ -285,5 +294,5 @@ def test_un_destinatario_que_no_se_puede_alcanzar_se_dice(conn, mundo, escribe, 
                     (mundo["personas"]["Ismael"]["app_user_id"],))
     conn.commit()
 
-    assert enviar(conn, mundo, IAGuionada(), AHORA) == {"omitido": 1}
+    assert enviar(conn, mundo, IAGuionada(), SALE) == {"omitido": 1}
     assert _avisos(conn)[0]["motivo_omision"] == motivo

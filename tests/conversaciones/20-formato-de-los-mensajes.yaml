@@ -101,7 +101,7 @@ pasos:
 
   - paso: 3
     quien: Leda
-    relojes: ["2026-10-20 10:16"]
+    relojes: ["2026-10-20 10:26"]
     salen:
       - a: Ismael
         tipo: nueva_prevision

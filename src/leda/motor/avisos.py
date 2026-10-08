@@ -37,7 +37,9 @@ espera a que vuelva (la escalera lo reemplaza por un reencuadre, `escalera.py`).
 
 Cada tipo se declara una vez con su regla (`TipoDeAviso`), como las fichas de las jugadas: el
 camino de envío es uno para todos. Cuándo se guardan los de la escalera es de `escalera.py`;
-los de una previsión y su corrección, de sus fichas (`fichas.py`).
+los de una previsión y su corrección, de sus fichas (`fichas.py`), que los guardan para después
+del margen para corregir (`margen.py`): lo que una persona dijo le llega a otra sólo cuando ya
+tuvo tiempo de corregirlo.
 """
 
 from __future__ import annotations

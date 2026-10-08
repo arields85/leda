@@ -100,7 +100,7 @@ pasos:
     hechos:
       - {jugada: anotar_prevision, resultado: anotado, tarea: PLC, prevision: "2026-10-28",
          fecha_comprometida: "2026-10-23", atraso_si_se_cumple_la_prevision_dias_habiles: 3,
-         aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-26T10:25"}}
+         aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-26T10:35"}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
@@ -120,7 +120,7 @@ pasos:
 
   - paso: 4
     quien: Leda
-    relojes: ["2026-10-26 10:30"]
+    relojes: ["2026-10-26 10:36"]
     salen:
       - a: Ismael
         tipo: nueva_prevision

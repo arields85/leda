@@ -13,7 +13,8 @@ eso, los hechos que dicen cuándo sale algo: la hora que se le cuenta a la perso
 verdad se usa. Antes, el pedido que sigue a un avance salía al empezar la jornada (09:00) y se
 le contaba "mañana a las 9", mientras el reloj adelantado y las conversaciones llegaban a las
 10:00. Es un valor fijo del motor, el mismo que pasó la prueba real; tiene que pasar a ser
-del espacio (`PENDIENTE`).
+del espacio (`PENDIENTE`). Un aviso a otra persona por algo que alguien dijo espera además el
+margen para corregir (`margen.sale_con_margen`), con estas mismas reglas encima.
 """
 
 from __future__ import annotations

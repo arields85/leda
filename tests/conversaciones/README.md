@@ -67,7 +67,8 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     estoy compliacdo, me falta el cable para programar comunicaciones…"). Leda reparte cada hecho en su
     tarea o, si no puede saber a cuál va, pregunta; nunca arma una causa o un motivo con palabras de la
     otra tarea. Es la primera con dos respuestas correctas en un paso: el YAML espera el reparto y la
-    pregunta de duda se juzga leyendo la transcripción.
+    pregunta de duda se juzga leyendo la transcripción. Después, Marcos corrige dentro del margen para
+    corregir y a Ismael le llega un solo aviso, el de la tarea correcta.
 
 La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 1 a 3, y ADR 0019):
 
@@ -235,6 +236,12 @@ Personas, roles y tareas salen de `espacios/corework.yaml` y `espacios/corework.
   hora para todo lo que Leda manda por su cuenta (la escalera, los avisos guardados, también a otra persona,
   y el pedido que sigue a un avance), la que dicen los hechos y a la que llega el reloj adelantado de la
   prueba por Telegram (`leda.motor.tiempo`, `HORA_DE_SALIDA`).
+- **El margen para corregir** (decisión del usuario, 2026-10-07; conversación 25): un aviso a otra persona
+  por algo que alguien dijo (la previsión nueva y su corrección, al referente) espera además diez minutos
+  (o los del espacio, `margen_para_corregir_minutos`) antes de salir, con el horario encima: una corrección
+  dentro de ese margen lo retira antes de que llegue. Por eso, en las conversaciones, el aviso a Ismael sale
+  diez minutos después del mensaje de Marcos, y los hechos dicen esa hora (`leda.motor.margen`). Lo que Leda
+  manda por su cuenta no lo espera.
 
 ### Calendario de referencia
 

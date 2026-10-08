@@ -9,7 +9,11 @@ fecha del viernes 23 en la tarea del PLC, con "comunicaciones" dentro de la caus
 motivo de la fecha, y el aviso equivocado le llegó a Ismael un minuto después. Lo que Marcos quiso decir:
 la del PLC está trabada porque le falta el cable para programar, y la de comunicaciones la termina el
 viernes 23. Es primero una conversación de prueba (`AGENTS.md`, "Hallazgos de conversación"): se mide con la
-IA real varias veces antes de cualquier arreglo, sin palabras clave ni casos especiales.
+IA real varias veces antes de cualquier arreglo, sin palabras clave ni casos especiales. La IA real leyó mal
+el paso 2 las cinco veces (bitácora de flujos); el usuario eligió un mecanismo general de la cocina, no un
+cambio en las instrucciones de la IA (2026-10-07): lo que una persona dice y le llega a otra espera un
+**margen para corregir** (10 minutos, o el del espacio; `leda.motor.margen`) antes de salir, así que una
+corrección dentro de ese margen retira el aviso equivocado antes de que le llegue a Ismael (paso 3).
 
 ## Estado inicial
 
@@ -60,8 +64,35 @@ IA real varias veces antes de cualquier arreglo, sin palabras clave ni casos esp
      motivo de la fecha nueva, que Marcos no dio; la fecha del viernes 23 en la tarea del PLC; el bloqueo
      en la de comunicaciones; que Leda le avisa a Ismael; negrita.
 
-3. **Leda**, por su cuenta, a Ismael (lunes 19, enseguida, dentro del horario): el aviso de la fecha nueva
-   de la tarea de comunicaciones. Sólo en (a); en (b), nada todavía.
+3. **Marcos** escribe (lunes 19, 10:44), dentro del margen para corregir del aviso del paso 2, con el mismo
+   estilo: "no el 23 es comunicaciones el plc esta trabado nomas"
+   → Lo que corresponde depende de cómo se leyó el paso 2:
+   - **Después de (a)**, la lectura correcta: Marcos repite lo que ya quedó anotado. Jugadas:
+     `anotar_prevision` sobre la de comunicaciones, con fecha viernes 23, sin motivo. Efecto: la misma
+     fecha, que deja atrás el aviso del paso 2 sin que salga (nunca en silencio: con su motivo) y guarda
+     otro igual, con su margen desde ahora; el bloqueo del PLC no cambia. La respuesta dice: en el bloque
+     de la de comunicaciones, con 📋 primero y ✏️ debajo, que la termina el vie 23/10; que Ismael será
+     notificado, en pasiva y en futuro; y otra vez, sola en el último renglón, la pregunta de quién puede
+     destrabar la del PLC, que sigue abierta. Es lo que espera el YAML.
+   - **Después de la lectura equivocada** de la prueba real (la fecha del viernes 23 en la tarea del PLC):
+     Jugadas: `corregir` la previsión de la tarea del PLC, que era de la de comunicaciones (situación
+     general 3, como en la conversación 06). Efecto: la previsión del PLC vuelve atrás con un hecho de
+     corrección, su aviso a Ismael, que todavía no salió, se retira (`prevision_corregida`), y la fecha
+     queda en la de comunicaciones con su propio aviso y su propio margen. El corredor no puede expresar
+     este camino en el mismo YAML: se juzga leyendo la transcripción, y la prueba determinista es
+     `tests/motor/test_situaciones.py`
+     (`test_una_correccion_dentro_del_margen_no_deja_salir_el_aviso_equivocado`).
+   - La respuesta no dice, en ninguno de los dos: la fecha del viernes 23 en la tarea del PLC; el bloqueo
+     en la de comunicaciones; que Ismael ya se enteró de algo; que Leda le avisa a Ismael.
+   - Estado después: tema abierto, quién destraba la del PLC.
+
+4. **Nadie** escribe (lunes 19, 10:50): a esta hora habría salido el aviso del paso 2.
+   → A Ismael no le llega nada: lo dicho en el paso 3 lo dejó atrás antes de su hora. En ninguno de los dos
+   caminos le llega un aviso con la fecha en la tarea equivocada.
+
+5. **Leda**, por su cuenta, a Ismael (lunes 19, 10:54, terminado el margen del paso 3, dentro del horario):
+   el aviso de la fecha nueva de la tarea de comunicaciones, el único que le llega por el paso 2 y el 3.
+   Sólo en (a) o después de la corrección; en (b), nada todavía.
    →
    - El mensaje dice, un renglón por idea: la tarea de comunicaciones en su renglón con 📋, el primero de
      su bloque; debajo, que Marcos dijo que la termina el vie 23/10, sin motivo porque no lo dio; que vence
@@ -70,7 +101,7 @@ IA real varias veces antes de cualquier arreglo, sin palabras clave ni casos esp
    - El mensaje no dice: un motivo inventado (el cable, el PLC); nada de la tarea del PLC; que la fecha
      cambió.
 
-4. **Marcos** escribe (lunes 19, 10:50): "el cable lo consigue martin de compras y comunicaciones al final
+6. **Marcos** escribe (lunes 19, 11:00): "el cable lo consigue martin de compras y comunicaciones al final
    es el lunes 26 xq me falta el switch tmb"
    →
    - Jugadas: dos. La respuesta a la pregunta abierta: quién destraba la del PLC, Martín de compras
@@ -87,14 +118,15 @@ IA real varias veces antes de cualquier arreglo, sin palabras clave ni casos esp
      que Leda le escribió a Martín o lo va a seguir; otra vez la pregunta de quién destraba.
    - Estado después: sin tema abierto, nada para después.
 
-5. **Leda**, por su cuenta, a Ismael (lunes 19, enseguida): el aviso de la fecha nueva del lunes 26.
+7. **Leda**, por su cuenta, a Ismael (lunes 19, 11:10, terminado el margen para corregir): el aviso de la
+   fecha nueva del lunes 26.
    →
    - El mensaje dice: la tarea de comunicaciones en su renglón con 📋, el primero de su bloque; debajo,
      que Marcos dijo que la termina el lun 26/10 porque le falta el switch; que vence el jue 22/10 y, con
      ⚠️, el atraso, dos días hábiles; que no hace falta que conteste, solo en el último renglón.
    - El mensaje no dice: el cable o Martín; que la fecha cambió.
 
-6. **Marcos** escribe (martes 20, 15:00): "ya llego el cable sigo con el plc y lo de comunicaciones lo
+8. **Marcos** escribe (martes 20, 15:00): "ya llego el cable sigo con el plc y lo de comunicaciones lo
    termine recien al final"
    →
    - Jugadas: dos. `destrabar` sobre la tarea del PLC (como en la conversación 17); `entregar` sobre la de
@@ -112,10 +144,12 @@ IA real varias veces antes de cualquier arreglo, sin palabras clave ni casos esp
 
 - **Garantías (5b):** no inventa (ni una causa con palabras de otra tarea, ni un motivo que Marcos no
   dio); no confunde la tarea (la fecha del paso 2 va a la de comunicaciones, el cable al PLC; el switch del
-  paso 4 es de comunicaciones; el "termine" del paso 6, de comunicaciones); ningún aviso a Ismael con una
-  fecha en la tarea equivocada.
+  paso 6 es de comunicaciones; el "termine" del paso 8, de comunicaciones); ningún aviso a Ismael con una
+  fecha en la tarea equivocada, tampoco si el paso 2 se leyó mal y Marcos lo corrigió dentro del margen
+  para corregir (pasos 3 a 5).
 - **El formato:** el corredor lo mide solo en cada mensaje (`comprobar.fallas_de_formato`), como en la
   conversación 20.
 - **Falla de comprensión:** pegar la fecha a la tarea que se nombró primero; meter en la causa o en el
   motivo palabras que eran de la otra tarea; tomar el switch como causa del bloqueo. En el paso 2, la
-  pregunta de duda (b) no es una falla: el corredor la marca y se juzga leyendo la transcripción.
+  pregunta de duda (b) no es una falla: el corredor la marca y se juzga leyendo la transcripción. Lo mismo
+  la corrección del paso 3 después de una lectura equivocada del paso 2.

@@ -82,7 +82,7 @@ pasos:
 
   - paso: 4
     quien: Leda
-    relojes: ["2026-10-20 10:44"]
+    relojes: ["2026-10-20 10:54"]
     salen:
       - a: Ismael
         tipo: nueva_prevision
@@ -100,7 +100,7 @@ pasos:
 
   - paso: 5
     quien: Marcos
-    a_las: "2026-10-20 10:46"
+    a_las: "2026-10-20 10:55"
     escribe: "es que no me mandaron el programa del fabricante"
     jugadas:
       - {nombre: anotar_bloqueo, tarea: PLC, causa: "no me mandaron el programa del fabricante"}

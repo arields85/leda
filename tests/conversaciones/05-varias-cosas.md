@@ -39,8 +39,8 @@ decisión 4, situación general 2, con la precisión de la decisión 9d.
      comunicaciones o una previsión en la del PLC; que falta algo.
    - Estado después: sin tema abierto, nada para después.
 
-3. **Leda**, por su cuenta, a Ismael (martes 20, enseguida, dentro del horario): el aviso de la nueva
-   previsión.
+3. **Leda**, por su cuenta, a Ismael (martes 20, 10:15, dentro del horario): el aviso de la nueva
+   previsión, terminado el margen para corregir, diez minutos después de lo que dijo Marcos.
    →
    - El mensaje dice: la tarea de comunicaciones; la previsión del miércoles 4 y su motivo; la fecha
      comprometida, el viernes 30; el atraso, tres días hábiles, calculado por el código (decisión 9b).

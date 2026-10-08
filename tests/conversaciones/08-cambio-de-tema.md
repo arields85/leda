@@ -48,15 +48,15 @@ general 1, con la precisión de la decisión 9d.
    - Botones: ninguno: no hay duda sobre de qué tarea habla.
    - Estado después: tema abierto, el mismo: el bloqueo de la tarea del PLC, esperando la causa.
 
-4. **Leda**, por su cuenta, a Ismael (martes 20, enseguida, dentro del horario): el aviso de la nueva
-   previsión.
+4. **Leda**, por su cuenta, a Ismael (martes 20, 10:53, dentro del horario): el aviso de la nueva
+   previsión, terminado el margen para corregir, diez minutos después de lo que dijo Marcos.
    →
    - El mensaje dice: la tarea de comunicaciones; la previsión del miércoles 4, sin motivo porque Marcos no
      lo dio; la fecha comprometida, el viernes 30; el atraso, tres días hábiles, calculado por el código
      (decisión 9b).
    - El mensaje no dice: un motivo inventado; nada del bloqueo de la tarea del PLC, que todavía no se anotó.
 
-5. **Marcos** escribe (martes 20, 10:46): "es que no me mandaron el programa del fabricante"
+5. **Marcos** escribe (martes 20, 10:55): "es que no me mandaron el programa del fabricante"
    →
    - Jugadas: la respuesta a la pregunta abierta: la causa del bloqueo de la tarea del PLC.
    - Efecto: el bloqueo abierto, con su causa; la tarea del PLC pasa a `bloqueada` y su escalera se detiene.

@@ -9,6 +9,8 @@ pruebas cubren lo que el motor escribe directo y la regla de qué se audita y qu
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import psycopg
 
 from leda import versiones
@@ -103,10 +105,14 @@ def test_un_avance_queda_auditado_con_la_version_de_las_reglas(conn, mundo, escr
 
 # --- Lo que se audita: lo que Leda manda por su cuenta -------------------------------------------
 
+# El aviso a Ismael sale terminado el margen para corregir (`margen.py`): 10 minutos después.
+SALE = AHORA + timedelta(minutes=10)
+
+
 def test_cada_aviso_que_sale_queda_auditado_como_un_envio_de_leda(conn, mundo, escribe):
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
 
-    assert enviar(conn, mundo, IAGuionada(redacciones=["Marcos prevé el 14."]), AHORA) == {
+    assert enviar(conn, mundo, IAGuionada(redacciones=["Marcos prevé el 14."]), SALE) == {
         "enviado": 1}
 
     [fila] = _auditadas(conn, "enviar_aviso")
@@ -117,7 +123,7 @@ def test_cada_aviso_que_sale_queda_auditado_como_un_envio_de_leda(conn, mundo, e
     assert fila["detalle"] == {
         "aviso_id": str(aviso["id"]), "tipo": "nueva_prevision",
         "destinatario_membership_id": mundo["personas"]["Ismael"]["membership_id"],
-        "outbox_id": str(aviso["outbox_id"]), "at": AHORA.isoformat()}
+        "outbox_id": str(aviso["outbox_id"]), "at": SALE.isoformat()}
 
 
 def test_un_aviso_que_no_salio_no_se_audita_como_enviado(conn, mundo, escribe):
@@ -125,7 +131,7 @@ def test_un_aviso_que_no_salio_no_se_audita_como_enviado(conn, mundo, escribe):
     dice(conn, escribe, jugada_prevision("T1", "2026-10-14"))
 
     caida = IAGuionada(redacciones=[RuntimeError("sin servicio")])
-    assert enviar(conn, mundo, caida, AHORA) == {"reintento": 1}
+    assert enviar(conn, mundo, caida, SALE) == {"reintento": 1}
 
     assert _auditadas(conn, "enviar_aviso") == []
 
