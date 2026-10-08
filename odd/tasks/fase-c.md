@@ -862,10 +862,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       `review-bf5579572725ac35`, con advertencias: el texto del ejemplo aceptado no se comprueba en la
       22 y la 27, y el comentario de la aprobación en la 23 se compara literal; `01c5ffe..29cd66d`
       `review-ac5f83ca192bdccf`, con una advertencia en `gasto.py:402`.
-  - [ ] **D7.** Las fallas de Leda de la ronda de la D6, con reglas ya decididas, cada una como mecanismo
-    general (2026-10-08, de noche). Route: delegada (escritor único, 2+ archivos no triviales). Hecha
-    salvo el punto 4, que necesita un archivo fuera de la superficie autorizada. Sin la IA real (el cupo
-    de ChatGPT está agotado): su chequeo es `PENDIENTE`.
+  - [x] **D7.** Las fallas de Leda de la ronda de la D6, con reglas ya decididas, cada una como mecanismo
+    general (2026-10-08, de noche). Route: delegada (escritor único, 2+ archivos no triviales). El punto
+    4 necesitó `tests/conversaciones/test_corredor.py`, autorizado por el coordinador sólo para los
+    números de paso de la 21. Sin la IA real (el cupo de ChatGPT está agotado): su chequeo es
+    `PENDIENTE`.
     - **1. El nombre de quien aprueba al retirar un aviso** (la 11, paso 4, 5 de 5: "Ismael no será
       informado del atraso que habías previsto"; decisión 11). Lo anunciado que ya no va a pasar
       (`ya_no_va_a_pasar`) dice con qué dato se contó (`anuncio`); si ese dato es uno de
@@ -900,24 +901,30 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       otra_cosa` y la de la pieza aceptada (`lo_que_escribio` en lugar de `el_ejemplo_que_acepto`). La
       22 (paso 7) y la 27 (paso 4) esperan la pieza nueva y su `no_dice`.
     - **4. La 21, paso 1, no es una falla de Leda** (5 de 5: pide sólo si arranca desde el PLC, que
-      Marcos no escribió; decisión 10). **Sin hacer:** cambiar la 21 para esperar esa pregunta y, al
-      aceptar o escribirlo, la vista previa, agrega un paso y corre los números de los demás, y
-      `tests/conversaciones/test_corredor.py` (fuera de la superficie autorizada) los nombra:
-      `test_el_aviso_de_una_entrega_cuenta_las_fotos_del_album_que_sigue_al_texto` espera las fallas en
-      el paso 7, y `test_la_entrega_confirmada_por_otro_camino_no_es_una_falla_de_garantia` reemplaza las
-      jugadas de los pasos 1, 4 y 5 y busca lo escrito en el 5. Propuesta: 1, la entrega con las dos
-      fotos (falta si arranca desde el PLC, con el ejemplo); 2 (nuevo), "si, va asi" (`entregar` con
-      `acepta_el_ejemplo`, la vista previa A con Confirmar); 3, saca la foto del martes (B); 4, toca el
-      Confirmar de A; 5, la foto con "dale mandala"; 6, "dale"; 7, "a quien le avisaste?"; 8, el aviso a
-      Ismael; y en `test_corredor.py`, el 7 pasa a 8 y los pasos 4 y 5 a 5 y 6. `PENDIENTE`: autorizar
-      ese archivo.
+      Marcos no escribió; decisión 10). La 21 tiene ahora 8 pasos: 1, la entrega con las dos fotos (falta
+      si arranca desde el PLC, con el ejemplo, sin nada que confirmar); 2 (nuevo), "si va asi"
+      (`entregar` con `acepta_el_ejemplo`: la vista previa con Confirmar); 3, saca la foto del martes
+      (ahora P5); 4, toca el Confirmar del paso 2; 5, la foto con "dale mandala"; 6, "dale" (seis filas de
+      evidencia, con el ejemplo aceptado); 7, "a quien le avisaste?"; 8, el aviso a Ismael. `.md`, YAML y
+      README. En `test_corredor.py`, sólo los números que corre el paso nuevo: las fallas del aviso pasan
+      del paso 7 al 8, las jugadas reemplazadas de los pasos 4 y 5 al 5 y 6, y lo escrito, del 5 al 6 y de
+      6 a 7 piezas (sin un ejemplo propuesto, el "si va asi" de ese camino es un texto más). `d9d40ec`.
+      Rojo primero: con el YAML nuevo y los números viejos, las dos pruebas del corredor fallaron (el paso
+      7 en lugar del 8; ninguna falla de lo escrito en el 5); la corrida en seco de la 21 mostró que el
+      ejemplo aceptado va antes de lo mandado antes y corre la foto del martes a P5.
     - **5. Cómo se dice lo que falta: el modelo que aprobó el usuario** (2026-10-08), referencia de lo
       que tiene que salir de los hechos, nunca un texto para la IA:
-      > 📋 **Programar PLC de la comprimidora**
+      > 📋 Programar PLC de la comprimidora
       > ✏️ Sumé tu descripción y las dos fotos.
       > ⚠️ Para entregarla falta saber si la comprimidora arranca desde el PLC.
       >
-      > Por ejemplo: «Arranca desde el PLC y completó 20 ciclos sin fallas». ¿Va así?
+      > Por ejemplo: «Arranca desde el PLC y completó 20 ciclos sin fallas».
+      >
+      > ¿Va así?
+
+      Con el formato aprobado el 2026-10-07 (sin negrita; el cierre, solo en su renglón): la negrita y la
+      pregunta en el mismo renglón del ejemplo, en la primera copia del modelo, fueron un error del
+      coordinador, no un cambio de formato. Las palabras son las del usuario.
 
       La IA escribía "Sumé lo que contaste… Todavía no se puede entregar… La tarea no pasó a revisión… ¿La
       confirmás o preferís contarlo con tus palabras?". Por la cocina (`82816ea`): lo que escribió quien
@@ -933,18 +940,17 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       dice_que_falta_y_no_mueve_la_tarea` (`al_confirmar`). La 12 (paso 6), la 22, la 25 y la 27 (paso
       1) suman a `dice` "una sola vez qué falta para entregarla" y a `no_dice` "contaste" o "contarlo";
       los lee una persona: el corredor no mide texto fuera del formato (`comprobar.py`, fuera de la
-      superficie). La negrita del título y la pregunta en el mismo renglón del ejemplo, en el modelo,
-      chocan con el formato aprobado el 2026-10-07 (sin negrita; el cierre, solo en su renglón): no se
-      tocó el formato. `PENDIENTE`: confirmarlo con el usuario.
+      superficie). El formato no cambió.
     - **Las instrucciones de la IA no cambiaron** (las huellas de `test_contratos.py` siguen): todo va en
       los datos de las jugadas (`ia_real.DATOS`, `FUERA_DE_LA_LISTA_ES`), las fichas, los nombres para
       redactar y los significados.
-    - **Chequeos** (2026-10-08, sobre `82816ea`): `pytest tests/motor tests/conversaciones`, 877
+    - **Chequeos** (2026-10-08, sobre `d9d40ec`): `pytest tests/motor tests/conversaciones`, 877
       passed (sin la intermitente); `pytest tests/garantias`, 323 passed; en seco, `correr --ia
-      guionada --veces 1 --ronda seco-d7`, 29 de 29 bien (informes borrados, `gasto.json` sin tocar).
+      guionada --veces 1 --ronda seco-d7`, 29 de 29 bien, la 21 con sus 8 pasos (informes borrados,
+      `gasto.json` sin tocar).
     - `PENDIENTE`:
-      - **La IA real**, cuando vuelva el cupo: una sola ronda de la 11, la 21 (después del punto 4), la
-        27 y la 28, 5 veces, sin repetir sin preguntar.
+      - **La IA real**, cuando vuelva el cupo: una sola ronda de la 11, la 21, la 27 y la 28, 5 veces,
+        sin repetir sin preguntar.
       - **El corredor no admite dos jugadas válidas para un paso:** la 28, paso 4, espera ninguna jugada;
         si la IA elige `fuera_de_la_lista` con `contesta_la_pregunta`, la garantía pasa (sin aviso) y la
         comprensión marca falla, aunque lo que ve Ismael sea lo mismo. Igual en la 27, paso 3, frente a
@@ -980,8 +986,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La D7 está hecha salvo el punto 4 (la 21, que necesita autorizar `tests/conversaciones/test_corredor.py`);
-su ronda con la IA real (la 11, la 21, la 27 y la 28, 5 veces) espera a que vuelva el cupo. La prueba
+La D7 está hecha; su ronda con la IA real (la 11, la 21, la 27 y la 28, 5 veces) espera a que vuelva
+el cupo. La prueba
 por Telegram del usuario con el guion de la D6 y las decisiones que dejó la D6 (insistir en
 mandar algo incompleto y quién juzga lo que cubre un texto); después, pedir el enlace por chat (la jugada que quedó de la porción 4) y la porción 5 de la C-3: el acceso del administrador
 (`docs/STATUS.md`, "Punto exacto para retomar").
