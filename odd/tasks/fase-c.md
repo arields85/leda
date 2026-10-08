@@ -845,8 +845,19 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       - **"y bueno fijate vos"** cae fuera de la lista (la 28): ¿un aviso a la administración cada vez?
       - **Nombrar a Ismael al retirar un aviso** (la 11, paso 4): "Ismael no será informado…".
       - **Decisión 20:** el guion no usa `servir` (ver arriba); confirmar con el usuario.
-      - **El corredor** se cae si otro proceso tiene abierto `gasto.json` al anotar el gasto, y pierde
-        el informe de la ronda entera (`tests/conversaciones/gasto.py`, `anotar`).
+    - **El corredor, arreglado** (2026-10-08, después de la ronda; route: delegada, un escritor, dos
+      archivos no triviales; primero en rojo, después en verde; sin la IA real):
+      - **El cupo agotado corta la ronda** (`01c5ffe`): el HTTP 429 `usage_limit_reached` de la
+        suscripción (o ese código dentro del flujo) es `gasto.SinCuota`, con cuándo se renueva
+        (`resets_in_seconds` o `resets_at`). La ronda se corta como con el 402: no empieza ninguna
+        corrida más, las que lo tuvieron son inválidas, el informe dice el motivo y cuándo se renueva,
+        y sale con 4 (`SALIDA_SIN_CUOTA`). Un 429 con otro código no corta. `chatgpt.py` no cambió.
+      - **La libreta tomada no se lleva el informe** (`29cd66d`): `Gasto.anotar` reintenta unos 2 s
+        ante el `PermissionError` y, si sigue tomada, deja lo pendiente en
+        `gasto-pendiente-<fecha>.json` con un aviso; entra a la libreta en la próxima escritura que
+        pueda y el archivo aparte se borra.
+      - `pytest tests/conversaciones tests/motor/test_chatgpt.py`: 185 passed; en seco
+        `--ronda seco-corredor`, 29 de 29 bien (informes borrados, `gasto.json` sin tocar).
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
