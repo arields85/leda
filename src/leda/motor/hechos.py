@@ -815,6 +815,9 @@ NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO: Mapping[str, str | None] = {
     "aprobada_por": None,
     "pidio_cambios": None,
 }
+# Lo anunciado antes que ya no va a pasar (`efectos.YA_NO_VA_A_PASAR`) dice con qué dato se
+# contó: su nombre, en esta clave.
+ANUNCIO = "anuncio"
 
 
 def _quien_aprueba_solo_si_pregunta(valor: Any) -> Any:
@@ -824,6 +827,14 @@ def _quien_aprueba_solo_si_pregunta(valor: Any) -> Any:
         return [_quien_aprueba_solo_si_pregunta(v) for v in valor]
     if not isinstance(valor, Mapping):
         return valor
+    # Lo anunciado que ya no va a pasar nombra el dato con que se contó (`anuncio`, D7: "Ismael
+    # no será informado…" al retirar un aviso): si ese dato nombra a quien aprueba el trabajo
+    # de la persona, su nombre va aparte igual que en el dato mismo.
+    anunciado = valor.get(ANUNCIO)
+    clave_del_anuncio = (NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO.get(anunciado)
+                         if isinstance(anunciado, str) else None)
+    if clave_del_anuncio is not None:
+        valor = _nombre_aparte(valor, clave_del_anuncio)
     copia: dict[str, Any] = {}
     aparte: dict[str, Any] = {}
     for k, v in valor.items():

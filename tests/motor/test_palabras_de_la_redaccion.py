@@ -159,6 +159,37 @@ def test_quien_aprueba_el_trabajo_de_la_persona_llega_a_la_redaccion_solo_si_pre
     assert pedido["hechos"][1]["queda_esperando_la_aprobacion_de"] == "Ismael"   # sin tocar
 
 
+def test_lo_anunciado_que_ya_no_va_a_pasar_nombra_a_quien_aprueba_solo_si_pregunta():
+    """D7 (la 11, paso 4, 5 de 5 con la IA real): al retirar un aviso, Leda escribía "Ismael no
+    será informado del atraso que habías previsto". Lo anunciado que ya no va a pasar nombra el
+    dato con que se contó (`anuncio`): si ese dato nombra a quien aprueba el trabajo de la
+    persona, el nombre va dentro de `solo_si_pregunta`, igual que en el dato mismo. Vale para
+    cada dato de la lista, también en los últimos turnos."""
+    retirado = {"anuncio": "aviso_al_referente",
+                "tarea": "Revisar comunicaciones industriales de la comprimidora",
+                "a": "Ismael Soschinski", "llega": "no_le_va_a_llegar",
+                "motivo": "hay_una_prevision_mas_nueva"}
+    pedido = {"hoy": "2026-10-23", "persona": "Marcos", "mensaje": "olvidate lo del 4",
+              "hechos": [], "pregunta": None,
+              "ya_no_va_a_pasar": [retirado,
+                                   {**retirado, "anuncio": "aviso_a_quien_aprueba"},
+                                   {**retirado, "anuncio": "aviso_al_responsable",
+                                    "a": "Mariano"}],
+              "ultimos_turnos": [{"sentido": "salida", "texto": "Anotado.",
+                                  "hechos": [], "ya_no_va_a_pasar": [retirado]}]}
+
+    recibido, _ = _lo_que_recibe_la_redaccion(pedido)
+
+    assert "Ismael" not in a_la_vista(recibido), a_la_vista(recibido)
+    assert solo_si_pregunta(recibido).count("Ismael") == 3
+    primero = recibido["ya_no_va_a_pasar"][0]
+    assert primero["solo_si_pregunta"] == {"a": "Ismael Soschinski"}
+    assert primero["anuncio"] == "aviso_a_quien_aprueba_su_trabajo"
+    assert primero["tarea"] == retirado["tarea"]
+    # Quien no aprueba el trabajo de la persona sigue a la vista.
+    assert recibido["ya_no_va_a_pasar"][2]["a"] == "Mariano"
+
+
 def test_a_quien_aprueba_se_le_nombra_a_la_persona_responsable_y_a_terceros():
     """La regla es sobre quien aprueba el trabajo de la persona a la que Leda le escribe: a quien
     aprueba se le nombra a la persona responsable ("Marcos te entregó…", y que Marcos se va a

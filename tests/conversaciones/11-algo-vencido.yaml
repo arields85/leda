@@ -119,6 +119,7 @@ pasos:
       - que la previsión del 4 quedó sin efecto y que la vigente es el viernes 30
     no_dice:
       - que Ismael se enteró de lo del 4
+      - el nombre de Ismael (no lo preguntó)
 
   - paso: 5
     quien: Leda

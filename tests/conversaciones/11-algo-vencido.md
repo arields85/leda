@@ -68,7 +68,9 @@ confirma, queda abajo, en "Para la prueba de la entrega".
      del 4 sigue sin salir.
    - La respuesta, enseguida (decisión 9e): dice que la previsión del 4 quedó sin efecto y que la vigente es
      el viernes 30.
-   - La respuesta no dice: que Ismael se enteró de lo del 4.
+   - La respuesta no dice: que Ismael se enteró de lo del 4; el nombre de Ismael (Marcos no lo preguntó;
+     decisión 11 del 2026-10-08): lo que ya no se va a informar se dice sin nombrar a quien aprueba su
+     trabajo (C-3d, D7: con la IA real decía "Ismael no será informado…", 5 de 5).
    - Estado después: sin tema abierto.
 
 5. **Leda**, al llegar las 10:00 del viernes 23, va a mandar el aviso guardado a Ismael.
