@@ -588,6 +588,24 @@ def test_si_la_respuesta_no_elige_leda_no_decide_ni_repite_la_pregunta(conn, mun
     assert _decisiones(conn, tarea) == [("aprobado", comentario)]
 
 
+def test_no_elegir_con_algo_fuera_de_la_lista_no_avisa_a_la_administracion(conn, mundo,
+                                                                           turnos):
+    """D7 (la 28, paso 4, 5 de 5 con la IA real): "y bueno fijate vos" llegó como algo fuera de
+    la lista, y cada vez le llegó un aviso a la administración. Es la respuesta a la pregunta
+    abierta: la maneja esa pregunta (no eligió: la entrega espera su decisión con los botones)
+    y no es un pedido nuevo."""
+    tarea = _cual_de_las_dos(conn, mundo, turnos, "que revise los colores")
+    r = turnos.dice("Ismael", Jugada("fuera_de_la_lista",
+                                     {"que_pide": "que Leda decida por él",
+                                      "contesta_la_pregunta": True}),
+                    texto="y bueno fijate vos")
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "no_eligio" and r.pregunta is None
+    assert hecho["botones"] == ["Aprobar", "Pedir cambios"]
+    assert cuantas(conn, "incident", "etapa = 'motor_fuera_de_la_lista'") == 0
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+
+
 def test_las_dos_lecturas_otra_vez_no_repiten_la_pregunta(conn, mundo, turnos):
     """Si la respuesta vuelve a mezclar aprobar y pedir cambios, tampoco elige: no se repite la
     pregunta, y la entrega sigue esperando con los botones."""

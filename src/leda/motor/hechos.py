@@ -473,6 +473,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "palabras": "Lo que la persona contó de cómo viene la tarea, con sus palabras.",
     "quien": "Quién puede destrabar el bloqueo, como lo nombró la persona.",
     "que_pide": "Lo que la persona le pidió a Leda, resumido.",
+    "contesta_la_pregunta": "Si lo que la persona pidió es su respuesta a la pregunta abierta "
+                            "de Leda: entonces no es un pedido nuevo.",
     "eligio": "La opción que eligió la persona.",
     "no_se_anoto_nada": "No quedó nada anotado.",
     "pregunta_sigue_abierta": "La pregunta sigue abierta: la opción elegida ya no se podía "

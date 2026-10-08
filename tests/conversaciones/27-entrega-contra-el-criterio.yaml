@@ -86,6 +86,9 @@ pasos:
     quien: Marcos
     a_las: "2026-10-22 15:03"
     escribe: "no, asi esta, mandala"
+    # Pide que vaya como está: `confirmar`, que no entrega con algo pendiente. Si la IA lo deja
+    # fuera de la lista como respuesta a la pregunta abierta (`contesta_la_pregunta`), la maneja
+    # esa pregunta y no hay aviso a la administración (C-3d, D7).
     jugadas:
       - {nombre: confirmar, tarea: PLC, puede_traer: [tarea]}
     efectos: {}

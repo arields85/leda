@@ -140,11 +140,14 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
                 lambda: ia.elegir_jugadas({**_situacion(ctx, jugadas), **llegaron}))
 
         def manejar(elegidas: list[Jugada]) -> list[dict[str, Any]]:
-            hechos = _manejar_todas(ctx, elegidas, jugadas)
+            # La respuesta a la pregunta abierta que no es ninguna jugada la maneja esa
+            # pregunta, como un mensaje sin jugada: no es un pedido nuevo (D7).
+            pedidos = [j for j in elegidas if not contesta_la_abierta(ctx, j, jugadas)]
+            hechos = _manejar_todas(ctx, pedidos, jugadas)
             # Lo que trajo el mensaje y ninguna jugada tomó: a la entrega abierta, o la
             # pregunta de para qué tarea es (ADR 0019, decisión 4).
             hechos += entrega.al_terminar_las_jugadas(ctx)
-            _avisar_fuera_de_la_lista(ctx, elegidas, jugadas)
+            _avisar_fuera_de_la_lista(ctx, pedidos, jugadas)
             return hechos
 
         return _turno(conn, cur, ctx, ia, reloj, elegir, manejar,
@@ -403,6 +406,20 @@ def _redactar(ia: IA, pedido: dict[str, Any],
 
 
 # --- (3) y (4) Las jugadas ----------------------------------------------------------------
+
+def contesta_la_abierta(ctx: Contexto, jugada: Jugada,
+                       jugadas: Mapping[str, Manejador]) -> bool:
+    """Si una jugada fuera de la lista es la respuesta de la persona a la pregunta abierta de
+    Leda (C-3d, D7; usuario, 2026-10-08): la IA lo dice (`contesta_la_pregunta`) y hay una
+    pregunta abierta que la persona vio en un mensaje anterior. Entonces no es un pedido nuevo:
+    no se avisa a la administración y la maneja esa pregunta, como un mensaje sin jugada (vuelve
+    con lo que espera, o, si se hace una sola vez, queda sin elegir). Un pedido nuevo, o una
+    respuesta sin pregunta abierta, sigue fuera de la lista (decisión 1; la 12)."""
+    if jugada.nombre in jugadas or (jugada.datos or {}).get("contesta_la_pregunta") is not True:
+        return False
+    abierta = preguntas.actual(ctx.cur, ctx.quien.membership_id)
+    return abierta is not None and str(abierta["id"]) not in ctx.preguntas_del_turno
+
 
 def _manejar_todas(ctx: Contexto, elegidas: list[Jugada],
                    jugadas: Mapping[str, Manejador]) -> list[dict[str, Any]]:

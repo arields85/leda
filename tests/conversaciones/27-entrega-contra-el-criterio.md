@@ -65,10 +65,13 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
 
 3. **Marcos** escribe (15:03): "no, asi esta, mandala"
    →
-   - Jugadas: `confirmar` (con la tarea del PLC o sin ella).
+   - Jugadas: `confirmar` (con la tarea del PLC o sin ella): pide que la entrega vaya como está.
    - Efecto: ninguno. Lo descrito no cubre el criterio: la entrega no sale aunque Marcos insista (una foto
      no certifica lo que pide el criterio, y entregarla igual sólo suma una vuelta: un pedido de cambios
-     y otra entrega). La tarea sigue `en_curso`.
+     y otra entrega). La tarea sigue `en_curso`. Es la respuesta a la pregunta abierta de Leda, no un
+     pedido nuevo: nunca le llega un aviso a la administración, aunque la IA no la lea como ninguna
+     jugada (C-3d, D7: con la IA real cayó fuera de la lista 4 de 5; la respuesta que no es una jugada
+     la maneja la pregunta abierta, que vuelve con lo que falta y su ejemplo).
    - La respuesta dice: que todavía no la puede pasar a revisión porque falta saber si completó los 20
      ciclos sin fallas; el ejemplo otra vez, como próximo paso.
    - La respuesta no dice: que la entregó; que Ismael se enteró; un reproche.

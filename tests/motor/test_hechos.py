@@ -165,6 +165,40 @@ def test_una_pregunta_sobre_lo_hecho_no_lleva_jugada_ni_aviso_y_se_contesta_del_
     assert SOLO_SI_PREGUNTA in registro and "aviso_al_administrador" in registro
 
 
+def _avisos_fuera_de_la_lista(conn) -> int:
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where etapa = 'motor_fuera_de_la_lista'")
+        n = cur.fetchone()["n"]
+    conn.commit()
+    return n
+
+
+def test_un_pedido_nuevo_con_una_pregunta_abierta_sigue_avisando_a_la_administracion(
+        conn, mundo, escribe):
+    """D7: sólo la respuesta a la pregunta abierta deja de ser un pedido nuevo. Un pedido que la
+    IA no marca como esa respuesta, o uno marcado sin ninguna pregunta abierta que haya visto la
+    persona, sigue siendo algo fuera de la lista, con su aviso (decisión 1; la 12)."""
+    ia = IAGuionada(jugadas=[[Jugada("anotar_bloqueo", {"tarea": "T1"})],
+                             [Jugada("fuera_de_la_lista", {"que_pide": "un recordatorio"})]],
+                    redacciones=["¿Qué te falta?", "Eso no lo puedo hacer."])
+    for texto in ("estoy trabado con el plc", "me recordás el turno con el médico?"):
+        quien, entrante = escribe("Marcos", texto)
+        r = procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
+        conn.commit()
+    assert r.pregunta is not None                   # la causa del bloqueo sigue abierta
+    assert [h["resultado"] for h in r.hechos] == ["fuera_de_la_lista"]
+    assert _avisos_fuera_de_la_lista(conn) == 1
+
+    ia = IAGuionada(jugadas=[[Jugada("fuera_de_la_lista", {"que_pide": "otro recordatorio",
+                                                           "contesta_la_pregunta": True})]],
+                    redacciones=["Eso no lo puedo hacer."])
+    quien, entrante = escribe("Ismael", "recordame lo del médico")
+    r = procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
+    conn.commit()
+    assert [h["resultado"] for h in r.hechos] == ["fuera_de_la_lista"]
+    assert _avisos_fuera_de_la_lista(conn) == 2
+
+
 def test_a_quien_se_le_aviso_se_contesta_del_registro_con_el_nombre(conn, mundo, escribe):
     """Decisión 11 del usuario (2026-10-08): el día nuevo se cuenta sin nombrar a quien aprueba
     el trabajo de la persona; si después pregunta a quién se le avisó, la pregunta no lleva

@@ -66,7 +66,9 @@ atajos).
    →
    - Jugadas: ninguna de la lista: no elige.
    - Efecto: ninguno; la tarea sigue `en_revision`. La pregunta se cierra sin elegir: se hace una
-     sola vez (decisión 12).
+     sola vez (decisión 12). Es la respuesta a la pregunta abierta, no un pedido nuevo: nunca le
+     llega un aviso a la administración, aunque la IA la deje fuera de la lista (C-3d, D7: con la IA
+     real, 5 de 5; la maneja la pregunta abierta, como un mensaje sin jugada).
    - La respuesta dice: que Leda no decide por él; que la entrega del tablero sigue esperando su
      decisión, con los botones para cuando quiera, o escribiéndolo.
    - La respuesta no dice: la misma pregunta otra vez; que la aprobó; que le pidió el cambio.

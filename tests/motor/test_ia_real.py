@@ -94,7 +94,9 @@ def test_cada_jugada_ofrece_solo_sus_datos_y_dice_que_la_distingue():
     variantes = _variantes(esquema_de_jugadas(sorted(JUGADAS)))
     for nombre, variante in variantes.items():
         ficha = FICHAS.get(nombre)
-        datos = set(ficha.necesita + ficha.opcional) if ficha else {"que_pide"}
+        # Lo que no está en la lista: qué pide y si contesta la pregunta abierta (D7).
+        datos = (set(ficha.necesita + ficha.opcional) if ficha
+                 else {"que_pide", "contesta_la_pregunta"})
         assert set(variante["properties"]) == {"nombre"} | datos, nombre
         assert variante["properties"]["nombre"]["enum"] == [nombre]
         assert variante["additionalProperties"] is False
@@ -161,6 +163,23 @@ def test_lo_que_no_esta_en_la_lista_llega_como_fuera_de_la_lista():
     assert jugadas == [Jugada(FUERA_DE_LA_LISTA, {"que_pide": "un recordatorio personal"}),
                        Jugada("inventada", {})]
     assert not {j.nombre for j in jugadas} & set(JUGADAS)
+
+
+def test_lo_que_no_esta_en_la_lista_dice_si_contesta_la_pregunta_abierta():
+    """D7: la respuesta a la pregunta abierta de Leda que no es ninguna jugada ("no, así está,
+    mandala" con algo pendiente) no es un pedido nuevo. La IA lo dice en un dato del esquema, y
+    el turno lo recibe."""
+    esquema = esquema_de_jugadas(sorted(JUGADAS))
+    [fuera] = [v for v in esquema["function"]["parameters"]["properties"]["jugadas"]["items"]
+               ["anyOf"] if v["properties"]["nombre"]["enum"] == [FUERA_DE_LA_LISTA]]
+    assert fuera["properties"]["contesta_la_pregunta"]["type"] == "boolean"
+    proveedor = ProveedorFalso([llamada_de_jugadas({"jugadas": [
+        {"nombre": FUERA_DE_LA_LISTA, "que_pide": "mandar la entrega así",
+         "contesta_la_pregunta": True}]})])
+
+    assert ia_real_falsa(proveedor).elegir_jugadas(SITUACION) == [
+        Jugada(FUERA_DE_LA_LISTA, {"que_pide": "mandar la entrega así",
+                                   "contesta_la_pregunta": True})]
 
 
 def test_una_lista_vacia_es_ninguna_jugada():

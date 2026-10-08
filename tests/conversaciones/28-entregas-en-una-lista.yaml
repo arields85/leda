@@ -130,6 +130,9 @@ pasos:
   - paso: 4
     a_las: "2026-10-23 15:31"
     escribe: "y bueno fijate vos"
+    # No elige. Si la IA lo deja fuera de la lista como respuesta a la pregunta abierta
+    # (`contesta_la_pregunta`), la maneja esa pregunta igual que sin jugada y no hay aviso a la
+    # administración (C-3d, D7).
     jugadas: []
     efectos: {}
     hechos:

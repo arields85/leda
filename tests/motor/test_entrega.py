@@ -862,6 +862,25 @@ def test_insistir_sin_cubrir_el_criterio_no_entrega_y_vuelve_a_proponer(conn, mu
     assert estado_de(conn, tarea) == "en_curso" and cuantas(conn, "evidence") == 0
 
 
+def test_insistir_con_algo_fuera_de_la_lista_contesta_la_pregunta_sin_avisar(conn, mundo,
+                                                                             marcos):
+    """D7 (la 27, paso 3, 4 de 5 con la IA real): "no, así está, mandala" con algo pendiente
+    llegó como algo fuera de la lista y cada vez le llegó un aviso a la administración. Es la
+    respuesta a la pregunta abierta de Leda: la maneja esa pregunta (vuelve, con lo que falta y
+    su ejemplo), nada se entrega y no es un pedido nuevo."""
+    tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
+                 texto="quedo cerrado y rotulado")
+    r = marcos.manda(Jugada("fuera_de_la_lista", {"que_pide": "mandar la entrega como está",
+                                                  "contesta_la_pregunta": True}),
+                     texto="no, asi esta, mandala")
+    assert r.hechos == []
+    assert r.pregunta["tipo"] == "lo_que_falta_de_la_entrega" and r.pregunta["desde_antes"]
+    assert r.pregunta["ejemplo"] == EJEMPLO
+    assert cuantas(conn, "incident", "etapa = 'motor_fuera_de_la_lista'") == 0
+    assert estado_de(conn, tarea) == "en_curso" and cuantas(conn, "evidence") == 0
+
+
 def test_sin_jugada_la_pregunta_vuelve_con_su_ejemplo(conn, mundo, marcos):
     """"¿Y qué pongo?" no es una jugada: la pregunta abierta vuelve con el ejemplo."""
     _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)

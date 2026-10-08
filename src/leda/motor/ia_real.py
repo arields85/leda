@@ -110,6 +110,10 @@ DATOS = {
     "tarea_correcta": ("string", "El alias de la tarea en la que sí va, si la persona la "
                                  "dice."),
     "que_pide": ("string", "Qué le pidió la persona a Leda, resumido."),
+    "contesta_la_pregunta": ("boolean", "Verdadero sólo si lo que pide es su respuesta a la "
+                                        "pregunta abierta de Leda, aunque no la complete ni "
+                                        "elija nada; si pide algo nuevo, aparte de esa "
+                                        "pregunta, va vacío."),
     "el_texto_cubre": ("array", "Los códigos (tipo_de_evidencia) de lo que pide la tarea que la "
                                 "persona describe con lo que escribe, de evidencia_que_pide. "
                                 "Sólo lo que dice: describir que terminó no es describir cómo lo "
@@ -141,7 +145,11 @@ DATOS = {
 FUERA_DE_LA_LISTA_ES = (
     "La persona le pide a Leda que haga algo que ninguna jugada hace. Es sólo un pedido de "
     "hacer algo: una pregunta sobre la conversación o sobre lo que Leda hizo o dijo no es un "
-    "pedido y no lleva jugada.")
+    "pedido y no lleva jugada. Si es la respuesta de la persona a la pregunta abierta de Leda, "
+    "lo dice contesta_la_pregunta.")
+# Sus datos: qué pidió y si es la respuesta a la pregunta abierta (D7: una respuesta que no es
+# ninguna jugada no es un pedido nuevo; la maneja esa pregunta, `turno.contesta_la_abierta`).
+DATOS_FUERA_DE_LA_LISTA = ("que_pide", "contesta_la_pregunta")
 
 
 class RespuestaInvalida(ValueError):
@@ -289,7 +297,8 @@ def esquema_de_jugadas(posibles: list[str]) -> dict[str, Any]:
     variantes = [_variante(n, FICHAS[n].es if n in FICHAS else n,
                            FICHAS[n].necesita + FICHAS[n].opcional if n in FICHAS else ())
                  for n in posibles]
-    variantes.append(_variante(FUERA_DE_LA_LISTA, FUERA_DE_LA_LISTA_ES, ("que_pide",)))
+    variantes.append(_variante(FUERA_DE_LA_LISTA, FUERA_DE_LA_LISTA_ES,
+                               DATOS_FUERA_DE_LA_LISTA))
     return {"type": "function", "function": {
         "name": NOMBRE_HERRAMIENTA,
         "description": ("Las jugadas que corresponden al mensaje, en el orden en que la "
@@ -320,7 +329,7 @@ def _dato(nombre: str) -> dict[str, Any]:
 def _datos_de(nombre: str, crudos: dict[str, Any]) -> dict[str, Any]:
     """Los datos que la jugada usa, sin los vacíos (la ficha lee vacío como "no lo dijo")."""
     if nombre == FUERA_DE_LA_LISTA:
-        validos = {"que_pide"}
+        validos = set(DATOS_FUERA_DE_LA_LISTA)
     elif nombre in FICHAS:
         validos = set(FICHAS[nombre].necesita + FICHAS[nombre].opcional)
     else:

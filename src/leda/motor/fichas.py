@@ -1348,8 +1348,10 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="quien aprueba se entera; si la guarda falla, muestra lo nuevo y no entrega",
           manejar=_confirmar, se_ofrece=False,
           es="La persona confirma, sin dudas, lo último que Leda le mostró para confirmar (la "
-             "entrega de una tarea), escribiendo en lugar de tocar el botón. Una respuesta con "
-             "un pero, una pregunta o un cambio no es una confirmación."),
+             "entrega de una tarea), escribiendo en lugar de tocar el botón, o pide que la "
+             "entrega que Leda le mostró vaya como está, también si Leda le dijo que le falta "
+             "algo. Una respuesta con un pero, una pregunta o un cambio no es una "
+             "confirmación."),
     Ficha("guardar_para_la_entrega", "dejar un archivo para cuando entregue una tarea",
           necesita=("tarea",), opcional=(),
           comprueba="que sea el responsable y que la tarea esté abierta, sin entregar",
