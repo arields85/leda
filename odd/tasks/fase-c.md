@@ -151,6 +151,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     para quien entrega: "Quedó entregada y pasa a revisión. Te aviso cuando la revisen o si hace falta algo
     más."; en la página de la tarea, "en revisión". Corrige el ejemplo "esperando aprobación" del ADR 0019
     (7c), que sólo pedía no mostrar el nombre del sistema (`en_revision`).
+19. **Los avisos de una decisión, sin margen para corregir:** decidida (usuario, 2026-10-08). "Quedó
+    aprobada" y el pedido de cambios le llegan al instante a quien entregó: una decisión no se corrige por
+    chat, así que el margen sólo la demoraría. Si un día se puede corregir una decisión por chat, se suma
+    el margen con esa función. Pedido del usuario para la plataforma: poder ajustar el margen para
+    corregir (`docs/product/plataforma-pendientes.md`).
 
 ## Chequeo de rumbo (2026-10-07)
 
