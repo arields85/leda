@@ -89,6 +89,27 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 8. **Cadencias:** ¿un mensaje por persona o uno por tarea, y reemplazan o se suman a la escalera de cada
    tarea? `PENDIENTE`.
 9. **Delegar:** ¿el referente confirma o sólo se entera? `PENDIENTE`.
+10. **Lo que describe la entrega frente al criterio:** decidida (usuario, 2026-10-08, del hallazgo de la
+    primera ronda con la IA real). La causa no estaba en la entrega sino en la creación de la tarea: sin
+    un criterio de aceptación concreto, la IA no sabe qué tiene que describir la persona (las tareas de
+    prueba tienen uno de relleno, `tests/conversaciones/carga.py`, y la entrega no lo lee).
+    - **Al crear la tarea** (la plataforma, con su ADR): el criterio tiene que ser concreto y comprobable
+      (mecánica §13) y, si quien la carga no sabe escribirlo, Leda lo ayuda con una propuesta, como en el
+      flujo C (`alta_turno.dato_a_proponer`, en `respaldo-flujos-antes-de-d`).
+    - **Al entregar:** Leda compara lo que la persona describe con el criterio y pregunta sólo lo que
+      falta, nunca lo que ya dijo. Cuando falta algo, dice qué en palabras simples y da un ejemplo sacado
+      del criterio (nunca un dato inventado), que la persona acepta o reescribe. Si lo descrito no cubre
+      el criterio, la entrega no sale hasta que se complete, aunque la persona insista: una foto no
+      certifica lo que pide el criterio, y entregarla igual sólo suma una vuelta (pedido de cambios y
+      otra entrega). La función de Leda es dirigir, ayudar y evitar idas y vueltas.
+    - **"Describir", no "contar"**, en lo que la IA lee sobre la entrega.
+11. **No nombrar a quien aprueba ni al referente por su cuenta:** decidida (usuario, 2026-10-08). Leda
+    no los usa como motivo ("Ismael va a necesitar…") sino que habla de la tarea ("Para aprobar esta
+    tarea, se necesita saber si completó los 20 ciclos sin fallas"), y tampoco los nombra al informar un
+    hecho: "✏️ Quedó entregada y pasa a revisión. Te aviso apenas la aprueben o si hace falta algo más." y
+    "✏️ Quedó anotado que la terminás el mar 27/10. La nueva fecha queda informada." Si la persona
+    pregunta a quién se le informa, Leda le dice el nombre. Reemplaza el "Ismael será notificado" del
+    formato de los mensajes (conversación 20): las conversaciones y los hechos que lo esperan cambian.
 
 ## Chequeo de rumbo (2026-10-07)
 
