@@ -63,14 +63,15 @@ def _sql_script(path: Path) -> str:
 # migraciones tocan (restricciones únicas, el mínimo del aviso previo). Los archivos
 # recibidos (migración 0033; ADR 0019): sus dos tablas y el rango del tamaño máximo en
 # `workspace_setting`. La evidencia de la entrega (migración 0034): las columnas nuevas de
-# `evidence` y de `task_evidence_policy`, y sus dos tablas nuevas.
+# `evidence` y de `task_evidence_policy`, y sus dos tablas nuevas. La salida con adjuntos
+# (migración 0035): su tabla.
 TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "conversation_question", "conversation_option",
                     "scheduled_notice", "task_forecast", "blocker_unblocker",
                     "task", "blocker", "workspace_setting",
                     "archivo", "archivo_de_mensaje",
                     "evidence", "task_evidence_policy", "evidencia_retirada",
-                    "archivo_de_tarea")
+                    "archivo_de_tarea", "message_outbox_adjunto")
 
 
 def _retrato_de_aislamiento(url, tablas):

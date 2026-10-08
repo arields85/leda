@@ -21,7 +21,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import NamedTuple, Protocol
+from typing import Callable, NamedTuple, Protocol
 
 import psycopg
 
@@ -100,12 +100,25 @@ class Entregado(NamedTuple):
     """Lo que se entregó. Es tupla para que `(chat_id, texto)` siga sirviendo.
     `bloque` es el bloque que se copia con un toque, si el mensaje lo llevaba.
     `texto` es el que vio la persona, ya sin las marcas de formato, y `entidades`, las de
-    Telegram (`salida.texto_y_entidades`), o `None` si el mensaje no tenía ninguna."""
+    Telegram (`salida.texto_y_entidades`), o `None` si el mensaje no tenía ninguna. Un álbum
+    (`enviar_album`) se entrega sin texto, con el nombre de cada foto en `fotos`."""
     chat_id: int
     texto: str
     botones: list[Boton]
     bloque: str | None = None
     entidades: list[dict] | None = None
+    fotos: list[str | None] | None = None
+
+
+class Adjunto(NamedTuple):
+    """Una foto de un álbum, como la recibe el transporte (ADR 0019, decisión 6): su nombre y su
+    tipo, el identificador que el canal le dio al recibirla, si sirve para mandarla otra vez
+    (`file_id`, del mismo bot del espacio), y cómo leer la copia propia (`contenido`), que se lee
+    sólo si hay que subirla."""
+    nombre: str | None
+    tipo: str
+    file_id: str | None
+    contenido: Callable[[], bytes]
 
 
 class Transporte(Protocol):
@@ -115,11 +128,16 @@ class Transporte(Protocol):
         bloque copiable (T9-R1c-3) se entrega con `bloque=...` además: sólo los
         mensajes que lo llevan pasan ese argumento."""
 
+    def enviar_album(self, chat_id: int, adjuntos: list[Adjunto]) -> int:
+        """Manda las fotos de una fila con adjuntos, sin texto, y devuelve el identificador
+        del primer mensaje (ADR 0019, decisión 6)."""
+
 
 @dataclass
 class TransporteDePrueba:
     enviados: list[Entregado] = field(default_factory=list)
     falla_en: set[int] = field(default_factory=set)
+    albumes: list[list[Adjunto]] = field(default_factory=list)
 
     def enviar(self, chat_id: int, texto: str,
                botones: list[Boton] | None = None,
@@ -136,11 +154,19 @@ class TransporteDePrueba:
             bloque, entidades or None))
         return len(self.enviados)
 
+    def enviar_album(self, chat_id: int, adjuntos: list[Adjunto]) -> int:
+        if chat_id in self.falla_en:
+            raise ConnectionError(f"no se pudo entregar a {chat_id}")
+        self.albumes.append(list(adjuntos))
+        self.enviados.append(Entregado(chat_id, "", [], fotos=[a.nombre for a in adjuntos]))
+        return len(self.enviados)
+
 
 class TransporteTelegram:
     def __init__(self, token: str, cliente=None) -> None:
         import httpx
-        self._url = f"https://api.telegram.org/bot{token}/sendMessage"
+        self._base = f"https://api.telegram.org/bot{token}/"
+        self._url = self._base + "sendMessage"
         self._cliente = cliente or httpx.Client(timeout=15)
 
     def enviar(self, chat_id: int, texto: str,
@@ -169,6 +195,45 @@ class TransporteTelegram:
         r = pedido_telegram(self._cliente.post, self._url, json=cuerpo)
         pedido_telegram(r.raise_for_status)
         return r.json()["result"]["message_id"]
+
+    def enviar_album(self, chat_id: int, adjuntos: list[Adjunto]) -> int:
+        """Las fotos de una fila con adjuntos (ADR 0019, decisión 6): una sola, como foto; de
+        dos a diez, como álbum. Primero con el identificador que Telegram le dio a cada una al
+        recibirla, que es del mismo bot del espacio y no vuelve a subir nada; si Telegram no lo
+        acepta (otro bot, un identificador vencido), sube la copia propia de todas. El error de
+        la segunda vuelta es el que queda."""
+        if not any(a.file_id for a in adjuntos):
+            return self._album(chat_id, adjuntos, reusar=False)
+        try:
+            return self._album(chat_id, adjuntos, reusar=True)
+        except ErrorTelegram:
+            return self._album(chat_id, adjuntos, reusar=False)
+
+    def _album(self, chat_id: int, adjuntos: list[Adjunto], *, reusar: bool) -> int:
+        subidas: dict[str, tuple[str, bytes, str]] = {}
+        medios = []
+        for i, a in enumerate(adjuntos):
+            if reusar and a.file_id:
+                medios.append({"type": "photo", "media": a.file_id})
+                continue
+            clave = f"foto{i}"
+            subidas[clave] = (a.nombre or f"{clave}.jpg", a.contenido(), a.tipo)
+            medios.append({"type": "photo", "media": f"attach://{clave}"})
+        datos: dict = {"chat_id": chat_id}
+        if len(medios) == 1:
+            metodo = "sendPhoto"
+            if subidas:
+                subidas = {"photo": next(iter(subidas.values()))}
+            else:
+                datos["photo"] = medios[0]["media"]
+        else:
+            metodo = "sendMediaGroup"
+            datos["media"] = json.dumps(medios)
+        r = pedido_telegram(self._cliente.post, self._base + metodo, data=datos,
+                            files=subidas or None)
+        pedido_telegram(r.raise_for_status)
+        resultado = r.json()["result"]
+        return (resultado[0] if isinstance(resultado, list) else resultado)["message_id"]
 
     def cerrar(self) -> None:
         """Cierra el cliente HTTP propio. Lo usa `ciclo.Ciclo` al reemplazar
@@ -793,19 +858,27 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
     tope = _tope_diario(cur, workspace_id)
     resumen = {"enviados": 0, "pospuestos": 0, "fallidos": 0, "descartados": 0}
     vistos: list[str] = []
+    # Los álbumes que esperan a su texto: si en esta pasada sale un mensaje, se vuelven a mirar
+    # (su texto pudo ser ése), así el álbum sale enseguida después y no en la pasada siguiente.
+    esperan: list[str] = []
     while len(vistos) < lote:
         cur.execute(
             """
              select id, workspace_id, chat_id, cuerpo, tipo,
                     destinatario_membership_id, intentos,
                     vence_en, es_respuesta, pending_action_id,
-                    es_bienvenida, bloque_copiable, es_coordinacion
+                    es_bienvenida, bloque_copiable, es_coordinacion, respuesta_grupo,
+                    array(select a.archivo_id from message_outbox_adjunto a
+                           where a.outbox_id = message_outbox.id
+                           order by a.orden) as adjuntos
               from message_outbox
              where workspace_id = %(ws)s
                and estado = 'listo'
                and programado_para <= %(ahora)s
                and id <> all(%(vistos)s::uuid[])
-             order by programado_para
+             order by programado_para,
+                      exists (select 1 from message_outbox_adjunto a
+                               where a.outbox_id = message_outbox.id)
              limit 1
              for update skip locked
             """,
@@ -814,17 +887,35 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
         if m is None:
             break
         vistos.append(str(m["id"]))
-        _despachar_fila(cur, workspace_id, transporte, cal, ahora, tope, m,
-                        resumen)
+        enviados = resumen["enviados"]
+        if _despachar_fila(cur, workspace_id, transporte, cal, ahora, tope, m,
+                           resumen) == "espera":
+            esperan.append(str(m["id"]))
+        elif resumen["enviados"] > enviados and esperan:
+            vistos = [v for v in vistos if v not in esperan]
+            esperan = []
     return resumen
 
 
 def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
                     cal: Calendario, ahora: datetime, tope, m,
-                    resumen: dict) -> None:
+                    resumen: dict) -> str | None:
     if not _preview_vigente(cur, m, ahora):
         resumen["descartados"] += 1
         return
+    if m["adjuntos"]:
+        # El álbum de una respuesta sale después de su texto (ADR 0019, decisión 6): mientras
+        # el texto no salió, espera (sin contar como pospuesto: no se movió de hora); si el
+        # texto ya no va a salir, el álbum tampoco, porque solo no se entiende. La falla del
+        # texto ya dejó su incidente (`_fallo`).
+        antes = _el_texto_del_album(cur, workspace_id, m)
+        if antes == "no_sale":
+            cur.execute(
+                "update message_outbox set estado = 'descartado' where id = %s", (m["id"],))
+            resumen["descartados"] += 1
+            return
+        if antes == "espera":
+            return "espera"
     # Contestarle a quien escribió no es "escribir fuera de horario", ni
     # cuenta contra el tope de mensajes automáticos: no es automático.
     if m["es_respuesta"]:
@@ -866,6 +957,49 @@ def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
         resumen["enviados"] += 1
     else:
         resumen["fallidos"] += 1
+
+
+def _el_texto_del_album(cur, workspace_id: str, m) -> str:
+    """Cómo está el texto de la respuesta de un álbum: las filas sin adjuntos de su mismo
+    `respuesta_grupo`. `sale`, si ya salieron todas (o no hay ninguna); `espera`, si alguna
+    todavía no salió; `no_sale`, si alguna ya no va a salir."""
+    if not m["respuesta_grupo"]:
+        return "sale"
+    cur.execute(
+        """select o.estado::text estado from message_outbox o
+            where o.workspace_id = %s and o.respuesta_grupo = %s and o.id <> %s
+              and not exists (select 1 from message_outbox_adjunto a
+                               where a.outbox_id = o.id)""",
+        (workspace_id, m["respuesta_grupo"], m["id"]))
+    estados = {f["estado"] for f in cur.fetchall()}
+    if estados & {"fallido", "descartado"}:
+        return "no_sale"
+    return "espera" if estados - {"enviado"} else "sale"
+
+
+def _adjuntos(cur, m) -> list[Adjunto]:
+    """Las fotos de una fila con adjuntos, en su orden, cada una con el identificador que
+    Telegram le dio al recibirla como foto en este espacio (del mismo bot), si lo hay. El
+    contenido se lee sólo si el transporte tiene que subir la copia propia."""
+    cur.execute(
+        """select a.id, a.nombre_original, a.tipo,
+                  (select d.telegram_file_id from archivo_de_mensaje d
+                    where d.workspace_id = a.workspace_id and d.archivo_id = a.id
+                      and d.que_llego = 'foto'
+                    order by d.at desc limit 1) as file_id
+             from message_outbox_adjunto x
+             join archivo a on a.workspace_id = x.workspace_id and a.id = x.archivo_id
+            where x.outbox_id = %s
+            order by x.orden""", (m["id"],))
+
+    def leer(archivo_id):
+        def contenido() -> bytes:
+            cur.execute("select contenido from archivo where id = %s", (archivo_id,))
+            return bytes(cur.fetchone()["contenido"])
+        return contenido
+
+    return [Adjunto(f["nombre_original"], f["tipo"], f["file_id"], leer(f["id"]))
+            for f in cur.fetchall()]
 
 
 def _marcar_enviado(cur: psycopg.Cursor, ahora: datetime, outbox_id) -> None:
@@ -929,6 +1063,17 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
     try:
         with cur.connection.transaction():
             _marcar_enviado(cur, ahora, m["id"])
+            if m.get("adjuntos"):
+                # Un álbum sale sin texto, sin botones y sin el saludo del día: el saludo, si
+                # toca, ya lo llevó el texto de su respuesta, que salió antes.
+                tg_id = transporte.enviar_album(m["chat_id"], _adjuntos(cur, m))
+                try:
+                    with cur.connection.transaction():
+                        _guardar_id_telegram(cur, tg_id, m["id"])
+                except Exception as exc_id:  # noqa: BLE001 -- se aísla, no deshace la marca
+                    print(f"  ! no se pudo guardar el id de Telegram del mensaje "
+                          f"{m['id']} ({type(exc_id).__name__}).")
+                return True
             botones = _botones(cur, m)
             texto, falla_saludo = saludo.reclamar_y_anteponer(
                 cur, workspace_id=workspace_id,

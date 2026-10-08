@@ -34,6 +34,10 @@ class ConOpciones:
             botones = self._opciones(chat_id, texto)
         return self.transporte.enviar(chat_id, texto, botones, **mas)
 
+    def enviar_album(self, chat_id: int, adjuntos: list) -> int:
+        """Un álbum no lleva botones (ADR 0019, decisión 6): pasa tal cual."""
+        return self.transporte.enviar_album(chat_id, adjuntos)
+
     def _opciones(self, chat_id: int, texto: str) -> list[Boton]:
         with self.cur.connection.cursor() as cur:
             # La respuesta que se está entregando: el despachador ya la marcó enviada y todavía

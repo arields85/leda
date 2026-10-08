@@ -6,10 +6,13 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 
 TELEGRAM_TEXT_LIMIT = 4096
+# Los adjuntos de una fila de la salida: un álbum de Telegram lleva hasta diez (ADR 0019,
+# decisión 6; la base lo exige en `message_outbox_adjunto`).
+MAX_ADJUNTOS = 10
 BUTTON_TEXT_LIMIT = 3900
 BUTTON_LABEL_LIMIT = 80
 CALLBACK_DATA_BYTES = 64
@@ -577,7 +580,8 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    es_bienvenida: bool = False,
                    bloque_copiable: str | None = None,
                    grupo_respuesta: str | None = None,
-                   es_coordinacion: bool = False) -> int:
+                   es_coordinacion: bool = False,
+                   adjuntos: Sequence[str] = ()) -> int:
     """Encola un mensaje visible. `es_coordinacion` marca el aviso causado
     directamente por el acto de otra persona sobre trabajo compartido (una
     entrega para revisar, cambios pedidos, una aprobación, un borrador para
@@ -590,7 +594,20 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     persona había escrito, para que lo copie con un toque: el final del texto
     (`entidad_de_bloque`), que el transporte marca como bloque y, si entra en
     `COPY_TEXT_LIMIT`, también sale con el botón de copiar. Un mensaje con
-    bloque no se parte."""
+    bloque no se parte.
+
+    `adjuntos` (ADR 0019, decisión 6; migración 0035) son los archivos que lleva la fila, en
+    orden: hasta `MAX_ADJUNTOS` (un álbum), atados en `message_outbox_adjunto` al archivo del
+    dominio, nunca a un identificador del canal; cómo se mandan lo decide el despachador. Una
+    fila con adjuntos no se parte ni lleva botones, y su texto es sólo el registro de lo que
+    lleva: el álbum sale sin texto, después del texto de su respuesta (`grupo_respuesta`). Si la
+    fila ya existía (la misma clave), no se le agrega nada: encolarla de nuevo no duplica."""
+    adjuntos = [str(a) for a in adjuntos]
+    if adjuntos and (len(adjuntos) > MAX_ADJUNTOS or allow_split
+                     or pending_action_id is not None or bloque_copiable is not None):
+        raise PayloadValidationError(
+            f"Un mensaje con adjuntos lleva de 1 a {MAX_ADJUNTOS}, no se parte y no lleva "
+            "botones.")
     if bloque_copiable is not None:
         bloque_copiable = normalize_visible_text(bloque_copiable)
         if allow_split or not normalize_visible_text(text).endswith(bloque_copiable):
@@ -624,6 +641,8 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     # nunca el reloj de la aplicación. Postgres guarda `timestamptz` con
     # precisión de microsegundos, y el caso de siempre (un solo mensaje,
     # desplazamiento 0) no cambia.
+    if adjuntos and len(payloads) != 1:
+        raise PayloadValidationError("Un mensaje con adjuntos no se parte.")
     inserted = 0
     for index, payload in enumerate(payloads):
         cur.execute(
@@ -635,12 +654,22 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                values (%s, %s, %s, %s, %s, %s,
                        coalesce(%s, now()) + %s * interval '1 microsecond',
                        %s, %s, %s, %s, %s, %s, %s, %s)
-               on conflict (dedupe_key) do nothing""",
+               on conflict (dedupe_key) do nothing
+               returning id""",
             (workspace_id, chat_id, recipient_membership_id, message_type,
              payload.text, state, scheduled_for, index,
              expires_at, payload.dedupe_key,
              is_response, pending_action_id, es_bienvenida,
              bloque_copiable, grupo_respuesta, es_coordinacion),
         )
-        inserted += cur.rowcount
+        fila = cur.fetchone()
+        if fila is not None and adjuntos:
+            outbox_id = fila["id"] if isinstance(fila, dict) else fila[0]
+            for orden, archivo_id in enumerate(adjuntos, 1):
+                cur.execute(
+                    """insert into message_outbox_adjunto (workspace_id, outbox_id, archivo_id,
+                                                         orden)
+                       values (%s, %s, %s, %s)""",
+                    (workspace_id, outbox_id, archivo_id, orden))
+        inserted += fila is not None
     return inserted

@@ -1516,6 +1516,32 @@ comment on table evidencia_retirada is
 comment on table archivo_de_tarea is
   'ADR 0019, decisión 4: un archivo que la persona dijo que es de una tarea antes de entregarla. No es evidencia: la vista previa de la entrega lo muestra y entra sólo si la persona lo deja.';
 
+-- La salida con adjuntos (migración 0035; ADR 0019, decisión 6): los archivos que lleva
+-- una fila de la salida, en orden (hasta diez: un álbum). Apunta a `archivo`, del
+-- dominio, nunca a un identificador de Telegram: cómo se manda un adjunto (reusar el
+-- identificador que el canal le dio al recibirlo o subir la copia propia) lo decide el
+-- despachador. `message_outbox` no suma columnas (riesgo 1 de `docs/STATUS.md`). El
+-- texto y su álbum son dos filas de una misma respuesta (`respuesta_grupo`), y el
+-- despachador no manda el álbum antes que el texto. Sólo se agrega.
+create table message_outbox_adjunto (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  outbox_id     uuid not null,
+  archivo_id    uuid not null,
+  orden         integer not null,
+  constraint message_outbox_adjunto_outbox
+    foreign key (workspace_id, outbox_id) references message_outbox(workspace_id, id)
+    on delete cascade,
+  constraint message_outbox_adjunto_archivo
+    foreign key (workspace_id, archivo_id) references archivo(workspace_id, id),
+  constraint message_outbox_adjunto_orden check (orden between 1 and 10),
+  constraint message_outbox_adjunto_orden_unico unique (outbox_id, orden),
+  constraint message_outbox_adjunto_archivo_unico unique (outbox_id, archivo_id)
+);
+
+comment on table message_outbox_adjunto is
+  'ADR 0019, decisión 6: los archivos que lleva una fila de la salida, en orden (hasta diez, un álbum). Apunta al archivo del dominio, nunca a un identificador de Telegram: cómo se manda lo decide el despachador. Sólo se agrega.';
+
 -- =========================================================================
 -- Sistema
 -- =========================================================================
@@ -2549,7 +2575,8 @@ begin
     'workspace_setting','message_template','permission','greeting_state',
     'conversation_question','conversation_option','conversation_turn',
     'scheduled_notice','conversation_state','task_forecast','blocker_unblocker',
-    'archivo','archivo_de_mensaje','evidencia_retirada','archivo_de_tarea']
+    'archivo','archivo_de_mensaje','evidencia_retirada','archivo_de_tarea',
+    'message_outbox_adjunto']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -2590,6 +2617,8 @@ revoke update, delete on archivo, archivo_de_mensaje from leda_app;
 -- La evidencia, sus retiros y los archivos dichos de una tarea (migración 0034),
 -- también: una pieza equivocada se retira, no se borra (ADR 0019, decisión 3).
 revoke update, delete on evidence, evidencia_retirada, archivo_de_tarea from leda_app;
+-- Lo que lleva un mensaje (migración 0035) no cambia: sólo se agrega y se lee.
+revoke update, delete on message_outbox_adjunto from leda_app;
 
 -- Registros auxiliares. Quedan fuera del bucle de arriba porque `audit_log` e
 -- `incident` admiten espacio nulo para los hechos de alcance global, que sólo
