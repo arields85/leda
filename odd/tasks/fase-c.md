@@ -136,6 +136,21 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     es después, al nuevo le llega el aviso de lo que espera su decisión, y un botón del aviso viejo le
     dice al anterior que esa tarea ya no la aprueba él, sin cambiar nada. Hoy queda omitido
     (`cambio_quien_aprueba`) y el nuevo no recibe nada.
+17. **Agrupar los avisos en listas:** decidida (usuario, 2026-10-08). Leda junta en un solo mensaje los
+    avisos que se pueden agrupar y arma listas; el tope diario cuenta mensajes, no lo que trae cada uno.
+    Hoy los avisos que Leda manda por su cuenta ya salen juntos por persona, pero los de entregas para
+    revisar salen uno por entrega: pasan a ser una lista ("Te entregaron 2 tareas para revisar", cada una
+    con su responsable y cuántas fotos trae) con un botón por tarea ([Ver PLC] [Ver bomba]); al tocar
+    una aparece esa entrega (lo entregado, las fotos, el enlace y los botones Aprobar y Pedir cambios).
+    Después de decidir una, Leda muestra lo que queda por revisar, sin insistir ese día; lo que queda
+    entra en los recordatorios del día hábil siguiente. La lista de recordatorios ("Esperan tu revisión
+    desde ayer") también lleva un botón por tarea. Escribir ("mostrame la del tablero") vale igual.
+18. **"Revisar", no "aprobar", para lo que espera:** decidida (usuario, 2026-10-08). Primero se revisa y
+    después se decide (aprobar o pedir cambios); "para aprobar" inclina la respuesta. Para quien revisa:
+    "Te entregaron 2 tareas para revisar", "Te queda una por revisar", "Esperan tu revisión desde ayer";
+    para quien entrega: "Quedó entregada y pasa a revisión. Te aviso cuando la revisen o si hace falta algo
+    más."; en la página de la tarea, "en revisión". Corrige el ejemplo "esperando aprobación" del ADR 0019
+    (7c), que sólo pedía no mostrar el nombre del sistema (`en_revision`).
 
 ## Chequeo de rumbo (2026-10-07)
 

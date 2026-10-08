@@ -233,7 +233,9 @@ Una tabla nueva, `archivo`, guarda el contenido de cada archivo recibido, separa
 - **La evidencia:** cada pieza con quién la mandó y cuándo; las imágenes se ven en la página, los
   demás archivos se descargan; las retiradas figuran como tales.
 - **En palabras de todos los días** (decisión del usuario del 2026-10-07): "esperando aprobación",
-  no `en_revision`. Sin identificadores, huellas, nombres de herramientas ni errores técnicos
+  no `en_revision`. **Nota (usuario, 2026-10-08):** la palabra es "en revisión", no "esperando
+  aprobación": primero se revisa y después se decide; lo que pedía esta decisión es no mostrar el
+  nombre del sistema (`odd/tasks/fase-c.md`, decisión 18). Sin identificadores, huellas, nombres de herramientas ni errores técnicos
   (constitución §10). Todo lo que viene de la base se escapa, como en el tablero.
 - **No muestra la conversación:** sólo los hechos. Leer lo que alguien escribió en el chat sigue
   siendo un acceso a conversaciones, del administrador y registrado.
