@@ -94,11 +94,14 @@ decisión 9 de `odd/tasks/fase-c.md`, del 2026-10-08). Hasta que se acepte, no s
 - **Re-aprobación** (mecánica §7, cambio de responsable): la da quien decide en el paso 2, y la
   auditoría guarda quién pidió, quién decidió, quién aceptó y el estado anterior, con la versión
   del pack y del núcleo.
-- **Fuera del alcance.** Una persona sin nadie a cargo no delega por chat: Leda le dice quién
-  puede hacerlo (decisión 1, "es una persona concreta").
+- **Sólo delega quien está a cargo de un sector** (usuario, 2026-10-09). Un integrante no delega:
+  si Nahuel pide "pasale la de comunicaciones a Lucas", Leda no lo hace y le dice que eso lo
+  decide Marcos (decisión 1, "es una persona concreta"). El encargado busca primero a alguien de
+  su sector; si están todos ocupados, puede pedir ayuda a gente de otro sector, y ahí decide el
+  encargado de ese sector y después confirma quien recibe (Marcos → Lucas: primero Martín, después
+  Lucas).
 - **Preguntas para el usuario antes de aceptar:**
-  1. ¿Un integrante (Nahuel) puede pedir pasarle su tarea a otro? Propuesta: sí; decide quien
-     manda sobre el que recibe, igual que arriba.
+  1. ~~¿Un integrante puede pedir pasarle su tarea a otro?~~ Respondida arriba: no.
   2. ¿Delegar una tarea que ya está en revisión o terminada? Propuesta: no; sólo asignada, en curso
      o trabada, y si está trabada se mueve con su bloqueo abierto.
   3. ¿"Quien manda sobre el que recibe" es `aprobado_por` o el referente del área? En CoreWork son
