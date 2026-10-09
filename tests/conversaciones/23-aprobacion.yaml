@@ -94,7 +94,7 @@ pasos:
     escribe: "che el tablero de la maquina 3 de mariano ya lo vi yo, esta joya. aprobalo asi avanza"
     # El comentario es un dato opcional de aprobar (su ficha): puede venir, con sus palabras.
     jugadas:
-      - {nombre: aprobar, de: mariano, puede_traer: [comentario]}
+      - {nombre: aprobar, de: mariano, puede_traer: [comentario, el_comentario_pide_algo]}
     efectos: {}
     hechos:
       - {jugada: aprobar, resultado: no_se_puede, motivo: no_es_quien_aprueba,
@@ -111,32 +111,14 @@ pasos:
       - que le pasa a Ismael lo que dijo Marcos
       - nombres de jugadas
 
-  # Una aprobación con un comentario para el responsable no cierra directo: Leda pregunta una vez
-  # cuál de las dos (decisión 22 del usuario, 2026-10-08; lo decide la cocina, no la IA).
+  # Un comentario que no le pide nada a nadie (un elogio) aprueba directo: la precisión del
+  # usuario a la decisión 22 (2026-10-08, D7c). La IA dice si el comentario pide algo; la cocina
+  # decide.
   - paso: 2
     a_las: "2026-10-26 10:30"
     escribe: "el plc de marcos aprobado, impecable"
     jugadas:
-      - {nombre: aprobar, tarea: PLC, comentario: impecable}
-    efectos: {}
-    hechos:
-      - {jugada: aprobar, resultado: dos_lecturas, tarea: PLC,
-         lecturas: [aprobar, pedir_cambios], pregunta: cual_de_las_dos}
-    pregunta: {tipo: cual_de_las_dos, tarea: PLC}
-    botones: [Aprobar, Pedir cambios]
-    estado_despues:
-      pregunta_abierta: {tipo: cual_de_las_dos, tarea: PLC}
-    dice:
-      - "una sola pregunta, cuál de las dos: aprobarla y pasarle el comentario a Marcos, o pedirle un cambio"
-    no_dice:
-      - que la aprobó
-      - que le pidió un cambio a Marcos
-
-  # El botón Aprobar de esa pregunta es la elección: aprueba con el comentario, sin otra pregunta.
-  - paso: 2b
-    a_las: "2026-10-26 10:31"
-    toca: Aprobar
-    de_la_tarea: PLC
+      - {nombre: aprobar, tarea: PLC, comentario: impecable, el_comentario_pide_algo: false}
     efectos:
       estados: {PLC: terminada}
       aprobaciones:
@@ -146,7 +128,7 @@ pasos:
     hechos:
       - {jugada: aprobar, resultado: anotado, tarea: PLC, comentario: presente,
          quedo_terminada: true, no_se_cierra_todavia: ausente,
-         aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-10-26T10:31"},
+         aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-10-26T10:30"},
          queda_por_revisar: [{tarea: TAB}, {tarea: COM}, {tarea: DASH}]}
     pregunta: null
     # Lo que queda por revisar, con un botón por tarea (decisión 17, D4).
@@ -162,7 +144,7 @@ pasos:
 
   - paso: 3
     quien: Leda
-    relojes: ["2026-10-26 10:31"]
+    relojes: ["2026-10-26 10:30"]
     salen:
       - a: Marcos
         tipo: tarea_aprobada
@@ -307,7 +289,7 @@ pasos:
     jugadas:
       # El comentario puede ir con la aprobación, con el pedido de cambios o con los dos.
       - {nombre: aprobar, tarea: DASH, comentario: "que revise los colores del gráfico de lotes",
-         puede_traer: [comentario]}
+         puede_traer: [comentario, el_comentario_pide_algo]}
       - {nombre: pedir_cambios, tarea: DASH,
          comentario: "que revise los colores del gráfico de lotes"}
     efectos: {}
@@ -331,7 +313,9 @@ pasos:
     # y lo demás como comentario (los dos valen; el significado de `cual_de_las_dos` lo dice). La
     # IA real elige `aprobar` 5 de 5 (ronda fase-c-d6): el comentario es libre y se pide presente.
     jugadas:
-      - {nombre: aprobar, tarea: DASH, comentario: "pasale lo de los colores"}
+      # Es la elección: si el comentario pide algo no cambia nada (puede venir o no).
+      - {nombre: aprobar, tarea: DASH, comentario: "pasale lo de los colores",
+         puede_traer: [el_comentario_pide_algo]}
     efectos:
       estados: {DASH: terminada}
       aprobaciones:

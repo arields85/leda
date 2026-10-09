@@ -543,15 +543,20 @@ def test_aprobar_y_pedir_cambios_juntos_no_hacen_nada_y_preguntan_cual(conn, mun
 
 # --- Aprobar con un comentario (decisión 22 del usuario, 2026-10-08) --------------------------
 
+@pytest.mark.parametrize("pide_algo", [True, None])
 def test_aprobar_con_un_comentario_pregunta_cual_de_las_dos_antes_de_cerrar(conn, mundo,
-                                                                            turnos):
+                                                                            turnos, pide_algo):
     """D7 (la 28, paso 3, 1 de 5 con la IA real): "esta bien pero que mariano revise el rotulo de
     los cables" llegó como `aprobar` con su comentario, sin `pedir_cambios`, y la tarea quedó
-    terminada. Lo decide la cocina, no la IA: una aprobación que trae un comentario para el
-    responsable nunca cierra directo; Leda pregunta una vez cuál de las dos."""
+    terminada. Lo decide la cocina, no la IA: una aprobación cuyo comentario le pide algo a
+    alguien nunca cierra directo; Leda pregunta una vez cuál de las dos. Si la IA no dijo si el
+    comentario pide algo, la cocina queda del lado seguro y pregunta (D7c)."""
     tarea = _entregada(conn, mundo, turnos)
     comentario = "que revise el rotulo de los cables"
-    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": comentario}),
+    datos = {"tarea": "T1", "comentario": comentario}
+    if pide_algo is not None:
+        datos["el_comentario_pide_algo"] = pide_algo
+    r = turnos.dice("Ismael", Jugada("aprobar", datos),
                     texto="esta bien pero que revise el rotulo de los cables")
     [hecho] = r.hechos
     assert hecho["jugada"] == "aprobar" and hecho["resultado"] == "dos_lecturas"
@@ -606,6 +611,24 @@ def test_aprobar_con_un_comentario_que_contesta_cual_de_las_dos_aprueba_directo(
                    "tipo = %s and cerrada_en is null", preguntas.CUAL_DE_LAS_DOS) == 0
 
 
+def test_aprobar_con_un_comentario_que_no_pide_nada_va_directo(conn, mundo, turnos):
+    """Precisión del usuario a la decisión 22 (2026-10-08, D7c): un elogio o una observación que
+    no le pide nada a nadie aprueba directo, como antes de la D7b, y el comentario le llega al
+    responsable. La IA dice si el comentario pide algo; la cocina decide."""
+    tarea = _entregada(conn, mundo, turnos)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": "impecable",
+                                                 "el_comentario_pide_algo": False}),
+                    texto="aprobado, impecable")
+    hecho = _hecho(r, "aprobar")
+    assert hecho["resultado"] == "anotado" and hecho["quedo_terminada"] is True
+    assert r.pregunta is None
+    assert estado_de(conn, tarea) == "terminada"
+    assert _decisiones(conn, tarea) == [("aprobado", "impecable")]
+    [aviso] = avisos_guardados(conn, "tarea_aprobada")
+    assert aviso["hechos"]["comentario"] == "impecable"
+    assert cuantas(conn, "conversation_question", "tipo = %s", preguntas.CUAL_DE_LAS_DOS) == 0
+
+
 def test_aprobar_sin_comentario_sigue_yendo_directo(conn, mundo, turnos):
     tarea = _entregada(conn, mundo, turnos)
     r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="aprobado")
@@ -618,6 +641,18 @@ def test_el_comentario_de_una_aprobacion_es_algo_para_el_responsable():
     from leda.motor.ia_real import DATOS
     assert "persona responsable" in DATOS["comentario"][1]
     assert "persona responsable" in FICHAS["aprobar"].es
+
+
+def test_si_el_comentario_pide_algo_lo_dice_la_ia_como_un_dato():
+    """D7c: la IA dice, como dato de `aprobar`, si el comentario le pide algo a alguien; el
+    dato describe qué es, sin frases de ejemplo, y la redacción lo lee con su significado."""
+    from leda.motor import hechos
+    from leda.motor.ia_real import DATOS
+    tipo, descripcion = DATOS["el_comentario_pide_algo"]
+    assert tipo == "boolean"
+    assert "persona responsable" in descripcion and '"' not in descripcion
+    assert "el_comentario_pide_algo" in FICHAS["aprobar"].opcional
+    assert hechos.significado("el_comentario_pide_algo")
 
 
 def _botones_de_la_respuesta(conn, mundo, at, nombre: str = "Ismael") -> list[str]:

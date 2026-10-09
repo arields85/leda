@@ -23,11 +23,13 @@ entregarla. "Terminé" nunca llega acá: la entrega lleva a revisión (constituc
 **Lo que admite dos lecturas** ("aprobado, pero que revise el cable") son dos jugadas opuestas
 sobre la misma tarea en un mensaje: ninguna se hace y Leda pregunta una sola vez cuál, con dos
 botones (`fichas.dos_lecturas`, una regla general para toda ficha que declara su opuesta).
-También una aprobación con un comentario para el responsable (decisión 22 del usuario,
-2026-10-08): lo decide la cocina, no la IA, que sólo dice que trae un comentario; cerrar por
-error es peor que un toque más. No pregunta cuando es la elección: una opción de una pregunta, o
-la respuesta escrita a la de cuál de las dos (decisión 12: "aprobala nomás y pasale lo de los
-colores" aprueba y pasa el comentario).
+También una aprobación cuyo comentario le pide algo a alguien (decisión 22 del usuario,
+2026-10-08, con su precisión de ese día, D7c): lo decide la cocina, no la IA, que sólo dice si
+el comentario pide algo (`el_comentario_pide_algo`); si no lo dijo, pregunta igual, porque
+cerrar por error es peor que un toque más. Un comentario que no pide nada (un elogio) aprueba
+directo. No pregunta cuando es la elección: una opción de una pregunta, o la respuesta escrita a
+la de cuál de las dos (decisión 12: "aprobala nomás y pasale lo de los colores" aprueba y pasa
+el comentario).
 
 **El aviso de una entrega ofrece los botones** "Aprobar" y "Pedir cambios" como atajos
 (`avisos`, `entrega_para_aprobar`, `preguntas.DECISION_DE_LA_ENTREGA`); escribir vale igual. El
@@ -168,8 +170,10 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
                 "ya_la_aprobo_el": aprobada_el(cur, vigente, ctx.calendario.zona),
                 **_frena(cur, tarea["id"])}
     comentario = _comentario(datos)
-    if comentario is not None and _antes_pregunta_cual(ctx, datos, tarea):
-        # Una aprobación con un comentario para el responsable no cierra directo (decisión 22).
+    if (comentario is not None and datos.get("el_comentario_pide_algo") is not False
+            and _antes_pregunta_cual(ctx, datos, tarea)):
+        # Una aprobación cuyo comentario le pide algo a alguien no cierra directo (decisión 22);
+        # si la IA no dijo si pide algo, tampoco: el lado seguro (D7c).
         return _cual_de_las_dos(ctx, datos, tarea, comentario)
     r = ejecutar(cur, ctx.quien, "aprobar_tarea",
                  {"tarea_id": tarea["id"], **({"comentario": comentario} if comentario else {})},
@@ -199,8 +203,8 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
 
 
 def _antes_pregunta_cual(ctx, datos: dict, tarea: dict) -> bool:
-    """Si una aprobación con comentario tiene que preguntar antes cuál de las dos (decisión 22
-    del usuario, 2026-10-08): sí, salvo que sea la elección. Elige una opción tocada o escrita
+    """Si una aprobación cuyo comentario pide algo tiene que preguntar antes cuál de las dos
+    (decisión 22 del usuario, 2026-10-08): sí, salvo que sea la elección. Elige una opción tocada o escrita
     (la de una pregunta: `de_la_pregunta`) o la respuesta escrita a la pregunta de cuál de las dos
     sobre esta tarea, que la persona vio en un mensaje anterior (decisión 12)."""
     if datos.get("de_la_pregunta"):

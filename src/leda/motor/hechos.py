@@ -272,8 +272,10 @@ SIGNIFICADOS: Mapping[str, str] = {
                            "con el estado en que quedaron.",
     "bloqueos_que_se_cerraron": "Lo que trababa la tarea y ya se resolvió.",
     "dos_lecturas": "El mensaje se puede leer de dos formas sobre la misma tarea (lecturas): "
-                    "dice a la vez dos cosas opuestas, o aprueba con un comentario para la "
-                    "persona responsable. No se hizo ninguna y Leda pregunta cuál de las dos.",
+                    "dice a la vez dos cosas opuestas, o aprueba con un comentario que le pide "
+                    "algo a alguien. No se hizo ninguna y Leda pregunta cuál de las dos.",
+    "el_comentario_pide_algo": "Si el comentario de la aprobación le pide a la persona "
+                               "responsable o a otra persona que haga o revise algo.",
     "su_propio_trabajo": "Es trabajo de la persona que escribe: no lo puede aprobar ni devolver "
                          "ella; lo decide quien aprueba su trabajo.",
     "no_es_quien_aprueba": "La persona que escribe no es quien aprueba ese trabajo: lo decide "

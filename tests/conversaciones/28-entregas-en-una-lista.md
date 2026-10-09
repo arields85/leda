@@ -56,8 +56,9 @@ atajos).
    →
    - Jugadas: `aprobar` y `pedir_cambios`, la tarea del tablero: admite dos lecturas (ADR 0018,
      decisión 2), así que no se hace ninguna. Si la IA elige sólo `aprobar` con el comentario (la
-     ronda D7, 1 de 5), pasa lo mismo: una aprobación con un comentario para el responsable nunca
-     cierra directo (decisión 22 del usuario, 2026-10-08; lo decide el código). El corredor espera
+     ronda D7, 1 de 5), pasa lo mismo: una aprobación cuyo comentario le pide algo a alguien
+     (`el_comentario_pide_algo` verdadero, o sin decirlo) nunca cierra directo (decisión 22 del
+     usuario, 2026-10-08, y su precisión de ese día, D7c; lo decide el código). El corredor espera
      las dos jugadas: no admite dos lecturas válidas para un paso.
    - Efecto: ninguno; la tarea sigue `en_revision`.
    - La respuesta dice: una sola pregunta, cuál de las dos: aprobarla y pasarle el comentario a

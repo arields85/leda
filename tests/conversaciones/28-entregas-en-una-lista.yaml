@@ -108,10 +108,12 @@ pasos:
   - paso: 3
     a_las: "2026-10-23 15:30"
     escribe: "esta bien pero que mariano revise el rotulo de los cables"
-    # Sólo `aprobar` con el comentario lleva a la misma pregunta (decisión 22; lo decide la cocina).
+    # Sólo `aprobar` con el comentario lleva a la misma pregunta, porque el comentario le pide algo
+    # a alguien (decisión 22 y su precisión, D7c; lo decide la cocina). Si la IA dice si lo pide,
+    # tiene que ser que sí; si no lo dice, la cocina pregunta igual.
     jugadas:
       - {nombre: aprobar, tarea: TAB, comentario: "que mariano revise el rotulo de los cables",
-         puede_traer: [comentario]}
+         el_comentario_pide_algo: true, puede_traer: [comentario, el_comentario_pide_algo]}
       - {nombre: pedir_cambios, tarea: TAB,
          comentario: "que mariano revise el rotulo de los cables"}
     efectos: {}

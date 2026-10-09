@@ -205,6 +205,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     aprobás así o pedís cambios?"; cerrar por error es peor que un toque más. La respuesta a esa pregunta
     es la elección (decisión 12: "aprobala nomás y pasale lo de los colores" aprueba y pasa el
     comentario). Lo decide la cocina, no la IA: la IA sólo dice que la aprobación trae un comentario.
+    **Precisión del usuario (2026-10-08, de noche, opción A; D7c):** pregunta sólo cuando el comentario
+    le pide algo a alguien ("esta bien pero que mariano revise el rotulo de los cables"); un elogio o
+    una observación que no pide nada ("el plc de marcos aprobado, impecable") aprueba directo, como
+    antes de la D7b. La IA lo dice como un dato de la jugada (`el_comentario_pide_algo`) y la cocina
+    decide: si es verdadero, o si la IA no lo dijo (el lado seguro), pregunta una vez; si es falso,
+    aprueba directo. La respuesta a la pregunta abierta sigue siendo la elección (decisión 12).
 
 ## Chequeo de rumbo (2026-10-07)
 

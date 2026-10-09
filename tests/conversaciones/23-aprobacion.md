@@ -6,8 +6,8 @@ tarea, si el código comprueba que se cumple todo lo demás; si algo más frena 
 queda anotada, Leda lo dice con honestidad y, cuando lo que faltaba se resuelve, el código vuelve a
 comprobar y la cierra sola, con aviso al responsable y a quien aprobó. Un pedido de cambios claro
 devuelve la tarea a su responsable con el comentario. Lo que mezcla aprobar y pedir un cambio, y una
-aprobación con un comentario para el responsable (decisión 22), llevan una sola pregunta con dos
-botones. Y alguien que no aprueba esa tarea no puede aprobarla. Lo claro va
+aprobación con un comentario que le pide algo a alguien (decisión 22), llevan una sola pregunta con
+dos botones; un comentario que no pide nada, como un elogio, aprueba directo (su precisión, D7c). Y alguien que no aprueba esa tarea no puede aprobarla. Lo claro va
 directo, sin vista previa: es la decisión de quien aprueba (`odd/tasks/fase-c.md`, decisiones 2 y 3).
 Circuito 8 (ADR 0017, decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7; constitución §3 y §11.
 
@@ -24,7 +24,7 @@ tres, no sale y queda omitido con su motivo. Por la misma regla, Marcos escribe 
 lugar de esperar a que pasen 30 minutos desde su mensaje. Desde la
 D4 de la C-3d: los cuatro avisos del viernes salen de a uno, cada uno al terminar su margen para
 corregir (los que salen juntos irían en una lista, la conversación 28), y después de cada decisión
-(pasos 2b, 4 y 6) la respuesta dice lo que le queda por revisar a Ismael, con un botón por tarea para
+(pasos 2, 4 y 6) la respuesta dice lo que le queda por revisar a Ismael, con un botón por tarea para
 verla (decisión 17 del usuario, 2026-10-08). En el paso 9, "pasale lo de los colores" es lo que la
 decisión 12 llama el comentario: va con la aprobación, no como un pedido de cambios.
 
@@ -70,18 +70,11 @@ decisión 12 llama el comentario: va con la aprobación, no como un pedido de ca
 
 2. **Ismael** escribe (10:30): "el plc de marcos aprobado, impecable"
    →
-   - Jugadas: `aprobar`, la tarea del PLC, con el comentario "impecable".
-   - Una aprobación que trae un comentario para el responsable no cierra directo (decisión 22 del
-     usuario, 2026-10-08): Leda pregunta una sola vez cuál de las dos, aprobarla con el comentario o
-     pedirle un cambio, con dos botones. Lo decide el código, no la IA: la IA sólo dice que la
-     aprobación trae un comentario; cerrar por error es peor que un toque más.
-   - Efecto: ninguno; la tarea sigue `en_revision`.
-   - La respuesta dice: una sola pregunta, cuál de las dos.
-   - Estado después: tema abierto, cuál de las dos, sobre la tarea del PLC.
-
-2b. **Ismael** toca (10:31) "Aprobar" en esa pregunta.
-   →
-   - El botón es la elección: aprueba con el comentario, sin otra pregunta (decisión 12).
+   - Jugadas: `aprobar`, la tarea del PLC, con el comentario "impecable", que no le pide nada a
+     nadie (`el_comentario_pide_algo` falso).
+   - Confirmación: ninguna; lo claro va directo. Un comentario que no le pide nada a nadie no abre
+     la pregunta de cuál de las dos (la precisión del usuario a la decisión 22, 2026-10-08, D7c): la
+     IA dice si el comentario pide algo y el código decide; si la IA no lo dijera, preguntaría.
    - Efecto: la aprobación, con quién y el comentario; el código comprueba el cierre (mecánica §5:
      evidencia, aprobación, sin dependencias ni bloqueos) y la tarea pasa a `terminada`, con evento de
      Ismael y auditoría. Dos hechos distintos, un solo acto. El aviso a Marcos sale enseguida.
@@ -89,7 +82,7 @@ decisión 12 llama el comentario: va con la aprobación, no como un pedido de ca
      comentario.
    - Estado después: quedan tres entregas esperando a Ismael.
 
-3. **Leda**, por su cuenta, a Marcos (10:31): el aviso de la aprobación.
+3. **Leda**, por su cuenta, a Marcos (10:30): el aviso de la aprobación.
    →
    - El mensaje dice: que quedó aprobada y terminada, sin nombrar a Ismael (decisión 11 del
      2026-10-08: el nombre, sólo si Marcos pregunta); la tarea del PLC en su renglón con 📋; el
@@ -199,11 +192,11 @@ decisión 12 llama el comentario: va con la aprobación, no como un pedido de ca
 ## Qué mide
 
 - **Garantías:** la aprobación es de quien la política designa, nunca de otro (paso 1) ni de Leda; el
-  cierre lo decide el código (pasos 2b, 4 y 10), y "aprobado" no es "terminada" cuando falta otra cosa;
+  cierre lo decide el código (pasos 2, 4 y 10), y "aprobado" no es "terminada" cuando falta otra cosa;
   una aprobación que todavía no puede cerrar queda registrada y el código cierra la tarea cuando se
   resuelve lo que faltaba, con aviso al responsable y a quien aprobó (pasos 10 y 11); el botón "Pedir
   cambios" es un atajo que pregunta qué falta, y escribir vale igual (pasos 5 y 6); no hace sin
-  confirmación lo que la admite con dos lecturas (pasos 2 y 8); no inventa (el paso 4 dice qué frena el
+  confirmación lo que la admite con dos lecturas (paso 8); no inventa (el paso 4 dice qué frena el
   cierre); el responsable se entera de cada decisión, con el comentario.
 - **El formato:** el de la conversación 20 en cada mensaje.
 - **Falla de comprensión:** que la IA tome "le falta el diagrama del tablero" del paso 6 como otra cosa

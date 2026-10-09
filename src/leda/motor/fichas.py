@@ -1369,15 +1369,16 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona dice de qué tarea es una foto, un video o un archivo que mandó, sin "
              "decir que la terminó."),
     Ficha("aprobar", "aprobar la entrega de una tarea que espera su decisión",
-          necesita=(), opcional=("tarea", "comentario", "de"),
+          necesita=(), opcional=("tarea", "comentario", "el_comentario_pide_algo", "de"),
           comprueba="que quien escribe sea quien aprueba el trabajo del responsable, que la "
                     "tarea esté entregada y que lo entregado cubra lo que pide (la cocina); con "
                     "el botón del aviso, que la entrega no haya cambiado desde que se mostró",
           hace="anota la aprobación (aprobar_tarea) y, si el sistema comprueba que se cumple "
                "todo lo demás, la tarea queda terminada en el mismo acto; si algo más frena el "
-               "cierre, la aprobación queda anotada. Con un comentario, antes pregunta una sola "
-               "vez cuál de las dos (aprobarla con el comentario o pedir el cambio), salvo que "
-               "sea la respuesta a esa pregunta: nada cambia hasta que elija",
+               "cierre, la aprobación queda anotada. Con un comentario que le pide algo a "
+               "alguien (o sin saber si lo pide), antes pregunta una sola vez cuál de las dos "
+               "(aprobarla con el comentario o pedir el cambio), salvo que sea la respuesta a "
+               "esa pregunta: nada cambia hasta que elija",
           despues="le avisa al responsable enseguida; si no se cerró, el sistema la cierra solo "
                   "cuando se resuelve lo que faltaba y les avisa a los dos",
           manejar=_aprobar, boton="Aprobar", opuesta="pedir_cambios",
@@ -1385,7 +1386,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                     preguntas.CUAL_DE_LAS_DOS),
           es="La persona que escribe aprueba el trabajo entregado de una tarea que espera su "
              "decisión, sin pedir que se cambie nada; puede sumar un comentario, lo que le pasa "
-             "a la persona responsable para que lo tenga en cuenta. Si además pide "
+             "a la persona responsable para que lo tenga en cuenta, y si ese comentario le "
+             "pide algo a alguien (el_comentario_pide_algo). Si además pide "
              "que se cambie o se revise algo, eso es también pedir cambios: van las dos "
              "jugadas, salvo cuando contesta la pregunta de cuál de las dos: entonces lo que "
              "elige es una sola decisión (elegir, o esta jugada con lo demás como comentario). "
