@@ -374,14 +374,22 @@ def _en_la_lista(envio: list[_Listo]) -> bool:
     return len(envio) > 1 and all(x.tipo.se_agrupa for x in envio)
 
 
+# Una entrega dentro de una lista de entregas para revisar, y la cabeza de la lista, con cuántas
+# son (decisiones 17 y 18 del usuario; D8, paso 9 de la prueba por Telegram del 2026-10-08).
+ENTREGA_EN_LA_LISTA = "entrega_en_la_lista"
+LISTA_DE_ENTREGAS = "lista_de_entregas_para_revisar"
+
+
 def _hechos_en_la_lista(hechos: dict[str, Any]) -> dict[str, Any]:
     """Un aviso de entrega dentro de una lista: la tarea, quién la entregó y cuántas fotos trae;
-    lo entregado se ve al tocar su botón (`ver_entrega`). Sin pregunta: la lista no pide decidir
-    ahí."""
+    lo entregado se ve al tocar su botón (`ver_entrega`). Sin pregunta ni decisión: en la lista
+    se revisa, no se decide, así que el aviso es otro (`ENTREGA_EN_LA_LISTA`) y lo que significa
+    el de una entrega sola (aprobarla o pedirle cambios) no le llega a la IA (D8)."""
     fotos = sum(1 for v in hechos.get("lo_que_entrego") or [] if "va_adjunta" in v)
     return {**{k: v for k, v in hechos.items()
-               if k not in ("lo_que_entrego", "fotos_adjuntas", "pregunta")},
-            "fotos_que_trae": fotos}
+               if k not in ("lo_que_entrego", "fotos_adjuntas", "pregunta",
+                            "necesita_respuesta")},
+            "aviso": ENTREGA_EN_LA_LISTA, "fotos_que_trae": fotos}
 
 
 def boton_para_ver(titulo: str) -> str:
@@ -468,8 +476,11 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     preguntas_de = [None if en_lista else _pregunta_del_aviso(m, x.aviso, x.hechos)
                     for x in envio]
     pregunta = next((q for q in preguntas_de if q is not None), None)
+    # Una lista empieza por cuántas entregas trae: es un hecho de la cocina, no una cuenta de la
+    # IA (D8).
+    cabeza = [{"aviso": LISTA_DE_ENTREGAS, "cuantas": len(envio)}] if en_lista else []
     pedido = {"hoy": m.hoy.isoformat(), "persona": destinatario["nombre"], "mensaje": None,
-              "hechos": [x.hechos for x in envio], "pregunta": pregunta,
+              "hechos": cabeza + [x.hechos for x in envio], "pregunta": pregunta,
               "ultimos_turnos": list(leer_ultimos_turnos(cur, persona))}
     try:
         texto = no_vacio(ia.redactar(pedido))

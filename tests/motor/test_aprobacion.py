@@ -11,6 +11,7 @@ cierre lo comprueba el sistema (mecánica §5), y "terminé" nunca llega a termi
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -21,6 +22,7 @@ from leda.autoridad import identificar_en_espacio
 from leda.db import admin, espacio
 from leda.despachador import TransporteDePrueba
 from leda.motor import aprobacion, hechos, preguntas
+from leda.motor import hechos as hechos_mod
 from leda.motor.ciclo import Ciclo
 from leda.motor.fichas import FICHAS
 from leda.motor.ia import IAGuionada, Jugada
@@ -767,8 +769,18 @@ def test_las_entregas_que_salen_juntas_van_en_una_lista_con_un_boton_por_tarea(c
     ia = IAQueRedacta()
     assert enviar(conn, mundo, ia, DESPUES_DEL_MARGEN) == {"enviado": 2}
     [pedido] = ia.pedidos_de_redaccion          # un solo mensaje
-    for hechos in pedido["hechos"]:
-        assert hechos["aviso"] == "entrega_para_aprobar"
+    # D8 (paso 9 de la prueba por Telegram): la lista dice cuántas son, como un hecho de la
+    # cocina ("Te entregaron 2 tareas para revisar", decisiones 17 y 18), y lo que significa el
+    # aviso de una entrega sola (aprobarla o pedirle cambios) no llega a la lista: ahí se revisa.
+    cabeza, *items = pedido["hechos"]
+    assert cabeza == {"aviso": "lista_de_entregas_para_revisar", "cuantas": 2}
+    assert len(items) == 2
+    assert "entrega_para_aprobar" not in json.dumps(pedido)
+    significados = hechos_mod.bloque(hechos_mod.para_redactar(pedido))
+    assert "aprobarla o pedirle cambios" not in significados
+    assert "revis" in hechos_mod.significado("lista_de_entregas_para_revisar")
+    for hechos in items:
+        assert hechos["aviso"] == "entrega_en_la_lista" and "necesita_respuesta" not in hechos
         assert hechos["fotos_que_trae"] == 0 and hechos["responsable"] == "Marcos"
         assert "lo_que_entrego" not in hechos and "fotos_adjuntas" not in hechos
         assert "lleva_el_enlace_a_la_pagina_de_la_tarea" not in hechos
@@ -800,7 +812,8 @@ def test_las_entregas_que_esperan_mientras_quien_revisa_conversa_salen_en_una_li
     assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=30)) == {"en_espera": 2}
     assert enviar(conn, mundo, ia, AHORA + timedelta(minutes=41)) == {"enviado": 2}
     [pedido] = ia.pedidos_de_redaccion
-    assert sorted(h["tarea"] for h in pedido["hechos"]) == sorted([ENTREGADA, OTRA])
+    assert pedido["hechos"][0] == {"aviso": "lista_de_entregas_para_revisar", "cuantas": 2}
+    assert sorted(h["tarea"] for h in pedido["hechos"][1:]) == sorted([ENTREGADA, OTRA])
 
 
 def test_ver_una_entrega_la_muestra_con_los_botones_para_decidir(conn, mundo, turnos):

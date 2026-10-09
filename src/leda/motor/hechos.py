@@ -292,8 +292,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                                         "llega un aviso nuevo con todo. Todavía no pasó.",
     "cambio_la_entrega": "La entrega cambió desde el aviso que tenía ese botón: el botón ya no "
                          "vale; se decide sobre lo que vale ahora.",
-    "decision_de_la_entrega": "Pregunta si quien aprueba aprueba la entrega o le pide cambios: "
-                              "lo puede tocar o escribir.",
+    "decision_de_la_entrega": "Pregunta qué decide quien revisa la entrega, después de "
+                              "revisarla: aprobarla o pedirle cambios; lo puede tocar o "
+                              "escribir.",
     "que_cambios_pide": "Pregunta qué le falta o qué hay que cambiar de la entrega: espera lo "
                         "que pide quien la aprueba.",
     "cual_de_las_dos": "Pregunta, una sola vez, cuál de las dos cosas quiso decir la persona "
@@ -649,8 +650,17 @@ SIGNIFICADOS: Mapping[str, str] = {
     "correccion_de_prevision": "Aviso a quien aprueba el trabajo de la persona responsable: "
                                "el día para terminar la tarea que ya recibió no vale.",
     "entrega_para_aprobar": "Aviso a quien aprueba el trabajo de la persona responsable: "
-                            "entregó la tarea, que espera su revisión y su decisión: aprobarla "
-                            "o pedirle cambios, con un botón o escribiendo.",
+                            "entregó la tarea, que espera su revisión; después de revisarla, "
+                            "decide: aprobarla o pedirle cambios, con un botón o escribiendo.",
+    "lista_de_entregas_para_revisar": "Aviso a la persona con las entregas que esperan su "
+                                      "revisión, que van juntas en este mensaje: cuántas son "
+                                      "(cuantas) y, en los hechos que siguen, cada una. Cada "
+                                      "una se abre con su botón para revisarla; en la lista no "
+                                      "se decide nada.",
+    "cuantas": "Cuántas son.",
+    "entrega_en_la_lista": "Una de las entregas de la lista que esperan la revisión de la "
+                           "persona: la tarea, quién la entregó y cuántas fotos trae. Se abre "
+                           "con su botón para revisarla.",
     "falla_de_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
     "lleva_el_enlace_a_la_pagina_de_la_tarea":
         "Al final de este mensaje, el código agrega un enlace personal a la página de la "
