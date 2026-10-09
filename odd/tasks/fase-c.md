@@ -302,6 +302,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     siga trabado, Leda lo vuelve a dejar asentado (decisión 35), con lo que pasó desde la vez
     anterior. Cambia la porción 5 (hoy, una sola vez por bloqueo).
 
+37. **Quien destraba no tiene Leda conectada** (de la C-5, porción 1): decidida (usuario,
+    2026-10-09, opción A con un agregado suyo). Leda se lo dice a la persona trabada, le cuenta que
+    ya le avisó al administrador para que lo conecte (el aviso sale de verdad, por su canal) y le
+    ofrece salidas: "A Mariano todavía no le puedo escribir. Ya se lo avisé al administrador para
+    que lo conecte. Mientras tanto, ¿hay otra persona que pueda destrabarlo, o se lo pedís vos y me
+    contás?". Cambia la porción 1 (hoy sólo dice que no le puede escribir).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2065,7 +2072,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 36 del usuario (2026-10-09; la 30 ya está), con test primero.
+- [ ] Las decisiones 24 a 37 del usuario (2026-10-09; la 30 ya está), con test primero.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
       primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo).
