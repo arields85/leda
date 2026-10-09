@@ -173,11 +173,16 @@ pasos:
                     esperando_a: [{de: Ariel De Simone, tarea: SRV}],
                     novedad: {de: Ariel De Simone, tarea: SRV, quien_destraba: Lucas Natuche,
                               dice_quien_destraba: {para_cuando: "2026-10-22"}}}}
+        # El día que dijo, Leda le vuelve a preguntar si llegó (decisión 42, C-5e).
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: SRV, a: Lucas, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                    responsable: Ariel De Simone, habia_dicho: {para_cuando: "2026-10-22"}}}
     hechos:
       - {jugada: decir_cuando_destraba, resultado: anotado, tarea: SRV,
          aviso_a_quien_esta_trabado: {a: Ariel De Simone, llega: "~2026-10-20T11:40"},
          avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Marcos Tarquini, tarea: PLC,
-                                                            llega: "~2026-10-20T11:40"}}]}
+                                                            llega: "~2026-10-20T11:40"}}],
+         le_vuelve_a_preguntar: {llega: "~2026-10-22T10:00"}}
     pregunta: null
     estado_despues:
       de: Lucas
@@ -208,6 +213,23 @@ pasos:
       - "a Marcos: que no hace falta responder, en el último renglón"
     no_dice:
       - "a Marcos: que la tarea del PLC se destrabó"
+
+  # El día que dijo Lucas (decisión 42, C-5e).
+  - paso: 7b
+    quien: Leda
+    relojes: ["2026-10-22 10:00"]
+    salen:
+      - a: Lucas
+        tipo: el_dia_que_dijo_quien_destraba
+        tarea: SRV
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Ariel De Simone, habia_dicho: {para_cuando: "2026-10-22"}}
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: SRV}
+      esperas_abiertas: [SRV]
+    dice:
+      - "a Lucas: que hoy es el día que dijo para el switch de la tarea del servidor de Ariel; si ya quedó andando"
 
   - paso: 8
     quien: Lucas
@@ -269,10 +291,16 @@ pasos:
         - {tipo: ya_no_hace_falta_que_destrabe, tarea: SRV, a: Lucas, estado: guardado,
            hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo,
                     habia_dicho: {ya_esta: true}}}
+        # Ahora Ariel puede pasarle la IP a Marcos: la pregunta de para cuándo (decisión 42).
+        - {tipo: pregunta_a_quien_destraba, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                    responsable: Marcos Tarquini, causa: presente}}
     hechos:
       - {jugada: destrabar, resultado: anotado, tarea: SRV, estado: en_curso,
          avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Marcos Tarquini, tarea: PLC,
-                                                            llega: "~2026-10-22T15:40"}}]}
+                                                            llega: "~2026-10-22T15:40"}}],
+         lo_esperan: [{le_pregunta_para_cuando: {responsable: Marcos Tarquini, tarea: PLC,
+                                                 llega: "~2026-10-22T16:00"}}]}
     pregunta: null
     dice:
       - que quedó anotado que sigue con el servidor
@@ -312,10 +340,13 @@ pasos:
         - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado,
            hechos: {quien_destraba: Ariel De Simone,
                     dice_quien_destraba: {para_cuando: "2026-10-23"}}}
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {habia_dicho: {para_cuando: "2026-10-23"}}}
     hechos:
       - {jugada: decir_cuando_destraba, resultado: anotado, tarea: PLC,
          aviso_a_quien_esta_trabado: {a: Marcos Tarquini, llega: "~2026-10-22T15:55"},
-         avisos_a_quienes_esperan: ausente}
+         avisos_a_quienes_esperan: ausente,
+         le_vuelve_a_preguntar: {llega: "~2026-10-23T10:00"}}
     pregunta: null
     dice:
       - que quedó anotado
@@ -332,6 +363,23 @@ pasos:
                  dice_quien_destraba: {para_cuando: "2026-10-23"}}
     dice:
       - "a Marcos: que Ariel dice que le pasa la IP mañana (vie 23/10) temprano"
+
+  # El día que dijo Ariel (decisión 42, C-5e). La pregunta de para cuándo del jueves no sale: ya
+  # lo dijo antes de que le llegara.
+  - paso: 13b
+    quien: Leda
+    relojes: ["2026-10-23 10:00"]
+    salen:
+      - a: Ariel
+        tipo: el_dia_que_dijo_quien_destraba
+        tarea: PLC
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Marcos Tarquini, habia_dicho: {para_cuando: "2026-10-23"}}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLC}
+    dice:
+      - "a Ariel: que hoy es el día que dijo para pasarle la IP a Marcos; si ya se la pasó"
 
   # --- La otra cadena: el enlace lo dice quien destraba -------------------------------------
   - paso: 14
@@ -459,11 +507,14 @@ pasos:
                     esperando_a: [{de: Mariano Naim, tarea: TAB}],
                     novedad: {de: Mariano Naim, tarea: TAB, quien_destraba: Lucas Natuche,
                               dice_quien_destraba: {para_cuando: "2026-10-26"}}}}
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: TAB, a: Lucas, estado: guardado,
+           hechos: {habia_dicho: {para_cuando: "2026-10-26"}}}
     hechos:
       - {jugada: decir_cuando_destraba, resultado: anotado, tarea: TAB,
          aviso_a_quien_esta_trabado: {a: Mariano Naim, llega: "~2026-10-23T11:50"},
          avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Nahuel Gimenez, tarea: PLA,
-                                                            llega: "~2026-10-23T11:50"}}]}
+                                                            llega: "~2026-10-23T11:50"}}],
+         le_vuelve_a_preguntar: {llega: "~2026-10-26T10:00"}}
     pregunta: null
 
   - paso: 21

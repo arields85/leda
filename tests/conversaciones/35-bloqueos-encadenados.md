@@ -7,6 +7,9 @@ está más lejos, se entera de cada avance del medio con avisos informativos que
 que Ariel se trabó, la fecha que da Lucas, que Lucas ya lo resolvió y que Ariel pudo seguir. Con otra
 cadena, el enlace lo dice quien destraba ("sigo parado con lo mío"), sin una dependencia cargada.
 Decisión 6 del usuario (`odd/tasks/fase-c.md`, 2026-10-08); ADR 0017, decisión 3a; mecánica §4 y §8.
+Desde la C-5e (decisión 42): el día que dijo cada uno, Leda le vuelve a preguntar si ya está; y cuando
+Ariel puede seguir, como ahora sí puede pasarle la IP a Marcos, Leda le pregunta para cuándo (si lo
+dice antes, la pregunta no sale).
 
 **Corre desde la porción 4 de la C-5** (`odd/tasks/fase-c.md`), entera, con su YAML.
 
@@ -97,7 +100,8 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
    →
    - Jugadas: `decir_cuando_destraba` sobre la tarea del servidor, para el jueves 22, con sus palabras.
    - Efecto: queda anotado lo que dice Lucas; se guardan el aviso a Ariel con lo que dijo Lucas (lo de
-     siempre) y el aviso a Marcos de ese avance del medio, los dos a las 11:40.
+     siempre) y el aviso a Marcos de ese avance del medio, los dos a las 11:40, y la pregunta a Lucas
+     de si ya está, para el jueves 22 a las 10:00 (decisión 42).
    - La respuesta dice: que quedó anotado; que Ariel se va a enterar.
 
 7. **Leda**, por su cuenta (martes 20, 11:40):
@@ -105,6 +109,11 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
    - A Ariel, informativo: que Lucas dice que deja el switch andando el jueves (jue 22/10) a la tarde.
    - A Marcos, informativo: lo mismo, como un avance de lo que espera su tarea (la del servidor de
      Ariel); que no hace falta responder.
+
+7b. **Leda**, por su cuenta, a Lucas (jueves 22, 10:00): el día que dijo; si ya quedó andando el
+    switch para la tarea del servidor de Ariel (decisión 42).
+    →
+    - Efecto: su pregunta abierta, con su espera.
 
 8. **Lucas** escribe (jueves 22, 15:00): "listo ya quedo instalado el switch"
    →
@@ -122,8 +131,11 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
     - Jugadas: `destrabar` sobre la tarea del servidor.
     - Efecto: el bloqueo del servidor se cierra y la tarea vuelve a `en_curso`; se guarda el aviso a
       Marcos de que Ariel pudo seguir, a las 15:40. Lucas, que había dicho que ya estaba, se entera
-      de que Ariel pudo seguir (regla 39, derivada en la C-5d): su aviso sale a la misma hora.
-    - La respuesta dice: que quedó anotado; que Marcos se va a enterar.
+      de que Ariel pudo seguir (regla 39, derivada en la C-5d): su aviso sale a la misma hora. Ahora
+      Ariel puede pasarle la IP a Marcos (decisión 42, C-5e): se guarda la pregunta a Ariel de para
+      cuándo, que le llega pasada la media hora desde que escribió (16:00).
+    - La respuesta dice: que quedó anotado; que Marcos se va a enterar; que Marcos espera la IP y
+      Leda le pregunta para cuándo.
 
 11. **Leda**, por su cuenta, a Marcos (jueves 22, 15:40): informativo, que Ariel ya pudo seguir con la
     tarea del servidor; que no hace falta responder.
@@ -134,10 +146,17 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
 12. **Ariel** escribe (jueves 22, 15:45): "la ip se la paso a marcos mañana temprano"
     →
     - Jugadas: `decir_cuando_destraba` sobre la tarea del PLC, para el viernes 23.
-    - Efecto: queda anotado; se guarda el aviso a Marcos con lo que dijo (lo de siempre), a las 15:55.
+    - Efecto: queda anotado; se guarda el aviso a Marcos con lo que dijo (lo de siempre), a las 15:55,
+      y la pregunta a Ariel de si se la pasó, para el viernes 23 a las 10:00. La pregunta de para
+      cuándo, que todavía no le llegó, ya no sale: lo dijo antes.
 
 13. **Leda**, por su cuenta, a Marcos (jueves 22, 15:55): que Ariel dice que le pasa la IP mañana
     (vie 23/10) temprano; que cuando pueda seguir, lo diga.
+
+13b. **Leda**, por su cuenta, a Ariel (viernes 23, 10:00): el día que dijo; si ya le pasó la IP a
+     Marcos (decisión 42).
+     →
+     - Efecto: su pregunta abierta.
 
 **La otra cadena: el enlace lo dice quien destraba.**
 
@@ -177,7 +196,8 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
     →
     - Jugadas: `decir_cuando_destraba` sobre la tarea del tablero, para el lunes 26.
     - Efecto: queda anotado; se guardan el aviso a Mariano (lo de siempre) y el aviso a Nahuel de ese
-      avance del medio, los dos a las 11:50.
+      avance del medio, los dos a las 11:50, y la pregunta a Lucas de si llegaron, para el lunes 26
+      a las 10:00.
 
 21. **Leda**, por su cuenta (viernes 23, 11:50):
     →

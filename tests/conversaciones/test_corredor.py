@@ -61,9 +61,10 @@ def test_hay_cuarenta_y_tres_conversaciones_y_cada_una_nombra_su_fuente():
     # tarea de su gente, la revisión sigue a quien era la tarea y un pase sin respuesta), y la
     # 40 desde las decisiones 31, 32, 44 y 46 de la C-6 (la semana de las listas), y la 41 desde
     # la decisión 25 (el informe al grupo), y la 42 desde la C-5b (a quien destraba y no
-    # contesta, Leda nunca lo abandona), y la 43 desde la C-5c (cerrar el tema para todos).
+    # contesta, Leda nunca lo abandona), y la 43 desde la C-5c (cerrar el tema para todos), y la
+    # 44 desde la C-5e (seguir la cadena hasta quien puede destrabarla).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 44)]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 45)]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]

@@ -184,6 +184,13 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     pregunta le llegó: Leda deja de preguntarle a Ariel y se lo dice. "Se lo pido yo y te cuento": Leda
     no le escribe a nadie y al día hábil siguiente le pregunta a Marcos cómo le fue (decisión 39 del
     usuario, con lo derivado en la 47 y la salida de la 37; C-5c).
+44. [`44-seguir-la-cadena.md`](44-seguir-la-cadena.md): Leda sigue la cadena hasta quien puede
+    destrabarla. Marcos nombra a Ariel, que ya está trabado con lo que le falta: Leda no le pide a
+    Ariel lo que no puede dar y le cuenta a Marcos enseguida qué espera Ariel, quién lo destraba y lo
+    que ya dijo, y que le avisa apenas se mueva. El día que Lucas dijo, Leda le vuelve a preguntar si
+    llegó; la fecha nueva les llega a Ariel y a Marcos, y si Lucas no contesta rige la regla de la 42.
+    Cuando Ariel puede seguir, Leda le pregunta para cuándo le pasa la IP a Marcos (decisión 42 del
+    usuario; C-5e). La 35 suma, desde la C-5e, la pregunta del día que dijo cada uno.
 
 Los pedidos de estado con ritmo fijo (circuito 5; ADR 0017, decisión 3b, punto 5; `odd/tasks/fase-c.md`,
 decisión 8):
