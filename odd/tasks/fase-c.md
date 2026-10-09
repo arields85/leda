@@ -255,6 +255,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     evitar retrasos. Y es más, si no tiene nada esperando, con más sentido tendría que
     repetírsela". Cambia la D5b (hoy sólo se repite si algo espera detrás) y quizás la 03 y la 26.
 
+30. **Qué sale primero cuando hay varias cosas esperando** (de la D5b): decidida (usuario,
+    2026-10-09, opción A). La que vence antes: el jueves, "cómo viene Comunicaciones" (vence hoy)
+    sale antes que la repetición del PLC (vence el viernes). Confirma lo construido en la D5b.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
