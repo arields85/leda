@@ -881,6 +881,9 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
     # a quien nombró no le puede escribir, las salidas de la decisión 37 (C-5b): otra persona que
     # pueda destrabarlo, o que se lo pida ella y le cuente.
     from . import persecucion               # persecucion importa este módulo
+    # Si contesta la pregunta de si se le ocurre otra persona (decisión 49): sigue la misma cadena
+    # y, si no se le ocurre nadie, queda asentado.
+    sigue_la_cadena = persecucion.contesta_si_hay_otra(cur, anotado)
     # A quien Leda le preguntaba antes ya no le hace falta: se entera (C-5c, decisión 39).
     _juntar(hecho, persecucion.cerrar_el_tema(
         ctx, task_id, str(bloqueo["id"]), persecucion.CAMBIO_QUIEN_DESTRABA,
@@ -889,6 +892,10 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
         _juntar(hecho, persecucion.preguntarle(ctx, fila, bloqueo, anotado, integrante))
         if "no_se_le_puede_escribir_a" in hecho:
             return {**hecho, "salidas": list(persecucion.SALIDAS_SIN_LEDA_CONECTADA)}
+    if sigue_la_cadena and no_sabe:
+        # Nadie más: queda asentado, y el tema se cierra así (decisión 49), sin salidas.
+        _juntar(hecho, persecucion.sin_otra_persona(ctx, fila, anotado))
+        return hecho
     sin_otra_persona = no_sabe or nadie_mas
     return {**hecho, "salidas": list(SALIDAS_DE_UN_BLOQUEO)} if sin_otra_persona else hecho
 
@@ -1436,7 +1443,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                "que le toca a la persona misma",
           despues="cierra la pregunta y la espera; si no se sabe, le toca a la persona "
                   "que escribe o a quien nombró Leda no le puede escribir, propone salidas, "
-                  "que quedan como tema abierto",
+                  "que quedan como tema abierto; si contesta si se le ocurre otra persona y no "
+                  "sabe, queda asentado, sin salidas",
           manejar=_anotar_quien_destraba,
           contesta=(preguntas.QUIEN_DESTRABA, preguntas.ESTADO_DE_LA_TAREA),
           propone=lambda hecho: hecho.get("salidas"),
@@ -1607,8 +1615,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           necesita=(), opcional=("tarea", "para_cuando", "ya_esta", "lo_que_dice",
                                  "ya_lo_hablaron", "su_tarea_trabada"),
           comprueba="que quien escribe sea quien destraba ahora un bloqueo abierto de esa tarea "
-                    "(lo último que dijo la persona trabada), o quien la destrababa si lo último "
-                    "que Leda le mandó es que ya no hace falta",
+                    "(lo último que dijo la persona trabada), quien la destrababa si lo último "
+                    "que Leda le mandó es que ya no hace falta, o a quien Leda le informó que "
+                    "sigue trabada",
           hace="anota lo que dice, atribuido y auditado, como un hecho del bloqueo: para "
                "cuándo, que ya está o sus palabras; no cierra el bloqueo. Si sólo dice que ya "
                "lo habló con la persona trabada, no anota nada todavía: pregunta una vez qué "
@@ -1626,7 +1635,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "que ya lo habló con la persona trabada (ya_lo_hablaron), o que no puede porque "
              "una tarea suya está trabada (su_tarea_trabada). También lo que contesta cuando "
              "Leda le dijo que ya no hace falta (está en la lista como "
-             "ya_no_hace_falta_que_la_destrabe). Es lo que dice sobre lo que traba la tarea de "
+             "ya_no_hace_falta_que_la_destrabe), y lo que dice de una tarea trabada de otra "
+             "persona que Leda le informó que sigue trabada (está en la lista como "
+             "se_le_informo_que_sigue_trabada). Es lo que dice sobre lo que traba la tarea de "
              "otro: no es un hecho de una tarea suya."),
     Ficha("decir_que_no_le_toca", "decir que no le corresponde destrabar la tarea trabada de "
                                   "otra persona",

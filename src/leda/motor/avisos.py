@@ -1738,6 +1738,11 @@ VOLVIO_A_SER_QUIEN_DESTRABA = "volvio_a_ser_quien_destraba"
 # Lo que dijo quien destrababa después de que la tarea ya no estaba trabada (decisión 39): sale
 # igual, porque es lo que contesta a eso.
 YA_SE_HABIA_DESTRABADO = "ya_se_habia_destrabado"
+# Antes de asentar un "ni idea", a la persona trabada (C-5d; decisión 49 del usuario,
+# 2026-10-09; `persecucion.py`): lo que dijo quien no lo toma y si se le ocurre otra persona que
+# pueda destrabarlo. Al salir abre su pregunta de quién lo destraba. De coordinación: lo causa lo
+# que dijo otra persona. No sale si ya contestó o el bloqueo se cerró.
+QUIEN_MAS_PUEDE_DESTRABAR = "quien_mas_puede_destrabar"
 
 
 def quien_destraba(cur, destraba_id) -> dict[str, Any] | None:
@@ -1947,6 +1952,21 @@ def _vigencia_de_ya_no_hace_falta(m: Momento, aviso) -> tuple[str | None, dict[s
     return persecucion.vigencia_de_ya_no_hace_falta(m, aviso)
 
 
+def _vigencia_de_quien_mas(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import persecucion
+    return persecucion.vigencia_de_quien_mas(m, aviso)
+
+
+def _abre_quien_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
+    """La pregunta de quién destraba, otra vez, a la persona trabada (decisión 49): lo que
+    recuerda al repetirla es lo que la traba (`preguntas.lo_anotado`)."""
+    hechos = aviso["hechos"] or {}
+    return preguntas.QUIEN_DESTRABA, {
+        "nombre": "anotar_quien_destraba",
+        "datos": {k: hechos[k] for k in ("causa", "quien_destraba") if hechos.get(k)},
+        "destraba_id": de_la_clave(aviso), "del_aviso": str(aviso["id"])}
+
+
 def _abre_que_arreglaron(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
     """La pregunta de qué arregló la persona trabada con quien destraba, atada a la fila que lo
     nombró: lo que recuerda al repetirla es con quién y por qué (`preguntas.lo_anotado`)."""
@@ -2033,6 +2053,10 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
                 es_coordinacion=True),
     # La cadena al referente, cuando nadie toma el bloqueo (porción 3): informativa.
     TipoDeAviso(CADENA_DEL_BLOQUEO, "informativo", _vigencia_de_la_cadena, es_coordinacion=True),
+    # Antes de asentar un "ni idea", a la persona trabada, si se le ocurre otra persona (C-5d,
+    # decisión 49): la causa lo que dijo otra persona; abre su pregunta de quién lo destraba.
+    TipoDeAviso(QUIEN_MAS_PUEDE_DESTRABAR, "normal", _vigencia_de_quien_mas, es_coordinacion=True,
+                abre=_abre_quien_destraba),
     # Un avance del medio a quien espera más abajo, en una cadena de bloqueos (porción 4):
     # informativo; lo causa el acto de otra persona.
     TipoDeAviso(NOVEDAD_DE_LO_QUE_ESPERA, "informativo", _vigencia_de_la_novedad,

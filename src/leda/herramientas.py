@@ -1549,7 +1549,7 @@ def _preparar_resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
         raise Denegado("Hace falta contar cómo se resolvió para poder cerrarlo.")
 
     cur.execute(
-        """select b.causa, b.task_id, b.resuelto_en, b.abierto_por, b.escalado_a,
+        """select b.causa, b.task_id, b.resuelto_en, b.abierto_por,
                   t.titulo, t.estado, t.responsable_membership_id
              from blocker b join task t on t.id = b.task_id
             where b.id = %s""",
@@ -1560,13 +1560,15 @@ def _preparar_resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
     if fila["resuelto_en"] is not None:
         return {"error": "ese bloqueo ya estaba resuelto"}
 
-    autorizados = {str(m) for m in (fila["responsable_membership_id"],
-                                    fila["abierto_por"], fila["escalado_a"])
+    # Lo da por destrabado quien está trabado (decisión 41 del usuario, 2026-10-09): quien tiene
+    # la tarea o quien anotó el bloqueo, nunca a quien se le informó que seguía abierto
+    # (`escalado_a`): lo que esa persona diga queda anotado y le llega a la persona trabada.
+    autorizados = {str(m) for m in (fila["responsable_membership_id"], fila["abierto_por"])
                   if m is not None}
     if str(quien.membership_id) not in autorizados:
         raise Denegado(
-            "No podés resolver ese bloqueo: no es tuyo, no lo abriste vos ni "
-            "se te escaló.")
+            "No podés resolver ese bloqueo: no es tuyo ni lo abriste vos. Lo da por "
+            "destrabado quien está trabado.")
 
     vuelve_a = None
     quedan_abiertos = None
@@ -1613,7 +1615,7 @@ def _resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
         raise Denegado("Hace falta contar cómo se resolvió para poder cerrarlo.")
 
     cur.execute(
-        """select b.task_id, b.resuelto_en, b.abierto_por, b.escalado_a,
+        """select b.task_id, b.resuelto_en, b.abierto_por,
                   t.responsable_membership_id
              from blocker b join task t on t.id = b.task_id
             where b.id = %s""",
@@ -1626,13 +1628,15 @@ def _resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
     if fila["resuelto_en"] is not None:
         return {"error": "ese bloqueo ya estaba resuelto"}
 
-    autorizados = {str(m) for m in (fila["responsable_membership_id"],
-                                    fila["abierto_por"], fila["escalado_a"])
+    # Lo da por destrabado quien está trabado (decisión 41 del usuario, 2026-10-09): quien tiene
+    # la tarea o quien anotó el bloqueo, nunca a quien se le informó que seguía abierto
+    # (`escalado_a`): lo que esa persona diga queda anotado y le llega a la persona trabada.
+    autorizados = {str(m) for m in (fila["responsable_membership_id"], fila["abierto_por"])
                   if m is not None}
     if str(quien.membership_id) not in autorizados:
         raise Denegado(
-            "No podés resolver ese bloqueo: no es tuyo, no lo abriste vos ni "
-            "se te escaló.")
+            "No podés resolver ese bloqueo: no es tuyo ni lo abriste vos. Lo da por "
+            "destrabado quien está trabado.")
 
     cur.execute(
         "update blocker set resuelto_en = now(), resolucion = %s where id = %s",

@@ -898,6 +898,16 @@ SIGNIFICADOS: Mapping[str, str] = {
                           "por qué no le llega.",
     "sin_referente": "No hay a quién informarle el bloqueo: el sector no tiene a nadie a "
                      "cargo.",
+    # --- Hasta tres personas, "ni idea" y lo que dice a quien se le informó (C-5d) ------------
+    "quien_mas_puede_destrabar": "Mensaje de Leda a la persona trabada: quien Leda creía que "
+                                 "podía destrabar su tarea (quien_destraba) dice que no le "
+                                 "corresponde y no sabe de quién es (dice_quien_destraba); la "
+                                 "pregunta de si se le ocurre otra persona que pueda "
+                                 "destrabarla. Si no se le ocurre nadie, queda asentado.",
+    "se_le_informo_que_sigue_trabada": "Una tarea de otra persona, trabada, que Leda le "
+                                       "informó a la persona que escribe que sigue trabada: lo "
+                                       "que diga de eso le llega a quien la tiene, que es quien "
+                                       "la da por destrabada. No es una tarea suya.",
     # --- Los bloqueos encadenados (C-5, porción 4; `encadenados.py`) -------------------------
     "novedad_de_lo_que_espera": "Aviso informativo a una persona trabada: algo pasó con lo que "
                                 "espera su tarea, más arriba en la cadena (novedad). No le pide "

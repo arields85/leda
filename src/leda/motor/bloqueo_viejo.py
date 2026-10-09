@@ -27,11 +27,15 @@ vez, con su fila de auditoría. Sale a la hora en que Leda manda lo suyo, dentro
 interrumpir una conversación (decisión 13), como todo aviso.
 
 **A quién** (`a_quien`): al referente del sector de la tarea trabada; si es la persona trabada
-misma, a quien aprueba su trabajo (la misma regla que la cadena de la porción 3,
-`persecucion.a_quien_informar`). Se relee al salir (`TipoDeAviso.va_a`). **Sin nadie a quien
-informar** (sin referente ni quien apruebe su trabajo, o sin Leda conectada; decisión 49 y "nunca
-fallar en silencio", C-5b), queda asentado igual: la vez queda contada con el aviso al referente
-omitido (`SIN_A_QUIEN_INFORMAR`, a nombre de la persona trabada: no le llega a nadie), en la
+misma o alguien de la cadena del bloqueo (decisión 24, C-5d), a quien aprueba su trabajo; nunca a
+alguien de la cadena (la misma regla que la cadena de la porción 3,
+`persecucion.a_quien_informar`). Quien lo recibe puede decir algo de eso ("ya está, llega
+mañana"): queda anotado y se lo cuenta a la persona trabada, pero no lo cierra; lo da por
+destrabado la persona trabada (decisión 41; `persecucion.decir_cuando_destraba`). Se relee al
+salir (`TipoDeAviso.va_a`). **Sin nadie a quien informar** (sin referente ni quien apruebe su
+trabajo, o sin Leda conectada; decisión 49 y "nunca fallar en silencio", C-5b), queda asentado
+igual: la vez queda contada con el aviso al referente omitido (`SIN_A_QUIEN_INFORMAR`, a nombre
+de la persona trabada: no le llega a nadie), en la
 historia con su motivo, un incidente para el administrador (`asentado.avisar_que_no_hay_a_quien`)
 y, a la persona trabada, que quedó asentado; que no le llega a nadie, sólo si lo pregunta.
 
@@ -65,7 +69,7 @@ from .asentado import (QUEDA_ASENTADO, SIN_A_QUIEN_INFORMAR, avisar_que_no_hay_a
 from .auditoria import auditar
 from .avisos import (ASENTADO_QUE_SIGUE_TRABADA, BLOQUEO_QUE_SIGUE_ABIERTO, YA_SE_DESTRABO,
                      Momento, de_la_clave, guardar, integrante, leer_tarea, omitir)
-from .persecucion import SIN_REFERENTE, a_quien_informar, alcanzable
+from .persecucion import SIN_REFERENTE, a_quien_informar, alcanzable, en_la_cadena
 from .tiempo import sale
 
 CLAVE = "bloqueos"
@@ -92,11 +96,14 @@ def clave(task_id, bloqueo_id, vez: int = 1, tipo: str = BLOQUEO_QUE_SIGUE_ABIER
     return base if vez == 1 else f"{base}:{vez}"
 
 
-def a_quien(cur, tarea: dict[str, Any]) -> dict[str, Any] | None:
-    """Al referente del sector de la tarea; si es la persona trabada, a quien aprueba su
-    trabajo. `None` si no hay nadie."""
-    return a_quien_informar(cur, {"responsable_membership_id": tarea["responsable_membership_id"],
-                                  "area_id": tarea["area_id"]}, None)
+def a_quien(cur, tarea: dict[str, Any], bloqueo_id) -> dict[str, Any] | None:
+    """Al referente del sector de la tarea; si es la persona trabada o alguien de la cadena del
+    bloqueo (decisión 24), a quien aprueba su trabajo; nunca a alguien de la cadena. `None` si no
+    hay nadie."""
+    trabado = str(tarea["responsable_membership_id"])
+    return a_quien_informar(cur, {"responsable_membership_id": trabado,
+                                  "area_id": tarea["area_id"]},
+                            en_la_cadena(cur, bloqueo_id, trabado))
 
 
 def _veces(cur, workspace_id: str, task_id, bloqueo_id) -> list[dict[str, Any]]:
@@ -133,7 +140,7 @@ def informar_los_viejos(m: Momento) -> int:
         tarea = leer_tarea(cur, b["task_id"])
         if tarea is None:
             continue
-        destino = a_quien(cur, tarea)
+        destino = a_quien(cur, tarea, b["id"])
         sin_a_quien = (SIN_REFERENTE if destino is None
                        else alcanzable(cur, str(destino["membership_id"]))[1])
         vez, cuando = len(veces) + 1, sale(m.cal, m.ahora)
@@ -323,7 +330,7 @@ def vigencia_de_lo_asentado(m: Momento, aviso: dict[str, Any]
     suyo = m.cur.fetchone()
     # Uno que no salió (omitido, o `fallido` porque la IA no lo redactó) no le llegó a nadie:
     # nunca se nombra a quien no lo recibió (constitución §4; revisión `review-8d6e96daab3e588b`).
-    destino = (a_quien(m.cur, tarea)
+    destino = (a_quien(m.cur, tarea, de_la_clave(aviso))
                if suyo is not None and suyo["estado"] not in ("omitido", "fallido") else None)
     return None, hechos_de_lo_asentado(m, de_la_clave(aviso),
                                        destino["nombre"] if destino else None,
@@ -333,7 +340,7 @@ def vigencia_de_lo_asentado(m: Momento, aviso: dict[str, Any]
 def va_a(m: Momento, aviso: dict[str, Any]) -> str | None:
     """A quién va al salir, releído."""
     tarea = leer_tarea(m.cur, aviso["task_id"])
-    destino = a_quien(m.cur, tarea) if tarea is not None else None
+    destino = a_quien(m.cur, tarea, de_la_clave(aviso)) if tarea is not None else None
     return str(destino["membership_id"]) if destino is not None else None
 
 

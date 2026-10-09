@@ -188,13 +188,28 @@ def test_al_salir_se_vuelve_a_mirar(conn, mundo, equipo, dias):
 def test_va_a_quien_es_referente_al_salir(conn, mundo, equipo, dias):
     _marcos_trabado(equipo)
     dias.ciclo(octubre(13, 8))
-    _referente(conn, mundo["area"], _membresia(mundo, "Ariel"))
+    _integrante(conn, mundo, "Nico", "Nico Sanchez", 81_042)
+    _referente(conn, mundo["area"], _membresia(mundo, "Nico"))
 
     dias.ciclo(octubre(13, 10))
 
     [aviso] = _viejos(conn)
-    assert str(aviso["destinatario_membership_id"]) == _membresia(mundo, "Ariel")
-    assert uno(conn, "select escalado_a::text a from blocker")["a"] == _membresia(mundo, "Ariel")
+    assert str(aviso["destinatario_membership_id"]) == _membresia(mundo, "Nico")
+    assert uno(conn, "select escalado_a::text a from blocker")["a"] == _membresia(mundo, "Nico")
+
+
+def test_nunca_va_a_alguien_de_la_cadena(conn, mundo, equipo, dias):
+    """Decisión 24 (C-5d): el referente de la tarea es Ariel, quien la destraba: va a quien
+    aprueba el trabajo de Marcos (Ismael)."""
+    _referente(conn, mundo["area"], _membresia(mundo, "Ariel"))
+    _marcos_trabado(equipo)
+
+    dias.ciclo(octubre(13, 10))
+
+    [aviso] = _viejos(conn)
+    assert str(aviso["destinatario_membership_id"]) == _membresia(mundo, "Ismael")
+    [hechos] = _asentado_para(dias, "Marcos")
+    assert hechos["queda_asentado"]["a"] == "Ismael"
 
 
 # --- Se le cuenta a la persona trabada (decisión 34) y con la forma de la 35 ----------------------
@@ -435,3 +450,104 @@ def test_si_la_vez_anterior_no_salio_no_se_guarda_otra(conn, mundo, equipo, dias
 
     [aviso] = _viejos(conn)
     assert aviso["estado"] == "guardado"
+
+
+# --- Lo da por destrabado quien está trabado (decisión 41; C-5d) --------------------------------
+
+YA_NO_HACE_FALTA = "ya_no_hace_falta_que_destrabe"
+LO_QUE_DIJO = "lo_que_dijo_quien_destraba"
+
+
+def _se_le_informo_a_lucas(equipo, dias) -> None:
+    _marcos_trabado(equipo)
+    dias.ciclo(octubre(13, 10))
+
+
+def test_quien_recibio_el_bloqueo_viejo_lo_ve_en_su_lista(conn, mundo, equipo, dias):
+    _se_le_informo_a_lucas(equipo, dias)
+
+    equipo.dice("Lucas", at=octubre(13, 11))
+
+    [tarea] = equipo.situacion["tareas"]
+    assert tarea["se_le_informo_que_sigue_trabada"] is True
+    assert "espera_que_la_destrabe" not in tarea
+    assert (tarea["responsable"], tarea["causa"]) == ("Marcos", CAUSA)
+
+
+def test_ya_esta_de_quien_recibio_el_bloqueo_viejo_se_anota_y_no_lo_cierra(conn, mundo, equipo,
+                                                                           dias):
+    _se_le_informo_a_lucas(equipo, dias)
+
+    r = equipo.dice("Lucas", Jugada("decir_cuando_destraba",
+                                    {"tarea": "T1", "ya_esta": True, "para_cuando": "2026-10-14",
+                                     "lo_que_dice": "ya esta, llega mañana"}),
+                    at=octubre(13, 11))
+
+    # Queda anotado, dicho por Lucas, y Marcos se entera.
+    dicho = uno(conn, """select ya_esta, para_cuando::text para_cuando,
+                                dicho_por_membership_id::text de
+                           from dicho_de_quien_destraba where dicho_por_membership_id = %s""",
+                _membresia(mundo, "Lucas"))
+    assert dicho == {"ya_esta": True, "para_cuando": "2026-10-14",
+                     "de": _membresia(mundo, "Lucas")}
+    aviso = avisos_guardados(conn, LO_QUE_DIJO)[-1]
+    assert str(aviso["destinatario_membership_id"]) == _membresia(mundo, "Marcos")
+    assert aviso["hechos"]["quien_destraba"] == LUCAS
+    assert aviso["hechos"]["dice_quien_destraba"]["ya_esta"] is True
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["aviso_a_quien_esta_trabado"]["a"] == "Marcos"
+    # El bloqueo sigue abierto hasta que Marcos diga que pudo seguir.
+    assert cuantas(conn, "blocker", "resuelto_en is null") == 1
+    assert uno(conn, "select estado::text e from task where titulo = 'Revisar el tablero'")[
+        "e"] == "bloqueada"
+
+
+def test_cuando_quien_esta_trabado_lo_destraba_se_enteran_los_que_dijeron_que_ya_esta(
+        conn, mundo, equipo, dias):
+    """Derivado de la regla 39: quien ya dijo "ya está" (Lucas) y quien había dado un día
+    (Ariel) se enteran de que el bloqueo, por fin, se cerró."""
+    _se_le_informo_a_lucas(equipo, dias)
+    equipo.dice("Lucas", Jugada("decir_cuando_destraba", {"tarea": "T1", "ya_esta": True}),
+                at=octubre(13, 11))
+
+    equipo.dice("Marcos", Jugada("destrabar", {"tarea": "T1"}), texto="ya la tengo",
+                at=octubre(14, 11))
+
+    avisos = avisos_guardados(conn, YA_NO_HACE_FALTA)
+    assert {str(a["destinatario_membership_id"]) for a in avisos} == {
+        _membresia(mundo, "Lucas"), _membresia(mundo, "Ariel")}
+    de_lucas = next(a for a in avisos
+                    if str(a["destinatario_membership_id"]) == _membresia(mundo, "Lucas"))
+    assert de_lucas["hechos"]["como_se_cerro"] == "ya_se_destrabo"
+    assert de_lucas["hechos"]["habia_dicho"] == {"ya_esta": True}
+
+
+def test_sin_nadie_que_lo_destrabe_lo_que_dice_queda_como_suyo(conn, mundo, equipo, dias):
+    """Marcos nunca dijo quién lo destraba: lo que dice Lucas queda anotado igual, como que lo
+    destraba él (dicho por él)."""
+    equipo.dice("Marcos", Jugada("anotar_bloqueo", {"tarea": "T1", "causa": CAUSA}))
+    dias.ciclo(octubre(13, 10))
+
+    equipo.dice("Lucas", Jugada("decir_cuando_destraba",
+                                {"tarea": "T1", "para_cuando": "2026-10-14"}),
+                at=octubre(13, 11))
+
+    fila = uno(conn, """select destraba_membership_id::text destraba,
+                               dicho_por_membership_id::text de from blocker_unblocker""")
+    assert fila == {"destraba": _membresia(mundo, "Lucas"), "de": _membresia(mundo, "Lucas")}
+    assert cuantas(conn, "dicho_de_quien_destraba") == 1
+    assert avisos_guardados(conn, LO_QUE_DIJO)[-1]["hechos"]["quien_destraba"] == LUCAS
+    assert cuantas(conn, "blocker", "resuelto_en is null") == 1
+
+
+def test_quien_no_recibio_el_bloqueo_viejo_no_puede_decirlo(conn, mundo, equipo, dias):
+    _marcos_trabado(equipo)
+
+    r = equipo.dice("Lucas", Jugada("decir_cuando_destraba",
+                                    {"tarea": "T1", "ya_esta": True}),
+                    at=octubre(6, 11))
+
+    assert r.hechos[0]["resultado"] in ("no_se_puede", "falta_dato")
+    assert cuantas(conn, "dicho_de_quien_destraba", "dicho_por_membership_id = %s",
+                   _membresia(mundo, "Lucas")) == 0

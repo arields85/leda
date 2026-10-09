@@ -611,9 +611,9 @@ def test_no_le_escribas_retira_el_mensaje_que_todavia_no_salio(conn, mundo, equi
                    _membresia(mundo, "Ariel")) == 0
 
 
-def test_no_le_escribas_despues_de_que_salio_dice_que_ya_le_llego(conn, mundo, equipo):
-    """Ariel ya contestó: Leda no le está preguntando nada, así que no hay nada que retirar ni
-    que cerrarle (con la pregunta todavía abierta, ver la C-5c, abajo)."""
+def test_no_le_escribas_despues_de_que_dio_un_dia_se_lo_cierra(conn, mundo, equipo):
+    """Ariel ya había dado un día: "no le escribas" hace que Leda no le pregunte más y se lo
+    diga (derivado de la regla 39 en la C-5d; antes no le llegaba nada)."""
     _le_pregunto(conn, mundo, equipo)
     equipo.dice("Ariel", Jugada("decir_cuando_destraba",
                                 {"tarea": "T1", "para_cuando": "2026-10-06"}))
@@ -623,9 +623,31 @@ def test_no_le_escribas_despues_de_que_salio_dice_que_ya_le_llego(conn, mundo, e
     [aviso] = avisos_guardados(conn, PREGUNTA_A_QUIEN_DESTRABA)
     assert aviso["estado"] == "enviado"
     [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["se_le_pregunta_a"] == {"a": ARIEL, "llega": "ya_le_llego",
+                                         "el": "2026-10-05"}
+    [avisado] = hecho["ya_no_hace_falta_que_destraben"]
+    assert avisado["aviso_a_quien_destrababa"]["a"] == ARIEL
+    [cerrado] = avisos_guardados(conn, YA_NO_HACE_FALTA)
+    assert str(cerrado["destinatario_membership_id"]) == _membresia(mundo, "Ariel")
+    assert cerrado["hechos"]["como_se_cerro"] == "dijo_que_ya_lo_hablaron"
+    assert cerrado["hechos"]["habia_dicho"] == {"para_cuando": "2026-10-06"}
+
+
+def test_no_le_escribas_despues_de_que_dijo_que_ya_esta_dice_que_ya_le_llego(conn, mundo,
+                                                                            equipo):
+    """Ariel ya dijo que ya está: Leda no le pregunta nada ni le va a preguntar, así que no hay
+    nada que retirar ni que cerrarle."""
+    _le_pregunto(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba", {"tarea": "T1", "ya_esta": True}))
+
+    r = equipo.dice("Marcos", Jugada("no_escribirle", {"tarea": "T1"}))
+
+    [hecho] = r.hechos
     assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "ya_se_le_escribio")
     assert hecho["se_le_pregunta_a"] == {"a": ARIEL, "llega": "ya_le_llego",
                                          "el": "2026-10-05"}
+    assert avisos_guardados(conn, YA_NO_HACE_FALTA) == []
 
 
 def test_no_le_escribas_encuentra_el_mensaje_aunque_esa_persona_ya_no_este_activa(conn, mundo,
@@ -752,14 +774,18 @@ def test_a_quien_todavia_no_le_llego_la_pregunta_no_hay_nada_que_cerrarle(conn, 
     assert avisos_guardados(conn, YA_NO_HACE_FALTA) == []
 
 
-def test_a_quien_dijo_que_ya_esta_no_se_le_cierra_nada(conn, mundo, equipo):
-    """Lo cerró él: ya sabe cómo terminó."""
+def test_a_quien_dijo_que_ya_esta_se_le_avisa_cuando_por_fin_se_destraba(conn, mundo, equipo):
+    """Derivado de la regla 39 en la C-5d: el bloqueo lo da por destrabado quien está trabado
+    (decisión 41), así que quien dijo "ya está" se entera de cuándo se cerró de verdad."""
     _le_pregunto(conn, mundo, equipo)
     _ariel_dice(equipo, ya_esta=True)
 
     equipo.dice("Marcos", Jugada("destrabar", {"tarea": "T1"}))
 
-    assert avisos_guardados(conn, YA_NO_HACE_FALTA) == []
+    [aviso] = avisos_guardados(conn, YA_NO_HACE_FALTA)
+    assert str(aviso["destinatario_membership_id"]) == _membresia(mundo, "Ariel")
+    assert aviso["hechos"]["como_se_cerro"] == "ya_se_destrabo"
+    assert aviso["hechos"]["habia_dicho"] == {"ya_esta": True}
 
 
 def test_a_quien_no_contesto_tambien_se_le_avisa(conn, mundo, equipo):

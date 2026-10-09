@@ -802,3 +802,18 @@ def test_si_el_sistema_termina_el_pase_mientras_quien_decide_contesta_no_falla(c
     assert "error" not in resultado, resultado.get("error")
     [hecho] = resultado["r"].hechos
     assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "no_hay_un_pase")
+
+
+def test_quien_autorizo_el_pase_se_lee_de_la_fila_entera():
+    """La regla de a quiénes les llega cómo terminó un pase lee `decidido_en` de la fila del pase
+    (`_el_pase`, `p.*`), nunca con un valor por omisión: una fila sin esa columna es un error a la
+    vista, no "nadie lo autorizó" (revisión RDD de la C-5c, `pase.py:572-575`)."""
+    from leda.motor.pase import _quienes_se_enteran
+
+    fila = {"pedido_por_membership_id": "m-pide", "decide_membership_id": "m-decide",
+            "de_membership_id": "m-tiene", "pidio": "Marcos"}
+    with pytest.raises(KeyError):
+        _quienes_se_enteran(fila, {"la_tomo": False}, actor=None, preguntado=None)
+    con = _quienes_se_enteran({**fila, "decidido_en": "2026-10-05T10:00"},
+                              {"la_tomo": False}, actor=None, preguntado=None)
+    assert [p for p, _clave, _propio in con] == ["m-pide", "m-decide"]

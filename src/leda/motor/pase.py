@@ -574,7 +574,9 @@ def _quienes_se_enteran(pase: dict, termino: dict, *, actor: str | None,
             lista.append((persona, clave, propio))
 
     sumar(pase["pedido_por_membership_id"], "aviso_a_quien_pidio", para_quien_pidio or {})
-    if termino.get("la_tomo") or pase.get("decidido_en") is not None:
+    # `decidido_en` viene siempre de la fila del pase (`_el_pase`, `p.*`): leído sin valor por
+    # omisión, una fila sin esa columna es un error a la vista (revisión RDD de la C-5c).
+    if termino.get("la_tomo") or pase["decidido_en"] is not None:
         sumar(pase["decide_membership_id"], "aviso_a_quien_decidio", {})
     if termino.get("la_tomo"):
         sumar(pase["de_membership_id"], "aviso_a_quien_la_tenia",
