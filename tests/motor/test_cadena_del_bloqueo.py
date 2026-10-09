@@ -24,7 +24,8 @@ from leda.motor.ia import Jugada
 from leda.motor.ia_real import DATOS
 from leda.motor.tiempo import RelojFijo
 
-from tests.motor.ayudantes import AHORA, IAQueRedacta, avisos_guardados, cuantas, todos, uno
+from tests.motor.ayudantes import (AHORA, IAQueRedacta, administrador, avisos_guardados, cuantas,
+                                   todos, uno)
 from tests.motor.test_aprobacion import Turnos
 
 CAUSA = "me falta la ip del servidor"
@@ -351,6 +352,37 @@ def test_sin_referente_no_promete_que_se_informa(conn, mundo, equipo):
     [hecho] = r.hechos
     assert hecho["aviso_de_la_cadena"] == {"llega": "no_le_va_a_llegar",
                                            "motivo": "sin_referente"}
+
+
+def test_sin_referente_la_cadena_queda_asentada_igual(conn, mundo, equipo):
+    """Sin nadie a quien informar (decisión 49, qué es dejar asentado; "nunca fallar en
+    silencio"): queda en la historia de la tarea (su auditoría), a la persona trabada se le dice
+    que quedó asentado, sin que le llegue a nadie, y queda un incidente para el administrador
+    (revisión `review-1db0e16dfeacfc4f`, `persecucion.py:550-559`)."""
+    administrador(conn)
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = null where id = %s",
+                    (mundo["area"],))
+        cur.execute("update membership set aprobador_membership_id = null where id = %s",
+                    (_membresia(mundo, "Marcos"),))
+    conn.commit()
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+
+    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"no_sabe": True}))
+
+    [fila] = todos(conn, """select sujeto_tipo, detalle from audit_log
+                             where accion = 'asentar_la_cadena_del_bloqueo'""")
+    assert fila["sujeto_tipo"] == "blocker"
+    assert fila["detalle"]["sin_a_quien_informar"] == "sin_referente"
+    assert fila["detalle"]["cadena"][-1]["no_sabe"] is True
+    [incidente] = todos(conn, "select etapa, resumen_sanitizado from incident")
+    assert incidente["etapa"] == "motor_sin_a_quien_informar"
+    assert "Revisar el tablero" in incidente["resumen_sanitizado"]
+    [aviso] = avisos_guardados(conn, LO_QUE_DIJO)
+    assert "aviso_de_la_cadena" not in aviso["hechos"]
+    assert aviso["hechos"]["queda_asentado"] == {
+        "figura_en_el_informe_al_grupo": False,
+        "solo_si_pregunta": {"no_le_llega_a_nadie": True}}
 
 
 def test_el_aviso_al_referente_no_sale_si_ya_se_destrabo(conn, mundo, equipo):

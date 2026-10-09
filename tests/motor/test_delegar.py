@@ -116,6 +116,33 @@ def _salir(conn, t: Turnos, at) -> IAQueRedacta:
 
 # --- La vista previa y la confirmación de quien pide -------------------------------------------
 
+def test_a_quien_no_tiene_leda_conectada_no_se_le_pasa_y_se_avisa_al_administrador(conn, equipo):
+    """Un pase a alguien sin Leda conectada sigue la decisión 37 (derivada en la 50): a quien
+    pide se le dice, el administrador recibe el aviso para conectarlo (de verdad, por su canal) y
+    Leda ofrece pasársela a otra persona. Nada cambia."""
+    with admin(conn) as cur:
+        cur.execute("update app_user set telegram_user_id = null where id = %s",
+                    (equipo.mundo["personas"]["Nahuel"]["app_user_id"],))
+    conn.commit()
+
+    r = _pedir(equipo, "Marcos", "COM", "nahuel")
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "no_se_puede"
+    assert hecho["no_se_le_puede_escribir_a"] == {"a": NAHUEL,
+                                                  "motivo": "destinatario_sin_telegram"}
+    assert hecho["se_le_aviso_al_administrador"]["para_que_conecte"] == NAHUEL
+    assert hecho["se_le_aviso_al_administrador"]["llega"] != "no_le_va_a_llegar"
+    assert hecho["en_cambio_puede"] == ["pasarsela_a_otra_persona"]
+    assert hechos.significado("pasarsela_a_otra_persona")
+    [incidente] = todos(conn, "select etapa, resumen_sanitizado from incident")
+    assert incidente["etapa"] == "motor_sin_leda_conectada"
+    assert NAHUEL in incidente["resumen_sanitizado"]
+    assert uno(conn, "select count(*) n from admin_notice")["n"] == 1
+    assert _pases(conn) == []
+    assert _quien_la_tiene(conn, equipo, "COM") == MARCOS
+
+
 def test_pedir_un_pase_muestra_la_vista_previa_y_no_cambia_nada(conn, equipo):
     r = _pedir(equipo, "Marcos", "COM", "nahuel")
     [hecho] = r.hechos

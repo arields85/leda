@@ -24,8 +24,8 @@ from leda.motor.ia_real import DATOS
 from leda.motor import hechos as hechos_mod
 from leda.motor.tiempo import RelojFijo
 
-from tests.motor.ayudantes import (AHORA, IAQueRedacta, avisos_guardados, cuantas, enviar,
-                                   octubre, todos, uno)
+from tests.motor.ayudantes import (AHORA, IAQueRedacta, administrador, avisos_guardados,
+                                   cuantas, enviar, octubre, todos, uno)
 from tests.motor.test_aprobacion import Turnos
 
 ARIEL, MARIANO = "Ariel De Simone", "Mariano Naim"
@@ -119,6 +119,80 @@ def test_a_quien_no_tiene_un_chat_con_leda_no_le_escribe_y_lo_dice(conn, mundo, 
                                                   "motivo": "destinatario_sin_telegram"}
 
 
+# --- Quien destraba no tiene Leda conectada (decisión 37 del usuario, 2026-10-09; C-5b) ------
+
+SIN_LEDA_CONECTADA = "motor_sin_leda_conectada"
+
+
+def test_sin_leda_conectada_se_le_avisa_al_administrador_para_que_lo_conecte(conn, mundo,
+                                                                            equipo):
+    administrador(conn)
+
+    r = _trabada(equipo, quien="mariano")
+
+    # El aviso sale de verdad, por el canal del administrador (un incidente y su aviso).
+    [incidente] = todos(conn, "select etapa, resumen_sanitizado from incident")
+    assert incidente["etapa"] == SIN_LEDA_CONECTADA
+    assert MARIANO in incidente["resumen_sanitizado"]
+    [cuerpo] = [f["cuerpo"] for f in todos(conn, "select cuerpo from admin_notice")]
+    assert cuerpo.splitlines()[0] == "Una persona del equipo no tiene Leda conectada"
+    [hecho] = r.hechos
+    assert hecho["no_se_le_puede_escribir_a"] == {"a": MARIANO,
+                                                  "motivo": "destinatario_sin_telegram"}
+    aviso = hecho["se_le_aviso_al_administrador"]
+    assert aviso["para_que_conecte"] == MARIANO
+    assert aviso["llega"].startswith("2026-10-05T10:02")
+
+
+def test_sin_un_administrador_alcanzable_no_promete_el_aviso(conn, mundo, equipo):
+    r = _trabada(equipo, quien="mariano")
+
+    # El incidente queda igual; a la persona no se le dice que el administrador se enteró.
+    assert cuantas(conn, "incident", "etapa = %s", SIN_LEDA_CONECTADA) == 1
+    [hecho] = r.hechos
+    assert hecho["se_le_aviso_al_administrador"] == {"para_que_conecte": MARIANO,
+                                                     "llega": "no_le_va_a_llegar"}
+
+
+def test_sin_leda_conectada_le_ofrece_salidas(conn, mundo, equipo):
+    """Otra persona que pueda destrabarlo, o que se lo pida ella y le cuente: un tema abierto,
+    como toda propuesta."""
+    administrador(conn)
+
+    r = _trabada(equipo, quien="mariano")
+
+    [hecho] = r.hechos
+    assert hecho["salidas"] == ["anotar_quien_destraba", "pedirselo_y_contar"]
+    assert r.pregunta["tipo"] == "propuesta"
+    for codigo in ("se_le_aviso_al_administrador", "para_que_conecte", "pedirselo_y_contar"):
+        assert hechos_mod.significado(codigo), codigo
+
+
+def test_nombrar_a_otra_persona_contesta_las_salidas_y_le_escribe(conn, mundo, equipo):
+    administrador(conn)
+    _trabada(equipo, quien="mariano")
+
+    r = equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"tarea": "T1", "quien": "ariel"}))
+
+    assert cuantas(conn, "conversation_question",
+                   "tipo = 'propuesta' and cerrada_en is null") == 0
+    [aviso] = avisos_guardados(conn, PREGUNTA_A_QUIEN_DESTRABA)
+    assert str(aviso["destinatario_membership_id"]) == _membresia(mundo, "Ariel")
+    [hecho] = r.hechos
+    assert "salidas" not in hecho
+
+
+def test_destrabar_cierra_las_salidas(conn, mundo, equipo):
+    """"Se lo pido yo y te cuento": cuando cuenta que se destrabó, no queda nada abierto."""
+    administrador(conn)
+    _trabada(equipo, quien="mariano")
+
+    equipo.dice("Marcos", Jugada("destrabar", {"tarea": "T1"}))
+
+    assert cuantas(conn, "conversation_question",
+                   "tipo = 'propuesta' and cerrada_en is null") == 0
+
+
 def test_a_alguien_de_afuera_del_equipo_no_le_escribe(conn, mundo, equipo):
     r = _trabada(equipo, quien="el proveedor de cables")
 
@@ -184,35 +258,57 @@ def test_no_sale_si_la_tarea_ya_se_destrabo(conn, mundo, equipo):
     assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "ya_se_destrabo")
 
 
-def test_la_pregunta_se_repite_el_dia_habil_siguiente_sin_escalar(conn, espacio_con_escalera,
-                                                                    equipo):
+def _los_dias(conn, mundo, dias) -> IAQueRedacta:
+    ia = IAQueRedacta()
+    from leda.motor.avisos import enviar_avisos
+    for dia in dias:
+        correr_escalera(conn, mundo["id"], RelojFijo(octubre(dia, 10)))
+        conn.commit()
+        enviar_avisos(conn, mundo["id"], ia, RelojFijo(octubre(dia, 10)))
+        conn.commit()
+    return ia
+
+
+def _repreguntas(conn) -> list[dict]:
+    return todos(conn, """select destinatario_membership_id::text a, hechos, creado_en
+                            from scheduled_notice where tipo = 'repregunta'
+                           order by creado_en""")
+
+
+def test_a_quien_destraba_y_no_contesta_nunca_lo_abandona(conn, espacio_con_escalera, equipo):
+    """Decisión 38 del usuario (2026-10-09): los días 1 a 3, una vez por día (la pregunta del
+    lunes 5 y las del martes 6 y el miércoles 7); desde el 4, cada 2 días hábiles mientras siga
+    el bloqueo (el viernes 9; el lunes 12 es feriado, así que el miércoles 14 y el viernes 16).
+    Nunca escala: lo que pasa con un bloqueo que no se mueve es el bloqueo viejo."""
     mundo = espacio_con_escalera
     _trabada(equipo)
     _salir(conn, mundo, AHORA + timedelta(minutes=12))
     ariel = _membresia(mundo, "Ariel")
-    ia = IAQueRedacta()
 
-    redactados = []
-    # Martes 6, miércoles 7, jueves 8 y viernes 9 a las 10:00.
-    for dia in (6, 7, 8, 9):
-        correr_escalera(conn, mundo["id"], RelojFijo(octubre(dia, 10)))
-        conn.commit()
-        from leda.motor.avisos import enviar_avisos
-        enviar_avisos(conn, mundo["id"], ia, RelojFijo(octubre(dia, 10)))
-        conn.commit()
-        redactados.append(list(ia.pedidos_de_redaccion))
-        ia.pedidos_de_redaccion.clear()
+    _los_dias(conn, mundo, (6, 7, 8, 9, 13, 14, 15, 16))
 
-    repreguntas = todos(conn, """select destinatario_membership_id::text a, hechos
-                                   from scheduled_notice where tipo = 'repregunta'
-                                  order by creado_en""")
-    assert [r["a"] for r in repreguntas] == [ariel, ariel]
+    repreguntas = _repreguntas(conn)
+    assert [r["a"] for r in repreguntas] == [ariel] * 5
+    assert [(r["creado_en"] - timedelta(hours=3)).day for r in repreguntas] == [6, 7, 9, 14, 16]
+    assert [r["hechos"]["numero"] for r in repreguntas] == [2, 3, 4, 5, 6]
     assert all("avisa_que_va_a_escalar" not in r["hechos"] for r in repreguntas)
     assert all("si_no_hay_respuesta" not in r["hechos"] for r in repreguntas)
     assert cuantas(conn, "scheduled_notice", "tipo = 'escalamiento_de_una_pregunta'") == 0
     # Lo que se repite dice quién está trabado y por qué.
     assert repreguntas[0]["hechos"]["sobre"]["responsable"] == "Marcos"
     assert repreguntas[0]["hechos"]["sobre"]["causa"] == CAUSA
+
+
+def test_deja_de_repetirla_cuando_se_destraba(conn, espacio_con_escalera, equipo):
+    mundo = espacio_con_escalera
+    _trabada(equipo)
+    _salir(conn, mundo, AHORA + timedelta(minutes=12))
+    _los_dias(conn, mundo, (6, 7, 8, 9))
+    equipo.dice("Marcos", Jugada("destrabar", {"tarea": "T1"}), at=octubre(9, 11))
+
+    _los_dias(conn, mundo, (13, 14, 15, 16))
+
+    assert len(_repreguntas(conn)) == 3
 
 
 # --- Quien destraba contesta ----------------------------------------------------------------

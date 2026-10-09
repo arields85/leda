@@ -20,7 +20,8 @@ from leda.motor import hechos as hechos_mod
 from leda.motor.avisos import TIPOS
 from leda.motor.ia import Jugada
 
-from tests.motor.ayudantes import AHORA, avisos_guardados, cuantas, octubre, uno
+from tests.motor.ayudantes import (AHORA, administrador, avisos_guardados, cuantas, octubre,
+                                   todos, uno)
 from tests.motor.test_aprobacion import Turnos
 from tests.motor.test_cadena_del_bloqueo import _integrante, _membresia, _referente
 
@@ -268,18 +269,87 @@ def test_a_la_persona_trabada_no_le_llega_si_se_destrabo_antes_de_salir(conn, mu
     assert _asentado_para(dias, "Marcos") == []
 
 
-def test_sin_nadie_a_quien_informar_no_se_le_dice_nada(conn, mundo, equipo, dias):
-    """Sin a quién informar, nada queda asentado: ni al referente ni a la persona trabada."""
-    _marcos_trabado(equipo)
+def _sin_referente(conn, mundo) -> None:
     with admin(conn) as cur:
         cur.execute("update area set referente_membership_id = null where id = %s",
                     (mundo["area"],))
         cur.execute("update membership set aprobador_membership_id = null")
     conn.commit()
 
+
+def test_sin_nadie_a_quien_informar_queda_asentado_igual(conn, mundo, equipo, dias):
+    """Sin a quién informar (decisión 49: dejar asentado es la historia de la tarea, quien
+    decide, el informe al grupo y la persona trabada; "nunca fallar en silencio"): queda en la
+    historia (su auditoría), a la persona trabada se le dice que quedó asentado, sin que le
+    llegue a nadie, y queda un incidente para el administrador. Antes no pasaba nada."""
+    administrador(conn)
+    _marcos_trabado(equipo)
+    _sin_referente(conn, mundo)
+
     dias.ciclo(octubre(13, 10))
 
-    assert _viejos(conn) == [] and _a_marcos(conn) == []
+    # A nadie le sale el aviso del referente; la vez queda contada, con su motivo.
+    [viejo] = _viejos(conn)
+    assert (viejo["estado"], viejo["motivo_omision"]) == ("omitido", "sin_a_quien_informar")
+    assert uno(conn, "select escalado_a from blocker")["escalado_a"] is None
+    [fila] = todos(conn, """select detalle from audit_log
+                             where accion = 'asentar_bloqueo_que_sigue_abierto'""")
+    assert fila["detalle"]["sin_a_quien_informar"] == "sin_referente"
+    assert fila["detalle"]["vez"] == 1
+    [incidente] = todos(conn, "select etapa, resumen_sanitizado from incident")
+    assert incidente["etapa"] == "motor_sin_a_quien_informar"
+    assert "Revisar el tablero" in incidente["resumen_sanitizado"]
+    [aviso] = _a_marcos(conn)
+    assert aviso["estado"] == "enviado"
+    [hechos] = _asentado_para(dias, "Marcos")
+    assert hechos["queda_asentado"] == {"figura_en_el_informe_al_grupo": False,
+                                        "solo_si_pregunta": {"no_le_llega_a_nadie": True}}
+    # Y no otra vez hasta los días del espacio desde esta vez.
+    dias.ciclo(octubre(14, 10))
+    assert len(_viejos(conn)) == 1 and len(_a_marcos(conn)) == 1
+
+
+def test_si_el_referente_no_tiene_leda_conectada_queda_asentado_igual(conn, mundo, equipo, dias):
+    administrador(conn)
+    _marcos_trabado(equipo)
+    with admin(conn) as cur:
+        cur.execute("update app_user set telegram_user_id = null where id = %s",
+                    (mundo["personas"]["Lucas"]["app_user_id"],))
+    conn.commit()
+
+    dias.ciclo(octubre(13, 10))
+
+    [viejo] = _viejos(conn)
+    assert (viejo["estado"], viejo["motivo_omision"]) == ("omitido", "sin_a_quien_informar")
+    [fila] = todos(conn, """select detalle from audit_log
+                             where accion = 'asentar_bloqueo_que_sigue_abierto'""")
+    assert fila["detalle"]["sin_a_quien_informar"] == "destinatario_sin_telegram"
+    assert cuantas(conn, "incident", "etapa = 'motor_sin_a_quien_informar'") == 1
+    [hechos] = _asentado_para(dias, "Marcos")
+    assert hechos["queda_asentado"]["solo_si_pregunta"] == {"no_le_llega_a_nadie": True}
+
+
+def test_lo_que_se_le_dice_a_la_persona_trabada_ya_quedo_asentado(conn, mundo, equipo, dias):
+    """Lo asentado queda en la historia al guardarse, no cuando le llega al referente: si Lucas
+    está ausente y su aviso espera, a Marcos se le dice algo que ya es cierto (revisión
+    `review-1db0e16dfeacfc4f`, `bloqueo_viejo.py:279-281`)."""
+    _marcos_trabado(equipo)
+    with admin(conn) as cur:
+        cur.execute("""insert into absence (workspace_id, membership_id, desde, hasta)
+                       values (%s, %s, '2026-10-13', '2026-10-14')""",
+                    (mundo["id"], _membresia(mundo, "Lucas")))
+    conn.commit()
+
+    dias.ciclo(octubre(13, 10))
+
+    [viejo] = _viejos(conn)
+    assert viejo["estado"] == "guardado"            # Lucas está ausente: su aviso espera
+    [aviso] = _a_marcos(conn)
+    assert aviso["estado"] == "enviado"
+    [fila] = todos(conn, """select detalle from audit_log
+                             where accion = 'asentar_bloqueo_que_sigue_abierto'""")
+    assert fila["detalle"]["a_membership_id"] == _membresia(mundo, "Lucas")
+    assert "sin_a_quien_informar" not in fila["detalle"]
 
 
 # --- Se vuelve a asentar mientras siga (decisión 36) ---------------------------------------------
