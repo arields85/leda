@@ -1603,7 +1603,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         sale enseguida (abajo). `PENDIENTE` (pregunta al usuario): si dos mensajes por día a quien
         no contesta un pedido de estado (la 04) es lo que se quiere.
     - **La pregunta que vuelve, fuera del horario** (2026-10-09, escritor único; route:
-      delegada). Decidido por el coordinador a partir de la decisión 50: la pregunta que vuelve
+      delegada; `7c9afd3`). Decidido por el coordinador a partir de la decisión 50: la pregunta que vuelve
       es parte de contestarle a la persona, así que sale justo después de la respuesta también
       fuera del horario; rige igual para la que vuelve al cerrarse la otra (decisión 21), por la
       misma razón. `avisos.guardar_la_que_vuelve` la guarda para ese momento; fuera del horario
@@ -1617,7 +1617,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         con su botón): 2 failed en rojo (`pytest -q ... -k fuera_del_horario`). Verde después;
         cambió por la misma regla la de la decisión 21 fuera del horario
         (`test_la_que_vuelve_fuera_del_horario_sale_enseguida_y_una_sola_vez`). La 30 dice la regla
-        nueva.
+        nueva. El corredor contaba esa fila como la respuesta del paso (la 08, la 12 y la 30
+        fallaban en seco): lo que sale de un aviso guardado es de Leda por su cuenta aunque su
+        fila vaya como respuesta (`48fe783`). Chequeos, con la C-6 (abajo).
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
@@ -2114,6 +2116,63 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           próxima lista o el día en que vence, no al día hábil siguiente. Ejemplo: el lunes Marcos
           dice "el hmi viene bien" (vence el viernes 6); Leda le dice que le vuelve a preguntar el
           lunes 2. ¿Está bien, o al día siguiente como con una tarea que ya venció?
+        - (Las preguntas de arriba quedaron contestadas en las decisiones 25, 30, 31, 32, 44, 45 y
+          46; abajo, lo construido.)
+  - **Las decisiones 31, 32, 44 y 46** (2026-10-09, escritor único; route: delegada, 2+ archivos no
+    triviales). Migración `0047` con su rollback (`scheduled_notice.tareas_de_la_lista`, fuera de
+    los hechos: lo lee sólo el código).
+    - **La conversación primero** (`c1ff9c8`): la 40, la semana de las listas (lunes, miércoles y
+      viernes; cinco tareas de Marcos, una trabada y una entregada), con su YAML y el cargador que
+      escribe una tarea trabada (`bloqueo`); la 37 cambia en el paso 4 (los sensores: Leda vuelve a
+      preguntar el viernes 30, no el jueves 29, por la 31). En seco, antes del código: la 37, 1
+      falla; la 40, 12 (`correr --ia guionada --veces 1 --sin-informe --conversacion 37 40`).
+    - **El código** (`29a5cda`), por decisión:
+    - **La 32** (`cadencias.tareas_de`, `renglon`, `se_puede_mover`): la lista trae todas las
+      tareas abiertas (asignadas, en curso, trabadas y entregadas), cada una con su situación; la
+      trabada, con `estado: bloqueada` y sus `causas`. Pregunta sólo por las que se pueden mover;
+      sin ninguna, sale sin pregunta (`necesita_respuesta: false`, no abre la pregunta).
+    - **La 46** (`cadencias.armar`): cada lista guarda al salir las tareas abiertas con su
+      situación (`situacion`: estado, bloqueos abiertos, el día que dio y si quedó atrasada), si se
+      mostró y si se preguntó. La primera de la semana (ISO) es completa; las otras llevan sólo las
+      nuevas, las preguntadas sin respuesta (`sin_respuesta_desde`), las que cambiaron y las que
+      traen algo de la escalera de ese día, con `solo_lo_que_cambio_o_falta`; sin nada, queda
+      omitida `sin_novedades_para_la_lista`.
+    - **La 31** (`cadencias.anotar_lo_que_conto`, `ya_lo_conto`, `escalera._un_paso`): toda jugada
+      del responsable sobre una tarea deja su renglón de la última lista contestado, con la
+      situación de después (la lista siguiente no la trae si no cambió). El primer pedido de estado,
+      el día del vencimiento o de la previsión, no se guarda si la persona la contestó en la lista
+      (no por su cuenta) después de la última lista y no cambió nada; si ese día sale una lista, el
+      pedido va en ella. Al día hábil siguiente, sin entregar, quedó atrasada: la escalera empieza
+      ahí (el escalamiento corre un día).
+    - **La 44** (`cadencias.cuando_vuelve_a_preguntar`): después de "viene bien" en la lista, lo
+      próximo es el aviso previo si todavía no salió (`antes_le_recuerda_que_vence`); la pregunta,
+      en la próxima lista completa o cuando la escalera la haga (el día del vencimiento si hay una
+      lista en el medio; si no, el día hábil siguiente), a la hora de la lista de ese día si sale
+      más tarde.
+    - **Test primero:** `tests/motor/test_cadencias.py`: 9 de 29 en rojo (`pytest -q
+      tests/motor/test_cadencias.py`: 9 failed, 20 passed); los que miran que algo pase como antes
+      (el pedido sale si no contestó, si cambió o con una lista en el medio) pasaban ya. Después,
+      uno más: lo contado fuera de la lista no saltea el pedido del vencimiento (rojo: 1 failed).
+      Verde: 30 de 30; la 37 y la 40 en seco, bien. Cambiaron por la regla nueva la de las trabadas
+      y entregadas (ahora van), la de sin tareas abiertas (con la tarea cancelada) y la del avance
+      sin pedido (T1 vuelve el martes 13, con el aviso previo del martes 6 antes).
+    - **Las instrucciones de la IA no cambiaron**: los códigos nuevos van en `hechos.SIGNIFICADOS`.
+    - **Chequeos** (2026-10-09, sobre `29a5cda`, con la pregunta que vuelve fuera del horario):
+      `pytest tests/motor tests/garantias tests/conversaciones`, 1476 passed (la paridad y el
+      rollback de la `0047` incluidos); en seco, `correr --ia guionada --veces 1 --sin-informe`, 40
+      de 40 bien. Sin la IA real (va en la tanda posterior: la 37 y la 40 se suman).
+    - `PENDIENTE` (preguntas al usuario, lecturas del coordinador que la regla no dice):
+      - **Con una fecha dada en la lista**, el día de esa fecha tampoco se pregunta (la 31 vale
+        igual para el vencimiento y para la previsión). Ejemplo: el lunes Marcos dice en la lista
+        "el plc lo termino el miércoles"; el miércoles, ¿Leda le pregunta si lo terminó, o recién
+        el jueves si sigue sin entregar (lo construido)?
+      - **Una respuesta vaga** ("ya casi, me falta uno") también cubre el día del vencimiento: los
+        sensores de Nahuel (la 37) se preguntan el viernes 30, no el jueves 29. ¿O una respuesta sin
+        nada cierto no debería cubrirlo?
+      - **El escalamiento corre un día** cuando el pedido del vencimiento no salió por la 31 (la
+        cuenta empieza el día hábil siguiente). ¿Está bien, o debería escalar igual a los tres días
+        hábiles del vencimiento?
+    - `leda_motor` necesita la `0047`; la IA real sobre la 37 y la 40, en la tanda posterior.
 - [ ] **C-8.** Las ausencias (usuario, 2026-10-09: "nunca se trató"; pendiente para más adelante).
   La mecánica §9 ya lo pide: con la persona ausente, Leda no le escribe ni avanza su escalera, avisa
   al referente de lo que queda sin cobertura y, al volver, retoma con un mensaje de reencuadre. En
@@ -2377,8 +2436,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         corrección: 53 (el encargado se queda él con una tarea de su gente) y la 39 en los pases.
   - [x] D5b: 29 (la repetición de las 4 horas sale siempre), 50 (la pregunta que quedó vuelve
         aparte); conversaciones 02, 03, 04, 08, 12 y 18 (`5101d0b`, `c3c1907`).
-  - [ ] C-6: 31 (lo contestado no se repite), 32 (la lista del lunes, completa con su situación),
-        44 ("viene bien": lo próximo es el aviso previo), 46 (las otras listas, sólo lo que falta).
+  - [x] C-6: 31 (lo contestado no se repite), 32 (la lista del lunes, completa con su situación),
+        44 ("viene bien": lo próximo es el aviso previo), 46 (las otras listas, sólo lo que falta);
+        conversación 40, migración `0047`.
   - [ ] C-5a: 35 ("quedó asentado"), 34 (se le cuenta a la persona trabada), 36 (se vuelve a
         asentar mientras siga).
   - [ ] C-5b: 37 (quien destraba sin Leda conectada), 38 (a quien no contesta no se lo abandona).
