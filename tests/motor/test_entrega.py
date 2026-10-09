@@ -275,6 +275,31 @@ def test_la_confirmacion_escrita_entrega_en_un_solo_acto_y_nunca_a_terminada(con
     assert hecho["aviso_a_quien_aprueba"]["llega"] == aviso["programado_para"].isoformat()
 
 
+def test_entregar_contesta_la_pregunta_de_como_viene_la_tarea(conn, mundo, marcos):
+    """Leda le había preguntado a Marcos cómo viene la tarea y no contestó; ahora la entrega. La
+    entrega contesta esa pregunta: no vuelve después de confirmar ("¿cómo viene?" de una tarea
+    que ya está en revisión). Lo mostró la conversación 41, paso 10."""
+    tarea = _tarea(conn, mundo)
+    with admin(conn) as cur:
+        cur.execute("""insert into conversation_question (workspace_id, membership_id, tipo,
+                                                          task_id, se_puede_dejar, abierta_en,
+                                                          preguntada_en)
+                       values (%s, %s, 'estado_de_la_tarea', %s, true, %s, %s)""",
+                    (mundo["id"], mundo["personas"]["Marcos"]["membership_id"], tarea,
+                     AHORA - timedelta(days=1), AHORA - timedelta(days=1)))
+    conn.commit()
+    marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero",
+                 archivos=[(JPEG, "foto", None)])
+
+    r = marcos.manda(Jugada("confirmar", {}), texto="dale")
+
+    assert _hecho(r, "confirmar")["resultado"] == "entregada"
+    assert r.pregunta is None
+    pregunta = uno(conn, """select cierre from conversation_question
+                             where tipo = 'estado_de_la_tarea'""")
+    assert pregunta["cierre"] == "respondida"
+
+
 def test_la_redaccion_de_la_entrega_nombra_a_quien_la_revisa_solo_si_se_pregunta(conn, mundo,
                                                                                 marcos):
     """Decisiones 11 y 18 del usuario (2026-10-08): Leda no nombra por su cuenta a quien aprueba
