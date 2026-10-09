@@ -2064,7 +2064,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     decisión 26); `23b24c3..ce6c6c9` `review-1080390624461ecb` (advertencias en `aprobacion.py:365`
     y `fichas.py:603`); `ce6c6c9..e082010` `review-8e6e2bf9ee6b926e` (advertencias: un botón
     Confirmar viejo, `pase.py:215`; contestar ignora un error, `pase.py:366`).
-  - **Falta construir:** las decisiones 26, 27 y 28, con test primero; y la 24, en la C-5.
+  - **Falta construir:** la 24, en la C-5. Las decisiones 26, 27 y 28 (con la 43, derivada de la
+    28) están hechas: abajo, "Las decisiones 26, 27 y 28".
   - **Suite completa** sobre `e082010` (coordinador, 2026-10-09): `pytest -q`, 1857 passed.
   - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
     sector, Leda le pregunta si la acepta y le avisa a quien delegó. Al construirlo cambian las
@@ -2140,13 +2141,73 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       necesitaba el id de las dos tareas); en seco, `correr --ia guionada --veces 1 --ronda seco-c7-todas`, **38 de 38 bien**.
       Informes borrados, `gasto.json` sin tocar. Sin la IA real (la tanda posterior). Sin la suite
       completa.
+    - **Las decisiones 26, 27 y 28** (con la 43, derivada de la 28; 2026-10-09, escritor delegado:
+      route delegada, 2+ archivos no triviales). La conversación 39 y las pruebas, primero.
+      - **La cocina y la base** (`9112c8a`, migración `0046`, con su rollback, `db/esquema.sql` y la
+        paridad; la vuelta atrás de la `0046` va antes que la de la `0045` en la prueba que deshace
+        la `0002`). **La revisión sigue a quien era la tarea** (28): `task.era_de_membership_id`
+        (de quién era antes de su primer pase) reemplaza a `task.revisa_membership_id`, y
+        `quien_revisa_la_tarea` lee, en el momento, quien aprueba el trabajo de esa persona, así
+        que si la plataforma lo cambia la revisión sigue el cambio (43). Puede ser quien la hace:
+        la de Nahuel que toma Marcos la revisa Marcos, y al entregarla (`entregar_tarea`) queda
+        aprobada por él y, si se cumple lo demás del cierre, terminada en el mismo acto, con su
+        fila de auditoría (`aprobar_tarea`, `la_entrego_quien_la_revisa`); a Ismael no le llega
+        nada. La aprobación y el cierre se escriben con el mismo código que `aprobar_tarea`
+        (`_aprobar_y_cerrar`). **El encargado pasa una tarea de su gente** (27): `pedir_pase_de_
+        tarea` deja pedirla a quien la tiene o al encargado del sector de quien la tiene, con las
+        mismas reglas de quién decide; pasarla a quien ya la tiene, no (`ya_la_tiene`). **Un pase
+        sin respuesta** (26): el estado terminal `sin_respuesta` y `terminar_pase_sin_respuesta`,
+        acto del sistema con su auditoría (`pase_sin_respuesta`); la tarea sigue con quien la
+        tenía. La auditoría de `cambiar_responsable` suma de quién era la tarea (`era_de`).
+        **Rojo:** `tests/garantias/test_pase_de_tarea.py`, 9 fallas de 34. **Verde:** las 34;
+        `pytest tests/garantias`, 373 passed (antes, una falla de `test_capacidades`: la columna
+        nueva sin uso en el código, que ahora lee la auditoría).
+      - **El motor** (`3e677f8`). (26) `pase.seguir_los_pases`, que corre la escalera: la
+        pregunta a quien decide o a quien recibe se repite una vez, el día hábil siguiente de haber
+        salido (`recordatorio_del_pase`, seguimiento por su cuenta, sin botones: recuerda la
+        pregunta de antes, con lo que pasa si sigue sin contestar); al día hábil siguiente de la
+        repetición, a la hora en que Leda escribe, el pase termina y a quien lo pidió le llega
+        `como_termino_el_pase` con `sin_respuesta`, quién no contestó y que puede pedírselo a otra
+        persona. Una ausencia la pausa; un turno que tiene tomada la tarea la deja para la vuelta
+        siguiente. (27) `pedir_reasignacion` ya no necesita la tarea de la lista: el encargado
+        nombra la de alguien de su sector (`como_la_nombra`, como `pedir_enlace`); si es de otro
+        sector, `no_es_de_su_sector`. La vista previa y la confirmación dicen quién la tiene, y al
+        tomarla le llega el aviso también a quien la tenía (`aviso_a_quien_la_tenia`, `era_suya`).
+        (28) La vista previa de la entrega de quien la revisa dice que al confirmarla queda
+        aprobada por él (`la_aprueba_al_entregarla`) y la confirmación, que quedó terminada, sin
+        aviso a nadie para revisarla; una nueva previsión suya no avisa a nadie
+        (`la_revisa_quien_la_hace`). Las instrucciones de la IA no cambiaron (huellas de
+        `test_contratos.py` iguales); los códigos nuevos van en `hechos.SIGNIFICADOS`, y
+        `terminar_pase_sin_respuesta` en la frontera del motor (`test_frontera.py`).
+        **Rojo:** `tests/motor/test_delegar.py`, 5 fallas de 24. **Verde:** las 24.
+      - **La conversación 39** (`3efcd44`): el encargado pasa la de los sensores de Nahuel a
+        Lucas (decide Martín, Nahuel se entera), Nahuel le pasa a Marcos la del tornillo y Marcos
+        la cierra al entregarla, y un pase que Martín no contesta se repite el miércoles y termina
+        el jueves. **Rojo, en seco**, con el motor de `9112c8a`: 32 fallas. **Verde, en seco:** la
+        39 bien, y la 12, la 19 y la 38 siguen bien. Cambió `test_corredor.py` (39
+        conversaciones). `PENDIENTE`: sumarla a la lista de `tests/conversaciones/README.md`.
+      - **Chequeos** (2026-10-09): `pytest tests/motor tests/garantias`, 1293 passed;
+        `pytest tests/garantias/test_migraciones.py tests/garantias/test_pase_de_tarea.py`,
+        50 passed; `pytest tests/conversaciones`, 152 passed; las pruebas de la raíz que
+        tocan la cocina (`test_aprobacion_cierra_tarea`, `test_autoridad_tarea`,
+        `test_dependencias`, `test_entrega_con_evidencia`, `test_herramientas` y tres más),
+        106 passed; en seco, `correr --ia guionada --veces 1 --conversacion 12 19 38 39`,
+        4 de 4 bien (informes borrados, `gasto.json` sin tocar). Sin la IA real (la tanda
+        posterior), sin la suite completa y sin la revisión RDD por tramos (coordinador).
+      - Lo que se leyó sin preguntar: un pase sin respuesta termina al día hábil siguiente de la
+        repetición, a la hora en que Leda escribe; la repetición dice qué pasa si sigue sin
+        contestar; a quien no contestó no le llega que terminó. El encargado no se pasa a sí mismo
+        una tarea de su gente (se la tiene que pasar la persona). Si la plataforma deja a quien
+        hace la tarea como quien la revisa con la tarea ya en revisión, nadie la puede aprobar.
     - `PENDIENTE`:
       - **La IA real** sobre la 12, la 19 y la 38 (la tanda posterior), y la prueba por Telegram, con
         `leda_motor` al día hasta la `0045` (respaldo previo).
       - La revisión RDD por tramos (coordinador).
       - La página de la tarea no muestra en su historia que cambió de manos (sale en
         `cambio_de_responsable`).
-      - **Preguntas para el usuario** (cada una con su ejemplo):
+      - **Preguntas para el usuario** (cada una con su ejemplo; contestadas el 2026-10-09: la
+        primera es la decisión 27, la segunda la 26, la tercera la 28, la cuarta y la quinta la
+        43; la sexta sigue `PENDIENTE`):
         - **¿Un encargado puede pasar la tarea de otro?** Hoy cada uno pasa sólo una tarea suya.
           Ejemplo: Nahuel está enfermo y Marcos le escribe a Leda "pasale la de los sensores de
           Nahuel a Pedro": hoy Leda no lo hace (no es tarea de Marcos).
@@ -2182,11 +2243,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 4: bloqueos encadenados y avisos hacia abajo (decisión 6; 35, `0044`).
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
-- [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
+- [x] C-7, delegar (38, `0045`), revisada; las decisiones 26, 27 y 28, hechas (39, `0046`).
 - [ ] Las decisiones 24 a 52 del usuario (2026-10-09; la 30, la 40, la 43, la 45 y la 52 ya están o
       esperan la prueba), con test primero, una porción por grupo (sesión del 2026-10-09, mañana):
-  - [ ] C-7: 26 (un pase sin respuesta), 27 (el encargado pasa una tarea de su gente), 28 (la
-        revisión sigue a quien era la tarea).
+  - [x] C-7: 26 (un pase sin respuesta), 27 (el encargado pasa una tarea de su gente), 28 (la
+        revisión sigue a quien era la tarea); conversación 39, migración `0046`.
   - [ ] D5b: 29 (la repetición de las 4 horas sale siempre), 50 (la pregunta que quedó vuelve
         aparte).
   - [ ] C-6: 31 (lo contestado no se repite), 32 (la lista del lunes, completa con su situación),
