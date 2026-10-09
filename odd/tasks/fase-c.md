@@ -583,8 +583,18 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       `correr --ia guionada --veces 1 --ronda seco-enlace`, 31 de 31 bien (informes borrados,
       `gasto.json` sin tocar). Sin la IA real (decisión del usuario: van en la tanda posterior).
       Sin la suite completa.
+    - **Revisión RDD por tramos (coordinador), aprobadas y reconocidas:** `e8998a8..410b15c` (la
+      31 y el cargador) `review-eb7d888c11cb4144`, advertencia: `carga.py` escribe la aprobación de
+      una tarea terminada sin comprobar quién aprueba; `410b15c..4167216` `review-b8d0b38089a6fd19`,
+      advertencia: la prueba de un solo enlace por mensaje es débil. Su sugerencia sobre el título
+      de una tarea que la persona no puede ver, que el hecho le pasaba a la IA, se corrigió en
+      `a64108c` (rojo observado; `pytest tests/motor tests/conversaciones` 940 passed; en seco 31
+      de 31), revisada `review-07bd2b7b2b2c08c0`.
     - `PENDIENTE`:
       - **La IA real** sobre la 31, en la tanda posterior (decisión del usuario).
+      - **Pregunta para el usuario:** "no podés ver esa" y "ninguna se llama así" son respuestas
+        distintas, así que Nahuel puede saber que existe una tarea con esas palabras aunque no la
+        vea (no su título ni nada más). ¿Alcanza, o las dos respuestas tienen que ser iguales?
       - **Un nombre con un error de tipeo que la IA copie tal cual** ("tablro") no encuentra la
         tarea: Leda dice que ninguna se llama así. El dato le pide a la IA las palabras bien
         escritas; si con la IA real falla, se mira la comparación, no una lista de errores.
