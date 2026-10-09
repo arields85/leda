@@ -186,7 +186,10 @@ infinitas; arreglar cada caso con frases o palabras clave no termina nunca. Leda
 pendiente como contexto, con una sola rama abierta a la vez; una respuesta visible por mensaje y por toque;
 estado real y sólo opciones posibles; toque con señal e idempotente. Y además: botones para elegir, texto para
 decir; los botones son atajos, también para confirmar, con una guarda (ADR 0018, decisión 2); un tema a la vez,
-con tres salidas (ADR 0018, decisión 4). Ante un hallazgo:
+con tres salidas (ADR 0018, decisión 4). Y en el seguimiento ([ADR 0021](docs/decisions/0021-reglas-generales-del-seguimiento.md)):
+informar antes que callar; también las buenas noticias; un equipo, no una competencia; nunca un tema
+abierto sin que todos sepan cómo se cerró; "quedó asentado", no "lo informé"; nunca abandonar a nadie.
+Ante un hallazgo:
 
 - en un flujo congelado no se arregla;
 - primero se escribe como conversación de prueba (punto 12) y después se resuelve en el motor de conversación

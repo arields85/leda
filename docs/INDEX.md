@@ -57,6 +57,7 @@ se trabaja y qué no se hace".
 | Decisión sobre el alcance del Motor: por chat, los hechos del trabajo; por la web, su estructura (aceptada en el paso M1, 2026-10-04) | [`decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) |
 | Decisión sobre el motor de conversación (aceptada el 2026-10-06, después de que pasó la prueba chica) | [`decisions/0018-motor-de-conversacion.md`](decisions/0018-motor-de-conversacion.md) |
 | Decisión sobre la evidencia de la entrega (texto, fotos y archivos) y la página de sólo lectura de una tarea, primer pedazo de la plataforma web (aceptado) | [`decisions/0019-evidencia-y-pagina-de-la-tarea.md`](decisions/0019-evidencia-y-pagina-de-la-tarea.md) |
+| Reglas generales del seguimiento: informar antes que callar, también las buenas noticias, un equipo y no una competencia, cerrar el tema para todos, "quedó asentado" y nunca abandonar a nadie (aceptado) | [`decisions/0021-reglas-generales-del-seguimiento.md`](decisions/0021-reglas-generales-del-seguimiento.md) |
 | Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
 | Relevamiento de NotebookLM y respuestas ancladas en fuentes | [`research/notebooklm-y-grounding.md`](research/notebooklm-y-grounding.md) |
 | Aprendizajes del `SOUL.md` y del contexto operativo de Prisma en Hermes (trabajo anterior del usuario) | [`research/soul-y-contexto-de-prisma-en-hermes.md`](research/soul-y-contexto-de-prisma-en-hermes.md) |
