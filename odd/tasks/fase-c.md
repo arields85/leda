@@ -410,6 +410,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     y queda asentado (decisión 49), con lo que dijo cada uno. Cambia la porción 3 (hoy corta en el
     segundo).
 
+52. **Un nombre mal escrito al pedir un enlace** (del enlace por chat): decidida (usuario,
+    2026-10-09, opción A). Por ahora nada: el dato le pide a la IA las palabras bien escritas; si
+    con la IA real falla ("tablro"), se agrega una búsqueda que tolere errores de tipeo. Lo mira la
+    tanda de pruebas.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2178,28 +2183,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 51 del usuario (2026-10-09; la 30, la 40, la 43 y la 45 ya están), con test primero.
+- [ ] Las decisiones 24 a 52 del usuario (2026-10-09; la 30, la 40, la 43, la 45 y la 52 ya están o esperan la prueba), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
       primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo).
 
-**Preguntas juntadas para el usuario** (cada una, con su ejemplo, en el registro de su unidad):
-
-1. **D5b** (cinco): si la pregunta se repite a las 4 horas aunque no espere nada detrás; qué es
-   "lo más urgente"; si la que volvió de un cambio de tema también va en un mensaje aparte;
-   "enseguida" fuera del horario; las preguntas que se hacen una sola vez.
-2. **El enlace** (cuatro): un nombre mal escrito; varias que coinciden sin botones; cuál gana si
-   sólo una se ve; y si "no podés ver esa" y "ninguna se llama así" tienen que ser iguales, para
-   no revelar que una tarea existe.
-3. **C-5, porciones 1 a 3** (cinco de la 1, siete de la 2 y la 3, y a quién va el informe si el referente es parte de la cadena): repetirle a quien destraba sin escalar; si se le escribe al
-   referente cuando lo nombran como quien destraba; quien destraba sin chat; "no le escribas"
-   después de que salió; avisarle a quien destraba que ya se destrabó por otro lado.
-4. **C-5, porciones 4 y 5** (once): nombrar como quien destraba a alguien que ya está trabado; si
-   el cierre que hace el sistema solo se avisa hacia abajo; si a la persona trabada se le dice que
-   se informó su bloqueo viejo; si se vuelve a informar; si el referente informado puede cerrar
-   el bloqueo; qué pasa si no hay nadie a quien informar; y las del registro de cada porción.
-5. **C-6** (siete): los atrasos en el informe al grupo; si lunes, miércoles y viernes preguntan lo
-   mismo; si son demasiados mensajes; si las trabadas y entregadas van en la lista; si la lista
-   se repite a las 4 horas; la hora de una cadencia antes de las 10:00; "viene bien" en una
-   tarea que no vence todavía.
+**Preguntas juntadas para el usuario: contestadas todas** (2026-10-09, a la mañana, de a una y
+con ejemplos simples). Son las decisiones 24 a 52 de "Preguntas al usuario", más los pedidos para
+la plataforma (`docs/product/plataforma-pendientes.md`, "La jerarquía, los avisos de cada uno y la
+vista de todo") y la C-8 (las ausencias), pendiente para más adelante.

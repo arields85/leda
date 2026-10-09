@@ -54,12 +54,13 @@ aceptada por el usuario. Todo revisado por tramos y subido; la lista de tareas y
 juntadas para el usuario, en el plan ("Próximo paso").
 
 **Lo que sigue (pedido del usuario: avanzar todo lo posible solo, sin esperar pruebas):**
-1. **Construir las decisiones 24 a 51** (la 30, la 40, la 43 y la 45 ya están) (plan, "Preguntas al usuario"), con test primero: el
+1. **Construir las decisiones 24 a 52** (la 30, la 40, la 43, la 45 y la 52 no piden código) (plan, "Preguntas al usuario"), con test primero: el
    informe de la cadena (C-5) y el pase sin respuesta, el encargado que pasa una tarea de su gente
    y la tarea que pasa a quien la revisaba (C-7); la repetición de las 4 horas, siempre (D5b); no repetir lo ya contestado en la lista y traer todas las tareas abiertas (C-6); el resumen y pedir el detalle (enlace).
 2. **El informe al grupo de la C-6** (decisión 25): el usuario crea el grupo en Telegram; falta el
    camino de un aviso al grupo y ver cómo toma Leda su identificador.
-3. **Seguir con las preguntas al usuario**, de a una y con ejemplos simples (plan, "Próximo paso").
+3. **Las preguntas al usuario están todas contestadas** (decisiones 24 a 52); las nuevas, de a una y
+   con ejemplos simples.
 4. **La porción 5:** el acceso del administrador por el bot de administración.
 5. **Las pruebas pendientes van juntas, en una tanda posterior** (pedido del usuario): la IA real
    sobre la 03, 05, 21, 23, 27, 28 y 30 a 38 (una vez, sin repetir sin preguntar) y la prueba por
