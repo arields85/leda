@@ -1750,14 +1750,17 @@ def _al_salir_el_bloqueo_viejo(m: Momento, aviso) -> None:
 # --- Pasarle una tarea a otra persona (C-7; `pase.py`) ------------------------------------------
 #
 # La pregunta a quien decide si la tarea pasa (`PASE_PARA_DECIDIR`) y a quien la recibe si la toma
-# (`PASE_PARA_TOMAR`), con dos botones cada una, y cómo terminó, a quien pidió y a quien decidió
-# (`COMO_TERMINO_EL_PASE`, información). Las tres las causa lo que dijo otra persona: de
-# coordinación, terminado el margen para corregir. Las preguntas no salen si el pase ya no espera
-# eso.
+# (`PASE_PARA_TOMAR`), con dos botones cada una, y cómo terminó, a quien pidió, a quien decidió
+# y a quien la tenía, si lo pidió su encargado (`COMO_TERMINO_EL_PASE`, información). Las tres las
+# causa lo que dijo otra persona: de coordinación, terminado el margen para corregir. Si nadie
+# contesta, la pregunta se repite una vez, el día hábil siguiente (`RECORDATORIO_DEL_PASE`,
+# decisión 26): seguimiento que Leda hace por su cuenta, que recuerda la pregunta que ya se hizo
+# con sus botones (`recuerda`). Las preguntas no salen si el pase ya no espera eso.
 
 PASE_PARA_DECIDIR = "pase_para_decidir"
 PASE_PARA_TOMAR = "pase_para_tomar"
 COMO_TERMINO_EL_PASE = "como_termino_el_pase"
+RECORDATORIO_DEL_PASE = "recordatorio_del_pase"
 
 
 def _vigencia_del_pase(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
@@ -1887,6 +1890,10 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso(PASE_PARA_TOMAR, "normal", _vigencia_del_pase, es_coordinacion=True,
                 opciones=_opciones_del_pase),
     TipoDeAviso(COMO_TERMINO_EL_PASE, "informativo", _vigencia_del_pase, es_coordinacion=True),
+    # Si nadie contesta, la pregunta otra vez, una sola (decisión 26): dentro del tope diario y en
+    # un envío por persona, sin botones ni otra pregunta abierta (9b).
+    TipoDeAviso(RECORDATORIO_DEL_PASE, "seguimiento", _vigencia_del_pase,
+                recuerda=preguntas.DECIDIR_EL_PASE),
 )})
 
 

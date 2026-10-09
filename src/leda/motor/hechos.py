@@ -864,9 +864,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                        "corresponde, quién lo aprobó (lo_aprobo) o que lo decide la misma "
                        "persona (tambien_lo_decide); pregunta si la toma.",
     "como_termino_el_pase": "Aviso de cómo terminó el pase de una tarea: si quien la recibía "
-                            "(pasaria_a) la tomó (la_tomo), o si quien decidía no lo aprobó "
-                            "(no_lo_aprobo, lo_decidio), y quién la tiene ahora (la_tiene). Es "
-                            "información: no pide respuesta.",
+                            "(pasaria_a) la tomó (la_tomo), si quien decidía no lo aprobó "
+                            "(no_lo_aprobo, lo_decidio) o si nadie contestó (sin_respuesta), y "
+                            "quién la tiene ahora (la_tiene). Es información: no pide respuesta.",
     "pidio": "Quién pidió pasar la tarea.",
     "lo_aprobo": "Quién aprobó que la tarea pase: el encargado del sector de quien la recibe.",
     "tambien_lo_decide": "Quien recibe este mensaje es también quien decide el pase: su "
@@ -896,6 +896,34 @@ SIGNIFICADOS: Mapping[str, str] = {
     "el_pase_ya_no_espera": "El pase ya no espera eso: se decidió, se tomó o terminó.",
     "cambio_quien_la_tiene": "La tarea pasó a otra persona: lo que se le preguntaba a quien la "
                              "tenía ya no espera nada.",
+    # Un pase que nadie contesta (decisión 26), el encargado que pasa una tarea de su gente (27) y
+    # la revisión que sigue a quien era la tarea (28).
+    "recordatorio_del_pase": "Mensaje de Leda, como Leda, que vuelve a hacer la pregunta del "
+                             "pase que la persona todavía no contestó (si lo aprueba o si toma "
+                             "la tarea), por única vez; se contesta igual que la primera.",
+    "se_lo_pregunto_el": "El día en que Leda le hizo la pregunta por primera vez.",
+    "si_sigue_sin_contestar": "Lo que pasa si la persona sigue sin contestar: ese día (fecha) el "
+                              "pase termina y la tarea sigue con quien la tiene (sigue_con).",
+    "sin_respuesta": "Nadie contestó la pregunta del pase (no_contesto dice quién tenía que "
+                     "hacerlo), ni la primera vez ni cuando Leda la repitió: el pase terminó y "
+                     "la tarea sigue con quien la tenía.",
+    "no_contesto": "Quién tenía que contestar la pregunta del pase y no contestó.",
+    "puede_pedirselo_a_otra_persona": "Quien pidió el pase puede pedir pasarle la tarea a otra "
+                                      "persona.",
+    "era_suya": "La tarea era de quien recibe este mensaje: la pidió pasar el encargado de su "
+                "sector (pidio), y ahora la tiene otra persona (la_tiene).",
+    "aviso_a_quien_la_tenia": "Lo que se le avisa a quien tenía la tarea, que pasó a otra "
+                              "persona: a quién (a) y cuándo se entera (llega).",
+    "no_es_de_su_sector": "La tarea nombrada es de otra persona (la_tiene) que no es de su "
+                          "sector: quien escribe no la puede pasar.",
+    "ya_la_tiene": "Quien recibiría la tarea es quien ya la tiene.",
+    "la_aprueba_al_entregarla": "Quien entrega la tarea es quien la revisa (era de alguien de su "
+                                "sector): al confirmarla queda aprobada por esa persona y, si no "
+                                "falta nada más para cerrarla, terminada. Nadie más la revisa.",
+    "la_aprobo_al_entregarla": "Quien entregó la tarea es quien la revisa: quedó aprobada por "
+                               "esa persona; nadie más la revisa ni se entera para aprobarla.",
+    "la_revisa_quien_la_hace": "Quien hace la tarea es también quien la revisa (era de alguien "
+                               "de su sector): no hay a quién avisarle.",
 }
 
 

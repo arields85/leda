@@ -134,6 +134,11 @@ def _una_por_id(ctx, task_id: str) -> dict[str, Any] | None:
     return {**fila, "ve": _puede_verla(cur, ctx.quien.membership_id, fila["id"])}
 
 
+# Para nombrar una tarea por cómo la dijo la persona en otra jugada (`pase.pedir`, decisión 27).
+que_nombra = _que_nombra
+misma_palabra = _misma_palabra
+
+
 def _puede_verla(cur, persona: str, task_id: str) -> bool:
     cur.execute("select puede_ver_tarea(%s, %s) as ve", (persona, task_id))
     return bool(cur.fetchone()["ve"])

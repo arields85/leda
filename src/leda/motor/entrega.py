@@ -678,8 +678,16 @@ def _tarea_de(ctx, task_id: str) -> dict[str, Any]:
 
 
 def _quien_aprueba(ctx, task_id: str) -> dict[str, str] | None:
-    """Quien revisa el trabajo de la tarea (C-7: si cambió de manos, quien la revisaba)."""
+    """Quien revisa el trabajo de la tarea (C-7: si cambió de manos, quien aprueba el trabajo de
+    quien era la tarea, decisión 28)."""
     return _fichas().quien_revisa(ctx.cur, task_id)
+
+
+def _la_revisa_quien_la_entrega(ctx, quien: Mapping[str, Any] | None) -> bool:
+    """Si quien entrega es quien revisa la tarea (la de alguien de su sector que tomó el
+    encargado, decisión 28): al confirmarla queda aprobada por esa persona (la cocina,
+    `entregar_tarea`) y nadie más la revisa."""
+    return quien is not None and quien["membership_id"] == ctx.quien.membership_id
 
 
 def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]],
@@ -738,7 +746,9 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
         "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]}, "entrega": muestra,
         **lo_que_falta}
     al_confirmar: dict[str, Any] = {"estado": "en_revision"}
-    if quien is not None:
+    if _la_revisa_quien_la_entrega(ctx, quien):
+        al_confirmar = {"la_aprueba_al_entregarla": True}
+    elif quien is not None:
         al_confirmar["queda_esperando_la_aprobacion_de"] = quien["nombre"]
     if tarea["estado"] == "asignada":
         # Nunca se arrancó: al confirmar, la historia dice que arrancó y se entregó en ese
@@ -992,7 +1002,7 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
         # Una tarea sin arrancar que espera que terminen otras de las que depende (mecánica §4).
         return {"resultado": "no_se_puede", "motivo": ESPERA_OTRAS_TAREAS,
                 "tarea": {"alias": tarea_q["alias"], "titulo": tarea_q["titulo"]}}
-    if r.get("estado") != "en_revision":
+    if r.get("estado") not in ("en_revision", "terminada"):
         return fichas.no_hecho(r, {"alias": tarea_q["alias"], "titulo": tarea_q["titulo"]})
     if q["cerrada_en"] is None:
         preguntas.cerrar(ctx, str(q["id"]), "respondida",
@@ -1003,8 +1013,21 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
     hecho: dict[str, Any] = {
         "resultado": ENTREGA_COMPLETA if completa else ENTREGADA,
         "tarea": {"alias": tarea_q["alias"], "titulo": tarea_q["titulo"]},
-        "estado": "en_revision", "entrega": mostrar(_ordenar(piezas), pol, ctx.calendario.zona),
+        "estado": r["estado"], "entrega": mostrar(_ordenar(piezas), pol, ctx.calendario.zona),
         **({"arranco_al_entregarla": True} if r.get("arranco") else {})}
+    from . import encadenados       # encadenados importa fichas, que importa este módulo
+    if r.get("aprobada_por_quien_la_entrego"):
+        # La revisa quien la entregó (decisión 28): quedó aprobada por esa persona y, si no
+        # faltaba nada más, terminada. Nadie más la revisa ni se entera para aprobarla.
+        hecho["la_aprobo_al_entregarla"] = True
+        if r.get("cerrada"):
+            hecho["quedo_terminada"] = True
+            fichas.juntar(hecho, encadenados.quedo_terminada(ctx, tarea_q["id"],
+                                                             r["aprobacion_id"]))
+        else:
+            from . import aprobacion    # aprobacion importa este módulo
+            hecho.update(aprobacion.lo_que_frena(cur, tarea_q["id"]))
+        return hecho
     quien = _quien_aprueba(ctx, tarea_q["id"])
     if quien is not None:
         hecho["queda_esperando_la_aprobacion_de"] = quien["nombre"]
@@ -1026,7 +1049,6 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
             fichas.nombrar_efecto(hecho, "aviso_a_quien_aprueba", fichas.AVISO, aviso_id)
     # Quien espera esta tarea, más abajo en una cadena de bloqueos, se entera de que la entregó
     # (C-5, porción 4: "Juan terminó").
-    from . import encadenados       # encadenados importa fichas, que importa este módulo
     fichas.juntar(hecho, encadenados.la_entrego(ctx, tarea_q["id"], r.get("entrega")))
     return hecho
 

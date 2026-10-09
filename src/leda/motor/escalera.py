@@ -107,6 +107,10 @@ conversación 36; `bloqueo_viejo.py`): un bloqueo que sigue abierto a los días 
 (`bloqueos.escala_solo_a_los_dias`, 5 si no está) se le informa al referente de la tarea, una sola
 vez, aunque la cadena se mueva, con la historia y las fechas dichas.
 
+**Un pase que nadie contesta** (C-7; decisión 26 del usuario, 2026-10-09; `pase.py`,
+`seguir_los_pases`): la pregunta a quien decide o a quien recibe se repite una vez, el día hábil
+siguiente; si sigue sin contestar, al otro día hábil el pase termina y quien lo pidió se entera.
+
 **Los pedidos de estado con ritmo fijo** (C-6; decisión 8 del usuario, 2026-10-08; conversación 37;
 `cadencias.py`): el día de una cadencia del espacio a cada integrante en privado, la primera pasada
 guarda el pedido de cada persona con la lista de sus tareas, para la hora de la cadencia. Va antes que
@@ -147,6 +151,7 @@ from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir
 from .avisos import BLOQUEO_QUE_SIGUE_ABIERTO, sigue_esperando_que_destrabe
 from .bloqueo_viejo import informar_los_viejos
 from .cadencias import guardar_los_pedidos
+from .pase import seguir_los_pases
 from .preguntas import COMO_VIENEN_SUS_TAREAS
 from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, lo_anotado
 from .preguntas import TIPOS as TIPOS_DE_PREGUNTA
@@ -232,6 +237,9 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
         viejos = informar_los_viejos(m)
         if viejos:
             resumen[BLOQUEO_QUE_SIGUE_ABIERTO] += viejos
+        # Los pases que nadie contesta: la pregunta otra vez y, si sigue, el fin del pase
+        # (decisión 26).
+        resumen.update(seguir_los_pases(m))
     return dict(resumen)
 
 

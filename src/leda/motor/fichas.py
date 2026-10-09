@@ -603,10 +603,16 @@ def referente(cur, responsable_membership_id: str) -> dict[str, str] | None:
         if fila else None
 
 
+# La tarea la revisa quien la hace: la de alguien de su sector que tomó el encargado (decisión 28
+# del usuario). Su significado, en `hechos.py`.
+LA_REVISA_QUIEN_LA_HACE = "la_revisa_quien_la_hace"
+
+
 def quien_revisa(cur, task_id: str) -> dict[str, str] | None:
     """Quien revisa el trabajo de una tarea (`autoridad.quien_revisa_la_tarea`, la regla de la
-    base): quien aprueba el trabajo de su responsable o, si la tarea cambió de manos, quien la
-    revisaba (C-7). Es a quien le llega el aviso de una nueva previsión y el de una entrega."""
+    base): quien aprueba el trabajo de su responsable o, si la tarea cambió de manos, el de quien
+    era la tarea (C-7, decisión 28). Es a quien le llega el aviso de una nueva previsión y el de
+    una entrega, salvo que sea quien la hace."""
     cur.execute("""select membership_id, nombre from integrante
                     where membership_id = quien_revisa_la_tarea(%s)""", (str(task_id),))
     fila = cur.fetchone()
@@ -729,6 +735,10 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         return {**hecho, "sin_aviso": "misma_fecha_comprometida"}
     if quien_aprueba is None:
         return {**hecho, "sin_aviso": "sin_referente"}
+    if quien_aprueba["membership_id"] == ctx.quien.membership_id:
+        # La revisa quien la hace (la tarea de su gente que tomó el encargado; decisión 28): es
+        # trabajo del sector, y nadie más se entera.
+        return {**hecho, "sin_aviso": LA_REVISA_QUIEN_LA_HACE}
     # Le llega a otra persona por lo que dijo ésta: espera el margen para corregir, y el hecho
     # dice esa hora, la real (`margen.py`; usuario, 2026-10-07). Sin el porqué de un atraso,
     # espera además la respuesta hasta el final del día de trabajo y, si sale sin ella, lo dice
@@ -1608,11 +1618,12 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "ejemplo, porque ya habló con esa persona). quien es a quién, como lo nombró. No "
              "cambia quién destraba ni cierra el bloqueo."),
     Ficha("pedir_reasignacion", "pasarle una tarea suya a otra persona del equipo",
-          necesita=("tarea",), opcional=("a",),
-          comprueba="que sea el responsable, que la tarea esté asignada, en curso o trabada, que "
-                    "quien la recibe sea del equipo y tenga un chat con Leda, y que la persona "
-                    "pueda pedirlo: el encargado de un sector, a cualquiera; un integrante, sólo "
-                    "a alguien de su sector (la cocina)",
+          necesita=(), opcional=("tarea", "a", "como_la_nombra"),
+          comprueba="que sea el responsable o, si nombra una que no está en su lista, el "
+                    "encargado del sector de quien la tiene (decisión 27), que la tarea esté "
+                    "asignada, en curso o trabada, que quien la recibe sea del equipo y tenga un "
+                    "chat con Leda, y que la persona pueda pedirlo: el encargado de un sector, a "
+                    "cualquiera; un integrante, sólo a alguien de su sector (la cocina)",
           hace="nada todavía: muestra la vista previa del pase (de quién a quién, quién lo "
                "decide y que quien la recibe tiene que tomarla)",
           despues="espera la confirmación (botón o escrito); al confirmar, Leda le pregunta a "
@@ -1621,7 +1632,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           manejar=_pedir_reasignacion, del_responsable=True,
           estados=frozenset({"asignada", "en_curso", "bloqueada"}),
           es="La persona pide que una tarea suya pase a otra persona del equipo (a, como la "
-             "nombró): que se la pasen, que la haga o la tome otra persona."),
+             "nombró): que se la pasen, que la haga o la tome otra persona. El encargado de un "
+             "sector también puede pedirlo para una tarea de alguien de su sector, que no está "
+             "en su lista: como_la_nombra dice cómo la nombró."),
     Ficha("contestar_el_pase", "decir si aprueba que una tarea pase a otra persona, o si toma "
                                "la que le quieren pasar",
           necesita=(), opcional=("tarea", "acepta", "por_que"),

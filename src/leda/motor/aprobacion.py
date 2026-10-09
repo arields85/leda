@@ -446,6 +446,11 @@ def _frena(cur, task_id: str) -> dict[str, Any]:
     return {"no_se_cierra_todavia": frena}
 
 
+
+# Para la entrega de quien revisa la tarea (decisión 28; `entrega.confirmar`).
+lo_que_frena = _frena
+
+
 def _responsable(cur, task_id: str) -> dict[str, Any]:
     cur.execute("""select i.membership_id, i.nombre from task t
                      join integrante i on i.membership_id = t.responsable_membership_id
