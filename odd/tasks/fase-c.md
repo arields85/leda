@@ -1861,6 +1861,103 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     sector, Leda le pregunta si la acepta y le avisa a quien delegó. Al construirlo cambian las
     respuestas a "me la podés pasar a Nahuel" de las conversaciones 12 y 19, que hoy dicen que no se hace
     por chat y quién lo decide (`quien_decide`; usuario, 2026-10-08: queda así hasta que exista delegar).
+  - **Delegar por chat** (ADR 0017, enmienda a la decisión 2, aceptada el 2026-10-09; conversación
+    38). Route: delegada (escritor único, 2+ archivos no triviales). Hecho el 2026-10-09:
+    - **La conversación primero** (`161d227`, más `85e1748`, que la cuenta en la lista del
+      corredor): la 38. Marcos le pasa una a Nahuel (decide Marcos al pedirlo, confirma Nahuel con el
+      botón); una en revisión no se pasa; Marcos le pasa otra a Lucas, decide Martín y Lucas no la
+      toma; Martín le pasa una a Marcos, que decide y la toma con un solo "sí"; Nahuel no puede
+      pasársela a Lucas (otro sector: lo decide Marcos), sí a Marcos, que dice que no. Cambiaron la
+      12 y la 19: "me la podés pasar a Nahuel" ya no dice que no se hace por chat ni quién lo decide;
+      muestra la vista previa, que Marcos deja sin efecto (la 12: "no, la saco igual"; la 19: "no
+      mejor no se la pases, la termino yo para el martes 27…", la fecha sigue como estaba). El
+      corredor mira quién tiene cada tarea (`responsables`, efecto y estado): un cambio que nadie
+      esperaba es de garantía. **Rojo, en seco** (`--ronda seco-c7-rojo`): la 12 y la 19 con 5
+      fallas cada una (la respuesta vieja) y la 38 con error (sin la jugada `contestar_el_pase`).
+      El límite del cargador: OT tiene sólo a Marcos y a Nahuel, así que "Nahuel se la pasa a otro
+      de OT y decide Marcos" lo prueban las pruebas (Pedro, un integrante más).
+    - **La cocina y la base** (`23b24c3`, migración `0045`, con su rollback, `db/esquema.sql` y la
+      paridad): `pase_de_tarea` (el pedido, quién lo decide y cómo terminó; sólo avanza, uno abierto
+      por tarea, `vigilar_pase_de_tarea`) y `cambio_de_responsable` (sólo se agrega; agregarlo es lo
+      único que cambia quién tiene la tarea: `aplicar_cambio_de_responsable`, `security definer` de
+      `leda_owner`, comprueba que el pase espera que la tome esa persona, con la decisión dada, y que
+      la tarea sigue con quien la tenía, asignada, en curso o trabada). `task.revisa_membership_id`
+      y `quien_revisa_la_tarea`: el trabajo lo sigue revisando quien lo revisaba (si es quien la
+      toma, quien aprueba el trabajo de esa persona, para que nadie revise lo suyo); lo leen el
+      cierre, quién ve la página, la página y la cocina (`autoridad.puede_revisar_la_tarea`, que
+      reemplaza a `puede_aprobar_tarea`). `bloquear_estado_directo` deja cambiar quién la tiene
+      sólo dentro de ese cambio. Tres operaciones (`cambiar_responsable`, que exige confirmación):
+      `pedir_pase_de_tarea` (con vista previa y huella), `decidir_pase_de_tarea` y
+      `contestar_pase_de_tarea`; la regla de quién pide y quién decide, en
+      `autoridad.regla_del_pase`. La auditoría: una fila por operación y `cambiar_responsable` con
+      quién pidió, quién decidió, quién aceptó, quién la tenía y quién la revisa, con la versión del
+      pack y del núcleo. RLS forzado con su política en las dos tablas; `leda_app` no borra un pase
+      ni toca un cambio. **Rojo:** `tests/garantias/test_pase_de_tarea.py`, 22 de 25 (las tres
+      que pasaban miran la base y la RLS, ya con la migración). **Verde:** las 25. Cambió
+      `test_migraciones.py` (las dos tablas en la paridad; la vuelta atrás de la `0045` antes que
+      la de la `0036` en la prueba que deshace la `0002`).
+    - **El revisor, en el motor** (`ce6c6c9`, sin cambio de comportamiento mientras la tarea no
+      cambie de manos): el aviso de una entrega, los recordatorios a quien aprueba, la lista de
+      entregas para revisar, el cierre que hace el sistema y el aviso de una nueva previsión leen
+      `quien_revisa_la_tarea` (`fichas.quien_revisa`).
+    - **El motor** (`e082010`, `leda.motor.pase`): `pedir_reasignacion` muestra la vista previa
+      (`preguntas.CONFIRMAR_EL_PASE`, con "Confirmar"; la cocina comprueba sin escribir y da la
+      huella) o dice por qué no (en revisión; otro sector, con quien lo decide; sin encargado;
+      alguien que no es del equipo; sin un chat con Leda; ya hay un pase); `confirmar` la reconoce
+      (`pase.la_que_se_confirma`) y la pide con la guarda escrita y la huella. Leda le pregunta a
+      quien decide (`pase_para_decidir`, "Aprobar el pase" / "No aprobarlo") o a quien recibe
+      (`pase_para_tomar`, "La tomo" / "No la tomo"), terminado el margen para corregir, con dos
+      botones que no son un tema abierto (`TipoDeAviso.opciones`); la tarea está en la lista de esa
+      persona (`pase.para_contestar`) y `contestar_el_pase` (`acepta`, `por_que`) lo anota por la
+      cocina. Cómo terminó (`como_termino_el_pase`), a quien pidió y, si la toma y es otra persona,
+      a quien decidió. Al tomarla, lo que la escalera tenía guardado para quien la tenía pasa a
+      quien la tiene y lo que Leda le preguntaba a quien la tenía se cierra. Las instrucciones de la
+      IA no cambiaron (huellas de `test_contratos.py` iguales): los códigos nuevos van en
+      `hechos.SIGNIFICADOS` (con `no_vale_la_confirmacion` y `como_queda` generalizados a la
+      entrega o el pase), dos datos nuevos (`acepta`, `por_que`, en `ia_real.DATOS` y `por_que` en
+      `comprobar.DATOS_LIBRES`), la jugada nueva en `PARA_LA_REDACCION` y en las listas de
+      `test_fichas.py`, y `pase_de_tarea` en `test_frontera.py`. Cambió el `es` de `confirmar` (lo
+      que confirma puede ser un pase). `pedir_reasignacion` ahora se ofrece entre lo que Leda hace.
+      Las dos pruebas de lo propuesto que usaban la reasignación vieja usan ahora las salidas de un
+      bloqueo sin quien lo destrabe. `tests/motor/test_delegar.py` se escribió antes del módulo,
+      pero no se corrió en rojo: el rojo observado del motor es el de la 38 en seco. **Verde:** las
+      18, y la 12, la 19 y la 38 en seco.
+    - **Chequeos** (2026-10-09): `pytest tests/motor tests/conversaciones`, 1065 passed;
+      `pytest tests/garantias tests/test_restriccion_horario.py tests/test_esqueleto.py
+      tests/test_saludo.py`, 415 passed; las pruebas de la raíz que tocan la cocina
+      (`test_dependencias`, `test_herramientas`, `test_entrega_con_evidencia`,
+      `test_aprobacion_cierra_tarea`, `test_autoridad_tarea` y siete más), 203 passed (antes, una
+      falla en `test_dependencias`, corregida en la cocina: la autoridad sobre una dependencia
+      necesitaba el id de las dos tareas); en seco, `correr --ia guionada --veces 1 --ronda seco-c7-todas`, **38 de 38 bien**.
+      Informes borrados, `gasto.json` sin tocar. Sin la IA real (la tanda posterior). Sin la suite
+      completa.
+    - `PENDIENTE`:
+      - **La IA real** sobre la 12, la 19 y la 38 (la tanda posterior), y la prueba por Telegram, con
+        `leda_motor` al día hasta la `0045` (respaldo previo).
+      - La revisión RDD por tramos (coordinador).
+      - La página de la tarea no muestra en su historia que cambió de manos (sale en
+        `cambio_de_responsable`).
+      - **Preguntas para el usuario** (cada una con su ejemplo):
+        - **¿Un encargado puede pasar la tarea de otro?** Hoy cada uno pasa sólo una tarea suya.
+          Ejemplo: Nahuel está enfermo y Marcos le escribe a Leda "pasale la de los sensores de
+          Nahuel a Pedro": hoy Leda no lo hace (no es tarea de Marcos).
+        - **¿Y si quien decide o quien recibe no contesta?** Hoy la pregunta sale una vez y el pase
+          espera para siempre (y no deja pedir otro para esa tarea). Ejemplo: Martín no contesta
+          si aprueba pasarle el PLC a Lucas; ¿Leda le repite al día hábil siguiente, le avisa a
+          Marcos, o el pedido vence?
+        - **Quien recibe era quien la revisaba.** La de los sensores de Nahuel la revisa Marcos; si
+          la toma Marcos, hoy la revisa Ismael (quien aprueba el trabajo de Marcos), para que
+          Marcos no se apruebe a sí mismo. ¿Está bien, o la revisa otra persona?
+        - **Quien revisa queda fijo.** Si después la plataforma cambia quién aprueba el trabajo de
+          Marcos, una tarea que Marcos le pasó a Nahuel la sigue revisando Ismael (quedó escrito al
+          pasarla). ¿O tiene que seguir el cambio?
+        - **El seguimiento que ya corría.** Si el PLC vence hoy y Marcos tenía el recordatorio
+          guardado, al pasárselo a Nahuel el recordatorio le llega a Nahuel, y lo que Leda esperaba
+          de Marcos (dos pedidos de estado sin respuesta) no cuenta para Nahuel: empieza de cero.
+          ¿Está bien?
+        - **Sin un chat con Leda no se puede.** Mariano no tiene Telegram: Marcos no le puede pasar
+          una tarea (Leda no le puede preguntar si la toma), ni a alguien de Electricidad, que
+          decide Mariano. ¿Está bien, o se puede decidir por la plataforma?
 
 ## Próximo paso (2026-10-09, noche, trabajo solo)
 
