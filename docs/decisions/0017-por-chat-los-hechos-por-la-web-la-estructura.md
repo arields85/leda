@@ -94,16 +94,22 @@ decisión 9 de `odd/tasks/fase-c.md`, del 2026-10-08). Hasta que se acepte, no s
 - **Re-aprobación** (mecánica §7, cambio de responsable): la da quien decide en el paso 2, y la
   auditoría guarda quién pidió, quién decidió, quién aceptó y el estado anterior, con la versión
   del pack y del núcleo.
-- **Sólo delega quien está a cargo de un sector** (usuario, 2026-10-09). Un integrante no delega:
-  si Nahuel pide "pasale la de comunicaciones a Lucas", Leda no lo hace y le dice que eso lo
-  decide Marcos (decisión 1, "es una persona concreta"). El encargado busca primero a alguien de
-  su sector; si están todos ocupados, puede pedir ayuda a gente de otro sector, y ahí decide el
-  encargado de ese sector y después confirma quien recibe (Marcos → Lucas: primero Martín, después
-  Lucas).
+- **Quién puede pedirlo** (usuario, 2026-10-09).
+  - **El encargado de un sector** busca primero a alguien de su sector; si están todos ocupados,
+    puede pedir ayuda a gente de otro sector, y ahí decide el encargado de ese sector y después
+    confirma quien recibe (Marcos → Lucas: primero Martín, después Lucas).
+  - **Un integrante, sólo dentro de su sector:** Nahuel puede pedir pasarle su tarea a otro de
+    OT. Decide Marcos (Leda le pregunta si lo aprueba; si dice que no, sigue con Nahuel) y después
+    confirma quien recibe. Que Marcos decida y no sólo se entere es la re-aprobación de la
+    mecánica §7.
+  - **Un integrante no delega a otro sector:** si Nahuel pide "pasale la de comunicaciones a
+    Lucas", Leda no lo hace y le dice que eso lo decide Marcos (decisión 1, "es una persona
+    concreta").
 - **Preguntas para el usuario antes de aceptar:**
   1. ~~¿Un integrante puede pedir pasarle su tarea a otro?~~ Respondida arriba: no.
-  2. ¿Delegar una tarea que ya está en revisión o terminada? Propuesta: no; sólo asignada, en curso
-     o trabada, y si está trabada se mueve con su bloqueo abierto.
+  2. ~~¿Delegar una tarea que ya está en revisión o terminada?~~ **Decidida (usuario,
+     2026-10-09):** no; sólo asignada, en curso o trabada, y si está trabada se mueve con su
+     bloqueo abierto.
   3. ¿"Quien manda sobre el que recibe" es `aprobado_por` o el referente del área? En CoreWork son
      la misma persona para todos menos para los referentes, a quienes los aprueba Ismael. Propuesta:
      `aprobado_por`, que ya existe y no necesita un dato nuevo. Consecuencia: pasarle una tarea a
