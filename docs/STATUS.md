@@ -45,24 +45,23 @@ que otro servidor puede estar en ejecución, cerrar los procesos `postgres` colg
 no quede un escuchador viejo corriendo.
 
 **Lo hecho la noche del 2026-10-09 (sola, con el usuario dormido):** la D5b (decisión 21,
-conversación 30), la `0041` (RLS forzado en cinco tablas de configuración y una prueba que recorre
-todas), pedir el enlace a la página por chat (conversación 31) y la enmienda al ADR 0017 para
-delegar, aceptada por el usuario con sus tres respuestas. Todo revisado por tramos; detalle,
-commits y `PENDIENTE` en el plan. Antes, el 2026-10-08: D1 a D8 y la prueba por Telegram del
-usuario (bitácora).
+conversación 30, `0040`), la `0041` (RLS forzado en cinco tablas de configuración y una prueba que
+recorre todas), pedir el enlace a la página por chat (conversación 31), la C-5 porción 1
+(escribirle a quien destraba, conversación 32, `0042`) y la enmienda al ADR 0017 para delegar,
+aceptada por el usuario. Todo revisado por tramos y subido; la lista de tareas y las preguntas
+juntadas para el usuario, en el plan ("Próximo paso").
 
 **Lo que sigue (pedido del usuario: avanzar todo lo posible solo, sin esperar pruebas):**
-1. **C-5, perseguir un bloqueo** (decisiones 4 a 7), por porciones, cada una con su conversación
-   de prueba primero (desde la 32): escribirle a quien destraba; "no le escribas, ya hablé"; "no
-   me corresponde" con un salto; bloqueos encadenados; el bloqueo viejo (`escala_solo_a_los_dias`
-   se importa y nadie lo lee).
+1. **C-5, porciones 2 a 5** (decisiones 4 a 7), cada una con su conversación de prueba primero
+   (desde la 33): "ya hablé con él" de quien destraba; "no me corresponde" con un salto y la
+   cadena al referente; bloqueos encadenados; el bloqueo viejo.
 2. **C-6, las cadencias** (decisión 8) y **C-7, delegar** (ADR 0017, enmienda a la decisión 2).
 3. **La porción 5:** el acceso del administrador por el bot de administración.
 4. **Las pruebas pendientes van juntas, en una tanda posterior** (pedido del usuario): la IA real
-   sobre la 21, la 23, la 27, la 28, la 30 y la 31 (una vez, sin repetir sin preguntar) y la
-   prueba por Telegram, con `leda_motor` al día hasta la `0041` (respaldo previo; autorizado) y el
-   guion en tandas cortas de unos 15 minutos.
-5. **Las preguntas juntadas para el usuario**, en el plan: las de la D5b y las del enlace.
+   sobre la 05, 21, 23, 27, 28, 30, 31 y 32 (una vez, sin repetir sin preguntar) y la prueba por
+   Telegram, con `leda_motor` al día hasta la `0042` (respaldo previo; autorizado) y el guion en
+   tandas cortas de unos 15 minutos.
+5. **Las preguntas para el usuario**, juntas en el plan.
 
 **La IA real:** antes de cada ronda, comprobar el cupo (`leda chatgpt estado`); una ronda por vez y ninguna
 repetición sin preguntarle al usuario. El corredor se corta solo al primer error de cupo (sale con 4). Si se

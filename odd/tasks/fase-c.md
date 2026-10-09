@@ -1463,10 +1463,32 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     respuestas a "me la podés pasar a Nahuel" de las conversaciones 12 y 19, que hoy dicen que no se hace
     por chat y quién lo decide (`quien_decide`; usuario, 2026-10-08: queda así hasta que exista delegar).
 
-## Próximo paso
+## Próximo paso (2026-10-09, noche, trabajo solo)
 
-La D7 y la D7b están hechas; el chequeo de la D7b con la IA real (la 21, la 23, la 27 y la 28) lo
-corre el coordinador. La prueba
-por Telegram del usuario con el guion de la D6 y las decisiones que dejó la D6 (insistir en
-mandar algo incompleto y quién juzga lo que cubre un texto); después, pedir el enlace por chat (la jugada que quedó de la porción 4) y la porción 5 de la C-3: el acceso del administrador
-(`docs/STATUS.md`, "Punto exacto para retomar").
+**Lista de tareas de la noche** (pedido del usuario: ver lo hecho y lo que falta):
+
+- [x] D5b, la pregunta sin contestar (decisión 21, conversación 30, `0040`).
+- [x] Las diez tablas con `workspace_id` sin RLS: cinco con RLS forzado (`0041`), cinco excepciones
+      escritas en `test_aislamiento.py`; `tools/restriccion_horario.py` bajo `admin()`.
+- [x] Pedir el enlace a la página por chat (conversación 31).
+- [x] La enmienda al ADR 0017 para delegar, aceptada por el usuario con sus tres respuestas.
+- [x] C-5, porción 1: escribirle a quien destraba y "no le escribas" (conversación 32, `0042`).
+- [ ] C-5, porciones 2 a 5: "ya hablé con él" de quien destraba; "no me corresponde" con un salto
+      y la cadena al referente; bloqueos encadenados y avisos hacia abajo; el bloqueo viejo.
+- [ ] C-6, las cadencias (decisión 8).
+- [ ] C-7, delegar (ADR 0017, enmienda a la decisión 2).
+- [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
+- [ ] La tanda de pruebas: la IA real sobre la 05, 21, 23, 27, 28, 30, 31 y 32 (una ronda, cupo
+      primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0042` (respaldo previo).
+
+**Preguntas juntadas para el usuario** (cada una, con su ejemplo, en el registro de su unidad):
+
+1. **D5b** (cinco): si la pregunta se repite a las 4 horas aunque no espere nada detrás; qué es
+   "lo más urgente"; si la que volvió de un cambio de tema también va en un mensaje aparte;
+   "enseguida" fuera del horario; las preguntas que se hacen una sola vez.
+2. **El enlace** (cuatro): un nombre mal escrito; varias que coinciden sin botones; cuál gana si
+   sólo una se ve; y si "no podés ver esa" y "ninguna se llama así" tienen que ser iguales, para
+   no revelar que una tarea existe.
+3. **C-5, porción 1** (cinco): repetirle a quien destraba sin escalar; si se le escribe al
+   referente cuando lo nombran como quien destraba; quien destraba sin chat; "no le escribas"
+   después de que salió; avisarle a quien destraba que ya se destrabó por otro lado.
