@@ -1440,6 +1440,8 @@ create table dicho_de_quien_destraba (
   ya_esta                  boolean not null default false,
   lo_que_dice              text check (btrim(lo_que_dice) <> ''),
   at                       timestamptz not null,
+  -- Migración 0043 (C-5, decisión 5): que no le corresponde, nunca con una fecha ni "ya está".
+  no_le_corresponde        boolean not null default false,
   constraint dicho_de_quien_destraba_destraba
     foreign key (workspace_id, blocker_unblocker_id)
     references blocker_unblocker(workspace_id, id) on delete cascade,
@@ -1447,7 +1449,9 @@ create table dicho_de_quien_destraba (
     foreign key (dicho_por_membership_id)
     references membership(id) on delete cascade,
   constraint dicho_de_quien_destraba_dice_algo check (
-    para_cuando is not null or ya_esta or lo_que_dice is not null)
+    para_cuando is not null or ya_esta or lo_que_dice is not null or no_le_corresponde),
+  constraint dicho_de_quien_destraba_no_le_corresponde check (
+    not no_le_corresponde or (para_cuando is null and not ya_esta))
 );
 
 create index dicho_de_quien_destraba_de on dicho_de_quien_destraba (blocker_unblocker_id, at desc);
@@ -1458,6 +1462,8 @@ comment on table blocker_unblocker is
   'El Motor (ADR 0018, 9c): quién destraba un bloqueo -- un integrante, alguien de afuera o que no se sabe, exactamente uno --, quién lo dijo y cuándo. Sólo se agrega.';
 comment on table dicho_de_quien_destraba is
   'El Motor (C-5, decisión 4; ADR 0017, 3a): lo que dice quien destraba un bloqueo cuando Leda le pregunta -- para cuándo, que ya está o sus palabras, al menos uno --, quién lo dijo y cuándo. No cierra el bloqueo. Sólo se agrega.';
+comment on column dicho_de_quien_destraba.no_le_corresponde is
+  'El Motor (C-5, decisión 5): quien destraba dice que no le corresponde. Nunca junto con para cuándo ni con que ya está; a quién le toca, si lo dice, es otra fila de blocker_unblocker dicha por esa persona.';
 
 -- Los archivos recibidos por chat (ADR 0019, decisiones 2 a 4; migración 0033).
 -- `archivo` es del dominio: el contenido con su huella, sin ningún identificador

@@ -66,7 +66,8 @@ def _sql_script(path: Path) -> str:
 # `evidence` y de `task_evidence_policy`, y sus dos tablas nuevas. La salida con adjuntos
 # (migración 0035): su tabla. La página de la tarea (migración 0036): sus tres tablas y el
 # referente de `area`. Lo que dice quien destraba (migración 0042): su tabla, y la restricción
-# única de `blocker_unblocker`.
+# única de `blocker_unblocker`; que no le corresponde (migración 0043), su columna y sus dos
+# restricciones.
 TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "conversation_question", "conversation_option",
                     "scheduled_notice", "task_forecast", "blocker_unblocker",
