@@ -54,7 +54,7 @@ aceptada por el usuario. Todo revisado por tramos y subido; la lista de tareas y
 juntadas para el usuario, en el plan ("Próximo paso").
 
 **Lo que sigue (pedido del usuario: avanzar todo lo posible solo, sin esperar pruebas):**
-1. **Construir las decisiones 24 a 37** (la 30 ya está) (plan, "Preguntas al usuario"), con test primero: el
+1. **Construir las decisiones 24 a 38** (la 30 ya está) (plan, "Preguntas al usuario"), con test primero: el
    informe de la cadena (C-5) y el pase sin respuesta, el encargado que pasa una tarea de su gente
    y la tarea que pasa a quien la revisaba (C-7); la repetición de las 4 horas, siempre (D5b); no repetir lo ya contestado en la lista y traer todas las tareas abiertas (C-6); el resumen y pedir el detalle (enlace).
 2. **El informe al grupo de la C-6** (decisión 25): el usuario crea el grupo en Telegram; falta el

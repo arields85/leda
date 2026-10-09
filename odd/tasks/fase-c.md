@@ -309,6 +309,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     que lo conecte. Mientras tanto, ¿hay otra persona que pueda destrabarlo, o se lo pedís vos y me
     contás?". Cambia la porción 1 (hoy sólo dice que no le puede escribir).
 
+38. **A quien destraba y no contesta, Leda nunca lo abandona** (de la C-5, porción 1): decidida
+    (usuario, 2026-10-09). Puede no contestar por no poder (perdió el celular, un problema
+    personal). Días 1 a 3, una vez por día; desde el 4, cada 2 días hábiles mientras siga el
+    bloqueo; si escribe por otra cosa, Leda le recuerda la pregunta en ese momento; a los días del
+    espacio queda asentado (decisiones 35 y 36). Cambia la porción 1 (hoy, tres días y nada más).
+    Las ausencias (vacaciones, licencia) quedan como tarea aparte (abajo, C-8).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -1946,6 +1953,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           próxima lista o el día en que vence, no al día hábil siguiente. Ejemplo: el lunes Marcos
           dice "el hmi viene bien" (vence el viernes 6); Leda le dice que le vuelve a preguntar el
           lunes 2. ¿Está bien, o al día siguiente como con una tarea que ya venció?
+- [ ] **C-8.** Las ausencias (usuario, 2026-10-09: "nunca se trató"; pendiente para más adelante).
+  La mecánica §9 ya lo pide: con la persona ausente, Leda no le escribe ni avanza su escalera, avisa
+  al referente de lo que queda sin cobertura y, al volver, retoma con un mensaje de reencuadre. En
+  la persecución, a quien espera le dice que esa persona no está, para buscar a otra. La tabla
+  `absence` existe en el esquema; falta todo lo demás, empezando por su conversación de prueba.
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
   - **Revisión RDD por tramos (coordinador), aprobadas y reconocidas:** `ad2a20e..85e1748`
     `review-d89334032b20102b`; `85e1748..23b24c3` `review-6bd5b1c7bd95c0c8` (advertencias: un
@@ -2072,7 +2084,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 37 del usuario (2026-10-09; la 30 ya está), con test primero.
+- [ ] Las decisiones 24 a 38 del usuario (2026-10-09; la 30 ya está), con test primero.
+- [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
       primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo).
