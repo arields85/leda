@@ -2015,6 +2015,61 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     `tests/test_restriccion_horario.py` (su conexión de prueba no sabía de `admin()`, desde
     `411d680`), corregidas en `832492a`. Las dos correcciones, revisadas `692513d..2f2aa12`
     `review-ee0dd21fd5d6d732`. **La C-5 queda completa en sus cinco porciones.**
+  - [x] **C-5a: "quedó asentado", a la persona trabada y otra vez mientras siga** (decisiones 35,
+    34 y 36 del usuario, 2026-10-09). Route: delegada (escritor único, 2+ archivos no triviales).
+    Hecha el 2026-10-09:
+    - **Las conversaciones primero** (`cc4d651`): la 36 suma que a Marcos le llega, a la vez que a
+      Ismael, que quedó asentado y, como el espacio tiene informe al grupo (`grupo` y una cadencia
+      al grupo en su YAML, nuevo en `carga.py`), que es para que el equipo esté al tanto; y, del
+      miércoles 28 al martes 3, lo que dice Ariel el jueves 29 y la segunda vez, a los diez días
+      hábiles, con lo que pasó desde la primera (las tareas vencen ahora el viernes 13, para que el
+      aviso previo no caiga ese día). La 03 espera también el aviso a Marcos del martes 27. La 04
+      (tercer pedido), la 02 y la 30 (punto 5 de la regla) dicen "va a quedar asentado que está
+      atrasada"; la 34, que a Nahuel se le dice que quedó asentado, nunca que Leda lo informa. En
+      seco, antes del código: 04 con 2 fallas, 34 con 6 y 36 con 3, todas del motor.
+    - **Quedó asentado** (`e91c38a`, `leda.motor.asentado`; decisión 35): el hecho
+      `queda_asentado` dice que queda (o va a quedar) asentado y si figura en el informe al grupo
+      (`figura_en_el_informe_al_grupo`); a quién le llega va en el mismo hecho (`a`) y la redacción
+      lo recibe en `solo_si_pregunta` (`hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`). Si figura en
+      el informe al grupo es un hecho del código, un solo predicado para el informe al grupo de la
+      C-6 (`hay_informe_al_grupo`): el espacio tiene su grupo (`workspace.grupo_chat_id`, del pack
+      `telegram.grupo_gestion_id`) y una cadencia activa al grupo (`cadence_job.audiencia =
+      'grupo'`). Lo llevan `si_no_hay_respuesta` (la escalera de la tarea y la de una pregunta;
+      su significado dice ahora "va a quedar asentado", nunca "se informa"), el aviso de la cadena
+      a la persona trabada (en lugar de `aviso_de_la_cadena`, salvo cuando no le llega a nadie,
+      que queda tal cual) y el aviso nuevo a la persona trabada. Sin esquema nuevo. Las
+      instrucciones de la IA no cambiaron: los datos nuevos van en `hechos.SIGNIFICADOS`.
+    - **A la persona trabada** (decisión 34; `asentado_que_sigue_trabada`, informativo, seguimiento
+      que Leda hace por su cuenta): se guarda con el aviso al referente, a la misma hora, con la
+      tarea, la causa, desde cuándo, los días hábiles y `queda_asentado`. No sale si el bloqueo o
+      la tarea se cerraron, si la tarea cambió de responsable o si el aviso de esa vez al referente
+      se omitió (nada quedó asentado). Sin nadie a quien informar, nada se guarda, como antes.
+    - **Otra vez mientras siga** (decisión 36): la clave nombra la vez (la primera, sin número,
+      como antes). Cada `bloqueos.escala_solo_a_los_dias` días hábiles desde la vez anterior (la
+      última que salió o se omitió); una que todavía no salió no deja guardar otra. Las veces
+      siguientes llevan `la_vez_anterior` y `desde_la_vez_anterior` (lo dicho desde entonces,
+      vacío si nada) en lugar de la historia entera. `blocker.escalado_en` guarda la primera vez;
+      cada vez deja su fila de auditoría, con su número (`vez`).
+    - **Test primero:** `tests/motor/test_asentado.py` y las nuevas de `test_bloqueo_viejo.py`, con
+      `asentado.py` sólo con sus nombres: 16 en rojo, 96 pasaban (`pytest tests/motor/
+      test_asentado.py test_bloqueo_viejo.py test_pregunta_sin_contestar.py
+      test_cadena_del_bloqueo.py test_escalera.py test_preguntas_que_esperan.py`). **Verde:** con
+      el código y `test_hechos.py` y `test_palabras_de_la_redaccion.py`, 138 passed y 1 falla,
+      `test_escalera.test_un_bloqueo_abierto_detiene_la_escalera`, que no esperaba el aviso a la
+      persona trabada; sumado, `test_escalera.py` 26 passed.
+      Cambiaron también las que esperaban `si_no_hay_respuesta` sin `queda_asentado`
+      (`test_escalera`, `test_preguntas_que_esperan`), el significado (`test_pregunta_sin_contestar`)
+      y el aviso de la cadena a la persona trabada (`test_cadena_del_bloqueo`).
+    - **Chequeos** (2026-10-09, sobre `e91c38a`): `pytest tests/motor tests/garantias tests/conversaciones`, **1494
+      passed**; en seco, `correr --ia guionada --veces 1
+      --sin-informe`, **40 de 40 bien**. Sin la IA real.
+    - `PENDIENTE`:
+      - **El informe al grupo todavía no sale** (C-6, decisión 25): con el pack de CoreWork,
+        `figura_en_el_informe_al_grupo` es verdadero porque el pack lo declara. Hasta que el
+        informe exista, Leda diría "para que el equipo esté al tanto" de algo que todavía no llega
+        al grupo: hay que construirlo antes de la prueba por Telegram, o decidir apagar el
+        predicado hasta entonces (pregunta para el usuario).
+      - **La IA real** sobre la 03, 04, 34 y 36, en la tanda de pruebas.
 - [ ] **C-6.** Las cadencias (pregunta 8). El pedido de estado por persona, hecho y revisado el
   2026-10-09; el informe al grupo, `PENDIENTE` (el grupo de CoreWork no existe en Telegram, el
   aviso del motor exige una persona como destinatario y falta decidir los atrasos; ver abajo).
@@ -2439,8 +2494,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
   - [x] C-6: 31 (lo contestado no se repite), 32 (la lista del lunes, completa con su situación),
         44 ("viene bien": lo próximo es el aviso previo), 46 (las otras listas, sólo lo que falta);
         conversación 40, migración `0047`.
-  - [ ] C-5a: 35 ("quedó asentado"), 34 (se le cuenta a la persona trabada), 36 (se vuelve a
-        asentar mientras siga).
+  - [x] C-5a: 35 ("quedó asentado"), 34 (se le cuenta a la persona trabada), 36 (se vuelve a
+        asentar mientras siga); conversaciones 02, 03, 04, 30, 34 y 36, sin migración
+        (`cc4d651`, `e91c38a`).
   - [ ] C-5b: 37 (quien destraba sin Leda conectada), 38 (a quien no contesta no se lo abandona).
   - [ ] C-5c: 39 (cerrar el tema para todos), 47 (confirmar lo acordado), 48 ("ya lo hablé" sin
         decir qué).
