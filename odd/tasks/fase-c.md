@@ -1755,7 +1755,16 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     `tests/test_restriccion_horario.py` (su conexión de prueba no sabía de `admin()`, desde
     `411d680`), corregidas en `832492a`. Las dos correcciones, revisadas `692513d..2f2aa12`
     `review-ee0dd21fd5d6d732`. **La C-5 queda completa en sus cinco porciones.**
-- [ ] **C-6.** Las cadencias (pregunta 8).
+- [ ] **C-6.** Las cadencias (pregunta 8). El pedido de estado por persona, hecho y revisado el
+  2026-10-09; el informe al grupo, `PENDIENTE` (el grupo de CoreWork no existe en Telegram, el
+  aviso del motor exige una persona como destinatario y falta decidir los atrasos; ver abajo).
+  - **Revisión RDD por tramos (coordinador), aprobadas y reconocidas:** `b5dc456..99169f8` (la 37)
+    `review-09924d6e29f5635b`; `99169f8..ad1d06f` `review-1d9856275ebcb0f5`, advertencia: dos
+    cadencias privadas el mismo día pueden chocar (`avisos.py:364-395`); sugerencias: un cron con
+    guion final se acepta, la lista guarda tareas que ya no corresponden, de varios días perdidos
+    sólo el último queda omitido.
+  - `PENDIENTE` (coordinador): `docs/capacidades.md` está atrasado en general (dice que el motor
+    está sin código); ponerlo al día es una tarea propia de documentación, no de la C-6.
   - **El pedido de estado a cada persona, con la lista** (decisión 8; conversación 37). Route:
     delegada (escritor único, 2+ archivos no triviales). Hecho el 2026-10-09:
     - **La conversación primero** (`99169f8`): la 37. Con la cadencia del lunes (sólo ésa: el
@@ -1866,7 +1875,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porciones 2 y 3: "ya hablé con él" y "no me corresponde" con un salto (33, 34, `0043`).
 - [x] C-5, porción 4: bloqueos encadenados y avisos hacia abajo (decisión 6; 35, `0044`).
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
-- [ ] C-6, las cadencias (decisión 8).
+- [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [ ] C-7, delegar (ADR 0017, enmienda a la decisión 2).
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
@@ -1887,3 +1896,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
    el cierre que hace el sistema solo se avisa hacia abajo; si a la persona trabada se le dice que
    se informó su bloqueo viejo; si se vuelve a informar; si el referente informado puede cerrar
    el bloqueo; qué pasa si no hay nadie a quien informar; y las del registro de cada porción.
+5. **C-6** (siete): los atrasos en el informe al grupo; si lunes, miércoles y viernes preguntan lo
+   mismo; si son demasiados mensajes; si las trabadas y entregadas van en la lista; si la lista
+   se repite a las 4 horas; la hora de una cadencia antes de las 10:00; "viene bien" en una
+   tarea que no vence todavía.
