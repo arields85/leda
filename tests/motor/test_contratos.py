@@ -121,4 +121,12 @@ def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
 # de ser "contar" y pasa a ser "decir" (y "lo que la persona contó", "lo que dijo"), porque con
 # los significados de la entrega ya en "describir" la IA real seguía escribiendo "contaste",
 # "contarlo" y "Marcos contó…" (decisión 10: "describir", no "contar"). Antes: "3f267a24d030de4a".
-HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "9e419fe6bbcc420a"}
+# Y otra vez a propósito el 2026-10-08 (D8), por la prueba por Telegram del usuario y su texto
+# aprobado para una entrega ("Quedó entregada y pasa a revisión. Te aviso cuando la revisen o si
+# hace falta algo más."): lo que un hecho dice que Leda le va a hacer a la persona se dice en
+# primera persona (antes la voz pasiva valía para todo: "serás informado"); cuándo se entera
+# otra persona, sólo si los hechos lo traen a la vista (la hora del aviso a quien aprueba va en
+# `solo_si_pregunta`); ⚠️ sólo para lo que pide atención, nunca el estado de una tarea que sigue
+# su curso ("⚠️ Está en revisión"); y una sola pregunta en el cierre. Sin frases de ejemplo.
+# Antes: "9e419fe6bbcc420a".
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "420146b697b5124b"}

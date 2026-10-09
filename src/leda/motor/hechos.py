@@ -217,8 +217,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                       "confirme, con el botón o escribiendo.",
     "le_falta_evidencia": "A la entrega le falta algo de lo que pide la tarea: le_falta y "
                           "le_falta_del_criterio dicen qué.",
-    "entregada": "La tarea quedó entregada y pasa a revisión: espera que quien aprueba el "
-                 "trabajo de la persona la revise y decida. No está terminada ni aprobada.",
+    "entregada": "La tarea quedó entregada y pasa a revisión, el paso que sigue a toda "
+                 "entrega: quien aprueba el trabajo de la persona la revisa y decide si la "
+                 "aprueba o le pide cambios; hasta entonces, no queda terminada.",
     "no_vale_la_confirmacion": "La confirmación no vale (motivo dice por qué) y se muestra la "
                                "entrega como quedó (como_queda).",
     "llego_algo_despues": "Llegó algo nuevo para la entrega después de mostrarla: lo que la "
@@ -353,6 +354,10 @@ SIGNIFICADOS: Mapping[str, str] = {
                                    "vez, que la entrega espera su decisión.",
     "se_le_avisa_cuando_decida": "Cuando quien aprueba decida sobre la entrega, Leda se lo "
                                  "avisa a la persona a la que le escribe. Todavía no pasó.",
+    "se_le_avisa_si_hace_falta_algo_mas": "Si quien revisa la entrega pide cambios porque hace "
+                                          "falta algo más, Leda se lo avisa a la persona a la "
+                                          "que le escribe, con lo que hace falta. Todavía no "
+                                          "pasó.",
     "aprobacion_destrabada": "Aviso a quien sabía que una entrega esperaba la revisión de "
                              "quien_aprueba: ya decidió. No pide respuesta.",
     "aviso_de_que_se_destrabo": "Lo que se le avisa a quien sabía que esa entrega esperaba "
@@ -868,14 +873,30 @@ def _quien_aprueba_solo_si_pregunta(valor: Any) -> Any:
 
 
 def _nombre_aparte(valor: Any, clave: str) -> Any:
-    """Un aviso (o una lista de avisos) con `clave` dentro de su `solo_si_pregunta`."""
+    """Un aviso (o una lista de avisos) con `clave` dentro de su `solo_si_pregunta`. Si el aviso
+    dice a quién va (`a`), también cuándo se entera, si es una hora (D8, prueba por Telegram del
+    2026-10-08: "Quien la revisa será informado hoy a las 11:28"; el modelo del usuario, "Quedó
+    entregada y pasa a revisión", no lo dice): como el nombre, se dice si la persona pregunta. Un
+    código de si le llegó o no queda a la vista: es lo que pasó en el mundo."""
     if isinstance(valor, (list, tuple)):
         return [_nombre_aparte(v, clave) for v in valor]
     if not isinstance(valor, Mapping) or clave not in valor:
         return valor
-    resto = {k: v for k, v in valor.items() if k != clave}
-    resto[SOLO_SI_PREGUNTA] = {**resto.get(SOLO_SI_PREGUNTA, {}), clave: valor[clave]}
+    aparte = [clave]
+    if clave == "a" and _es_una_hora(valor.get(LLEGA)):
+        aparte.append(LLEGA)
+    resto = {k: v for k, v in valor.items() if k not in aparte}
+    resto[SOLO_SI_PREGUNTA] = {**resto.get(SOLO_SI_PREGUNTA, {}),
+                               **{k: valor[k] for k in aparte}}
     return resto
+
+
+# Cuándo se entera quien recibe un aviso (`fichas.LLEGA`): una fecha y hora, o un código.
+LLEGA = "llega"
+
+
+def _es_una_hora(valor: Any) -> bool:
+    return isinstance(valor, str) and bool(re.match(r"^\d{4}-\d{2}-\d{2}T", valor))
 
 
 # --- Los días de las fechas (tercera vuelta de ajuste, usuario, 2026-10-06) ------------------

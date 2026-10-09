@@ -301,7 +301,26 @@ def test_la_redaccion_de_la_entrega_nombra_a_quien_la_revisa_solo_si_se_pregunta
     assert redactado["estado"] == "en_revision"
     assert redactado["se_le_avisa_cuando_decida"] is True
     assert redactado["solo_si_pregunta"] == {"queda_esperando_la_revision_de": "Ismael"}
-    assert set(redactado["aviso_a_quien_aprueba"]) == {"llega", "solo_si_pregunta"}
+    # D8: cuándo se entera quien revisa, también sólo si pregunta (como su nombre).
+    assert set(redactado["aviso_a_quien_aprueba"]) == {"solo_si_pregunta"}
+    assert set(redactado["aviso_a_quien_aprueba"]["solo_si_pregunta"]) == {"a", "llega"}
+
+
+def test_la_entrega_confirmada_dice_lo_que_leda_le_avisa_despues(conn, mundo, marcos):
+    """D8, el texto aprobado por el usuario: "Quedó entregada y pasa a revisión. Te aviso cuando
+    la revisen o si hace falta algo más." Lo que Leda le avisa después a la persona es un hecho
+    de la cocina: cuando decidan (`se_le_avisa_cuando_decida`) y, si piden cambios, lo que hace
+    falta (`se_le_avisa_si_hace_falta_algo_mas`: el aviso del pedido de cambios, `aprobacion`).
+    Ser una revisión es el paso normal de una entrega, no una consecuencia."""
+    _tarea(conn, mundo)
+    marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero",
+                 archivos=[(JPEG, "foto", None)])
+    entregada = _hecho(marcos.manda(Jugada("confirmar", {}), texto="dale"), "confirmar")
+
+    assert entregada["se_le_avisa_cuando_decida"] is True
+    assert entregada["se_le_avisa_si_hace_falta_algo_mas"] is True
+    assert "Leda" in hechos.significado("se_le_avisa_si_hace_falta_algo_mas")
+    assert "no está terminada ni aprobada" not in hechos.significado("entregada").lower()
 
 
 def test_una_pieza_que_llega_con_la_confirmacion_la_deja_sin_valor(conn, mundo, marcos):

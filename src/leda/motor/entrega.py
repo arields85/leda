@@ -973,6 +973,9 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
         # Cuando decida, la persona se entera enseguida (`aprobacion.py`, decisión 19): se dice
         # sin nombrar a quien la revisa (decisión 11; `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`).
         hecho["se_le_avisa_cuando_decida"] = True
+        # Si pide cambios, el aviso del pedido le dice qué hace falta (`aprobacion.py`, D8: el
+        # texto aprobado por el usuario, "Te aviso cuando la revisen o si hace falta algo más").
+        hecho["se_le_avisa_si_hace_falta_algo_mas"] = True
         # El aviso a quien aprueba, del motor (ADR 0019, decisión 6; porción 3a): guardado con
         # sus hechos, sale terminado el margen para corregir, y el hecho dice esa hora, la real.
         from . import avisos        # avisos importa fichas, que importa este módulo

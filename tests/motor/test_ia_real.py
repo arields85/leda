@@ -316,7 +316,10 @@ def test_la_redaccion_cuenta_lo_que_pasa_en_el_mundo_y_no_da_por_hecho_lo_que_no
     Telegram real (2026-10-06): con el estado interno del aviso, Leda lo repetía; el usuario
     decidió que habla del mundo, no de la cocina. Una regla del trabajo, sin frases ni casos."""
     texto = INSTRUCCIONES_REDACCION
-    assert "lo que pasa en el mundo" in texto and "quién se entera de qué y cuándo" in texto
+    # D8: cuándo, sólo si los hechos lo traen a la vista (la hora del aviso a quien aprueba va en
+    # `solo_si_pregunta`).
+    assert "lo que pasa en el mundo" in texto and "quién se entera de qué" in texto
+    assert "cuándo si los hechos lo traen" in texto
     assert "todavía no pasó" in texto and "nunca lo das por hecho" in texto
     for palabra in ("guardado", "en cola", "sin enviar", "cuándo sale"):
         assert palabra not in texto, palabra
@@ -348,7 +351,9 @@ def test_la_redaccion_describe_la_tercera_vuelta_del_formato_sin_frases_de_ejemp
     assert "📅" not in texto
     assert "el primero del bloque" in texto and "va debajo" in texto
     assert "al principio de su renglón" in texto and "nunca en el medio" in texto
-    assert "voz pasiva" in texto and "Nunca lo decís como algo que hacés vos" in texto
+    assert "voz pasiva" in texto and "nunca lo decís como algo que hacés vos" in texto
+    # D8: lo que Leda misma le va a hacer a la persona, en primera persona.
+    assert "en primera persona" in texto
     # Decisión 11 (2026-10-08): a quien se entera se lo nombra sólo si un hecho lo nombra a la
     # vista; si no, el sujeto es lo que se informa.
     assert "fuera de solo_si_pregunta; si no, lo que se informa" in texto

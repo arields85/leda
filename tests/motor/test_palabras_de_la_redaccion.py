@@ -148,8 +148,14 @@ def test_quien_aprueba_el_trabajo_de_la_persona_llega_a_la_redaccion_solo_si_pre
 
     assert "Ismael" not in a_la_vista(recibido), a_la_vista(recibido)
     assert solo_si_pregunta(recibido).count("Ismael") == 13
+    # Cuándo se entera, también sólo si pregunta (D8: "Quien la revisa será informado hoy a las
+    # 11:28"; el modelo del usuario no lo dice).
     assert recibido["hechos"][0]["aviso_a_quien_aprueba_su_trabajo"] == {
-        "llega": "2026-10-20T15:50:00-03:00", "solo_si_pregunta": {"a": "Ismael"}}
+        "solo_si_pregunta": {"a": "Ismael", "llega": "2026-10-20T15:50:00-03:00"}}
+    # Un código de si le llegó o no queda a la vista: no es una hora.
+    assert recibido["hechos"][3]["no_vuelve_a_preguntar_como_viene"][
+        "avisados_de_que_no_contestaba"] == [
+        {"llega": "ya_le_llego", "solo_si_pregunta": {"a": "Ismael"}}]
     assert recibido["hechos"][4]["si_no_hay_respuesta"] == {
         "solo_si_pregunta": {"se_avisa_a": ["Ismael"]}}
     assert recibido["hechos"][5]["si_sigue_sin_decidir"] == {
