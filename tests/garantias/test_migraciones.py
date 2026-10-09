@@ -69,7 +69,7 @@ def _sql_script(path: Path) -> str:
 # única de `blocker_unblocker`; que no le corresponde (migración 0043), su columna y sus dos
 # restricciones; con qué bloqueo suyo está trabado (migración 0044), su columna, su referencia
 # del mismo espacio y la restricción de que dice algo. Delegar (migración 0045): sus dos tablas
-# y quién revisa el trabajo de `task`.
+# y quién revisa el trabajo de `task`; de quién era la tarea y el pase sin respuesta (0046).
 TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "conversation_question", "conversation_option",
                     "scheduled_notice", "task_forecast", "blocker_unblocker",
@@ -811,7 +811,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # base queda donde esa vuelta atrás espera encontrarla. Antes, la 0045 y la 0036,
             # cuyas claves compuestas por espacio apuntan a la restricción única de
             # `membership` que la vuelta atrás de la 0002 borra (la 0045 primero: vuelve a
-            # dejar las funciones de la página como las dejó la 0036).
+            # dejar las funciones de la página como las dejó la 0036), y antes de la 0045, la
+            # 0046, que deja la tarea y el pase como los espera aquélla.
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0046_la_revision_sigue_a_quien_era_la_tarea.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0045_pase_de_tarea.sql"))
             db.execute(_sql_script(

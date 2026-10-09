@@ -470,8 +470,8 @@ create table task (
   source_draft_id           uuid unique references task_draft(id),
   creado_en                 timestamptz not null default now(),
   actualizado_en            timestamptz not null default now(),
-  -- Migración 0045 (C-7, delegar): quién revisa su trabajo desde que cambió de manos.
-  revisa_membership_id      uuid,
+  -- Migraciones 0045 y 0046 (C-7, delegar): de quién era antes de su primer pase.
+  era_de_membership_id      uuid,
   -- Migración 0030: para las claves foráneas con el espacio del motor.
   constraint task_workspace_id_unique unique (workspace_id, id)
 );
@@ -1464,10 +1464,10 @@ create table dicho_de_quien_destraba (
 
 create index dicho_de_quien_destraba_de on dicho_de_quien_destraba (blocker_unblocker_id, at desc);
 
-alter table task add constraint task_revisa
-  foreign key (workspace_id, revisa_membership_id) references membership(workspace_id, id);
-comment on column task.revisa_membership_id is
-  'El Motor (C-7, delegar): quién revisa el trabajo de la tarea desde que cambió de manos (lo escribe el cambio de responsable). Nulo: quien aprueba el trabajo de su responsable.';
+alter table task add constraint task_era_de
+  foreign key (workspace_id, era_de_membership_id) references membership(workspace_id, id);
+comment on column task.era_de_membership_id is
+  'El Motor (C-7, decisión 28): de quién era la tarea antes de su primer pase (lo escribe el cambio de responsable). La revisa quien aprueba el trabajo de esa persona. Nulo: nunca cambió de manos.';
 
 -- Pasarle una tarea a otra persona (migración 0045; C-7, delegar; ADR 0017, enmienda a la
 -- decisión 2). Un pase se pide con una vista previa confirmada, lo decide el encargado del sector
@@ -1484,7 +1484,8 @@ create table pase_de_tarea (
   decide_membership_id      uuid not null,
   estado                    text not null check (estado in (
                               'esperando_decision', 'esperando_que_la_tome', 'la_tomo',
-                              'no_lo_aprobo', 'no_la_tomo', 'sin_efecto')),
+                              'no_lo_aprobo', 'no_la_tomo', 'sin_efecto',
+                              'sin_respuesta')),
   pedido_en                 timestamptz not null,
   decidido_en               timestamptz,
   contestado_en             timestamptz,
@@ -1544,7 +1545,7 @@ create index cambio_de_responsable_tarea_at on cambio_de_responsable (task_id, a
 comment on table pase_de_tarea is
   'El Motor (C-7; ADR 0017, enmienda a la decisión 2): el pedido de pasarle una tarea a otra persona, quién lo pidió, quién lo decide (el encargado del sector de quien recibe) y cómo terminó. Cambia de estado sólo hacia adelante; la_tomo, sólo con su cambio_de_responsable.';
 comment on table cambio_de_responsable is
-  'El Motor (C-7): el cambio de quién tiene una tarea, con el pase que lo autorizó, quién la tenía, quién la tomó y quién revisa su trabajo desde entonces. Sólo se agrega; agregarlo aplica el cambio en la tarea.';
+  'El Motor (C-7): el cambio de quién tiene una tarea, con el pase que lo autorizó, quién la tenía, quién la tomó y quién revisaba su trabajo en ese momento (después, quien aprueba el trabajo de quien era la tarea, migración 0046). Sólo se agrega; agregarlo aplica el cambio en la tarea.';
 
 comment on table task_forecast is
   'El Motor (ADR 0018, 9b y 9f): las previsiones de una tarea. Sólo se agregan; una corrección reemplaza a otra con una fila nueva. El atraso lo calcula el código en días hábiles del espacio.';
@@ -1765,16 +1766,18 @@ create table message_outbox_enlace (
 comment on table message_outbox_enlace is
   'ADR 0019, decisión 6: la fila de la salida lleva el enlace de esta tarea para esta persona. El despachador lo emite al mandar; la base guarda sólo su hash (acceso_tarea). Sólo se agrega.';
 
--- Quién revisa el trabajo de una tarea (migración 0045; C-7, delegar): el que quedó escrito en la
--- tarea cuando cambió de manos o, si nunca cambió, quien aprueba el trabajo de su responsable
--- (`membership.aprobador_membership_id`). Es la única regla: el cierre, quién ve la página y la
--- aplicación la leen de acá.
+-- Quién revisa el trabajo de una tarea (migraciones 0045 y 0046; C-7, decisiones 28 y 43): quien
+-- aprueba el trabajo de quien era la tarea antes de su primer pase o, si nunca cambió de manos, el
+-- de su responsable (`membership.aprobador_membership_id`), leído ahora: si la plataforma lo
+-- cambia, la revisión sigue el cambio. Puede ser quien la hace ahora (la tarea de Nahuel que toma
+-- Marcos la revisa Marcos). Es la única regla: el cierre, quién ve la página y la aplicación la
+-- leen de acá.
 create or replace function quien_revisa_la_tarea(p_task uuid)
 returns uuid
 language sql stable set search_path = leda, public, pg_temp as $$
-  select coalesce(t.revisa_membership_id, m.aprobador_membership_id)
+  select m.aprobador_membership_id
     from task t
-    left join membership m on m.id = t.responsable_membership_id
+    join membership m on m.id = coalesce(t.era_de_membership_id, t.responsable_membership_id)
    where t.id = p_task;
 $$;
 
@@ -2428,7 +2431,8 @@ begin
     raise exception 'pase_de_tarea: sólo el cambio de responsable lo da por tomado';
   end if;
   if old.estado = 'esperando_que_la_tome'
-     and new.estado not in ('esperando_que_la_tome', 'la_tomo', 'no_la_tomo', 'sin_efecto') then
+     and new.estado not in ('esperando_que_la_tome', 'la_tomo', 'no_la_tomo', 'sin_efecto',
+                            'sin_respuesta') then
     raise exception 'pase_de_tarea: el pase ya se decidió';
   end if;
   if old.estado = 'esperando_decision' and new.estado in ('la_tomo', 'no_la_tomo')
@@ -2444,15 +2448,15 @@ create trigger trg_vigilar_pase_de_tarea
 
 -- Agregar un cambio de responsable lo aplica: comprueba que el pase espera que lo tome quien lo
 -- recibe (con la decisión ya dada, o dada con su respuesta si es quien decide), que la tarea
--- sigue en manos de quien la tenía y en un estado que se pasa, escribe quién revisa su trabajo
--- desde ahora (quien lo revisaba; si es quien la toma, quien aprueba el trabajo de esa persona),
+-- sigue en manos de quien la tenía y en un estado que se pasa, deja escrito de quién era la tarea
+-- antes de su primer pase y quién la revisa desde ahora (quien aprueba el trabajo de esa persona),
 -- cambia la tarea y da el pase por tomado. Corre con los privilegios de `leda_owner`, que no
 -- saltea la RLS: sólo ve el espacio de la transacción.
 create or replace function aplicar_cambio_de_responsable() returns trigger
 security definer set search_path = leda, public, pg_temp as $$
 declare p pase_de_tarea%rowtype;
         t task%rowtype;
-        revisa uuid;
+        era uuid;
 begin
   select * into p from pase_de_tarea where id = new.pase_id for update;
   if not found or p.workspace_id <> new.workspace_id or p.task_id <> new.task_id then
@@ -2472,18 +2476,13 @@ begin
      or t.estado not in ('asignada', 'en_curso', 'bloqueada') then
     raise exception 'cambio_de_responsable: la tarea ya no se puede pasar';
   end if;
-  revisa := coalesce(t.revisa_membership_id,
-                     (select m.aprobador_membership_id from membership m
-                       where m.id = t.responsable_membership_id));
-  if revisa = p.a_membership_id then
-    revisa := (select m.aprobador_membership_id from membership m
-                where m.id = p.a_membership_id);
-  end if;
-  new.revisa_membership_id := revisa;
+  era := coalesce(t.era_de_membership_id, t.responsable_membership_id);
+  new.revisa_membership_id := (select m.aprobador_membership_id from membership m
+                                where m.id = era);
   perform set_config('leda.aplicando_pase', '1', true);
   update task
      set responsable_membership_id = p.a_membership_id,
-         revisa_membership_id = revisa,
+         era_de_membership_id = era,
          actualizado_en = new.at
    where id = t.id;
   update pase_de_tarea
@@ -2638,11 +2637,11 @@ begin
      or new.source_draft_id is distinct from old.source_draft_id then
     raise exception 'Los campos de compromiso de una tarea son inmutables.';
   end if;
-  -- Quién la tiene y quién revisa su trabajo cambian sólo con un pase confirmado por quien lo
-  -- pidió, quien lo decidió y quien la toma (migración 0045; C-7, delegar): lo aplica
+  -- Quién la tiene y de quién era cambian sólo con un pase confirmado por quien lo pidió, quien
+  -- lo decidió y quien la toma (migraciones 0045 y 0046; C-7, delegar): lo aplica
   -- `aplicar_cambio_de_responsable`, al agregarse el cambio en `cambio_de_responsable`.
   if (new.responsable_membership_id is distinct from old.responsable_membership_id
-      or new.revisa_membership_id is distinct from old.revisa_membership_id)
+      or new.era_de_membership_id is distinct from old.era_de_membership_id)
      and coalesce(current_setting('leda.aplicando_pase', true), '0') <> '1' then
     raise exception 'Los campos de compromiso de una tarea son inmutables.';
   end if;

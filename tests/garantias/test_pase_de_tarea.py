@@ -1,13 +1,16 @@
-"""Pasarle una tarea a otra persona (migración 0045; C-7; ADR 0017, enmienda a la decisión 2).
+"""Pasarle una tarea a otra persona (migraciones 0045 y 0046; C-7; ADR 0017, enmienda a la
+decisión 2; decisiones 26, 27, 28 y 43 del usuario).
 
 La capa de garantías del pase, no la conversación: quién puede pedirlo (el encargado de un sector, a
-cualquiera; un integrante, sólo dentro de su sector), quién lo decide (el encargado del sector de
-quien recibe; si es quien pide, su pedido es la decisión; si es quien recibe, decide con su
-respuesta), qué tareas se pasan (asignadas, en curso o trabadas), que ningún responsable cambia sin
-la confirmación de quien pide, la decisión de quien decide y la de quien recibe (la base lo hace
-cumplir: el responsable cambia sólo al agregarse un `cambio_de_responsable` de un pase que espera
-que lo tome esa persona), que el trabajo lo sigue revisando quien lo revisaba, la auditoría con
-quién pidió, quién decidió, quién aceptó y quién la tenía, y el aislamiento entre espacios.
+cualquiera, una tarea suya o de alguien de su sector; un integrante, una suya, sólo dentro de su
+sector), quién lo decide (el encargado del sector de quien recibe; si es quien pide, su pedido es la
+decisión; si es quien recibe, decide con su respuesta), qué tareas se pasan (asignadas, en curso o
+trabadas), que ningún responsable cambia sin la confirmación de quien pide, la decisión de quien
+decide y la de quien recibe (la base lo hace cumplir: el responsable cambia sólo al agregarse un
+`cambio_de_responsable` de un pase que espera que lo tome esa persona), que la revisión sigue a
+quien era la tarea (aunque la haga quien la revisa, que al entregarla la deja aprobada y
+terminada), que un pase sin respuesta termina sin cambiar nada, la auditoría con quién pidió,
+quién decidió, quién aceptó y quién la tenía, y el aislamiento entre espacios.
 
 El mundo es el de las conversaciones (`tests.conversaciones.carga`): Marcos, encargado de OT, y
 Nahuel; Martín, encargado de IT, y Lucas; Ismael, Dirección, que aprueba el trabajo de Marcos y de
@@ -190,10 +193,46 @@ def test_una_tarea_en_revision_no_se_pasa(conn, equipo):
                                                               "estado": "en_revision"}
 
 
-def test_sólo_se_pasa_una_tarea_propia(conn, equipo):
-    with pytest.raises(Denegado):
-        _pedir(conn, equipo, "Marcos", "SEN", "Pedro")
-    conn.rollback()
+def test_sólo_se_pasa_una_tarea_propia_o_de_alguien_de_su_sector_si_es_el_encargado(conn,
+                                                                                   equipo):
+    # La de los sensores es de Nahuel (OT): ni el encargado de otro sector, ni otro integrante de
+    # OT, ni Dirección la pasan (decisión 27: sólo el encargado del sector de quien la tiene).
+    for otro in ("Martin", "Pedro", "Ismael"):
+        with pytest.raises(Denegado):
+            _pedir(conn, equipo, otro, "SEN", "Lucas")
+        conn.rollback()
+    assert _pase_abierto(conn, equipo, "SEN") is None
+
+
+# --- El encargado pasa una tarea de su gente (decisión 27) ----------------------------------------
+
+def test_el_encargado_pasa_una_tarea_de_alguien_de_su_sector(conn, equipo):
+    r = _pedir(conn, equipo, "Marcos", "SEN", "Pedro")
+    # Las mismas reglas: Pedro es de OT, así que decide Marcos, con su pedido.
+    assert (r["estado"], r["decide_membership_id"]) == ("esperando_que_la_tome",
+                                                        _id(equipo, "Marcos"))
+    pase = _pase(conn, r["pase_id"])
+    assert str(pase["de_membership_id"]) == _id(equipo, "Nahuel")
+    assert str(pase["pedido_por_membership_id"]) == _id(equipo, "Marcos")
+    assert _quien_la_tiene(conn, equipo, "SEN") == "Nahuel"
+    _contestar(conn, equipo, "Pedro", r["pase_id"], True)
+    assert _quien_la_tiene(conn, equipo, "SEN") == "Pedro"
+    with admin(conn) as cur:
+        cur.execute("select detalle from audit_log where accion = 'cambiar_responsable'")
+        d = cur.fetchone()["detalle"]
+    conn.commit()
+    assert (d["pedido_por"], d["responsable_anterior"], d["responsable_nuevo"]) == (
+        _id(equipo, "Marcos"), _id(equipo, "Nahuel"), _id(equipo, "Pedro"))
+
+
+def test_el_encargado_pasa_una_de_su_gente_a_otro_sector_y_decide_ese_encargado(conn, equipo):
+    r = _pedir(conn, equipo, "Marcos", "SEN", "Lucas")
+    assert (r["estado"], r["decide_membership_id"]) == ("esperando_decision",
+                                                        _id(equipo, "Martin"))
+
+
+def test_el_encargado_no_la_pasa_a_quien_ya_la_tiene(conn, equipo):
+    assert _pedir(conn, equipo, "Marcos", "SEN", "Nahuel") == {"error": "ya_la_tiene"}
 
 
 def test_no_se_pasa_a_la_misma_persona_ni_dos_veces(conn, equipo):
@@ -370,12 +409,132 @@ def test_el_trabajo_lo_sigue_revisando_quien_lo_revisaba(conn, equipo):
     conn.commit()
 
 
-def test_nadie_revisa_su_propio_trabajo_despues_de_un_pase(conn, equipo):
-    # La de los sensores la revisaba Marcos; si la toma Marcos, la revisa quien revisa a Marcos.
+def test_la_revision_sigue_a_quien_era_la_tarea_aunque_la_tome_quien_la_revisaba(conn, equipo):
+    # Decisión 28: la de los sensores era de Nahuel y la revisa Marcos; si la toma Marcos, la
+    # sigue revisando él (es trabajo del sector), y a Ismael no le llega.
     assert _quien_revisa(conn, equipo, "SEN") == "Marcos"
     r = _pedir(conn, equipo, "Nahuel", "SEN", "Marcos")
     _contestar(conn, equipo, "Marcos", r["pase_id"], True)
-    assert _quien_revisa(conn, equipo, "SEN") == "Ismael"
+    assert _quien_revisa(conn, equipo, "SEN") == "Marcos"
+
+
+def test_con_dos_pases_la_revision_sigue_a_quien_era_la_tarea_al_principio(conn, equipo):
+    # La de comunicaciones era de Marcos (la revisa Ismael): pasa a Nahuel y de Nahuel a Pedro, y
+    # la sigue revisando Ismael, no Marcos (que aprueba el trabajo de Nahuel y de Pedro).
+    r = _pedir(conn, equipo, "Marcos", "COM", "Nahuel")
+    _contestar(conn, equipo, "Nahuel", r["pase_id"], True)
+    r = _pedir(conn, equipo, "Nahuel", "COM", "Pedro")
+    _decidir(conn, equipo, "Marcos", r["pase_id"], True)
+    _contestar(conn, equipo, "Pedro", r["pase_id"], True)
+    assert _quien_la_tiene(conn, equipo, "COM") == "Pedro"
+    assert _quien_revisa(conn, equipo, "COM") == "Ismael"
+
+
+def test_si_cambia_quien_aprueba_a_quien_era_la_tarea_la_revision_sigue_el_cambio(conn, equipo):
+    # Decisión 43, derivada de la 28: la plataforma cambia quién aprueba el trabajo de Marcos
+    # después de que su tarea pasó a Nahuel; la revisión sigue a ese cambio.
+    r = _pedir(conn, equipo, "Marcos", "COM", "Nahuel")
+    _contestar(conn, equipo, "Nahuel", r["pase_id"], True)
+    with admin(conn) as cur:
+        cur.execute("update membership set aprobador_membership_id = %s where id = %s",
+                    (_id(equipo, "Martin"), _id(equipo, "Marcos")))
+    conn.commit()
+    assert _quien_revisa(conn, equipo, "COM") == "Martin"
+
+
+def _entregar(conn, mundo, corto: str, tarea: str) -> dict:
+    quien = _quien(conn, mundo, corto)
+    with espacio(conn, mundo.workspace_id) as cur:
+        r = ejecutar(cur, quien, "entregar_tarea",
+                     {"tarea_id": mundo.tareas[tarea],
+                      "piezas": [{"clase": "texto", "texto": "listo, calibrados y probados"}]},
+                     ya_confirmada=True)
+    conn.commit()
+    return r
+
+
+def test_si_la_entrega_quien_la_revisa_queda_aprobada_por_el_y_terminada(conn, equipo):
+    # Decisión 28: Marcos toma la de Nahuel y, al entregarla, se cierra ahí: la hizo y la aprobó
+    # Marcos, con la auditoría de las dos cosas; a Ismael no le llega nada.
+    r = _pedir(conn, equipo, "Nahuel", "SEN", "Marcos")
+    _contestar(conn, equipo, "Marcos", r["pase_id"], True)
+    hecho = _entregar(conn, equipo, "Marcos", "SEN")
+    assert hecho["estado"] == "terminada"
+    assert hecho["aprobada_por_quien_la_entrego"] is True and hecho["cerrada"] is True
+    with admin(conn) as cur:
+        cur.execute("select estado::text e from task where id = %s", (equipo.tareas["SEN"],))
+        assert cur.fetchone()["e"] == "terminada"
+        cur.execute("""select aprobador_membership_id a, decision from approval
+                        where sujeto_id = %s""", (equipo.tareas["SEN"],))
+        assert [(str(f["a"]), f["decision"]) for f in cur.fetchall()] == [
+            (_id(equipo, "Marcos"), "aprobado")]
+        cur.execute("""select estado_nuevo::text e, actor_app_user_id from task_state_event
+                        where task_id = %s order by at""", (equipo.tareas["SEN"],))
+        eventos = cur.fetchall()
+        cur.execute("""select detalle from audit_log where accion = 'aprobar_tarea'
+                        and sujeto_id = %s""", (equipo.tareas["SEN"],))
+        auditoria = cur.fetchone()
+    conn.commit()
+    assert [e["e"] for e in eventos][-2:] == ["en_revision", "terminada"]
+    assert {str(e["actor_app_user_id"]) for e in eventos[-2:]} == {
+        equipo.personas["Marcos"]["app_user_id"]}
+    assert auditoria is not None
+    assert auditoria["detalle"]["la_entrego_quien_la_revisa"] is True
+
+
+def test_si_la_entrega_otra_persona_queda_en_revision_para_quien_la_revisa(conn, equipo):
+    # Tarea de Nahuel que hace Pedro: la revisa Marcos; no se aprueba sola.
+    r = _pedir(conn, equipo, "Marcos", "SEN", "Pedro")
+    _contestar(conn, equipo, "Pedro", r["pase_id"], True)
+    hecho = _entregar(conn, equipo, "Pedro", "SEN")
+    assert hecho["estado"] == "en_revision"
+    assert "aprobada_por_quien_la_entrego" not in hecho
+    assert _quien_revisa(conn, equipo, "SEN") == "Marcos"
+
+
+# --- Un pase que nadie contesta (decisión 26) --------------------------------------------------
+
+def _sin_respuesta(conn, mundo, pase: str):
+    from leda.herramientas import terminar_pase_sin_respuesta
+    with espacio(conn, mundo.workspace_id) as cur:
+        r = terminar_pase_sin_respuesta(cur, pase, AT)
+    conn.commit()
+    return r
+
+
+def test_un_pase_sin_respuesta_termina_y_la_tarea_sigue_con_quien_la_tenia(conn, equipo):
+    r = _pedir(conn, equipo, "Marcos", "PLC", "Lucas")
+    assert _sin_respuesta(conn, equipo, r["pase_id"]) == {"pase_id": r["pase_id"],
+                                                          "estado": "sin_respuesta"}
+    pase = _pase(conn, r["pase_id"])
+    assert pase["estado"] == "sin_respuesta" and pase["contestado_en"] == AT
+    assert _quien_la_tiene(conn, equipo, "PLC") == "Marcos"
+    # Ya no espera nada: Martín no lo decide tarde, y otra vez no hace nada.
+    with pytest.raises(Denegado):
+        _decidir(conn, equipo, "Martin", r["pase_id"], True)
+    conn.rollback()
+    assert _sin_respuesta(conn, equipo, r["pase_id"]) is None
+    # Quien lo pidió puede pedírselo a otra persona.
+    assert _pedir(conn, equipo, "Marcos", "PLC", "Nahuel")["estado"] == "esperando_que_la_tome"
+    with admin(conn) as cur:
+        cur.execute("""select actor_kind, detalle, pack_hash, nucleo_hash from audit_log
+                        where accion = 'pase_sin_respuesta'""")
+        [fila] = cur.fetchall()
+    conn.commit()
+    assert fila["actor_kind"] == "sistema"
+    assert fila["detalle"]["pase_id"] == r["pase_id"]
+    assert fila["pack_hash"] and fila["nucleo_hash"]
+
+
+def test_la_base_no_reabre_un_pase_sin_respuesta(conn, equipo):
+    r = _pedir(conn, equipo, "Marcos", "PLC", "Lucas")
+    _sin_respuesta(conn, equipo, r["pase_id"])
+    with admin(conn) as cur:
+        with pytest.raises(psycopg.errors.RaiseException):
+            with conn.transaction():
+                cur.execute("update pase_de_tarea set estado = 'esperando_decision' "
+                            "where id = %s", (r["pase_id"],))
+    conn.rollback()
 
 
 def test_aprueba_la_entrega_quien_revisa_la_tarea_no_quien_aprueba_a_la_persona(conn, equipo):

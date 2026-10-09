@@ -195,9 +195,10 @@ def verificar(cur: psycopg.Cursor, quien: Solicitante, accion: str,
 
 
 def quien_revisa_la_tarea(cur: psycopg.Cursor, task_id) -> str | None:
-    """Quién revisa el trabajo de una tarea: el que quedó escrito en ella cuando cambió de manos
-    o, si nunca cambió, quien aprueba el trabajo de su responsable (C-7, delegar). La regla es
-    una sola y vive en la base (`quien_revisa_la_tarea`)."""
+    """Quién revisa el trabajo de una tarea: quien aprueba el trabajo de quien era la tarea antes
+    de su primer pase o, si nunca cambió de manos, el de su responsable (C-7, decisiones 28 y 43
+    del usuario). Puede ser quien la hace ahora. La regla es una sola y vive en la base
+    (`quien_revisa_la_tarea`)."""
     cur.execute("select quien_revisa_la_tarea(%s) as quien", (str(task_id),))
     fila = cur.fetchone()
     return str(fila["quien"]) if fila and fila["quien"] else None
@@ -210,8 +211,9 @@ def puede_revisar_la_tarea(cur: psycopg.Cursor, quien: Solicitante, task_id) -> 
     aprueba Dirección (`membership.aprobador_membership_id`). Tener la decisión final del equipo
     **no** habilita a firmar trabajo técnico de cualquier área: la autoridad final sirve para
     desempatar y fijar prioridades; la autoridad técnica sigue siendo de cada referente. Una
-    tarea que pasó a otra persona la sigue revisando quien la revisaba (ADR 0017, enmienda a la
-    decisión 2: "el trabajo lo sigue revisando el aprobador de la tarea original")."""
+    tarea que pasó a otra persona la revisa quien aprueba el trabajo de quien era (ADR 0017,
+    enmienda a la decisión 2: "el trabajo lo sigue revisando el aprobador de la tarea original";
+    decisión 28 del usuario: aunque la haga esa misma persona)."""
     return quien_revisa_la_tarea(cur, task_id) == str(quien.membership_id)
 
 
@@ -240,7 +242,9 @@ def regla_del_pase(cur: psycopg.Cursor, pide: str, recibe: str) -> ReglaDelPase:
 
     - El encargado de un sector (el referente de su área) le puede pasar una tarea a cualquiera;
       un integrante, sólo a alguien de su sector. Si pide pasarla a otro sector, no se puede, y
-      lo decide el encargado de su sector, una persona concreta.
+      lo decide el encargado de su sector, una persona concreta. La tarea es de quien pide o,
+      si pide el encargado de su sector, de alguien de ese sector (decisión 27; lo comprueba la
+      cocina, `herramientas.pedir_pase_de_tarea`).
     - Decide el encargado del sector de quien recibe (si es quien pide, su pedido es la
       decisión; si es quien recibe, decide con su respuesta). Sin encargado, no hay quien
       decida: no se puede. Dirección no interviene por ser Dirección."""

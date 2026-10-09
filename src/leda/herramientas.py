@@ -26,7 +26,7 @@ from typing import Any, Callable
 import psycopg
 from psycopg.types.json import Jsonb
 
-from .autoridad import (Denegado, Solicitante, puede_revisar_la_tarea,
+from .autoridad import (Denegado, Solicitante, encargado_del_sector, puede_revisar_la_tarea,
                          quien_revisa_la_tarea, regla_del_pase, requiere_confirmacion,
                          verificar)
 from . import versiones
@@ -1875,8 +1875,29 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
     else:
         cur.execute("select pg_current_xact_id()::text as x")
         entrega = f"{tarea_id}:{cur.fetchone()['x']}"
-    return {"estado": "en_revision", "evidencias": ids, "entrega": entrega,
-            **({"arranco": True} if arranca else {})}
+    hecho = {"estado": "en_revision", "evidencias": ids, "entrega": entrega,
+             **({"arranco": True} if arranca else {})}
+    if quien_revisa_la_tarea(cur, tarea_id) == str(quien.membership_id):
+        # Decisión 28 del usuario (2026-10-09): la tarea la revisa quien aprueba el trabajo de
+        # quien era, y la hizo esa misma persona (la de Nahuel que tomó Marcos). Sigue siendo
+        # trabajo del sector: al entregarla queda aprobada por ella y, si se cumple lo demás del
+        # cierre (mecánica §5), terminada; a nadie más le llega para revisar. Dos hechos
+        # distintos, con su auditoría: la entrega (arriba) y la aprobación.
+        aprobacion_id, cerrada, falta = _aprobar_y_cerrar(
+            cur, quien, tarea_id, "en_revision", "la entregó quien la revisa")
+        registrar_auditoria(
+            cur, accion="aprobar_tarea", workspace_id=quien.workspace_id,
+            actor_app_user_id=quien.app_user_id, actor_kind="persona", sujeto_tipo="task",
+            sujeto_id=str(tarea_id),
+            detalle={"aprobacion_id": str(aprobacion_id), "la_entrego_quien_la_revisa": True,
+                     "cerrada": cerrada, "entrega": entrega},
+            pack_hash=versiones.pack_hash(cur, quien.workspace_id),
+            nucleo_hash=versiones.nucleo_hash())
+        hecho.update({"aprobada_por_quien_la_entrego": True, "aprobacion_id": str(aprobacion_id),
+                      "cerrada": cerrada, "falta": falta})
+        if cerrada:
+            hecho["estado"] = "terminada"
+    return hecho
 
 
 @herramienta(
@@ -2015,6 +2036,24 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
     _exigir_puede_aprobarse(cur, tarea_id, fila)
 
+    aprobacion_id, cerrada, falta = _aprobar_y_cerrar(cur, quien, tarea_id, fila["estado"],
+                                                      comentario)
+
+    # Constitución §3: el responsable se entera de la decisión (sesión 2 por
+    # Telegram, 2026-09-27, hallazgo 5: Ismael aprobó y nadie le avisó a
+    # Ariel). Porción 3b de la C-3: ese aviso ya no sale de acá, con texto
+    # fijo. Lo guarda el motor, que lo redacta desde los hechos
+    # (`motor.avisos`, `tarea_aprobada`); la cocina devuelve la identidad del
+    # acto (`aprobacion_id`), a la que se ata la clave del aviso.
+    return {"aprobada": True, "cerrada": cerrada, "falta": falta,
+            "titulo": fila["titulo"], "aprobacion_id": str(aprobacion_id)}
+
+
+def _aprobar_y_cerrar(cur, quien: Solicitante, tarea_id, estado: str,
+                      comentario: str | None) -> tuple[Any, bool, str | None]:
+    """La aprobación de quien revisa la tarea y, si con ella se cumplen las condiciones de
+    cierre, el paso a `terminada` en el mismo acto. Devuelve el id de la aprobación, si cerró y,
+    si no, qué falta."""
     # T6f (seguimiento del orquestador): `at` explícito con
     # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
     cur.execute(
@@ -2042,20 +2081,12 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
             """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
                                              actor_kind, actor_app_user_id, motivo, at)
                values (%s, %s, 'terminada', 'persona', %s, %s, clock_timestamp())""",
-            (tarea_id, fila["estado"], quien.app_user_id, comentario or "aprobación"))
+            (tarea_id, estado, quien.app_user_id, comentario or "aprobación"))
         # Revisión (review-ec6f7d80): antes usaba `uuid.uuid4()` -- sin
         # ningún vínculo con lo que se acaba de escribir -- cuando ya había
         # un id real de negocio a mano, el de esta misma aprobación.
         _avisar_dependencia_informativa(cur, quien, tarea_id, "terminada", aprobacion_id)
-
-    # Constitución §3: el responsable se entera de la decisión (sesión 2 por
-    # Telegram, 2026-09-27, hallazgo 5: Ismael aprobó y nadie le avisó a
-    # Ariel). Porción 3b de la C-3: ese aviso ya no sale de acá, con texto
-    # fijo. Lo guarda el motor, que lo redacta desde los hechos
-    # (`motor.avisos`, `tarea_aprobada`); la cocina devuelve la identidad del
-    # acto (`aprobacion_id`), a la que se ata la clave del aviso.
-    return {"aprobada": True, "cerrada": cerrada, "falta": falta,
-            "titulo": fila["titulo"], "aprobacion_id": str(aprobacion_id)}
+    return aprobacion_id, cerrada, falta
 
 
 def _exigir_puede_pedirse_cambios(cur, fila) -> None:
@@ -2711,13 +2742,15 @@ def _consultar_objetivos(cur, quien: Solicitante):
 #
 # Tres actos de tres personas, cada uno con su operación: quien pide confirma la vista previa
 # (`pedir_pase_de_tarea`), quien decide lo aprueba o no (`decidir_pase_de_tarea`) y quien recibe
-# la toma o no (`contestar_pase_de_tarea`). Si quien pide es quien decide, su pedido es la
-# decisión; si quien recibe es quien decide, decide con su respuesta. Sólo al tomarla cambia el
-# responsable, y lo cambia la base (`cambio_de_responsable`, `aplicar_cambio_de_responsable`):
-# la fecha, el criterio y la evidencia no cambian, y el trabajo lo sigue revisando quien lo
-# revisaba. Las tres verifican la autoridad adentro (`valida_en_handler`): depende del pase. La
-# acción es `cambiar_responsable`, que exige confirmación humana (constitución §7): sin
-# `ya_confirmada`, nada se escribe.
+# la toma o no (`contestar_pase_de_tarea`). Pide quien tiene la tarea o el encargado de su sector
+# (decisión 27). Si quien pide es quien decide, su pedido es la decisión; si quien recibe es quien
+# decide, decide con su respuesta. Sólo al tomarla cambia el responsable, y lo cambia la base
+# (`cambio_de_responsable`, `aplicar_cambio_de_responsable`): la fecha, el criterio y la
+# evidencia no cambian, y la revisa quien aprueba el trabajo de quien era la tarea (decisión 28).
+# Las tres verifican la autoridad adentro (`valida_en_handler`): depende del pase. La acción es
+# `cambiar_responsable`, que exige confirmación humana (constitución §7): sin `ya_confirmada`,
+# nada se escribe. Un pase que nadie contesta termina sin respuesta (decisión 26), por el motor
+# (`terminar_pase_sin_respuesta`).
 
 ESTADOS_QUE_SE_PASAN = ("asignada", "en_curso", "bloqueada")
 PASE_ABIERTO = ("esperando_decision", "esperando_que_la_tome")
@@ -2736,18 +2769,20 @@ def _exigir_espacio(quien: Solicitante) -> None:
 
 
 def _lo_que_se_pasa(cur, quien: Solicitante, tarea_id, a_membership_id) -> dict:
-    """Lo que se lee y se comprueba para pedir un pase: la tarea, de quien la pide; quien la
-    recibe, del espacio y activo; la regla de quién puede pedirlo y quién decide; y que no haya
-    otro pase abierto. Un rechazo de negocio, como dict con `error`; la tarea de otra persona,
-    `Denegado`."""
+    """Lo que se lee y se comprueba para pedir un pase: la tarea, de quien la pide o, si quien
+    la pide es el encargado del sector de quien la tiene, de alguien de su sector (decisión 27);
+    quien la recibe, del espacio, activo y otra persona; la regla de quién puede pedirlo y quién
+    decide; y que no haya otro pase abierto. Un rechazo de negocio, como dict con `error`; la
+    tarea de otra persona que no es de su sector, `Denegado`."""
     _exigir_espacio(quien)
     cur.execute("""select id, titulo, estado::text estado, responsable_membership_id
                      from task where id = %s""", (tarea_id,))
     tarea = cur.fetchone()
     if tarea is None:
         return {"error": "tarea_desconocida"}
-    if str(tarea["responsable_membership_id"]) != str(quien.membership_id):
-        raise Denegado("La tarea no es de quien la pasa.")
+    la_tiene = str(tarea["responsable_membership_id"])
+    if la_tiene != str(quien.membership_id)             and encargado_del_sector(cur, la_tiene) != str(quien.membership_id):
+        raise Denegado("La tarea no es de quien la pasa ni de alguien de su sector.")
     if tarea["estado"] not in ESTADOS_QUE_SE_PASAN:
         return {"error": "estado", "estado": tarea["estado"]}
     recibe = _uuid_normalizado(a_membership_id)
@@ -2760,6 +2795,8 @@ def _lo_que_se_pasa(cur, quien: Solicitante, tarea_id, a_membership_id) -> dict:
         return {"error": "persona_desconocida"}
     if recibe == str(quien.membership_id):
         return {"error": "es_la_misma_persona"}
+    if recibe == la_tiene:
+        return {"error": "ya_la_tiene"}
     regla = regla_del_pase(cur, str(quien.membership_id), recibe)
     if regla.no_se_puede is not None:
         return {"error": regla.no_se_puede,
@@ -2777,7 +2814,9 @@ def _preparar_pedir_pase_de_tarea(cur, quien: Solicitante, tarea_id, a_membershi
     if "error" in leido:
         return leido
     tarea, recibe = leido["tarea"], leido["recibe"]
-    cambio = _filas((None, f"«{tarea['titulo']}» pasa de {quien.nombre} a {recibe['nombre']}"))
+    de = _persona(cur, tarea["responsable_membership_id"])
+    cambio = _filas((None, f"«{tarea['titulo']}» pasa de {de['nombre'] if de else quien.nombre} "
+                           f"a {recibe['nombre']}"))
     huella = _huella("pedir_pase_de_tarea", tarea_id, tarea["estado"],
                      tarea["responsable_membership_id"], recibe["membership_id"],
                      leido["decide"])
@@ -2787,8 +2826,9 @@ def _preparar_pedir_pase_de_tarea(cur, quien: Solicitante, tarea_id, a_membershi
 
 @herramienta(
     "pedir_pase_de_tarea", "cambiar_responsable",
-    "Pide pasarle una tarea propia a otra persona. La tarea sigue con quien la tiene hasta que "
-    "lo decide el encargado del sector de quien la recibe y quien la recibe la toma.",
+    "Pide pasarle una tarea propia, o el encargado de un sector una de alguien de su sector, a "
+    "otra persona. La tarea sigue con quien la tiene hasta que lo decide el encargado del sector "
+    "de quien la recibe y quien la recibe la toma.",
     {"tarea_id": {"type": "string", "requerido": True},
      "a_membership_id": {"type": "string", "requerido": True},
      "at": {"type": "string"}},
@@ -2809,8 +2849,9 @@ def _pedir_pase_de_tarea(cur, quien: Solicitante, tarea_id, a_membership_id, at=
                                       pedido_por_membership_id, decide_membership_id, estado,
                                       pedido_en, decidido_en)
            values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id""",
-        (quien.workspace_id, tarea_id, quien.membership_id, recibe, quien.membership_id, decide,
-         estado, momento, momento if estado == "esperando_que_la_tome" else None))
+        (quien.workspace_id, tarea_id, leido["tarea"]["responsable_membership_id"], recibe,
+         quien.membership_id, decide, estado, momento,
+         momento if estado == "esperando_que_la_tome" else None))
     return {"pase_id": str(cur.fetchone()["id"]), "estado": estado,
             "decide_membership_id": decide, "a_membership_id": recibe}
 
@@ -2841,6 +2882,31 @@ def _sin_efecto(cur, pase: dict, momento: datetime) -> dict:
                           motivo = 'la tarea ya no se puede pasar'
                     where id = %s""", (momento, pase["id"]))
     return {"pase_id": str(pase["id"]), "estado": "sin_efecto", "motivo": "la_tarea_cambio"}
+
+
+def terminar_pase_sin_respuesta(cur, pase_id, momento: datetime) -> dict | None:
+    """Un pase que nadie contesta termina (decisión 26 del usuario, 2026-10-09): lo da por
+    terminado el motor, después de repetir la pregunta una vez (`motor.pase.seguir_los_pases`).
+    No cambia nada en la tarea: sigue con quien la tenía, y quien lo pidió puede pedírselo a otra
+    persona. No es el acto de una persona sino del sistema, y queda en la auditoría como tal, con
+    la versión de las reglas. `None` si el pase ya no espera nada (lo contestaron, o ya terminó)."""
+    pase = _pase_de(cur, pase_id)
+    if pase is None or pase["estado"] not in PASE_ABIERTO:
+        return None
+    cur.execute("""update pase_de_tarea set estado = 'sin_respuesta', contestado_en = %s
+                    where id = %s""", (momento, pase["id"]))
+    espera = ("decision" if pase["estado"] == "esperando_decision"
+              and str(pase["decide_membership_id"]) != str(pase["a_membership_id"])
+              else "que_la_tome")
+    registrar_auditoria(
+        cur, accion="pase_sin_respuesta", workspace_id=str(pase["workspace_id"]),
+        actor_kind="sistema", sujeto_tipo="task", sujeto_id=str(pase["task_id"]),
+        detalle={"pase_id": str(pase["id"]), "esperaba": espera,
+                 "pedido_por": str(pase["pedido_por_membership_id"]),
+                 "la_tiene": str(pase["de_membership_id"]), "at": momento.isoformat()},
+        pack_hash=versiones.pack_hash(cur, str(pase["workspace_id"])),
+        nucleo_hash=versiones.nucleo_hash())
+    return {"pase_id": str(pase["id"]), "estado": "sin_respuesta"}
 
 
 @herramienta(
@@ -2904,8 +2970,9 @@ def _contestar_pase_de_tarea(cur, quien: Solicitante, pase_id, acepta, motivo=No
                               motivo = %s
                         where id = %s""", (momento, motivo, pase["id"]))
         return {"pase_id": str(pase["id"]), "estado": "no_la_tomo"}
-    # La base comprueba el pase y la tarea otra vez, cambia quién la tiene y quién revisa su
-    # trabajo, y da el pase por tomado (`aplicar_cambio_de_responsable`).
+    # La base comprueba el pase y la tarea otra vez, cambia quién la tiene, deja escrito de quién
+    # era antes de su primer pase (la revisa quien aprueba el trabajo de esa persona, decisión
+    # 28) y da el pase por tomado (`aplicar_cambio_de_responsable`).
     cur.execute(
         """insert into cambio_de_responsable (workspace_id, task_id, pase_id,
                                               anterior_membership_id, nuevo_membership_id,
@@ -2915,8 +2982,10 @@ def _contestar_pase_de_tarea(cur, quien: Solicitante, pase_id, acepta, motivo=No
          quien.membership_id, quien.membership_id, momento))
     cambio = cur.fetchone()
     revisa = str(cambio["revisa_membership_id"]) if cambio["revisa_membership_id"] else None
-    # Constitución §12 y mecánica §7: quién pidió, quién decidió, quién aceptó y quién la tenía,
-    # con la versión de las reglas del núcleo y del pack.
+    cur.execute("select era_de_membership_id from task where id = %s", (pase["task_id"],))
+    era_de = str(cur.fetchone()["era_de_membership_id"])
+    # Constitución §12 y mecánica §7: quién pidió, quién decidió, quién aceptó, quién la tenía, de
+    # quién era y quién la revisa ahora, con la versión de las reglas del núcleo y del pack.
     registrar_auditoria(
         cur, accion="cambiar_responsable", workspace_id=quien.workspace_id,
         actor_app_user_id=quien.app_user_id, actor_kind="persona", sujeto_tipo="task",
@@ -2926,8 +2995,8 @@ def _contestar_pase_de_tarea(cur, quien: Solicitante, pase_id, acepta, motivo=No
                  "decidio": str(pase["decide_membership_id"]),
                  "acepto": str(quien.membership_id),
                  "responsable_anterior": str(pase["de_membership_id"]),
-                 "responsable_nuevo": str(quien.membership_id), "revisa": revisa,
-                 "at": momento.isoformat()},
+                 "responsable_nuevo": str(quien.membership_id), "era_de": era_de,
+                 "revisa": revisa, "at": momento.isoformat()},
         pack_hash=versiones.pack_hash(cur, quien.workspace_id),
         nucleo_hash=versiones.nucleo_hash())
     return {"pase_id": str(pase["id"]), "estado": "la_tomo", "tomada": True,
