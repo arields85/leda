@@ -78,9 +78,11 @@ def informar_los_viejos(m: Momento) -> int:
     dias = dias_del_bloqueo_viejo(cur, m.workspace_id)
     cur.execute("""select b.id, b.task_id, b.abierto_en from blocker b
                      join task t on t.id = b.task_id
-                    where b.resuelto_en is null and b.escalado_en is null
+                    where b.workspace_id = %s
+                      and b.resuelto_en is null and b.escalado_en is null
                       and t.estado not in ('terminada', 'cancelada')
-                    order by b.abierto_en, b.id""")
+                    order by b.abierto_en, b.id""", (m.workspace_id,))
+    # El filtro por espacio se suma al RLS forzado de `blocker` y `task`: dos defensas.
     guardados = 0
     for b in cur.fetchall():
         if m.cal.habiles_entre(b["abierto_en"], m.ahora) < dias:
