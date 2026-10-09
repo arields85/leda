@@ -221,9 +221,9 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
         if guardadas:
             resumen[REPETICION_DEL_DIA] += guardadas
         # Las entregas que esperan la decisión de quien las aprueba (porción 3c).
-        cur.execute("""select t.id, m.aprobador_membership_id from task t
-                         join membership m on m.id = t.responsable_membership_id
-                        where t.estado = 'en_revision' and m.aprobador_membership_id is not null
+        cur.execute("""select t.id, quien_revisa_la_tarea(t.id) as aprobador_membership_id
+                         from task t
+                        where t.estado = 'en_revision' and quien_revisa_la_tarea(t.id) is not null
                         order by t.titulo, t.id""")
         for fila in cur.fetchall():
             resumen.update(_un_paso_de_una_decision(m, str(fila["id"]),

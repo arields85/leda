@@ -109,9 +109,8 @@ def para_decidir(cur, quien: Solicitante, desde: int, zona) -> tuple[dict[str, A
     cur.execute("""select t.id, t.titulo, t.estado::text estado, t.fecha_objetivo,
                           i.nombre as responsable
                      from task t
-                     join membership m on m.id = t.responsable_membership_id
                      join integrante i on i.membership_id = t.responsable_membership_id
-                    where m.aprobador_membership_id = %s and t.estado = 'en_revision'
+                    where quien_revisa_la_tarea(t.id) = %s and t.estado = 'en_revision'
                     order by t.fecha_objetivo nulls last, t.titulo""", (quien.membership_id,))
     tareas = []
     for i, t in enumerate(cur.fetchall(), desde + 1):
@@ -358,17 +357,19 @@ def _la_tarea(ctx, nombre: str, datos: dict, tarea: dict | None
         persona = str(coinciden[0]["membership_id"])
         if persona == yo:
             return None, _su_propio_trabajo(ctx, None)
+        cur.execute("""select id from task where responsable_membership_id = %s
+                          and id = any(%s::uuid[])""",
+                    (persona, [t["id"] for t in candidatas]))
+        las_suyas = {str(f["id"]) for f in cur.fetchall()}
         quien_aprueba = fichas.referente(cur, persona)
-        if quien_aprueba is None or quien_aprueba["membership_id"] != yo:
+        # Una tarea que cambió de manos la sigue revisando quien la revisaba (C-7): si alguna de
+        # las que esperan su decisión es de esa persona, vale aunque no apruebe su trabajo.
+        if not las_suyas and (quien_aprueba is None or quien_aprueba["membership_id"] != yo):
             return None, {"resultado": "no_se_puede", "motivo": NO_ES_QUIEN_APRUEBA,
                           "responsable": coinciden[0]["nombre"],
                           **({"quien_aprueba": quien_aprueba["nombre"]}
                              if quien_aprueba is not None else {})}
-        cur.execute("""select id from task where responsable_membership_id = %s
-                          and id = any(%s::uuid[])""",
-                    (persona, [t["id"] for t in candidatas]))
-        suyas = {str(f["id"]) for f in cur.fetchall()}
-        candidatas = [t for t in candidatas if t["id"] in suyas]
+        candidatas = [t for t in candidatas if t["id"] in las_suyas]
         if len(candidatas) == 1:
             return candidatas[0], None
         if not candidatas:
@@ -526,11 +527,11 @@ def cerrar_las_que_ya_pueden(conn: psycopg.Connection, workspace_id: str, reloj:
     with espacio(conn, workspace_id) as cur:
         cal = Calendario.desde_base(cur, workspace_id)
         for _ in range(_VUELTAS_DE_CIERRE):
-            cur.execute("""select t.id, t.titulo, m.aprobador_membership_id
+            cur.execute("""select t.id, t.titulo,
+                                  quien_revisa_la_tarea(t.id) as aprobador_membership_id
                              from task t
-                             join membership m on m.id = t.responsable_membership_id
                             where t.estado = 'en_revision'
-                              and m.aprobador_membership_id is not null
+                              and quien_revisa_la_tarea(t.id) is not null
                               and motivo_no_cierra_tarea(t.id) is null
                             order by t.titulo, t.id""")
             listas = cur.fetchall()

@@ -677,8 +677,9 @@ def _tarea_de(ctx, task_id: str) -> dict[str, Any]:
             "titulo": fila["titulo"], "estado": fila["estado"]}
 
 
-def _quien_aprueba(ctx) -> dict[str, str] | None:
-    return _fichas().referente(ctx.cur, ctx.quien.membership_id)
+def _quien_aprueba(ctx, task_id: str) -> dict[str, str] | None:
+    """Quien revisa el trabajo de la tarea (C-7: si cambió de manos, quien la revisaba)."""
+    return _fichas().quien_revisa(ctx.cur, task_id)
 
 
 def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]],
@@ -731,7 +732,7 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
                                                        opciones=opciones)
     _que_sea_lo_mostrado(ctx, pregunta_id if completa else None, huella)
 
-    quien = _quien_aprueba(ctx)
+    quien = _quien_aprueba(ctx, tarea["id"])
     hecho: dict[str, Any] = {
         "resultado": PARA_CONFIRMAR if completa else LE_FALTA_EVIDENCIA,
         "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]}, "entrega": muestra,
@@ -1004,7 +1005,7 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
         "tarea": {"alias": tarea_q["alias"], "titulo": tarea_q["titulo"]},
         "estado": "en_revision", "entrega": mostrar(_ordenar(piezas), pol, ctx.calendario.zona),
         **({"arranco_al_entregarla": True} if r.get("arranco") else {})}
-    quien = _quien_aprueba(ctx)
+    quien = _quien_aprueba(ctx, tarea_q["id"])
     if quien is not None:
         hecho["queda_esperando_la_aprobacion_de"] = quien["nombre"]
         # Cuando decida, la persona se entera enseguida (`aprobacion.py`, decisión 19): se dice

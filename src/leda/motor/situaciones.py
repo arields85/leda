@@ -141,9 +141,9 @@ def _por_que_ya_no_esta(ctx, task_id) -> dict[str, Any]:
     ahora y, si espera una revisión, que la revisa otra persona. Nada cambia."""
     if not task_id:
         return {"motivo": "tarea_cerrada"}
-    ctx.cur.execute("""select t.estado::text estado, m.aprobador_membership_id
-                         from task t join membership m on m.id = t.responsable_membership_id
-                        where t.id = %s""", (str(task_id),))
+    ctx.cur.execute("""select t.estado::text estado,
+                              quien_revisa_la_tarea(t.id) as aprobador_membership_id
+                         from task t where t.id = %s""", (str(task_id),))
     fila = ctx.cur.fetchone()
     if fila is None or fila["estado"] in ("terminada", "cancelada"):
         return {"motivo": "tarea_cerrada"}

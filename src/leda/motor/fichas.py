@@ -588,13 +588,24 @@ def _abrir_pregunta(ctx: Contexto, hecho: dict[str, Any], tipo: str, task_id: st
 
 
 def referente(cur, responsable_membership_id: str) -> dict[str, str] | None:
-    """Quien aprueba el trabajo del responsable de una tarea, según la política del espacio
-    (`autoridad.puede_aprobar_tarea`: `membership.aprobador_membership_id`). Es a quien le
-    llega el aviso de una nueva previsión y quien decide una reasignación (9b, 9g)."""
+    """Quien aprueba el trabajo de una persona, según la política del espacio
+    (`membership.aprobador_membership_id`). El de una tarea es `quien_revisa`: una tarea que
+    cambió de manos la sigue revisando quien la revisaba (C-7)."""
     cur.execute("""select i.membership_id, i.nombre
                      from membership m
                      join integrante i on i.membership_id = m.aprobador_membership_id
                     where m.id = %s""", (responsable_membership_id,))
+    fila = cur.fetchone()
+    return {"membership_id": str(fila["membership_id"]), "nombre": fila["nombre"]} \
+        if fila else None
+
+
+def quien_revisa(cur, task_id: str) -> dict[str, str] | None:
+    """Quien revisa el trabajo de una tarea (`autoridad.quien_revisa_la_tarea`, la regla de la
+    base): quien aprueba el trabajo de su responsable o, si la tarea cambió de manos, quien la
+    revisaba (C-7). Es a quien le llega el aviso de una nueva previsión y el de una entrega."""
+    cur.execute("""select membership_id, nombre from integrante
+                    where membership_id = quien_revisa_la_tarea(%s)""", (str(task_id),))
     fila = cur.fetchone()
     return {"membership_id": str(fila["membership_id"]), "nombre": fila["nombre"]} \
         if fila else None
@@ -710,7 +721,7 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
                         jugada={"nombre": "anotar_prevision",
                                 "datos": {"fecha": prevista.isoformat()}})
 
-    quien_aprueba = referente(cur, str(fila["responsable_membership_id"]))
+    quien_aprueba = quien_revisa(cur, tarea["id"])
     if prevista == comprometida.astimezone(cal.zona).date():
         return {**hecho, "sin_aviso": "misma_fecha_comprometida"}
     if quien_aprueba is None:
@@ -1215,7 +1226,7 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
                     where workspace_id = %s and dedupe_key = %s""",
                 (ctx.quien.workspace_id, f"motor:nueva_prevision:{equivocada['id']}"))
     aviso = cur.fetchone()
-    quien_aprueba = referente(cur, ctx.quien.membership_id)
+    quien_aprueba = quien_revisa(cur, tarea["id"])
     if aviso is not None and aviso["estado"] == "guardado":
         cur.execute("""update scheduled_notice
                           set estado = 'omitido', motivo_omision = 'prevision_corregida',

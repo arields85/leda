@@ -151,7 +151,7 @@ from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, ancl
 from .ancla import prevision_vigente as _prevision_vigente
 from .auditoria import auditar
 from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, FICHAS, LLEGA, NO_LE_LLEGO,
-                     YA_LE_LLEGO, referente)
+                     YA_LE_LLEGO, quien_revisa, referente)
 from .margen import sale_con_margen
 from .ia import IA
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
@@ -1370,7 +1370,7 @@ def guardar_aviso_de_entrega(ctx, tarea: dict[str, Any], entrega_id: str
     que al salir lleva toda la evidencia vigente (ADR 0009, enmienda T6i). (id, cuándo sale), o
     `None` si nadie aprueba su trabajo."""
     cur = ctx.cur
-    quien = referente(cur, ctx.quien.membership_id)
+    quien = quien_revisa(cur, tarea["id"])
     if quien is None:
         return None
     cur.execute("""update scheduled_notice
@@ -1431,7 +1431,7 @@ def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, An
         return "tarea_cerrada", {}
     if tarea["estado"] != "en_revision":
         return YA_NO_ESTA_ENTREGADA, {}
-    quien = referente(m.cur, str(tarea["responsable_membership_id"]))
+    quien = quien_revisa(m.cur, str(tarea["id"]))
     if quien is None or quien["membership_id"] != str(aviso["destinatario_membership_id"]):
         return CAMBIO_QUIEN_APRUEBA, {}
     if aprobacion_vigente(m.cur, str(tarea["id"]), quien["membership_id"]) is not None:
@@ -1451,11 +1451,11 @@ def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, An
 
 
 def _quien_la_revisa(m: Momento, aviso) -> str | None:
-    """Quien aprueba hoy el trabajo del responsable de la tarea del aviso (decisión 16)."""
-    tarea = leer_tarea(m.cur, aviso["task_id"])
-    if tarea is None:
+    """Quien revisa hoy el trabajo de la tarea del aviso (decisión 16; C-7, si cambió de manos,
+    quien la revisaba)."""
+    if leer_tarea(m.cur, aviso["task_id"]) is None:
         return None
-    quien = referente(m.cur, str(tarea["responsable_membership_id"]))
+    quien = quien_revisa(m.cur, str(aviso["task_id"]))
     return quien["membership_id"] if quien is not None else None
 
 
@@ -1581,7 +1581,7 @@ def _vigencia_de_una_decision(m: Momento, aviso) -> tuple[str | None, dict[str, 
     entrega_aviso = aviso_de_la_entrega(m.cur, tarea["id"])
     if entrega_aviso is None or str(entrega_aviso["id"]) != aviso["dedupe_key"].split(":")[2]:
         return HAY_UNA_ENTREGA_MAS_NUEVA, {}
-    aprobador = referente(m.cur, str(tarea["responsable_membership_id"]))
+    aprobador = quien_revisa(m.cur, str(tarea["id"]))
     if aprobador is None or \
             aprobador["membership_id"] != str(entrega_aviso["destinatario_membership_id"]):
         return CAMBIO_QUIEN_APRUEBA, {}
