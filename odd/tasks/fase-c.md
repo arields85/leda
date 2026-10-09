@@ -1539,6 +1539,18 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       --ronda seco-c5-p23`, **34 de 34 bien**; `pytest tests/motor tests/conversaciones`, 985
       passed. Informes borrados, `gasto.json` sin tocar. Sin la IA real (van en la tanda
       posterior). Sin la suite completa.
+    - **Revisión RDD de las porciones 2 y 3 por tramos (coordinador), aprobadas y reconocidas:**
+      `071fb9c..89be38d` `review-3928fe02290e314b`; `89be38d..6d4ebc8` `review-c09d4a03cf195437`;
+      `6d4ebc8..10dedc1` `review-57372f1a870a3121` (advertencia: la vuelta atrás de la `0043` pierde
+      la marca de "no le corresponde" sin avisar); `10dedc1..5da0985` `review-69632d0014e39f56`. Sus
+      advertencias del motor se corrigieron abajo; la corrección, revisada `4d67a31~1..4d67a31`
+      `review-f7c11e509302f5e8` (advertencia: el respaldo de una cadena guardada sin salir no tiene
+      prueba propia).
+    - **Pregunta para el usuario (coordinador):** si la cadena termina en un referente que es parte
+      de ella, el informe le llega a quien acaba de decir que no le corresponde. Ejemplo: Ariel dice
+      "eso es de mariano", Mariano dice "no es mío" y, como es el referente de Electricidad, el
+      informe le llega a Mariano. Recomendación: que nunca vaya a alguien de la cadena; en ese caso,
+      al referente de la tarea trabada.
     - **Correcciones de la revisión** (advertencias de las revisiones RDD del 2026-10-09, todas
       aprobadas; route: delegada, escritor único). Commit `4d67a31`, sólo `persecucion.py` y
       sus pruebas:
@@ -1621,8 +1633,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] Pedir el enlace a la página por chat (conversación 31).
 - [x] La enmienda al ADR 0017 para delegar, aceptada por el usuario con sus tres respuestas.
 - [x] C-5, porción 1: escribirle a quien destraba y "no le escribas" (conversación 32, `0042`).
-- [ ] C-5, porciones 2 a 5: "ya hablé con él" de quien destraba; "no me corresponde" con un salto
-      y la cadena al referente; bloqueos encadenados y avisos hacia abajo; el bloqueo viejo.
+- [x] C-5, porciones 2 y 3: "ya hablé con él" y "no me corresponde" con un salto (33, 34, `0043`).
+- [ ] C-5, porciones 4 y 5: bloqueos encadenados y avisos hacia abajo (decisión 6); el bloqueo viejo (7).
 - [ ] C-6, las cadencias (decisión 8).
 - [ ] C-7, delegar (ADR 0017, enmienda a la decisión 2).
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
@@ -1637,6 +1649,6 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 2. **El enlace** (cuatro): un nombre mal escrito; varias que coinciden sin botones; cuál gana si
    sólo una se ve; y si "no podés ver esa" y "ninguna se llama así" tienen que ser iguales, para
    no revelar que una tarea existe.
-3. **C-5, porción 1** (cinco): repetirle a quien destraba sin escalar; si se le escribe al
+3. **C-5, porciones 1 a 3** (cinco de la 1, siete de la 2 y la 3, y a quién va el informe si el referente es parte de la cadena): repetirle a quien destraba sin escalar; si se le escribe al
    referente cuando lo nombran como quien destraba; quien destraba sin chat; "no le escribas"
    después de que salió; avisarle a quien destraba que ya se destrabó por otro lado.

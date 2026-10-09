@@ -58,8 +58,8 @@ juntadas para el usuario, en el plan ("Próximo paso").
 2. **C-6, las cadencias** (decisión 8) y **C-7, delegar** (ADR 0017, enmienda a la decisión 2).
 3. **La porción 5:** el acceso del administrador por el bot de administración.
 4. **Las pruebas pendientes van juntas, en una tanda posterior** (pedido del usuario): la IA real
-   sobre la 05, 21, 23, 27, 28, 30, 31 y 32 (una vez, sin repetir sin preguntar) y la prueba por
-   Telegram, con `leda_motor` al día hasta la `0042` (respaldo previo; autorizado) y el guion en
+   sobre la 05, 21, 23, 27, 28 y 30 a 34 (una vez, sin repetir sin preguntar) y la prueba por
+   Telegram, con `leda_motor` al día hasta la `0043` (respaldo previo; autorizado) y el guion en
    tandas cortas de unos 15 minutos.
 5. **Las preguntas para el usuario**, juntas en el plan.
 
