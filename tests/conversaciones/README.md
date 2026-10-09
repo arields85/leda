@@ -113,6 +113,10 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
     trabajo de Mariano mientras dos entregas esperan; el aviso que no había salido le llega al nuevo,
     al nuevo le llega también el que ya había salido, y el botón del aviso viejo le dice al anterior
     que esa tarea ya no la revisa él, sin cambiar nada (decisión 16 del usuario, 2026-10-08; D4).
+30. [`30-pregunta-sin-contestar.md`](30-pregunta-sin-contestar.md): una pregunta de Leda sin contestar
+    frena los otros temas hasta su única repetición del día, a las 4 horas; 4 horas después sale
+    aparte el tema siguiente, y al cerrarse una de las dos preguntas el código trae la otra en un
+    mensaje aparte, en los dos órdenes de respuesta (decisión 21 del usuario, 2026-10-08; D5b).
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
