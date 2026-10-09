@@ -72,8 +72,9 @@ decisión 4, situación general 2, con la precisión de la decisión 9d.
    - Efecto: el bloqueo abierto en la tarea del PLC, con su causa y con Martín como quien lo destraba; la
      tarea pasa a `bloqueada` y su escalera se detiene. Ningún aviso a Ismael por el bloqueo (decisión 9c,
      paso 4). Como hay otra persona que lo destraba, Leda no propone salidas (9c, corregida el 2026-10-05).
-   - La respuesta no dice: que Leda le escribió a Martín o lo va a seguir (eso es la prueba siguiente); la
-     pregunta de quién lo destraba, que Marcos ya contestó.
+   - Desde la C-5 (porción 1, conversación 32): Leda le va a preguntar a Martín, como Leda, cuando termine
+     el margen para corregir, y la respuesta lo dice: que le pregunta y le avisa a Marcos apenas sepa algo.
+   - La respuesta no dice: la pregunta de quién lo destraba, que Marcos ya contestó.
 
 ## Qué mide
 

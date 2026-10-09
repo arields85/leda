@@ -134,15 +134,21 @@ pasos:
       estados: {PLC: bloqueada}
       bloqueos: [{tarea: PLC, causa: presente}]
       destraban: [{tarea: PLC, alguien: true, no_sabe: false}]
+      # Desde la C-5 (porción 1, conversación 32): Leda le pregunta a Martín, como Leda, cuando
+      # termina el margen para corregir.
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: PLC, a: Martin, estado: guardado}
     hechos:
       - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC}
-      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente}
+      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente,
+         quien_destraba: {integrante: Martín Forte},
+         se_le_pregunta_a: {a: Martín Forte, llega: "~2026-10-20T11:05"}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
       para_despues: []
     dice:
       - que quedó anotado el bloqueo, con su causa y con Martín como quien lo destraba
+      - que Leda le va a preguntar a Martín y le avisa a Marcos cuando sepa algo
     no_dice:
-      - que Leda le escribió a Martín o lo va a seguir
       - la pregunta de quién lo destraba, que Marcos ya contestó
