@@ -1,0 +1,154 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/41-el-informe-al-grupo.md
+numero: "41"
+titulo: "El informe al grupo"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-26 09:00"
+foco: [PLC, COM, TAB, HMI, SEN]
+
+# El grupo del espacio, con las dos cadencias al grupo del pack (decisión 25).
+grupo: -1001
+cadencias:
+  - {nombre: resumen_grupal, cuando: "miercoles 15:30", audiencia: grupo}
+  - {nombre: informe_semanal, cuando: "viernes 16:15", audiencia: grupo}
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-26"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Integrar datos de la comprimidora en CoreLabs
+    criterio: "CoreLabs muestra los datos de producción de la comprimidora actualizados cada minuto"
+    responsable: Ariel
+    vence: "2026-10-23"
+    estado: en_curso
+    desde: "2026-10-19"
+  TAB:
+    titulo: Cablear el tablero de la línea 2
+    criterio: "El tablero de la línea 2 queda cableado según el plano y pasa la prueba de continuidad"
+    responsable: Lucas
+    vence: "2026-11-13"
+    estado: bloqueada
+    desde: "2026-10-26"
+    bloqueo: esperando el repuesto
+  HMI:
+    titulo: Instalar el panel HMI de la comprimidora
+    criterio: "El panel HMI muestra el estado de la comprimidora y permite arrancarla y pararla desde la planta"
+    responsable: Nahuel
+    vence: "2026-10-30"
+    estado: terminada
+    desde: "2026-10-26"
+  SEN:
+    titulo: Medir los sensores de la comprimidora
+    criterio: "Cada sensor de la comprimidora queda medido contra el patrón, con su desvío anotado"
+    responsable: Nahuel
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-26 10:00"]
+    salen:
+      - {a: Marcos, tipo: pedido_de_estado, tarea: PLC, hechos: {numero: 1}}
+      - {a: Ariel, tipo: pedido_de_estado, tarea: COM, hechos: {numero: 1}}
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-26 10:30"
+    escribe: "el plc lo termino el jueves, falta que llegue el cable"
+    jugadas:
+      - {nombre: anotar_prevision, tarea: PLC, fecha: "2026-10-29",
+         motivo: "falta que llegue el cable"}
+    efectos:
+      previsiones: [{tarea: PLC, fecha: "2026-10-29", motivo: presente}]
+      avisos_guardados:
+        - {tipo: nueva_prevision, tarea: PLC, a: Ismael, estado: guardado}
+    hechos:
+      - {jugada: anotar_prevision, resultado: anotado, tarea: PLC, prevision: "2026-10-29"}
+    pregunta: null
+    dice:
+      - lo anotado y el día que dio
+    no_dice:
+      - que la fecha cambió
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-26 10:40"]
+    salen:
+      - {a: Ismael, tipo: nueva_prevision, tarea: PLC}
+
+  - paso: 4
+    quien: Leda
+    relojes: ["2026-10-27 10:00"]
+    salen:
+      - {a: Ariel, tipo: pedido_de_estado, tarea: COM, hechos: {numero: 2}}
+
+  # El informe del miércoles: el atraso del PLC, hablado en privado, con su día y su motivo; la
+  # integración de Ariel, de la que todavía no habló, en ninguna parte (constitución §8).
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-28 10:00", "2026-10-28 15:30"]
+    salen:
+      - {a: Ariel, tipo: pedido_de_estado, tarea: COM,
+         hechos: {numero: 3, si_no_hay_respuesta: presente}}
+      # La pregunta sin contestar se repite una vez a las 4 horas (decisión 29).
+      - {a: Ariel, tipo: repeticion_del_dia, tarea: COM}
+      - a: grupo
+        tipo: informe_al_grupo
+        hechos:
+          necesita_respuesta: false
+          terminadas: [{tarea: HMI, la_tiene: Nahuel Gimenez}]
+          atrasadas: [{tarea: PLC, la_tiene: Marcos Tarquini, vence: "2026-10-26",
+                       prevision: "2026-10-29", motivo: presente}]
+          trabadas: [{tarea: TAB, la_tiene: Lucas Natuche, causas: [esperando el repuesto],
+                      trabada_desde: "2026-10-26"}]
+          entregadas: ausente
+          siguen: [{tarea: SEN, la_tiene: Nahuel Gimenez, vence: "2026-11-06"}]
+    dice:
+      - "al grupo: cada tarea con el nombre de quien la tiene"
+      - "al grupo: que el PLC vencía el lunes 26 y Marcos lo termina el jueves 29, porque falta que llegue el cable"
+      - "al grupo: que el tablero de Lucas sigue trabado esperando el repuesto"
+    no_dice:
+      - "al grupo: la integración de Ariel"
+      - "al grupo: un reproche o a quién se le avisó"
+      - "al grupo: una pregunta"
+
+  # El escalamiento de la integración de Ariel: quedó asentado que está atrasada.
+  - paso: 6
+    quien: Leda
+    relojes: ["2026-10-29 10:00"]
+    salen:
+      - {a: Marcos, tipo: pedido_de_estado, tarea: PLC, hechos: {numero: 1}}
+      - {a: Ismael, tipo: escalamiento, tarea: COM}
+
+  # El informe del viernes: lo asentado figura; el panel HMI, terminado antes del informe anterior, no.
+  - paso: 7
+    quien: Leda
+    relojes: ["2026-10-30 10:00", "2026-10-30 16:15"]
+    salen:
+      - {a: Marcos, tipo: pedido_de_estado, tarea: PLC, hechos: {numero: 2}}
+      - {a: Marcos, tipo: repeticion_del_dia, tarea: PLC}
+      - a: grupo
+        tipo: informe_al_grupo
+        hechos:
+          necesita_respuesta: false
+          terminadas: ausente
+          atrasadas: [{tarea: COM, la_tiene: Ariel De Simone, vence: "2026-10-23",
+                       prevision: ausente},
+                      {tarea: PLC, la_tiene: Marcos Tarquini, vence: "2026-10-26",
+                       prevision: "2026-10-29"}]
+          trabadas: [{tarea: TAB, la_tiene: Lucas Natuche}]
+          siguen: [{tarea: SEN, la_tiene: Nahuel Gimenez}]
+    dice:
+      - "al grupo: que la integración de Ariel vencía el viernes 23"
+      - "al grupo: el PLC, con el día que dio Marcos y su motivo"
+    no_dice:
+      - "al grupo: el panel HMI"
+      - "al grupo: un día que nadie dio para la integración"

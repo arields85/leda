@@ -32,7 +32,8 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   suponen apagadas (`README.md`, "Datos ficticios"; la 37, C-6);
 - **el grupo del espacio** (`grupo`), el identificador de su chat de Telegram, como
   `telegram.grupo_gestion_id` del pack: con una cadencia al grupo (`audiencia: grupo`), el espacio
-  tiene informe al grupo (decisión 35; la 36).
+  tiene informe al grupo (decisión 35; la 36), que sale a ese chat (decisión 25; la 41): lo que
+  Leda manda al grupo se espera con `a: grupo`.
 
 Lo que pasó antes en la conversación (avisos ya enviados, una pregunta ya contestada) no se
 escribe a mano: lo corre el motor mismo como **preludio** (`corredor.py`), así queda igual que
@@ -85,6 +86,9 @@ OBJETIVO = "Conectar y automatizar equipos para que produzcan y entreguen datos"
 PACK = Path(__file__).resolve().parents[2] / "espacios" / "corework.yaml"
 TELEGRAM_BASE = 70_001
 TELEGRAM_ADMIN = 79_999
+# Cómo nombran las conversaciones al grupo del espacio, como a quien recibe lo que Leda manda
+# (`salen`, `a: grupo`; el informe al grupo, C-6, decisión 25; la 41).
+GRUPO = "grupo"
 # El tono del pack (`persona` en `espacios/corework.yaml`).
 TONO = {"nombre_visible": "Leda", "registro": "vos", "formalidad": "profesional_cordial",
         "longitud": "breve", "emojis": False}
@@ -100,6 +104,7 @@ class Mundo:
     areas: dict[str, str] = field(default_factory=dict)            # slug -> area_id
     tareas: dict[str, str] = field(default_factory=dict)          # clave -> task_id
     titulos: dict[str, str] = field(default_factory=dict)         # clave -> título
+    grupo: int | None = None        # el chat del grupo del espacio (`grupo`), si lo tiene
 
     def clave_de_titulo(self, titulo: str) -> str | None:
         return next((k for k, t in self.titulos.items() if t == titulo), None)
@@ -109,6 +114,10 @@ class Mundo:
                      if p["membership_id"] == str(membership_id)), None)
 
     def persona_de_chat(self, chat_id: int) -> str | None:
+        """Quién recibe lo que sale a ese chat: una persona, por su nombre corto, o `grupo`, el
+        grupo del espacio (el informe al grupo, C-6; la 41)."""
+        if self.grupo is not None and chat_id == self.grupo:
+            return GRUPO
         return next((k for k, p in self.personas.items() if p["telegram"] == chat_id), None)
 
 
@@ -133,6 +142,7 @@ def cargar(conn, conversacion: dict[str, Any]) -> Mundo:
         if conversacion.get("grupo") is not None:
             cur.execute("update workspace set grupo_chat_id = %s where id = %s",
                         (int(conversacion["grupo"]), mundo.workspace_id))
+            mundo.grupo = int(conversacion["grupo"])
     conn.commit()
     return mundo
 

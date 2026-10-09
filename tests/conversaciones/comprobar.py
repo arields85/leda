@@ -40,7 +40,7 @@ from typing import Any
 from leda.db import admin
 from leda.motor.avisos import ETAPA_AVISO_REINTENTO
 
-from .carga import ZONA, Mundo
+from .carga import GRUPO, ZONA, Mundo
 from .motores import Motor
 from .motores import cargar as cargar_motor
 
@@ -153,16 +153,20 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                                                     if f["espera_la_tarea"] else None)}
                  for f in cur.fetchall()}
         cur.execute("""select * from scheduled_notice where workspace_id = %s""", (ws,))
+        # Un aviso al grupo del espacio (el informe al grupo, C-6) va a `grupo`, sin persona.
         avisos = {str(f["id"]): {"tipo": f["tipo"], "tarea": tarea(f["task_id"]),
-                                 "a": persona(f["destinatario_membership_id"]),
+                                 "a": (GRUPO if f["al_grupo"]
+                                       else persona(f["destinatario_membership_id"])),
                                  "estado": f["estado"], "motivo": f["motivo_omision"],
                                  "hechos": f["hechos"], "clave": f["dedupe_key"],
                                  "outbox_id": str(f["outbox_id"]) if f["outbox_id"] else None}
                   for f in cur.fetchall()}
-        cur.execute("""select id, destinatario_membership_id, es_respuesta, tipo, cuerpo, estado,
-                              dedupe_key
+        cur.execute("""select id, destinatario_membership_id, chat_id, es_respuesta, tipo, cuerpo,
+                              estado, dedupe_key
                          from message_outbox where workspace_id = %s""", (ws,))
-        salidas = {str(f["id"]): {"a": persona(f["destinatario_membership_id"]),
+        salidas = {str(f["id"]): {"a": (persona(f["destinatario_membership_id"])
+                                        or (GRUPO if mundo.grupo is not None
+                                            and f["chat_id"] == mundo.grupo else None)),
                                   "es_respuesta": f["es_respuesta"], "tipo": f["tipo"],
                                   "cuerpo": f["cuerpo"], "estado": f["estado"]}
                    for f in cur.fetchall()}

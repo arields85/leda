@@ -29,8 +29,7 @@ from leda.motor.informe_al_grupo import (INFORME_AL_GRUPO, NADA_PARA_INFORMAR,
                                          guardar_los_informes)
 from leda.motor.ia import Jugada
 
-from tests.motor.ayudantes import (Dias, avisos_guardados, cuantas, dice, nueva_tarea, octubre,
-                                   todos, uno)
+from tests.motor.ayudantes import avisos_guardados, cuantas, dice, octubre, todos, uno
 
 GRUPO = -100_500
 VIERNES = "15 16 * * 5"         # `informe_semanal` del pack: viernes 16:15
@@ -68,8 +67,17 @@ def _estado(conn, mundo, titulo: str, estado: str, at: datetime, *,
             vence: datetime | None = None, bloqueo: str | None = None) -> str:
     """Otra tarea de Marcos en ese estado desde `at`, como la cargaría la plataforma: trabada con
     su bloqueo abierto, terminada con la aprobación que su cierre exige."""
-    tarea = nueva_tarea(conn, mundo, titulo, fecha=vence or octubre(30, 17))
     with admin(conn) as cur:
+        # Con su criterio de aceptación: el cierre lo comprueba la base (mecánica §5).
+        cur.execute(
+            """insert into task (workspace_id, objective_id, titulo, area_id,
+                                 responsable_membership_id, estado, fecha_objetivo,
+                                 criterio_aceptacion)
+               values (%s, %s, %s, %s, %s, 'asignada', %s, 'Queda hecho y probado')
+               returning id""",
+            (mundo["id"], mundo["objetivo"], titulo, mundo["area"],
+             mundo["personas"]["Marcos"]["membership_id"], vence or octubre(30, 17)))
+        tarea = str(cur.fetchone()["id"])
         if bloqueo:
             cur.execute("""insert into blocker (workspace_id, task_id, causa, abierto_en,
                                                 abierto_por)
@@ -88,6 +96,15 @@ def _estado(conn, mundo, titulo: str, estado: str, at: datetime, *,
                                    %s)""", (tarea, estado, at))
     conn.commit()
     return tarea
+
+
+def _cancelar_el_tablero(conn, mundo) -> None:
+    with admin(conn) as cur:
+        cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                     actor_kind, motivo, at)
+                       values (%s, 'asignada', 'cancelada', 'sistema', 'prueba', %s)""",
+                    (mundo["tarea"], octubre(5, 10)))
+    conn.commit()
 
 
 # --- Cuándo y a dónde sale ------------------------------------------------------------------------
@@ -126,6 +143,7 @@ def test_sale_una_vez_por_dia_de_la_cadencia(conn, mundo, dias):
 def test_leda_no_conversa_en_el_grupo(conn, mundo, dias):
     """El informe no pide respuesta ni abre ninguna pregunta, y no es el último aviso de nadie."""
     _con_informe(conn, mundo)
+    _cancelar_el_tablero(conn, mundo)               # sólo el informe sale en esa vuelta
     _estado(conn, mundo, T2, "en_curso", octubre(5, 10))
     preguntas_antes = cuantas(conn, "conversation_question")
 
@@ -134,15 +152,6 @@ def test_leda_no_conversa_en_el_grupo(conn, mundo, dias):
     [aviso] = avisos_guardados(conn, INFORME_AL_GRUPO)
     assert cuantas(conn, "conversation_question") == preguntas_antes
     assert cuantas(conn, "conversation_state", "ultimo_aviso_id = %s", str(aviso["id"])) == 0
-
-
-def _cancelar_el_tablero(conn, mundo) -> None:
-    with admin(conn) as cur:
-        cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
-                                                     actor_kind, motivo, at)
-                       values (%s, 'asignada', 'cancelada', 'sistema', 'prueba', %s)""",
-                    (mundo["tarea"], octubre(5, 10)))
-    conn.commit()
 
 
 def test_sin_nada_que_informar_no_sale_nada(conn, mundo, dias):

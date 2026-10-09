@@ -174,7 +174,15 @@ decisión 8):
     trabada y la entregada) y pregunta sólo por las que se pueden mover; lo contestado no se vuelve a
     preguntar (el martes, nada del PLC que vence ese día); "viene bien" deja como próximo contacto el
     aviso previo de siempre; las listas del miércoles y del viernes traen sólo lo que cambió o no se
-    contestó (decisiones 31, 32, 44 y 46 del usuario, 2026-10-09; C-6).
+    contestó (decisiones 31, 32, 44 y 46 del usuario, 2026-10-09; C-6). Desde la corrección de la
+    C-6, lo que no sale el día del vencimiento queda dado por contestado y la escalera sigue anclada
+    al vencimiento: el escalamiento del PLC llega el viernes, no un día después.
+41. [`41-el-informe-al-grupo.md`](41-el-informe-al-grupo.md): con las cadencias al grupo del
+    miércoles y del viernes, Leda le manda al grupo del equipo lo que pasó con las tareas, cada
+    renglón con el nombre de quien la tiene: la terminada, el atraso que Marcos ya habló en privado
+    (con el día que dio y su motivo), la tarea trabada y la que sigue; el atraso de Ariel, del que
+    todavía no habló, no figura hasta que queda asentado porque no contestó (decisión 25 del usuario,
+    2026-10-09; decisiones 8, 35 y 49; C-6).
 
 Delegar (ADR 0017, enmienda a la decisión 2; `odd/tasks/fase-c.md`, decisión 9):
 
@@ -348,7 +356,9 @@ jugada lo dice con `su_tarea_trabada`, también por su clave), y el espacio tien
 bloqueo viejo del pack (`bloqueos.escala_solo_a_los_dias`, 5). Desde la C-5a (decisión 35): el
 estado inicial puede darle al espacio su grupo (`grupo`, como `telegram.grupo_gestion_id` del pack)
 que, con una cadencia al grupo (`cadencias`, `audiencia: grupo`), es tener informe al grupo; sin
-eso, lo asentado no figura en ningún informe al grupo (la 36 lo tiene; las demás, no).
+eso, lo asentado no figura en ningún informe al grupo (la 36 lo tiene; las demás, no). Desde el
+informe al grupo (C-6, decisión 25; la 41), lo que Leda le manda al grupo se espera con `a: grupo`
+(el chat del `grupo` del estado inicial), sin persona, y los avisos al grupo se nombran igual.
 
 **Delegar** (C-7): los efectos suman quién tiene cada tarea que cambió de manos (`responsables`, por la
 clave de la tarea y el nombre corto de la persona): uno de más es de garantía, porque una tarea no cambia de
