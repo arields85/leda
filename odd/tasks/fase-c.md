@@ -1247,6 +1247,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       incluidos); en seco, `correr --ia guionada --veces 1 --ronda seco-d5b`, 30 de 30 bien
       (informes borrados, `gasto.json` sin tocar). Sin la IA real (decisión del usuario: van en la
       tanda posterior). Sin la suite completa.
+    - **Revisión RDD por tramos (coordinador), aprobadas y reconocidas:** `7b34ba4..56cdd45` (la
+      conversación 30) `review-0a0e60ef937044db`; `2ac62af..9bfc40f` `review-0b4660c4f081ffd4`, con
+      una advertencia: una repetición del día que no salía (omitida o fallida) frenaba los otros
+      temas hasta el día siguiente. Corregida en `0c28777` (sin repetición enviada, el turno termina
+      a las 8 horas de preguntada; rojo observado, `pytest tests/motor tests/conversaciones` 926
+      passed), revisada `16c0a2c..0c28777` `review-168316baac80a7f6`; su advertencia: la prueba
+      simula la repetición que no salió sin un aviso omitido real. `635aae7` suma la 30 al README.
     - `PENDIENTE` (decisiones del usuario; lo construido es la lectura que no agrega mensajes):
       - **La repetición a las 4 horas sólo sale si algo espera detrás.** Sin otro tema esperando, la
         pregunta sigue su escalera de siempre (el día hábil siguiente), como en la 03 y la 26. Ejemplo:
@@ -1266,7 +1273,6 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         repita).
       - **Una pregunta que se hace una sola vez** (`cual_de_las_dos`, decisión 12) o que no es de una
         tarea no se repite; su turno termina a las 8 horas, como si se hubiera repetido.
-      - El README de las conversaciones no lista la 30 (fuera de la superficie de la D5b).
       - **La IA real** sobre la 30 (y el punto 5 sobre la 04), y la prueba por Telegram, en la tanda
         posterior. `leda_motor` necesita la `0040` además de la `0039`.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
