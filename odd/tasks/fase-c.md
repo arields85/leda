@@ -1756,6 +1756,97 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     `411d680`), corregidas en `832492a`. Las dos correcciones, revisadas `692513d..2f2aa12`
     `review-ee0dd21fd5d6d732`. **La C-5 queda completa en sus cinco porciones.**
 - [ ] **C-6.** Las cadencias (pregunta 8).
+  - **El pedido de estado a cada persona, con la lista** (decisión 8; conversación 37). Route:
+    delegada (escritor único, 2+ archivos no triviales). Hecho el 2026-10-09:
+    - **La conversación primero** (`99169f8`): la 37. Con la cadencia del lunes (sólo ésa: el
+      cargador escribe las cadencias que la conversación nombra, `cadencias` en su YAML; las demás
+      conversaciones las siguen suponiendo apagadas), Marcos recibe un mensaje con sus tres tareas y el
+      vencimiento del PLC adentro, y Nahuel con las suyas y el aviso previo de los sensores adentro.
+      Marcos contesta las tres de corrido; Nahuel contesta una, Leda pregunta una vez por las otras y,
+      con otra respuesta parcial, no vuelve a preguntar. En seco, antes del código: 11 fallas, todas
+      porque faltaba el motor (ninguna lista salía; "viene bien" de una tarea que no vence daba
+      `nadie_pidio_el_estado`).
+    - **El motor** (`ad1d06f`, `leda.motor.cadencias`, una pasada de `escalera.correr_escalera`,
+      antes de los pasos del día): el día de una cadencia `privado_cada_integrante` (`cadence_job`, del
+      pack), cada persona activa con tareas asignadas o en curso sin un bloqueo abierto recibe un
+      aviso `como_vienen_sus_tareas`, a la hora de la cadencia o a las 10:00 si es antes
+      (`tiempo.sale`). Al salir, el envío arma la lista (`avisos._a_la_lista`, `sus_tareas`: cada
+      tarea con los mismos hechos que un pedido de estado de su escalera, y `vence_hoy`) y le pone
+      adentro lo que la escalera tenía para ese día sobre esas tareas (`TipoDeAviso.entra_en_la_lista`:
+      aviso previo, pedido de estado, recordatorio del vencimiento con otro día dado, reencuadre,
+      pedido después de un avance), que sale con la misma fila y cuenta como dado; si pedía el estado,
+      suma el recordatorio en su espera sin abrir otra pregunta. Con la cadencia más tarde (miércoles
+      11:30), lo de la escalera de ese día la espera. Una sola pregunta, sin tarea propia
+      (`preguntas.COMO_VIENEN_SUS_TAREAS`, se puede dejar); cada jugada del responsable sobre una tarea
+      de la lista la contesta ahí (`preguntas.marcar_en_la_lista`, salvo `no_se_puede`) y la jugada
+      hace lo suyo en la tarea; con todas, se cierra. Contestada en parte, la respuesta pregunta una
+      vez por las otras (`de_la_lista`, `pregunto_por_las_otras`); otra respuesta parcial la cierra.
+      "Viene bien" de una tarea sin espera de su escalera se anota igual si está en la lista abierta
+      (`fichas._avance_de_la_lista`, auditado con `en_la_lista`), sin espera ni repregunta: vuelve en la
+      próxima lista o el día en que su escalera pide el estado, lo que llegue antes
+      (`cadencias.cuando_vuelve_a_preguntar`). Una vez por día de la cadencia
+      (`cadence_job.ultima_corrida` y la clave por cadencia, persona y día); un día que pasó sin
+      atenderse o que sale otro día (ausente, conversando) queda omitido `ya_paso_su_momento`
+      (mecánica §12); un feriado, `no_es_dia_habil`; antes de la primera vuelta no se repone nada. Un
+      cron que no se entiende deja un incidente por día (etapa de la escalera) y las demás siguen. Sin
+      migración.
+    - **Test primero:** `tests/motor/test_cadencias.py` con un esqueleto del módulo (sólo la constante):
+      15 de 19 en rojo (las otras 4 miran que algo no pase: sin tareas, antes de la primera vuelta, la
+      cadencia del grupo, y la escalera que se detiene con la respuesta). **Verde:** las 19, más la 37
+      en seco. Cambiaron `test_frontera.py` (`cadence_job` en las tablas permitidas) y
+      `test_capacidades.py` (`ultima_corrida` deja de ser una promesa sin cumplir; su prueba pide
+      actualizar `docs/capacidades.md`, fuera de lo que el escritor podía tocar: `PENDIENTE`,
+      coordinador). Ninguna conversación existente cambió: el cargador no carga cadencias salvo que
+      la conversación las nombre.
+    - **Las instrucciones de la IA no cambiaron** (huellas de `test_contratos.py` iguales): los códigos
+      nuevos (`como_vienen_sus_tareas`, `sus_tareas`, `de_la_lista`, `vence_hoy`, `ya_paso_su_momento`,
+      `no_es_dia_habil`, `sin_tareas_abiertas`) van en `hechos.SIGNIFICADOS`. No hay jugadas nuevas.
+      `docs/product/plataforma-pendientes.md`: la fila de las cadencias dice qué corre hoy.
+    - **Tamaño:** el commit del motor tiene unas 900 líneas, casi 350 de pruebas; es un solo
+      comportamiento (guardar, armar la lista con lo del día adentro y contestarla).
+    - **Chequeos** (2026-10-09, sobre el código de `ad1d06f`): `pytest tests/motor tests/conversaciones`,
+      1044 passed; `pytest tests/garantias tests/test_restriccion_horario.py tests/test_esqueleto.py
+      tests/test_saludo.py`, 390 passed; en seco, `correr --ia guionada --veces 1 --ronda
+      seco-c6-todas`, **37 de 37 bien**. Informes borrados, `gasto.json` sin tocar. Sin la IA real
+      (decisión del usuario: van en la tanda posterior). Sin la suite completa.
+    - `PENDIENTE`:
+      - **El informe al grupo** (la otra mitad de la decisión 8): no se construyó. El transporte
+        existe (una fila del outbox al `workspace.grupo_chat_id`, como la presentación,
+        `onboarding.encolar_presentacion`), pero (1) el grupo de CoreWork no existe en Telegram
+        ("chat not found"), así que no hay dónde probarlo; (2) los avisos del motor son de un
+        integrante (`scheduled_notice.destinatario_membership_id` no nulo; la redacción, el estado
+        de la conversación, las ausencias y no interrumpir son por persona): hace falta una migración
+        y un camino de envío al grupo; (3) qué es "un atraso hablado en privado" necesita una
+        decisión (abajo). Las cadencias `grupo` hoy no hacen nada (probado).
+      - **La IA real** sobre la 37, y la prueba por Telegram, en la tanda posterior.
+      - **Preguntas para el usuario** (cada una con su ejemplo):
+        - **El atraso en el informe al grupo.** La decisión 8 dice que un atraso no hablado en
+          privado no figura; la constitución §8 dice además que se expone sólo si persiste o afecta
+          al equipo. Ejemplo: el PLC venció el lunes, Leda se lo preguntó a Marcos en privado el
+          lunes y él dio el miércoles; el viernes, ¿el informe dice "PLC, vencía el lun 26/10, Marcos
+          lo termina el mié 28/10" o no lo nombra porque todavía no persiste?
+        - **¿Las tres cadencias privadas piden lo mismo?** Hoy el lunes, el miércoles y el viernes
+          mandan la misma lista (el pack dice "objetivos de la semana", "pedido de estado" y "cierre
+          con evidencias pendientes"). Ejemplo: el viernes, ¿Leda le pregunta a Marcos también qué
+          le falta para entregar, o sólo cómo vienen?
+        - **¿Tres listas por semana es mucho?** Con la escalera encima, una tarea que vence el martes
+          le llega a Marcos en la lista del lunes, el martes aparte (su recordatorio) y otra vez en la
+          lista del miércoles.
+        - **Las tareas trabadas y las entregadas no van en la lista** (la trabada la sigue la
+          persecución del bloqueo; la entregada espera la revisión). Ejemplo: Marcos tiene el tablero
+          trabado desde hace dos días; el lunes la lista no lo nombra. ¿O tiene que ir, como "sigue
+          trabada por el repuesto"?
+        - **La lista no se repite a las 4 horas** (decisión 21): como no es de una tarea, frena los
+          otros temas que piden respuesta hasta 8 horas y después sale el siguiente. Ejemplo: Nahuel
+          no contesta la lista de las 10:00; a las 14:00 no se le repite. ¿Se repite como las demás
+          preguntas?
+        - **Una cadencia antes de las 10:00 sale a las 10:00** (la hora única de lo que Leda manda
+          por su cuenta, 2026-10-06). Ejemplo: la del lunes 09:15 sale a las 10:00, con el
+          recordatorio del día adentro. ¿O a las 09:15, y el recordatorio de ese día también?
+        - **"Viene bien" de una tarea que todavía no vence** se anota y Leda vuelve a preguntar en la
+          próxima lista o el día en que vence, no al día hábil siguiente. Ejemplo: el lunes Marcos
+          dice "el hmi viene bien" (vence el viernes 6); Leda le dice que le vuelve a preguntar el
+          lunes 2. ¿Está bien, o al día siguiente como con una tarea que ya venció?
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
   - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
     sector, Leda le pregunta si la acepta y le avisa a quien delegó. Al construirlo cambian las
