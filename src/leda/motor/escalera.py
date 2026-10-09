@@ -133,7 +133,9 @@ from .avisos import (ABIERTOS, ANTES_LA_REVISABA_OTRA_PERSONA, APROBACION_TRABAD
 from .avisos import REPETICION_DEL_DIA, hechos_de_la_que_vuelve
 from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir, preguntada_en,
                                      se_repite)
-from .preguntas import DECISION_DE_LA_ENTREGA, lo_anotado
+from .avisos import sigue_esperando_que_destrabe
+from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, lo_anotado
+from .preguntas import TIPOS as TIPOS_DE_PREGUNTA
 from .tiempo import Reloj, sale
 
 ETAPA_ESCALERA = "motor_escalera"
@@ -465,6 +467,22 @@ def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
     tarea = leer_tarea(cur, task_id)
     if tarea is None or tarea["estado"] in ("terminada", "cancelada"):
         return None
+    if pregunta["tipo"] == CUANDO_SE_DESTRABA and sigue_esperando_que_destrabe(
+            cur, (pregunta["jugada"] or {}).get("destraba_id"), persona) is not None:
+        # La tarea se destrabó, o la destraba otra persona, por un camino que no la cerró: ya
+        # no espera nada de quien se le preguntaba (C-5).
+        cur.execute("""update conversation_question
+                          set cerrada_en = %s, cierre = 'sin_efecto',
+                              cierre_detalle = jsonb_build_object('tarea', %s::text)
+                        where id = %s""", (m.ahora, task_id, pregunta["id"]))
+        cur.execute("""update conversation_state set pregunta_abierta_id = null,
+                                                     actualizado_en = %s
+                        where membership_id = %s and pregunta_abierta_id = %s""",
+                    (m.ahora, persona, pregunta["id"]))
+        cur.execute("update pending_reply set satisfecho_en = %s where id = %s",
+                    (m.ahora, espera["id"]))
+        return None
+    escala = TIPOS_DE_PREGUNTA[pregunta["tipo"]].escala
     de = f"q{pregunta['id']}"
     cur.execute("""select * from scheduled_notice
                     where task_id = %s and tipo = any(%s)
@@ -482,6 +500,8 @@ def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
     siguiente = 1 + len(dados)          # el pedido 0 es la pregunta misma
     if siguiente > PEDIDOS or m.cal.habiles_entre(espera["preguntado_en"], m.ahora) < siguiente:
         return None
+    if not escala and siguiente >= PEDIDOS:
+        return None                     # la repite y no le avisa a nadie (`TipoDePregunta.escala`)
     if dados and m.cal.habiles_entre(dados[-1]["resuelto_en"], m.ahora) < 1:
         return None                     # nunca dos pasos el mismo día hábil
     sobre = lo_anotado(pregunta)        # lo que la repregunta recuerda
@@ -490,9 +510,11 @@ def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
                 "necesita_respuesta": True, **({"sobre": sobre} if sobre else {})}
         if _no_llegaron(dados):
             base["pedidos_anteriores_que_no_le_llegaron"] = _no_llegaron(dados)
-        if siguiente == PEDIDOS - 1:
+        if siguiente == PEDIDOS - 1 and escala:
             base["avisa_que_va_a_escalar"] = True
-        _guardar_de_una_pregunta(m, REPREGUNTA, tarea, base, de, siguiente)
+        # A quien se le hizo: el responsable o, si se le pregunta a quien destraba una tarea de
+        # otra persona, esa persona (C-5).
+        _guardar_de_una_pregunta(m, REPREGUNTA, tarea, base, de, siguiente, destinatario=persona)
         return REPREGUNTA
     destinos = quienes_escalan(cur, tarea)
     if not destinos:

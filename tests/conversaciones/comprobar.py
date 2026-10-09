@@ -50,7 +50,7 @@ GARANTIA, COMPRENSION, MOTOR, FORMATO = "garantia", "comprension", "motor", "for
 # `puede_traer`, pueden venir, pero sólo con las palabras de la persona (revisión del contrato,
 # 2026-10-05): uno inventado sigue siendo una falla.
 DATOS_LIBRES = frozenset({"motivo", "causa", "palabras", "quien", "a", "que_pide",
-                          "comentario", "de", "como_la_nombra"})
+                          "comentario", "de", "como_la_nombra", "lo_que_dice"})
 FUERA_DE_LA_LISTA = "fuera_de_la_lista"
 ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
 # Un aviso cuya redacción falló y se reintenta (usuario, 2026-10-07): en la corrida es un aviso
@@ -127,6 +127,19 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                 "alguien": bool(f["destraba_externo"]) or (
                     f["destraba_membership_id"] is not None
                     and f["destraba_membership_id"] != f["dicho_por_membership_id"])}
+        # Lo que dice quien destraba (C-5): de qué tarea, quién, para cuándo y si ya está.
+        cur.execute("""select d.id, b.task_id, d.dicho_por_membership_id, d.para_cuando,
+                              d.ya_esta
+                         from dicho_de_quien_destraba d
+                         join blocker_unblocker u on u.id = d.blocker_unblocker_id
+                         join blocker b on b.id = u.blocker_id
+                        where d.workspace_id = %s""", (ws,))
+        dicen = {str(f["id"]): {"tarea": tarea(f["task_id"]),
+                                "de": persona(f["dicho_por_membership_id"]),
+                                "para_cuando": (f["para_cuando"].isoformat()
+                                                if f["para_cuando"] else None),
+                                "ya_esta": f["ya_esta"]}
+                 for f in cur.fetchall()}
         cur.execute("""select * from scheduled_notice where workspace_id = %s""", (ws,))
         avisos = {str(f["id"]): {"tipo": f["tipo"], "tarea": tarea(f["task_id"]),
                                  "a": persona(f["destinatario_membership_id"]),
@@ -224,7 +237,8 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                 de_las[0] if len(de_las) == 1 else de_las or None)
     conn.commit()
     return {"estados": estados, "previsiones": previsiones, "bloqueos": bloqueos,
-            "destraban": destraban, "avisos": avisos, "salidas": salidas,
+            "destraban": destraban, "dicen_quien_destraba": dicen, "avisos": avisos,
+            "salidas": salidas,
             "incidentes": incidentes, "avisos_admin": avisos_admin, "avances": avances,
             "esperas": esperas, "preguntas": preguntas, "ultimo_aviso": ultimo_aviso,
             "evidencias": evidencias, "archivos_de_tarea": archivos_de_tarea,
@@ -245,6 +259,7 @@ def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
                                if v["resuelto"] and not antes["bloqueos"].get(k, {}).get(
                                    "resuelto", False)],
         "destraban": nuevas("destraban"),
+        "dicen_quien_destraba": nuevas("dicen_quien_destraba"),
         "avisos_guardados": [v for k, v in despues["avisos"].items() if k not in antes["avisos"]],
         "salidas": nuevas("salidas"),
         "incidentes": nuevas("incidentes"),
@@ -514,6 +529,9 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
     filas("previsiones", hubo["previsiones"], "previsión")
     filas("bloqueos", hubo["bloqueos"], "bloqueo")
     filas("destraban", hubo["destraban"], "quién destraba")
+    # Lo que dice quien destraba (C-5): uno de más es de garantía.
+    filas("dicen_quien_destraba", hubo.get("dicen_quien_destraba") or [],
+          "lo que dice quien destraba")
     filas("avances", hubo["avances"], "avance")
     filas("avisos_guardados", [a for a in hubo["avisos_guardados"]], "aviso guardado")
     # Como las demás filas: uno de más es de garantía; uno que falta, de comprensión (revisión

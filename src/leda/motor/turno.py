@@ -46,6 +46,10 @@ Quien aprueba el trabajo de otras personas lee, además de sus tareas, las entre
 decisión (`aprobacion.para_decidir`, porción 3b), con su alias después de las suyas. Dos jugadas
 opuestas sobre la misma tarea en un mensaje (aprobar y pedir cambios) no se hacen: Leda pregunta
 cuál (`fichas.dos_lecturas`), una regla general para toda ficha que declara su opuesta.
+
+Quien puede destrabar la tarea trabada de otra persona (lo último que ella dijo de su bloqueo)
+lee, además, esas tareas (`persecucion.para_destrabar`, C-5), con su alias después de las
+anteriores: así contesta lo que Leda le preguntó nombrándola.
 """
 
 from __future__ import annotations
@@ -68,8 +72,8 @@ from ..incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
                           REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
 from ..salida import enqueue_outbox
 
-from . import (aprobacion, archivos, cambios_de_estado, entrega, fichas, pregunta_sin_contestar,
-               preguntas, registro)
+from . import (aprobacion, archivos, cambios_de_estado, entrega, fichas, persecucion,
+               pregunta_sin_contestar, preguntas, registro)
 from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
 from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
@@ -293,15 +297,18 @@ def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None =
     tareas = entrega.para_la_ia(cur, tareas, zona)
     # Las entregas que esperan su decisión, si aprueba el trabajo de alguien (porción 3b).
     para_aprobar = aprobacion.para_decidir(cur, quien, len(tareas), zona)
+    # Las trabadas de otras personas que destraba (C-5).
+    para_destrabar = persecucion.para_destrabar(cur, quien.membership_id,
+                                                len(tareas) + len(para_aprobar))
+    todas = tareas + para_aprobar + para_destrabar
 
     ultimos = leer_ultimos_turnos(cur, quien.membership_id)
     return Contexto(cur=cur, quien=quien, entrante_id=entrante_id, chat_id=chat_id,
                     texto=texto, ahora=ahora, llegada=entrega.lo_que_trae(cur, entrante_id, texto),
-                    estado=preguntas.estado_para_la_ia(cur, quien.membership_id,
-                                                       tareas + para_aprobar),
+                    estado=preguntas.estado_para_la_ia(cur, quien.membership_id, todas),
                     tareas=tareas, ultimos_turnos=ultimos,
-                    ultimo_aviso=_ultimo_aviso(estado, tareas + para_aprobar), toque=toque,
-                    jugadas=jugadas, para_aprobar=para_aprobar)
+                    ultimo_aviso=_ultimo_aviso(estado, todas), toque=toque,
+                    jugadas=jugadas, para_aprobar=para_aprobar, para_destrabar=para_destrabar)
 
 
 def _lo_que_llego(cur, workspace_id: str, entrante_id: str,
@@ -361,7 +368,7 @@ def _situacion(ctx: Contexto, jugadas: Mapping[str, Manejador]) -> dict[str, Any
         "estado": ctx.estado,       # la pregunta abierta, con sus opciones, y las de después
         "ultimo_aviso": ctx.ultimo_aviso,
         "tareas": [{k: v for k, v in t.items() if k != "id"}
-                   for t in ctx.tareas + ctx.para_aprobar],
+                   for t in ctx.tareas + ctx.para_aprobar + ctx.para_destrabar],
         "ultimos_turnos": list(ctx.ultimos_turnos),
         "jugadas_posibles": sorted(jugadas),
     }

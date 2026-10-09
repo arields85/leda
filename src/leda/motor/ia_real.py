@@ -149,6 +149,13 @@ DATOS = {
                                  "tareas: las palabras de su título que dijo, bien escritas, y "
                                  "de quién es, si lo dijo. Sólo si la nombró y no está en la "
                                  "lista."),
+    "para_cuando": ("string", "La fecha para la que quien puede destrabar la tarea de otra "
+                              "persona dice que lo resuelve, como AAAA-MM-DD, calculada desde "
+                              "hoy. Sólo si la dijo."),
+    "ya_esta": ("boolean", "Verdadero sólo si quien puede destrabar la tarea de otra persona "
+                           "dice que ya lo resolvió."),
+    "lo_que_dice": ("string", "Lo que dice quien puede destrabar la tarea de otra persona sobre "
+                              "lo que la traba, con sus palabras."),
 }
 
 # Qué es lo que no está en la lista: sólo un pedido de hacer algo (revisión del contrato,

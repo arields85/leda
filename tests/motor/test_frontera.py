@@ -83,11 +83,12 @@ BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 # (`archivos.py`). La entrega (ADR 0019, decisiones 4 y 5; `entrega.py`): lo que pide la tarea
 # (`task_evidence_policy`), lo entregado y lo retirado (sólo lee: escribe la cocina), los
 # archivos dichos de una tarea y el último pedido de cambios, que abre el ciclo (`approval`,
-# sólo lee).
+# sólo lee). La persecución del bloqueo (C-5): lo que dice quien destraba.
 TABLAS_PERMITIDAS = {
     "absence", "app_user", "approval", "archivo", "archivo_de_mensaje", "archivo_de_tarea",
     "blocker", "blocker_unblocker", "conversation_option", "conversation_question",
-    "conversation_state", "conversation_turn", "dependency", "escalation_route", "evidence",
+    "conversation_state", "conversation_turn", "dependency", "dicho_de_quien_destraba",
+    "escalation_route", "evidence",
     "evidencia_retirada", "inbound_message", "integrante", "membership", "message_outbox",
     "model_config", "pending_reply", "persona_config", "scheduled_notice", "task",
     "task_evidence_policy", "task_forecast", "workspace", "workspace_setting",

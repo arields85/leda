@@ -101,6 +101,14 @@ CUAL_DE_LAS_DOS = "cual_de_las_dos"
 # revisar después de decidir una. No es un tema abierto, sólo muestra: uno nuevo no reemplaza a
 # otro (`ofrecer`, `reemplaza=False`), y tocarlo corre `ver_entrega`, como escribirlo.
 VER_LA_ENTREGA = "ver_la_entrega"
+# Para cuándo destraba una tarea de otra persona quien la puede destrabar (C-5, porción 1;
+# decisión 4 del usuario, 2026-10-08): la abre el aviso que le escribe Leda
+# (`avisos.PREGUNTA_A_QUIEN_DESTRABA`) para esa persona, sobre la tarea de la persona trabada.
+# Espera respuesta con su propia espera, que la escalera de las preguntas repite; no escala a
+# nadie (el bloqueo que no se mueve es la decisión 7, de otra porción). La contesta lo que dice
+# quien destraba (`decir_cuando_destraba`) y se cierra cuando la tarea se destraba o cambia
+# quién la destraba (`persecucion.py`).
+CUANDO_SE_DESTRABA = "cuando_se_destraba"
 
 
 @dataclass(frozen=True)
@@ -109,11 +117,14 @@ class TipoDePregunta:
     que espera respuesta; `None` si se puede dejar sin efecto. `sin_elegir_queda`: si se hace
     una sola vez, el tipo de la decisión que queda con sus opciones cuando la persona contesta
     otra cosa sin elegir: la pregunta se cierra, no se repite, y sus opciones salen como botones
-    de la respuesta (`ofrecer_en_la_respuesta`), sin ser un tema abierto."""
+    de la respuesta (`ofrecer_en_la_respuesta`), sin ser un tema abierto. `escala`: si la
+    escalera de una pregunta que espera respuesta termina avisándole a quien corresponde
+    (`escalera.py`); si no, la repite y no le avisa a nadie."""
 
     nombre: str
     espera: str | None = None
     sin_elegir_queda: str | None = None
+    escala: bool = True
 
     @property
     def se_puede_dejar(self) -> bool:
@@ -135,6 +146,7 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(QUE_CAMBIOS_PIDE),
     TipoDePregunta(CUAL_DE_LAS_DOS, sin_elegir_queda=DECISION_DE_LA_ENTREGA),
     TipoDePregunta(VER_LA_ENTREGA),
+    TipoDePregunta(CUANDO_SE_DESTRABA, espera=CUANDO_SE_DESTRABA, escala=False),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
@@ -268,9 +280,11 @@ def _alias(tareas, task_id) -> str | None:
 
 
 def _todas(ctx) -> tuple:
-    """Las tareas que la persona nombra por su alias: las suyas y las entregas que esperan su
-    decisión (`fichas.Contexto.para_aprobar`)."""
-    return tuple(ctx.tareas) + tuple(getattr(ctx, "para_aprobar", ()) or ())
+    """Las tareas que la persona nombra por su alias: las suyas, las entregas que esperan su
+    decisión (`fichas.Contexto.para_aprobar`) y las de otras personas que espera que destrabe
+    (`fichas.Contexto.para_destrabar`)."""
+    return (tuple(ctx.tareas) + tuple(getattr(ctx, "para_aprobar", ()) or ())
+            + tuple(getattr(ctx, "para_destrabar", ()) or ()))
 
 
 # --- Abrir, cerrar y retomar ------------------------------------------------------------------
@@ -475,6 +489,34 @@ def cerrar_las_de_la_tarea(ctx, task_id: str, cierre: str, detalle: dict[str, An
             """update conversation_state set pregunta_abierta_id = null, actualizado_en = %s
                 where membership_id = %s and pregunta_abierta_id = %s""",
             (ctx.ahora, fila["membership_id"], fila["id"]))
+
+
+def cerrar_las_de_otras_personas(ctx, tipo: str, task_id: str, cierre: str,
+                                 detalle: dict[str, Any], *, salvo: str | None = None) -> int:
+    """Las preguntas sin cerrar de ese tipo sobre esa tarea, de cualquier persona salvo `salvo`,
+    con su espera: lo que se le preguntaba ya no espera nada (la tarea se destrabó, o la destraba
+    otra persona). La que una persona tenía abierta deja de serlo. Cuántas cerró."""
+    ctx.cur.execute(
+        """update conversation_question
+              set cerrada_en = %s, cierre = %s, cierre_detalle = %s
+            where task_id = %s and tipo = %s and cerrada_en is null
+              and membership_id is distinct from %s::uuid
+        returning id, membership_id""",
+        (ctx.ahora, cierre, _json(detalle), task_id, tipo, salvo))
+    cerradas = ctx.cur.fetchall()
+    for fila in cerradas:
+        ctx.cur.execute(
+            """update conversation_state set pregunta_abierta_id = null, actualizado_en = %s
+                where membership_id = %s and pregunta_abierta_id = %s""",
+            (ctx.ahora, fila["membership_id"], fila["id"]))
+    espera = TIPOS[tipo].espera
+    if espera is not None:
+        ctx.cur.execute(
+            """update pending_reply set satisfecho_en = %s
+                where task_id = %s and tipo = %s and satisfecho_en is null
+                  and membership_id is distinct from %s::uuid""",
+            (ctx.ahora, task_id, espera, salvo))
+    return len(cerradas)
 
 
 def cerrar_las_de_una_jugada(ctx, nombre: str, task_id: str, cierre: str,

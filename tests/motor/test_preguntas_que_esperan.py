@@ -99,7 +99,9 @@ def test_una_repregunta_guardada_no_sale_si_ya_se_contesto(conn, mundo, tareas, 
     conn.commit()
     dice(conn, escribe, Jugada("anotar_quien_destraba", {"quien": "Ismael"}), at=octubre(6, 9, 30))
 
-    assert dias.ciclo(octubre(6, 10)) == []
+    # A Marcos no le sale nada. A Ismael, que lo destraba, Leda le pregunta para cuándo (C-5,
+    # `test_persecucion.py`).
+    assert [p["persona"] for p in dias.ciclo(octubre(6, 10))] == ["Ismael"]
     [guardada] = avisos_guardados(conn, "repregunta")
     assert (guardada["estado"], guardada["motivo_omision"]) == ("omitido", "ya_respondio")
 

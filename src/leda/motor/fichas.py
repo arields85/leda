@@ -101,6 +101,9 @@ class Contexto:
     # Las entregas de otras personas que esperan la decisión de quien escribe (porción 3b de la
     # C-3; `aprobacion.para_decidir`), con su alias, después de las suyas: no son tareas suyas.
     para_aprobar: tuple[dict[str, Any], ...] = ()
+    # Las tareas trabadas de otras personas que destraba quien escribe (C-5; `persecucion.
+    # para_destrabar`), con su alias, después de las anteriores: no son tareas suyas.
+    para_destrabar: tuple[dict[str, Any], ...] = ()
     # Las decisiones ofrecidas en la respuesta de este turno (`preguntas.ofrecer_en_la_
     # respuesta`): sus botones salen con ella, sin ser un tema abierto (C-3d, D4).
     ofrecidas: list[str] = field(default_factory=list)
@@ -115,8 +118,10 @@ class Contexto:
     elegidas: list[str] = field(default_factory=list)
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
-        """Una tarea por su alias: de las suyas o de las que esperan su decisión."""
-        return next((t for t in self.tareas + self.para_aprobar if t["alias"] == alias), None)
+        """Una tarea por su alias: de las suyas, de las que esperan su decisión o de las que
+        destraba."""
+        return next((t for t in self.tareas + self.para_aprobar + self.para_destrabar
+                     if t["alias"] == alias), None)
 
     def suya(self, alias: str) -> dict[str, Any] | None:
         """Una tarea suya por su alias: de la que es responsable."""
@@ -773,8 +778,8 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
         task_id = str(pregunta["task_id"]) if pregunta else None
     bloqueo = None
     if task_id is not None:
-        _exigir_responsable(cur, ctx.quien, task_id)
-        cur.execute("""select id from blocker where task_id = %s and resuelto_en is null
+        fila = _exigir_responsable(cur, ctx.quien, task_id)
+        cur.execute("""select id, causa from blocker where task_id = %s and resuelto_en is null
                         order by abierto_en desc limit 1""", (task_id,))
         bloqueo = cur.fetchone()
     if bloqueo is None:
@@ -818,8 +823,11 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
                                 else {"nadie_mas": True} if nadie_mas
                                 else {"integrante": integrante["nombre"]} if integrante
                                 else {"externo": quien_texto})}
-    # Con otra persona que lo destraba, seguirla es la persecución (ADR 0017, decisión 3a),
-    # de la prueba siguiente; sin otra persona, las salidas (9c, corregida el 2026-10-05).
+    # Con otro integrante que lo destraba, Leda le escribe (la persecución, ADR 0017, decisión
+    # 3a; C-5, `persecucion.py`); sin otra persona, las salidas (9c, corregida el 2026-10-05).
+    if integrante is not None and not nadie_mas:
+        from . import persecucion           # persecucion importa este módulo
+        _juntar(hecho, persecucion.preguntarle(ctx, fila, bloqueo, anotado, integrante))
     sin_otra_persona = no_sabe or nadie_mas
     return {**hecho, "salidas": list(SALIDAS_DE_UN_BLOQUEO)} if sin_otra_persona else hecho
 
@@ -857,6 +865,8 @@ def _destrabar(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     _cerrar_esperas(ctx, tarea["id"])
     preguntas.cerrar_las_de_una_jugada(ctx, "anotar_quien_destraba", tarea["id"], "sin_efecto",
                                        {"jugada": "destrabar", "tarea": tarea["id"]})
+    from . import persecucion               # persecucion importa este módulo
+    persecucion.al_destrabarse(ctx, tarea["id"])
     cur.execute("select estado::text estado from task where id = %s", (tarea["id"],))
     hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
                              "bloqueo_resuelto": {"causa": bloqueo["causa"]},
@@ -1065,6 +1075,19 @@ def _pedir_enlace(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     return enlace.pedir_enlace(ctx, datos, tarea)
 
 
+# La persecución del bloqueo (C-5, porción 1): las jugadas están en `persecucion.py`, que
+# importa este módulo.
+
+def _decir_cuando_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import persecucion
+    return persecucion.decir_cuando_destraba(ctx, datos, tarea)
+
+
+def _no_escribirle(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import persecucion
+    return persecucion.no_escribirle(ctx, datos, tarea)
+
+
 def _pedir_reasignacion(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     decide = referente(ctx.cur, ctx.quien.membership_id)
     return {"resultado": "no_por_chat", "motivo": "cambiar_el_responsable_no_es_por_chat",
@@ -1232,6 +1255,8 @@ def _deshacer_bloqueo(ctx: Contexto, tarea: dict) -> dict | None:
                  ya_confirmada=True)
     if not r.get("resuelto"):
         return None
+    from . import persecucion               # persecucion importa este módulo
+    persecucion.al_destrabarse(ctx, tarea["id"])
     cur.execute("select estado::text estado from task where id = %s", (tarea["id"],))
     return {"hechos": {"vuelve_a": {"estado": cur.fetchone()["estado"]}},
             "datos": {"causa": bloqueo["causa"]}}
@@ -1450,6 +1475,33 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "suya, una que espera su revisión o cualquier otra que nombre. Si la tarea no está "
              "en la lista, como_la_nombra dice cómo la nombró. Pedir ver lo entregado de una "
              "tarea que espera su revisión es otra jugada."),
+    Ficha("decir_cuando_destraba", "anotar para cuándo destraba la tarea trabada de otra "
+                                   "persona",
+          necesita=(), opcional=("tarea", "para_cuando", "ya_esta", "lo_que_dice"),
+          comprueba="que quien escribe sea quien destraba ahora un bloqueo abierto de esa tarea "
+                    "(lo último que dijo la persona trabada)",
+          hace="anota lo que dice, atribuido y auditado, como un hecho del bloqueo: para "
+               "cuándo, que ya está o sus palabras; no cierra el bloqueo",
+          despues="cierra su pregunta y su espera; la persona trabada se entera terminado el "
+                  "margen para corregir, como información",
+          manejar=_decir_cuando_destraba, se_ofrece=False,
+          contesta=(preguntas.CUANDO_SE_DESTRABA,),
+          es="La persona que escribe puede destrabar una tarea trabada de otra persona (está "
+             "en la lista como espera_que_la_destrabe) y dice para cuándo lo resuelve "
+             "(para_cuando), que ya lo resolvió (ya_esta) o qué pasa con eso (lo_que_dice). Es "
+             "lo que dice sobre lo que traba la tarea de otro: no es un hecho de una tarea "
+             "suya."),
+    Ficha("no_escribirle", "no escribirle a quien destraba una tarea trabada",
+          necesita=(), opcional=("tarea", "quien"),
+          comprueba="que sea el responsable de la tarea y que Leda le haya guardado un mensaje "
+                    "a quien la destraba",
+          hace="si el mensaje todavía no salió, no sale (queda retirado con su motivo); si ya "
+               "salió, nada",
+          despues="la respuesta dice que no le escribe o, si ya salió, que ya le llegó",
+          manejar=_no_escribirle, del_responsable=True, se_ofrece=False,
+          es="La persona trabada pide que Leda no le escriba a quien destraba su tarea (por "
+             "ejemplo, porque ya habló con esa persona). quien es a quién, como lo nombró. No "
+             "cambia quién destraba ni cierra el bloqueo."),
     Ficha("pedir_reasignacion", "pasarle una tarea a otra persona",
           necesita=(), opcional=("tarea", "a"),
           comprueba="nada", hace="nada: cambiar el responsable no es por chat (9g)",

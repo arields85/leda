@@ -107,6 +107,15 @@ turno termina (4 horas después de la repetición, o al día siguiente), de lo q
 lo más urgente (`_un_tema_a_la_vez`, `_urgencia`), y la pregunta queda para después. Las dos
 quedan abiertas a la vez: cuando una se cierra, la otra vuelve en su propio mensaje
 (`vuelve_la_pregunta`, `guardar_la_que_vuelve`), sin esperar los 30 minutos de la conversación.
+
+**La persecución del bloqueo** (C-5, porción 1; decisión 4 del usuario, 2026-10-08; conversación
+32; `persecucion.py`): cuando la persona trabada nombra a quien destraba su tarea, Leda le escribe
+a esa persona, como Leda (`pregunta_a_quien_destraba`), terminado el margen para corregir. Al
+salir abre la pregunta de quien destraba (`TipoDeAviso.abre`, `preguntas.CUANDO_SE_DESTRABA`),
+con su propia espera, que la escalera de las preguntas repite a esa persona sin escalar. Lo que
+contesta le llega a la persona trabada como información (`lo_que_dijo_quien_destraba`). Los dos
+son de coordinación; no salen si el bloqueo ya se cerró, la pregunta tampoco si la destraba otra
+persona (`sigue_esperando_que_destrabe`).
 """
 
 from __future__ import annotations
@@ -227,6 +236,10 @@ class TipoDeAviso:
     # Si es parte de la conversación que sigue y no espera a que la persona deje de escribir
     # (`no_interrumpir`): la pregunta que vuelve cuando se cerró la otra (decisión 21).
     sigue_la_conversacion: bool = False
+    # La pregunta que abre al salir para quien lo recibe, si no es el pedido del estado de su
+    # propia tarea: su tipo y la jugada que guarda (la pregunta a quien destraba una tarea de
+    # otra persona, C-5).
+    abre: Callable[["Momento", dict[str, Any]], tuple[str, dict[str, Any]]] | None = None
 
 
 # El hecho que le dice a la IA que el mensaje lleva al final el enlace a la página de la tarea.
@@ -737,7 +750,13 @@ def _abrir_la_pregunta(m: Momento, turno, aviso: dict[str, Any]) -> None:
     respuesta la vuelve a hacer: es la abierta (`preguntas.retomar`)."""
     task_id, tipo_de_aviso = str(aviso["task_id"]), aviso["tipo"]
     persona = turno.quien.membership_id
-    if tipo_de_aviso in (REPREGUNTA, REPETICION_DEL_DIA, VUELVE_LA_PREGUNTA):
+    tipo = TIPOS.get(tipo_de_aviso)
+    if tipo is not None and tipo.abre is not None:
+        # Una pregunta de otro tipo, con su propia espera (la abre `preguntas.abrir`).
+        de_tipo, jugada = tipo.abre(m, aviso)
+        preguntas.abrir(turno, de_tipo, task_id, jugada=jugada)
+        espera = preguntas.TIPOS[de_tipo].espera
+    elif tipo_de_aviso in (REPREGUNTA, REPETICION_DEL_DIA, VUELVE_LA_PREGUNTA):
         pregunta = pregunta_del_aviso(m.cur, aviso)
         preguntas.retomar(turno, str(pregunta["id"]))
         if tipo_de_aviso == VUELVE_LA_PREGUNTA:
@@ -1130,11 +1149,24 @@ def _vigencia_de_una_pregunta(m: Momento, aviso) -> tuple[str | None, dict[str, 
     pregunta = pregunta_del_aviso(m.cur, aviso)
     if pregunta is None or pregunta["cerrada_en"] is not None:
         return "ya_respondio", {}
-    if str(tarea["responsable_membership_id"]) != str(pregunta["membership_id"]):
-        return "cambio_el_responsable", {}
+    motivo = de_quien_es_la_pregunta(m.cur, tarea, pregunta)
+    if motivo is not None:
+        return motivo, {}
     if espera_de_la_pregunta(m.cur, pregunta) is None:
         return "ya_respondio", {}
     return None, hechos_de_una_pregunta(m, tarea, dict(aviso["hechos"]))
+
+
+def de_quien_es_la_pregunta(cur, tarea: dict[str, Any], pregunta: dict[str, Any]) -> str | None:
+    """Por qué la pregunta ya no es de la persona a la que se le hizo, o `None`: la de una tarea
+    es de su responsable; la de quien destraba una tarea de otra persona, de quien la destraba
+    ahora, mientras el bloqueo siga abierto (C-5)."""
+    if pregunta["tipo"] == preguntas.CUANDO_SE_DESTRABA:
+        return sigue_esperando_que_destrabe(cur, (pregunta["jugada"] or {}).get("destraba_id"),
+                                            str(pregunta["membership_id"]))
+    if str(tarea["responsable_membership_id"]) != str(pregunta["membership_id"]):
+        return "cambio_el_responsable"
+    return None
 
 
 # --- Una pregunta sin contestar (decisión 21) ----------------------------------------------------
@@ -1459,6 +1491,107 @@ def _vigencia_de_una_decision(m: Momento, aviso) -> tuple[str | None, dict[str, 
     return None, hechos_de_una_decision(m, tarea, entrega_aviso, dict(aviso["hechos"]))
 
 
+# --- La persecución del bloqueo (C-5, porción 1; `persecucion.py`) --------------------------------
+#
+# Cuando la persona trabada dice quién destraba su tarea, Leda le escribe a esa persona, como Leda:
+# quién está trabado, con qué tarea y qué le falta, y para cuándo lo puede resolver
+# (`PREGUNTA_A_QUIEN_DESTRABA`). Es de coordinación (lo causa lo que dijo la persona trabada) y
+# sale terminado el margen para corregir; al salir abre la pregunta de quien destraba
+# (`preguntas.CUANDO_SE_DESTRABA`), con su propia espera. Lo que contesta le llega a la persona
+# trabada como información (`LO_QUE_DIJO_QUIEN_DESTRABA`), también con el margen. Ninguno sale si
+# el bloqueo ya se cerró; la pregunta, tampoco si la destraba otra persona; lo que dijo, tampoco
+# si después dijo algo más nuevo, que sale en su lugar.
+
+PREGUNTA_A_QUIEN_DESTRABA = "pregunta_a_quien_destraba"
+LO_QUE_DIJO_QUIEN_DESTRABA = "lo_que_dijo_quien_destraba"
+YA_SE_DESTRABO = "ya_se_destrabo"
+CAMBIO_QUIEN_DESTRABA = "cambio_quien_destraba"
+DIJO_ALGO_MAS_NUEVO = "dijo_algo_mas_nuevo"
+
+
+def quien_destraba(cur, destraba_id) -> dict[str, Any] | None:
+    """Una fila de quién destraba, con su bloqueo: la tarea, la causa y si se cerró."""
+    if not destraba_id:
+        return None
+    cur.execute("""select u.*, b.task_id, b.causa, b.resuelto_en
+                     from blocker_unblocker u join blocker b on b.id = u.blocker_id
+                    where u.id = %s""", (str(destraba_id),))
+    return cur.fetchone()
+
+
+def ultimo_quien_destraba(cur, blocker_id) -> dict[str, Any] | None:
+    """Quién destraba el bloqueo ahora: lo último que se dijo."""
+    cur.execute("""select * from blocker_unblocker where blocker_id = %s
+                    order by at desc, id desc limit 1""", (str(blocker_id),))
+    return cur.fetchone()
+
+
+def sigue_esperando_que_destrabe(cur, destraba_id, persona: str | None = None) -> str | None:
+    """Por qué ya no se espera que esa persona (la de la fila `destraba_id`) destrabe el bloqueo,
+    o `None`: el bloqueo se cerró, o lo último que se dijo es que lo destraba otra persona. Que
+    se la nombre otra vez no cambia nada: sigue siendo ella."""
+    fila = quien_destraba(cur, destraba_id)
+    if fila is None:
+        return "tarea_inexistente"
+    if fila["resuelto_en"] is not None:
+        return YA_SE_DESTRABO
+    ultimo = ultimo_quien_destraba(cur, fila["blocker_id"])
+    persona = persona or str(fila["destraba_membership_id"])
+    if ultimo is None or str(ultimo["destraba_membership_id"]) != persona \
+            or str(fila["destraba_membership_id"]) != persona:
+        return CAMBIO_QUIEN_DESTRABA
+    return None
+
+
+def de_la_clave(aviso: dict[str, Any]) -> str:
+    """La fila que nombra la clave de un aviso de la persecución: `motor:<tipo>:<tarea>:<x><id>`."""
+    return aviso["dedupe_key"].split(":")[3][1:]
+
+
+def _vigencia_de_la_pregunta_a_quien_destraba(m: Momento, aviso
+                                              ) -> tuple[str | None, dict[str, Any]]:
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return "tarea_inexistente", {}
+    if tarea["estado"] in ("terminada", "cancelada"):
+        return "tarea_cerrada", {}
+    motivo = sigue_esperando_que_destrabe(m.cur, de_la_clave(aviso),
+                                          str(aviso["destinatario_membership_id"]))
+    if motivo is not None:
+        return motivo, {}
+    return None, {**dict(aviso["hechos"]), "tarea": tarea["titulo"]}
+
+
+def _abre_cuando_se_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
+    """La pregunta de quien destraba, atada a la fila que lo nombró: lo que recuerda al repetirla
+    es quién está trabado y por qué (`preguntas.lo_anotado`)."""
+    hechos = aviso["hechos"] or {}
+    return preguntas.CUANDO_SE_DESTRABA, {
+        "nombre": "anotar_quien_destraba",
+        "datos": {k: hechos[k] for k in ("responsable", "causa") if hechos.get(k)},
+        "destraba_id": de_la_clave(aviso), "del_aviso": str(aviso["id"])}
+
+
+def _vigencia_de_lo_que_dijo(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    m.cur.execute("""select d.id, u.blocker_id, b.resuelto_en
+                       from dicho_de_quien_destraba d
+                       join blocker_unblocker u on u.id = d.blocker_unblocker_id
+                       join blocker b on b.id = u.blocker_id
+                      where d.id = %s""", (de_la_clave(aviso),))
+    dicho = m.cur.fetchone()
+    if dicho is None:
+        return "tarea_inexistente", {}
+    if dicho["resuelto_en"] is not None:
+        return YA_SE_DESTRABO, {}
+    m.cur.execute("""select d.id from dicho_de_quien_destraba d
+                       join blocker_unblocker u on u.id = d.blocker_unblocker_id
+                      where u.blocker_id = %s order by d.at desc, d.id desc limit 1""",
+                  (dicho["blocker_id"],))
+    if str(m.cur.fetchone()["id"]) != str(dicho["id"]):
+        return DIJO_ALGO_MAS_NUEVO, {}
+    return None, dict(aviso["hechos"])
+
+
 TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # La escalera (mecánica §9; 9b): sin botones, siempre privados.
     # El aviso previo y el recordatorio del vencimiento no piden nada: lo ya hablado de su
@@ -1509,6 +1642,12 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
                 recuerda=preguntas.DECISION_DE_LA_ENTREGA, ofrece_ver=True),
     TipoDeAviso(APROBACION_TRABADA, "informativo", _vigencia_de_una_decision),
     TipoDeAviso(APROBACION_DESTRABADA, "informativo", _siempre, es_coordinacion=True),
+    # La persecución del bloqueo (C-5): la pregunta a quien destraba, que lo causa lo que dijo la
+    # persona trabada, y lo que contesta, a la persona trabada. Los dos, de coordinación.
+    TipoDeAviso(PREGUNTA_A_QUIEN_DESTRABA, "normal", _vigencia_de_la_pregunta_a_quien_destraba,
+                es_coordinacion=True, abre=_abre_cuando_se_destraba),
+    TipoDeAviso(LO_QUE_DIJO_QUIEN_DESTRABA, "informativo", _vigencia_de_lo_que_dijo,
+                es_coordinacion=True),
 )})
 
 

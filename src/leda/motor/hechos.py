@@ -694,6 +694,45 @@ SIGNIFICADOS: Mapping[str, str] = {
                                     "enlace para pasar.",
     "ya_lleva_el_enlace_de_otra_tarea": "Este mensaje ya lleva el enlace de otra tarea, y "
                                         "lleva uno solo: el de ésta se puede pedir aparte.",
+    # --- La persecución del bloqueo (C-5, porción 1; `persecucion.py`) -------------------------
+    "se_le_pregunta_a": "A quién le pregunta Leda, como Leda y no en nombre de nadie, para "
+                        "cuándo destraba la tarea (a), y cuándo le llega (llega).",
+    "no_se_le_puede_escribir_a": "A quién Leda no le puede escribir por este chat (a), y por "
+                                 "qué (motivo): no se le pregunta nada ni se promete que se "
+                                 "va a enterar.",
+    "espera_que_la_destrabe": "Una tarea de otra persona, trabada, que la persona que escribe "
+                              "puede destrabar: lo dijo quien la tiene (responsable), con lo "
+                              "que la traba (causa). No es una tarea suya.",
+    "cuando_se_destraba": "Pregunta a quien puede destrabar la tarea de otra persona para "
+                          "cuándo lo resuelve: espera su respuesta.",
+    "pregunta_a_quien_destraba": "Mensaje de Leda, como Leda, a quien puede destrabar la tarea "
+                                 "de otra persona: quién está trabado (responsable), con qué "
+                                 "tarea y qué le falta (causa), como lo dijo esa persona, y la "
+                                 "pregunta de para cuándo lo puede resolver. No es un mensaje "
+                                 "en nombre de nadie.",
+    "lo_que_dijo_quien_destraba": "Aviso a la persona trabada con lo que dijo quien puede "
+                                  "destrabar su tarea (quien_destraba). Es información: no "
+                                  "pide respuesta; cuando pueda seguir, lo dice.",
+    "dice_quien_destraba": "Lo que dijo quien puede destrabar la tarea: para cuándo, que ya "
+                           "está o lo que pasa, con sus palabras.",
+    "aviso_a_quien_esta_trabado": "El aviso a la persona trabada con lo que dijo quien escribe: "
+                                  "a quién (a) y cuándo se entera (llega).",
+    "para_cuando": "El día para el que quien puede destrabar la tarea dice que lo resuelve.",
+    "ya_esta": "Quien puede destrabar la tarea dice que ya lo resolvió. La tarea sigue trabada "
+               "hasta que la persona trabada diga que puede seguir.",
+    "lo_que_dice": "Lo que dijo quien puede destrabar la tarea, con sus palabras.",
+    "pidio_que_no_le_escriba": "La persona trabada pidió que Leda no le escribiera a quien "
+                               "puede destrabar su tarea.",
+    "ya_se_le_escribio": "Leda ya le escribió a quien puede destrabar la tarea: lo que le "
+                         "llegó no se puede retirar.",
+    "no_le_iba_a_escribir": "Leda no le iba a escribir a nadie por esa tarea trabada.",
+    "ya_se_destrabo": "La tarea ya no está trabada por eso.",
+    "cambio_quien_destraba": "La persona trabada dijo después que la tarea la destraba otra "
+                             "persona.",
+    "dijo_algo_mas_nuevo": "Quien puede destrabar la tarea dijo algo más nuevo, que sale en su "
+                           "lugar.",
+    "no_le_toca_destrabarla": "La persona que escribe no es quien puede destrabar esa tarea: "
+                              "lo que dice no queda anotado.",
 }
 
 
@@ -792,6 +831,8 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "pedir_cambios": "devolver_la_entrega_con_cambios",
     "ver_entrega": "mostrar_la_entrega_para_revisar",
     "pedir_enlace": "pasar_el_enlace_a_la_pagina_de_una_tarea",
+    "decir_cuando_destraba": "anotar_para_cuando_destraba_la_tarea_de_otra_persona",
+    "no_escribirle": "no_escribirle_a_quien_destraba",
 }
 _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 
@@ -799,13 +840,14 @@ _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 # le puso a un archivo.
 _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", "dice",
                                       "enlace", "lo_que_pide", "describe",
-                                      "le_falta_del_criterio", "ejemplo"})
+                                      "le_falta_del_criterio", "ejemplo", "lo_que_dice"})
 # El nombre de un archivo nunca es un código, aunque se escriba como uno (`informe_final`).
 # Ni lo que escribió en una pieza de una entrega, ni un enlace, ni el código de una cosa que
 # pide la tarea, que es dato del pack (va con sus palabras, `en_palabras`).
 _NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_evidencia",
                               "el_texto_cubre", "lo_que_pide", "describe",
-                              "le_falta_del_criterio", "ejemplo", "lo_descrito_cubre"})
+                              "le_falta_del_criterio", "ejemplo", "lo_descrito_cubre",
+                              "lo_que_dice"})
 
 
 def para_redactar(valor: Any) -> Any:
