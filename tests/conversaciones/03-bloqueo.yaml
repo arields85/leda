@@ -142,10 +142,28 @@ pasos:
 
   - paso: 7
     quien: nadie
-    relojes: ["2026-10-23 10:00", "2026-10-26 10:00", "2026-10-27 10:00"]
+    relojes: ["2026-10-23 10:00", "2026-10-26 10:00"]
     salen: []
     estado_despues:
       esperas_abiertas: []
     dice:
       - ningún recordatorio de la tarea del PLC mientras el bloqueo siga abierto
       - ningún mensaje a Ismael por el bloqueo
+
+  # El bloqueo viejo (C-5, porción 5; decisión 7): a los cinco días hábiles, a Ismael (el
+  # referente de OT es Marcos, la persona trabada: va a quien aprueba su trabajo), una vez.
+  - paso: 8
+    quien: Leda
+    relojes: ["2026-10-27 10:00", "2026-10-28 10:00"]
+    salen:
+      - a: Ismael
+        tipo: bloqueo_que_sigue_abierto
+        tarea: PLC
+        hechos: {necesita_respuesta: false, responsable: Marcos Tarquini, causa: presente,
+                 trabada_desde: "2026-10-20", dias_habiles_trabada: 5,
+                 historia: [{el: "2026-10-21", de: Marcos Tarquini, no_sabe: true}]}
+    dice:
+      - "a Ismael: que Marcos está trabado con la tarea del PLC desde el martes 20 (mar 20/10), hace cinco días hábiles, porque falta el repuesto, y que Marcos no sabe quién lo está comprando"
+      - "a Ismael: que no hace falta responder, en el último renglón"
+    no_dice:
+      - "a Ismael: una pregunta"

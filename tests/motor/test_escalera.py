@@ -228,12 +228,17 @@ def test_un_bloqueo_abierto_detiene_la_escalera(conn, mundo, dias, escribe):
          at=octubre(5, 11))
 
     # Ningún paso de la escalera de la tarea. Lo que sigue es la escalera de la pregunta de
-    # quién lo destraba, que espera respuesta (`test_preguntas_que_esperan.py`).
+    # quién lo destraba, que espera respuesta (`test_preguntas_que_esperan.py`), y, a los cinco
+    # días hábiles, el bloqueo viejo (C-5, porción 5; `test_bloqueo_viejo.py`), que no es de la
+    # escalera de la tarea.
+    otros = ("repregunta", "falta_de_respuesta", "bloqueo_que_sigue_abierto")
     for dia in (6, 9, 13, 14, 15):
         assert [p for p in dias.ciclo(octubre(dia, 10))
-                if p["hechos"][0]["aviso"] not in ("repregunta", "falta_de_respuesta")] == []
+                if any(h["aviso"] not in otros for h in p["hechos"])] == []
     assert cuantas(conn, "scheduled_notice",
-                   "tipo not in ('repregunta', 'escalamiento_de_una_pregunta')") == 0
+                   "tipo not in ('repregunta', 'escalamiento_de_una_pregunta', "
+                   "'bloqueo_que_sigue_abierto')") == 0
+    assert cuantas(conn, "scheduled_notice", "tipo = 'bloqueo_que_sigue_abierto'") == 1
     assert espera_del_estado(conn) is None
 
 

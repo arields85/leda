@@ -120,7 +120,9 @@ llegara (`ya_contesto_quien_destraba`, porción 2). Si nadie toma el bloqueo, la
 llega al referente como información (`cadena_del_bloqueo`, porción 3; decisión 5), mientras el
 bloqueo siga abierto. En una cadena de bloqueos (Marcos ← Juan ← Pedro), cada avance del medio le
 llega a quien espera más abajo, como información (`novedad_de_lo_que_espera`, porción 4; decisión
-6; `encadenados.py`), mientras siga esperando eso.
+6; `encadenados.py`), mientras siga esperando eso. Un bloqueo que sigue abierto a los días
+hábiles del espacio se le informa al referente, una vez, con su historia
+(`bloqueo_que_sigue_abierto`, porción 5; decisión 7; `bloqueo_viejo.py`).
 """
 
 from __future__ import annotations
@@ -245,6 +247,9 @@ class TipoDeAviso:
     # propia tarea: su tipo y la jugada que guarda (la pregunta a quien destraba una tarea de
     # otra persona, C-5).
     abre: Callable[["Momento", dict[str, Any]], tuple[str, dict[str, Any]]] | None = None
+    # Lo que queda registrado cuando sale, además del envío: que el bloqueo viejo se informó, a
+    # quién y cuándo (C-5, porción 5; `bloqueo_viejo.al_salir`).
+    al_salir: Callable[["Momento", dict[str, Any]], None] | None = None
 
 
 # El hecho que le dice a la IA que el mensaje lleva al final el enlace a la página de la tarea.
@@ -601,6 +606,8 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                               intentos = intentos + 1, proximo_intento_en = null
                         where id = %s""", (outbox_id, m.ahora, _json(x.hechos), x.aviso["id"]))
         _auditar_el_envio(m, x.aviso, persona, outbox_id, len(adjuntos))
+        if x.tipo.al_salir is not None:
+            x.tipo.al_salir(m, {**x.aviso, "hechos": x.hechos})
     registrar_salida(cur, m.workspace_id, persona, outbox_id, ia.nombre, m.ahora)
     # El último aviso es el envío: el primero de sus avisos; los demás comparten su fila.
     cur.execute(
@@ -1515,6 +1522,9 @@ CADENA_DEL_BLOQUEO = "cadena_del_bloqueo"
 # Un avance del medio a quien espera más abajo, en una cadena de bloqueos (porción 4; decisión 6):
 # informativo, de coordinación; cuándo se guarda y su vigencia, `encadenados.py`.
 NOVEDAD_DE_LO_QUE_ESPERA = "novedad_de_lo_que_espera"
+# El bloqueo que sigue abierto a los días hábiles del espacio, al referente (porción 5; decisión
+# 7): informativo, una vez por bloqueo; cuándo se guarda y su vigencia, `bloqueo_viejo.py`.
+BLOQUEO_QUE_SIGUE_ABIERTO = "bloqueo_que_sigue_abierto"
 YA_SE_DESTRABO = "ya_se_destrabo"
 CAMBIO_QUIEN_DESTRABA = "cambio_quien_destraba"
 DIJO_ALGO_MAS_NUEVO = "dijo_algo_mas_nuevo"
@@ -1616,6 +1626,21 @@ def _vigencia_de_la_novedad(m: Momento, aviso) -> tuple[str | None, dict[str, An
     return encadenados.vigencia(m, aviso)
 
 
+def _vigencia_del_bloqueo_viejo(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import bloqueo_viejo         # bloqueo_viejo importa este módulo
+    return bloqueo_viejo.vigencia(m, aviso)
+
+
+def _a_quien_va_el_bloqueo_viejo(m: Momento, aviso) -> str | None:
+    from . import bloqueo_viejo
+    return bloqueo_viejo.va_a(m, aviso)
+
+
+def _al_salir_el_bloqueo_viejo(m: Momento, aviso) -> None:
+    from . import bloqueo_viejo
+    bloqueo_viejo.al_salir(m, aviso)
+
+
 def _abre_cuando_se_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
     """La pregunta de quien destraba, atada a la fila que lo nombró: lo que recuerda al repetirla
     es quién está trabado y por qué (`preguntas.lo_anotado`)."""
@@ -1708,6 +1733,11 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # informativo; lo causa el acto de otra persona.
     TipoDeAviso(NOVEDAD_DE_LO_QUE_ESPERA, "informativo", _vigencia_de_la_novedad,
                 es_coordinacion=True),
+    # El bloqueo viejo, al referente (porción 5): seguimiento que Leda hace por su cuenta, dentro
+    # del tope diario y en un envío por persona; va a quien corresponde al salir, y al salir queda
+    # registrado que se informó.
+    TipoDeAviso(BLOQUEO_QUE_SIGUE_ABIERTO, "informativo", _vigencia_del_bloqueo_viejo,
+                va_a=_a_quien_va_el_bloqueo_viejo, al_salir=_al_salir_el_bloqueo_viejo),
 )})
 
 

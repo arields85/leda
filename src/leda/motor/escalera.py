@@ -102,6 +102,11 @@ sale. Al anterior no le llega nada; si toca un botón del aviso viejo, Leda le d
 ya no la revisa él (`situaciones`, `ya_no_le_corresponde`). Si cambió antes de que saliera, el
 aviso va al nuevo al salir (`avisos.TipoDeAviso.va_a`).
 
+**El bloqueo viejo** (C-5, porción 5; decisión 7 del usuario, 2026-10-08; mecánica §8;
+conversación 36; `bloqueo_viejo.py`): un bloqueo que sigue abierto a los días hábiles del espacio
+(`bloqueos.escala_solo_a_los_dias`, 5 si no está) se le informa al referente de la tarea, una sola
+vez, aunque la cadena se mueva, con la historia y las fechas dichas.
+
 **Sin `aviso_previo_dias_habiles`** (el plan lo dejó `PENDIENTE`): se usa el mínimo del núcleo,
 un día hábil (mecánica §9), y cada aviso previo que sale con él deja un incidente de severidad
 baja para el administrador: nunca en silencio, y sin escribir la configuración por su cuenta.
@@ -133,7 +138,8 @@ from .avisos import (ABIERTOS, ANTES_LA_REVISABA_OTRA_PERSONA, APROBACION_TRABAD
 from .avisos import REPETICION_DEL_DIA, hechos_de_la_que_vuelve
 from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir, preguntada_en,
                                      se_repite)
-from .avisos import sigue_esperando_que_destrabe
+from .avisos import BLOQUEO_QUE_SIGUE_ABIERTO, sigue_esperando_que_destrabe
+from .bloqueo_viejo import informar_los_viejos
 from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, lo_anotado
 from .preguntas import TIPOS as TIPOS_DE_PREGUNTA
 from .tiempo import Reloj, sale
@@ -209,6 +215,10 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
         for fila in cur.fetchall():
             resumen.update(_un_paso_de_una_decision(m, str(fila["id"]),
                                                     str(fila["aprobador_membership_id"])))
+        # Los bloqueos que siguen abiertos a los días hábiles del espacio (C-5, porción 5).
+        viejos = informar_los_viejos(m)
+        if viejos:
+            resumen[BLOQUEO_QUE_SIGUE_ABIERTO] += viejos
     return dict(resumen)
 
 

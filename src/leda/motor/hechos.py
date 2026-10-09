@@ -786,6 +786,19 @@ SIGNIFICADOS: Mapping[str, str] = {
                               "destraba o ya no está trabada.",
     "no_se_entero_que_se_trabo": "La persona no se había enterado de que esa tarea se trabó: "
                                  "que se destrabó no le dice nada.",
+    # --- El bloqueo viejo (C-5, porción 5; `bloqueo_viejo.py`) -------------------------------
+    "bloqueo_que_sigue_abierto": "Aviso informativo a quien está a cargo del sector de la "
+                                 "tarea, o a quien aprueba el trabajo de la persona trabada si "
+                                 "la persona trabada está a cargo del sector: la tarea sigue "
+                                 "trabada desde hace varios días hábiles, con lo que la traba y "
+                                 "todo lo que se dijo (historia). No le pide nada.",
+    "trabada_desde": "El día en que la persona dijo que la tarea quedó trabada.",
+    "dias_habiles_trabada": "Cuántos días hábiles lleva trabada la tarea, hasta hoy.",
+    "historia": "Lo que se dijo de lo que traba la tarea, en el orden en que pasó, cada cosa con "
+                "su día (el) y quién la dijo (de): a quién le toca destrabarla (le_toca_a), que "
+                "no sabe, que le toca a quien lo dijo (nadie_mas), y lo que dijo quien la "
+                "destraba: para cuándo, que ya está, que no le corresponde, con qué está trabado "
+                "o sus palabras. Un día que alguien dio no es un hecho cumplido.",
 }
 
 

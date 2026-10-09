@@ -747,6 +747,11 @@ def _anotar_bloqueo(ctx: Contexto, datos: dict, tarea: dict) -> dict:
                  {"tarea_id": tarea["id"], "causa": causa}, ya_confirmada=True)
     if "bloqueo_id" not in r:
         return _no_hecho(r, tarea)
+    # Desde cuándo está trabada, con el momento del motor, como todo lo que anota: la operación
+    # lo fecha con la hora real de la base, y el bloqueo viejo cuenta sus días hábiles desde ahí
+    # (C-5, porción 5; `bloqueo_viejo.py`). Con el reloj de verdad, son el mismo momento.
+    ctx.cur.execute("update blocker set abierto_en = %s where id = %s",
+                    (ctx.ahora, r["bloqueo_id"]))
     _cerrar_esperas(ctx, tarea["id"])
     # La causa contesta su pregunta antes de que se abra la siguiente.
     preguntas.contestar(ctx, "anotar_bloqueo", (preguntas.CAUSA_DEL_BLOQUEO,), tarea["id"])

@@ -91,11 +91,19 @@ sin escribirle todavía a quien destraba.
    - Estado después: sin tema abierto, nada para después.
 
 7. **Leda** no le escribe a Marcos sobre la tarea del PLC el viernes 23 ni los días hábiles siguientes, ni
-   a Ismael por el bloqueo.
+   a Ismael por el bloqueo hasta que cumple cinco días hábiles.
    →
    - Efecto: ningún recordatorio de esa tarea en el outbox mientras el bloqueo siga abierto, y ningún
-     mensaje a Ismael. Ismael se entera sólo por un escalamiento (9c, paso 4; mecánica §8): un bloqueo
-     viejo escala por su antigüedad según el pack (cinco días), fuera de esta conversación.
+     mensaje a Ismael el viernes 23 ni el lunes 26.
+
+8. **Leda**, por su cuenta, a Ismael (martes 27, 10:00): el bloqueo viejo (mecánica §8; decisión 7 del
+   usuario, `odd/tasks/fase-c.md`; desde la porción 5 de la C-5, conversación 36). El referente de OT es
+   Marcos, la persona trabada: va a quien aprueba su trabajo.
+   →
+   - Efecto: un mensaje privado a Ismael, informativo, una sola vez (el miércoles 28, nada).
+   - El mensaje dice: que Marcos está trabado con la tarea del PLC desde el martes 20, hace cinco días
+     hábiles, porque falta el repuesto; que Marcos dijo que no sabe quién lo está comprando; que no
+     hace falta responder.
 
 ## Qué mide
 
@@ -103,7 +111,8 @@ sin escribirle todavía a quien destraba.
   que el código no calculó); no hace sin confirmación lo que la requiere (nada la requiere en este
   circuito); no deja sin salida (las salidas del paso 5 y el próximo paso del 6); no confunde la tarea (el
   bloqueo va a la del PLC, y la de comunicaciones aparece sólo como lo que depende).
-- **Regla del bloqueo (9c):** ningún aviso a Ismael por el bloqueo; todo bloqueo con causa lleva la
+- **Regla del bloqueo (9c):** ningún aviso a Ismael por el bloqueo hasta los cinco días hábiles (el
+  bloqueo viejo, paso 8); todo bloqueo con causa lleva la
   pregunta de quién lo puede destrabar, que se repite el día hábil siguiente y deja de repetirse cuando
   llega la respuesta, aunque sea "no sé". Que Leda proponga salidas sin preguntar es una falla (pasó en el
   primer contacto real, 2026-10-05).

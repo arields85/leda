@@ -1673,6 +1673,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       `su_tarea_trabada` por su clave y mira `dicen_quien_destraba.espera_la_tarea`.
       `test_corredor` cuenta 36 conversaciones.
     - **Ninguna conversación anterior cambió.**
+    - **Commit del motor:** `b0043cc` (unas 1.080 líneas, más de la mitad pruebas y documentos;
+      un solo comportamiento: el enlace, los avances y su vigencia comparten la cadena).
     - **Chequeos** (2026-10-09, antes del commit): `pytest tests/motor tests/conversaciones`,
       1010 passed y 1 failed (`test_corredor`, que contaba 34 conversaciones; corregido, en
       verde); `pytest tests/garantias`, 339 passed (la paridad y el rollback de la `0044`
@@ -1689,7 +1691,61 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         (`aprobacion.cerrar_las_que_ya_pueden`) también avisa hacia abajo (hoy no); si a quien
         destraba se le avisa cuando la tarea que esperaba se destrabó por otro lado (sigue sin
         aviso).
-  - **Lo que sigue de la C-5**, con su conversación de prueba primero: el bloqueo viejo (7).
+  - [x] **Porción 5: el bloqueo viejo** (decisión 7; mecánica §8; conversación 36). Route:
+    delegada (escritor único, 2+ archivos no triviales). Hecha el 2026-10-09:
+    - **La conversación primero** (`ba71984`): la 36. Marcos se traba el martes 20 con el PLC y
+      Ariel va dando fechas (el jueves, después el lunes); el lunes 26, con cuatro días hábiles,
+      nada; el martes 27, a Ismael (el referente de OT es Marcos, la persona trabada: va a quien
+      aprueba su trabajo) le llega, una vez, que sigue trabada desde el 20, con la historia y las
+      fechas que dio cada uno; el miércoles, nada. Un bloqueo más nuevo (el panel HMI), cerrado
+      el mismo día, no se informa. En seco, antes del código: 1 falla (paso 13, no salió).
+    - **El motor** (`leda.motor.bloqueo_viejo`, una pasada más de `escalera.correr_escalera`): un
+      bloqueo abierto de una tarea sin cerrar, que lleva los días hábiles del espacio
+      (`workspace_setting` `bloqueos.escala_solo_a_los_dias`, que importa el pack; sin el ajuste,
+      o con uno que no es un número entero de días, 1 o más, 5, el del producto) y no se informó.
+      El aviso nuevo `bloqueo_que_sigue_abierto` (informativo; seguimiento que Leda hace por su
+      cuenta: cuenta para el tope diario y sale en el envío del día de esa persona, mecánica
+      §10) lleva la tarea, quién la tiene, la causa, desde cuándo, cuántos días hábiles y la
+      historia entera (`historia`: quién dijo quién la destraba y lo que dijo cada uno, con su
+      día, de `blocker_unblocker` y `dicho_de_quien_destraba`). Una vez por bloqueo (la clave
+      nombra el bloqueo); sale a la hora de lo que Leda manda por su cuenta, dentro del horario y
+      sin interrumpir (como todo aviso). **A quién:** al referente del sector de la tarea; si es
+      la persona trabada, a quien aprueba su trabajo (`persecucion.a_quien_informar`), releído
+      al salir (`TipoDeAviso.va_a`). **Al salir** (`TipoDeAviso.al_salir`, nuevo): se escriben
+      `blocker.escalado_a` y `escalado_en`, con su fila de auditoría
+      (`informar_bloqueo_que_sigue_abierto`); se relee y no sale si el bloqueo o la tarea ya se
+      cerraron. A la persona trabada no le llega nada por esto.
+    - **El momento del bloqueo:** `registrar_bloqueo` fecha `abierto_en` con la hora real de la
+      base; `fichas._anotar_bloqueo` la pone con el momento del motor, como todo lo que anota
+      (con el reloj de verdad son el mismo; con el reloj de las pruebas y el de la prueba por
+      Telegram, los días se contaban mal). Ojo: con `escalado_a` escrito, quien recibió el
+      informe puede cerrar el bloqueo (`resolver_bloqueo` lo permite a quien se escaló).
+    - **Test primero:** `tests/motor/test_bloqueo_viejo.py`, 12 de 13 en rojo (la que pasaba mira
+      que uno cerrado antes no se informe). **Verde:** las 13, después de fechar el bloqueo con el
+      momento del motor (sin eso, ninguno llegaba a sus días).
+    - **Las instrucciones de la IA no cambiaron:** los códigos nuevos van en
+      `hechos.SIGNIFICADOS`. El cargador de las conversaciones pone el ajuste del pack.
+      `docs/product/plataforma-pendientes.md` ya tenía el ajuste; suma el valor del producto.
+    - **Cambió la 03** (el bloqueo que sigue abierto): su paso 7 decía que Ismael se enteraba
+      "fuera de esta conversación" a los cinco días; ahora el paso 7 llega hasta el lunes 26 y el
+      paso 8 nuevo espera el informe a Ismael el martes 27, una vez (el 28, nada). Cambiaron
+      también `test_escalera.test_un_bloqueo_abierto_detiene_la_escalera` (el informe del
+      bloqueo viejo no es de la escalera de la tarea; ahora lo espera una vez) y un significado
+      que decía "ella misma" (`test_hechos`).
+    - **Chequeos** (2026-10-09): `pytest tests/motor tests/conversaciones`, 1024 passed;
+      `pytest tests/garantias`, 339 passed; en seco, `correr --ia guionada --veces 1 --ronda
+      seco-c5-p5`, **36 de 36 bien**. Informes borrados, `gasto.json` sin tocar. Sin la IA real. Sin la
+      suite completa.
+    - `PENDIENTE`:
+      - **La IA real** sobre la 36, y la prueba por Telegram (con `leda_motor` al día).
+      - **Preguntas para el usuario:** si a la persona trabada se le dice que se informó (hoy
+        no: la decisión habla sólo del referente); si un bloqueo informado se vuelve a informar
+        si sigue abierto muchos días más (hoy, una vez para siempre); si el referente ausente
+        espera a volver (hoy sí, como todo aviso); qué pasa si no hay nadie a quien informar (hoy
+        no se guarda nada, sin incidente); si el referente que recibe el informe puede cerrar el
+        bloqueo (hoy sí, por `escalado_a`, como lo dejaba la operación del dominio).
+  - **La C-5 queda completa en sus cinco porciones** (decisiones 4 a 7); falta la tanda de pruebas
+    con la IA real y por Telegram. La casilla la marca el coordinador.
 - [ ] **C-6.** Las cadencias (pregunta 8).
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
   - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
@@ -1709,7 +1765,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 1: escribirle a quien destraba y "no le escribas" (conversación 32, `0042`).
 - [x] C-5, porciones 2 y 3: "ya hablé con él" y "no me corresponde" con un salto (33, 34, `0043`).
 - [x] C-5, porción 4: bloqueos encadenados y avisos hacia abajo (decisión 6; 35, `0044`).
-- [ ] C-5, porción 5: el bloqueo viejo (decisión 7; 36).
+- [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36).
 - [ ] C-6, las cadencias (decisión 8).
 - [ ] C-7, delegar (ADR 0017, enmienda a la decisión 2).
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.

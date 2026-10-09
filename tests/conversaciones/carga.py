@@ -151,6 +151,9 @@ def _espacio(cur) -> tuple[Mundo, str]:
                    values (%s, 1, 'corredor-prueba-chica')""", (ws,))
     cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
                    values (%s, 'aviso_previo_dias_habiles', '3')""", (ws,))
+    # Los días hábiles del bloqueo viejo, como en el pack (C-5, porción 5; la 36).
+    cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                   values (%s, 'bloqueos', '{"escala_solo_a_los_dias": 5}')""", (ws,))
     areas = {}
     for slug, nombre in AREAS.items():
         cur.execute("""insert into area (workspace_id, slug, nombre) values (%s, %s, %s)
