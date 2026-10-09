@@ -602,7 +602,7 @@ def _lo_entregado(cur, task_id: str) -> list[dict[str, Any]]:
     desde = _ciclo_desde(cur, task_id)
     cur.execute(
         """select e.id, e.clase, e.texto, e.uri, e.cubre, e.describe_del_criterio, e.at,
-                  a.nombre_original,
+                  e.es_ejemplo_aceptado, a.nombre_original,
                   a.clase as clase_del_archivo, a.sha256, e.archivo_id,
                   a.tipo as tipo_del_archivo, a.tamano
              from evidence e
@@ -615,6 +615,9 @@ def _lo_entregado(cur, task_id: str) -> list[dict[str, Any]]:
     for f in cur.fetchall():
         es = {"texto": LO_QUE_ESCRIBIO, "enlace": UN_ENLACE, "imagen": UNA_FOTO}.get(
             f["clase"], UN_VIDEO if f["clase_del_archivo"] == "video" else UN_ARCHIVO)
+        if f["es_ejemplo_aceptado"]:
+            # Lo propuso Leda y la persona lo aceptó: lo describe, pero no lo escribió (D8).
+            es = EL_EJEMPLO_QUE_ACEPTO
         piezas.append({"evidencia_id": str(f["id"]), "id": f"v:{f['id']}", "clase": f["clase"],
                        "es": es, "texto": f["texto"], "uri": f["uri"],
                        "nombre": f["nombre_original"], "sha256": f["sha256"],
@@ -1005,7 +1008,9 @@ def _para_la_cocina(p: Mapping[str, Any]) -> dict[str, Any]:
     if p.get("archivo_id"):
         return {"archivo_id": p["archivo_id"], "cubre": list(p["cubre"])}
     return {"texto": p.get("texto") or p.get("uri"), "cubre": list(p["cubre"]),
-            "describe": list(p.get("describe") or [])}
+            "describe": list(p.get("describe") or []),
+            # Que la persona aceptó el ejemplo y no lo escribió queda en la pieza (D8).
+            "ejemplo_aceptado": p.get("es") == EL_EJEMPLO_QUE_ACEPTO}
 
 
 def corregir(ctx, datos: dict, tarea: dict) -> dict:

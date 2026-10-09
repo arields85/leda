@@ -572,6 +572,10 @@ create table evidence (
   -- que describe este texto, tal cual el criterio los decía al entregar. Sólo un texto
   -- describe el criterio; las filas de antes de la 0038, `{}`.
   describe_del_criterio text[] not null default '{}',
+  -- D8 (migración 0039): si el texto es un ejemplo que Leda propuso para lo que faltaba del
+  -- criterio y la persona aceptó tal cual: vale como lo que describe, pero no lo escribió ella.
+  -- Sólo un texto; las filas de antes de la 0039, `false`.
+  es_ejemplo_aceptado boolean not null default false,
   constraint evidence_workspace_id_unique unique (workspace_id, id),
   constraint evidence_task_workspace
     foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
@@ -583,7 +587,9 @@ create table evidence (
       else archivo_id is not null
     end),
   constraint evidence_describe_solo_un_texto
-    check (clase = 'texto' or describe_del_criterio = '{}')
+    check (clase = 'texto' or describe_del_criterio = '{}'),
+  constraint evidence_ejemplo_solo_un_texto
+    check (clase = 'texto' or not es_ejemplo_aceptado)
 );
 
 comment on column evidence.clase is
@@ -1787,7 +1793,7 @@ begin
                'id', e.id, 'clase', e.clase, 'texto', e.texto,
                'enlace', case when e.clase = 'enlace' then e.uri end,
                'nombre', a.nombre_original, 'tipo_de_archivo', a.tipo, 'cubre', e.cubre,
-               'quien', u.nombre, 'cuando', e.at,
+               'ejemplo_aceptado', e.es_ejemplo_aceptado, 'quien', u.nombre, 'cuando', e.at,
                'retirada', x.id is not null, 'retirada_el', x.at) order by e.at, e.id)
         from evidence e
         left join archivo a on a.workspace_id = e.workspace_id and a.id = e.archivo_id

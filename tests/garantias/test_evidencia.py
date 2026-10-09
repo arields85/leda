@@ -592,6 +592,54 @@ def test_el_rollback_de_la_0038_se_niega_si_una_pieza_describe_el_criterio(corew
         assert _cuantas(cur, "evidence") == 1
 
 
+# --- El ejemplo aceptado (migración 0039; D8, G2) --------------------------------------------
+
+def test_entregar_guarda_si_un_texto_es_un_ejemplo_aceptado(corework, conn):
+    """Lo que Leda propuso y la persona aceptó tal cual vale como lo que describe, pero no lo
+    escribió ella: la pieza lo guarda. Sólo un texto puede serlo."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws)
+        foto = _archivo(cur, ws, _membresia(cur, ws, "Mariano Naim"))
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, ws, "Mariano Naim")
+        r = H.ejecutar(cur, quien, "entregar_tarea", {"tarea_id": tarea, "piezas": [
+            {"texto": "Quedó cerrado", "cubre": ["explicacion"]},
+            {"texto": "Pasa la prueba de aislación", "cubre": [], "ejemplo_aceptado": True},
+            {"archivo_id": foto, "cubre": ["foto"], "ejemplo_aceptado": True}]},
+            ya_confirmada=True)
+    assert r["estado"] == "en_revision"
+    with admin(conn) as cur:
+        cur.execute("""select clase, es_ejemplo_aceptado e from evidence
+                        where task_id = %s order by at""", (tarea,))
+        assert [(f["clase"], f["e"]) for f in cur.fetchall()] == [
+            ("texto", False), ("texto", True), ("imagen", False)]
+        with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():
+            cur.execute("""insert into evidence (workspace_id, task_id, tipo, clase, archivo_id,
+                                                 es_ejemplo_aceptado)
+                           values (%s, %s, 'imagen', 'imagen', %s, true)""", (ws, tarea, foto))
+
+
+def test_el_rollback_de_la_0039_se_niega_si_una_pieza_es_un_ejemplo_aceptado(corework, conn):
+    """Deshacerla borraría que esa descripción la aceptó y no la escribió la persona."""
+    script = (Path(__file__).resolve().parents[2] / "db" / "rollbacks"
+              / "0039_el_ejemplo_aceptado.sql").read_text("utf-8")
+    guarda = re.search(r"do \$\$.*?end \$\$;", script, re.S).group(0)
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws)
+        cur.execute("""insert into evidence (workspace_id, task_id, tipo, clase, texto, cubre,
+                                             es_ejemplo_aceptado)
+                       values (%s, %s, 'texto', 'texto', 'Quedó probado', '{explicacion}',
+                               true)""", (ws, tarea))
+        with pytest.raises(psycopg.errors.RaiseException, match="0039 rollback refused"), \
+                conn.transaction():
+            cur.execute("set local search_path = leda, public")
+            cur.execute(guarda)
+        assert _cuantas(cur, "evidence") == 1
+
+
 # --- Entregar una tarea que nunca se arrancó (decisión 14 del usuario, 2026-10-08; D3) ------
 
 def test_entregar_una_tarea_sin_arrancar_anota_el_inicio_y_la_entrega_en_ese_momento(

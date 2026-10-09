@@ -134,6 +134,9 @@ def _pieza(p: dict[str, Any], token: str, palabras: dict[str, str], zona: ZoneIn
     nombre = _e(p.get("nombre"))
     if retirada:
         contenido = f"{QUE_ERA.get(clase, 'Una pieza')} que se retiró"
+    elif clase == "texto" and p.get("ejemplo_aceptado"):
+        # Lo propuso Leda y la persona lo aceptó tal cual: nunca "lo que escribió" (D8).
+        contenido = f"Aceptó esta descripción: «{_e(p.get('texto'))}»"
     elif clase == "texto":
         contenido = f"Lo que escribió: «{_e(p.get('texto'))}»"
     elif clase == "enlace":

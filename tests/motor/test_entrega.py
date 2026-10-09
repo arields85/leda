@@ -17,6 +17,7 @@ import json
 import uuid
 from datetime import datetime, timedelta
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -822,6 +823,28 @@ def test_aceptar_el_ejemplo_lo_suma_como_lo_que_describe_la_persona(conn, mundo,
     assert [(f["texto"], list(f["d"])) for f in todos(
         conn, "select texto, describe_del_criterio d from evidence order by at")] == [
         ("quedo cerrado y rotulado", [CERRADO]), (EJEMPLO, [AISLACION])]
+
+
+def test_lo_entregado_dice_que_el_ejemplo_lo_acepto_y_no_que_lo_escribio(conn, mundo, marcos):
+    """Prueba por Telegram del 2026-10-08 (D8, G2): el ejemplo aceptado se guardaba como un texto
+    más y a quien revisa le llegaba "Marcos escribió que…". La pieza guarda que fue un ejemplo
+    aceptado (migración 0039), y lo entregado, releído después, lo dice así."""
+    from leda.motor import aprobacion
+
+    tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"], ejemplo=EJEMPLO),
+                 texto="quedo cerrado y rotulado")
+    marcos.manda(_entregar(acepta_el_ejemplo=True), texto="si")
+    marcos.manda(Jugada("confirmar", {}), texto="dale")
+
+    assert [f["es_ejemplo_aceptado"] for f in todos(
+        conn, "select es_ejemplo_aceptado from evidence order by at")] == [False, True]
+    with admin(conn) as cur:
+        vistas = aprobacion.lo_que_entrego(cur, tarea, ZoneInfo("America/Argentina/Buenos_Aires"))
+    assert [(v["es"], v.get("dice")) for v in vistas] == [
+        ("lo_que_escribio", "quedo cerrado y rotulado"), ("el_ejemplo_que_acepto", EJEMPLO)]
+    significado = hechos.significado("el_ejemplo_que_acepto")
+    assert "aceptó" in significado and "no la escribió" in significado
 
 
 def test_el_ejemplo_aceptado_no_lo_pisa_otro_juicio_de_la_ia(conn, mundo, marcos):

@@ -72,6 +72,23 @@ def test_la_pagina_muestra_la_tarea_en_palabras_de_todos_los_dias(web, conn, mun
     assert "Pintar el galpón" not in r.text and "Secreto del oeste" not in r.text
 
 
+def test_un_ejemplo_aceptado_figura_como_aceptado_y_no_como_escrito(web, conn, mundo):
+    """D8 (G2, prueba por Telegram del 2026-10-08): el ejemplo que Leda propuso y la persona
+    aceptó tal cual se leía como "Lo que escribió". La base guarda que fue aceptado (migración
+    0039) y la página lo dice así."""
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, clase, texto, entregado_por,
+                                     es_ejemplo_aceptado)
+               values (%s, %s, 'texto', 'texto', 'Completa 20 ciclos sin fallas', %s, true)""",
+            (mundo["norte"]["ws"], mundo["norte"]["id"], _persona(mundo, "Sam Noble")))
+    conn.commit()
+    r = web.get(f"/tarea/{_emitir(conn, mundo, 'Taylor Quinn')}")
+    assert "Aceptó esta descripción: «Completa 20 ciclos sin fallas»" in r.text
+    assert "Lo que escribió: «Completa 20 ciclos sin fallas»" not in r.text
+    assert "Lo que escribió: «Quedó andando»" in r.text
+
+
 def test_la_pagina_no_muestra_identificadores_ni_nombres_de_la_cocina(web, conn, mundo):
     token = _emitir(conn, mundo, "Taylor Quinn")
     r = web.get(f"/tarea/{token}")

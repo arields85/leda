@@ -1061,17 +1061,20 @@ def _tipos_que_faltan(cur, tarea_id, piezas: list[dict] | None = None) -> list[s
 def _insertar_evidencia(cur, quien: Solicitante, tarea_id, pieza: dict) -> str:
     """Una fila de `evidence` para una pieza ya resuelta (`clase`, `cubre` y su
     contenido: `texto`, `uri` o `archivo_id`; un texto, también los puntos del criterio
-    de aceptación que describe, `describe`). `tipo` es igual a la clase."""
+    de aceptación que describe, `describe`, y si es un ejemplo que la persona aceptó,
+    `ejemplo_aceptado`). `tipo` es igual a la clase."""
     # T6f (seguimiento del orquestador): `at` explícito con `clock_timestamp()` --
     # ver el comentario de `_bloquear_tarea`.
     cur.execute(
         """insert into evidence (workspace_id, task_id, tipo, clase, texto, uri,
-                                 archivo_id, cubre, describe_del_criterio, entregado_por, at)
-           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, clock_timestamp())
+                                 archivo_id, cubre, describe_del_criterio,
+                                 es_ejemplo_aceptado, entregado_por, at)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, clock_timestamp())
            returning id""",
         (quien.workspace_id, tarea_id, pieza["clase"], pieza["clase"],
          pieza.get("texto"), pieza.get("uri"), pieza.get("archivo_id"),
-         list(pieza["cubre"]), list(pieza.get("describe") or []), quien.membership_id))
+         list(pieza["cubre"]), list(pieza.get("describe") or []),
+         bool(pieza.get("ejemplo_aceptado")), quien.membership_id))
     return str(cur.fetchone()["id"])
 
 
@@ -1783,6 +1786,9 @@ def _resolver_piezas(cur, tarea_id, piezas: list[dict]) -> list[dict]:
             if resuelta["clase"] == "texto":
                 resuelta["describe"] = [str(d) for d in pieza.get("describe") or []
                                         if str(d).strip()]
+                # D8 (migración 0039): un ejemplo que Leda propuso y la persona aceptó tal
+                # cual. Vale como lo que describe, pero no lo escribió ella.
+                resuelta["ejemplo_aceptado"] = bool(pieza.get("ejemplo_aceptado"))
             resueltas.append(resuelta)
         else:
             raise ValueError("contenido")
