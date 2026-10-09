@@ -3,8 +3,8 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-08, sesión con el usuario: todas las decisiones de la Fase C
-(1 a 23), la C-3d hasta la D8 construida y revisada, y la prueba por Telegram del usuario.
+**Última actualización documental:** 2026-10-09, cierre al mediodía: la C-5, la C-6 (por persona) y la
+C-7 construidas y revisadas; las decisiones del usuario 24 a 52.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -36,8 +36,8 @@ chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Te
 ## Punto exacto para retomar (2026-10-09, mañana, con el usuario)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
-Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 23 (**todas las
-preguntas de la Fase C están decididas**) y la C-3d (D1 a D8, con el registro de cada una).
+Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 52 (**todas
+contestadas**), el registro de cada unidad y la lista de tareas en "Próximo paso".
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`); al cerrar la sesión se apaga. Si
 está caído, levantarlo con `levantar-postgres.bat` (o `pg_ctl ... start`, fuera del sandbox). Si `pg_ctl` dice
@@ -49,14 +49,14 @@ conversación 30, `0040`), la `0041` (RLS forzado en cinco tablas de configuraci
 recorre todas), pedir el enlace a la página por chat (conversación 31), la C-5 entera
 (perseguir un bloqueo, decisiones 4 a 7; conversaciones 32 a 36, `0042` a `0044`), el pedido de estado
 de la C-6 (conversación 37; el informe al grupo, `PENDIENTE`) y la C-7, delegar
-(conversación 38, `0045`). Con el usuario a la mañana: sus decisiones 24 a 28 (en el plan) y la enmienda al ADR 0017 para delegar,
-aceptada por el usuario. Todo revisado por tramos y subido; la lista de tareas y las preguntas
-juntadas para el usuario, en el plan ("Próximo paso").
+(conversación 38, `0045`). Con el usuario a la mañana: sus decisiones 24 a 52, los pedidos para la plataforma (jerarquía,
+avisos de cada uno, la vista de todo) y la C-8 (ausencias, para más adelante). Todo revisado por
+tramos y subido (`b21053c`); suite completa sobre `e082010`, 1857 passed.
 
 **Lo que sigue (pedido del usuario: avanzar todo lo posible solo, sin esperar pruebas):**
-1. **Construir las decisiones 24 a 52** (la 30, la 40, la 43, la 45 y la 52 no piden código) (plan, "Preguntas al usuario"), con test primero: el
-   informe de la cadena (C-5) y el pase sin respuesta, el encargado que pasa una tarea de su gente
-   y la tarea que pasa a quien la revisaba (C-7); la repetición de las 4 horas, siempre (D5b); no repetir lo ya contestado en la lista y traer todas las tareas abiertas (C-6); el resumen y pedir el detalle (enlace).
+1. **Construir las decisiones 24 a 52** (plan, "Preguntas al usuario"; la 30, la 40, la 43, la 45 y
+   la 52 no piden código), con test primero, una porción por grupo: C-5 (24, 34 a 42, 47 a 49,
+   51), C-7 (26 a 28), D5b (29, 50), C-6 (31, 32, 44, 46) y el enlace (33).
 2. **El informe al grupo de la C-6** (decisión 25): el usuario crea el grupo en Telegram; falta el
    camino de un aviso al grupo y ver cómo toma Leda su identificador.
 3. **Las preguntas al usuario están todas contestadas** (decisiones 24 a 52); las nuevas, de a una y
@@ -139,7 +139,7 @@ validador de invariantes. Destino de cada uno:
   `deteccion_pregunta`, `jev` y `local`) y la escalera, el reloj y el ciclo viejos.
 - **La auditoría vuelve a la cocina:** cada `herramientas.ejecutar` y cada efecto propio del motor deja su fila
   en `audit_log`, con `pack_hash` y `nucleo_hash`.
-- **Migraciones:** hasta `0025` en `main`, más `0030` a `0032` en la rama. La `0032` borra las tablas del alta.
+- **Migraciones:** hasta `0025` en `main`, más `0030` a `0045` en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   `PENDIENTE`: un ensayo de propiedad sobre un clúster limpio.

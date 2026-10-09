@@ -2168,7 +2168,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           una tarea (Leda no le puede preguntar si la toma), ni a alguien de Electricidad, que
           decide Mariano. ¿Está bien, o se puede decidir por la plataforma?
 
-## Próximo paso (2026-10-09, noche, trabajo solo)
+## Próximo paso (cierre del 2026-10-09, al mediodía)
 
 **Lista de tareas de la noche** (pedido del usuario: ver lo hecho y lo que falta):
 
@@ -2185,9 +2185,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
 - [ ] Las decisiones 24 a 52 del usuario (2026-10-09; la 30, la 40, la 43, la 45 y la 52 ya están o esperan la prueba), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
+- [ ] El informe al grupo de la C-6 (decisión 25), cuando el usuario cree el grupo en Telegram.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
-- [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
-      primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo).
+- [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 38 (una ronda, cupo
+      primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0045` (respaldo previo).
 
 **Preguntas juntadas para el usuario: contestadas todas** (2026-10-09, a la mañana, de a una y
 con ejemplos simples). Son las decisiones 24 a 52 de "Preguntas al usuario", más los pedidos para
