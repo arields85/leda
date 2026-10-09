@@ -24,7 +24,7 @@ import sys
 
 import yaml
 
-from leda.db import conectar
+from leda.db import admin, conectar
 
 BASES_DE_DESARROLLO = {"leda", "leda_flujo", "leda_motor"}
 TODOS_LOS_DIAS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
@@ -46,7 +46,7 @@ def main() -> int:
     if base not in BASES_DE_DESARROLLO:
         print(f"STOP: {base!r} no es una base de desarrollo ({sorted(BASES_DE_DESARROLLO)}).")
         return 1
-    with conn, conn.cursor() as cur:
+    with conn, admin(conn) as cur:   # leda_admin: work_calendar tiene RLS forzado (0041)
         cur.execute("select id from workspace where slug = %s", (espacio,))
         fila = cur.fetchone()
         if not fila:
