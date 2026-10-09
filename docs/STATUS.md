@@ -175,6 +175,7 @@ validador de invariantes. Destino de cada uno:
 | Rama del Motor, con la C-3d hasta la D8 (`792392b`) | suite completa | 2026-10-08 | 1659 passed |
 | Rama del Motor, ídem | `pytest tests/garantias` | 2026-10-08 | 326 passed |
 | Rama del Motor, ídem | `correr --ia guionada --veces 1` (en seco) | 2026-10-08 | 29 de 29 bien |
+| Rama del Motor, con la C-5, la C-6 y la C-7 (`e082010`) | suite completa | 2026-10-09 | 1857 passed |
 
 **Conversaciones con la IA real** (bitácora de flujos):
 - La ronda 3 de la prueba chica dio 85 de 85.

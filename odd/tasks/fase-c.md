@@ -1894,6 +1894,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     y `fichas.py:603`); `ce6c6c9..e082010` `review-8e6e2bf9ee6b926e` (advertencias: un botón
     Confirmar viejo, `pase.py:215`; contestar ignora un error, `pase.py:366`).
   - **Falta construir:** las decisiones 26, 27 y 28, con test primero; y la 24, en la C-5.
+  - **Suite completa** sobre `e082010` (coordinador, 2026-10-09): `pytest -q`, 1857 passed.
   - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
     sector, Leda le pregunta si la acepta y le avisa a quien delegó. Al construirlo cambian las
     respuestas a "me la podés pasar a Nahuel" de las conversaciones 12 y 19, que hoy dicen que no se hace
