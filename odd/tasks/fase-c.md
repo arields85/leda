@@ -1452,10 +1452,114 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         dejar de repetirle la pregunta a quien destraba (hoy no cambia nada); y si a quien
         destraba se le avisa cuando la tarea se destrabó por otro lado (hoy no: es la decisión
         6, avisos hacia abajo).
-    - **Lo que sigue de la C-5**, cada una con su conversación de prueba primero: "ya hablé con
-      él" dicho por quien destraba (decisión 4, segunda mitad); "no me corresponde" y la cadena
-      al referente (5); los bloqueos encadenados y los avisos hacia abajo (6); el bloqueo viejo
-      (7).
+  - [x] **Porción 2: "ya hablé con él"** (decisión 4, segunda mitad; conversación 33). Route:
+    delegada (escritor único, 2+ archivos no triviales). Hecha el 2026-10-09:
+    - **La conversación primero** (`89be38d`, junto con la 34): la 33. Ariel contesta "si ya lo
+      hable con marcos"; Leda le pregunta qué arreglaron y para cuándo, y con "quedamos q se la
+      paso el jueves temprano" queda anotado y a Marcos le llega lo arreglado, como información.
+      Dicho todo junto ("si ya lo hablamos con marcos, la libero el viernes"), se anota sin
+      preguntar. En seco, antes del código: el paso 4 falla (los hechos no piden lo que
+      arreglaron) y la corrida se cae en el paso 5 (`ya_lo_hablaron` no era un dato de la ficha).
+    - **El motor** (`6d4ebc8`, `persecucion.py`): `decir_cuando_destraba` suma el dato
+      `ya_lo_hablaron`. Sin una fecha ni "ya está", no anota nada todavía: pregunta una vez qué
+      arreglaron y para cuándo (`falta: [lo_que_arreglaron, para_cuando]`). Su pregunta
+      (`cuando_se_destraba`) sigue abierta con su espera y lo recuerda en los datos de su jugada
+      (la repetición de la escalera lo dice, `sobre.ya_lo_hablaron`); que ya se preguntó queda
+      en la jugada (`pregunto_que_arreglaron`): nunca dos veces. La respuesta queda en
+      `dicho_de_quien_destraba`, sin columna nueva (lo asentado es lo que arreglaron y para
+      cuándo), y le llega a Marcos con `dice_quien_destraba.ya_lo_hablaron`. **Un borde de la
+      porción 1, cerrado:** si quien destraba habla de la tarea antes de que le llegue la
+      pregunta de Leda (ya la ve en su lista), esa pregunta no sale (`ya_respondio`,
+      `avisos.ya_contesto_quien_destraba`); antes salía igual. Si sólo dijo que ya lo hablaron,
+      la pregunta se le abre en su chat en ese momento.
+    - **Test primero:** `tests/motor/test_persecucion.py`, 8 en rojo (7 nuevas y la de los
+      significados); las dos de "antes de que le llegue", además, en rojo con el chequeo nuevo
+      apagado a mano. **Verde:** 27 de 27.
+    - **Las instrucciones de la IA no cambiaron** (huellas de `test_contratos.py` iguales): el
+      dato va en `ia_real.DATOS` y en la ficha (`es`, `hace`); sus códigos, en
+      `hechos.SIGNIFICADOS`.
+    - **Chequeos** (2026-10-09, sobre `6d4ebc8`): `pytest tests/motor tests/conversaciones`, 969
+      passed y 1 failed (`test_comprobar`, el YAML de la 34 nombra la jugada de la porción 3,
+      que todavía no existía); en seco, `correr --conversacion 33`, bien.
+  - [x] **Porción 3: "no me corresponde" y la cadena al referente** (decisión 5; ADR 0018, 9c,
+    precisión del 2026-10-09; conversación 34). Route: delegada (escritor único, 2+ archivos no
+    triviales). Hecha el 2026-10-09:
+    - **La conversación primero** (`89be38d`): la 34, con Nahuel trabado (OT; el referente de
+      OT es Marcos). Ariel: "no me corresponde eso" (Leda pregunta quién se encarga), "lo maneja
+      mariano" (Leda le escribe a Mariano y Nahuel se entera); Mariano: "ni idea yo eso no lo
+      manejo" (la cadena va a Marcos, el del sector de la tarea; a Nahuel, "lo informo", sin
+      nombre); Nahuel pregunta a quién (lo dice la IA real, no el seco). Con la otra tarea, Lucas
+      nombra a Martín y Martín a Mariano: va al referente de eléctrica (Mariano), el sector de
+      quien quedó nombrado. El cargador ahora pone el referente de cada área como el pack
+      (`carga.REFERENTES`) y el corredor mira quién dijo cada "lo destraba" (`destraban.de`) y
+      `dicen_quien_destraba.no_le_corresponde`. En seco, antes del código: las 01 a 32 bien
+      (los referentes de área no cambian ninguna), la 34 se cae en el paso 4 (la jugada no
+      existía).
+    - **La columna** (`10dedc1`, migración `0043` con su rollback):
+      `dicho_de_quien_destraba.no_le_corresponde`, que alcanza sola y nunca va con una fecha ni
+      con "ya está"; a quién le toca, si lo dice, es otra fila de `blocker_unblocker` dicha por
+      esa persona. El aislamiento y los permisos de la `0042` siguen. El rollback borra lo que
+      sólo decía eso (`pg_dump` antes).
+    - **El motor** (`5da0985`, `persecucion.py`): la jugada nueva `decir_que_no_le_toca`
+      (`quien`, `no_sabe`, `lo_que_dice`; no se ofrece). Anota que no le corresponde (auditado,
+      `anotar_que_no_le_toca`) y, si nombra o no sabe, la fila nueva de quién destraba
+      (auditada como `anotar_quien_destraba`). **El límite de un salto:** la primera de la cadena
+      (la nombró la persona trabada) que no dice de quién es recibe una sola pregunta (quién se
+      encarga; su pregunta sigue abierta); si vuelve a no decirlo, es que no sabe. Si nombra a
+      otro integrante, Leda le escribe a esa persona como en la porción 1, diciendo quién la
+      nombró (`nombrado_por`), y a la persona trabada le llega lo que dijo, como información.
+      Cualquier otro caso corta la cadena (la segunda tampoco lo toma, diga lo que diga; la
+      primera no sabe o nombra a alguien de afuera o a la persona trabada): el aviso nuevo
+      `cadena_del_bloqueo` lleva la cadena entera (`persecucion.cadena`: quién dijo qué, desde
+      la última vez que habló la persona trabada) al referente, informativo, de coordinación,
+      con el margen, y no sale si el bloqueo ya se cerró; auditado
+      (`informar_la_cadena_del_bloqueo`). **A quién** (`a_quien_informar`): al referente del
+      sector de quien quedó nombrado como quien se encarga, si es un integrante; si no, al del
+      sector de la tarea trabada; si ése es la persona trabada misma, a quien aprueba su trabajo.
+      Sin ninguno, nada se promete (`sin_referente`). A la persona trabada le llega lo que dijo
+      el último y que se informa; el nombre del referente va en `solo_si_pregunta`
+      (`aviso_de_la_cadena` en `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`, decisiones 11 y 21).
+      Refactor: lo que se anota y el aviso a la persona trabada quedaron en
+      `_anotar_lo_que_dice` y `_avisar_a_quien_esta_trabado`, compartidos con la porción 2.
+      `test_frontera.TABLAS_PERMITIDAS` suma `area` (sólo lee el referente).
+    - **Test primero:** `tests/motor/test_cadena_del_bloqueo.py`, 15 de 15 en rojo, y
+      `tests/garantias/test_no_le_corresponde.py`, 2 de 2 en rojo sin la columna. **Verde:** las
+      17, con las 27 de `test_persecucion.py`. La suite después mostró dos más, arregladas: la
+      frontera (`area`) y un significado que decía "referente" (`test_hechos`: los significados
+      hablan con palabras de todos los días).
+    - **Las instrucciones de la IA no cambiaron** (huellas iguales): la jugada llega con su
+      ficha; sus códigos, en `hechos.SIGNIFICADOS` y `PARA_LA_REDACCION`; `test_fichas.py` la
+      suma a la lista cerrada. Ningún dato libre nuevo (`quien` y `lo_que_dice` ya estaban).
+    - **Ninguna conversación anterior cambió.**
+    - **Tamaño:** el commit del motor tiene unas 820 líneas, más de la mitad pruebas; es un solo
+      comportamiento (seguir un salto y cortar la cadena comparten lo que se anota y a quién se
+      avisa).
+    - **Chequeos** (2026-10-09, sobre `5da0985`): `pytest tests/garantias`, 337 passed (la
+      paridad y el rollback de la `0043` incluidos); en seco, `correr --ia guionada --veces 1
+      --ronda seco-c5-p23`, **34 de 34 bien**; `pytest tests/motor tests/conversaciones`, 985
+      passed. Informes borrados, `gasto.json` sin tocar. Sin la IA real (van en la tanda
+      posterior). Sin la suite completa.
+  - `PENDIENTE` de las porciones 2 y 3:
+    - **La IA real** sobre la 33 y la 34, y la prueba por Telegram, en la tanda posterior.
+      `leda_motor` necesita la `0043` además de la `0039`, la `0040` y la `0042`.
+    - **Preguntas para el usuario** (cómo se leyó lo que la regla no dice):
+      1. "Ya lo hablé" solo no se anota hasta que dice qué arreglaron; si nunca contesta, sólo
+         queda en el registro de turnos (la pregunta se repite dos días hábiles, sin escalar).
+      2. A Marcos le llega lo arreglado aunque lo habló él ("Quedó asentado lo que arreglaste
+         con Ariel: te pasa la IP el jueves"): ¿sirve o es ruido?
+      3. El sector "de lo que falta" es el de la última persona nombrada: si Martín dice "eso es
+         de mariano", la cadena va a Mariano, que es el referente de eléctrica y el nombrado; la
+         otra lectura es mandarla siempre al de la tarea trabada (Marcos).
+      4. La primera persona que no sabe de quién es, o nombra a alguien de afuera, corta la
+         cadena enseguida (ADR 0017, 3a, paso 4: "si Juan no sabe, al referente").
+      5. Si el referente es la persona trabada (Marcos, referente de OT, trabado), va a quien
+         aprueba su trabajo (Ismael).
+      6. Quien queda nombrado al cortarse la cadena pasa a ser quien destraba en los datos: ve la
+         tarea en su lista y lo que diga queda anotado, aunque Leda no le escriba.
+      7. Si la persona que nombra la primera no tiene un chat con Leda, Leda lo dice y no informa
+         a nadie (como la porción 1).
+  - **Lo que sigue de la C-5**, cada una con su conversación de prueba primero: los bloqueos
+    encadenados y los avisos hacia abajo (decisión 6); el bloqueo viejo (7).
 - [ ] **C-6.** Las cadencias (pregunta 8).
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
   - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
