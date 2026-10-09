@@ -331,6 +331,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     (la porción 1 ya le escribe a quien la persona nombra); precisa la 9c, paso 4, del ADR 0018: el
     referente no recibe avisos *por* el bloqueo, pero sí el pedido cuando él es quien destraba.
 
+41. **El bloqueo lo da por destrabado quien está trabado** (de la C-5, porción 5): decidida
+    (usuario, 2026-10-09, opción A). Si quien recibió el bloqueo viejo dice "ya está, llega
+    mañana", Leda lo anota y se lo cuenta a la persona trabada, pero el bloqueo sigue abierto hasta
+    que ella diga que pudo seguir. Cambia `resolver_bloqueo`, que hoy deja cerrarlo a quien se le
+    informó (`escalado_a`).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2099,7 +2105,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 39 del usuario (2026-10-09; la 30 ya está), con test primero.
+- [ ] Las decisiones 24 a 41 del usuario (2026-10-09; la 30 y la 40 ya están), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
