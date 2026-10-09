@@ -1375,6 +1375,78 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     que cubre un texto). `leda_motor` está al día y el guion de la prueba por Telegram, escrito
     (`docs/product/guion-telegram-fase-c-parte-1.md`). Falta: la prueba por Telegram del usuario.
 - [ ] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).
+  - [x] **Porción 1: escribirle a quien destraba** (decisión 4, primera mitad, y "no le escribas";
+    conversación 32 con su YAML). Route: delegada (escritor único, 2+ archivos no triviales).
+    Hecha el 2026-10-09:
+    - **La conversación primero** (`cfb8b00`): la 32. Marcos nombra a Ariel y Leda le escribe,
+      terminado el margen; Ariel contesta "mañana a la mañana se la paso" y Marcos se entera como
+      información; Mariano no tiene un chat con Leda y Leda lo dice; "no le escribas" dentro del
+      margen y después de que salió. El cargador deja a una persona sin Telegram
+      (`sin_telegram`, como en el pack). En seco, antes del código: 6 fallas en los pasos 2 y 3
+      (ningún mensaje a Ariel) y la corrida se cae en el paso 4 (la jugada no existía).
+    - **La tabla** (`692a31c`, migración `0042` con su rollback): `dicho_de_quien_destraba`, lo
+      que dice quien destraba (para cuándo, que ya está o sus palabras; al menos uno), sobre la
+      fila de `blocker_unblocker` que lo nombró. Sólo se agrega; RLS forzado con su política,
+      referencias del mismo espacio, `select` e `insert` para `leda_app`. En la paridad de
+      `test_migraciones.py`.
+    - **El motor** (`dd9ae4e`, `leda.motor.persecucion`): con otro integrante que destraba,
+      `anotar_quien_destraba` guarda `pregunta_a_quien_destraba` (de coordinación, con el margen,
+      clave por fila de `blocker_unblocker`; la respuesta a Marcos dice `se_le_pregunta_a`, con
+      cuándo le llega). Al salir abre `cuando_se_destraba` para Ariel con su propia espera
+      (`TipoDeAviso.abre`): la escalera de las preguntas se la repite a él (antes iba siempre al
+      responsable) y no escala (`TipoDePregunta.escala`); vale la D5b. Sin Telegram o inactivo,
+      nada se guarda y el hecho lo dice (`no_se_le_puede_escribir_a`); a alguien de afuera, como
+      antes. Ariel ve la tarea en su lista (`para_destrabar`, `espera_que_la_destrabe`) y la
+      jugada nueva `decir_cuando_destraba` anota lo que dice, auditado, cierra su pregunta y su
+      espera, y guarda `lo_que_dijo_quien_destraba` para Marcos (informativo, con el margen).
+      **"Ya está" no cierra el bloqueo** (`resolver_bloqueo` lo permite al responsable, a quien
+      lo abrió o a quien se escaló; Ariel no es ninguno): Marcos se entera y lo cierra con
+      `destrabar`. La jugada nueva `no_escribirle` omite el mensaje que no salió
+      (`pidio_que_no_le_escriba`, auditado) o dice que ya le llegó (`ya_se_le_escribio`, con el
+      día). Lo que esperaba de Ariel se cierra al destrabarse la tarea o si la destraba otra
+      persona; por cualquier otro camino, la escalera lo cierra al mirarlo, y un aviso guardado
+      no sale (`ya_se_destrabo`, `cambio_quien_destraba`). Nombrar otra vez a la misma persona no
+      le escribe dos veces.
+    - **Test primero:** `tests/motor/test_persecucion.py`, 17 de 19 en rojo (las otras dos miran
+      que algo no pase: alguien de afuera y destrabar sin nada que cerrar); la de nombrar otra
+      vez a la misma persona, en rojo durante el refactor. `tests/garantias/test_lo_que_dice_
+      quien_destraba.py`, 4 de 4 en rojo sin el esquema. **Verde:** las 24. Cambiaron
+      `test_fichas.py` (la lista cerrada suma las dos jugadas, que no se ofrecen) y
+      `test_preguntas_que_esperan.py` (Ismael, nombrado como quien destraba, ahora recibe la
+      pregunta; a Marcos sigue sin salirle nada).
+    - **Las instrucciones de la IA no cambiaron** (huellas de `test_contratos.py` iguales): las
+      jugadas llegan con su ficha (`es`), sus datos nuevos (`para_cuando`, `ya_esta`,
+      `lo_que_dice`) en `ia_real.DATOS` y sus códigos en `hechos.SIGNIFICADOS`;
+      `comprobar.DATOS_LIBRES` suma `lo_que_dice`, y el corredor mira lo que dice quien destraba
+      (`dicen_quien_destraba`).
+    - **Tamaño:** el commit del motor tiene unas 1.100 líneas, la mitad pruebas; es un solo
+      comportamiento (preguntar, contestar y retirar comparten el aviso, la pregunta y su
+      vigencia) y partirlo dejaba la rama a medias.
+    - **Chequeos** (2026-10-09, sobre `dd9ae4e`): `pytest tests/motor tests/conversaciones`, 961
+      passed; `pytest tests/garantias`, 335 passed (la paridad y el rollback de la `0042`
+      incluidos); en seco, `correr --ia guionada --veces 1 --ronda seco-c5`, **31 de 32 bien**:
+      la 05, paso 5, falla de garantía porque Martín ahora recibe la pregunta (el comportamiento
+      nuevo); su `.md` y su YAML dicen "que Leda le escribió a Martín o lo va a seguir" en lo que
+      no dice, y quedaron fuera de lo que el escritor podía tocar (`PENDIENTE`, coordinador).
+      Informes borrados, `gasto.json` sin tocar. Sin la IA real (decisión del usuario: van en la
+      tanda posterior). Sin la suite completa.
+    - `PENDIENTE`:
+      - **La 05** (`.md` y YAML, paso 5): esperar el aviso a Martín y cambiar el "no dice".
+      - **La IA real** sobre la 32 (y la 05), y la prueba por Telegram, en la tanda posterior.
+        `leda_motor` necesita la `0042` además de la `0039` y la `0040`.
+      - **Preguntas para el usuario:** si a quien destraba se le repite la pregunta sin
+        escalar (hoy: el día hábil siguiente y el otro, y después nada hasta el bloqueo viejo,
+        decisión 7); si cuando el que destraba es el referente (Marcos nombra a Ismael) Leda le
+        escribe igual (hoy sí: lo nombró la persona; 9c, paso 4, decía que el referente no
+        recibe avisos por el bloqueo); qué hace Leda con quien destraba y no tiene un chat (hoy
+        sólo lo dice, sin proponer salidas); si "no le escribas" después de que salió tiene que
+        dejar de repetirle la pregunta a quien destraba (hoy no cambia nada); y si a quien
+        destraba se le avisa cuando la tarea se destrabó por otro lado (hoy no: es la decisión
+        6, avisos hacia abajo).
+    - **Lo que sigue de la C-5**, cada una con su conversación de prueba primero: "ya hablé con
+      él" dicho por quien destraba (decisión 4, segunda mitad); "no me corresponde" y la cadena
+      al referente (5); los bloqueos encadenados y los avisos hacia abajo (6); el bloqueo viejo
+      (7).
 - [ ] **C-6.** Las cadencias (pregunta 8).
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
   - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
