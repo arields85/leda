@@ -26,8 +26,9 @@ import pytest
 
 from leda import entrada
 from leda.db import admin
-from leda.despachador import TransporteDePrueba
+from leda.despachador import Adjunto, Transporte, TransporteDePrueba
 from leda.motor import archivos, hechos, recibir
+from leda.salida import enqueue_outbox
 from leda.motor.escucha import BotTelegram, Escucha
 from leda.motor.ia import IAGuionada
 from leda.motor.recibir import IntentosPorUpdate, Recepcion, recibir_update
@@ -211,6 +212,47 @@ def test_un_album_es_un_solo_mensaje_con_un_solo_turno_despues_de_la_espera(conn
     # Atenderlo otra vez no hace nada.
     assert recepcion.atender_albumes() == 0
     assert cuantas(conn, "conversation_turn", "sentido = 'entrada'") == 1
+
+
+def test_el_album_de_una_respuesta_sale_en_el_despacho_inmediato(conn, mundo):
+    """Prueba por Telegram del 2026-10-08 (D8, T2): el despacho inmediato envolvía el transporte
+    sin `enviar_album`, así que cada álbum de una respuesta fallaba ahí y salía una vuelta más
+    tarde. El envoltorio delega todo lo que el transporte sabe hacer."""
+    ia, salida = _ia("Recibí la foto."), TransporteDePrueba()
+    recepcion = _recepcion(conn, mundo, ia, Bajadas({"F1": JPEG}), salida)
+    _recibir(recepcion, _foto(530, "F1"))
+    archivo = str(uno(conn, "select id from archivo")["id"])
+    chat = mundo["personas"]["Marcos"]["telegram"]
+    persona = mundo["personas"]["Marcos"]["membership_id"]
+    with admin(conn) as cur:
+        for clave, texto, adjuntos in (("r:1", "La entrega de Marcos.", {}),
+                                       ("r:1:adjuntos", "(adjuntos: 1)",
+                                        {"adjuntos": [archivo]})):
+            enqueue_outbox(cur, workspace_id=mundo["id"], chat_id=chat, text=texto,
+                           dedupe_key=clave, recipient_membership_id=persona,
+                           is_response=True, grupo_respuesta="r:1", scheduled_for=AHORA,
+                           **adjuntos)
+    conn.commit()
+
+    recepcion.despachar_ahora()
+
+    assert [e.texto for e in salida.enviados][-2:] == ["La entrega de Marcos.", ""]
+    assert len(salida.albumes) == 1
+    assert todos(conn, """select estado::text estado, intentos from message_outbox
+                           where dedupe_key like 'r:1%%' order by dedupe_key""") == [
+        {"estado": "enviado", "intentos": 0}, {"estado": "enviado", "intentos": 0}]
+
+
+def test_el_envoltorio_del_despacho_inmediato_sabe_todo_lo_del_transporte():
+    """Lo que el protocolo del transporte declara, el envoltorio lo tiene, y anota la hora de
+    cada envío (también el de un álbum)."""
+    salida = TransporteDePrueba()
+    envuelto = recibir._ConHoraDeEnvio(salida)
+    metodos = {n for n in dir(Transporte) if not n.startswith("_")}
+
+    assert metodos and all(callable(getattr(envuelto, n)) for n in metodos)
+    envuelto.enviar_album(5, [Adjunto("a.jpg", "image/jpeg", None, lambda: JPEG)])
+    assert 5 in envuelto.enviado_en and len(salida.albumes) == 1
 
 
 def test_el_escuchador_espera_poco_mientras_hay_un_album_y_despues_lo_atiende(conn, mundo,

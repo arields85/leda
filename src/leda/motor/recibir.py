@@ -182,7 +182,12 @@ class IndicadorDelTurno:
 
 class _ConHoraDeEnvio:
     """El transporte del despacho inmediato, que anota cuándo Telegram aceptó el último
-    mensaje de cada chat (`time.monotonic`): es el final de la línea de la consola."""
+    mensaje de cada chat (`time.monotonic`): es el final de la línea de la consola.
+
+    Es el mismo transporte: todo lo que sabe hacer pasa tal cual (`__getattr__`), y lo que
+    manda algo a un chat (un mensaje o un álbum) anota además su hora. Sin la delegación, cada
+    álbum de una respuesta fallaba en el despacho inmediato y salía una vuelta más tarde (prueba
+    por Telegram del 2026-10-08, D8)."""
 
     def __init__(self, transporte: Transporte) -> None:
         self.transporte = transporte
@@ -192,6 +197,15 @@ class _ConHoraDeEnvio:
         tg_id = self.transporte.enviar(chat_id, texto, botones, **mas)
         self.enviado_en[chat_id] = time.monotonic()
         return tg_id
+
+    def enviar_album(self, chat_id: int, adjuntos, **mas: Any) -> int:
+        tg_id = self.transporte.enviar_album(chat_id, adjuntos, **mas)
+        self.enviado_en[chat_id] = time.monotonic()
+        return tg_id
+
+    def __getattr__(self, nombre: str) -> Any:
+        # Sólo lo que no está definido acá: el resto del transporte, tal cual.
+        return getattr(self.transporte, nombre)
 
 
 class Recepcion:
