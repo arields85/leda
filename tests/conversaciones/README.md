@@ -19,8 +19,8 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
    comprometida no cambia y el referente se entera, con el atraso y lo que depende; el seguimiento pasa a
    la previsión (un recordatorio el día del vencimiento y el pedido de estado el día de la previsión).
 3. [`03-bloqueo.md`](03-bloqueo.md): "estoy trabado, falta el repuesto"; Leda pregunta quién lo puede
-   destrabar, repite la pregunta al día hábil siguiente y, como Marcos no sabe, propone salidas, sin avisar
-   al referente; la escalera se detiene.
+   destrabar, repite la pregunta a las 4 horas (decisión 29) y al día hábil siguiente y, como Marcos no
+   sabe, propone salidas, sin avisar al referente; la escalera se detiene.
 4. [`04-sin-respuesta.md`](04-sin-respuesta.md): no contesta; desde el vencimiento Leda pide el estado y la
    escalera avanza hasta escalar.
 5. [`05-varias-cosas.md`](05-varias-cosas.md): dos hechos de dos tareas en un mensaje, y después uno que
@@ -28,7 +28,7 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 6. [`06-correccion.md`](06-correccion.md): "no, era la otra tarea".
 7. [`07-cancelar.md`](07-cancelar.md): "dejá, no importa" con una pregunta abierta.
 8. [`08-cambio-de-tema.md`](08-cambio-de-tema.md): otro tema con una pregunta abierta; Leda anota lo
-   nuevo y vuelve a la pregunta.
+   nuevo y vuelve a la pregunta en otro mensaje, justo después (decisión 50: un mensaje, un tema).
 9. [`09-duda.md`](09-duda.md): no se sabe de qué tarea habla; se elige con opciones.
 10. [`10-escrito-en-lugar-de-boton.md`](10-escrito-en-lugar-de-boton.md): escribir en lugar de tocar una
     opción; la guarda de la decisión 2 queda marcada para la prueba de la entrega.
@@ -115,9 +115,10 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
     al nuevo le llega también el que ya había salido, y el botón del aviso viejo le dice al anterior
     que esa tarea ya no la revisa él, sin cambiar nada (decisión 16 del usuario, 2026-10-08; D4).
 30. [`30-pregunta-sin-contestar.md`](30-pregunta-sin-contestar.md): una pregunta de Leda sin contestar
-    frena los otros temas hasta su única repetición del día, a las 4 horas; 4 horas después sale
-    aparte el tema siguiente, y al cerrarse una de las dos preguntas el código trae la otra en un
-    mensaje aparte, en los dos órdenes de respuesta (decisión 21 del usuario, 2026-10-08; D5b).
+    frena los otros temas hasta su única repetición del día, a las 4 horas (haya o no otro tema
+    esperando, decisión 29); 4 horas después sale aparte el tema siguiente, y al cerrarse una de las
+    dos preguntas el código trae la otra en un mensaje aparte, en los dos órdenes de respuesta
+    (decisión 21 del usuario, 2026-10-08; D5b).
 
 La página de la tarea (ADR 0019, decisión 7):
 
@@ -519,7 +520,8 @@ Las conversaciones dejaban 16 preguntas abiertas (P1 a P16). El usuario las deci
   recordatorio pide el estado y la escalera avanza si no hay respuesta (9b).
 - **P13 y P14.** Ante un cambio de tema, Leda anota lo nuevo si es directo y vuelve en la misma respuesta a la
   pregunta pendiente, sin menú; si lo nuevo también pide una pregunta, sigue a la persona y vuelve después
-  (9d).
+  (9d). **Precisada por la decisión 50 del usuario (2026-10-09):** la pregunta pendiente vuelve en otro
+  mensaje, justo después de la respuesta a lo nuevo (un mensaje, un tema; conversaciones 08 y 12).
 - **P15.** Un aviso guardado se vuelve a leer al salir: si ya no corresponde, no sale y se registra la
   omisión; si la previsión volvió a la fecha comprometida, tampoco sale otro (9b).
 - **P16.** Una reasignación: Leda dice que no puede y que la decide Ismael, no pasa el pedido ni avisa al

@@ -1,9 +1,11 @@
 # 08. Cambio de tema
 
 **Qué prueba:** con una pregunta abierta sobre una tarea, Marcos habla de otra. Lo nuevo se puede anotar
-directo: Leda lo anota y, en la misma respuesta, vuelve a la pregunta pendiente, sin ofrecer un menú de
-salidas. Un tema a la vez, nunca dos preguntas juntas, sin perder nada. ADR 0018, decisión 4, situación
-general 1, con la precisión de la decisión 9d.
+directo: Leda lo anota y, en otro mensaje justo después, vuelve a la pregunta pendiente, sin ofrecer un
+menú de salidas. Un mensaje, un tema; nunca dos preguntas juntas, sin perder nada. ADR 0018, decisión 4,
+situación general 1, con la precisión de la decisión 9d y la decisión 50 del usuario (2026-10-09, opción
+A: la pregunta que quedó por un cambio de tema vuelve en un mensaje aparte; hasta entonces volvía en la
+misma respuesta).
 
 ## Estado inicial
 
@@ -43,17 +45,26 @@ general 1, con la precisión de la decisión 9d.
      porqué desde el 2026-10-07: una fecha que atrasa sin él abre la pregunta de qué la atrasa, que iría
      primero, ADR 0018, 9n y 9d; acá se prueba la vuelta a la pregunta pendiente.)
    - Efecto: la previsión, directo (decisión 9a), con la fecha comprometida en el viernes 30 y su motivo;
-     un aviso a Ismael guardado como hechos. Ningún bloqueo anotado.
-   - La respuesta dice, en una sola respuesta: que quedó anotada la previsión del miércoles 4 en la tarea
-     de comunicaciones, con su motivo; y la vuelta a la pregunta pendiente, la causa del bloqueo de la
-     tarea del PLC, sin pedirle que repita que está trabado (eso es retomarla, decisión 9d).
-   - La respuesta no dice: un menú con las salidas (seguir, dejar para después, cancelar); otra pregunta
-     además de la pendiente; nada que trate la fecha o su motivo como la causa del bloqueo; que la tarea
-     del PLC está bloqueada.
+     un aviso a Ismael guardado como hechos. Ningún bloqueo anotado. La pregunta pendiente, guardada
+     para salir enseguida, aparte (paso 4; decisión 50).
+   - La respuesta dice: que quedó anotada la previsión del miércoles 4 en la tarea de comunicaciones, con
+     su motivo. Sólo eso: un mensaje, un tema.
+   - La respuesta no dice: la pregunta pendiente (la trae el código aparte, paso 4); un menú con las
+     salidas (seguir, dejar para después, cancelar); nada que trate la fecha o su motivo como la causa del
+     bloqueo; que la tarea del PLC está bloqueada.
    - Botones: ninguno: no hay duda sobre de qué tarea habla.
    - Estado después: tema abierto, el mismo: el bloqueo de la tarea del PLC, esperando la causa.
 
-4. **Leda**, por su cuenta, a Ismael (martes 20, 10:53, dentro del horario): el aviso de la nueva
+4. **Leda**, a Marcos (martes 20, 10:44), en otro mensaje justo después de la respuesta, aunque Marcos
+   acaba de escribir: la vuelta a la pregunta pendiente.
+   →
+   - El mensaje dice: la causa del bloqueo de la tarea del PLC, sin pedirle que repita que está trabado
+     (eso es retomarla, decisión 9d).
+   - El mensaje no dice: nada de la tarea de comunicaciones, que ya se contestó; un menú con las salidas;
+     otra pregunta además de la pendiente.
+   - Estado después: tema abierto, el mismo: el bloqueo de la tarea del PLC, esperando la causa.
+
+5. **Leda**, por su cuenta, a Ismael (martes 20, 10:53, dentro del horario): el aviso de la nueva
    previsión, terminado el margen para corregir, diez minutos después de lo que dijo Marcos.
    →
    - El mensaje dice: la tarea de comunicaciones; la previsión del miércoles 4 y su motivo, con las palabras
@@ -62,7 +73,7 @@ general 1, con la precisión de la decisión 9d.
    - El mensaje no dice: otro motivo que el que dio Marcos; nada del bloqueo de la tarea del PLC, que
      todavía no se anotó.
 
-5. **Marcos** escribe (martes 20, 10:55): "es que no me mandaron el programa del fabricante"
+6. **Marcos** escribe (martes 20, 10:55): "es que no me mandaron el programa del fabricante"
    →
    - Jugadas: la respuesta a la pregunta abierta: la causa del bloqueo de la tarea del PLC.
    - Efecto: el bloqueo abierto, con su causa; la tarea del PLC pasa a `bloqueada` y su escalera se detiene.
@@ -74,7 +85,7 @@ general 1, con la precisión de la decisión 9d.
 
 - **Garantías (5b):** no inventa (ni un bloqueo sin causa, ni una fecha cambiada, ni otro motivo que el que
   dio Marcos); no hace sin confirmación lo que la requiere (nada la requiere en este circuito); no deja sin
-  salida (lo nuevo queda anotado y la pregunta pendiente vuelve, sin perder nada); no confunde la tarea (la
+  salida (lo nuevo queda anotado y la pregunta pendiente vuelve aparte, sin perder nada); no confunde la tarea (la
   previsión y su motivo van a la de comunicaciones, nunca como causa del bloqueo de la del PLC).
 - **Falla de comprensión:** que la IA no sepa si el mensaje del paso 3 contesta la pregunta abierta o
   cambia de tema. Tiene que preguntar; tomar "no llego" como la causa del bloqueo, o atender lo nuevo y

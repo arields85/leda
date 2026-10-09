@@ -171,18 +171,34 @@ pasos:
     quien: nadie
     relojes: ["2026-10-27 16:00", "2026-10-28 10:00", "2026-10-28 16:00", "2026-10-29 10:00",
               "2026-10-29 16:00", "2026-10-30 10:00", "2026-10-30 16:00"]
+    # Cada pedido sin contestar se repite una vez ese día, a las 4 horas (decisiones 21 y 29).
     salen:
+      - a: Marcos
+        el: "2026-10-27"
+        tipo: repeticion_del_dia
+        tarea: PLC
+        hechos: {pregunta: estado_de_la_tarea, necesita_respuesta: true}
       - a: Marcos
         el: "2026-10-28"
         tipo: pedido_de_estado
         tarea: PLC
         hechos: {numero: 2, seguimiento_por: prevision}
       - a: Marcos
+        el: "2026-10-28"
+        tipo: repeticion_del_dia
+        tarea: PLC
+        hechos: {pregunta: estado_de_la_tarea, necesita_respuesta: true}
+      - a: Marcos
         el: "2026-10-29"
         tipo: pedido_de_estado
         tarea: PLC
         hechos: {numero: 3, seguimiento_por: prevision,
                  si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski]}}
+      - a: Marcos
+        el: "2026-10-29"
+        tipo: repeticion_del_dia
+        tarea: PLC
+        hechos: {pregunta: estado_de_la_tarea, necesita_respuesta: true}
       - a: Ismael
         el: "2026-10-30"
         tipo: escalamiento

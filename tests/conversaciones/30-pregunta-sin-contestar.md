@@ -33,9 +33,8 @@ conversación 26.
 
 Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/fase-c.md`, D5b):
 
-- **La repetición a las 4 horas es para destrabar:** sale sólo si detrás de la pregunta espera otro
-  tema que pide respuesta. Sin nada esperando, la pregunta sigue con su escalera de siempre (el día
-  hábil siguiente; conversaciones 03 y 26).
+- **La repetición a las 4 horas sale siempre** (decisión 29 del usuario, 2026-10-09, que reemplaza
+  la lectura de que era sólo para destrabar): haya o no otro tema esperando detrás (conversación 03).
 - **"Más urgente":** el tipo de mensaje más urgente (mecánica §11) y, entre iguales, la tarea que
   vence antes.
 - **"Al día siguiente":** una pregunta hecha un día anterior ya no frena: a la hora en que Leda escribe
@@ -43,9 +42,9 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
   escalera, o el tema de otra tarea.
 - **"Enseguida":** el mensaje aparte no espera los 30 minutos de la conversación 26 (es la conversación
   que sigue), pero sí el horario: fuera de él sale el día hábil siguiente.
-- **Sólo dos temas que abrió Leda:** el mensaje aparte es para la pregunta que un aviso dejó para
-  después y la que la dejó. Cuando la persona cambió de tema por su cuenta (decisión 9d, conversación
-  08), Leda vuelve a la pregunta en la misma respuesta, como hasta ahora.
+- **También cuando la persona cambia de tema** (decisión 50 del usuario, 2026-10-09, que reemplaza
+  la lectura de que el mensaje aparte era sólo para dos temas que abrió Leda): la pregunta que quedó
+  vuelve en un mensaje aparte, justo después de la respuesta a lo nuevo (conversaciones 08 y 12).
 
 ## Estado inicial
 

@@ -1,8 +1,8 @@
 # 03. "Estoy trabado, falta el repuesto"
 
 **Qué prueba:** Marcos contesta el aviso con un bloqueo y su causa. Leda lo anota, directo, y pregunta
-quién lo puede destrabar; esa pregunta espera respuesta: Marcos no contesta ese día y Leda la repite el día
-hábil siguiente. Como Marcos no sabe quién, Leda propone salidas. Ismael no recibe ningún aviso por el
+quién lo puede destrabar; esa pregunta espera respuesta: Marcos no contesta, Leda la repite una vez ese
+día, a las 4 horas (decisión 29 del usuario, 2026-10-09), y otra vez el día hábil siguiente. Como Marcos no sabe quién, Leda propone salidas. Ismael no recibe ningún aviso por el
 bloqueo, y la escalera de recordatorios de la tarea se detiene. ADR 0018, decisión 5a, tercera respuesta,
 con la enmienda de la decisión 9c (corregida el 2026-10-05): el arranque de la persecución (pasos 1 a 4),
 sin escribirle todavía a quien destraba.
@@ -49,9 +49,15 @@ sin escribirle todavía a quien destraba.
      espera respuesta como un pedido de estado (9c, paso 2): queda abierta la espera de la respuesta de
      Marcos.
 
-3. **Nadie** escribe el resto del martes 20.
+3. **Leda**, por su cuenta, a Marcos (martes 20, 14:20), y nadie escribe el resto del martes: la
+   pregunta otra vez, una sola vez en el día, a las 4 horas de haberla hecho, aunque no espere nada más
+   detrás (decisiones 21 y 29 del usuario; conversación 30).
    →
-   - Efecto: ningún otro mensaje de Leda a Marcos el martes. La espera de respuesta sigue abierta.
+   - Efecto: un mensaje privado en el outbox; ningún otro mensaje de Leda a Marcos el martes. La espera
+     de respuesta sigue abierta; la repetición no es un paso de la escalera.
+   - El mensaje dice: el bloqueo de la tarea del PLC por el repuesto; la pregunta de quién lo puede
+     destrabar.
+   - El mensaje no dice: un reproche porque no contestó; otra pregunta además de ésa.
 
 4. **Leda**, por su cuenta, a Marcos (miércoles 21, 10:00): la pregunta otra vez, el día hábil siguiente
    (9c, paso 2: la misma escalera de quien no contestó, 9b).

@@ -109,9 +109,18 @@ y espera la confirmación; Marcos dice que no y no pasa nada.
    - Efecto: ninguno; el turno queda en el registro.
    - La respuesta dice: sus dos tareas, con su estado y su fecha, como figuran en la base: la del PLC en
      curso, que vence el viernes 23; la de comunicaciones asignada, que vence el viernes 30.
-   - Con la entrega abierta, es otro tema (situación general 8): Leda contesta lo nuevo y vuelve a lo
-     que le falta a la entrega.
-   - La respuesta no dice: tareas de otras personas; la del PLC como entregada.
+   - Con la entrega abierta, es otro tema (situación general 8): Leda contesta sólo lo nuevo; lo que
+     le falta a la entrega vuelve en otro mensaje, justo después (paso 8; decisión 50 del usuario,
+     2026-10-09: un mensaje, un tema). Hasta entonces volvía en la misma respuesta.
+   - La respuesta no dice: tareas de otras personas; la del PLC como entregada; lo que le falta a la
+     entrega.
+   - Estado después: tema abierto, lo que falta de la misma entrega.
+
+8. **Leda**, a Marcos (martes 20, 16:03), en otro mensaje justo después de la respuesta, aunque Marcos
+   acaba de escribir: la vuelta a la entrega.
+   →
+   - El mensaje dice: que la entrega de la del PLC sigue esperando lo que le falta.
+   - El mensaje no dice: la del PLC como entregada; sus tareas otra vez.
    - Estado después: tema abierto, lo que falta de la misma entrega.
 
 ## Qué mide

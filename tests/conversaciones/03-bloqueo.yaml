@@ -66,11 +66,25 @@ pasos:
       - que Ismael se enteró o se va a enterar
 
   - paso: 3
-    quien: nadie
-    relojes: ["2026-10-20 16:00"]
-    salen: []
+    quien: Leda
+    # La repetición del día, a las 4 horas, aunque nada espere detrás (decisión 29 del usuario,
+    # 2026-10-09); después, nada más el martes.
+    relojes: ["2026-10-20 14:20", "2026-10-20 16:00"]
+    salen:
+      - a: Marcos
+        tipo: repeticion_del_dia
+        tarea: PLC
+        hechos: {pregunta: quien_destraba, necesita_respuesta: true,
+                 sobre: {jugada: anotar_bloqueo, causa: presente}}
     estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
       esperas_abiertas: [PLC]
+    dice:
+      - el bloqueo de la tarea del PLC por el repuesto
+      - la pregunta de quién lo puede destrabar
+    no_dice:
+      - un reproche porque no contestó
+      - otra pregunta además de ésa
 
   - paso: 4
     quien: Leda

@@ -156,6 +156,12 @@ pasos:
         hechos: {prevision: "2026-10-28", fecha_comprometida: "2026-10-23",
                  atraso_si_se_cumple_la_prevision_dias_habiles: 3, dependientes: [COM],
                  sin_motivo_todavia: true, motivo: ausente}
+      # A Marcos, la repetición del día de la pregunta de qué la atrasa, a las 4 horas de
+      # haberla hecho (08:30; decisiones 21 y 29 del usuario).
+      - a: Marcos
+        tipo: repeticion_del_dia
+        tarea: PLC
+        hechos: {pregunta: motivo_del_atraso, necesita_respuesta: true}
     estado_despues:
       pregunta_abierta: {tipo: motivo_del_atraso, tarea: PLC}
       esperas_abiertas: [PLC]

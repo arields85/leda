@@ -72,7 +72,8 @@ del día y sale diciendo que todavía no la dio, y el porqué que llega después
    el pedido del estado anunciado para hoy se omite con su motivo (Marcos ya contestó).
 
 6. **Leda**, por su cuenta, a Ismael (lunes 26, 16:30, el final del día de trabajo): el aviso de la nueva
-   previsión, que no esperó más. A Marcos, nada.
+   previsión, que no esperó más. A Marcos, sólo la repetición del día de la pregunta de qué la atrasa,
+   una vez, a las 4 horas de haberla hecho (12:30; decisiones 21 y 29 del usuario, 2026-10-09).
    →
    - El mensaje dice: que Marcos prevé terminar la tarea del PLC el miércoles 28; que la fecha
      comprometida era el viernes 23; el atraso, tres días hábiles; que la de comunicaciones depende de ella;

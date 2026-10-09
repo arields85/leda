@@ -69,9 +69,15 @@ pasos:
       - nada de la tarea de comunicaciones como si fuera otro recordatorio
 
   - paso: 4
-    quien: nadie
+    quien: Leda
+    # La repetición del día del pedido, a las 4 horas (decisiones 21 y 29 del usuario).
     relojes: ["2026-10-27 16:00"]
-    salen: []
+    salen:
+      - a: Marcos
+        el: "2026-10-27"
+        tipo: repeticion_del_dia
+        tarea: PLC
+        hechos: {pregunta: estado_de_la_tarea, necesita_respuesta: true}
     estado_despues:
       esperas_abiertas: [PLC]
 
@@ -94,9 +100,15 @@ pasos:
       - ningún reproche ni intención atribuida
 
   - paso: 6
-    quien: nadie
+    quien: Leda
+    # La repetición del día del pedido, a las 4 horas (decisiones 21 y 29 del usuario).
     relojes: ["2026-10-28 16:00"]
-    salen: []
+    salen:
+      - a: Marcos
+        el: "2026-10-28"
+        tipo: repeticion_del_dia
+        tarea: PLC
+        hechos: {pregunta: estado_de_la_tarea, necesita_respuesta: true}
 
   - paso: 7
     quien: Leda
@@ -116,9 +128,15 @@ pasos:
       - que ya se avisó a Ismael
 
   - paso: 8
-    quien: nadie
+    quien: Leda
+    # La repetición del día del pedido, a las 4 horas (decisiones 21 y 29 del usuario).
     relojes: ["2026-10-29 16:00"]
-    salen: []
+    salen:
+      - a: Marcos
+        el: "2026-10-29"
+        tipo: repeticion_del_dia
+        tarea: PLC
+        hechos: {pregunta: estado_de_la_tarea, necesita_respuesta: true}
 
   - paso: 9
     quien: Leda

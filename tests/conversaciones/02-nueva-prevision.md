@@ -97,7 +97,9 @@ desde esa fecha. ADR 0018, decisión 5a, segunda respuesta, y decisiones 9a, 9b 
    - Efecto: la escalera sigue desde el 27, como la de la conversación 04 desde el vencimiento: el miércoles
      28, el segundo pedido; el jueves 29, el tercero, que avisa que sin respuesta se va a informar, sin nombrar a Ismael; el viernes
      30, el escalamiento a Ismael por falta de respuesta, con la previsión, la fecha comprometida y el
-     atraso del código. Es información: no le pide a Ismael que persiga ni que resuelva nada.
+     atraso del código. Es información: no le pide a Ismael que persiga ni que resuelva nada. Cada
+     pedido sin contestar, del 27 al 29, se repite una vez ese día, a las 4 horas (decisiones 21 y 29
+     del usuario, 2026-10-09); la repetición no es un paso de la escalera.
 
 ## Qué mide
 

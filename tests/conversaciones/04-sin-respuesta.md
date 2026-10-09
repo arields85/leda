@@ -3,7 +3,9 @@
 **Qué prueba:** Leda avisa un jueves que la tarea vence el martes; el aviso no pide respuesta y Leda no
 vuelve a escribir hasta el vencimiento (ni el viernes, ni el fin de semana, ni el lunes). Desde el día del
 vencimiento cada recordatorio pide el estado; Marcos no contesta y la escalera avanza hasta escalar a
-Ismael. ADR 0018, decisión 5a, cuarta respuesta, y decisión 9b; mecánica §9.
+Ismael. Cada pedido sin contestar se repite una vez ese mismo día, a las 4 horas (decisiones 21 y 29
+del usuario, 2026-10-09: haya o no otro tema esperando); la repetición no es un paso de la escalera.
+ADR 0018, decisión 5a, cuarta respuesta, y decisión 9b; mecánica §9.
 
 ## Estado inicial
 
@@ -49,8 +51,8 @@ Ismael. ADR 0018, decisión 5a, cuarta respuesta, y decisión 9b; mecánica §9.
 
 4. **Nadie** escribe el martes 27.
    →
-   - Efecto: ningún otro recordatorio de la tarea del PLC el martes. La espera de respuesta sigue abierta y
-     sin contestar.
+   - Efecto: a las 14:00, la repetición del día del pedido, una sola vez (decisión 29); ningún otro
+     recordatorio de la tarea del PLC el martes. La espera de respuesta sigue abierta y sin contestar.
 
 5. **Leda**, por su cuenta, a Marcos (miércoles 28, 10:00): el segundo recordatorio, con el impacto
    (mecánica §9).
@@ -61,6 +63,7 @@ Ismael. ADR 0018, decisión 5a, cuarta respuesta, y decisión 9b; mecánica §9.
      hecho; ningún reproche ni intención atribuida (constitución §8).
 
 6. **Nadie** escribe el miércoles 28.
+   → A las 14:00, la repetición del día del segundo recordatorio, una sola vez.
 
 7. **Leda**, por su cuenta, a Marcos (jueves 29, 10:00): el tercer recordatorio (mecánica §9).
    →
@@ -69,6 +72,7 @@ Ismael. ADR 0018, decisión 5a, cuarta respuesta, y decisión 9b; mecánica §9.
    - El mensaje no dice: una amenaza ni un reproche (constitución §8); que ya se avisó a Ismael.
 
 8. **Nadie** escribe el jueves 29.
+   → A las 14:00, la repetición del día del tercer recordatorio, una sola vez.
 
 9. **Leda**, por su cuenta, a Ismael (viernes 30, 10:00): el escalamiento por falta de respuesta, por la ruta
    del pack (`escalamiento`, Dirección).

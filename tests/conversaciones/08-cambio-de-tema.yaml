@@ -57,7 +57,7 @@ pasos:
     quien: Marcos
     a_las: "2026-10-20 10:43"
     # Con su porqué (usuario, 2026-10-07; ADR 0018, 9n): sin él, Leda preguntaría qué la atrasa
-    # y esa pregunta iría primero (9d), y el mensaje del paso 5 ya no contestaría sólo la causa.
+    # y esa pregunta iría primero (9d), y el mensaje del paso 6 ya no contestaría sólo la causa.
     escribe: "che y lo de comunicaciones no llego al 30 porque esta semana me mandaron a otra obra, necesito hasta el miercoles 4"
     jugadas:
       - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-04",
@@ -70,23 +70,43 @@ pasos:
           a: Ismael
           hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
                    atraso_si_se_cumple_la_prevision_dias_habiles: 3, motivo: presente}
+        # La pregunta pendiente, guardada para salir enseguida, aparte (paso 4; decisión 50).
+        - {tipo: vuelve_la_pregunta, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {pregunta: causa_del_bloqueo, necesita_respuesta: true}}
     hechos:
       - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-04",
          motivo: presente, pregunta: ausente}
-    # La vuelta a la pregunta pendiente, en la misma respuesta (retomarla, 9d).
-    pregunta: {tipo: causa_del_bloqueo, tarea: PLC, desde_antes: true}
+    # Un mensaje, un tema (decisión 50): la pregunta pendiente no va en esta respuesta.
+    pregunta: null
     estado_despues:
       pregunta_abierta: {tipo: causa_del_bloqueo, tarea: PLC}
     dice:
       - que quedó anotada la previsión del miércoles 4 en la tarea de comunicaciones, con su motivo
-      - la vuelta a la pregunta pendiente, la causa del bloqueo de la tarea del PLC, sin pedirle que repita que está trabado
     no_dice:
+      - la pregunta por la causa del bloqueo de la tarea del PLC
       - un menú con las salidas (seguir, dejar para después, cancelar)
-      - otra pregunta además de la pendiente
       - nada que trate la fecha o su motivo como la causa del bloqueo
       - que la tarea del PLC está bloqueada
 
   - paso: 4
+    quien: Leda
+    # Justo después y aparte, aunque Marcos escribió hace un minuto (decisión 50).
+    relojes: ["2026-10-20 10:44"]
+    salen:
+      - a: Marcos
+        tipo: vuelve_la_pregunta
+        tarea: PLC
+        hechos: {pregunta: causa_del_bloqueo, necesita_respuesta: true}
+    estado_despues:
+      pregunta_abierta: {tipo: causa_del_bloqueo, tarea: PLC}
+    dice:
+      - la vuelta a la pregunta pendiente, la causa del bloqueo de la tarea del PLC, sin pedirle que repita que está trabado
+    no_dice:
+      - nada de la tarea de comunicaciones
+      - un menú con las salidas (seguir, dejar para después, cancelar)
+      - otra pregunta además de la pendiente
+
+  - paso: 5
     quien: Leda
     relojes: ["2026-10-20 10:54"]
     salen:
@@ -104,7 +124,7 @@ pasos:
       - otro motivo que el que dio Marcos
       - nada del bloqueo de la tarea del PLC, que todavía no se anotó
 
-  - paso: 5
+  - paso: 6
     quien: Marcos
     a_las: "2026-10-20 10:55"
     escribe: "es que no me mandaron el programa del fabricante"

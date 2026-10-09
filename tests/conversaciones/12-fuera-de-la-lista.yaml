@@ -168,20 +168,43 @@ pasos:
     escribe: "y que mas tengo pendiente?"
     jugadas:
       - {nombre: consultar_pendientes}
-    efectos: {}
+    efectos:
+      # Lo que le falta a la entrega, guardado para volver enseguida, aparte (paso 8; decisión 50).
+      avisos_guardados:
+        - {tipo: vuelve_la_pregunta, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {pregunta: lo_que_falta_de_la_entrega, necesita_respuesta: true}}
     hechos:
       - jugada: consultar_pendientes
         resultado: leido
         tareas:
           - {titulo: PLC, estado: en_curso, vence: "2026-10-23"}
           - {titulo: COM, estado: asignada, vence: "2026-10-30"}
-    # Otro tema con la entrega abierta (situación general 8): contesta lo nuevo y vuelve a lo que le
-    # falta a la entrega.
-    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC, desde_antes: true}
+    # Otro tema con la entrega abierta (situación general 8): contesta lo nuevo; lo que le falta a
+    # la entrega vuelve en otro mensaje, justo después (decisión 50: un mensaje, un tema).
+    pregunta: null
     botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
     dice:
       - "sus dos tareas, con su estado y su fecha: la del PLC en curso, que vence el viernes 23; la de comunicaciones asignada, que vence el viernes 30"
-      - que la entrega de la del PLC sigue esperando lo que le falta
     no_dice:
       - tareas de otras personas
       - la del PLC como entregada
+      - lo que le falta a la entrega de la del PLC (vuelve aparte, paso 8)
+
+  - paso: 8
+    quien: Leda
+    # Justo después y aparte, aunque Marcos escribió hace un minuto (decisión 50).
+    relojes: ["2026-10-20 16:03"]
+    salen:
+      - a: Marcos
+        tipo: vuelve_la_pregunta
+        tarea: PLC
+        hechos: {pregunta: lo_que_falta_de_la_entrega, necesita_respuesta: true}
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: PLC}
+    dice:
+      - que la entrega de la del PLC sigue esperando lo que le falta
+    no_dice:
+      - la del PLC como entregada
+      - sus tareas otra vez
