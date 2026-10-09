@@ -219,6 +219,32 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     cambios pide cambiar, y Leda pregunta sólo lo que falta de verdad (decisión 10: nunca lo que la
     persona ya dijo). Construida en la D8 (punto 10).
 
+24. **A quién va el informe de una cadena de bloqueo** (de la C-5, porción 3): decidida (usuario,
+    2026-10-09, opción A). Nunca a alguien que es parte de la cadena. Ejemplo: Marcos está trabado;
+    Ariel dice "eso es de Mariano"; Mariano dice "no es mío" y es el referente de Electricidad: el
+    informe no le llega a Mariano. Va al referente de la tarea trabada; si ése es la persona trabada
+    o alguien de la cadena, a quien aprueba el trabajo de la persona trabada (acá, Ismael).
+25. **Los atrasos en el informe al grupo** (de la C-6): decidida (usuario, 2026-10-09, opción A). Un
+    atraso ya hablado en privado aparece con el nombre y el motivo que dio la persona, como
+    información, nunca como acusación: "• PLC (Marcos): vencía el lun 26/10, la termina el mié
+    28/10 (falta que llegue el cable)". Todas las líneas llevan nombre. El porqué, del usuario: el
+    grupo puede ayudar ("lucas lee eso y se entera que marcos estaba frenado porque le falta el
+    cable y el tiene un cable extra. se lo presta y destraba la situacion").
+26. **Un pase que nadie contesta** (de la C-7): decidida (usuario, 2026-10-09, opción A). Leda le
+    repite la pregunta una vez, el día hábil siguiente, a quien tiene que decidir o tomarla; si
+    sigue sin contestar, el pase termina: le avisa a quien lo pidió que no hubo respuesta y que la
+    tarea sigue con quien la tenía, y quien lo pidió puede pedírselo a otro.
+27. **El encargado pasa una tarea de su gente** (de la C-7): decidida (usuario, 2026-10-09, opción
+    A). Marcos puede pedir "pasale la de los sensores de Nahuel a Pedro"; rigen las mismas reglas
+    de quién decide y quién toma, y Leda le avisa a Nahuel que su tarea pasó a Pedro.
+28. **Una tarea que pasa al encargado que la revisaba** (de la C-7): decidida (usuario, 2026-10-09).
+    Sigue siendo trabajo del sector: si Marcos toma "Poner el tornillo del tablero" de Nahuel, que
+    revisaba él, cuando dice "listo" la tarea se cierra ahí, con la auditoría de que la hizo y la
+    aprobó Marcos, y a Ismael no le llega nada. Reemplaza lo construido en la C-7 (pasaba a quien
+    aprueba el trabajo de Marcos). El porqué, del usuario: la gente del encargado hace partes de las
+    tareas del encargado; mandarle a Ismael "el tornillito" para aprobar es la sobrecarga que no se
+    quiere.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -1857,6 +1883,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           dice "el hmi viene bien" (vence el viernes 6); Leda le dice que le vuelve a preguntar el
           lunes 2. ¿Está bien, o al día siguiente como con una tarea que ya venció?
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
+  - **Revisión RDD por tramos (coordinador), aprobadas y reconocidas:** `ad2a20e..85e1748`
+    `review-d89334032b20102b`; `85e1748..23b24c3` `review-6bd5b1c7bd95c0c8` (advertencias: un
+    momento inválido en `herramientas.py:2726-2730`; un pase abierto sin salida, que resuelve la
+    decisión 26); `23b24c3..ce6c6c9` `review-1080390624461ecb` (advertencias en `aprobacion.py:365`
+    y `fichas.py:603`); `ce6c6c9..e082010` `review-8e6e2bf9ee6b926e` (advertencias: un botón
+    Confirmar viejo, `pase.py:215`; contestar ignora un error, `pase.py:366`).
+  - **Falta construir:** las decisiones 26, 27 y 28, con test primero; y la 24, en la C-5.
   - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
     sector, Leda le pregunta si la acepta y le avisa a quien delegó. Al construirlo cambian las
     respuestas a "me la podés pasar a Nahuel" de las conversaciones 12 y 19, que hoy dicen que no se hace
@@ -1973,7 +2006,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 4: bloqueos encadenados y avisos hacia abajo (decisión 6; 35, `0044`).
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
-- [ ] C-7, delegar (ADR 0017, enmienda a la decisión 2).
+- [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
+- [ ] Las decisiones 24 a 28 del usuario (2026-10-09), con test primero.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
       primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo).

@@ -33,7 +33,7 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-09, noche, trabajo solo)
+## Punto exacto para retomar (2026-10-09, mañana, con el usuario)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
 Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 23 (**todas las
@@ -48,20 +48,23 @@ no quede un escuchador viejo corriendo.
 conversación 30, `0040`), la `0041` (RLS forzado en cinco tablas de configuración y una prueba que
 recorre todas), pedir el enlace a la página por chat (conversación 31), la C-5 entera
 (perseguir un bloqueo, decisiones 4 a 7; conversaciones 32 a 36, `0042` a `0044`), el pedido de estado
-de la C-6 (conversación 37; el informe al grupo, `PENDIENTE`) y la enmienda al ADR 0017 para delegar,
+de la C-6 (conversación 37; el informe al grupo, `PENDIENTE`) y la C-7, delegar
+(conversación 38, `0045`). Con el usuario a la mañana: sus decisiones 24 a 28 (en el plan) y la enmienda al ADR 0017 para delegar,
 aceptada por el usuario. Todo revisado por tramos y subido; la lista de tareas y las preguntas
 juntadas para el usuario, en el plan ("Próximo paso").
 
 **Lo que sigue (pedido del usuario: avanzar todo lo posible solo, sin esperar pruebas):**
-1. **C-7, delegar** (ADR 0017, enmienda a la decisión 2, aceptada), con su conversación de
-   prueba primero (desde la 38).
-2. **El informe al grupo de la C-6**, cuando exista el grupo en Telegram y con la decisión de los atrasos.
-3. **La porción 5:** el acceso del administrador por el bot de administración.
-4. **Las pruebas pendientes van juntas, en una tanda posterior** (pedido del usuario): la IA real
-   sobre la 03, 05, 21, 23, 27, 28 y 30 a 37 (una vez, sin repetir sin preguntar) y la prueba por
-   Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo; autorizado) y el guion en
+1. **Construir las decisiones 24 a 28** (plan, "Preguntas al usuario"), con test primero: el
+   informe de la cadena (C-5) y el pase sin respuesta, el encargado que pasa una tarea de su gente
+   y la tarea que pasa a quien la revisaba (C-7).
+2. **El informe al grupo de la C-6** (decisión 25): el usuario crea el grupo en Telegram; falta el
+   camino de un aviso al grupo y ver cómo toma Leda su identificador.
+3. **Seguir con las preguntas al usuario**, de a una y con ejemplos simples (plan, "Próximo paso").
+4. **La porción 5:** el acceso del administrador por el bot de administración.
+5. **Las pruebas pendientes van juntas, en una tanda posterior** (pedido del usuario): la IA real
+   sobre la 03, 05, 21, 23, 27, 28 y 30 a 38 (una vez, sin repetir sin preguntar) y la prueba por
+   Telegram, con `leda_motor` al día hasta la `0045` (respaldo previo; autorizado) y el guion en
    tandas cortas de unos 15 minutos.
-5. **Las preguntas para el usuario**, juntas en el plan.
 
 **La IA real:** antes de cada ronda, comprobar el cupo (`leda chatgpt estado`); una ronda por vez y ninguna
 repetición sin preguntarle al usuario. El corredor se corta solo al primer error de cupo (sale con 4). Si se
