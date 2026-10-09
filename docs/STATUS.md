@@ -46,15 +46,14 @@ no quede un escuchador viejo corriendo.
 
 **Lo hecho la noche del 2026-10-09 (sola, con el usuario dormido):** la D5b (decisión 21,
 conversación 30, `0040`), la `0041` (RLS forzado en cinco tablas de configuración y una prueba que
-recorre todas), pedir el enlace a la página por chat (conversación 31), la C-5 porción 1
-(escribirle a quien destraba, conversación 32, `0042`) y la enmienda al ADR 0017 para delegar,
+recorre todas), pedir el enlace a la página por chat (conversación 31), la C-5 porciones 1 a 3
+(escribirle a quien destraba, "ya hablé con él" y "no me corresponde"; conversaciones 32 a 34) y la enmienda al ADR 0017 para delegar,
 aceptada por el usuario. Todo revisado por tramos y subido; la lista de tareas y las preguntas
 juntadas para el usuario, en el plan ("Próximo paso").
 
 **Lo que sigue (pedido del usuario: avanzar todo lo posible solo, sin esperar pruebas):**
-1. **C-5, porciones 2 a 5** (decisiones 4 a 7), cada una con su conversación de prueba primero
-   (desde la 33): "ya hablé con él" de quien destraba; "no me corresponde" con un salto y la
-   cadena al referente; bloqueos encadenados; el bloqueo viejo.
+1. **C-5, porciones 4 y 5** (decisiones 6 y 7), cada una con su conversación de prueba primero
+   (desde la 35): bloqueos encadenados y avisos hacia abajo; el bloqueo viejo.
 2. **C-6, las cadencias** (decisión 8) y **C-7, delegar** (ADR 0017, enmienda a la decisión 2).
 3. **La porción 5:** el acceso del administrador por el bot de administración.
 4. **Las pruebas pendientes van juntas, en una tanda posterior** (pedido del usuario): la IA real
