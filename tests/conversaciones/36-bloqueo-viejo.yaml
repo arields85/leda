@@ -1,0 +1,187 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/36-bloqueo-viejo.md
+numero: "36"
+titulo: "El bloqueo viejo"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+foco: [PLC, HMI]
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  HMI:
+    titulo: Instalar el panel HMI de la comprimidora
+    criterio: "El panel HMI muestra el estado de la comprimidora y permite arrancarla y pararla desde la planta"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-20 10:20"
+    escribe: "estoy trabado con el plc me falta la ip del servidor de corelabs"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC, causa: "me falta la ip del servidor de corelabs"}
+    efectos:
+      estados: {PLC: bloqueada}
+      bloqueos: [{tarea: PLC, causa: presente}]
+    pregunta: {tipo: quien_destraba, tarea: PLC}
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:22"
+    escribe: "me la tiene q pasar ariel"
+    jugadas:
+      - {nombre: anotar_quien_destraba, quien: "ariel", puede_traer: [tarea]}
+    efectos:
+      destraban: [{tarea: PLC, integrante: Ariel, alguien: true, no_sabe: false, de: Marcos}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: PLC, a: Ariel, estado: guardado}
+    pregunta: null
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-20 10:32"]
+    salen:
+      - {a: Ariel, tipo: pregunta_a_quien_destraba, tarea: PLC}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLC}
+
+  - paso: 4
+    quien: Ariel
+    a_las: "2026-10-20 11:00"
+    escribe: "te la paso el jueves"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: PLC, para_cuando: "2026-10-22",
+         puede_traer: [lo_que_dice]}
+    efectos:
+      dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: "2026-10-22", ya_esta: false}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado}
+    pregunta: null
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-20 11:10"]
+    salen:
+      - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: PLC}
+
+  - paso: 6
+    quien: Ariel
+    a_las: "2026-10-22 16:00"
+    escribe: "se me complico con otra cosa, no llego, la tengo el lunes"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: PLC, para_cuando: "2026-10-26",
+         puede_traer: [lo_que_dice]}
+    efectos:
+      dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: "2026-10-26", ya_esta: false}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado}
+    pregunta: null
+
+  - paso: 7
+    quien: Leda
+    relojes: ["2026-10-22 16:10"]
+    salen:
+      - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: PLC,
+         hechos: {dice_quien_destraba: {para_cuando: "2026-10-26"}}}
+
+  - paso: 8
+    quien: Marcos
+    a_las: "2026-10-26 10:20"
+    escribe: "el hmi tambien esta parado, ariel tiene q liberar la licencia"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: HMI, causa: "ariel tiene q liberar la licencia"}
+      - {nombre: anotar_quien_destraba, quien: "ariel", puede_traer: [tarea]}
+    efectos:
+      estados: {HMI: bloqueada}
+      bloqueos: [{tarea: HMI, causa: presente}]
+      destraban: [{tarea: HMI, integrante: Ariel, alguien: true, no_sabe: false, de: Marcos}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: HMI, a: Ariel, estado: guardado}
+    pregunta: null
+
+  - paso: 9
+    quien: Leda
+    relojes: ["2026-10-26 10:30"]
+    salen:
+      - {a: Ariel, tipo: pregunta_a_quien_destraba, tarea: HMI}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: HMI}
+
+  - paso: 10
+    quien: Ariel
+    a_las: "2026-10-26 10:45"
+    escribe: "la licencia la libero hoy a la tarde"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: HMI, para_cuando: "2026-10-26",
+         puede_traer: [lo_que_dice]}
+    efectos:
+      dicen_quien_destraba: [{tarea: HMI, de: Ariel, para_cuando: "2026-10-26", ya_esta: false}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: HMI, a: Marcos, estado: guardado}
+    pregunta: null
+
+  # El bloqueo del PLC lleva cuatro días hábiles: nada sale por él.
+  - paso: 11
+    quien: Leda
+    relojes: ["2026-10-26 10:55"]
+    salen:
+      - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: HMI}
+
+  - paso: 12
+    quien: Marcos
+    a_las: "2026-10-26 15:00"
+    escribe: "listo ya tengo la licencia sigo con el hmi"
+    jugadas:
+      - {nombre: destrabar, tarea: HMI}
+    efectos:
+      estados: {HMI: en_curso}
+      bloqueos_resueltos: [HMI]
+    pregunta: null
+
+  - paso: 13
+    quien: Leda
+    relojes: ["2026-10-27 10:00"]
+    salen:
+      - a: Ismael
+        tipo: bloqueo_que_sigue_abierto
+        tarea: PLC
+        hechos: {necesita_respuesta: false, responsable: Marcos Tarquini, causa: presente,
+                 trabada_desde: "2026-10-20", dias_habiles_trabada: 5,
+                 historia: [{el: "2026-10-20", de: Marcos Tarquini, le_toca_a: Ariel De Simone},
+                            {el: "2026-10-20", de: Ariel De Simone, para_cuando: "2026-10-22"},
+                            {el: "2026-10-22", de: Ariel De Simone, para_cuando: "2026-10-26"}]}
+    dice:
+      - "a Ismael: que Marcos está trabado con la tarea del PLC desde el martes 20 (mar 20/10), hace cinco días hábiles, porque le falta la IP del servidor de CoreLabs"
+      - "a Ismael: la historia: Marcos dijo que se la pasa Ariel; Ariel dijo que el jueves (jue 22/10) y después que el lunes (lun 26/10), porque se le complicó"
+      - "a Ismael: que no hace falta responder, en el último renglón"
+    no_dice:
+      - "a Ismael: una pregunta"
+      - "a Ismael: algo del panel HMI"
+
+  - paso: 14
+    quien: Ismael
+    a_las: "2026-10-27 10:40"
+    escribe: "y eso quien lo tiene q resolver?"
+    jugadas: []
+    efectos: {}
+    pregunta: null
+    dice:
+      - que lo destraba Ariel, que dio el lunes 26 y todavía no lo resolvió
+
+  # Ya se informó: no sale otra vez.
+  - paso: 15
+    quien: Leda
+    relojes: ["2026-10-28 10:00"]
+    salen: []

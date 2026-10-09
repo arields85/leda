@@ -1,0 +1,476 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/35-bloqueos-encadenados.md
+numero: "35"
+titulo: "Bloqueos encadenados"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+foco: [PLC, SRV, TAB, PLA]
+
+tareas:
+  SRV:
+    titulo: Configurar el servidor de CoreLabs de la comprimidora
+    criterio: "El servidor de CoreLabs de la comprimidora tiene su IP fija en la red de planta y responde desde el PLC"
+    responsable: Ariel
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+    depende_de: SRV
+  TAB:
+    titulo: Armar el tablero eléctrico de la comprimidora
+    criterio: "El tablero eléctrico de la comprimidora está armado con todos sus guardamotores y probado sin carga"
+    responsable: Mariano
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  PLA:
+    titulo: Dibujar los planos eléctricos de la comprimidora
+    criterio: "Los planos eléctricos de la comprimidora están en DWG, con todos los componentes del tablero, y los revisó quien arma el tablero"
+    responsable: Nahuel
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-20 10:20"
+    escribe: "estoy trabado con el plc me falta la ip del servidor de corelabs"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC, causa: "me falta la ip del servidor de corelabs"}
+    efectos:
+      estados: {PLC: bloqueada}
+      bloqueos: [{tarea: PLC, causa: presente}]
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC, pregunta: quien_destraba,
+         avisos_a_quienes_esperan: ausente}
+    pregunta: {tipo: quien_destraba, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+    dice:
+      - que quedó anotado el bloqueo
+      - "una sola pregunta: quién lo puede destrabar"
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:22"
+    escribe: "me la tiene q pasar ariel"
+    jugadas:
+      - {nombre: anotar_quien_destraba, quien: "ariel", puede_traer: [tarea]}
+    efectos:
+      destraban: [{tarea: PLC, integrante: Ariel, alguien: true, no_sabe: false, de: Marcos}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: PLC, a: Ariel, estado: guardado}
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado,
+         se_le_pregunta_a: {a: Ariel De Simone, llega: "~2026-10-20T10:32"}}
+    pregunta: null
+    dice:
+      - que Leda le pregunta a Ariel y le avisa apenas sepa algo
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-20 10:32"]
+    salen:
+      - a: Ariel
+        tipo: pregunta_a_quien_destraba
+        tarea: PLC
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Marcos Tarquini, causa: presente}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLC}
+      esperas_abiertas: [PLC]
+
+  - paso: 4
+    quien: Ariel
+    a_las: "2026-10-20 11:00"
+    escribe: "todavia no la tengo, estoy parado con el servidor xq falta el switch nuevo, lo pone lucas"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: SRV, causa: "falta el switch nuevo"}
+      - {nombre: anotar_quien_destraba, quien: "lucas", puede_traer: [tarea]}
+    # Los dos bloqueos quedan enlazados: la tarea del PLC depende de la del servidor y la destraba
+    # Ariel. La pregunta de Ariel por la tarea del PLC se cierra (está trabado con eso), y a Marcos
+    # le llega que Ariel se trabó, como información.
+    efectos:
+      estados: {SRV: bloqueada}
+      bloqueos: [{tarea: SRV, causa: presente}]
+      destraban: [{tarea: SRV, integrante: Lucas, alguien: true, no_sabe: false, de: Ariel}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: SRV, a: Lucas, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                    responsable: Ariel De Simone, causa: presente}}
+        - {tipo: novedad_de_lo_que_espera, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: false, causa: presente,
+                    esperando_a: [{de: Ariel De Simone, tarea: SRV}],
+                    novedad: {de: Ariel De Simone, tarea: SRV, se_trabo: {causa: presente}}}}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: SRV,
+         avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Marcos Tarquini, tarea: PLC,
+                                                            llega: "~2026-10-20T11:10"}}]}
+      - {jugada: anotar_quien_destraba, resultado: anotado,
+         se_le_pregunta_a: {a: Lucas Natuche, llega: "~2026-10-20T11:10"}}
+    pregunta: null
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: null
+      esperas_abiertas: []
+    dice:
+      - que quedó anotado que está trabado con el servidor y que lo destraba Lucas
+      - que Leda le pregunta a Lucas
+      - que Marcos se va a enterar
+    no_dice:
+      - una pregunta por la tarea del PLC
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-20 11:10"]
+    salen:
+      - a: Lucas
+        tipo: pregunta_a_quien_destraba
+        tarea: SRV
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Ariel De Simone, causa: presente}
+      - a: Marcos
+        tipo: novedad_de_lo_que_espera
+        tarea: PLC
+        hechos: {necesita_respuesta: false,
+                 esperando_a: [{de: Ariel De Simone, tarea: SRV}],
+                 novedad: {de: Ariel De Simone, tarea: SRV,
+                           se_trabo: {causa: presente, lo_destraba: Lucas Natuche}}}
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: SRV}
+      esperas_abiertas: [SRV]
+    dice:
+      - "a Marcos: que Ariel, que le tiene que pasar la IP, está trabado con la tarea del servidor porque falta el switch nuevo, y que eso lo destraba Lucas"
+      - "a Marcos: que no hace falta responder, en el último renglón"
+    no_dice:
+      - "a Marcos: que la tarea del PLC se destrabó"
+
+  - paso: 6
+    quien: Lucas
+    a_las: "2026-10-20 11:30"
+    escribe: "el switch llega el jueves, a la tarde lo dejo andando"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: SRV, para_cuando: "2026-10-22",
+         puede_traer: [lo_que_dice]}
+    efectos:
+      dicen_quien_destraba: [{tarea: SRV, de: Lucas, para_cuando: "2026-10-22", ya_esta: false}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: SRV, a: Ariel, estado: guardado,
+           hechos: {necesita_respuesta: false, quien_destraba: Lucas Natuche,
+                    dice_quien_destraba: {para_cuando: "2026-10-22"}}}
+        - {tipo: novedad_de_lo_que_espera, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: false,
+                    esperando_a: [{de: Ariel De Simone, tarea: SRV}],
+                    novedad: {de: Ariel De Simone, tarea: SRV, quien_destraba: Lucas Natuche,
+                              dice_quien_destraba: {para_cuando: "2026-10-22"}}}}
+    hechos:
+      - {jugada: decir_cuando_destraba, resultado: anotado, tarea: SRV,
+         aviso_a_quien_esta_trabado: {a: Ariel De Simone, llega: "~2026-10-20T11:40"},
+         avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Marcos Tarquini, tarea: PLC,
+                                                            llega: "~2026-10-20T11:40"}}]}
+    pregunta: null
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: null
+      esperas_abiertas: []
+    dice:
+      - que quedó anotado
+      - que Ariel se va a enterar
+
+  - paso: 7
+    quien: Leda
+    relojes: ["2026-10-20 11:40"]
+    salen:
+      - a: Ariel
+        tipo: lo_que_dijo_quien_destraba
+        tarea: SRV
+        hechos: {necesita_respuesta: false, quien_destraba: Lucas Natuche,
+                 dice_quien_destraba: {para_cuando: "2026-10-22"}}
+      - a: Marcos
+        tipo: novedad_de_lo_que_espera
+        tarea: PLC
+        hechos: {necesita_respuesta: false,
+                 novedad: {de: Ariel De Simone, tarea: SRV, quien_destraba: Lucas Natuche,
+                           dice_quien_destraba: {para_cuando: "2026-10-22"}}}
+    dice:
+      - "a Ariel: que Lucas dice que deja el switch andando el jueves (jue 22/10) a la tarde"
+      - "a Marcos: que Lucas, que destraba la tarea del servidor de Ariel, dice que la resuelve el jueves (jue 22/10)"
+      - "a Marcos: que no hace falta responder, en el último renglón"
+    no_dice:
+      - "a Marcos: que la tarea del PLC se destrabó"
+
+  - paso: 8
+    quien: Lucas
+    a_las: "2026-10-22 15:00"
+    escribe: "listo ya quedo instalado el switch"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: SRV, ya_esta: true, puede_traer: [lo_que_dice]}
+    efectos:
+      dicen_quien_destraba: [{tarea: SRV, de: Lucas, ya_esta: true}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: SRV, a: Ariel, estado: guardado,
+           hechos: {dice_quien_destraba: {ya_esta: true}}}
+        - {tipo: novedad_de_lo_que_espera, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {novedad: {de: Ariel De Simone, tarea: SRV, quien_destraba: Lucas Natuche,
+                              dice_quien_destraba: {ya_esta: true}}}}
+    hechos:
+      - {jugada: decir_cuando_destraba, resultado: anotado, tarea: SRV,
+         aviso_a_quien_esta_trabado: {a: Ariel De Simone, llega: "~2026-10-22T15:10"},
+         avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Marcos Tarquini, tarea: PLC,
+                                                            llega: "~2026-10-22T15:10"}}]}
+    pregunta: null
+    dice:
+      - que quedó anotado
+    no_dice:
+      - que la tarea del servidor se destrabó
+
+  - paso: 9
+    quien: Leda
+    relojes: ["2026-10-22 15:10"]
+    salen:
+      - a: Ariel
+        tipo: lo_que_dijo_quien_destraba
+        tarea: SRV
+        hechos: {dice_quien_destraba: {ya_esta: true}}
+      - a: Marcos
+        tipo: novedad_de_lo_que_espera
+        tarea: PLC
+        hechos: {necesita_respuesta: false,
+                 novedad: {de: Ariel De Simone, tarea: SRV, quien_destraba: Lucas Natuche,
+                           dice_quien_destraba: {ya_esta: true}}}
+    dice:
+      - "a Ariel: que Lucas dice que ya está; que cuando pueda seguir, lo diga"
+      - "a Marcos: que Lucas dice que el switch de la tarea del servidor de Ariel ya está instalado"
+      - "a Marcos: que no hace falta responder, en el último renglón"
+
+  - paso: 10
+    quien: Ariel
+    a_las: "2026-10-22 15:30"
+    escribe: "buenisimo ya sigo con el servidor"
+    jugadas:
+      - {nombre: destrabar, tarea: SRV}
+    efectos:
+      estados: {SRV: en_curso}
+      bloqueos_resueltos: [SRV]
+      avisos_guardados:
+        - {tipo: novedad_de_lo_que_espera, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {novedad: {de: Ariel De Simone, tarea: SRV, se_destrabo: true}}}
+    hechos:
+      - {jugada: destrabar, resultado: anotado, tarea: SRV, estado: en_curso,
+         avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Marcos Tarquini, tarea: PLC,
+                                                            llega: "~2026-10-22T15:40"}}]}
+    pregunta: null
+    dice:
+      - que quedó anotado que sigue con el servidor
+      - que Marcos se va a enterar
+
+  - paso: 11
+    quien: Leda
+    relojes: ["2026-10-22 15:40"]
+    salen:
+      - a: Marcos
+        tipo: novedad_de_lo_que_espera
+        tarea: PLC
+        hechos: {necesita_respuesta: false,
+                 esperando_a: [{de: Ariel De Simone, tarea: SRV}],
+                 novedad: {de: Ariel De Simone, tarea: SRV, se_destrabo: true}}
+    dice:
+      - "a Marcos: que Ariel ya pudo seguir con la tarea del servidor"
+      - "a Marcos: que no hace falta responder, en el último renglón"
+    no_dice:
+      - "a Marcos: que la tarea del PLC se destrabó"
+
+  - paso: 12
+    quien: Ariel
+    a_las: "2026-10-22 15:45"
+    escribe: "la ip se la paso a marcos mañana temprano"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: PLC, para_cuando: "2026-10-23",
+         puede_traer: [lo_que_dice]}
+    efectos:
+      dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: "2026-10-23", ya_esta: false}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {quien_destraba: Ariel De Simone,
+                    dice_quien_destraba: {para_cuando: "2026-10-23"}}}
+    hechos:
+      - {jugada: decir_cuando_destraba, resultado: anotado, tarea: PLC,
+         aviso_a_quien_esta_trabado: {a: Marcos Tarquini, llega: "~2026-10-22T15:55"},
+         avisos_a_quienes_esperan: ausente}
+    pregunta: null
+    dice:
+      - que quedó anotado
+      - que Marcos se va a enterar
+
+  - paso: 13
+    quien: Leda
+    relojes: ["2026-10-22 15:55"]
+    salen:
+      - a: Marcos
+        tipo: lo_que_dijo_quien_destraba
+        tarea: PLC
+        hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
+                 dice_quien_destraba: {para_cuando: "2026-10-23"}}
+    dice:
+      - "a Marcos: que Ariel dice que le pasa la IP mañana (vie 23/10) temprano"
+
+  # --- La otra cadena: el enlace lo dice quien destraba -------------------------------------
+  - paso: 14
+    quien: Mariano
+    a_las: "2026-10-23 10:20"
+    escribe: "estoy parado con el tablero me faltan los guardamotores, los pide lucas"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: TAB, causa: "me faltan los guardamotores"}
+      - {nombre: anotar_quien_destraba, quien: "lucas", puede_traer: [tarea]}
+    efectos:
+      estados: {TAB: bloqueada}
+      bloqueos: [{tarea: TAB, causa: presente}]
+      destraban: [{tarea: TAB, integrante: Lucas, alguien: true, no_sabe: false, de: Mariano}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: TAB, a: Lucas, estado: guardado}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: TAB, avisos_a_quienes_esperan: ausente}
+      - {jugada: anotar_quien_destraba, resultado: anotado,
+         se_le_pregunta_a: {a: Lucas Natuche, llega: "~2026-10-23T10:30"}}
+    pregunta: null
+
+  - paso: 15
+    quien: Leda
+    relojes: ["2026-10-23 10:30"]
+    salen:
+      - a: Lucas
+        tipo: pregunta_a_quien_destraba
+        tarea: TAB
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Mariano Naim, causa: presente}
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: TAB}
+
+  - paso: 16
+    quien: Nahuel
+    a_las: "2026-10-23 10:45"
+    escribe: "estoy trabado con los planos necesito el tablero armado, eso lo tiene mariano"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLA, causa: "necesito el tablero armado"}
+      - {nombre: anotar_quien_destraba, quien: "mariano", puede_traer: [tarea]}
+    efectos:
+      estados: {PLA: bloqueada}
+      bloqueos: [{tarea: PLA, causa: presente}]
+      destraban: [{tarea: PLA, integrante: Mariano, alguien: true, no_sabe: false, de: Nahuel}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: PLA, a: Mariano, estado: guardado}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLA}
+      - {jugada: anotar_quien_destraba, resultado: anotado,
+         se_le_pregunta_a: {a: Mariano Naim, llega: "~2026-10-23T10:55"}}
+    pregunta: null
+
+  - paso: 17
+    quien: Leda
+    relojes: ["2026-10-23 10:55"]
+    salen:
+      - a: Mariano
+        tipo: pregunta_a_quien_destraba
+        tarea: PLA
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Nahuel Gimenez, causa: presente}
+    estado_despues:
+      de: Mariano
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLA}
+
+  - paso: 18
+    quien: Mariano
+    a_las: "2026-10-23 11:15"
+    escribe: "no puedo hasta tener los guardamotores, sigo parado con el tablero"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: PLA, su_tarea_trabada: TAB,
+         puede_traer: [lo_que_dice]}
+    # El enlace lo dice Mariano: lo que le falta a Nahuel espera el bloqueo del tablero.
+    efectos:
+      dicen_quien_destraba: [{tarea: PLA, de: Mariano, ya_esta: false, espera_la_tarea: TAB}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: PLA, a: Nahuel, estado: guardado,
+           hechos: {necesita_respuesta: false, quien_destraba: Mariano Naim,
+                    dice_quien_destraba: {su_tarea_trabada: {tarea: TAB, causa: presente,
+                                                             lo_destraba: Lucas Natuche}}}}
+    hechos:
+      - {jugada: decir_cuando_destraba, resultado: anotado, tarea: PLA,
+         dice_quien_destraba: {su_tarea_trabada: {tarea: TAB}},
+         aviso_a_quien_esta_trabado: {a: Nahuel Gimenez, llega: "~2026-10-23T11:25"}}
+    pregunta: null
+    estado_despues:
+      de: Mariano
+      pregunta_abierta: null
+      esperas_abiertas: []
+    dice:
+      - que quedó anotado
+      - que Nahuel se va a enterar
+
+  - paso: 19
+    quien: Leda
+    relojes: ["2026-10-23 11:25"]
+    salen:
+      - a: Nahuel
+        tipo: lo_que_dijo_quien_destraba
+        tarea: PLA
+        hechos: {necesita_respuesta: false, quien_destraba: Mariano Naim,
+                 dice_quien_destraba: {su_tarea_trabada: {tarea: TAB, causa: presente,
+                                                          lo_destraba: Lucas Natuche}}}
+    dice:
+      - "a Nahuel: que Mariano no puede hasta tener los guardamotores, que está trabado con el tablero y que eso lo destraba Lucas"
+      - "a Nahuel: que no hace falta responder, en el último renglón"
+
+  - paso: 20
+    quien: Lucas
+    a_las: "2026-10-23 11:40"
+    escribe: "los guardamotores llegan el lunes"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: TAB, para_cuando: "2026-10-26",
+         puede_traer: [lo_que_dice]}
+    efectos:
+      dicen_quien_destraba: [{tarea: TAB, de: Lucas, para_cuando: "2026-10-26", ya_esta: false}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: TAB, a: Mariano, estado: guardado,
+           hechos: {quien_destraba: Lucas Natuche,
+                    dice_quien_destraba: {para_cuando: "2026-10-26"}}}
+        - {tipo: novedad_de_lo_que_espera, tarea: PLA, a: Nahuel, estado: guardado,
+           hechos: {necesita_respuesta: false,
+                    esperando_a: [{de: Mariano Naim, tarea: TAB}],
+                    novedad: {de: Mariano Naim, tarea: TAB, quien_destraba: Lucas Natuche,
+                              dice_quien_destraba: {para_cuando: "2026-10-26"}}}}
+    hechos:
+      - {jugada: decir_cuando_destraba, resultado: anotado, tarea: TAB,
+         aviso_a_quien_esta_trabado: {a: Mariano Naim, llega: "~2026-10-23T11:50"},
+         avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Nahuel Gimenez, tarea: PLA,
+                                                            llega: "~2026-10-23T11:50"}}]}
+    pregunta: null
+
+  - paso: 21
+    quien: Leda
+    relojes: ["2026-10-23 11:50"]
+    salen:
+      - a: Mariano
+        tipo: lo_que_dijo_quien_destraba
+        tarea: TAB
+        hechos: {quien_destraba: Lucas Natuche, dice_quien_destraba: {para_cuando: "2026-10-26"}}
+      - a: Nahuel
+        tipo: novedad_de_lo_que_espera
+        tarea: PLA
+        hechos: {necesita_respuesta: false,
+                 novedad: {de: Mariano Naim, tarea: TAB, quien_destraba: Lucas Natuche,
+                           dice_quien_destraba: {para_cuando: "2026-10-26"}}}
+    dice:
+      - "a Mariano: que Lucas dice que los guardamotores llegan el lunes (lun 26/10)"
+      - "a Nahuel: que Lucas, que destraba el tablero de Mariano, dice que los guardamotores llegan el lunes (lun 26/10)"
+      - "a Nahuel: que no hace falta responder, en el último renglón"

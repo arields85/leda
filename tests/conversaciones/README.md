@@ -145,6 +145,16 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     también dice que no, que no sabe o nombra a otra, Leda le informa al referente con toda la cadena,
     sin pedirle nada, y a Nahuel, que está trabado, le dice que lo informa sin nombrar a quién
     (decisión 5 del usuario; porción 3 de la C-5).
+35. [`35-bloqueos-encadenados.md`](35-bloqueos-encadenados.md): los bloqueos se enlazan solos
+    (Marcos ← Ariel ← Lucas): por la dependencia cargada entre las dos tareas, o porque quien destraba
+    dice que está trabado con una tarea suya. Leda no le sigue preguntando a Ariel y sigue con quien
+    lo destraba; Marcos, más abajo, se entera de cada avance del medio con avisos informativos que no
+    piden respuesta (que Ariel se trabó, la fecha que da Lucas, que ya está, que Ariel pudo seguir)
+    (decisión 6 del usuario; porción 4 de la C-5).
+36. [`36-bloqueo-viejo.md`](36-bloqueo-viejo.md): un bloqueo que sigue abierto a los cinco días
+    hábiles se le informa al referente una sola vez, aunque la cadena se mueva, con la historia y las
+    fechas que dio cada uno; uno más nuevo o ya cerrado, no (decisión 7 del usuario; porción 5 de la
+    C-5).
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
@@ -296,7 +306,10 @@ efectos suman lo que dice quien destraba (`dicen_quien_destraba`: la tarea, de q
 dijo que ya está). Desde las porciones 2 y 3: quién dijo cada "lo destraba" (`destraban`, `de`), si
 quien destraba dijo que no le corresponde (`dicen_quien_destraba`, `no_le_corresponde`), y cada área
 tiene su referente técnico, como en el pack (`carga.REFERENTES`), a quien va la cadena de un bloqueo
-que nadie toma (la 34).
+que nadie toma (la 34). Desde las porciones 4 y 5: lo que dice quien destraba puede nombrar la tarea
+suya, trabada, con la que está trabado (`dicen_quien_destraba`, `espera_la_tarea`, por su clave; la
+jugada lo dice con `su_tarea_trabada`, también por su clave), y el espacio tiene los días hábiles del
+bloqueo viejo del pack (`bloqueos.escala_solo_a_los_dias`, 5).
 
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 
@@ -433,7 +446,9 @@ importa es el significado:
 - `decir_cuando_destraba`: quien puede destrabar una tarea de otra persona dice para cuándo lo
   resuelve, que ya está o lo que pasa; queda anotado y la persona trabada se entera (conversación
   32). Si dice que ya lo habló con la persona trabada (`ya_lo_hablaron`) sin decir para cuándo,
-  Leda le pregunta qué arreglaron y para cuándo (conversación 33).
+  Leda le pregunta qué arreglaron y para cuándo (conversación 33). Si dice que no puede porque
+  está trabado con una tarea suya (`su_tarea_trabada`), los dos bloqueos quedan enlazados
+  (conversación 35).
 - `decir_que_no_le_toca`: quien puede destrabar una tarea de otra persona dice que no le
   corresponde y, si lo sabe, quién se encarga; Leda sigue con esa persona una vez y, si tampoco,
   informa la cadena al referente (conversación 34).
