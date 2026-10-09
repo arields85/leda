@@ -126,6 +126,17 @@ La página de la tarea (ADR 0019, decisión 7):
     dice que ése no se lo puede pasar, sin enlace y sin decir quién la ve (lo que quedó de la
     porción 4 de la C-3).
 
+La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, decisiones 4 a 7):
+
+32. [`32-escribirle-a-quien-destraba.md`](32-escribirle-a-quien-destraba.md): Marcos dice quién
+    destraba una tarea suya y Leda le escribe a esa persona, como Leda, terminado el margen para
+    corregir: quién está trabado, con qué tarea y qué le falta, y para cuándo lo resuelve; a Marcos
+    le dice que le pregunta y que le avisa. Ariel contesta en su chat, queda anotado como un hecho
+    del bloqueo y a Marcos le llega lo que dijo, como información; un "ya está" no cierra el
+    bloqueo. A quien no tiene un chat con Leda no le escribe y lo dice; "no le escribas, ya hablé"
+    retira el mensaje que todavía no salió, y del que ya salió Leda dice que ya le llegó (decisión
+    4 del usuario, 2026-10-08, primera mitad; porción 1 de la C-5).
+
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
 
@@ -270,6 +281,11 @@ tiene que ser ése. No es una regla para todos los opcionales: un motivo o un co
 persona no dio como tal sigue siendo una falla donde el YAML no lo permite (la 08: "no llegó al 30"
 guardado como motivo le llegaría a Ismael).
 
+**La persecución del bloqueo** (porción 1 de la C-5): el estado inicial puede nombrar a las personas
+sin un chat con Leda (`sin_telegram`, como en el pack las que tienen su Telegram `PENDIENTE`), y los
+efectos suman lo que dice quien destraba (`dicen_quien_destraba`: la tarea, de quién, para cuándo y si
+dijo que ya está).
+
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 
 ## Formato de cada conversación
@@ -402,6 +418,11 @@ importa es el significado:
   (conversaciones 23 y 24).
 - `pedir_enlace`: la persona pide el enlace a la página de una tarea; sale sólo si puede verla
   (conversación 31).
+- `decir_cuando_destraba`: quien puede destrabar una tarea de otra persona dice para cuándo lo
+  resuelve, que ya está o lo que pasa; queda anotado y la persona trabada se entera (conversación
+  32).
+- `no_escribirle`: la persona trabada pide que Leda no le escriba a quien destraba; si el mensaje
+  todavía no salió, no sale (conversación 32).
 
 ## Decisiones del usuario (2026-10-04)
 

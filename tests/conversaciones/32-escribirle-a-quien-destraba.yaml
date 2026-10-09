@@ -1,0 +1,251 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/32-escribirle-a-quien-destraba.md
+numero: "32"
+titulo: "Escribirle a quien destraba"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+foco: [PLC, COM, HMI]
+# Mariano no tiene un chat con Leda (en el pack, su Telegram está PENDIENTE): Leda no le puede
+# escribir.
+sin_telegram: [Mariano]
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  HMI:
+    titulo: Instalar el panel HMI de la comprimidora
+    criterio: "El panel HMI muestra el estado de la comprimidora y permite arrancarla y pararla desde la planta"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-20 10:20"
+    escribe: "estoy trabado con el plc me falta la ip del servidor de corelabs"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC, causa: "me falta la ip del servidor de corelabs"}
+    efectos:
+      estados: {PLC: bloqueada}
+      bloqueos: [{tarea: PLC, causa: presente}]
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC, causa: presente,
+         pregunta: quien_destraba}
+    pregunta: {tipo: quien_destraba, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+    dice:
+      - que quedó anotado el bloqueo y su causa
+      - "una sola pregunta: quién lo puede destrabar"
+    no_dice:
+      - que Ismael se enteró o se va a enterar
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:22"
+    escribe: "eso me lo tiene que pasar ariel"
+    jugadas:
+      - {nombre: anotar_quien_destraba, quien: "ariel", puede_traer: [tarea]}
+    efectos:
+      destraban: [{tarea: PLC, integrante: Ariel, alguien: true, no_sabe: false}]
+      # El mensaje a Ariel: una pregunta, que sale terminado el margen para corregir.
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                    responsable: Marcos Tarquini, causa: presente}}
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente,
+         quien_destraba: {integrante: Ariel De Simone},
+         se_le_pregunta_a: {a: Ariel De Simone, llega: "~2026-10-20T10:32"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+      esperas_abiertas: []
+    dice:
+      - que quedó anotado que lo destraba Ariel
+      - que Leda le pregunta a Ariel para cuándo y le avisa a Marcos apenas sepa algo
+    no_dice:
+      - que ya le escribió a Ariel
+      - que le escribe en nombre de Marcos
+      - una fecha de Ariel que nadie dio
+      - que Ismael se entera
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-20 10:32"]
+    salen:
+      - a: Ariel
+        tipo: pregunta_a_quien_destraba
+        tarea: PLC
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Marcos Tarquini, causa: presente}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLC}
+      esperas_abiertas: [PLC]
+      ultimo_aviso: {Ariel: PLC}
+    dice:
+      - que Marcos está trabado con la tarea del PLC
+      - lo que le falta, como lo dijo Marcos (la IP del servidor de CoreLabs)
+      - "la pregunta: para cuándo se la puede pasar"
+    no_dice:
+      - que escribe en nombre de Marcos
+      - un reproche
+      - que se va a avisar a alguien si no contesta
+
+  - paso: 4
+    quien: Ariel
+    a_las: "2026-10-20 11:05"
+    escribe: "uh me olvide, mañana a la mañana se la paso"
+    jugadas:
+      - {nombre: decir_cuando_destraba, para_cuando: "2026-10-21",
+         puede_traer: [tarea, lo_que_dice]}
+    efectos:
+      dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: "2026-10-21", ya_esta: false}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
+                    dice_quien_destraba: {para_cuando: "2026-10-21"}}}
+    hechos:
+      - {jugada: decir_cuando_destraba, resultado: anotado, tarea: PLC,
+         dice_quien_destraba: {para_cuando: "2026-10-21"},
+         aviso_a_quien_esta_trabado: {a: Marcos Tarquini, llega: "~2026-10-20T11:15"}}
+    pregunta: null
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: null
+      esperas_abiertas: []
+    dice:
+      - que quedó anotado
+      - que Marcos se va a enterar
+    no_dice:
+      - que el bloqueo se cerró
+      - un reproche porque se olvidó
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-20 11:15"]
+    salen:
+      - a: Marcos
+        tipo: lo_que_dijo_quien_destraba
+        tarea: PLC
+        hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
+                 dice_quien_destraba: {para_cuando: "2026-10-21"}}
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - la tarea del PLC
+      - que Ariel dice que mañana (mié 21/10) a la mañana le pasa la IP
+      - que cuando pueda seguir, lo diga
+      - que no hace falta responder, en el último renglón
+    no_dice:
+      - que la tarea se destrabó
+
+  - paso: 6
+    quien: Marcos
+    a_las: "2026-10-20 11:40"
+    escribe: "con comunicaciones tambien estoy parado, falta que mariano termine el cableado del tablero"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: COM,
+         causa: "falta que mariano termine el cableado del tablero"}
+      - {nombre: anotar_quien_destraba, quien: "mariano", puede_traer: [tarea]}
+    efectos:
+      estados: {COM: bloqueada}
+      bloqueos: [{tarea: COM, causa: presente}]
+      destraban: [{tarea: COM, integrante: Mariano, alguien: true, no_sabe: false}]
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: COM}
+      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente,
+         se_le_pregunta_a: ausente,
+         no_se_le_puede_escribir_a: {a: Mariano Naim, motivo: destinatario_sin_telegram}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que quedó anotado el bloqueo y que lo destraba Mariano
+      - que a Mariano Leda no le puede escribir por acá
+      - que Marcos avise cuando se destrabe
+    no_dice:
+      - que le va a preguntar a Mariano
+      - que le avisa cuando sepa algo de Mariano
+
+  - paso: 7
+    quien: Marcos
+    a_las: "2026-10-20 14:00"
+    escribe: "el panel hmi tambien esta trabado, ariel tiene que liberar la licencia"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: HMI, causa: "ariel tiene que liberar la licencia"}
+      - {nombre: anotar_quien_destraba, quien: "ariel", puede_traer: [tarea]}
+    efectos:
+      estados: {HMI: bloqueada}
+      bloqueos: [{tarea: HMI, causa: presente}]
+      destraban: [{tarea: HMI, integrante: Ariel, alguien: true, no_sabe: false}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: HMI, a: Ariel, estado: guardado}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: HMI}
+      - {jugada: anotar_quien_destraba, resultado: anotado,
+         se_le_pregunta_a: {a: Ariel De Simone, llega: "~2026-10-20T14:10"}}
+    pregunta: null
+    dice:
+      - que quedó anotado el bloqueo y que lo destraba Ariel
+      - que le pregunta a Ariel y le avisa apenas sepa algo
+
+  - paso: 8
+    quien: Marcos
+    a_las: "2026-10-20 14:03"
+    escribe: "no le escribas a ariel, ya hable con el recien"
+    jugadas:
+      - {nombre: no_escribirle, tarea: HMI, quien: "ariel", puede_traer: [tarea, quien]}
+    efectos: {}
+    estado_avisos:
+      - {tipo: pregunta_a_quien_destraba, tarea: HMI, a: Ariel, estado: omitido,
+         motivo: pidio_que_no_le_escriba}
+    hechos:
+      - {jugada: no_escribirle, resultado: anotado, tarea: HMI,
+         se_le_pregunta_a: {a: Ariel De Simone, llega: no_le_va_a_llegar,
+                            motivo: pidio_que_no_le_escriba}}
+    pregunta: null
+    dice:
+      - que no le escribe a Ariel
+      - "el próximo paso: que Marcos avise cuando se destrabe"
+    no_dice:
+      - que ya le escribió
+
+  - paso: 9
+    quien: nadie
+    relojes: ["2026-10-20 14:10"]
+    salen: []
+
+  - paso: 10
+    quien: Marcos
+    a_las: "2026-10-20 15:00"
+    escribe: "y por lo del plc tampoco le escribas a ariel, ya lo hablamos"
+    jugadas:
+      - {nombre: no_escribirle, tarea: PLC, quien: "ariel", puede_traer: [quien]}
+    efectos: {}
+    hechos:
+      - {jugada: no_escribirle, resultado: no_se_puede, motivo: ya_se_le_escribio, tarea: PLC,
+         se_le_pregunta_a: {a: Ariel De Simone, llega: ya_le_llego, el: "2026-10-20"}}
+    pregunta: null
+    dice:
+      - que a Ariel ya le escribió esta mañana, y que no se puede retirar
+    no_dice:
+      - que lo retiró o que no le va a llegar

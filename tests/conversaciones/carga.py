@@ -21,7 +21,10 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   cada área y, por tipo, las clases que lo cubren y cómo se dice, de `espacios/corework.yaml`
   (ADR 0019, decisión 5); cada tarea pide lo de su área;
 - **lo mandado antes** (`mandado_antes`): fotos y archivos que la persona dijo que eran de una
-  tarea antes de entregarla (`archivo_de_tarea`), con el mensaje que los trajo.
+  tarea antes de entregarla (`archivo_de_tarea`), con el mensaje que los trajo;
+- **las personas sin un chat con Leda** (`sin_telegram`): como en el pack, donde su Telegram está
+  `PENDIENTE`; Leda no les puede escribir (C-5, conversación 32). Ninguna de ellas escribe en la
+  conversación.
 
 Lo que pasó antes en la conversación (avisos ya enviados, una pregunta ya contestada) no se
 escribe a mano: lo corre el motor mismo como **preludio** (`corredor.py`), así queda igual que
@@ -113,8 +116,18 @@ def cargar(conn, conversacion: dict[str, Any]) -> Mundo:
         pide = _politica(cur, mundo, conversacion.get("evidencia") or {})
         _tareas(cur, mundo, objetivo, conversacion.get("tareas") or {}, pide)
         _mandado_antes(cur, mundo, conversacion.get("mandado_antes") or [])
+        _sin_telegram(cur, mundo, conversacion.get("sin_telegram") or [])
     conn.commit()
     return mundo
+
+
+def _sin_telegram(cur, mundo: Mundo, personas: list[str]) -> None:
+    """Las personas que no conectaron su chat con Leda: sin Telegram, como lo dice el pack."""
+    for corto in personas:
+        persona = mundo.personas[corto]
+        cur.execute("update app_user set telegram_user_id = null where id = %s",
+                    (persona["app_user_id"],))
+        persona["telegram"] = None
 
 
 def _espacio(cur) -> tuple[Mundo, str]:
