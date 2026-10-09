@@ -89,7 +89,9 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
     revisión) y un video que no entra (Leda lo dice y propone un enlace o uno más corto).
 23. [`23-aprobacion.md`](23-aprobacion.md): "aprobado" que cierra; "aprobado" que no cierra porque falta
     otra cosa, dicho con honestidad; un pedido de cambios con su comentario; "aprobado, pero que
-    revise…", con una sola pregunta y dos botones; y quien no aprueba esa tarea intenta aprobarla.
+    revise…", con una sola pregunta y dos botones; quien no aprueba esa tarea intenta aprobarla; y la
+    entrega otra vez después del pedido de cambios, que no vuelve a pedir lo que ya dijo la primera
+    (decisión 23).
 24. [`24-quien-aprueba-no-contesta.md`](24-quien-aprueba-no-contesta.md): un recordatorio a quien aprueba
     por día hábil hasta que decide; el segundo avisa que al día siguiente se entera quien está arriba
     (Marcos → Ismael), que al tercero recibe un aviso sólo informativo, una vez, y después que se

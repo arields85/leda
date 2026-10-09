@@ -33,10 +33,13 @@ atajos).
 
 1. **Leda**, por su cuenta, a Ismael (viernes 23, 15:20): los tres avisos, que salen juntos.
    →
-   - El mensaje dice: que le entregaron 3 tareas para revisar; cada una en su renglón con 📋, con
-     quién la entregó y cuántas fotos trae (el dashboard, ninguna); el cierre, aparte: que toque una
-     para verla. Nunca "para aprobar" (decisión 18).
-   - El mensaje no dice: lo entregado pieza por pieza (eso se ve al tocar); que ya las aprobó.
+   - El mensaje dice: que le entregaron 3 tareas para revisar (cuántas son lo dice la cocina, como un
+     hecho: D8); cada una en su renglón con 📋, con quién la entregó y cuántas fotos trae (el
+     dashboard, ninguna); el cierre, aparte: que toque una para verla. Nunca "para aprobar" (decisión
+     18).
+   - El mensaje no dice: lo entregado pieza por pieza (eso se ve al tocar); que ya las aprobó; que la
+     apruebe o le pida cambios desde la lista (ahí se revisa: lo que significa el aviso de una entrega
+     sola no le llega a la IA, D8).
    - Botones: uno por tarea, en el orden de la lista ([Ver PLC] [Ver tablero] [Ver dashboard]). Sin
      fotos adjuntas, sin enlace y sin Aprobar ni Pedir cambios: son de cada entrega.
    - Es un solo mensaje: el tope diario cuenta mensajes, no lo que trae cada uno, y los avisos de

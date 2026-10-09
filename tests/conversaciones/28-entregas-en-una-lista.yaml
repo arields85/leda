@@ -80,6 +80,7 @@ pasos:
       - "el cierre, aparte: que toque una para verla"
     no_dice:
       - para aprobar
+      - que la apruebe o le pida cambios desde la lista (ahí se revisa; D8)
       - lo entregado pieza por pieza
 
   - paso: 2

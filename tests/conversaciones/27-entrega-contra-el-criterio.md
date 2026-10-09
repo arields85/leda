@@ -105,7 +105,9 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
 
 6. **Leda**, por su cuenta, a Ismael (jueves 22, 15:16, terminado el margen para corregir): el aviso
    de la entrega, con la foto adjunta y los botones "Aprobar" y "Pedir cambios", como en la
-   conversación 21. A Marcos, nada.
+   conversación 21. Lo de los 20 ciclos es el ejemplo que Marcos aceptó en el paso 4: el aviso dice
+   que lo aceptó o lo confirmó, nunca que lo escribió (D8). El cierre, sobre revisarla y decidir
+   (decisión 18). A Marcos, nada.
 
 7. **Marcos** escribe (15:20): "la foto sacala, era de otra maquina"
    →
@@ -147,7 +149,8 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
     - La respuesta no dice: el nombre de Ismael; que la tarea está terminada o aprobada.
 
 11. **Leda**, por su cuenta, a Ismael (15:55): el aviso nuevo de la entrega, con lo que describió
-    Marcos, la foto nueva adjunta y los botones. Nunca la foto retirada.
+    Marcos (lo de los 20 ciclos, como el ejemplo que aceptó), la foto nueva adjunta y los botones.
+    Nunca la foto retirada.
 
 12. **Marcos** manda (viernes 23, 10:00) una foto con el texto: "lo de comunicaciones ya esta, los equipos
    se comunicaron con el plc por la red de planta una hora sin errores"

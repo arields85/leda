@@ -223,17 +223,20 @@ pasos:
     hechos:
       - {jugada: confirmar, resultado: entregada, tarea: PLC, estado: en_revision,
          queda_esperando_la_aprobacion_de: Ismael Soschinski,
+         se_le_avisa_cuando_decida: true, se_le_avisa_si_hace_falta_algo_mas: true,
          aviso_a_quien_aprueba: {a: Ismael Soschinski, llega: "~2026-10-22T15:26"}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
     dice:
       - que quedó entregada y pasa a revisión
-      - que le avisa cuando la revisen o si hace falta algo más
+      - que le avisa cuando la revisen o si hace falta algo más, en primera persona
     no_dice:
       - que la tarea está terminada o aprobada
       - que Ismael ya la vio
       - el nombre de Ismael (no lo preguntó)
+      - a qué hora se entera quien la revisa (no lo preguntó)
+      - un ⚠️ porque está en revisión
       - la foto del martes
 
   # La pregunta de a quién se le avisó (decisión 11 del usuario, 2026-10-08): no lleva jugada y
@@ -275,7 +278,8 @@ pasos:
             - {es: lo_que_escribio}
             - {es: una_foto, va_adjunta: true}
             - {es: una_foto, va_adjunta: true}
-            - {es: lo_que_escribio}
+            # El ejemplo que aceptó: lo aceptó, no lo escribió (D8, migración 0039).
+            - {es: el_ejemplo_que_acepto}
             - {es: lo_que_escribio}
             - {es: una_foto, va_adjunta: true}
             - {es: un_archivo, nombre_del_archivo: comprimidora_v3.zip}
@@ -283,9 +287,11 @@ pasos:
     dice:
       - que Marcos entregó la tarea del PLC, en su renglón con 📋
       - lo que describió Marcos, en pocas palabras (arranca desde el PLC y 20 ciclos sin una falla)
+      - que la descripción de lo que faltaba Marcos la aceptó o la confirmó, no que la escribió
       - que van tres fotos adjuntas y que comprimidora_v3.zip está en la página de la tarea
-      - "el cierre, aparte: si la aprueba o le pide cambios, con los botones o escribiendo"
+      - "el cierre, aparte: que la revise y decida, con los botones o escribiendo"
     no_dice:
+      - que Marcos escribió la descripción que aceptó
       - la foto del martes
       - que la tarea está terminada
       - un juicio sobre lo que muestran las fotos

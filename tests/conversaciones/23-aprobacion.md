@@ -189,6 +189,21 @@ decisión 12 llama el comentario: va con la aprobación, no como un pedido de ca
     - El mensaje no dice: que Leda la aprobó o la cerró por su cuenta; que hace falta otra aprobación.
     - Estado de Marcos y de Ismael después: sin tema abierto.
 
+12. **Mariano** manda (miércoles 28, 11:30) una foto con el texto: "ahi va el diagrama del tablero"
+    →
+    - Jugadas: `entregar`, la tarea del tablero, otra vez, después del pedido de cambios del paso 6.
+      Lo que describió su primera entrega ("cableado segun el diagrama y paso continuidad y
+      aislacion") sigue contando, salvo lo que el pedido de cambios pidió cambiar (decisión 23 del
+      usuario, 2026-10-08, opción A; D8, paso 19 de la prueba por Telegram): la IA lo recibe, con lo
+      que pidió Ismael, y juzga lo nuevo junto con eso (`lo_descrito_cubre`).
+    - Efecto: ninguno todavía; la vista previa de la entrega nueva, con Confirmar.
+    - La respuesta dice: la entrega nueva, una pieza por renglón; que al confirmarla vuelve a
+      revisión, sin nombrar a Ismael; el cierre, aparte: si la entrega así.
+    - La respuesta no dice: que falta saber si quedó cableado según el diagrama o si pasó continuidad
+      y aislación (ya lo dijo en la primera entrega: decisión 10, nunca lo que ya dijo); que la tarea
+      quedó entregada o en revisión.
+    - Estado de Mariano después: lo mostrado para confirmar.
+
 ## Qué mide
 
 - **Garantías:** la aprobación es de quien la política designa, nunca de otro (paso 1) ni de Leda; el

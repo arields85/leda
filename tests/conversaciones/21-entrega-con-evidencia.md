@@ -131,10 +131,13 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
      mandó y cuándo; la tarea del PLC pasa de `en_curso` a `en_revision`, con evento de Marcos y auditoría. Nunca
      `terminada`. El aviso a Ismael queda guardado como hechos y sale terminado el margen para
      corregir, a las 15:26 (ADR 0018, 9n: es un aviso a otra persona por lo que dijo Marcos).
-   - La respuesta dice: que quedó entregada y pasa a revisión; el próximo paso: que le avisa cuando la
-     revisen o si hace falta algo más (decisiones 11 y 18 del 2026-10-08).
-   - La respuesta no dice: el nombre de Ismael (Marcos no lo preguntó); que la tarea está terminada o
-     aprobada; que Ismael ya la vio; la foto del martes.
+   - La respuesta dice: que quedó entregada y pasa a revisión; el próximo paso, en primera persona: que
+     le avisa cuando la revisen o si hace falta algo más (decisiones 11 y 18 del 2026-10-08; el texto
+     aprobado por el usuario en la D8: "Quedó entregada y pasa a revisión. Te aviso cuando la revisen o
+     si hace falta algo más.").
+   - La respuesta no dice: el nombre de Ismael ni a qué hora se entera (Marcos no lo preguntó: D8); que
+     la tarea está terminada o aprobada; que Ismael ya la vio; la foto del martes; un ⚠️ por estar en
+     revisión, que es el paso normal de una entrega (D8).
    - Estado después: sin tema abierto, nada mostrado para confirmar.
 
 7. **Marcos** escribe (15:20): "a quien le avisaste?"
@@ -155,12 +158,13 @@ botones Aprobar y Pedir cambios, y desde la 4, con el enlace a la página de la 
      Dos filas de la misma respuesta: el texto y, después, las tres fotos de hoy como álbum (nunca antes
      que el texto). Es un aviso de coordinación: fuera del tope diario (mecánica §10).
    - El mensaje dice: primero, que Marcos entregó; la tarea del PLC en su renglón con 📋; lo que describió
-     Marcos, en pocas palabras (20 ciclos sin una falla); que van tres fotos adjuntas y que
-     `comprimidora_v3.zip` está en la página; el cierre, aparte: que puede aprobarla o pedir cambios, con
-     los botones o contestando. Al final del texto, un enlace a la página de la tarea, que agrega el
+     Marcos, en pocas palabras (20 ciclos sin una falla); que la descripción de lo que faltaba (el
+     ejemplo del paso 2) Marcos la aceptó, nunca que la escribió (D8: la pieza lo guarda, migración
+     `0039`); que van tres fotos adjuntas y que `comprimidora_v3.zip` está en la página; el cierre,
+     aparte: que la revise y decida, con los botones o contestando (decisión 18). Al final del texto, un enlace a la página de la tarea, que agrega el
      código: la IA no lo ve ni lo escribe.
-   - El mensaje no dice: la foto del martes; que la tarea está terminada; un juicio sobre las fotos; un
-     identificador o una huella.
+   - El mensaje no dice: que Marcos escribió la descripción que aceptó; la foto del martes; que la tarea
+     está terminada; un juicio sobre las fotos; un identificador o una huella.
    - El enlace sale sin vista previa, para que Telegram no abra la página por su cuenta; en la base
      queda sólo su hash, y ni la salida ni el registro de turnos lo guardan (ADR 0019, decisión 6).
    - Botones: dos atajos, "Aprobar" y "Pedir cambios" (`odd/tasks/fase-c.md`, decisión 3; ADR 0018,

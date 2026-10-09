@@ -129,7 +129,9 @@ pasos:
       - {jugada: aprobar, resultado: anotado, tarea: PLC, comentario: presente,
          quedo_terminada: true, no_se_cierra_todavia: ausente,
          aviso_al_responsable: {a: Marcos Tarquini, llega: "~2026-10-26T10:30"},
-         queda_por_revisar: [{tarea: TAB}, {tarea: COM}, {tarea: DASH}]}
+         queda_por_revisar: [{tarea: TAB}, {tarea: COM}, {tarea: DASH}],
+         # El día hábil siguiente, del calendario del espacio (D8, G1).
+         se_las_recuerda_el: "2026-10-27"}
     pregunta: null
     # Lo que queda por revisar, con un botón por tarea (decisión 17, D4).
     botones: [Ver TAB, Ver COM, Ver DASH]
@@ -415,3 +417,37 @@ pasos:
     no_dice:
       - que Leda la aprobó o la cerró por su cuenta
       - que hace falta otra aprobación
+
+  # Decisión 23 del usuario (2026-10-08, opción A; D8, paso 19 de la prueba por Telegram):
+  # Mariano vuelve a entregar el tablero con lo que le pidieron (paso 6). Lo que describió su
+  # primera entrega (cableado según el diagrama, continuidad y aislación) sigue contando: la IA lo
+  # recibe con el pedido de cambios y juzga lo nuevo junto con eso. Leda no le vuelve a pedir lo
+  # que ya dijo.
+  - paso: 12
+    quien: Mariano
+    a_las: "2026-10-28 11:30"
+    escribe: "ahi va el diagrama del tablero"
+    manda: [{que: foto}]
+    jugadas:
+      - {nombre: entregar, tarea: TAB, lo_descrito_cubre: [C1],
+         puede_traer: [el_texto_cubre, lo_descrito_cubre]}
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: TAB, pregunta: confirmar_la_entrega,
+         le_falta_del_criterio: ausente, ejemplo: ausente,
+         entrega: [
+           {pieza: P1, es: lo_que_escribio, dice: "ahi va el diagrama del tablero",
+            describe: ["El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba de continuidad y de aislación"]},
+           {pieza: P2, es: una_foto}]}
+    pregunta: {tipo: confirmar_la_entrega, tarea: TAB}
+    botones: [Confirmar]
+    estado_despues:
+      de: Mariano
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: TAB}
+    dice:
+      - la entrega nueva, una pieza por renglón
+      - que al confirmarla vuelve a revisión, sin nombrar a Ismael
+      - "el cierre, aparte: si la entrega así"
+    no_dice:
+      - que falta saber si quedó cableado según el diagrama o si pasó continuidad y aislación (ya lo dijo en la primera entrega)
+      - que la tarea quedó entregada o en revisión
