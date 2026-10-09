@@ -69,6 +69,43 @@ Condiciones de la carga (usuario, 2026-10-04):
 **Anotado para más adelante: la aceptación dentro de Leda.** Quien decide las tareas las acepta en
 Leda. Se retoma cuando exista el formulario web, que es donde se haría; nunca por chat.
 
+**Enmienda propuesta, delegar por chat** (`PENDIENTE` de aceptación del usuario; escrita el
+2026-10-09 a partir de las decisiones del usuario del 2026-10-07 en `docs/ROADMAP.md` y de la
+decisión 9 de `odd/tasks/fase-c.md`, del 2026-10-08). Hasta que se acepte, no se escribe código.
+
+- **Qué cambia.** Crear y aceptar tareas sigue fuera del chat. Cambiar el responsable de una tarea
+  que ya existe pasa a poder hacerse por chat, sólo como delegación dentro de la cadena de mando
+  declarada en el pack. Cambia la última línea de la decisión 3b ("crear, aceptar, reasignar")
+  y el punto 2 de la decisión 7, para los responsables; las fechas siguen como están.
+- **Quién decide.** Decide quien manda sobre el que recibe, según el pack (`aprobado_por` de
+  quien recibe). Si quien pide la delegación es esa misma persona, su pedido es la decisión.
+  Ejemplo: Marcos le pasa "Revisar comunicaciones" a Nahuel; Nahuel tiene `aprobado_por: marcos`,
+  así que decide Marcos. Si Marcos se la quiere pasar a Lucas, de Infraestructura, decide Martín
+  (`aprobado_por` de Lucas).
+- **Pasos, con las garantías de siempre.** (1) Quien pide ve una vista previa ("📋 Revisar
+  comunicaciones pasa de Marcos a Nahuel") y confirma (constitución §7). (2) Si decide otra
+  persona, Leda se lo pregunta; si dice que no, la tarea sigue con quien la tenía y Leda se lo dice
+  a quien pidió. (3) Quien recibe confirma que la toma; si no la toma, la tarea sigue con quien la
+  tenía y Leda se lo dice a quien pidió. (4) Al aceptar, cambia el responsable y Leda le avisa a
+  quien pidió y, si no es la misma persona, a quien la tenía.
+- **Lo que no cambia.** La fecha objetivo, el criterio de aceptación y la evidencia siguen
+  iguales. El trabajo lo sigue revisando el aprobador de la tarea original. A Dirección no le llega
+  ningún aviso (decisión 9: "a Ismael no le interesa quién lo haga mientras se haga").
+- **Re-aprobación** (mecánica §7, cambio de responsable): la da quien decide en el paso 2, y la
+  auditoría guarda quién pidió, quién decidió, quién aceptó y el estado anterior, con la versión
+  del pack y del núcleo.
+- **Fuera del alcance.** Una persona sin nadie a cargo no delega por chat: Leda le dice quién
+  puede hacerlo (decisión 1, "es una persona concreta").
+- **Preguntas para el usuario antes de aceptar:**
+  1. ¿Un integrante (Nahuel) puede pedir pasarle su tarea a otro? Propuesta: sí; decide quien
+     manda sobre el que recibe, igual que arriba.
+  2. ¿Delegar una tarea que ya está en revisión o terminada? Propuesta: no; sólo asignada, en curso
+     o trabada, y si está trabada se mueve con su bloqueo abierto.
+  3. ¿"Quien manda sobre el que recibe" es `aprobado_por` o el referente del área? En CoreWork son
+     la misma persona para todos menos para los referentes, a quienes los aprueba Ismael. Propuesta:
+     `aprobado_por`, que ya existe y no necesita un dato nuevo. Consecuencia: pasarle una tarea a
+     un referente (Martín se la pasa a Marcos) lo decidiría Ismael, la única vez que interviene.
+
 ### 3. Qué hace Leda por chat en esta etapa
 
 #### 3a. El seguimiento persigue los bloqueos hasta quien puede destrabarlos (usuario, 2026-10-04)
