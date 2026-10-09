@@ -33,7 +33,7 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-08, cierre de la sesión con el usuario)
+## Punto exacto para retomar (2026-10-09, noche, trabajo solo)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
 Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 23 (**todas las
@@ -44,27 +44,25 @@ está caído, levantarlo con `levantar-postgres.bat` (o `pg_ctl ... start`, fuer
 que otro servidor puede estar en ejecución, cerrar los procesos `postgres` colgados y reintentar. Comprobar que
 no quede un escuchador viejo corriendo.
 
-**Lo hecho el 2026-10-08:** D1 a D8 construidas, revisadas por tramos y con la suite completa en verde
-(1659 passed sobre `792392b`). Rondas con la IA real: la D6 (01 a 29), y la D7 y la D7c (sólo las tocadas):
-garantías 20 de 20 en la última. La prueba por Telegram del usuario pasó en lo importante (nada sin
-confirmación, nada inventado, sin nombrar a Ismael por su cuenta) y dejó los arreglos de la D8 (el borrador
-"…" que quedaba, las fotos de la respuesta un ciclo tarde, "mañana" un viernes, "escribió" por "aceptó", el
-texto de la entrega confirmada, la lista sin "2 tareas para revisar"). Detalle en la bitácora y en el plan.
+**Lo hecho la noche del 2026-10-09 (sola, con el usuario dormido):** la D5b (decisión 21,
+conversación 30), la `0041` (RLS forzado en cinco tablas de configuración y una prueba que recorre
+todas), pedir el enlace a la página por chat (conversación 31) y la enmienda al ADR 0017 para
+delegar, aceptada por el usuario con sus tres respuestas. Todo revisado por tramos; detalle,
+commits y `PENDIENTE` en el plan. Antes, el 2026-10-08: D1 a D8 y la prueba por Telegram del
+usuario (bitácora).
 
 **Lo que sigue (pedido del usuario: avanzar todo lo posible solo, sin esperar pruebas):**
-1. **D5b** (decisión 21): la pregunta sin contestar. Primero su conversación de prueba con los dos órdenes de
-   respuesta, después el código.
-2. **Pedir el enlace a la página por chat** (una jugada nueva, con su conversación de prueba primero).
+1. **C-5, perseguir un bloqueo** (decisiones 4 a 7), por porciones, cada una con su conversación
+   de prueba primero (desde la 32): escribirle a quien destraba; "no le escribas, ya hablé"; "no
+   me corresponde" con un salto; bloqueos encadenados; el bloqueo viejo (`escala_solo_a_los_dias`
+   se importa y nadie lo lee).
+2. **C-6, las cadencias** (decisión 8) y **C-7, delegar** (ADR 0017, enmienda a la decisión 2).
 3. **La porción 5:** el acceso del administrador por el bot de administración.
-4. **Parte 2, perseguir un bloqueo** (decisiones 4 a 7), **parte 3, las cadencias** (8; hoy no corren en el
-   motor) y **parte 4, delegar** (9: antes del código, escribir la enmienda al ADR 0017, decisión 2, y
-   pedírsela al usuario; sin aviso a Ismael). Cada una: conversación de prueba primero.
-5. **Las pruebas pendientes van juntas, en una tanda posterior, no al empezar** (pedido del usuario): la
-   ronda con la IA real de la 21, la 23, la 27 y la 28 sobre la D8 (una vez, sin repetir sin preguntar) y
-   la prueba por Telegram de los arreglos de la D8, con `leda_motor` puesta al día con la `0039` (respaldo
-   previo; autorizado) y el guion en tandas cortas de unos 15 minutos.
-6. **Diez tablas con `workspace_id` sin `row level security`** (lista en `odd/tasks/fase-c.md`): ver si son
-   sólo de administración o si les falta, contra la invariante de `AGENTS.md`.
+4. **Las pruebas pendientes van juntas, en una tanda posterior** (pedido del usuario): la IA real
+   sobre la 21, la 23, la 27, la 28, la 30 y la 31 (una vez, sin repetir sin preguntar) y la
+   prueba por Telegram, con `leda_motor` al día hasta la `0041` (respaldo previo; autorizado) y el
+   guion en tandas cortas de unos 15 minutos.
+5. **Las preguntas juntadas para el usuario**, en el plan: las de la D5b y las del enlace.
 
 **La IA real:** antes de cada ronda, comprobar el cupo (`leda chatgpt estado`); una ronda por vez y ninguna
 repetición sin preguntarle al usuario. El corredor se corta solo al primer error de cupo (sale con 4). Si se
