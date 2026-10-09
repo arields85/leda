@@ -661,6 +661,23 @@ SIGNIFICADOS: Mapping[str, str] = {
     "de_la_lista": "Las tareas de la lista por las que Leda pregunta: las que la persona todavía "
                    "no contó.",
     "vence_hoy": "La tarea vence hoy.",
+    # --- El informe al grupo (C-6, decisión 25; `informe_al_grupo.py`) -------------------------
+    "informe_al_grupo": "Mensaje al grupo del equipo, no a una persona: lo que pasó con las "
+                        "tareas del equipo desde el informe anterior, para que todos estén al "
+                        "tanto y puedan ayudar. Cada tarea con quién la tiene (la_tiene). Es "
+                        "información: no pide respuesta.",
+    "terminadas": "Las tareas que quedaron terminadas (aprobadas) desde el informe anterior.",
+    "atrasadas": "Las tareas cuyo atraso la persona ya habló con Leda en privado: el día en que "
+                 "vencían (vence) y, si los dio, el día que dio para terminarla y su motivo. Es "
+                 "información para el equipo.",
+    "trabadas": "Las tareas trabadas: lo que las traba como lo dijo la persona (causas), desde "
+                "cuándo, cuántos días hábiles lleva y, si quien la destraba dio un día, ese día "
+                "(para_cuando).",
+    "entregadas": "Las tareas entregadas que esperan la revisión.",
+    "siguen": "Las tareas que siguen su curso: cada una con su estado y el día en que vence.",
+    "nada_para_el_informe": "No había nada que contarle al grupo: ninguna tarea abierta ni "
+                            "terminada desde el informe anterior.",
+    "sin_grupo": "El espacio no tiene un grupo del equipo.",
     "ya_conto_como_viene": "La persona ya había contado cómo viene la tarea y no cambió nada: "
                            "no hacía falta preguntárselo ese día.",
     "ya_paso_su_momento": "El día de ese mensaje ya pasó: no se manda otro día.",

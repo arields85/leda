@@ -123,6 +123,10 @@ pedido queda dado por contestado (`cadencias.YA_LO_CONTO`), como el primer paso:
 anclada al vencimiento (mecánica §9) y, sin entregar, el día hábil siguiente sale el segundo pedido
 y el escalamiento llega el mismo día que sin la lista. El día de una previsión no se saltea.
 
+**El informe al grupo** (C-6; decisión 25 del usuario, 2026-10-09; conversación 41;
+`informe_al_grupo.py`): el día de una cadencia al grupo, la misma pasada guarda el informe de ese
+día para el grupo del espacio, a la hora de la cadencia.
+
 **Sin `aviso_previo_dias_habiles`** (el plan lo dejó `PENDIENTE`): se usa el mínimo del núcleo,
 un día hábil (mecánica §9), y cada aviso previo que sale con él deja un incidente de severidad
 baja para el administrador: nunca en silencio, y sin escribir la configuración por su cuenta.
@@ -157,6 +161,7 @@ from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir
 from .avisos import BLOQUEO_QUE_SIGUE_ABIERTO, sigue_esperando_que_destrabe
 from .bloqueo_viejo import informar_los_viejos
 from .cadencias import YA_LO_CONTO, guardar_los_pedidos, ya_lo_conto
+from .informe_al_grupo import INFORME_AL_GRUPO, guardar_los_informes
 from .pase import seguir_los_pases
 from .preguntas import COMO_VIENEN_SUS_TAREAS
 from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, lo_anotado
@@ -206,6 +211,10 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
         pedidos = guardar_los_pedidos(m)
         if pedidos:
             resumen[COMO_VIENEN_SUS_TAREAS] += pedidos
+        # El informe al grupo de la cadencia al grupo (C-6, decisión 25).
+        informes = guardar_los_informes(m)
+        if informes:
+            resumen[INFORME_AL_GRUPO] += informes
         n = dias_de_aviso_previo(cur, workspace_id)
         cur.execute("""select t.id from task t
                         where t.estado::text = any(%s) and t.fecha_objetivo is not null

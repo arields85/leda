@@ -15,9 +15,9 @@ la redacción lo recibe dentro de `solo_si_pregunta` (`hechos.NOMBRAN_A_QUIEN_AP
 **Si figura en el informe al grupo** es un hecho del código, no del momento: el espacio tiene un
 grupo (`workspace.grupo_chat_id`, del pack `telegram.grupo_gestion_id`) y al menos una cadencia
 activa al grupo (`cadence_job.audiencia = 'grupo'`, como `resumen_grupal` e `informe_semanal` de
-CoreWork). Es el predicado único que usa el informe al grupo (C-6, decisión 25, `PENDIENTE`):
-mientras ese informe no esté construido, el predicado dice lo que el pack declara, no lo que ya
-sale (`odd/tasks/fase-c.md`, C-5a).
+CoreWork) con un ritmo que se entiende (`cadencias.leer_ritmo`). Es el predicado único con el que
+el informe al grupo (C-6, decisión 25; `informe_al_grupo.py`) decide si se guarda: verdadero sólo
+cuando ese informe de verdad corre para el espacio.
 """
 
 from __future__ import annotations
@@ -31,14 +31,18 @@ AL_GRUPO = "grupo"
 
 
 def hay_informe_al_grupo(cur, workspace_id: str) -> bool:
-    """Si el espacio tiene informe al grupo: su grupo y una cadencia activa al grupo."""
-    cur.execute("""select w.grupo_chat_id is not null
-                          and exists (select 1 from cadence_job c
-                                       where c.workspace_id = w.id and c.activo
-                                         and c.audiencia = %s) as hay
+    """Si el espacio tiene informe al grupo que de verdad corre: su grupo y una cadencia activa
+    al grupo con un ritmo que se entiende."""
+    from .cadencias import leer_ritmo   # cadencias importa `avisos`, que importa este módulo
+
+    cur.execute("""select w.grupo_chat_id is not null as con_grupo,
+                          array(select c.cron from cadence_job c
+                                 where c.workspace_id = w.id and c.activo
+                                   and c.audiencia = %s) as ritmos
                      from workspace w where w.id = %s""", (AL_GRUPO, workspace_id))
     fila = cur.fetchone()
-    return bool(fila and fila["hay"])
+    return bool(fila and fila["con_grupo"]
+                and any(leer_ritmo(cron) is not None for cron in fila["ritmos"]))
 
 
 def queda_asentado(cur, workspace_id: str, a: str | None = None) -> dict[str, Any]:

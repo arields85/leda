@@ -279,19 +279,22 @@ LLEVA_EL_ENLACE = "lleva_el_enlace_a_la_pagina_de_la_tarea"
 
 # --- Guardar --------------------------------------------------------------------------------
 
-def guardar(cur, workspace_id: str, tipo: str, *, task_id: str | None, destinatario: str,
-            hechos: dict[str, Any], programado_para: datetime, clave: str, ahora: datetime,
-            turno_id: str | None = None) -> tuple[str, bool]:
-    """Guarda un aviso, salvo que ya exista uno con la misma clave. (id, si es nuevo)."""
+def guardar(cur, workspace_id: str, tipo: str, *, task_id: str | None,
+            destinatario: str | None, hechos: dict[str, Any], programado_para: datetime,
+            clave: str, ahora: datetime, turno_id: str | None = None,
+            al_grupo: bool = False) -> tuple[str, bool]:
+    """Guarda un aviso, salvo que ya exista uno con la misma clave. (id, si es nuevo). Va a una
+    persona (`destinatario`) o, con `al_grupo`, al grupo del espacio, sin destinatario (el informe
+    al grupo, `informe_al_grupo.py`; migración 0048)."""
     cur.execute(
         """insert into scheduled_notice (workspace_id, tipo, task_id,
                                          destinatario_membership_id, turno_id, hechos,
-                                         programado_para, dedupe_key, creado_en)
-           values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                         programado_para, dedupe_key, creado_en, al_grupo)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            on conflict (workspace_id, dedupe_key) do nothing
            returning id""",
         (workspace_id, tipo, task_id, destinatario, turno_id, _json(hechos), programado_para,
-         clave, ahora))
+         clave, ahora, al_grupo))
     fila = cur.fetchone()
     if fila is not None:
         return str(fila["id"]), True
@@ -312,7 +315,8 @@ def omitir(cur, aviso_id: str, motivo: str, ahora: datetime) -> None:
 def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Reloj, *,
                   solo: str | None = None, forzar: bool = False) -> dict[str, int]:
     """Los avisos guardados cuya hora llegó, de a uno. Fuera del horario no sale ninguno. `solo`
-    acota a un aviso; `forzar` no espera el próximo intento (el comando que reintenta a mano).
+    acota a un aviso; `forzar` no espera el próximo intento (el comando que reintenta a mano). El
+    informe al grupo sale aparte, dentro del horario (`informe_al_grupo.enviar`).
     Corre en una transacción de `db.espacio`; quien llama la confirma. Devuelve cuántos
     terminaron de cada forma (`enviado`, `omitido`, `reintento`, `fallido`, `en_espera`)."""
     ahora = reloj.ahora()
@@ -330,7 +334,7 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
             # varios (sus hechos y sus botones, `botones.py`) es siempre el mismo.
             """select a.* from scheduled_notice a
                  left join task t on t.id = a.task_id
-                where a.estado = 'guardado' and a.programado_para <= %s
+                where a.estado = 'guardado' and a.programado_para <= %s and not a.al_grupo
                   and (%s or a.proximo_intento_en is null or a.proximo_intento_en <= %s)
                   and (%s::uuid is null or a.id = %s::uuid)
                   and (%s::text[] is null or a.tipo = any(%s::text[]))
@@ -355,6 +359,10 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
         for envio in _envios(listos):
             for resultado in _enviar(m, envio, ia):
                 resumen[resultado] += 1
+        if tipos is None and solo is None:
+            # El informe al grupo (C-6, decisión 25), dentro del horario: no es de una persona.
+            from .informe_al_grupo import enviar as enviar_al_grupo
+            resumen.update(enviar_al_grupo(m, ia))
     return dict(resumen)
 
 
