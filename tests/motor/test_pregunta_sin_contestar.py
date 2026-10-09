@@ -29,7 +29,9 @@ from leda.motor import preguntas
 from leda.motor.hechos import significado
 from leda.motor.ia import Jugada
 from leda.motor.pregunta_sin_contestar import (CLAVE, ESPERA_POR_OMISION, REPETICION_DEL_DIA,
-                                               VUELVE_LA_PREGUNTA, espera_para_repetir)
+                                               VUELVE_LA_PREGUNTA, espera_para_repetir,
+                                               termino_su_turno)
+from leda.calendario import Calendario
 
 from tests.motor.ayudantes import (Dias, abierta, avisos_guardados, dice, jugada_bloqueo,
                                    nueva_tarea, octubre, todos)
@@ -143,6 +145,27 @@ def test_cuatro_horas_despues_de_la_repeticion_sale_aparte_el_tema_siguiente(con
     assert pedido["pregunta"]["tipo"] == preguntas.ESTADO_DE_LA_TAREA
     assert abierta(conn) == (preguntas.ESTADO_DE_LA_TAREA, dos["T1"])
     assert _para_despues(conn) == [(preguntas.QUIEN_DESTRABA, dos["T2"])]
+
+
+def test_una_repeticion_que_no_salio_no_frena_los_otros_temas_todo_el_dia(conn, mundo, escribe,
+                                                                         dos):
+    """Si la repetición del día quedó guardada pero no salió (omitida, fallida), el turno de la
+    pregunta termina igual a las 4 horas de cuando hubiera salido: nunca frena el resto del día."""
+    dias = Dias(conn, mundo)
+    _trabada_a_las(conn, escribe, dias, octubre(9, 8, 55))
+    dias.ciclo(octubre(9, 10))
+    with admin(conn) as cur:
+        cur.execute("""select q.* from conversation_state s
+                         join conversation_question q on q.id = s.pregunta_abierta_id""")
+        pregunta = cur.fetchone()
+    conn.commit()
+    with espacio(conn, mundo["id"]) as cur:
+        cal = Calendario.desde_base(cur, mundo["id"])
+        antes = termino_su_turno(cur, cal, mundo["id"], pregunta, octubre(9, 16, 54))
+        despues = termino_su_turno(cur, cal, mundo["id"], pregunta, octubre(9, 16, 55))
+    conn.commit()
+    assert avisos_guardados(conn, REPETICION_DEL_DIA) == []
+    assert (antes, despues) == (False, True)
 
 
 def test_si_ya_no_es_horario_lo_que_espera_sale_el_dia_habil_siguiente(conn, mundo, escribe,

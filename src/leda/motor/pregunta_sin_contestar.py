@@ -95,17 +95,17 @@ def termino_su_turno(cur, cal, workspace_id: str, pregunta: dict[str, Any],
                      ahora: datetime) -> bool:
     """Si la pregunta abierta dejó de frenar los otros temas: se hizo un día anterior, o pasaron
     las 4 horas desde que se repitió hoy (la repetición la vuelve a hacer: cuenta desde ella).
-    Una que no se repite cuenta las 4 horas de la repetición que no tuvo, más las del tema
-    siguiente."""
+    Una que no se repite, o cuya repetición no salió (omitida o fallida), cuenta las 4 horas de
+    la repetición que no tuvo, más las del tema siguiente: nunca frena el resto del día."""
     zona = cal.zona
     hoy = ahora.astimezone(zona).date()
     desde = preguntada_en(pregunta)
     if desde.astimezone(zona).date() < hoy:
         return True
     espera = espera_para_repetir(cur, workspace_id)
-    if not se_repite(pregunta):
-        return ahora >= desde + 2 * espera
-    return se_repitio_hoy(cur, pregunta, hoy) and ahora >= desde + espera
+    if se_repite(pregunta) and se_repitio_hoy(cur, pregunta, hoy):
+        return ahora >= desde + espera
+    return ahora >= desde + 2 * espera
 
 
 def al_terminar_el_turno(ctx) -> dict[str, Any] | None:
