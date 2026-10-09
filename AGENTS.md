@@ -37,20 +37,17 @@ trabajo; por la web, su estructura.* El porqué está en
   `D:\Proyectos\Leda-PM`, que es `main`), lo cargado puede estar atrasado: leer este archivo y los importados
   desde la carpeta del Motor.
 - Nunca se abre una sesión en las carpetas congeladas de `D:\Proyectos\Leda-PM-worktrees\`:
-  `flujo-de-un-mensaje` y `alta-y-google`. Las de `c4-medicion`, `flujo-c6` y `prueba-0-35` se borraron el
-  2026-10-06; sus commits quedan en las etiquetas `archivo-*`.
+  `flujo-de-un-mensaje` y `alta-y-google`.
 - Una sola casa para los documentos vivos (este archivo, `docs/STATUS.md`, `docs/ROADMAP.md`, la bitácora de
-  flujos, los ADR y el documento de la unidad): la rama del Motor. `main` recibe sólo documentos, por avance
-  rápido y cuando lo decide el usuario, hasta el paso M2 o M3.
+  flujos, los ADR y el documento de la unidad): la rama del Motor. `main` recibe la rama por avance rápido,
+  cuando lo decide el usuario.
 
 **Qué no se hace.**
 
 - Retomar tareas del alta por chat o de la rama congelada (0-35, 0-36, P-1c, P1-P7, 0-29, 0-17, 0-14 y las
   demás; su destino, en `docs/STATUS.md`, "Qué quedó congelado o superado").
 - Corregir, mejorar o extender los flujos A, B o C.
-- Escribir código de conversación sin su diseño aceptado (punto 12), o el motor de conversación definitivo (su
-  paquete en `src/leda` y su prueba de frontera) antes de la Etapa 3. La prueba chica de la Etapa 2 es
-  descartable y vive fuera de `src/leda`.
+- Escribir código de conversación sin su diseño aceptado (punto 12).
 - Tratar una suite en verde o la auditoría de otro agente como prueba de que la conversación funciona.
 - Adoptar Rasa, Engram u otro marco de terceros como componente.
 - Construir la creación de tareas u objetivos por chat (ADR 0017, decisiones 1 y 2).
@@ -226,10 +223,10 @@ hallazgo por hallazgo y parecía progreso. Por eso la señal de parar está escr
    decisiones y su porqué, no ensayos.
 6. **Lo sólido no se simplifica.** La base, el aislamiento, las confirmaciones y la auditoría funcionan; ninguna
    "simplificación" (un framework de agente, SQL libre, reglas en el prompt en vez de garantías) los reemplaza.
-7. **Un camino pasa al flujo nuevo sólo cuando se retiró lo viejo.** En el Motor, los flujos A y B se borran
-   antes de construir el motor de conversación definitivo (Etapa 3), después de mudar las pruebas de garantías.
-8. **Separar la IA del flujo.** Antes de culpar al flujo de una falla de comprensión, medir cuánto aporta la IA.
-   La prueba chica arranca con GPT-6 sol y mide GPT-6 luna y Jev en paralelo (ADR 0018, decisiones 6 y 7).
+7. **Un camino pasa al flujo nuevo sólo cuando se retiró lo viejo** (así se hizo en M3: los flujos A y B se
+   borraron después de mudar las pruebas de garantías).
+8. **Separar la IA del flujo.** Antes de culpar al flujo de una falla de comprensión, medir cuánto aporta la IA
+   (la comparación de cada IA, en la bitácora de flujos).
 9. **Funcionalidad nueva congelada** (ADR 0017, decisión 5): en esta etapa se construyen el seguimiento por chat
    y la plataforma web de tareas; lo demás va a la lista "Anotado para más adelante" de `docs/ROADMAP.md`
    hasta que Leda haga bien el seguimiento en pruebas reales. Lo que se pida de pasada se anota ahí.
