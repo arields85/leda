@@ -1430,8 +1430,17 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       no dice, y quedaron fuera de lo que el escritor podía tocar (`PENDIENTE`, coordinador).
       Informes borrados, `gasto.json` sin tocar. Sin la IA real (decisión del usuario: van en la
       tanda posterior). Sin la suite completa.
+    - **La 05, resuelta** (coordinador, `bb9db83`): espera la pregunta a Martín y lo dice; en seco
+      `correr --conversacion 05`, bien.
+    - **Revisión RDD por tramos (coordinador), aprobadas y reconocidas:** `505cb7a..cfb8b00`
+      `review-c2bd1bc8369204a2`; `cfb8b00..692a31c` `review-6238077ea86307ad`; `692a31c..dd9ae4e`
+      `review-a565fefc568a6238`; `64eb71a..bb9db83` `review-9f2c2d3582e9d4d7`. Advertencias de
+      casos de borde, sin arreglar: volver a nombrar a la misma persona después de que la pregunta
+      salió puede hacerle una segunda (`persecucion.py:103-121`); "no le escribas a X" con un
+      nombre que no coincide deja la lista vacía y dice que no le iba a escribir
+      (`persecucion.py:283-293`); en la 05, la persona del corredor se llama `Martin` y la del
+      hecho `Martín Forte`.
     - `PENDIENTE`:
-      - **La 05** (`.md` y YAML, paso 5): esperar el aviso a Martín y cambiar el "no dice".
       - **La IA real** sobre la 32 (y la 05), y la prueba por Telegram, en la tanda posterior.
         `leda_motor` necesita la `0042` además de la `0039` y la `0040`.
       - **Preguntas para el usuario:** si a quien destraba se le repite la pregunta sin
