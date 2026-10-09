@@ -1,0 +1,239 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/30-pregunta-sin-contestar.md
+numero: "30"
+titulo: "Una pregunta de Leda sin contestar"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-26 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-26"
+  TAB:
+    titulo: Cablear tablero de la máquina 3
+    criterio: "El tablero queda cableado según el plano y pasa la prueba de continuidad de todos sus circuitos"
+    responsable: Marcos
+    vence: "2026-10-28"
+    estado: asignada
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
+    responsable: Marcos
+    vence: "2026-10-29"
+    estado: asignada
+
+# Lo ya enviado del estado inicial: el aviso previo de cada tarea (tres días hábiles antes de
+# su vencimiento), el lunes 26 el del tablero y el de comunicaciones, el martes 27 el del PLC.
+preludio:
+  - quien: nadie
+    relojes: ["2026-10-26 10:00", "2026-10-27 10:00"]
+    salen: []
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-28 08:55"
+    escribe: "el plc esta trabado, me falta el cable de programacion"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC, causa: "me falta el cable de programacion"}
+    efectos:
+      estados: {PLC: bloqueada}
+      bloqueos: [{tarea: PLC, causa: presente}]
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC, causa: presente,
+         pregunta: quien_destraba}
+    pregunta: {tipo: quien_destraba, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+      para_despues: []
+    dice:
+      - que quedó anotado el bloqueo del PLC por el cable
+      - "una sola pregunta: quién lo puede destrabar"
+
+  - paso: 2
+    quien: nadie
+    # El pedido de estado del tablero (vence hoy) pide respuesta, y la pregunta del PLC sigue
+    # abierta: espera (decisión 13, punto 3).
+    relojes: ["2026-10-28 10:00"]
+    salen: []
+    estado_avisos:
+      - {tipo: pedido_de_estado, tarea: TAB, a: Marcos, estado: guardado}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+
+  - paso: 3
+    quien: Leda
+    # 4 horas después de la pregunta, con un tema esperando detrás: la repite, una vez en el día,
+    # sola. El pedido del tablero sigue esperando.
+    relojes: ["2026-10-28 12:55"]
+    salen:
+      - a: Marcos
+        tipo: repeticion_del_dia
+        tarea: PLC
+        hechos: {pregunta: quien_destraba, necesita_respuesta: true,
+                 sobre: {jugada: anotar_bloqueo, causa: presente}}
+    estado_avisos:
+      - {tipo: pedido_de_estado, tarea: TAB, a: Marcos, estado: guardado}
+      - {tipo: repeticion_del_dia, tarea: PLC, a: Marcos, estado: enviado}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+      para_despues: []
+    dice:
+      - el bloqueo del PLC por el cable
+      - la pregunta de quién lo puede destrabar
+    no_dice:
+      - nada del tablero
+      - un reproche porque no contestó
+
+  - paso: 4
+    quien: nadie
+    # Todavía no pasaron 4 horas desde la repetición: nada sale.
+    relojes: ["2026-10-28 16:50"]
+    salen: []
+    estado_avisos:
+      - {tipo: pedido_de_estado, tarea: TAB, a: Marcos, estado: guardado}
+
+  - paso: 5
+    quien: Leda
+    # 4 horas después de la repetición y todavía en horario: sale aparte el tema siguiente más
+    # urgente. Su pregunta queda abierta y la del PLC, para después.
+    relojes: ["2026-10-28 16:55"]
+    salen:
+      - a: Marcos
+        tipo: pedido_de_estado
+        tarea: TAB
+        hechos: {numero: 1, necesita_respuesta: true, vence: "2026-10-28"}
+    estado_despues:
+      pregunta_abierta: {tipo: estado_de_la_tarea, tarea: TAB}
+      para_despues: [{tipo: quien_destraba, tarea: PLC}]
+    dice:
+      - que el tablero vence hoy
+      - pide el estado
+    no_dice:
+      - nada del PLC
+
+  - paso: 6
+    quien: Marcos
+    a_las: "2026-10-28 16:57"
+    escribe: "el tablero lo arranque hoy"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: TAB}
+    efectos:
+      estados: {TAB: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: TAB}
+    # La otra pregunta no va en esta respuesta: la trae el código aparte (paso 7).
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+      para_despues: []
+    dice:
+      - que quedó anotado que arrancó el tablero
+    no_dice:
+      - la pregunta de quién destraba el PLC
+
+  - paso: 7
+    quien: Leda
+    # Enseguida y aparte, aunque Marcos escribió hace un minuto.
+    relojes: ["2026-10-28 16:58"]
+    salen:
+      - a: Marcos
+        tipo: vuelve_la_pregunta
+        tarea: PLC
+        hechos: {pregunta: quien_destraba, necesita_respuesta: true,
+                 sobre: {jugada: anotar_bloqueo, causa: presente}}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+      para_despues: []
+    dice:
+      - el bloqueo del PLC por el cable
+      - la pregunta de quién lo puede destrabar
+    no_dice:
+      - nada del tablero
+
+  - paso: 8
+    quien: Leda
+    # Al día siguiente la pregunta del PLC ya no frena: de lo que espera, sale lo más urgente,
+    # el pedido de comunicaciones (vence hoy, antes que el PLC). La repetición del PLC espera.
+    relojes: ["2026-10-29 10:00"]
+    salen:
+      - a: Marcos
+        tipo: pedido_de_estado
+        tarea: COM
+        hechos: {numero: 1, necesita_respuesta: true, vence: "2026-10-29"}
+    estado_avisos:
+      - {tipo: repregunta, tarea: PLC, a: Marcos, estado: guardado}
+    estado_despues:
+      pregunta_abierta: {tipo: estado_de_la_tarea, tarea: COM}
+      para_despues: [{tipo: quien_destraba, tarea: PLC}]
+    dice:
+      - que comunicaciones vence hoy
+      - pide el estado
+    no_dice:
+      - nada del PLC
+
+  - paso: 9
+    quien: Marcos
+    a_las: "2026-10-29 10:20"
+    escribe: "el cable lo consigue pedro de compras"
+    jugadas:
+      - {nombre: anotar_quien_destraba, tarea: PLC, quien: "pedro de compras"}
+    efectos:
+      destraban: [{tarea: PLC, alguien: true, no_sabe: false}]
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: {tipo: estado_de_la_tarea, tarea: COM}
+      para_despues: []
+    dice:
+      - que quedó anotado que el cable lo consigue Pedro de compras
+    no_dice:
+      - la pregunta de cómo viene comunicaciones
+
+  - paso: 10
+    quien: Leda
+    relojes: ["2026-10-29 10:21"]
+    salen:
+      - a: Marcos
+        tipo: vuelve_la_pregunta
+        tarea: COM
+        hechos: {pregunta: estado_de_la_tarea, necesita_respuesta: true}
+    estado_avisos:
+      - {tipo: repregunta, tarea: PLC, a: Marcos, estado: guardado}
+    estado_despues:
+      pregunta_abierta: {tipo: estado_de_la_tarea, tarea: COM}
+    dice:
+      - la tarea de comunicaciones
+      - pide el estado
+    no_dice:
+      - nada del PLC
+
+  - paso: 11
+    quien: Marcos
+    a_las: "2026-10-29 10:40"
+    escribe: "comunicaciones la arranque recien"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: COM}
+    efectos:
+      estados: {COM: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: COM}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que quedó anotado que arrancó comunicaciones
+
+  - paso: 12
+    quien: nadie
+    relojes: ["2026-10-29 11:15"]
+    salen: []
+    estado_avisos:
+      - {tipo: repregunta, tarea: PLC, a: Marcos, estado: omitido, motivo: presente}
