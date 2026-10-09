@@ -120,7 +120,8 @@ validador de invariantes. Destino de cada uno:
   `D:\Proyectos\Leda-PM-respaldos\leda-repositorio-completo-20261007.bundle` (2026-10-07, verificado), en el
   mismo disco.
 - **El archivo global `~/.claude/CLAUDE.md`** (unos 71.300 caracteres, de gentle-ai) más lo que carga el
-  proyecto quedan al límite de 150.000 (`LC_ALL=C.UTF-8 wc -m`, 2026-10-08).
+  proyecto suman unos 138.700 de 150.000 (`LC_ALL=C.UTF-8 wc -m`, 2026-10-09, con el documento del Motor
+  reducido).
 - **`PENDIENTE` dentro de los ADR y del plan:**
   - si Leda avisa que se cargaron tareas (ADR 0017, decisión 2);
   - qué pasa si quien destraba dice que no le corresponde (3a);
