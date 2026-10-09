@@ -1,0 +1,192 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/37-pedido-de-estado.md
+numero: "37"
+titulo: "El pedido de estado del lunes"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-21 09:00"
+foco: [PLC, COM, HMI, SEN, MOT, TAB]
+
+# Sólo la cadencia del lunes, a cada integrante en privado (`objetivos_semanales` del pack).
+cadencias:
+  - {nombre: objetivos_semanales, cuando: "lunes 09:15", audiencia: privado_cada_integrante}
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-26"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
+    responsable: Marcos
+    vence: "2026-10-30"
+  HMI:
+    titulo: Instalar el panel HMI de la comprimidora
+    criterio: "El panel HMI muestra el estado de la comprimidora y permite arrancarla y pararla desde la planta"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  SEN:
+    titulo: Calibrar los sensores de la envasadora
+    criterio: "Los seis sensores de la envasadora miden dentro de la tolerancia del fabricante en una prueba de una hora"
+    responsable: Nahuel
+    vence: "2026-10-29"
+    estado: en_curso
+    desde: "2026-10-20"
+  MOT:
+    titulo: Cambiar el motor de la cinta 4
+    criterio: "La cinta 4 funciona con el motor nuevo una jornada completa sin detenerse"
+    responsable: Nahuel
+    vence: "2026-11-06"
+  TAB:
+    titulo: Cablear el tablero de la línea 2
+    criterio: "El tablero de la línea 2 queda cableado según el plano y pasa la prueba de continuidad"
+    responsable: Nahuel
+    vence: "2026-11-06"
+
+# Lo que ya se envió (estado inicial del .md): el aviso previo del PLC, el miércoles 21.
+preludio:
+  - quien: Leda
+    relojes: ["2026-10-21 10:00"]
+    salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-26 10:00"]
+    salen:
+      # Un solo mensaje a Marcos: la lista, con el recordatorio del vencimiento del PLC adentro.
+      - a: Marcos
+        tipo: como_vienen_sus_tareas
+        tareas: [PLC]
+        hechos: {necesita_respuesta: true,
+                 tareas: [{tarea: PLC, vence: "2026-10-26", vence_hoy: true},
+                          {tarea: COM, vence: "2026-10-30", vence_hoy: ausente},
+                          {tarea: HMI, vence: "2026-11-06", vence_hoy: ausente}]}
+      # Y uno a Nahuel, con el aviso previo de los sensores adentro.
+      - a: Nahuel
+        tipo: como_vienen_sus_tareas
+        tareas: [SEN]
+        hechos: {necesita_respuesta: true,
+                 tareas: [{tarea: SEN, vence: "2026-10-29", vence_hoy: ausente},
+                          {tarea: TAB, vence: "2026-11-06"},
+                          {tarea: MOT, vence: "2026-11-06"}]}
+    estado_avisos:
+      - {tipo: pedido_de_estado, tarea: PLC, a: Marcos, estado: enviado}
+      - {tipo: aviso_previo, tarea: SEN, a: Nahuel, estado: enviado}
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+      para_despues: []
+      esperas_abiertas: [PLC]
+    dice:
+      - "a Marcos: cada tarea con su vencimiento, y que la del PLC vence hoy"
+      - "a Marcos: la pregunta de cómo vienen, una sola, en el último renglón"
+      - "a Nahuel: cada tarea con su vencimiento, y que la de los sensores vence el jueves"
+    no_dice:
+      - "a Marcos: un reproche, o que se va a avisar a alguien"
+      - "a Marcos: una pregunta por cada tarea"
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-26 10:40"
+    escribe: "el plc lo termino el miercoles q se me atraso la placa, las comunicasiones arranco hoy y el hmi viene bien"
+    jugadas:
+      - {nombre: anotar_prevision, tarea: PLC, fecha: "2026-10-28", motivo: "se me atraso la placa"}
+      - {nombre: anotar_inicio, tarea: COM}
+      - {nombre: informar_avance, tarea: HMI, palabras: "el hmi viene bien"}
+    efectos:
+      estados: {COM: en_curso}
+      previsiones: [{tarea: PLC, fecha: "2026-10-28", motivo: presente, es_correccion: false}]
+      avances: [{tarea: HMI}]
+      avisos_guardados:
+        - {tipo: nueva_prevision, tarea: PLC, a: Ismael, estado: guardado}
+    hechos:
+      - {jugada: anotar_prevision, resultado: anotado, tarea: PLC}
+      - {jugada: anotar_inicio, resultado: anotado, tarea: COM}
+      - jugada: informar_avance
+        resultado: anotado
+        tarea: HMI
+        avance: {dijo: presente}
+        vuelve_a_pedir_el_estado: {llega: "~2026-11-02T10:00"}
+        el_pedido_de_estado: ausente
+        veces_sin_algo_cierto: ausente
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+      esperas_abiertas: []
+    dice:
+      - lo anotado de cada una de las tres tareas
+      - "del panel HMI: que le vuelve a preguntar el lunes 2, como algo que todavía no pasó"
+    no_dice:
+      - ninguna pregunta
+      - "que del panel HMI le vuelve a preguntar mañana"
+      - una fecha que nadie dio
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-26 10:50"]
+    salen:
+      - a: Ismael
+        tipo: nueva_prevision
+        tarea: PLC
+        hechos: {prevision: "2026-10-28", fecha_comprometida: "2026-10-26",
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 2, motivo: presente}
+
+  - paso: 4
+    quien: Nahuel
+    a_las: "2026-10-26 10:55"
+    escribe: "los sensores ya casi estan me falta uno"
+    jugadas:
+      - {nombre: informar_avance, tarea: SEN, palabras: "los sensores ya casi estan me falta uno"}
+    efectos:
+      avances: [{tarea: SEN}]
+    hechos:
+      - jugada: informar_avance
+        resultado: anotado
+        tarea: SEN
+        avance: {dijo: presente}
+        vuelve_a_pedir_el_estado: {llega: "~2026-10-29T10:00"}
+    pregunta: {tipo: como_vienen_sus_tareas, de_la_lista: [TAB, MOT]}
+    estado_despues:
+      de: Nahuel
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+      para_despues: []
+    dice:
+      - lo anotado de los sensores
+      - que le vuelve a preguntar el jueves 29, el día en que vencen
+      - una sola pregunta, por el motor de la cinta 4 y el tablero de la línea 2, en el último renglón
+    no_dice:
+      - una pregunta por los sensores
+      - un reproche
+
+  - paso: 5
+    quien: Nahuel
+    a_las: "2026-10-26 11:30"
+    escribe: "el motor ya lo empece"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: MOT}
+    efectos:
+      estados: {MOT: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: MOT}
+    pregunta: null
+    estado_despues:
+      de: Nahuel
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que quedó anotado que arrancó el motor de la cinta 4
+    no_dice:
+      - otra pregunta por el tablero de la línea 2
+
+  # Nada más ese día: la lista no se vuelve a pedir.
+  - paso: 6
+    quien: Leda
+    relojes: ["2026-10-26 16:00"]
+    salen: []

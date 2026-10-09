@@ -25,7 +25,10 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   tarea antes de entregarla (`archivo_de_tarea`), con el mensaje que los trajo;
 - **las personas sin un chat con Leda** (`sin_telegram`): como en el pack, donde su Telegram está
   `PENDIENTE`; Leda no les puede escribir (C-5, conversación 32). Ninguna de ellas escribe en la
-  conversación.
+  conversación;
+- **las cadencias** (`cadencias`), sólo las que la conversación nombra, como las carga el importador
+  del pack (`cadence_job`, con su día y su hora traducidos a cron): las demás conversaciones las
+  suponen apagadas (`README.md`, "Datos ficticios"; la 37, C-6).
 
 Lo que pasó antes en la conversación (avisos ya enviados, una pregunta ya contestada) no se
 escribe a mano: lo corre el motor mismo como **preludio** (`corredor.py`), así queda igual que
@@ -122,8 +125,22 @@ def cargar(conn, conversacion: dict[str, Any]) -> Mundo:
         _tareas(cur, mundo, objetivo, conversacion.get("tareas") or {}, pide)
         _mandado_antes(cur, mundo, conversacion.get("mandado_antes") or [])
         _sin_telegram(cur, mundo, conversacion.get("sin_telegram") or [])
+        _cadencias(cur, mundo, conversacion.get("cadencias") or [])
     conn.commit()
     return mundo
+
+
+def _cadencias(cur, mundo: Mundo, cadencias: list[dict[str, Any]]) -> None:
+    """Las cadencias que nombra la conversación, con el día y la hora traducidos como los traduce
+    el importador del pack (`importador._a_cron`)."""
+    from leda.importador import _a_cron
+
+    for c in cadencias:
+        cur.execute("""insert into cadence_job (workspace_id, nombre, cron, audiencia,
+                                               plantilla_clave)
+                       values (%s, %s, %s, %s, %s)""",
+                    (mundo.workspace_id, c["nombre"], _a_cron(c["cuando"]),
+                     c.get("audiencia", "privado_cada_integrante"), c["nombre"]))
 
 
 def _sin_telegram(cur, mundo: Mundo, personas: list[str]) -> None:

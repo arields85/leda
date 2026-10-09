@@ -47,7 +47,7 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_treinta_y_seis_conversaciones_y_cada_una_nombra_su_fuente():
+def test_hay_treinta_y_siete_conversaciones_y_cada_una_nombra_su_fuente():
     # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega), la 23 desde la 3b (la
     # aprobación), la 24 desde la 3c (quien aprueba no contesta), la 27 desde la D3 de la C-3d
     # (la entrega frente al criterio), la 28 y la 29 desde la D4 (las entregas en listas y si
@@ -55,10 +55,10 @@ def test_hay_treinta_y_seis_conversaciones_y_cada_una_nombra_su_fuente():
     # la D5b (una pregunta de Leda sin contestar), la 31 desde la unidad de pedir el enlace
     # por chat (lo que quedó de la porción 4), la 32 desde la porción 1 de la C-5 (escribirle
     # a quien destraba), la 33 desde la porción 2 ("ya hablé con él") y la 34 desde la 3 ("no
-    # me corresponde" y la cadena al referente), la 35 desde la 4 (los bloqueos encadenados) y
-    # la 36 desde la 5 (el bloqueo viejo).
+    # me corresponde" y la cadena al referente), la 35 desde la 4 (los bloqueos encadenados), la
+    # 36 desde la 5 (el bloqueo viejo) y la 37 desde la C-6 (el pedido de estado con la lista).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 37)]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 38)]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]
@@ -88,8 +88,13 @@ def test_el_cargador_escribe_el_estado_inicial_de_cada_conversacion(conn, ruta):
                         where workspace_id = %s and clave = 'aviso_previo_dias_habiles'""",
                     (mundo.workspace_id,))
         aviso_previo = cur.fetchone()["valor"]
+        cur.execute("""select nombre, audiencia from cadence_job where workspace_id = %s""",
+                    (mundo.workspace_id,))
+        cadencias = {(f["nombre"], f["audiencia"]) for f in cur.fetchall()}
     conn.commit()
     assert aviso_previo == 3
+    # Sólo las cadencias que nombra la conversación (la 37, C-6): las demás las suponen apagadas.
+    assert cadencias == {(c["nombre"], c["audiencia"]) for c in conv.get("cadencias") or []}
     assert set(tareas) == {t["titulo"] for t in conv["tareas"].values()}
     for t in conv["tareas"].values():
         fila = tareas[t["titulo"]]

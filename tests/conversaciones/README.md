@@ -156,6 +156,16 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     fechas que dio cada uno; uno más nuevo o ya cerrado, no (decisión 7 del usuario; porción 5 de la
     C-5).
 
+Los pedidos de estado con ritmo fijo (circuito 5; ADR 0017, decisión 3b, punto 5; `odd/tasks/fase-c.md`,
+decisión 8):
+
+37. [`37-pedido-de-estado.md`](37-pedido-de-estado.md): con la cadencia del lunes, Leda le pide a cada
+    persona el estado de sus tareas en un solo mensaje, con la lista, y el recordatorio del día
+    (el vencimiento del PLC, el aviso previo de los sensores) va adentro, no aparte. Marcos contesta
+    las tres en un mensaje de corrido y cada cosa queda en su tarea; Nahuel contesta una sola y Leda,
+    en la misma respuesta, pregunta una vez por las otras dos; con otra respuesta parcial no vuelve a
+    preguntar (decisión 8 del usuario, 2026-10-08; C-6).
+
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
 
@@ -386,8 +396,9 @@ Personas, roles y tareas salen de `espacios/corework.yaml` y `espacios/corework.
   suponen la restricción de horario prendida; si la Etapa 2 la apaga, las horas se trasladan. El horario
   rige para lo que Leda manda por su cuenta; a quien le escribe le contesta a cualquier hora (decisión 9e).
 - Las cadencias del espacio (lunes 09:15; miércoles 11:30 y 15:30; viernes 11:00 y 16:15) se suponen
-  apagadas, y los mensajes que Leda manda por su cuenta salen a las 10:00: cómo convive el recordatorio con
-  ellas (mecánica §10 junta en un envío los mensajes automáticos del día) es otra conversación. Es una sola
+  apagadas, y los mensajes que Leda manda por su cuenta salen a las 10:00. Cómo convive el recordatorio con
+  ellas es la 37, que carga sólo la cadencia del lunes (`cadencias` en su YAML, con su nombre, cuándo y
+  a quién, como en el pack): el pedido de estado del lunes lleva adentro el recordatorio de ese día. Es una sola
   hora para todo lo que Leda manda por su cuenta (la escalera, los avisos guardados, también a otra persona,
   y el pedido que sigue a un avance), la que dicen los hechos y a la que llega el reloj adelantado de la
   prueba por Telegram (`leda.motor.tiempo`, `HORA_DE_SALIDA`).
