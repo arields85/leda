@@ -110,6 +110,10 @@ sin escribirle todavía a quien destraba.
    - El mensaje dice: que Marcos está trabado con la tarea del PLC desde el martes 20, hace cinco días
      hábiles, porque falta el repuesto; que Marcos dijo que no sabe quién lo está comprando; que no
      hace falta responder.
+   - A Marcos, a la vez (decisiones 34 y 35 del usuario, 2026-10-09), un mensaje corto e informativo:
+     que quedó asentado que el PLC lleva cinco días hábiles trabado. No dice que se le informó a
+     alguien ni nombra a Ismael; tampoco que es para que el equipo esté al tanto (el espacio no tiene
+     informe al grupo en esta conversación).
 
 ## Qué mide
 

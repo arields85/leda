@@ -145,8 +145,8 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
 34. [`34-no-me-corresponde.md`](34-no-me-corresponde.md): a quien Leda le pregunta por un bloqueo
     dice que no le corresponde; Leda pregunta quién se encarga y sigue con esa persona. Si la segunda
     también dice que no, que no sabe o nombra a otra, Leda le informa al referente con toda la cadena,
-    sin pedirle nada, y a Nahuel, que está trabado, le dice que lo informa sin nombrar a quién
-    (decisión 5 del usuario; porción 3 de la C-5).
+    sin pedirle nada, y a Nahuel, que está trabado, le dice que quedó asentado, sin decir que se lo
+    informa a alguien ni a quién (decisión 5 del usuario; porción 3 de la C-5; decisión 35).
 35. [`35-bloqueos-encadenados.md`](35-bloqueos-encadenados.md): los bloqueos se enlazan solos
     (Marcos ← Ariel ← Lucas): por la dependencia cargada entre las dos tareas, o porque quien destraba
     dice que está trabado con una tarea suya. Leda no le sigue preguntando a Ariel y sigue con quien
@@ -154,9 +154,11 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     piden respuesta (que Ariel se trabó, la fecha que da Lucas, que ya está, que Ariel pudo seguir)
     (decisión 6 del usuario; porción 4 de la C-5).
 36. [`36-bloqueo-viejo.md`](36-bloqueo-viejo.md): un bloqueo que sigue abierto a los cinco días
-    hábiles se le informa al referente una sola vez, aunque la cadena se mueva, con la historia y las
-    fechas que dio cada uno; uno más nuevo o ya cerrado, no (decisión 7 del usuario; porción 5 de la
-    C-5).
+    hábiles se le informa al referente, aunque la cadena se mueva, con la historia y las fechas que
+    dio cada uno, y a Marcos, que está trabado, se le dice que quedó asentado, para que el equipo
+    esté al tanto (el espacio tiene informe al grupo); mientras siga, cada cinco días hábiles se
+    vuelve a asentar, con lo que pasó desde la vez anterior; uno más nuevo o ya cerrado, no
+    (decisión 7 del usuario; porción 5 de la C-5; decisiones 34, 35 y 36, C-5a).
 
 Los pedidos de estado con ritmo fijo (circuito 5; ADR 0017, decisión 3b, punto 5; `odd/tasks/fase-c.md`,
 decisión 8):
@@ -343,7 +345,10 @@ tiene su referente técnico, como en el pack (`carga.REFERENTES`), a quien va la
 que nadie toma (la 34). Desde las porciones 4 y 5: lo que dice quien destraba puede nombrar la tarea
 suya, trabada, con la que está trabado (`dicen_quien_destraba`, `espera_la_tarea`, por su clave; la
 jugada lo dice con `su_tarea_trabada`, también por su clave), y el espacio tiene los días hábiles del
-bloqueo viejo del pack (`bloqueos.escala_solo_a_los_dias`, 5).
+bloqueo viejo del pack (`bloqueos.escala_solo_a_los_dias`, 5). Desde la C-5a (decisión 35): el
+estado inicial puede darle al espacio su grupo (`grupo`, como `telegram.grupo_gestion_id` del pack)
+que, con una cadencia al grupo (`cadencias`, `audiencia: grupo`), es tener informe al grupo; sin
+eso, lo asentado no figura en ningún informe al grupo (la 36 lo tiene; las demás, no).
 
 **Delegar** (C-7): los efectos suman quién tiene cada tarea que cambió de manos (`responsables`, por la
 clave de la tarea y el nombre corto de la persona): uno de más es de garantía, porque una tarea no cambia de

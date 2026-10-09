@@ -4,11 +4,11 @@
 quién se encarga y sigue con esa persona, como siguió con la primera: le escribe como Leda, y a quien
 está trabado le cuenta lo que pasó, como información. Si la segunda persona también dice que no le
 corresponde, que no sabe o nombra a otra, Leda no da más vueltas: le informa al referente con toda la
-cadena, para que determine quién lo resuelve, sin pedirle nada; a quien está trabado le dice que lo
-informa, sin nombrar a nadie por su cuenta. Decisión 5 del usuario (`odd/tasks/fase-c.md`,
-2026-10-08, opción A con límite); ADR 0017, decisión 3a, paso 4; ADR 0018, 9c, con la precisión del
-2026-10-09 (el tercer aviso al referente, informativo); decisión 11 (no nombrar al referente por su
-cuenta) y decisión 21 ("voy a informar…").
+cadena, para que determine quién lo resuelve, sin pedirle nada; a quien está trabado le dice que
+quedó asentado, sin decir que le informa a alguien ni nombrar a nadie por su cuenta. Decisión 5 del
+usuario (`odd/tasks/fase-c.md`, 2026-10-08, opción A con límite); ADR 0017, decisión 3a, paso 4; ADR
+0018, 9c, con la precisión del 2026-10-09 (el tercer aviso al referente, informativo); decisión 11
+(no nombrar al referente por su cuenta) y decisión 35 ("quedó asentado", no "lo informé").
 
 **Corre desde la porción 3 de la C-5** (`odd/tasks/fase-c.md`), entera, con su YAML.
 
@@ -30,8 +30,9 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
   encarga: es el sector de esa persona. Si termina en "no sé" o en "no me corresponde" sin nombre, no
   se sabe y va al referente del sector de la tarea trabada.
 - **A quien está trabado le llega cada paso como información:** que la primera dijo que le toca a otra
-  y que Leda le pregunta a esa otra; y, al cortarse la cadena, lo que dijo la segunda y que Leda lo
-  informa para que se decida quién lo resuelve. No le pide nada.
+  y que Leda le pregunta a esa otra; y, al cortarse la cadena, lo que dijo la segunda y que quedó
+  asentado (decisión 35; sin informe al grupo en esta conversación, nada del equipo). No le pide
+  nada.
 - **El aviso al referente no pide nada:** es información, con el margen para corregir, como todo aviso
   a otra persona por algo que alguien dijo.
 
@@ -112,9 +113,9 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
    - A Marcos, informativo: Nahuel está trabado con la tarea de los planos por la lista de componentes
      del tablero; dijo que la tenía Ariel, Ariel que la maneja Mariano, y Mariano que no sabe; para que
      determine quién lo resuelve. No le pide nada; que no hace falta responder.
-   - A Nahuel, informativo: que Mariano dice que no le corresponde y no sabe de quién es; que Leda lo
-     informa para que se decida quién lo resuelve; que cuando pueda seguir, lo diga.
-   - El mensaje a Nahuel no dice: a quién se informa (no lo preguntó).
+   - A Nahuel, informativo: que Mariano dice que no le corresponde y no sabe de quién es; que quedó
+     asentado; que cuando pueda seguir, lo diga.
+   - El mensaje a Nahuel no dice: que Leda se lo informa a alguien, ni a quién (no lo preguntó).
 
 9. **Nahuel** escribe (martes 20, 12:30): "y a quien le avisaste?"
    →
@@ -145,11 +146,11 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
     - Efecto: queda anotado que Martín dice que no le corresponde y que es de Mariano. Es el segundo de
       la cadena: Leda no le escribe a Mariano. Se guardan los mensajes que salen a las 15:10: a
       Mariano, el referente de Sistemas eléctricos y tableros (el sector de lo que falta, el de quien
-      quedó nombrado), la cadena entera; a Nahuel, lo que dijo Martín y que Leda lo informa.
+      quedó nombrado), la cadena entera; a Nahuel, lo que dijo Martín y que quedó asentado.
     - La respuesta dice: que quedó anotado; que Nahuel se va a enterar.
 
 15. **Leda**, por su cuenta (martes 20, 15:10): a Mariano, la cadena (Nahuel dijo Lucas, Lucas dijo
-    Martín, Martín dijo Mariano), informativa; a Nahuel, lo que dijo Martín y que se informa.
+    Martín, Martín dijo Mariano), informativa; a Nahuel, lo que dijo Martín y que quedó asentado.
 
 ## Qué mide
 

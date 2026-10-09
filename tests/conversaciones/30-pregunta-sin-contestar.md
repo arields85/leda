@@ -26,10 +26,11 @@ conversación 26.
    aparte.
 4. **Al día siguiente sigue la escalera.** Varias cosas esperando van de a una, primero la más urgente,
    con la misma regla.
-5. **El aviso de que se va a informar el atraso es informar, sin nombrar a nadie** ("si mañana sigue
-   igual, se informa que está atrasada"), nunca "la paso para que te ayuden a destrabarla"; si la
-   persona pregunta a quién, Leda dice el nombre. Lo ejercitan los pedidos de estado de la 04; acá no
-   llega.
+5. **El aviso de que se va a informar el atraso es informar, sin nombrar a nadie**, nunca "la paso
+   para que te ayuden a destrabarla"; si la persona pregunta a quién, Leda dice el nombre. **Con la
+   forma de la decisión 35** (2026-10-09): "Si mañana sigue igual, va a quedar asentado que está
+   atrasada" y, sólo si el espacio tiene informe al grupo, "para que el equipo esté al tanto"; Leda
+   no dice que le informa a alguien. Lo ejercitan los pedidos de estado de la 04; acá no llega.
 
 Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/fase-c.md`, D5b):
 

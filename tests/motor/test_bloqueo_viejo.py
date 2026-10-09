@@ -194,3 +194,154 @@ def test_va_a_quien_es_referente_al_salir(conn, mundo, equipo, dias):
     [aviso] = _viejos(conn)
     assert str(aviso["destinatario_membership_id"]) == _membresia(mundo, "Ariel")
     assert uno(conn, "select escalado_a::text a from blocker")["a"] == _membresia(mundo, "Ariel")
+
+
+# --- Se le cuenta a la persona trabada (decisión 34) y con la forma de la 35 ----------------------
+
+A_LA_PERSONA = "asentado_que_sigue_trabada"
+
+
+def _a_marcos(conn) -> list[dict]:
+    return avisos_guardados(conn, A_LA_PERSONA)
+
+
+def _asentado_para(dias, nombre: str) -> list[dict]:
+    return [h for p in dias.ia.pedidos_de_redaccion if p["persona"] == nombre
+            for h in p["hechos"] if h.get("aviso") == A_LA_PERSONA]
+
+
+def test_el_aviso_a_la_persona_trabada_esta_declarado_con_su_significado():
+    tipo = TIPOS[A_LA_PERSONA]
+    # Seguimiento que Leda hace por su cuenta sobre el bloqueo de la persona: dentro del tope.
+    assert tipo.tipo_de_mensaje == "informativo" and not tipo.es_coordinacion
+    for codigo in (A_LA_PERSONA, "la_vez_anterior", "desde_la_vez_anterior"):
+        assert hechos_mod.significado(codigo), codigo
+
+
+def test_a_la_persona_trabada_se_le_dice_que_quedo_asentado(conn, mundo, equipo, dias):
+    _marcos_trabado(equipo)
+
+    dias.ciclo(octubre(13, 10))
+
+    [aviso] = _a_marcos(conn)
+    assert str(aviso["destinatario_membership_id"]) == _membresia(mundo, "Marcos")
+    assert aviso["estado"] == "enviado"
+    [hechos] = _asentado_para(dias, "Marcos")
+    assert hechos["necesita_respuesta"] is False
+    assert (hechos["tarea"], hechos["causa"]) == ("Revisar el tablero", CAUSA)
+    assert hechos["trabada_desde"] == "2026-10-05"
+    assert hechos["dias_habiles_trabada"] == 5
+    # Quedó asentado; a quién le llegó, sólo si pregunta; sin informe al grupo, nada del equipo.
+    assert hechos["queda_asentado"] == {"figura_en_el_informe_al_grupo": False, "a": LUCAS}
+    redactado = hechos_mod.para_redactar(hechos)
+    assert redactado["queda_asentado"] == {"figura_en_el_informe_al_grupo": False,
+                                           "solo_si_pregunta": {"a": LUCAS}}
+    assert LUCAS not in json.dumps({k: v for k, v in redactado["queda_asentado"].items()
+                                    if k != "solo_si_pregunta"}, ensure_ascii=False)
+    assert "historia" not in hechos         # un mensaje corto
+
+
+def test_con_informe_al_grupo_el_equipo_esta_al_tanto(conn, mundo, equipo, dias):
+    from tests.motor.test_asentado import informe_al_grupo
+    informe_al_grupo(conn, mundo)
+    _marcos_trabado(equipo)
+
+    dias.ciclo(octubre(13, 10))
+
+    [hechos] = _asentado_para(dias, "Marcos")
+    assert hechos["queda_asentado"]["figura_en_el_informe_al_grupo"] is True
+
+
+def test_a_la_persona_trabada_no_le_llega_si_se_destrabo_antes_de_salir(conn, mundo, equipo,
+                                                                        dias):
+    _marcos_trabado(equipo)
+    dias.ciclo(octubre(13, 8))
+    [aviso] = _a_marcos(conn)
+    assert aviso["estado"] == "guardado"
+    equipo.dice("Marcos", Jugada("destrabar", {"tarea": "T1"}), texto="ya la tengo",
+                at=octubre(13, 8, 30))
+
+    dias.ciclo(octubre(13, 10))
+
+    [aviso] = _a_marcos(conn)
+    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "ya_se_destrabo")
+    assert _asentado_para(dias, "Marcos") == []
+
+
+def test_sin_nadie_a_quien_informar_no_se_le_dice_nada(conn, mundo, equipo, dias):
+    """Sin a quién informar, nada queda asentado: ni al referente ni a la persona trabada."""
+    _marcos_trabado(equipo)
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = null where id = %s",
+                    (mundo["area"],))
+        cur.execute("update membership set aprobador_membership_id = null")
+    conn.commit()
+
+    dias.ciclo(octubre(13, 10))
+
+    assert _viejos(conn) == [] and _a_marcos(conn) == []
+
+
+# --- Se vuelve a asentar mientras siga (decisión 36) ---------------------------------------------
+
+def test_mientras_siga_trabada_se_vuelve_a_asentar_con_lo_que_paso_desde_la_vez_anterior(
+        conn, mundo, equipo, dias):
+    _marcos_trabado(equipo)
+    dias.ciclo(octubre(13, 10))                 # la primera vez, a los cinco días hábiles
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba",
+                                {"tarea": "T1", "para_cuando": "2026-10-19",
+                                 "lo_que_dice": "el lunes sin falta"}),
+                at=octubre(15, 11))
+
+    # Del martes 13 al lunes 19 van cuatro días hábiles: nada.
+    for dia in (14, 15, 16, 19):
+        dias.ciclo(octubre(dia, 10))
+    assert len(_viejos(conn)) == 1 and len(_a_marcos(conn)) == 1
+
+    # El martes 20, cinco desde la vez anterior: otra vez, al referente y a la persona trabada.
+    dias.ciclo(octubre(20, 10))
+
+    primera, segunda = _viejos(conn)
+    assert segunda["estado"] == "enviado" and segunda["dedupe_key"] != primera["dedupe_key"]
+    [_, hechos] = _para(dias, LUCAS)
+    assert hechos["dias_habiles_trabada"] == 10
+    assert hechos["la_vez_anterior"] == "2026-10-13"
+    assert hechos["desde_la_vez_anterior"] == [
+        {"el": "2026-10-15", "de": ARIEL, "para_cuando": "2026-10-19",
+         "lo_que_dice": "el lunes sin falta"}]
+    assert "historia" not in hechos
+    assert len(_a_marcos(conn)) == 2
+    [_, a_marcos] = _asentado_para(dias, "Marcos")
+    assert a_marcos["dias_habiles_trabada"] == 10
+    assert a_marcos["queda_asentado"]["figura_en_el_informe_al_grupo"] is False
+    # Cada vez con su auditoría; el bloqueo guarda la primera vez que se informó.
+    assert cuantas(conn, "audit_log", "accion = 'informar_bloqueo_que_sigue_abierto'") == 2
+    assert uno(conn, "select escalado_en from blocker")["escalado_en"] == octubre(13, 10)
+    # Y no antes de otros cinco.
+    dias.ciclo(octubre(21, 10))
+    assert len(_viejos(conn)) == 2
+
+
+def test_sin_novedades_desde_la_vez_anterior_va_vacio(conn, mundo, equipo, dias):
+    _marcos_trabado(equipo)
+    dias.ciclo(octubre(13, 10))
+
+    dias.ciclo(octubre(20, 10))
+
+    [_, hechos] = _para(dias, LUCAS)
+    assert hechos["desde_la_vez_anterior"] == []
+
+
+def test_si_la_vez_anterior_no_salio_no_se_guarda_otra(conn, mundo, equipo, dias):
+    """Una vez guardada que todavía no salió (Lucas estaba ausente, el ciclo parado) sale con
+    los hechos de su momento: no se guarda otra encima."""
+    _marcos_trabado(equipo)
+    from leda.motor.escalera import correr_escalera
+    from leda.motor.tiempo import RelojFijo
+    correr_escalera(conn, mundo["id"], RelojFijo(octubre(13, 10)))
+    conn.commit()
+    correr_escalera(conn, mundo["id"], RelojFijo(octubre(20, 10)))
+    conn.commit()
+
+    [aviso] = _viejos(conn)
+    assert aviso["estado"] == "guardado"

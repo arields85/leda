@@ -134,7 +134,8 @@ def test_sin_respuesta_la_escalera_avanza_un_dia_habil_por_paso_y_escala(conn, m
     assert "si_no_hay_respuesta" not in v1["hechos"][0]
     [v2] = dias.ciclo(octubre(14, 10))
     assert v2["hechos"][0]["numero"] == 3
-    assert v2["hechos"][0]["si_no_hay_respuesta"] == {"se_avisa_a": ["Ismael"]}
+    assert v2["hechos"][0]["si_no_hay_respuesta"] == {
+        "queda_asentado": {"figura_en_el_informe_al_grupo": False}, "se_avisa_a": ["Ismael"]}
     # Tres pedidos y la repetición del viernes: también es un recordatorio de esa espera.
     assert espera_del_estado(conn)["recordatorios"] == 4
 
@@ -237,15 +238,18 @@ def test_un_bloqueo_abierto_detiene_la_escalera(conn, mundo, dias, escribe):
     # Ningún paso de la escalera de la tarea. Lo que sigue es la escalera de la pregunta de
     # quién lo destraba, que espera respuesta (`test_preguntas_que_esperan.py`), y, a los cinco
     # días hábiles, el bloqueo viejo (C-5, porción 5; `test_bloqueo_viejo.py`), que no es de la
-    # escalera de la tarea.
-    otros = ("repregunta", "falta_de_respuesta", "bloqueo_que_sigue_abierto")
+    # escalera de la tarea, con lo que a la persona trabada se le dice que quedó asentado
+    # (decisiones 34 y 35).
+    otros = ("repregunta", "falta_de_respuesta", "bloqueo_que_sigue_abierto",
+             "asentado_que_sigue_trabada")
     for dia in (6, 9, 13, 14, 15):
         assert [p for p in dias.ciclo(octubre(dia, 10))
                 if any(h["aviso"] not in otros for h in p["hechos"])] == []
     assert cuantas(conn, "scheduled_notice",
                    "tipo not in ('repregunta', 'escalamiento_de_una_pregunta', "
-                   "'bloqueo_que_sigue_abierto')") == 0
+                   "'bloqueo_que_sigue_abierto', 'asentado_que_sigue_trabada')") == 0
     assert cuantas(conn, "scheduled_notice", "tipo = 'bloqueo_que_sigue_abierto'") == 1
+    assert cuantas(conn, "scheduled_notice", "tipo = 'asentado_que_sigue_trabada'") == 1
     assert espera_del_estado(conn) is None
 
 

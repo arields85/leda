@@ -95,7 +95,8 @@ desde esa fecha. ADR 0018, decisión 5a, segunda respuesta, y decisiones 9a, 9b 
 7. **Nadie** escribe del martes 27 al viernes 30.
    →
    - Efecto: la escalera sigue desde el 27, como la de la conversación 04 desde el vencimiento: el miércoles
-     28, el segundo pedido; el jueves 29, el tercero, que avisa que sin respuesta se va a informar, sin nombrar a Ismael; el viernes
+     28, el segundo pedido; el jueves 29, el tercero, que avisa que sin respuesta va a quedar asentado que está atrasada, sin nombrar a
+     Ismael (decisión 35); el viernes
      30, el escalamiento a Ismael por falta de respuesta, con la previsión, la fecha comprometida y el
      atraso del código. Es información: no le pide a Ismael que persiga ni que resuelva nada. Cada
      pedido sin contestar, del 27 al 29, se repite una vez ese día, a las 4 horas (decisiones 21 y 29

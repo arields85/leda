@@ -378,13 +378,14 @@ def test_los_avisos_nuevos_tienen_su_significado(codigo):
     assert significado(codigo) is not None
 
 
-def test_lo_que_pasa_si_no_contesta_es_informar():
-    """Punto 5 de la regla: el aviso de que se va a escalar informa que la tarea está atrasada,
-    nunca que se la pasa a alguien para que la destrabe; el nombre de a quién, sólo si lo
-    pregunta (`hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`, decisión 11)."""
+def test_lo_que_pasa_si_no_contesta_queda_asentado():
+    """Punto 5 de la regla, con la forma de la decisión 35: el aviso de que se va a escalar dice
+    que va a quedar asentado que la tarea está atrasada, nunca que se la pasa a alguien para que
+    la destrabe ni que se le informa a alguien; el nombre de a quién, sólo si lo pregunta
+    (`hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`, decisión 11)."""
     from leda.motor.hechos import NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO
 
     dicho = significado("si_no_hay_respuesta")
-    assert "se informa que la tarea está atrasada" in dicho
+    assert "va a quedar asentado que la tarea está atrasada" in dicho
     assert "nadie toma la tarea" in dicho
     assert NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO["si_no_hay_respuesta"] == "se_avisa_a"

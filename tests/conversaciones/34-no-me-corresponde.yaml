@@ -177,7 +177,8 @@ pasos:
         - {tipo: lo_que_dijo_quien_destraba, tarea: PLA, a: Nahuel, estado: guardado,
            hechos: {necesita_respuesta: false, quien_destraba: Mariano Naim,
                     dice_quien_destraba: {no_le_corresponde: true, no_sabe: true},
-                    aviso_de_la_cadena: {a: Marcos Tarquini}}}
+                    queda_asentado: {a: Marcos Tarquini, figura_en_el_informe_al_grupo: false},
+                    aviso_de_la_cadena: ausente}}
     hechos:
       - {jugada: decir_que_no_le_toca, resultado: anotado, tarea: PLA,
          dice_quien_destraba: {no_le_corresponde: true, no_sabe: true},
@@ -209,15 +210,16 @@ pasos:
         tarea: PLA
         hechos: {necesita_respuesta: false, quien_destraba: Mariano Naim,
                  dice_quien_destraba: {no_le_corresponde: true, no_sabe: true},
-                 aviso_de_la_cadena: {a: Marcos Tarquini}}
+                 queda_asentado: {a: Marcos Tarquini, figura_en_el_informe_al_grupo: false},
+                 aviso_de_la_cadena: ausente}
     dice:
       - "a Marcos: que Nahuel está trabado con la tarea de los planos por la lista de componentes del tablero"
       - "a Marcos: la cadena: Nahuel dijo que la tenía Ariel, Ariel que la maneja Mariano, y Mariano que no sabe"
       - "a Marcos: que es para que determine quién lo resuelve, sin pedirle nada; que no hace falta responder"
       - "a Nahuel: que Mariano dice que no le corresponde y no sabe de quién es"
-      - "a Nahuel: que Leda lo informa para que se decida quién lo resuelve"
+      - "a Nahuel: que quedó asentado"
     no_dice:
-      - "a Nahuel: a quién se informa"
+      - "a Nahuel: que Leda se lo informa a alguien, ni a quién"
 
   - paso: 9
     quien: Nahuel
@@ -325,7 +327,8 @@ pasos:
         - {tipo: lo_que_dijo_quien_destraba, tarea: DIG, a: Nahuel, estado: guardado,
            hechos: {quien_destraba: Martín Forte,
                     dice_quien_destraba: {no_le_corresponde: true, le_toca_a: Mariano Naim},
-                    aviso_de_la_cadena: {a: Mariano Naim}}}
+                    queda_asentado: {a: Mariano Naim, figura_en_el_informe_al_grupo: false},
+                    aviso_de_la_cadena: ausente}}
     hechos:
       - {jugada: decir_que_no_le_toca, resultado: anotado, tarea: DIG,
          se_le_pregunta_a: ausente,
@@ -347,7 +350,8 @@ pasos:
         tipo: lo_que_dijo_quien_destraba
         tarea: DIG
         hechos: {necesita_respuesta: false, quien_destraba: Martín Forte,
-                 aviso_de_la_cadena: {a: Mariano Naim}}
+                 queda_asentado: {a: Mariano Naim, figura_en_el_informe_al_grupo: false},
+                 aviso_de_la_cadena: ausente}
     dice:
       - "a Mariano: la cadena: Nahuel dijo que lo tenía Lucas, Lucas que lo ve Martín, y Martín que es de Mariano; para que determine quién lo resuelve, sin pedirle nada"
-      - "a Nahuel: que Martín dice que no le corresponde y que es de Mariano, y que Leda lo informa para que se decida quién lo resuelve, sin decir a quién"
+      - "a Nahuel: que Martín dice que no le corresponde y que es de Mariano, y que quedó asentado, sin decir que se lo informa a alguien ni a quién"

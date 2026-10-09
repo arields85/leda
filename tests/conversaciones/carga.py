@@ -29,7 +29,10 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   conversación;
 - **las cadencias** (`cadencias`), sólo las que la conversación nombra, como las carga el importador
   del pack (`cadence_job`, con su día y su hora traducidos a cron): las demás conversaciones las
-  suponen apagadas (`README.md`, "Datos ficticios"; la 37, C-6).
+  suponen apagadas (`README.md`, "Datos ficticios"; la 37, C-6);
+- **el grupo del espacio** (`grupo`), el identificador de su chat de Telegram, como
+  `telegram.grupo_gestion_id` del pack: con una cadencia al grupo (`audiencia: grupo`), el espacio
+  tiene informe al grupo (decisión 35; la 36).
 
 Lo que pasó antes en la conversación (avisos ya enviados, una pregunta ya contestada) no se
 escribe a mano: lo corre el motor mismo como **preludio** (`corredor.py`), así queda igual que
@@ -127,6 +130,9 @@ def cargar(conn, conversacion: dict[str, Any]) -> Mundo:
         _mandado_antes(cur, mundo, conversacion.get("mandado_antes") or [])
         _sin_telegram(cur, mundo, conversacion.get("sin_telegram") or [])
         _cadencias(cur, mundo, conversacion.get("cadencias") or [])
+        if conversacion.get("grupo") is not None:
+            cur.execute("update workspace set grupo_chat_id = %s where id = %s",
+                        (int(conversacion["grupo"]), mundo.workspace_id))
     conn.commit()
     return mundo
 

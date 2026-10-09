@@ -118,14 +118,17 @@ pasos:
         tipo: pedido_de_estado
         tarea: PLC
         hechos: {numero: 3, atraso_dias_habiles: 2,
-                 si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski]}}
+                 si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski],
+                                       queda_asentado: {figura_en_el_informe_al_grupo: false}}}
     dice:
       - que la tarea del PLC venció el martes
-      - que si no hay novedades se va a informar, sin nombrar a Ismael
+      - que si no hay novedades va a quedar asentado que está atrasada, sin nombrar a Ismael
       - pide el estado
     no_dice:
       - una amenaza ni un reproche
       - que ya se avisó a Ismael
+      - que se le va a informar a alguien
+      - que es para que el equipo esté al tanto
 
   - paso: 8
     quien: Leda

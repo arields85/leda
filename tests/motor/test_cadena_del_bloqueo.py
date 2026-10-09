@@ -255,12 +255,14 @@ def test_el_segundo_que_no_sabe_corta_la_cadena_y_va_al_referente_de_la_tarea(co
         {"de": ARIEL, "no_le_corresponde": True, "le_toca_a": MARIANO},
         {"de": MARIANO, "no_le_corresponde": True, "no_sabe": True, "lo_que_dice": "ni idea"}]
     assert cuantas(conn, "audit_log", "accion = 'informar_la_cadena_del_bloqueo'") == 1
-    # A Marcos, que se informa, sin nombrar a quién por su cuenta.
+    # A Marcos, que quedó asentado, sin nombrar a quién le llega por su cuenta (decisión 35).
     _de_ariel, aviso = avisos_guardados(conn, LO_QUE_DIJO)
-    assert aviso["hechos"]["aviso_de_la_cadena"] == {"a": "Ismael"}
+    assert "aviso_de_la_cadena" not in aviso["hechos"]
+    assert aviso["hechos"]["queda_asentado"] == {"figura_en_el_informe_al_grupo": False,
+                                                 "a": "Ismael"}
     redactado = hechos_mod.para_redactar(dict(aviso["hechos"]))
-    assert "a" not in redactado["aviso_de_la_cadena"]
-    assert redactado["aviso_de_la_cadena"]["solo_si_pregunta"]["a"] == "Ismael"
+    assert "a" not in redactado["queda_asentado"]
+    assert redactado["queda_asentado"]["solo_si_pregunta"]["a"] == "Ismael"
     [hecho] = r.hechos
     assert hecho["aviso_de_la_cadena"]["a"] == "Ismael"
     assert "se_le_pregunta_a" not in hecho
@@ -439,10 +441,11 @@ def test_si_al_segundo_no_se_le_puede_escribir_la_cadena_va_al_referente(conn, m
     [hecho] = r.hechos
     assert hecho["no_se_le_puede_escribir_a"]["a"] == "Pedro Gomez"
     assert hecho["aviso_de_la_cadena"]["a"] == "Ismael"
-    # A Marcos, que a Pedro no se le puede escribir y que se informa.
+    # A Marcos, que a Pedro no se le puede escribir y que quedó asentado (decisión 35).
     [aviso] = avisos_guardados(conn, LO_QUE_DIJO)
     assert aviso["hechos"]["no_se_le_puede_escribir_a"]["a"] == "Pedro Gomez"
-    assert aviso["hechos"]["aviso_de_la_cadena"] == {"a": "Ismael"}
+    assert aviso["hechos"]["queda_asentado"] == {"figura_en_el_informe_al_grupo": False,
+                                                 "a": "Ismael"}
 
 
 def test_el_aviso_al_referente_sale_como_informacion(conn, mundo, equipo):

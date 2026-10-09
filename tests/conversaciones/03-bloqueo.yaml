@@ -176,8 +176,18 @@ pasos:
         hechos: {necesita_respuesta: false, responsable: Marcos Tarquini, causa: presente,
                  trabada_desde: "2026-10-20", dias_habiles_trabada: 5,
                  historia: [{el: "2026-10-21", de: Marcos Tarquini, no_sabe: true}]}
+      # A Marcos, a la vez, que quedó asentado (decisiones 34 y 35), en su envío del día con el
+      # aviso previo de la tarea de comunicaciones.
+      - a: Marcos
+        el: "2026-10-27"
+        tipo: asentado_que_sigue_trabada
+        tarea: PLC
+        hechos: {necesita_respuesta: false, dias_habiles_trabada: 5,
+                 queda_asentado: {figura_en_el_informe_al_grupo: false, a: Ismael Soschinski}}
     dice:
       - "a Ismael: que Marcos está trabado con la tarea del PLC desde el martes 20 (mar 20/10), hace cinco días hábiles, porque falta el repuesto, y que Marcos no sabe quién lo está comprando"
       - "a Ismael: que no hace falta responder, en el último renglón"
+      - "a Marcos: que quedó asentado que el PLC lleva cinco días hábiles trabado"
     no_dice:
       - "a Ismael: una pregunta"
+      - "a Marcos: que se le informó a alguien, ni el nombre de Ismael; que es para que el equipo esté al tanto"
