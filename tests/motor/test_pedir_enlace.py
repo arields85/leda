@@ -147,11 +147,12 @@ def test_quien_no_puede_verla_no_recibe_el_enlace(conn, mundo, escribe, direccio
     _nahuel(conn, mundo)
     hecho, pedido = _pide(conn, escribe, "Nahuel", como_la_nombra="tablero de marcos")
     assert hecho == {"jugada": "pedir_enlace", "resultado": "no_se_puede",
-                     "motivo": "no_puede_ver_esa_tarea",
-                     "tarea": {"titulo": "Revisar el tablero"}}
+                     "motivo": "no_puede_ver_esa_tarea"}
     assert _enlaces(conn) == []
-    # Nada dice quién sí la ve (decisión 11), ni un nombre de la base (constitución §10).
+    # Nada dice quién sí la ve (decisión 11), ni un nombre de la base (constitución §10), ni el
+    # título entero de una tarea que no puede ver: sólo lo que la persona ya dijo.
     assert "Ismael" not in repr(pedido) and "puede_ver_tarea" not in repr(pedido)
+    assert "Revisar el tablero" not in repr(pedido)
 
 
 def test_entre_varias_que_coinciden_sale_la_unica_que_puede_ver(conn, mundo, escribe,

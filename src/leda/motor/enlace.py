@@ -63,16 +63,15 @@ def pedir_enlace(ctx, datos: dict, tarea: dict | None) -> dict[str, Any]:
         if not coinciden:
             return {"resultado": "no_se_puede", "motivo": NINGUNA_CON_ESE_NOMBRE}
         if not visibles:
-            return {"resultado": "no_se_puede", "motivo": NO_PUEDE_VER,
-                    **({"tarea": _tarea(ctx, coinciden[0])} if len(coinciden) == 1 else {})}
+            # Sin el título: de una tarea que no puede ver, sólo lo que la persona ya dijo.
+            return {"resultado": "no_se_puede", "motivo": NO_PUEDE_VER}
         if len(visibles) > 1:
             return {"resultado": "falta_dato", "falta": ["tarea"],
                     "coinciden": [{"titulo": t["titulo"], "responsable": t["responsable"]}
                                   for t in visibles]}
         una = visibles[0]
     if una is None or not una["ve"]:
-        return {"resultado": "no_se_puede", "motivo": NO_PUEDE_VER,
-                **({"tarea": _tarea(ctx, una)} if una is not None else {})}
+        return {"resultado": "no_se_puede", "motivo": NO_PUEDE_VER}
     hecho: dict[str, Any] = {"resultado": "leido", "tarea": _tarea(ctx, una)}
     if una["responsable_id"] != yo and una["responsable"]:
         hecho["responsable"] = una["responsable"]
