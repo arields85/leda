@@ -386,8 +386,9 @@ def test_lo_contestado_en_la_lista_no_se_vuelve_a_preguntar_el_dia_que_vence(con
     vence el viernes 9. El martes le llega el aviso previo de siempre (no pide nada, decisión 44);
     el viernes, ningún "hoy vence": el pedido de ese día queda dado por contestado, con su motivo
     (nunca en silencio). El martes 13 (el lunes es feriado), ya atrasada y sin entregar, cambió:
-    Leda le pide el estado, y es el segundo pedido de su escalera (mecánica §9: anclada al
-    vencimiento)."""
+    Leda le pide el estado: es el segundo paso de su escalera (mecánica §9: anclada al
+    vencimiento), pero la primera vez que se le pregunta sin que conteste (`numero`): lo del
+    viernes lo había contado (revisión `review-52e1f429c07370b9`, `escalera.py:349-356`)."""
     _pregunta_la_lista(conn, mundo, dias)
     dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "viene bien"}),
          at=octubre(5, 10, 30))
@@ -402,7 +403,7 @@ def test_lo_contestado_en_la_lista_no_se_vuelve_a_preguntar_el_dia_que_vence(con
 
     [pedido] = dias.ciclo(octubre(13, 10))
     assert pedido["hechos"][0]["aviso"] == "pedido_de_estado"
-    assert pedido["hechos"][0]["numero"] == 2
+    assert pedido["hechos"][0]["numero"] == 1
     assert "pedidos_anteriores_que_no_le_llegaron" not in pedido["hechos"][0]
 
 
@@ -422,8 +423,9 @@ def test_sin_el_pedido_del_dia_que_vence_la_escalera_escala_igual_al_tercer_dia_
     [tercero] = dias.ciclo(octubre(14, 10))
     escala = dias.ciclo(octubre(15, 10))
 
-    assert segundo["hechos"][0]["numero"] == 2
-    assert tercero["hechos"][0]["numero"] == 3
+    # Las veces que se le preguntó sin que conteste, contando ésa: el viernes no se le preguntó.
+    assert segundo["hechos"][0]["numero"] == 1
+    assert tercero["hechos"][0]["numero"] == 2
     assert "si_no_hay_respuesta" in tercero["hechos"][0]
     assert [p["persona"] for p in escala] == ["Ismael"]
     [aviso] = [p["hechos"][0] for p in escala]

@@ -8,8 +8,12 @@ anterior, las que siguen, las entregadas, las trabadas con lo que las traba y lo
 hablados en privado, con el nombre de quien la tiene en cada renglón. Un atraso aparece con el día
 en que vencía, el día que dio la persona y su motivo, como información (decisión 25); uno que la
 persona todavía no habló con Leda no aparece (constitución §8: primero en privado); lo que quedó
-asentado por falta de respuesta, sí (decisiones 35 y 49). Sin nada que informar, no sale nada. Leda
-no conversa en el grupo: no pide respuesta ni abre ninguna pregunta.
+asentado por falta de respuesta, sí (decisiones 35 y 49). Lo que sigue igual se repite en cada informe
+(decisión 54: "no es exponer, es informar"). El informe sale siempre, a su cadencia (decisión 55): sin
+nada malo dice que está todo en orden, sólo si los hechos lo prueban; lo que Leda no sabe lo dice como
+no sabido (quien no contestó no está "bien" ni "atrasado"); cuenta lo que se terminó y quién lo hizo y,
+si la semana fue buena según reglas fijas del código, lo reconoce, nunca comparando personas. Leda no
+conversa en el grupo: no pide respuesta ni abre ninguna pregunta.
 
 El reloj es el de `test_escalera.py`: "Revisar el tablero" (T1) vence el viernes 9 de octubre de
 2026; el lunes 12 es feriado.
@@ -25,11 +29,13 @@ from leda.db import admin, espacio
 from leda.motor import hechos as hechos_mod
 from leda.motor.asentado import hay_informe_al_grupo
 from leda.motor.avisos import INTENTOS
-from leda.motor.informe_al_grupo import (INFORME_AL_GRUPO, NADA_PARA_INFORMAR,
+from leda.motor.informe_al_grupo import (INFORME_AL_GRUPO, SEMANA_BUENA, SIN_GRUPO,
+                                         SIN_NOVEDADES, SIN_SABER, TODO_EN_ORDEN,
                                          guardar_los_informes)
 from leda.motor.ia import Jugada
 
-from tests.motor.ayudantes import avisos_guardados, cuantas, dice, octubre, todos, uno
+from tests.motor.ayudantes import (IAQueRedacta, avisos_guardados, cuantas, dice, octubre,
+                                   todos, uno)
 
 GRUPO = -100_500
 VIERNES = "15 16 * * 5"         # `informe_semanal` del pack: viernes 16:15
@@ -154,17 +160,21 @@ def test_leda_no_conversa_en_el_grupo(conn, mundo, dias):
     assert cuantas(conn, "conversation_state", "ultimo_aviso_id = %s", str(aviso["id"])) == 0
 
 
-def test_sin_nada_que_informar_no_sale_nada(conn, mundo, dias):
-    """Sin tareas abiertas ni terminadas, el informe queda omitido con su motivo: nunca un
-    mensaje vacío al grupo, nunca en silencio."""
+def test_sin_nada_malo_sale_igual_y_dice_que_esta_todo_en_orden(conn, mundo, dias):
+    """Decisión 55: el informe sale siempre a su cadencia, también como señal de que Leda funciona
+    ("es una buena noticia recibir que todo está en orden"). Sin tareas abiertas ni terminadas,
+    sale con que está todo en orden: nada atrasado, nada trabado, nada que Leda no sepa."""
     _con_informe(conn, mundo)
     _cancelar_el_tablero(conn, mundo)
 
-    assert _al_grupo(dias.ciclo(octubre(9, 16, 15))) == []
+    hechos = _el_informe(dias, octubre(9, 16, 15))
 
+    assert hechos == {"aviso": INFORME_AL_GRUPO, "necesita_respuesta": False,
+                      TODO_EN_ORDEN: True}
     [aviso] = avisos_guardados(conn, INFORME_AL_GRUPO)
-    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", NADA_PARA_INFORMAR)
-    assert cuantas(conn, "message_outbox", "chat_id = %s", GRUPO) == 0
+    assert aviso["estado"] == "enviado"
+    assert cuantas(conn, "message_outbox", "chat_id = %s", GRUPO) == 1
+    assert hechos_mod.sin_significado(hechos) == set()
 
 
 def test_un_dia_de_la_cadencia_que_paso_sin_atenderse_no_sale_tarde(conn, mundo, dias):
@@ -209,6 +219,8 @@ def test_si_la_ia_no_lo_redacta_se_reintenta_y_nunca_sale_un_texto_armado(conn, 
 
     [aviso] = avisos_guardados(conn, INFORME_AL_GRUPO)
     assert (aviso["estado"], aviso["intentos"]) == ("fallido", INTENTOS)
+    # Queda con sus hechos: lo que iba a decir (revisión `review-f4d7f683f853df7c`).
+    assert _titulos(aviso["hechos"]["siguen"]) == [T2]
     assert cuantas(conn, "message_outbox", "chat_id = %s", GRUPO) == 0
     assert cuantas(conn, "incident", "etapa = 'motor_aviso_guardado'") == 1
 
@@ -261,6 +273,8 @@ def test_cada_renglon_dice_de_quien_es_y_como_esta(conn, mundo, dias):
          "vence": "2026-10-09"},
         {"tarea": T5, "la_tiene": "Marcos", "estado": "en_curso", "vence": "2026-10-23"}]
     assert "atrasadas" not in hechos
+    # Una trabada: ni todo en orden ni una semana buena (decisión 55).
+    assert TODO_EN_ORDEN not in hechos and SEMANA_BUENA not in hechos
     assert hechos_mod.sin_significado(hechos) == set()
 
 
@@ -281,19 +295,59 @@ def test_un_atraso_hablado_en_privado_figura_con_el_dia_que_dio_y_su_motivo(conn
                                     "vence": "2026-10-09", "prevision": "2026-10-14",
                                     "motivo": "falta el cable"}]
     assert "siguen" not in hechos
+    assert TODO_EN_ORDEN not in hechos and SEMANA_BUENA not in hechos
 
 
-def test_un_atraso_que_no_se_hablo_en_privado_no_figura(conn, mundo, dias):
-    """Constitución §8 y decisión 8: Leda le preguntó a Marcos en privado y todavía no contestó.
-    El informe del martes no nombra el tablero, ni como atrasado ni como algo que sigue."""
+def test_quien_no_contesto_no_esta_bien_ni_atrasado_se_dice_que_no_se_sabe(conn, mundo, dias):
+    """Constitución §4 y §8; decisiones 8 y 55: Leda le preguntó a Marcos en privado el viernes y
+    todavía no contestó. El informe del martes no dice que el tablero está atrasado (no lo habló),
+    ni que sigue bien: dice que no se sabe cómo viene, sin el día en que vencía. Y no dice que
+    está todo en orden."""
     _con_informe(conn, mundo, MARTES)
     _estado(conn, mundo, T5, "en_curso", octubre(5, 10), vence=octubre(23, 17))
     dias.ciclo(octubre(9, 10))
 
     hechos = _el_informe(dias, octubre(13, 16, 15))
 
+    assert hechos[SIN_SABER] == [{"tarea": "Revisar el tablero", "la_tiene": "Marcos"}]
     assert "atrasadas" not in hechos
     assert _titulos(hechos["siguen"]) == [T5]
+    assert TODO_EN_ORDEN not in hechos and SEMANA_BUENA not in hechos
+    assert hechos_mod.sin_significado(hechos) == set()
+
+
+def test_lo_preguntado_hoy_todavia_no_es_algo_que_no_se_sabe(conn, mundo, dias):
+    """Lo que Leda le preguntó hoy y la persona todavía no contestó sigue su curso: no contestar
+    es de otro día."""
+    _con_informe(conn, mundo)
+    _estado(conn, mundo, T5, "en_curso", octubre(5, 10), vence=octubre(23, 17))
+
+    hechos = _el_informe(dias, octubre(9, 16, 15))      # el pedido del tablero sale hoy
+
+    assert SIN_SABER not in hechos
+    assert _titulos(hechos["siguen"]) == ["Revisar el tablero", T5]
+    assert hechos[TODO_EN_ORDEN] is True
+
+
+def test_un_atraso_sin_hablar_no_figura_y_no_deja_decir_que_esta_todo_en_orden(conn, mundo,
+                                                                               escribe, dias):
+    """Marcos contestó el viernes sin un día ("ya casi") y el tablero venció: no habló de su
+    atraso, así que no figura (constitución §8), pero tampoco se puede decir que está todo en
+    orden. Sin nada más que contar, el informe sale igual y lo dice así (decisión 55)."""
+    _con_informe(conn, mundo, "15 9 * * 2")
+    dias.ciclo(octubre(9, 10))
+    dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "ya casi"}),
+         at=octubre(9, 10, 30))
+    with admin(conn) as cur:        # lo que contestó cierra lo que se le preguntó
+        cur.execute("update pending_reply set satisfecho_en = %s where satisfecho_en is null",
+                    (octubre(9, 10, 30),))
+    conn.commit()
+
+    hechos = _el_informe(dias, octubre(13, 9, 15))
+
+    assert hechos == {"aviso": INFORME_AL_GRUPO, "necesita_respuesta": False,
+                      SIN_NOVEDADES: True}
+    assert hechos_mod.sin_significado(hechos) == set()
 
 
 def test_lo_asentado_por_falta_de_respuesta_figura_en_el_informe(conn, mundo, dias):
@@ -322,6 +376,220 @@ def test_las_terminadas_son_las_de_despues_del_informe_anterior(conn, mundo, dia
     hechos = _el_informe(dias, octubre(16, 16, 15))
 
     assert _titulos(hechos["terminadas"]) == [T3]
+
+
+def test_lo_que_sigue_igual_se_repite_en_cada_informe(conn, mundo, escribe, dias):
+    """Decisión 54 del usuario (opción A): el informe repite lo que sigue igual ("PLC: sigue
+    demorada, falta que llegue el cable"), porque "no es exponer, es informar" y nadie tiene que
+    adivinar qué pasó con ese tema. Cada cuánto, se ajusta en la plataforma."""
+    _con_informe(conn, mundo, "15 16 * * 2,5")
+    dias.ciclo(octubre(9, 10))
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-20",
+                                                    "motivo": "falta el cable"}),
+         at=octubre(9, 10, 30))
+    atraso = {"tarea": "Revisar el tablero", "la_tiene": "Marcos", "vence": "2026-10-09",
+              "prevision": "2026-10-20", "motivo": "falta el cable"}
+
+    martes = _el_informe(dias, octubre(13, 16, 15))
+    viernes = _el_informe(dias, octubre(16, 16, 15))
+
+    assert martes["atrasadas"] == viernes["atrasadas"] == [atraso]
+
+
+# --- Las buenas noticias y la semana buena (decisión 55) -----------------------------------------
+
+def test_una_semana_buena_se_reconoce_con_lo_terminado_y_quien_lo_hizo(conn, mundo, dias):
+    """Decisión 55: lo terminado, con quién lo hizo, y la semana buena por reglas fijas del
+    código: nada atrasado de nuevo, nada trabado, lo que vencía se entregó a tiempo. Es un dato
+    del equipo: ningún conteo por persona ni comparación ("es un equipo, no una competencia")."""
+    _con_informe(conn, mundo)
+    _cancelar_el_tablero(conn, mundo)
+    _estado(conn, mundo, T2, "terminada", octubre(7, 11), vence=octubre(8, 17))
+    _estado(conn, mundo, T3, "en_curso", octubre(5, 10), vence=octubre(23, 17))
+
+    hechos = _el_informe(dias, octubre(9, 16, 15))
+
+    assert hechos["terminadas"] == [{"tarea": T2, "la_tiene": "Marcos"}]
+    assert hechos[TODO_EN_ORDEN] is True and hechos[SEMANA_BUENA] is True
+    # Sólo los hechos del equipo: ningún conteo ni ranking por persona.
+    assert set(hechos) == {"aviso", "necesita_respuesta", "terminadas", "siguen",
+                           TODO_EN_ORDEN, SEMANA_BUENA}
+    assert all(set(r) <= {"tarea", "la_tiene", "estado", "vence"}
+               for r in hechos["terminadas"] + hechos["siguen"])
+    assert hechos_mod.sin_significado(hechos) == set()
+
+
+def test_sin_nada_hecho_en_la_semana_no_hay_semana_buena(conn, mundo, dias):
+    """Todo en orden no es una semana buena: sin nada entregado ni terminado, no se reconoce
+    nada (sin exagerar)."""
+    _con_informe(conn, mundo)
+    _cancelar_el_tablero(conn, mundo)
+    _estado(conn, mundo, T3, "en_curso", octubre(5, 10), vence=octubre(23, 17))
+
+    hechos = _el_informe(dias, octubre(9, 16, 15))
+
+    assert hechos[TODO_EN_ORDEN] is True and SEMANA_BUENA not in hechos
+
+
+def test_lo_entregado_tarde_no_es_una_semana_buena(conn, mundo, dias):
+    """Vencía el miércoles y se entregó el jueves: está entregada (todo en orden ahora), pero lo
+    que vencía no se entregó a tiempo."""
+    _con_informe(conn, mundo)
+    _cancelar_el_tablero(conn, mundo)
+    _estado(conn, mundo, T2, "en_revision", octubre(8, 11), vence=octubre(7, 17))
+
+    hechos = _el_informe(dias, octubre(9, 16, 15))
+
+    assert _titulos(hechos["entregadas"]) == [T2]
+    assert hechos[TODO_EN_ORDEN] is True and SEMANA_BUENA not in hechos
+
+
+def test_un_dia_nuevo_dado_en_la_semana_no_es_una_semana_buena(conn, mundo, escribe, dias):
+    """Un atraso nuevo de la semana (un día posterior al vencimiento) no deja reconocer la semana,
+    aunque algo se haya terminado."""
+    _con_informe(conn, mundo)
+    _estado(conn, mundo, T2, "terminada", octubre(7, 11), vence=octubre(8, 17))
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14",
+                                                    "motivo": "falta el cable"}),
+         at=octubre(8, 10, 30))
+
+    hechos = _el_informe(dias, octubre(9, 16, 15))
+
+    assert _titulos(hechos["terminadas"]) == [T2]
+    assert SEMANA_BUENA not in hechos and TODO_EN_ORDEN not in hechos
+
+
+def test_una_terminada_cuenta_por_el_dia_en_que_se_termino(conn, mundo, dias):
+    """Las terminadas cuentan por su evento de estado, no por su última actualización: una tarea
+    terminada que se toca después (la plataforma, un dato suyo) no vuelve a figurar (revisión
+    `review-f4d7f683f853df7c`, `informe_al_grupo.py:246`)."""
+    _con_informe(conn, mundo)
+    t2 = _estado(conn, mundo, T2, "terminada", octubre(7, 11))
+    _el_informe(dias, octubre(9, 16, 15))
+    with admin(conn) as cur:
+        cur.execute("update task set actualizado_en = %s where id = %s", (octubre(13, 11), t2))
+    conn.commit()
+
+    hechos = _el_informe(dias, octubre(16, 16, 15))
+
+    assert "terminadas" not in hechos
+
+
+# --- Cuando algo falla ----------------------------------------------------------------------------
+
+def _guardar_el_del_viernes(conn, mundo):
+    from leda.motor.escalera import correr_escalera
+    from leda.motor.tiempo import RelojFijo
+
+    correr_escalera(conn, mundo["id"], RelojFijo(octubre(9, 16, 15)))
+    conn.commit()
+
+
+def test_sin_el_grupo_al_salir_queda_omitido_con_su_motivo(conn, mundo):
+    """El grupo se borró entre que se guardó y que salía: queda omitido con su motivo, sin nada
+    en el outbox (revisión `review-f4d7f683f853df7c`, `informe_al_grupo.py:143-147`)."""
+    from leda.motor.avisos import enviar_avisos
+    from leda.motor.tiempo import RelojFijo
+
+    _con_informe(conn, mundo)
+    _guardar_el_del_viernes(conn, mundo)
+    with admin(conn) as cur:
+        cur.execute("update workspace set grupo_chat_id = null where id = %s", (mundo["id"],))
+    conn.commit()
+    enviar_avisos(conn, mundo["id"], IAQueRedacta(), RelojFijo(octubre(9, 16, 15)))
+    conn.commit()
+
+    [aviso] = avisos_guardados(conn, INFORME_AL_GRUPO)
+    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", SIN_GRUPO)
+    assert cuantas(conn, "message_outbox", "chat_id = %s", GRUPO) == 0
+
+
+def test_si_el_texto_no_se_puede_mandar_se_reintenta_con_sus_hechos(conn, mundo, monkeypatch):
+    """Un texto que el outbox rechaza es como no redactarlo: se reintenta, con sus hechos
+    guardados, y nunca sale otro armado a mano."""
+    from leda.motor import informe_al_grupo
+    from leda.motor.avisos import enviar_avisos
+    from leda.motor.tiempo import RelojFijo
+    from leda.salida import PayloadValidationError
+
+    def rechaza(*args, **kwargs):
+        raise PayloadValidationError("no se pudo dividir")
+
+    monkeypatch.setattr(informe_al_grupo, "enqueue_outbox", rechaza)
+    _con_informe(conn, mundo)
+    _cancelar_el_tablero(conn, mundo)
+    _estado(conn, mundo, T2, "en_curso", octubre(5, 10))
+    _guardar_el_del_viernes(conn, mundo)
+    resumen = enviar_avisos(conn, mundo["id"], IAQueRedacta(), RelojFijo(octubre(9, 16, 15)))
+    conn.commit()
+
+    assert resumen["reintento"] == 1
+    [aviso] = avisos_guardados(conn, INFORME_AL_GRUPO)
+    assert (aviso["estado"], aviso["intentos"]) == ("guardado", 1)
+    assert aviso["proximo_intento_en"] is not None
+    assert _titulos(aviso["hechos"]["siguen"]) == [T2]
+    assert cuantas(conn, "incident", "etapa = 'motor_aviso_reintento'") == 1
+
+
+def test_si_el_informe_se_cae_los_avisos_a_cada_persona_salen_igual(conn, mundo, dias,
+                                                                     monkeypatch):
+    """Una falla del informe al grupo no arrastra lo que sale a cada persona en la misma pasada:
+    el pedido de estado del tablero a Marcos sale, el informe queda para reintentarse y la falla
+    deja su incidente (revisión `review-f4d7f683f853df7c`, `avisos.py:362-365`)."""
+    from leda.motor import informe_al_grupo
+
+    def se_cae(*args, **kwargs):
+        raise RuntimeError("se cayó al armarlo")
+
+    monkeypatch.setattr(informe_al_grupo, "armar", se_cae)
+    _con_informe(conn, mundo)
+
+    dias.ciclo(octubre(9, 16, 15))
+
+    [pedido] = avisos_guardados(conn, "pedido_de_estado")
+    assert pedido["estado"] == "enviado"
+    assert cuantas(conn, "message_outbox", "chat_id = %s",
+                   mundo["personas"]["Marcos"]["telegram"]) == 1
+    [aviso] = avisos_guardados(conn, INFORME_AL_GRUPO)
+    assert (aviso["estado"], aviso["intentos"]) == ("guardado", 1)
+    assert aviso["proximo_intento_en"] is not None
+    assert cuantas(conn, "incident", "etapa = 'motor_ciclo'") == 1
+    assert cuantas(conn, "message_outbox", "chat_id = %s", GRUPO) == 0
+
+
+def test_el_reintento_a_mano_tambien_manda_el_informe(conn, mundo):
+    """`enviar_avisos(solo=…, forzar=True)`, el reintento a mano, también alcanza al informe al
+    grupo: sale sin esperar su próximo intento (revisión `review-f4d7f683f853df7c`)."""
+    from datetime import timedelta
+
+    from leda.motor.avisos import enviar_avisos
+    from leda.motor.tiempo import RelojFijo
+
+    class NoRedacta:
+        nombre = "falla"
+
+        def redactar(self, pedido):
+            raise TimeoutError("la IA no contestó")
+
+    _con_informe(conn, mundo)
+    _cancelar_el_tablero(conn, mundo)
+    _estado(conn, mundo, T2, "en_curso", octubre(5, 10))
+    _guardar_el_del_viernes(conn, mundo)
+    at = octubre(9, 16, 15)
+    enviar_avisos(conn, mundo["id"], NoRedacta(), RelojFijo(at))
+    conn.commit()
+    [aviso] = avisos_guardados(conn, INFORME_AL_GRUPO)
+    assert aviso["proximo_intento_en"] > at + timedelta(seconds=30)
+
+    resumen = enviar_avisos(conn, mundo["id"], IAQueRedacta(),
+                            RelojFijo(at + timedelta(seconds=30)), solo=str(aviso["id"]),
+                            forzar=True)
+    conn.commit()
+
+    assert resumen["enviado"] == 1
+    [aviso] = avisos_guardados(conn, INFORME_AL_GRUPO)
+    assert aviso["estado"] == "enviado"
+    assert cuantas(conn, "message_outbox", "chat_id = %s", GRUPO) == 1
 
 
 def test_guardar_sin_cadencias_no_hace_nada(conn, mundo):

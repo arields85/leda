@@ -77,6 +77,11 @@ INFORME_AL_GRUPO = "informe_al_grupo"
 # Por qué un informe al grupo no salió: no había nada que informar, o el espacio ya no tiene grupo.
 NADA_PARA_INFORMAR = "nada_para_el_informe"
 SIN_GRUPO = "sin_grupo"
+# Lo que dice el informe además de sus listas (decisión 55).
+SIN_SABER = "sin_saber_como_vienen"
+TODO_EN_ORDEN = "todo_en_orden"
+SEMANA_BUENA = "semana_buena"
+SIN_NOVEDADES = "sin_novedades_para_el_grupo"
 # Las tareas abiertas del informe y las que siguen su curso (comprometidas, sin entregar).
 ABIERTAS = ("asignada", "en_curso", "bloqueada", "en_revision")
 SIGUEN = ("asignada", "en_curso")

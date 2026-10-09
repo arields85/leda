@@ -352,6 +352,26 @@ def test_lo_que_se_le_dice_a_la_persona_trabada_ya_quedo_asentado(conn, mundo, e
     assert "sin_a_quien_informar" not in fila["detalle"]
 
 
+def test_si_el_aviso_al_referente_no_salio_no_se_dice_que_le_llega(conn, mundo, equipo, dias):
+    """Constitución §4: el aviso a Lucas quedó `fallido` (la IA no lo redactó tras sus
+    intentos) antes de que saliera el de Marcos. Si Marcos pregunta a quién le llegó, la verdad
+    es que a nadie: no se nombra a Lucas (revisión `review-8d6e96daab3e588b`,
+    `bloqueo_viejo.py:324-328`)."""
+    _marcos_trabado(equipo)
+    dias.ciclo(octubre(13, 8))                  # fuera del horario: los dos, guardados
+    [viejo] = _viejos(conn)
+    with admin(conn) as cur:
+        cur.execute("""update scheduled_notice set estado = 'fallido', resuelto_en = %s
+                        where id = %s""", (octubre(13, 8, 30), str(viejo["id"])))
+    conn.commit()
+
+    dias.ciclo(octubre(13, 10))
+
+    [hechos] = _asentado_para(dias, "Marcos")
+    assert hechos["queda_asentado"] == {"figura_en_el_informe_al_grupo": False,
+                                        "solo_si_pregunta": {"no_le_llega_a_nadie": True}}
+
+
 # --- Se vuelve a asentar mientras siga (decisión 36) ---------------------------------------------
 
 def test_mientras_siga_trabada_se_vuelve_a_asentar_con_lo_que_paso_desde_la_vez_anterior(

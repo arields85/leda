@@ -143,6 +143,28 @@ def test_a_quien_no_tiene_leda_conectada_no_se_le_pasa_y_se_avisa_al_administrad
     assert _quien_la_tiene(conn, equipo, "COM") == MARCOS
 
 
+def test_si_quien_decide_no_tiene_leda_conectada_el_aviso_dice_que_es_para_decidir(conn,
+                                                                                  equipo):
+    """Nahuel le pide pasar su tarea a Pedro y lo decide Marcos, el encargado de OT, que no tiene
+    Leda conectada. Al administrador le llega para qué hay que conectarlo: para que decida el
+    pase, no para recibir la tarea, que va a Pedro (constitución §4; revisión
+    `review-8d6e96daab3e588b`, `pase.py:243-245`)."""
+    with admin(conn) as cur:
+        cur.execute("update app_user set telegram_user_id = null where id = %s",
+                    (equipo.mundo["personas"]["Marcos"]["app_user_id"],))
+    conn.commit()
+
+    r = _pedir(equipo, "Nahuel", "SEN", "pedro")
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "no_se_puede"
+    assert hecho["no_se_le_puede_escribir_a"]["a"] == MARCOS
+    [incidente] = todos(conn, "select resumen_sanitizado from incident")
+    assert "para que decida" in incidente["resumen_sanitizado"]
+    assert "para pasarle" not in incidente["resumen_sanitizado"]
+    assert _pases(conn) == []
+
+
 def test_pedir_un_pase_muestra_la_vista_previa_y_no_cambia_nada(conn, equipo):
     r = _pedir(equipo, "Marcos", "COM", "nahuel")
     [hecho] = r.hechos
