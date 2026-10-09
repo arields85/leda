@@ -117,6 +117,14 @@ CUANDO_SE_DESTRABA = "cuando_se_destraba"
 # (`pregunto_por_las_otras`) y, con otra respuesta parcial, se cierra (`al_terminar_el_turno`). Se
 # puede dejar: las tareas que vencen tienen la espera de su escalera.
 COMO_VIENEN_SUS_TAREAS = "como_vienen_sus_tareas"
+# Pasarle una tarea a otra persona (C-7; `pase.py`): la vista previa del pase, que espera la
+# confirmación de quien lo pide (con el botón "Confirmar" o escrita, con la guarda; se puede
+# dejar), y lo que ofrece la pregunta a quien decide y a quien recibe, con dos botones cada una:
+# como la decisión de una entrega, no es un tema abierto (`ofrecer`); se contesta tocando o
+# escribiendo (`contestar_el_pase`).
+CONFIRMAR_EL_PASE = "confirmar_el_pase"
+DECIDIR_EL_PASE = "decidir_el_pase"
+TOMAR_LA_TAREA = "tomar_la_tarea"
 
 
 @dataclass(frozen=True)
@@ -156,6 +164,9 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(VER_LA_ENTREGA),
     TipoDePregunta(CUANDO_SE_DESTRABA, espera=CUANDO_SE_DESTRABA, escala=False),
     TipoDePregunta(COMO_VIENEN_SUS_TAREAS),
+    TipoDePregunta(CONFIRMAR_EL_PASE),
+    TipoDePregunta(DECIDIR_EL_PASE),
+    TipoDePregunta(TOMAR_LA_TAREA),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
@@ -292,10 +303,12 @@ def _alias(tareas, task_id) -> str | None:
 
 def _todas(ctx) -> tuple:
     """Las tareas que la persona nombra por su alias: las suyas, las entregas que esperan su
-    decisión (`fichas.Contexto.para_aprobar`) y las de otras personas que espera que destrabe
-    (`fichas.Contexto.para_destrabar`)."""
+    decisión (`fichas.Contexto.para_aprobar`), las de otras personas que espera que destrabe
+    (`fichas.Contexto.para_destrabar`) y las de otras personas cuyo pase espera algo de ella
+    (`fichas.Contexto.pases`, C-7)."""
     return (tuple(ctx.tareas) + tuple(getattr(ctx, "para_aprobar", ()) or ())
-            + tuple(getattr(ctx, "para_destrabar", ()) or ()))
+            + tuple(getattr(ctx, "para_destrabar", ()) or ())
+            + tuple(getattr(ctx, "pases", ()) or ()))
 
 
 # --- Abrir, cerrar y retomar ------------------------------------------------------------------
@@ -733,3 +746,7 @@ def _etiqueta(titulo: str) -> str:
 
 def _json(valor: Any) -> str:
     return json.dumps(valor, ensure_ascii=False, default=str)
+
+
+# Para el cierre de una pregunta que escribe otro módulo (`pase.py`).
+json_de = _json

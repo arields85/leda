@@ -26,7 +26,7 @@ from tests.motor.ayudantes import AHORA, a_la_vista
 VIERNES_9 = datetime(2026, 10, 9, 20, 0, tzinfo=timezone.utc)      # 17:00 en Buenos Aires
 OFRECIDAS = ("anotar_inicio", "anotar_prevision", "anotar_bloqueo", "anotar_quien_destraba",
              "destrabar", "consultar_pendientes", "informar_avance", "entregar", "aprobar",
-             "pedir_cambios", "ver_entrega", "pedir_enlace")
+             "pedir_cambios", "ver_entrega", "pedir_enlace", "pedir_reasignacion")
 
 
 # --- Ayudas ---------------------------------------------------------------------------------
@@ -119,11 +119,13 @@ def test_la_lista_cerrada_tiene_una_ficha_por_jugada_del_recordatorio():
     """Las del recordatorio y las de las situaciones generales (E2-4), que no se ofrecen como
     algo que Leda puede hacer."""
     assert sorted(JUGADAS) == sorted(FICHAS) == sorted(
-        OFRECIDAS + ("pedir_reasignacion",) + SITUACIONES
+        OFRECIDAS + SITUACIONES
         + ("confirmar", "guardar_para_la_entrega")
         # La persecución del bloqueo (C-5): lo que dice quien destraba, "no le escribas" y
         # "no me corresponde" (porción 3).
-        + ("decir_cuando_destraba", "no_escribirle", "decir_que_no_le_toca"))
+        + ("decir_cuando_destraba", "no_escribirle", "decir_que_no_le_toca")
+        # Delegar (C-7): la respuesta de quien decide un pase o de quien lo recibe.
+        + ("contestar_el_pase",))
     assert not any(FICHAS[n].se_ofrece for n in SITUACIONES)
     for ficha in FICHAS.values():
         assert ficha.para_que and ficha.comprueba and ficha.hace and ficha.despues
@@ -695,17 +697,17 @@ def test_una_tarea_sin_arrancar_se_entrega_con_su_vista_previa(conn, mundo, escr
     assert hecho["al_confirmar"]["arranca_al_entregarla"] is True
 
 
-def test_una_reasignacion_dice_quien_decide_y_no_avisa_a_nadie(conn, mundo, escribe):
+def test_un_pase_sin_quien_lo_decida_no_se_puede_y_no_avisa_a_nadie(conn, mundo, escribe):
+    """Delegar (C-7): decide el encargado del sector de quien recibe. En este espacio el área no
+    tiene encargado: no hay quien decida, y nada cambia ni le llega a nadie. Los demás casos, con
+    los sectores de CoreWork, en `test_delegar.py`."""
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada(
-        "pedir_reasignacion", {"tarea": "T1", "a": "Nahuel"}),
-        texto="me la podés pasar a Nahuel?")
+        "pedir_reasignacion", {"tarea": "T1", "a": "Ismael"}),
+        texto="me la podés pasar a Ismael?")
 
-    # La previsión ofrecida queda como tema abierto (decisión del usuario, 2026-10-05).
-    assert hecho == {"jugada": "pedir_reasignacion", "resultado": "no_por_chat",
-                     "motivo": "cambiar_el_responsable_no_es_por_chat",
-                     "quien_decide": "Ismael", "alternativa": "anotar_prevision",
-                     "tarea": {"alias": "T1", "titulo": "Revisar el tablero"},
-                     "pregunta": "propuesta"}
+    assert hecho == {"jugada": "pedir_reasignacion", "resultado": "no_se_puede",
+                     "motivo": "sin_encargado",
+                     "tarea": {"alias": "T1", "titulo": "Revisar el tablero"}}
     assert _uno(conn, "select responsable_membership_id r from task where id = %s",
                 mundo["tarea"])["r"] is not None
     assert _cuantas(conn, "incident") == 0 and _cuantas(conn, "scheduled_notice") == 0

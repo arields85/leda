@@ -206,7 +206,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "sacadas": "Las piezas que la persona sacó de la entrega antes de confirmarla: no van.",
     "retiradas": "Las piezas ya entregadas que la persona retiró: dejan de valer, nada se "
                  "borra.",
-    "como_queda": "Cómo queda la entrega después de esto, con su código.",
+    "como_queda": "Cómo queda lo que se confirmaba (la entrega o el pase) después de esto, con "
+                  "su código.",
     "reemplazada": "Esa vista de la entrega dejó de valer porque cambió lo que mostraba: la "
                    "reemplazó otra.",
     "para_cuando_la_entregue": "Lo que la persona mandó y queda en la conversación para "
@@ -227,8 +228,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "entregada": "La tarea quedó entregada y pasa a revisión, el paso que sigue a toda "
                  "entrega: quien aprueba el trabajo de la persona la revisa y decide si la "
                  "aprueba o le pide cambios; hasta entonces, no queda terminada.",
-    "no_vale_la_confirmacion": "La confirmación no vale (motivo dice por qué) y se muestra la "
-                               "entrega como quedó (como_queda).",
+    "no_vale_la_confirmacion": "La confirmación no vale (motivo dice por qué) y se muestra otra "
+                               "vez lo que se confirmaba, la entrega o el pase, como quedó "
+                               "(como_queda).",
     "llego_algo_despues": "Llegó algo nuevo para la entrega después de mostrarla: lo que la "
                           "persona confirmaba ya no era lo último.",
     "cambio_lo_que_se_mostro": "Lo que se le mostró a la persona cambió desde entonces.",
@@ -811,6 +813,89 @@ SIGNIFICADOS: Mapping[str, str] = {
                 "no sabe, que le toca a quien lo dijo (nadie_mas), y lo que dijo quien la "
                 "destraba: para cuándo, que ya está, que no le corresponde, con qué está trabado "
                 "o sus palabras. Un día que alguien dio no es un hecho cumplido.",
+    # --- Pasarle una tarea a otra persona (C-7; `pase.py`) --------------------------------------
+    "pase_para_confirmar": "Lo que se mostró es el pase de una tarea a otra persona (pase), con "
+                           "lo que pasa al confirmarlo (al_confirmar_el_pase): todavía no "
+                           "cambió nada; espera que la persona lo confirme, con el botón o "
+                           "escribiendo.",
+    "pase": "Pasar la tarea a otra persona: quién la tiene (la_tiene) y a quién pasaría "
+            "(pasaria_a).",
+    "la_tiene": "Quién tiene la tarea ahora: quien la hace y da sus novedades.",
+    "pasaria_a": "A quién pasaría la tarea con el pase.",
+    "al_confirmar_el_pase": "Lo que pasa cuando la persona confirme el pase: si lo decide otra "
+                            "persona, Leda se lo pregunta primero (lo_decide); después, quien "
+                            "la recibe tiene que decir que la toma (la_tiene_que_tomar). Hasta "
+                            "que la tome, la tarea sigue con quien la tiene.",
+    "lo_decide": "Quién decide si la tarea pasa: el encargado del sector de quien la recibe. "
+                 "Leda se lo pregunta antes que a quien la recibe.",
+    "la_tiene_que_tomar": "Quién recibe la tarea: Leda le pregunta si la toma, y sólo con su sí "
+                          "pasa a ser suya.",
+    "decide_y_la_toma": "Quien recibe la tarea es también quien decide: su sí vale como las "
+                        "dos cosas.",
+    "pase_pedido": "El pase quedó pedido: la tarea sigue con quien la tiene hasta que la tomen, "
+                   "y Leda le pregunta a quien sigue (le_pregunta_a).",
+    "le_pregunta_a": "A quién le pregunta Leda por el pase, como Leda y no en nombre de nadie "
+                     "(a), y cuándo le llega (llega).",
+    "aprobo_el_pase": "Si quien escribe aprobó que la tarea pase a otra persona (verdadero) o "
+                      "no (falso).",
+    "la_toma": "Si quien escribe toma la tarea que le querían pasar: con su sí ya es suya, con "
+               "la misma fecha y lo que pide para terminarla; con su no, sigue con quien la "
+               "tenía.",
+    "tambien_lo_decidia": "Quien escribe era también quien decidía el pase: su respuesta vale "
+                          "como la decisión.",
+    "sigue_con": "Quién sigue teniendo la tarea: no cambió de manos.",
+    "aviso_a_quien_pidio": "Lo que se le avisa a quien pidió el pase, de cómo terminó: a quién "
+                           "(a) y cuándo se entera (llega).",
+    "aviso_a_quien_decidio": "Lo que se le avisa a quien decidió el pase, de cómo terminó: a "
+                             "quién (a) y cuándo se entera (llega).",
+    "confirmar_el_pase": "Pregunta si la persona confirma pasarle la tarea a la otra persona, "
+                         "como lo muestra el pase: con el botón Confirmar o escribiendo. Se "
+                         "puede dejar.",
+    "decidir_el_pase": "Pregunta a quien decide si aprueba que la tarea de otra persona pase a "
+                       "alguien de su sector, con dos botones; también se contesta escribiendo.",
+    "tomar_la_tarea": "Pregunta a quien le quieren pasar una tarea si la toma, con dos botones; "
+                      "también se contesta escribiendo.",
+    "pase_para_decidir": "Mensaje de Leda, como Leda, a quien decide si una tarea de otra "
+                         "persona pasa a alguien: quién lo pidió (pidio), quién la tiene "
+                         "(la_tiene), a quién pasaría (pasaria_a) y para cuándo vence; pregunta "
+                         "si lo aprueba.",
+    "pase_para_tomar": "Mensaje de Leda, como Leda, a quien le quieren pasar una tarea: quién lo "
+                       "pidió (pidio), quién la tiene (la_tiene), para cuándo vence y, si "
+                       "corresponde, quién lo aprobó (lo_aprobo) o que lo decide la misma "
+                       "persona (tambien_lo_decide); pregunta si la toma.",
+    "como_termino_el_pase": "Aviso de cómo terminó el pase de una tarea: si quien la recibía "
+                            "(pasaria_a) la tomó (la_tomo), o si quien decidía no lo aprobó "
+                            "(no_lo_aprobo, lo_decidio), y quién la tiene ahora (la_tiene). Es "
+                            "información: no pide respuesta.",
+    "pidio": "Quién pidió pasar la tarea.",
+    "lo_aprobo": "Quién aprobó que la tarea pase: el encargado del sector de quien la recibe.",
+    "tambien_lo_decide": "Quien recibe este mensaje es también quien decide el pase: su "
+                         "respuesta vale como la decisión.",
+    "la_tomo": "Si quien recibía la tarea la tomó (verdadero) o no (falso).",
+    "no_lo_aprobo": "Quien decidía no aprobó que la tarea pase: sigue con quien la tenía.",
+    "lo_decidio": "Quién decidió el pase.",
+    "por_que": "Por qué no aprobó el pase o no tomó la tarea, con sus palabras.",
+    "acepta": "Si la persona dice que sí (verdadero) o que no (falso).",
+    "espera_su_decision_del_pase": "Una tarea de otra persona que quien la tiene (la_tiene) pidió "
+                                   "pasar a alguien (pasaria_a): espera que la persona que "
+                                   "escribe decida si lo aprueba. No es una tarea suya.",
+    "espera_que_la_tome": "Una tarea de otra persona que le quieren pasar a la persona que "
+                          "escribe (lo pidió pidio): espera que diga si la toma. Todavía no es "
+                          "suya.",
+    "otro_sector": "Quien escribe no puede pasarle la tarea a alguien de otro sector: eso lo "
+                   "decide el encargado de su sector (quien_decide). No se le pasa el pedido a "
+                   "nadie.",
+    "sin_encargado": "El sector de quien recibiría la tarea no tiene a nadie que decida el "
+                     "pase.",
+    "es_la_misma_persona": "La persona nombró a sí misma: la tarea ya es suya.",
+    "ya_hay_un_pase": "Ya se pidió pasar esa tarea (pase) y todavía no terminó: no se pide "
+                      "otro.",
+    "no_hay_un_pase": "Ninguna tarea espera que la persona decida un pase o que la tome.",
+    "la_tarea_cambio": "La tarea ya no se puede pasar (se entregó o se cerró): el pase quedó "
+                       "sin efecto.",
+    "el_pase_ya_no_espera": "El pase ya no espera eso: se decidió, se tomó o terminó.",
+    "cambio_quien_la_tiene": "La tarea pasó a otra persona: lo que se le preguntaba a quien la "
+                             "tenía ya no espera nada.",
 }
 
 
@@ -905,6 +990,7 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "guardar_para_la_entrega": "dejarlo_para_cuando_la_entregue",
     "informar_avance": "anotar_como_viene_sin_algo_cierto",
     "pedir_reasignacion": "pasarle_la_tarea_a_otra_persona",
+    "contestar_el_pase": "decir_si_aprueba_el_pase_o_si_toma_la_tarea",
     "aprobar": "aprobar_la_entrega",
     "pedir_cambios": "devolver_la_entrega_con_cambios",
     "ver_entrega": "mostrar_la_entrega_para_revisar",

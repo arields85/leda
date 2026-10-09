@@ -136,9 +136,17 @@ def test_lo_propuesto_se_puede_cancelar(conn, tareas, marcos):
     assert cuantas(conn, "blocker", "resuelto_en is null") == 1     # el bloqueo sigue
 
 
+def _sin_quien_destrabe(marcos) -> None:
+    """Marcos se traba con la T1 y no sabe quién la destraba: Leda le propone salidas."""
+    marcos.dice(jugada_bloqueo("T1", "falta el repuesto"))
+    r = marcos.dice(Jugada("anotar_quien_destraba", {"tarea": "T1", "no_sabe": True}))
+    assert "anotar_prevision" in r.hechos[0]["salidas"]
+
+
 def test_lo_propuesto_se_contesta_haciendolo(conn, tareas, marcos):
-    r = marcos.dice(Jugada("pedir_reasignacion", {"tarea": "T1", "a": "nahuel"}))
-    assert r.hechos[0]["alternativa"] == "anotar_prevision"
+    # Lo que Leda propone cuando nadie más destraba un bloqueo (9c); hasta la C-7, la previsión
+    # que ofrecía en lugar de pasar la tarea a otra persona.
+    _sin_quien_destrabe(marcos)
     assert abierta(conn) == (preguntas.PROPUESTA, tareas["T1"])
 
     r = marcos.dice(Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14",
@@ -152,7 +160,7 @@ def test_lo_propuesto_se_contesta_haciendolo(conn, tareas, marcos):
 
 
 def test_lo_propuesto_sigue_la_regla_de_un_tema_a_la_vez(conn, tareas, marcos):
-    marcos.dice(Jugada("pedir_reasignacion", {"tarea": "T1", "a": "nahuel"}))
+    _sin_quien_destrabe(marcos)
 
     r = marcos.dice(jugada_bloqueo("T2"))     # lo nuevo también pregunta: Leda sigue a Marcos
 

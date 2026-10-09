@@ -103,6 +103,10 @@ DATOS = {
                              "Leda)."),
     "palabras": ("string", "Lo que la persona contó de cómo viene la tarea, con sus palabras."),
     "a": ("string", "A quién quiere pasarle la tarea, como lo nombró la persona."),
+    "acepta": ("boolean", "Verdadero si la persona dice que sí (aprueba el pase o toma la "
+                          "tarea); falso si dice que no. Sólo si lo dijo."),
+    "por_que": ("string", "Por qué no aprueba el pase o no toma la tarea, con las palabras de "
+                          "la persona. Sólo si lo dijo."),
     "opcion": ("string", "El alias de la opción que eligió (O1, O2...), de la pregunta "
                          "abierta."),
     "corrige": ("string", "El nombre de la jugada ya anotada que la persona dice que estuvo "

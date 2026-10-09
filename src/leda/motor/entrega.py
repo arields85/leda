@@ -1106,3 +1106,8 @@ def corregir(ctx, datos: dict, tarea: dict) -> dict:
         return {**_la_entrega_queda_incompleta(ctx, tarea), "resultado": "corregido", **base,
                 "retiradas": retiradas}
     return {"resultado": "no_se_puede", "motivo": "nada_que_corregir", **base}
+
+
+# Para la vista previa de un pase (`pase.py`), que se confirma con la misma guarda.
+que_sea_lo_mostrado = _que_sea_lo_mostrado
+lo_mostrado = _lo_mostrado

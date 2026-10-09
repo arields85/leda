@@ -256,6 +256,12 @@ class TipoDeAviso:
     # Si lo que la escalera tenía para ese día sobre una tarea va dentro de la lista de la cadencia
     # de su responsable, como un renglón, en lugar de salir aparte (decisión 8).
     entra_en_la_lista: bool = False
+    # La decisión que ofrece al salir con sus propias opciones, cada una con la jugada que corre y
+    # sus datos: su tipo de pregunta, la jugada que guarda y las opciones (`preguntas.ofrecer`).
+    # Como `ofrece`, no es un tema abierto. La pregunta del pase a quien decide y a quien recibe
+    # (C-7, `pase.opciones`).
+    opciones: Callable[["Momento", dict[str, Any]],
+                       tuple[str, dict[str, Any], list[tuple[str, dict[str, Any]]]]] | None = None
 
 
 # El hecho que le dice a la IA que el mensaje lleva al final el enlace a la página de la tarea.
@@ -698,6 +704,10 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
             _ofrecer_la_decision(m, turno, x.aviso, x.tipo)
         elif q is not None and x.tipo.recuerda:
             pass                # la decisión sigue abierta desde el aviso que la ofreció
+        elif q is not None and x.tipo.opciones is not None:
+            de_tipo, jugada, opciones = x.tipo.opciones(m, x.aviso)
+            preguntas.ofrecer(turno, de_tipo, str(x.aviso["task_id"]), jugada=jugada,
+                              opciones=opciones)
         elif q is not None:
             _abrir_la_pregunta(m, turno, x.aviso)
         if x.tipo.escala:
@@ -784,6 +794,8 @@ def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, 
     tipo = TIPOS.get(aviso["tipo"])
     if tipo is not None and tipo.ofrece:
         pregunta["opciones"] = [{"etiqueta": FICHAS[n].boton} for n in tipo.ofrece]
+    if tipo is not None and tipo.opciones is not None:
+        pregunta["opciones"] = [{"etiqueta": e} for e, _ in tipo.opciones(m, aviso)[2]]
     if tipo is not None and tipo.recuerda:
         pregunta["desde_antes"] = True      # la hizo el aviso que la ofreció
     if aviso["tipo"] in (REPETICION_DEL_DIA, VUELVE_LA_PREGUNTA):
@@ -1735,6 +1747,29 @@ def _al_salir_el_bloqueo_viejo(m: Momento, aviso) -> None:
     bloqueo_viejo.al_salir(m, aviso)
 
 
+# --- Pasarle una tarea a otra persona (C-7; `pase.py`) ------------------------------------------
+#
+# La pregunta a quien decide si la tarea pasa (`PASE_PARA_DECIDIR`) y a quien la recibe si la toma
+# (`PASE_PARA_TOMAR`), con dos botones cada una, y cómo terminó, a quien pidió y a quien decidió
+# (`COMO_TERMINO_EL_PASE`, información). Las tres las causa lo que dijo otra persona: de
+# coordinación, terminado el margen para corregir. Las preguntas no salen si el pase ya no espera
+# eso.
+
+PASE_PARA_DECIDIR = "pase_para_decidir"
+PASE_PARA_TOMAR = "pase_para_tomar"
+COMO_TERMINO_EL_PASE = "como_termino_el_pase"
+
+
+def _vigencia_del_pase(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import pase                  # pase importa este módulo
+    return pase.vigencia(m, aviso)
+
+
+def _opciones_del_pase(m: Momento, aviso):
+    from . import pase
+    return pase.opciones(m, aviso)
+
+
 def _vigencia_de_la_lista(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     from . import cadencias             # cadencias importa este módulo
     return cadencias.vigencia(m, aviso)
@@ -1845,6 +1880,13 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # seguimiento que Leda hace por su cuenta, un mensaje dentro del tope diario.
     TipoDeAviso(preguntas.COMO_VIENEN_SUS_TAREAS, "seguimiento", _vigencia_de_la_lista,
                 lista=True),
+    # Pasarle una tarea a otra persona (C-7): la pregunta a quien decide y a quien recibe, con sus
+    # dos botones, y cómo terminó. De coordinación: los causa lo que dijo otra persona.
+    TipoDeAviso(PASE_PARA_DECIDIR, "normal", _vigencia_del_pase, es_coordinacion=True,
+                opciones=_opciones_del_pase),
+    TipoDeAviso(PASE_PARA_TOMAR, "normal", _vigencia_del_pase, es_coordinacion=True,
+                opciones=_opciones_del_pase),
+    TipoDeAviso(COMO_TERMINO_EL_PASE, "informativo", _vigencia_del_pase, es_coordinacion=True),
 )})
 
 

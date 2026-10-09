@@ -54,9 +54,9 @@ pasos:
       - {nombre: pedir_reasignacion, tarea: COM, a: nahuel}
     efectos: {}
     hechos:
-      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: COM,
-         pase: {de: Marcos Tarquini, a: Nahuel Gimenez},
-         al_confirmar: {lo_decide: ausente, la_tiene_que_tomar: Nahuel Gimenez},
+      - {jugada: pedir_reasignacion, resultado: pase_para_confirmar, tarea: COM,
+         pase: {la_tiene: Marcos Tarquini, pasaria_a: Nahuel Gimenez},
+         al_confirmar_el_pase: {lo_decide: ausente, la_tiene_que_tomar: Nahuel Gimenez},
          pregunta: confirmar_el_pase}
     pregunta: {tipo: confirmar_el_pase, tarea: COM}
     botones: [Confirmar]
@@ -84,9 +84,9 @@ pasos:
            hechos: {necesita_respuesta: true, pregunta: tomar_la_tarea, pidio: Marcos Tarquini,
                     lo_aprobo: ausente, tambien_lo_decide: ausente}}
     hechos:
-      - {jugada: confirmar, resultado: pedido, tarea: COM,
-         pase: {de: Marcos Tarquini, a: Nahuel Gimenez},
-         se_le_pregunta_a: {a: Nahuel Gimenez, llega: "~2026-10-20T10:11"}}
+      - {jugada: confirmar, resultado: pase_pedido, tarea: COM,
+         pase: {la_tiene: Marcos Tarquini, pasaria_a: Nahuel Gimenez},
+         le_pregunta_a: {a: Nahuel Gimenez, llega: "~2026-10-20T10:11"}}
     pregunta: null
     botones: []
     estado_despues:
@@ -126,7 +126,7 @@ pasos:
       responsables: {COM: Nahuel}
       avisos_guardados:
         - {tipo: como_termino_el_pase, tarea: COM, a: Marcos, estado: guardado,
-           hechos: {necesita_respuesta: false, la_tomo: true, a: Nahuel Gimenez}}
+           hechos: {necesita_respuesta: false, la_tomo: true, pasaria_a: Nahuel Gimenez}}
     hechos:
       - {jugada: contestar_el_pase, resultado: anotado, tarea: COM, la_toma: true,
          aviso_a_quien_pidio: {a: Marcos Tarquini, llega: "~2026-10-20T10:40"},
@@ -150,7 +150,7 @@ pasos:
       - a: Marcos
         tipo: como_termino_el_pase
         tarea: COM
-        hechos: {necesita_respuesta: false, la_tomo: true, a: Nahuel Gimenez}
+        hechos: {necesita_respuesta: false, la_tomo: true, pasaria_a: Nahuel Gimenez}
     dice:
       - que Nahuel tomó la de comunicaciones
       - que no hace falta contestar, en el último renglón
@@ -183,9 +183,9 @@ pasos:
       - {nombre: pedir_reasignacion, tarea: PLC, a: lucas}
     efectos: {}
     hechos:
-      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: PLC,
-         pase: {de: Marcos Tarquini, a: Lucas Natuche},
-         al_confirmar: {lo_decide: Martín Forte, la_tiene_que_tomar: Lucas Natuche},
+      - {jugada: pedir_reasignacion, resultado: pase_para_confirmar, tarea: PLC,
+         pase: {la_tiene: Marcos Tarquini, pasaria_a: Lucas Natuche},
+         al_confirmar_el_pase: {lo_decide: Martín Forte, la_tiene_que_tomar: Lucas Natuche},
          pregunta: confirmar_el_pase}
     pregunta: {tipo: confirmar_el_pase, tarea: PLC}
     botones: [Confirmar]
@@ -207,8 +207,8 @@ pasos:
            hechos: {necesita_respuesta: true, pregunta: decidir_el_pase, pidio: Marcos Tarquini,
                     pasaria_a: Lucas Natuche}}
     hechos:
-      - {jugada: confirmar, resultado: pedido, tarea: PLC,
-         se_le_pregunta_a: {a: Martín Forte, llega: "~2026-10-20T11:13"}}
+      - {jugada: confirmar, resultado: pase_pedido, tarea: PLC,
+         le_pregunta_a: {a: Martín Forte, llega: "~2026-10-20T11:13"}}
     pregunta: null
     botones: []
     estado_despues:
@@ -247,7 +247,7 @@ pasos:
                     lo_aprobo: Martín Forte}}
     hechos:
       - {jugada: contestar_el_pase, resultado: anotado, tarea: PLC, aprobo_el_pase: true,
-         se_le_pregunta_a: {a: Lucas Natuche, llega: "~2026-10-20T11:40"}}
+         le_pregunta_a: {a: Lucas Natuche, llega: "~2026-10-20T11:40"}}
     pregunta: null
     botones: []
     estado_despues:
@@ -278,11 +278,11 @@ pasos:
     a_las: "2026-10-20 12:00"
     escribe: "uh no puedo esta semana, estoy con lo del data center"
     jugadas:
-      - {nombre: contestar_el_pase, tarea: PLC, acepta: false, puede_traer: [motivo]}
+      - {nombre: contestar_el_pase, tarea: PLC, acepta: false, puede_traer: [por_que]}
     efectos:
       avisos_guardados:
         - {tipo: como_termino_el_pase, tarea: PLC, a: Marcos, estado: guardado,
-           hechos: {necesita_respuesta: false, la_tomo: false, a: Lucas Natuche}}
+           hechos: {necesita_respuesta: false, la_tomo: false, pasaria_a: Lucas Natuche}}
     hechos:
       - {jugada: contestar_el_pase, resultado: anotado, tarea: PLC, la_toma: false,
          sigue_con: Marcos Tarquini,
@@ -304,7 +304,7 @@ pasos:
       - a: Marcos
         tipo: como_termino_el_pase
         tarea: PLC
-        hechos: {necesita_respuesta: false, la_tomo: false, a: Lucas Natuche}
+        hechos: {necesita_respuesta: false, la_tomo: false, pasaria_a: Lucas Natuche}
     dice:
       - que Lucas no puede tomar la del PLC y que sigue con él
 
@@ -317,9 +317,9 @@ pasos:
       - {nombre: pedir_reasignacion, tarea: SRV, a: marcos}
     efectos: {}
     hechos:
-      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: SRV,
-         pase: {de: Martín Forte, a: Marcos Tarquini},
-         al_confirmar: {lo_decide: ausente, la_tiene_que_tomar: Marcos Tarquini,
+      - {jugada: pedir_reasignacion, resultado: pase_para_confirmar, tarea: SRV,
+         pase: {la_tiene: Martín Forte, pasaria_a: Marcos Tarquini},
+         al_confirmar_el_pase: {lo_decide: ausente, la_tiene_que_tomar: Marcos Tarquini,
                         decide_y_la_toma: true},
          pregunta: confirmar_el_pase}
     pregunta: {tipo: confirmar_el_pase, tarea: SRV}
@@ -343,8 +343,8 @@ pasos:
            hechos: {necesita_respuesta: true, pregunta: tomar_la_tarea, pidio: Martín Forte,
                     tambien_lo_decide: true}}
     hechos:
-      - {jugada: confirmar, resultado: pedido, tarea: SRV,
-         se_le_pregunta_a: {a: Marcos Tarquini, llega: "~2026-10-20T14:11"}}
+      - {jugada: confirmar, resultado: pase_pedido, tarea: SRV,
+         le_pregunta_a: {a: Marcos Tarquini, llega: "~2026-10-20T14:11"}}
     pregunta: null
     botones: []
     estado_despues:
@@ -376,7 +376,7 @@ pasos:
       responsables: {SRV: Marcos}
       avisos_guardados:
         - {tipo: como_termino_el_pase, tarea: SRV, a: Martin, estado: guardado,
-           hechos: {necesita_respuesta: false, la_tomo: true, a: Marcos Tarquini}}
+           hechos: {necesita_respuesta: false, la_tomo: true, pasaria_a: Marcos Tarquini}}
     hechos:
       - {jugada: contestar_el_pase, resultado: anotado, tarea: SRV, la_toma: true,
          tambien_lo_decidia: true,
@@ -397,7 +397,7 @@ pasos:
       - a: Martin
         tipo: como_termino_el_pase
         tarea: SRV
-        hechos: {necesita_respuesta: false, la_tomo: true, a: Marcos Tarquini}
+        hechos: {necesita_respuesta: false, la_tomo: true, pasaria_a: Marcos Tarquini}
     dice:
       - que Marcos tomó la del servidor
 
@@ -411,7 +411,7 @@ pasos:
     efectos: {}
     hechos:
       - {jugada: pedir_reasignacion, resultado: no_se_puede, motivo: otro_sector,
-         lo_decide: Marcos Tarquini, tarea: SEN}
+         quien_decide: Marcos Tarquini, tarea: SEN}
     pregunta: null
     botones: []
     estado_despues:
@@ -431,9 +431,9 @@ pasos:
       - {nombre: pedir_reasignacion, tarea: SEN, a: marcos}
     efectos: {}
     hechos:
-      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: SEN,
-         pase: {de: Nahuel Gimenez, a: Marcos Tarquini},
-         al_confirmar: {la_tiene_que_tomar: Marcos Tarquini, decide_y_la_toma: true},
+      - {jugada: pedir_reasignacion, resultado: pase_para_confirmar, tarea: SEN,
+         pase: {la_tiene: Nahuel Gimenez, pasaria_a: Marcos Tarquini},
+         al_confirmar_el_pase: {la_tiene_que_tomar: Marcos Tarquini, decide_y_la_toma: true},
          pregunta: confirmar_el_pase}
     pregunta: {tipo: confirmar_el_pase, tarea: SEN}
     botones: [Confirmar]
@@ -452,8 +452,8 @@ pasos:
         - {tipo: pase_para_tomar, tarea: SEN, a: Marcos, estado: guardado,
            hechos: {necesita_respuesta: true, pidio: Nahuel Gimenez, tambien_lo_decide: true}}
     hechos:
-      - {jugada: confirmar, resultado: pedido, tarea: SEN,
-         se_le_pregunta_a: {a: Marcos Tarquini, llega: "~2026-10-20T15:13"}}
+      - {jugada: confirmar, resultado: pase_pedido, tarea: SEN,
+         le_pregunta_a: {a: Marcos Tarquini, llega: "~2026-10-20T15:13"}}
     pregunta: null
     botones: []
     estado_despues:
@@ -475,11 +475,11 @@ pasos:
     a_las: "2026-10-20 15:30"
     escribe: "no, esa hacela vos nahuel que la conoces mejor"
     jugadas:
-      - {nombre: contestar_el_pase, tarea: SEN, acepta: false, puede_traer: [motivo]}
+      - {nombre: contestar_el_pase, tarea: SEN, acepta: false, puede_traer: [por_que]}
     efectos:
       avisos_guardados:
         - {tipo: como_termino_el_pase, tarea: SEN, a: Nahuel, estado: guardado,
-           hechos: {necesita_respuesta: false, la_tomo: false, a: Marcos Tarquini}}
+           hechos: {necesita_respuesta: false, la_tomo: false, pasaria_a: Marcos Tarquini}}
     hechos:
       - {jugada: contestar_el_pase, resultado: anotado, tarea: SEN, la_toma: false,
          tambien_lo_decidia: true, sigue_con: Nahuel Gimenez,
@@ -500,7 +500,7 @@ pasos:
       - a: Nahuel
         tipo: como_termino_el_pase
         tarea: SEN
-        hechos: {necesita_respuesta: false, la_tomo: false, a: Marcos Tarquini}
+        hechos: {necesita_respuesta: false, la_tomo: false, pasaria_a: Marcos Tarquini}
     estado_despues:
       responsables: {COM: Nahuel, PLC: Marcos, SRV: Marcos, SEN: Nahuel, HMI: Marcos}
     dice:

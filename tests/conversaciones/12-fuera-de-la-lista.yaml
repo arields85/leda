@@ -47,9 +47,9 @@ pasos:
       - {nombre: pedir_reasignacion, tarea: PLC, a: nahuel}
     efectos: {}
     hechos:
-      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: PLC,
-         pase: {de: Marcos Tarquini, a: Nahuel Gimenez},
-         al_confirmar: {lo_decide: ausente, la_tiene_que_tomar: Nahuel Gimenez},
+      - {jugada: pedir_reasignacion, resultado: pase_para_confirmar, tarea: PLC,
+         pase: {la_tiene: Marcos Tarquini, pasaria_a: Nahuel Gimenez},
+         al_confirmar_el_pase: {lo_decide: ausente, la_tiene_que_tomar: Nahuel Gimenez},
          quien_decide: ausente, pregunta: confirmar_el_pase}
     pregunta: {tipo: confirmar_el_pase, tarea: PLC}
     botones: [Confirmar]

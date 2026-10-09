@@ -208,8 +208,8 @@ def test_a_quien_aprueba_se_le_nombra_a_la_persona_responsable_y_a_terceros():
                           "responsable": "Ariel"},
                          {"jugada": "aprobar", "resultado": "no_se_puede",
                           "motivo": "no_es_quien_aprueba", "quien_aprueba": "Marcos"},
-                         {"jugada": "pedir_reasignacion", "resultado": "no_por_chat",
-                          "quien_decide": "Marcos"}],
+                         {"jugada": "pedir_reasignacion", "resultado": "no_se_puede",
+                          "motivo": "otro_sector", "quien_decide": "Marcos"}],
               "ultimos_turnos": []}
 
     recibido, _ = _lo_que_recibe_la_redaccion(pedido)

@@ -104,6 +104,9 @@ class Contexto:
     # Las tareas trabadas de otras personas que destraba quien escribe (C-5; `persecucion.
     # para_destrabar`), con su alias, después de las anteriores: no son tareas suyas.
     para_destrabar: tuple[dict[str, Any], ...] = ()
+    # Las tareas de otras personas cuyo pase espera algo de quien escribe: su decisión o que la
+    # tome (C-7; `pase.para_contestar`), con su alias, después de las anteriores.
+    pases: tuple[dict[str, Any], ...] = ()
     # Las decisiones ofrecidas en la respuesta de este turno (`preguntas.ofrecer_en_la_
     # respuesta`): sus botones salen con ella, sin ser un tema abierto (C-3d, D4).
     ofrecidas: list[str] = field(default_factory=list)
@@ -118,10 +121,10 @@ class Contexto:
     elegidas: list[str] = field(default_factory=list)
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
-        """Una tarea por su alias: de las suyas, de las que esperan su decisión o de las que
-        destraba."""
+        """Una tarea por su alias: de las suyas, de las que esperan su decisión, de las que
+        destraba o de las que le quieren pasar."""
         return next((t for t in self.tareas + self.para_aprobar + self.para_destrabar
-                     if t["alias"] == alias), None)
+                     + self.pases if t["alias"] == alias), None)
 
     def suya(self, alias: str) -> dict[str, Any] | None:
         """Una tarea suya por su alias: de la que es responsable."""
@@ -1096,7 +1099,12 @@ def _entregar(ctx: Contexto, datos: dict, tarea: dict) -> dict:
 
 
 def _confirmar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
-    from . import entrega
+    """Lo último que Leda mostró para confirmar: la vista previa de un pase (C-7) o una
+    entrega."""
+    from . import entrega, pase
+    q = pase.la_que_se_confirma(ctx, datos, tarea)
+    if q is not None:
+        return pase.confirmar(ctx, datos, q)
     return entrega.confirmar(ctx, datos, tarea)
 
 
@@ -1154,12 +1162,18 @@ def _no_escribirle(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     return persecucion.no_escribirle(ctx, datos, tarea)
 
 
-def _pedir_reasignacion(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
-    decide = referente(ctx.cur, ctx.quien.membership_id)
-    return {"resultado": "no_por_chat", "motivo": "cambiar_el_responsable_no_es_por_chat",
-            "quien_decide": decide["nombre"] if decide else None,
-            "alternativa": "anotar_prevision",
-            **({"tarea": _tarea(tarea)} if tarea else {})}
+# Delegar por chat (C-7; ADR 0017, enmienda a la decisión 2): las jugadas están en `pase.py`, que
+# importa este módulo. Hasta la C-7, pasar una tarea no se hacía por chat y Leda decía quién lo
+# decidía (9g; decisión del usuario del 2026-10-08: "queda así hasta que exista delegar").
+
+def _pedir_reasignacion(ctx: Contexto, datos: dict, tarea: dict) -> dict:
+    from . import pase
+    return pase.pedir(ctx, datos, tarea)
+
+
+def _contestar_el_pase(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import pase
+    return pase.contestar(ctx, datos, tarea)
 
 
 # --- Cómo se deshace lo anotado (9f) -------------------------------------------------------
@@ -1455,14 +1469,17 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           comprueba="la guarda: que lo que confirma sea lo último que la persona vio, en un "
                     "mensaje anterior, y que no haya cambiado desde entonces (su huella)",
           hace="entrega la tarea: las piezas de evidencia y el paso a revisión en un solo acto "
-               "(entregar_tarea); nunca a terminada",
-          despues="quien aprueba se entera; si la guarda falla, muestra lo nuevo y no entrega",
+               "(entregar_tarea), nunca a terminada; o pide el pase de una tarea a otra persona "
+               "(pedir_pase_de_tarea), que todavía no la cambia de manos",
+          despues="de una entrega, quien aprueba se entera; de un pase, Leda le pregunta a quien "
+                  "lo decide o a quien la recibe; si la guarda falla, muestra lo nuevo y no hace "
+                  "nada",
           manejar=_confirmar, se_ofrece=False,
           es="La persona confirma, sin dudas, lo último que Leda le mostró para confirmar (la "
-             "entrega de una tarea), escribiendo en lugar de tocar el botón, o pide que la "
-             "entrega que Leda le mostró vaya como está, también si Leda le dijo que le falta "
-             "algo. Una respuesta con un pero, una pregunta o un cambio no es una "
-             "confirmación."),
+             "entrega de una tarea o pasarle una tarea a otra persona), escribiendo en lugar de "
+             "tocar el botón, o pide que la entrega que Leda le mostró vaya como está, también "
+             "si Leda le dijo que le falta algo. Una respuesta con un pero, una pregunta o un "
+             "cambio no es una confirmación."),
     Ficha("guardar_para_la_entrega", "dejar un archivo para cuando entregue una tarea",
           necesita=("tarea",), opcional=(),
           comprueba="que sea el responsable y que la tarea esté abierta, sin entregar",
@@ -1590,14 +1607,39 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona trabada pide que Leda no le escriba a quien destraba su tarea (por "
              "ejemplo, porque ya habló con esa persona). quien es a quién, como lo nombró. No "
              "cambia quién destraba ni cierra el bloqueo."),
-    Ficha("pedir_reasignacion", "pasarle una tarea a otra persona",
-          necesita=(), opcional=("tarea", "a"),
-          comprueba="nada", hace="nada: cambiar el responsable no es por chat (9g)",
-          despues="dice quién lo decide y ofrece una nueva previsión, que queda como tema "
-                  "abierto; sin aviso al administrador",
-          manejar=_pedir_reasignacion, se_ofrece=False,
-          propone=lambda hecho: [hecho["alternativa"]] if hecho.get("alternativa") else None,
-          es="La persona pide que una tarea suya pase a otra persona."),
+    Ficha("pedir_reasignacion", "pasarle una tarea suya a otra persona del equipo",
+          necesita=("tarea",), opcional=("a",),
+          comprueba="que sea el responsable, que la tarea esté asignada, en curso o trabada, que "
+                    "quien la recibe sea del equipo y tenga un chat con Leda, y que la persona "
+                    "pueda pedirlo: el encargado de un sector, a cualquiera; un integrante, sólo "
+                    "a alguien de su sector (la cocina)",
+          hace="nada todavía: muestra la vista previa del pase (de quién a quién, quién lo "
+               "decide y que quien la recibe tiene que tomarla)",
+          despues="espera la confirmación (botón o escrito); al confirmar, Leda le pregunta a "
+                  "quien lo decide o a quien la recibe. Si no se puede, dice por qué y, si es "
+                  "de otro sector, quién lo decide",
+          manejar=_pedir_reasignacion, del_responsable=True,
+          estados=frozenset({"asignada", "en_curso", "bloqueada"}),
+          es="La persona pide que una tarea suya pase a otra persona del equipo (a, como la "
+             "nombró): que se la pasen, que la haga o la tome otra persona."),
+    Ficha("contestar_el_pase", "decir si aprueba que una tarea pase a otra persona, o si toma "
+                               "la que le quieren pasar",
+          necesita=(), opcional=("tarea", "acepta", "por_que"),
+          comprueba="que la tarea espere su decisión o que la tome (la cocina: quien decide es "
+                    "el encargado del sector de quien la recibe)",
+          hace="anota la decisión o la respuesta (decidir_pase_de_tarea o "
+               "contestar_pase_de_tarea); si la toma, la tarea pasa a ser suya, con la misma "
+               "fecha y el mismo criterio",
+          despues="si aprueba, Leda le pregunta a quien la recibe si la toma; si no, o si no la "
+                  "toma, la tarea sigue con quien la tenía; quien pidió se entera de cómo "
+                  "terminó y, si la toma, también quien decidió",
+          manejar=_contestar_el_pase, se_ofrece=False,
+          contesta=(preguntas.DECIDIR_EL_PASE, preguntas.TOMAR_LA_TAREA),
+          es="La persona dice si aprueba que una tarea de otra persona pase a alguien (la tarea "
+             "está en la lista como espera_su_decision_del_pase) o si toma la tarea que le "
+             "quieren pasar (espera_que_la_tome), tocando su botón o escribiéndolo: acepta es "
+             "verdadero si dice que sí, falso si dice que no; por_que, sus palabras si dice "
+             "por qué."),
     # Las situaciones generales (`situaciones.py`): valen igual para todas las fichas.
     Ficha("elegir", "elegir una de las opciones de la pregunta abierta",
           necesita=("opcion",), opcional=(),

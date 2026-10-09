@@ -72,7 +72,7 @@ from ..incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
                           REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
 from ..salida import enqueue_outbox
 
-from . import (aprobacion, archivos, cambios_de_estado, entrega, fichas, persecucion,
+from . import (aprobacion, archivos, cambios_de_estado, entrega, fichas, pase, persecucion,
                pregunta_sin_contestar, preguntas, registro)
 from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
 from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
@@ -300,7 +300,10 @@ def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None =
     # Las trabadas de otras personas que destraba (C-5).
     para_destrabar = persecucion.para_destrabar(cur, quien.membership_id,
                                                 len(tareas) + len(para_aprobar))
-    todas = tareas + para_aprobar + para_destrabar
+    # Las de otras personas cuyo pase espera su decisión o que la tome (C-7).
+    pases = pase.para_contestar(cur, quien.membership_id,
+                                len(tareas) + len(para_aprobar) + len(para_destrabar))
+    todas = tareas + para_aprobar + para_destrabar + pases
 
     ultimos = leer_ultimos_turnos(cur, quien.membership_id)
     return Contexto(cur=cur, quien=quien, entrante_id=entrante_id, chat_id=chat_id,
@@ -308,7 +311,8 @@ def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None =
                     estado=preguntas.estado_para_la_ia(cur, quien.membership_id, todas),
                     tareas=tareas, ultimos_turnos=ultimos,
                     ultimo_aviso=_ultimo_aviso(estado, todas), toque=toque,
-                    jugadas=jugadas, para_aprobar=para_aprobar, para_destrabar=para_destrabar)
+                    jugadas=jugadas, para_aprobar=para_aprobar, para_destrabar=para_destrabar,
+                    pases=pases)
 
 
 def _lo_que_llego(cur, workspace_id: str, entrante_id: str,
@@ -368,7 +372,7 @@ def _situacion(ctx: Contexto, jugadas: Mapping[str, Manejador]) -> dict[str, Any
         "estado": ctx.estado,       # la pregunta abierta, con sus opciones, y las de después
         "ultimo_aviso": ctx.ultimo_aviso,
         "tareas": [{k: v for k, v in t.items() if k != "id"}
-                   for t in ctx.tareas + ctx.para_aprobar + ctx.para_destrabar],
+                   for t in ctx.tareas + ctx.para_aprobar + ctx.para_destrabar + ctx.pases],
         "ultimos_turnos": list(ctx.ultimos_turnos),
         "jugadas_posibles": sorted(jugadas),
     }
