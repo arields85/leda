@@ -2168,7 +2168,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           una tarea (Leda no le puede preguntar si la toma), ni a alguien de Electricidad, que
           decide Mariano. ¿Está bien, o se puede decidir por la plataforma?
 
-## Próximo paso (cierre del 2026-10-09, al mediodía)
+## Próximo paso (cierre del 2026-10-09, a la mañana)
 
 **Lista de tareas de la noche** (pedido del usuario: ver lo hecho y lo que falta):
 
@@ -2183,7 +2183,23 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 52 del usuario (2026-10-09; la 30, la 40, la 43, la 45 y la 52 ya están o esperan la prueba), con test primero.
+- [ ] Las decisiones 24 a 52 del usuario (2026-10-09; la 30, la 40, la 43, la 45 y la 52 ya están o
+      esperan la prueba), con test primero, una porción por grupo (sesión del 2026-10-09, mañana):
+  - [ ] C-7: 26 (un pase sin respuesta), 27 (el encargado pasa una tarea de su gente), 28 (la
+        revisión sigue a quien era la tarea).
+  - [ ] D5b: 29 (la repetición de las 4 horas sale siempre), 50 (la pregunta que quedó vuelve
+        aparte).
+  - [ ] C-6: 31 (lo contestado no se repite), 32 (la lista del lunes, completa con su situación),
+        44 ("viene bien": lo próximo es el aviso previo), 46 (las otras listas, sólo lo que falta).
+  - [ ] C-5a: 35 ("quedó asentado"), 34 (se le cuenta a la persona trabada), 36 (se vuelve a
+        asentar mientras siga).
+  - [ ] C-5b: 37 (quien destraba sin Leda conectada), 38 (a quien no contesta no se lo abandona).
+  - [ ] C-5c: 39 (cerrar el tema para todos), 47 (confirmar lo acordado), 48 ("ya lo hablé" sin
+        decir qué).
+  - [ ] C-5d: 24 (el informe, nunca a alguien de la cadena), 41 (destraba quien está trabado), 49
+        (preguntarle a la persona trabada antes de asentar), 51 (hasta tres personas).
+  - [ ] C-5e: 42 (seguir la cadena hasta quien puede destrabarla).
+  - [ ] El enlace: 33 (el resumen para cualquiera, el detalle a pedido).
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] El informe al grupo de la C-6 (decisión 25), cuando el usuario cree el grupo en Telegram.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.

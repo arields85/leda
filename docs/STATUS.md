@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-09, cierre al mediodía: la C-5, la C-6 (por persona) y la
+**Última actualización documental:** 2026-10-09, cierre a la mañana: la C-5, la C-6 (por persona) y la
 C-7 construidas y revisadas; las decisiones del usuario 24 a 52.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
