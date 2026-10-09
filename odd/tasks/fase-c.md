@@ -2211,7 +2211,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         `3e677f8` `review-e9e8ade73f835677`, `3efcd44` `review-360cab64f27d298e`. Sus advertencias
         se miraron en la corrección (abajo).
     - **La corrección de la C-7: la decisión 53, la 39 en los pases y las advertencias de las
-      revisiones** (2026-10-09, escritor delegado: route delegada, 2+ archivos no triviales).
+      revisiones** (2026-10-09, escritor delegado: route delegada, 2+ archivos no triviales;
+      `ba7d701` la cocina, el motor y sus pruebas, `c20f52e` la conversación 39, `e6ea968` este
+      registro). Chequeos: `pytest tests/motor tests/garantias tests/conversaciones`, 1455 passed;
+      en seco, `correr --ia guionada --veces 1 --conversacion 12 19 38 39`, 4 de 4 bien.
       - **El encargado se queda él mismo con una tarea de su gente** (53): la cocina deja que el
         encargado del sector de quien la tiene la pida para sí (`_lo_que_se_pasa`; una tarea
         propia a uno mismo sigue siendo `es_la_misma_persona`); como pide, decide y la toma la
