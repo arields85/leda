@@ -65,7 +65,8 @@ def _sql_script(path: Path) -> str:
 # `workspace_setting`. La evidencia de la entrega (migración 0034): las columnas nuevas de
 # `evidence` y de `task_evidence_policy`, y sus dos tablas nuevas. La salida con adjuntos
 # (migración 0035): su tabla. La página de la tarea (migración 0036): sus tres tablas y el
-# referente de `area`.
+# referente de `area`. Lo que dice quien destraba (migración 0042): su tabla, y la restricción
+# única de `blocker_unblocker`.
 TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "conversation_question", "conversation_option",
                     "scheduled_notice", "task_forecast", "blocker_unblocker",
@@ -73,7 +74,8 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "archivo", "archivo_de_mensaje",
                     "evidence", "task_evidence_policy", "evidencia_retirada",
                     "archivo_de_tarea", "message_outbox_adjunto",
-                    "area", "acceso_tarea", "vista_de_tarea", "message_outbox_enlace")
+                    "area", "acceso_tarea", "vista_de_tarea", "message_outbox_enlace",
+                    "dicho_de_quien_destraba")
 
 # La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
 # política. `model_config` admite espacio nulo para el modelo global.

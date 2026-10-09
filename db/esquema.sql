@@ -1423,15 +1423,41 @@ create table blocker_unblocker (
   constraint blocker_unblocker_exactamente_uno check (
     (destraba_membership_id is not null)::int
     + (destraba_externo is not null)::int
-    + no_sabe::int = 1)
+    + no_sabe::int = 1),
+  -- Migración 0042: para la clave foránea con el espacio de `dicho_de_quien_destraba`.
+  constraint blocker_unblocker_workspace_id_unique unique (workspace_id, id)
 );
 
 create index blocker_unblocker_de on blocker_unblocker (blocker_id, at desc);
+
+-- Lo que dice quien destraba cuando Leda le pregunta (migración 0042; C-5, decisión 4).
+create table dicho_de_quien_destraba (
+  id                       uuid primary key default gen_random_uuid(),
+  workspace_id             uuid not null references workspace(id) on delete cascade,
+  blocker_unblocker_id     uuid not null,
+  dicho_por_membership_id  uuid not null,
+  para_cuando              date,
+  ya_esta                  boolean not null default false,
+  lo_que_dice              text check (btrim(lo_que_dice) <> ''),
+  at                       timestamptz not null,
+  constraint dicho_de_quien_destraba_destraba
+    foreign key (workspace_id, blocker_unblocker_id)
+    references blocker_unblocker(workspace_id, id) on delete cascade,
+  constraint dicho_de_quien_destraba_said_by
+    foreign key (dicho_por_membership_id)
+    references membership(id) on delete cascade,
+  constraint dicho_de_quien_destraba_dice_algo check (
+    para_cuando is not null or ya_esta or lo_que_dice is not null)
+);
+
+create index dicho_de_quien_destraba_de on dicho_de_quien_destraba (blocker_unblocker_id, at desc);
 
 comment on table task_forecast is
   'El Motor (ADR 0018, 9b y 9f): las previsiones de una tarea. Sólo se agregan; una corrección reemplaza a otra con una fila nueva. El atraso lo calcula el código en días hábiles del espacio.';
 comment on table blocker_unblocker is
   'El Motor (ADR 0018, 9c): quién destraba un bloqueo -- un integrante, alguien de afuera o que no se sabe, exactamente uno --, quién lo dijo y cuándo. Sólo se agrega.';
+comment on table dicho_de_quien_destraba is
+  'El Motor (C-5, decisión 4; ADR 0017, 3a): lo que dice quien destraba un bloqueo cuando Leda le pregunta -- para cuándo, que ya está o sus palabras, al menos uno --, quién lo dijo y cuándo. No cierra el bloqueo. Sólo se agrega.';
 
 -- Los archivos recibidos por chat (ADR 0019, decisiones 2 a 4; migración 0033).
 -- `archivo` es del dominio: el contenido con su huella, sin ningún identificador
@@ -2252,6 +2278,11 @@ create trigger trg_exigir_referencias_del_espacio
   before insert or update on blocker_unblocker
   for each row execute function exigir_referencias_del_espacio(
     'destraba_membership_id', 'membership', 'dicho_por_membership_id', 'membership');
+-- Lo que dice quien destraba (migración 0042): quien lo dijo es del mismo espacio.
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on dicho_de_quien_destraba
+  for each row execute function exigir_referencias_del_espacio(
+    'dicho_por_membership_id', 'membership');
 
 -- Los archivos recibidos (migración 0033): quién lo mandó y el mensaje que lo trajo
 -- son del mismo espacio.
@@ -2879,7 +2910,8 @@ begin
     'conversation_question','conversation_option','conversation_turn',
     'scheduled_notice','conversation_state','task_forecast','blocker_unblocker',
     'archivo','archivo_de_mensaje','evidencia_retirada','archivo_de_tarea',
-    'message_outbox_adjunto','acceso_tarea','vista_de_tarea','message_outbox_enlace']
+    'message_outbox_adjunto','acceso_tarea','vista_de_tarea','message_outbox_enlace',
+    'dicho_de_quien_destraba']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -2922,6 +2954,8 @@ revoke update, delete on archivo, archivo_de_mensaje from leda_app;
 revoke update, delete on evidence, evidencia_retirada, archivo_de_tarea from leda_app;
 -- Lo que lleva un mensaje (migración 0035) no cambia: sólo se agrega y se lee.
 revoke update, delete on message_outbox_adjunto from leda_app;
+-- Lo que dice quien destraba (migración 0042) sólo se agrega y se lee.
+revoke update, delete on dicho_de_quien_destraba from leda_app;
 -- La página de la tarea (migración 0036): `leda_app` no tiene nada sobre los accesos ni las
 -- vistas, sólo `execute` sobre sus funciones; la marca del enlace en la salida, agregar y leer.
 revoke all on acceso_tarea, vista_de_tarea from public, leda_app;
