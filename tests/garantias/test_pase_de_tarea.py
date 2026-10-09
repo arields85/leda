@@ -19,7 +19,7 @@ Martín. Se suma Pedro, otro integrante de OT, para el pase entre dos integrante
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import psycopg
 import pytest
@@ -40,6 +40,10 @@ def _conversacion(tareas: dict) -> dict:
 @pytest.fixture
 def equipo(conn):
     """CoreWork en chico, con una tarea de cada uno y Pedro, otro integrante de OT."""
+    return _equipo(conn)
+
+
+def _equipo(conn):
     mundo = cargar(conn, _conversacion({
         "COM": {"titulo": "Revisar comunicaciones", "responsable": "Marcos",
                 "vence": "2026-11-06"},
@@ -83,7 +87,7 @@ def _quien(conn, mundo, corto: str):
 def _hacer(conn, mundo, corto: str, nombre: str, args: dict, *, confirmada: bool = True):
     quien = _quien(conn, mundo, corto)
     with espacio(conn, mundo.workspace_id) as cur:
-        con_momento = {**args, "at": AT.isoformat()} if nombre.endswith("pase_de_tarea") else args
+        con_momento = {"at": AT.isoformat(), **args} if nombre.endswith("pase_de_tarea") else args
         r = ejecutar(cur, quien, nombre, con_momento, ya_confirmada=confirmada)
     conn.commit()
     return r
@@ -233,6 +237,46 @@ def test_el_encargado_pasa_una_de_su_gente_a_otro_sector_y_decide_ese_encargado(
 
 def test_el_encargado_no_la_pasa_a_quien_ya_la_tiene(conn, equipo):
     assert _pedir(conn, equipo, "Marcos", "SEN", "Nahuel") == {"error": "ya_la_tiene"}
+
+
+# --- El encargado se queda él mismo con una tarea de su gente (decisión 53) ---------------------
+
+def test_el_encargado_se_queda_con_una_tarea_de_su_gente_al_confirmar(conn, equipo):
+    # "La de los sensores de Nahuel la hago yo": como cuando se la pasa a Pedro (decisión 27),
+    # pero quien pide, quien decide y quien la toma son la misma persona, así que su confirmación
+    # de la vista previa vale por las tres.
+    with pytest.raises(NecesitaConfirmacion):
+        _pedir(conn, equipo, "Marcos", "SEN", "Marcos", confirmada=False)
+    conn.rollback()
+    assert _quien_la_tiene(conn, equipo, "SEN") == "Nahuel"
+    r = _pedir(conn, equipo, "Marcos", "SEN", "Marcos")
+    assert (r["estado"], r["tomada"]) == ("la_tomo", True)
+    assert _quien_la_tiene(conn, equipo, "SEN") == "Marcos"
+    pase = _pase(conn, r["pase_id"])
+    assert pase["estado"] == "la_tomo" and pase["decidido_en"] is not None
+    assert {str(pase[k]) for k in ("pedido_por_membership_id", "decide_membership_id",
+                                   "a_membership_id")} == {_id(equipo, "Marcos")}
+    with admin(conn) as cur:
+        cur.execute("select detalle from audit_log where accion = 'cambiar_responsable'")
+        [d] = [f["detalle"] for f in cur.fetchall()]
+    conn.commit()
+    assert (d["pedido_por"], d["decidio"], d["acepto"], d["responsable_anterior"],
+            d["era_de"]) == (_id(equipo, "Marcos"), _id(equipo, "Marcos"), _id(equipo, "Marcos"),
+                             _id(equipo, "Nahuel"), _id(equipo, "Nahuel"))
+    # Sigue siendo trabajo del sector (decisión 28): la revisa Marcos y, al entregarla, se cierra.
+    assert _quien_revisa(conn, equipo, "SEN") == "Marcos"
+    assert _entregar(conn, equipo, "Marcos", "SEN")["estado"] == "terminada"
+
+
+def test_solo_el_encargado_se_queda_con_la_tarea_de_otro(conn, equipo):
+    # Una tarea propia no se pasa a uno mismo, y nadie más que el encargado de su sector se queda
+    # con la de otra persona.
+    assert _pedir(conn, equipo, "Nahuel", "SEN", "Nahuel") == {"error": "es_la_misma_persona"}
+    for otro in ("Pedro", "Martin", "Ismael"):
+        with pytest.raises(Denegado):
+            _pedir(conn, equipo, otro, "SEN", otro)
+        conn.rollback()
+    assert _quien_la_tiene(conn, equipo, "SEN") == "Nahuel"
 
 
 def test_no_se_pasa_a_la_misma_persona_ni_dos_veces(conn, equipo):
@@ -494,12 +538,47 @@ def test_si_la_entrega_otra_persona_queda_en_revision_para_quien_la_revisa(conn,
 
 # --- Un pase que nadie contesta (decisión 26) --------------------------------------------------
 
-def _sin_respuesta(conn, mundo, pase: str):
-    from leda.herramientas import terminar_pase_sin_respuesta
+def _terminar(conn, mundo, pase: str, *, vencido: bool):
+    from leda.herramientas import terminar_pase
     with espacio(conn, mundo.workspace_id) as cur:
-        r = terminar_pase_sin_respuesta(cur, pase, AT)
+        r = terminar_pase(cur, pase, AT, vencido=vencido)
     conn.commit()
     return r
+
+
+def _sin_respuesta(conn, mundo, pase: str):
+    return _terminar(conn, mundo, pase, vencido=True)
+
+
+def test_un_pase_que_todavia_espera_no_lo_termina_el_sistema(conn, equipo):
+    r = _pedir(conn, equipo, "Marcos", "PLC", "Lucas")
+    assert _terminar(conn, equipo, r["pase_id"], vencido=False) is None
+    assert _pase(conn, r["pase_id"])["estado"] == "esperando_decision"
+
+
+def test_el_pase_de_una_tarea_que_ya_no_se_puede_pasar_termina_sin_efecto(conn, equipo):
+    # Mientras Martín no decide, Marcos entrega el PLC: el pase ya no espera nada, aunque no se
+    # haya cumplido el plazo (decisión 39: el tema se cierra para todos, y Leda deja de preguntar).
+    r = _pedir(conn, equipo, "Marcos", "PLC", "Lucas")
+    marcos = _quien(conn, equipo, "Marcos")
+    with espacio(conn, equipo.workspace_id) as cur:
+        ejecutar(cur, marcos, "entregar_tarea",
+                 {"tarea_id": equipo.tareas["PLC"],
+                  "piezas": [{"clase": "texto", "texto": "probado, 20 ciclos sin fallas"}]},
+                 ya_confirmada=True)
+    conn.commit()
+    assert _terminar(conn, equipo, r["pase_id"], vencido=False) == {
+        "pase_id": r["pase_id"], "estado": "sin_efecto"}
+    assert _pase(conn, r["pase_id"])["estado"] == "sin_efecto"
+    assert _quien_la_tiene(conn, equipo, "PLC") == "Marcos"
+    assert _terminar(conn, equipo, r["pase_id"], vencido=True) is None
+    with admin(conn) as cur:
+        cur.execute("""select actor_kind, detalle, pack_hash, nucleo_hash from audit_log
+                        where accion = 'pase_sin_efecto'""")
+        [fila] = cur.fetchall()
+    conn.commit()
+    assert fila["actor_kind"] == "sistema" and fila["detalle"]["pase_id"] == r["pase_id"]
+    assert fila["pack_hash"] and fila["nucleo_hash"]
 
 
 def test_un_pase_sin_respuesta_termina_y_la_tarea_sigue_con_quien_la_tenia(conn, equipo):
@@ -621,3 +700,77 @@ def test_un_pase_de_otro_espacio_no_se_ve_ni_se_contesta(conn, equipo):
         _contestar(conn, equipo, "Nahuel", "00000000-0000-0000-0000-000000000000", True)
     conn.rollback()
     assert _pase(conn, r["pase_id"])["estado"] == "esperando_que_la_tome"
+
+
+# --- La migración 0046 con datos: el relleno y su vuelta atrás ------------------------------------
+
+@pytest.fixture
+def base_aparte():
+    """Una base propia, con el esquema de hoy (el de la 0046), para correr su vuelta atrás y volver
+    a aplicarla sin tocar la base que comparten las demás pruebas."""
+    import os
+    from leda.db import conectar
+    from tests.conftest import _con_base_efimera
+
+    mantenimiento = os.environ.get("LEDA_TEST_DB_URL")
+    if not mantenimiento:
+        pytest.skip("La migración con datos necesita el servidor de pruebas (LEDA_TEST_DB_URL).")
+    base = _con_base_efimera(mantenimiento)
+    url = next(base)
+    c = conectar(url)
+    try:
+        yield url, c
+    finally:
+        c.close()
+        base.close()
+
+
+def _correr_0046(url, carpeta: str) -> None:
+    from tests.garantias.test_migraciones import ROOT, _sql_script
+    with psycopg.connect(str(url), autocommit=True) as db:
+        db.execute(_sql_script(
+            ROOT / "db" / carpeta / "0046_la_revision_sigue_a_quien_era_la_tarea.sql"))
+
+
+def test_la_0046_rellena_de_quien_era_y_su_vuelta_atras_no_deja_a_nadie_revisando_lo_suyo(
+        base_aparte):
+    url, c = base_aparte
+    equipo = _equipo(c)
+    # Marcos toma la de los sensores de Nahuel (decisión 28: la revisa él); la de comunicaciones,
+    # de Marcos, pasa a Nahuel y de Nahuel a Pedro.
+    r = _pedir(c, equipo, "Nahuel", "SEN", "Marcos")
+    _contestar(c, equipo, "Marcos", r["pase_id"], True)
+    r = _pedir(c, equipo, "Marcos", "COM", "Nahuel")
+    _contestar(c, equipo, "Nahuel", r["pase_id"], True)
+    # El segundo, una hora después: el relleno toma el primero por su momento.
+    despues = (AT + timedelta(hours=1)).isoformat()
+    r = _hacer(c, equipo, "Nahuel", "pedir_pase_de_tarea",
+               {"tarea_id": equipo.tareas["COM"], "a_membership_id": _id(equipo, "Pedro"),
+                "at": despues})
+    _hacer(c, equipo, "Marcos", "decidir_pase_de_tarea",
+           {"pase_id": r["pase_id"], "aprueba": True, "at": despues})
+    _hacer(c, equipo, "Pedro", "contestar_pase_de_tarea",
+           {"pase_id": r["pase_id"], "acepta": True, "at": despues})
+    c.commit()
+
+    def leer(columna: str) -> dict[str, tuple[str, str]]:
+        with admin(c) as cur:
+            cur.execute(f"""select id::text id, {columna}::text col,
+                                   quien_revisa_la_tarea(id)::text revisa
+                              from task where id = any(%s::uuid[])""",
+                        ([equipo.tareas["SEN"], equipo.tareas["COM"]],))
+            filas = {f["id"]: (equipo.persona_de_membresia(f["col"]),
+                               equipo.persona_de_membresia(f["revisa"]))
+                     for f in cur.fetchall()}
+        c.commit()
+        return {k: filas[equipo.tareas[k]] for k in ("SEN", "COM")}
+
+    # La vuelta atrás deja la regla de la 0045, en la que nadie revisa lo suyo: la de los sensores,
+    # que ahora hace Marcos, la revisa quien aprueba su trabajo.
+    _correr_0046(url, "rollbacks")
+    assert {k: v[1] for k, v in leer("revisa_membership_id").items()} == {
+        "SEN": "Ismael", "COM": "Ismael"}
+    # Al volver a aplicarla, el relleno: de quién era cada tarea antes de su primer pase.
+    _correr_0046(url, "migrations")
+    assert leer("era_de_membership_id") == {"SEN": ("Nahuel", "Marcos"),
+                                            "COM": ("Marcos", "Ismael")}

@@ -832,15 +832,19 @@ SIGNIFICADOS: Mapping[str, str] = {
                           "pasa a ser suya.",
     "decide_y_la_toma": "Quien recibe la tarea es también quien decide: su sí vale como las "
                         "dos cosas.",
+    "la_toma_al_confirmar": "Quien escribe se queda él con la tarea de alguien de su sector: pide, "
+                            "decide y la toma la misma persona, así que al confirmar la tarea "
+                            "pasa a ser suya, con la misma fecha y lo que pide para terminarla, "
+                            "y Leda le avisa a quien la tenía.",
     "pase_pedido": "El pase quedó pedido: la tarea sigue con quien la tiene hasta que la tomen, "
                    "y Leda le pregunta a quien sigue (le_pregunta_a).",
     "le_pregunta_a": "A quién le pregunta Leda por el pase, como Leda y no en nombre de nadie "
                      "(a), y cuándo le llega (llega).",
     "aprobo_el_pase": "Si quien escribe aprobó que la tarea pase a otra persona (verdadero) o "
                       "no (falso).",
-    "la_toma": "Si quien escribe toma la tarea que le querían pasar: con su sí ya es suya, con "
-               "la misma fecha y lo que pide para terminarla; con su no, sigue con quien la "
-               "tenía.",
+    "la_toma": "Si quien escribe toma la tarea que le querían pasar, o la de alguien de su sector "
+               "con la que se queda: con su sí ya es suya, con la misma fecha y lo que pide para "
+               "terminarla; con su no, sigue con quien la tenía.",
     "tambien_lo_decidia": "Quien escribe era también quien decidía el pase: su respuesta vale "
                           "como la decisión.",
     "sigue_con": "Quién sigue teniendo la tarea: no cambió de manos.",
@@ -865,8 +869,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                        "persona (tambien_lo_decide); pregunta si la toma.",
     "como_termino_el_pase": "Aviso de cómo terminó el pase de una tarea: si quien la recibía "
                             "(pasaria_a) la tomó (la_tomo), si quien decidía no lo aprobó "
-                            "(no_lo_aprobo, lo_decidio) o si nadie contestó (sin_respuesta), y "
-                            "quién la tiene ahora (la_tiene). Es información: no pide respuesta.",
+                            "(no_lo_aprobo, lo_decidio), si nadie contestó (sin_respuesta) o si "
+                            "la tarea ya no se podía pasar (la_tarea_cambio), y quién la tiene "
+                            "ahora (la_tiene). Es información: no pide respuesta.",
     "pidio": "Quién pidió pasar la tarea.",
     "lo_aprobo": "Quién aprobó que la tarea pase: el encargado del sector de quien la recibe.",
     "tambien_lo_decide": "Quien recibe este mensaje es también quien decide el pase: su "
@@ -914,6 +919,13 @@ SIGNIFICADOS: Mapping[str, str] = {
                 "sector (pidio), y ahora la tiene otra persona (la_tiene).",
     "aviso_a_quien_la_tenia": "Lo que se le avisa a quien tenía la tarea, que pasó a otra "
                               "persona: a quién (a) y cuándo se entera (llega).",
+    "aviso_a_quien_se_le_preguntaba": "Lo que se le avisa a quien Leda le preguntaba por el pase "
+                                      "y no llegó a contestar, de cómo terminó: a quién (a) y "
+                                      "cuándo se entera (llega).",
+    "ya_no_espera_su_respuesta": "Leda le preguntaba a quien recibe este mensaje por el pase "
+                                 "(si lo aprobaba o si tomaba la tarea), que pidió pidio; el "
+                                 "pase terminó y ya no hace falta que conteste: Leda no le "
+                                 "pregunta más.",
     "no_es_de_su_sector": "La tarea nombrada es de otra persona (la_tiene) que no es de su "
                           "sector: quien escribe no la puede pasar.",
     "ya_la_tiene": "Quien recibiría la tarea es quien ya la tiene.",

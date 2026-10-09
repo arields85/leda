@@ -177,11 +177,18 @@ alter function aplicar_cambio_de_responsable() owner to leda_owner;
 revoke execute on function aplicar_cambio_de_responsable() from public;
 
 -- Quién revisa cada tarea que cambió de manos, como la 0045: el que quedó escrito en su último
--- cambio de responsable.
+-- cambio de responsable. Con la regla de la 0045 nadie revisa lo suyo: si quien quedó escrito es
+-- quien la tiene (la 0046 lo permite, decisión 28: la de Nahuel que tomó Marcos la revisa Marcos),
+-- la revisa quien aprueba el trabajo de esa persona, como lo habría escrito la 0045 al pasarla.
 select set_config('leda.aplicando_pase', '1', true);
 update task t
-   set revisa_membership_id = (select c.revisa_membership_id from cambio_de_responsable c
-                                where c.task_id = t.id order by c.at desc, c.id desc limit 1)
+   set revisa_membership_id = (
+         select case when c.revisa_membership_id = t.responsable_membership_id
+                     then (select m.aprobador_membership_id from membership m
+                            where m.id = t.responsable_membership_id)
+                     else c.revisa_membership_id end
+           from cambio_de_responsable c
+          where c.task_id = t.id order by c.at desc, c.id desc limit 1)
  where t.revisa_membership_id is not null;
 select set_config('leda.aplicando_pase', '0', true);
 

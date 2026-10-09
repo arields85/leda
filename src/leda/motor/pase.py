@@ -11,8 +11,11 @@ decisión 9; constitución §7 (un cambio de responsable se confirma con una vis
 trabada, a alguien del equipo; el encargado de un sector, también una de alguien de su sector,
 que nombra como la dijo porque no está en su lista (`como_la_nombra`; decisión 27 del usuario,
 "pasale la de los sensores de Nahuel a Pedro", con las mismas reglas de quién decide y quién la
-toma). Leda muestra la vista previa (de quién a quién, quién lo decide si es otra persona y que
-quien la recibe tiene que tomarla) y espera la confirmación, con el botón "Confirmar" o escrita,
+toma). El encargado también se queda él con la de alguien de su sector ("la del tornillo de
+Nahuel la hago yo"; decisión 53): pide, decide y la toma la misma persona, así que al confirmar la
+vista previa la tarea pasa a ser suya. Leda muestra la vista previa (de quién a quién, quién lo
+decide si es otra persona y que quien la recibe tiene que tomarla) y espera la confirmación, con el
+botón "Confirmar" o escrita,
 con la guarda de la decisión 2 (`confirmar`): lo último que la persona vio, en un mensaje
 anterior, sin cambios desde entonces (la huella de la cocina). Si no se puede, dice por qué: una
 tarea en revisión o terminada no se pasa; un integrante no pasa una tarea a otro sector, y Leda le
@@ -31,17 +34,25 @@ lista de esa persona como un pase que espera su decisión o que la tome (`para_c
 la tarea sigue con quien la tenía y Leda se lo dice a quien pidió. Si la toma, cambia el
 responsable (la cocina; la fecha, el criterio y la evidencia no cambian, y la revisa quien aprueba
 el trabajo de quien era la tarea, decisión 28) y Leda le avisa a quien pidió, a quien decidió y,
-si lo pidió su encargado, a quien la tenía, cada uno una vez. Lo que la escalera tenía guardado
-para quien la tenía pasa a quien la tiene, y lo que Leda le preguntaba a quien la tenía sobre esa
-tarea ya no espera nada de esa persona. A Dirección no le llega nada.
+si lo pidió su encargado, a quien la tenía. Lo que la escalera tenía guardado para quien la tenía
+pasa a quien la tiene, y lo que Leda le preguntaba a quien la tenía sobre esa tarea ya no espera
+nada de esa persona. A Dirección no le llega nada.
+
+**Nunca un pase abierto sin que todos sepan cómo terminó** (decisión 39 del usuario; `_al_terminar`,
+una regla para todo fin de un pase): cada uno se entera una vez y nunca quien lo terminó; quien
+pidió, siempre; quien tenía que contestar y no llegó a hacerlo (se le preguntó y el pase terminó
+sin su respuesta: nadie contestó, o la tarea ya no se puede pasar), que ya no hace falta que
+conteste; y las preguntas del pase, con sus botones, dejan de esperar.
 
 **Si nadie contesta** (`seguir_los_pases`, que corre la escalera; decisión 26 del usuario): la
 pregunta a quien decide o a quien recibe se repite una sola vez, el día hábil siguiente de haber
 salido (`RECORDATORIO_DEL_PASE`). Si al día hábil siguiente de la repetición, a la hora en que
 Leda escribe, sigue sin contestar, el pase termina sin respuesta (la cocina,
-`terminar_pase_sin_respuesta`): la tarea sigue con quien la tenía, y Leda se lo dice a quien lo
+`terminar_pase`): la tarea sigue con quien la tenía, y Leda se lo dice a quien lo
 pidió, que puede pedírselo a otra persona. La cuenta es de cada pregunta: la de quien recibe
 empieza cuando sale, después de la decisión. Una ausencia de quien tiene que contestar la pausa.
+Si la tarea ya no se puede pasar (se entregó, se cerró), el pase termina sin efecto en la vuelta
+siguiente, sin esperar el plazo.
 """
 
 from __future__ import annotations
@@ -51,7 +62,7 @@ from typing import Any
 
 from ..autoridad import encargado_del_sector, regla_del_pase
 from ..herramientas import (EstadoCambio, NecesitaConfirmacion, ejecutar,
-                            terminar_pase_sin_respuesta)
+                            terminar_pase)
 
 from . import entrega, preguntas
 from .ancla import candado
@@ -80,6 +91,9 @@ BOTONES_PARA_TOMAR = (("La tomo", True), ("No la tomo", False))
 _DE_LA_ESCALERA = ("aviso_previo", "vencimiento_con_prevision", "pedido_de_estado",
                    "reencuadre", "repregunta_de_estado")
 _ABIERTO = ("esperando_decision", "esperando_que_la_tome")
+# Los estados en que una tarea se pasa (los de la ficha `pedir_reasignacion`; la regla es de la
+# cocina, `herramientas.terminar_pase`): una pregunta de un pase de otra tarea ya no sale.
+_SE_PASA = ("asignada", "en_curso", "bloqueada")
 
 
 # --- Lo que ve quien decide o recibe -------------------------------------------------------------
@@ -216,11 +230,16 @@ def _mostrar(ctx: Contexto, tarea: dict, recibe: str) -> dict:
                     "no_se_le_puede_escribir_a": {"a": quien["nombre"] if quien else None,
                                                   "motivo": motivo}}
     nombre = integrante(cur, recibe)["nombre"]
-    al_confirmar: dict[str, Any] = {"la_tiene_que_tomar": nombre}
-    if decide == recibe:
-        al_confirmar["decide_y_la_toma"] = True
-    elif decide != ctx.quien.membership_id:
-        al_confirmar["lo_decide"] = integrante(cur, decide)["nombre"]
+    al_confirmar: dict[str, Any]
+    if recibe == ctx.quien.membership_id == decide:
+        # Se queda él con la de alguien de su sector (decisión 53): con su confirmación es suya.
+        al_confirmar = {"la_toma_al_confirmar": True}
+    else:
+        al_confirmar = {"la_tiene_que_tomar": nombre}
+        if decide == recibe:
+            al_confirmar["decide_y_la_toma"] = True
+        elif decide != ctx.quien.membership_id:
+            al_confirmar["lo_decide"] = integrante(cur, decide)["nombre"]
     hecho: dict[str, Any] = {"resultado": PASE_PARA_CONFIRMAR, "tarea": tarea_hecho(tarea),
                              "pase": {"la_tiene": _quien_la_tiene(cur, tarea["id"]),
                                       "pasaria_a": nombre},
@@ -326,6 +345,10 @@ def confirmar(ctx: Contexto, datos: dict, q: dict) -> dict:
                          {"jugada": "confirmar", "tarea": tarea["id"]})
     entrega.que_sea_lo_mostrado(ctx, None, None)
     pase = _el_pase(cur, r["pase_id"])
+    if r.get("tomada"):
+        # El encargado se quedó él con la de alguien de su sector (decisión 53).
+        return _la_tomo(ctx, pase, {"resultado": "anotado", "tarea": tarea_hecho(tarea),
+                                    "la_toma": True})
     hecho: dict[str, Any] = {"resultado": PASE_PEDIDO, "tarea": tarea_hecho(tarea),
                              "pase": {"la_tiene": pase["la_tiene"],
                                       "pasaria_a": pase["pasaria_a"]}}
@@ -444,6 +467,9 @@ def contestar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     acepta = datos.get("acepta")
     if not isinstance(acepta, bool):
         return {"resultado": "falta_dato", "falta": ["acepta"], "tarea": tarea_hecho(tarea)}
+    # La escalera puede estar terminando este pase (`seguir_los_pases`): el turno la espera y
+    # recién entonces lee si el pase sigue esperando algo (`ancla.candado`).
+    candado(cur, tarea["id"])
     cur.execute("""select id from pase_de_tarea where task_id = %s and estado = any(%s)
                     order by pedido_en desc limit 1""", (tarea["id"], list(_ABIERTO)))
     fila = cur.fetchone()
@@ -458,8 +484,7 @@ def contestar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
         r = ejecutar(cur, ctx.quien, "decidir_pase_de_tarea",
                      {"pase_id": pase["id"], "aprueba": acepta, **momento}, ya_confirmada=True)
         if r.get("estado") == "sin_efecto":
-            return {"resultado": "no_se_puede", "motivo": LA_TAREA_CAMBIO,
-                    "tarea": tarea_hecho(tarea)}
+            return _ya_no_se_puede_pasar(ctx, pase, tarea)
         hecho: dict[str, Any] = {"resultado": "anotado", "tarea": tarea_hecho(tarea),
                                  "aprobo_el_pase": acepta}
         if acepta:
@@ -467,41 +492,98 @@ def contestar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
                                       pase["a_membership_id"]))
             return hecho
         hecho["sigue_con"] = pase["la_tiene"]
-        _juntar(hecho, _como_termino(ctx, pase, pase["pedido_por_membership_id"],
-                                     "aviso_a_quien_pidio",
-                                     {"no_lo_aprobo": True, "lo_decidio": pase["decide"],
-                                      "la_tiene": pase["la_tiene"],
-                                      **({"por_que": por_que} if por_que else {})}))
+        _juntar(hecho, _al_terminar(ctx, pase, {"no_lo_aprobo": True, "lo_decidio": pase["decide"],
+                                                "la_tiene": pase["la_tiene"],
+                                                **({"por_que": por_que} if por_que else {})}))
         return hecho
     r = ejecutar(cur, ctx.quien, "contestar_pase_de_tarea",
                  {"pase_id": pase["id"], "acepta": acepta, **momento}, ya_confirmada=True)
     if r.get("estado") == "sin_efecto":
-        return {"resultado": "no_se_puede", "motivo": LA_TAREA_CAMBIO,
-                "tarea": tarea_hecho(tarea)}
+        return _ya_no_se_puede_pasar(ctx, pase, tarea)
     tambien = pase["decide_membership_id"] == quien
     hecho = {"resultado": "anotado", "tarea": tarea_hecho(tarea), "la_toma": acepta,
              **({"tambien_lo_decidia": True} if tambien else {})}
     if acepta:
-        _al_cambiar_de_manos(ctx, pase)
-        if pase["fecha_objetivo"] is not None:
-            hecho["vence"] = pase["fecha_objetivo"].astimezone(
-                ctx.calendario.zona).date().isoformat()
-        termino = {"la_tomo": True, "la_tiene": ctx.quien.nombre}
-    else:
-        hecho["sigue_con"] = pase["la_tiene"]
-        termino = {"la_tomo": False, "la_tiene": pase["la_tiene"],
-                   **({"por_que": por_que} if por_que else {})}
-    _juntar(hecho, _como_termino(ctx, pase, pase["pedido_por_membership_id"],
-                                 "aviso_a_quien_pidio", termino))
-    if acepta and pase["decide_membership_id"] not in (pase["pedido_por_membership_id"], quien):
-        _juntar(hecho, _como_termino(ctx, pase, pase["decide_membership_id"],
-                                     "aviso_a_quien_decidio", termino))
-    if acepta and pase["de_membership_id"] not in (pase["pedido_por_membership_id"],
-                                                   pase["decide_membership_id"], quien):
-        # Lo pidió su encargado (decisión 27): a quien la tenía, que su tarea pasó a otra persona.
-        _juntar(hecho, _como_termino(ctx, pase, pase["de_membership_id"],
-                                     "aviso_a_quien_la_tenia",
-                                     {**termino, "era_suya": True, "pidio": pase["pidio"]}))
+        return _la_tomo(ctx, pase, hecho)
+    hecho["sigue_con"] = pase["la_tiene"]
+    _juntar(hecho, _al_terminar(ctx, pase, {"la_tomo": False, "la_tiene": pase["la_tiene"],
+                                            **({"por_que": por_que} if por_que else {})}))
+    return hecho
+
+
+def _la_tomo(ctx: Contexto, pase: dict, hecho: dict) -> dict:
+    """Quien escribe tomó la tarea (o se quedó con la de alguien de su sector): ya es suya, y se
+    enteran quienes tienen que enterarse (`_al_terminar`)."""
+    _al_cambiar_de_manos(ctx, pase)
+    if pase["fecha_objetivo"] is not None:
+        hecho["vence"] = pase["fecha_objetivo"].astimezone(ctx.calendario.zona).date().isoformat()
+    _juntar(hecho, _al_terminar(ctx, pase, {"la_tomo": True, "la_tiene": ctx.quien.nombre}))
+    return hecho
+
+
+def _ya_no_se_puede_pasar(ctx: Contexto, pase: dict, tarea: dict) -> dict:
+    """La tarea cambió (se entregó, se cerró) antes de que quien escribe contestara: el pase quedó
+    sin efecto, y se enteran quienes tienen que enterarse."""
+    hecho = {"resultado": "no_se_puede", "motivo": LA_TAREA_CAMBIO, "tarea": tarea_hecho(tarea)}
+    _juntar(hecho, _al_terminar(ctx, pase, {"la_tarea_cambio": True, "la_tiene": pase["la_tiene"]}))
+    return hecho
+
+
+# --- Cómo terminó: una regla para todo fin de un pase (decisión 39) ----------------------------
+
+def _quienes_se_enteran(pase: dict, termino: dict, *, actor: str | None,
+                        preguntado: str | None,
+                        para_quien_pidio: dict | None = None) -> list[tuple[str, str, dict]]:
+    """A quiénes les llega cómo terminó un pase, con lo propio de cada uno (decisión 39 del
+    usuario: nunca un tema abierto sin que todos sepan cómo se cerró). Cada persona una vez, y
+    nunca quien lo terminó (`actor`):
+
+    - quien lo pidió, siempre;
+    - si alguien la tomó, quien decidió y, si lo pidió su encargado, quien la tenía (decisión 27);
+    - quien tenía que contestar y no llegó a hacerlo (`preguntado`: se le preguntó y el pase
+      terminó sin su respuesta), que ya no hace falta que conteste."""
+    lista: list[tuple[str, str, dict]] = []
+    vistos = {actor} if actor else set()
+
+    def sumar(persona: str, clave: str, propio: dict) -> None:
+        if persona not in vistos:
+            vistos.add(persona)
+            lista.append((persona, clave, propio))
+
+    sumar(pase["pedido_por_membership_id"], "aviso_a_quien_pidio", para_quien_pidio or {})
+    if termino.get("la_tomo"):
+        sumar(pase["decide_membership_id"], "aviso_a_quien_decidio", {})
+        sumar(pase["de_membership_id"], "aviso_a_quien_la_tenia",
+              {"era_suya": True, "pidio": pase["pidio"]})
+    if preguntado is not None:
+        sumar(preguntado, "aviso_a_quien_se_le_preguntaba",
+              {"ya_no_espera_su_respuesta": True, "pidio": pase["pidio"]})
+    return lista
+
+
+def _cerrar_las_preguntas(cur, pase: dict, ahora) -> None:
+    """Las preguntas del pase, con sus botones, dejan de esperar: el pase ya no espera nada de
+    nadie (un botón viejo, igual, no hace nada y lo dice: `contestar`)."""
+    cur.execute("""update conversation_question
+                      set cerrada_en = %s, cierre = 'sin_efecto', cierre_detalle = %s
+                    where task_id = %s and tipo = any(%s) and cerrada_en is null
+                      and jugada ->> 'pase' = %s""",
+                (ahora, preguntas.json_de({"tarea": pase["task_id"],
+                                           "el_pase_ya_no_espera": True}),
+                 pase["task_id"], [preguntas.DECIDIR_EL_PASE, preguntas.TOMAR_LA_TAREA],
+                 pase["id"]))
+
+
+def _al_terminar(ctx: Contexto, pase: dict, termino: dict) -> dict:
+    """El fin de un pase en un turno: quien escribe lo terminó (decidió, contestó o se quedó con
+    la tarea); los demás se enteran, terminado el margen para corregir. Los hechos para quien
+    escribe."""
+    _cerrar_las_preguntas(ctx.cur, pase, ctx.ahora)
+    hecho: dict[str, Any] = {}
+    for persona, clave, propio in _quienes_se_enteran(pase, termino,
+                                                       actor=ctx.quien.membership_id,
+                                                       preguntado=None):
+        _juntar(hecho, _como_termino(ctx, pase, persona, clave, {**termino, **propio}))
     return hecho
 
 
@@ -537,11 +619,16 @@ def vigencia(m, aviso) -> tuple[str | None, dict[str, Any]]:
     from .avisos import de_la_clave       # avisos importa este módulo al salir
     if aviso["tipo"] == COMO_TERMINO_EL_PASE:
         return None, dict(aviso["hechos"])
-    m.cur.execute("""select estado, decide_membership_id, a_membership_id from pase_de_tarea
-                      where id = %s""", (de_la_clave(aviso),))
+    m.cur.execute("""select p.estado, p.decide_membership_id, p.a_membership_id,
+                             t.estado::text = any(%s)
+                               and t.responsable_membership_id = p.de_membership_id se_pasa
+                        from pase_de_tarea p join task t on t.id = p.task_id
+                       where p.id = %s""", (list(_SE_PASA), de_la_clave(aviso)))
     pase = m.cur.fetchone()
     if pase is None:
         return "tarea_inexistente", {}
+    if not pase["se_pasa"]:
+        return "el_pase_ya_no_espera", {}       # la tarea cambió: el pase termina sin efecto
     decidir = (aviso["tipo"] == PASE_PARA_DECIDIR
                or (aviso["tipo"] == RECORDATORIO_DEL_PASE
                    and (aviso["hechos"] or {}).get("pregunta") == preguntas.DECIDIR_EL_PASE))
@@ -577,8 +664,9 @@ def seguir_los_pases(m) -> list[str]:
     """Lo que toca de cada pase que espera una respuesta que no llega (decisión 26 del usuario,
     2026-10-09): la pregunta otra vez, una sola, el día hábil siguiente de haber salido; y, al día
     hábil siguiente de la repetición, a la hora en que Leda escribe, el fin del pase sin
-    respuesta, con el aviso a quien lo pidió. Corre en la escalera (`escalera.correr_escalera`).
-    Los tipos de lo que guardó."""
+    respuesta. Si la tarea ya no se puede pasar, el fin sin efecto, en cualquier vuelta. Lo
+    decide la cocina (`terminar_pase`), y de cómo terminó se enteran todos (`_al_terminar_solo`).
+    Corre en la escalera (`escalera.correr_escalera`). Los tipos de lo que guardó."""
     cur = m.cur
     cur.execute("select id from pase_de_tarea where estado = any(%s) order by pedido_en, id",
                 (list(_ABIERTO),))
@@ -588,23 +676,23 @@ def seguir_los_pases(m) -> list[str]:
         tipo, espera_de = _lo_que_espera(pase)
         if tipo is None or not candado(cur, pase["task_id"], esperar=False):
             continue                    # un turno la tiene tomada: la vuelta siguiente
-        if ausente(cur, espera_de, m.hoy):
-            continue                    # pausada: no avanza mientras no está
         pregunta = _el_aviso(cur, tipo, pase)
-        if not _salio(pregunta):
-            continue                    # todavía no se le preguntó
         etapa = f":{tipo}"
         otra_vez = _el_aviso(cur, RECORDATORIO_DEL_PASE, pase, etapa)
-        if otra_vez is None:
-            if m.cal.habiles_entre(pregunta["resuelto_en"], m.ahora) >= 1:
-                _repetir(m, pase, tipo, espera_de, pregunta, etapa)
-                guardados.append(RECORDATORIO_DEL_PASE)
-            continue
-        if (_salio(otra_vez) and m.cal.habiles_entre(otra_vez["resuelto_en"], m.ahora) >= 1
-                and sale(m.cal, m.ahora) <= m.ahora
-                and terminar_pase_sin_respuesta(cur, pase["id"], m.ahora) is not None):
-            _sin_respuesta(m, pase, espera_de)
+        pausado = ausente(cur, espera_de, m.hoy)    # no avanza mientras no está
+        vencido = (not pausado and _salio(otra_vez)
+                   and m.cal.habiles_entre(otra_vez["resuelto_en"], m.ahora) >= 1
+                   and sale(m.cal, m.ahora) <= m.ahora)
+        termino = terminar_pase(cur, pase["id"], m.ahora, vencido=vencido)
+        if termino is not None:
+            _al_terminar_solo(m, pase, termino["estado"], espera_de if _salio(pregunta) else None)
             guardados.append(COMO_TERMINO_EL_PASE)
+            continue
+        if pausado or not _salio(pregunta) or otra_vez is not None:
+            continue                    # todavía no se le preguntó, o ya se repitió
+        if m.cal.habiles_entre(pregunta["resuelto_en"], m.ahora) >= 1:
+            _repetir(m, pase, tipo, espera_de, pregunta, etapa)
+            guardados.append(RECORDATORIO_DEL_PASE)
     return guardados
 
 
@@ -623,18 +711,30 @@ def _repetir(m, pase: dict, tipo: str, espera_de: str, pregunta: dict, etapa: st
             ahora=m.ahora)
 
 
-def _sin_respuesta(m, pase: dict, espera_de: str) -> None:
-    """A quien pidió el pase, que terminó sin respuesta: la tarea sigue con quien la tiene y
-    puede pedírselo a otra persona. Información."""
-    hechos = {"aviso": COMO_TERMINO_EL_PASE, "tarea": pase["titulo"],
-              "necesita_respuesta": False, "pasaria_a": pase["pasaria_a"],
-              "sin_respuesta": True, "no_contesto": integrante(m.cur, espera_de)["nombre"],
-              "la_tiene": pase["la_tiene"], "puede_pedirselo_a_otra_persona": True}
-    guardar(m.cur, m.workspace_id, COMO_TERMINO_EL_PASE, task_id=pase["task_id"],
-            destinatario=pase["pedido_por_membership_id"], hechos=hechos,
-            programado_para=sale(m.cal, m.ahora),
-            clave=f"motor:{COMO_TERMINO_EL_PASE}:{pase['task_id']}:p{pase['id']}"
-                  ":aviso_a_quien_pidio", ahora=m.ahora)
+def _al_terminar_solo(m, pase: dict, estado: str, preguntado: str | None) -> None:
+    """El fin de un pase que da el sistema (`seguir_los_pases`): sin respuesta, la tarea sigue con
+    quien la tiene y quien lo pidió puede pedírselo a otra persona; sin efecto, la tarea cambió.
+    Se enteran todos (`_quienes_se_enteran`), también a quien se le preguntaba, que ya no hace
+    falta que conteste. Información, a la hora en que Leda escribe."""
+    _cerrar_las_preguntas(m.cur, pase, m.ahora)
+    if estado == "sin_respuesta":
+        termino = {"sin_respuesta": True, "la_tiene": pase["la_tiene"]}
+        para_quien_pidio = {"no_contesto": integrante(m.cur, preguntado)["nombre"],
+                            "puede_pedirselo_a_otra_persona": True} if preguntado else {}
+    else:
+        termino = {"la_tarea_cambio": True, "la_tiene": pase["la_tiene"]}
+        para_quien_pidio = {}
+    for persona, clave, propio in _quienes_se_enteran(pase, termino, actor=None,
+                                                       preguntado=preguntado,
+                                                       para_quien_pidio=para_quien_pidio):
+        guardar(m.cur, m.workspace_id, COMO_TERMINO_EL_PASE, task_id=pase["task_id"],
+                destinatario=persona,
+                hechos={"aviso": COMO_TERMINO_EL_PASE, "tarea": pase["titulo"],
+                        "necesita_respuesta": False, "pasaria_a": pase["pasaria_a"],
+                        **termino, **propio},
+                programado_para=sale(m.cal, m.ahora),
+                clave=f"motor:{COMO_TERMINO_EL_PASE}:{pase['task_id']}:p{pase['id']}:{clave}",
+                ahora=m.ahora)
 
 
 def opciones(m, aviso) -> tuple[str, dict[str, Any], list[tuple[str, dict[str, Any]]]]:

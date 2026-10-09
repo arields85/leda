@@ -1625,16 +1625,19 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                     "chat con Leda, y que la persona pueda pedirlo: el encargado de un sector, a "
                     "cualquiera; un integrante, sólo a alguien de su sector (la cocina)",
           hace="nada todavía: muestra la vista previa del pase (de quién a quién, quién lo "
-               "decide y que quien la recibe tiene que tomarla)",
+               "decide y que quien la recibe tiene que tomarla, o que con su confirmación pasa "
+               "a ser suya)",
           despues="espera la confirmación (botón o escrito); al confirmar, Leda le pregunta a "
-                  "quien lo decide o a quien la recibe. Si no se puede, dice por qué y, si es "
-                  "de otro sector, quién lo decide",
+                  "quien lo decide o a quien la recibe o, si se la queda él, la tarea pasa a "
+                  "ser suya. Si no se puede, dice por qué y, si es de otro sector, quién lo "
+                  "decide",
           manejar=_pedir_reasignacion, del_responsable=True,
           estados=frozenset({"asignada", "en_curso", "bloqueada"}),
           es="La persona pide que una tarea suya pase a otra persona del equipo (a, como la "
              "nombró): que se la pasen, que la haga o la tome otra persona. El encargado de un "
              "sector también puede pedirlo para una tarea de alguien de su sector, que no está "
-             "en su lista: como_la_nombra dice cómo la nombró."),
+             "en su lista (como_la_nombra dice cómo la nombró), y quedársela él: entonces a es "
+             "su propio nombre."),
     Ficha("contestar_el_pase", "decir si aprueba que una tarea pase a otra persona, o si toma "
                                "la que le quieren pasar",
           necesita=(), opcional=("tarea", "acepta", "por_que"),

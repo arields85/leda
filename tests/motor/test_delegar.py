@@ -416,19 +416,30 @@ def test_un_pase_que_nadie_contesta_se_repite_una_vez_y_despues_termina(conn, eq
     _escalera(conn, equipo, miercoles)
     assert _pases(conn)[0]["estado"] == "sin_respuesta"
     assert _quien_la_tiene(conn, equipo, "PLC") == MARCOS
-    [termino] = avisos_guardados(conn, COMO_TERMINO)
-    assert str(termino["destinatario_membership_id"]) == equipo.mundo["personas"]["Marcos"][
-        "membership_id"]
-    assert termino["hechos"]["sin_respuesta"] is True
-    assert termino["hechos"]["no_contesto"] == MARTIN
-    assert termino["hechos"]["la_tiene"] == MARCOS
-    assert termino["hechos"]["puede_pedirselo_a_otra_persona"] is True
+    personas = equipo.mundo["personas"]
+    avisos = {str(a["destinatario_membership_id"]): a["hechos"]
+              for a in avisos_guardados(conn, COMO_TERMINO)}
+    assert set(avisos) == {personas["Marcos"]["membership_id"],
+                           personas["Martin"]["membership_id"]}
+    a_marcos = avisos[personas["Marcos"]["membership_id"]]
+    assert a_marcos["sin_respuesta"] is True
+    assert a_marcos["no_contesto"] == MARTIN
+    assert a_marcos["la_tiene"] == MARCOS
+    assert a_marcos["puede_pedirselo_a_otra_persona"] is True
+    # Decisión 39: Martín, a quien Leda le preguntaba, también se entera de que terminó y de que ya
+    # no hace falta que conteste, sin un reproche; y Leda deja de preguntarle (sus botones, también).
+    a_martin = avisos[personas["Martin"]["membership_id"]]
+    assert a_martin["sin_respuesta"] is True and a_martin["ya_no_espera_su_respuesta"] is True
+    assert a_martin["pidio"] == MARCOS and a_martin["la_tiene"] == MARCOS
+    assert "no_contesto" not in a_martin and "puede_pedirselo_a_otra_persona" not in a_martin
+    assert _preguntas_del_pase_abiertas(conn, equipo, "Martin") == []
     ia = _salir(conn, equipo, miercoles + timedelta(minutes=5))
-    assert hechos.sin_significado(ia.pedidos_de_redaccion[0]) == set()
+    assert len(ia.pedidos_de_redaccion) == 2
+    assert all(hechos.sin_significado(p) == set() for p in ia.pedidos_de_redaccion)
     # Nada más: ni otra repetición ni otro aviso.
     _escalera(conn, equipo, miercoles + timedelta(days=1))
     assert len(avisos_guardados(conn, RECORDATORIO_DEL_PASE)) == 1
-    assert len(avisos_guardados(conn, COMO_TERMINO)) == 1
+    assert len(avisos_guardados(conn, COMO_TERMINO)) == 2
     # Si Martín contesta tarde, no hay nada que contestar.
     r = equipo.dice("Martin", Jugada("contestar_el_pase", {"acepta": True}),
                     at=miercoles + timedelta(hours=1))
@@ -530,3 +541,171 @@ def test_la_de_nahuel_que_toma_marcos_se_cierra_cuando_marcos_la_entrega(conn, e
     assert [a for a in avisos_guardados(conn)
             if str(a["destinatario_membership_id"]) == ismael] == []
     assert avisos_guardados(conn, "entrega_para_aprobar") == []
+
+
+# --- El encargado se queda él mismo con una tarea de su gente (decisión 53) ------------------
+
+def test_el_encargado_se_queda_con_la_de_nahuel_al_confirmar(conn, equipo):
+    r = equipo.dice("Marcos", Jugada("pedir_reasignacion",
+                                     {"como_la_nombra": "sensores de Nahuel", "a": "marcos"}))
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "pase_para_confirmar"
+    assert hecho["pase"] == {"la_tiene": NAHUEL, "pasaria_a": MARCOS}
+    # Pide, decide y la toma él: al confirmar, la tarea pasa a ser suya.
+    assert hecho["al_confirmar_el_pase"] == {"la_toma_al_confirmar": True}
+    assert hechos.sin_significado(equipo.redaccion) == set()
+    assert _pases(conn) == [] and _quien_la_tiene(conn, equipo, "SEN") == NAHUEL
+    r = equipo.dice("Marcos", Jugada("confirmar", {}))
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["la_toma"]) == ("anotado", True)
+    assert hecho["aviso_a_quien_la_tenia"]["a"] == NAHUEL
+    assert hechos.sin_significado(equipo.redaccion) == set()
+    assert _quien_la_tiene(conn, equipo, "SEN") == MARCOS
+    # Nadie más tiene que decidir ni tomarla; a Nahuel, que su tarea pasó a Marcos.
+    assert avisos_guardados(conn, PASE_PARA_TOMAR) == []
+    assert avisos_guardados(conn, PASE_PARA_DECIDIR) == []
+    [aviso] = avisos_guardados(conn, COMO_TERMINO)
+    assert str(aviso["destinatario_membership_id"]) == equipo.mundo["personas"]["Nahuel"][
+        "membership_id"]
+    assert (aviso["hechos"]["la_tomo"], aviso["hechos"]["era_suya"], aviso["hechos"]["pidio"],
+            aviso["hechos"]["la_tiene"]) == (True, True, MARCOS, MARCOS)
+    ia = _salir(conn, equipo, aviso["programado_para"] + timedelta(minutes=1))
+    assert all(hechos.sin_significado(p) == set() for p in ia.pedidos_de_redaccion)
+    # Sigue siendo trabajo del sector (decisión 28): cuando Marcos dice "listo", se cierra ahí.
+    alias = _alias(equipo, "Marcos", "SEN")
+    r = equipo.dice("Marcos", Jugada("entregar", {"tarea": alias, "lo_descrito_cubre": ["C1"]}),
+                    texto="listo, calibrados y probados, dan dentro de la tolerancia")
+    assert r.hechos[0]["al_confirmar"]["la_aprueba_al_entregarla"] is True
+    ismael = equipo.mundo["personas"]["Ismael"]["membership_id"]
+    assert [a for a in avisos_guardados(conn)
+            if str(a["destinatario_membership_id"]) == ismael] == []
+
+
+# --- Nunca un pase abierto sin que todos sepan cómo terminó (decisión 39) ---------------------
+
+def _preguntas_del_pase_abiertas(conn, t: Turnos, nombre: str) -> list[dict]:
+    """Las preguntas de un pase, con sus botones, que esperan algo de esa persona."""
+    return todos(conn, """select * from conversation_question
+                           where membership_id = %s and tipo = any(%s) and cerrada_en is null""",
+                 t.mundo["personas"][nombre]["membership_id"],
+                 [preguntas.DECIDIR_EL_PASE, preguntas.TOMAR_LA_TAREA])
+
+
+def _entregar_por_la_cocina(conn, t: Turnos, nombre: str, clave: str) -> None:
+    from leda.db import espacio
+    from leda.herramientas import ejecutar
+    quien = t._quien(nombre)
+    with espacio(conn, t.carga.workspace_id) as cur:
+        r = ejecutar(cur, quien, "entregar_tarea",
+                     {"tarea_id": t.carga.tareas[clave],
+                      "piezas": [{"clase": "texto", "texto": "probado, 20 ciclos sin fallas"}]},
+                     ya_confirmada=True)
+    conn.commit()
+    assert r["estado"] == "en_revision"
+
+
+def _plc_a_lucas_con_la_pregunta_a_martin(conn, t: Turnos) -> dict:
+    _pedir(t, "Marcos", "PLC", "lucas")
+    t.dice("Marcos", Jugada("confirmar", {}))
+    [pregunta] = avisos_guardados(conn, PASE_PARA_DECIDIR)
+    _salir(conn, t, pregunta["programado_para"] + timedelta(minutes=1))
+    assert len(_preguntas_del_pase_abiertas(conn, t, "Martin")) == 1
+    return pregunta
+
+
+def test_si_la_tarea_ya_no_se_puede_pasar_el_pase_termina_y_todos_se_enteran(conn, equipo):
+    _plc_a_lucas_con_la_pregunta_a_martin(conn, equipo)
+    # Mientras Martín no decide, Marcos entrega el PLC: el pase ya no espera nada. Leda no espera
+    # el plazo del pase sin respuesta.
+    _entregar_por_la_cocina(conn, equipo, "Marcos", "PLC")
+    _escalera(conn, equipo, AHORA + timedelta(hours=2))
+    assert _pases(conn)[0]["estado"] == "sin_efecto"
+    personas = equipo.mundo["personas"]
+    avisos = {str(a["destinatario_membership_id"]): a["hechos"]
+              for a in avisos_guardados(conn, COMO_TERMINO)}
+    # A Marcos, que lo pidió, y a Martín, a quien se le preguntaba; a Lucas todavía no se le había
+    # preguntado nada.
+    assert set(avisos) == {personas["Marcos"]["membership_id"],
+                           personas["Martin"]["membership_id"]}
+    assert avisos[personas["Marcos"]["membership_id"]]["la_tarea_cambio"] is True
+    a_martin = avisos[personas["Martin"]["membership_id"]]
+    assert a_martin["la_tarea_cambio"] is True and a_martin["ya_no_espera_su_respuesta"] is True
+    assert _preguntas_del_pase_abiertas(conn, equipo, "Martin") == []
+    ia = _salir(conn, equipo, AHORA + timedelta(hours=3))
+    assert len(ia.pedidos_de_redaccion) == 2
+    assert all(hechos.sin_significado(p) == set() for p in ia.pedidos_de_redaccion)
+    # Una vuelta más de la escalera no repite nada.
+    _escalera(conn, equipo, AHORA + timedelta(days=1))
+    assert len(avisos_guardados(conn, COMO_TERMINO)) == 2
+    assert avisos_guardados(conn, RECORDATORIO_DEL_PASE) == []
+
+
+def test_si_quien_decide_contesta_cuando_la_tarea_ya_cambio_se_entera_quien_lo_pidio(conn,
+                                                                                     equipo):
+    pregunta = _plc_a_lucas_con_la_pregunta_a_martin(conn, equipo)
+    _entregar_por_la_cocina(conn, equipo, "Marcos", "PLC")
+    alias = _alias(equipo, "Martin", "PLC")
+    r = equipo.dice("Martin", Jugada("contestar_el_pase", {"tarea": alias, "acepta": True}),
+                    at=pregunta["programado_para"] + timedelta(minutes=20))
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "la_tarea_cambio")
+    assert hecho["aviso_a_quien_pidio"]["a"] == MARCOS
+    assert hechos.sin_significado(equipo.redaccion) == set()
+    [aviso] = avisos_guardados(conn, COMO_TERMINO)
+    assert str(aviso["destinatario_membership_id"]) == equipo.mundo["personas"]["Marcos"][
+        "membership_id"]
+    assert aviso["hechos"]["la_tarea_cambio"] is True
+    assert _preguntas_del_pase_abiertas(conn, equipo, "Martin") == []
+
+
+def test_contestado_escrito_la_pregunta_con_botones_deja_de_esperar(conn, equipo):
+    pregunta = _plc_a_lucas_con_la_pregunta_a_martin(conn, equipo)
+    alias = _alias(equipo, "Martin", "PLC")
+    equipo.dice("Martin", Jugada("contestar_el_pase", {"tarea": alias, "acepta": True}),
+                at=pregunta["programado_para"] + timedelta(minutes=20))
+    assert _preguntas_del_pase_abiertas(conn, equipo, "Martin") == []
+
+
+def test_si_el_sistema_termina_el_pase_mientras_quien_decide_contesta_no_falla(conn, equipo,
+                                                                              uri):
+    # La escalera termina el pase (y no confirma todavía) justo cuando Martín contesta: el turno
+    # espera a la escalera y dice que ya no hay nada que contestar, en lugar de fallar.
+    import threading
+    import time
+
+    from leda.db import conectar
+    from leda.herramientas import terminar_pase
+    from leda.motor.ancla import candado
+
+    pregunta = _plc_a_lucas_con_la_pregunta_a_martin(conn, equipo)
+    alias = _alias(equipo, "Martin", "PLC")
+    [pase] = _pases(conn)
+    escalera = conectar(uri)
+    resultado: dict = {}
+    try:
+        cur = escalera.cursor()
+        cur.execute("set local role leda_app")
+        cur.execute("select set_config('leda.workspace_id', %s, true)",
+                    (equipo.carga.workspace_id,))
+        assert candado(cur, equipo.carga.tareas["PLC"], esperar=False)
+        assert terminar_pase(cur, str(pase["id"]), AHORA + timedelta(days=2),
+                             vencido=True)["estado"] == "sin_respuesta"
+
+        def contestar() -> None:
+            try:
+                resultado["r"] = equipo.dice(
+                    "Martin", Jugada("contestar_el_pase", {"tarea": alias, "acepta": True}),
+                    at=pregunta["programado_para"] + timedelta(minutes=20))
+            except BaseException as e:      # noqa: BLE001 -- se mira en el hilo principal
+                resultado["error"] = e
+
+        hilo = threading.Thread(target=contestar)
+        hilo.start()
+        time.sleep(1.5)
+        escalera.commit()
+        hilo.join(60)
+    finally:
+        escalera.close()
+    assert "error" not in resultado, resultado.get("error")
+    [hecho] = resultado["r"].hechos
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "no_hay_un_pase")

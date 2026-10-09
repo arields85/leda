@@ -42,11 +42,11 @@ PAQUETE = "motor"
 PERMITIDOS: dict[str, set[str] | None] = {
     "db": None,
     "autoridad": None,
-    # `terminar_pase_sin_respuesta` (decisión 26 del usuario, C-7): el fin de un pase que nadie
-    # contestó no es el acto de una persona, así que no pasa por `ejecutar`; es de la cocina y
-    # deja su auditoría como acto del sistema.
+    # `terminar_pase` (decisión 26 del usuario, C-7): el fin de un pase que nadie contestó, o
+    # cuya tarea ya no se puede pasar, no es el acto de una persona, así que no pasa por
+    # `ejecutar`; es de la cocina y deja su auditoría como acto del sistema.
     "herramientas": {"ejecutar", "NecesitaConfirmacion", "EstadoCambio", "NecesitaElegir",
-                     "NecesitaOpciones", "terminar_pase_sin_respuesta"},
+                     "NecesitaOpciones", "terminar_pase"},
     "calendario": None,
     "salida": {"enqueue_outbox", "PayloadValidationError", "MAX_ADJUNTOS"},
     "despachador": None,

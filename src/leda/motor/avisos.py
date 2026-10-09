@@ -1891,7 +1891,9 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
                 opciones=_opciones_del_pase),
     TipoDeAviso(COMO_TERMINO_EL_PASE, "informativo", _vigencia_del_pase, es_coordinacion=True),
     # Si nadie contesta, la pregunta otra vez, una sola (decisión 26): dentro del tope diario y en
-    # un envío por persona, sin botones ni otra pregunta abierta (9b).
+    # un envío por persona, sin botones ni otra pregunta abierta (9b). `recuerda` sólo dice que la
+    # pregunta ya se hizo: si es decidir el pase o tomar la tarea lo dicen sus hechos
+    # (`pase.hechos_de_la_pregunta`), y eso lleva la redacción.
     TipoDeAviso(RECORDATORIO_DEL_PASE, "seguimiento", _vigencia_del_pase,
                 recuerda=preguntas.DECIDIR_EL_PASE),
 )})
