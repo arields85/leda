@@ -332,6 +332,134 @@ def test_destrabar_cierra_la_pregunta_de_quien_destraba(conn, mundo, equipo):
                    "membership_id = %s and satisfecho_en is null", ariel) == 0
 
 
+# --- "Ya lo hablé con él" (C-5, porción 2; decisión 4, segunda mitad; conversación 33) ---------
+
+def _su_pregunta(conn, mundo, corto: str = "Ariel") -> dict | None:
+    return uno(conn, """select q.tipo, q.task_id::text tarea, q.jugada, q.cerrada_en
+                          from conversation_state s
+                          join conversation_question q on q.id = s.pregunta_abierta_id
+                         where s.membership_id = %s""", _membresia(mundo, corto))
+
+
+def test_ya_lo_hablaron_sin_fecha_pregunta_que_arreglaron(conn, mundo, equipo):
+    _le_pregunto(conn, mundo, equipo)
+
+    r = equipo.dice("Ariel", Jugada("decir_cuando_destraba", {"ya_lo_hablaron": True}),
+                    texto="si ya lo hable con marcos")
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "falta_dato"
+    assert hecho["falta"] == ["lo_que_arreglaron", "para_cuando"]
+    assert hecho["ya_lo_hablaron"] is True
+    assert hecho["pregunta"] == "cuando_se_destraba"
+    assert hecho["tarea"] == {"alias": "T1", "titulo": "Revisar el tablero"}
+    # Nada queda anotado todavía y Marcos no se entera de nada.
+    assert cuantas(conn, "dicho_de_quien_destraba") == 0
+    assert avisos_guardados(conn, LO_QUE_DIJO) == []
+    # La pregunta sigue abierta, con su espera, y ahora recuerda que ya lo hablaron.
+    pregunta = _su_pregunta(conn, mundo)
+    assert (pregunta["tipo"], pregunta["tarea"], pregunta["cerrada_en"]) == (
+        "cuando_se_destraba", mundo["tarea"], None)
+    assert pregunta["jugada"]["datos"]["ya_lo_hablaron"] is True
+    assert cuantas(conn, "pending_reply", "membership_id = %s and satisfecho_en is null",
+                   _membresia(mundo, "Ariel")) == 1
+
+
+def test_lo_que_arreglaron_queda_anotado_y_le_llega_a_quien_esta_trabado(conn, mundo, equipo):
+    _le_pregunto(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba", {"ya_lo_hablaron": True}))
+
+    r = equipo.dice("Ariel", Jugada("decir_cuando_destraba",
+                                    {"para_cuando": "2026-10-08",
+                                     "lo_que_dice": "quedamos q se la paso el jueves"}))
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["dice_quien_destraba"] == {"para_cuando": "2026-10-08",
+                                            "lo_que_dice": "quedamos q se la paso el jueves",
+                                            "ya_lo_hablaron": True}
+    dicho = uno(conn, "select para_cuando::text p, lo_que_dice from dicho_de_quien_destraba")
+    assert dicho == {"p": "2026-10-08", "lo_que_dice": "quedamos q se la paso el jueves"}
+    [aviso] = avisos_guardados(conn, LO_QUE_DIJO)
+    assert aviso["hechos"]["dice_quien_destraba"]["ya_lo_hablaron"] is True
+    assert _su_pregunta(conn, mundo) is None
+    assert cuantas(conn, "pending_reply", "membership_id = %s and satisfecho_en is null",
+                   _membresia(mundo, "Ariel")) == 0
+    assert cuantas(conn, "audit_log", "accion = 'anotar_lo_que_dice_quien_destraba'") == 1
+
+
+def test_dicho_todo_junto_se_anota_sin_preguntar(conn, mundo, equipo):
+    _le_pregunto(conn, mundo, equipo)
+
+    r = equipo.dice("Ariel", Jugada("decir_cuando_destraba",
+                                    {"tarea": "T1", "ya_lo_hablaron": True,
+                                     "para_cuando": "2026-10-09"}))
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["dice_quien_destraba"] == {"para_cuando": "2026-10-09", "ya_lo_hablaron": True}
+    assert "pregunta" not in hecho
+    assert cuantas(conn, "dicho_de_quien_destraba") == 1
+
+
+def test_lo_que_arreglaron_se_pregunta_una_sola_vez(conn, mundo, equipo):
+    _le_pregunto(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba", {"ya_lo_hablaron": True}))
+
+    r = equipo.dice("Ariel", Jugada("decir_cuando_destraba",
+                                    {"lo_que_dice": "quedamos que lo ve el con corelabs"}))
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["dice_quien_destraba"] == {"lo_que_dice": "quedamos que lo ve el con corelabs",
+                                            "ya_lo_hablaron": True}
+    assert _su_pregunta(conn, mundo) is None
+
+
+def test_lo_que_se_repite_recuerda_que_ya_lo_hablaron(conn, espacio_con_escalera, equipo):
+    mundo = espacio_con_escalera
+    _le_pregunto(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba", {"ya_lo_hablaron": True}))
+
+    correr_escalera(conn, mundo["id"], RelojFijo(octubre(6, 10)))
+    conn.commit()
+
+    [repregunta] = todos(conn, "select hechos from scheduled_notice where tipo = 'repregunta'")
+    assert repregunta["hechos"]["sobre"]["ya_lo_hablaron"] is True
+
+
+def test_si_contesta_antes_de_que_le_llegue_la_pregunta_no_sale(conn, mundo, equipo):
+    """Quien destraba ya ve la tarea en su lista: si contesta antes de que le llegue el mensaje
+    de Leda (el margen para corregir), ese mensaje no sale."""
+    _trabada(equipo)
+
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba",
+                                {"tarea": "T1", "para_cuando": "2026-10-06"}))
+    # Pasada la media hora en que Ariel estuvo conversando (no interrumpir).
+    _salir(conn, mundo, AHORA + timedelta(minutes=40))
+
+    [aviso] = avisos_guardados(conn, PREGUNTA_A_QUIEN_DESTRABA)
+    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "ya_respondio")
+
+
+def test_ya_lo_hablaron_antes_de_que_le_llegue_la_pregunta_se_la_hace_ahora(conn, mundo, equipo):
+    _trabada(equipo)
+
+    r = equipo.dice("Ariel", Jugada("decir_cuando_destraba",
+                                    {"tarea": "T1", "ya_lo_hablaron": True}))
+    _salir(conn, mundo, AHORA + timedelta(minutes=40))
+
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["pregunta"]) == ("falta_dato", "cuando_se_destraba")
+    pregunta = _su_pregunta(conn, mundo)
+    assert pregunta["tipo"] == "cuando_se_destraba"
+    destraba = uno(conn, "select id::text id from blocker_unblocker")
+    assert pregunta["jugada"]["destraba_id"] == destraba["id"]
+    # El mensaje que todavía no salió ya no hace falta: la pregunta se le hizo en su chat.
+    [aviso] = avisos_guardados(conn, PREGUNTA_A_QUIEN_DESTRABA)
+    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "ya_respondio")
+
+
 # --- "No le escribas" -------------------------------------------------------------------------
 
 def test_no_le_escribas_retira_el_mensaje_que_todavia_no_salio(conn, mundo, equipo):
@@ -400,5 +528,8 @@ def test_las_jugadas_nuevas_tienen_sus_datos_y_sus_significados():
                    "dice_quien_destraba", "aviso_a_quien_esta_trabado", "para_cuando",
                    "ya_esta", "lo_que_dice", "pidio_que_no_le_escriba", "ya_se_le_escribio",
                    "no_le_iba_a_escribir", "ya_se_destrabo", "cambio_quien_destraba",
-                   "no_le_toca_destrabarla"):
+                   "no_le_toca_destrabarla",
+                   # La porción 2: "ya lo hablé con él".
+                   "ya_lo_hablaron", "lo_que_arreglaron"):
         assert hechos_mod.significado(codigo), codigo
+    assert "ya_lo_hablaron" in FICHAS["decir_cuando_destraba"].opcional

@@ -1477,20 +1477,23 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "tarea que espera su revisión es otra jugada."),
     Ficha("decir_cuando_destraba", "anotar para cuándo destraba la tarea trabada de otra "
                                    "persona",
-          necesita=(), opcional=("tarea", "para_cuando", "ya_esta", "lo_que_dice"),
+          necesita=(), opcional=("tarea", "para_cuando", "ya_esta", "lo_que_dice",
+                                 "ya_lo_hablaron"),
           comprueba="que quien escribe sea quien destraba ahora un bloqueo abierto de esa tarea "
                     "(lo último que dijo la persona trabada)",
           hace="anota lo que dice, atribuido y auditado, como un hecho del bloqueo: para "
-               "cuándo, que ya está o sus palabras; no cierra el bloqueo",
+               "cuándo, que ya está o sus palabras; no cierra el bloqueo. Si sólo dice que ya "
+               "lo habló con la persona trabada, no anota nada todavía: pregunta una vez qué "
+               "arreglaron y para cuándo",
           despues="cierra su pregunta y su espera; la persona trabada se entera terminado el "
                   "margen para corregir, como información",
           manejar=_decir_cuando_destraba, se_ofrece=False,
           contesta=(preguntas.CUANDO_SE_DESTRABA,),
           es="La persona que escribe puede destrabar una tarea trabada de otra persona (está "
              "en la lista como espera_que_la_destrabe) y dice para cuándo lo resuelve "
-             "(para_cuando), que ya lo resolvió (ya_esta) o qué pasa con eso (lo_que_dice). Es "
-             "lo que dice sobre lo que traba la tarea de otro: no es un hecho de una tarea "
-             "suya."),
+             "(para_cuando), que ya lo resolvió (ya_esta), qué pasa con eso (lo_que_dice) o "
+             "que ya lo habló con la persona trabada (ya_lo_hablaron). Es lo que dice sobre lo "
+             "que traba la tarea de otro: no es un hecho de una tarea suya."),
     Ficha("no_escribirle", "no escribirle a quien destraba una tarea trabada",
           necesita=(), opcional=("tarea", "quien"),
           comprueba="que sea el responsable de la tarea y que Leda le haya guardado un mensaje "

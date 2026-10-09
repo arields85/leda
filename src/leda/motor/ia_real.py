@@ -156,6 +156,8 @@ DATOS = {
                            "dice que ya lo resolvió."),
     "lo_que_dice": ("string", "Lo que dice quien puede destrabar la tarea de otra persona sobre "
                               "lo que la traba, con sus palabras."),
+    "ya_lo_hablaron": ("boolean", "Verdadero sólo si quien puede destrabar la tarea de otra "
+                                  "persona dice que ya lo habló con esa persona."),
 }
 
 # Qué es lo que no está en la lista: sólo un pedido de hacer algo (revisión del contrato,

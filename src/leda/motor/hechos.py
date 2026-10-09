@@ -733,6 +733,11 @@ SIGNIFICADOS: Mapping[str, str] = {
                            "lugar.",
     "no_le_toca_destrabarla": "La persona que escribe no es quien puede destrabar esa tarea: "
                               "lo que dice no queda anotado.",
+    # --- "Ya lo hablé con él" (C-5, porción 2; `persecucion.py`) -------------------------------
+    "ya_lo_hablaron": "Quien puede destrabar la tarea dice que ya lo habló con la persona "
+                      "trabada: lo que queda anotado es lo que arreglaron entre ellos.",
+    "lo_que_arreglaron": "Qué arreglaron quien puede destrabar la tarea y la persona trabada, "
+                         "para que quede asentado.",
 }
 
 

@@ -1559,7 +1559,25 @@ def _vigencia_de_la_pregunta_a_quien_destraba(m: Momento, aviso
                                           str(aviso["destinatario_membership_id"]))
     if motivo is not None:
         return motivo, {}
+    if ya_contesto_quien_destraba(m.cur, de_la_clave(aviso),
+                                  str(aviso["destinatario_membership_id"])):
+        return "ya_respondio", {}
     return None, {**dict(aviso["hechos"]), "tarea": tarea["titulo"]}
+
+
+def ya_contesto_quien_destraba(cur, destraba_id, persona: str) -> bool:
+    """Si quien destraba ya habló de esa tarea antes de que le llegara la pregunta de Leda (la ve
+    en su lista): dijo algo que quedó anotado, o Leda ya le preguntó en su chat (C-5, porción
+    2). Entonces la pregunta guardada ya no hace falta."""
+    cur.execute("""select exists (select 1 from dicho_de_quien_destraba
+                                    where blocker_unblocker_id = %s
+                                      and dicho_por_membership_id = %s)
+                       or exists (select 1 from conversation_question
+                                   where membership_id = %s and tipo = %s
+                                     and jugada ->> 'destraba_id' = %s) as ya""",
+                (str(destraba_id), persona, persona, preguntas.CUANDO_SE_DESTRABA,
+                 str(destraba_id)))
+    return bool(cur.fetchone()["ya"])
 
 
 def _abre_cuando_se_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
