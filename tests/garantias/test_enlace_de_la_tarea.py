@@ -213,3 +213,72 @@ def test_el_enganche_de_la_cocina_da_la_marca_y_nunca_una_direccion(conn, mundo,
             tarea, _persona(mundo, "Taylor Quinn"))
         assert H._enlace_portal_tarea(cur, tarea, _persona(mundo, "Sam North")) is None
     conn.commit()
+
+
+# --- Pedido por chat (la jugada `pedir_enlace`; conversación 31) ------------------------------
+#
+# La IA sólo nombra la tarea (por su alias o por cómo la dijo la persona); quién la ve lo decide
+# la base. Lo que se garantiza: quien no puede verla nunca recibe un enlace, ni la marca en la
+# salida ni un acceso emitido al mandar, y una tarea de otro espacio no existe para la búsqueda.
+
+def _pide_por_chat(conn, mundo, persona: str, como_la_nombra: str) -> dict:
+    """Un mensaje de `persona` (North Lab) que la IA lee como `pedir_enlace`, despachado: el
+    hecho de la jugada."""
+    from leda.autoridad import identificar_en_espacio
+    from leda.motor.ia import IAGuionada, Jugada
+    from leda.motor.tiempo import RelojFijo
+    from leda.motor.turno import procesar_turno
+
+    ws = mundo["north-lab"]["id"]
+    gente = mundo["north-lab"]["people"]
+    with espacio(conn, ws) as cur:
+        quien = identificar_en_espacio(cur, gente[persona]["telegram"], ws)
+        cur.execute("""insert into inbound_message (workspace_id, telegram_message_id, chat_id,
+                                                    app_user_id, texto, at)
+                       values (%s, %s, %s, %s, 'pasame el link', %s) returning id""",
+                    (ws, 4242 + len(persona), gente[persona]["telegram"],
+                     gente[persona]["app_user_id"], AHORA))
+        entrante = str(cur.fetchone()["id"])
+    conn.commit()
+    ia = IAGuionada(jugadas=[[Jugada("pedir_enlace", {"como_la_nombra": como_la_nombra})]],
+                    redacciones=["Listo."])
+    resultado = procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
+    conn.commit()
+    assert resultado.error is None
+    [hecho] = resultado.hechos
+    return hecho
+
+
+def test_quien_no_ve_la_tarea_nunca_recibe_su_enlace_por_chat(conn, mundo, direccion):
+    """Sam North es del equipo y no tiene nada que ver con la tarea (ADR 0019, 7b)."""
+    hecho = _pide_por_chat(conn, mundo, "Sam North", "la balanza")
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "no_puede_ver_esa_tarea")
+    transporte = TransporteDePrueba()
+    _despachar(conn, mundo, transporte)
+    assert _filas(conn, "select * from message_outbox_enlace") == []
+    assert _filas(conn, "select * from acceso_tarea") == []
+    assert transporte.enviados and not any(ENLACE.search(e.texto)
+                                           for e in transporte.enviados)
+
+
+def test_quien_la_ve_la_recibe_por_chat_y_el_enlace_se_emite_al_mandar(conn, mundo, direccion):
+    hecho = _pide_por_chat(conn, mundo, "Taylor Quinn", "la balanza")
+    assert hecho["resultado"] == "leido"
+    transporte = TransporteDePrueba()
+    _despachar(conn, mundo, transporte)
+    [enviado] = transporte.enviados
+    assert ENLACE.search(enviado.texto) and enviado.sin_vista_previa
+    [acceso] = _filas(conn, "select task_id::text tarea, membership_id::text persona "
+                            "from acceso_tarea")
+    assert acceso == {"tarea": mundo["norte"]["id"],
+                      "persona": _persona(mundo, "Taylor Quinn")}
+
+
+def test_una_tarea_de_otro_espacio_no_se_encuentra_por_chat(conn, mundo, direccion):
+    """Morgan Hale es la autoridad final de North Lab, no de West Studio: "Secreto del oeste"
+    no existe para su búsqueda."""
+    hecho = _pide_por_chat(conn, mundo, "Morgan Hale", "secreto del oeste")
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede",
+                                                     "ninguna_tarea_con_ese_nombre")
+    assert "tarea" not in hecho
+    assert _filas(conn, "select * from message_outbox_enlace") == []

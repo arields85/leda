@@ -50,7 +50,7 @@ GARANTIA, COMPRENSION, MOTOR, FORMATO = "garantia", "comprension", "motor", "for
 # `puede_traer`, pueden venir, pero sólo con las palabras de la persona (revisión del contrato,
 # 2026-10-05): uno inventado sigue siendo una falla.
 DATOS_LIBRES = frozenset({"motivo", "causa", "palabras", "quien", "a", "que_pide",
-                          "comentario", "de"})
+                          "comentario", "de", "como_la_nombra"})
 FUERA_DE_LA_LISTA = "fuera_de_la_lista"
 ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
 # Un aviso cuya redacción falló y se reintenta (usuario, 2026-10-07): en la corrida es un aviso

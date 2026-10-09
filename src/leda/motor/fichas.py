@@ -1057,6 +1057,14 @@ def _ver_entrega(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     return aprobacion.ver_entrega(ctx, datos, tarea)
 
 
+# El enlace a la página de una tarea, pedido por chat (ADR 0019, decisión 7a): la jugada está en
+# `enlace.py`, que importa este módulo.
+
+def _pedir_enlace(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import enlace
+    return enlace.pedir_enlace(ctx, datos, tarea)
+
+
 def _pedir_reasignacion(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     decide = referente(ctx.cur, ctx.quien.membership_id)
     return {"resultado": "no_por_chat", "motivo": "cambiar_el_responsable_no_es_por_chat",
@@ -1429,6 +1437,19 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "decisión (lo que describió quien la hizo, sus fotos, archivos y enlaces), tocando "
              "su botón o escribiéndolo. No decide nada: aprobarla o pedirle cambios son otras "
              "jugadas. Una tarea que no está en la lista se nombra por su responsable (de)."),
+    Ficha("pedir_enlace", "pasar el enlace a la página de una tarea",
+          necesita=(), opcional=("tarea", "como_la_nombra"),
+          comprueba="que la tarea sea del espacio y que la persona pueda verla (la base: quien "
+                    "la tiene, quien aprueba su trabajo, quien decidió sobre ella, el referente "
+                    "del área y la autoridad final)",
+          hace="lee la tarea; no cambia nada",
+          despues="la respuesta lleva al final el enlace personal a la página de la tarea, que "
+                  "el código agrega; si no puede verla, ningún enlace sale",
+          manejar=_pedir_enlace,
+          es="La persona pide el enlace (o el link) a la página de una tarea, para verla: una "
+             "suya, una que espera su revisión o cualquier otra que nombre. Si la tarea no está "
+             "en la lista, como_la_nombra dice cómo la nombró. Pedir ver lo entregado de una "
+             "tarea que espera su revisión es otra jugada."),
     Ficha("pedir_reasignacion", "pasarle una tarea a otra persona",
           necesita=(), opcional=("tarea", "a"),
           comprueba="nada", hace="nada: cambiar el responsable no es por chat (9g)",

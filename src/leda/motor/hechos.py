@@ -683,6 +683,17 @@ SIGNIFICADOS: Mapping[str, str] = {
         "tarea, de sólo lectura, con la tarea, lo que fue pasando y lo que se entregó. La IA no "
         "lo ve ni lo escribe: no hay ninguna dirección para escribir.",
     "no_salio_un_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
+    # --- El enlace a la página de una tarea, pedido por chat (`enlace.py`) ---------------------
+    "como_la_nombra": "Cómo nombró la persona una tarea que no está en su lista.",
+    "no_puede_ver_esa_tarea": "La página de esa tarea la ven sólo las personas que tienen que "
+                              "ver con ella: la persona que escribe no está entre ellas, y "
+                              "ningún enlace sale.",
+    "ninguna_tarea_con_ese_nombre": "Ninguna tarea del equipo se llama como la nombró la "
+                                    "persona.",
+    "la_pagina_no_esta_disponible": "La página de las tareas no está disponible ahora: no hay "
+                                    "enlace para pasar.",
+    "ya_lleva_el_enlace_de_otra_tarea": "Este mensaje ya lleva el enlace de otra tarea, y "
+                                        "lleva uno solo: el de ésta se puede pedir aparte.",
 }
 
 
@@ -780,6 +791,7 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "aprobar": "aprobar_la_entrega",
     "pedir_cambios": "devolver_la_entrega_con_cambios",
     "ver_entrega": "mostrar_la_entrega_para_revisar",
+    "pedir_enlace": "pasar_el_enlace_a_la_pagina_de_una_tarea",
 }
 _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 

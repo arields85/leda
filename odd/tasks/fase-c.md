@@ -469,8 +469,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       fila por el final del texto; con el enlace al final, buscan sin el último renglón.
     - `PENDIENTE`:
       - **Pedir el enlace por chat** (ADR 0019, 7a: una jugada nueva de la lista cerrada, para
-        cualquiera que pueda ver la tarea): queda como el próximo ítem. Cambia la lista de
-        jugadas (y su huella en `test_contratos.py`) y lleva su conversación de prueba primero.
+        cualquiera que pueda ver la tarea): hecho el 2026-10-09, en el ítem que sigue a esta
+        porción. La huella de `test_contratos.py` no cambió: mide las instrucciones, no la lista.
       - **Operación:** el enlace sólo sale con `LEDA_BASE_URL` configurada; para abrirlo desde el
         teléfono, esa dirección tiene que llegar al servidor (`python -m leda servir`). Hoy la
         prueba por Telegram corre con el escuchador, sin servidor: decidir con el usuario cómo se
@@ -543,6 +543,55 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           Comprobado con `restriccion_horario.py estado corework` sobre `leda_motor`.
       - `PENDIENTE`: el tablero (`_servir_tablero`) arma su página fuera de una guarda, como la
         página de la tarea antes de esto; no se tocó.
+  - [x] **Pedir el enlace por chat** (2026-10-09; lo que quedó de la porción 4; ADR 0019, 7a y
+    7b; conversación 31). Route: delegada (escritor único, 2+ archivos no triviales).
+    - **La conversación primero** (`410b15c`): la 31, con su YAML. Marcos pide el de una tarea
+      suya; Ismael, el de una de Marcos ya terminada y el de una de Lucas, que no están en su lista
+      (la ve por ser la autoridad final); Nahuel, el de una que no puede ver. El cargador escribe
+      una tarea `terminada` con la aprobación que su cierre exige. En seco, antes del código: 15
+      fallas, todas del motor más el aviso al administrador de algo fuera de la lista.
+    - **La jugada** (`pedir_enlace`, `leda.motor.enlace`; el commit que registra esto): la IA
+      nombra la tarea por su alias o, si no está en su lista, por cómo la dijo
+      (`como_la_nombra`, un dato nuevo); la cocina la busca entre las tareas del espacio de quien
+      escribe, también las terminadas y canceladas, y la base dice si puede verla
+      (`puede_ver_tarea`). La respuesta lleva la marca del enlace, como `ver_entrega`, y el
+      despachador lo emite al mandar, con la base comprobando otra vez. Si no puede verla: ningún
+      enlace y el motivo (`no_puede_ver_esa_tarea`), sin decir quién la ve. Si puede ver varias
+      que coinciden, pregunta cuál (`coinciden`); sin la dirección pública, lo dice
+      (`la_pagina_no_esta_disponible`); uno solo por mensaje (`ya_lleva_el_enlace_de_otra_tarea`).
+      No cambia nada ni deja auditoría (es una lectura; la emisión y cada vista ya quedan en
+      `acceso_tarea` y `vista_de_tarea`).
+    - **Por qué este mecanismo y no ampliar la lista de la IA:** sumar a la lista de cada turno
+      todas las tareas que la persona puede ver le daría a la autoridad final todas las del
+      espacio en cada mensaje, para todas las jugadas (aprobar, entregar…), y cambiaría lo que
+      ya se probó con la IA real. La búsqueda queda en la jugada que la necesita, la arma el
+      código y compara palabras enteras, sin patrones de la base (como `integrantes_que_
+      coinciden`): cada palabra dicha tiene que estar en el título o en el nombre de quien la
+      tiene, un plural vale por su singular y las palabras de unión ("la del", "de") no cuentan.
+      Nunca una búsqueda libre de la IA.
+    - **Test primero:** `tests/motor/test_pedir_enlace.py` en rojo, 12 de 13 (la que mira que no
+      cambie nada pasaba desde antes); en `tests/garantias/test_enlace_de_la_tarea.py`, las tres
+      nuevas en rojo (quien no la ve nunca recibe el enlace, ni la marca ni un acceso al mandar;
+      quien la ve lo recibe y se emite al mandar; una tarea de otro espacio no existe para la
+      búsqueda); en `tests/motor/test_fichas.py`, las dos que nombran la lista cerrada.
+      **Verde:** las 18. `OFRECIDAS` suma la jugada; `comprobar.DATOS_LIBRES`, el dato nuevo.
+    - **Las instrucciones de la IA no cambiaron** (huellas de `test_contratos.py` iguales): la
+      jugada llega con su ficha (`es`), su dato con su descripción (`ia_real.DATOS`) y sus
+      códigos con su significado (`hechos.py`).
+    - **Chequeos** (2026-10-09, sobre el código de este commit): `pytest tests/motor
+      tests/conversaciones`, 940 passed; `pytest tests/garantias`, 331 passed; en seco,
+      `correr --ia guionada --veces 1 --ronda seco-enlace`, 31 de 31 bien (informes borrados,
+      `gasto.json` sin tocar). Sin la IA real (decisión del usuario: van en la tanda posterior).
+      Sin la suite completa.
+    - `PENDIENTE`:
+      - **La IA real** sobre la 31, en la tanda posterior (decisión del usuario).
+      - **Un nombre con un error de tipeo que la IA copie tal cual** ("tablro") no encuentra la
+        tarea: Leda dice que ninguna se llama así. El dato le pide a la IA las palabras bien
+        escritas; si con la IA real falla, se mira la comparación, no una lista de errores.
+      - **Varias que coinciden:** Leda las nombra y la persona contesta; no es una pregunta con
+        botones (la duda de siempre ofrece sólo tareas de la lista de la persona, por su alias).
+      - **El administrador de plataforma** pide su enlace por el bot de administración (porción
+        5), no por esta jugada.
   - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-3d.** Lo que decidió el usuario el 2026-10-08 (preguntas 10 a 20), en este orden. Route de
   cada una: delegada (escritor único, 2+ archivos no triviales), una por vez, revisión RDD por commit.

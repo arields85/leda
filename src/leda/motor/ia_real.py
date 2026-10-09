@@ -145,6 +145,10 @@ DATOS = {
                      "escribe, cuando la tarea no está en la lista. Sólo si la nombró."),
     "saca": ("array", "Los alias de las piezas (P1, P2...) que la persona saca de su entrega, "
                       "de lo mostrado o de lo entregado."),
+    "como_la_nombra": ("string", "Cómo nombró la persona una tarea que no está en la lista de "
+                                 "tareas: las palabras de su título que dijo, bien escritas, y "
+                                 "de quién es, si lo dijo. Sólo si la nombró y no está en la "
+                                 "lista."),
 }
 
 # Qué es lo que no está en la lista: sólo un pedido de hacer algo (revisión del contrato,
