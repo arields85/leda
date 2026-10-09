@@ -126,7 +126,8 @@ pasos:
          motivo: ya_conto_como_viene}
 
   # La lista del miércoles, sólo con lo que falta (decisión 46): el PLC, que venció sin entregarse,
-  # con su pedido de estado adentro (el segundo de su escalera, anclada al vencimiento), y el motor,
+  # con su pedido de estado adentro (el segundo paso de su escalera, anclada al vencimiento, y la
+  # primera vez que se le pregunta sin que conteste: el lunes lo había contado), y el motor,
   # que no contestó el lunes.
   - paso: 4
     quien: Leda
@@ -136,11 +137,11 @@ pasos:
         tipo: como_vienen_sus_tareas
         tareas: [PLC]
         hechos: {necesita_respuesta: true, solo_lo_que_cambio_o_falta: true,
-                 sus_tareas: [{tarea: PLC, atraso_dias_habiles: 1, numero: 2,
+                 sus_tareas: [{tarea: PLC, atraso_dias_habiles: 1, numero: 1,
                                sin_respuesta_desde: ausente},
                           {tarea: MOT, sin_respuesta_desde: "2026-11-02"}]}
     estado_avisos:
-      - {tipo: pedido_de_estado, tarea: PLC, a: Marcos, estado: enviado, hechos: {numero: 2}}
+      - {tipo: pedido_de_estado, tarea: PLC, a: Marcos, estado: enviado, hechos: {numero: 1}}
     estado_despues:
       pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
       esperas_abiertas: [PLC]
@@ -175,7 +176,7 @@ pasos:
     relojes: ["2026-11-05 10:00"]
     salen:
       - {a: Marcos, tipo: pedido_de_estado, tarea: PLC,
-         hechos: {numero: 3, si_no_hay_respuesta: presente}}
+         hechos: {numero: 2, si_no_hay_respuesta: presente}}
 
   # El viernes, al tercer día hábil del vencimiento del PLC, el escalamiento, como si no hubiera
   # habido lista (mecánica §9). La lista del viernes, sólo con lo que falta: el PLC, sin respuesta

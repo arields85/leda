@@ -45,7 +45,9 @@ Cómo se leyó lo que la regla no dice (decidido por el coordinador a partir de 
 - **La escalera sigue anclada al vencimiento** (mecánica §9): el pedido del día del vencimiento que no
   sale queda dado por contestado, con su motivo, como el primer paso. Si la tarea sigue sin entregar,
   el día hábil siguiente sale el segundo pedido y el escalamiento llega el mismo día que sin la lista
-  (al tercer día hábil del vencimiento), nunca uno después.
+  (al tercer día hábil del vencimiento), nunca uno después. Las veces que se le pregunta sin que
+  conteste (`numero`) cuentan sólo las preguntas que se le hicieron: el pedido dado por contestado
+  no es una (revisión `review-52e1f429c07370b9`).
 - **Un día dado en la lista es una previsión como cualquier otra** ("lo termino el miércoles"): la
   misma jugada que fuera de la lista y el mismo seguimiento; ese día Leda pregunta.
 
@@ -100,7 +102,8 @@ Cómo se leyó lo que la regla no dice (decidido por el coordinador a partir de 
    PLC, que venció ayer, espera la lista); a las 11:30, la lista del miércoles, sólo con lo que falta.
    →
    - Efecto: un mensaje privado con dos tareas: el PLC, que venció ayer sin entregarse (cambió), con el
-     pedido de estado de su escalera adentro (el segundo: la escalera sigue anclada al vencimiento);
+     pedido de estado de su escalera adentro (el segundo paso, porque la escalera sigue anclada al
+     vencimiento, pero la primera vez que se le pregunta sin que conteste);
      y el motor, del que no contestó el lunes. Ni las comunicaciones (contestadas, sin cambios), ni
      el tablero ni el panel HMI (sin cambios).
    - Estado después: la pregunta de cómo vienen sus tareas, abierta; la espera del estado del PLC,
@@ -114,8 +117,9 @@ Cómo se leyó lo que la regla no dice (decidido por el coordinador a partir de 
      PLC.
    - Estado después: la pregunta de cómo vienen sus tareas sigue abierta, con el PLC.
 
-6. **Leda**, por su cuenta (jueves 5, 10:00): el tercer pedido de estado del PLC, aparte (no hay lista
-   los jueves), que avisa que si sigue igual va a quedar asentado que está atrasada.
+6. **Leda**, por su cuenta (jueves 5, 10:00): el tercer pedido de estado del PLC (la segunda vez que
+   se le pregunta sin que conteste), aparte (no hay lista los jueves), que avisa que si sigue igual
+   va a quedar asentado que está atrasada.
 
 7. **Leda**, por su cuenta (viernes 6, 10:00 y 11:00): a las 10:00, al tercer día hábil del
    vencimiento del PLC, el escalamiento a Ismael, como si no hubiera habido lista; a las 11:00, la

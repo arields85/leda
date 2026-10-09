@@ -1009,6 +1009,10 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
                          {"jugada": "confirmar", "tarea": tarea_q["id"]})
     _que_sea_lo_mostrado(ctx, None, None)
     fichas.cerrar_esperas(ctx, tarea_q["id"])
+    # La entrega contesta lo que Leda le preguntaba de esa tarea (cómo viene, para cuándo): no
+    # vuelve después, sobre una tarea que ya está en revisión (conversación 41, paso 10).
+    preguntas.contestar(ctx, "entregar", (preguntas.ESTADO_DE_LA_TAREA,
+                                          preguntas.FECHA_DE_LA_TAREA), tarea_q["id"])
     pol = politica(cur, tarea_q["id"])
     hecho: dict[str, Any] = {
         "resultado": ENTREGA_COMPLETA if completa else ENTREGADA,

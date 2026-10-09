@@ -197,9 +197,11 @@ decisión 8):
 41. [`41-el-informe-al-grupo.md`](41-el-informe-al-grupo.md): con las cadencias al grupo del
     miércoles y del viernes, Leda le manda al grupo del equipo lo que pasó con las tareas, cada
     renglón con el nombre de quien la tiene: la terminada, el atraso que Marcos ya habló en privado
-    (con el día que dio y su motivo), la tarea trabada y la que sigue; el atraso de Ariel, del que
-    todavía no habló, no figura hasta que queda asentado porque no contestó (decisión 25 del usuario,
-    2026-10-09; decisiones 8, 35 y 49; C-6).
+    (con el día que dio y su motivo), la tarea trabada y la que sigue; de la tarea de Ariel, que no
+    contesta, que no se sabe cómo viene, hasta que queda asentado su atraso. Lo que sigue igual se
+    repite; la semana siguiente, sin nada malo, el informe dice que está todo en orden y reconoce la
+    semana buena, sin comparar personas; el viernes, sin nada hecho desde el miércoles, sólo todo en
+    orden (decisiones 25, 54 y 55 del usuario, 2026-10-09; decisiones 8, 35 y 49; C-6).
 
 Delegar (ADR 0017, enmienda a la decisión 2; `odd/tasks/fase-c.md`, decisión 9):
 

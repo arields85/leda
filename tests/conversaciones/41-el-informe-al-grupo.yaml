@@ -90,8 +90,9 @@ pasos:
     salen:
       - {a: Ariel, tipo: pedido_de_estado, tarea: COM, hechos: {numero: 2}}
 
-  # El informe del miércoles: el atraso del PLC, hablado en privado, con su día y su motivo; la
-  # integración de Ariel, de la que todavía no habló, en ninguna parte (constitución §8).
+  # El informe del miércoles: el atraso del PLC, hablado en privado, con su día y su motivo; de la
+  # integración de Ariel, que no contestó desde el lunes, que no se sabe cómo viene, sin el día en que
+  # vencía: ni bien ni atrasada (constitución §4 y §8; decisión 55). No está todo en orden.
   - paso: 5
     quien: Leda
     relojes: ["2026-10-28 10:00", "2026-10-28 15:30"]
@@ -110,14 +111,19 @@ pasos:
           trabadas: [{tarea: TAB, la_tiene: Lucas Natuche, causas: [esperando el repuesto],
                       trabada_desde: "2026-10-26"}]
           entregadas: ausente
+          sin_saber_como_vienen: [{tarea: COM, la_tiene: Ariel De Simone, vence: ausente}]
           siguen: [{tarea: SEN, la_tiene: Nahuel Gimenez, vence: "2026-11-06"}]
+          todo_en_orden: ausente
+          semana_buena: ausente
     dice:
       - "al grupo: cada tarea con el nombre de quien la tiene"
       - "al grupo: que el PLC vencía el lunes 26 y Marcos lo termina el jueves 29, porque falta que llegue el cable"
       - "al grupo: que el tablero de Lucas sigue trabado esperando el repuesto"
+      - "al grupo: que de la integración de Ariel no se sabe cómo viene"
     no_dice:
-      - "al grupo: la integración de Ariel"
+      - "al grupo: que la integración de Ariel está atrasada, o el día en que vencía"
       - "al grupo: un reproche o a quién se le avisó"
+      - "al grupo: que está todo en orden"
       - "al grupo: una pregunta"
 
   # El escalamiento de la integración de Ariel: quedó asentado que está atrasada.
@@ -145,10 +151,147 @@ pasos:
                       {tarea: PLC, la_tiene: Marcos Tarquini, vence: "2026-10-26",
                        prevision: "2026-10-29"}]
           trabadas: [{tarea: TAB, la_tiene: Lucas Natuche}]
+          sin_saber_como_vienen: ausente
           siguen: [{tarea: SEN, la_tiene: Nahuel Gimenez}]
+          todo_en_orden: ausente
     dice:
       - "al grupo: que la integración de Ariel vencía el viernes 23"
-      - "al grupo: el PLC, con el día que dio Marcos y su motivo"
+      - "al grupo: el PLC, con el día que dio Marcos y su motivo, otra vez: sigue igual (decisión 54)"
     no_dice:
       - "al grupo: el panel HMI"
       - "al grupo: un día que nadie dio para la integración"
+
+
+  # La semana siguiente (decisión 55): Lucas se destraba, Marcos y Ariel entregan.
+  - paso: 8
+    quien: Lucas
+    a_las: "2026-11-02 09:20"
+    escribe: "ya llego el repuesto, sigo con el tablero"
+    jugadas:
+      - {nombre: destrabar, tarea: TAB}
+    efectos:
+      estados: {TAB: asignada}
+      bloqueos_resueltos: [TAB]
+    pregunta: null
+    dice:
+      - que quedó anotado que el tablero se destrabó
+    no_dice:
+      - una fecha para terminarlo que nadie dio
+
+  - paso: 9
+    quien: Marcos
+    a_las: "2026-11-02 09:30"
+    escribe: "termine el plc, arranca desde el plc y completo los 20 ciclos sin fallas"
+    jugadas:
+      - {nombre: entregar, tarea: PLC, lo_descrito_cubre: [C1]}
+    efectos: {}
+    botones: [Confirmar]
+    dice:
+      - "lo que entrega y que, al confirmar, la tarea pasa a revisión"
+    no_dice:
+      - que la tarea quedó entregada o terminada
+
+  - paso: 10
+    quien: Marcos
+    a_las: "2026-11-02 09:31"
+    toca: Confirmar
+    efectos:
+      estados: {PLC: en_revision}
+      evidencias:
+        - {tarea: PLC, clase: texto, cubre: []}
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: PLC, a: Ismael, estado: guardado}
+    pregunta: null
+    dice:
+      - que quedó entregada y pasa a revisión
+
+  - paso: 11
+    quien: Ariel
+    a_las: "2026-11-02 09:35"
+    escribe: "termine la integracion, corelabs muestra los datos de produccion de la comprimidora actualizados cada minuto"
+    jugadas:
+      - {nombre: entregar, tarea: COM, lo_descrito_cubre: [C1]}
+    efectos: {}
+    botones: [Confirmar]
+    dice:
+      - "lo que entrega y que, al confirmar, la tarea pasa a revisión"
+    no_dice:
+      - que la tarea quedó entregada o terminada
+
+  - paso: 12
+    quien: Ariel
+    a_las: "2026-11-02 09:36"
+    toca: Confirmar
+    efectos:
+      estados: {COM: en_revision}
+      evidencias:
+        - {tarea: COM, clase: texto, cubre: []}
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: COM, a: Ismael, estado: guardado}
+    pregunta: null
+    dice:
+      - que quedó entregada y pasa a revisión
+
+  # Lo de Ismael (las entregas para revisar y sus recordatorios) y el aviso previo de los sensores
+  # siguen como siempre. El informe del miércoles: nada atrasado, nada trabado, nada que no se sepa:
+  # todo en orden; y la semana fue buena por las reglas del código (ningún atraso nuevo, lo que
+  # vencía entregado a tiempo, algo entregado). Las entregas, con quien las hizo; nunca una
+  # comparación entre personas.
+  - paso: 13
+    quien: Leda
+    relojes: ["2026-11-02 10:00", "2026-11-03 10:00", "2026-11-04 10:00", "2026-11-04 15:30"]
+    salen:
+      - {a: Ismael, tipo: entrega_para_aprobar, tareas: [COM, PLC]}
+      - {a: Ismael, tipo: recordatorio_de_la_decision, tareas: [COM, PLC]}
+      - {a: Nahuel, tipo: aviso_previo, tarea: SEN}
+      - {a: Ismael, tipo: recordatorio_de_la_decision, tareas: [COM, PLC]}
+      - a: grupo
+        tipo: informe_al_grupo
+        hechos:
+          necesita_respuesta: false
+          terminadas: ausente
+          atrasadas: ausente
+          trabadas: ausente
+          sin_saber_como_vienen: ausente
+          entregadas: [{tarea: COM, la_tiene: Ariel De Simone},
+                       {tarea: PLC, la_tiene: Marcos Tarquini}]
+          siguen: [{tarea: SEN, la_tiene: Nahuel Gimenez},
+                   {tarea: TAB, la_tiene: Lucas Natuche}]
+          todo_en_orden: true
+          semana_buena: true
+    dice:
+      - "al grupo: que está todo en orden"
+      - "al grupo: un reconocimiento breve al equipo por la semana, sin exagerar"
+      - "al grupo: que el PLC (Marcos) y la integración (Ariel) están entregados, esperando la revisión"
+    no_dice:
+      - "al grupo: una comparación entre personas, un ranking o cuántas hizo cada uno"
+      - "al grupo: un atraso"
+      - "al grupo: una pregunta"
+
+  # El informe del viernes: sigue todo en orden, pero desde el miércoles no se entregó ni se terminó
+  # nada: no hay una semana buena que reconocer (sin exagerar). De los sensores, que vencen hoy, Leda
+  # le preguntó hoy a Nahuel: siguen su curso, no son algo que no se sepa.
+  - paso: 14
+    quien: Leda
+    relojes: ["2026-11-05 10:00", "2026-11-06 10:00", "2026-11-06 16:15"]
+    salen:
+      - {a: Ismael, tipo: recordatorio_de_la_decision, tareas: [COM, PLC]}
+      - {a: Ismael, tipo: recordatorio_de_la_decision, tareas: [COM, PLC]}
+      - {a: Nahuel, tipo: pedido_de_estado, tarea: SEN, hechos: {numero: 1}}
+      - {a: Nahuel, tipo: repeticion_del_dia, tarea: SEN}
+      - a: grupo
+        tipo: informe_al_grupo
+        hechos:
+          necesita_respuesta: false
+          entregadas: [{tarea: COM, la_tiene: Ariel De Simone},
+                       {tarea: PLC, la_tiene: Marcos Tarquini}]
+          siguen: [{tarea: SEN, la_tiene: Nahuel Gimenez, vence: "2026-11-06"},
+                   {tarea: TAB, la_tiene: Lucas Natuche}]
+          sin_saber_como_vienen: ausente
+          todo_en_orden: true
+          semana_buena: ausente
+    dice:
+      - "al grupo: que sigue todo en orden"
+    no_dice:
+      - "al grupo: un reconocimiento por la semana"
+      - "al grupo: una comparación entre personas o un ranking"

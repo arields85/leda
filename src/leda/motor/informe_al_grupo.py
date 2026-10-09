@@ -82,6 +82,7 @@ from typing import Any
 
 from ..incidentes import registrar_incidente
 from ..salida import PayloadValidationError, enqueue_outbox
+from . import cambios_de_estado
 from .ancla import prevision_vigente
 from .asentado import AL_GRUPO, hay_informe_al_grupo
 from .auditoria import auditar
@@ -420,11 +421,26 @@ def _semana_buena(m: Momento, desde: datetime, hubo_terminadas: bool) -> bool:
             return False
     if hubo_terminadas:
         return True
-    cur.execute("""select 1 from task t
-                     join integrante i on i.membership_id = t.responsable_membership_id
-                    where i.activo and t.estado = 'en_revision' and t.actualizado_en > %s
-                    limit 1""", (desde,))
-    return cur.fetchone() is not None
+    return any(_entregada_desde(m, t) > m.fecha(desde) for t in _entregadas(m))
+
+
+def _entregadas(m: Momento) -> list[dict[str, Any]]:
+    m.cur.execute("""select t.id, t.responsable_membership_id, t.actualizado_en
+                       from task t
+                       join integrante i on i.membership_id = t.responsable_membership_id
+                      where i.activo and t.estado = 'en_revision'""")
+    return m.cur.fetchall()
+
+
+def _entregada_desde(m: Momento, t: dict[str, Any]) -> date:
+    """El día en que la tarea quedó entregada: el que anotó el motor en el turno de quien la
+    entregó (`cambios_de_estado`, con su reloj) o, si la entregó otro camino, su última
+    actualización (la proyección del evento que la puso en revisión)."""
+    dia = cambios_de_estado.desde(m.cur, t["id"], t["responsable_membership_id"], "en_revision",
+                                  m.cal.zona)
+    if dia and dia != cambios_de_estado.DESCONOCIDO:
+        return date.fromisoformat(dia)
+    return m.fecha(t["actualizado_en"])
 
 
 def _quedo_asentado_el_atraso(m: Momento, task_id, vence: date) -> bool:
