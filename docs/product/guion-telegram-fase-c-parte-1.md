@@ -19,18 +19,40 @@ base `leda_motor` (recreada el 2026-10-08 para esta prueba; respaldo previo en
 
 ## Antes de empezar
 
-Todo desde la carpeta del Motor, en PowerShell:
-`cd D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
+Tres terminales de PowerShell. En cada una, primero pegá esto y Enter:
 
-- **Terminal 1, Leda.** Primero la dirección de la página, para que los avisos lleven el enlace, y
-  después el escuchador (queda corriendo):
-  `$env:LEDA_BASE_URL = "http://localhost:8000"`
-  `.venv\Scripts\python.exe -m leda escuchar corework`
-- **Terminal 2, la página de la tarea** (queda corriendo; sólo se abre desde esta PC):
-  `.venv\Scripts\python.exe -m uvicorn leda.entrada:app --host 127.0.0.1 --port 8000 --no-access-log`
+```
+cd D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion
+```
+
+Cada bloque de abajo es **un renglón entero**: copialo completo y Enter. No escribas
+`.venv\Scripts\python.exe` solo (abre Python con `>>>`; si te pasa, `exit()` y Enter).
+
+- **Terminal 1, Leda** (queda corriendo). Dos renglones, uno por vez:
+
+  ```
+  $env:LEDA_BASE_URL = "http://localhost:8000"
+  ```
+
+  ```
+  .venv\Scripts\python.exe -m leda escuchar corework
+  ```
+
+- **Terminal 2, la página de la tarea** (queda corriendo; dice `Uvicorn running on
+  http://127.0.0.1:8000`):
+
+  ```
+  .venv\Scripts\python.exe -m uvicorn leda.entrada:app --host 127.0.0.1 --port 8000 --no-access-log
+  ```
+
   No se usa `python -m leda servir`: además de la página arranca otro ciclo de Leda, que mandaría
-  avisos y usaría la sesión de ChatGPT a la vez que el escuchador (y escucha en el puerto 8080).
-- **Terminal 3, el reloj de Leda:** `.venv\Scripts\python.exe -m leda.motor.reloj corework estado`.
+  avisos y usaría la sesión de ChatGPT a la vez que el escuchador.
+- **Terminal 3, el reloj de Leda** (para ver en qué hora está):
+
+  ```
+  .venv\Scripts\python.exe -m leda.motor.reloj corework estado
+  ```
+
   Después de cada salto del reloj, **esperar 2 minutos reales**: los avisos se revisan una vez por
   minuto.
 - **Los enlaces** se abren con Telegram Desktop o Telegram Web en la PC. Si el enlace no se puede
