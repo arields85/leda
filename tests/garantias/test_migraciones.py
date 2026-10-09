@@ -68,7 +68,8 @@ def _sql_script(path: Path) -> str:
 # referente de `area`. Lo que dice quien destraba (migración 0042): su tabla, y la restricción
 # única de `blocker_unblocker`; que no le corresponde (migración 0043), su columna y sus dos
 # restricciones; con qué bloqueo suyo está trabado (migración 0044), su columna, su referencia
-# del mismo espacio y la restricción de que dice algo.
+# del mismo espacio y la restricción de que dice algo. Delegar (migración 0045): sus dos tablas
+# y quién revisa el trabajo de `task`.
 TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "conversation_question", "conversation_option",
                     "scheduled_notice", "task_forecast", "blocker_unblocker",
@@ -77,7 +78,7 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "evidence", "task_evidence_policy", "evidencia_retirada",
                     "archivo_de_tarea", "message_outbox_adjunto",
                     "area", "acceso_tarea", "vista_de_tarea", "message_outbox_enlace",
-                    "dicho_de_quien_destraba")
+                    "dicho_de_quien_destraba", "pase_de_tarea", "cambio_de_responsable")
 
 # La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
 # política. `model_config` admite espacio nulo para el modelo global.
@@ -807,9 +808,12 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
 
             # Lo que sigue ejercita la vuelta atrás de la 0002, que necesita las
             # tablas del alta guiada: se deshace la 0032 (las recrea vacías) y la
-            # base queda donde esa vuelta atrás espera encontrarla. Antes, la 0036, cuyas
-            # claves compuestas por espacio apuntan a la restricción única de `membership`
-            # que la vuelta atrás de la 0002 borra.
+            # base queda donde esa vuelta atrás espera encontrarla. Antes, la 0045 y la 0036,
+            # cuyas claves compuestas por espacio apuntan a la restricción única de
+            # `membership` que la vuelta atrás de la 0002 borra (la 0045 primero: vuelve a
+            # dejar las funciones de la página como las dejó la 0036).
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0045_pase_de_tarea.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0036_pagina_de_la_tarea.sql"))
             db.execute(_sql_script(

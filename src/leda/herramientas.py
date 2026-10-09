@@ -26,8 +26,9 @@ from typing import Any, Callable
 import psycopg
 from psycopg.types.json import Jsonb
 
-from .autoridad import (Denegado, Solicitante, puede_aprobar_tarea,
-                         requiere_confirmacion, verificar)
+from .autoridad import (Denegado, Solicitante, puede_revisar_la_tarea,
+                         quien_revisa_la_tarea, regla_del_pase, requiere_confirmacion,
+                         verificar)
 from . import versiones
 from .db import registrar_auditoria
 from .incidentes import ETAPA_EVIDENCIA_INVALIDA, registrar_incidente
@@ -1412,11 +1413,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         # ADR 0009, decisión 3: quien aprueba se entera de la entrega con
         # botones -- no sólo el responsable con un aviso de texto -- para
         # que "Aprobar" y "Pedir cambios" salgan de ese mismo mensaje.
-        cur.execute(
-            "select aprobador_membership_id from membership where id = %s",
-            (fila["responsable_membership_id"],))
-        aprob = cur.fetchone()
-        aprobador_membership_id = aprob["aprobador_membership_id"] if aprob else None
+        aprobador_membership_id = quien_revisa_la_tarea(cur, tarea_id)
         if aprobador_membership_id:
             # T6d (`odd/tasks/leda-orienta.md`): antes, sin evidencia nueva
             # (política sin evidencia requerida, o entrega sin texto nuevo),
@@ -1695,10 +1692,10 @@ def _preparar_adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo,
     if not fila:
         return {"error": "esa tarea no existe en este equipo"}
     if (str(fila["responsable_membership_id"]) != str(quien.membership_id)
-            and not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"])):
+            and not puede_revisar_la_tarea(cur, quien, tarea_id)):
         # T2b: a diferencia de actualizar_estado/registrar_bloqueo, mecánica
         # §6 lista "confirmación del referente" entre la evidencia que
-        # Leda solicita -- el aprobador de la tarea (`puede_aprobar_tarea`,
+        # Leda solicita -- el aprobador de la tarea (`puede_revisar_la_tarea`,
         # un solo nivel) también puede adjuntarla, no sólo el responsable.
         raise Denegado(
             "No podés adjuntar evidencia a una tarea que no es tuya ni que revisás.")
@@ -1732,7 +1729,7 @@ def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
     if not fila:
         return {"error": "esa tarea no existe en este equipo"}
     if (str(fila["responsable_membership_id"]) != str(quien.membership_id)
-            and not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"])):
+            and not puede_revisar_la_tarea(cur, quien, tarea_id)):
         raise Denegado(
             "No podés adjuntar evidencia a una tarea que no es tuya ni que revisás.")
 
@@ -1959,7 +1956,7 @@ def _preparar_aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
 
     if str(fila["responsable_membership_id"]) == str(quien.membership_id):
         raise Denegado("No podés aprobar tu propio trabajo.")
-    if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
+    if not puede_revisar_la_tarea(cur, quien, tarea_id):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
     _exigir_puede_aprobarse(cur, tarea_id, fila)
 
@@ -2014,7 +2011,7 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
 
     if str(fila["responsable_membership_id"]) == str(quien.membership_id):
         raise Denegado("No podés aprobar tu propio trabajo.")
-    if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
+    if not puede_revisar_la_tarea(cur, quien, tarea_id):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
     _exigir_puede_aprobarse(cur, tarea_id, fila)
 
@@ -2101,7 +2098,7 @@ def _preparar_pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=
 
     if str(fila["responsable_membership_id"]) == str(quien.membership_id):
         raise Denegado("No podés pedir cambios en tu propio trabajo.")
-    if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
+    if not puede_revisar_la_tarea(cur, quien, tarea_id):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
     _exigir_puede_pedirse_cambios(cur, fila)
 
@@ -2142,7 +2139,7 @@ def _pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
 
     if str(fila["responsable_membership_id"]) == str(quien.membership_id):
         raise Denegado("No podés pedir cambios en tu propio trabajo.")
-    if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
+    if not puede_revisar_la_tarea(cur, quien, tarea_id):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
     _exigir_puede_pedirse_cambios(cur, fila)
 
@@ -2214,8 +2211,8 @@ def _cerrar_tarea_aprobada(cur, quien: Solicitante, tarea_id):
     fila = cur.fetchone()
     if not fila:
         return {"cerrada": False, "error": "esa tarea no existe en este equipo"}
-    if fila["responsable_membership_id"] is None or not puede_aprobar_tarea(
-            cur, quien, fila["responsable_membership_id"]):
+    if fila["responsable_membership_id"] is None or not puede_revisar_la_tarea(
+            cur, quien, tarea_id):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
     if fila["estado"] != "en_revision":
         return {"cerrada": False, "error": "la tarea no está en revisión"}
@@ -2371,11 +2368,7 @@ def _avisar_evidencia_nueva_en_revision(cur, quien: Solicitante, tarea_id, titul
     vigente (`_notificar_entrega_al_aprobador`, `es_reemplazo`). Si quien la
     manda es el propio aprobador, no hay a quién avisar de nuevo -- ya lo
     sabe."""
-    cur.execute(
-        "select aprobador_membership_id from membership where id = %s",
-        (responsable_membership_id,))
-    aprob = cur.fetchone()
-    aprobador_membership_id = aprob["aprobador_membership_id"] if aprob else None
+    aprobador_membership_id = quien_revisa_la_tarea(cur, tarea_id)
     if not aprobador_membership_id:
         return
     if str(quien.membership_id) == str(aprobador_membership_id):
@@ -2431,25 +2424,25 @@ def _autorizado_para_dependencia(cur, quien: Solicitante, origen, destino) -> bo
     (decisión de producto, 2026-09-22): una dependencia bloqueante frena la
     tarea de otra persona, así que no la declara cualquiera; pero exigir
     confirmación de la otra parte agrega fricción sin necesidad, porque el
-    aviso ya la hace visible. "Referente" es `puede_aprobar_tarea`, la misma
+    aviso ya la hace visible. "Referente" es `puede_revisar_la_tarea`, la misma
     noción que usa `aprobar_tarea`."""
     quien_id = str(quien.membership_id)
     if quien_id == str(origen["responsable_membership_id"]):
         return True
     if quien_id == str(destino["responsable_membership_id"]):
         return True
-    if puede_aprobar_tarea(cur, quien, origen["responsable_membership_id"]):
+    if puede_revisar_la_tarea(cur, quien, origen["id"]):
         return True
-    if puede_aprobar_tarea(cur, quien, destino["responsable_membership_id"]):
+    if puede_revisar_la_tarea(cur, quien, destino["id"]):
         return True
     return False
 
 
 def _destinatarios_dependencia_creada(cur, quien: Solicitante, origen, destino):
     """La otra parte, y entre áreas distintas los dos referentes (mecánica
-    §4). "Referente" acá es quien aprueba el trabajo de cada responsable
-    (`aprobador_membership_id`) -- la misma noción funcional que
-    `puede_aprobar_tarea`, no un rol con un nombre fijo que cada pack puede
+    §4). "Referente" acá es quien revisa el trabajo de cada tarea
+    (`quien_revisa_la_tarea`) -- la misma noción funcional que
+    `puede_revisar_la_tarea`, no un rol con un nombre fijo que cada pack puede
     llamar distinto."""
     quien_id = str(quien.membership_id)
     resp_origen = origen["responsable_membership_id"]
@@ -2474,15 +2467,12 @@ def _destinatarios_dependencia_creada(cur, quien: Solicitante, origen, destino):
     # Si es responsable de las dos a la vez, no hay "otra parte" a quien avisar.
 
     if str(origen["area_id"]) != str(destino["area_id"]):
-        for resp in (resp_origen, resp_destino):
-            if resp is None:
+        for tarea in (origen, destino):
+            if tarea["responsable_membership_id"] is None:
                 continue
-            cur.execute(
-                "select aprobador_membership_id from membership where id = %s",
-                (resp,))
-            fila = cur.fetchone()
-            if fila and fila["aprobador_membership_id"]:
-                destinatarios.add(str(fila["aprobador_membership_id"]))
+            revisa = quien_revisa_la_tarea(cur, tarea["id"])
+            if revisa:
+                destinatarios.add(revisa)
 
     destinatarios.discard(quien_id)
     return destinatarios
@@ -2600,6 +2590,7 @@ def _crear_dependencia(cur, quien: Solicitante, origen_tarea_id, destino_tarea_i
 def _preparar_quitar_dependencia(cur, quien: Solicitante, dependencia_id):
     cur.execute(
         """select d.id, o.titulo as origen_titulo, t.titulo as destino_titulo,
+                  o.id as origen_id, t.id as destino_id,
                   o.responsable_membership_id as origen_resp,
                   t.responsable_membership_id as destino_resp
              from dependency d
@@ -2610,8 +2601,8 @@ def _preparar_quitar_dependencia(cur, quien: Solicitante, dependencia_id):
     if not fila:
         return {"error": "esa dependencia no existe en este equipo"}
 
-    origen = {"responsable_membership_id": fila["origen_resp"]}
-    destino = {"responsable_membership_id": fila["destino_resp"]}
+    origen = {"id": fila["origen_id"], "responsable_membership_id": fila["origen_resp"]}
+    destino = {"id": fila["destino_id"], "responsable_membership_id": fila["destino_resp"]}
     if not _autorizado_para_dependencia(cur, quien, origen, destino):
         raise Denegado(
             "No podés quitar esa dependencia: no sos responsable de ninguna "
@@ -2633,7 +2624,8 @@ def _preparar_quitar_dependencia(cur, quien: Solicitante, dependencia_id):
     valida_en_handler=True, preparar=_preparar_quitar_dependencia)
 def _quitar_dependencia(cur, quien: Solicitante, dependencia_id):
     cur.execute(
-        """select d.id, o.responsable_membership_id as origen_resp,
+        """select d.id, o.id as origen_id, t.id as destino_id,
+                  o.responsable_membership_id as origen_resp,
                   t.responsable_membership_id as destino_resp
              from dependency d
              join task o on o.id = d.origen_task_id
@@ -2645,8 +2637,8 @@ def _quitar_dependencia(cur, quien: Solicitante, dependencia_id):
         # otro espacio llega hasta acá igual de vacía que una inventada.
         return {"error": "esa dependencia no existe en este equipo"}
 
-    origen = {"responsable_membership_id": fila["origen_resp"]}
-    destino = {"responsable_membership_id": fila["destino_resp"]}
+    origen = {"id": fila["origen_id"], "responsable_membership_id": fila["origen_resp"]}
+    destino = {"id": fila["destino_id"], "responsable_membership_id": fila["destino_resp"]}
     if not _autorizado_para_dependencia(cur, quien, origen, destino):
         raise Denegado(
             "No podés quitar esa dependencia: no sos responsable de ninguna "
@@ -2711,3 +2703,232 @@ def _consultar_objetivos(cur, quien: Solicitante):
             group by o.id order by o.tipo, o.creado_en""",
         (quien.workspace_id,))
     return [dict(f) for f in cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Pasarle una tarea a otra persona (C-7; ADR 0017, enmienda a la decisión 2)
+# ---------------------------------------------------------------------------
+#
+# Tres actos de tres personas, cada uno con su operación: quien pide confirma la vista previa
+# (`pedir_pase_de_tarea`), quien decide lo aprueba o no (`decidir_pase_de_tarea`) y quien recibe
+# la toma o no (`contestar_pase_de_tarea`). Si quien pide es quien decide, su pedido es la
+# decisión; si quien recibe es quien decide, decide con su respuesta. Sólo al tomarla cambia el
+# responsable, y lo cambia la base (`cambio_de_responsable`, `aplicar_cambio_de_responsable`):
+# la fecha, el criterio y la evidencia no cambian, y el trabajo lo sigue revisando quien lo
+# revisaba. Las tres verifican la autoridad adentro (`valida_en_handler`): depende del pase. La
+# acción es `cambiar_responsable`, que exige confirmación humana (constitución §7): sin
+# `ya_confirmada`, nada se escribe.
+
+ESTADOS_QUE_SE_PASAN = ("asignada", "en_curso", "bloqueada")
+PASE_ABIERTO = ("esperando_decision", "esperando_que_la_tome")
+
+
+def _momento(at) -> datetime:
+    """El momento del acto: el que da quien llama (el reloj del motor) o el de ahora."""
+    if at is None:
+        return datetime.now(timezone.utc)
+    return at if isinstance(at, datetime) else datetime.fromisoformat(str(at))
+
+
+def _exigir_espacio(quien: Solicitante) -> None:
+    if quien.workspace_id is None or quien.membership_id is None:
+        raise Denegado("Esta acción pertenece a un espacio de trabajo y este canal no lo es.")
+
+
+def _lo_que_se_pasa(cur, quien: Solicitante, tarea_id, a_membership_id) -> dict:
+    """Lo que se lee y se comprueba para pedir un pase: la tarea, de quien la pide; quien la
+    recibe, del espacio y activo; la regla de quién puede pedirlo y quién decide; y que no haya
+    otro pase abierto. Un rechazo de negocio, como dict con `error`; la tarea de otra persona,
+    `Denegado`."""
+    _exigir_espacio(quien)
+    cur.execute("""select id, titulo, estado::text estado, responsable_membership_id
+                     from task where id = %s""", (tarea_id,))
+    tarea = cur.fetchone()
+    if tarea is None:
+        return {"error": "tarea_desconocida"}
+    if str(tarea["responsable_membership_id"]) != str(quien.membership_id):
+        raise Denegado("La tarea no es de quien la pasa.")
+    if tarea["estado"] not in ESTADOS_QUE_SE_PASAN:
+        return {"error": "estado", "estado": tarea["estado"]}
+    recibe = _uuid_normalizado(a_membership_id)
+    if recibe is None:
+        return {"error": "persona_desconocida"}
+    cur.execute("select membership_id, nombre, activo from integrante where membership_id = %s",
+                (recibe,))
+    persona = cur.fetchone()
+    if persona is None or not persona["activo"]:
+        return {"error": "persona_desconocida"}
+    if recibe == str(quien.membership_id):
+        return {"error": "es_la_misma_persona"}
+    regla = regla_del_pase(cur, str(quien.membership_id), recibe)
+    if regla.no_se_puede is not None:
+        return {"error": regla.no_se_puede,
+                **({"lo_decide": regla.lo_decide} if regla.lo_decide else {})}
+    cur.execute("""select id from pase_de_tarea where task_id = %s
+                     and estado = any(%s)""", (tarea_id, list(PASE_ABIERTO)))
+    abierto = cur.fetchone()
+    if abierto is not None:
+        return {"error": "ya_hay_un_pase", "pase_id": str(abierto["id"])}
+    return {"tarea": tarea, "recibe": persona, "decide": regla.decide}
+
+
+def _preparar_pedir_pase_de_tarea(cur, quien: Solicitante, tarea_id, a_membership_id, at=None):
+    leido = _lo_que_se_pasa(cur, quien, tarea_id, a_membership_id)
+    if "error" in leido:
+        return leido
+    tarea, recibe = leido["tarea"], leido["recibe"]
+    cambio = _filas((None, f"«{tarea['titulo']}» pasa de {quien.nombre} a {recibe['nombre']}"))
+    huella = _huella("pedir_pase_de_tarea", tarea_id, tarea["estado"],
+                     tarea["responsable_membership_id"], recibe["membership_id"],
+                     leido["decide"])
+    return Preparacion(cambio=cambio, huella=huella,
+                       hecho=f"Pediste pasarle «{tarea['titulo']}» a {recibe['nombre']}.")
+
+
+@herramienta(
+    "pedir_pase_de_tarea", "cambiar_responsable",
+    "Pide pasarle una tarea propia a otra persona. La tarea sigue con quien la tiene hasta que "
+    "lo decide el encargado del sector de quien la recibe y quien la recibe la toma.",
+    {"tarea_id": {"type": "string", "requerido": True},
+     "a_membership_id": {"type": "string", "requerido": True},
+     "at": {"type": "string"}},
+    valida_en_handler=True, preparar=_preparar_pedir_pase_de_tarea)
+def _pedir_pase_de_tarea(cur, quien: Solicitante, tarea_id, a_membership_id, at=None):
+    _bloquear_tarea(cur, tarea_id)
+    leido = _lo_que_se_pasa(cur, quien, tarea_id, a_membership_id)
+    if "error" in leido:
+        return leido
+    momento = _momento(at)
+    decide = leido["decide"]
+    # Si quien pide es quien decide, su pedido es la decisión.
+    estado = "esperando_que_la_tome" if decide == str(quien.membership_id) \
+        else "esperando_decision"
+    recibe = str(leido["recibe"]["membership_id"])
+    cur.execute(
+        """insert into pase_de_tarea (workspace_id, task_id, de_membership_id, a_membership_id,
+                                      pedido_por_membership_id, decide_membership_id, estado,
+                                      pedido_en, decidido_en)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id""",
+        (quien.workspace_id, tarea_id, quien.membership_id, recibe, quien.membership_id, decide,
+         estado, momento, momento if estado == "esperando_que_la_tome" else None))
+    return {"pase_id": str(cur.fetchone()["id"]), "estado": estado,
+            "decide_membership_id": decide, "a_membership_id": recibe}
+
+
+def _pase_de(cur, pase_id) -> dict | None:
+    """Un pase de este espacio (la RLS esconde los de otros), tomado para este acto."""
+    pase = _uuid_normalizado(pase_id)
+    if pase is None:
+        return None
+    cur.execute("select * from pase_de_tarea where id = %s for update", (pase,))
+    return cur.fetchone()
+
+
+def _sigue_pudiendose_pasar(cur, pase: dict) -> bool:
+    """Si la tarea sigue con quien la tenía, en un estado que se pasa: si no, el pase ya no
+    corresponde."""
+    cur.execute("select estado::text estado, responsable_membership_id from task where id = %s",
+                (pase["task_id"],))
+    tarea = cur.fetchone()
+    return (tarea is not None and tarea["estado"] in ESTADOS_QUE_SE_PASAN
+            and str(tarea["responsable_membership_id"]) == str(pase["de_membership_id"]))
+
+
+def _sin_efecto(cur, pase: dict, momento: datetime) -> dict:
+    """El pase de una tarea que ya no se puede pasar (se entregó, se cerró) termina sin efecto:
+    no cambia nada y deja de esperar."""
+    cur.execute("""update pase_de_tarea set estado = 'sin_efecto', contestado_en = %s,
+                          motivo = 'la tarea ya no se puede pasar'
+                    where id = %s""", (momento, pase["id"]))
+    return {"pase_id": str(pase["id"]), "estado": "sin_efecto", "motivo": "la_tarea_cambio"}
+
+
+@herramienta(
+    "decidir_pase_de_tarea", "cambiar_responsable",
+    "Quien decide un pase (el encargado del sector de quien recibe la tarea) lo aprueba o no.",
+    {"pase_id": {"type": "string", "requerido": True},
+     "aprueba": {"type": "boolean", "requerido": True},
+     "motivo": {"type": "string"},
+     "at": {"type": "string"}},
+    valida_en_handler=True)
+def _decidir_pase_de_tarea(cur, quien: Solicitante, pase_id, aprueba, motivo=None, at=None):
+    """La re-aprobación de un cambio de responsable (mecánica §7) la da quien decide el pase. Si
+    quien decide es quien recibe, decide con su respuesta (`contestar_pase_de_tarea`)."""
+    _exigir_espacio(quien)
+    pase = _pase_de(cur, pase_id)
+    if pase is None or str(pase["decide_membership_id"]) != str(quien.membership_id):
+        raise Denegado("No sos quien decide ese pase.")
+    if pase["estado"] != "esperando_decision" or \
+            str(pase["decide_membership_id"]) == str(pase["a_membership_id"]):
+        raise Denegado("Ese pase no espera tu decisión.")
+    momento = _momento(at)
+    _bloquear_tarea(cur, pase["task_id"])
+    if not _sigue_pudiendose_pasar(cur, pase):
+        return _sin_efecto(cur, pase, momento)
+    motivo = (motivo or "").strip() or None
+    if aprueba:
+        cur.execute("""update pase_de_tarea set estado = 'esperando_que_la_tome', decidido_en = %s
+                        where id = %s""", (momento, pase["id"]))
+        return {"pase_id": str(pase["id"]), "estado": "esperando_que_la_tome"}
+    cur.execute("""update pase_de_tarea set estado = 'no_lo_aprobo', decidido_en = %s,
+                          contestado_en = %s, motivo = %s
+                    where id = %s""", (momento, momento, motivo, pase["id"]))
+    return {"pase_id": str(pase["id"]), "estado": "no_lo_aprobo"}
+
+
+@herramienta(
+    "contestar_pase_de_tarea", "cambiar_responsable",
+    "Quien recibe un pase toma la tarea o no. Si la toma, la tarea pasa a ser suya; si es "
+    "quien decide el pase, su respuesta vale también como la decisión.",
+    {"pase_id": {"type": "string", "requerido": True},
+     "acepta": {"type": "boolean", "requerido": True},
+     "motivo": {"type": "string"},
+     "at": {"type": "string"}},
+    valida_en_handler=True)
+def _contestar_pase_de_tarea(cur, quien: Solicitante, pase_id, acepta, motivo=None, at=None):
+    _exigir_espacio(quien)
+    pase = _pase_de(cur, pase_id)
+    if pase is None or str(pase["a_membership_id"]) != str(quien.membership_id):
+        raise Denegado("Ese pase no es para vos.")
+    decide_al_tomarla = str(pase["decide_membership_id"]) == str(quien.membership_id)
+    if not (pase["estado"] == "esperando_que_la_tome"
+            or (pase["estado"] == "esperando_decision" and decide_al_tomarla)):
+        raise Denegado("Ese pase no espera tu respuesta.")
+    momento = _momento(at)
+    _bloquear_tarea(cur, pase["task_id"])
+    if not _sigue_pudiendose_pasar(cur, pase):
+        return _sin_efecto(cur, pase, momento)
+    motivo = (motivo or "").strip() or None
+    if not acepta:
+        cur.execute("""update pase_de_tarea set estado = 'no_la_tomo', contestado_en = %s,
+                              motivo = %s
+                        where id = %s""", (momento, motivo, pase["id"]))
+        return {"pase_id": str(pase["id"]), "estado": "no_la_tomo"}
+    # La base comprueba el pase y la tarea otra vez, cambia quién la tiene y quién revisa su
+    # trabajo, y da el pase por tomado (`aplicar_cambio_de_responsable`).
+    cur.execute(
+        """insert into cambio_de_responsable (workspace_id, task_id, pase_id,
+                                              anterior_membership_id, nuevo_membership_id,
+                                              aceptado_por_membership_id, at)
+           values (%s, %s, %s, %s, %s, %s, %s) returning id, revisa_membership_id""",
+        (quien.workspace_id, pase["task_id"], pase["id"], pase["de_membership_id"],
+         quien.membership_id, quien.membership_id, momento))
+    cambio = cur.fetchone()
+    revisa = str(cambio["revisa_membership_id"]) if cambio["revisa_membership_id"] else None
+    # Constitución §12 y mecánica §7: quién pidió, quién decidió, quién aceptó y quién la tenía,
+    # con la versión de las reglas del núcleo y del pack.
+    registrar_auditoria(
+        cur, accion="cambiar_responsable", workspace_id=quien.workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="persona", sujeto_tipo="task",
+        sujeto_id=str(pase["task_id"]),
+        detalle={"pase_id": str(pase["id"]), "cambio_id": str(cambio["id"]),
+                 "pedido_por": str(pase["pedido_por_membership_id"]),
+                 "decidio": str(pase["decide_membership_id"]),
+                 "acepto": str(quien.membership_id),
+                 "responsable_anterior": str(pase["de_membership_id"]),
+                 "responsable_nuevo": str(quien.membership_id), "revisa": revisa,
+                 "at": momento.isoformat()},
+        pack_hash=versiones.pack_hash(cur, quien.workspace_id),
+        nucleo_hash=versiones.nucleo_hash())
+    return {"pase_id": str(pase["id"]), "estado": "la_tomo", "tomada": True,
+            "responsable": str(quien.membership_id), "revisa": revisa}

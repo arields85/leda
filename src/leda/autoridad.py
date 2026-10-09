@@ -194,22 +194,66 @@ def verificar(cur: psycopg.Cursor, quien: Solicitante, accion: str,
     raise Denegado("No tenés permiso para eso en este equipo.")
 
 
-def puede_aprobar_tarea(cur: psycopg.Cursor, quien: Solicitante,
-                        responsable_membership_id: str) -> bool:
-    """La aprobación sube un nivel: a un integrante lo aprueba su referente,
-    a un referente lo aprueba Dirección.
-
-    Tener la decisión final del equipo **no** habilita a firmar trabajo
-    técnico de cualquier área. La autoridad final sirve para desempatar y
-    fijar prioridades; la autoridad técnica sigue siendo de cada referente.
-    """
-    cur.execute(
-        "select aprobador_membership_id from membership where id = %s",
-        (responsable_membership_id,))
+def quien_revisa_la_tarea(cur: psycopg.Cursor, task_id) -> str | None:
+    """Quién revisa el trabajo de una tarea: el que quedó escrito en ella cuando cambió de manos
+    o, si nunca cambió, quien aprueba el trabajo de su responsable (C-7, delegar). La regla es
+    una sola y vive en la base (`quien_revisa_la_tarea`)."""
+    cur.execute("select quien_revisa_la_tarea(%s) as quien", (str(task_id),))
     fila = cur.fetchone()
-    if not fila:
-        return False
-    return str(fila["aprobador_membership_id"] or "") == str(quien.membership_id)
+    return str(fila["quien"]) if fila and fila["quien"] else None
+
+
+def puede_revisar_la_tarea(cur: psycopg.Cursor, quien: Solicitante, task_id) -> bool:
+    """Si quien escribe revisa el trabajo de esa tarea: aprueba su entrega o le pide cambios.
+
+    La aprobación sube un nivel: a un integrante lo aprueba su referente, a un referente lo
+    aprueba Dirección (`membership.aprobador_membership_id`). Tener la decisión final del equipo
+    **no** habilita a firmar trabajo técnico de cualquier área: la autoridad final sirve para
+    desempatar y fijar prioridades; la autoridad técnica sigue siendo de cada referente. Una
+    tarea que pasó a otra persona la sigue revisando quien la revisaba (ADR 0017, enmienda a la
+    decisión 2: "el trabajo lo sigue revisando el aprobador de la tarea original")."""
+    return quien_revisa_la_tarea(cur, task_id) == str(quien.membership_id)
+
+
+@dataclass(frozen=True)
+class ReglaDelPase:
+    """Lo que dice la regla de un pase entre dos personas (ADR 0017, enmienda a la decisión 2):
+    quién lo decide o, si no se puede, por qué y, si un integrante pide pasarla a otro sector, el
+    encargado de su sector, que es quien lo decide."""
+
+    decide: str | None = None
+    no_se_puede: str | None = None
+    lo_decide: str | None = None
+
+
+def encargado_del_sector(cur: psycopg.Cursor, membership_id: str) -> str | None:
+    """El encargado del sector de una persona: el referente del área de su membresía."""
+    cur.execute("""select a.referente_membership_id from membership m
+                     join area a on a.id = m.area_id where m.id = %s""", (membership_id,))
+    fila = cur.fetchone()
+    return str(fila["referente_membership_id"]) if fila and fila["referente_membership_id"] \
+        else None
+
+
+def regla_del_pase(cur: psycopg.Cursor, pide: str, recibe: str) -> ReglaDelPase:
+    """Quién puede pedir un pase y quién lo decide (ADR 0017, enmienda a la decisión 2).
+
+    - El encargado de un sector (el referente de su área) le puede pasar una tarea a cualquiera;
+      un integrante, sólo a alguien de su sector. Si pide pasarla a otro sector, no se puede, y
+      lo decide el encargado de su sector, una persona concreta.
+    - Decide el encargado del sector de quien recibe (si es quien pide, su pedido es la
+      decisión; si es quien recibe, decide con su respuesta). Sin encargado, no hay quien
+      decida: no se puede. Dirección no interviene por ser Dirección."""
+    cur.execute("select id, area_id from membership where id = any(%s::uuid[])",
+                ([pide, recibe],))
+    areas = {str(f["id"]): str(f["area_id"]) for f in cur.fetchall()}
+    encargado_de_quien_pide = encargado_del_sector(cur, pide)
+    if encargado_de_quien_pide != pide and areas.get(pide) != areas.get(recibe):
+        return ReglaDelPase(no_se_puede="otro_sector", lo_decide=encargado_de_quien_pide)
+    decide = encargado_del_sector(cur, recibe)
+    if decide is None:
+        return ReglaDelPase(no_se_puede="sin_encargado")
+    return ReglaDelPase(decide=decide)
 
 
 def _verificar_aprobacion(cur, quien: Solicitante, accion: str,
