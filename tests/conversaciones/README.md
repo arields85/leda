@@ -167,6 +167,12 @@ decisión 8):
     las tres en un mensaje de corrido y cada cosa queda en su tarea; Nahuel contesta una sola y Leda,
     en la misma respuesta, pregunta una vez por las otras dos; con otra respuesta parcial no vuelve a
     preguntar (decisión 8 del usuario, 2026-10-08; C-6).
+40. [`40-la-semana-de-las-listas.md`](40-la-semana-de-las-listas.md): con las listas del lunes, el
+    miércoles y el viernes, la del lunes trae todas las tareas abiertas con su situación (también la
+    trabada y la entregada) y pregunta sólo por las que se pueden mover; lo contestado no se vuelve a
+    preguntar (el martes, nada del PLC que vence ese día); "viene bien" deja como próximo contacto el
+    aviso previo de siempre; las listas del miércoles y del viernes traen sólo lo que cambió o no se
+    contestó (decisiones 31, 32, 44 y 46 del usuario, 2026-10-09; C-6).
 
 Delegar (ADR 0017, enmienda a la decisión 2; `odd/tasks/fase-c.md`, decisión 9):
 
@@ -421,7 +427,8 @@ Personas, roles y tareas salen de `espacios/corework.yaml` y `espacios/corework.
 - Las cadencias del espacio (lunes 09:15; miércoles 11:30 y 15:30; viernes 11:00 y 16:15) se suponen
   apagadas, y los mensajes que Leda manda por su cuenta salen a las 10:00. Cómo convive el recordatorio con
   ellas es la 37, que carga sólo la cadencia del lunes (`cadencias` en su YAML, con su nombre, cuándo y
-  a quién, como en el pack): el pedido de estado del lunes lleva adentro el recordatorio de ese día. Es una sola
+  a quién, como en el pack): el pedido de estado del lunes lleva adentro el recordatorio de ese día; la 40 carga las tres a cada
+  integrante en privado (lunes, miércoles y viernes), para la semana de las listas. Es una sola
   hora para todo lo que Leda manda por su cuenta (la escalera, los avisos guardados, también a otra persona,
   y el pedido que sigue a un avance), la que dicen los hechos y a la que llega el reloj adelantado de la
   prueba por Telegram (`leda.motor.tiempo`, `HORA_DE_SALIDA`).

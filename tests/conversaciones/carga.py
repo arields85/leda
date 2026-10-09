@@ -13,7 +13,8 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   administrador de plataforma con el bot de administración alcanzable;
 - **las tareas** de la conversación: título, responsable, vencimiento (17:00 del día, el fin de
   la jornada), estado (un inicio, como el evento del día que dice; una `terminada`, con la
-  aprobación que su cierre exige, de quien aprueba el trabajo del responsable), dependencias y
+  aprobación que su cierre exige, de quien aprueba el trabajo del responsable; una `bloqueada`,
+  con el bloqueo abierto que dice `bloqueo`, desde ese día), dependencias y
   su criterio de aceptación (`criterio`): concreto y comprobable, como lo pide la mecánica §13,
   porque la entrega lo compara con lo que la persona describe (`odd/tasks/fase-c.md`, decisión
   10). Si la conversación no lo dice, va uno de reserva, también concreto: sin criterio, ninguna
@@ -302,6 +303,15 @@ def _tareas(cur, mundo: Mundo, objetivo: str, tareas: dict[str, dict[str, Any]],
              pide.get(persona["area"], []), t.get("criterio", CRITERIO_DE_LA_PRUEBA)))
         task_id = str(cur.fetchone()["id"])
         mundo.tareas[clave], mundo.titulos[clave] = task_id, t["titulo"]
+        if t.get("bloqueo"):
+            # Una tarea trabada (`estado: bloqueada`), con la causa que dijo la persona y desde
+            # el día que dice: el bloqueo abierto que la traba, antes que su estado (mecánica
+            # §3: no hay bloqueo sin causa; la 40, C-6).
+            cur.execute("""insert into blocker (workspace_id, task_id, causa, abierto_en,
+                                                abierto_por)
+                           values (%s, %s, %s, %s, %s)""",
+                        (mundo.workspace_id, task_id, t["bloqueo"],
+                         momento(f"{t['desde']} 10:00"), persona["membership_id"]))
         estado = t.get("estado", "asignada")
         if estado != "asignada":
             # El estado es la proyección de sus eventos: el inicio, con el día que dice.

@@ -26,14 +26,16 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
   (`leda.motor.tiempo`, `HORA_DE_SALIDA`): la cadencia de las 09:15 sale a las 10:00, junto con el
   recordatorio del vencimiento de ese día. Una cadencia más tarde (el miércoles a las 11:30) sale a su
   hora, y lo que la escalera tenía para ese día sobre esas tareas espera y va en la lista.
-- **Qué tareas van en la lista:** las que la persona tiene asignadas o en curso, sin un bloqueo
-  abierto. Una trabada la sigue la persecución del bloqueo (C-5), y una entregada espera la revisión de
-  otra persona.
+- **Qué tareas van en la lista:** desde la decisión 32 del usuario (2026-10-09), todas las abiertas,
+  cada una con su situación, también las trabadas y las entregadas; Leda pregunta cómo vienen sólo por
+  las asignadas o en curso sin un bloqueo (la conversación 40). Acá todas se pueden mover.
 - **Una vez por las otras:** si después de esa pregunta la persona contesta otra vez sólo una parte,
   Leda anota lo que dijo y no vuelve a preguntar por la lista. Las que vencen siguen con su escalera.
-- **"Viene bien" de una tarea que todavía no vence** queda anotado con sus palabras, y Leda vuelve a
-  preguntar en el próximo pedido de la lista o el día en que vence, lo que llegue antes, no al día
-  hábil siguiente: nadie le había pedido el estado de esa tarea por su escalera.
+- **"Viene bien" de una tarea que todavía no vence** queda anotado con sus palabras, y Leda no le
+  vuelve a preguntar por ella hasta la próxima lista completa o, si vence antes, hasta el día de su
+  vencimiento; si entre la respuesta y el vencimiento no hay otra lista, lo contestado lo cubre
+  (decisión 31 del usuario, 2026-10-09) y pregunta el día hábil siguiente, si sigue sin entregar. Si el
+  aviso previo todavía no salió, sale antes, como siempre (decisión 44; la conversación 40).
 
 ## Estado inicial
 
@@ -87,9 +89,10 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
    →
    - Jugadas: `informar_avance` sobre los sensores, con sus palabras.
    - Efecto: el avance de los sensores anotado.
-   - La respuesta dice: lo anotado de los sensores; que le vuelve a preguntar el jueves 29, el día en
-     que vencen; y, en la misma respuesta, una sola pregunta por las otras dos tareas de la lista (el
-     motor de la cinta 4 y el tablero de la línea 2).
+   - La respuesta dice: lo anotado de los sensores; que le vuelve a preguntar el viernes 30, si para
+     entonces no la entregó (el jueves 29, el día en que vencen, no: ya contó cómo vienen, decisión 31);
+     y, en la misma respuesta, una sola pregunta por las otras dos tareas de la lista (el motor de la
+     cinta 4 y el tablero de la línea 2).
    - La respuesta no dice: una pregunta por los sensores; un reproche.
    - Estado después: la pregunta de cómo vienen sus tareas sigue abierta, con las dos que faltan.
 

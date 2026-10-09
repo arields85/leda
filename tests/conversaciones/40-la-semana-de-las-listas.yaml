@@ -1,0 +1,194 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/40-la-semana-de-las-listas.md
+numero: "40"
+titulo: "La semana de las listas"
+mide: garantias
+persona: Marcos
+inicio: "2026-11-02 09:00"
+foco: [PLC, HMI, COM, TAB, MOT]
+
+# Las tres cadencias del pack a cada integrante en privado.
+cadencias:
+  - {nombre: objetivos_semanales, cuando: "lunes 09:15", audiencia: privado_cada_integrante}
+  - {nombre: estado_medio_semana, cuando: "miercoles 11:30", audiencia: privado_cada_integrante}
+  - {nombre: cierre_semanal, cuando: "viernes 11:00", audiencia: privado_cada_integrante}
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-11-03"
+    estado: en_curso
+    desde: "2026-10-26"
+  HMI:
+    titulo: Instalar el panel HMI de la comprimidora
+    criterio: "El panel HMI muestra el estado de la comprimidora y permite arrancarla y pararla desde la planta"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: en_revision
+    desde: "2026-10-30"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
+    responsable: Marcos
+    vence: "2026-11-06"
+  TAB:
+    titulo: Cablear el tablero de la línea 2
+    criterio: "El tablero de la línea 2 queda cableado según el plano y pasa la prueba de continuidad"
+    responsable: Marcos
+    vence: "2026-11-13"
+    estado: bloqueada
+    desde: "2026-11-02"
+    bloqueo: esperando el repuesto
+  MOT:
+    titulo: Cambiar el motor de la cinta 4
+    criterio: "La cinta 4 funciona con el motor nuevo una jornada completa sin detenerse"
+    responsable: Marcos
+    vence: "2026-11-13"
+
+pasos:
+  # La lista del lunes, completa: las cinco tareas con su situación (decisión 32), y el aviso previo
+  # del PLC adentro. Pregunta sólo por las que se pueden mover.
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-11-02 10:00"]
+    salen:
+      - a: Marcos
+        tipo: como_vienen_sus_tareas
+        tareas: [PLC]
+        hechos: {necesita_respuesta: true, solo_lo_que_cambio_o_falta: ausente,
+                 sus_tareas: [{tarea: PLC, vence: "2026-11-03"},
+                          {tarea: HMI, vence: "2026-11-06", estado: en_revision},
+                          {tarea: COM, vence: "2026-11-06", estado: asignada},
+                          {tarea: TAB, vence: "2026-11-13", estado: bloqueada,
+                           causas: [esperando el repuesto]},
+                          {tarea: MOT, vence: "2026-11-13", estado: asignada}]}
+    estado_avisos:
+      - {tipo: aviso_previo, tarea: PLC, a: Marcos, estado: enviado}
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+      para_despues: []
+      esperas_abiertas: []
+    dice:
+      - "cada tarea con su situación: el PLC vence mañana, el panel HMI entregado y esperando revisión, el tablero trabado esperando el repuesto"
+      - "una sola pregunta, en el último renglón, por el PLC, las comunicaciones y el motor"
+    no_dice:
+      - "una pregunta por el tablero o por el panel HMI"
+      - un reproche
+
+  # "Viene bien": del PLC, que vence mañana, Leda no pregunta mañana (decisión 31) sino el miércoles,
+  # si sigue sin entregar; de las comunicaciones, el aviso previo del martes es lo próximo (decisión
+  # 44) y la pregunta, el viernes. Pregunta una vez por el motor.
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-11-02 10:30"
+    escribe: "el plc viene bien y las comunicaciones tambien"
+    jugadas:
+      - {nombre: informar_avance, tarea: PLC, palabras: "el plc viene bien"}
+      - {nombre: informar_avance, tarea: COM, palabras: "las comunicaciones tambien"}
+    efectos:
+      avances: [{tarea: PLC}, {tarea: COM}]
+    hechos:
+      - jugada: informar_avance
+        resultado: anotado
+        tarea: PLC
+        vuelve_a_pedir_el_estado: {llega: "~2026-11-04T11:30"}
+        antes_le_recuerda_que_vence: ausente
+      - jugada: informar_avance
+        resultado: anotado
+        tarea: COM
+        vuelve_a_pedir_el_estado: {llega: "~2026-11-06T11:00"}
+        antes_le_recuerda_que_vence: {llega: "~2026-11-03T10:00"}
+    pregunta: {tipo: como_vienen_sus_tareas, de_la_lista: [MOT]}
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+      para_despues: []
+      esperas_abiertas: []
+    dice:
+      - lo anotado del PLC y de las comunicaciones
+      - "del PLC: que si para el miércoles no lo entregó, le vuelve a preguntar ese día"
+      - "de las comunicaciones: que el martes le recuerda que vencen el viernes, y que le pregunta el viernes"
+      - "una sola pregunta, en el último renglón, por el motor de la cinta 4"
+    no_dice:
+      - "que mañana le recuerda que vence el PLC"
+      - "una pregunta por el tablero o por el panel HMI"
+
+  # El martes, sólo el aviso previo de las comunicaciones; del PLC, que vence hoy, nada (decisión 31).
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-11-03 10:00"]
+    salen:
+      - {a: Marcos, tipo: aviso_previo, tarea: COM}
+
+  # La lista del miércoles, sólo con lo que falta (decisión 46): el PLC, que venció sin entregarse,
+  # con su pedido de estado adentro, y el motor, que no contestó el lunes.
+  - paso: 4
+    quien: Leda
+    relojes: ["2026-11-04 10:00", "2026-11-04 11:30"]
+    salen:
+      - a: Marcos
+        tipo: como_vienen_sus_tareas
+        tareas: [PLC]
+        hechos: {necesita_respuesta: true, solo_lo_que_cambio_o_falta: true,
+                 sus_tareas: [{tarea: PLC, atraso_dias_habiles: 1, numero: 1,
+                               sin_respuesta_desde: ausente},
+                          {tarea: MOT, sin_respuesta_desde: "2026-11-02"}]}
+    estado_avisos:
+      - {tipo: pedido_de_estado, tarea: PLC, a: Marcos, estado: enviado}
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+      esperas_abiertas: [PLC]
+    dice:
+      - "a Marcos: que el PLC venció ayer y cómo viene"
+      - "a Marcos: que del motor no le contó el lunes"
+    no_dice:
+      - "a Marcos: las comunicaciones, el tablero o el panel HMI"
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-11-04 12:00"
+    escribe: "el motor ya lo arranque"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: MOT}
+    efectos:
+      estados: {MOT: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: MOT}
+    pregunta: {tipo: como_vienen_sus_tareas, de_la_lista: [PLC]}
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+      esperas_abiertas: [PLC]
+    dice:
+      - que quedó anotado que arrancó el motor
+      - "una sola pregunta, en el último renglón, por el PLC"
+
+  # El jueves no hay lista: el segundo pedido de estado del PLC sale aparte.
+  - paso: 6
+    quien: Leda
+    relojes: ["2026-11-05 10:00"]
+    salen:
+      - {a: Marcos, tipo: pedido_de_estado, tarea: PLC, hechos: {numero: 2}}
+
+  # La lista del viernes, sólo con lo que falta: el PLC, sin respuesta desde el miércoles, y las
+  # comunicaciones, que vencen hoy (lo contestado el lunes cubría hasta la lista del miércoles). El
+  # motor, contestado el miércoles y sin cambios, no.
+  - paso: 7
+    quien: Leda
+    relojes: ["2026-11-06 10:00", "2026-11-06 11:00"]
+    salen:
+      - a: Marcos
+        tipo: como_vienen_sus_tareas
+        tareas: [PLC, COM]
+        hechos: {necesita_respuesta: true, solo_lo_que_cambio_o_falta: true,
+                 sus_tareas: [{tarea: PLC, sin_respuesta_desde: "2026-11-04", numero: 3},
+                          {tarea: COM, vence_hoy: true, numero: 1}]}
+    estado_avisos:
+      - {tipo: pedido_de_estado, tarea: COM, a: Marcos, estado: enviado}
+    estado_despues:
+      esperas_abiertas: [PLC, COM]
+    dice:
+      - "a Marcos: que del PLC no le contó desde el miércoles, y cómo viene"
+      - "a Marcos: que las comunicaciones vencen hoy, y cómo vienen"
+    no_dice:
+      - "a Marcos: el motor, el tablero o el panel HMI"
