@@ -11,11 +11,12 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   el trabajo de cada una (Ismael aprueba el de Marcos), y un administrador de plataforma con el
   bot de administración alcanzable;
 - **las tareas** de la conversación: título, responsable, vencimiento (17:00 del día, el fin de
-  la jornada), estado (un inicio, como el evento del día que dice), dependencias y su criterio
-  de aceptación (`criterio`): concreto y comprobable, como lo pide la mecánica §13, porque la
-  entrega lo compara con lo que la persona describe (`odd/tasks/fase-c.md`, decisión 10). Si la
-  conversación no lo dice, va uno de reserva, también concreto: sin criterio, ninguna tarea se
-  podría cerrar al aprobarla (mecánica §5);
+  la jornada), estado (un inicio, como el evento del día que dice; una `terminada`, con la
+  aprobación que su cierre exige, de quien aprueba el trabajo del responsable), dependencias y
+  su criterio de aceptación (`criterio`): concreto y comprobable, como lo pide la mecánica §13,
+  porque la entrega lo compara con lo que la persona describe (`odd/tasks/fase-c.md`, decisión
+  10). Si la conversación no lo dice, va uno de reserva, también concreto: sin criterio, ninguna
+  tarea se podría cerrar al aprobarla (mecánica §5);
 - **la política de evidencia** (`evidencia`, por área), si la conversación la nombra: lo que pide
   cada área y, por tipo, las clases que lo cubren y cómo se dice, de `espacios/corework.yaml`
   (ADR 0019, decisión 5); cada tarea pide lo de su área;
@@ -264,6 +265,14 @@ def _tareas(cur, mundo: Mundo, objetivo: str, tareas: dict[str, dict[str, Any]],
         if estado != "asignada":
             # El estado es la proyección de sus eventos: el inicio, con el día que dice.
             desde = t.get("desde")
+            if estado == "terminada":
+                # El cierre lo comprueba la base (mecánica §5): sin la aprobación de quien
+                # aprueba el trabajo del responsable, no queda terminada.
+                cur.execute("""insert into approval (workspace_id, sujeto_tipo, sujeto_id,
+                                                     aprobador_membership_id, decision)
+                               select %s, 'tarea', %s, aprobador_membership_id, 'aprobado'
+                                 from membership where id = %s""",
+                            (mundo.workspace_id, task_id, persona["membership_id"]))
             cur.execute(
                 """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
                                                  actor_kind, actor_app_user_id, motivo, at)

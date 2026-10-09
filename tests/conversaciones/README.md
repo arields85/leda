@@ -118,6 +118,14 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
     aparte el tema siguiente, y al cerrarse una de las dos preguntas el código trae la otra en un
     mensaje aparte, en los dos órdenes de respuesta (decisión 21 del usuario, 2026-10-08; D5b).
 
+La página de la tarea (ADR 0019, decisión 7):
+
+31. [`31-pedir-el-enlace.md`](31-pedir-el-enlace.md): pedir por chat el enlace a la página de una
+    tarea: Marcos, el de una suya; Ismael, el de una de Marcos ya terminada y el de una de Lucas,
+    que no están en su lista (es la autoridad final); Nahuel, el de una que no puede ver, y Leda le
+    dice que ése no se lo puede pasar, sin enlace y sin decir quién la ve (lo que quedó de la
+    porción 4 de la C-3).
+
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
 
@@ -392,6 +400,8 @@ importa es el significado:
   para confirmar (conversaciones 21 y 22).
 - `aprobar` y `pedir_cambios`: quien aprueba decide sobre una entrega, directo cuando es claro
   (conversaciones 23 y 24).
+- `pedir_enlace`: la persona pide el enlace a la página de una tarea; sale sólo si puede verla
+  (conversación 31).
 
 ## Decisiones del usuario (2026-10-04)
 
