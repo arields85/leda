@@ -103,7 +103,7 @@ reales. Las unidades de abajo que no son el seguimiento ni la plataforma tambié
 <br>(1) decide quien manda sobre el que recibe. Un referente le delega a su gente, y el que recibe confirma que la toma. Un par le delega a la gente de otro par, y decide ese par: Marcos le pasa una tarea a Lucas, decide Martín y, si acepta, Leda avisa a Marcos y a Lucas.
 <br>(2) si no acepta, la tarea sigue con quien la tenía y Leda se lo dice.
 <br>(3) el trabajo lo aprueba el aprobador de la tarea original.
-<br>`PENDIENTE`, para verlo más adelante: si el referente original (Ismael) tiene que intervenir. La mecánica §7 pide re-aprobación ante un cambio de responsable. El usuario no quiere que la delegación dependa de que Ismael toque algo. |
+<br>(4) Ismael no interviene ni recibe aviso (usuario, 2026-10-08, decisión 9 de `odd/tasks/fase-c.md`): la re-aprobación de la mecánica §7 la da quien manda sobre el que recibe, declarado en el pack, y queda en la auditoría. |
 
 ### Antecedentes
 
