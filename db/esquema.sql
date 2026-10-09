@@ -2952,6 +2952,36 @@ create policy aislamiento_espacio on incident
   using (workspace_id is null
          or workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
 
+-- La configuración de cada espacio (migración 0041): `leda_app` la lee directamente, con
+-- `select` solamente (la concesión está más abajo), y la escribe sólo la conexión
+-- administrativa. Fuera del bucle de arriba porque el bucle concede el juego completo.
+-- `model_config` admite espacio nulo para el modelo global, que ve todo espacio.
+alter table work_calendar enable row level security;
+alter table work_calendar force row level security;
+create policy aislamiento_espacio on work_calendar
+  using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
+
+alter table holiday enable row level security;
+alter table holiday force row level security;
+create policy aislamiento_espacio on holiday
+  using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
+
+alter table persona_config enable row level security;
+alter table persona_config force row level security;
+create policy aislamiento_espacio on persona_config
+  using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
+
+alter table workspace_version enable row level security;
+alter table workspace_version force row level security;
+create policy aislamiento_espacio on workspace_version
+  using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
+
+alter table model_config enable row level security;
+alter table model_config force row level security;
+create policy aislamiento_espacio on model_config
+  using (workspace_id is null
+         or workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
+
 grant execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
   to leda_gateway;
 grant execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
@@ -3070,7 +3100,8 @@ comment on view integrante is
 grant usage on schema leda to leda_app, leda_admin;
 grant usage on schema leda to leda_gateway;
 -- approval_requirement no lleva workspace_id: sólo se llega a ella por
--- approval_policy, que sí tiene RLS.
+-- approval_policy, que sí tiene RLS. Las tablas de configuración de esta lista
+-- tienen su política desde la migración 0041.
 grant select on workspace, work_calendar, holiday, persona_config,
                 integrante, absence, model_config, workspace_version,
                 approval_requirement to leda_app;

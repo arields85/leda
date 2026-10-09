@@ -75,6 +75,11 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "archivo_de_tarea", "message_outbox_adjunto",
                     "area", "acceso_tarea", "vista_de_tarea", "message_outbox_enlace")
 
+# La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
+# política. `model_config` admite espacio nulo para el modelo global.
+TABLAS_DE_CONFIGURACION = ("work_calendar", "holiday", "persona_config",
+                           "workspace_version", "model_config")
+
 # Las políticas de más de una tabla, además de la de aislamiento: `acceso_tarea` (migración
 # 0036) se encuentra por el hash del token antes de saber su espacio, sólo desde las funciones
 # de `leda_owner`.
@@ -212,6 +217,7 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "greeting_state",
               "message_outbox", "inbound_message") + TABLAS_DEL_MOTOR
+    tablas += TABLAS_DE_CONFIGURACION
     nombre = f"leda_rollback_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(nombre)))
@@ -277,7 +283,7 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "acceso_tablero",
               "greeting_state", "message_outbox", "inbound_message"
-              ) + TABLAS_DEL_MOTOR
+              ) + TABLAS_DEL_MOTOR + TABLAS_DE_CONFIGURACION
     con_politica = set(tablas) - {"acceso_tablero"}
     sufijo = uuid.uuid4().hex[:10]
     nombres = {"limpia": f"leda_limpia_{sufijo}",
@@ -320,8 +326,9 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
                 ["aislamiento_espacio"] + POLITICAS_DE_MAS.get(tabla, []))
 
         # `audit_log` e `incident` admiten espacio nulo para los hechos de
-        # alcance global; el resto no tiene esa excepción.
-        for tabla in con_politica - {"audit_log", "incident"}:
+        # alcance global, y `model_config` para el modelo global; el resto no
+        # tiene esa excepción.
+        for tabla in con_politica - {"audit_log", "incident", "model_config"}:
             assert any(c["column_name"] == "workspace_id"
                        and c["is_nullable"] == "NO"
                        for c in limpia[tabla]["columnas"]), (
