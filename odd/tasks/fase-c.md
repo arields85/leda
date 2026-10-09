@@ -352,6 +352,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     construido en la C-7. Derivado de la decisión 28, sin preguntar: si la plataforma cambia quién
     aprueba al dueño original de una tarea pasada, la revisión sigue a ese cambio.
 
+44. **"Viene bien" en la lista: la próxima vez es el aviso previo de siempre** (de la C-6):
+    decidida (usuario, 2026-10-09, opción A). Si el lunes 2 Marcos dice "el hmi viene bien" y vence
+    el viernes 6, Leda no le pregunta nada hasta el aviso previo del espacio (en CoreWork, 3 días
+    hábiles antes: el martes 3; ADR 0017, 3b, enmienda), nunca recién en la lista siguiente, cuando
+    ya habría vencido. Cambia la C-6 (hoy, lo que llegue primero entre la lista y el vencimiento).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2120,7 +2126,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 42 del usuario (2026-10-09; la 30 y la 40 ya están), con test primero.
+- [ ] Las decisiones 24 a 44 del usuario (2026-10-09; la 30, la 40 y la 43 ya están), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
