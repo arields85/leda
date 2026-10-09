@@ -394,6 +394,15 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     próximo informe al grupo (decisión 25); y a la persona trabada se le dice con la forma de la
     decisión 35. Cambia la porción 3 (hoy, el "ni idea" de la primera persona va directo).
 
+50. **La pregunta que quedó por un cambio de tema vuelve en un mensaje aparte** (de la D5b):
+    decidida (usuario, 2026-10-09, opción A). Si Marcos cambia de tema mientras Leda le preguntaba
+    por el PLC, Leda contesta lo nuevo ("📋 Tablero: anotado para el viernes") y, en otro mensaje
+    justo después, vuelve a la pregunta ("¿Y el PLC, cómo viene?"). Un mensaje, un tema. Cambia la
+    D5b (hoy, en el mismo mensaje) y las conversaciones que lo esperan así (08, 12, 21, 27).
+    Derivadas sin preguntar: el cierre que hace el sistema se avisa hacia abajo (decisión 39); pasar
+    una tarea a alguien sin Leda conectada sigue la decisión 37; varias tareas que coinciden al
+    pedir un enlace siguen la decisión 33.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2162,7 +2171,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 49 del usuario (2026-10-09; la 30, la 40, la 43 y la 45 ya están), con test primero.
+- [ ] Las decisiones 24 a 50 del usuario (2026-10-09; la 30, la 40, la 43 y la 45 ya están), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
