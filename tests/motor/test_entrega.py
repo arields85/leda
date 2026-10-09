@@ -402,6 +402,40 @@ def test_el_boton_de_una_vista_previa_reemplazada_no_entrega(conn, mundo, marcos
     assert cuantas(conn, "evidence") == 2 and estado_de(conn, tarea) == "en_revision"
 
 
+def test_un_cambio_de_tema_con_la_entrega_por_confirmar_la_trae_aparte_con_su_boton(
+        conn, mundo, marcos):
+    """Decisión 50 del usuario (2026-10-09): con la vista previa esperando su confirmación,
+    Marcos pregunta otra cosa. La respuesta es sólo lo nuevo y sale sin el botón; la pregunta
+    vuelve aparte, justo después, con su botón Confirmar: el botón va con la pregunta, en el
+    mensaje que la hace (`botones.py`)."""
+    from leda.despachador import TransporteDePrueba, despachar
+    from leda.motor.botones import ConOpciones
+
+    tarea = _tarea(conn, mundo)
+    marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero",
+                 archivos=[(JPEG, "foto", None)])
+    r = marcos.manda(Jugada("consultar_pendientes", {}), texto="que mas tengo?")
+    assert r.pregunta is None
+    ia = IAQueRedacta()
+    enviar(conn, mundo, ia, AHORA + timedelta(minutes=3))
+    [pedido] = ia.pedidos_de_redaccion
+    assert pedido["hechos"][0]["aviso"] == "vuelve_la_pregunta"
+    assert pedido["pregunta"]["tipo"] == "confirmar_la_entrega"
+    transporte = TransporteDePrueba()
+    with espacio(conn, mundo["id"]) as cur:
+        despachar(cur, mundo["id"], ConOpciones(transporte, cur),
+                  Calendario.desde_base(cur, mundo["id"]), AHORA + timedelta(minutes=3))
+    conn.commit()
+    vista_previa, lo_nuevo, vuelve = transporte.enviados
+    assert [b.etiqueta for b in vista_previa.botones] == ["Confirmar"]
+    assert lo_nuevo.botones == []
+    assert [b.etiqueta for b in vuelve.botones] == ["Confirmar"]
+    assert vuelve.texto.endswith("Aviso 1.")
+
+    hecho = _hecho(marcos.toca(_token_de(conn)), "confirmar")
+    assert hecho["resultado"] == "entregada" and estado_de(conn, tarea) == "en_revision"
+
+
 # --- Lo mandado antes y la corrección -------------------------------------------------------
 
 def test_lo_mandado_antes_entra_aparte_y_solo_si_queda(conn, mundo, marcos):

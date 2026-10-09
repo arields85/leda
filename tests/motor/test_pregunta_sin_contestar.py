@@ -6,13 +6,16 @@ frenaba para siempre los avisos que piden respuesta. La regla, para todas las pr
 los circuitos:
 
 1. la pregunta frena los otros temas que piden respuesta hasta que Leda la repite, una sola vez en
-   el día, a las 4 horas de haberla hecho (o los minutos del espacio);
+   el día, a las 4 horas de haberla hecho (o los minutos del espacio), haya o no otro tema
+   esperando (decisión 29 del usuario, 2026-10-09);
 2. 4 horas después de la repetición, todavía en horario, sale aparte el tema siguiente más
    urgente, y la pregunta queda para después;
 3. la persona contesta cualquiera de las dos, y al cerrarse una el código trae la otra enseguida,
    en un mensaje aparte;
 4. al día siguiente la pregunta de ayer ya no frena: lo que espera sale de a uno, primero lo más
-   urgente.
+   urgente;
+5. la pregunta que quedó por un cambio de tema vuelve en un mensaje aparte, justo después de la
+   respuesta (decisión 50 del usuario, 2026-10-09): un mensaje, un tema.
 
 El reloj es el de `test_escalera.py`: "Revisar el tablero" (T1) vence el viernes 9 de octubre de
 2026 y "Probar las comunicaciones" (T2), el viernes 16; el lunes 12 es feriado.
@@ -121,12 +124,39 @@ def test_con_un_tema_esperando_la_repite_a_las_cuatro_horas_una_vez(conn, mundo,
     assert abierta(conn) == (preguntas.QUIEN_DESTRABA, dos["T2"])
 
 
-def test_sin_nada_esperando_no_se_repite_en_el_dia(conn, mundo, escribe, dos):
-    """Lectura de la regla (`PENDIENTE` del usuario): la repetición es para destrabar; sin nada
-    detrás, la pregunta sigue con su escalera, el día hábil siguiente (conversación 03)."""
+def test_sin_nada_esperando_tambien_la_repite_a_las_cuatro_horas(conn, mundo, escribe, dos):
+    """Decisión 29 del usuario (2026-10-09, opción B): la repetición sale haya o no otro tema
+    esperando ("si no tiene nada esperando, con más sentido tendría que repetírsela")."""
     dias = Dias(conn, mundo)
     _trabada_a_las(conn, escribe, dias, octubre(5, 8, 55))  # el lunes 5 no vence nada
-    assert dias.ciclo(octubre(5, 13)) == []
+    assert dias.ciclo(octubre(5, 10)) == []
+    assert dias.ciclo(octubre(5, 12, 54)) == []
+    [repeticion] = dias.ciclo(octubre(5, 12, 55))
+    assert repeticion["hechos"][0]["aviso"] == REPETICION_DEL_DIA
+    assert repeticion["pregunta"]["tipo"] == preguntas.QUIEN_DESTRABA
+    assert _tareas(repeticion) == ["Probar las comunicaciones"]
+    assert dias.ciclo(octubre(5, 16, 59)) == []             # una sola vez en el día
+    assert len(avisos_guardados(conn, REPETICION_DEL_DIA)) == 1
+
+
+def test_una_pregunta_que_vuelve_en_una_respuesta_cuenta_las_cuatro_horas_desde_ahi(
+        conn, mundo, escribe, dos):
+    """Lo que la persona escribe sobre la pregunta la vuelve a hacer en la respuesta: las 4
+    horas de la repetición cuentan desde ahí, así que nunca interrumpe esa conversación."""
+    dias = Dias(conn, mundo)
+    _trabada_a_las(conn, escribe, dias, octubre(5, 8, 55))
+    dice(conn, escribe, at=octubre(5, 12, 40))              # un mensaje sin jugada
+    assert dias.ciclo(octubre(5, 12, 55)) == []
+    assert dias.ciclo(octubre(5, 16, 39)) == []
+    [repeticion] = dias.ciclo(octubre(5, 16, 40))
+    assert repeticion["hechos"][0]["aviso"] == REPETICION_DEL_DIA
+
+
+def test_fuera_del_horario_la_repeticion_no_sale(conn, mundo, escribe, dos):
+    """La pregunta a las 14:00: las 4 horas caen fuera del horario; ese día no se repite y al
+    día hábil siguiente sigue su escalera."""
+    dias = Dias(conn, mundo)
+    _trabada_a_las(conn, escribe, dias, octubre(5, 14))
     assert dias.ciclo(octubre(5, 16, 59)) == []
     assert avisos_guardados(conn, REPETICION_DEL_DIA) == []
 
@@ -227,10 +257,40 @@ def test_la_que_vuelve_no_repite_lo_mismo_dos_veces_el_dia_siguiente(conn, mundo
     assert dias.ciclo(octubre(13, 10, 1)) == []
 
 
-def test_cuando_la_persona_cambia_de_tema_vuelve_en_la_misma_respuesta(conn, mundo, escribe,
+# --- 5. La pregunta que quedó por un cambio de tema (decisión 50) ----------------------------------
+
+def _vuelve(pedido: dict) -> bool:
+    return pedido["hechos"][0]["aviso"] == VUELVE_LA_PREGUNTA
+
+
+def _de_marcos(pedidos: list[dict]) -> list[dict]:
+    return [p for p in pedidos if p["persona"].startswith("Marcos")]
+
+
+def test_un_cambio_de_tema_contesta_lo_nuevo_y_la_pregunta_vuelve_aparte(conn, mundo, escribe,
                                                                          dos):
-    """Dos preguntas que no abrió un aviso (decisión 9d, conversación 08): la de antes vuelve en
-    la misma respuesta, como hasta ahora; ningún mensaje aparte."""
+    """Decisión 50 del usuario (2026-10-09, opción A; conversación 08): Marcos habla de otra
+    tarea mientras Leda le preguntaba por la trabada. La respuesta es sólo lo nuevo; la pregunta
+    vuelve en otro mensaje, justo después, aunque Marcos acaba de escribir."""
+    dias = Dias(conn, mundo)
+    _trabada_a_las(conn, escribe, dias, octubre(5, 10, 30))
+    r = dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(5, 10, 40))
+    assert r.pregunta is None                               # un mensaje, un tema
+    assert abierta(conn) == (preguntas.QUIEN_DESTRABA, dos["T2"])
+    [guardado] = avisos_guardados(conn, VUELVE_LA_PREGUNTA)
+    assert guardado["estado"] == "guardado"
+    [vuelve] = dias.ciclo(octubre(5, 10, 41))
+    assert _vuelve(vuelve) and _tareas(vuelve) == ["Probar las comunicaciones"]
+    assert vuelve["pregunta"]["tipo"] == preguntas.QUIEN_DESTRABA
+    assert vuelve["pregunta"]["desde_antes"] is True
+    assert abierta(conn) == (preguntas.QUIEN_DESTRABA, dos["T2"])
+
+
+def test_la_pregunta_que_quedo_para_despues_vuelve_aparte(conn, mundo, escribe, dos):
+    """Dos preguntas que abrió la conversación, no un aviso (decisión 9d): cerrada la de ahora,
+    la que quedó para después vuelve en un mensaje aparte (hasta la decisión 50, en la misma
+    respuesta). Enseguida, aunque sea antes de la hora en que Leda escribe por su cuenta."""
+    dias = Dias(conn, mundo)
     dice(conn, escribe, jugada_bloqueo("T2", "falta el cable"), at=octubre(5, 9))
     dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14"}),
          at=octubre(5, 9, 5))
@@ -238,9 +298,56 @@ def test_cuando_la_persona_cambia_de_tema_vuelve_en_la_misma_respuesta(conn, mun
     r = dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14",
                                                         "motivo": "el proveedor"}),
              at=octubre(5, 9, 10))
+    assert r.pregunta is None
+    assert abierta(conn) == (preguntas.QUIEN_DESTRABA, dos["T2"])
+    [vuelve] = _de_marcos(dias.ciclo(octubre(5, 9, 11)))
+    assert _vuelve(vuelve) and vuelve["pregunta"]["tipo"] == preguntas.QUIEN_DESTRABA
+
+
+def test_lo_que_habla_de_la_pregunta_la_deja_en_la_misma_respuesta(conn, mundo, escribe, dos):
+    """Un mensaje sobre la pregunta misma, que no la contesta (conversación 27, "y que pongo?"),
+    no es un cambio de tema: la pregunta va en la respuesta, como siempre."""
+    _trabada_a_las(conn, escribe, Dias(conn, mundo), octubre(5, 10, 30))
+    r = dice(conn, escribe, at=octubre(5, 10, 40))           # ninguna jugada
     assert r.pregunta is not None and r.pregunta["tipo"] == preguntas.QUIEN_DESTRABA
     assert r.pregunta["desde_antes"] is True
     assert avisos_guardados(conn, VUELVE_LA_PREGUNTA) == []
+
+
+def test_un_hecho_de_la_misma_tarea_la_deja_en_la_misma_respuesta(conn, mundo, escribe, dos):
+    """El tema es la tarea: lo que la persona dice de la tarea de la pregunta, sin contestarla,
+    sigue ese tema y la pregunta va en la misma respuesta."""
+    _trabada_a_las(conn, escribe, Dias(conn, mundo), octubre(5, 10, 30))
+    r = dice(conn, escribe, Jugada("informar_avance", {"tarea": "T2",
+                                                       "palabras": "voy con lo demas"}),
+             at=octubre(5, 10, 40))
+    assert r.pregunta is not None and r.pregunta["tipo"] == preguntas.QUIEN_DESTRABA
+    assert avisos_guardados(conn, VUELVE_LA_PREGUNTA) == []
+
+
+def test_dos_cambios_de_tema_seguidos_traen_la_pregunta_una_sola_vez(conn, mundo, escribe, dos):
+    dias = Dias(conn, mundo)
+    _trabada_a_las(conn, escribe, dias, octubre(5, 10, 30))
+    dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(5, 10, 40))
+    dice(conn, escribe, Jugada("consultar_pendientes", {}), at=octubre(5, 10, 40))
+    assert len(avisos_guardados(conn, VUELVE_LA_PREGUNTA)) == 1
+    assert len(_de_marcos(dias.ciclo(octubre(5, 10, 41)))) == 1
+
+
+def test_un_cambio_de_tema_fuera_del_horario_trae_la_pregunta_el_dia_habil_siguiente(
+        conn, mundo, escribe, dos):
+    """Leda contesta a cualquier hora (9e), pero lo que manda por su cuenta espera el horario:
+    la pregunta vuelve el día hábil siguiente, una sola vez aunque su escalera también la
+    repita (lectura de la decisión 21, que la 50 no cambia)."""
+    dias = Dias(conn, mundo)
+    _trabada_a_las(conn, escribe, dias, octubre(5, 16))
+    r = dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(5, 20))
+    assert r.pregunta is None
+    assert dias.ciclo(octubre(5, 20, 1)) == []
+    # El martes también sale el aviso previo de T1, que no pregunta nada.
+    salen = [p for p in _de_marcos(dias.ciclo(octubre(6, 10))) if p["pregunta"]]
+    assert [p["pregunta"]["tipo"] for p in salen] == [preguntas.QUIEN_DESTRABA]
+    assert _de_marcos(dias.ciclo(octubre(6, 10, 1))) == []
 
 
 # --- Lo que lee la IA ----------------------------------------------------------------------------

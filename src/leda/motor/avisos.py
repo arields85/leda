@@ -102,11 +102,13 @@ Los que esperan siguen guardados, con su hora; los que vencen juntos salen junto
 
 **Una pregunta sin contestar no frena para siempre** (decisión 21 del usuario, 2026-10-08;
 conversación 30; C-3d, D5b; `pregunta_sin_contestar.py`): la escalera la repite una vez en el día,
-a las 4 horas, si detrás espera otro tema que pide respuesta (`repeticion_del_dia`); cuando su
+a las 4 horas, haya o no otro tema esperando (decisión 29; `repeticion_del_dia`); cuando su
 turno termina (4 horas después de la repetición, o al día siguiente), de lo que espera sale aparte
 lo más urgente (`_un_tema_a_la_vez`, `_urgencia`), y la pregunta queda para después. Las dos
 quedan abiertas a la vez: cuando una se cierra, la otra vuelve en su propio mensaje
 (`vuelve_la_pregunta`, `guardar_la_que_vuelve`), sin esperar los 30 minutos de la conversación.
+Por el mismo camino vuelve la pregunta que quedó por un cambio de tema (decisión 50): un mensaje,
+un tema.
 
 **La persecución del bloqueo** (C-5, porción 1; decisión 4 del usuario, 2026-10-08; conversación
 32; `persecucion.py`): cuando la persona trabada nombra a quien destraba su tarea, Leda le escribe
@@ -1298,8 +1300,20 @@ def hechos_de_la_que_vuelve(pregunta: dict[str, Any], aviso: str) -> dict[str, A
 
 
 def guardar_la_que_vuelve(ctx, pregunta: dict[str, Any]) -> str:
-    """La pregunta que vuelve aparte cuando se cerró la otra de las dos abiertas a la vez
-    (decisión 21): enseguida, en su propio mensaje, dentro del horario."""
+    """La pregunta que vuelve aparte (`pregunta_sin_contestar.al_terminar_el_turno`): cuando se
+    cerró la otra de las dos abiertas a la vez (decisión 21) o cuando la respuesta del turno
+    habló de otro tema (decisión 50). Enseguida, en su propio mensaje: dentro del horario, en la
+    vuelta siguiente del ciclo (es la conversación que sigue, también antes de la hora en que
+    Leda escribe por su cuenta); fuera de él, el día hábil siguiente (`tiempo.sale`). Una sola
+    por pregunta: si ya hay una guardada, es ésa."""
+    clave = f"motor:{VUELVE_LA_PREGUNTA}:{pregunta['task_id']}:q{pregunta['id']}:"
+    ctx.cur.execute("""select id from scheduled_notice
+                        where workspace_id = %s and tipo = %s and estado = 'guardado'
+                          and starts_with(dedupe_key, %s)""",
+                    (ctx.quien.workspace_id, VUELVE_LA_PREGUNTA, clave))
+    ya = ctx.cur.fetchone()
+    if ya is not None:
+        return str(ya["id"])
     cal = Calendario.desde_base(ctx.cur, ctx.quien.workspace_id)
     m = Momento(ctx.cur, ctx.quien.workspace_id, cal, ctx.ahora)
     tarea = leer_tarea(ctx.cur, pregunta["task_id"])
@@ -1308,9 +1322,8 @@ def guardar_la_que_vuelve(ctx, pregunta: dict[str, Any]) -> str:
         ctx.cur, ctx.quien.workspace_id, VUELVE_LA_PREGUNTA, task_id=str(pregunta["task_id"]),
         destinatario=ctx.quien.membership_id,
         hechos={**base, **hechos_de_una_pregunta(m, tarea, base)},
-        programado_para=sale(cal, ctx.ahora),
-        clave=(f"motor:{VUELVE_LA_PREGUNTA}:{pregunta['task_id']}:q{pregunta['id']}:"
-               f"{int(ctx.ahora.timestamp())}"), ahora=ctx.ahora)
+        programado_para=ctx.ahora if cal.en_horario(ctx.ahora) else sale(cal, ctx.ahora),
+        clave=f"{clave}{int(ctx.ahora.timestamp())}", ahora=ctx.ahora)
     return aviso_id
 
 

@@ -28,7 +28,7 @@ from leda.motor.turno import SOLO_SI_PREGUNTA, procesar_turno
 from tests.conversaciones import motores
 from tests.conversaciones.corredor import correr_conversacion, elegir
 from tests.conversaciones.grabar import IAPerfecta
-from tests.motor.ayudantes import (AHORA, SITUACION, ProveedorFalso, a_la_vista, ia_real_falsa,
+from tests.motor.ayudantes import (AHORA, SITUACION, ProveedorFalso, a_la_vista, ia_real_falsa, todos,
                                    llamada_de_jugadas, respuesta_de_texto, solo_si_pregunta)
 
 
@@ -185,7 +185,10 @@ def test_un_pedido_nuevo_con_una_pregunta_abierta_sigue_avisando_a_la_administra
         quien, entrante = escribe("Marcos", texto)
         r = procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
         conn.commit()
-    assert r.pregunta is not None                   # la causa del bloqueo sigue abierta
+    # La causa del bloqueo sigue abierta y vuelve aparte: el pedido es otro tema (decisión 50).
+    assert r.pregunta is None
+    assert [a["tipo"] for a in todos(conn, "select tipo from scheduled_notice")] == [
+        "vuelve_la_pregunta"]
     assert [h["resultado"] for h in r.hechos] == ["fuera_de_la_lista"]
     assert _avisos_fuera_de_la_lista(conn) == 1
 

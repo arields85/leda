@@ -92,12 +92,21 @@ def test_dos_cosas_que_preguntan_van_de_a_una_en_el_orden_dicho(conn, tareas, ma
 
     # Con alguien que lo destraba no hay salidas que propone (que serían el tema nuevo).
     r = marcos.dice(Jugada("anotar_quien_destraba", {"quien": "el de compras"}))
-    # Cerrada la de T1, vuelve la que quedó para después: retomarla (9d).
-    assert r.pregunta == {"tipo": "causa_del_bloqueo", "tarea": T2, "desde_antes": True}
+    # Cerrada la de T1, vuelve la que quedó para después: retomarla (9d), en un mensaje aparte
+    # porque es otra tarea (decisión 50).
+    assert r.pregunta is None
+    assert _vuelve_aparte(conn) == [("causa_del_bloqueo", tareas["T2"])]
     assert abierta(conn) == ("causa_del_bloqueo", tareas["T2"]) and _para_despues(conn) == []
 
 
 # --- Situación 1: cambio de tema (conversación 08) ----------------------------------------------
+
+def _vuelve_aparte(conn) -> list[tuple[str, str]]:
+    """Las preguntas guardadas para volver en un mensaje aparte (decisión 50)."""
+    return [(a["hechos"]["pregunta"], str(a["task_id"])) for a in todos(
+        conn, """select hechos, task_id from scheduled_notice
+                  where tipo = 'vuelve_la_pregunta' and estado = 'guardado'""")]
+
 
 def test_un_cambio_de_tema_se_anota_y_vuelve_a_la_pregunta_pendiente(conn, tareas, marcos):
     marcos.dice(jugada_bloqueo("T1"))
@@ -108,7 +117,9 @@ def test_un_cambio_de_tema_se_anota_y_vuelve_a_la_pregunta_pendiente(conn, tarea
                                                 "motivo": "me mandaron a otra obra"}))
 
     assert [(h["jugada"], h["resultado"]) for h in r.hechos] == [("anotar_prevision", "anotado")]
-    assert r.pregunta == {"tipo": "causa_del_bloqueo", "tarea": T1, "desde_antes": True}
+    # Un mensaje, un tema (decisión 50 del usuario): la pendiente vuelve en un mensaje aparte.
+    assert r.pregunta is None
+    assert _vuelve_aparte(conn) == [("causa_del_bloqueo", tareas["T1"])]
     assert abierta(conn) == ("causa_del_bloqueo", tareas["T1"]) and _para_despues(conn) == []
     assert cuantas(conn, "blocker") == 0 and cuantas(conn, "conversation_question") == 1
 
@@ -126,8 +137,9 @@ def test_si_lo_nuevo_tambien_pregunta_leda_sigue_a_la_persona(conn, tareas, marc
 
     r = marcos.dice(jugada_bloqueo("T2", "falta el cable"),
                     Jugada("anotar_quien_destraba", {"tarea": "T2", "quien": "el de compras"}))
-    # Cerrado lo nuevo, Leda vuelve a la pendiente.
-    assert r.pregunta == {"tipo": "causa_del_bloqueo", "tarea": T1, "desde_antes": True}
+    # Cerrado lo nuevo, Leda vuelve a la pendiente, en un mensaje aparte (decisión 50).
+    assert r.pregunta is None
+    assert _vuelve_aparte(conn) == [("causa_del_bloqueo", tareas["T1"])]
     assert abierta(conn) == ("causa_del_bloqueo", tareas["T1"]) and _para_despues(conn) == []
 
 

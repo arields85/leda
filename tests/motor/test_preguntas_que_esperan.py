@@ -51,7 +51,10 @@ def test_sin_respuesta_la_pregunta_se_repite_y_sigue_la_escalera_hasta_escalar(
         conn, tareas, marcos, dias):
     marcos.dice(jugada_bloqueo("T1", "falta el repuesto"))    # lunes 5, 10:00
 
-    assert dias.ciclo(octubre(5, 16)) == []                   # el mismo día, nada
+    # El mismo día, sólo la repetición del día, a las 4 horas (decisión 29 del usuario).
+    [repeticion] = dias.ciclo(octubre(5, 16))
+    assert repeticion["hechos"][0]["aviso"] == "repeticion_del_dia"
+    assert dias.ciclo(octubre(5, 16, 30)) == []
 
     [otra_vez] = dias.ciclo(octubre(6, 10))
     hechos = otra_vez["hechos"][0]

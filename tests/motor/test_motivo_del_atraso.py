@@ -348,7 +348,12 @@ def test_sin_porque_el_aviso_sale_al_terminar_el_dia_y_la_pregunta_sigue(conn, m
                                                                         dias):
     _turno(conn, escribe, jugada_prevision("T1", "2026-10-13"))
 
-    assert dias.ciclo(octubre(5, 16)) == []                    # todavía espera el porqué
+    # Todavía espera el porqué; a Marcos, la repetición del día de la pregunta, a las 4 horas
+    # (decisión 29 del usuario).
+    [repeticion] = dias.ciclo(octubre(5, 16))
+    assert repeticion["persona"] == "Marcos"
+    assert (repeticion["hechos"][0]["aviso"], repeticion["pregunta"]["tipo"]) == (
+        "repeticion_del_dia", MOTIVO)
 
     [a_ismael] = dias.ciclo(octubre(5, 16, 30))
     assert a_ismael["persona"] == "Ismael"
@@ -458,7 +463,7 @@ def test_en_el_mismo_mensaje_la_pregunta_del_porque_espera_su_turno(conn, mundo,
 
 def test_una_pregunta_de_antes_queda_para_despues_y_vuelve(conn, mundo, escribe):
     """9d: Leda sigue a la persona; la de antes queda para después y vuelve cuando se contesta
-    la nueva."""
+    la nueva, en un mensaje aparte (decisión 50 del usuario, 2026-10-09)."""
     t2 = nueva_tarea(conn, mundo, "Probar las comunicaciones")
     dice(conn, escribe, jugada_bloqueo("T2", "no llego el switch"))
     assert abierta(conn) == ("quien_destraba", t2)
@@ -469,5 +474,7 @@ def test_una_pregunta_de_antes_queda_para_despues_y_vuelve(conn, mundo, escribe)
 
     _, pedido = _turno(conn, escribe, jugada_prevision("T1", "2026-10-13", "faltan los cables"),
                        at=octubre(5, 10, 10))
-    assert pedido["pregunta"]["tipo"] == "quien_destraba"
-    assert pedido["pregunta"]["desde_antes"] is True
+    assert pedido["pregunta"] is None
+    assert abierta(conn) == ("quien_destraba", t2)
+    [vuelve] = todos(conn, "select * from scheduled_notice where tipo = 'vuelve_la_pregunta'")
+    assert vuelve["hechos"]["pregunta"] == "quien_destraba" and vuelve["estado"] == "guardado"

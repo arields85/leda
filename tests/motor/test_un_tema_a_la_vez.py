@@ -176,7 +176,10 @@ def test_la_pregunta_de_despues_abre_su_espera_cuando_se_hace(conn, mundo, dias,
 
     assert r.pregunta["tipo"] == PROPUESTA       # las salidas del primero, antes que la otra
     r = dice(conn, escribe, Jugada("cancelar", {}), at=octubre(6, 10, 10))
-    assert r.pregunta["tipo"] == "quien_destraba"           # ahora sí se hace la del segundo
+    # Ahora sí se hace la del segundo, en un mensaje aparte: es otro tema (decisión 50).
+    assert r.pregunta is None
+    assert [p["pregunta"]["tipo"] for p in dias.ciclo(octubre(6, 10, 11))
+            if p["persona"] == "Marcos"] == ["quien_destraba"]
     [espera] = todos(conn, """select preguntado_en from pending_reply
                                 where tipo = 'quien_destraba' and satisfecho_en is null""")
     assert espera["preguntado_en"] == octubre(6, 10, 10)

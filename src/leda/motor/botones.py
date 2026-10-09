@@ -18,6 +18,12 @@ por tarea para ver su entrega (una lista, un recordatorio), en el orden de sus a
 respuesta lleva, después de las opciones de la pregunta abierta, las decisiones que su turno
 ofreció en ella sin que sean un tema abierto (`preguntas.ofrecer_en_la_respuesta`): Aprobar y
 Pedir cambios al ver una entrega o cuando la persona no eligió, y lo que queda por revisar.
+
+Desde la decisión 50 del usuario (2026-10-09): **los botones van con la pregunta, en el mensaje que
+la hace.** Una pregunta que vuelve en un aviso aparte (`pregunta_sin_contestar`: la repetición del
+día y la que vuelve, `REPITEN_LA_PREGUNTA`) lleva sus opciones, si sigue abierta; y la respuesta de
+la que se apartó (la que vuelve quedó guardada antes o junto con ella y todavía no salió cuando se
+escribió) no las lleva.
 """
 
 from __future__ import annotations
@@ -26,7 +32,14 @@ from typing import Any
 
 from ..despachador import Boton, Transporte
 
+from .pregunta_sin_contestar import REPETICION_DEL_DIA, VUELVE_LA_PREGUNTA
 from .preguntas import callback
+
+# Los avisos que vuelven a hacer la pregunta abierta: llevan sus opciones, como una respuesta.
+REPITEN_LA_PREGUNTA = (REPETICION_DEL_DIA, VUELVE_LA_PREGUNTA)
+# La pregunta que repite un aviso: su clave la nombra (`motor:<tipo>:<tarea>:q<pregunta>:...`,
+# `avisos.pregunta_del_aviso`).
+_LA_PREGUNTA_DEL_AVISO = "split_part(a.dedupe_key, ':', 4) = 'q' || q.id::text"
 
 
 class ConOpciones:
@@ -76,15 +89,35 @@ class ConOpciones:
                                 where a.outbox_id = %s and q.cerrada_en is null
                                 order by a.programado_para, a.creado_en, t.titulo,
                                          a.dedupe_key, o.orden""", (fila["id"],))
-                return [Boton(o["etiqueta"], callback(o["token"])) for o in cur.fetchall()]
-            cur.execute("""select o.etiqueta, o.token
-                             from conversation_state s
-                             join conversation_question q on q.id = s.pregunta_abierta_id
-                             join conversation_option o on o.question_id = q.id
-                            where s.membership_id = %s and q.cerrada_en is null
-                              and q.abierta_en <= %s
-                            order by o.orden""",
-                        (fila["destinatario_membership_id"], fila["programado_para"]))
+                ofrece = [Boton(o["etiqueta"], callback(o["token"])) for o in cur.fetchall()]
+                # La pregunta abierta que el aviso vuelve a hacer, con sus opciones (decisión 50).
+                cur.execute(f"""select o.etiqueta, o.token
+                                  from scheduled_notice a
+                                  join conversation_question q on {_LA_PREGUNTA_DEL_AVISO}
+                                  join conversation_option o on o.question_id = q.id
+                                 where a.outbox_id = %s and a.tipo = any(%s)
+                                   and q.cerrada_en is null
+                                 order by a.creado_en, o.orden""",
+                            (fila["id"], list(REPITEN_LA_PREGUNTA)))
+                return ofrece + [Boton(o["etiqueta"], callback(o["token"]))
+                                 for o in cur.fetchall()]
+            # Las de la pregunta abierta, salvo que se haya apartado de esta respuesta para volver
+            # en su propio mensaje (decisión 50): la que vuelve se guardó antes o junto con la
+            # respuesta y no había salido cuando se escribió.
+            cur.execute(f"""select o.etiqueta, o.token
+                              from conversation_state s
+                              join conversation_question q on q.id = s.pregunta_abierta_id
+                              join conversation_option o on o.question_id = q.id
+                             where s.membership_id = %(persona)s and q.cerrada_en is null
+                               and q.abierta_en <= %(escrita)s
+                               and not exists (
+                                   select 1 from scheduled_notice a
+                                    where a.tipo = %(vuelve)s and {_LA_PREGUNTA_DEL_AVISO}
+                                      and a.creado_en <= %(escrita)s
+                                      and (a.estado = 'guardado' or a.resuelto_en > %(escrita)s))
+                             order by o.orden""",
+                        {"persona": fila["destinatario_membership_id"],
+                         "escrita": fila["programado_para"], "vuelve": VUELVE_LA_PREGUNTA})
             de_la_pregunta = [Boton(o["etiqueta"], callback(o["token"])) for o in cur.fetchall()]
             # Las decisiones que el turno ofreció en esta respuesta, sin ser un tema abierto
             # (`preguntas.ofrecer_en_la_respuesta`): en el orden en que se ofrecieron.

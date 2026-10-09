@@ -667,8 +667,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "repregunta": "Leda vuelve a hacer una pregunta que no tuvo respuesta.",
     "repeticion_del_dia": "Leda vuelve a hacer, una sola vez en el día, una pregunta que la "
                           "persona todavía no contestó.",
-    "vuelve_la_pregunta": "Leda vuelve a una pregunta que había quedado para después: la "
-                          "persona ya contestó la otra que estaba abierta.",
+    "vuelve_la_pregunta": "Leda vuelve, en un mensaje aparte, a una pregunta que había "
+                          "quedado sin contestar: la persona contestó la otra que estaba "
+                          "abierta, o habló de otro tema.",
     "la_misma_pregunta_sale_en_otro_aviso": "La misma pregunta sale en otro mensaje de ese "
                                             "momento: no se repite dos veces.",
     "ya_no_es_el_dia_de_la_repeticion": "La repetición era para otro día: ese día ya pasó.",

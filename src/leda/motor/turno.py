@@ -198,6 +198,8 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
     elegidas: list[Jugada] | None = None    # None: la IA no llegó a elegir
     try:
         elegidas = elegir()
+        # De qué habló el mensaje, antes de manejarlo: la pregunta abierta es la de antes.
+        temas = de_que_hablo(ctx, elegidas, option_id)
         with conn.transaction():
             hechos = manejar(elegidas)
             # Una pregunta que se hace una sola vez y este mensaje no contestó: no se repite
@@ -206,8 +208,8 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
             # Desde cuándo cada tarea está en su estado lo sabe el motor por lo que anota
             # (`cambios_de_estado.py`): los cambios de este turno, fuera de los hechos.
             cambios = cambios_de_estado.del_turno(cur, ctx.tareas)
-            # La que vuelve aparte no va en la respuesta (decisión 21).
-            pregunta = pregunta_sin_contestar.al_terminar_el_turno(ctx)
+            # La que vuelve aparte no va en la respuesta (decisiones 21 y 50).
+            pregunta = pregunta_sin_contestar.al_terminar_el_turno(ctx, temas)
             # Lo que los hechos dejaron para después, como quedó después de todas las jugadas
             # (9k). También lo que un turno anterior dejó anunciado y ya no va a pasar, y lo
             # que sigue.
@@ -420,6 +422,48 @@ def _redactar(ia: IA, pedido: dict[str, Any],
 
 
 # --- (3) y (4) Las jugadas ----------------------------------------------------------------
+
+# Las jugadas que siempre son sobre la pregunta abierta: elegir una de sus opciones y las
+# salidas de un tema (situaciones generales 1 y 6).
+SOBRE_LA_PREGUNTA = ("elegir", "cancelar", "dejar_para_despues")
+
+
+def de_que_hablo(ctx: Contexto, elegidas: list[Jugada],
+                 option_id: str | None = None) -> set[str] | None:
+    """Las tareas de las que habló el mensaje (decisión 50 del usuario, 2026-10-09;
+    `pregunta_sin_contestar.hablo_de_otro_tema`): la que nombra cada jugada y, la que es sobre
+    una pregunta, la tarea de esa pregunta (la de la opción tocada o la abierta). Es sobre la
+    pregunta una jugada de `SOBRE_LA_PREGUNTA`, la respuesta que no es ninguna jugada
+    (`contesta_la_abierta`) y la que no nombra su tarea y contesta esa clase de pregunta
+    (`Ficha.contesta`: la ficha la toma de la pregunta abierta). Se lee antes de manejar las
+    jugadas. `None` si el mensaje no trae ninguna jugada: no habló de otra cosa que de la
+    pregunta abierta."""
+    if not elegidas:
+        return None
+    jugadas = ctx.jugadas if ctx.jugadas is not None else JUGADAS
+    cur = ctx.cur
+    abierta = preguntas.actual(cur, ctx.quien.membership_id)
+    if option_id is not None:
+        cur.execute("""select q.task_id, q.tipo from conversation_option o
+                         join conversation_question q on q.id = o.question_id
+                        where o.id = %s""", (option_id,))
+        abierta = cur.fetchone()
+    de_la_pregunta = abierta["task_id"] if abierta else None
+    temas: set[str] = set()
+    for jugada in elegidas:
+        alias = (jugada.datos or {}).get("tarea")
+        tarea = ctx.tarea(alias) if isinstance(alias, str) else None
+        if tarea is not None:
+            temas.add(str(tarea["id"]))
+        ficha = fichas.FICHAS.get(jugada.nombre)
+        sin_tarea_la_contesta = (tarea is None and ficha is not None and abierta is not None
+                                 and abierta["tipo"] in ficha.contesta)
+        if de_la_pregunta is not None and (jugada.nombre in SOBRE_LA_PREGUNTA
+                                           or sin_tarea_la_contesta
+                                           or contesta_la_abierta(ctx, jugada, jugadas)):
+            temas.add(str(de_la_pregunta))
+    return temas
+
 
 def contesta_la_abierta(ctx: Contexto, jugada: Jugada,
                        jugadas: Mapping[str, Manejador]) -> bool:

@@ -120,8 +120,13 @@ def test_sin_respuesta_la_escalera_avanza_un_dia_habil_por_paso_y_escala(conn, m
                              where s.membership_id = %s""", marcos["membership_id"])
     assert pregunta == {"tipo": "estado_de_la_tarea", "se_puede_dejar": False}
 
+    # Sin respuesta, la repetición del día a las 4 horas, haya o no otro tema esperando
+    # (decisiones 21 y 29 del usuario; `pregunta_sin_contestar.py`): no es un paso de la escalera.
+    [repeticion] = dias.ciclo(octubre(9, 15))
+    assert repeticion["hechos"][0]["aviso"] == "repeticion_del_dia"
+    assert repeticion["pregunta"]["tipo"] == "estado_de_la_tarea"
     # Nada más el viernes, el fin de semana ni el feriado del lunes.
-    for momento in (octubre(9, 15), octubre(10, 10), octubre(11, 10), octubre(12, 10)):
+    for momento in (octubre(9, 16), octubre(10, 10), octubre(11, 10), octubre(12, 10)):
         assert dias.ciclo(momento) == []
 
     [v1] = dias.ciclo(octubre(13, 10))
@@ -130,7 +135,8 @@ def test_sin_respuesta_la_escalera_avanza_un_dia_habil_por_paso_y_escala(conn, m
     [v2] = dias.ciclo(octubre(14, 10))
     assert v2["hechos"][0]["numero"] == 3
     assert v2["hechos"][0]["si_no_hay_respuesta"] == {"se_avisa_a": ["Ismael"]}
-    assert espera_del_estado(conn)["recordatorios"] == 3
+    # Tres pedidos y la repetición del viernes: también es un recordatorio de esa espera.
+    assert espera_del_estado(conn)["recordatorios"] == 4
 
     [v3] = dias.ciclo(octubre(15, 10))
 
@@ -145,7 +151,8 @@ def test_sin_respuesta_la_escalera_avanza_un_dia_habil_por_paso_y_escala(conn, m
     assert escalamiento["tipo"] == "prioritario" and escalamiento["es_respuesta"] is False
     assert espera_del_estado(conn)["escalado_en"] == octubre(15, 10)
     assert dias.ciclo(octubre(16, 10)) == [] and dias.ciclo(octubre(19, 10)) == []
-    assert len(lo_que_salio_para(conn, mundo, "Marcos")) == 4
+    # El aviso previo, los tres pedidos y la repetición del viernes (decisión 29).
+    assert len(lo_que_salio_para(conn, mundo, "Marcos")) == 5
     assert len(lo_que_salio_para(conn, mundo, "Ismael")) == 1
 
 
@@ -315,7 +322,10 @@ def test_una_ausencia_pausa_la_escalera_y_la_vuelta_lleva_un_reencuadre(conn, mu
     assert hechos["necesita_respuesta"] is True and hechos["atraso_dias_habiles"] == 3
     assert vuelta["pregunta"]["tipo"] == "estado_de_la_tarea"
     assert avisos_guardados(conn, "reencuadre")[0]["estado"] == "enviado"
-    assert dias.ciclo(octubre(15, 15)) == []
+    # La repetición del día de su pregunta, a las 4 horas (decisión 29 del usuario).
+    [repeticion] = dias.ciclo(octubre(15, 15))
+    assert repeticion["hechos"][0]["aviso"] == "repeticion_del_dia"
+    assert dias.ciclo(octubre(15, 16)) == []
 
     # Retoma desde donde quedó: el segundo pedido, no el escalamiento que le tocaba.
     [siguiente] = dias.ciclo(octubre(16, 10))
