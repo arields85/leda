@@ -252,6 +252,10 @@ hallazgo por hallazgo y parecía progreso. Por eso la señal de parar está escr
 
 - Actualizar `docs/STATUS.md` ("Punto exacto para retomar", hechos, riesgos) y el documento de la unidad (tareas,
   evidencia, próximo paso). `AGENTS.md` sólo cambia si cambió una regla estable.
+- **Cierre por contexto** (usuario, 2026-10-09): al llegar a un 75-85 % del contexto usado, o ante el primer aviso
+  de compactación, el agente cierra solo, sin esperar a terminar la unidad: STATUS, documento de la unidad,
+  memoria propia y Engram con lo hecho, lo que falta y el punto exacto para retomar. Si trabaja solo, sigue
+  después desde ese punto; si no, propone una sesión nueva.
 - Antes de cerrar la sesión, después de la última modificación, operación o commit, contrastar `docs/STATUS.md` y
   los documentos de continuidad con el estado real de Git, código, esquema, pruebas y operación. Si no cambió un
   hecho relevante, no editar documentación sólo para registrar la sesión. Si cambiaron los archivos importados,
