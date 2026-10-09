@@ -126,7 +126,11 @@ llega a quien espera más abajo, como información (`novedad_de_lo_que_espera`, 
 hábiles del espacio se le informa al referente, con su historia (`bloqueo_que_sigue_abierto`,
 porción 5; decisión 7; `bloqueo_viejo.py`), y otra vez cada esos días mientras siga (decisión
 36); a la persona trabada, a la vez, que quedó asentado (`asentado_que_sigue_trabada`, decisiones
-34 y 35; `asentado.py`).
+34 y 35; `asentado.py`). Desde la C-5c (decisiones 39, 47 y 48): a quien Leda le preguntaba y el
+tema se cerró sin esa persona, que ya no hace falta (`ya_no_hace_falta_que_destrabe`); a la
+persona trabada, la pregunta de qué arregló (`pregunta_a_quien_esta_trabado`) o de cómo le fue
+(`como_le_fue_con_quien_destraba`), que abren `preguntas.QUE_ARREGLARON`; y a quien destraba, lo
+que dijo la persona trabada (`lo_que_dijo_quien_esta_trabado`).
 """
 
 from __future__ import annotations
@@ -1342,6 +1346,13 @@ def de_quien_es_la_pregunta(cur, tarea: dict[str, Any], pregunta: dict[str, Any]
                                             str(pregunta["membership_id"]))
     if str(tarea["responsable_membership_id"]) != str(pregunta["membership_id"]):
         return "cambio_el_responsable"
+    if pregunta["tipo"] == preguntas.QUE_ARREGLARON:
+        # Lo que arregló con quien destraba, mientras el bloqueo siga abierto (C-5c).
+        fila = quien_destraba(cur, (pregunta["jugada"] or {}).get("destraba_id"))
+        if fila is None:
+            return "tarea_inexistente"
+        if fila["resuelto_en"] is not None:
+            return YA_SE_DESTRABO
     return None
 
 
@@ -1706,6 +1717,25 @@ ASENTADO_QUE_SIGUE_TRABADA = "asentado_que_sigue_trabada"
 YA_SE_DESTRABO = "ya_se_destrabo"
 CAMBIO_QUIEN_DESTRABA = "cambio_quien_destraba"
 DIJO_ALGO_MAS_NUEVO = "dijo_algo_mas_nuevo"
+# Cerrar el tema para todos, lo acordado y "se lo pido yo" (C-5c; decisiones 39, 47 y 48 del
+# usuario, 2026-10-09; `persecucion.py`): la pregunta a la persona trabada de qué arregló con quien
+# destraba (si quien destraba dice que ya lo hablaron sin decir qué: de coordinación) y la de cómo
+# le fue, al día hábil siguiente de "se lo pido yo" (seguimiento que Leda hace por su cuenta); lo
+# que dice la persona trabada, a quien destraba; y que ya no hace falta, a quien Leda le
+# preguntaba cuando el tema se cerró sin él. Los tres primeros abren o llevan lo que se acordó; el
+# último cierra el tema para esa persona.
+PREGUNTA_A_QUIEN_ESTA_TRABADO = "pregunta_a_quien_esta_trabado"
+COMO_LE_FUE = "como_le_fue_con_quien_destraba"
+LO_QUE_DIJO_QUIEN_ESTA_TRABADO = "lo_que_dijo_quien_esta_trabado"
+YA_NO_HACE_FALTA = "ya_no_hace_falta_que_destrabe"
+# Por qué una de esas preguntas ya no sale: lo que arreglaron ya lo contó el otro.
+YA_LO_CONTO_QUIEN_DESTRABA = "ya_lo_conto_quien_destraba"
+YA_LO_CONTO_QUIEN_ESTA_TRABADO = "ya_lo_conto_quien_esta_trabado"
+# Por qué no sale que ya no hace falta: la persona trabada lo volvió a nombrar.
+VOLVIO_A_SER_QUIEN_DESTRABA = "volvio_a_ser_quien_destraba"
+# Lo que dijo quien destrababa después de que la tarea ya no estaba trabada (decisión 39): sale
+# igual, porque es lo que contesta a eso.
+YA_SE_HABIA_DESTRABADO = "ya_se_habia_destrabado"
 
 
 def quien_destraba(cur, destraba_id) -> dict[str, Any] | None:
@@ -1865,7 +1895,24 @@ def _abre_cuando_se_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
         "destraba_id": de_la_clave(aviso), "del_aviso": str(aviso["id"])}
 
 
+def ultimo_dicho_de_quien_destraba(cur, blocker_id) -> str | None:
+    """Lo último que dijo de un bloqueo quien lo destraba (o lo destrababa), sin contar lo que
+    cuenta la persona trabada de lo que arreglaron (C-5c), que va por su lado: el id."""
+    cur.execute("""select d.id from dicho_de_quien_destraba d
+                     join blocker_unblocker u on u.id = d.blocker_unblocker_id
+                     join blocker b on b.id = u.blocker_id
+                     join task t on t.id = b.task_id
+                    where u.blocker_id = %s
+                      and d.dicho_por_membership_id <> t.responsable_membership_id
+                    order by d.at desc, d.id desc limit 1""", (str(blocker_id),))
+    fila = cur.fetchone()
+    return str(fila["id"]) if fila else None
+
+
 def _vigencia_de_lo_que_dijo(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    """Lo que dijo quien destraba sale mientras el bloqueo siga abierto y sea lo último que dijo;
+    lo que dijo después de que el tema se cerró (decisión 39) sale igual: es lo que contesta a
+    eso."""
     m.cur.execute("""select d.id, u.blocker_id, b.resuelto_en
                        from dicho_de_quien_destraba d
                        join blocker_unblocker u on u.id = d.blocker_unblocker_id
@@ -1874,15 +1921,39 @@ def _vigencia_de_lo_que_dijo(m: Momento, aviso) -> tuple[str | None, dict[str, A
     dicho = m.cur.fetchone()
     if dicho is None:
         return "tarea_inexistente", {}
-    if dicho["resuelto_en"] is not None:
+    if dicho["resuelto_en"] is not None and not (aviso["hechos"] or {}).get(
+            YA_SE_HABIA_DESTRABADO):
         return YA_SE_DESTRABO, {}
-    m.cur.execute("""select d.id from dicho_de_quien_destraba d
-                       join blocker_unblocker u on u.id = d.blocker_unblocker_id
-                      where u.blocker_id = %s order by d.at desc, d.id desc limit 1""",
-                  (dicho["blocker_id"],))
-    if str(m.cur.fetchone()["id"]) != str(dicho["id"]):
+    if ultimo_dicho_de_quien_destraba(m.cur, dicho["blocker_id"]) != str(dicho["id"]):
         return DIJO_ALGO_MAS_NUEVO, {}
     return None, dict(aviso["hechos"])
+
+
+def _vigencia_de_lo_que_dijo_quien_esta_trabado(m: Momento, aviso
+                                                ) -> tuple[str | None, dict[str, Any]]:
+    from . import persecucion           # persecucion importa este módulo
+    return persecucion.vigencia_de_lo_que_dijo_quien_esta_trabado(m, aviso)
+
+
+def _vigencia_de_que_arreglaron(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import persecucion
+    return persecucion.vigencia_de_que_arreglaron(m, aviso)
+
+
+def _vigencia_de_ya_no_hace_falta(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import persecucion
+    return persecucion.vigencia_de_ya_no_hace_falta(m, aviso)
+
+
+def _abre_que_arreglaron(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
+    """La pregunta de qué arregló la persona trabada con quien destraba, atada a la fila que lo
+    nombró: lo que recuerda al repetirla es con quién y por qué (`preguntas.lo_anotado`)."""
+    hechos = aviso["hechos"] or {}
+    return preguntas.QUE_ARREGLARON, {
+        "nombre": "contar_lo_que_arreglaron",
+        "datos": {k: hechos[k] for k in ("quien_destraba", "se_lo_pide_a", "causa",
+                                         "ya_lo_hablaron") if hechos.get(k)},
+        "destraba_id": de_la_clave(aviso), "del_aviso": str(aviso["id"])}
 
 
 TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
@@ -1944,6 +2015,19 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso(PREGUNTA_A_QUIEN_DESTRABA, "normal", _vigencia_de_la_pregunta_a_quien_destraba,
                 es_coordinacion=True, abre=_abre_cuando_se_destraba),
     TipoDeAviso(LO_QUE_DIJO_QUIEN_DESTRABA, "informativo", _vigencia_de_lo_que_dijo,
+                es_coordinacion=True),
+    # Cerrar el tema para todos y lo acordado (C-5c): la pregunta a la persona trabada de qué
+    # arregló, si quien destraba dice que ya lo hablaron (la causa lo que dijo otra persona); la de
+    # cómo le fue, al día hábil siguiente de "se lo pido yo" (seguimiento que Leda hace por su
+    # cuenta); lo que dice la persona trabada, a quien destraba; y que ya no hace falta, a quien
+    # Leda le preguntaba. Los dos últimos, información.
+    TipoDeAviso(PREGUNTA_A_QUIEN_ESTA_TRABADO, "normal", _vigencia_de_que_arreglaron,
+                es_coordinacion=True, abre=_abre_que_arreglaron),
+    TipoDeAviso(COMO_LE_FUE, "seguimiento", _vigencia_de_que_arreglaron,
+                abre=_abre_que_arreglaron),
+    TipoDeAviso(LO_QUE_DIJO_QUIEN_ESTA_TRABADO, "informativo",
+                _vigencia_de_lo_que_dijo_quien_esta_trabado, es_coordinacion=True),
+    TipoDeAviso(YA_NO_HACE_FALTA, "informativo", _vigencia_de_ya_no_hace_falta,
                 es_coordinacion=True),
     # La cadena al referente, cuando nadie toma el bloqueo (porción 3): informativa.
     TipoDeAviso(CADENA_DEL_BLOQUEO, "informativo", _vigencia_de_la_cadena, es_coordinacion=True),

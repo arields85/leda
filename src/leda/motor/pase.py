@@ -40,7 +40,8 @@ nada de esa persona. A Dirección no le llega nada.
 
 **Nunca un pase abierto sin que todos sepan cómo terminó** (decisión 39 del usuario; `_al_terminar`,
 una regla para todo fin de un pase): cada uno se entera una vez y nunca quien lo terminó; quien
-pidió, siempre; quien tenía que contestar y no llegó a hacerlo (se le preguntó y el pase terminó
+pidió, siempre; quien lo autorizó, también si quien la recibía no la tomó o no contestó (C-5c);
+quien tenía que contestar y no llegó a hacerlo (se le preguntó y el pase terminó
 sin su respuesta: nadie contestó, o la tarea ya no se puede pasar), que ya no hace falta que
 conteste; y las preguntas del pase, con sus botones, dejan de esperar.
 
@@ -554,7 +555,9 @@ def _quienes_se_enteran(pase: dict, termino: dict, *, actor: str | None,
     nunca quien lo terminó (`actor`):
 
     - quien lo pidió, siempre;
-    - si alguien la tomó, quien decidió y, si lo pidió su encargado, quien la tenía (decisión 27);
+    - quien lo autorizó (decidió que sí: `decidido_en`), también si quien la recibía no la tomó o
+      no contestó (C-5c: el tema también era suyo), y quien decidió si alguien la tomó;
+    - si alguien la tomó y lo pidió su encargado, quien la tenía (decisión 27);
     - quien tenía que contestar y no llegó a hacerlo (`preguntado`: se le preguntó y el pase
       terminó sin su respuesta), que ya no hace falta que conteste."""
     lista: list[tuple[str, str, dict]] = []
@@ -566,8 +569,9 @@ def _quienes_se_enteran(pase: dict, termino: dict, *, actor: str | None,
             lista.append((persona, clave, propio))
 
     sumar(pase["pedido_por_membership_id"], "aviso_a_quien_pidio", para_quien_pidio or {})
-    if termino.get("la_tomo"):
+    if termino.get("la_tomo") or pase.get("decidido_en") is not None:
         sumar(pase["decide_membership_id"], "aviso_a_quien_decidio", {})
+    if termino.get("la_tomo"):
         sumar(pase["de_membership_id"], "aviso_a_quien_la_tenia",
               {"era_suya": True, "pidio": pase["pidio"]})
     if preguntado is not None:

@@ -43,7 +43,7 @@ from typing import Any
 from . import preguntas
 from .avisos import (DIJO_ALGO_MAS_NUEVO, NOVEDAD_DE_LO_QUE_ESPERA, PREGUNTA_A_QUIEN_DESTRABA,
                      YA_NO_ESTA_ENTREGADA, YA_SE_DESTRABO, Momento, guardar, integrante,
-                     leer_tarea, omitir, ultimo_quien_destraba)
+                     leer_tarea, omitir, ultimo_dicho_de_quien_destraba, ultimo_quien_destraba)
 from .fichas import AVISO, LLEGA, NO_LE_VA_A_LLEGAR, Contexto, nombrar_efecto
 from .margen import sale_con_margen
 from .tiempo import sale
@@ -275,11 +275,9 @@ def vigencia(m: Momento, aviso: dict[str, Any]) -> tuple[str | None, dict[str, A
             return "tarea_inexistente", {}
         if dicho["resuelto_en"] is not None:
             return YA_SE_DESTRABO, {}
-        cur.execute("""select d.id from dicho_de_quien_destraba d
-                         join blocker_unblocker u on u.id = d.blocker_unblocker_id
-                        where u.blocker_id = %s order by d.at desc, d.id desc limit 1""",
-                    (dicho["id"],))
-        if str(cur.fetchone()["id"]) != ident:
+        # Lo último que dijo quien la destraba (lo que cuenta la persona trabada de lo que
+        # arreglaron va por su lado, C-5c).
+        if ultimo_dicho_de_quien_destraba(cur, dicho["id"]) != ident:
             return DIJO_ALGO_MAS_NUEVO, {}
         origen = str(dicho["task_id"])
     elif letra == OTRO_DIA:

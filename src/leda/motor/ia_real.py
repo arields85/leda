@@ -154,12 +154,14 @@ DATOS = {
                                  "de quién es, si lo dijo. Sólo si la nombró y no está en la "
                                  "lista."),
     "para_cuando": ("string", "La fecha para la que quien puede destrabar la tarea de otra "
-                              "persona dice que lo resuelve, como AAAA-MM-DD, calculada desde "
-                              "hoy. Sólo si la dijo."),
+                              "persona dice que lo resuelve, o la que la persona trabada dice "
+                              "que arregló con quien la destraba, como AAAA-MM-DD, calculada "
+                              "desde hoy. Sólo si la dijo."),
     "ya_esta": ("boolean", "Verdadero sólo si quien puede destrabar la tarea de otra persona "
                            "dice que ya lo resolvió."),
     "lo_que_dice": ("string", "Lo que dice quien puede destrabar la tarea de otra persona sobre "
-                              "lo que la traba, con sus palabras."),
+                              "lo que la traba, o la persona trabada sobre lo que arregló con "
+                              "quien la destraba, con sus palabras."),
     "ya_lo_hablaron": ("boolean", "Verdadero sólo si quien puede destrabar la tarea de otra "
                                   "persona dice que ya lo habló con esa persona."),
     "su_tarea_trabada": ("string", "El alias de una tarea de la persona que escribe, trabada, "

@@ -880,8 +880,12 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
     # 3a; C-5, `persecucion.py`); sin otra persona, las salidas (9c, corregida el 2026-10-05). Si
     # a quien nombró no le puede escribir, las salidas de la decisión 37 (C-5b): otra persona que
     # pueda destrabarlo, o que se lo pida ella y le cuente.
+    from . import persecucion               # persecucion importa este módulo
+    # A quien Leda le preguntaba antes ya no le hace falta: se entera (C-5c, decisión 39).
+    _juntar(hecho, persecucion.cerrar_el_tema(
+        ctx, task_id, str(bloqueo["id"]), persecucion.CAMBIO_QUIEN_DESTRABA,
+        salvo=(str(integrante["membership_id"]),) if integrante is not None else ()))
     if integrante is not None and not nadie_mas:
-        from . import persecucion           # persecucion importa este módulo
         _juntar(hecho, persecucion.preguntarle(ctx, fila, bloqueo, anotado, integrante))
         if "no_se_le_puede_escribir_a" in hecho:
             return {**hecho, "salidas": list(persecucion.SALIDAS_SIN_LEDA_CONECTADA)}
@@ -923,11 +927,12 @@ def _destrabar(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     preguntas.cerrar_las_de_una_jugada(ctx, "anotar_quien_destraba", tarea["id"], "sin_efecto",
                                        {"jugada": "destrabar", "tarea": tarea["id"]})
     from . import persecucion               # persecucion importa este módulo
-    persecucion.al_destrabarse(ctx, tarea["id"])
+    # A quien le preguntaba se le avisa que ya no hace falta (C-5c, decisión 39).
+    cerrado = persecucion.al_destrabarse(ctx, tarea["id"], str(bloqueo["id"]))
     cur.execute("select estado::text estado from task where id = %s", (tarea["id"],))
     hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
                              "bloqueo_resuelto": {"causa": bloqueo["causa"]},
-                             "estado": cur.fetchone()["estado"]}
+                             "estado": cur.fetchone()["estado"], **cerrado}
     # Quien espera esta tarea, más abajo en una cadena de bloqueos, se entera (C-5, porción 4).
     from . import encadenados               # encadenados importa este módulo
     _juntar(hecho, encadenados.se_destrabo(ctx, tarea["id"], str(bloqueo["id"])))
@@ -1187,6 +1192,16 @@ def _no_escribirle(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     return persecucion.no_escribirle(ctx, datos, tarea)
 
 
+def _contar_lo_que_arreglaron(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import persecucion
+    return persecucion.contar_lo_que_arreglaron(ctx, datos, tarea)
+
+
+def _pedirselo_y_contar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import persecucion
+    return persecucion.pedirselo_y_contar(ctx, datos, tarea)
+
+
 # Delegar por chat (C-7; ADR 0017, enmienda a la decisión 2): las jugadas están en `pase.py`, que
 # importa este módulo. Hasta la C-7, pasar una tarea no se hacía por chat y Leda decía quién lo
 # decidía (9g; decisión del usuario del 2026-10-08: "queda así hasta que exista delegar").
@@ -1361,9 +1376,11 @@ def _deshacer_bloqueo(ctx: Contexto, tarea: dict) -> dict | None:
     if not r.get("resuelto"):
         return None
     from . import persecucion               # persecucion importa este módulo
-    persecucion.al_destrabarse(ctx, tarea["id"])
+    # El bloqueo quedó sin efecto: a quien le preguntaba también se le avisa (decisión 39).
+    cerrado = persecucion.al_destrabarse(ctx, tarea["id"], str(bloqueo["id"]),
+                                         persecucion.QUEDO_SIN_EFECTO)
     cur.execute("select estado::text estado from task where id = %s", (tarea["id"],))
-    return {"hechos": {"vuelve_a": {"estado": cur.fetchone()["estado"]}},
+    return {"hechos": {"vuelve_a": {"estado": cur.fetchone()["estado"]}, **cerrado},
             "datos": {"causa": bloqueo["causa"]}}
 
 
@@ -1435,10 +1452,11 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           hace="cierra el bloqueo (resolver_bloqueo): la tarea vuelve al estado que tenía "
                "antes de bloquearse",
           despues="cierra la pregunta de quién lo destraba, lo propuesto para salir del bloqueo "
-                  "y sus esperas; la escalera vuelve a seguir la tarea y, si su seguimiento ya "
-                  "había empezado, Leda vuelve a pedir el estado el día hábil siguiente",
+                  "y sus esperas; a quien Leda le preguntaba se le avisa que ya no hace falta; "
+                  "la escalera vuelve a seguir la tarea y, si su seguimiento ya había empezado, "
+                  "Leda vuelve a pedir el estado el día hábil siguiente",
           manejar=_destrabar, del_responsable=True, estados=frozenset({"bloqueada"}),
-          contesta=(preguntas.QUIEN_DESTRABA,), sigue_el_pedido=True,
+          contesta=(preguntas.QUIEN_DESTRABA, preguntas.QUE_ARREGLARON), sigue_el_pedido=True,
           es="La persona dice que la causa de un bloqueo ya no está: llegó lo que le faltaba "
              "o se resolvió lo que frenaba el trabajo, y la tarea puede seguir. El bloqueo es "
              "uno abierto antes o el que anota una jugada anterior del mismo mensaje. Es salir "
@@ -1589,22 +1607,27 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           necesita=(), opcional=("tarea", "para_cuando", "ya_esta", "lo_que_dice",
                                  "ya_lo_hablaron", "su_tarea_trabada"),
           comprueba="que quien escribe sea quien destraba ahora un bloqueo abierto de esa tarea "
-                    "(lo último que dijo la persona trabada)",
+                    "(lo último que dijo la persona trabada), o quien la destrababa si lo último "
+                    "que Leda le mandó es que ya no hace falta",
           hace="anota lo que dice, atribuido y auditado, como un hecho del bloqueo: para "
                "cuándo, que ya está o sus palabras; no cierra el bloqueo. Si sólo dice que ya "
                "lo habló con la persona trabada, no anota nada todavía: pregunta una vez qué "
-               "arreglaron y para cuándo. Si dice que está trabado con una tarea suya, la anota "
-               "con el bloqueo de esa tarea, que enlaza los dos",
+               "arreglaron y para cuándo, y lo mismo a la persona trabada. Si dice que está "
+               "trabado con una tarea suya, la anota con el bloqueo de esa tarea, que enlaza "
+               "los dos",
           despues="cierra su pregunta y su espera; la persona trabada se entera terminado el "
-                  "margen para corregir, como información",
+                  "margen para corregir: como información, para que lo confirme si es lo que "
+                  "arreglaron, o como cierre del tema si contesta lo que Leda le pasó",
           manejar=_decir_cuando_destraba, se_ofrece=False,
           contesta=(preguntas.CUANDO_SE_DESTRABA,),
           es="La persona que escribe puede destrabar una tarea trabada de otra persona (está "
              "en la lista como espera_que_la_destrabe) y dice para cuándo lo resuelve "
              "(para_cuando), que ya lo resolvió (ya_esta), qué pasa con eso (lo_que_dice) o "
              "que ya lo habló con la persona trabada (ya_lo_hablaron), o que no puede porque "
-             "una tarea suya está trabada (su_tarea_trabada). Es lo que dice sobre lo que traba "
-             "la tarea de otro: no es un hecho de una tarea suya."),
+             "una tarea suya está trabada (su_tarea_trabada). También lo que contesta cuando "
+             "Leda le dijo que ya no hace falta (está en la lista como "
+             "ya_no_hace_falta_que_la_destrabe). Es lo que dice sobre lo que traba la tarea de "
+             "otro: no es un hecho de una tarea suya."),
     Ficha("decir_que_no_le_toca", "decir que no le corresponde destrabar la tarea trabada de "
                                   "otra persona",
           necesita=(), opcional=("tarea", "quien", "no_sabe", "lo_que_dice"),
@@ -1627,12 +1650,47 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           comprueba="que sea el responsable de la tarea y que Leda le haya guardado un mensaje "
                     "a quien la destraba",
           hace="si el mensaje todavía no salió, no sale (queda retirado con su motivo); si ya "
-               "salió, nada",
-          despues="la respuesta dice que no le escribe o, si ya salió, que ya le llegó",
+               "salió y Leda le sigue preguntando a esa persona, deja de preguntarle; si no, "
+               "nada",
+          despues="la respuesta dice que no le escribe o, si ya salió, que ya le llegó y, si "
+                  "le seguía preguntando, que no le pregunta más y esa persona se entera",
           manejar=_no_escribirle, del_responsable=True, se_ofrece=False,
           es="La persona trabada pide que Leda no le escriba a quien destraba su tarea (por "
              "ejemplo, porque ya habló con esa persona). quien es a quién, como lo nombró. No "
              "cambia quién destraba ni cierra el bloqueo."),
+    Ficha("contar_lo_que_arreglaron", "anotar lo que la persona trabada arregló con quien "
+                                      "destraba su tarea",
+          necesita=(), opcional=("tarea", "para_cuando", "lo_que_dice"),
+          comprueba="que sea el responsable de la tarea y que su bloqueo más nuevo tenga a otra "
+                    "persona que lo destraba",
+          hace="anota lo que dice, atribuido y auditado, como un hecho del bloqueo: para cuándo "
+               "o sus palabras; no cierra el bloqueo",
+          despues="cierra su pregunta de qué arreglaron y lo que se le preguntaba a quien "
+                  "destraba; a esa persona le llega terminado el margen para corregir: para que "
+                  "lo confirme o, si contesta lo que Leda le pasó, como cierre del tema",
+          manejar=_contar_lo_que_arreglaron, del_responsable=True, se_ofrece=False,
+          contesta=(preguntas.QUE_ARREGLARON,),
+          es="La persona trabada cuenta lo que arregló con quien destraba su tarea "
+             "(para_cuando, si dice para cuándo; lo_que_dice, sus palabras), corrige lo que Leda "
+             "le pasó de esa persona o le contesta algo que esa persona dijo. No es decir que "
+             "ya puede seguir: eso es salir del bloqueo. Nombrar a otra persona que lo destraba "
+             "es otra jugada."),
+    Ficha("pedirselo_y_contar", "que la persona trabada se lo pida directamente a quien "
+                                "destraba su tarea y le cuente a Leda cómo le fue",
+          necesita=(), opcional=("tarea", "quien"),
+          comprueba="que sea el responsable y que la tarea tenga un bloqueo abierto",
+          hace="anota que se lo pide directamente, auditado; Leda no le escribe a quien "
+               "destraba (el mensaje que todavía no salió no sale)",
+          despues="cierra lo propuesto y la pregunta de quién lo destraba; si Leda ya le "
+                  "preguntaba a quien destraba, deja de preguntarle y esa persona se entera; al "
+                  "día hábil siguiente Leda le pregunta a la persona trabada cómo le fue",
+          manejar=_pedirselo_y_contar, del_responsable=True, se_ofrece=False,
+          estados=frozenset({"bloqueada"}),
+          contesta=(preguntas.QUIEN_DESTRABA,),
+          es="La persona trabada dice que se lo va a pedir directamente a quien destraba su "
+             "tarea y que después le cuenta a Leda: quien es a quién se lo pide, como lo "
+             "nombró, si lo dice. Pedir que Leda no le escriba porque ya lo hablaron es otra "
+             "jugada."),
     Ficha("pedir_reasignacion", "pasarle una tarea suya a otra persona del equipo",
           necesita=(), opcional=("tarea", "a", "como_la_nombra"),
           comprueba="que sea el responsable o, si nombra una que no está en su lista, el "

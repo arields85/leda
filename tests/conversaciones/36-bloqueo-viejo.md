@@ -99,7 +99,15 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
 12. **Marcos** escribe (lunes 26, 15:00): "listo ya tengo la licencia sigo con el hmi"
     →
     - Jugadas: `destrabar` sobre la tarea del panel HMI.
-    - Efecto: el bloqueo del panel HMI se cierra.
+    - Efecto: el bloqueo del panel HMI se cierra. Ariel, que había dado el lunes para liberar la
+      licencia, se entera de que ya no hace falta (decisión 39, desde la C-5c): se guarda el aviso a
+      Ariel, que sale terminado el margen para corregir (15:10).
+
+12b. **Leda**, por su cuenta, a Ariel (lunes 26, 15:10): que ya no hace falta.
+    →
+    - Efecto: un mensaje privado a Ariel, informativo.
+    - El mensaje dice: que lo del panel HMI ya se resolvió y no hace falta que libere la licencia;
+      que no hace falta responder.
 
 13. **Leda**, por su cuenta, a Ismael (martes 27, 10:00): el bloqueo del PLC lleva cinco días hábiles.
     →

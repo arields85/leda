@@ -152,7 +152,25 @@ pasos:
     efectos:
       estados: {HMI: en_curso}
       bloqueos_resueltos: [HMI]
+      # Ariel había dado el lunes para la licencia: se entera de que ya no hace falta (decisión
+      # 39, desde la C-5c).
+      avisos_guardados:
+        - {tipo: ya_no_hace_falta_que_destrabe, tarea: HMI, a: Ariel, estado: guardado,
+           hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo,
+                    habia_dicho: {para_cuando: "2026-10-26"}}}
     pregunta: null
+
+  - paso: 12b
+    quien: Leda
+    relojes: ["2026-10-26 15:10"]
+    salen:
+      - a: Ariel
+        tipo: ya_no_hace_falta_que_destrabe
+        tarea: HMI
+        hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo}
+    dice:
+      - que lo del panel HMI ya se resolvió y no hace falta que libere la licencia
+      - que no hace falta responder, en el último renglón
 
   - paso: 13
     quien: Leda

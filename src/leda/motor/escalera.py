@@ -161,13 +161,13 @@ from .avisos import (ABIERTOS, ANTES_LA_REVISABA_OTRA_PERSONA, APROBACION_TRABAD
 from .avisos import REPETICION_DEL_DIA, hechos_de_la_que_vuelve
 from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir, preguntada_en,
                                      se_repite)
-from .avisos import BLOQUEO_QUE_SIGUE_ABIERTO, sigue_esperando_que_destrabe
+from .avisos import BLOQUEO_QUE_SIGUE_ABIERTO, de_quien_es_la_pregunta
 from .bloqueo_viejo import informar_los_viejos
 from .cadencias import YA_LO_CONTO, guardar_los_pedidos, ya_lo_conto
 from .informe_al_grupo import INFORME_AL_GRUPO, guardar_los_informes
 from .pase import seguir_los_pases
 from .preguntas import COMO_VIENEN_SUS_TAREAS
-from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, lo_anotado
+from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, QUE_ARREGLARON, lo_anotado
 from .preguntas import TIPOS as TIPOS_DE_PREGUNTA
 from .tiempo import Reloj, sale
 
@@ -537,10 +537,11 @@ def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
     tarea = leer_tarea(cur, task_id)
     if tarea is None or tarea["estado"] in ("terminada", "cancelada"):
         return None
-    if pregunta["tipo"] == CUANDO_SE_DESTRABA and sigue_esperando_que_destrabe(
-            cur, (pregunta["jugada"] or {}).get("destraba_id"), persona) is not None:
+    if pregunta["tipo"] in (CUANDO_SE_DESTRABA, QUE_ARREGLARON) and de_quien_es_la_pregunta(
+            cur, tarea, pregunta) is not None:
         # La tarea se destrabó, o la destraba otra persona, por un camino que no la cerró: ya
-        # no espera nada de quien se le preguntaba (C-5).
+        # no espera nada de quien se le preguntaba (C-5), ni de la persona trabada lo que
+        # arregló con esa persona (C-5c).
         cur.execute("""update conversation_question
                           set cerrada_en = %s, cierre = 'sin_efecto',
                               cierre_detalle = jsonb_build_object('tarea', %s::text)

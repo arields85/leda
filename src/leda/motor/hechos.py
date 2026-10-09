@@ -625,9 +625,10 @@ SIGNIFICADOS: Mapping[str, str] = {
     "respondida": "La pregunta se cerró con la respuesta de la persona.",
     # --- Códigos: lo que Leda propone y lo que espera saber ------------------------------------
     "que_alguien_ayude": "Propuesta: que alguien del equipo ayude con el bloqueo.",
-    "pedirselo_y_contar": "Propuesta: que la persona trabada se lo pida directamente a quien "
-                          "destraba y le cuente a Leda lo que pase (quién lo destraba, o que ya "
-                          "puede seguir).",
+    "pedirselo_y_contar": "Que la persona trabada se lo pida directamente a quien destraba y le "
+                          "cuente a Leda lo que pase (lo que arreglaron, quién lo destraba, o "
+                          "que ya puede seguir): Leda no le escribe a quien destraba y al día "
+                          "hábil siguiente le pregunta cómo le fue.",
     "pasarsela_a_otra_persona": "Pasarle la tarea a otra persona del equipo que tenga un chat "
                                 "con Leda.",
     "si_la_termino": "Si la persona terminó la tarea.",
@@ -773,10 +774,11 @@ SIGNIFICADOS: Mapping[str, str] = {
                            "está o lo que pasa, con sus palabras.",
     "aviso_a_quien_esta_trabado": "El aviso a la persona trabada con lo que dijo quien escribe: "
                                   "a quién (a) y cuándo se entera (llega).",
-    "para_cuando": "El día para el que quien puede destrabar la tarea dice que lo resuelve.",
+    "para_cuando": "El día para el que se resuelve lo que traba la tarea, según quien lo dijo.",
     "ya_esta": "Quien puede destrabar la tarea dice que ya lo resolvió. La tarea sigue trabada "
                "hasta que la persona trabada diga que puede seguir.",
-    "lo_que_dice": "Lo que dijo quien puede destrabar la tarea, con sus palabras.",
+    "lo_que_dice": "Lo que dijo quien puede destrabar la tarea, o la persona trabada, con sus "
+                   "palabras.",
     "pidio_que_no_le_escriba": "La persona trabada pidió que Leda no le escribiera a quien "
                                "puede destrabar su tarea.",
     "ya_se_le_escribio": "Leda ya le escribió a quien puede destrabar la tarea: lo que le "
@@ -794,6 +796,77 @@ SIGNIFICADOS: Mapping[str, str] = {
                       "trabada: lo que queda anotado es lo que arreglaron entre ellos.",
     "lo_que_arreglaron": "Qué arreglaron quien puede destrabar la tarea y la persona trabada, "
                          "para que quede asentado.",
+    # --- Cerrar el tema para todos, lo acordado y "se lo pido yo" (C-5c; `persecucion.py`) -----
+    "que_arreglaron": "Pregunta a la persona trabada qué arregló con quien puede destrabar su "
+                      "tarea y para cuándo: espera su respuesta.",
+    "pregunta_a_quien_esta_trabado": "Mensaje de Leda a la persona trabada: quien puede "
+                                     "destrabar su tarea (quien_destraba) dice que ya lo "
+                                     "hablaron, sin decir qué; la pregunta de qué arreglaron y "
+                                     "para cuándo. Vale lo que conteste primero cualquiera de "
+                                     "los dos.",
+    "como_le_fue_con_quien_destraba": "Mensaje de Leda a la persona trabada, el día hábil "
+                                      "siguiente de que dijo que se lo pedía directamente a "
+                                      "quien destraba su tarea (se_lo_pide_a): la pregunta de "
+                                      "cómo le fue, qué arreglaron y para cuándo.",
+    "lo_que_dijo_quien_esta_trabado": "Aviso a quien puede destrabar (o destrababa) la tarea "
+                                      "de otra persona con lo que dijo la persona trabada "
+                                      "(quien_esta_trabado) sobre lo que arreglaron, o lo que "
+                                      "contestó. Es información: no pide respuesta.",
+    "ya_no_hace_falta_que_destrabe": "Aviso a quien Leda le preguntaba por la tarea trabada de "
+                                     "otra persona (responsable): el tema se cerró sin esa "
+                                     "persona (como_se_cerro), así que ya no hace falta lo que "
+                                     "se le pedía y Leda no le pregunta más. Es información: no "
+                                     "pide respuesta.",
+    "se_lo_pasa_si_contesta": "Lo que llega es lo que dijo la otra persona de lo que "
+                              "arreglaron, o lo que contestó: si es así, no hace falta que haga "
+                              "nada; si no es lo que entendió, o quiere decirle algo, que lo "
+                              "diga y Leda se lo pasa.",
+    "cierra_el_tema": "Lo que llega contesta lo que la otra persona había dicho: con eso el tema "
+                      "queda cerrado para los dos y no se le pide nada más a nadie.",
+    "como_se_cerro": "Cómo se cerró el tema para quien recibe el aviso: la tarea ya no está "
+                     "trabada por eso (ya_se_destrabo), la destraba otra persona "
+                     "(cambio_quien_destraba), la persona trabada dijo que ya lo hablaron "
+                     "(dijo_que_ya_lo_hablaron) o que se lo pide directamente "
+                     "(se_lo_pide_quien_esta_trabado), o el bloqueo se había anotado por error "
+                     "(quedo_sin_efecto).",
+    "habia_dicho": "Lo último que había dicho sobre eso quien recibe el aviso: para cuándo o sus "
+                   "palabras.",
+    "dijo_que_ya_lo_hablaron": "La persona trabada dijo que ya lo habló con quien destraba su "
+                               "tarea.",
+    "se_lo_pide_quien_esta_trabado": "La persona trabada dijo que se lo pide directamente a "
+                                     "quien destraba su tarea.",
+    "quedo_sin_efecto": "El bloqueo se había anotado por error y quedó sin efecto.",
+    "ya_no_hace_falta_que_destraben": "A quiénes Leda les preguntaba por la tarea trabada y "
+                                      "ahora les avisa que ya no hace falta "
+                                      "(aviso_a_quien_destrababa).",
+    "aviso_a_quien_destrababa": "El aviso de que ya no hace falta, a quien Leda le preguntaba "
+                                "por la tarea trabada: a quién (a) y cuándo se entera (llega).",
+    "quien_esta_trabado": "Quién tiene la tarea trabada: la persona que dijo lo que llega.",
+    "dice_quien_esta_trabado": "Lo que dijo la persona trabada sobre lo que arregló con quien "
+                               "destraba su tarea, o lo que contestó: para cuándo y sus "
+                               "palabras.",
+    "aviso_a_quien_destraba": "El aviso con lo que dijo la persona que escribe, a quien destraba "
+                              "su tarea: a quién (a) y cuándo se entera (llega).",
+    "le_pregunta_tambien_a": "La misma pregunta, qué arreglaron y para cuándo, también a la "
+                             "persona trabada: a quién (a) y cuándo le llega (llega). Vale lo "
+                             "que conteste primero cualquiera de los dos.",
+    "ya_se_habia_destrabado": "Lo que dijo quien destrababa la tarea llegó después de que la "
+                              "tarea ya no estaba trabada por eso.",
+    "ya_no_hace_falta_que_la_destrabe": "Una tarea de otra persona que la persona que escribe "
+                                        "iba a destrabar y ya no hace falta (Leda se lo avisó): "
+                                        "lo que diga de eso le llega a quien la tiene. No es una "
+                                        "tarea suya.",
+    "se_lo_pide_a": "A quién se lo pide directamente la persona trabada.",
+    "le_pregunta_como_le_fue": "Cuándo le pregunta Leda a la persona trabada cómo le fue "
+                               "(llega).",
+    "ya_lo_conto_quien_destraba": "Quien puede destrabar la tarea ya contó lo que arreglaron: "
+                                  "la pregunta a la persona trabada ya no hace falta.",
+    "ya_lo_conto_quien_esta_trabado": "La persona trabada ya contó lo que arreglaron: la "
+                                      "pregunta ya no hace falta.",
+    "volvio_a_ser_quien_destraba": "La persona trabada volvió a decir que la destraba esa misma "
+                                   "persona.",
+    "sin_quien_destraba": "La tarea trabada no tiene a otra persona que la destrabe: no hay con "
+                          "quién haber arreglado algo.",
     # --- "No me corresponde" y la cadena al referente (C-5, porción 3; `persecucion.py`) -------
     "no_le_corresponde": "Quien Leda creía que podía destrabar la tarea dice que no le "
                          "corresponde.",
@@ -1101,6 +1174,8 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "decir_cuando_destraba": "anotar_para_cuando_destraba_la_tarea_de_otra_persona",
     "no_escribirle": "no_escribirle_a_quien_destraba",
     "decir_que_no_le_toca": "anotar_que_no_le_toca_destrabar_la_tarea_de_otra_persona",
+    "contar_lo_que_arreglaron": "anotar_lo_que_arreglo_con_quien_la_destraba",
+    "pedirselo_y_contar": "se_lo_pide_directamente_y_despues_cuenta",
 }
 _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 

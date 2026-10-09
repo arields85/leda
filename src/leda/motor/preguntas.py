@@ -109,6 +109,14 @@ VER_LA_ENTREGA = "ver_la_entrega"
 # quien destraba (`decir_cuando_destraba`) y se cierra cuando la tarea se destraba o cambia
 # quién la destraba (`persecucion.py`).
 CUANDO_SE_DESTRABA = "cuando_se_destraba"
+# Qué arregló la persona trabada con quien destraba su tarea (C-5c; decisiones 48 y 37 del
+# usuario, 2026-10-09): la abre el aviso que se la hace (`avisos.PREGUNTA_A_QUIEN_ESTA_TRABADO`,
+# cuando quien destraba dice que ya lo hablaron sin decir qué; `avisos.COMO_LE_FUE`, al día hábil
+# siguiente de "se lo pido yo y te cuento"). Espera respuesta con su propia espera, que la escalera
+# de las preguntas repite sin escalar (decisión 38: nunca se la abandona). La contesta lo que
+# cuenta la persona trabada (`contar_lo_que_arreglaron`) o que ya puede seguir (`destrabar`); se
+# cierra si contesta primero quien destraba (`persecucion.py`).
+QUE_ARREGLARON = "que_arreglaron"
 # Cómo vienen las tareas de la lista que Leda manda con el ritmo fijo del espacio (C-6, decisión 8 del
 # usuario, 2026-10-08; `cadencias.py`): una sola pregunta por todas, sin tarea propia. Su jugada guarda
 # las tareas de la lista (`tareas`) y las que la persona ya contó (`contestadas`, con el momento del
@@ -163,6 +171,7 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(CUAL_DE_LAS_DOS, sin_elegir_queda=DECISION_DE_LA_ENTREGA),
     TipoDePregunta(VER_LA_ENTREGA),
     TipoDePregunta(CUANDO_SE_DESTRABA, espera=CUANDO_SE_DESTRABA, escala=False),
+    TipoDePregunta(QUE_ARREGLARON, espera=QUE_ARREGLARON, escala=False),
     TipoDePregunta(COMO_VIENEN_SUS_TAREAS),
     TipoDePregunta(CONFIRMAR_EL_PASE),
     TipoDePregunta(DECIDIR_EL_PASE),
