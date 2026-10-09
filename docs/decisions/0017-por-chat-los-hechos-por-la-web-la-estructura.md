@@ -69,51 +69,49 @@ Condiciones de la carga (usuario, 2026-10-04):
 **Anotado para más adelante: la aceptación dentro de Leda.** Quien decide las tareas las acepta en
 Leda. Se retoma cuando exista el formulario web, que es donde se haría; nunca por chat.
 
-**Enmienda propuesta, delegar por chat** (`PENDIENTE` de aceptación del usuario; escrita el
-2026-10-09 a partir de las decisiones del usuario del 2026-10-07 en `docs/ROADMAP.md` y de la
-decisión 9 de `odd/tasks/fase-c.md`, del 2026-10-08). Hasta que se acepte, no se escribe código.
+**Enmienda a la decisión 2: delegar por chat** (aceptada por el usuario el 2026-10-09, "está
+bien la idea", con las respuestas a las tres preguntas de abajo; parte de las decisiones del
+2026-10-07 en `docs/ROADMAP.md` y de la decisión 9 de `odd/tasks/fase-c.md`, del 2026-10-08).
 
 - **Qué cambia.** Crear y aceptar tareas sigue fuera del chat. Cambiar el responsable de una tarea
-  que ya existe pasa a poder hacerse por chat, sólo como delegación dentro de la cadena de mando
-  declarada en el pack. Cambia la última línea de la decisión 3b ("crear, aceptar, reasignar")
+  que ya existe pasa a poder hacerse por chat, sólo como delegación dentro de los sectores
+  declarados en el pack. Cambia la última línea de la decisión 3b ("crear, aceptar, reasignar")
   y el punto 2 de la decisión 7, para los responsables; las fechas siguen como están.
-- **Quién decide.** Decide quien manda sobre el que recibe, según el pack (`aprobado_por` de
-  quien recibe). Si quien pide la delegación es esa misma persona, su pedido es la decisión.
-  Ejemplo: Marcos le pasa "Revisar comunicaciones" a Nahuel; Nahuel tiene `aprobado_por: marcos`,
-  así que decide Marcos. Si Marcos se la quiere pasar a Lucas, de Infraestructura, decide Martín
-  (`aprobado_por` de Lucas).
+- **Quién puede pedirlo.**
+  - **El encargado de un sector** (el referente del área en el pack) busca primero a alguien de su
+    sector; si están todos ocupados, puede pedir ayuda a gente de otro sector.
+  - **Un integrante, sólo dentro de su sector:** Nahuel puede pedir pasarle su tarea a otro de OT.
+  - **Un integrante no delega a otro sector:** si Nahuel pide "pasale la de comunicaciones a
+    Lucas", Leda no lo hace y le dice que eso lo decide Marcos (decisión 1, "es una persona
+    concreta").
+- **Quién decide: el encargado del sector de quien recibe** (`areas[].referente` del pack). Si
+  quien pide es ese mismo encargado, su pedido es la decisión. Ejemplos:
+  - Marcos le pasa "Revisar comunicaciones" a Nahuel: decide Marcos al pedirlo; confirma Nahuel.
+  - Nahuel se la quiere pasar a otro de OT: Leda le pregunta a Marcos si lo aprueba (si dice que
+    no, sigue con Nahuel) y después confirma quien recibe. Que Marcos decida y no sólo se entere
+    es la re-aprobación de la mecánica §7.
+  - Marcos se la quiere pasar a Lucas, de Infraestructura: decide Martín y después confirma Lucas.
+  - Martín se la quiere pasar a Marcos, encargado de OT: decide Marcos, y su "sí" vale como
+    decisión y como confirmación. Ismael no interviene.
+- **Qué tareas.** Sólo una tarea asignada, en curso o trabada; una trabada se mueve con su bloqueo
+  abierto. Una tarea en revisión o terminada no se delega: el trabajo ya está hecho y moverla
+  mezclaría quién lo hizo.
 - **Pasos, con las garantías de siempre.** (1) Quien pide ve una vista previa ("📋 Revisar
   comunicaciones pasa de Marcos a Nahuel") y confirma (constitución §7). (2) Si decide otra
   persona, Leda se lo pregunta; si dice que no, la tarea sigue con quien la tenía y Leda se lo dice
   a quien pidió. (3) Quien recibe confirma que la toma; si no la toma, la tarea sigue con quien la
   tenía y Leda se lo dice a quien pidió. (4) Al aceptar, cambia el responsable y Leda le avisa a
-  quien pidió y, si no es la misma persona, a quien la tenía.
+  quien pidió y, si no es la misma persona, a quien decidió y a quien la tenía.
 - **Lo que no cambia.** La fecha objetivo, el criterio de aceptación y la evidencia siguen
   iguales. El trabajo lo sigue revisando el aprobador de la tarea original. A Dirección no le llega
   ningún aviso (decisión 9: "a Ismael no le interesa quién lo haga mientras se haga").
-- **Re-aprobación** (mecánica §7, cambio de responsable): la da quien decide en el paso 2, y la
-  auditoría guarda quién pidió, quién decidió, quién aceptó y el estado anterior, con la versión
-  del pack y del núcleo.
-- **Quién puede pedirlo** (usuario, 2026-10-09).
-  - **El encargado de un sector** busca primero a alguien de su sector; si están todos ocupados,
-    puede pedir ayuda a gente de otro sector, y ahí decide el encargado de ese sector y después
-    confirma quien recibe (Marcos → Lucas: primero Martín, después Lucas).
-  - **Un integrante, sólo dentro de su sector:** Nahuel puede pedir pasarle su tarea a otro de
-    OT. Decide Marcos (Leda le pregunta si lo aprueba; si dice que no, sigue con Nahuel) y después
-    confirma quien recibe. Que Marcos decida y no sólo se entere es la re-aprobación de la
-    mecánica §7.
-  - **Un integrante no delega a otro sector:** si Nahuel pide "pasale la de comunicaciones a
-    Lucas", Leda no lo hace y le dice que eso lo decide Marcos (decisión 1, "es una persona
-    concreta").
-- **Preguntas para el usuario antes de aceptar:**
-  1. ~~¿Un integrante puede pedir pasarle su tarea a otro?~~ Respondida arriba: no.
-  2. ~~¿Delegar una tarea que ya está en revisión o terminada?~~ **Decidida (usuario,
-     2026-10-09):** no; sólo asignada, en curso o trabada, y si está trabada se mueve con su
-     bloqueo abierto.
-  3. ¿"Quien manda sobre el que recibe" es `aprobado_por` o el referente del área? En CoreWork son
-     la misma persona para todos menos para los referentes, a quienes los aprueba Ismael. Propuesta:
-     `aprobado_por`, que ya existe y no necesita un dato nuevo. Consecuencia: pasarle una tarea a
-     un referente (Martín se la pasa a Marcos) lo decidiría Ismael, la única vez que interviene.
+- **Re-aprobación** (mecánica §7, cambio de responsable): la da quien decide, y la auditoría
+  guarda quién pidió, quién decidió, quién aceptó y el responsable anterior, con la versión del
+  pack y del núcleo.
+- **Preguntas que se hicieron al usuario (2026-10-09):** (1) ¿un integrante puede delegar? Sí,
+  sólo dentro de su sector, y decide su encargado (opción A: decide, no sólo se entera); (2) ¿una
+  tarea en revisión o terminada? No; (3) ¿quién decide cuando recibe un encargado de otro sector?
+  Él mismo (opción A), no Ismael.
 
 ### 3. Qué hace Leda por chat en esta etapa
 
