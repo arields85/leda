@@ -284,8 +284,10 @@ def test_la_redaccion_de_un_dia_nuevo_nombra_a_quien_se_le_avisa_solo_si_se_preg
     assert hecho["aviso_al_referente"]["a"] == "Ismael"
     redactado = hechos.para_redactar(hecho)
     assert "Ismael" not in a_la_vista(redactado)
+    # D8: la hora en que se entera, también sólo si pregunta, como el nombre (el modelo del
+    # usuario no la dice).
     assert redactado["aviso_a_quien_aprueba_su_trabajo"] == {
-        "llega": "2026-10-05T10:10:00-03:00", "solo_si_pregunta": {"a": "Ismael"}}
+        "solo_si_pregunta": {"a": "Ismael", "llega": "2026-10-05T10:10:00-03:00"}}
 
 
 def test_el_aviso_al_referente_espera_el_margen_del_espacio(conn, mundo, escribe):
