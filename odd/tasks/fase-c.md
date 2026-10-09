@@ -2254,11 +2254,94 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         una cadena (porción 4); sólo lo que dice quien destraba.
       - Lo que contesta quien destrababa sólo se toma mientras el aviso de que ya no hace falta
         sea lo último que Leda le mandó.
-      - **Preguntas para el usuario** (cómo se leyó lo que las decisiones no dicen): a quien ya
-        dijo "ya está" no se le avisa que se destrabó (lo cerró esa persona); si Ariel ya contestó
-        una fecha, "no le escribas" no le manda nada (Leda ya no le preguntaba); lo que Ariel
-        contesta después del cierre le llega a Marcos para que, si quiere, le conteste, sin
-        preguntarle ni repetírselo.
+      - **Preguntas para el usuario** (cómo se leyó lo que las decisiones no dicen): ~~a quien ya
+        dijo "ya está" no se le avisa que se destrabó~~ y ~~si Ariel ya contestó una fecha, "no le
+        escribas" no le manda nada~~: derivados de la regla 39 por el coordinador y hechos en la
+        C-5d; lo que Ariel contesta después del cierre le llega a Marcos para que, si quiere, le
+        conteste, sin preguntarle ni repetírselo.
+    - **Revisión RDD de la C-5c:** encontró un CRITICAL (`R3-avisar-arity`, linaje
+      `review-ac86a6b1e12114b3`) que es un falso positivo: `_avisar_a_quien_esta_trabado` ya tenía
+      el sexto parámetro `mas` en `bda6a91` y lo suma a los hechos (`**(mas or {})`). El CRITICAL del
+      tramo del commit de pruebas vino de separar las pruebas del código; el rango entero pasa del
+      presupuesto del revisor, y un reintento se detuvo con `corrupted_or_unverifiable_authority`.
+      Así que la C-5c queda sin un recibo aprobado, verificada por la suite (1567 passed) y la
+      corrida en seco (43 de 43).
+  - [x] **C-5d: a quién va lo asentado, quién destraba, "ni idea" y hasta tres personas**
+    (decisiones 24, 41, 49 y 51 del usuario, 2026-10-09; derivados por el coordinador de la regla 39:
+    quien dijo "ya está" se entera de cuándo se cerró de verdad, y "no le escribas" después de que
+    quien destraba dio un día se lo cierra; las advertencias de la revisión RDD de la C-5c). Route:
+    delegada (escritor único, 2+ archivos no triviales). Hecha el 2026-10-09:
+    - **Las conversaciones primero** (`4cadd41`): la 34 cambia en dos hilos (y la 32 y la 35, por los derivados de la 39). En el de los planos,
+      Mariano (la segunda persona preguntada) dice "ni idea": Leda no lo asienta todavía y le
+      pregunta a Nahuel si se le ocurre otra persona (pasos 7 y 8); Nahuel dice que no y queda
+      asentado: la cadena le llega a Marcos y a Nahuel se le dice que quedó asentado (pasos 8b y
+      8c, nuevos). En el de la digitalización, Martín nombra a Mariano y Leda le pregunta a
+      Mariano, la tercera (pasos 14 y 15); Mariano nombra a Ismael y ahí se corta: la cadena va a
+      Marcos, el referente de OT, y nunca a Mariano, que es parte de la cadena aunque sea el
+      referente de lo eléctrico (pasos 16 y 17, nuevos). La 36 suma la decisión 41: Ismael, que
+      recibió el bloqueo viejo, dice "ya esta, llega mañana"; queda anotado y le llega a Marcos,
+      pero el bloqueo sigue abierto; cuando Marcos dice que pudo seguir, se enteran Ariel e
+      Ismael (pasos 20 a 23). En seco contra el código anterior: 34 con 20 fallas y 36 con 6.
+    - **El motor** (`86a5cdd`, `persecucion.py` sobre todo):
+      - **51, hasta tres personas** (`LIMITE_DE_LA_CADENA`): la cadena se cuenta por vuelta
+        (`_vuelta`: desde la última vez que la persona trabada dijo por su cuenta quién lo destraba)
+        y por las personas que otra nombró (`_nombrados`). Mientras haya lugar, quien no dice de
+        quién es recibe la pregunta de quién se encarga (antes, sólo la primera) y a quien nombra,
+        Leda le escribe (antes, sólo la primera nombraba); con las tres ya preguntadas, se corta
+        sin preguntar nada más. La idea de "la primera" desaparece.
+      - **49, "ni idea" con lugar:** antes de asentarlo, a la persona trabada, terminado el margen,
+        lo que dijo quien no lo toma y si se le ocurre otra persona (aviso nuevo
+        `quien_mas_puede_destrabar`, de coordinación, que al salir abre su pregunta de quién lo
+        destraba; no sale si ya contestó o se destrabó). Lo que contesta sigue la misma cadena
+        (`contesta_si_hay_otra`: la clave del aviso nombra la fila del "ni idea"): si nombra a
+        alguien, Leda le escribe; si no sabe, queda asentado (`sin_otra_persona`: la cadena entera a
+        quien decide y, a ella, que quedó asentado, sin salidas). Sin migración.
+      - **24, a quién va** (`a_quien_informar`): al referente del sector de la tarea trabada; si es
+        la persona trabada o alguien de la cadena, a quien aprueba el trabajo de la persona
+        trabada; nunca a alguien de la cadena (si los dos lo son, a nadie: queda asentado con el
+        incidente para el administrador, como sin referente). Reemplaza al sector de lo que falta
+        de la decisión 5. Vale también para el bloqueo viejo (`bloqueo_viejo.a_quien`, con la
+        cadena de toda la historia del bloqueo), porque lo asentado le llega a quien decide quién
+        lo resuelve (decisión 49).
+      - **41, lo da por destrabado quien está trabado:** `resolver_bloqueo` ya no deja cerrarlo a
+        `escalado_a` (sólo a quien tiene la tarea o quien anotó el bloqueo), en la vista previa y
+        en la ejecución. A quien Leda le informó que sigue trabada (el bloqueo viejo o la cadena)
+        la ve en su lista (`se_le_informo_que_sigue_trabada`) y `decir_cuando_destraba` anota lo
+        que dice sobre la fila de quién la destraba ahora, dicho por esa persona (si nadie dijo
+        nunca quién, una fila nueva que dice que la destraba ella), y le llega a la persona
+        trabada; el bloqueo sigue abierto.
+      - **Derivados de la 39:** quien dijo "ya está" (también quien habló del bloqueo sin que lo
+        nombraran, como a quien se le informó) se entera de cuándo se cerró de verdad
+        (`_con_el_tema_abierto`; la clave de `ya_no_hace_falta_que_destrabe` suma la persona);
+        "no le escribas" después de que quien destraba dio un día le cierra el tema (`_dio_un_dia`).
+      - **Las advertencias de la revisión de la C-5c:** `pase._quienes_se_enteran` lee
+        `pase["decidido_en"]` sin valor por omisión (todas las filas vienen de `_el_pase`, `p.*`;
+        una prueba lo fija); `vigencia_de_que_arreglaron` ordena "quién ya lo contó" por `d.at desc,
+        d.id desc`, como el resto (sin prueba en rojo: con dos filas en el mismo instante el orden
+        sin desempate no es determinista, así que ninguna prueba falla siempre).
+      - **Las instrucciones de la IA no cambiaron** (huellas de `test_contratos.py` iguales): el
+        aviso nuevo y la marca de la lista, en `hechos.SIGNIFICADOS`; las fichas de
+        `anotar_quien_destraba` y `decir_cuando_destraba` dicen el caso nuevo, sin frases.
+    - **Test primero:** `test_cadena_del_bloqueo.py` reescrita con las reglas nuevas (35 pruebas),
+      `test_bloqueo_viejo.py` (24 y 41), `test_persecucion.py` (los dos derivados), `test_delegar.py`
+      (`decidido_en`) y `tests/garantias/test_destraba_quien_esta_trabado.py` (41, en la vista
+      previa y en la ejecución): **30 en rojo** antes del código. **Verde:** las 168 de esos
+      archivos.
+    - **Cambió fuera de lo permitido:** `tests/test_bloqueos.py::test_resolver_bloqueo_lo_puede_a_quien_se_escalo`
+      espera lo contrario de la decisión 41; queda para el coordinador (no estaba entre los
+      archivos de este escritor).
+    - **Chequeos** (2026-10-09, sobre `86a5cdd`): `pytest tests/motor tests/garantias
+      tests/conversaciones`, **1607 passed**; en seco, `correr --ia guionada --veces 1 --sin-informe`,
+      **43 de 43 bien**. Sin la IA real; informes borrados, `gasto.json` sin tocar.
+    - `PENDIENTE`:
+      - **La IA real** sobre la 34 y la 36, y la prueba por Telegram.
+      - **Preguntas para el usuario** (cómo se leyó lo que las decisiones no dicen): si quien
+        aprueba el trabajo de la persona trabada también es de la cadena, hoy no le llega a nadie
+        (incidente para el administrador); si la persona trabada no contesta la pregunta de si se
+        le ocurre otra persona, la escalera de esa pregunta termina avisando como cualquier
+        pregunta de quién lo destraba; a quien recibió la cadena (no sólo el bloqueo viejo) también
+        se le toma lo que dice; si la persona trabada nombra fuera del equipo al contestar, queda
+        anotado como siempre (Leda no le escribe) y la cadena no se asienta.
 - [ ] **C-6.** Las cadencias (pregunta 8). El pedido de estado por persona, hecho y revisado el
   2026-10-09; el informe al grupo (decisión 25), construido el mismo día con su corrección (abajo,
   "La corrección de la C-6 y el informe al grupo"); falta la revisión RDD de ese tramo
@@ -2563,7 +2646,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     decisión 26); `23b24c3..ce6c6c9` `review-1080390624461ecb` (advertencias en `aprobacion.py:365`
     y `fichas.py:603`); `ce6c6c9..e082010` `review-8e6e2bf9ee6b926e` (advertencias: un botón
     Confirmar viejo, `pase.py:215`; contestar ignora un error, `pase.py:366`).
-  - **Falta construir:** la 24, en la C-5. Las decisiones 26, 27 y 28 (con la 43, derivada de la
+  - **Falta construir:** ~~la 24, en la C-5~~ (hecha en la C-5d). Las decisiones 26, 27 y 28 (con la 43, derivada de la
     28) están hechas: abajo, "Las decisiones 26, 27 y 28"; la 53 y la 39 en los pases, en "La
     corrección de la C-7".
   - **Suite completa** sobre `e082010` (coordinador, 2026-10-09): `pytest -q`, 1857 passed.
@@ -2828,8 +2911,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         decir qué), con "se lo pido yo", la 39 en los pases y lo asentado en la página de la
         tarea; conversaciones 33, 36, 38 y 43, migración `0049` (`0817e28`, `2e17dcf`,
         `bf291d3`, `3e055a8`).
-  - [ ] C-5d: 24 (el informe, nunca a alguien de la cadena), 41 (destraba quien está trabado), 49
-        (preguntarle a la persona trabada antes de asentar), 51 (hasta tres personas).
+  - [x] C-5d: 24 (el informe, nunca a alguien de la cadena), 41 (destraba quien está trabado), 49
+        (preguntarle a la persona trabada antes de asentar), 51 (hasta tres personas);
+        conversaciones 34 y 36, sin migración (`4cadd41`, `86a5cdd`).
   - [ ] C-5e: 42 (seguir la cadena hasta quien puede destrabarla).
   - [ ] El enlace: 33 (el resumen para cualquiera, el detalle a pedido).
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
