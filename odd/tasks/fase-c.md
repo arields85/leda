@@ -1210,6 +1210,65 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       (`fichas.py:368`, `preguntas.py:453`), `herramientas.py:1791` (lo del ejemplo aceptado sin
       validar contra la clase) y la ventana entre pedidos de cambios (`entrega.py:297`).
       `leda_motor` necesita la `0039` antes de la próxima prueba por Telegram.
+  - [x] **D5b.** Una pregunta de Leda sin contestar (decisión 21, conversación 30 con su YAML). Route:
+    delegada (escritor único, 2+ archivos no triviales). Hecha el 2026-10-09:
+    - **La conversación primero** (`56cdd45`): la 30, con los dos órdenes de respuesta en un hilo
+      (el miércoles Marcos contesta primero la segunda pregunta; el jueves, primero la que quedó para
+      después), la repetición a las 4 horas, el tema siguiente aparte y el día siguiente. En
+      `test_corredor` (30). En seco, antes del código: 17 fallas, todas del motor (pasos 3, 5 a 10 y
+      12).
+    - **La regla** (`9bfc40f`, `leda.motor.pregunta_sin_contestar`; migración `0040` con su rollback:
+      `conversation_question.preguntada_en` y `vuelve_aparte`): con otro tema que pide respuesta
+      esperando detrás, la escalera repite la pregunta abierta una vez en el día, a las 4 horas
+      (`repeticion_del_dia`; `pregunta_sin_contestar_minutos` en `workspace_setting`, 240 por
+      omisión, anotado en `docs/product/plataforma-pendientes.md`). Su turno termina 4 horas después
+      de la repetición, o al día siguiente: de lo que espera sale aparte uno solo, el más urgente
+      (`avisos._un_tema_a_la_vez`, `_urgencia`), y la pregunta queda para después. Las dos quedan
+      marcadas: cuando una se cierra, el código trae la otra en su propio mensaje
+      (`vuelve_la_pregunta`, `sigue_la_conversacion`: no espera los 30 minutos de la D5, sí el
+      horario), y la respuesta del turno no la lleva. La misma pregunta nunca sale dos veces en un
+      momento: si la repite su escalera, la repetición del día y la que vuelve quedan omitidas
+      (`la_misma_pregunta_sale_en_otro_aviso`).
+    - **El aviso de que se va a escalar** (punto 5 de la decisión): el significado de
+      `si_no_hay_respuesta` dice ahora que se informa que la tarea está atrasada (o la pregunta sin
+      respuesta) y que nadie toma la tarea por eso; el nombre ya iba en `solo_si_pregunta` (decisión
+      11). Las instrucciones de la IA no cambiaron (huellas de `test_contratos.py` iguales).
+    - **Test primero:** `tests/motor/test_pregunta_sin_contestar.py` con el módulo sólo con la espera
+      configurable: 8 de 18 en rojo (las otras 10: la configuración y dos que miran que algo no
+      pase). La del significado de lo que pasa sin respuesta se escribió con el cambio, sin rojo
+      observado. La 30 se completó con el código: sus pasos 6 y 9 no declaraban el aviso guardado de
+      la pregunta que vuelve.
+    - **Pruebas que cambiaron:** `test_un_envio_por_dia.py` ordenaba dos preguntas abiertas en el
+      mismo momento por el orden físico de las filas, que cambia al marcar `preguntada_en`; ahora la
+      abierta va primero, explícito. Por la misma prueba, a igual urgencia gana la pregunta abierta
+      (el tema en curso).
+    - **Chequeos** (2026-10-09, sobre `9bfc40f`): `pytest tests/motor tests/conversaciones`, 925
+      passed; `pytest tests/garantias`, 326 passed (la paridad y el rollback de la `0040`
+      incluidos); en seco, `correr --ia guionada --veces 1 --ronda seco-d5b`, 30 de 30 bien
+      (informes borrados, `gasto.json` sin tocar). Sin la IA real (decisión del usuario: van en la
+      tanda posterior). Sin la suite completa.
+    - `PENDIENTE` (decisiones del usuario; lo construido es la lectura que no agrega mensajes):
+      - **La repetición a las 4 horas sólo sale si algo espera detrás.** Sin otro tema esperando, la
+        pregunta sigue su escalera de siempre (el día hábil siguiente), como en la 03 y la 26. Ejemplo:
+        Marcos no contesta a las 10:20 quién destraba el PLC y no tiene nada más pendiente: hoy no
+        se le repite a las 14:20, sino mañana a las 10:00. ¿O se repite igual?
+      - **"Más urgente"**: el tipo de mensaje (mecánica §11) y, entre iguales, la tarea que vence
+        antes; a igual vencimiento, la pregunta abierta. En la 30, el jueves sale primero el pedido
+        de comunicaciones (vence el jueves) que la repetición del PLC (vence el viernes).
+      - **"Al día siguiente"**: una pregunta de un día anterior ya no frena; a las 10:00 sale lo más
+        urgente de lo que espera, de a uno. Lo que no sale espera con su escalera parada (un paso
+        guardado sin salir la detiene), así que puede escalar más tarde.
+      - **El mensaje aparte** es sólo para las dos preguntas que abrió un aviso de Leda. Cuando la
+        persona cambió de tema por su cuenta (9d, la 08, la 12, la 21 y la 27), la pregunta vuelve
+        en la misma respuesta, como antes. ¿También aparte?
+      - **"Enseguida" fuera del horario**: si la persona contesta a las 17:05, la otra pregunta
+        vuelve el día hábil siguiente a las 10:00 (una sola vez, aunque su escalera también la
+        repita).
+      - **Una pregunta que se hace una sola vez** (`cual_de_las_dos`, decisión 12) o que no es de una
+        tarea no se repite; su turno termina a las 8 horas, como si se hubiera repetido.
+      - El README de las conversaciones no lista la 30 (fuera de la superficie de la D5b).
+      - **La IA real** sobre la 30 (y el punto 5 sobre la 04), y la prueba por Telegram, en la tanda
+        posterior. `leda_motor` necesita la `0040` además de la `0039`.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
