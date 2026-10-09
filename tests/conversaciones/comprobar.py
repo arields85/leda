@@ -122,6 +122,8 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
             destraban[str(f["id"])] = {
                 "tarea": tarea(f["task_id"]), "no_sabe": f["no_sabe"],
                 "integrante": quien, "externo": f["destraba_externo"],
+                # Quién lo dijo: la persona trabada o, en la cadena, quien no lo tomó (C-5).
+                "de": persona(f["dicho_por_membership_id"]),
                 # Otra persona que lo destraba: alguien de afuera o un integrante que no es
                 # quien lo dijo (nombrarse a sí misma es "le toca a la persona que escribe").
                 "alguien": bool(f["destraba_externo"]) or (

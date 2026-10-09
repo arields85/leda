@@ -8,8 +8,9 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
   (lunes a viernes, 09:00 a 17:00, sin feriados en el período de referencia), el aviso previo a
   tres días hábiles, la falta de respuesta escalada a Dirección y el tono del pack;
 - **las personas** de `espacios/corework.yaml` que nombran las conversaciones, con quién aprueba
-  el trabajo de cada una (Ismael aprueba el de Marcos), y un administrador de plataforma con el
-  bot de administración alcanzable;
+  el trabajo de cada una (Ismael aprueba el de Marcos), el referente técnico de cada área, como
+  en el pack (a quien va la cadena de un bloqueo que nadie toma, C-5, conversación 34), y un
+  administrador de plataforma con el bot de administración alcanzable;
 - **las tareas** de la conversación: título, responsable, vencimiento (17:00 del día, el fin de
   la jornada), estado (un inicio, como el evento del día que dice; una `terminada`, con la
   aprobación que su cierre exige, de quien aprueba el trabajo del responsable), dependencias y
@@ -63,6 +64,10 @@ PERSONAS = {
 AREAS = {"direccion": "Dirección", "ot": "OT y automatización", "it": "Infraestructura IT",
          "corelabs": "Software e interfaz HMI",
          "electricidad": "Sistemas eléctricos y tableros"}
+# El referente técnico de cada área, como en el pack (`referente`, ADR 0019, decisión 7b): a quien
+# va la cadena de un bloqueo que nadie toma (C-5, decisión 5; la 34).
+REFERENTES = {"direccion": "Ismael", "ot": "Marcos", "it": "Martin", "electricidad": "Mariano",
+              "corelabs": "Ariel"}
 # El de reserva, para una tarea cuya conversación no dice el suyo (C-3d, D1: cada tarea de las
 # conversaciones lleva uno propio en su YAML).
 CRITERIO_DE_LA_PRUEBA = ("Lo que pide el título de la tarea queda hecho y probado, y quien lo hizo "
@@ -175,6 +180,9 @@ def _espacio(cur) -> tuple[Mundo, str]:
                                  "membership_id": str(cur.fetchone()["id"]),
                                  "telegram": telegram, "area_id": areas[area],
                                  "area": area}
+    for area, corto in REFERENTES.items():
+        cur.execute("update area set referente_membership_id = %s where id = %s",
+                    (mundo.personas[corto]["membership_id"], areas[area]))
     # Sin esto el despachador antepone el saludo del día y cada texto cambia.
     cur.execute("""insert into greeting_state (membership_id, workspace_id, ultima_fecha_local)
                    select id, workspace_id, date '9999-12-31' from membership

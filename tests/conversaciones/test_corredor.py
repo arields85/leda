@@ -47,16 +47,17 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_treinta_y_dos_conversaciones_y_cada_una_nombra_su_fuente():
+def test_hay_treinta_y_cuatro_conversaciones_y_cada_una_nombra_su_fuente():
     # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega), la 23 desde la 3b (la
     # aprobación), la 24 desde la 3c (quien aprueba no contesta), la 27 desde la D3 de la C-3d
     # (la entrega frente al criterio), la 28 y la 29 desde la D4 (las entregas en listas y si
     # cambia quién revisa), la 26 desde la D5 (no interrumpir una conversación) y la 30 desde
     # la D5b (una pregunta de Leda sin contestar), la 31 desde la unidad de pedir el enlace
-    # por chat (lo que quedó de la porción 4) y la 32 desde la porción 1 de la C-5 (escribirle
-    # a quien destraba).
+    # por chat (lo que quedó de la porción 4), la 32 desde la porción 1 de la C-5 (escribirle
+    # a quien destraba), la 33 desde la porción 2 ("ya hablé con él") y la 34 desde la 3 ("no
+    # me corresponde" y la cadena al referente).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 33)]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 35)]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]

@@ -136,6 +136,15 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     bloqueo. A quien no tiene un chat con Leda no le escribe y lo dice; "no le escribas, ya hablé"
     retira el mensaje que todavía no salió, y del que ya salió Leda dice que ya le llegó (decisión
     4 del usuario, 2026-10-08, primera mitad; porción 1 de la C-5).
+33. [`33-ya-hable-con-el.md`](33-ya-hable-con-el.md): Ariel, a quien Leda le preguntó, contesta que
+    ya lo habló con Marcos; Leda le pregunta qué arreglaron y para cuándo, para que quede asentado, y
+    con la respuesta a Marcos le llega lo arreglado, como información. Dicho todo junto, queda
+    anotado sin preguntar (decisión 4 del usuario, segunda mitad; porción 2 de la C-5).
+34. [`34-no-me-corresponde.md`](34-no-me-corresponde.md): a quien Leda le pregunta por un bloqueo
+    dice que no le corresponde; Leda pregunta quién se encarga y sigue con esa persona. Si la segunda
+    también dice que no, que no sabe o nombra a otra, Leda le informa al referente con toda la cadena,
+    sin pedirle nada, y a Nahuel, que está trabado, le dice que lo informa sin nombrar a quién
+    (decisión 5 del usuario; porción 3 de la C-5).
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
@@ -284,7 +293,10 @@ guardado como motivo le llegaría a Ismael).
 **La persecución del bloqueo** (porción 1 de la C-5): el estado inicial puede nombrar a las personas
 sin un chat con Leda (`sin_telegram`, como en el pack las que tienen su Telegram `PENDIENTE`), y los
 efectos suman lo que dice quien destraba (`dicen_quien_destraba`: la tarea, de quién, para cuándo y si
-dijo que ya está).
+dijo que ya está). Desde las porciones 2 y 3: quién dijo cada "lo destraba" (`destraban`, `de`), si
+quien destraba dijo que no le corresponde (`dicen_quien_destraba`, `no_le_corresponde`), y cada área
+tiene su referente técnico, como en el pack (`carga.REFERENTES`), a quien va la cadena de un bloqueo
+que nadie toma (la 34).
 
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 
@@ -420,7 +432,11 @@ importa es el significado:
   (conversación 31).
 - `decir_cuando_destraba`: quien puede destrabar una tarea de otra persona dice para cuándo lo
   resuelve, que ya está o lo que pasa; queda anotado y la persona trabada se entera (conversación
-  32).
+  32). Si dice que ya lo habló con la persona trabada (`ya_lo_hablaron`) sin decir para cuándo,
+  Leda le pregunta qué arreglaron y para cuándo (conversación 33).
+- `decir_que_no_le_toca`: quien puede destrabar una tarea de otra persona dice que no le
+  corresponde y, si lo sabe, quién se encarga; Leda sigue con esa persona una vez y, si tampoco,
+  informa la cadena al referente (conversación 34).
 - `no_escribirle`: la persona trabada pide que Leda no le escriba a quien destraba; si el mensaje
   todavía no salió, no sale (conversación 32).
 
