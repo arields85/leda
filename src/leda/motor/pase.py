@@ -44,6 +44,11 @@ pidió, siempre; quien tenía que contestar y no llegó a hacerlo (se le pregunt
 sin su respuesta: nadie contestó, o la tarea ya no se puede pasar), que ya no hace falta que
 conteste; y las preguntas del pase, con sus botones, dejan de esperar.
 
+**A alguien sin Leda conectada** (decisión 37, derivada en la 50 del usuario; C-5b): el pase no se
+puede hacer (sin su respuesta no hay pase), a quien pide se le dice, el administrador recibe el
+aviso para conectarlo, de verdad, por su canal (`persecucion.avisar_para_que_lo_conecte`), y Leda
+le ofrece pasársela a otra persona (`en_cambio_puede`). Nada cambia.
+
 **Si nadie contesta** (`seguir_los_pases`, que corre la escalera; decisión 26 del usuario): la
 pregunta a quien decide o a quien recibe se repite una sola vez, el día hábil siguiente de haber
 salido (`RECORDATORIO_DEL_PASE`). Si al día hábil siguiente de la repetición, a la hora en que
@@ -72,9 +77,12 @@ from .enlace import NINGUNA_CON_ESE_NOMBRE, misma_palabra, que_nombra
 from .fichas import (AVISO, FICHAS, LLEGA, Contexto, _duda, _juntar, integrantes_que_coinciden,
                      nombrar_efecto, nombrar_pregunta, palabras, vacio)
 from .margen import sale_con_margen
-from .persecucion import alcanzable
+from .persecucion import (SE_LE_AVISO_AL_ADMINISTRADOR, SIN_TELEGRAM, alcanzable,
+                          avisar_para_que_lo_conecte)
 from .tiempo import sale
 
+# Lo que Leda ofrece en lugar de un pase a alguien sin Leda conectada (decisión 37; C-5b).
+PASARSELA_A_OTRA_PERSONA = "pasarsela_a_otra_persona"
 # Los resultados de las jugadas del pase y sus motivos (sus significados, en `hechos.py`).
 PASE_PARA_CONFIRMAR = "pase_para_confirmar"
 PASE_PEDIDO = "pase_pedido"
@@ -226,9 +234,16 @@ def _mostrar(ctx: Contexto, tarea: dict, recibe: str) -> dict:
         if motivo is not None:
             # A quien no tiene un chat con Leda no se le puede preguntar: sin su respuesta, el
             # pase no se puede hacer (constitución §7: nunca se promete un mensaje que no sale).
-            return {"resultado": "no_se_puede", "motivo": motivo, "tarea": tarea_hecho(tarea),
-                    "no_se_le_puede_escribir_a": {"a": quien["nombre"] if quien else None,
-                                                  "motivo": motivo}}
+            # Sin Leda conectada, el administrador recibe el aviso para conectarlo y Leda ofrece
+            # pasársela a otra persona (decisión 37; C-5b).
+            hecho = {"resultado": "no_se_puede", "motivo": motivo, "tarea": tarea_hecho(tarea),
+                     "no_se_le_puede_escribir_a": {"a": quien["nombre"] if quien else None,
+                                                   "motivo": motivo},
+                     "en_cambio_puede": [PASARSELA_A_OTRA_PERSONA]}
+            if motivo == SIN_TELEGRAM:
+                hecho[SE_LE_AVISO_AL_ADMINISTRADOR] = avisar_para_que_lo_conecte(
+                    ctx, quien["nombre"], f"para pasarle la tarea «{tarea['titulo']}»")
+            return hecho
     nombre = integrante(cur, recibe)["nombre"]
     al_confirmar: dict[str, Any]
     if recibe == ctx.quien.membership_id == decide:

@@ -50,8 +50,11 @@ PERMITIDOS: dict[str, set[str] | None] = {
     "calendario": None,
     "salida": {"enqueue_outbox", "PayloadValidationError", "MAX_ADJUNTOS"},
     "despachador": None,
-    "incidentes": {"registrar_incidente", "NOTICIA_NEUTRA_INCIDENTE",
-                   "ETAPA_TURNO_CONVERSACION", "REFERENCIA_INBOUND_MESSAGE"},
+    # `registrar_incidente_y_si_se_aviso` (decisión 37, C-5b): el mismo incidente, sabiendo si
+    # el administrador quedó avisado, para decirle a la persona sólo lo que es cierto.
+    "incidentes": {"registrar_incidente", "registrar_incidente_y_si_se_aviso",
+                   "NOTICIA_NEUTRA_INCIDENTE", "ETAPA_TURNO_CONVERSACION",
+                   "REFERENCIA_INBOUND_MESSAGE"},
     "llm": None,
     "config": None,
     "onboarding": {"activar", "bienvenida", "ActivacionInvalida"},

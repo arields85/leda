@@ -815,15 +815,18 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
         return {"resultado": "falta_dato", "falta": ["quien_destraba"],
                 "puede_ser": ["alguien", "no_sabe", "nadie_mas"]}
 
-    # El bloqueo: el de la tarea nombrada o, si no la nombra, el de la pregunta abierta.
+    # El bloqueo: el de la tarea nombrada o, si no la nombra, el de la pregunta abierta: quién lo
+    # destraba, o las salidas que Leda propuso porque a quien nombró no le puede escribir (C-5b,
+    # decisión 37: otra persona que pueda destrabarlo).
     if tarea is not None:
         task_id = tarea["id"]
     else:
         cur.execute("""select task_id from conversation_question
-                        where membership_id = %s and tipo = 'quien_destraba'
-                          and cerrada_en is null
+                        where membership_id = %s and cerrada_en is null
+                          and (tipo = 'quien_destraba'
+                               or (tipo = %s and jugada ->> 'nombre' = 'anotar_quien_destraba'))
                         order by para_despues_en nulls first, abierta_en limit 1""",
-                    (ctx.quien.membership_id,))
+                    (ctx.quien.membership_id, preguntas.PROPUESTA))
         pregunta = cur.fetchone()
         task_id = str(pregunta["task_id"]) if pregunta else None
     bloqueo = None
@@ -874,10 +877,14 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
                                 else {"integrante": integrante["nombre"]} if integrante
                                 else {"externo": quien_texto})}
     # Con otro integrante que lo destraba, Leda le escribe (la persecución, ADR 0017, decisión
-    # 3a; C-5, `persecucion.py`); sin otra persona, las salidas (9c, corregida el 2026-10-05).
+    # 3a; C-5, `persecucion.py`); sin otra persona, las salidas (9c, corregida el 2026-10-05). Si
+    # a quien nombró no le puede escribir, las salidas de la decisión 37 (C-5b): otra persona que
+    # pueda destrabarlo, o que se lo pida ella y le cuente.
     if integrante is not None and not nadie_mas:
         from . import persecucion           # persecucion importa este módulo
         _juntar(hecho, persecucion.preguntarle(ctx, fila, bloqueo, anotado, integrante))
+        if "no_se_le_puede_escribir_a" in hecho:
+            return {**hecho, "salidas": list(persecucion.SALIDAS_SIN_LEDA_CONECTADA)}
     sin_otra_persona = no_sabe or nadie_mas
     return {**hecho, "salidas": list(SALIDAS_DE_UN_BLOQUEO)} if sin_otra_persona else hecho
 
@@ -1410,8 +1417,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           comprueba="que haya un bloqueo abierto en una tarea suya",
           hace="anota quién destraba: un integrante, alguien de afuera, que no se sabe o "
                "que le toca a la persona misma",
-          despues="cierra la pregunta y la espera; si no se sabe o le toca a la persona "
-                  "que escribe, propone salidas, que quedan como tema abierto",
+          despues="cierra la pregunta y la espera; si no se sabe, le toca a la persona "
+                  "que escribe o a quien nombró Leda no le puede escribir, propone salidas, "
+                  "que quedan como tema abierto",
           manejar=_anotar_quien_destraba,
           contesta=(preguntas.QUIEN_DESTRABA, preguntas.ESTADO_DE_LA_TAREA),
           propone=lambda hecho: hecho.get("salidas"),

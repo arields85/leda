@@ -17,6 +17,20 @@ llega (`se_le_pregunta_a`). Sin un chat con Leda, o fuera del equipo activo, no 
 el hecho lo dice (`no_se_le_puede_escribir_a`): nunca se promete un mensaje que no va a salir. A
 alguien de afuera del equipo Leda nunca le escribe (constitución §6): queda como antes.
 
+**Sin Leda conectada** (decisión 37 del usuario, 2026-10-09; C-5b): a quien no tiene un chat con
+Leda, el administrador recibe el aviso para conectarlo, de verdad, por su canal (un incidente,
+`avisar_para_que_lo_conecte`); el hecho dice que se le avisó y cuándo le llega, o que no le llega
+si ningún administrador es alcanzable (`SE_LE_AVISO_AL_ADMINISTRADOR`). A la persona trabada, Leda
+le ofrece salidas (`SALIDAS_SIN_LEDA_CONECTADA`, un tema abierto como toda propuesta): otra persona
+que pueda destrabarlo, o que se lo pida ella y le cuente (lo que cuente cierra el tema: quién lo
+destraba, o que ya puede seguir). Lo mismo para un pase a alguien sin Leda conectada (`pase.py`).
+
+**A quien no contesta, Leda nunca lo abandona** (decisión 38 del usuario; C-5b): la escalera de
+las preguntas le repite la pregunta los días 1 a 3 una vez por día y, desde el 4, cada 2 días
+hábiles mientras siga el bloqueo, sin escalar (`escalera._un_paso_de_una_pregunta`); si escribe
+por otra cosa, la pregunta vuelve en un mensaje aparte (decisión 50,
+`pregunta_sin_contestar.al_terminar_el_turno`).
+
 **Lo que dice quien destraba** (`decir_cuando_destraba`): para cuándo lo resuelve, que ya está o
 sus palabras. Queda como un hecho del bloqueo (`dicho_de_quien_destraba`, sólo se agrega),
 atribuido y auditado, contesta su pregunta y su espera, y le llega a la persona trabada como
@@ -63,8 +77,12 @@ no sabe, otra fila de quién destraba dicha por esa persona. La cadena tiene un 
   sector de la tarea trabada; nunca a la persona trabada misma (entonces, a quien aprueba su
   trabajo; `a_quien_informar`). A la persona trabada le llega lo que pasó y que quedó asentado,
   sin decir que se le informa a alguien ni nombrar a quién por su cuenta (decisiones 11 y 35:
-  `queda_asentado`, `asentado.py`, `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`). Sin referente,
-  nada se promete y el hecho lo dice (`sin_referente`).
+  `queda_asentado`, `asentado.py`, `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`). Sin nadie a
+  quien informar (sin referente, o sin Leda conectada), a nadie se le promete el aviso y el hecho
+  lo dice (`sin_referente`), pero queda asentado igual (decisión 49; C-5b): en la historia de la
+  tarea (`asentar_la_cadena_del_bloqueo`, en la auditoría), a la persona trabada se le dice que
+  quedó asentado (que no le llega a nadie, sólo si lo pregunta) y queda un incidente para el
+  administrador (`asentado.avisar_que_no_hay_a_quien`).
 
 **Está trabado con algo suyo** (porción 4; decisión 6, bloqueos encadenados; conversación 35):
 quien destraba puede decir que no puede porque una tarea suya está trabada (`su_tarea_trabada`).
@@ -78,12 +96,13 @@ Fuera de estas porciones (`odd/tasks/fase-c.md`, C-5): el bloqueo viejo (decisi�
 
 from __future__ import annotations
 
-import re
 from datetime import date
 from typing import Any
 
+from ..incidentes import REFERENCIA_INBOUND_MESSAGE, registrar_incidente_y_si_se_aviso
 from . import encadenados, preguntas
-from .asentado import QUEDA_ASENTADO, queda_asentado
+from .asentado import (QUEDA_ASENTADO, SIN_A_QUIEN_INFORMAR, avisar_que_no_hay_a_quien,
+                       por_que_no_hay_a_quien, queda_asentado)
 from .auditoria import auditar
 from .avisos import (CADENA_DEL_BLOQUEO, CAMBIO_QUIEN_DESTRABA, DIJO_ALGO_MAS_NUEVO,
                      LO_QUE_DIJO_QUIEN_DESTRABA, PREGUNTA_A_QUIEN_DESTRABA, guardar, integrante,
@@ -114,6 +133,14 @@ PREGUNTO_QUIEN_SE_ENCARGA = "pregunto_quien_se_encarga"
 # Por qué la cadena no le llega a nadie: el sector no tiene referente ni hay quien apruebe el
 # trabajo de la persona trabada.
 SIN_REFERENTE = "sin_referente"
+# Quien destraba no tiene Leda conectada (decisión 37; C-5b): el aviso al administrador para que lo
+# conecte (su incidente, por su canal) y las salidas que Leda le ofrece a la persona trabada: otra
+# persona que pueda destrabarlo, o que se lo pida ella y le cuente.
+ETAPA_SIN_LEDA_CONECTADA = "motor_sin_leda_conectada"
+SE_LE_AVISO_AL_ADMINISTRADOR = "se_le_aviso_al_administrador"
+PARA_QUE_CONECTE = "para_que_conecte"
+PEDIRSELO_Y_CONTAR = "pedirselo_y_contar"
+SALIDAS_SIN_LEDA_CONECTADA = ("anotar_quien_destraba", PEDIRSELO_Y_CONTAR)
 
 
 def alcanzable(cur, membership_id: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -124,6 +151,23 @@ def alcanzable(cur, membership_id: str) -> tuple[dict[str, Any] | None, str | No
     if persona["telegram_user_id"] is None:
         return persona, SIN_TELEGRAM
     return persona, None
+
+
+def avisar_para_que_lo_conecte(ctx: Contexto, nombre: str, para: str) -> dict[str, Any]:
+    """El aviso al administrador para que conecte a esa persona, de verdad, por su canal (un
+    incidente con su aviso; decisión 37): `para`, en palabras, para qué la necesita quien
+    escribe. El hecho: a quién conectar y cuándo le llega al administrador, o que no le llega si
+    ningún administrador es alcanzable (nunca se dice que se avisó si no salió)."""
+    _id, avisado = registrar_incidente_y_si_se_aviso(
+        ctx.cur, ctx.quien.workspace_id,
+        f"{ctx.quien.nombre} necesita que Leda le escriba a {nombre} {para}, y {nombre} no tiene "
+        f"un chat con Leda (no conectó su Telegram): Leda no le escribió. Hay que conectarlo.",
+        severidad="media", etapa=ETAPA_SIN_LEDA_CONECTADA,
+        referencia_tipo=REFERENCIA_INBOUND_MESSAGE if ctx.entrante_id else None,
+        referencia_id=ctx.entrante_id, chat_id=ctx.chat_id, app_user_id=ctx.quien.app_user_id)
+    return {PARA_QUE_CONECTE: nombre,
+            LLEGA: (ctx.ahora.astimezone(ctx.calendario.zona).isoformat() if avisado
+                    else NO_LE_VA_A_LLEGAR)}
 
 
 # --- Le escribe a quien destraba ---------------------------------------------------------------
@@ -154,7 +198,11 @@ def preguntarle(ctx: Contexto, tarea: dict[str, Any], bloqueo: dict[str, Any], d
             omitir(cur, str(viejo["id"]), CAMBIO_QUIEN_DESTRABA, ctx.ahora)
     quien, motivo = alcanzable(cur, persona)
     if motivo is not None:
-        return {"no_se_le_puede_escribir_a": {"a": destraba["nombre"], "motivo": motivo}}
+        hecho = {"no_se_le_puede_escribir_a": {"a": destraba["nombre"], "motivo": motivo}}
+        if motivo == SIN_TELEGRAM:
+            hecho[SE_LE_AVISO_AL_ADMINISTRADOR] = avisar_para_que_lo_conecte(
+                ctx, destraba["nombre"], f"para destrabar la tarea «{tarea['titulo']}»")
+        return hecho
     if mismo is not None:
         hecho = {"se_le_pregunta_a": {"a": quien["nombre"],
                                       LLEGA: mismo["programado_para"].astimezone(
@@ -540,6 +588,8 @@ def decir_que_no_le_toca(ctx: Contexto, datos: dict[str, Any],
                                       sin_chat=sin_chat)
         _juntar(hecho, informe)
         mas = {**({"no_se_le_puede_escribir_a": sin_chat} if sin_chat else {}),
+               **({SE_LE_AVISO_AL_ADMINISTRADOR: sigue[SE_LE_AVISO_AL_ADMINISTRADOR]}
+                  if SE_LE_AVISO_AL_ADMINISTRADOR in sigue else {}),
                **_lo_que_queda_para_quien_esta_trabado(ctx, informe["aviso_de_la_cadena"])}
     _juntar(hecho, _avisar_a_quien_esta_trabado(ctx, tarea, destraba, dicho_id, dice, mas))
     # Quien espera esta tarea, más abajo en una cadena de bloqueos, se entera (porción 4).
@@ -551,11 +601,11 @@ def _lo_que_queda_para_quien_esta_trabado(ctx: Contexto, aviso: dict[str, Any]
                                           ) -> dict[str, Any]:
     """Lo que la persona trabada sabe del informe de la cadena: que quedó asentado (decisión
     35), sin decir que se le informa a alguien ni nombrar a nadie por su cuenta (a quién le
-    llega, sólo si lo pregunta). Si no le va a llegar a nadie, nada quedó asentado: el hecho del
-    aviso, tal cual, con su motivo."""
+    llega, sólo si lo pregunta). Si no le va a llegar a nadie, quedó asentado igual (decisión 49;
+    `_informar_la_cadena` lo dejó en la historia de la tarea): que no le llega a nadie, también
+    sólo si lo pregunta."""
     if aviso.get(LLEGA) == NO_LE_VA_A_LLEGAR:
-        return {"aviso_de_la_cadena": {k: v for k, v in aviso.items()
-                                       if k != LLEGA or not _es_una_hora(v)}}
+        return {QUEDA_ASENTADO: queda_asentado(ctx.cur, ctx.quien.workspace_id, a_nadie=True)}
     return {QUEDA_ASENTADO: queda_asentado(ctx.cur, ctx.quien.workspace_id, aviso.get("a"))}
 
 
@@ -636,6 +686,7 @@ def _informar_la_cadena(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str
             return {"aviso_de_la_cadena": {
                 "a": ultima["a_nombre"],
                 LLEGA: ultima["programado_para"].astimezone(ctx.calendario.zona).isoformat()}}
+        _asentar_sin_a_quien(ctx, tarea, destraba, motivo)
         if ref is None:
             return {"aviso_de_la_cadena": {LLEGA: NO_LE_VA_A_LLEGAR, "motivo": SIN_REFERENTE}}
         return {"aviso_de_la_cadena": {"a": ref["nombre"], LLEGA: NO_LE_VA_A_LLEGAR,
@@ -663,6 +714,25 @@ def _informar_la_cadena(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str
                                                     LLEGA: sale.isoformat()}}
     nombrar_efecto(hecho, "aviso_de_la_cadena", AVISO, aviso_id)
     return hecho
+
+
+def _asentar_sin_a_quien(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],
+                         motivo: str) -> None:
+    """La cadena que no le llega a nadie queda asentada igual (decisión 49; C-5b): en la historia
+    de la tarea (su auditoría, con la cadena entera y el motivo) y con un incidente para el
+    administrador, para que complete quién decide."""
+    eslabones = cadena(ctx.cur, destraba["blocker_id"], str(destraba["responsable_membership_id"]))
+    auditar(ctx.cur, accion="asentar_la_cadena_del_bloqueo", workspace_id=ctx.quien.workspace_id,
+            sujeto_tipo="blocker", sujeto_id=destraba["blocker_id"], quien=ctx.quien,
+            detalle={"task_id": tarea["id"], "cadena": eslabones, SIN_A_QUIEN_INFORMAR: motivo,
+                     "at": ctx.ahora.isoformat(), "inbound_message_id": ctx.entrante_id})
+    avisar_que_no_hay_a_quien(
+        ctx.cur, ctx.quien.workspace_id,
+        f"La cadena del bloqueo de la tarea «{tarea['titulo']}» de {destraba['responsable']} se "
+        f"cortó (nadie lo toma) y no le llega a nadie que decida: "
+        f"{por_que_no_hay_a_quien(motivo)}. Quedó asentado en la historia de la tarea.",
+        referencia_tipo=REFERENCIA_INBOUND_MESSAGE if ctx.entrante_id else None,
+        referencia_id=ctx.entrante_id, chat_id=ctx.chat_id, app_user_id=ctx.quien.app_user_id)
 
 
 def _cadenas_de_esta_vuelta(cur, destraba: dict[str, Any], task_id: str) -> list[dict[str, Any]]:
@@ -734,11 +804,6 @@ def cadena(cur, blocker_id, trabado: str) -> list[dict[str, Any]]:
                               **({"lo_que_dice": dijo["lo_que_dice"]}
                                  if dijo["lo_que_dice"] else {})})
     return eslabones
-
-
-def _es_una_hora(valor: Any) -> bool:
-    """Si cuándo se entera es una fecha y hora (y no un código, como que no le va a llegar)."""
-    return isinstance(valor, str) and re.match(r"^\d{4}-\d{2}-\d{2}T", valor) is not None
 
 
 # --- "No le escribas" ------------------------------------------------------------------------

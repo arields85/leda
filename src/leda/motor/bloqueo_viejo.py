@@ -18,15 +18,22 @@ están o no son un número entero de días, 1 o más, vale el del producto, 5 (`
 **Cada vez, una sola:** la clave del aviso nombra el bloqueo y la vez (la primera, sin número, como
 antes de la decisión 36; `clave`). La vez anterior es la última que se resolvió (salió o se omitió):
 una que todavía no salió (la persona estaba ausente, el ciclo parado) sale con los hechos de su
-momento y no se guarda otra encima. Al salir la primera queda registrado a quién y cuándo se
-informó (`blocker.escalado_a` y `escalado_en`); cada vez, con su fila de auditoría. Sale a la hora
-en que Leda manda lo suyo, dentro del horario y sin interrumpir una conversación (decisión 13),
-como todo aviso.
+momento y no se guarda otra encima. **Queda asentado al guardarse** (decisión 49: en la historia de
+la tarea; revisión `review-1db0e16dfeacfc4f`): cada vez deja su fila de auditoría
+(`asentar_bloqueo_que_sigue_abierto`, con a quién le va a llegar o por qué a nadie), así lo que se
+le dice a la persona trabada ya es cierto aunque el aviso al referente todavía espere. Al salir la
+primera queda registrado a quién y cuándo se informó (`blocker.escalado_a` y `escalado_en`); cada
+vez, con su fila de auditoría. Sale a la hora en que Leda manda lo suyo, dentro del horario y sin
+interrumpir una conversación (decisión 13), como todo aviso.
 
 **A quién** (`a_quien`): al referente del sector de la tarea trabada; si es la persona trabada
 misma, a quien aprueba su trabajo (la misma regla que la cadena de la porción 3,
-`persecucion.a_quien_informar`). Se relee al salir (`TipoDeAviso.va_a`). Sin nadie, nada se
-guarda: ni al referente ni a la persona trabada (nada queda asentado).
+`persecucion.a_quien_informar`). Se relee al salir (`TipoDeAviso.va_a`). **Sin nadie a quien
+informar** (sin referente ni quien apruebe su trabajo, o sin Leda conectada; decisión 49 y "nunca
+fallar en silencio", C-5b), queda asentado igual: la vez queda contada con el aviso al referente
+omitido (`SIN_A_QUIEN_INFORMAR`, a nombre de la persona trabada: no le llega a nadie), en la
+historia con su motivo, un incidente para el administrador (`asentado.avisar_que_no_hay_a_quien`)
+y, a la persona trabada, que quedó asentado; que no le llega a nadie, sólo si lo pregunta.
 
 **Qué lleva** (`hechos_del_bloqueo`): la tarea, quién la tiene, lo que la traba, desde cuándo y
 cuántos días hábiles lleva, y la historia entera (`historia`): quién dijo quién la destraba y lo
@@ -43,8 +50,9 @@ lleva y, sólo si el espacio tiene informe al grupo, que figura ahí (`queda_ase
 (`hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`). También seguimiento que Leda hace por su cuenta.
 
 Al salir se vuelve a mirar (`vigencia`, `vigencia_de_lo_asentado`): si el bloqueo ya se cerró o
-la tarea se cerró, no sale; lo de la persona trabada tampoco si lo de esa vez al referente se
-omitió (entonces nada quedó asentado) o si la tarea cambió de responsable.
+la tarea se cerró, no sale; lo de la persona trabada tampoco si la tarea cambió de responsable.
+Lo de la persona trabada no depende de que el aviso al referente haya salido: lo asentado ya
+quedó al guardarse; a quién le llega va sólo si su aviso no se omitió.
 """
 
 from __future__ import annotations
@@ -52,11 +60,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from .asentado import QUEDA_ASENTADO, queda_asentado
+from .asentado import (QUEDA_ASENTADO, SIN_A_QUIEN_INFORMAR, avisar_que_no_hay_a_quien,
+                       por_que_no_hay_a_quien, queda_asentado)
 from .auditoria import auditar
 from .avisos import (ASENTADO_QUE_SIGUE_TRABADA, BLOQUEO_QUE_SIGUE_ABIERTO, YA_SE_DESTRABO,
-                     Momento, de_la_clave, guardar, integrante, leer_tarea)
-from .persecucion import SIN_REFERENTE, a_quien_informar
+                     Momento, de_la_clave, guardar, integrante, leer_tarea, omitir)
+from .persecucion import SIN_REFERENTE, a_quien_informar, alcanzable
 from .tiempo import sale
 
 CLAVE = "bloqueos"
@@ -122,23 +131,55 @@ def informar_los_viejos(m: Momento) -> int:
         if m.cal.habiles_entre(desde, m.ahora) < dias:
             continue
         tarea = leer_tarea(cur, b["task_id"])
-        destino = a_quien(cur, tarea) if tarea is not None else None
-        if destino is None:
+        if tarea is None:
             continue
+        destino = a_quien(cur, tarea)
+        sin_a_quien = (SIN_REFERENTE if destino is None
+                       else alcanzable(cur, str(destino["membership_id"]))[1])
         vez, cuando = len(veces) + 1, sale(m.cal, m.ahora)
         bloqueo_id = str(b["id"])
-        guardar(cur, m.workspace_id, BLOQUEO_QUE_SIGUE_ABIERTO, task_id=str(b["task_id"]),
-                destinatario=str(destino["membership_id"]),
-                hechos=hechos_del_bloqueo(m, bloqueo_id), programado_para=cuando,
-                clave=clave(b["task_id"], b["id"], vez), ahora=m.ahora)
+        trabado = str(tarea["responsable_membership_id"])
+        aviso_id, _ = guardar(
+            cur, m.workspace_id, BLOQUEO_QUE_SIGUE_ABIERTO, task_id=str(b["task_id"]),
+            destinatario=trabado if sin_a_quien else str(destino["membership_id"]),
+            hechos=hechos_del_bloqueo(m, bloqueo_id), programado_para=cuando,
+            clave=clave(b["task_id"], b["id"], vez), ahora=m.ahora)
+        if sin_a_quien:
+            # No le llega a nadie: la vez queda contada, con su motivo (nunca se borra).
+            omitir(cur, aviso_id, SIN_A_QUIEN_INFORMAR, m.ahora)
+        _asentar(m, tarea, bloqueo_id, aviso_id, vez, destino, sin_a_quien)
         guardar(cur, m.workspace_id, ASENTADO_QUE_SIGUE_TRABADA, task_id=str(b["task_id"]),
-                destinatario=str(tarea["responsable_membership_id"]),
-                hechos=hechos_de_lo_asentado(m, bloqueo_id, destino["nombre"]),
+                destinatario=trabado,
+                hechos=hechos_de_lo_asentado(m, bloqueo_id,
+                                             None if sin_a_quien else destino["nombre"],
+                                             a_nadie=bool(sin_a_quien)),
                 programado_para=cuando,
                 clave=clave(b["task_id"], b["id"], vez, ASENTADO_QUE_SIGUE_TRABADA),
                 ahora=m.ahora)
         guardados += 1
     return guardados
+
+
+def _asentar(m: Momento, tarea: dict[str, Any], bloqueo_id: str, aviso_id: str, vez: int,
+             destino: dict[str, Any] | None, sin_a_quien: str | None) -> None:
+    """Lo asentado de esta vez, en la historia de la tarea (su fila de auditoría): a quién le
+    va a llegar o, si a nadie, por qué, con un incidente para el administrador (decisión 49;
+    C-5b)."""
+    dias = m.cal.habiles_entre(_el_bloqueo(m.cur, bloqueo_id)["abierto_en"], m.ahora)
+    detalle: dict[str, Any] = {"aviso_id": aviso_id, "task_id": str(tarea["id"]), "vez": vez,
+                               "dias_habiles_trabada": dias, "at": m.ahora.isoformat()}
+    if sin_a_quien:
+        detalle[SIN_A_QUIEN_INFORMAR] = sin_a_quien
+    else:
+        detalle["a_membership_id"] = str(destino["membership_id"])
+    auditar(m.cur, accion="asentar_bloqueo_que_sigue_abierto", workspace_id=m.workspace_id,
+            sujeto_tipo="blocker", sujeto_id=bloqueo_id, detalle=detalle)
+    if sin_a_quien:
+        avisar_que_no_hay_a_quien(
+            m.cur, m.workspace_id,
+            f"El bloqueo de la tarea «{tarea['titulo']}» lleva {dias} días hábiles abierto y no "
+            f"le llega a nadie que decida: {por_que_no_hay_a_quien(sin_a_quien)}. Quedó "
+            f"asentado en la historia de la tarea y se le dijo a quien la tiene.")
 
 
 def _el_bloqueo(cur, bloqueo_id: str) -> dict[str, Any]:
@@ -172,15 +213,16 @@ def hechos_del_bloqueo(m: Momento, bloqueo_id: str) -> dict[str, Any]:
     return hechos
 
 
-def hechos_de_lo_asentado(m: Momento, bloqueo_id: str, a: str) -> dict[str, Any]:
+def hechos_de_lo_asentado(m: Momento, bloqueo_id: str, a: str | None, *,
+                          a_nadie: bool = False) -> dict[str, Any]:
     """Lo que le llega a la persona trabada: la tarea, lo que la traba, desde cuándo, cuántos
-    días hábiles lleva y que quedó asentado (a quién, sólo si lo pregunta)."""
+    días hábiles lleva y que quedó asentado (a quién, o que a nadie, sólo si lo pregunta)."""
     b = _el_bloqueo(m.cur, bloqueo_id)
     return {"aviso": ASENTADO_QUE_SIGUE_TRABADA, "necesita_respuesta": False,
             "tarea": b["titulo"], "causa": b["causa"],
             "trabada_desde": m.fecha(b["abierto_en"]).isoformat(),
             "dias_habiles_trabada": m.cal.habiles_entre(b["abierto_en"], m.ahora),
-            QUEDA_ASENTADO: queda_asentado(m.cur, m.workspace_id, a)}
+            QUEDA_ASENTADO: queda_asentado(m.cur, m.workspace_id, a, a_nadie=a_nadie)}
 
 
 def historia(m: Momento, bloqueo_id: str, desde: datetime | None = None) -> list[dict[str, Any]]:
@@ -264,9 +306,10 @@ def vigencia(m: Momento, aviso: dict[str, Any]) -> tuple[str | None, dict[str, A
 
 def vigencia_de_lo_asentado(m: Momento, aviso: dict[str, Any]
                             ) -> tuple[str | None, dict[str, Any]]:
-    """Lo de la persona trabada sale si el bloqueo sigue abierto, la tarea sin cerrar y con el
-    mismo responsable, y lo de esa vez al referente no se omitió: nada se dice asentado si no
-    quedó asentado."""
+    """Lo de la persona trabada sale si el bloqueo sigue abierto y la tarea sin cerrar y con el
+    mismo responsable. Lo asentado ya quedó al guardarse (`_asentar`): no espera al aviso al
+    referente (revisión `review-1db0e16dfeacfc4f`). A quién le llega, releído, sólo si el aviso
+    de esa vez al referente no se omitió; si se omitió, a nadie (decisión 49)."""
     motivo, tarea = _sigue_abierto(m, aviso)
     if motivo is not None:
         return motivo, {}
@@ -274,16 +317,15 @@ def vigencia_de_lo_asentado(m: Momento, aviso: dict[str, Any]
         return CAMBIO_EL_RESPONSABLE, {}
     al_referente = aviso["dedupe_key"].replace(ASENTADO_QUE_SIGUE_TRABADA,
                                                BLOQUEO_QUE_SIGUE_ABIERTO, 1)
-    m.cur.execute("""select estado, motivo_omision from scheduled_notice
+    m.cur.execute("""select estado from scheduled_notice
                       where workspace_id = %s and dedupe_key = %s""",
                   (m.workspace_id, al_referente))
     suyo = m.cur.fetchone()
-    if suyo is not None and suyo["estado"] == "omitido":
-        return suyo["motivo_omision"], {}
-    destino = a_quien(m.cur, tarea)
-    if destino is None:
-        return SIN_REFERENTE, {}
-    return None, hechos_de_lo_asentado(m, de_la_clave(aviso), destino["nombre"])
+    destino = (a_quien(m.cur, tarea)
+               if suyo is not None and suyo["estado"] != "omitido" else None)
+    return None, hechos_de_lo_asentado(m, de_la_clave(aviso),
+                                       destino["nombre"] if destino else None,
+                                       a_nadie=destino is None)
 
 
 def va_a(m: Momento, aviso: dict[str, Any]) -> str | None:

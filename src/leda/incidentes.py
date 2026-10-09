@@ -41,6 +41,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from .db import registrar_auditoria
@@ -358,6 +359,34 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                    "dice en cada vuelta si sigue cayéndose.")),
     # El Motor (`leda.motor.fondo`, E3-7): el servidor del webhook encontró un espacio activo
     # sin el token de su bot. Nada de ese espacio corre hasta que se configure.
+    # El Motor (`motor/persecucion.py` y `motor/pase.py`; decisión 37 del usuario,
+    # 2026-10-09): alguien necesita que Leda le escriba a una persona del equipo que no tiene
+    # un chat con Leda. El aviso es para que la administración la conecte.
+    "motor_sin_leda_conectada": ExplicacionDeEtapa(
+        titulo="Una persona del equipo no tiene Leda conectada",
+        que_paso=("Alguien del equipo necesita que Leda le escriba a una persona que todavía no "
+                  "tiene un chat con Leda (no conectó su Telegram): para destrabar una tarea, o "
+                  "para pasarle una. Leda no le escribió. El resumen dice a quién hay que "
+                  "conectar y para qué."),
+        que_vio=("Que a esa persona Leda todavía no le puede escribir, que se le avisó a la "
+                 "administración para que la conecte y qué puede hacer mientras tanto."),
+        que_hacer=("Pedile a esa persona que conecte su Telegram con el bot del espacio (su "
+                   "activación) o, si ya no es del equipo, dala de baja. Leda no vuelve a "
+                   "escribirle sola: {nombre} puede pedirlo otra vez cuando esté conectada.")),
+    # El Motor (`motor/bloqueo_viejo.py` y `motor/persecucion.py`; decisión 49 del usuario,
+    # qué es dejar asentado, y "nunca fallar en silencio"): un bloqueo tenía que llegarle a
+    # quien decide y no hay nadie, o esa persona no tiene Leda conectada.
+    "motor_sin_a_quien_informar": ExplicacionDeEtapa(
+        titulo="Un bloqueo no tiene a quién informarse",
+        que_paso=("Un bloqueo quedó asentado en la historia de la tarea y tenía que llegarle a "
+                  "quien está a cargo del sector o a quien aprueba el trabajo de la persona "
+                  "trabada, pero no hay nadie en ese lugar o esa persona no tiene Leda "
+                  "conectada. El resumen dice qué tarea y por qué."),
+        que_vio=("Que quedó asentado, sin que se le diga que no le llegó a nadie salvo que lo "
+                 "pregunte."),
+        que_hacer=("Completá en el espacio el referente del sector o quien aprueba el trabajo "
+                   "de esa persona, o conectá a quien está en ese lugar, y mirá el bloqueo: "
+                   "nadie que decida se enteró todavía.")),
     "motor_sin_bot": ExplicacionDeEtapa(
         titulo="Un espacio activo no tiene su bot configurado",
         que_paso=("El servidor de Leda (`servir`) encontró un espacio activo sin el token de "
@@ -487,7 +516,7 @@ def avisar_incidente_admin(cur, incident_id: str, *, workspace_id: str | None,
     return avisados
 
 
-def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
+def registrar_incidente_y_si_se_aviso(cur, workspace_id: str | None, resumen: str, *,
                         severidad: str = "media",
                         referencia_cruda: str | None = None,
                         etapa: str | None = None,
@@ -497,7 +526,7 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
                         app_user_id: str | None = None,
                         notificado_en=None,
                         avisar_admin: bool = True,
-                        sin_avisar_porque: str | None = None) -> str:
+                        sin_avisar_porque: str | None = None) -> tuple[str, bool]:
     """Inserta un incidente sanitizado y avisa a la administración de
     plataforma (Constitución §10). Helper compartido para que quien necesite
     registrar un incidente no arme el insert a mano en cada lugar nuevo.
@@ -532,7 +561,9 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
     el corte es por otra razón (el Motor, un intento fallido que se
     reintenta: `motor.avisos`), así el resumen no miente sobre por qué.
 
-    Devuelve el id del incidente insertado."""
+    Devuelve el id del incidente insertado y si algún administrador quedó avisado de verdad
+    (lo que permite decirle a una persona que el administrador se enteró sólo si es cierto;
+    decisión 37 del usuario, C-5b). `registrar_incidente` devuelve sólo el id."""
     incident_id = str(uuid.uuid4())
     referencia_cruda = redactar_secreto_telegram(referencia_cruda)
 
@@ -568,4 +599,11 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
         (incident_id, workspace_id, severidad, resumen_final, referencia_cruda,
          etapa, referencia_tipo, referencia_id, chat_id, app_user_id,
          notificado_en, notificado_admin_en))
-    return incident_id
+    return incident_id, notificado_admin_en is not None
+
+
+def registrar_incidente(cur, workspace_id: str | None, resumen: str,
+                        **opciones: Any) -> str:
+    """Inserta un incidente sanitizado y avisa a la administración de plataforma (constitución
+    §10): `registrar_incidente_y_si_se_aviso`, devolviendo sólo el id."""
+    return registrar_incidente_y_si_se_aviso(cur, workspace_id, resumen, **opciones)[0]

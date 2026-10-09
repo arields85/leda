@@ -66,7 +66,10 @@ no contestó, contada desde el día en que se hizo, que es su primer pedido: sin
 hábil siguiente Leda la repite (`repregunta`, con lo que se había anotado), al otro la repite
 avisando a quién se va a escalar, y al siguiente escala por la ruta de falta de respuesta
 (`escalamiento_de_una_pregunta`). Un paso por día hábil; termina al escalar o cuando llega la
-respuesta (la pregunta se cierra o su espera se contesta). La del estado de la tarea y la de su
+respuesta (la pregunta se cierra o su espera se contesta). Una que no escala (la de quien destraba
+la tarea de otra persona, C-5) nunca termina sin respuesta (decisión 38 del usuario, 2026-10-09;
+C-5b): los días 1 a 3, una vez por día, y desde el 4, cada `CADA_CUANTO_SI_NO_ESCALA` días hábiles
+desde la repetición anterior, mientras siga esperando (mientras siga el bloqueo). La del estado de la tarea y la de su
 fecha esperan con el pedido de estado: las repite la escalera de la tarea, no ésta. Una espera
 cuya pregunta se cerró sin contestarse (una corrección la dejó sin efecto) ya no espera nada y
 se cierra. Una ausencia la pausa, como a la de la tarea.
@@ -173,6 +176,9 @@ CLAVE_AVISO_PREVIO = "aviso_previo_dias_habiles"
 MINIMO_DEL_NUCLEO = 1          # mecánica §9: nunca menos de un día hábil entre pasos
 
 PEDIDOS = 3                     # el ancla, +1 y +2; el paso siguiente es el escalamiento
+# Una pregunta que no escala, después de sus tres días (decisión 38; C-5b): cada cuántos días
+# hábiles se le repite mientras siga esperando. Nunca se la abandona.
+CADA_CUANTO_SI_NO_ESCALA = 2
 # Los motivos de omisión que detienen la escalera de un vencimiento: la persona contestó o se
 # bloqueó la tarea antes de que el paso saliera (9b; mecánica §9). Cualquier otro paso que no
 # llegó (la IA no lo redactó, el destinatario no se podía alcanzar) cuenta como dado y la
@@ -562,14 +568,19 @@ def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
         return None                     # contestó antes de que saliera
     dados = sorted(escalon, key=lambda a: a["resuelto_en"])
     siguiente = 1 + len(dados)          # el pedido 0 es la pregunta misma
-    if siguiente > PEDIDOS or m.cal.habiles_entre(espera["preguntado_en"], m.ahora) < siguiente:
+    # Una que no escala, pasados sus tres días, se repite cada 2 días hábiles desde la anterior
+    # mientras siga esperando: nunca se la abandona ni se le avisa a nadie (decisión 38).
+    nunca_la_abandona = not escala and siguiente >= PEDIDOS
+    if nunca_la_abandona:
+        if m.cal.habiles_entre(dados[-1]["resuelto_en"], m.ahora) < CADA_CUANTO_SI_NO_ESCALA:
+            return None
+    elif (siguiente > PEDIDOS
+          or m.cal.habiles_entre(espera["preguntado_en"], m.ahora) < siguiente):
         return None
-    if not escala and siguiente >= PEDIDOS:
-        return None                     # la repite y no le avisa a nadie (`TipoDePregunta.escala`)
     if dados and m.cal.habiles_entre(dados[-1]["resuelto_en"], m.ahora) < 1:
         return None                     # nunca dos pasos el mismo día hábil
     sobre = lo_anotado(pregunta)        # lo que la repregunta recuerda
-    if siguiente < PEDIDOS:
+    if siguiente < PEDIDOS or nunca_la_abandona:
         base = {"aviso": REPREGUNTA, "pregunta": pregunta["tipo"], "numero": siguiente + 1,
                 "necesita_respuesta": True, **({"sobre": sobre} if sobre else {})}
         if _no_llegaron(dados):

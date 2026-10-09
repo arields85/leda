@@ -625,6 +625,11 @@ SIGNIFICADOS: Mapping[str, str] = {
     "respondida": "La pregunta se cerró con la respuesta de la persona.",
     # --- Códigos: lo que Leda propone y lo que espera saber ------------------------------------
     "que_alguien_ayude": "Propuesta: que alguien del equipo ayude con el bloqueo.",
+    "pedirselo_y_contar": "Propuesta: que la persona trabada se lo pida directamente a quien "
+                          "destraba y le cuente a Leda lo que pase (quién lo destraba, o que ya "
+                          "puede seguir).",
+    "pasarsela_a_otra_persona": "Pasarle la tarea a otra persona del equipo que tenga un chat "
+                                "con Leda.",
     "si_la_termino": "Si la persona terminó la tarea.",
     "si_la_empezo": "Si la persona empezó la tarea.",
     "para_cuando_la_termina": "Para qué día la va a terminar.",
@@ -747,6 +752,10 @@ SIGNIFICADOS: Mapping[str, str] = {
     "no_se_le_puede_escribir_a": "A quién Leda no le puede escribir por este chat (a), y por "
                                  "qué (motivo): no se le pregunta nada ni se promete que se "
                                  "va a enterar.",
+    "se_le_aviso_al_administrador": "El aviso al administrador para que conecte con Leda a esa "
+                                    "persona (para_que_conecte), con cuándo le llega (llega), o "
+                                    "que no le va a llegar.",
+    "para_que_conecte": "La persona que el administrador tiene que conectar con Leda.",
     "espera_que_la_destrabe": "Una tarea de otra persona, trabada, que la persona que escribe "
                               "puede destrabar: lo dijo quien la tiene (responsable), con lo "
                               "que la traba (causa). No es una tarea suya.",
@@ -851,6 +860,12 @@ SIGNIFICADOS: Mapping[str, str] = {
     "queda_asentado": "Queda asentado en la historia de la tarea (si todavía no pasó, va a "
                       "quedar asentado). figura_en_el_informe_al_grupo dice si además figura en "
                       "el informe al grupo del espacio. A quién le llega (a), si se sabe.",
+    "no_le_llega_a_nadie": "Lo asentado no le llega a nadie que decida: no hay quien esté a "
+                           "cargo del sector ni quien apruebe el trabajo de la persona, o no "
+                           "tiene Leda conectada. Quedó en la historia de la tarea y el "
+                           "administrador está avisado.",
+    "sin_a_quien_informar": "No hay a quién informarlo: nadie a cargo del sector ni quien "
+                            "apruebe el trabajo de la persona, o no tiene Leda conectada.",
     "figura_en_el_informe_al_grupo": "Si figura en el informe al grupo del espacio, para que el "
                                      "equipo esté al tanto. Si es falso, no figura en ningún "
                                      "informe al grupo.",
