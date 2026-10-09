@@ -269,3 +269,71 @@ pasos:
     no_dice:
       - "a Ismael: una pregunta"
       - "a Marcos: que se le informó a alguien, ni el nombre de Ismael"
+
+  # Decisión 41 (C-5d): lo que dice quien recibió el bloqueo viejo se anota y le llega a Marcos,
+  # pero no lo cierra.
+  - paso: 20
+    quien: Ismael
+    a_las: "2026-11-04 10:30"
+    escribe: "ya esta, llega mañana"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: PLC, ya_esta: true, para_cuando: "2026-11-05",
+         puede_traer: [lo_que_dice]}
+    efectos:
+      dicen_quien_destraba: [{tarea: PLC, de: Ismael, para_cuando: "2026-11-05", ya_esta: true}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {quien_destraba: Ismael Soschinski}}
+    hechos:
+      - {jugada: decir_cuando_destraba, resultado: anotado, tarea: PLC,
+         aviso_a_quien_esta_trabado: {a: Marcos Tarquini, llega: "~2026-11-04T10:40"}}
+    pregunta: null
+    dice:
+      - que quedó anotado
+      - que Marcos se va a enterar
+    no_dice:
+      - que la tarea ya se destrabó
+
+  - paso: 21
+    quien: Leda
+    relojes: ["2026-11-04 10:40"]
+    salen:
+      - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: PLC,
+         hechos: {necesita_respuesta: false, quien_destraba: Ismael Soschinski,
+                  dice_quien_destraba: {ya_esta: true, para_cuando: "2026-11-05"}}}
+    dice:
+      - "a Marcos: que Ismael dice que ya está y que llega mañana (jue 5/11)"
+      - "a Marcos: que cuando pueda seguir, lo diga; que no hace falta responder"
+    no_dice:
+      - "a Marcos: que la tarea ya se destrabó"
+
+  - paso: 22
+    quien: Marcos
+    a_las: "2026-11-05 11:00"
+    escribe: "llego la ip, sigo con el plc"
+    jugadas:
+      - {nombre: destrabar, tarea: PLC}
+    efectos:
+      estados: {PLC: en_curso}
+      bloqueos_resueltos: [PLC]
+      # Se enteran todos los que estaban en el tema: Ariel, que había dado el lunes 2, e Ismael,
+      # que dijo que ya estaba (regla 39, derivada en la C-5d).
+      avisos_guardados:
+        - {tipo: ya_no_hace_falta_que_destrabe, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo,
+                    habia_dicho: {para_cuando: "2026-11-02"}}}
+        - {tipo: ya_no_hace_falta_que_destrabe, tarea: PLC, a: Ismael, estado: guardado,
+           hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo}}
+    pregunta: null
+
+  - paso: 23
+    quien: Leda
+    relojes: ["2026-11-05 11:10"]
+    salen:
+      - {a: Ariel, tipo: ya_no_hace_falta_que_destrabe, tarea: PLC,
+         hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo}}
+      - {a: Ismael, tipo: ya_no_hace_falta_que_destrabe, tarea: PLC,
+         hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo}}
+    dice:
+      - "a Ismael: que Marcos ya pudo seguir con el PLC; que no hace falta responder"
+      - "a Ariel: que lo del PLC ya se resolvió y no hace falta que consiga la IP"

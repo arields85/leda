@@ -136,8 +136,9 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     le dice que le pregunta y que le avisa. Ariel contesta en su chat, queda anotado como un hecho
     del bloqueo y a Marcos le llega lo que dijo, como información; un "ya está" no cierra el
     bloqueo. A quien no tiene un chat con Leda no le escribe y lo dice; "no le escribas, ya hablé"
-    retira el mensaje que todavía no salió, y del que ya salió Leda dice que ya le llegó (decisión
-    4 del usuario, 2026-10-08, primera mitad; porción 1 de la C-5).
+    retira el mensaje que todavía no salió, y del que ya salió Leda dice que ya le llegó; si quien
+    destraba ya había dado un día, Leda deja de preguntarle y se lo dice (decisión 4 del usuario,
+    2026-10-08, primera mitad; porción 1 de la C-5; la regla 39, derivada en la C-5d).
 33. [`33-ya-hable-con-el.md`](33-ya-hable-con-el.md): Ariel, a quien Leda le preguntó, contesta que
     ya lo habló con Marcos; Leda le pregunta qué arreglaron y para cuándo, para que quede asentado, y
     le pregunta lo mismo a Marcos: vale lo que conteste el primero, y a Marcos le llega lo arreglado
@@ -146,22 +147,29 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     le llega para confirmarlo. Dicho todo junto, queda anotado sin preguntar (decisión 4 del usuario,
     segunda mitad; porción 2 de la C-5; decisiones 47 y 48, C-5c).
 34. [`34-no-me-corresponde.md`](34-no-me-corresponde.md): a quien Leda le pregunta por un bloqueo
-    dice que no le corresponde; Leda pregunta quién se encarga y sigue con esa persona. Si la segunda
-    también dice que no, que no sabe o nombra a otra, Leda le informa al referente con toda la cadena,
-    sin pedirle nada, y a Nahuel, que está trabado, le dice que quedó asentado, sin decir que se lo
-    informa a alguien ni a quién (decisión 5 del usuario; porción 3 de la C-5; decisión 35).
+    dice que no le corresponde; Leda pregunta quién se encarga y sigue con esa persona, hasta tres
+    personas preguntadas. Ante un "ni idea", antes de asentarlo, le pregunta a Nahuel, que está
+    trabado, si se le ocurre otra persona. Si la tercera tampoco lo toma, o Nahuel no sabe de nadie
+    más, Leda le informa la cadena entera a quien decide quién lo resuelve, nunca a alguien de la
+    cadena, sin pedirle nada, y a Nahuel le dice que quedó asentado, sin decir que se lo informa a
+    alguien ni a quién (decisión 5 del usuario; porción 3 de la C-5; decisión 35; decisiones 24, 49 y
+    51, C-5d).
 35. [`35-bloqueos-encadenados.md`](35-bloqueos-encadenados.md): los bloqueos se enlazan solos
     (Marcos ← Ariel ← Lucas): por la dependencia cargada entre las dos tareas, o porque quien destraba
     dice que está trabado con una tarea suya. Leda no le sigue preguntando a Ariel y sigue con quien
     lo destraba; Marcos, más abajo, se entera de cada avance del medio con avisos informativos que no
-    piden respuesta (que Ariel se trabó, la fecha que da Lucas, que ya está, que Ariel pudo seguir)
-    (decisión 6 del usuario; porción 4 de la C-5).
+    piden respuesta (que Ariel se trabó, la fecha que da Lucas, que ya está, que Ariel pudo seguir),
+    y Lucas, que dijo que ya estaba, se entera de que Ariel pudo seguir (decisión 6 del usuario;
+    porción 4 de la C-5; la regla 39, derivada en la C-5d).
 36. [`36-bloqueo-viejo.md`](36-bloqueo-viejo.md): un bloqueo que sigue abierto a los cinco días
     hábiles se le informa al referente, aunque la cadena se mueva, con la historia y las fechas que
     dio cada uno, y a Marcos, que está trabado, se le dice que quedó asentado, para que el equipo
     esté al tanto (el espacio tiene informe al grupo); mientras siga, cada cinco días hábiles se
     vuelve a asentar, con lo que pasó desde la vez anterior; uno más nuevo o ya cerrado, no
-    (decisión 7 del usuario; porción 5 de la C-5; decisiones 34, 35 y 36, C-5a).
+    (decisión 7 del usuario; porción 5 de la C-5; decisiones 34, 35 y 36, C-5a). Desde la C-5d
+    (decisión 41): Ismael, que recibió el informe, dice "ya está, llega mañana"; queda anotado y le
+    llega a Marcos, pero el bloqueo sigue abierto hasta que Marcos dice que pudo seguir, y entonces
+    se enteran Ariel e Ismael.
 42. [`42-quien-destraba-no-contesta.md`](42-quien-destraba-no-contesta.md): a quien destraba y no
     contesta, Leda nunca lo abandona: los días 1 a 3, una vez por día; desde el 4, cada 2 días
     hábiles mientras siga el bloqueo, sin escalar por su silencio; si escribe por otra cosa, Leda le

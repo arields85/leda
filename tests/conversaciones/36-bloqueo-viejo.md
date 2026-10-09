@@ -5,10 +5,13 @@ aunque la cadena se mueva (quien lo destraba fue dando fechas): va con la histor
 fechas que dio cada uno, sin pedirle nada. A la persona trabada se le dice, en un mensaje corto, que
 quedó asentado y, como el espacio tiene informe al grupo, que es para que el equipo esté al tanto,
 sin nombrar a quién le llegó. Mientras siga trabado, cada cinco días hábiles se vuelve a asentar,
-con lo que pasó desde la vez anterior. Uno más nuevo, o uno que se cerró antes, no se informa.
+con lo que pasó desde la vez anterior. Uno más nuevo, o uno que se cerró antes, no se informa. Si
+quien recibió el informe dice "ya está, llega mañana", Leda lo anota y se lo cuenta a la persona
+trabada, pero el bloqueo sigue abierto hasta que ella diga que pudo seguir; entonces se enteran
+todos los que estaban en el tema, también quien dijo que ya estaba (decisión 41 y la regla 39).
 Decisión 7 del usuario (`odd/tasks/fase-c.md`, 2026-10-08, opción A) y decisiones 34, 35 y 36
-(2026-10-09, C-5a); mecánica §8 ("un bloqueo abierto hace más de [pack] días escala aunque nadie
-lo pida").
+(2026-10-09, C-5a); decisión 41 (2026-10-09, C-5d); mecánica §8 ("un bloqueo abierto hace más
+de [pack] días escala aunque nadie lo pida").
 
 **Corre desde la porción 5 de la C-5** (`odd/tasks/fase-c.md`), entera, con su YAML.
 
@@ -27,6 +30,9 @@ lo pida").
    quién se le avisó, Leda dice la verdad.
 5. **Se vuelve a asentar mientras siga** (decisión 36): cada `bloqueos.escala_solo_a_los_dias` días
    hábiles mientras siga trabado, con lo que pasó desde la vez anterior.
+6. **El bloqueo lo da por destrabado quien está trabado** (decisión 41): si quien recibió el
+   bloqueo viejo dice "ya está, llega mañana", Leda lo anota y se lo cuenta a la persona trabada,
+   pero el bloqueo sigue abierto hasta que ella diga que pudo seguir.
 
 Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/fase-c.md`, C-5):
 
@@ -39,6 +45,8 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
   hábiles del espacio.
 - **"Va a figurar en el informe al grupo"** es un hecho del código: el espacio tiene su grupo y una
   cadencia al grupo, como CoreWork en el pack (`telegram.grupo_gestion_id` e `informe_semanal`).
+- **Cuando por fin se destraba** se enteran todos los que estaban en el tema (regla 39): quien había
+  dado un día y también quien dijo que ya estaba (derivado de la decisión 41 en la C-5d).
 
 ## Estado inicial
 
@@ -150,12 +158,41 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
       días hábiles, para que el equipo esté al tanto; que no hace falta responder.
     - El mensaje a Marcos no dice: que se le informó a alguien; el nombre de Ismael.
 
+20. **Ismael** escribe (miércoles 4, 10:30): "ya esta, llega mañana"
+    →
+    - Jugadas: `decir_cuando_destraba` sobre la tarea del PLC, que ya está, para el jueves 5.
+    - Efecto: queda anotado, dicho por Ismael; el aviso a Marcos sale a las 10:40. El bloqueo sigue
+      abierto y la tarea, trabada: lo da por destrabado Marcos.
+    - La respuesta dice: que quedó anotado; que Marcos se va a enterar.
+    - La respuesta no dice: que la tarea ya se destrabó.
+
+21. **Leda**, por su cuenta, a Marcos (miércoles 4, 10:40): lo que dijo Ismael.
+    →
+    - El mensaje dice: que Ismael dice que ya está y que llega mañana (jue 5/11); que cuando pueda
+      seguir, lo diga; que no hace falta responder.
+    - El mensaje no dice: que la tarea ya se destrabó.
+
+22. **Marcos** escribe (jueves 5, 11:00): "llego la ip, sigo con el plc"
+    →
+    - Jugadas: `destrabar` sobre la tarea del PLC.
+    - Efecto: el bloqueo del PLC se cierra y la tarea vuelve a en curso. Se enteran, terminado el
+      margen para corregir (11:10), los que estaban en el tema: Ariel, que había dado el lunes 2, y
+      Ismael, que dijo que ya estaba.
+
+23. **Leda**, por su cuenta (jueves 5, 11:10): a Ariel y a Ismael, que el PLC ya se destrabó.
+    →
+    - A Ismael, informativo: que Marcos ya pudo seguir con el PLC; que no hace falta responder.
+    - A Ariel, informativo: que lo del PLC ya se resolvió y no hace falta que consiga la IP; que no
+      hace falta responder.
+
 ## Qué mide
 
 - **Garantías (5b):** el bloqueo viejo se asienta cada cinco días hábiles mientras siga abierto, nunca
   antes; uno que se cerró o que es más nuevo no se informa; los avisos no piden nada; no inventa una
   fecha que nadie dio; la historia dice lo que dijo cada uno, con sus fechas, y la segunda vez sólo lo
-  que pasó desde la primera; a Marcos le llega cada vez, sin que se le nombre a nadie.
+  que pasó desde la primera; a Marcos le llega cada vez, sin que se le nombre a nadie; lo que dice
+  quien recibió el informe no cierra el bloqueo; al cerrarse, se enteran todos los que estaban en el
+  tema.
 - **Falla de comprensión:** que la IA cuente las fechas que dio Ariel como si se hubieran cumplido;
   que no responda con lo que ya informó cuando Ismael pregunta; que a Marcos le diga que le informó
   a alguien, o que no diga que es para que el equipo esté al tanto.

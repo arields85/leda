@@ -262,9 +262,13 @@ pasos:
     efectos:
       estados: {SRV: en_curso}
       bloqueos_resueltos: [SRV]
+      # Lucas, que dijo que ya estaba, se entera de que Ariel pudo seguir (regla 39, C-5d).
       avisos_guardados:
         - {tipo: novedad_de_lo_que_espera, tarea: PLC, a: Marcos, estado: guardado,
            hechos: {novedad: {de: Ariel De Simone, tarea: SRV, se_destrabo: true}}}
+        - {tipo: ya_no_hace_falta_que_destrabe, tarea: SRV, a: Lucas, estado: guardado,
+           hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo,
+                    habia_dicho: {ya_esta: true}}}
     hechos:
       - {jugada: destrabar, resultado: anotado, tarea: SRV, estado: en_curso,
          avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Marcos Tarquini, tarea: PLC,
@@ -284,9 +288,14 @@ pasos:
         hechos: {necesita_respuesta: false,
                  esperando_a: [{de: Ariel De Simone, tarea: SRV}],
                  novedad: {de: Ariel De Simone, tarea: SRV, se_destrabo: true}}
+      - a: Lucas
+        tipo: ya_no_hace_falta_que_destrabe
+        tarea: SRV
+        hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo}
     dice:
       - "a Marcos: que Ariel ya pudo seguir con la tarea del servidor"
       - "a Marcos: que no hace falta responder, en el último renglón"
+      - "a Lucas: que Ariel ya pudo seguir con la tarea del servidor; que no hace falta responder"
     no_dice:
       - "a Marcos: que la tarea del PLC se destrabó"
 

@@ -121,12 +121,15 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
     →
     - Jugadas: `destrabar` sobre la tarea del servidor.
     - Efecto: el bloqueo del servidor se cierra y la tarea vuelve a `en_curso`; se guarda el aviso a
-      Marcos de que Ariel pudo seguir, a las 15:40.
+      Marcos de que Ariel pudo seguir, a las 15:40. Lucas, que había dicho que ya estaba, se entera
+      de que Ariel pudo seguir (regla 39, derivada en la C-5d): su aviso sale a la misma hora.
     - La respuesta dice: que quedó anotado; que Marcos se va a enterar.
 
 11. **Leda**, por su cuenta, a Marcos (jueves 22, 15:40): informativo, que Ariel ya pudo seguir con la
     tarea del servidor; que no hace falta responder.
     - El mensaje no dice: que la tarea del PLC se destrabó.
+    - A Lucas, a la vez, informativo: que Ariel ya pudo seguir con la tarea del servidor; que no
+      hace falta responder.
 
 12. **Ariel** escribe (jueves 22, 15:45): "la ip se la paso a marcos mañana temprano"
     →

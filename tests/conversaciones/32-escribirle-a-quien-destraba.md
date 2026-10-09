@@ -172,9 +172,17 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
     hablamos"
     →
     - Jugadas: `no_escribirle`, sobre la tarea del PLC.
-    - Efecto: ninguno: ese mensaje ya le llegó a Ariel a las 10:32.
-    - La respuesta dice: que a Ariel ya le escribió esta mañana, y que no se puede retirar.
+    - Efecto: ese mensaje ya le llegó a Ariel a las 10:32 y Ariel ya dio un día (el miércoles 21):
+      Leda no le va a volver a preguntar y se lo dice (derivado de la regla 39 en la C-5d); se
+      guarda el aviso a Ariel, que sale terminado el margen para corregir (15:10).
+    - La respuesta dice: que a Ariel ya le escribió esta mañana, y que no se puede retirar; que no
+      le pregunta más.
     - La respuesta no dice: que lo retiró o que no le va a llegar.
+
+10b. **Leda**, por su cuenta, a Ariel (martes 20, 15:10): que Marcos dice que ya lo hablaron, así
+    que no le pregunta más por el PLC.
+    →
+    - Efecto: un mensaje privado a Ariel, informativo; que no hace falta responder.
 
 ## Qué mide
 

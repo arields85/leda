@@ -165,25 +165,17 @@ pasos:
     efectos:
       destraban: [{tarea: PLA, no_sabe: true, de: Mariano}]
       dicen_quien_destraba: [{tarea: PLA, de: Mariano, no_le_corresponde: true}]
-      # El segundo de la cadena: Leda no sigue preguntando. La cadena va al referente de OT (no
-      # se sabe el sector de lo que falta: va el de la tarea trabada), y a Nahuel lo que dijo.
+      # Un "ni idea" con lugar en la cadena (dos personas preguntadas): antes de asentarlo, Leda
+      # le pregunta a Nahuel si se le ocurre otra persona (decisión 49). Nada a Marcos todavía.
       avisos_guardados:
-        - {tipo: cadena_del_bloqueo, tarea: PLA, a: Marcos, estado: guardado,
-           hechos: {necesita_respuesta: false, responsable: Nahuel Gimenez, causa: presente,
-                    cadena: [{de: Nahuel Gimenez, le_toca_a: Ariel De Simone},
-                             {de: Ariel De Simone, no_le_corresponde: true,
-                              le_toca_a: Mariano Naim},
-                             {de: Mariano Naim, no_le_corresponde: true, no_sabe: true}]}}
-        - {tipo: lo_que_dijo_quien_destraba, tarea: PLA, a: Nahuel, estado: guardado,
-           hechos: {necesita_respuesta: false, quien_destraba: Mariano Naim,
-                    dice_quien_destraba: {no_le_corresponde: true, no_sabe: true},
-                    queda_asentado: {a: Marcos Tarquini, figura_en_el_informe_al_grupo: false},
-                    aviso_de_la_cadena: ausente}}
+        - {tipo: quien_mas_puede_destrabar, tarea: PLA, a: Nahuel, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: quien_destraba,
+                    quien_destraba: Mariano Naim,
+                    dice_quien_destraba: {no_le_corresponde: true, no_sabe: true}}}
     hechos:
       - {jugada: decir_que_no_le_toca, resultado: anotado, tarea: PLA,
          dice_quien_destraba: {no_le_corresponde: true, no_sabe: true},
-         se_le_pregunta_a: ausente,
-         aviso_de_la_cadena: {a: Marcos Tarquini, llega: "~2026-10-20T11:50"},
+         se_le_pregunta_a: ausente, aviso_de_la_cadena: ausente,
          aviso_a_quien_esta_trabado: {a: Nahuel Gimenez, llega: "~2026-10-20T11:50"}}
     pregunta: null
     estado_despues:
@@ -195,31 +187,70 @@ pasos:
       - que Nahuel se va a enterar
     no_dice:
       - el nombre de Marcos
+      - que se lo informa a alguien
 
   - paso: 8
     quien: Leda
     relojes: ["2026-10-20 11:50"]
+    salen:
+      - a: Nahuel
+        tipo: quien_mas_puede_destrabar
+        tarea: PLA
+        hechos: {necesita_respuesta: true, pregunta: quien_destraba,
+                 quien_destraba: Mariano Naim,
+                 dice_quien_destraba: {no_le_corresponde: true, no_sabe: true}}
+    estado_despues:
+      de: Nahuel
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLA}
+    dice:
+      - "a Nahuel: que Mariano dice que no le corresponde y no sabe de quién es"
+      - "a Nahuel: una sola pregunta: si se le ocurre otra persona que pueda destrabarlo"
+
+  - paso: 8b
+    quien: Nahuel
+    a_las: "2026-10-20 12:00"
+    escribe: "no, no se me ocurre nadie"
+    jugadas:
+      - {nombre: anotar_quien_destraba, no_sabe: true, puede_traer: [tarea]}
+    efectos:
+      destraban: [{tarea: PLA, no_sabe: true, de: Nahuel}]
+      # Queda asentado: la cadena va a Marcos, el referente de OT, que no es parte de la cadena
+      # (decisión 24), con lo que dijo cada uno.
+      avisos_guardados:
+        - {tipo: cadena_del_bloqueo, tarea: PLA, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: false, responsable: Nahuel Gimenez, causa: presente,
+                    cadena: [{de: Nahuel Gimenez, le_toca_a: Ariel De Simone},
+                             {de: Ariel De Simone, no_le_corresponde: true,
+                              le_toca_a: Mariano Naim},
+                             {de: Mariano Naim, no_le_corresponde: true, no_sabe: true},
+                             {de: Nahuel Gimenez, no_sabe: true}]}}
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado,
+         queda_asentado: {a: Marcos Tarquini, figura_en_el_informe_al_grupo: false},
+         salidas: ausente}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que quedó asentado
+      - que cuando pueda seguir, lo diga
+    no_dice:
+      - que Leda se lo informa a alguien, ni a quién
+      - otras salidas para destrabarlo
+
+  - paso: 8c
+    quien: Leda
+    relojes: ["2026-10-20 12:10"]
     salen:
       - a: Marcos
         tipo: cadena_del_bloqueo
         tarea: PLA
         hechos: {necesita_respuesta: false, responsable: Nahuel Gimenez, causa: presente,
                  cadena: presente}
-      - a: Nahuel
-        tipo: lo_que_dijo_quien_destraba
-        tarea: PLA
-        hechos: {necesita_respuesta: false, quien_destraba: Mariano Naim,
-                 dice_quien_destraba: {no_le_corresponde: true, no_sabe: true},
-                 queda_asentado: {a: Marcos Tarquini, figura_en_el_informe_al_grupo: false},
-                 aviso_de_la_cadena: ausente}
     dice:
       - "a Marcos: que Nahuel está trabado con la tarea de los planos por la lista de componentes del tablero"
-      - "a Marcos: la cadena: Nahuel dijo que la tenía Ariel, Ariel que la maneja Mariano, y Mariano que no sabe"
+      - "a Marcos: la cadena: Nahuel dijo que la tenía Ariel, Ariel que la maneja Mariano, Mariano que no sabe, y Nahuel tampoco sabe de otra persona"
       - "a Marcos: que es para que determine quién lo resuelve, sin pedirle nada; que no hace falta responder"
-      - "a Nahuel: que Mariano dice que no le corresponde y no sabe de quién es"
-      - "a Nahuel: que quedó asentado"
-    no_dice:
-      - "a Nahuel: que Leda se lo informa a alguien, ni a quién"
 
   - paso: 9
     quien: Nahuel
@@ -314,44 +345,95 @@ pasos:
     efectos:
       destraban: [{tarea: DIG, integrante: Mariano, alguien: true, no_sabe: false, de: Martin}]
       dicen_quien_destraba: [{tarea: DIG, de: Martin, no_le_corresponde: true}]
-      # El segundo de la cadena nombra a otra persona: Leda no le escribe. El sector de lo que
-      # falta es el de quien quedó nombrado: va al referente de Sistemas eléctricos (Mariano).
+      # La segunda persona preguntada nombra a otra: Leda sigue con Mariano, la tercera
+      # (decisión 51).
       avisos_guardados:
-        - {tipo: cadena_del_bloqueo, tarea: DIG, a: Mariano, estado: guardado,
-           hechos: {necesita_respuesta: false, responsable: Nahuel Gimenez,
-                    cadena: [{de: Nahuel Gimenez, le_toca_a: Lucas Natuche},
-                             {de: Lucas Natuche, no_le_corresponde: true,
-                              le_toca_a: Martín Forte},
-                             {de: Martín Forte, no_le_corresponde: true,
-                              le_toca_a: Mariano Naim}]}}
+        - {tipo: pregunta_a_quien_destraba, tarea: DIG, a: Mariano, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                    responsable: Nahuel Gimenez, nombrado_por: Martín Forte}}
         - {tipo: lo_que_dijo_quien_destraba, tarea: DIG, a: Nahuel, estado: guardado,
            hechos: {quien_destraba: Martín Forte,
                     dice_quien_destraba: {no_le_corresponde: true, le_toca_a: Mariano Naim},
-                    queda_asentado: {a: Mariano Naim, figura_en_el_informe_al_grupo: false},
-                    aviso_de_la_cadena: ausente}}
+                    se_le_pregunta_a: {a: Mariano Naim}}}
     hechos:
       - {jugada: decir_que_no_le_toca, resultado: anotado, tarea: DIG,
-         se_le_pregunta_a: ausente,
-         aviso_de_la_cadena: {a: Mariano Naim, llega: "~2026-10-20T15:10"}}
+         se_le_pregunta_a: {a: Mariano Naim, llega: "~2026-10-20T15:10"},
+         aviso_de_la_cadena: ausente}
     pregunta: null
     dice:
       - que quedó anotado
-      - que Nahuel se va a enterar
+      - que Leda le pregunta a Mariano
 
   - paso: 15
     quien: Leda
     relojes: ["2026-10-20 15:10"]
     salen:
       - a: Mariano
+        tipo: pregunta_a_quien_destraba
+        tarea: DIG
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Nahuel Gimenez, nombrado_por: Martín Forte}
+      - a: Nahuel
+        tipo: lo_que_dijo_quien_destraba
+        tarea: DIG
+        hechos: {necesita_respuesta: false, quien_destraba: Martín Forte}
+    estado_despues:
+      de: Mariano
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: DIG}
+
+  - paso: 16
+    quien: Mariano
+    a_las: "2026-10-20 15:30"
+    escribe: "no es mio, eso lo ve ismael"
+    jugadas:
+      - {nombre: decir_que_no_le_toca, quien: "ismael", puede_traer: [tarea, lo_que_dice]}
+    efectos:
+      destraban: [{tarea: DIG, integrante: Ismael, alguien: true, no_sabe: false, de: Mariano}]
+      dicen_quien_destraba: [{tarea: DIG, de: Mariano, no_le_corresponde: true}]
+      # La tercera persona preguntada tampoco lo toma: Leda no le escribe a Ismael y queda
+      # asentado. Va a Marcos, el referente de OT (la tarea trabada); nunca a Mariano, que es
+      # parte de la cadena aunque sea el referente de lo eléctrico (decisión 24).
+      avisos_guardados:
+        - {tipo: cadena_del_bloqueo, tarea: DIG, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: false, responsable: Nahuel Gimenez,
+                    cadena: [{de: Nahuel Gimenez, le_toca_a: Lucas Natuche},
+                             {de: Lucas Natuche, no_le_corresponde: true,
+                              le_toca_a: Martín Forte},
+                             {de: Martín Forte, no_le_corresponde: true,
+                              le_toca_a: Mariano Naim},
+                             {de: Mariano Naim, no_le_corresponde: true,
+                              le_toca_a: Ismael Soschinski}]}}
+        - {tipo: lo_que_dijo_quien_destraba, tarea: DIG, a: Nahuel, estado: guardado,
+           hechos: {quien_destraba: Mariano Naim,
+                    dice_quien_destraba: {no_le_corresponde: true,
+                                          le_toca_a: Ismael Soschinski},
+                    queda_asentado: {a: Marcos Tarquini, figura_en_el_informe_al_grupo: false},
+                    aviso_de_la_cadena: ausente}}
+    hechos:
+      - {jugada: decir_que_no_le_toca, resultado: anotado, tarea: DIG,
+         se_le_pregunta_a: ausente,
+         aviso_de_la_cadena: {a: Marcos Tarquini, llega: "~2026-10-20T15:40"}}
+    pregunta: null
+    dice:
+      - que quedó anotado
+      - que Nahuel se va a enterar
+    no_dice:
+      - el nombre de Marcos
+
+  - paso: 17
+    quien: Leda
+    relojes: ["2026-10-20 15:40"]
+    salen:
+      - a: Marcos
         tipo: cadena_del_bloqueo
         tarea: DIG
         hechos: {necesita_respuesta: false, responsable: Nahuel Gimenez, cadena: presente}
       - a: Nahuel
         tipo: lo_que_dijo_quien_destraba
         tarea: DIG
-        hechos: {necesita_respuesta: false, quien_destraba: Martín Forte,
-                 queda_asentado: {a: Mariano Naim, figura_en_el_informe_al_grupo: false},
+        hechos: {necesita_respuesta: false, quien_destraba: Mariano Naim,
+                 queda_asentado: {a: Marcos Tarquini, figura_en_el_informe_al_grupo: false},
                  aviso_de_la_cadena: ausente}
     dice:
-      - "a Mariano: la cadena: Nahuel dijo que lo tenía Lucas, Lucas que lo ve Martín, y Martín que es de Mariano; para que determine quién lo resuelve, sin pedirle nada"
-      - "a Nahuel: que Martín dice que no le corresponde y que es de Mariano, y que quedó asentado, sin decir que se lo informa a alguien ni a quién"
+      - "a Marcos: la cadena: Nahuel dijo que lo tenía Lucas, Lucas que lo ve Martín, Martín que es de Mariano, y Mariano que lo ve Ismael; para que determine quién lo resuelve, sin pedirle nada"
+      - "a Nahuel: que Mariano dice que no le corresponde y que lo ve Ismael, y que quedó asentado, sin decir que se lo informa a alguien ni a quién"
