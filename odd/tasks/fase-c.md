@@ -358,6 +358,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     hábiles antes: el martes 3; ADR 0017, 3b, enmienda), nunca recién en la lista siguiente, cuando
     ya habría vencido. Cambia la C-6 (hoy, lo que llegue primero entre la lista y el vencimiento).
 
+45. **Una sola hora de salida** (de la C-6): decidida (usuario, 2026-10-09, opción B). Mientras no
+    exista la plataforma, todo lo que Leda manda por su cuenta sale a las 10:00, también el pedido
+    de estado que el pack pone a las 9:15. En la plataforma queda una sola hora por espacio, que se
+    elige ahí y usan todos (`docs/product/plataforma-pendientes.md`). Confirma lo construido.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
