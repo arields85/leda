@@ -1200,6 +1200,16 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         descrito y pide una descripción, aunque la entrega anterior lo dijera.
       - **El paso 19 de la prueba** (volver a preguntar en la entrega nueva lo que ya dijo la
         primera) queda cubierto por la decisión 23; si con la IA real vuelve a pasar, es de diseño.
+    - **Cierre del coordinador:** `792392b` saca los incidentes de cada reintento de los conteos de
+      `tests/test_esqueleto.py` y `tests/test_saludo.py` (eran de un solo incidente); suite completa
+      sobre `792392b`, 1659 passed. **Revisión RDD por tramos, aprobadas y reconocidas:**
+      `647c01c..3588141` `review-70be0520f9a6c10f`, `..28849d0` `review-8d5cecf121c0b5e1`,
+      `..0517d06` `review-d7da326944900d6c`, `..119dfba` `review-a2fe706ec1d91986`, `..02d4d67`
+      `review-9f23c3d91a741a7f`. Advertencias abiertas: el retiro del borrador es en serie
+      (`recibir.py:656`), una pregunta cerrada en el mismo turno y un deshacer que no la reabre
+      (`fichas.py:368`, `preguntas.py:453`), `herramientas.py:1791` (lo del ejemplo aceptado sin
+      validar contra la clase) y la ventana entre pedidos de cambios (`entrega.py:297`).
+      `leda_motor` necesita la `0039` antes de la próxima prueba por Telegram.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
