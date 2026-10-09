@@ -534,9 +534,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           la migrada y el ensayo de vuelta atrás incluyen ahora las cinco tablas.
         - **Chequeos** (2026-10-09): `pytest tests/garantias` 328 passed;
           `pytest tests/motor tests/conversaciones` 926 passed; suite completa 1682 passed.
-        - `PENDIENTE`: `tools/restriccion_horario.py` lee y escribe `work_calendar` con la
-          conexión del `.env` sin cambiar de rol; si ese usuario no es superusuario ni
-          `bypassrls`, con la política deja de ver el calendario. Comprobar al usarlo.
+        - **Revisión RDD** (coordinador): `b09f46f..f06e699` `review-1f3e103485c088f9`, aprobada
+          y reconocida. Advertencias: la política de la `0041` no tiene `with check` (hoy
+          `leda_app` sólo lee y `leda_admin` la saltea; si un día `leda_app` escribe, hace falta);
+          la prueba de comportamiento apaga los modelos globales que ya hubiera.
+        - **Resuelto** (`411d680`, coordinador): `tools/restriccion_horario.py` leía y escribía
+          `work_calendar` sin cambiar de rol; ahora corre bajo `admin()` (`leda_admin`).
+          Comprobado con `restriccion_horario.py estado corework` sobre `leda_motor`.
       - `PENDIENTE`: el tablero (`_servir_tablero`) arma su página fuera de una guarda, como la
         página de la tarea antes de esto; no se tocó.
   - [ ] Porción 5: el acceso del administrador.
