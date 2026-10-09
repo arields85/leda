@@ -1542,19 +1542,16 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       passed), revisada `16c0a2c..0c28777` `review-168316baac80a7f6`; su advertencia: la prueba
       simula la repetición que no salió sin un aviso omitido real. `635aae7` suma la 30 al README.
     - `PENDIENTE` (decisiones del usuario; lo construido es la lectura que no agrega mensajes):
-      - **La repetición a las 4 horas sólo sale si algo espera detrás.** Sin otro tema esperando, la
-        pregunta sigue su escalera de siempre (el día hábil siguiente), como en la 03 y la 26. Ejemplo:
-        Marcos no contesta a las 10:20 quién destraba el PLC y no tiene nada más pendiente: hoy no
-        se le repite a las 14:20, sino mañana a las 10:00. ¿O se repite igual?
+      - ~~**La repetición a las 4 horas sólo sale si algo espera detrás.**~~ Decidida: sale
+        siempre (decisión 29; hecha, abajo).
       - **"Más urgente"**: el tipo de mensaje (mecánica §11) y, entre iguales, la tarea que vence
         antes; a igual vencimiento, la pregunta abierta. En la 30, el jueves sale primero el pedido
         de comunicaciones (vence el jueves) que la repetición del PLC (vence el viernes).
       - **"Al día siguiente"**: una pregunta de un día anterior ya no frena; a las 10:00 sale lo más
         urgente de lo que espera, de a uno. Lo que no sale espera con su escalera parada (un paso
         guardado sin salir la detiene), así que puede escalar más tarde.
-      - **El mensaje aparte** es sólo para las dos preguntas que abrió un aviso de Leda. Cuando la
-        persona cambió de tema por su cuenta (9d, la 08, la 12, la 21 y la 27), la pregunta vuelve
-        en la misma respuesta, como antes. ¿También aparte?
+      - ~~**El mensaje aparte** es sólo para las dos preguntas que abrió un aviso de Leda.~~
+        Decidida: también aparte cuando la persona cambia de tema (decisión 50; hecha, abajo).
       - **"Enseguida" fuera del horario**: si la persona contesta a las 17:05, la otra pregunta
         vuelve el día hábil siguiente a las 10:00 (una sola vez, aunque su escalera también la
         repita).
@@ -1562,6 +1559,46 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         tarea no se repite; su turno termina a las 8 horas, como si se hubiera repetido.
       - **La IA real** sobre la 30 (y el punto 5 sobre la 04), y la prueba por Telegram, en la tanda
         posterior. `leda_motor` necesita la `0040` además de la `0039`.
+    - **Las decisiones 29 y 50** (2026-10-09, escritor único; route: delegada, 2+ archivos no
+      triviales). Sin migración: alcanzan `conversation_question.preguntada_en` y el aviso
+      `vuelve_la_pregunta` de la `0040`.
+      - **La conversación primero** (`5101d0b`): la 08 (paso 3 sin la pregunta, paso 4 nuevo con la
+        que vuelve aparte; los siguientes, renumerados) y la 12 (paso 8 nuevo) para la 50; la 03,
+        la 04, la 02 y la 18 suman la repetición del día que ahora sale sin nada esperando (29); la
+        30 y el README, la regla nueva. La 21 y la 27 no cambian: su "desde antes" es sobre la misma
+        tarea (un botón viejo de esa entrega, "y que pongo?"), no un cambio de tema.
+      - **La 29** (`c3c1907`, `escalera._repetir_las_preguntas_abiertas`): sin la condición de que
+        algo espere detrás (`_otro_tema_espera`, borrada). Rigen el horario y no interrumpir. Con la
+        escalera de un pedido de estado sin contestar, a la persona le llegan dos mensajes por día
+        (el pedido a las 10:00 y su repetición a las 14:00, la 04); la repetición cuenta como
+        recordatorio de la espera (`pending_reply.recordatorios`), no como paso de la escalera.
+      - **La 50** (`c3c1907`): `turno.de_que_hablo` lee, antes de manejar las jugadas, de qué tareas
+        habló el mensaje (la que nombra cada jugada; la de la pregunta para `elegir`, `cancelar`,
+        `dejar_para_despues`, la respuesta que no es ninguna jugada y la jugada sin tarea que
+        contesta esa clase de pregunta); `pregunta_sin_contestar.hablo_de_otro_tema` decide: una
+        pregunta que viene de antes y es de otra tarea no va en la respuesta, se guarda como
+        `vuelve_la_pregunta` y sale en la vuelta siguiente del ciclo (dentro del horario, también
+        antes de las 10:00; fuera, el día hábil siguiente), una sola guardada por pregunta. El tema
+        es la tarea; un mensaje sin jugadas no es un cambio de tema. Vale también para la que quedó
+        para después y vuelve al cerrarse la de ahora (9d). Una pregunta sin tarea vuelve en la
+        respuesta, como antes. "Una respuesta visible por mensaje" sigue: la pregunta que vuelve
+        es un aviso aparte, como en la decisión 21. **Los botones van con la pregunta**
+        (`botones.py`): el aviso que la repite o la trae lleva sus opciones (el Confirmar de una
+        vista previa) y la respuesta de la que se apartó, no.
+      - **Test primero:** `tests/motor/test_pregunta_sin_contestar.py` (decisiones 29 y 50) en rojo,
+        6 de 27 (`pytest -q tests/motor/test_pregunta_sin_contestar.py`: 6 failed, 21 passed); una de
+        las seis esperaba mal (que un mensaje sin jugada demorara la repetición: la vuelve a hacer
+        en la respuesta, y las 4 horas cuentan desde ahí) y se reescribió. La del botón,
+        `test_entrega.py`, en rojo (la respuesta llevaba Confirmar). Verde después. Cambiaron por la
+        regla nueva `test_escalera`, `test_hechos`, `test_motivo_del_atraso`,
+        `test_preguntas_que_esperan`, `test_situaciones` y `test_un_tema_a_la_vez`.
+      - **Chequeos** (2026-10-09, sobre `c3c1907`): `pytest tests/motor tests/garantias
+        tests/conversaciones`, 1463 passed; en seco, `correr --ia guionada --veces 1 --sin-informe`,
+        39 de 39 bien. Sin la IA real (va en la tanda posterior: la 03, 04, 08, 12 y 18 se suman).
+      - `PENDIENTE` (preguntas al usuario): si la pregunta que vuelve por un cambio de tema escrito
+        fuera del horario espera al día hábil siguiente (lo construido, como la decisión 21) o sale
+        enseguida porque la persona está escribiendo; y si dos mensajes por día a quien no contesta
+        un pedido de estado (la 04) es lo que se quiere.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
@@ -2319,8 +2356,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
   - [x] C-7: 26 (un pase sin respuesta), 27 (el encargado pasa una tarea de su gente), 28 (la
         revisión sigue a quien era la tarea); conversación 39, migración `0046`. Con su
         corrección: 53 (el encargado se queda él con una tarea de su gente) y la 39 en los pases.
-  - [ ] D5b: 29 (la repetición de las 4 horas sale siempre), 50 (la pregunta que quedó vuelve
-        aparte).
+  - [x] D5b: 29 (la repetición de las 4 horas sale siempre), 50 (la pregunta que quedó vuelve
+        aparte); conversaciones 02, 03, 04, 08, 12 y 18 (`5101d0b`, `c3c1907`).
   - [ ] C-6: 31 (lo contestado no se repite), 32 (la lista del lunes, completa con su situación),
         44 ("viene bien": lo próximo es el aviso previo), 46 (las otras listas, sólo lo que falta).
   - [ ] C-5a: 35 ("quedó asentado"), 34 (se le cuenta a la persona trabada), 36 (se vuelve a
