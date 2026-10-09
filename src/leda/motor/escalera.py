@@ -435,7 +435,12 @@ def _recordar_el_vencimiento(m: Momento, tarea, vence: date) -> str | None:
 
 def _pedir_el_estado(m: Momento, tarea, hasta: Anclaje, paso: int, ronda: list[str],
                      anteriores: list[dict[str, Any]], por: dict[str, str]) -> str:
-    base = {"aviso": "pedido_de_estado", "numero": paso + 1, "necesita_respuesta": True, **por}
+    # `numero` son las veces que se le pregunta sin que conteste, contando ésta: un paso que no
+    # salió porque ya había contado cómo viene (`YA_LO_CONTO`) no es una pregunta sin respuesta;
+    # el paso de la escalera sigue anclado al vencimiento (revisión `review-52e1f429c07370b9`).
+    contados = sum(a["motivo_omision"] == YA_LO_CONTO for a in anteriores)
+    base = {"aviso": "pedido_de_estado", "numero": paso + 1 - contados,
+            "necesita_respuesta": True, **por}
     if _no_llegaron(anteriores):        # que no le hable como si ya le hubiera preguntado
         base["pedidos_anteriores_que_no_le_llegaron"] = _no_llegaron(anteriores)
     if paso == PEDIDOS - 1:

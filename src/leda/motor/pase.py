@@ -242,8 +242,13 @@ def _mostrar(ctx: Contexto, tarea: dict, recibe: str) -> dict:
                                                    "motivo": motivo},
                      "en_cambio_puede": [PASARSELA_A_OTRA_PERSONA]}
             if motivo == SIN_TELEGRAM:
+                # Para qué hay que conectarla, como es: recibir la tarea o decidir el pase
+                # (constitución §4; revisión `review-8d6e96daab3e588b`).
+                para = (f"para pasarle la tarea «{tarea['titulo']}»" if persona == recibe else
+                        f"para que decida el pase de la tarea «{tarea['titulo']}» a "
+                        f"{integrante(cur, recibe)['nombre']}")
                 hecho[SE_LE_AVISO_AL_ADMINISTRADOR] = avisar_para_que_lo_conecte(
-                    ctx, quien["nombre"], f"para pasarle la tarea «{tarea['titulo']}»")
+                    ctx, quien["nombre"], para)
             return hecho
     nombre = integrante(cur, recibe)["nombre"]
     al_confirmar: dict[str, Any]

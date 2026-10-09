@@ -399,6 +399,19 @@ def _la_ultima_que_salio(cur, persona: str) -> dict[str, Any] | None:
     return cur.fetchone()
 
 
+def sin_contestar_en_la_lista(cur, persona: str, task_id, antes_del: date) -> bool:
+    """Si la lista le pregunta a la persona por la tarea desde antes del día `antes_del` y no
+    contestó: la última que le salió la preguntó sin respuesta desde un día anterior (el informe al
+    grupo: lo que Leda no sabe, decisión 55)."""
+    fila = _la_ultima_que_salio(cur, persona)
+    lleva = (fila["tareas_de_la_lista"] if fila is not None else None) or {}
+    dicha = (lleva.get("tareas") or {}).get(str(task_id))
+    if not dicha or not dicha.get("preguntada") or dicha.get("contestada_en"):
+        return False
+    desde = dicha.get("sin_respuesta_desde")
+    return desde is not None and date.fromisoformat(desde) < antes_del
+
+
 # --- Lo contestado (decisión 31) ----------------------------------------------------------------
 
 def anotar_lo_que_conto(ctx, task_id) -> None:

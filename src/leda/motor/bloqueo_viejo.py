@@ -309,7 +309,7 @@ def vigencia_de_lo_asentado(m: Momento, aviso: dict[str, Any]
     """Lo de la persona trabada sale si el bloqueo sigue abierto y la tarea sin cerrar y con el
     mismo responsable. Lo asentado ya quedó al guardarse (`_asentar`): no espera al aviso al
     referente (revisión `review-1db0e16dfeacfc4f`). A quién le llega, releído, sólo si el aviso
-    de esa vez al referente no se omitió; si se omitió, a nadie (decisión 49)."""
+    de esa vez al referente no se omitió ni falló; si no salió, a nadie (decisión 49)."""
     motivo, tarea = _sigue_abierto(m, aviso)
     if motivo is not None:
         return motivo, {}
@@ -321,8 +321,10 @@ def vigencia_de_lo_asentado(m: Momento, aviso: dict[str, Any]
                       where workspace_id = %s and dedupe_key = %s""",
                   (m.workspace_id, al_referente))
     suyo = m.cur.fetchone()
+    # Uno que no salió (omitido, o `fallido` porque la IA no lo redactó) no le llegó a nadie:
+    # nunca se nombra a quien no lo recibió (constitución §4; revisión `review-8d6e96daab3e588b`).
     destino = (a_quien(m.cur, tarea)
-               if suyo is not None and suyo["estado"] != "omitido" else None)
+               if suyo is not None and suyo["estado"] not in ("omitido", "fallido") else None)
     return None, hechos_de_lo_asentado(m, de_la_clave(aviso),
                                        destino["nombre"] if destino else None,
                                        a_nadie=destino is None)

@@ -331,19 +331,14 @@ def test_lo_preguntado_hoy_todavia_no_es_algo_que_no_se_sabe(conn, mundo, dias):
 
 def test_un_atraso_sin_hablar_no_figura_y_no_deja_decir_que_esta_todo_en_orden(conn, mundo,
                                                                                escribe, dias):
-    """Marcos contestó el viernes sin un día ("ya casi") y el tablero venció: no habló de su
+    """Marcos contestó el viernes que ya arrancó, sin un día, y el tablero venció: no habló de su
     atraso, así que no figura (constitución §8), pero tampoco se puede decir que está todo en
     orden. Sin nada más que contar, el informe sale igual y lo dice así (decisión 55)."""
-    _con_informe(conn, mundo, "15 9 * * 2")
+    _con_informe(conn, mundo, MARTES)
     dias.ciclo(octubre(9, 10))
-    dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "ya casi"}),
-         at=octubre(9, 10, 30))
-    with admin(conn) as cur:        # lo que contestó cierra lo que se le preguntó
-        cur.execute("update pending_reply set satisfecho_en = %s where satisfecho_en is null",
-                    (octubre(9, 10, 30),))
-    conn.commit()
+    dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(9, 10, 30))
 
-    hechos = _el_informe(dias, octubre(13, 9, 15))
+    hechos = _el_informe(dias, octubre(13, 16, 15))
 
     assert hechos == {"aviso": INFORME_AL_GRUPO, "necesita_respuesta": False,
                       SIN_NOVEDADES: True}
@@ -432,11 +427,20 @@ def test_sin_nada_hecho_en_la_semana_no_hay_semana_buena(conn, mundo, dias):
 
 
 def test_lo_entregado_tarde_no_es_una_semana_buena(conn, mundo, dias):
-    """Vencía el miércoles y se entregó el jueves: está entregada (todo en orden ahora), pero lo
-    que vencía no se entregó a tiempo."""
+    """Vencía el miércoles; el jueves Leda tuvo que preguntarle a Marcos cómo venía y la
+    entregó después: está entregada (todo en orden ahora), pero lo que vencía no se entregó a
+    tiempo. Es un dato que el motor tiene con su propio reloj: el paso de la escalera que salió
+    con la tarea ya vencida (`leda_app` no lee los eventos de estado)."""
     _con_informe(conn, mundo)
     _cancelar_el_tablero(conn, mundo)
-    _estado(conn, mundo, T2, "en_revision", octubre(8, 11), vence=octubre(7, 17))
+    t2 = _estado(conn, mundo, T2, "en_curso", octubre(5, 10), vence=octubre(7, 17))
+    dias.ciclo(octubre(8, 10))
+    with admin(conn) as cur:
+        cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                     actor_kind, motivo, at)
+                       values (%s, 'en_curso', 'en_revision', 'sistema', 'prueba', %s)""",
+                    (t2, octubre(8, 11)))
+    conn.commit()
 
     hechos = _el_informe(dias, octubre(9, 16, 15))
 

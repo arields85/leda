@@ -363,10 +363,12 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
         for envio in _envios(listos):
             for resultado in _enviar(m, envio, ia):
                 resumen[resultado] += 1
-        if tipos is None and solo is None:
+        if tipos is None:
             # El informe al grupo (C-6, decisión 25), dentro del horario: no es de una persona.
+            # Con `solo`, sólo si es ése (el reintento a mano también lo alcanza). Cada informe
+            # corre en su savepoint: si se cae, lo de cada persona de esta pasada sale igual.
             from .informe_al_grupo import enviar as enviar_al_grupo
-            resumen.update(enviar_al_grupo(m, ia))
+            resumen.update(enviar_al_grupo(m, ia, solo=solo, forzar=forzar))
     return dict(resumen)
 
 

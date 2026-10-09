@@ -669,10 +669,11 @@ SIGNIFICADOS: Mapping[str, str] = {
     "vence_hoy": "La tarea vence hoy.",
     # --- El informe al grupo (C-6, decisión 25; `informe_al_grupo.py`) -------------------------
     "informe_al_grupo": "Mensaje al grupo del equipo, no a una persona: lo que pasó con las "
-                        "tareas del equipo desde el informe anterior, para que todos estén al "
-                        "tanto y puedan ayudar. Cada tarea con quién la tiene (la_tiene). Es "
-                        "información: no pide respuesta.",
-    "terminadas": "Las tareas que quedaron terminadas (aprobadas) desde el informe anterior.",
+                        "tareas del equipo desde el informe anterior y lo que sigue igual, para "
+                        "que todos estén al tanto y puedan ayudar. Cada tarea con quién la tiene "
+                        "(la_tiene). Es información: no pide respuesta.",
+    "terminadas": "Las tareas que quedaron terminadas (aprobadas) desde el informe anterior, "
+                  "cada una con quién la hizo (la_tiene).",
     "atrasadas": "Las tareas cuyo atraso la persona ya habló con Leda en privado: el día en que "
                  "vencían (vence) y, si los dio, el día que dio para terminarla y su motivo. Es "
                  "información para el equipo.",
@@ -681,6 +682,17 @@ SIGNIFICADOS: Mapping[str, str] = {
                 "(para_cuando).",
     "entregadas": "Las tareas entregadas que esperan la revisión.",
     "siguen": "Las tareas que siguen su curso: cada una con su estado y el día en que vence.",
+    "sin_saber_como_vienen": "Las tareas de las que Leda no sabe cómo vienen: le preguntó a "
+                             "quien la tiene otro día y todavía no contestó. No están bien ni "
+                             "atrasadas: no se sabe.",
+    "todo_en_orden": "Lo comprobó el sistema: ninguna tarea atrasada, ninguna trabada y ninguna "
+                     "de la que Leda no sepa cómo viene. Es una buena noticia para el equipo.",
+    "semana_buena": "Lo comprobó el sistema con reglas fijas, desde el informe anterior: ningún "
+                    "atraso nuevo, nada trabado, lo que vencía se entregó a tiempo y algo se "
+                    "terminó o se entregó. Es un reconocimiento breve al equipo entero: no dice "
+                    "nada de una persona frente a otra.",
+    "sin_novedades_para_el_grupo": "Esta vez no hay nada que se le pueda contar al grupo. No "
+                                   "quiere decir que esté todo en orden.",
     "nada_para_el_informe": "No había nada que contarle al grupo: ninguna tarea abierta ni "
                             "terminada desde el informe anterior.",
     "sin_grupo": "El espacio no tiene un grupo del equipo.",
