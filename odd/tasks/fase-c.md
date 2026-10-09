@@ -1080,6 +1080,28 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         confirmación.
       - `consultar_pendientes` se redacta como `contar_sus_tareas_pendientes`, y las instrucciones
         de las jugadas dicen "con lo que contó" de un avance: no son de la entrega y no se tocaron.
+  - [x] **D7c.** La precisión del usuario a la decisión 22 (2026-10-08, de noche, opción A): una
+    aprobación pregunta cuál de las dos sólo si su comentario le pide algo a alguien (`827d13b`).
+    Route: delegada (escritor único, 2+ archivos no triviales). Resuelve el `PENDIENTE` de la D7b
+    "Impecable ahora pregunta".
+    - El dato `el_comentario_pide_algo` (booleano, opcional de `aprobar`, en `ia_real.DATOS` y en
+      `hechos.SIGNIFICADOS`, sólo como dato, sin frases): si el comentario le pide a la persona
+      responsable o a otra persona que haga o revise algo. La cocina (`aprobacion.aprobar`)
+      pregunta si es verdadero o si la IA no lo dijo (el lado seguro); falso aprueba directo. La
+      ficha de `aprobar` y el significado de `dos_lecturas` lo dicen. Las huellas de las
+      instrucciones no cambiaron (el dato va en el esquema de la jugada, no en el texto).
+    - Conversaciones: la 23, paso 2 ("el plc de marcos aprobado, impecable"), vuelve a aprobar
+      directo con el dato falso (sin el paso 2b; el aviso a Marcos vuelve a las 10:30), y los
+      pasos 1, 8 y 9 lo aceptan en `puede_traer`; la 28, paso 3, lo espera verdadero si viene.
+    - Rojo primero: `test_aprobar_con_un_comentario_que_no_pide_nada_va_directo` (`dos_lecturas`
+      en lugar de `anotado`) y `test_si_el_comentario_pide_algo_lo_dice_la_ia_como_un_dato`
+      (`KeyError`).
+    - **Chequeos** (2026-10-08, sobre `827d13b` sin este registro): `pytest tests/motor
+      tests/conversaciones`, 888 passed; en seco, `correr --ia guionada --veces 1 --ronda
+      seco-d7c`, 29 de 29 bien (informes borrados, `gasto.json` sin tocar).
+    - `PENDIENTE`: la IA real sobre la 23 y la 28 (el coordinador); `docs/capacidades.md` (la hoja
+      de aprobación) todavía dice que una aprobación con un comentario para el responsable nunca
+      cierra directo.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
