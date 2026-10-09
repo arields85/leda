@@ -362,6 +362,89 @@ def test_el_aviso_al_referente_no_sale_si_ya_se_destrabo(conn, mundo, equipo):
     assert (cadena["estado"], cadena["motivo_omision"]) == ("omitido", "ya_se_destrabo")
 
 
+def test_la_cadena_le_llega_al_referente_una_sola_vez(conn, mundo, equipo):
+    """El segundo que vuelve a decir que no le toca, después de que la cadena salió: la cadena no
+    se le manda otra vez al referente, y los hechos dicen que ya le llegó (revisión del
+    2026-10-09)."""
+    _le_pregunto_a_mariano(conn, mundo, equipo)
+    equipo.dice("Mariano", Jugada("decir_que_no_le_toca", {}))
+    _salir(conn, mundo, AHORA + timedelta(minutes=100))
+    equipo.minuto = 110
+
+    r = equipo.dice("Mariano", Jugada("decir_que_no_le_toca",
+                                      {"lo_que_dice": "ya te dije que no es mio"}))
+
+    # Lo que dijo queda anotado (sólo se agrega), pero la cadena no vuelve a salir.
+    assert cuantas(conn, "dicho_de_quien_destraba", "dicho_por_membership_id = %s",
+                   _membresia(mundo, "Mariano")) == 2
+    [cadena] = avisos_guardados(conn, CADENA)
+    assert cadena["estado"] == "enviado"
+    [hecho] = r.hechos
+    assert hecho["aviso_de_la_cadena"]["a"] == "Ismael"
+    assert hecho["aviso_de_la_cadena"]["llega"] == "ya_le_llego"
+    assert cuantas(conn, "audit_log", "accion = 'informar_la_cadena_del_bloqueo'") == 1
+
+
+def test_la_cadena_que_todavia_no_salio_sale_una_vez_con_lo_ultimo(conn, mundo, equipo):
+    """Si el segundo vuelve a hablar antes de que la cadena salga, sale una sola, con lo último
+    que dijo; la anterior queda omitida (nunca se borra)."""
+    _le_pregunto_a_mariano(conn, mundo, equipo)
+    equipo.dice("Mariano", Jugada("decir_que_no_le_toca", {}))
+
+    equipo.dice("Mariano", Jugada("decir_que_no_le_toca", {"no_sabe": True,
+                                                            "lo_que_dice": "ni idea"}))
+    _salir(conn, mundo, AHORA + timedelta(minutes=100))
+
+    vieja, nueva = avisos_guardados(conn, CADENA)
+    assert (vieja["estado"], vieja["motivo_omision"]) == ("omitido", "dijo_algo_mas_nuevo")
+    assert nueva["estado"] == "enviado"
+    assert nueva["hechos"]["cadena"][-1] == {"de": MARIANO, "no_le_corresponde": True,
+                                             "no_sabe": True, "lo_que_dice": "ni idea"}
+
+
+def test_quien_quedo_nombrado_al_cortarse_no_manda_la_cadena_otra_vez(conn, mundo, equipo):
+    """Juan, nombrado por Mariano cuando la cadena ya se cortó, ve la tarea en su lista; si dice
+    que tampoco es suyo, la cadena no se le manda otra vez al referente."""
+    _le_pregunto_a_mariano(conn, mundo, equipo)
+    equipo.dice("Mariano", Jugada("decir_que_no_le_toca", {"quien": "juan"}))
+    _salir(conn, mundo, AHORA + timedelta(minutes=100))
+    equipo.minuto = 110
+
+    equipo.dice("Juan", Jugada("decir_que_no_le_toca", {"tarea": "T1"}))
+
+    [cadena] = avisos_guardados(conn, CADENA)
+    assert cadena["estado"] == "enviado"
+
+
+def test_si_al_segundo_no_se_le_puede_escribir_la_cadena_va_al_referente(conn, mundo, equipo):
+    """La primera nombra a alguien del equipo sin un chat con Leda: Leda no puede seguir con esa
+    persona, así que la cadena se corta y le llega al referente, diciendo que a esa persona no
+    se le puede escribir; nunca queda en silencio (revisión del 2026-10-09)."""
+    _integrante(conn, mundo, "Pedro", "Pedro Gomez", None)
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+
+    r = equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "pedro"}))
+
+    # A Pedro no se le guarda nada; quién destraba ahora es Pedro, dicho por Ariel.
+    assert len(avisos_guardados(conn, PREGUNTA_A_QUIEN_DESTRABA)) == 1
+    assert _destraban(conn)[-1]["destraba"] == _membresia(mundo, "Pedro")
+    # Al referente del sector de Pedro (el de la tarea, Ismael), la cadena y que a Pedro no se
+    # le puede escribir.
+    [cadena] = avisos_guardados(conn, CADENA)
+    assert str(cadena["destinatario_membership_id"]) == _membresia(mundo, "Ismael")
+    assert cadena["hechos"]["cadena"][-1] == {"de": ARIEL, "no_le_corresponde": True,
+                                              "le_toca_a": "Pedro Gomez"}
+    assert cadena["hechos"]["no_se_le_puede_escribir_a"] == {
+        "a": "Pedro Gomez", "motivo": "destinatario_sin_telegram"}
+    [hecho] = r.hechos
+    assert hecho["no_se_le_puede_escribir_a"]["a"] == "Pedro Gomez"
+    assert hecho["aviso_de_la_cadena"]["a"] == "Ismael"
+    # A Marcos, que a Pedro no se le puede escribir y que se informa.
+    [aviso] = avisos_guardados(conn, LO_QUE_DIJO)
+    assert aviso["hechos"]["no_se_le_puede_escribir_a"]["a"] == "Pedro Gomez"
+    assert aviso["hechos"]["aviso_de_la_cadena"] == {"a": "Ismael"}
+
+
 def test_el_aviso_al_referente_sale_como_informacion(conn, mundo, equipo):
     _le_pregunto_a_ariel(conn, mundo, equipo)
     equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"no_sabe": True}))
@@ -388,6 +471,22 @@ def test_quien_no_destraba_esa_tarea_no_puede_decir_que_no_le_toca(conn, mundo, 
     assert hecho["resultado"] in ("no_se_puede", "falta_dato")
     assert cuantas(conn, "dicho_de_quien_destraba") == 0
     assert len(_destraban(conn)) == 1
+
+
+# --- Nada de lo que dice se pierde ----------------------------------------------------------------
+
+def test_lo_que_dijo_antes_de_nombrar_a_otro_no_se_pierde(conn, mundo, equipo):
+    """Ariel dice algo al no tomarlo y algo más al nombrar a Mariano: quedan las dos cosas."""
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_que_no_le_toca",
+                                {"lo_que_dice": "no me corresponde, yo no toco servidores"}))
+
+    equipo.dice("Ariel", Jugada("decir_que_no_le_toca",
+                                {"quien": "mariano", "lo_que_dice": "lo maneja mariano"}))
+
+    dicho = uno(conn, "select lo_que_dice from dicho_de_quien_destraba")
+    assert "no me corresponde, yo no toco servidores" in dicho["lo_que_dice"]
+    assert "lo maneja mariano" in dicho["lo_que_dice"]
 
 
 # --- El contrato con la IA ------------------------------------------------------------------

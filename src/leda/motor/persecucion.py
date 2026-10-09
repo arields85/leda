@@ -31,8 +31,10 @@ anota nada todavía: Leda le pregunta una vez qué arreglaron y para cuándo, pa
 asentado (`_preguntar`: su pregunta sigue abierta, con su espera, y recuerda que ya lo hablaron).
 Con la respuesta queda anotado, y a la persona trabada le llega como información, diciendo que lo
 arreglaron entre ellos (`ya_lo_hablaron`). La respuesta no se vuelve a preguntar: si trae lo que
-arreglaron sin una fecha, queda así. Si quien destraba habla antes de que le llegue el mensaje de
-Leda (la tarea ya está en su lista), ese mensaje no sale (`avisos.ya_contesto_quien_destraba`).
+arreglaron sin una fecha, queda así. Lo que dijo cuando Leda le preguntó queda en su pregunta y
+se anota junto con la respuesta (`_sus_palabras`): nada de lo que dice se pierde. Si quien
+destraba habla antes de que le llegue el mensaje de Leda (la tarea ya está en su lista), ese
+mensaje no sale (`avisos.ya_contesto_quien_destraba`).
 
 **"No le escribas"** (`no_escribirle`): la persona trabada pide que Leda no le escriba a quien
 destraba. Si el mensaje todavía no salió, queda omitido con su motivo (nunca se borra) y
@@ -52,14 +54,16 @@ no sabe, otra fila de quién destraba dicha por esa persona. La cadena tiene un 
   que no sabe. Si nombra a otro integrante, Leda le escribe a esa persona como a la primera
   (`preguntarle`, diciendo quién la nombró), y la persona trabada se entera, como información.
 - **Si la cadena se corta** (la segunda tampoco lo toma, cualquiera sea lo que diga; la primera no
-  sabe, nombra a alguien de afuera o a la persona trabada), Leda no da más vueltas: le informa la
-  cadena entera al referente (`avisos.CADENA_DEL_BLOQUEO`, `cadena`), sin pedirle nada, para que
-  determine quién lo resuelve. Va al del sector de lo que falta si se sabe (el de la persona que
-  quedó nombrada como quien se encarga) y, si no, al del sector de la tarea trabada; nunca a la
-  persona trabada misma (entonces, a quien aprueba su trabajo; `a_quien_informar`). A la persona
-  trabada le llega lo que pasó y que se informa, sin nombrar a quién por su cuenta (decisión 11:
-  `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`, `aviso_de_la_cadena`). Sin referente, nada se
-  promete y el hecho lo dice (`sin_referente`).
+  sabe, nombra a alguien de afuera o a la persona trabada, o nombra a alguien del equipo a quien
+  Leda no le puede escribir), Leda no da más vueltas: le informa la cadena entera al referente
+  (`avisos.CADENA_DEL_BLOQUEO`, `cadena`), sin pedirle nada, para que determine quién lo
+  resuelve. Le llega una sola vez por cadena: lo que se diga después queda anotado, pero no se
+  la manda otra vez (si todavía no salió, sale una, con lo último). Va al del sector de lo que
+  falta si se sabe (el de la persona que quedó nombrada como quien se encarga) y, si no, al del
+  sector de la tarea trabada; nunca a la persona trabada misma (entonces, a quien aprueba su
+  trabajo; `a_quien_informar`). A la persona trabada le llega lo que pasó y que se informa, sin
+  nombrar a quién por su cuenta (decisión 11: `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`,
+  `aviso_de_la_cadena`). Sin referente, nada se promete y el hecho lo dice (`sin_referente`).
 
 Fuera de estas porciones (`odd/tasks/fase-c.md`, C-5): los bloqueos encadenados y los avisos
 hacia abajo (decisión 6) y el bloqueo viejo (7).
@@ -73,8 +77,9 @@ from typing import Any
 
 from . import preguntas
 from .auditoria import auditar
-from .avisos import (CADENA_DEL_BLOQUEO, CAMBIO_QUIEN_DESTRABA, LO_QUE_DIJO_QUIEN_DESTRABA,
-                     PREGUNTA_A_QUIEN_DESTRABA, guardar, integrante, omitir)
+from .avisos import (CADENA_DEL_BLOQUEO, CAMBIO_QUIEN_DESTRABA, DIJO_ALGO_MAS_NUEVO,
+                     LO_QUE_DIJO_QUIEN_DESTRABA, PREGUNTA_A_QUIEN_DESTRABA, guardar, integrante,
+                     omitir)
 from .fichas import (AVISO, LLEGA, NO_LE_LLEGO, NO_LE_VA_A_LLEGAR, PREGUNTA, YA_LE_LLEGO,
                      Contexto, _juntar, integrantes_que_coinciden, nombrar_efecto,
                      nombrar_tipo_de_pregunta, referente, tarea_hecho, vacio)
@@ -223,7 +228,6 @@ def decir_cuando_destraba(ctx: Contexto, datos: dict[str, Any],
             return {"resultado": "falta_dato", "falta": ["para_cuando"],
                     "tarea": tarea_hecho(tarea)}
     ya_esta = datos.get("ya_esta") is True
-    lo_que_dice = None if vacio(datos.get("lo_que_dice")) else str(datos["lo_que_dice"]).strip()
     destraba = _lo_destraba(ctx, tarea["id"])
     if destraba is None:
         return {"resultado": "no_se_puede", "motivo": NO_LE_TOCA_DESTRABARLA,
@@ -231,16 +235,20 @@ def decir_cuando_destraba(ctx: Contexto, datos: dict[str, Any],
     # "Ya lo hablé con él" (porción 2): lo dice ahora o lo dijo antes, en la misma pregunta.
     pregunta = _su_pregunta(ctx, tarea["id"])
     jugada = dict((pregunta or {}).get("jugada") or {})
+    lo_que_dice = _sus_palabras(datos, jugada)
     ya_lo_hablaron = (datos.get("ya_lo_hablaron") is True
                       or (jugada.get("datos") or {}).get(YA_LO_HABLARON) is True)
     if (ya_lo_hablaron and para_cuando is None and not ya_esta
             and not jugada.get(PREGUNTO_QUE_ARREGLARON)):
-        # Lo que queda asentado es lo que arreglaron y para cuándo: se pregunta una vez.
-        return _preguntar(ctx, tarea, destraba, pregunta, {YA_LO_HABLARON: True},
+        # Lo que queda asentado es lo que arreglaron y para cuándo: se pregunta una vez. Lo que
+        # dijo queda en su pregunta y se anota con la respuesta.
+        return _preguntar(ctx, tarea, destraba, pregunta,
+                          {YA_LO_HABLARON: True,
+                           **({"lo_que_dice": lo_que_dice} if lo_que_dice else {})},
                           PREGUNTO_QUE_ARREGLARON,
                           {"resultado": "falta_dato", "falta": ["lo_que_arreglaron", "para_cuando"],
                            "tarea": tarea_hecho(tarea), YA_LO_HABLARON: True})
-    if para_cuando is None and not ya_esta and lo_que_dice is None:
+    if para_cuando is None and not ya_esta and vacio(datos.get("lo_que_dice")):
         return {"resultado": "falta_dato", "falta": ["para_cuando"],
                 "puede_ser": ["para_cuando", "ya_esta", "lo_que_dice"],
                 "tarea": tarea_hecho(tarea)}
@@ -300,7 +308,7 @@ def _avisar_a_quien_esta_trabado(ctx: Contexto, tarea: dict[str, Any], destraba:
                     where a.task_id = %s and a.tipo = %s and a.estado = 'guardado'""",
                 (tarea["id"], LO_QUE_DIJO_QUIEN_DESTRABA))
     for viejo in cur.fetchall():
-        omitir(cur, str(viejo["id"]), "dijo_algo_mas_nuevo", ctx.ahora)
+        omitir(cur, str(viejo["id"]), DIJO_ALGO_MAS_NUEVO, ctx.ahora)
     sale = sale_con_margen(cur, ctx.calendario, ctx.quien.workspace_id, ctx.ahora)
     aviso_id, _ = guardar(
         cur, ctx.quien.workspace_id, LO_QUE_DIJO_QUIEN_DESTRABA, task_id=tarea["id"],
@@ -315,6 +323,20 @@ def _avisar_a_quien_esta_trabado(ctx: Contexto, tarea: dict[str, Any], destraba:
                                                             LLEGA: sale.isoformat()}}
     nombrar_efecto(hecho, "aviso_a_quien_esta_trabado", AVISO, aviso_id)
     return hecho
+
+
+def _sus_palabras(datos: dict[str, Any], jugada: dict[str, Any]) -> str | None:
+    """Lo que dice ahora quien destraba, junto con lo que dijo antes en la misma pregunta (lo
+    recuerdan los datos de su jugada, `_preguntar`): nada de lo que dijo se pierde. Si una parte
+    ya contiene a la otra, queda la más completa."""
+    ahora = None if vacio(datos.get("lo_que_dice")) else str(datos["lo_que_dice"]).strip()
+    antes = (jugada.get("datos") or {}).get("lo_que_dice")
+    antes = None if vacio(antes) else str(antes).strip()
+    if antes is None or ahora is None:
+        return ahora or antes
+    if antes in ahora or ahora in antes:
+        return max(antes, ahora, key=len)
+    return f"{antes} / {ahora}"
 
 
 def _lo_destraba(ctx: Contexto, task_id: str) -> dict[str, Any] | None:
@@ -332,7 +354,7 @@ def _lo_destraba(ctx: Contexto, task_id: str) -> dict[str, Any] | None:
                             order by u.at desc, u.id desc limit 1) u on true
             where b.task_id = %s and b.resuelto_en is null
               and u.destraba_membership_id = %s
-            order by b.abierto_en desc limit 1""", (task_id, ctx.quien.membership_id))
+            order by b.abierto_en desc, b.id desc limit 1""", (task_id, ctx.quien.membership_id))
     return ctx.cur.fetchone()
 
 
@@ -341,7 +363,7 @@ def _su_pregunta(ctx: Contexto, task_id: str) -> dict[str, Any] | None:
     ctx.cur.execute("""select * from conversation_question
                         where membership_id = %s and tipo = %s and task_id = %s
                           and cerrada_en is null
-                        order by abierta_en desc limit 1""",
+                        order by abierta_en desc, id desc limit 1""",
                     (ctx.quien.membership_id, preguntas.CUANDO_SE_DESTRABA, task_id))
     return ctx.cur.fetchone()
 
@@ -377,7 +399,7 @@ def _de_la_pregunta_abierta(ctx: Contexto) -> dict[str, Any] | None:
     una para después), o la única que destraba."""
     ctx.cur.execute("""select task_id from conversation_question
                         where membership_id = %s and tipo = %s and cerrada_en is null
-                        order by para_despues_en nulls first, abierta_en limit 1""",
+                        order by para_despues_en nulls first, abierta_en, id limit 1""",
                     (ctx.quien.membership_id, preguntas.CUANDO_SE_DESTRABA))
     fila = ctx.cur.fetchone()
     if fila is not None:
@@ -417,9 +439,7 @@ def decir_que_no_le_toca(ctx: Contexto, datos: dict[str, Any],
                 "tarea": tarea_hecho(tarea)}
     pregunta = _su_pregunta(ctx, tarea["id"])
     jugada = dict((pregunta or {}).get("jugada") or {})
-    antes = jugada.get("datos") or {}
-    lo_que_dice = (None if vacio(datos.get("lo_que_dice")) else str(datos["lo_que_dice"]).strip()
-                   ) or antes.get("lo_que_dice")
+    lo_que_dice = _sus_palabras(datos, jugada)
     no_sabe = datos.get("no_sabe") is True
     integrante, externo = None, None
     if not no_sabe and not vacio(datos.get("quien")):
@@ -461,6 +481,7 @@ def decir_que_no_le_toca(ctx: Contexto, datos: dict[str, Any],
     hecho: dict[str, Any] = {"resultado": "anotado", "tarea": tarea_hecho(tarea),
                              "dice_quien_destraba": dice}
     bloqueo = {"causa": destraba["causa"]}
+    sigue: dict[str, Any] = {}
     if primera and integrante is not None and str(integrante["membership_id"]) != str(
             destraba["responsable_membership_id"]):
         # Leda sigue con esa persona, como siguió con la primera (una sola vez: el límite).
@@ -468,15 +489,19 @@ def decir_que_no_le_toca(ctx: Contexto, datos: dict[str, Any],
                             nueva, integrante, responsable=destraba["responsable"],
                             nombrado_por=ctx.quien.nombre)
         _juntar(hecho, sigue)
-        mas = ({"se_le_pregunta_a": {"a": sigue["se_le_pregunta_a"]["a"]}}
-               if "se_le_pregunta_a" in sigue else
-               {"no_se_le_puede_escribir_a": sigue["no_se_le_puede_escribir_a"]})
+    if "se_le_pregunta_a" in sigue:
+        mas = {"se_le_pregunta_a": {"a": sigue["se_le_pregunta_a"]["a"]}}
     else:
-        # La cadena se corta: al referente, con la cadena entera, como información.
+        # La cadena se corta: al referente, con la cadena entera, como información. También si
+        # a quien nombró la primera no se le puede escribir: Leda no puede seguir con esa
+        # persona, y la cadena no queda en silencio (revisión del 2026-10-09).
+        sin_chat = sigue.get("no_se_le_puede_escribir_a")
         informe = _informar_la_cadena(ctx, tarea, destraba, dicho_id,
-                                      integrante["membership_id"] if integrante else None)
+                                      integrante["membership_id"] if integrante else None,
+                                      sin_chat=sin_chat)
         _juntar(hecho, informe)
-        mas = {"aviso_de_la_cadena": {k: v for k, v in informe["aviso_de_la_cadena"].items()
+        mas = {**({"no_se_le_puede_escribir_a": sin_chat} if sin_chat else {}),
+               "aviso_de_la_cadena": {k: v for k, v in informe["aviso_de_la_cadena"].items()
                                       if k != LLEGA or not _es_una_hora(v)}}
     _juntar(hecho, _avisar_a_quien_esta_trabado(ctx, tarea, destraba, dicho_id, dice, mas))
     return hecho
@@ -530,18 +555,41 @@ def a_quien_informar(cur, destraba: dict[str, Any],
 
 
 def _informar_la_cadena(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],
-                        dicho_id: str, nombrado: str | None) -> dict[str, Any]:
+                        dicho_id: str, nombrado: str | None, *,
+                        sin_chat: dict[str, Any] | None = None) -> dict[str, Any]:
     """La cadena entera le llega al referente como información, terminado el margen para
     corregir (`avisos.CADENA_DEL_BLOQUEO`): no le pide nada (ADR 0018, 9c, precisión del
-    2026-10-09). Los hechos para quien escribe: a quién y cuándo, o por qué no le llega."""
+    2026-10-09). `sin_chat`: a quién quedó nombrado y Leda no le puede escribir, y por qué.
+
+    Le llega una sola vez por cadena (desde la última vez que la persona trabada dijo quién lo
+    destraba; revisión del 2026-10-09): si ya salió, no se manda otra vez y los hechos dicen que
+    ya le llegó; si todavía no salió, la anterior queda omitida (nunca se borra) y sale ésta, con
+    lo último que se dijo. Los hechos para quien escribe: a quién y cuándo, o por qué no le
+    llega."""
     cur = ctx.cur
+    previas = _cadenas_de_esta_vuelta(cur, destraba, tarea["id"])
+    enviada = next((p for p in previas if p["estado"] == "enviado"), None)
+    if enviada is not None:
+        return {"aviso_de_la_cadena": {
+            "a": enviada["a_nombre"], LLEGA: YA_LE_LLEGO,
+            "el": enviada["resuelto_en"].astimezone(ctx.calendario.zona).date().isoformat()}}
+    guardadas = [p for p in previas if p["estado"] == "guardado"]
     ref = a_quien_informar(cur, destraba, nombrado)
-    if ref is None:
-        return {"aviso_de_la_cadena": {LLEGA: NO_LE_VA_A_LLEGAR, "motivo": SIN_REFERENTE}}
-    quien, motivo = alcanzable(cur, str(ref["membership_id"]))
+    quien, motivo = (alcanzable(cur, str(ref["membership_id"])) if ref is not None
+                     else (None, SIN_REFERENTE))
     if motivo is not None:
+        if guardadas:
+            # La que ya estaba guardada sigue: es la que le llega.
+            ultima = guardadas[-1]
+            return {"aviso_de_la_cadena": {
+                "a": ultima["a_nombre"],
+                LLEGA: ultima["programado_para"].astimezone(ctx.calendario.zona).isoformat()}}
+        if ref is None:
+            return {"aviso_de_la_cadena": {LLEGA: NO_LE_VA_A_LLEGAR, "motivo": SIN_REFERENTE}}
         return {"aviso_de_la_cadena": {"a": ref["nombre"], LLEGA: NO_LE_VA_A_LLEGAR,
                                        "motivo": motivo}}
+    for vieja in guardadas:
+        omitir(cur, str(vieja["id"]), DIJO_ALGO_MAS_NUEVO, ctx.ahora)
     sale = sale_con_margen(cur, ctx.calendario, ctx.quien.workspace_id, ctx.ahora)
     eslabones = cadena(cur, destraba["blocker_id"], str(destraba["responsable_membership_id"]))
     aviso_id, _ = guardar(
@@ -549,7 +597,8 @@ def _informar_la_cadena(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str
         destinatario=str(ref["membership_id"]),
         hechos={"aviso": CADENA_DEL_BLOQUEO, "necesita_respuesta": False,
                 "tarea": tarea["titulo"], "responsable": destraba["responsable"],
-                "causa": destraba["causa"], "cadena": eslabones},
+                "causa": destraba["causa"], "cadena": eslabones,
+                **({"no_se_le_puede_escribir_a": sin_chat} if sin_chat else {})},
         programado_para=sale, clave=f"motor:{CADENA_DEL_BLOQUEO}:{tarea['id']}:d{dicho_id}",
         ahora=ctx.ahora)
     ctx.avisos_guardados.append(aviso_id)
@@ -562,6 +611,31 @@ def _informar_la_cadena(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str
                                                     LLEGA: sale.isoformat()}}
     nombrar_efecto(hecho, "aviso_de_la_cadena", AVISO, aviso_id)
     return hecho
+
+
+def _cadenas_de_esta_vuelta(cur, destraba: dict[str, Any], task_id: str) -> list[dict[str, Any]]:
+    """Los avisos de la cadena ya guardados para esta vuelta del bloqueo: los de lo que se dijo
+    desde la última vez que la persona trabada dijo quién lo destraba (la clave de cada uno
+    nombra lo dicho, `avisos.de_la_clave`), del más viejo al más nuevo."""
+    cur.execute("""select s.at, s.id from blocker_unblocker s
+                    where s.blocker_id = %s and s.dicho_por_membership_id = %s
+                    order by s.at desc, s.id desc limit 1""",
+                (str(destraba["blocker_id"]), str(destraba["responsable_membership_id"])))
+    desde = cur.fetchone()
+    cur.execute(
+        """select a.id, a.estado, a.programado_para, a.resuelto_en, i.nombre as a_nombre
+             from scheduled_notice a
+             join dicho_de_quien_destraba d
+               on d.id::text = substr(split_part(a.dedupe_key, ':', 4), 2)
+             join blocker_unblocker u on u.id = d.blocker_unblocker_id
+             left join integrante i on i.membership_id = a.destinatario_membership_id
+            where a.tipo = %s and a.task_id = %s and u.blocker_id = %s
+              and (%s::timestamptz is null or (u.at, u.id) >= (%s::timestamptz, %s::uuid))
+            order by a.creado_en, a.id""",
+        (CADENA_DEL_BLOQUEO, str(task_id), str(destraba["blocker_id"]),
+         desde["at"] if desde else None, desde["at"] if desde else None,
+         str(desde["id"]) if desde else None))
+    return cur.fetchall()
 
 
 def cadena(cur, blocker_id, trabado: str) -> list[dict[str, Any]]:
@@ -629,7 +703,7 @@ def no_escribirle(ctx: Contexto, datos: dict[str, Any],
              from scheduled_notice a
              join integrante i on i.membership_id = a.destinatario_membership_id
             where a.tipo = %s and a.task_id = any(%s::uuid[])
-            order by a.task_id, a.creado_en desc""",
+            order by a.task_id, a.creado_en desc, a.id desc""",
         (PREGUNTA_A_QUIEN_DESTRABA, [t["id"] for t in suyas]))
     avisos = cur.fetchall()
     if not vacio(datos.get("quien")):
@@ -641,7 +715,7 @@ def no_escribirle(ctx: Contexto, datos: dict[str, Any],
         return {"resultado": "falta_dato", "falta": ["tarea"],
                 "coinciden": [_titulo(ctx, a["task_id"]) for a in guardados]}
     if not guardados and len(avisos) > 1:
-        avisos = sorted(avisos, key=lambda a: a["creado_en"])[-1:]
+        avisos = sorted(avisos, key=lambda a: (a["creado_en"], str(a["id"])))[-1:]
     aviso = (guardados or avisos or [None])[0]
     if aviso is None:
         hecho: dict[str, Any] = {"resultado": "no_se_puede", "motivo": NO_LE_IBA_A_ESCRIBIR}

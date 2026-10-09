@@ -416,6 +416,40 @@ def test_lo_que_arreglaron_se_pregunta_una_sola_vez(conn, mundo, equipo):
     assert _su_pregunta(conn, mundo) is None
 
 
+def test_lo_que_dice_junto_con_ya_lo_hablaron_no_se_pierde(conn, mundo, equipo):
+    """Lo que dice quien destraba al contar que ya lo hablaron, sin una fecha, queda en su
+    pregunta y se anota con la respuesta: nada de lo que dijo se pierde (revisión del
+    2026-10-09)."""
+    _le_pregunto(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba",
+                                {"ya_lo_hablaron": True,
+                                 "lo_que_dice": "ya lo hable con marcos, depende de sistemas"}))
+    assert _su_pregunta(conn, mundo)["jugada"]["datos"]["lo_que_dice"] == \
+        "ya lo hable con marcos, depende de sistemas"
+
+    r = equipo.dice("Ariel", Jugada("decir_cuando_destraba", {"para_cuando": "2026-10-08"}))
+
+    [hecho] = r.hechos
+    assert hecho["dice_quien_destraba"]["lo_que_dice"] == \
+        "ya lo hable con marcos, depende de sistemas"
+    dicho = uno(conn, "select lo_que_dice from dicho_de_quien_destraba")
+    assert dicho["lo_que_dice"] == "ya lo hable con marcos, depende de sistemas"
+
+
+def test_lo_que_dice_antes_y_despues_de_la_pregunta_queda_todo(conn, mundo, equipo):
+    _le_pregunto(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba",
+                                {"ya_lo_hablaron": True, "lo_que_dice": "depende de sistemas"}))
+
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba",
+                                {"para_cuando": "2026-10-08",
+                                 "lo_que_dice": "quedamos q se la paso el jueves"}))
+
+    dicho = uno(conn, "select lo_que_dice from dicho_de_quien_destraba")
+    assert "depende de sistemas" in dicho["lo_que_dice"]
+    assert "quedamos q se la paso el jueves" in dicho["lo_que_dice"]
+
+
 def test_lo_que_se_repite_recuerda_que_ya_lo_hablaron(conn, espacio_con_escalera, equipo):
     mundo = espacio_con_escalera
     _le_pregunto(conn, mundo, equipo)
@@ -492,6 +526,26 @@ def test_no_le_escribas_despues_de_que_salio_dice_que_ya_le_llego(conn, mundo, e
     assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "ya_se_le_escribio")
     assert hecho["se_le_pregunta_a"] == {"a": ARIEL, "llega": "ya_le_llego",
                                          "el": "2026-10-05"}
+
+
+def test_no_le_escribas_encuentra_el_mensaje_aunque_esa_persona_ya_no_este_activa(conn, mundo,
+                                                                                   equipo):
+    """La vista `integrante` incluye a las personas inactivas del espacio: el mensaje a quien
+    dejó de estar activo después de guardado se encuentra y se retira igual (revisión del
+    2026-10-09, que no era un defecto: queda como regresión)."""
+    _trabada(equipo)
+    with admin(conn) as cur:
+        cur.execute("update membership set activo = false where id = %s",
+                    (_membresia(mundo, "Ariel"),))
+    conn.commit()
+
+    r = equipo.dice("Marcos", Jugada("no_escribirle", {"tarea": "T1"}))
+
+    [aviso] = avisos_guardados(conn, PREGUNTA_A_QUIEN_DESTRABA)
+    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "pidio_que_no_le_escriba")
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["se_le_pregunta_a"]["a"] == ARIEL
 
 
 def test_no_le_escribas_sin_ningun_mensaje_lo_dice(conn, mundo, equipo):
