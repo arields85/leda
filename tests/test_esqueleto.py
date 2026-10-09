@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from leda.autoridad import Canal, Denegado, identificar, verificar
+from leda.incidentes import ETAPA_ENTREGA_REINTENTO
 from leda.calendario import Calendario
 from leda.db import admin, espacio
 from leda.despachador import TransporteDePrueba, despachar
@@ -157,7 +158,8 @@ def test_reintenta_y_abre_incidente(corework, conn):
         assert fila["intentos"] == 5
 
     with admin(conn) as cur:
-        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        cur.execute("select count(*) n from incident where workspace_id = %s"
+                    " and etapa is distinct from %s", (ws, ETAPA_ENTREGA_REINTENTO))
         assert cur.fetchone()["n"] == 1
 
 

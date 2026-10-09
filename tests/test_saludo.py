@@ -24,6 +24,7 @@ import psycopg
 import pytest
 
 from leda import saludo as S
+from leda.incidentes import ETAPA_ENTREGA_REINTENTO
 from leda.calendario import Calendario
 from leda.db import admin, conectar, espacio
 from leda.despachador import TransporteDePrueba, despachar
@@ -721,7 +722,8 @@ def test_falla_del_saludo_con_envio_fallido_se_reporta_una_sola_vez(
     # los conteos se leen por la conexión administrativa, como en el resto
     # de la suite (`tests/test_menu_tarea.py`, por ejemplo).
     with admin(conn) as cur:
-        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        cur.execute("select count(*) n from incident where workspace_id = %s"
+                    " and etapa is distinct from %s", (ws, ETAPA_ENTREGA_REINTENTO))
         antes = cur.fetchone()["n"]
 
     transporte_falla = TransporteDePrueba(falla_en={tg})
@@ -735,7 +737,8 @@ def test_falla_del_saludo_con_envio_fallido_se_reporta_una_sola_vez(
         assert resumen["fallidos"] == 1
 
     with admin(conn) as cur:
-        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        cur.execute("select count(*) n from incident where workspace_id = %s"
+                    " and etapa is distinct from %s", (ws, ETAPA_ENTREGA_REINTENTO))
         despues_del_primero = cur.fetchone()["n"]
     assert despues_del_primero == antes + 1      # el saludo se reportó igual
 
@@ -748,7 +751,8 @@ def test_falla_del_saludo_con_envio_fallido_se_reporta_una_sola_vez(
         despachar(cur, ws, transporte_falla, cal, AHORA_HABIL + timedelta(minutes=1))
 
     with admin(conn) as cur:
-        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        cur.execute("select count(*) n from incident where workspace_id = %s"
+                    " and etapa is distinct from %s", (ws, ETAPA_ENTREGA_REINTENTO))
         despues_del_segundo = cur.fetchone()["n"]
 
     assert despues_del_segundo == antes + 1      # sigue siendo uno solo
