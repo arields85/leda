@@ -526,8 +526,11 @@ class _Corredor:
             avisos, hechos = _avisos_del_envio(avisos_de.get(fila_id, []), self.mundo.titulos)
             tipos = sorted({a["tipo"] for a in avisos})
             botones = [self._etiqueta(b.etiqueta) for b in e.botones]
+            # Lo que sale de un aviso guardado es lo que Leda manda por su cuenta, aunque su fila
+            # vaya como una respuesta: la pregunta que vuelve es parte de contestarle a la persona
+            # (mecánica §10) y sale también fuera del horario (decisión 50).
             salidas.append(Salida(
-                quien, texto, botones, bool(fila.get("es_respuesta")),
+                quien, texto, botones, bool(fila.get("es_respuesta")) and not avisos,
                 tipo=tipos[0] if len(tipos) == 1 else None,
                 tareas=list(dict.fromkeys(a["tarea"] for a in avisos if a["tarea"])),
                 hechos=(hechos[0] if len(hechos) == 1 else hechos) if hechos else None,
