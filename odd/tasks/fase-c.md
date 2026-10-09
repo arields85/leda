@@ -316,6 +316,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     espacio queda asentado (decisiones 35 y 36). Cambia la porción 1 (hoy, tres días y nada más).
     Las ausencias (vacaciones, licencia) quedan como tarea aparte (abajo, C-8).
 
+39. **Nunca un tema abierto sin que todos sepan cómo se cerró** (de la C-5; usuario, 2026-10-09,
+    opción A ampliada; regla general). Si el bloqueo se resuelve por otro lado, Leda le avisa a
+    quien le estaba preguntando ("Lo del cable para Marcos ya se resolvió, no hace falta que lo
+    consigas") y deja de preguntarle. Si esa persona contesta algo que afecta a otro ("ya lo pedí,
+    no lo puedo cancelar"), Leda se lo lleva a quien decide (Marcos: "que llegue, queda de
+    repuesto") y les cierra el tema a los dos. Cambia la porción 1 (hoy quien destraba no se entera).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2084,7 +2091,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 38 del usuario (2026-10-09; la 30 ya está), con test primero.
+- [ ] Las decisiones 24 a 39 del usuario (2026-10-09; la 30 ya está), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
