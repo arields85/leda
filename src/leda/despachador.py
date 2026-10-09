@@ -28,7 +28,7 @@ import psycopg
 from . import saludo
 from .calendario import Calendario
 from .incidentes import (ETAPA_ENTREGA_AVISO_ADMIN, ETAPA_ENTREGA_MENSAJE,
-                         REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
+                         ETAPA_ENTREGA_REINTENTO, REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
                          registrar_incidente)
 from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, formatear, prepare_buttons,
                      prepare_payload, texto_y_entidades)
@@ -1286,6 +1286,34 @@ def _fallo(cur, workspace_id: str, m, error: Exception, cal: Calendario,
             cur, workspace_id,
             f"Un mensaje no se pudo entregar tras {MAX_INTENTOS} intentos.",
             severidad="alta", etapa=ETAPA_ENTREGA_MENSAJE)
+    else:
+        _rastro_del_intento(cur, workspace_id, m, intentos,
+                            f"{type(error).__name__}: {ultimo_error}")
+
+
+def _rastro_del_intento(cur, workspace_id: str, m, intentos: int, falla: str) -> None:
+    """Un intento fallido que se reintenta deja su rastro (D8, G4; nunca en silencio): un
+    incidente de severidad baja, sin avisar a la administración (un reintento no es para
+    molestarla; el quinto fallo la avisa con el suyo), con la falla ya saneada en la referencia
+    técnica y la fila de la salida como referencia, el mismo criterio que los avisos que la IA no
+    redactó (`motor.avisos`). Una falla esperando la respuesta de Telegram puede querer decir que
+    el mensaje llegó: no hay cómo saberlo (la API no tiene una clave para no repetir un envío), y
+    la explicación de la etapa lo dice. En su propio punto de retorno: si no se puede escribir, no
+    deshace el resto de la pasada (los mensajes ya marcados como enviados)."""
+    que = "una respuesta" if m.get("es_respuesta") else "un mensaje"
+    try:
+        with cur.connection.transaction():
+            registrar_incidente(
+                cur, workspace_id,
+                f"No se pudo entregar {que} por Telegram en el intento {intentos} de "
+                f"{MAX_INTENTOS}: se reintenta en el despacho siguiente.",
+                severidad="baja", referencia_cruda=falla, etapa=ETAPA_ENTREGA_REINTENTO,
+                referencia_tipo="message_outbox", referencia_id=str(m["id"]),
+                chat_id=m.get("chat_id"), avisar_admin=False,
+                sin_avisar_porque="un intento que se reintenta queda sólo como rastro; el "
+                                  "quinto fallo sí la avisa.")
+    except Exception as e:  # noqa: BLE001 -- el rastro no puede tirar la pasada
+        print(f"  ! no se pudo registrar el rastro del envío {m['id']} ({type(e).__name__}).")
 
 
 def _ya_recibio(cur, membership_id: str, ahora: datetime) -> int:

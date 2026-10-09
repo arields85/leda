@@ -88,6 +88,9 @@ NOTICIA_NEUTRA_INCIDENTE = (
 # con su entrada en `EXPLICACION_POR_ETAPA`.
 ETAPA_TURNO_CONVERSACION = "turno_conversacion"
 ETAPA_ENTREGA_MENSAJE = "entrega_mensaje"
+# D8 (G4, prueba por Telegram del 2026-10-08): un intento de entregar un mensaje que falló y se
+# reintenta. Queda sólo como rastro; el quinto fallo deja su propio incidente (`entrega_mensaje`).
+ETAPA_ENTREGA_REINTENTO = "entrega_mensaje_reintento"
 ETAPA_ENTREGA_AVISO_ADMIN = "entrega_aviso_admin"
 ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
@@ -259,6 +262,17 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=("Revisá que Telegram responda y que {nombre} no haya "
                    "bloqueado el bot. Después decidí si hay que reenviarle lo "
                    "que faltó.")),
+    ETAPA_ENTREGA_REINTENTO: ExplicacionDeEtapa(
+        titulo="Un mensaje de Leda se demoró",
+        que_paso=("Un mensaje para {nombre} no se pudo entregar por Telegram en uno de sus "
+                  "intentos. Se reintenta solo, en el despacho siguiente; al quinto fallo "
+                  "queda su propio incidente (`entrega_mensaje`). El resumen dice qué intento "
+                  "fue."),
+        que_vio=("Todavía nada, o el mensaje igual: si la falla fue esperando la respuesta de "
+                 "Telegram (un tiempo de espera agotado), el mensaje puede haberle llegado y el "
+                 "reintento lo repite."),
+        que_hacer=(_BUSCAR_DETALLE + ": la referencia técnica dice cómo falló. Si se repite "
+                   "seguido, revisá que Telegram responda.")),
     ETAPA_ENTREGA_AVISO_ADMIN: ExplicacionDeEtapa(
         que_paso=("Un aviso a la administración de la plataforma no se pudo "
                   "entregar después de varios intentos."),
