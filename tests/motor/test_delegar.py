@@ -308,6 +308,50 @@ def test_si_quien_decide_dice_que_no_la_tarea_sigue_y_se_le_dice_a_quien_pidio(c
     assert _quien_la_tiene(conn, equipo, "PLC") == MARCOS
 
 
+def _aprobado_por_marcos(conn, equipo) -> None:
+    """Nahuel pide pasarle los sensores a Pedro y Marcos, que decide, lo aprueba."""
+    _pedir(equipo, "Nahuel", "SEN", "pedro")
+    equipo.dice("Nahuel", Jugada("confirmar", {}))
+    alias = _alias(equipo, "Marcos", "SEN")
+    equipo.dice("Marcos", Jugada("contestar_el_pase", {"tarea": alias, "acepta": True}))
+
+
+def _a_quienes_les_llega_como_termino(conn, equipo) -> dict[str, dict]:
+    personas = {p["membership_id"]: corto for corto, p in equipo.mundo["personas"].items()}
+    return {personas[str(a["destinatario_membership_id"])]: a["hechos"]
+            for a in avisos_guardados(conn, COMO_TERMINO)}
+
+
+def test_si_quien_recibe_no_la_toma_tambien_se_entera_quien_lo_aprobo(conn, equipo):
+    """Decisión 39: quien autorizó el pase también sabe cómo terminó, no sólo cuando la tomaron."""
+    _aprobado_por_marcos(conn, equipo)
+    alias = _alias(equipo, "Pedro", "SEN")
+
+    r = equipo.dice("Pedro", Jugada("contestar_el_pase", {"tarea": alias, "acepta": False}))
+
+    avisos = _a_quienes_les_llega_como_termino(conn, equipo)
+    assert set(avisos) == {"Nahuel", "Marcos"}
+    assert avisos["Marcos"]["la_tomo"] is False and avisos["Marcos"]["la_tiene"] == NAHUEL
+    assert set(r.hechos[0]) >= {"aviso_a_quien_pidio", "aviso_a_quien_decidio"}
+
+
+def test_si_quien_recibe_no_contesta_tambien_se_entera_quien_lo_aprobo(conn, equipo):
+    _aprobado_por_marcos(conn, equipo)
+    [pregunta] = avisos_guardados(conn, PASE_PARA_TOMAR)
+    _salir(conn, equipo, pregunta["programado_para"] + timedelta(minutes=1))
+    _escalera(conn, equipo, AHORA + timedelta(days=1))
+    _salir(conn, equipo, AHORA + timedelta(days=1, minutes=5))
+
+    _escalera(conn, equipo, AHORA + timedelta(days=2))
+
+    assert _pases(conn)[0]["estado"] == "sin_respuesta"
+    avisos = _a_quienes_les_llega_como_termino(conn, equipo)
+    assert set(avisos) == {"Nahuel", "Marcos", "Pedro"}
+    assert avisos["Marcos"]["sin_respuesta"] is True
+    assert "no_contesto" not in avisos["Marcos"]
+    assert avisos["Pedro"]["ya_no_espera_su_respuesta"] is True
+
+
 def test_el_si_del_encargado_que_recibe_vale_por_las_dos_y_a_ismael_no_le_llega_nada(conn,
                                                                                       equipo):
     _pedir(equipo, "Martin", "SRV", "marcos")

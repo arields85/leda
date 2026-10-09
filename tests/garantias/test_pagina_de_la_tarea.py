@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg
+from psycopg.types.json import Jsonb
 import pytest
 
 from leda import pagina_de_tarea as P
@@ -400,6 +401,69 @@ def test_la_lectura_trae_la_tarea_su_historia_y_su_evidencia(conn, mundo):
     clases = sorted(e["clase"] for e in datos["evidencia"])
     assert clases == ["archivo", "imagen", "texto"]
     assert all(e["quien"] == "Sam Noble 1" and e["cuando"] for e in datos["evidencia"])
+
+
+def asentar_un_bloqueo(conn, mundo: dict, tarea: dict | None = None) -> None:
+    """Un bloqueo de Sam Noble que destraba Taylor Quinn, con lo que dijo Taylor Quinn y que
+    quedó asentado a los cinco días hábiles (C-5, porciones 1 a 5)."""
+    ws, tarea = mundo["north-lab"]["id"], (tarea or mundo["norte"])["id"]
+    sam, taylor = _persona(mundo, "Sam Noble"), _persona(mundo, "Taylor Quinn")
+    with admin(conn) as cur:
+        cur.execute("""insert into blocker (workspace_id, task_id, causa, abierto_por, abierto_en)
+                       values (%s, %s, 'falta la pesa patrón', %s, %s) returning id""",
+                    (ws, tarea, sam, datetime(2026, 10, 19, 13, 0, tzinfo=timezone.utc)))
+        bloqueo = str(cur.fetchone()["id"])
+        cur.execute("""insert into blocker_unblocker (workspace_id, blocker_id,
+                                                      destraba_membership_id,
+                                                      dicho_por_membership_id, at)
+                       values (%s, %s, %s, %s, %s) returning id""",
+                    (ws, bloqueo, taylor, sam, datetime(2026, 10, 19, 13, 5, tzinfo=timezone.utc)))
+        fila = str(cur.fetchone()["id"])
+        cur.execute("""insert into dicho_de_quien_destraba (workspace_id, blocker_unblocker_id,
+                                                            dicho_por_membership_id, para_cuando,
+                                                            lo_que_dice, at)
+                       values (%s, %s, %s, '2026-10-23', 'la traigo del depósito', %s)""",
+                    (ws, fila, taylor, datetime(2026, 10, 19, 14, 0, tzinfo=timezone.utc)))
+        cur.execute("""insert into audit_log (workspace_id, actor_kind, accion, sujeto_tipo,
+                                              sujeto_id, detalle)
+                       values (%s, 'leda', 'asentar_bloqueo_que_sigue_abierto', 'blocker', %s,
+                               %s)""",
+                    (ws, bloqueo, Jsonb(
+                        {"task_id": tarea, "vez": 1, "dias_habiles_trabada": 5,
+                         "a_membership_id": taylor, "at": "2026-10-26T13:00:00+00:00"})))
+    conn.commit()
+
+
+def test_la_historia_trae_lo_que_quedo_asentado_de_un_bloqueo(conn, mundo):
+    """Decisión 49 del usuario (C-5c): lo asentado de un bloqueo queda en la historia de la tarea:
+    quién dijo que lo destraba, lo que dijo esa persona y que quedó asentado, sin decir a quién se
+    le informó."""
+    asentar_un_bloqueo(conn, mundo)
+
+    historia = _leer(conn, _emitir(conn, mundo, "Taylor Quinn"))["historia"]
+
+    quien = next(h for h in historia if h["que"] == "quien_destraba")
+    assert (quien["quien"], quien["destraba"]) == ("Sam Noble 1", "Taylor Quinn 1")
+    dicho = next(h for h in historia if h["que"] == "dicho_del_bloqueo")
+    assert (dicho["quien"], dicho["para_cuando"]) == ("Taylor Quinn 1", "2026-10-23")
+    assert dicho["lo_que_dice"] == "la traigo del depósito"
+    asentado = next(h for h in historia if h["que"] == "asentado")
+    assert (asentado["por"], asentado["dias_habiles"]) == ("sigue_trabada", 5)
+    assert asentado["cuando"].startswith("2026-10-26")
+    assert "a_membership_id" not in asentado and "a" not in asentado
+    # En el orden en que pasó: se trabó, quién lo destraba, lo que dijo, quedó asentado.
+    orden = [h["que"] for h in historia if h["que"] in ("bloqueo", "quien_destraba",
+                                                        "dicho_del_bloqueo", "asentado")]
+    assert orden == ["bloqueo", "quien_destraba", "dicho_del_bloqueo", "asentado"]
+
+
+def test_lo_asentado_de_un_bloqueo_no_se_ve_en_otra_tarea(conn, mundo):
+    asentar_un_bloqueo(conn, mundo)
+
+    historia = _leer(conn, _emitir(conn, mundo, "Morgan Hale", mundo["vecina"]))["historia"]
+
+    assert not [h for h in historia
+                if h["que"] in ("quien_destraba", "dicho_del_bloqueo", "asentado")]
 
 
 def test_cada_vista_y_cada_descarga_quedan_registradas(conn, mundo):

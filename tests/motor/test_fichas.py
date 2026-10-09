@@ -124,6 +124,8 @@ def test_la_lista_cerrada_tiene_una_ficha_por_jugada_del_recordatorio():
         # La persecución del bloqueo (C-5): lo que dice quien destraba, "no le escribas" y
         # "no me corresponde" (porción 3).
         + ("decir_cuando_destraba", "no_escribirle", "decir_que_no_le_toca")
+        # Lo que arregló la persona trabada y "se lo pido yo y te cuento" (C-5c).
+        + ("contar_lo_que_arreglaron", "pedirselo_y_contar")
         # Delegar (C-7): la respuesta de quien decide un pase o de quien lo recibe.
         + ("contestar_el_pase",))
     assert not any(FICHAS[n].se_ofrece for n in SITUACIONES)

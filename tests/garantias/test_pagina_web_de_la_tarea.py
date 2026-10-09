@@ -131,6 +131,23 @@ def test_la_pagina_cuenta_la_historia(web, conn, mundo):
     assert "falta la pesa patrón" in r.text
 
 
+def test_la_pagina_cuenta_lo_que_quedo_asentado_de_un_bloqueo(web, conn, mundo):
+    """Decisión 49 del usuario (C-5c): lo asentado queda en la historia de la tarea, en palabras
+    de todos los días y sin decir a quién se le informó."""
+    from tests.garantias.test_pagina_de_la_tarea import asentar_un_bloqueo
+    asentar_un_bloqueo(conn, mundo)
+
+    r = web.get(f"/tarea/{_emitir(conn, mundo, 'Taylor Quinn')}")
+
+    assert r.status_code == 200
+    assert "Sam Noble 1 dijo que la destraba Taylor Quinn 1" in r.text
+    assert "Taylor Quinn 1 dijo que la destraba el vie 23/10" in r.text
+    assert "la traigo del depósito" in r.text
+    assert "Quedó asentado que sigue trabada: 5 días hábiles" in r.text
+    for palabra in ("asentar_", "blocker", "dicho_del_bloqueo", "a_membership_id"):
+        assert palabra not in r.text
+
+
 def test_la_pagina_escapa_lo_que_viene_de_la_base(web, conn, mundo):
     """Un comentario o un nombre de objetivo los escribe una persona."""
     with admin(conn) as cur:
