@@ -34,8 +34,9 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     opción; la guarda de la decisión 2 queda marcada para la prueba de la entrega.
 11. [`11-algo-vencido.md`](11-algo-vencido.md): un botón viejo, una respuesta fuera de horario y un aviso
     guardado que ya no corresponde.
-12. [`12-fuera-de-la-lista.md`](12-fuera-de-la-lista.md): un pedido que no es ninguna de las ocho cosas,
-    frente a una reasignación, una entrega, un inicio repetido y "qué tengo pendiente".
+12. [`12-fuera-de-la-lista.md`](12-fuera-de-la-lista.md): un pedido que no es ninguna de las cosas por
+    chat, frente a un pedido de pase que Marcos no confirma (desde la C-7), una entrega, un inicio
+    repetido y "qué tengo pendiente".
 13. [`13-jev-dos-tareas-iguales.md`](13-jev-dos-tareas-iguales.md): dos tareas parecidas avisadas juntas;
     lo correcto es preguntar (ADR 0018, decisión 7).
 14. [`14-jev-el-estado-decide.md`](14-jev-el-estado-decide.md): dos tareas parecidas, pero el estado de la
@@ -54,8 +55,8 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 18. [`18-habla-del-mundo.md`](18-habla-del-mundo.md): un avance, una previsión antes de la hora en que
     Leda escribe por su cuenta y el pedido de estado del día previsto; Leda cuenta quién se entera de qué
     y cuándo, y qué va a hacer ella, nunca el estado interno de un aviso o de un pedido.
-19. [`19-palabras-de-todos-los-dias.md`](19-palabras-de-todos-los-dias.md): una reasignación con la oferta
-    de anotar para cuándo la termina, la fecha que da Marcos, "que es prevision?" y lo que Leda manda por
+19. [`19-palabras-de-todos-los-dias.md`](19-palabras-de-todos-los-dias.md): la vista previa de un pase que
+    Marcos deja sin efecto (desde la C-7), la fecha que da, "que es prevision?" y lo que Leda manda por
     su cuenta hasta ese día; Leda dice el hecho concreto con palabras de todos los días y nunca nombra un
     concepto del sistema.
 20. [`20-formato-de-los-mensajes.md`](20-formato-de-los-mensajes.md): una consulta de pendientes, dos
@@ -165,6 +166,15 @@ decisión 8):
     las tres en un mensaje de corrido y cada cosa queda en su tarea; Nahuel contesta una sola y Leda,
     en la misma respuesta, pregunta una vez por las otras dos; con otra respuesta parcial no vuelve a
     preguntar (decisión 8 del usuario, 2026-10-08; C-6).
+
+Delegar (ADR 0017, enmienda a la decisión 2; `odd/tasks/fase-c.md`, decisión 9):
+
+38. [`38-delegar.md`](38-delegar.md): pasarle una tarea a otra persona por chat. Marcos le pasa una a
+    Nahuel (decide Marcos al pedirlo, confirma Nahuel); una en revisión no se pasa; Marcos le pasa otra a
+    Lucas, decide Martín y Lucas no la toma; Martín le pasa una a Marcos, que decide y la toma con un solo
+    "sí"; Nahuel no puede pasársela a otro sector (lo decide Marcos), y a Marcos sí, que dice que no. Vista
+    previa y confirmación, la pregunta a quien decide y a quien recibe con dos botones, y el aviso de cómo
+    terminó; el responsable cambia sólo con las tres confirmaciones, y a Ismael no le llega nada (C-7).
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:
@@ -321,6 +331,11 @@ suya, trabada, con la que está trabado (`dicen_quien_destraba`, `espera_la_tare
 jugada lo dice con `su_tarea_trabada`, también por su clave), y el espacio tiene los días hábiles del
 bloqueo viejo del pack (`bloqueos.escala_solo_a_los_dias`, 5).
 
+**Delegar** (C-7): los efectos suman quién tiene cada tarea que cambió de manos (`responsables`, por la
+clave de la tarea y el nombre corto de la persona): uno de más es de garantía, porque una tarea no cambia de
+manos sin la confirmación de quien pide, la decisión de quien decide y la de quien recibe. El estado de
+después puede decir quién tiene cada tarea (`responsables`), también para mirar que un "no" no la movió.
+
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 
 ## Formato de cada conversación
@@ -465,6 +480,11 @@ importa es el significado:
   informa la cadena al referente (conversación 34).
 - `no_escribirle`: la persona trabada pide que Leda no le escriba a quien destraba; si el mensaje
   todavía no salió, no sale (conversación 32).
+- `pedir_reasignacion`: la persona pide pasarle una tarea suya a otra persona; Leda muestra la vista
+  previa del pase para confirmar, o dice por qué no se puede y, si es de otro sector, quién lo decide
+  (conversaciones 12, 19 y 38). Hasta la C-7, Leda decía que no se hacía por chat (P16, más abajo).
+- `contestar_el_pase`: quien decide un pase dice si lo aprueba, y quien recibe la tarea dice si la toma
+  (`acepta`), tocando o escribiendo (conversación 38).
 
 ## Decisiones del usuario (2026-10-04)
 

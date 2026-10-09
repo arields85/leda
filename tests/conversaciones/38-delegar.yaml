@@ -1,0 +1,507 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/38-delegar.md
+numero: "38"
+titulo: "Delegar una tarea por chat"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+# La del panel HMI está en revisión y espera a Ismael: lo que le llegue por ella no es de esta
+# conversación.
+foco: [COM, PLC, SRV, SEN]
+
+tareas:
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: asignada
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  HMI:
+    titulo: Instalar el panel HMI de la comprimidora
+    criterio: "El panel HMI muestra el estado de la comprimidora y permite arrancarla y pararla desde la planta"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: en_revision
+    desde: "2026-10-19"
+  SRV:
+    titulo: Instalar el servidor de datos de la planta
+    criterio: "El servidor de datos de la planta recibe los datos de las máquinas y los guarda sin pérdidas durante una jornada"
+    responsable: Martin
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  SEN:
+    titulo: Calibrar los sensores de la envasadora
+    criterio: "Los seis sensores de la envasadora miden dentro de la tolerancia del fabricante en una prueba de una hora"
+    responsable: Nahuel
+    vence: "2026-11-06"
+    estado: asignada
+
+pasos:
+  # --- Marcos → Nahuel: decide Marcos al pedirlo (es el encargado de OT); confirma Nahuel ---------
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-20 10:00"
+    escribe: "che me la pasas la de comunicaciones a nahuel? estoy tapado con lo de la paila"
+    jugadas:
+      - {nombre: pedir_reasignacion, tarea: COM, a: nahuel}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: COM,
+         pase: {de: Marcos Tarquini, a: Nahuel Gimenez},
+         al_confirmar: {lo_decide: ausente, la_tiene_que_tomar: Nahuel Gimenez},
+         pregunta: confirmar_el_pase}
+    pregunta: {tipo: confirmar_el_pase, tarea: COM}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_el_pase, tarea: COM}
+      responsables: {COM: Marcos}
+    dice:
+      - "la vista previa: que la de comunicaciones pasa de Marcos a Nahuel"
+      - que antes le pregunta a Nahuel si la toma
+      - que confirme con el botón o escribiéndolo
+    no_dice:
+      - que la tarea ya pasó a Nahuel
+      - que lo decide Ismael
+      - que Ismael se entera
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:01"
+    escribe: "dale"
+    jugadas:
+      - {nombre: confirmar, puede_traer: [tarea]}
+    efectos:
+      avisos_guardados:
+        - {tipo: pase_para_tomar, tarea: COM, a: Nahuel, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: tomar_la_tarea, pidio: Marcos Tarquini,
+                    lo_aprobo: ausente, tambien_lo_decide: ausente}}
+    hechos:
+      - {jugada: confirmar, resultado: pedido, tarea: COM,
+         pase: {de: Marcos Tarquini, a: Nahuel Gimenez},
+         se_le_pregunta_a: {a: Nahuel Gimenez, llega: "~2026-10-20T10:11"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+      responsables: {COM: Marcos}
+    dice:
+      - que le pregunta a Nahuel si la toma y le avisa cuando conteste
+      - que mientras tanto la tarea sigue con él
+    no_dice:
+      - que la tarea ya es de Nahuel
+      - que Ismael se entera
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-20 10:11"]
+    salen:
+      - a: Nahuel
+        tipo: pase_para_tomar
+        tarea: COM
+        hechos: {necesita_respuesta: true, pregunta: tomar_la_tarea, pidio: Marcos Tarquini,
+                 vence: "2026-11-06"}
+        botones: [La tomo, No la tomo]
+    estado_despues:
+      de: Nahuel
+      pregunta_abierta: null
+    dice:
+      - que Marcos le quiere pasar la de comunicaciones, que vence el viernes 6
+      - "la pregunta: si la toma"
+    no_dice:
+      - que ya es suya
+
+  - paso: 4
+    quien: Nahuel
+    a_las: "2026-10-20 10:30"
+    toca: La tomo
+    efectos:
+      responsables: {COM: Nahuel}
+      avisos_guardados:
+        - {tipo: como_termino_el_pase, tarea: COM, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: false, la_tomo: true, a: Nahuel Gimenez}}
+    hechos:
+      - {jugada: contestar_el_pase, resultado: anotado, tarea: COM, la_toma: true,
+         aviso_a_quien_pidio: {a: Marcos Tarquini, llega: "~2026-10-20T10:40"},
+         aviso_a_quien_decidio: ausente}
+    pregunta: null
+    botones: []
+    estado_despues:
+      de: Nahuel
+      pregunta_abierta: null
+      responsables: {COM: Nahuel}
+    dice:
+      - que la tarea quedó a su cargo, con su vencimiento
+      - que Marcos se va a enterar
+    no_dice:
+      - que Ismael se entera
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-20 10:40"]
+    salen:
+      - a: Marcos
+        tipo: como_termino_el_pase
+        tarea: COM
+        hechos: {necesita_respuesta: false, la_tomo: true, a: Nahuel Gimenez}
+    dice:
+      - que Nahuel tomó la de comunicaciones
+      - que no hace falta contestar, en el último renglón
+
+  # --- Una tarea en revisión no se delega -------------------------------------------------------------
+  - paso: 6
+    quien: Marcos
+    a_las: "2026-10-20 11:00"
+    escribe: "y la del hmi tambien pasasela a nahuel"
+    jugadas:
+      - {nombre: pedir_reasignacion, tarea: HMI, a: nahuel}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_reasignacion, resultado: no_se_puede, motivo: estado, estado: en_revision}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que esa no se puede pasar porque ya la entregó y espera la revisión
+    no_dice:
+      - que le pregunta a Nahuel
+
+  # --- Marcos → Lucas: decide Martín, y Lucas no la toma ---------------------------------------------
+  - paso: 7
+    quien: Marcos
+    a_las: "2026-10-20 11:02"
+    escribe: "bueno entonces la del plc pasala a lucas, martin me dijo q lo tiene libre"
+    jugadas:
+      - {nombre: pedir_reasignacion, tarea: PLC, a: lucas}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: PLC,
+         pase: {de: Marcos Tarquini, a: Lucas Natuche},
+         al_confirmar: {lo_decide: Martín Forte, la_tiene_que_tomar: Lucas Natuche},
+         pregunta: confirmar_el_pase}
+    pregunta: {tipo: confirmar_el_pase, tarea: PLC}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_el_pase, tarea: PLC}
+    dice:
+      - "la vista previa: que la del PLC pasa de Marcos a Lucas"
+      - que primero lo decide Martín y después le pregunta a Lucas si la toma
+    no_dice:
+      - que la tarea ya pasó a Lucas
+
+  - paso: 8
+    quien: Marcos
+    a_las: "2026-10-20 11:03"
+    toca: Confirmar
+    efectos:
+      avisos_guardados:
+        - {tipo: pase_para_decidir, tarea: PLC, a: Martin, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: decidir_el_pase, pidio: Marcos Tarquini,
+                    pasaria_a: Lucas Natuche}}
+    hechos:
+      - {jugada: confirmar, resultado: pedido, tarea: PLC,
+         se_le_pregunta_a: {a: Martín Forte, llega: "~2026-10-20T11:13"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+      responsables: {PLC: Marcos}
+    dice:
+      - que le pregunta a Martín si lo aprueba y que le avisa
+
+  - paso: 9
+    quien: Leda
+    relojes: ["2026-10-20 11:13"]
+    salen:
+      - a: Martin
+        tipo: pase_para_decidir
+        tarea: PLC
+        hechos: {necesita_respuesta: true, pregunta: decidir_el_pase, pidio: Marcos Tarquini,
+                 pasaria_a: Lucas Natuche}
+        botones: [Aprobar el pase, No aprobarlo]
+    estado_despues:
+      de: Martin
+      pregunta_abierta: null
+    dice:
+      - que Marcos le quiere pasar la del PLC a Lucas
+      - "la pregunta: si lo aprueba"
+
+  - paso: 10
+    quien: Martin
+    a_las: "2026-10-20 11:30"
+    escribe: "si dale, que la agarre lucas"
+    jugadas:
+      - {nombre: contestar_el_pase, tarea: PLC, acepta: true}
+    efectos:
+      avisos_guardados:
+        - {tipo: pase_para_tomar, tarea: PLC, a: Lucas, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: tomar_la_tarea, pidio: Marcos Tarquini,
+                    lo_aprobo: Martín Forte}}
+    hechos:
+      - {jugada: contestar_el_pase, resultado: anotado, tarea: PLC, aprobo_el_pase: true,
+         se_le_pregunta_a: {a: Lucas Natuche, llega: "~2026-10-20T11:40"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      de: Martin
+      pregunta_abierta: null
+      responsables: {PLC: Marcos}
+    dice:
+      - que le pregunta a Lucas si la toma
+    no_dice:
+      - que la tarea ya es de Lucas
+
+  - paso: 11
+    quien: Leda
+    relojes: ["2026-10-20 11:40"]
+    salen:
+      - a: Lucas
+        tipo: pase_para_tomar
+        tarea: PLC
+        hechos: {necesita_respuesta: true, pregunta: tomar_la_tarea, pidio: Marcos Tarquini,
+                 lo_aprobo: Martín Forte}
+        botones: [La tomo, No la tomo]
+    dice:
+      - que Marcos le quiere pasar la del PLC y que Martín lo aprobó
+      - "la pregunta: si la toma"
+
+  - paso: 12
+    quien: Lucas
+    a_las: "2026-10-20 12:00"
+    escribe: "uh no puedo esta semana, estoy con lo del data center"
+    jugadas:
+      - {nombre: contestar_el_pase, tarea: PLC, acepta: false, puede_traer: [motivo]}
+    efectos:
+      avisos_guardados:
+        - {tipo: como_termino_el_pase, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: false, la_tomo: false, a: Lucas Natuche}}
+    hechos:
+      - {jugada: contestar_el_pase, resultado: anotado, tarea: PLC, la_toma: false,
+         sigue_con: Marcos Tarquini,
+         aviso_a_quien_pidio: {a: Marcos Tarquini, llega: "~2026-10-20T12:10"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: null
+      responsables: {PLC: Marcos}
+    dice:
+      - que la tarea sigue con Marcos
+      - que Marcos se va a enterar
+
+  - paso: 13
+    quien: Leda
+    relojes: ["2026-10-20 12:10"]
+    salen:
+      - a: Marcos
+        tipo: como_termino_el_pase
+        tarea: PLC
+        hechos: {necesita_respuesta: false, la_tomo: false, a: Lucas Natuche}
+    dice:
+      - que Lucas no puede tomar la del PLC y que sigue con él
+
+  # --- Martín → Marcos: Marcos, encargado de OT, decide y la toma con un solo "sí" ------------------
+  - paso: 14
+    quien: Martin
+    a_las: "2026-10-20 14:00"
+    escribe: "pasale lo del servidor a marcos, me pidieron otra cosa urgente"
+    jugadas:
+      - {nombre: pedir_reasignacion, tarea: SRV, a: marcos}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: SRV,
+         pase: {de: Martín Forte, a: Marcos Tarquini},
+         al_confirmar: {lo_decide: ausente, la_tiene_que_tomar: Marcos Tarquini,
+                        decide_y_la_toma: true},
+         pregunta: confirmar_el_pase}
+    pregunta: {tipo: confirmar_el_pase, tarea: SRV}
+    botones: [Confirmar]
+    estado_despues:
+      de: Martin
+      pregunta_abierta: {tipo: confirmar_el_pase, tarea: SRV}
+    dice:
+      - "la vista previa: que la del servidor pasa de Martín a Marcos"
+      - que Marcos decide y la toma con su respuesta
+
+  - paso: 15
+    quien: Martin
+    a_las: "2026-10-20 14:01"
+    escribe: "si"
+    jugadas:
+      - {nombre: confirmar, puede_traer: [tarea]}
+    efectos:
+      avisos_guardados:
+        - {tipo: pase_para_tomar, tarea: SRV, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: tomar_la_tarea, pidio: Martín Forte,
+                    tambien_lo_decide: true}}
+    hechos:
+      - {jugada: confirmar, resultado: pedido, tarea: SRV,
+         se_le_pregunta_a: {a: Marcos Tarquini, llega: "~2026-10-20T14:11"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      de: Martin
+      pregunta_abierta: null
+      responsables: {SRV: Martin}
+
+  - paso: 16
+    quien: Leda
+    relojes: ["2026-10-20 14:11"]
+    salen:
+      - a: Marcos
+        tipo: pase_para_tomar
+        tarea: SRV
+        hechos: {necesita_respuesta: true, pregunta: tomar_la_tarea, pidio: Martín Forte,
+                 tambien_lo_decide: true}
+        botones: [La tomo, No la tomo]
+    dice:
+      - que Martín le quiere pasar la del servidor
+      - "la pregunta: si la toma"
+
+  - paso: 17
+    quien: Marcos
+    a_las: "2026-10-20 14:30"
+    escribe: "dale la agarro yo"
+    jugadas:
+      - {nombre: contestar_el_pase, tarea: SRV, acepta: true}
+    efectos:
+      responsables: {SRV: Marcos}
+      avisos_guardados:
+        - {tipo: como_termino_el_pase, tarea: SRV, a: Martin, estado: guardado,
+           hechos: {necesita_respuesta: false, la_tomo: true, a: Marcos Tarquini}}
+    hechos:
+      - {jugada: contestar_el_pase, resultado: anotado, tarea: SRV, la_toma: true,
+         tambien_lo_decidia: true,
+         aviso_a_quien_pidio: {a: Martín Forte, llega: "~2026-10-20T14:40"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+      responsables: {SRV: Marcos}
+    dice:
+      - que la del servidor quedó a su cargo
+      - que Martín se va a enterar
+
+  - paso: 18
+    quien: Leda
+    relojes: ["2026-10-20 14:40"]
+    salen:
+      - a: Martin
+        tipo: como_termino_el_pase
+        tarea: SRV
+        hechos: {necesita_respuesta: false, la_tomo: true, a: Marcos Tarquini}
+    dice:
+      - que Marcos tomó la del servidor
+
+  # --- Nahuel, integrante de OT: a otro sector no; a Marcos sí, y Marcos dice que no --------------
+  - paso: 19
+    quien: Nahuel
+    a_las: "2026-10-20 15:00"
+    escribe: "le podes pasar la de los sensores a lucas?"
+    jugadas:
+      - {nombre: pedir_reasignacion, tarea: SEN, a: lucas}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_reasignacion, resultado: no_se_puede, motivo: otro_sector,
+         lo_decide: Marcos Tarquini, tarea: SEN}
+    pregunta: null
+    botones: []
+    estado_despues:
+      de: Nahuel
+      pregunta_abierta: null
+    dice:
+      - que eso no lo puede hacer por él y que lo decide Marcos
+    no_dice:
+      - que le pasa el pedido a Marcos
+      - que lo decide Ismael o Martín
+
+  - paso: 20
+    quien: Nahuel
+    a_las: "2026-10-20 15:02"
+    escribe: "ah ok entonces pasasela a marcos"
+    jugadas:
+      - {nombre: pedir_reasignacion, tarea: SEN, a: marcos}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: SEN,
+         pase: {de: Nahuel Gimenez, a: Marcos Tarquini},
+         al_confirmar: {la_tiene_que_tomar: Marcos Tarquini, decide_y_la_toma: true},
+         pregunta: confirmar_el_pase}
+    pregunta: {tipo: confirmar_el_pase, tarea: SEN}
+    botones: [Confirmar]
+    estado_despues:
+      de: Nahuel
+      pregunta_abierta: {tipo: confirmar_el_pase, tarea: SEN}
+    dice:
+      - "la vista previa: que la de los sensores pasa de Nahuel a Marcos, que decide y la toma"
+
+  - paso: 21
+    quien: Nahuel
+    a_las: "2026-10-20 15:03"
+    toca: Confirmar
+    efectos:
+      avisos_guardados:
+        - {tipo: pase_para_tomar, tarea: SEN, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: true, pidio: Nahuel Gimenez, tambien_lo_decide: true}}
+    hechos:
+      - {jugada: confirmar, resultado: pedido, tarea: SEN,
+         se_le_pregunta_a: {a: Marcos Tarquini, llega: "~2026-10-20T15:13"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      de: Nahuel
+      pregunta_abierta: null
+
+  - paso: 22
+    quien: Leda
+    relojes: ["2026-10-20 15:13"]
+    salen:
+      - a: Marcos
+        tipo: pase_para_tomar
+        tarea: SEN
+        hechos: {necesita_respuesta: true, pidio: Nahuel Gimenez, tambien_lo_decide: true}
+        botones: [La tomo, No la tomo]
+
+  - paso: 23
+    quien: Marcos
+    a_las: "2026-10-20 15:30"
+    escribe: "no, esa hacela vos nahuel que la conoces mejor"
+    jugadas:
+      - {nombre: contestar_el_pase, tarea: SEN, acepta: false, puede_traer: [motivo]}
+    efectos:
+      avisos_guardados:
+        - {tipo: como_termino_el_pase, tarea: SEN, a: Nahuel, estado: guardado,
+           hechos: {necesita_respuesta: false, la_tomo: false, a: Marcos Tarquini}}
+    hechos:
+      - {jugada: contestar_el_pase, resultado: anotado, tarea: SEN, la_toma: false,
+         tambien_lo_decidia: true, sigue_con: Nahuel Gimenez,
+         aviso_a_quien_pidio: {a: Nahuel Gimenez, llega: "~2026-10-20T15:40"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+      responsables: {SEN: Nahuel}
+    dice:
+      - que la de los sensores sigue con Nahuel
+      - que Nahuel se va a enterar
+
+  - paso: 24
+    quien: Leda
+    relojes: ["2026-10-20 15:40"]
+    salen:
+      - a: Nahuel
+        tipo: como_termino_el_pase
+        tarea: SEN
+        hechos: {necesita_respuesta: false, la_tomo: false, a: Marcos Tarquini}
+    estado_despues:
+      responsables: {COM: Nahuel, PLC: Marcos, SRV: Marcos, SEN: Nahuel, HMI: Marcos}
+    dice:
+      - que Marcos no la toma y que sigue con él, con lo que dijo Marcos

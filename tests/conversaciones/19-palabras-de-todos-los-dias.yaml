@@ -37,20 +37,24 @@ pasos:
     quien: Marcos
     a_las: "2026-10-20 11:00"
     escribe: "me la podes pasar a nahuel?"
+    # Desde la C-7 (delegar; ADR 0017, enmienda a la decisión 2): la vista previa del pase. Marcos
+    # es el encargado de OT: su pedido es la decisión, y Nahuel la confirma.
     jugadas:
       - {nombre: pedir_reasignacion, tarea: PLC, a: nahuel}
     efectos: {}
     hechos:
-      - {jugada: pedir_reasignacion, resultado: no_por_chat, quien_decide: Ismael Soschinski,
-         alternativa: anotar_prevision, tarea: PLC, pregunta: propuesta}
-    pregunta: {tipo: propuesta, tarea: PLC, propone: [anotar_prevision]}
+      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: PLC,
+         pase: {de: Marcos Tarquini, a: Nahuel Gimenez},
+         al_confirmar: {la_tiene_que_tomar: Nahuel Gimenez}, pregunta: confirmar_el_pase}
+    pregunta: {tipo: confirmar_el_pase, tarea: PLC}
+    botones: [Confirmar]
     estado_despues:
-      pregunta_abierta: {tipo: propuesta, tarea: PLC}
+      pregunta_abierta: {tipo: confirmar_el_pase, tarea: PLC}
     dice:
-      - que eso no lo puede hacer y que lo decide Ismael
-      - "ofrece anotar para qué día la va a terminar, con palabras de todos los días"
+      - "la vista previa, con palabras de todos los días: que la del PLC pasa de Marcos a Nahuel"
+      - que antes le pregunta a Nahuel si la toma, y que lo confirme
     no_dice:
-      - '"previsión" ni otro nombre de un dato o de una jugada'
+      - '"reasignación", "responsable", "delegación" ni otro nombre de un dato o de una jugada'
       - que la tarea pasó a Nahuel
 
   - paso: 2
@@ -58,8 +62,9 @@ pasos:
     a_las: "2026-10-20 11:05"
     # Con su porqué (usuario, 2026-10-07; ADR 0018, 9n): una fecha que atrasa sin él abre la
     # pregunta de qué la atrasa, que no es lo que mide esta conversación.
-    escribe: "dale, para el martes 27, estoy tapado con la puesta en marcha"
+    escribe: "no mejor no se la pases, la termino yo para el martes 27, estoy tapado con la puesta en marcha"
     jugadas:
+      - {nombre: cancelar}
       - {nombre: anotar_prevision, tarea: PLC, fecha: "2026-10-27",
          motivo: "estoy tapado con la puesta en marcha"}
     efectos:
@@ -71,6 +76,7 @@ pasos:
           hechos: {prevision: "2026-10-27", fecha_comprometida: "2026-10-23",
                    atraso_si_se_cumple_la_prevision_dias_habiles: 2, dependientes: [COM]}
     hechos:
+      - {jugada: cancelar, resultado: cancelado, pregunta: {tipo: confirmar_el_pase, tarea: PLC}}
       - {jugada: anotar_prevision, resultado: anotado, tarea: PLC, prevision: "2026-10-27",
          fecha_comprometida: "2026-10-23", atraso_si_se_cumple_la_prevision_dias_habiles: 2,
          aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-20T11:15"}}
@@ -78,7 +84,9 @@ pasos:
     estado_despues:
       pregunta_abierta: null
       para_despues: []
+      responsables: {PLC: Marcos}
     dice:
+      - que no se la pasa a Nahuel
       - que anotó que la del PLC la termina el martes 27, con su motivo
       - que el vencimiento sigue siendo el viernes 23, dicho como el día para el que estaba
       - que la fecha nueva queda informada hoy, como algo que todavía no pasó, sin nombrar a Ismael

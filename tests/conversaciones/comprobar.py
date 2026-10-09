@@ -98,8 +98,12 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
 
     ws = mundo.workspace_id
     with admin(conn) as cur:
-        cur.execute("select id, estado::text e from task where workspace_id = %s", (ws,))
-        estados = {tarea(f["id"]): f["e"] for f in cur.fetchall()}
+        cur.execute("""select id, estado::text e, responsable_membership_id r from task
+                        where workspace_id = %s""", (ws,))
+        filas_de_tareas = cur.fetchall()
+        estados = {tarea(f["id"]): f["e"] for f in filas_de_tareas}
+        # Quién tiene cada tarea (C-7, delegar): cambia sólo con las tres confirmaciones.
+        responsables = {tarea(f["id"]): persona(f["r"]) for f in filas_de_tareas}
         cur.execute("""select f.id, f.task_id, f.fecha_prevista, f.motivo, f.es_correccion
                          from task_forecast f join task t on t.id = f.task_id
                         where t.workspace_id = %s""", (ws,))
@@ -244,7 +248,8 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
             ultimo_aviso[persona(f["membership_id"])] = (
                 de_las[0] if len(de_las) == 1 else de_las or None)
     conn.commit()
-    return {"estados": estados, "previsiones": previsiones, "bloqueos": bloqueos,
+    return {"estados": estados, "responsables": responsables,
+            "previsiones": previsiones, "bloqueos": bloqueos,
             "destraban": destraban, "dicen_quien_destraba": dicen, "avisos": avisos,
             "salidas": salidas,
             "incidentes": incidentes, "avisos_admin": avisos_admin, "avances": avances,
@@ -261,6 +266,8 @@ def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
     return {
         "estados": {k: v for k, v in despues["estados"].items()
                     if antes["estados"].get(k) != v},
+        "responsables": {k: v for k, v in despues.get("responsables", {}).items()
+                         if antes.get("responsables", {}).get(k) != v},
         "previsiones": nuevas("previsiones"),
         "bloqueos": nuevas("bloqueos"),
         "bloqueos_resueltos": [v["tarea"] for k, v in despues["bloqueos"].items()
@@ -489,6 +496,21 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
             if not extra:
                 c.falla(COMPRENSION, "falta un efecto: estado", estados_e, hubo["estados"])
 
+    # Un responsable que cambió sin esperarlo es de garantía (C-7: ninguna tarea cambia de manos
+    # sin las confirmaciones); uno esperado que no cambió, de comprensión.
+    responsables_e = esperados.get("responsables") or {}
+    responsables = hubo.get("responsables") or {}
+    if responsables_e != responsables:
+        extra = {k: v for k, v in responsables.items() if responsables_e.get(k) != v}
+        if extra:
+            de_mas = True
+            c.falla(GARANTIA, "efecto de más: responsable", responsables_e, responsables)
+        if any(responsables.get(k) != v for k, v in responsables_e.items()):
+            falta = True
+            if not extra:
+                c.falla(COMPRENSION, "falta un efecto: responsable", responsables_e,
+                        responsables)
+
     def filas(nombre: str, reales: list[dict], que: str,
               esperadas: list[dict] | None = None) -> None:
         nonlocal de_mas, falta
@@ -575,7 +597,8 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
 def comprobar_estado(c: Comprobacion, esperado: dict[str, Any], f: dict[str, Any],
                      persona: str, clase: str = MOTOR) -> None:
     """El estado después del paso, sólo lo que el paso nombra: la pregunta abierta y las de
-    después de la persona, las esperas abiertas y el último aviso de cada una."""
+    después de la persona, las esperas abiertas, quién tiene cada tarea nombrada (C-7) y el último
+    aviso de cada una."""
     if not esperado:
         return
     preguntas = f["preguntas"].get(persona, {"abierta": None, "para_despues": []})
@@ -592,6 +615,10 @@ def comprobar_estado(c: Comprobacion, esperado: dict[str, Any], f: dict[str, Any
         if sorted(esperado["esperas_abiertas"]) != reales:
             c.falla(clase, "esperas abiertas después", sorted(esperado["esperas_abiertas"]),
                     reales)
+    for tarea, quien in (esperado.get("responsables") or {}).items():
+        real = (f.get("responsables") or {}).get(tarea)
+        if real != quien:
+            c.falla(clase, f"quién tiene {tarea}", quien, real)
     for quien, tarea in (esperado.get("ultimo_aviso") or {}).items():
         if f["ultimo_aviso"].get(quien) != tarea:
             c.falla(clase, f"último aviso de {quien}", tarea, f["ultimo_aviso"].get(quien))

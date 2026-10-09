@@ -31,6 +31,38 @@ def test_un_bloqueo_resuelto_que_falta_es_de_comprension_y_uno_de_mas_de_garanti
         (cp.GARANTIA, "efecto de más: bloqueo resuelto")]
 
 
+def test_un_responsable_que_cambia_sin_esperarlo_es_de_garantia_y_uno_que_falta_de_comprension():
+    """C-7: ninguna tarea cambia de manos sin las confirmaciones; el corredor lo mira como un
+    efecto, igual que un estado."""
+    sobra = cp.Comprobacion()
+    assert cp.comprobar_efectos(sobra, {}, _hubo(responsables={"COM": "Nahuel"}), {}) == (
+        True, False)
+    assert [(f.clase, f.que) for f in sobra.fallas] == [
+        (cp.GARANTIA, "efecto de más: responsable")]
+
+    falta = cp.Comprobacion()
+    assert cp.comprobar_efectos(falta, {"responsables": {"COM": "Nahuel"}}, _hubo(), {}) == (
+        False, True)
+    assert [(f.clase, f.que) for f in falta.fallas] == [
+        (cp.COMPRENSION, "falta un efecto: responsable")]
+
+    bien = cp.Comprobacion()
+    assert cp.comprobar_efectos(bien, {"responsables": {"COM": "Nahuel"}},
+                                _hubo(responsables={"COM": "Nahuel"}), {}) == (False, False)
+    assert bien.fallas == []
+
+
+def test_el_estado_dice_quien_tiene_cada_tarea_nombrada():
+    c = cp.Comprobacion()
+    foto = {"preguntas": {}, "esperas": {}, "ultimo_aviso": {},
+            "responsables": {"COM": "Nahuel", "PLC": "Marcos"}}
+    cp.comprobar_estado(c, {"responsables": {"COM": "Nahuel"}}, foto, "Marcos")
+    assert c.fallas == []
+    cp.comprobar_estado(c, {"responsables": {"PLC": "Lucas"}}, foto, "Marcos")
+    assert [(f.que, f.esperado, f.real) for f in c.fallas] == [("quién tiene PLC", "Lucas",
+                                                                 "Marcos")]
+
+
 def test_el_emparejamiento_no_se_deja_ganar_por_el_primero_que_coincide():
     """Un esperado general no se queda con el real que otro esperado más preciso necesita."""
     esperados = [{"tarea": "PLC"}, {"tarea": "PLC", "fecha": "2026-10-27"}]

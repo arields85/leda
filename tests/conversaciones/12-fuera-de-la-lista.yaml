@@ -41,29 +41,29 @@ pasos:
     quien: Marcos
     a_las: "2026-10-20 10:10"
     escribe: "uh justo, me la podes pasar a nahuel? estoy tapado con lo de la paila"
-    # "Ninguna de la lista" de las ocho cosas por chat: en la lista cerrada es la jugada que se
-    # reconoce y no se hace (plan, sección 4).
+    # Desde la C-7 (delegar; ADR 0017, enmienda a la decisión 2) es un pedido de pase: la vista
+    # previa, que espera la confirmación. Marcos es el encargado de OT: su pedido es la decisión.
     jugadas:
       - {nombre: pedir_reasignacion, tarea: PLC, a: nahuel}
     efectos: {}
     hechos:
-      - {jugada: pedir_reasignacion, resultado: no_por_chat, quien_decide: Ismael Soschinski,
-         alternativa: anotar_prevision, tarea: PLC, pregunta: propuesta}
-    # Lo ofrecido es la única pregunta de la respuesta, y queda como tema abierto (decisión
-    # del usuario, 2026-10-05).
-    pregunta: {tipo: propuesta, tarea: PLC, propone: [anotar_prevision]}
+      - {jugada: pedir_reasignacion, resultado: para_confirmar, tarea: PLC,
+         pase: {de: Marcos Tarquini, a: Nahuel Gimenez},
+         al_confirmar: {lo_decide: ausente, la_tiene_que_tomar: Nahuel Gimenez},
+         quien_decide: ausente, pregunta: confirmar_el_pase}
+    pregunta: {tipo: confirmar_el_pase, tarea: PLC}
+    botones: [Confirmar]
     estado_despues:
-      # Tema abierto: la nueva previsión ofrecida, a la espera de lo que Marcos diga.
-      pregunta_abierta: {tipo: propuesta, tarea: PLC}
+      pregunta_abierta: {tipo: confirmar_el_pase, tarea: PLC}
+      responsables: {PLC: Marcos}
     dice:
-      - que eso no lo puede hacer
-      - que lo decide Ismael
-      - como el motivo es que no llega con el tiempo, ofrece anotar una nueva previsión
+      - "la vista previa: que la del PLC pasa de Marcos a Nahuel"
+      - que antes le pregunta a Nahuel si la toma
+      - que confirme con el botón o escribiéndolo
     no_dice:
       - que la tarea pasó a Nahuel
       - que le avisó a Nahuel o a Ismael
-      - que le va a pasar el pedido a Ismael
-      - '"consultá con la administración" sin una persona'
+      - que lo decide Ismael
       - nombres de jugadas o herramientas
 
   - paso: 3
@@ -75,13 +75,14 @@ pasos:
       - {nombre: anotar_inicio, tarea: PLC}
     efectos: {}
     hechos:
-      - {jugada: cancelar, resultado: cancelado}
+      - {jugada: cancelar, resultado: cancelado, pregunta: {tipo: confirmar_el_pase, tarea: PLC}}
       - {jugada: anotar_inicio, resultado: no_se_puede, motivo: estado, estado: en_curso}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
+      responsables: {PLC: Marcos}
     dice:
-      - que no anota ninguna previsión
+      - que no se la pasa a Nahuel
       # PENDIENTE (2026-10-06): el inicio del lunes 19 lo cargó la semilla, antes del motor, y
       # el motor no lo puede saber (`cambios_de_estado.py`): el hecho trae
       # `estado_desde: desconocido`. Decide el usuario: que la carga de tareas dé ese día, o que
@@ -89,7 +90,8 @@ pasos:
       - que la tarea del PLC ya figura en curso desde el lunes 19
     no_dice:
       - que anotó un inicio nuevo
-      - otra vez el ofrecimiento
+      - otra vez la vista previa
+      - que le avisó a Nahuel
 
   - paso: 4
     quien: Marcos
@@ -104,7 +106,7 @@ pasos:
     pregunta: null
     dice:
       - que eso no lo puede hacer
-      - "qué puede hacer por chat con sus tareas: anotar que arrancó, una fecha nueva o un bloqueo, y contarle qué tiene pendiente"
+      - "qué puede hacer por chat con sus tareas: anotar que arrancó, una fecha nueva o un bloqueo, pasársela a otra persona, y contarle qué tiene pendiente"
     no_dice:
       - que le avisó al administrador
       - que se lo va a recordar
