@@ -386,6 +386,38 @@ Primera ronda con la IA real de los circuitos nuevos (`resultados/fase-c-c3-regr
   comprensión de la entrega con la IA real todavía no está: falta decidir quién juzga lo que cubre un
   texto. No hay prueba por Telegram de estos circuitos.
 
+## Las fallas de la D6, arregladas (Fase C, D7 a D7c, 2026-10-08, de noche)
+
+Dos rondas cortas con GPT-6 sol por la suscripción, sólo de las conversaciones tocadas, 5 veces cada
+una: `resultados/fase-c-d7.md` (11, 21, 27 y 28, sobre `46cf49c`) y `resultados/fase-c-d7c.md` (21, 23,
+27 y 28, sobre `4aff836`).
+
+| Ronda | Garantías | Comprensión | Formato |
+|---|---|---|---|
+| D7: 11 · 21 · 27 · 28 | 5 · 5 · 5 · 4 | 5 · 0 · 0 · 0 | 4 · 0 · 0 · 2 |
+| D7c: 21 · 23 · 27 · 28 | 5 · 5 · 5 · 5 | 1 · 5 · 5 · 5 | 0 · 0 · 0 · 1 |
+
+- **Lo que arreglaron la D7 y la D7b** (decididas o ya reglas): Leda no nombra a quien aprueba al
+  retirar un aviso (11, 5 de 5); una respuesta a la pregunta abierta nunca es un pedido nuevo para el
+  administrador (27 y 28); el ejemplo no entra con un mensaje que contesta otra cosa (27); en la 21 pregunta
+  sólo la parte del criterio que falta, que es la decisión 10 (no era una falla de Leda); lo que falta se
+  dice una vez, como la descripción de la persona, sin "contar" (cambió la instrucción de la redacción:
+  "contás" pasó a "decir"); el corredor ya no pierde el enlace de la página con corridas en paralelo.
+- **La falla de garantía de la ronda D7** (28, 1 de 5): "esta bien pero que mariano revise el rotulo de
+  los cables" se aprobó y la tarea quedó terminada. Decisión 22 del usuario: antes de cerrar, una
+  aprobación con un comentario que pide algo pregunta una vez; un elogio aprueba directo. En la ronda
+  D7c, 5 de 5 bien en la 23 y la 28.
+- **Lo que queda de la D7c:** la comprensión de la 21 (4 de 5) es del comparador, no de Leda: la IA trae
+  `el_texto_cubre: [resultado_de_prueba]` y la cocina le suma la explicación (un texto cubre siempre lo
+  que sólo un texto puede cubrir), así que los hechos son los mismos; el corredor exige el valor exacto
+  de un dato que viene. Aflojarlo es cambiar esa regla del comparador (`PENDIENTE`). El formato sigue
+  siendo la deuda conocida (renglones de más de 140 caracteres).
+- **El cupo:** la ronda D7c usó la cuenta con la página de límites en 0 % y las llamadas igual
+  respondieron con tokens; el corredor ahora se corta solo al primer error de cupo (`01c5ffe`).
+
+**Conclusión vigente:** la entrega y la revisión por chat pasan las garantías con la IA real en las
+conversaciones que fallaban. Falta la prueba por Telegram del usuario y lo que queda de la parte 1.
+
 ## La regresión de la C-3d con la IA real (Fase C, D6, 2026-10-08, de tarde)
 
 La ronda de las 29 conversaciones, 5 veces cada una, con sol por la suscripción, sobre `eec2b8a` (D1 a D5
