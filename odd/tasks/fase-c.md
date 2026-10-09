@@ -346,6 +346,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     llegó, con la regla de la decisión 38 si no contesta. Falta: no preguntarle a quien ya está
     trabado, y comprobar si existe la vuelta a preguntar el día de la fecha prometida.
 
+43. **Quien recibe una tarea arranca de cero** (de la C-7): decidida (usuario, 2026-10-09, opción
+    A). Si el PLC pasa a Nahuel el día que vence, Leda le dice que vence hoy y le pregunta cómo la
+    ve; lo que Marcos no contestó no cuenta contra Nahuel y queda en la historia. Confirma lo
+    construido en la C-7. Derivado de la decisión 28, sin preguntar: si la plataforma cambia quién
+    aprueba al dueño original de una tarea pasada, la revisión sigue a ese cambio.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
