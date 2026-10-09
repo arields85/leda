@@ -270,6 +270,18 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     persona vea todo junto y avise si algo cambió. Cambia la C-6 (hoy sólo las asignadas y en
     curso sin bloqueo).
 
+33. **Pedir el enlace de una tarea que no le toca ver** (del enlace por chat): decidida (usuario,
+    2026-10-09). Dos niveles: el resumen (qué tarea, de quién, para cuándo, cómo quedó) lo ve
+    cualquiera del equipo; el detalle (fotos, archivos, correcciones pedidas) sólo quienes tienen
+    que ver con la tarea (ADR 0019, 7b, sigue igual). Leda nunca contesta "no la podés ver" ni
+    deja a la persona sin un próximo paso: le da el resumen y ofrece pedir el detalle por ella.
+    Ejemplo: Nahuel: "pasame el link de la tarea del switch". Leda: "📋 Configurar el switch, de
+    Lucas: en curso, vence el vie 16/10. El detalle con fotos y correcciones lo ve
+    Infraestructura; si lo necesitás, le pregunto a Martín." Si Nahuel dice que sí, Leda le
+    pregunta al encargado del sector de la tarea si se la comparte; si dice que sí, a Nahuel le
+    llega el enlace; si no, se lo cuenta. Compartir una tarea con alguien de otro sector es nuevo:
+    una porción propia.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2033,7 +2045,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 32 del usuario (2026-10-09; la 30 ya está), con test primero.
+- [ ] Las decisiones 24 a 33 del usuario (2026-10-09; la 30 ya está), con test primero.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
       primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo).
