@@ -13,13 +13,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from leda.autoridad import identificar_en_espacio
 from leda.db import admin, espacio
 from leda.despachador import TransporteDePrueba
-from leda.motor import aprobacion, preguntas
+from leda.motor import aprobacion, hechos, preguntas
 from leda.motor.ciclo import Ciclo
 from leda.motor.fichas import FICHAS
 from leda.motor.ia import IAGuionada, Jugada
@@ -853,6 +854,24 @@ def test_despues_de_decidir_una_muestra_lo_que_queda_por_revisar(conn, mundo, tu
     r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="la bomba ok",
                     at=DESPUES_DEL_MARGEN)
     assert "queda_por_revisar" not in _hecho(r, "aprobar")
+
+
+def test_lo_que_queda_por_revisar_se_recuerda_el_dia_habil_siguiente(conn, mundo, turnos):
+    """Prueba por Telegram del 2026-10-08 (D8, G1): un viernes Leda prometió "Mañana te la
+    recuerdo". La cocina da el día hábil siguiente del calendario del espacio (decisión 17), como
+    un hecho, y el significado no dice "mañana"."""
+    _dos_entregadas(conn, mundo, turnos)
+    viernes = DESPUES_DEL_MARGEN + timedelta(days=4)
+    assert viernes.astimezone(ZoneInfo("America/Argentina/Buenos_Aires")).weekday() == 4
+
+    r = turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1"}), texto="lo del tablero ok",
+                    at=viernes)
+
+    hecho = _hecho(r, "aprobar")
+    assert hecho["queda_por_revisar"] == [{"tarea": OTRA, "responsable": "Marcos"}]
+    assert hecho["se_las_recuerda_el"] == "2026-10-12"          # el lunes, no el sábado
+    assert "mañana" not in hechos.significado("queda_por_revisar")
+    assert hechos.significado("se_las_recuerda_el")
 
 
 # --- Si cambia quién aprueba (decisión 16 del usuario, 2026-10-08; C-3d, D4) -----------------

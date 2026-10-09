@@ -65,7 +65,7 @@ tarea, sin insistir: lo que queda entra en los recordatorios del día hábil sig
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import psycopg
@@ -310,13 +310,16 @@ def _lo_que_queda(ctx, hecho: dict, decidida: str) -> None:
     """Después de decidir una entrega, lo que le queda por revisar a quien decide (decisión 17):
     las otras que esperan su decisión y que todavía no aprobó, con quién las entregó, y un botón
     por tarea para verla, en la respuesta. Sin insistir: ningún aviso nuevo; lo que queda entra
-    en los recordatorios del día hábil siguiente."""
+    en los recordatorios del día hábil siguiente, y el hecho dice ese día, del calendario del
+    espacio (`se_las_recuerda_el`; D8: un viernes, Leda prometió "mañana")."""
     quedan = [t for t in para_decidir(ctx.cur, ctx.quien, 0, ctx.calendario.zona)
               if t["id"] != decidida and "ya_la_aprobo_el" not in t]
     if not quedan:
         return
     hecho["queda_por_revisar"] = [{"tarea": t["titulo"], "responsable": t["responsable"]}
                                   for t in quedan]
+    hoy = ctx.ahora.astimezone(ctx.calendario.zona).date()
+    hecho["se_las_recuerda_el"] = ctx.calendario.proximo_habil(hoy + timedelta(days=1)).isoformat()
     for t in quedan:
         preguntas.ofrecer_en_la_respuesta(
             ctx, preguntas.VER_LA_ENTREGA, t["id"], jugada={"nombre": "ver_entrega"},

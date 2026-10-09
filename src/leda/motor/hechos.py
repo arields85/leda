@@ -310,7 +310,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     # --- Las entregas en listas (decisión 17 del usuario, 2026-10-08; C-3d, D4) --------------
     "queda_por_revisar": "Las otras entregas que esperan la revisión de la persona que escribe, "
                          "cada una con quién la entregó: le quedan por revisar. Leda no insiste "
-                         "hoy; mañana se las recuerda.",
+                         "hoy: se las recuerda el día de se_las_recuerda_el.",
+    "se_las_recuerda_el": "El día hábil en que Leda le recuerda a la persona lo que le queda por "
+                          "revisar. Todavía no pasó.",
     "fotos_que_trae": "Cuántas fotos trae esa entrega: se ven al abrirla con su botón; en este "
                       "mensaje no van.",
     "ver_la_entrega": "El botón que muestra la entrega de una tarea que espera la revisión de la "
