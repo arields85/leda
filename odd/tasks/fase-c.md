@@ -510,11 +510,33 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         `tests/garantias/test_aislamiento.py`, y la paridad entre la instalación limpia y la
         migrada compara ahora también dueño, camino y privilegios de las funciones elevadas. El
         commit que registra esto.
-      - `PENDIENTE`: diez tablas con `workspace_id` sin `row level security` (`acceso_tablero`,
-        `activation_token`, `admin_notice`, `conversation_access_log`, `holiday`, `learning`,
-        `model_config`, `persona_config`, `work_calendar` y `workspace_version`, leídas del
-        catálogo de una base de prueba): ver si son sólo de administración o si les falta,
-        contra la invariante de `AGENTS.md`.
+      - **Resuelto (2026-10-09): diez tablas con `workspace_id` sin `row level security`**
+        (`acceso_tablero`, `activation_token`, `admin_notice`, `conversation_access_log`,
+        `holiday`, `learning`, `model_config`, `persona_config`, `work_calendar` y
+        `workspace_version`), contra la invariante de `AGENTS.md`. Route: delegada (escritor
+        único, 2+ archivos no triviales). Commit `f06e699`.
+        - **A cinco les faltaba:** `leda_app` las lee directamente (`select`) dentro de
+          `espacio()`: `work_calendar` y `holiday` (`calendario.Calendario`), `persona_config`
+          (`motor.instrucciones.tono_del_espacio`), `workspace_version` (`versiones.pack_hash`) y
+          `model_config` (`motor.ia_real.desde_base`); su aislamiento dependía del `where` de
+          cada lector. Migración `0041` (con su vuelta atrás) y `db/esquema.sql`: RLS forzada y
+          `aislamiento_espacio`; `model_config` con la forma de `audit_log` (nulo o el espacio
+          activo), para que el modelo global se siga viendo. `leda_app` sigue sólo con
+          `select`. Ningún lector cambió: todos corren en `espacio()` del mismo espacio, las
+          escrituras son de `admin()` y ninguna función `security definer` las lee.
+        - **Las otras cinco quedan sin política, como excepciones declaradas** con su motivo
+          (`EXCEPCIONES_SIN_RLS` en `tests/garantias/test_aislamiento.py`): ni `leda_app` ni
+          `leda_gateway` tienen privilegios sobre ellas, y la prueba lo exige.
+        - **Rojo primero:** la prueba del catálogo (toda tabla común con `workspace_id` tiene RLS
+          forzada salvo las excepciones) falló nombrando las cinco, y la de comportamiento
+          (dentro de `espacio()` de un espacio no se ven filas del otro; el modelo global sí)
+          falló en `holiday`. **Verde:** las dos pasan; la paridad entre la instalación limpia y
+          la migrada y el ensayo de vuelta atrás incluyen ahora las cinco tablas.
+        - **Chequeos** (2026-10-09): `pytest tests/garantias` 328 passed;
+          `pytest tests/motor tests/conversaciones` 926 passed; suite completa 1682 passed.
+        - `PENDIENTE`: `tools/restriccion_horario.py` lee y escribe `work_calendar` con la
+          conexión del `.env` sin cambiar de rol; si ese usuario no es superusuario ni
+          `bypassrls`, con la política deja de ver el calendario. Comprobar al usarlo.
       - `PENDIENTE`: el tablero (`_servir_tablero`) arma su página fuera de una guarda, como la
         página de la tarea antes de esto; no se tocó.
   - [ ] Porción 5: el acceso del administrador.
