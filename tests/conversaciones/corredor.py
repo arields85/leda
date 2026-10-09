@@ -580,7 +580,7 @@ class _Corredor:
         else:
             clase = cp.MOTOR
             self._comprobar_salen(c, paso.get("salen") or [], r.salidas)
-            cp.comprobar_incidentes(c, hubo["incidentes"])
+            cp.comprobar_incidentes(c, hubo["incidentes"], paso.get("incidentes"))
         estado = dict(paso.get("estado_despues") or {})
         de = estado.pop("de", self.persona)
         cp.comprobar_estado(c, estado, despues, de, clase)

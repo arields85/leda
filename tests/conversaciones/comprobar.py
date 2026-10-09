@@ -306,17 +306,30 @@ def falla_sin_texto(referencia: str | None) -> dict[str, Any]:
     return falla
 
 
-def comprobar_incidentes(c: Comprobacion, incidentes: list[dict[str, Any]]) -> None:
+def comprobar_incidentes(c: Comprobacion, incidentes: list[dict[str, Any]],
+                         esperados: list[str] | None = None) -> None:
     """Los incidentes nuevos de un paso, salvo los de un pedido fuera de la lista (que se
     comparan con los avisos al administrador esperados). Un intento de redactar un aviso que
-    falló se dice como lo que es, con su falla sin texto; cualquier otro, como incidente."""
+    falló se dice como lo que es, con su falla sin texto. Los que el paso espera (`incidentes`,
+    por su etapa: lo que tiene que llegarle al administrador por su canal, como que alguien no
+    tiene Leda conectada, C-5b) no son una falla, y uno esperado que falta es del motor;
+    cualquier otro, como incidente."""
     for i in incidentes:
         if i["etapa"] == ETAPA_AVISO_REINTENTO:
             c.falla(MOTOR, AVISO_SIN_REDACTAR, None, i["falla"])
     otros = [i for i in incidentes
              if i["etapa"] not in (ETAPA_FUERA_DE_LA_LISTA, ETAPA_AVISO_REINTENTO)]
-    if otros:
-        c.falla(MOTOR, "incidente", [], otros)
+    faltan = list(esperados or [])
+    sobran = []
+    for i in otros:
+        if i["etapa"] in faltan:
+            faltan.remove(i["etapa"])
+        else:
+            sobran.append(i)
+    if sobran:
+        c.falla(MOTOR, "incidente", [], sobran)
+    if faltan:
+        c.falla(MOTOR, "falta un incidente", faltan, otros)
 
 
 # --- Traducir a claves --------------------------------------------------------------------------
@@ -587,7 +600,7 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
         else:
             falta = True
             c.falla(COMPRENSION, "falta el aviso al administrador", al_admin_e, len(fuera))
-    comprobar_incidentes(c, hubo["incidentes"])
+    comprobar_incidentes(c, hubo["incidentes"], esperados.get("incidentes"))
     # Lo que Leda manda a otra persona por lo que pasó en el turno se guarda como aviso y sale
     # después, por el ciclo (también el de una entrega a quien la aprueba, desde la porción 3a
     # de la C-3): en el turno, sólo la respuesta.

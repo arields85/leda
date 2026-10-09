@@ -169,22 +169,74 @@ pasos:
       estados: {COM: bloqueada}
       bloqueos: [{tarea: COM, causa: presente}]
       destraban: [{tarea: COM, integrante: Mariano, alguien: true, no_sabe: false}]
+      # El aviso al administrador para que conecte a Mariano (decisión 37), por su canal.
+      incidentes: [motor_sin_leda_conectada]
     hechos:
       - {jugada: anotar_bloqueo, resultado: anotado, tarea: COM}
+      - {jugada: anotar_quien_destraba, resultado: anotado, se_le_pregunta_a: ausente,
+         no_se_le_puede_escribir_a: {a: Mariano Naim, motivo: destinatario_sin_telegram},
+         se_le_aviso_al_administrador: {para_que_conecte: Mariano Naim,
+                                        llega: "~2026-10-20T11:40"},
+         salidas: [anotar_quien_destraba, pedirselo_y_contar]}
+    pregunta: {tipo: propuesta, tarea: COM}
+    estado_despues:
+      pregunta_abierta: {tipo: propuesta, tarea: COM}
+      para_despues: []
+    dice:
+      - que quedó anotado el bloqueo y que lo destraba Mariano
+      - que a Mariano Leda todavía no le puede escribir
+      - que ya se lo avisó al administrador para que lo conecte
+      - "una sola pregunta: si hay otra persona que pueda destrabarlo, o si se lo pide Marcos y le cuenta"
+    no_dice:
+      - que le va a preguntar a Mariano
+      - que le avisa cuando sepa algo de Mariano
+
+  - paso: 6b
+    quien: Marcos
+    a_las: "2026-10-20 11:43"
+    escribe: "pedile a lucas, el tambien sabe del tablero"
+    jugadas:
+      - {nombre: anotar_quien_destraba, quien: "lucas", puede_traer: [tarea]}
+    efectos:
+      destraban: [{tarea: COM, integrante: Lucas, alguien: true, no_sabe: false}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: COM, a: Lucas, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                    responsable: Marcos Tarquini, causa: presente}}
+    hechos:
       - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente,
-         se_le_pregunta_a: ausente,
-         no_se_le_puede_escribir_a: {a: Mariano Naim, motivo: destinatario_sin_telegram}}
+         quien_destraba: {integrante: Lucas Natuche},
+         se_le_pregunta_a: {a: Lucas Natuche, llega: "~2026-10-20T11:53"}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
       para_despues: []
     dice:
-      - que quedó anotado el bloqueo y que lo destraba Mariano
-      - que a Mariano Leda no le puede escribir por acá
-      - que Marcos avise cuando se destrabe
+      - que quedó anotado que lo destraba Lucas
+      - que Leda le pregunta a Lucas para cuándo y le avisa a Marcos apenas sepa algo
     no_dice:
-      - que le va a preguntar a Mariano
-      - que le avisa cuando sepa algo de Mariano
+      - que ya le escribió a Lucas
+      - que le escribe en nombre de Marcos
+
+  - paso: 6c
+    quien: Leda
+    relojes: ["2026-10-20 11:53"]
+    salen:
+      - a: Lucas
+        tipo: pregunta_a_quien_destraba
+        tarea: COM
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Marcos Tarquini, causa: presente}
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: COM}
+    dice:
+      - que Marcos está trabado con la tarea de comunicaciones
+      - lo que le falta, como lo dijo Marcos (que Mariano termine el cableado del tablero)
+      - "la pregunta: para cuándo lo puede destrabar"
+    no_dice:
+      - que escribe en nombre de Marcos
+      - un reproche
 
   - paso: 7
     quien: Marcos

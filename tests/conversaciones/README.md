@@ -159,6 +159,13 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     esté al tanto (el espacio tiene informe al grupo); mientras siga, cada cinco días hábiles se
     vuelve a asentar, con lo que pasó desde la vez anterior; uno más nuevo o ya cerrado, no
     (decisión 7 del usuario; porción 5 de la C-5; decisiones 34, 35 y 36, C-5a).
+42. [`42-quien-destraba-no-contesta.md`](42-quien-destraba-no-contesta.md): a quien destraba y no
+    contesta, Leda nunca lo abandona: los días 1 a 3, una vez por día; desde el 4, cada 2 días
+    hábiles mientras siga el bloqueo, sin escalar por su silencio; si escribe por otra cosa, Leda le
+    contesta lo suyo y le recuerda la pregunta en un mensaje aparte; a los días del espacio queda
+    asentado, como siempre (decisión 38 del usuario, con la 50; C-5b). La 32 suma, desde la C-5b,
+    la decisión 37: a quien destraba sin Leda conectada no le escribe, le avisa al administrador
+    para que lo conecte y le ofrece a la persona trabada salidas.
 
 Los pedidos de estado con ritmo fijo (circuito 5; ADR 0017, decisión 3b, punto 5; `odd/tasks/fase-c.md`,
 decisión 8):
@@ -359,6 +366,12 @@ que, con una cadencia al grupo (`cadencias`, `audiencia: grupo`), es tener infor
 eso, lo asentado no figura en ningún informe al grupo (la 36 lo tiene; las demás, no). Desde el
 informe al grupo (C-6, decisión 25; la 41), lo que Leda le manda al grupo se espera con `a: grupo`
 (el chat del `grupo` del estado inicial), sin persona, y los avisos al grupo se nombran igual.
+
+**Lo que le llega al administrador** (C-5b): un paso puede esperar los incidentes que llegan al
+administrador por su canal, por su etapa (`incidentes`, en los efectos de un paso escrito o en el
+paso de Leda por su cuenta), como que alguien no tiene Leda conectada (`motor_sin_leda_conectada`,
+la 32, paso 6). Uno esperado no es una falla; uno que falta es del motor, y cualquier otro sigue
+siendo un incidente que no se esperaba.
 
 **Delegar** (C-7): los efectos suman quién tiene cada tarea que cambió de manos (`responsables`, por la
 clave de la tarea y el nombre corto de la persona): uno de más es de garantía, porque una tarea no cambia de

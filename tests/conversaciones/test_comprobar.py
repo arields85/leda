@@ -326,6 +326,30 @@ def test_de_la_falla_de_un_aviso_el_informe_sabe_la_clase_y_el_codigo_nunca_el_t
         (cp.MOTOR, "incidente", [{"etapa": "motor_ciclo", "severidad": "alta"}])]
 
 
+def test_un_incidente_esperado_no_es_una_falla_y_uno_que_falta_si():
+    """Lo que el paso espera que llegue al administrador por su canal (`incidentes`, por su
+    etapa; C-5b: quien destraba no tiene Leda conectada, decisión 37): uno esperado no es una
+    falla; uno que falta es del motor, y uno de más sigue siendo un incidente."""
+    sin_leda = {"etapa": "motor_sin_leda_conectada", "severidad": "media"}
+    bien = cp.Comprobacion()
+    cp.comprobar_incidentes(bien, [sin_leda], ["motor_sin_leda_conectada"])
+    assert bien.fallas == []
+
+    falta = cp.Comprobacion()
+    cp.comprobar_incidentes(falta, [], ["motor_sin_leda_conectada"])
+    assert [(f.clase, f.que) for f in falta.fallas] == [(cp.MOTOR, "falta un incidente")]
+
+    de_mas = cp.Comprobacion()
+    cp.comprobar_incidentes(de_mas, [sin_leda, sin_leda], ["motor_sin_leda_conectada"])
+    assert [(f.clase, f.que, f.real) for f in de_mas.fallas] == [
+        (cp.MOTOR, "incidente", [sin_leda])]
+
+    efectos = cp.Comprobacion()
+    cp.comprobar_efectos(efectos, {"incidentes": ["motor_sin_leda_conectada"]},
+                         _hubo(incidentes=[sin_leda]), {})
+    assert efectos.fallas == []
+
+
 # --- El formato de los mensajes (segunda vuelta, usuario, 2026-10-07) ---------------------------
 
 PLC = "Programar PLC de la comprimidora"

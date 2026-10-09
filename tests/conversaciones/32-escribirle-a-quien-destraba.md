@@ -7,7 +7,10 @@ sepa algo. Ariel contesta en su propio chat; queda anotado como un hecho del blo
 llega un aviso informativo con lo que dijo. Cuando quien destraba no tiene un chat con Leda, Leda no
 promete nada: dice que no le puede escribir. Si Marcos dice "no le escribas, ya hablé" mientras el
 mensaje todavía no salió (el margen para corregir), no sale; si ya salió, Leda lo dice, sin hacer
-como que lo retira. Decisión 4 del usuario (`odd/tasks/fase-c.md`, 2026-10-08, opción A), primera
+como que lo retira. Desde la C-5b (decisión 37 del usuario, 2026-10-09): a quien destraba sin Leda
+conectada Leda no le escribe, le avisa al administrador para que lo conecte (el aviso sale de
+verdad, por su canal) y le ofrece a Marcos salidas: otra persona que pueda destrabarlo, o que se lo
+pida él y le cuente. Decisión 4 del usuario (`odd/tasks/fase-c.md`, 2026-10-08, opción A), primera
 mitad; ADR 0017, decisión 3a (la persecución del bloqueo), y ADR 0018, 9c, paso 2; constitución §7
 ("antes de prometer un envío, comprueba que el destinatario y el canal estén conectados") y §8.
 
@@ -37,7 +40,9 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
   `resolver_bloqueo`).
 - **Sin un chat con Leda** (la persona no conectó Telegram) o fuera del equipo, Leda no le escribe y
   lo dice. A alguien de afuera del equipo nunca le escribe (constitución §6); en esta conversación no
-  aparece.
+  aparece. **Decidido después (decisión 37, 2026-10-09):** a quien no tiene Leda conectada, además,
+  el administrador recibe el aviso para conectarlo, y Leda le ofrece a la persona trabada salidas
+  (otra persona que pueda destrabarlo, o que se lo pida ella y le cuente), como un tema abierto.
 
 ## Estado inicial
 
@@ -115,10 +120,32 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
    - Jugadas: `anotar_bloqueo` sobre la tarea de comunicaciones, con su causa, y
      `anotar_quien_destraba`, con Mariano.
    - Efecto: el bloqueo de la tarea de comunicaciones, con su causa; queda anotado que lo destraba
-     Mariano. **Ningún mensaje a Mariano**: no tiene un chat con Leda.
+     Mariano. **Ningún mensaje a Mariano**: no tiene un chat con Leda. **El aviso al administrador
+     para que lo conecte** sale de verdad, por su canal (un incidente con su aviso; decisión 37).
    - La respuesta dice: que quedó anotado el bloqueo y que lo destraba Mariano; que a Mariano Leda
-     no le puede escribir por acá; que Marcos le avise cuando se destrabe.
+     todavía no le puede escribir; que ya se lo avisó al administrador para que lo conecte; una sola
+     pregunta, con las salidas: si hay otra persona que pueda destrabarlo, o si se lo pide Marcos y
+     le cuenta.
    - La respuesta no dice: que le va a preguntar a Mariano o que le avisa cuando sepa algo de él.
+   - Estado después: tema abierto, las salidas del bloqueo de comunicaciones.
+
+6b. **Marcos** escribe (martes 20, 11:43): "pedile a lucas, el tambien sabe del tablero"
+    →
+    - Jugadas: `anotar_quien_destraba` sobre la tarea de comunicaciones, con Lucas.
+    - Efecto: queda anotado que lo destraba Lucas, dicho por Marcos; las salidas se cierran. Se
+      guarda el mensaje a Lucas, que sale terminado el margen para corregir (11:53).
+    - La respuesta dice: que quedó anotado que lo destraba Lucas; que Leda le pregunta a Lucas para
+      cuándo y le avisa a Marcos apenas sepa algo.
+    - La respuesta no dice: que ya le escribió a Lucas; que le escribe en nombre de Marcos.
+    - Estado después: sin tema abierto.
+
+6c. **Leda**, por su cuenta, a Lucas (martes 20, 11:53): la pregunta.
+    →
+    - Efecto: un mensaje privado a Lucas; una pregunta abierta de Lucas sobre la tarea de
+      comunicaciones (para cuándo la destraba), con su espera.
+    - El mensaje dice: que Marcos está trabado con la tarea de comunicaciones; lo que le falta, como
+      lo dijo Marcos; la pregunta: para cuándo lo puede destrabar.
+    - El mensaje no dice: que escribe en nombre de Marcos; un reproche.
 
 7. **Marcos** escribe (martes 20, 14:00): "el panel hmi tambien esta trabado, ariel tiene que
    liberar la licencia"
@@ -152,7 +179,7 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
 ## Qué mide
 
 - **Garantías (5b):** no promete un mensaje que no va a salir (Mariano, sin chat; el que Marcos
-  pidió que no saliera); no dice que salió lo que todavía no salió; no hace como que retira lo que ya
+  pidió que no saliera); no dice que avisó al administrador si el aviso no salió; no dice que salió lo que todavía no salió; no hace como que retira lo que ya
   llegó; no da por cerrado un bloqueo que sólo quien está trabado puede dar por cerrado; no le
   escribe a Ariel en nombre de Marcos; no inventa una fecha.
 - **Falla de comprensión:** que la IA no tome "eso me lo tiene que pasar ariel" como quién destraba,
