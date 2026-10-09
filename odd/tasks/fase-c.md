@@ -211,6 +211,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     antes de la D7b. La IA lo dice como un dato de la jugada (`el_comentario_pide_algo`) y la cocina
     decide: si es verdadero, o si la IA no lo dijo (el lado seguro), pregunta una vez; si es falso,
     aprueba directo. La respuesta a la pregunta abierta sigue siendo la elección (decisión 12).
+23. **Volver a entregar después de un pedido de cambios** (del paso 19 de la prueba por Telegram del
+    2026-10-08: Marcos volvió a entregar "completo los 20 ciclos sin fallas" y Leda le preguntó si
+    arranca desde el PLC, que su primera entrega ya decía; la entrega nueva sólo miraba lo mandado
+    desde el pedido de cambios, y el criterio es un solo punto): decidida (usuario, 2026-10-08,
+    opción A). Lo que describió la entrega anterior sigue contando, salvo lo que el pedido de
+    cambios pide cambiar, y Leda pregunta sólo lo que falta de verdad (decisión 10: nunca lo que la
+    persona ya dijo). Construida en la D8 (punto 10).
 
 ## Chequeo de rumbo (2026-10-07)
 
@@ -1102,6 +1109,97 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     - `PENDIENTE`: la IA real sobre la 23 y la 28 (el coordinador); `docs/capacidades.md` (la hoja
       de aprobación) todavía dice que una aprobación con un comentario para el responsable nunca
       cierra directo.
+  - [x] **D8.** Lo que dejó la prueba por Telegram del usuario del 2026-10-08 (el guion de la D6,
+    `python -m leda.motor.leer corework --completo`), con reglas ya decididas, cada punto como
+    mecanismo general, con la prueba en rojo primero y su commit (2026-10-08, de noche). Route:
+    delegada (escritor único, 2+ archivos no triviales). Sin la IA real ni Telegram.
+    - **1. Los álbumes de una respuesta** (`89da6fb`): el despacho inmediato envolvía el transporte
+      sin `enviar_album` y cada álbum fallaba ahí ("'_ConHoraDeEnvio' object has no attribute
+      'enviar_album'") y salía una vuelta más tarde. El envoltorio anota la hora de un mensaje o un
+      álbum y delega todo lo demás. Rojo: `test_el_album_de_una_respuesta_sale_en_el_despacho_
+      inmediato` (el álbum no salía) y la del protocolo del transporte (`AttributeError`).
+    - **2. El "…" del borrador a la vista** (`3588141`): el mensaje no siempre reemplazaba al
+      borrador, un envío del borrador en vuelo podía llegar después del mensaje, y una respuesta que
+      no salió lo dejaba solo. Ahora el cierre, si sigue un mensaje, espera (acotado a su tope) a que
+      vuelva el pedido del borrador en vuelo, así ninguno llega después; quien despachó la respuesta
+      retira el borrador después, salga o no (como un turno sin mensaje: la semilla silenciosa y su
+      borrado, sin otro "escribiendo…"), sólo si se llegó a pedir uno, y una falla deja su
+      incidente. El escuchador despacha enseguida la respuesta de un álbum, como el webhook. La Bot
+      API, según los comentarios del código: el borrador es una vista previa efímera, sin
+      `message_id` propio (por eso el retiro materializa la semilla y la borra). Rojo: cuatro pruebas
+      de `test_indicador.py` con el `despachador.py` anterior. La espera del borrador en vuelo es la
+      de un pedido ya hecho (decenas o cientos de milisegundos), nunca un retiro antes del mensaje.
+    - **3. Los envíos que fallan, nunca en silencio** (`9a6bfbb`): cada intento fallido que se
+      reintenta deja un incidente de severidad baja (`entrega_mensaje_reintento`), con la falla
+      saneada y la fila de la salida, sin avisar a la administración; el quinto deja el suyo. Rojo:
+      `test_cada_intento_fallido_de_una_respuesta_deja_su_rastro`.
+    - **4. "Mañana te la recuerdo" un viernes** (`866d7ee`): lo que queda por revisar lleva el día
+      hábil siguiente del calendario del espacio (`se_las_recuerda_el`) y el significado ya no dice
+      "mañana". Rojo: `test_lo_que_queda_por_revisar_se_recuerda_el_dia_habil_siguiente` (`KeyError`).
+    - **5. El ejemplo aceptado, nunca "escribió"** (`0517d06`): migración `0039`
+      (`evidence.es_ejemplo_aceptado`, sólo un texto, las filas de antes en `false`, sólo agregar; la
+      función de la página lo devuelve; el rollback se niega si una pieza lo es). La cocina lo guarda,
+      lo entregado lo relee como `el_ejemplo_que_acepto` ("la aceptó, no la escribió") y la página
+      dice "Aceptó esta descripción". El ensayo de rollback y la paridad pasan
+      (`tests/garantias/test_migraciones.py`, 16 passed). Rojo: `test_lo_entregado_dice_que_el_
+      ejemplo_lo_acepto_y_no_que_lo_escribio` (la columna no existía). La superficie autorizada decía
+      `db/migraciones/0039*`; la carpeta real es `db/migrations/`: se usó ésa.
+    - **6. Ninguna pregunta abierta para siempre** (`28849d0`): aprobar o pedir cambios (las fichas
+      con `decide_la_tarea`) cierra toda pregunta sin cerrar sobre esa tarea, de cualquier persona; un
+      botón viejo dice que ya se decidió (`cerrada_con.ya_decidio`). Rojo: las dos variantes de
+      `test_al_decidir_una_entrega_no_queda_abierta_ninguna_pregunta_de_su_tarea` con el `fichas.py`
+      anterior.
+    - **7. La entrega confirmada, con el texto que aprobó el usuario** (`1af2b25`, `02d4d67`): lo
+      que un hecho dice que Leda le va a hacer a la persona se dice en primera persona (otra persona
+      que se entera sigue en voz pasiva); la hora en que se entera quien aprueba va con su nombre en
+      `solo_si_pregunta` (un código de si le llegó queda a la vista); un hecho nuevo,
+      `se_le_avisa_si_hace_falta_algo_mas` (lo hace el aviso del pedido de cambios); ⚠️ sólo para lo
+      que pide atención, nunca el estado de una tarea que sigue su curso; una sola pregunta en el
+      cierre; el significado de `entregada` deja "No está terminada ni aprobada". **La huella de la
+      redacción cambió a propósito**: `9e419fe6bbcc420a` → `420146b697b5124b` (`test_contratos.py`,
+      con el porqué); la de las jugadas no cambió. Sin frases de ejemplo. Rojo:
+      `test_la_entrega_confirmada_dice_lo_que_leda_le_avisa_despues` (`KeyError`) y la de la hora en
+      `test_palabras_de_la_redaccion.py`.
+    - **8. La lista de lo que hay para revisar** (`119dfba`): empieza por cuántas son, un hecho de la
+      cocina (`lista_de_entregas_para_revisar`, `cuantas`); cada entrega de la lista es otro aviso
+      (`entrega_en_la_lista`), sin `necesita_respuesta` ni el significado del aviso de una entrega
+      sola ("aprobarla o pedirle cambios"); los significados del aviso de una entrega y de su decisión
+      dicen que primero se revisa (decisión 18). Rojo: `test_las_entregas_que_salen_juntas_van_en_
+      una_lista_con_un_boton_por_tarea`.
+    - **9. Las conversaciones** (`74c05c0`): la 21 (el texto de la entrega confirmada, la hora sólo
+      si pregunta, el ejemplo aceptado en el aviso a Ismael), la 27 (el ejemplo aceptado en los dos
+      avisos), la 23 (`se_las_recuerda_el` y el paso nuevo 12, la entrega otra vez después del pedido
+      de cambios) y la 28 (la lista no ofrece decidir). Lo que dice la IA lo lee una persona.
+    - **10. Decisión 23, volver a entregar después de un pedido de cambios** (`8a38859`): la IA que
+      elige recibe, en la tarea, lo que describió la entrega anterior con lo que pidió el pedido de
+      cambios (`la_entrega_anterior`: `lo_que_describio`, `cambios_pedidos`), y juzga lo descrito de
+      la nueva junto con eso (`lo_descrito_cubre`, su dato y su significado lo dicen); la cocina hace
+      lo de siempre con ese juicio. Rojo: `test_al_entregar_otra_vez_cuenta_lo_que_ya_describio_la_
+      entrega_anterior` (`KeyError`). En seco el corredor no lo distingue (la IA guionada ya da el
+      juicio): lo mide la IA real.
+    - **Chequeos** (2026-10-08, sobre `02d4d67`): `pytest tests/motor tests/conversaciones`, 904
+      passed y 1 failed (`test_fichas.py`, la hora del aviso a quien aprueba a la vista: la regla
+      nueva del punto 7; corregida en `02d4d67`, 70 passed); `pytest tests/garantias`, 326 passed;
+      suite completa, 1657 passed y 2 failed: `tests/test_esqueleto.py::test_reintenta_y_abre_
+      incidente` y `tests/test_saludo.py::test_falla_del_saludo_con_envio_fallido_se_reporta_una_
+      sola_vez`, que cuentan todos los incidentes del espacio y ahora encuentran también el rastro de
+      cada intento fallido (punto 3, a propósito). Esos dos archivos están fuera de la superficie
+      autorizada de la D8 y no se tocaron (`PENDIENTE`: contar sólo los de su etapa, sin
+      `entrega_mensaje_reintento`). En seco, `correr --ia guionada --veces 1 --ronda seco-d8`, 29 de
+      29 bien (informes borrados, `gasto.json` sin tocar).
+    - `PENDIENTE`:
+      - **La IA real** sobre la 21, la 23, la 27 y la 28, y la prueba por Telegram de los puntos 2 y
+        7 (el borrador después del mensaje, el texto de la entrega), por el coordinador y el usuario.
+      - **Un envío que falla esperando la respuesta de Telegram** (un tiempo de espera agotado) puede
+        haber llegado: la API no tiene una clave para no repetir un envío y el código no tiene cómo
+        saberlo, así que el reintento puede duplicarlo. La explicación del incidente lo dice.
+      - **El retiro después del mensaje** puede verse como una burbuja vacía que aparece y se borra
+        debajo de la respuesta, si Telegram ya había reemplazado el borrador: lo dice la prueba por
+        Telegram.
+      - **Volver a entregar sólo con fotos** (sin ningún texto): la cocina no tiene dónde guardar lo
+        descrito y pide una descripción, aunque la entrega anterior lo dijera.
+      - **El paso 19 de la prueba** (volver a preguntar en la entrega nueva lo que ya dijo la
+        primera) queda cubierto por la decisión 23; si con la IA real vuelve a pasar, es de diseño.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega
