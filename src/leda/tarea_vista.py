@@ -118,10 +118,43 @@ def _hecho(h: dict[str, Any], zona: ZoneInfo) -> str:
         verbo = "corrigió el día en que la termina" if h.get("es_correccion") \
             else "dijo que la termina"
         texto = f"{quien} {verbo}: {_e(_dia(h.get('fecha'), zona))}"
+    elif que == "quien_destraba":
+        if h.get("no_sabe"):
+            texto = f"{quien} dijo que no sabe quién la destraba"
+        elif h.get("nadie_mas"):
+            texto = f"{quien} dijo que no hay otra persona que la destrabe"
+        else:
+            texto = f"{quien} dijo que la destraba {_e(h.get('destraba'))}"
+    elif que == "dicho_del_bloqueo":
+        texto = _lo_que_dijo_del_bloqueo(h, quien, zona)
+    elif que == "asentado":
+        if h.get("por") == "sigue_trabada":
+            texto = "Quedó asentado que sigue trabada"
+            if h.get("dias_habiles") is not None:
+                texto += f": {_e(h['dias_habiles'])} días hábiles"
+        else:
+            texto = "Quedó asentado que nadie toma el bloqueo"
     else:
         return ""
     return (f'<li>{texto} <span class="quien">· {_e(_cuando(h.get("cuando"), zona))}'
             f"</span></li>")
+
+
+def _lo_que_dijo_del_bloqueo(h: dict[str, Any], quien: str, zona: ZoneInfo) -> str:
+    """Lo que dijo quien destraba (o la persona trabada sobre lo que arreglaron), ya escapado:
+    para cuándo, que ya está o que no le corresponde, y sus palabras (C-5c, decisión 49: lo
+    asentado queda en la historia de la tarea)."""
+    if h.get("no_le_corresponde"):
+        texto = f"{quien} dijo que no le corresponde"
+    elif h.get("ya_esta"):
+        texto = f"{quien} dijo que ya está"
+    elif h.get("para_cuando"):
+        texto = f"{quien} dijo que la destraba el {_e(_dia(h['para_cuando'], zona))}"
+    else:
+        texto = f"{quien} dijo"
+    if h.get("lo_que_dice"):
+        texto += f": «{_e(h['lo_que_dice'])}»"
+    return texto
 
 
 def _pieza(p: dict[str, Any], token: str, palabras: dict[str, str], zona: ZoneInfo) -> str:

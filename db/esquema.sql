@@ -1943,7 +1943,49 @@ begin
           from task_forecast f
           join membership m on m.id = f.dicho_por_membership_id
           join app_user u on u.id = m.app_user_id
-         where f.task_id = t.id) h), '[]'::jsonb),
+         where f.task_id = t.id
+        union all
+        select u.at, 5,
+               jsonb_build_object('que', 'quien_destraba', 'quien', pu.nombre,
+                                  'destraba', coalesce(du.nombre, u.destraba_externo),
+                                  'no_sabe', u.no_sabe,
+                                  'nadie_mas', u.destraba_membership_id
+                                               = u.dicho_por_membership_id,
+                                  'cuando', u.at)
+          from blocker_unblocker u
+          join blocker b on b.id = u.blocker_id
+          join membership pm on pm.id = u.dicho_por_membership_id
+          join app_user pu on pu.id = pm.app_user_id
+          left join membership dm on dm.id = u.destraba_membership_id
+          left join app_user du on du.id = dm.app_user_id
+         where b.task_id = t.id
+        union all
+        select d.at, 6,
+               jsonb_build_object('que', 'dicho_del_bloqueo', 'quien', pu.nombre,
+                                  'para_cuando', d.para_cuando, 'ya_esta', d.ya_esta,
+                                  'no_le_corresponde', d.no_le_corresponde,
+                                  'lo_que_dice', d.lo_que_dice, 'cuando', d.at)
+          from dicho_de_quien_destraba d
+          join blocker_unblocker u on u.id = d.blocker_unblocker_id
+          join blocker b on b.id = u.blocker_id
+          join membership pm on pm.id = d.dicho_por_membership_id
+          join app_user pu on pu.id = pm.app_user_id
+         where b.task_id = t.id
+        union all
+        select coalesce((a.detalle ->> 'at')::timestamptz, a.at), 7,
+               jsonb_build_object('que', 'asentado',
+                                  'por', case a.accion
+                                           when 'asentar_bloqueo_que_sigue_abierto'
+                                             then 'sigue_trabada'
+                                           else 'nadie_lo_toma' end,
+                                  'dias_habiles', (a.detalle ->> 'dias_habiles_trabada')::int,
+                                  'cuando', coalesce((a.detalle ->> 'at')::timestamptz, a.at))
+          from audit_log a
+          join blocker b on b.id = a.sujeto_id
+         where a.sujeto_tipo = 'blocker' and b.task_id = t.id
+           and a.accion in ('asentar_bloqueo_que_sigue_abierto',
+                            'informar_la_cadena_del_bloqueo',
+                            'asentar_la_cadena_del_bloqueo')) h), '[]'::jsonb),
     'evidencia', coalesce((
       select jsonb_agg(jsonb_build_object(
                'id', e.id, 'clase', e.clase, 'texto', e.texto,
