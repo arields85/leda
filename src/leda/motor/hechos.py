@@ -738,6 +738,25 @@ SIGNIFICADOS: Mapping[str, str] = {
                       "trabada: lo que queda anotado es lo que arreglaron entre ellos.",
     "lo_que_arreglaron": "Qué arreglaron quien puede destrabar la tarea y la persona trabada, "
                          "para que quede asentado.",
+    # --- "No me corresponde" y la cadena al referente (C-5, porción 3; `persecucion.py`) -------
+    "no_le_corresponde": "Quien Leda creía que podía destrabar la tarea dice que no le "
+                         "corresponde.",
+    "le_toca_a": "A quién le toca destrabarla, según quien lo dijo.",
+    "quien_se_encarga": "Quién se encarga de destrabar la tarea, si no es la persona que "
+                        "escribe.",
+    "nombrado_por": "Quién dijo que esta persona es la que puede destrabar la tarea, cuando no "
+                    "lo dijo la persona trabada.",
+    "cadena_del_bloqueo": "Aviso informativo a quien está a cargo de un sector: nadie toma el "
+                          "bloqueo de una tarea y va la cadena entera, quién dijo qué (cadena), "
+                          "para que determine quién lo resuelve. No le pide nada.",
+    "cadena": "Quién dijo qué sobre quién destraba la tarea, en orden: de es quien lo dijo, "
+              "le_toca_a a quién según esa persona, y si dijo que no le corresponde o que no "
+              "sabe, con sus palabras.",
+    "aviso_de_la_cadena": "El aviso que informa el bloqueo, con la cadena entera, para que se "
+                          "decida quién lo resuelve: a quién (a) y cuándo se entera (llega), o "
+                          "por qué no le llega.",
+    "sin_referente": "No hay a quién informarle el bloqueo: el sector no tiene a nadie a "
+                     "cargo.",
 }
 
 
@@ -838,6 +857,7 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "pedir_enlace": "pasar_el_enlace_a_la_pagina_de_una_tarea",
     "decir_cuando_destraba": "anotar_para_cuando_destraba_la_tarea_de_otra_persona",
     "no_escribirle": "no_escribirle_a_quien_destraba",
+    "decir_que_no_le_toca": "anotar_que_no_le_toca_destrabar_la_tarea_de_otra_persona",
 }
 _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 
@@ -913,6 +933,9 @@ NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO: Mapping[str, str | None] = {
     "aviso_de_la_prevision_anterior": "a",
     "aviso_de_que_se_destrabo": "a",
     "escalado_a": "a",
+    # La cadena de un bloqueo que nadie toma va al referente (C-5, porción 3): tampoco se lo
+    # nombra por su cuenta (decisión 21: "voy a informar…").
+    "aviso_de_la_cadena": "a",
     "si_no_hay_respuesta": "se_avisa_a",
     "si_sigue_sin_decidir": "se_avisa_a",
     "queda_esperando_la_aprobacion_de": None,

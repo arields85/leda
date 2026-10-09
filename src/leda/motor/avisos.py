@@ -115,7 +115,10 @@ salir abre la pregunta de quien destraba (`TipoDeAviso.abre`, `preguntas.CUANDO_
 con su propia espera, que la escalera de las preguntas repite a esa persona sin escalar. Lo que
 contesta le llega a la persona trabada como información (`lo_que_dijo_quien_destraba`). Los dos
 son de coordinación; no salen si el bloqueo ya se cerró, la pregunta tampoco si la destraba otra
-persona (`sigue_esperando_que_destrabe`).
+persona (`sigue_esperando_que_destrabe`) o si quien destraba ya habló de esa tarea antes de que le
+llegara (`ya_contesto_quien_destraba`, porción 2). Si nadie toma el bloqueo, la cadena entera le
+llega al referente como información (`cadena_del_bloqueo`, porción 3; decisión 5), mientras el
+bloqueo siga abierto.
 """
 
 from __future__ import annotations
@@ -1504,6 +1507,9 @@ def _vigencia_de_una_decision(m: Momento, aviso) -> tuple[str | None, dict[str, 
 
 PREGUNTA_A_QUIEN_DESTRABA = "pregunta_a_quien_destraba"
 LO_QUE_DIJO_QUIEN_DESTRABA = "lo_que_dijo_quien_destraba"
+# La cadena de un bloqueo que nadie toma, al referente (porción 3; decisión 5): informativa, no le
+# pide nada; sale terminado el margen para corregir, mientras el bloqueo siga abierto.
+CADENA_DEL_BLOQUEO = "cadena_del_bloqueo"
 YA_SE_DESTRABO = "ya_se_destrabo"
 CAMBIO_QUIEN_DESTRABA = "cambio_quien_destraba"
 DIJO_ALGO_MAS_NUEVO = "dijo_algo_mas_nuevo"
@@ -1562,6 +1568,26 @@ def _vigencia_de_la_pregunta_a_quien_destraba(m: Momento, aviso
     if ya_contesto_quien_destraba(m.cur, de_la_clave(aviso),
                                   str(aviso["destinatario_membership_id"])):
         return "ya_respondio", {}
+    return None, {**dict(aviso["hechos"]), "tarea": tarea["titulo"]}
+
+
+def _vigencia_de_la_cadena(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    """La cadena al referente (C-5, porción 3) sale mientras el bloqueo siga abierto y la tarea
+    sin cerrar: lo que pasó después (se destrabó) le quita sentido."""
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return "tarea_inexistente", {}
+    if tarea["estado"] in ("terminada", "cancelada"):
+        return "tarea_cerrada", {}
+    m.cur.execute("""select b.resuelto_en from dicho_de_quien_destraba d
+                       join blocker_unblocker u on u.id = d.blocker_unblocker_id
+                       join blocker b on b.id = u.blocker_id
+                      where d.id = %s""", (de_la_clave(aviso),))
+    dicho = m.cur.fetchone()
+    if dicho is None:
+        return "tarea_inexistente", {}
+    if dicho["resuelto_en"] is not None:
+        return YA_SE_DESTRABO, {}
     return None, {**dict(aviso["hechos"]), "tarea": tarea["titulo"]}
 
 
@@ -1666,6 +1692,8 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
                 es_coordinacion=True, abre=_abre_cuando_se_destraba),
     TipoDeAviso(LO_QUE_DIJO_QUIEN_DESTRABA, "informativo", _vigencia_de_lo_que_dijo,
                 es_coordinacion=True),
+    # La cadena al referente, cuando nadie toma el bloqueo (porción 3): informativa.
+    TipoDeAviso(CADENA_DEL_BLOQUEO, "informativo", _vigencia_de_la_cadena, es_coordinacion=True),
 )})
 
 

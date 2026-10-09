@@ -1,4 +1,4 @@
-"""La persecución de un bloqueo: escribirle a quien destraba (C-5, porciones 1 y 2).
+"""La persecución de un bloqueo: escribirle a quien destraba (C-5, porciones 1 a 3).
 
 Decisión 4 del usuario (`odd/tasks/fase-c.md`, 2026-10-08, opción A), primera mitad; ADR 0017,
 decisión 3a (el seguimiento persigue los bloqueos hasta quien puede destrabarlos); ADR 0018, 9c,
@@ -42,23 +42,42 @@ Lo que espera de quien destraba se cierra cuando la tarea se destraba (`al_destr
 destraba otra persona (`preguntarle`); por cualquier otro camino, la escalera lo cierra al mirarlo
 (`escalera._un_paso_de_una_pregunta`), y un aviso guardado no sale (su vigencia).
 
-Fuera de estas porciones (`odd/tasks/fase-c.md`, C-5): "no me corresponde" y la cadena al
-referente (decisión 5), los bloqueos encadenados y los avisos hacia abajo (6) y el bloqueo viejo
-(7).
+**"No me corresponde"** (porción 3; decisión 5, opción A con límite; ADR 0018, 9c, precisión
+del 2026-10-09; conversación 34; `decir_que_no_le_toca`). Queda anotado que no le corresponde
+(`dicho_de_quien_destraba.no_le_corresponde`, migración 0043) y, si dice quién se encarga o que
+no sabe, otra fila de quién destraba dicha por esa persona. La cadena tiene un salto:
+
+- **La primera persona** (la nombró quien está trabado) que no dice de quién es: Leda le pregunta
+  una vez quién se encarga (su pregunta sigue abierta y lo recuerda); si vuelve a no decirlo, es
+  que no sabe. Si nombra a otro integrante, Leda le escribe a esa persona como a la primera
+  (`preguntarle`, diciendo quién la nombró), y la persona trabada se entera, como información.
+- **Si la cadena se corta** (la segunda tampoco lo toma, cualquiera sea lo que diga; la primera no
+  sabe, nombra a alguien de afuera o a la persona trabada), Leda no da más vueltas: le informa la
+  cadena entera al referente (`avisos.CADENA_DEL_BLOQUEO`, `cadena`), sin pedirle nada, para que
+  determine quién lo resuelve. Va al del sector de lo que falta si se sabe (el de la persona que
+  quedó nombrada como quien se encarga) y, si no, al del sector de la tarea trabada; nunca a la
+  persona trabada misma (entonces, a quien aprueba su trabajo; `a_quien_informar`). A la persona
+  trabada le llega lo que pasó y que se informa, sin nombrar a quién por su cuenta (decisión 11:
+  `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`, `aviso_de_la_cadena`). Sin referente, nada se
+  promete y el hecho lo dice (`sin_referente`).
+
+Fuera de estas porciones (`odd/tasks/fase-c.md`, C-5): los bloqueos encadenados y los avisos
+hacia abajo (decisión 6) y el bloqueo viejo (7).
 """
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Any
 
 from . import preguntas
 from .auditoria import auditar
-from .avisos import (CAMBIO_QUIEN_DESTRABA, LO_QUE_DIJO_QUIEN_DESTRABA,
+from .avisos import (CADENA_DEL_BLOQUEO, CAMBIO_QUIEN_DESTRABA, LO_QUE_DIJO_QUIEN_DESTRABA,
                      PREGUNTA_A_QUIEN_DESTRABA, guardar, integrante, omitir)
 from .fichas import (AVISO, LLEGA, NO_LE_LLEGO, NO_LE_VA_A_LLEGAR, PREGUNTA, YA_LE_LLEGO,
-                     Contexto, integrantes_que_coinciden, nombrar_efecto,
-                     nombrar_tipo_de_pregunta, tarea_hecho, vacio)
+                     Contexto, _juntar, integrantes_que_coinciden, nombrar_efecto,
+                     nombrar_tipo_de_pregunta, referente, tarea_hecho, vacio)
 from .margen import sale_con_margen
 
 # Por qué Leda no le escribe a quien destraba (los mismos códigos con que un aviso no sale).
@@ -75,6 +94,13 @@ NO_LE_TOCA_DESTRABARLA = "no_le_toca_destrabarla"
 # pregunta, en los datos de su jugada. Que Leda ya le preguntó qué arreglaron, en la jugada.
 YA_LO_HABLARON = "ya_lo_hablaron"
 PREGUNTO_QUE_ARREGLARON = "pregunto_que_arreglaron"
+# Quien destraba dice que no le corresponde (porción 3): lo recuerda su pregunta, si Leda le
+# pregunta quién se encarga; que ya se lo preguntó, en la jugada.
+NO_LE_CORRESPONDE = "no_le_corresponde"
+PREGUNTO_QUIEN_SE_ENCARGA = "pregunto_quien_se_encarga"
+# Por qué la cadena no le llega a nadie: el sector no tiene referente ni hay quien apruebe el
+# trabajo de la persona trabada.
+SIN_REFERENTE = "sin_referente"
 
 
 def alcanzable(cur, membership_id: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -90,10 +116,12 @@ def alcanzable(cur, membership_id: str) -> tuple[dict[str, Any] | None, str | No
 # --- Le escribe a quien destraba ---------------------------------------------------------------
 
 def preguntarle(ctx: Contexto, tarea: dict[str, Any], bloqueo: dict[str, Any], destraba_id: str,
-                destraba: dict[str, Any]) -> dict[str, Any]:
+                destraba: dict[str, Any], *, responsable: str | None = None,
+                nombrado_por: str | None = None) -> dict[str, Any]:
     """Lo que pasa cuando la persona trabada nombra a otro integrante que destraba su tarea: lo
     que se le preguntaba a otra persona deja de esperar, y a ésta Leda le escribe si puede. Los
-    hechos que se suman a los de `anotar_quien_destraba`."""
+    hechos que se suman a los de `anotar_quien_destraba`. En la cadena (porción 3) la nombra
+    quien no lo tomó: `responsable` es quien está trabado y `nombrado_por`, quien la nombró."""
     cur = ctx.cur
     task_id = str(tarea["id"])
     persona = str(destraba["membership_id"])
@@ -126,7 +154,8 @@ def preguntarle(ctx: Contexto, tarea: dict[str, Any], bloqueo: dict[str, Any], d
         destinatario=persona,
         hechos={"aviso": PREGUNTA_A_QUIEN_DESTRABA, "necesita_respuesta": True,
                 "pregunta": preguntas.CUANDO_SE_DESTRABA, "tarea": tarea["titulo"],
-                "responsable": ctx.quien.nombre, "causa": bloqueo["causa"]},
+                "responsable": responsable or ctx.quien.nombre, "causa": bloqueo["causa"],
+                **({"nombrado_por": nombrado_por} if nombrado_por else {})},
         programado_para=sale, clave=f"motor:{PREGUNTA_A_QUIEN_DESTRABA}:{task_id}:u{destraba_id}",
         ahora=ctx.ahora)
     ctx.avisos_guardados.append(aviso_id)
@@ -179,7 +208,6 @@ def decir_cuando_destraba(ctx: Contexto, datos: dict[str, Any],
                           tarea: dict[str, Any] | None) -> dict[str, Any]:
     """Quien destraba una tarea de otra persona dice para cuándo, que ya está o lo que pasa:
     queda anotado y la persona trabada se entera (ver el módulo)."""
-    cur = ctx.cur
     if tarea is None:
         tarea = _de_la_pregunta_abierta(ctx)
     if tarea is None:
@@ -216,35 +244,58 @@ def decir_cuando_destraba(ctx: Contexto, datos: dict[str, Any],
         return {"resultado": "falta_dato", "falta": ["para_cuando"],
                 "puede_ser": ["para_cuando", "ya_esta", "lo_que_dice"],
                 "tarea": tarea_hecho(tarea)}
-    cur.execute(
-        """insert into dicho_de_quien_destraba (workspace_id, blocker_unblocker_id,
-                                                dicho_por_membership_id, para_cuando, ya_esta,
-                                                lo_que_dice, at)
-           values (%s, %s, %s, %s, %s, %s, %s) returning id""",
-        (ctx.quien.workspace_id, destraba["id"], ctx.quien.membership_id, para_cuando, ya_esta,
-         lo_que_dice, ctx.ahora))
-    dicho_id = str(cur.fetchone()["id"])
     dice = {k: v for k, v in (("para_cuando", para_cuando.isoformat() if para_cuando else None),
                               ("ya_esta", ya_esta or None), ("lo_que_dice", lo_que_dice),
                               (YA_LO_HABLARON, ya_lo_hablaron or None))
             if v is not None}
-    auditar(cur, accion="anotar_lo_que_dice_quien_destraba",
+    dicho_id = _anotar_lo_que_dice(ctx, tarea, destraba, dice, para_cuando=para_cuando,
+                                   ya_esta=ya_esta, lo_que_dice=lo_que_dice)
+    hecho: dict[str, Any] = {"resultado": "anotado", "tarea": tarea_hecho(tarea),
+                             "dice_quien_destraba": dice}
+    _juntar(hecho, _avisar_a_quien_esta_trabado(ctx, tarea, destraba, dicho_id, dice))
+    return hecho
+
+
+def _anotar_lo_que_dice(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],
+                        dice: dict[str, Any], *, para_cuando: date | None = None,
+                        ya_esta: bool = False, lo_que_dice: str | None = None,
+                        no_le_corresponde: bool = False) -> str:
+    """Lo que dice quien destraba, como un hecho del bloqueo sobre la fila que lo nombró
+    (`dicho_de_quien_destraba`, sólo se agrega), atribuido y auditado; su pregunta y su espera
+    se cierran. El id de lo anotado."""
+    cur = ctx.cur
+    cur.execute(
+        """insert into dicho_de_quien_destraba (workspace_id, blocker_unblocker_id,
+                                                dicho_por_membership_id, para_cuando, ya_esta,
+                                                lo_que_dice, no_le_corresponde, at)
+           values (%s, %s, %s, %s, %s, %s, %s, %s) returning id""",
+        (ctx.quien.workspace_id, destraba["id"], ctx.quien.membership_id, para_cuando, ya_esta,
+         lo_que_dice, no_le_corresponde, ctx.ahora))
+    dicho_id = str(cur.fetchone()["id"])
+    auditar(cur, accion=("anotar_que_no_le_toca" if no_le_corresponde
+                         else "anotar_lo_que_dice_quien_destraba"),
             workspace_id=ctx.quien.workspace_id, sujeto_tipo="blocker",
             sujeto_id=destraba["blocker_id"], quien=ctx.quien,
-            detalle={"dicho_id": dicho_id, "blocker_unblocker_id": destraba["id"],
+            detalle={"dicho_id": dicho_id, "blocker_unblocker_id": str(destraba["id"]),
                      "task_id": tarea["id"], **dice, "at": ctx.ahora.isoformat(),
                      "inbound_message_id": ctx.entrante_id})
     _contestada(ctx, tarea["id"])
+    return dicho_id
 
-    hecho: dict[str, Any] = {"resultado": "anotado", "tarea": tarea_hecho(tarea),
-                             "dice_quien_destraba": dice}
+
+def _avisar_a_quien_esta_trabado(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],
+                                 dicho_id: str, dice: dict[str, Any],
+                                 mas: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Lo que dijo quien destraba le llega a la persona trabada como información, terminado el
+    margen para corregir (`avisos.LO_QUE_DIJO_QUIEN_DESTRABA`), con lo que pasa después
+    (`mas`: a quién le pregunta Leda ahora, o que lo informa). Lo que dijo antes y todavía no le
+    llegó queda atrás. Los hechos para quien escribe."""
+    cur = ctx.cur
     responsable = str(destraba["responsable_membership_id"])
     quien, motivo = alcanzable(cur, responsable)
     if motivo is not None:
-        hecho["no_se_le_puede_escribir_a"] = {"a": quien["nombre"] if quien else None,
-                                              "motivo": motivo}
-        return hecho
-    # Lo que dijo antes y todavía no le llegó a la persona trabada queda atrás: sale esto.
+        return {"no_se_le_puede_escribir_a": {"a": quien["nombre"] if quien else None,
+                                              "motivo": motivo}}
     cur.execute("""select a.id from scheduled_notice a
                     where a.task_id = %s and a.tipo = %s and a.estado = 'guardado'""",
                 (tarea["id"], LO_QUE_DIJO_QUIEN_DESTRABA))
@@ -256,11 +307,12 @@ def decir_cuando_destraba(ctx: Contexto, datos: dict[str, Any],
         destinatario=responsable,
         hechos={"aviso": LO_QUE_DIJO_QUIEN_DESTRABA, "necesita_respuesta": False,
                 "tarea": tarea["titulo"], "quien_destraba": ctx.quien.nombre,
-                "causa": destraba["causa"], "dice_quien_destraba": dice},
+                "causa": destraba["causa"], "dice_quien_destraba": dice, **(mas or {})},
         programado_para=sale, clave=f"motor:{LO_QUE_DIJO_QUIEN_DESTRABA}:{tarea['id']}:d{dicho_id}",
         ahora=ctx.ahora)
     ctx.avisos_guardados.append(aviso_id)
-    hecho["aviso_a_quien_esta_trabado"] = {"a": quien["nombre"], LLEGA: sale.isoformat()}
+    hecho: dict[str, Any] = {"aviso_a_quien_esta_trabado": {"a": quien["nombre"],
+                                                            LLEGA: sale.isoformat()}}
     nombrar_efecto(hecho, "aviso_a_quien_esta_trabado", AVISO, aviso_id)
     return hecho
 
@@ -342,6 +394,225 @@ def _contestada(ctx: Contexto, task_id: str) -> None:
                           and satisfecho_en is null""",
                     (ctx.ahora, ctx.quien.membership_id, task_id,
                      preguntas.CUANDO_SE_DESTRABA))
+
+
+# --- "No me corresponde" (porción 3) -----------------------------------------------------------
+
+def decir_que_no_le_toca(ctx: Contexto, datos: dict[str, Any],
+                         tarea: dict[str, Any] | None) -> dict[str, Any]:
+    """Quien destraba una tarea de otra persona dice que no le corresponde y, si lo sabe, quién se
+    encarga: Leda sigue con esa persona una vez o le informa la cadena al referente (ver el
+    módulo)."""
+    cur = ctx.cur
+    if tarea is None:
+        tarea = _de_la_pregunta_abierta(ctx)
+    if tarea is None:
+        return {"resultado": "falta_dato", "falta": ["tarea"]}
+    if not any(t["id"] == tarea["id"] for t in ctx.para_destrabar):
+        return {"resultado": "no_se_puede", "motivo": NO_LE_TOCA_DESTRABARLA,
+                "tarea": tarea_hecho(tarea)}
+    destraba = _lo_destraba(ctx, tarea["id"])
+    if destraba is None:
+        return {"resultado": "no_se_puede", "motivo": NO_LE_TOCA_DESTRABARLA,
+                "tarea": tarea_hecho(tarea)}
+    pregunta = _su_pregunta(ctx, tarea["id"])
+    jugada = dict((pregunta or {}).get("jugada") or {})
+    antes = jugada.get("datos") or {}
+    lo_que_dice = (None if vacio(datos.get("lo_que_dice")) else str(datos["lo_que_dice"]).strip()
+                   ) or antes.get("lo_que_dice")
+    no_sabe = datos.get("no_sabe") is True
+    integrante, externo = None, None
+    if not no_sabe and not vacio(datos.get("quien")):
+        texto = str(datos["quien"]).strip()
+        coinciden = integrantes_que_coinciden(cur, texto)
+        if len(coinciden) > 1:
+            return {"resultado": "falta_dato", "falta": ["integrante"],
+                    "coinciden": [c["nombre"] for c in coinciden], "tarea": tarea_hecho(tarea)}
+        if coinciden:
+            # Nombrarse a sí misma no es decir de quién es.
+            if str(coinciden[0]["membership_id"]) != ctx.quien.membership_id:
+                integrante = coinciden[0]
+        else:
+            externo = texto
+    # La primera persona de la cadena (la nombró quien está trabado) que no dice de quién es:
+    # Leda le pregunta una vez quién se encarga. Si vuelve a no decirlo, es que no sabe.
+    primera = str(destraba["dicho_por_membership_id"]) == str(
+        destraba["responsable_membership_id"])
+    nombra = integrante is not None or externo is not None
+    if primera and not nombra and not no_sabe:
+        if not jugada.get(PREGUNTO_QUIEN_SE_ENCARGA):
+            return _preguntar(
+                ctx, tarea, destraba, pregunta,
+                {NO_LE_CORRESPONDE: True, **({"lo_que_dice": lo_que_dice} if lo_que_dice else {})},
+                PREGUNTO_QUIEN_SE_ENCARGA,
+                {"resultado": "falta_dato", "falta": ["quien_se_encarga"],
+                 "tarea": tarea_hecho(tarea)})
+        no_sabe = True
+
+    le_toca_a = (integrante["nombre"] if integrante is not None else externo)
+    dice = {k: v for k, v in ((NO_LE_CORRESPONDE, True), ("le_toca_a", le_toca_a),
+                              ("no_sabe", no_sabe or None), ("lo_que_dice", lo_que_dice))
+            if v is not None}
+    dicho_id = _anotar_lo_que_dice(ctx, tarea, destraba, dice, lo_que_dice=lo_que_dice,
+                                   no_le_corresponde=True)
+    if nombra or no_sabe:
+        # A quién le toca, según quien no lo toma: otra fila de quién destraba, dicha por él.
+        nueva = _anotar_quien_destraba(ctx, tarea, destraba, integrante, externo, no_sabe)
+    hecho: dict[str, Any] = {"resultado": "anotado", "tarea": tarea_hecho(tarea),
+                             "dice_quien_destraba": dice}
+    bloqueo = {"causa": destraba["causa"]}
+    if primera and integrante is not None and str(integrante["membership_id"]) != str(
+            destraba["responsable_membership_id"]):
+        # Leda sigue con esa persona, como siguió con la primera (una sola vez: el límite).
+        sigue = preguntarle(ctx, {"id": tarea["id"], "titulo": tarea["titulo"]}, bloqueo,
+                            nueva, integrante, responsable=destraba["responsable"],
+                            nombrado_por=ctx.quien.nombre)
+        _juntar(hecho, sigue)
+        mas = ({"se_le_pregunta_a": {"a": sigue["se_le_pregunta_a"]["a"]}}
+               if "se_le_pregunta_a" in sigue else
+               {"no_se_le_puede_escribir_a": sigue["no_se_le_puede_escribir_a"]})
+    else:
+        # La cadena se corta: al referente, con la cadena entera, como información.
+        informe = _informar_la_cadena(ctx, tarea, destraba, dicho_id,
+                                      integrante["membership_id"] if integrante else None)
+        _juntar(hecho, informe)
+        mas = {"aviso_de_la_cadena": {k: v for k, v in informe["aviso_de_la_cadena"].items()
+                                      if k != LLEGA or not _es_una_hora(v)}}
+    _juntar(hecho, _avisar_a_quien_esta_trabado(ctx, tarea, destraba, dicho_id, dice, mas))
+    return hecho
+
+
+def _anotar_quien_destraba(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],
+                           integrante: dict[str, Any] | None, externo: str | None,
+                           no_sabe: bool) -> str:
+    """Quién destraba ahora, según quien escribe: otra fila de `blocker_unblocker`, dicha por
+    esa persona y auditada como cuando lo dice quien está trabado. Su id."""
+    ctx.cur.execute(
+        """insert into blocker_unblocker (workspace_id, blocker_id, destraba_membership_id,
+                                          destraba_externo, no_sabe,
+                                          dicho_por_membership_id, at)
+           values (%s, %s, %s, %s, %s, %s, %s) returning id""",
+        (ctx.quien.workspace_id, destraba["blocker_id"],
+         integrante["membership_id"] if integrante else None, externo, no_sabe,
+         ctx.quien.membership_id, ctx.ahora))
+    nueva = str(ctx.cur.fetchone()["id"])
+    auditar(ctx.cur, accion="anotar_quien_destraba", workspace_id=ctx.quien.workspace_id,
+            sujeto_tipo="blocker", sujeto_id=destraba["blocker_id"], quien=ctx.quien,
+            detalle={"blocker_unblocker_id": nueva, "task_id": tarea["id"],
+                     "destraba_membership_id": (str(integrante["membership_id"])
+                                                if integrante else None),
+                     "destraba_externo": externo, "no_sabe": no_sabe,
+                     "at": ctx.ahora.isoformat(), "inbound_message_id": ctx.entrante_id})
+    return nueva
+
+
+def a_quien_informar(cur, destraba: dict[str, Any],
+                     nombrado: str | None) -> dict[str, Any] | None:
+    """El referente al que va la cadena (decisión 5): el del sector de lo que falta, si se sabe
+    (el de la persona que quedó nombrada como quien se encarga); si no, el del sector de la tarea
+    trabada. Nunca la persona trabada misma: si es ella, a quien aprueba su trabajo. `None` si no
+    hay ninguno."""
+    trabado = str(destraba["responsable_membership_id"])
+    areas = []
+    if nombrado is not None and str(nombrado) != trabado:
+        persona = integrante(cur, nombrado)
+        if persona is not None:
+            areas.append(persona["area_id"])
+    areas.append(destraba["area_id"])
+    for area in areas:
+        cur.execute("""select i.membership_id, i.nombre from area a
+                         join integrante i on i.membership_id = a.referente_membership_id
+                        where a.id = %s""", (str(area),))
+        fila = cur.fetchone()
+        if fila is not None and str(fila["membership_id"]) != trabado:
+            return fila
+    return referente(cur, trabado)
+
+
+def _informar_la_cadena(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],
+                        dicho_id: str, nombrado: str | None) -> dict[str, Any]:
+    """La cadena entera le llega al referente como información, terminado el margen para
+    corregir (`avisos.CADENA_DEL_BLOQUEO`): no le pide nada (ADR 0018, 9c, precisión del
+    2026-10-09). Los hechos para quien escribe: a quién y cuándo, o por qué no le llega."""
+    cur = ctx.cur
+    ref = a_quien_informar(cur, destraba, nombrado)
+    if ref is None:
+        return {"aviso_de_la_cadena": {LLEGA: NO_LE_VA_A_LLEGAR, "motivo": SIN_REFERENTE}}
+    quien, motivo = alcanzable(cur, str(ref["membership_id"]))
+    if motivo is not None:
+        return {"aviso_de_la_cadena": {"a": ref["nombre"], LLEGA: NO_LE_VA_A_LLEGAR,
+                                       "motivo": motivo}}
+    sale = sale_con_margen(cur, ctx.calendario, ctx.quien.workspace_id, ctx.ahora)
+    eslabones = cadena(cur, destraba["blocker_id"], str(destraba["responsable_membership_id"]))
+    aviso_id, _ = guardar(
+        cur, ctx.quien.workspace_id, CADENA_DEL_BLOQUEO, task_id=tarea["id"],
+        destinatario=str(ref["membership_id"]),
+        hechos={"aviso": CADENA_DEL_BLOQUEO, "necesita_respuesta": False,
+                "tarea": tarea["titulo"], "responsable": destraba["responsable"],
+                "causa": destraba["causa"], "cadena": eslabones},
+        programado_para=sale, clave=f"motor:{CADENA_DEL_BLOQUEO}:{tarea['id']}:d{dicho_id}",
+        ahora=ctx.ahora)
+    ctx.avisos_guardados.append(aviso_id)
+    auditar(cur, accion="informar_la_cadena_del_bloqueo", workspace_id=ctx.quien.workspace_id,
+            sujeto_tipo="blocker", sujeto_id=destraba["blocker_id"], quien=ctx.quien,
+            detalle={"aviso_id": aviso_id, "task_id": tarea["id"],
+                     "a_membership_id": str(ref["membership_id"]), "cadena": eslabones,
+                     "at": ctx.ahora.isoformat(), "inbound_message_id": ctx.entrante_id})
+    hecho: dict[str, Any] = {"aviso_de_la_cadena": {"a": quien["nombre"],
+                                                    LLEGA: sale.isoformat()}}
+    nombrar_efecto(hecho, "aviso_de_la_cadena", AVISO, aviso_id)
+    return hecho
+
+
+def cadena(cur, blocker_id, trabado: str) -> list[dict[str, Any]]:
+    """La cadena de un bloqueo, de quién dijo qué, desde la última vez que la persona trabada
+    dijo quién lo destraba: a quién le toca según cada uno (`blocker_unblocker`), y si dijo que
+    no le corresponde, con sus palabras (`dicho_de_quien_destraba`). Quien no lo tomó sin decir
+    de quién es cierra la cadena con lo que dijo."""
+    cur.execute("""select u.id, u.destraba_membership_id, u.destraba_externo, u.no_sabe,
+                          u.dicho_por_membership_id, d.nombre as destraba, p.nombre as de
+                     from blocker_unblocker u
+                     left join integrante d on d.membership_id = u.destraba_membership_id
+                     join integrante p on p.membership_id = u.dicho_por_membership_id
+                    where u.blocker_id = %s order by u.at, u.id""", (str(blocker_id),))
+    filas = cur.fetchall()
+    desde = max((i for i, f in enumerate(filas) if str(f["dicho_por_membership_id"]) == trabado),
+                default=0)
+    filas = filas[desde:]
+    cur.execute("""select blocker_unblocker_id, dicho_por_membership_id, lo_que_dice
+                     from dicho_de_quien_destraba
+                    where blocker_unblocker_id = any(%s::uuid[]) and no_le_corresponde
+                    order by at, id""", ([str(f["id"]) for f in filas],))
+    no_les_toca = {(str(d["blocker_unblocker_id"]), str(d["dicho_por_membership_id"])): d
+                   for d in cur.fetchall()}
+    eslabones: list[dict[str, Any]] = []
+    anterior = None
+    for f in filas:
+        eslabon: dict[str, Any] = {"de": f["de"]}
+        dijo = (no_les_toca.get((str(anterior["id"]), str(f["dicho_por_membership_id"])))
+                if anterior is not None else None)
+        if dijo is not None:
+            eslabon[NO_LE_CORRESPONDE] = True
+        if f["destraba"] or f["destraba_externo"]:
+            eslabon["le_toca_a"] = f["destraba"] or f["destraba_externo"]
+        if f["no_sabe"]:
+            eslabon["no_sabe"] = True
+        if dijo is not None and dijo["lo_que_dice"]:
+            eslabon["lo_que_dice"] = dijo["lo_que_dice"]
+        eslabones.append(eslabon)
+        anterior = f
+    if anterior is not None and anterior["destraba_membership_id"] is not None:
+        dijo = no_les_toca.get((str(anterior["id"]), str(anterior["destraba_membership_id"])))
+        if dijo is not None:
+            eslabones.append({"de": anterior["destraba"], NO_LE_CORRESPONDE: True,
+                              **({"lo_que_dice": dijo["lo_que_dice"]}
+                                 if dijo["lo_que_dice"] else {})})
+    return eslabones
+
+
+def _es_una_hora(valor: Any) -> bool:
+    """Si cuándo se entera es una fecha y hora (y no un código, como que no le va a llegar)."""
+    return isinstance(valor, str) and re.match(r"^\d{4}-\d{2}-\d{2}T", valor) is not None
 
 
 # --- "No le escribas" ------------------------------------------------------------------------

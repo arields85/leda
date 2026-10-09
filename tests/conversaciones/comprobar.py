@@ -129,9 +129,10 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                 "alguien": bool(f["destraba_externo"]) or (
                     f["destraba_membership_id"] is not None
                     and f["destraba_membership_id"] != f["dicho_por_membership_id"])}
-        # Lo que dice quien destraba (C-5): de qué tarea, quién, para cuándo y si ya está.
+        # Lo que dice quien destraba (C-5): de qué tarea, quién, para cuándo, si ya está y si
+        # dijo que no le corresponde (porción 3).
         cur.execute("""select d.id, b.task_id, d.dicho_por_membership_id, d.para_cuando,
-                              d.ya_esta
+                              d.ya_esta, d.no_le_corresponde
                          from dicho_de_quien_destraba d
                          join blocker_unblocker u on u.id = d.blocker_unblocker_id
                          join blocker b on b.id = u.blocker_id
@@ -140,7 +141,8 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                                 "de": persona(f["dicho_por_membership_id"]),
                                 "para_cuando": (f["para_cuando"].isoformat()
                                                 if f["para_cuando"] else None),
-                                "ya_esta": f["ya_esta"]}
+                                "ya_esta": f["ya_esta"],
+                                "no_le_corresponde": f["no_le_corresponde"]}
                  for f in cur.fetchall()}
         cur.execute("""select * from scheduled_notice where workspace_id = %s""", (ws,))
         avisos = {str(f["id"]): {"tipo": f["tipo"], "tarea": tarea(f["task_id"]),

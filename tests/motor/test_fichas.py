@@ -121,8 +121,9 @@ def test_la_lista_cerrada_tiene_una_ficha_por_jugada_del_recordatorio():
     assert sorted(JUGADAS) == sorted(FICHAS) == sorted(
         OFRECIDAS + ("pedir_reasignacion",) + SITUACIONES
         + ("confirmar", "guardar_para_la_entrega")
-        # La persecución del bloqueo (C-5): lo que dice quien destraba y "no le escribas".
-        + ("decir_cuando_destraba", "no_escribirle"))
+        # La persecución del bloqueo (C-5): lo que dice quien destraba, "no le escribas" y
+        # "no me corresponde" (porción 3).
+        + ("decir_cuando_destraba", "no_escribirle", "decir_que_no_le_toca"))
     assert not any(FICHAS[n].se_ofrece for n in SITUACIONES)
     for ficha in FICHAS.values():
         assert ficha.para_que and ficha.comprueba and ficha.hace and ficha.despues

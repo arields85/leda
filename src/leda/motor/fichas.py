@@ -1083,6 +1083,11 @@ def _decir_cuando_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
     return persecucion.decir_cuando_destraba(ctx, datos, tarea)
 
 
+def _decir_que_no_le_toca(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import persecucion
+    return persecucion.decir_que_no_le_toca(ctx, datos, tarea)
+
+
 def _no_escribirle(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     from . import persecucion
     return persecucion.no_escribirle(ctx, datos, tarea)
@@ -1494,6 +1499,23 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "(para_cuando), que ya lo resolvió (ya_esta), qué pasa con eso (lo_que_dice) o "
              "que ya lo habló con la persona trabada (ya_lo_hablaron). Es lo que dice sobre lo "
              "que traba la tarea de otro: no es un hecho de una tarea suya."),
+    Ficha("decir_que_no_le_toca", "decir que no le corresponde destrabar la tarea trabada de "
+                                  "otra persona",
+          necesita=(), opcional=("tarea", "quien", "no_sabe", "lo_que_dice"),
+          comprueba="que quien escribe sea quien destraba ahora un bloqueo abierto de esa tarea",
+          hace="anota que no le corresponde y, si lo dice, quién se encarga, atribuido y "
+               "auditado; si es la primera persona de la cadena y no dice de quién es, no anota "
+               "nada todavía: pregunta una vez quién se encarga",
+          despues="cierra su pregunta y su espera; con un integrante nombrado por la primera, "
+                  "Leda le escribe a esa persona; si no, le informa la cadena entera al "
+                  "referente, sin pedirle nada; la persona trabada se entera, como información",
+          manejar=_decir_que_no_le_toca, se_ofrece=False,
+          contesta=(preguntas.CUANDO_SE_DESTRABA,),
+          es="La persona que escribe es a quien se le preguntó por una tarea trabada de otra "
+             "persona (está en la lista como espera_que_la_destrabe) y dice que no le "
+             "corresponde destrabarla: quien es quién se encarga, como lo nombró, si lo dice; "
+             "no_sabe, si dice que no sabe quién; lo_que_dice, sus palabras. No es una fecha "
+             "para destrabarla ni que ya está."),
     Ficha("no_escribirle", "no escribirle a quien destraba una tarea trabada",
           necesita=(), opcional=("tarea", "quien"),
           comprueba="que sea el responsable de la tarea y que Leda le haya guardado un mensaje "
