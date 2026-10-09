@@ -56,6 +56,20 @@ agrega acá con dónde vive hoy.
 | Qué hace Leda cuando la IA no responde al redactar un aviso para otra persona (por ejemplo, el pedido de confirmación a quien aprueba): reintentar más tarde, mandar sólo la lista de datos o avisar la falla sin enviar | Construido en la rama `feat/flujo-de-un-mensaje` (P-1b, ADR 0016): reintentar más tarde con espera creciente (1, 2, 4 y 8 minutos); al quinto intento fallido el aviso queda `fallido` y ya no se reintenta, con incidente y aviso de falla a quien pidió (pendiente de decidir con el usuario si debería seguir reintentando) | Decisión del usuario (2026-10-03): por ahora reintentar; tiene que poder elegirse desde la plataforma |
 | Cuánto se espera a que vuelva el proveedor del modelo antes de avisar a la persona que no se pudo y pedirle que lo escriba de nuevo | Por construir en la rama `feat/flujo-de-un-mensaje`: 4 horas hábiles; el sondeo del proveedor empieza a los 30 s y se espacia | Decisión del usuario (2026-10-02), tareas P4 a P6 de esa rama |
 
+## La jerarquía, los avisos de cada uno y la vista de todo (usuario, 2026-10-09)
+
+- **La jerarquía se arma desde la plataforma:** quién está a cargo de qué sector, quién
+  aprueba el trabajo de quién. Hoy sale del pack (`areas[].referente`, `aprobado_por`). Rige
+  la decisión 28 de `odd/tasks/fase-c.md`: quién revisa depende de quién era la tarea; a la
+  autoridad final (Ismael) le llegan para aprobar sólo las tareas de los encargados de sector.
+- **Qué avisos le llegan a cada persona se elige desde la plataforma.** Ejemplo: Ismael elige si
+  le llega un aviso cuando Nahuel termina una tarea, o ninguno. Lo que la persona necesita para
+  trabajar (pedidos de su decisión, la confirmación de lo suyo) no se apaga: se eligen los
+  avisos informativos.
+- **La autoridad final ve todo el seguimiento desde la plataforma**, sin que Leda le avise ni le
+  pida nada: qué está haciendo cada uno, sus tareas, fechas, bloqueos y entregas. Hoy ya puede
+  abrir la página de cualquier tarea (`puede_ver_tarea`, ADR 0019); falta la vista de todo junto.
+
 ## Configuración de cada espacio
 
 Lo que hoy sale del pack (`espacios/<espacio>.yaml`, se cambia editando y reimportando) o
