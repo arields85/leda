@@ -45,8 +45,11 @@ corre el turno de alguien del equipo (un mensaje o un toque), `indicador` muestr
 escribiendo (`despachador.mantener_chat_activo`). Se apaga al terminar el turno, salga lo que
 salga, y nunca demora la respuesta ("La función del escribiendo y el '…' es mostrar que Leda está
 activa, no generar demora en la respuesta"): cuando el turno dejó un mensaje confirmado en el
-outbox, se le avisa (`sigue_la_respuesta`) y el cierre no espera ni retira nada, porque ese
-mensaje reemplaza al borrador. Sólo un turno sin mensaje retira el borrador. Lo que Leda manda
+outbox, se le avisa (`sigue_la_respuesta`) y el cierre no retira nada antes del mensaje; sólo
+espera a que vuelva el envío del borrador que estaba en vuelo, para que ninguno llegue después
+del mensaje, y el borrador se retira después de despacharlo, salga o no (`despachar_ahora`; D8,
+prueba por Telegram del 2026-10-08: los tres puntos quedaban a la vista). Un turno sin mensaje
+lo retira al cerrar. Lo que Leda manda
 por su cuenta (avisos, escalera) no pasa por acá y nunca lo muestra. Una falla del indicador no
 cambia el turno.
 
@@ -80,7 +83,8 @@ from typing import Any
 from ..autoridad import Canal, Denegado, identificar, identificar_en_espacio
 from ..calendario import Calendario
 from ..db import admin, atar_al_entrante, espacio, registrar_auditoria
-from ..despachador import Transporte, despachar, texto_error_seguro
+from ..despachador import (Transporte, despachar, registrar_falla_del_retiro,
+                           texto_error_seguro)
 from ..entrada import VENTANA_TURNO_EN_CURSO, clave_de_candado_del_mensaje, sql_respondido
 from ..incidentes import (ETAPA_TURNO_CONVERSACION, REFERENCIA_INBOUND_MESSAGE,
                           registrar_incidente)
@@ -179,6 +183,13 @@ class IndicadorDelTurno:
         if avisar is not None:
             avisar()
 
+    def tras_la_respuesta(self) -> Exception | None:
+        """Ya salió la respuesta (o falló al salir): el borrador se retira, si se mostró
+        (`despachador.IndicadorDeActividad.retirar_tras_la_respuesta`). La falla del retiro, o
+        `None`; uno que no sabe de retiros no hace nada."""
+        retirar = getattr(self._abierto, "retirar_tras_la_respuesta", None)
+        return retirar() if retirar is not None else None
+
 
 class _ConHoraDeEnvio:
     """El transporte del despacho inmediato, que anota cuándo Telegram aceptó el último
@@ -234,6 +245,9 @@ class Recepcion:
         # El chat y la hora (`time.monotonic`) en que estuvo listo el texto de la respuesta del
         # último turno, hasta que `despachar_ahora` la mide.
         self._listo: tuple[int, float] | None = None
+        # Los indicadores de los turnos cuya respuesta sigue: su borrador se retira después de
+        # despacharla (`despachar_ahora`, D8).
+        self._por_retirar: list[IndicadorDelTurno] = []
 
     def procesar(self, u: dict[str, Any]) -> None:
         if u.get("callback_query"):
@@ -354,6 +368,7 @@ class Recepcion:
         except Exception as e:  # noqa: BLE001 -- cosmético: el turno ya terminó
             self.imprimir(f"  ! el indicador de actividad no recibió el aviso: "
                           f"{texto_error_seguro(e)}")
+        self._por_retirar.append(indicador)
 
     @contextmanager
     def _indicador_del_turno(self, chat_id: int) -> Iterator[IndicadorDelTurno]:
@@ -610,6 +625,12 @@ class Recepcion:
         Si el update dejó una respuesta, imprime cuánto tardó en salir desde que su texto
         estuvo listo; sin datos de la conversación."""
         listo, self._listo = self._listo, None
+        try:
+            self._despachar_ya(listo)
+        finally:
+            self._retirar_los_borradores()
+
+    def _despachar_ya(self, listo: tuple[int, float] | None) -> None:
         if self.transporte is None:
             return
         salida = _ConHoraDeEnvio(self.transporte)
@@ -626,6 +647,28 @@ class Recepcion:
         if listo is not None and listo[0] in salida.enviado_en:
             ms = max(0, round((salida.enviado_en[listo[0]] - listo[1]) * 1000))
             self.imprimir(f"  ⏱ respuesta: texto listo → enviado en {ms} ms")
+
+    def _retirar_los_borradores(self) -> None:
+        """Después del despacho, salga o no la respuesta, el borrador de cada turno que la dejó
+        se retira, si se mostró (D8: los tres puntos quedaban a la vista cuando el mensaje no
+        los reemplazaba, o cuando la respuesta falló al salir). Una falla queda en la consola y
+        en un incidente; el despacho no cambia."""
+        por_retirar, self._por_retirar = self._por_retirar, []
+        for indicador in por_retirar:
+            try:
+                falla = indicador.tras_la_respuesta()
+            except Exception as e:  # noqa: BLE001 -- cosmético, pero nunca en silencio
+                falla = e
+            if falla is None:
+                continue
+            self.imprimir(f"  ! el borrador no se pudo retirar: {texto_error_seguro(falla)}")
+            try:
+                with espacio(self.conn, self.ws) as cur:
+                    registrar_falla_del_retiro(cur, self.ws, falla)
+                self.conn.commit()
+            except Exception as e:  # noqa: BLE001 -- queda en la consola
+                self.conn.rollback()
+                self.imprimir(f"  ! tampoco se pudo registrar: {texto_error_seguro(e)}")
 
     def _activar(self, texto: str, tg_user: int, chat_id: int, message_id: int) -> None:
         """El mecanismo de activación de siempre (`leda.onboarding`), con permisos de

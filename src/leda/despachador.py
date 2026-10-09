@@ -347,12 +347,14 @@ class IndicadorDeActividad:
     el 2026-10-01).
 
     Efímero: es el borrador, nunca un mensaje; no pasa por el outbox, no se audita y no lleva
-    botones. El mensaje de verdad sale por el outbox, con su texto, y es el que reemplaza al
-    borrador: la Bot API dice que el borrador es una vista previa efímera y que, al terminar,
-    se manda el mensaje completo con `sendMessage`. Por eso, cuando sigue un mensaje (quien
-    atiende el turno llama a `sigue_la_respuesta`), el cierre no espera nada ni retira nada
-    (pedido del usuario, 2026-10-07: "La función del escribiendo y el '…' es mostrar que Leda
-    está activa, no generar demora en la respuesta"). Seguro entre hilos: lo llama el hilo que
+    botones. El mensaje de verdad sale por el outbox, con su texto: la Bot API dice que el
+    borrador es una vista previa efímera y que, al terminar, se manda el mensaje completo con
+    `sendMessage`. Cuando sigue un mensaje (quien atiende el turno llama a `sigue_la_respuesta`),
+    el cierre no retira nada antes de él (pedido del usuario, 2026-10-07: "La función del
+    escribiendo y el '…' es mostrar que Leda está activa, no generar demora en la respuesta");
+    sólo espera, acotado, a que termine el envío del borrador que esté en vuelo, y el retiro
+    queda para después del mensaje (`retirar_tras_la_respuesta`; D8: el mensaje no siempre
+    reemplazaba al borrador y los tres puntos quedaban a la vista). Seguro entre hilos: lo llama el hilo que
     lee lo que escribe la IA mientras el hilo del indicador manda la semilla y el
     "escribiendo…"; `candado` ordena los envíos del borrador, y cada uno mira `cerrado` justo
     antes de salir."""
@@ -370,6 +372,10 @@ class IndicadorDeActividad:
         self.con_texto = threading.Event()
         self.intentado = threading.Event()
         self.activado = threading.Event()
+        # Se le pidió a Telegram un borrador (semilla o texto), haya vuelto bien o no: es lo que
+        # puede haber quedado a la vista y hay que retirar. Se marca con el candado tomado, justo
+        # antes del pedido (D8).
+        self.pedido = threading.Event()
         # Al turno le sigue un mensaje, que reemplaza al borrador: el cierre no lo retira.
         self.sigue_respuesta = threading.Event()
         self._ultimo_texto: str | None = None
@@ -380,12 +386,34 @@ class IndicadorDeActividad:
         self._estado = threading.Lock()
         self._pendiente: str | None = None
         self._trabajando = False
+        # El retiro del borrador que queda para después de la respuesta (`mantener_chat_activo`
+        # lo deja al cerrar, si sigue un mensaje): `retirar_tras_la_respuesta` lo hace una vez.
+        self._retiro: Callable[[], Exception | None] | None = None
+
+    def retirar_tras_la_respuesta(self) -> Exception | None:
+        """Después de que salió el mensaje de verdad (o de que falló al salir), el borrador se
+        retira igual que en un turno sin mensaje (`_cerrar_sin_respuesta`), si se llegó a mostrar:
+        en la prueba por Telegram del 2026-10-08 (D8) los tres puntos quedaron a la vista en
+        varios chats, porque el mensaje no siempre lo reemplaza y un envío del borrador que estaba
+        en vuelo podía llegar después del mensaje. Lo llama quien despachó la respuesta, una sola
+        vez; sin retiro pendiente, no hace nada. Nunca lanza: devuelve la falla del retiro (ya
+        reportada en la consola) para que quien llama deje el incidente, o `None`."""
+        retiro, self._retiro = self._retiro, None
+        if retiro is None:
+            return None
+        try:
+            return retiro()
+        except Exception as e:  # noqa: BLE001 - cosmético, pero nunca en silencio
+            _reportar_falla_indicador(self._impresos, "retiro", e)
+            return e
 
     def sigue_la_respuesta(self) -> None:
-        """Avisa que al turno le sigue un mensaje de verdad (ya confirmado en el outbox): ese
-        mensaje reemplaza al borrador, así que el cierre no espera a un borrador en vuelo ni lo
-        retira, y la respuesta sale enseguida. Sin este aviso, el cierre retira el borrador,
-        porque nada lo va a reemplazar."""
+        """Avisa que al turno le sigue un mensaje de verdad (ya confirmado en el outbox): el
+        cierre no lo retira antes del mensaje (el retiro antes de la respuesta se veía como "aparece
+        y se va"), espera a que termine el envío del borrador que esté en vuelo, para que ninguno
+        llegue después del mensaje, y deja el retiro para después de la respuesta
+        (`retirar_tras_la_respuesta`). Sin este aviso, el cierre retira el borrador enseguida,
+        porque no sigue ningún mensaje."""
         self.sigue_respuesta.set()
 
     def actualizar_borrador(self, texto: str) -> None:
@@ -442,6 +470,7 @@ class IndicadorDeActividad:
                     return
                 self._ultimo_envio = self._reloj()
                 ritmo = None
+                self.pedido.set()
                 try:
                     _enviar_borrador_texto(self._http, self._token, self._chat_id,
                                            self.draft_id, texto)
@@ -569,15 +598,21 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
     9.5 sólo lo abrió ahí; en grupo o canal degrada en silencio a sólo
     typing.
 
-    Al salir del bloque, nada de lo que hace el indicador demora la
-    respuesta (pedido del usuario, 2026-10-07). Si quien atiende el turno
-    avisó que sigue un mensaje (`IndicadorDeActividad.sigue_la_respuesta`),
-    ese mensaje -- el `sendMessage` del outbox -- reemplaza al borrador,
-    como pide la Bot API para `sendMessageDraft`: el cierre sólo marca el
-    indicador cerrado y vuelve, sin esperar al borrador en vuelo ni
-    retirarlo. Si no avisó -- un turno sin mensaje nuevo, o un llamador
-    que no sabe --, nada va a reemplazar al borrador y, si se llegó a
-    mostrar, se retira (ADR 0011, decisión 3; `_cerrar_sin_respuesta`).
+    Al salir del bloque, el indicador no retira nada antes de la respuesta
+    (pedido del usuario, 2026-10-07). Si quien atiende el turno avisó que
+    sigue un mensaje (`IndicadorDeActividad.sigue_la_respuesta`), el cierre
+    marca el indicador cerrado (ningún envío del borrador empieza después)
+    y espera, acotado a `timeout_borrador`, a que termine el que esté en
+    vuelo: así ningún borrador le llega a Telegram después del
+    `sendMessage` de la respuesta (D8; antes eran dos pedidos en paralelo y
+    uno tardío volvía a mostrar el borrador). El retiro queda para después
+    del mensaje: quien lo despachó llama a
+    `IndicadorDeActividad.retirar_tras_la_respuesta`, que retira el
+    borrador como un turno sin mensaje, si se llegó a mostrar (el mensaje
+    no siempre lo reemplazaba, y una respuesta que no salió lo dejaba a la
+    vista sin nada). Si no avisó -- un turno sin mensaje nuevo, o un
+    llamador que no sabe --, se retira al cerrar (ADR 0011, decisión 3;
+    `_cerrar_sin_respuesta`).
 
     El `draft_id` es aleatorio por invocación -- nunca un contador de
     proceso (el código recuperado lo marcaba como pendiente: un contador no
@@ -600,8 +635,8 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
     `espera_cierre` no prueba que esa llamada ya volvió. Antes de retirar,
     se espera (acotado a `timeout_borrador`, el mismo timeout que ya tiene
     el cliente HTTP) a que el intento de mandar el borrador termine de
-    verdad. Esa espera sólo existe en el cierre sin mensaje: con un mensaje
-    que sigue, no hay retiro y no hay espera."""
+    verdad. Con un mensaje que sigue, la misma espera va antes del mensaje
+    (y otra vez antes del retiro, por si la primera se agotó)."""
     import httpx
 
     try:
@@ -634,6 +669,7 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                         # tampoco: la respuesta ya puede estar saliendo.
                         if not (indicador.con_texto.is_set()
                                 or indicador.cerrado.is_set()):
+                            indicador.pedido.set()
                             _enviar_borrador_semilla(http, token, chat_id, draft_id)
                 except Exception as e:  # noqa: BLE001 - no fatal, se reporta
                     _reportar_falla_indicador(impresos, "borrador", e)
@@ -676,32 +712,39 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
             _cerrar_sin_respuesta(indicador, hilo, http, token, chat_id, owned_client,
                                   impresos, espera_cierre, timeout_borrador, cur,
                                   workspace_id)
-        # Si sigue un mensaje de verdad, él reemplaza al borrador: no se espera al borrador
-        # en vuelo ni al hilo, y no se retira nada. La respuesta sale enseguida (pedido del
-        # usuario, 2026-10-07). El hilo del "escribiendo…" termina solo, y cierra su cliente
-        # propio cuando vuelve el borrador en vuelo.
-        #
-        # Lo que queda, dicho con honestidad: un envío del borrador que ya estaba en vuelo
-        # cuando se cerró puede llegarle a Telegram después del mensaje (son dos pedidos HTTP
-        # en paralelo). Es una vista previa efímera, de a lo sumo 30 segundos según la Bot
-        # API, nunca un mensaje; esperarlo es justo la demora que se sacó. Ningún envío del
-        # borrador EMPIEZA después del cierre, y el cierre es anterior al despacho de la
-        # respuesta. Lo mismo con un "escribiendo…" que ya estaba saliendo: dura a lo sumo 5
-        # segundos.
+        else:
+            # Sigue un mensaje de verdad. Ningún envío del borrador EMPIEZA después del cierre
+            # (cada uno mira `cerrado` con el candado tomado), y acá se espera, acotado, a que
+            # vuelva el que estaba en vuelo: el cierre es anterior al despacho de la respuesta,
+            # así que ningún borrador le llega a Telegram después del mensaje (D8: uno tardío
+            # volvía a mostrar el borrador). La espera es la de un pedido ya en vuelo, nunca un
+            # retiro antes del mensaje (pedido del usuario, 2026-10-07).
+            if indicador.candado.acquire(timeout=timeout_borrador):
+                indicador.candado.release()
+            # El retiro, después del mensaje (o de su falla): lo pide quien lo despachó. Sin
+            # "escribiendo…" después: ya no hay respuesta que esperar.
+            indicador._retiro = lambda: _cerrar_sin_respuesta(
+                indicador, hilo, http, token, chat_id, owned_client, impresos, espera_cierre,
+                timeout_borrador, cur, workspace_id, escribiendo_despues=False)
 
 
 def _cerrar_sin_respuesta(indicador: IndicadorDeActividad, hilo: threading.Thread, http,
                           token: str, chat_id: int, owned_client: bool, impresos: set[str],
                           espera_cierre: float, timeout_borrador: float, cur,
-                          workspace_id: str | None) -> None:
-    """El cierre de un turno al que no le sigue ningún mensaje (o de un llamador que no avisa
-    que le sigue uno): nada va a reemplazar al borrador, así que, si se llegó a mostrar, se
-    retira (ADR 0011, decisión 3). Como no hay mensaje, no demora ninguno.
+                          workspace_id: str | None, *,
+                          escribiendo_despues: bool = True) -> Exception | None:
+    """El retiro del borrador, si se llegó a mostrar (ADR 0011, decisión 3): al cerrar un turno
+    al que no le sigue ningún mensaje (o de un llamador que no avisa que le sigue uno), y después
+    del mensaje de un turno que sí lo tiene (`IndicadorDeActividad.retirar_tras_la_respuesta`,
+    D8). Nunca va antes de un mensaje, así que no demora ninguno. Después del retiro de un turno
+    sin mensaje sale un "escribiendo…" (`_escribiendo_tras_el_retiro`); después de la respuesta,
+    no (`escribiendo_despues=False`): ya no hay nada que esperar.
 
     El retiro nunca puede llegar antes que el propio borrador (R3-001, revisión 2026-09-28
     sobre el commit e2a094e): se espera, acotado a `timeout_borrador`, a que el envío en vuelo
     del borrador (semilla o texto) termine; si ni con ese margen resolvió, se abandona el
-    retiro en vez de arriesgar el orden."""
+    retiro en vez de arriesgar el orden. Devuelve la falla del retiro, ya reportada (en la
+    consola y, con `cur`, en un incidente), o `None`."""
     import httpx
 
     if indicador.candado.acquire(timeout=timeout_borrador):
@@ -714,8 +757,13 @@ def _cerrar_sin_respuesta(indicador: IndicadorDeActividad, hilo: threading.Threa
     # de `ciclo`): el retiro usa un cliente PROPIO y de corta vida cuando el llamador no
     # inyectó uno, así que nunca compite por el mismo cliente que el hilo de typing todavía
     # puede estar cerrando.
-    if not (indicador.activado.is_set() and indicador.admite_borrador):
-        return
+    #
+    # Sólo si se le pidió algún borrador a Telegram: con el indicador cerrado y el candado ya
+    # tomado una vez, ningún pedido del borrador empieza después, así que si no hubo ninguno
+    # no hay nada a la vista (antes se miraba `activado`, que se marca también cuando el
+    # borrador nunca llegó a pedirse, y el retiro esperaba en vano su tope, D8).
+    if not (indicador.pedido.is_set() and indicador.admite_borrador):
+        return None
     if not indicador.intentado.wait(timeout_borrador):
         # Ni con ese margen se resolvió (cliente colgado más allá de su propio timeout):
         # abandonar el retiro en vez de arriesgar que llegue antes que un borrador que
@@ -723,18 +771,29 @@ def _cerrar_sin_respuesta(indicador: IndicadorDeActividad, hilo: threading.Threa
         falla = TimeoutError("el borrador no terminó de intentarse a tiempo para retirarlo")
         _reportar_falla_indicador(impresos, "retiro", falla)
         _reportar_falla_retiro(cur, workspace_id, falla)
-        return
+        return falla
     try:
         if owned_client:
             with httpx.Client(timeout=_TIMEOUT_CLIENTE_INDICADOR) as http_retiro:
                 _retirar_borrador(http_retiro, token, chat_id)
-                _escribiendo_tras_el_retiro(http_retiro, token, chat_id, impresos)
+                if escribiendo_despues:
+                    _escribiendo_tras_el_retiro(http_retiro, token, chat_id, impresos)
         else:
             _retirar_borrador(http, token, chat_id)
-            _escribiendo_tras_el_retiro(http, token, chat_id, impresos)
+            if escribiendo_despues:
+                _escribiendo_tras_el_retiro(http, token, chat_id, impresos)
     except Exception as e:  # noqa: BLE001 - no fatal, pero pesa más
         _reportar_falla_indicador(impresos, "retiro", e)
         _reportar_falla_retiro(cur, workspace_id, e)
+        return e
+    return None
+
+
+def registrar_falla_del_retiro(cur, workspace_id: str | None, error: Exception) -> None:
+    """El incidente de un borrador que no se pudo retirar después de la respuesta (D8), para
+    quien la despachó y tiene la base a mano: el mismo de `_cerrar_sin_respuesta`, deduplicado
+    por proceso (`_reportar_falla_retiro`)."""
+    _reportar_falla_retiro(cur, workspace_id, error)
 
 
 def _escribiendo_tras_el_retiro(http, token: str, chat_id: int, impresos: set[str]) -> None:

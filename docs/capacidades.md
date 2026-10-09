@@ -151,8 +151,9 @@ Código en `src/leda/motor/`, `src/leda/salida.py` y `src/leda/despachador.py`; 
 | A la persona, Leda no nombra por su cuenta a quien aprueba su trabajo (decisión 11 del usuario, 2026-10-08): la redacción recibe ese nombre dentro de `solo_si_pregunta`, en el mismo lugar del dato que lo nombra, y lo dice si la persona pregunta; los hechos de la cocina y el registro de turnos lo guardan igual. Lo que espera una decisión se dice revisión ("pasa a revisión", "para revisar"; decisión 18), también en la página de la tarea ("en revisión") | `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`, `hechos.para_redactar`, `tarea_vista.ESTADOS` |
 | Formato de los mensajes: un renglón por idea, 📋 ✏️ 🗓️ ⚠️ al principio del renglón, fechas cortas, cierre aparte; medido por el corredor | `instrucciones.py`, `tests/conversaciones/comprobar.py` |
 | Negrita por entidades de Telegram, sin `parse_mode` (hoy la instrucción no la pide) | `salida.formatear` |
-| "Escribiendo…", borrador "…" y el texto de la respuesta en vivo; el mensaje final sale enseguida | `despachador.py`, `recibir.py` |
+| "Escribiendo…", borrador "…" y el texto de la respuesta en vivo; el mensaje final sale enseguida, después de que vuelve el envío del borrador que estaba en vuelo, y el borrador se retira después de despacharlo, salga o no (D8) | `despachador.py`, `recibir.py` |
 | Rastro de cada intento fallido de redactar un aviso (incidente de severidad baja) | `avisos.py` |
+| Rastro de cada intento fallido de entregar un mensaje que se reintenta (incidente de severidad baja, sin avisar a la administración; el quinto deja el suyo). `PENDIENTE`: una falla esperando la respuesta de Telegram puede querer decir que llegó, y el reintento lo repite | `despachador.py` (`_rastro_del_intento`) |
 | Margen de 10 minutos antes de los avisos a otra persona, para que una corrección retire el equivocado | `margen.py` |
 | Una fecha que atrasa sin motivo: Leda lo pregunta y el aviso espera la respuesta o sale al final del día | `fichas.py` |
 | Recibir y guardar fotos, documentos, videos y álbumes (sin evidencia todavía), con límites por contenido | `archivos.py`, migración `0033` |

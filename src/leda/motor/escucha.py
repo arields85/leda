@@ -158,6 +158,8 @@ class Escucha(Recepcion):
         recibidos = self.recibir(min(espera, recibir.ESPERA_ALBUM_S) if hay_album else espera)
         if self.albumes_en_espera:
             self.atender_albumes()
+            # Como en el webhook: la respuesta de un álbum sale ya, y su borrador se retira.
+            self.despachar_ahora()
         self.recibir_admin()
         self.despachar()
         return recibidos

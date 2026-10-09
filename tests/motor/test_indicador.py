@@ -51,6 +51,7 @@ class TelegramDeMentira:
                  borrador_lento: float = 0.0) -> None:
         self.llamadas: list[tuple[str, dict]] = []
         self.horas: list[float] = []          # cuándo empezó cada llamada (`time.monotonic`)
+        self.vueltas: list[tuple[str, float]] = []    # cuándo volvió cada una
         self.falla_en = falla_en
         self.ritmo = ritmo
         # Un borrador con texto queda en vuelo hasta `borrador_lento` segundos, o hasta `soltar`.
@@ -73,6 +74,9 @@ class TelegramDeMentira:
                 and (json or {}).get("text") != SEMILLA_INDICADOR):
             self.borrador_en_vuelo.set()
             self.soltar.wait(self.borrador_lento)
+        with self._hubo:
+            self.vueltas.append((metodo, time.monotonic()))
+            self._hubo.notify_all()
         if (metodo == "sendMessageDraft" and (json or {}).get("text") != SEMILLA_INDICADOR
                 and self.ritmo > 0):
             self.ritmo -= 1
@@ -174,25 +178,81 @@ def test_si_sigue_la_respuesta_lo_proximo_es_el_mensaje_de_verdad_sin_retiro():
     assert _sin_hilos_nuevos(antes)
 
 
-def test_un_borrador_lento_en_vuelo_no_demora_la_respuesta():
-    """Un `sendMessageDraft` que tarda 2 s en volver no retiene el cierre: la respuesta sale
-    enseguida, y el borrador en vuelo ya había salido antes que ella."""
-    telegram = TelegramDeMentira(borrador_lento=2.0)
+def test_despues_del_mensaje_el_borrador_se_retira_sin_otro_escribiendo():
+    """Prueba por Telegram del 2026-10-08 (D8): los tres puntos quedaban a la vista, porque el
+    mensaje de verdad no siempre reemplaza al borrador. Después de que salió, quien lo despachó
+    pide el retiro (`retirar_tras_la_respuesta`): la semilla como mensaje silencioso y su
+    borrado, como en un turno sin mensaje, pero sin otro "escribiendo…" (ya no hay nada que
+    esperar). Una sola vez."""
+    telegram = TelegramDeMentira()
     antes = _hilos_del_indicador()
+    with _indicador(telegram) as indicador:
+        indicador.actualizar_borrador("Anoté que arrancaste.")
+        assert telegram.esperar(lambda: telegram.borradores_con_texto())
+        indicador.sigue_la_respuesta()
+    redactado = len(telegram.llamadas)
+    _respuesta_de_verdad(telegram)
+
+    assert indicador.retirar_tras_la_respuesta() is None
+    assert indicador.retirar_tras_la_respuesta() is None        # ya no queda nada
+
+    assert telegram.metodos()[redactado:] == ["sendMessage", "sendMessage", "deleteMessage"]
+    final, semilla = [p for m, p in telegram.llamadas if m == "sendMessage"]
+    assert final["text"] == "Anoté que arrancaste."
+    assert semilla["text"] == SEMILLA_INDICADOR and semilla["disable_notification"] is True
+    assert _sin_hilos_nuevos(antes)
+
+
+def test_el_borrador_en_vuelo_vuelve_antes_de_que_salga_el_mensaje():
+    """D8: un envío del borrador en vuelo al cerrar podía llegarle a Telegram después del
+    mensaje y volver a mostrar el borrador. El cierre espera a que vuelva (es un pedido ya en
+    vuelo, no un retiro antes del mensaje), así que el mensaje sale después."""
+    telegram = TelegramDeMentira(borrador_lento=0.3)
+    antes = _hilos_del_indicador()
+    with _indicador(telegram, intervalo_borrador=0.0) as indicador:
+        indicador.actualizar_borrador("Anoté que arrancaste.")
+        assert telegram.borrador_en_vuelo.wait(1.0)
+        indicador.sigue_la_respuesta()
+    _respuesta_de_verdad(telegram)
+
+    [(_, volvio)] = [v for v in telegram.vueltas if v[0] == "sendMessageDraft"]
+    enviado = telegram.horas[telegram.metodos().index("sendMessage")]
+    assert enviado >= volvio
+    assert telegram.metodos() == ["sendMessageDraft", "sendMessage"]
+    assert _sin_hilos_nuevos(antes)
+
+
+def test_un_borrador_colgado_no_retiene_el_cierre_mas_que_su_tope():
+    """Un envío del borrador que no vuelve: el cierre espera sólo hasta `timeout_borrador` y el
+    mensaje sale igual. El retiro de después tampoco se arriesga a llegar antes que ese borrador:
+    no se hace, y la falla vuelve para que quien despachó deje el incidente."""
+    telegram = TelegramDeMentira(borrador_lento=3.0)
     try:
-        with _indicador(telegram, intervalo_borrador=0.0) as indicador:
+        with _indicador(telegram, intervalo_borrador=0.0, timeout_borrador=0.2) as indicador:
             indicador.actualizar_borrador("Anoté que arrancaste.")
             assert telegram.borrador_en_vuelo.wait(1.0)
-            redactado = time.monotonic()
+            cerrando = time.monotonic()
             indicador.sigue_la_respuesta()
-        _respuesta_de_verdad(telegram)
-        enviado = telegram.horas[telegram.metodos().index("sendMessage")]
+        assert time.monotonic() - cerrando < 1.0
 
-        assert enviado - redactado < 0.5
-        assert telegram.metodos() == ["sendMessageDraft", "sendMessage"]
+        falla = indicador.retirar_tras_la_respuesta()
+
+        assert isinstance(falla, TimeoutError)
+        assert "deleteMessage" not in telegram.metodos()
     finally:
         telegram.soltar.set()
-    assert _sin_hilos_nuevos(antes)
+
+
+def test_sin_nada_a_la_vista_no_hay_nada_que_retirar():
+    """Una respuesta rápida (antes del umbral) no mostró nada: después del mensaje no se manda
+    nada más."""
+    telegram = TelegramDeMentira()
+    with _indicador(telegram) as indicador:
+        indicador.sigue_la_respuesta()
+    _respuesta_de_verdad(telegram)
+
+    assert indicador.retirar_tras_la_respuesta() is None
+    assert telegram.metodos() == ["sendMessage"]
 
 
 def test_sin_mensaje_que_siga_el_borrador_se_retira_y_ya_no_recibe_texto():
