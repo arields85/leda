@@ -383,6 +383,14 @@ mismo resultado.
 > usuario lo corrigió: la idea es que Leda ayude a solucionar el inconveniente y no le lleve
 > problemas al referente, que con ese aviso sólo ganaba tener que actuar.
 
+> **Precisión (usuario, 2026-10-08, decisiones 5 a 7 de `odd/tasks/fase-c.md`; escrita el
+> 2026-10-09).** El paso 4 suma un tercer escalamiento: si la segunda persona de la cadena también
+> dice que no le corresponde, que no sabe o nombra a otra, Leda le informa al referente con toda la
+> cadena, para que determine quién lo resuelve (al del sector de lo que falta si se sabe; si no, al
+> de la tarea trabada). Los tres avisos al referente son informativos: no le piden nada. Además, el
+> bloqueo viejo "ya existe en el código" valía para `main` antes del Motor; en el motor de
+> conversación vuelve con la C-5.
+
 > **Corrección (usuario, 2026-10-05; primer contacto real).** Hasta ese día, el paso 2 preguntaba
 > quién destraba sólo si la causa dependía de otra persona, y eso lo juzgaba la IA. En el primer
 > contacto real, con "estoy trabado, falta el repuesto", la IA juzgó que no dependía de otro y
