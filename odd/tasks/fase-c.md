@@ -2150,11 +2150,96 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         el incidente para el administrador no se registra en ese momento (sólo al guardarse).
       - Un incidente por cada vez que se nombra a alguien sin Leda conectada (no se agrupan:
         `leda_app` no puede leer `incident` para saber si ya se avisó ese día).
-      - La página de la tarea no muestra lo asentado en su historia (tampoco con referente): queda
-        en la auditoría y en el bloqueo (`escalado_a`, `escalado_en`).
-      - "Se lo pido yo" sin más, a la espera de lo que cuente, no tiene jugada: el tema de las
-        salidas queda abierto hasta que nombre a otra persona, diga que puede seguir, lo deje sin
-        efecto o pasen sus horas (decisión 21). Ver con la IA real.
+      - ~~La página de la tarea no muestra lo asentado en su historia~~: hecho en la C-5c (`0049`).
+      - ~~"Se lo pido yo" sin más no tiene jugada~~: hecho en la C-5c (`pedirselo_y_contar`).
+  - [x] **C-5c: cerrar el tema para todos, confirmar lo acordado y "ya lo hablé" sin decir qué**
+    (decisiones 39, 47 y 48 del usuario, 2026-10-09; derivados por el coordinador: "no le
+    escribas" después de que la pregunta salió, la 39 en los pases, "se lo pido yo" como jugada y lo
+    asentado en la historia de la tarea, de la 49). Route: delegada (escritor único, 2+ archivos no
+    triviales). Hecha el 2026-10-09:
+    - **Las conversaciones primero** (`0817e28`): la 33 suma la pregunta a los dos (48: Leda le
+      pregunta también a Marcos; vale lo que conteste el primero), lo acordado que le llega a Marcos
+      para confirmarlo (47) y su corrección, que le llega a Ariel y cierra el tema (pasos 4 a 6c), y
+      otra tarea en la que contesta primero Marcos (pasos 11 a 16). La 43 nueva (cerrar el tema para
+      todos): Marcos consigue el cable por otro lado y Ariel se entera de que ya no hace falta; lo
+      que Ariel contesta ("ya lo pedí") le llega a Marcos y su respuesta cierra el tema; "no le
+      escribas" con la pregunta ya enviada; "se lo pido yo y te cuento" con Mariano sin Leda y la
+      pregunta de cómo le fue el día hábil siguiente. La 38, paso 12-13: Martín, que aprobó el pase,
+      también se entera de que Lucas no la tomó. En seco, antes del código: 33 y 43 se caen
+      (`contar_lo_que_arreglaron` no existía) después de fallar los pasos 4 a 6 y 5 a 8; 38 con 3
+      fallas (pasos 12 y 13).
+    - **Test primero** (`2e17dcf`): `test_persecucion.py` (31 nuevas, 24 en rojo; las otras miran
+      que algo no pase), `test_delegar.py` (2, en rojo), `test_fichas.py` (la lista cerrada, en rojo)
+      y, en `tests/garantias`, `test_pagina_de_la_tarea.py` y `test_pagina_web_de_la_tarea.py` (2 en
+      rojo; la de otra tarea pasa). Una prueba vieja cambió: "no le escribas" después de que salió
+      dice que ya le llegó sólo si Ariel ya había contestado.
+    - **Lo asentado en la historia de la tarea** (`bf291d3`, migración `0049` con su rollback; sin
+      tablas ni columnas): `leer_pagina_de_tarea` suma quién dijo que lo destraba
+      (`blocker_unblocker`), lo que se dijo del bloqueo (`dicho_de_quien_destraba`: para cuándo, ya
+      está, no le corresponde, sus palabras) y que quedó asentado (`audit_log` del bloqueo viejo y
+      de la cadena: que sigue trabada con sus días hábiles, o que nadie lo toma), nunca a quién se
+      le informó (decisión 35). Quién ve la página no cambia (7b). `tarea_vista.py` lo dice en
+      palabras de todos los días.
+    - **El motor** (`3e055a8`, `persecucion.py` sobre todo):
+      - **39, una regla** (`cerrar_el_tema`): a quien tenía el tema abierto (a quien Leda le
+        preguntó o que ya habló del bloqueo, salvo que lo último que dijo sea "ya está" o "no me
+        corresponde"), Leda deja de preguntarle y le avisa cómo se cerró (aviso nuevo
+        `ya_no_hace_falta_que_destrabe`, informativo, con el margen; `como_se_cerro`: se destrabó,
+        lo destraba otra persona, dijo que ya lo hablaron, se lo pide directamente, o el bloqueo
+        quedó sin efecto por una corrección; y lo que esa persona había dicho). La llaman
+        `destrabar`, la corrección de un bloqueo, `anotar_quien_destraba` (cualquier cambio de quién
+        destraba), "no le escribas" con la pregunta ya enviada y `pedirselo_y_contar`. A quien
+        todavía no le escribió no se le cierra nada (su mensaje no sale). Si al salir lo volvieron a
+        nombrar, no sale (`volvio_a_ser_quien_destraba`).
+      - **Lo que contesta después** le llega a quien decide: la tarea queda en su lista
+        (`ya_no_hace_falta_que_la_destrabe`) mientras ese aviso sea lo último que Leda le mandó, y
+        `decir_cuando_destraba` lo anota sobre la fila que la nombraba (`ya_se_habia_destrabado`).
+      - **Lo que se dicen los dos, por Leda** (47): lo que una parte dice de lo acordado le llega a
+        la otra con `se_lo_pasa_si_contesta` (si es así, nada; si no, que avise); si contesta a eso,
+        llega con `cierra_el_tema` y no pide nada más. La jugada nueva `contar_lo_que_arreglaron`
+        (la persona trabada: lo que arregló, su corrección o su respuesta) se anota en
+        `dicho_de_quien_destraba` dicha por ella (auditada, `anotar_lo_que_arreglaron`) y le llega
+        a quien destraba (aviso nuevo `lo_que_dijo_quien_esta_trabado`). Lo que vigila "dijo algo
+        más nuevo" de quien destraba no cuenta lo de la persona trabada
+        (`avisos.ultimo_dicho_de_quien_destraba`, también en `encadenados`).
+      - **48:** "ya lo hablé" sin decir qué guarda también la pregunta a la persona trabada (aviso
+        `pregunta_a_quien_esta_trabado`, que abre la pregunta nueva `que_arreglaron`, con su espera
+        y sin escalar); la primera respuesta cierra la del otro y su aviso que no salió
+        (`ya_lo_conto_quien_destraba`, `ya_lo_conto_quien_esta_trabado`).
+      - **"Se lo pido yo y te cuento"** (`pedirselo_y_contar`, la salida de la decisión 37): lo
+        anota (auditado), cierra lo propuesto, retira el mensaje a quien destraba que no salió
+        (`se_lo_pide_quien_esta_trabado`) o, si ya le preguntaba, le cierra el tema, y guarda para
+        el día hábil siguiente a la hora de salida la pregunta de cómo le fue (aviso
+        `como_le_fue_con_quien_destraba`, seguimiento por su cuenta), que abre `que_arreglaron`: la
+        escalera de las preguntas la repite sin escalar (decisión 38). Sin a quién, pregunta a quién
+        se lo pide. `destrabar` contesta esa pregunta.
+      - **La 39 en los pases** (`pase._quienes_se_enteran`): quien aprobó el pase (`decidido_en`)
+        se entera también si quien la recibía no la toma o no contesta.
+      - **Las instrucciones de la IA no cambiaron** (huellas de `test_contratos.py` iguales): las
+        dos jugadas llegan con su ficha (no se ofrecen); `para_cuando` y `lo_que_dice` dicen en
+        `ia_real.DATOS` que también los dice la persona trabada; los códigos nuevos, en
+        `hechos.SIGNIFICADOS` y `PARA_LA_REDACCION`.
+    - **Cambió la 36:** Ariel, que había dado el lunes para la licencia del panel, se entera de que
+      ya no hace falta cuando Marcos lo destraba (pasos 12 y 12b nuevo).
+    - **Verde** (2026-10-09): `pytest tests/motor/test_persecucion.py`, 65 passed;
+      `tests/garantias/test_pagina_de_la_tarea.py` y `test_pagina_web_de_la_tarea.py`, 48 passed;
+      `tests/garantias/test_migraciones.py` (paridad y rollback de la `0049`), 16 passed; `pytest
+      tests/motor`, 1024 passed; en seco, `correr --ia guionada --veces 1 --sin-informe`, 42 de 43
+      (la 36, por el aviso nuevo) y, con la 36 al día, 43 de 43. Sobre `3e055a8`: `pytest
+      tests/motor tests/garantias tests/conversaciones`, **1567 passed**; en seco, **43 de 43
+      bien**. Sin la IA real; informes borrados, `gasto.json` sin tocar.
+    - `PENDIENTE`:
+      - **La IA real** sobre la 33, la 38 y la 43, y la prueba por Telegram (`leda_motor` necesita
+        la `0049`).
+      - Lo que cuenta la persona trabada no les llega como novedad a quienes esperan más abajo en
+        una cadena (porción 4); sólo lo que dice quien destraba.
+      - Lo que contesta quien destrababa sólo se toma mientras el aviso de que ya no hace falta
+        sea lo último que Leda le mandó.
+      - **Preguntas para el usuario** (cómo se leyó lo que las decisiones no dicen): a quien ya
+        dijo "ya está" no se le avisa que se destrabó (lo cerró esa persona); si Ariel ya contestó
+        una fecha, "no le escribas" no le manda nada (Leda ya no le preguntaba); lo que Ariel
+        contesta después del cierre le llega a Marcos para que, si quiere, le conteste, sin
+        preguntarle ni repetírselo.
 - [ ] **C-6.** Las cadencias (pregunta 8). El pedido de estado por persona, hecho y revisado el
   2026-10-09; el informe al grupo (decisión 25), construido el mismo día con su corrección (abajo,
   "La corrección de la C-6 y el informe al grupo"); falta la revisión RDD de ese tramo
@@ -2654,8 +2739,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         (`cc4d651`, `e91c38a`).
   - [x] C-5b: 37 (quien destraba sin Leda conectada), 38 (a quien no contesta no se lo abandona);
         conversaciones 32 y 42, sin migración (`67f7f3a`, `43ad895`, `97c818e`).
-  - [ ] C-5c: 39 (cerrar el tema para todos), 47 (confirmar lo acordado), 48 ("ya lo hablé" sin
-        decir qué).
+  - [x] C-5c: 39 (cerrar el tema para todos), 47 (confirmar lo acordado), 48 ("ya lo hablé" sin
+        decir qué), con "se lo pido yo", la 39 en los pases y lo asentado en la página de la
+        tarea; conversaciones 33, 36, 38 y 43, migración `0049` (`0817e28`, `2e17dcf`,
+        `bf291d3`, `3e055a8`).
   - [ ] C-5d: 24 (el informe, nunca a alguien de la cadena), 41 (destraba quien está trabado), 49
         (preguntarle a la persona trabada antes de asentar), 51 (hasta tres personas).
   - [ ] C-5e: 42 (seguir la cadena hasta quien puede destrabarla).
