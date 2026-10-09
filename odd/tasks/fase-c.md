@@ -337,6 +337,15 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     que ella diga que pudo seguir. Cambia `resolver_bloqueo`, que hoy deja cerrarlo a quien se le
     informó (`escalado_a`).
 
+42. **Leda sigue la cadena hasta quien puede destrabarla** (de la C-5, porción 4): decidida
+    (usuario, 2026-10-09, opción A ampliada). Si la persona nombrada como quien destraba ya está
+    trabada, Leda no le pide lo que no puede dar: se lo cuenta enseguida a quien espera ("Ariel
+    está esperando que llegue el servidor; apenas se mueva te aviso") y sigue profundizando: de
+    quién depende lo que traba a Ariel (Compras), le pregunta para cuándo, informa la fecha a
+    Ariel, a Marcos y a toda la cadena, y el día de esa fecha le vuelve a preguntar a Compras si
+    llegó, con la regla de la decisión 38 si no contesta. Falta: no preguntarle a quien ya está
+    trabado, y comprobar si existe la vuelta a preguntar el día de la fecha prometida.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2105,7 +2114,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 41 del usuario (2026-10-09; la 30 y la 40 ya están), con test primero.
+- [ ] Las decisiones 24 a 42 del usuario (2026-10-09; la 30 y la 40 ya están), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
