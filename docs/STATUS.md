@@ -46,19 +46,18 @@ no quede un escuchador viejo corriendo.
 
 **Lo hecho la noche del 2026-10-09 (sola, con el usuario dormido):** la D5b (decisión 21,
 conversación 30, `0040`), la `0041` (RLS forzado en cinco tablas de configuración y una prueba que
-recorre todas), pedir el enlace a la página por chat (conversación 31), la C-5 porciones 1 a 3
-(escribirle a quien destraba, "ya hablé con él" y "no me corresponde"; conversaciones 32 a 34) y la enmienda al ADR 0017 para delegar,
+recorre todas), pedir el enlace a la página por chat (conversación 31), la C-5 entera
+(perseguir un bloqueo, decisiones 4 a 7; conversaciones 32 a 36, `0042` a `0044`) y la enmienda al ADR 0017 para delegar,
 aceptada por el usuario. Todo revisado por tramos y subido; la lista de tareas y las preguntas
 juntadas para el usuario, en el plan ("Próximo paso").
 
 **Lo que sigue (pedido del usuario: avanzar todo lo posible solo, sin esperar pruebas):**
-1. **C-5, porciones 4 y 5** (decisiones 6 y 7), cada una con su conversación de prueba primero
-   (desde la 35): bloqueos encadenados y avisos hacia abajo; el bloqueo viejo.
-2. **C-6, las cadencias** (decisión 8) y **C-7, delegar** (ADR 0017, enmienda a la decisión 2).
+1. **C-6, las cadencias** (decisión 8), con su conversación de prueba primero (desde la 37).
+2. **C-7, delegar** (ADR 0017, enmienda a la decisión 2, aceptada).
 3. **La porción 5:** el acceso del administrador por el bot de administración.
 4. **Las pruebas pendientes van juntas, en una tanda posterior** (pedido del usuario): la IA real
-   sobre la 05, 21, 23, 27, 28 y 30 a 34 (una vez, sin repetir sin preguntar) y la prueba por
-   Telegram, con `leda_motor` al día hasta la `0043` (respaldo previo; autorizado) y el guion en
+   sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una vez, sin repetir sin preguntar) y la prueba por
+   Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo; autorizado) y el guion en
    tandas cortas de unos 15 minutos.
 5. **Las preguntas para el usuario**, juntas en el plan.
 

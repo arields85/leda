@@ -1374,7 +1374,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     se cumplen con la IA real; quedan dos de diseño (insistir en mandar algo incompleto y quién juzga lo
     que cubre un texto). `leda_motor` está al día y el guion de la prueba por Telegram, escrito
     (`docs/product/guion-telegram-fase-c-parte-1.md`). Falta: la prueba por Telegram del usuario.
-- [ ] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).
+- [x] **C-5.** La persecución del bloqueo (preguntas 4 a 7, conversación de prueba, ficha y prueba).
+  Completa en sus cinco porciones el 2026-10-09; falta la tanda de pruebas con la IA real y por Telegram.
   - [x] **Porción 1: escribirle a quien destraba** (decisión 4, primera mitad, y "no le escribas";
     conversación 32 con su YAML). Route: delegada (escritor único, 2+ archivos no triviales).
     Hecha el 2026-10-09:
@@ -1744,8 +1745,16 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         espera a volver (hoy sí, como todo aviso); qué pasa si no hay nadie a quien informar (hoy
         no se guarda nada, sin incidente); si el referente que recibe el informe puede cerrar el
         bloqueo (hoy sí, por `escalado_a`, como lo dejaba la operación del dominio).
-  - **La C-5 queda completa en sus cinco porciones** (decisiones 4 a 7); falta la tanda de pruebas
-    con la IA real y por Telegram. La casilla la marca el coordinador.
+  - **Revisión RDD de las porciones 4 y 5 por tramos (coordinador), aprobadas y reconocidas:**
+    `160eb3d..ba71984` `review-f2cba4eed6a986f3`; `ba71984..b0043cc` `review-5fde45d2f1cee13c`
+    (advertencias: la clave del aviso de una entrega no es determinista, `encadenados.py:213-216`;
+    ramas de la vigencia y "no me corresponde" hacia abajo sin prueba propia); `b0043cc..692513d`
+    (la porción 5) `review-7e9123d2ad572556` (advertencias: la búsqueda de bloqueos viejos no
+    filtraba por espacio, corregida en `2f2aa12` como segunda defensa sobre el RLS forzado; los
+    hechos con un responsable nulo). La suite completa sobre `692513d` dio 3 fallas en
+    `tests/test_restriccion_horario.py` (su conexión de prueba no sabía de `admin()`, desde
+    `411d680`), corregidas en `832492a`. Las dos correcciones, revisadas `692513d..2f2aa12`
+    `review-ee0dd21fd5d6d732`. **La C-5 queda completa en sus cinco porciones.**
 - [ ] **C-6.** Las cadencias (pregunta 8).
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
   - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
@@ -1765,12 +1774,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 1: escribirle a quien destraba y "no le escribas" (conversación 32, `0042`).
 - [x] C-5, porciones 2 y 3: "ya hablé con él" y "no me corresponde" con un salto (33, 34, `0043`).
 - [x] C-5, porción 4: bloqueos encadenados y avisos hacia abajo (decisión 6; 35, `0044`).
-- [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36).
+- [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [ ] C-6, las cadencias (decisión 8).
 - [ ] C-7, delegar (ADR 0017, enmienda a la decisión 2).
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
-- [ ] La tanda de pruebas: la IA real sobre la 05, 21, 23, 27, 28, 30, 31 y 32 (una ronda, cupo
-      primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0042` (respaldo previo).
+- [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
+      primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo).
 
 **Preguntas juntadas para el usuario** (cada una, con su ejemplo, en el registro de su unidad):
 
@@ -1783,3 +1792,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 3. **C-5, porciones 1 a 3** (cinco de la 1, siete de la 2 y la 3, y a quién va el informe si el referente es parte de la cadena): repetirle a quien destraba sin escalar; si se le escribe al
    referente cuando lo nombran como quien destraba; quien destraba sin chat; "no le escribas"
    después de que salió; avisarle a quien destraba que ya se destrabó por otro lado.
+4. **C-5, porciones 4 y 5** (once): nombrar como quien destraba a alguien que ya está trabado; si
+   el cierre que hace el sistema solo se avisa hacia abajo; si a la persona trabada se le dice que
+   se informó su bloqueo viejo; si se vuelve a informar; si el referente informado puede cerrar
+   el bloqueo; qué pasa si no hay nadie a quien informar; y las del registro de cada porción.
