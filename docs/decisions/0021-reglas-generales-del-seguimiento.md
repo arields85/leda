@@ -70,6 +70,10 @@ Cada regla trae el caso en que nació y su porqué, dicho por el usuario.
 
 ## Consecuencias
 
+- Las reglas pasan a la constitución (`nucleo/constitucion.md`, §8 y principios 13 y 14, versión
+  1.1), por decisión del usuario como administrador de plataforma (2026-10-09): son comportamiento
+  de Leda para cualquier cliente y ningún pack las puede cambiar. Este ADR queda como registro de su
+  origen y su porqué.
 - Cada diseño nuevo de un circuito o de un informe se contrasta con estas seis reglas antes del
   código, igual que con las del ADR 0013.
 - Una contradicción entre una porción construida y estas reglas es un hallazgo: se escribe primero
