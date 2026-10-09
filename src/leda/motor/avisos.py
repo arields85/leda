@@ -250,6 +250,12 @@ class TipoDeAviso:
     # Lo que queda registrado cuando sale, además del envío: que el bloqueo viejo se informó, a
     # quién y cuándo (C-5, porción 5; `bloqueo_viejo.al_salir`).
     al_salir: Callable[["Momento", dict[str, Any]], None] | None = None
+    # Si es el pedido de estado de la cadencia, con la lista de las tareas de la persona (C-6,
+    # `cadencias.py`): lo arma el envío (`_a_la_lista`) y hace una sola pregunta, por la lista.
+    lista: bool = False
+    # Si lo que la escalera tenía para ese día sobre una tarea va dentro de la lista de la cadencia
+    # de su responsable, como un renglón, en lugar de salir aparte (decisión 8).
+    entra_en_la_lista: bool = False
 
 
 # El hecho que le dice a la IA que el mensaje lleva al final el enlace a la página de la tarea.
@@ -318,7 +324,9 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
                 resumen[listo] += 1
             else:
                 listos.append(listo)
+        listos, por_la_lista = _a_la_lista(m, listos)
         listos, esperan, omitidos = _un_tema_a_la_vez(m, listos)
+        esperan += por_la_lista
         if esperan:
             resumen["en_espera"] += esperan
         if omitidos:
@@ -340,6 +348,60 @@ class _Listo:
     # La pregunta abierta de la persona, repetida (la de la escalera de esa pregunta, o el pedido
     # de estado de su tarea): sale sola, sin ningún aviso de otro tema (decisión 13, punto 2).
     solo: bool = False
+    # La lista de la cadencia (C-6): sus tareas, en el orden de la lista, y lo de la escalera de
+    # ese día que va adentro, que sale con ella.
+    de_la_lista: tuple[str, ...] = ()
+    plegados: tuple["_Listo", ...] = ()
+
+
+def _a_la_lista(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], int]:
+    """La lista de la cadencia de cada persona (C-6, decisión 8; `cadencias.py`): sus tareas, cada
+    una con lo que se sabe de ella, y adentro lo que la escalera tenía para ese día sobre esas
+    tareas (`TipoDeAviso.entra_en_la_lista`), que sale con la lista y no aparte. Si la lista de la
+    persona sale más tarde ese día, lo de la escalera la espera. Lo que sale y cuántos esperan."""
+    from . import cadencias             # cadencias importa este módulo
+
+    listas = {str(x.destinatario["membership_id"]): x for x in listos if x.tipo.lista}
+    plegables: dict[str, list[_Listo]] = {}
+    salen: list[_Listo] = []
+    for x in listos:
+        persona = str(x.destinatario["membership_id"])
+        if x.tipo.entra_en_la_lista and x.aviso["task_id"] is not None and (
+                persona in listas or _la_lista_sale_mas_tarde(m, persona)):
+            plegables.setdefault(persona, []).append(x)
+        else:
+            salen.append(x)
+    esperan = 0
+    armadas: dict[str, _Listo] = {}
+    for persona, lista in listas.items():
+        tareas = cadencias.tareas_de(m.cur, persona)
+        ids = [str(t["id"]) for t in tareas]
+        suyos = plegables.pop(persona, [])
+        adentro = [x for x in suyos if str(x.aviso["task_id"]) in ids]
+        salen.extend(x for x in suyos if str(x.aviso["task_id"]) not in ids)
+        renglones = [cadencias.renglon(m, t, [x.hechos for x in adentro
+                                             if str(x.aviso["task_id"]) == str(t["id"])])
+                     for t in tareas]
+        armadas[persona] = replace(lista, hechos={**lista.hechos, "sus_tareas": renglones},
+                                   de_la_lista=tuple(ids), plegados=tuple(adentro))
+    for resto in plegables.values():
+        # Sin la lista ahora: o sale más tarde ese día (y la esperan), o no es de la lista.
+        for x in resto:
+            if _la_lista_sale_mas_tarde(m, str(x.destinatario["membership_id"])):
+                esperan += 1
+            else:
+                salen.append(x)
+    return [armadas.get(str(x.destinatario["membership_id"]), x) if x.tipo.lista else x
+            for x in salen], esperan
+
+
+def _la_lista_sale_mas_tarde(m: Momento, persona: str) -> bool:
+    """Si la persona tiene la lista de la cadencia guardada para más tarde ese mismo día."""
+    m.cur.execute("""select programado_para from scheduled_notice
+                      where destinatario_membership_id = %s and tipo = %s and estado = 'guardado'
+                        and programado_para > %s""",
+                  (persona, preguntas.COMO_VIENEN_SUS_TAREAS, m.ahora))
+    return any(m.fecha(f["programado_para"]) == m.hoy for f in m.cur.fetchall())
 
 
 def _un_tema_a_la_vez(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], int, int]:
@@ -600,7 +662,8 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
         return _si_la_ia_no_redacta(m, envio, falla)
     cur.execute("select id from message_outbox where dedupe_key = %s", (clave,))
     outbox_id = str(cur.fetchone()["id"])
-    for x in envio:
+    # Lo de la escalera que fue dentro de la lista de la cadencia sale con ella (C-6).
+    for x in [y for x in envio for y in (x, *x.plegados)]:
         cur.execute("""update scheduled_notice
                           set estado = 'enviado', outbox_id = %s, resuelto_en = %s, hechos = %s,
                               intentos = intentos + 1, proximo_intento_en = null
@@ -625,6 +688,9 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                                                   membership_id=persona))
     antes = preguntas.actual(cur, persona)
     for x, q in zip(envio, preguntas_de):
+        if x.tipo.lista:
+            _abrir_la_lista(m, turno, x)
+            continue
         if (en_lista or x.tipo.ofrece_ver) and x.hechos.get("tarea"):
             _ofrecer_ver(turno, x.aviso, x.hechos["tarea"],
                          reemplaza_la_decision=en_lista and bool(x.tipo.ofrece))
@@ -705,7 +771,12 @@ def _responsable_ausente(m: Momento, aviso) -> bool:
 
 def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, Any] | None:
     """Un aviso que necesita respuesta pide el estado de su tarea: es la única pregunta que
-    se hace en él (la misma regla que en una respuesta)."""
+    se hace en él (la misma regla que en una respuesta). La lista de la cadencia hace una sola, por
+    todas sus tareas (C-6)."""
+    tipo = TIPOS.get(aviso["tipo"])
+    if tipo is not None and tipo.lista:
+        return {"tipo": preguntas.COMO_VIENEN_SUS_TAREAS, "desde_antes": False,
+                "de_la_lista": [{"titulo": t["tarea"]} for t in hechos.get("sus_tareas") or []]}
     if hechos.get("necesita_respuesta") is not True or aviso["task_id"] is None:
         return None
     pregunta: dict[str, Any] = {"tipo": hechos.get("pregunta") or ESPERA_DE_ESTADO,
@@ -787,6 +858,29 @@ def _abrir_la_pregunta(m: Momento, turno, aviso: dict[str, Any]) -> None:
                                      and satisfecho_en is null
                                    order by preguntado_en desc limit 1)""",
                   (task_id, persona, espera))
+
+
+def _abrir_la_lista(m: Momento, turno, lista: _Listo) -> None:
+    """La pregunta de la lista de la cadencia, con sus tareas (C-6): una sola, por todas; la de
+    una lista anterior sin cerrar queda reemplazada por ésta (`preguntas.abrir`, la misma). Lo de
+    la escalera que fue adentro y pedía el estado cuenta en su espera, como un recordatorio, sin
+    abrir otra pregunta; reemplaza, como el pedido mismo, la pregunta de la fecha de su tarea."""
+    preguntas.abrir(turno, preguntas.COMO_VIENEN_SUS_TAREAS, None,
+                    jugada={"tareas": list(lista.de_la_lista), "contestadas": [],
+                            "del_aviso": str(lista.aviso["id"])})
+    persona = turno.quien.membership_id
+    for x in lista.plegados:
+        if x.hechos.get("necesita_respuesta") is not True:
+            continue
+        task_id = str(x.aviso["task_id"])
+        preguntas.cerrar_de_tipo(turno, preguntas.FECHA_DE_LA_TAREA, task_id, "sin_efecto",
+                                 {"reemplazada_por": x.aviso["tipo"]})
+        m.cur.execute("""update pending_reply set recordatorios = recordatorios + 1
+                          where id = (select id from pending_reply
+                                       where task_id = %s and membership_id = %s and tipo = %s
+                                         and satisfecho_en is null
+                                       order by preguntado_en desc limit 1)""",
+                      (task_id, persona, ESPERA_DE_ESTADO))
 
 
 def pregunta_del_aviso(cur, aviso: dict[str, Any]) -> dict[str, Any] | None:
@@ -1641,6 +1735,11 @@ def _al_salir_el_bloqueo_viejo(m: Momento, aviso) -> None:
     bloqueo_viejo.al_salir(m, aviso)
 
 
+def _vigencia_de_la_lista(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import cadencias             # cadencias importa este módulo
+    return cadencias.vigencia(m, aviso)
+
+
 def _abre_cuando_se_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
     """La pregunta de quien destraba, atada a la fila que lo nombró: lo que recuerda al repetirla
     es quién está trabado y por qué (`preguntas.lo_anotado`)."""
@@ -1675,16 +1774,20 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # La escalera (mecánica §9; 9b): sin botones, siempre privados.
     # El aviso previo y el recordatorio del vencimiento no piden nada: lo ya hablado de su
     # tarea los omite (decisión 13, punto 5).
+    # Lo de la escalera de ese día sobre una tarea va en la lista de la cadencia de su responsable,
+    # si sale ese día (C-6).
     TipoDeAviso("aviso_previo", "informativo", _vigencia_de_la_escalera,
-                se_omite_si_ya_se_hablo=True),
+                se_omite_si_ya_se_hablo=True, entra_en_la_lista=True),
     # Con el ancla en una previsión, el único aviso del vencimiento: no pide nada (9i).
     TipoDeAviso(VENCIMIENTO_CON_PREVISION, "informativo", _vigencia_de_la_escalera,
-                se_omite_si_ya_se_hablo=True),
-    TipoDeAviso("pedido_de_estado", "seguimiento", _vigencia_de_la_escalera),
-    TipoDeAviso("reencuadre", "seguimiento", _vigencia_de_la_escalera),
+                se_omite_si_ya_se_hablo=True, entra_en_la_lista=True),
+    TipoDeAviso("pedido_de_estado", "seguimiento", _vigencia_de_la_escalera,
+                entra_en_la_lista=True),
+    TipoDeAviso("reencuadre", "seguimiento", _vigencia_de_la_escalera, entra_en_la_lista=True),
     TipoDeAviso("escalamiento", "prioritario", _vigencia_de_la_escalera, escala=True),
     # Después de un avance sin un hecho cierto, el pedido del día hábil siguiente.
-    TipoDeAviso(REPREGUNTA_DE_ESTADO, "seguimiento", _vigencia_de_la_escalera),
+    TipoDeAviso(REPREGUNTA_DE_ESTADO, "seguimiento", _vigencia_de_la_escalera,
+                entra_en_la_lista=True),
     # La escalera de una pregunta que espera respuesta: la pregunta otra vez y su escalamiento.
     TipoDeAviso(REPREGUNTA, "seguimiento", _vigencia_de_una_pregunta),
     TipoDeAviso(ESCALAMIENTO_DE_UNA_PREGUNTA, "prioritario", _vigencia_de_una_pregunta,
@@ -1738,6 +1841,10 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # registrado que se informó.
     TipoDeAviso(BLOQUEO_QUE_SIGUE_ABIERTO, "informativo", _vigencia_del_bloqueo_viejo,
                 va_a=_a_quien_va_el_bloqueo_viejo, al_salir=_al_salir_el_bloqueo_viejo),
+    # El pedido de estado de la cadencia, con la lista de las tareas de la persona (C-6): el
+    # seguimiento que Leda hace por su cuenta, un mensaje dentro del tope diario.
+    TipoDeAviso(preguntas.COMO_VIENEN_SUS_TAREAS, "seguimiento", _vigencia_de_la_lista,
+                lista=True),
 )})
 
 

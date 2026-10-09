@@ -22,8 +22,9 @@ En cada vuelta del escuchador (a lo sumo unos 25 segundos):
    real: `admin_notice` lo fecha la base y no tiene horario.
 
 Reemplaza al ciclo, al reloj y a la escalera viejos de `leda` (`leda.ciclo`, `leda.reloj`,
-`leda.escalera`, de textos fijos y con las cadencias), retirados en la E3-7; las cadencias
-vuelven después de M3. Detrás del webhook lo corre `fondo.py`.
+`leda.escalera`, de textos fijos y con las cadencias), retirados en la E3-7; las cadencias a cada
+integrante volvieron en la C-6 como una pasada de la escalera (`cadencias.py`). Detrás del webhook
+lo corre `fondo.py`.
 
 **Cada paso, aislado.** Corre en su transacción y se confirma solo. Si se cae, se deshace lo
 suyo, se dice en la consola y queda un incidente (`ETAPA_CICLO`) la primera vez: mientras siga

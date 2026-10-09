@@ -109,6 +109,14 @@ VER_LA_ENTREGA = "ver_la_entrega"
 # quien destraba (`decir_cuando_destraba`) y se cierra cuando la tarea se destraba o cambia
 # quién la destraba (`persecucion.py`).
 CUANDO_SE_DESTRABA = "cuando_se_destraba"
+# Cómo vienen las tareas de la lista que Leda manda con el ritmo fijo del espacio (C-6, decisión 8 del
+# usuario, 2026-10-08; `cadencias.py`): una sola pregunta por todas, sin tarea propia. Su jugada guarda
+# las tareas de la lista (`tareas`) y las que la persona ya contó (`contestadas`, con el momento del
+# turno); cada jugada sobre una de ellas la contesta en la lista (`marcar_en_la_lista`), y cuando
+# están todas se cierra. Si contestó sólo una parte, la respuesta pregunta una vez por las otras
+# (`pregunto_por_las_otras`) y, con otra respuesta parcial, se cierra (`al_terminar_el_turno`). Se
+# puede dejar: las tareas que vencen tienen la espera de su escalera.
+COMO_VIENEN_SUS_TAREAS = "como_vienen_sus_tareas"
 
 
 @dataclass(frozen=True)
@@ -147,6 +155,7 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(CUAL_DE_LAS_DOS, sin_elegir_queda=DECISION_DE_LA_ENTREGA),
     TipoDePregunta(VER_LA_ENTREGA),
     TipoDePregunta(CUANDO_SE_DESTRABA, espera=CUANDO_SE_DESTRABA, escala=False),
+    TipoDePregunta(COMO_VIENEN_SUS_TAREAS),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
@@ -223,6 +232,8 @@ def estado_para_la_ia(cur, membership_id: str, tareas) -> dict[str, Any] | None:
 def _para_la_ia(cur, q, tareas) -> dict[str, Any]:
     dicha = {"tipo": q["tipo"], "tarea": _alias(tareas, q["task_id"]), **_lo_propuesto(q),
              **_lo_mostrado(q)}
+    if q["tipo"] == COMO_VIENEN_SUS_TAREAS:
+        dicha["de_la_lista"] = [_alias(tareas, t) for t in faltan_de_la_lista(q)]
     ops = opciones(cur, q["id"])
     if ops:
         dicha["opciones"] = [{"opcion": alias_de_opcion(o["orden"]), "etiqueta": o["etiqueta"],
@@ -550,6 +561,64 @@ def contestar(ctx, nombre: str, tipos: Sequence[str], task_id: str) -> None:
         cerrar(ctx, str(fila["id"]), "respondida", {"jugada": nombre, "tarea": task_id})
 
 
+def marcar_en_la_lista(ctx, task_id: str) -> None:
+    """Una jugada sobre una tarea de la lista de la cadencia la contesta en la lista (C-6): queda
+    contada con el momento del turno, y la lista se cierra cuando están todas."""
+    cur = ctx.cur
+    cur.execute("""select * from conversation_question
+                    where membership_id = %s and tipo = %s and cerrada_en is null
+                      and jugada -> 'tareas' ? %s""",
+                (ctx.quien.membership_id, COMO_VIENEN_SUS_TAREAS, str(task_id)))
+    for q in cur.fetchall():
+        jugada = dict(q["jugada"] or {})
+        if str(task_id) in _contestadas(jugada):
+            continue
+        jugada["contestadas"] = [*(jugada.get("contestadas") or []),
+                                 {"tarea": str(task_id), "en": ctx.ahora.isoformat()}]
+        cur.execute("update conversation_question set jugada = %s where id = %s",
+                    (_json(jugada), q["id"]))
+        if not faltan_de_la_lista({**q, "jugada": jugada}):
+            cerrar(ctx, str(q["id"]), "respondida", {"tareas": list(jugada.get("tareas") or [])})
+
+
+def en_la_lista(cur, membership_id: str, task_id) -> bool:
+    """Si la tarea está en una lista de la cadencia que la persona tiene sin cerrar: Leda le pidió
+    su estado ahí."""
+    cur.execute("""select 1 from conversation_question
+                    where membership_id = %s and tipo = %s and cerrada_en is null
+                      and jugada -> 'tareas' ? %s limit 1""",
+                (membership_id, COMO_VIENEN_SUS_TAREAS, str(task_id)))
+    return cur.fetchone() is not None
+
+
+def faltan_de_la_lista(q) -> list[str]:
+    """Las tareas de la lista que la persona todavía no contó."""
+    jugada = q["jugada"] or {}
+    ya = _contestadas(jugada)
+    return [t for t in jugada.get("tareas") or [] if t not in ya]
+
+
+def _contestadas(jugada: dict[str, Any]) -> set[str]:
+    return {c["tarea"] for c in jugada.get("contestadas") or []}
+
+
+def _la_lista_al_terminar(ctx) -> None:
+    """Si la persona contestó en este turno otra parte de la lista después de que Leda preguntó
+    una vez por las otras, la lista se cierra: no se pregunta otra vez (decisión 8)."""
+    cur = ctx.cur
+    cur.execute("""select * from conversation_question
+                    where membership_id = %s and tipo = %s and cerrada_en is null
+                      and (jugada ->> 'pregunto_por_las_otras')::boolean""",
+                (ctx.quien.membership_id, COMO_VIENEN_SUS_TAREAS))
+    for q in cur.fetchall():
+        de_este_turno = [c for c in (q["jugada"] or {}).get("contestadas") or []
+                         if c.get("en") == ctx.ahora.isoformat()]
+        if de_este_turno:
+            cerrar(ctx, str(q["id"]), "respondida",
+                   {"tareas": list((q["jugada"] or {}).get("tareas") or []),
+                    "sin_contestar": faltan_de_la_lista(q)})
+
+
 def dejar_para_despues(ctx, pregunta_id: str) -> None:
     """La persona deja la pregunta para más tarde: no vuelve en este mismo mensaje."""
     _dejar_para_despues(ctx, pregunta_id)
@@ -561,6 +630,7 @@ def al_terminar_el_turno(ctx) -> dict[str, Any] | None:
     después. Devuelve la única que se hace en la respuesta, descrita para la redacción, con
     `desde_antes` si no salió de este mensaje (volver a ella es retomarla, 9d)."""
     cur, persona = ctx.cur, ctx.quien.membership_id
+    _la_lista_al_terminar(ctx)
     abierta = actual(cur, persona)
     if abierta is None:
         cur.execute("""select * from conversation_question
@@ -572,6 +642,11 @@ def al_terminar_el_turno(ctx) -> dict[str, Any] | None:
             return None
         _que_sea_la_abierta(ctx, str(abierta["id"]))
         _esperar_respuesta(ctx, abierta["tipo"], abierta["task_id"])
+    if abierta["tipo"] == COMO_VIENEN_SUS_TAREAS and (abierta["jugada"] or {}).get("contestadas"):
+        # La pregunta por las otras de la lista, una sola vez (decisión 8).
+        cur.execute("""update conversation_question
+                          set jugada = jugada || '{"pregunto_por_las_otras": true}'::jsonb
+                        where id = %s""", (abierta["id"],))
     return {**describir(ctx, abierta),
             "desde_antes": str(abierta["id"]) not in ctx.preguntas_del_turno}
 
@@ -584,6 +659,8 @@ def describir(ctx, q) -> dict[str, Any]:
         dicha["tarea"] = tarea_dicha(ctx, q["task_id"])
     dicha.update(_lo_propuesto(q))
     dicha.update(_lo_mostrado(q))
+    if q["tipo"] == COMO_VIENEN_SUS_TAREAS:
+        dicha["de_la_lista"] = [tarea_dicha(ctx, t) for t in faltan_de_la_lista(q)]
     ops = opciones(ctx.cur, q["id"])
     if ops:
         dicha["opciones"] = [{"opcion": alias_de_opcion(o["orden"]), "etiqueta": o["etiqueta"],

@@ -74,10 +74,6 @@ PROMESAS_SIN_CUMPLIR = {
         "(E3-3).",
     "resuelta_en":
         "Cuándo se resolvió una acción pendiente (ver `resuelta_por`).",
-    "ultima_corrida":
-        "Cuándo corrió por última vez una cadencia (`cadence_job`). La escribía el "
-        "ciclo viejo de `leda`, retirado en la E3-7 con las cadencias; vuelve con el "
-        "circuito 5 (el pedido de estado de las cadencias), después de M3.",
 }
 
 # Tablas enteras sin implementación: sus columnas tampoco se referencian, y

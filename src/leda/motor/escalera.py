@@ -107,6 +107,12 @@ conversación 36; `bloqueo_viejo.py`): un bloqueo que sigue abierto a los días 
 (`bloqueos.escala_solo_a_los_dias`, 5 si no está) se le informa al referente de la tarea, una sola
 vez, aunque la cadena se mueva, con la historia y las fechas dichas.
 
+**Los pedidos de estado con ritmo fijo** (C-6; decisión 8 del usuario, 2026-10-08; conversación 37;
+`cadencias.py`): el día de una cadencia del espacio a cada integrante en privado, la primera pasada
+guarda el pedido de cada persona con la lista de sus tareas, para la hora de la cadencia. Va antes que
+los pasos de la escalera: lo que ésta tenga para ese día sobre esas tareas sale dentro de la lista
+(`avisos._a_la_lista`), no aparte, y cuenta como dado.
+
 **Sin `aviso_previo_dias_habiles`** (el plan lo dejó `PENDIENTE`): se usa el mínimo del núcleo,
 un día hábil (mecánica §9), y cada aviso previo que sale con él deja un incidente de severidad
 baja para el administrador: nunca en silencio, y sin escribir la configuración por su cuenta.
@@ -140,6 +146,8 @@ from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir
                                      se_repite)
 from .avisos import BLOQUEO_QUE_SIGUE_ABIERTO, sigue_esperando_que_destrabe
 from .bloqueo_viejo import informar_los_viejos
+from .cadencias import guardar_los_pedidos
+from .preguntas import COMO_VIENEN_SUS_TAREAS
 from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, lo_anotado
 from .preguntas import TIPOS as TIPOS_DE_PREGUNTA
 from .tiempo import Reloj, sale
@@ -182,6 +190,11 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
     resumen: Counter[str] = Counter()
     with espacio(conn, workspace_id) as cur:
         m = Momento(cur, workspace_id, Calendario.desde_base(cur, workspace_id), reloj.ahora())
+        # Los pedidos de estado de la cadencia (C-6), antes que los pasos del día: lo de la
+        # escalera sobre esas tareas va dentro de la lista.
+        pedidos = guardar_los_pedidos(m)
+        if pedidos:
+            resumen[COMO_VIENEN_SUS_TAREAS] += pedidos
         n = dias_de_aviso_previo(cur, workspace_id)
         cur.execute("""select t.id from task t
                         where t.estado::text = any(%s) and t.fecha_objetivo is not null

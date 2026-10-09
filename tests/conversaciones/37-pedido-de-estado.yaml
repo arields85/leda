@@ -65,7 +65,7 @@ pasos:
         tipo: como_vienen_sus_tareas
         tareas: [PLC]
         hechos: {necesita_respuesta: true,
-                 tareas: [{tarea: PLC, vence: "2026-10-26", vence_hoy: true},
+                 sus_tareas: [{tarea: PLC, vence: "2026-10-26", vence_hoy: true},
                           {tarea: COM, vence: "2026-10-30", vence_hoy: ausente},
                           {tarea: HMI, vence: "2026-11-06", vence_hoy: ausente}]}
       # Y uno a Nahuel, con el aviso previo de los sensores adentro.
@@ -73,7 +73,7 @@ pasos:
         tipo: como_vienen_sus_tareas
         tareas: [SEN]
         hechos: {necesita_respuesta: true,
-                 tareas: [{tarea: SEN, vence: "2026-10-29", vence_hoy: ausente},
+                 sus_tareas: [{tarea: SEN, vence: "2026-10-29", vence_hoy: ausente},
                           {tarea: TAB, vence: "2026-11-06"},
                           {tarea: MOT, vence: "2026-11-06"}]}
     estado_avisos:

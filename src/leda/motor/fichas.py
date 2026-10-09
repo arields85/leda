@@ -367,6 +367,13 @@ def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
                                       tarea["estado"], ctx.calendario.zona))
             hecho = {"jugada": ficha.nombre, **ficha.manejar(ctx, datos, tarea)}
             de_la_tarea = tarea or ctx.tarea((hecho.get("tarea") or {}).get("alias", ""))
+            if (de_la_tarea is not None and ficha.del_responsable
+                    and hecho["jugada"] == ficha.nombre
+                    and hecho.get("resultado") != "no_se_puede"):
+                # Lo que dice de una tarea de la lista de la cadencia la contesta en la lista
+                # (C-6, decisión 8): también lo que todavía no se anota (una entrega que espera
+                # su confirmación, un bloqueo sin su causa), que sigue su propia pregunta.
+                preguntas.marcar_en_la_lista(ctx, de_la_tarea["id"])
             if hecho.get("resultado") == "anotado" and hecho["jugada"] == ficha.nombre:
                 if de_la_tarea is not None:
                     preguntas.contestar(ctx, ficha.nombre, ficha.contesta, de_la_tarea["id"])
@@ -943,6 +950,8 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
                 (persona, tarea["id"], preguntas.ESTADO_DE_LA_TAREA))
     espera = cur.fetchone()
     if espera is None:
+        if preguntas.en_la_lista(cur, persona, tarea["id"]):
+            return _avance_de_la_lista(ctx, tarea, dijo)
         return {"resultado": "no_se_puede", "motivo": "nadie_pidio_el_estado",
                 "tarea": _tarea(tarea)}
 
@@ -955,6 +964,30 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     if hecho.get("veces_sin_algo_cierto", 0) > 1:
         _abrir_pregunta(ctx, hecho, preguntas.FECHA_DE_LA_TAREA, tarea["id"],
                         jugada={"nombre": "informar_avance", "datos": datos})
+    return hecho
+
+
+def _avance_de_la_lista(ctx: Contexto, tarea: dict, dijo: str) -> dict:
+    """Cómo viene una tarea de la lista de la cadencia que su escalera todavía no siguió (no
+    vence todavía): Leda pidió el estado en la lista, así que se anota igual, con las palabras de
+    la persona, atribuido y auditado (C-6, decisión 8). No abre ninguna espera: Leda vuelve a
+    preguntar en la próxima lista o el día en que la escalera pide el estado, lo que llegue
+    antes (`cadencias.cuando_vuelve_a_preguntar`), no al día hábil siguiente."""
+    from . import cadencias                 # cadencias importa este módulo por `avisos`
+
+    _auditar(ctx, "informar_avance", "task", tarea["id"],
+             {"dijo": dijo, "dicho_por_membership_id": ctx.quien.membership_id,
+              "en_la_lista": True})
+    fila = _exigir_responsable(ctx.cur, ctx.quien, tarea["id"])
+    vuelve = cadencias.cuando_vuelve_a_preguntar(
+        ctx.cur, ctx.calendario, ctx.quien.workspace_id,
+        {"id": tarea["id"], "fecha_objetivo": fila["fecha_objetivo"]}, ctx.ahora)
+    hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
+                             "avance": {"dijo": dijo}}
+    if vuelve is not None:
+        hecho["vuelve_a_pedir_el_estado"] = {LLEGA: vuelve.isoformat()}
+    else:
+        hecho["no_vuelve_a_pedir_el_estado"] = {"motivo": "sin_fecha_comprometida"}
     return hecho
 
 

@@ -637,6 +637,18 @@ SIGNIFICADOS: Mapping[str, str] = {
                          "porqué de ese día, con sus palabras.",
     "propuesta": "Leda le propuso algo a la persona: espera que elija una de las propuestas o "
                  "la deje.",
+    "como_vienen_sus_tareas": "Leda le pregunta a la persona cómo viene cada una de sus tareas, "
+                              "todas juntas en un solo mensaje, con el ritmo fijo del equipo: "
+                              "espera algo cierto de cada una. Es una sola pregunta, por la "
+                              "lista entera.",
+    "sus_tareas": "Las tareas de la persona por las que Leda le pregunta en este mensaje, en "
+                  "una lista: cada una con lo que se sabe de ella.",
+    "de_la_lista": "Las tareas de la lista por las que Leda pregunta: las que la persona todavía "
+                   "no contó.",
+    "vence_hoy": "La tarea vence hoy.",
+    "ya_paso_su_momento": "El día de ese mensaje ya pasó: no se manda otro día.",
+    "no_es_dia_habil": "Ese día no es de trabajo para el equipo.",
+    "sin_tareas_abiertas": "La persona no tiene tareas por las que preguntarle.",
     # --- Códigos: los avisos que Leda manda por su cuenta --------------------------------------
     "aviso_previo": "Aviso de que la tarea vence pronto; no pide respuesta.",
     "vencimiento_proximo": "La tarea vence pronto; no pide respuesta.",
