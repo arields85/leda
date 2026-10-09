@@ -38,11 +38,16 @@ Cómo se leyó lo que la regla no dice (decidido por el coordinador a partir de 
 - **Lo contestado cubre hasta la lista siguiente.** El pedido de estado del día del vencimiento no
   sale si la persona contó cómo viene esa tarea después de la última lista y no cambió nada; si entre
   la respuesta y el vencimiento hay otra lista (o la hay ese mismo día), el pedido sale, dentro de esa
-  lista. Sin el pedido del vencimiento, Leda pregunta el día hábil siguiente si la tarea sigue sin
-  entregar: ya atrasada, cambió.
-- **Lo que la persona cuenta fuera de la lista también cuenta como contestado para la lista
-  siguiente**: no se le vuelve a preguntar ahí lo que acaba de decir. Pero no saltea el pedido del día
-  del vencimiento: eso es sólo para lo contestado en la lista.
+  lista. Una respuesta vaga ("ya casi") también es contar cómo viene.
+- **Una sola regla, en la lista o fuera de ella** (corrección de la C-6, del coordinador): lo que la
+  persona cuenta de una tarea por su cuenta tiene el mismo efecto que contestarlo en la lista; no se
+  le vuelve a preguntar en la lista siguiente ni el día del vencimiento.
+- **La escalera sigue anclada al vencimiento** (mecánica §9): el pedido del día del vencimiento que no
+  sale queda dado por contestado, con su motivo, como el primer paso. Si la tarea sigue sin entregar,
+  el día hábil siguiente sale el segundo pedido y el escalamiento llega el mismo día que sin la lista
+  (al tercer día hábil del vencimiento), nunca uno después.
+- **Un día dado en la lista es una previsión como cualquier otra** ("lo termino el miércoles"): la
+  misma jugada que fuera de la lista y el mismo seguimiento; ese día Leda pregunta.
 
 ## Estado inicial
 
@@ -88,14 +93,16 @@ Cómo se leyó lo que la regla no dice (decidido por el coordinador a partir de 
    - Estado después: la pregunta de cómo vienen sus tareas sigue abierta, con el motor.
 
 3. **Leda**, por su cuenta (martes 3, 10:00): el aviso previo de las comunicaciones (vencen el
-   viernes), que no pide respuesta. Del PLC, que vence hoy, nada: Marcos ya contó cómo viene.
+   viernes), que no pide respuesta. Del PLC, que vence hoy, nada: Marcos ya contó cómo viene. El
+   pedido de ese día queda dado por contestado, con su motivo: el primer paso de su escalera.
 
 4. **Leda**, por su cuenta (miércoles 4, 10:00 y 11:30): a las 10:00, nada (el pedido de estado del
    PLC, que venció ayer, espera la lista); a las 11:30, la lista del miércoles, sólo con lo que falta.
    →
    - Efecto: un mensaje privado con dos tareas: el PLC, que venció ayer sin entregarse (cambió), con el
-     pedido de estado de su escalera adentro; y el motor, del que no contestó el lunes. Ni las
-     comunicaciones (contestadas, sin cambios), ni el tablero ni el panel HMI (sin cambios).
+     pedido de estado de su escalera adentro (el segundo: la escalera sigue anclada al vencimiento);
+     y el motor, del que no contestó el lunes. Ni las comunicaciones (contestadas, sin cambios), ni
+     el tablero ni el panel HMI (sin cambios).
    - Estado después: la pregunta de cómo vienen sus tareas, abierta; la espera del estado del PLC,
      abierta.
 
@@ -107,13 +114,15 @@ Cómo se leyó lo que la regla no dice (decidido por el coordinador a partir de 
      PLC.
    - Estado después: la pregunta de cómo vienen sus tareas sigue abierta, con el PLC.
 
-6. **Leda**, por su cuenta (jueves 5, 10:00): el segundo pedido de estado del PLC, aparte (no hay lista
-   los jueves).
+6. **Leda**, por su cuenta (jueves 5, 10:00): el tercer pedido de estado del PLC, aparte (no hay lista
+   los jueves), que avisa que si sigue igual va a quedar asentado que está atrasada.
 
-7. **Leda**, por su cuenta (viernes 6, 10:00 y 11:00): la lista del viernes, sólo con lo que falta.
+7. **Leda**, por su cuenta (viernes 6, 10:00 y 11:00): a las 10:00, al tercer día hábil del
+   vencimiento del PLC, el escalamiento a Ismael, como si no hubiera habido lista; a las 11:00, la
+   lista del viernes, sólo con lo que falta.
    →
-   - Efecto: un mensaje privado con dos tareas: el PLC, del que no contestó desde el miércoles, con el
-     tercer pedido de estado de su escalera adentro; y las comunicaciones, que vencen hoy, con su
+   - Efecto: a Ismael, que el PLC sigue sin novedades. A Marcos, un mensaje privado con dos tareas: el
+     PLC, del que no contestó desde el miércoles; y las comunicaciones, que vencen hoy, con su
      pedido de estado adentro (la respuesta del lunes cubría hasta la lista del miércoles). Ni el motor
      (contestado el miércoles, sin cambios), ni el tablero ni el panel HMI.
    - Estado después: la espera del estado del PLC y la de las comunicaciones, abiertas.
@@ -122,7 +131,7 @@ Cómo se leyó lo que la regla no dice (decidido por el coordinador a partir de 
 
 - **Garantías (5b):** la lista del lunes con todas las tareas abiertas, cada una con su situación;
   una sola pregunta por lista y sólo por las que se pueden mover; nada aparte por lo que ya contestó;
-  las listas siguientes sólo con lo que cambió o no se contestó; el aviso previo de siempre; ninguna
-  fecha que nadie dio.
+  las listas siguientes sólo con lo que cambió o no se contestó; el aviso previo de siempre; la
+  escalera anclada al vencimiento (el escalamiento no se corre); ninguna fecha que nadie dio.
 - **Falla de comprensión:** que la IA reparta mal lo que Marcos dijo entre las tareas, o que tome
   "viene bien" como que la tarea está terminada.

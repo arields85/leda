@@ -114,15 +114,20 @@ pasos:
       - "que mañana le recuerda que vence el PLC"
       - "una pregunta por el tablero o por el panel HMI"
 
-  # El martes, sólo el aviso previo de las comunicaciones; del PLC, que vence hoy, nada (decisión 31).
+  # El martes, sólo el aviso previo de las comunicaciones; del PLC, que vence hoy, nada (decisión 31):
+  # su pedido de ese día queda dado por contestado, el primer paso de su escalera.
   - paso: 3
     quien: Leda
     relojes: ["2026-11-03 10:00"]
     salen:
       - {a: Marcos, tipo: aviso_previo, tarea: COM}
+    estado_avisos:
+      - {tipo: pedido_de_estado, tarea: PLC, a: Marcos, estado: omitido,
+         motivo: ya_conto_como_viene}
 
   # La lista del miércoles, sólo con lo que falta (decisión 46): el PLC, que venció sin entregarse,
-  # con su pedido de estado adentro, y el motor, que no contestó el lunes.
+  # con su pedido de estado adentro (el segundo de su escalera, anclada al vencimiento), y el motor,
+  # que no contestó el lunes.
   - paso: 4
     quien: Leda
     relojes: ["2026-11-04 10:00", "2026-11-04 11:30"]
@@ -131,11 +136,11 @@ pasos:
         tipo: como_vienen_sus_tareas
         tareas: [PLC]
         hechos: {necesita_respuesta: true, solo_lo_que_cambio_o_falta: true,
-                 sus_tareas: [{tarea: PLC, atraso_dias_habiles: 1, numero: 1,
+                 sus_tareas: [{tarea: PLC, atraso_dias_habiles: 1, numero: 2,
                                sin_respuesta_desde: ausente},
                           {tarea: MOT, sin_respuesta_desde: "2026-11-02"}]}
     estado_avisos:
-      - {tipo: pedido_de_estado, tarea: PLC, a: Marcos, estado: enviado}
+      - {tipo: pedido_de_estado, tarea: PLC, a: Marcos, estado: enviado, hechos: {numero: 2}}
     estado_despues:
       pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
       esperas_abiertas: [PLC]
@@ -163,25 +168,29 @@ pasos:
       - que quedó anotado que arrancó el motor
       - "una sola pregunta, en el último renglón, por el PLC"
 
-  # El jueves no hay lista: el segundo pedido de estado del PLC sale aparte.
+  # El jueves no hay lista: el tercer pedido de estado del PLC sale aparte, y avisa que si sigue igual
+  # va a quedar asentado.
   - paso: 6
     quien: Leda
     relojes: ["2026-11-05 10:00"]
     salen:
-      - {a: Marcos, tipo: pedido_de_estado, tarea: PLC, hechos: {numero: 2}}
+      - {a: Marcos, tipo: pedido_de_estado, tarea: PLC,
+         hechos: {numero: 3, si_no_hay_respuesta: presente}}
 
-  # La lista del viernes, sólo con lo que falta: el PLC, sin respuesta desde el miércoles, y las
-  # comunicaciones, que vencen hoy (lo contestado el lunes cubría hasta la lista del miércoles). El
-  # motor, contestado el miércoles y sin cambios, no.
+  # El viernes, al tercer día hábil del vencimiento del PLC, el escalamiento, como si no hubiera
+  # habido lista (mecánica §9). La lista del viernes, sólo con lo que falta: el PLC, sin respuesta
+  # desde el miércoles, y las comunicaciones, que vencen hoy (lo contestado el lunes cubría hasta la
+  # lista del miércoles). El motor, contestado el miércoles y sin cambios, no.
   - paso: 7
     quien: Leda
     relojes: ["2026-11-06 10:00", "2026-11-06 11:00"]
     salen:
+      - {a: Ismael, tipo: escalamiento, tarea: PLC}
       - a: Marcos
         tipo: como_vienen_sus_tareas
-        tareas: [PLC, COM]
+        tareas: [COM]
         hechos: {necesita_respuesta: true, solo_lo_que_cambio_o_falta: true,
-                 sus_tareas: [{tarea: PLC, sin_respuesta_desde: "2026-11-04", numero: 3},
+                 sus_tareas: [{tarea: PLC, sin_respuesta_desde: "2026-11-04", numero: ausente},
                           {tarea: COM, vence_hoy: true, numero: 1}]}
     estado_avisos:
       - {tipo: pedido_de_estado, tarea: COM, a: Marcos, estado: enviado}

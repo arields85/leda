@@ -12,6 +12,12 @@ tareas abiertas con su situación y pregunta sólo por las que se pueden mover (
 vuelve a preguntar mientras no cambie nada (31); después de "viene bien", lo próximo es el aviso previo
 de siempre (44); la primera lista de la semana es completa y las otras traen sólo lo que cambió o no se
 contestó, y si no hay nada no salen (46).
+
+La corrección de la C-6 (coordinador, a partir de las decisiones 31 y 8; mecánica §9): lo que la
+persona cuenta de una tarea tiene el mismo efecto en la lista o fuera de ella (una sola regla); un
+día dado en la lista es una previsión como cualquier otra y se sigue como tal; una respuesta vaga
+también cuenta como contada; y el pedido del día del vencimiento que no sale por lo contado cuenta
+como el primer paso de su escalera, que sigue anclada al vencimiento: el escalamiento no se corre.
 """
 
 from __future__ import annotations
@@ -22,12 +28,12 @@ from leda.db import admin
 from leda.motor import hechos as hechos_mod
 from leda.motor import preguntas
 from leda.motor.avisos import TIPOS
-from leda.motor.cadencias import leer_ritmo
+from leda.motor.cadencias import YA_LO_CONTO, leer_ritmo
 from leda.motor.escalera import ETAPA_ESCALERA
 from leda.motor.ia import Jugada
 
-from tests.motor.ayudantes import (abierta, avisos_guardados, cuantas, dice, estado_de,
-                                   nueva_tarea, octubre, poner_estado, todos, uno)
+from tests.motor.ayudantes import (abierta, avisos_guardados, cuantas, dice, espera_del_estado,
+                                   estado_de, nueva_tarea, octubre, poner_estado, todos, uno)
 
 LISTA = "como_vienen_sus_tareas"
 LUNES = "15 9 * * 1"
@@ -79,7 +85,7 @@ def test_el_aviso_y_la_pregunta_estan_declarados_con_su_significado():
     for codigo in (LISTA, "sus_tareas", "vence_hoy", "de_la_lista", "ya_paso_su_momento",
                    "no_es_dia_habil", "sin_tareas_abiertas", "sin_respuesta_desde",
                    "solo_lo_que_cambio_o_falta", "sin_novedades_para_la_lista",
-                   "antes_le_recuerda_que_vence"):
+                   "antes_le_recuerda_que_vence", YA_LO_CONTO):
         assert hechos_mod.significado(codigo), codigo
     # Lo que la escalera tenía para ese día sobre una tarea de la lista va adentro.
     assert {n for n, t in TIPOS.items() if t.entra_en_la_lista} == {
@@ -378,8 +384,10 @@ def test_lo_contestado_en_la_lista_no_se_vuelve_a_preguntar_el_dia_que_vence(con
                                                                              escribe, dias):
     """Decisión 31 del usuario (2026-10-09): Marcos contó en la lista del lunes cómo viene T1, que
     vence el viernes 9. El martes le llega el aviso previo de siempre (no pide nada, decisión 44);
-    el viernes, ningún "hoy vence"; el martes 13 (el lunes es feriado), ya atrasada y sin
-    entregar, cambió: Leda le pide el estado."""
+    el viernes, ningún "hoy vence": el pedido de ese día queda dado por contestado, con su motivo
+    (nunca en silencio). El martes 13 (el lunes es feriado), ya atrasada y sin entregar, cambió:
+    Leda le pide el estado, y es el segundo pedido de su escalera (mecánica §9: anclada al
+    vencimiento)."""
     _pregunta_la_lista(conn, mundo, dias)
     dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "viene bien"}),
          at=octubre(5, 10, 30))
@@ -387,9 +395,72 @@ def test_lo_contestado_en_la_lista_no_se_vuelve_a_preguntar_el_dia_que_vence(con
     [previo] = [p for p in dias.ciclo(octubre(6, 10)) if p["persona"].startswith("Marcos")]
     assert previo["hechos"][0]["aviso"] == "vencimiento_proximo"
     assert dias.ciclo(octubre(9, 10)) == []
-    assert avisos_guardados(conn, "pedido_de_estado") == []
+    [dado] = avisos_guardados(conn, "pedido_de_estado")
+    assert (dado["estado"], dado["motivo_omision"]) == ("omitido", YA_LO_CONTO)
+    assert "necesita_respuesta" not in dado["hechos"]
+    assert espera_del_estado(conn) is None
 
     [pedido] = dias.ciclo(octubre(13, 10))
+    assert pedido["hechos"][0]["aviso"] == "pedido_de_estado"
+    assert pedido["hechos"][0]["numero"] == 2
+    assert "pedidos_anteriores_que_no_le_llegaron" not in pedido["hechos"][0]
+
+
+def test_sin_el_pedido_del_dia_que_vence_la_escalera_escala_igual_al_tercer_dia_habil(
+        conn, mundo, escribe, dias):
+    """Mecánica §9: la escalera se ancla al vencimiento. Que el pedido del viernes 9 no salga
+    porque Marcos ya contó cómo venía no corre el escalamiento un día: martes 13 el segundo
+    pedido, miércoles 14 el tercero (avisa que va a quedar asentado) y jueves 15 el escalamiento,
+    como sin la lista; los pedidos sin respuesta que dice son los que salieron."""
+    _pregunta_la_lista(conn, mundo, dias)
+    dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "viene bien"}),
+         at=octubre(5, 10, 30))
+    dias.ciclo(octubre(6, 10))
+    dias.ciclo(octubre(9, 10))
+
+    [segundo] = dias.ciclo(octubre(13, 10))
+    [tercero] = dias.ciclo(octubre(14, 10))
+    escala = dias.ciclo(octubre(15, 10))
+
+    assert segundo["hechos"][0]["numero"] == 2
+    assert tercero["hechos"][0]["numero"] == 3
+    assert "si_no_hay_respuesta" in tercero["hechos"][0]
+    assert [p["persona"] for p in escala] == ["Ismael"]
+    [aviso] = [p["hechos"][0] for p in escala]
+    assert aviso["aviso"] == "falta_de_respuesta"
+    assert aviso["pedidos_de_estado_sin_respuesta"] == 2
+    assert "pedidos_de_estado_que_no_le_llegaron" not in aviso
+    assert dias.ciclo(octubre(16, 10)) == []
+
+
+def test_una_respuesta_vaga_en_la_lista_tambien_cuenta_como_contada(conn, mundo, escribe, dias):
+    """Una respuesta sin nada cierto ("ya casi, me falta uno") es contar cómo viene (decisión
+    31): el pedido del día del vencimiento tampoco sale."""
+    _pregunta_la_lista(conn, mundo, dias)
+    dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1",
+                                                   "palabras": "ya casi, me falta uno"}),
+         at=octubre(5, 10, 30))
+    dias.ciclo(octubre(6, 10))
+
+    assert dias.ciclo(octubre(9, 10)) == []
+    [dado] = avisos_guardados(conn, "pedido_de_estado")
+    assert dado["motivo_omision"] == YA_LO_CONTO
+
+
+def test_un_dia_dado_en_la_lista_se_sigue_como_cualquier_prevision(conn, mundo, escribe, dias):
+    """Un día dado en la lista es una previsión, la misma jugada que fuera de ella, con el mismo
+    seguimiento: el viernes 9 (vencía) el recordatorio que no pide nada, y el miércoles 14, el
+    día que dio, Leda le pregunta si la terminó. Lo contado no saltea el pedido del día de una
+    previsión: ese día lo eligió la persona."""
+    _pregunta_la_lista(conn, mundo, dias)
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14",
+                                                    "motivo": "falta el cable"}),
+         at=octubre(5, 10, 30))
+    dias.ciclo(octubre(5, 10, 45))                  # el aviso a Ismael, pasado el margen
+
+    [vencia] = [p for p in dias.ciclo(octubre(9, 10)) if p["persona"].startswith("Marcos")]
+    assert vencia["hechos"][0]["aviso"] == "vencimiento_con_prevision"
+    [pedido] = [p for p in dias.ciclo(octubre(14, 10)) if p["persona"].startswith("Marcos")]
     assert pedido["hechos"][0]["aviso"] == "pedido_de_estado"
     assert pedido["hechos"][0]["numero"] == 1
 
@@ -421,10 +492,11 @@ def test_si_cambio_algo_despues_de_contestar_el_dia_que_vence_se_le_pregunta(con
     assert pedido["estado"] == "enviado"
 
 
-def test_lo_que_cuenta_fuera_de_la_lista_no_saltea_el_pedido_del_dia_que_vence(conn, mundo,
-                                                                             escribe, dias):
-    """La decisión 31 es sobre lo contestado en la lista: si Marcos cuenta algo de T1 por su cuenta,
-    con la lista ya cerrada, el día en que vence se le pide el estado como siempre."""
+def test_lo_que_cuenta_fuera_de_la_lista_tambien_saltea_el_pedido_del_dia_que_vence(
+        conn, mundo, escribe, dias):
+    """Una sola regla (decisión 31): lo que Marcos cuenta de T1 por su cuenta, con la lista ya
+    cerrada, tiene el mismo efecto que contestarlo en la lista: el día en que vence no se le
+    pregunta, y el pedido de ese día queda dado por contestado."""
     _pregunta_la_lista(conn, mundo, dias, (T2, octubre(30, 17)), (T3, octubre(30, 17)))
     dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T2"}), at=octubre(5, 10, 30))
     dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T3"}), at=octubre(5, 10, 40))
@@ -432,10 +504,10 @@ def test_lo_que_cuenta_fuera_de_la_lista_no_saltea_el_pedido_del_dia_que_vence(c
     dias.ciclo(octubre(6, 10))
     dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(6, 15))
 
-    dias.ciclo(octubre(9, 10))
+    assert dias.ciclo(octubre(9, 10)) == []
 
-    [pedido] = avisos_guardados(conn, "pedido_de_estado")
-    assert pedido["estado"] == "enviado"
+    [dado] = avisos_guardados(conn, "pedido_de_estado")
+    assert (dado["estado"], dado["motivo_omision"]) == ("omitido", YA_LO_CONTO)
 
 
 def test_con_otra_lista_en_el_medio_el_dia_que_vence_se_le_pregunta(conn, mundo, escribe, dias):

@@ -29,6 +29,7 @@ import pytest
 
 from leda.db import admin, espacio
 from leda.motor import preguntas
+from leda.motor.avisos import REPREGUNTA
 from leda.motor.hechos import significado
 from leda.motor.ia import Jugada
 from leda.motor.pregunta_sin_contestar import (CLAVE, ESPERA_POR_OMISION, REPETICION_DEL_DIA,
@@ -257,10 +258,37 @@ def test_la_que_vuelve_fuera_del_horario_sale_enseguida_y_una_sola_vez(conn, mun
     [vuelve] = dias.ciclo(octubre(9, 17, 6))                # fuera del horario
     assert vuelve["pregunta"]["tipo"] == preguntas.QUIEN_DESTRABA
     assert dias.ciclo(octubre(9, 17, 7)) == []
+    # El martes 13 la repite su escalera (la del día hábil siguiente), una sola vez.
     salen = [p for p in dias.ciclo(octubre(13, 10)) if p["pregunta"]]
-    assert [p["pregunta"]["tipo"] for p in salen] in ([], [preguntas.QUIEN_DESTRABA])
+    assert [(p["pregunta"]["tipo"], p["hechos"][0]["aviso"]) for p in salen] == [
+        (preguntas.QUIEN_DESTRABA, REPREGUNTA)]
     assert dias.ciclo(octubre(13, 10, 1)) == []
 
+
+
+def test_fuera_del_horario_sale_solo_lo_que_sigue_la_conversacion(conn, mundo, dos):
+    """El filtro del envío fuera del horario (`avisos.enviar_avisos`, revisión
+    `review-f853adf249068e7d`): sólo se mira lo que sigue la conversación
+    (`TipoDeAviso.sigue_la_conversacion`). Lo demás ni se prepara: un aviso de un tipo sin declarar,
+    que dentro del horario queda omitido al prepararlo, fuera del horario sigue guardado."""
+    from leda.motor.avisos import TIPOS, guardar
+
+    with espacio(conn, mundo["id"]) as cur:
+        guardar(cur, mundo["id"], "tipo_que_no_existe", task_id=dos["T1"],
+                destinatario=mundo["personas"]["Marcos"]["membership_id"],
+                hechos={"aviso": "tipo_que_no_existe"}, programado_para=octubre(5, 16),
+                clave="prueba:fuera-del-horario", ahora=octubre(5, 16))
+    conn.commit()
+    assert not any(t.sigue_la_conversacion and t.nombre == "tipo_que_no_existe"
+                   for t in TIPOS.values())
+
+    assert Dias(conn, mundo).ciclo(octubre(5, 20)) == []
+    [aviso] = avisos_guardados(conn, "tipo_que_no_existe")
+    assert (aviso["estado"], aviso["intentos"]) == ("guardado", 0)
+
+    Dias(conn, mundo).ciclo(octubre(6, 9, 30))
+    [aviso] = avisos_guardados(conn, "tipo_que_no_existe")
+    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "tipo_sin_declarar")
 
 # --- 5. La pregunta que quedó por un cambio de tema (decisión 50) ----------------------------------
 
@@ -365,9 +393,10 @@ def test_un_cambio_de_tema_fuera_del_horario_trae_la_pregunta_enseguida(
     conn.commit()
     assert transporte.enviados[-1].texto.endswith("Aviso 1.")
     assert dias.ciclo(octubre(5, 20, 2)) == []
-    # El martes, la pregunta no sale dos veces (su escalera la puede repetir, una sola).
+    # El martes la repite su escalera (la del día hábil siguiente), una sola vez.
     salen = [p for p in _de_marcos(dias.ciclo(octubre(6, 10))) if p["pregunta"]]
-    assert [p["pregunta"]["tipo"] for p in salen] in ([], [preguntas.QUIEN_DESTRABA])
+    assert [(p["pregunta"]["tipo"], p["hechos"][0]["aviso"]) for p in salen] == [
+        (preguntas.QUIEN_DESTRABA, REPREGUNTA)]
     assert _de_marcos(dias.ciclo(octubre(6, 10, 1))) == []
 
 
