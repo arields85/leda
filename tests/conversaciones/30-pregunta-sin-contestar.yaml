@@ -125,6 +125,10 @@ pasos:
       - {nombre: anotar_inicio, tarea: TAB}
     efectos:
       estados: {TAB: en_curso}
+      # La otra pregunta, guardada para salir enseguida, aparte (paso 7).
+      avisos_guardados:
+        - {tipo: vuelve_la_pregunta, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {pregunta: quien_destraba, necesita_respuesta: true}}
     hechos:
       - {jugada: anotar_inicio, resultado: anotado, tarea: TAB}
     # La otra pregunta no va en esta respuesta: la trae el código aparte (paso 7).
@@ -185,6 +189,9 @@ pasos:
       - {nombre: anotar_quien_destraba, tarea: PLC, quien: "pedro de compras"}
     efectos:
       destraban: [{tarea: PLC, alguien: true, no_sabe: false}]
+      avisos_guardados:
+        - {tipo: vuelve_la_pregunta, tarea: COM, a: Marcos, estado: guardado,
+           hechos: {pregunta: estado_de_la_tarea, necesita_respuesta: true}}
     hechos:
       - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente}
     pregunta: null

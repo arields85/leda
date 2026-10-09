@@ -99,6 +99,14 @@ uno de otra tarea que no pide respuesta sale aparte y los demás esperan a que s
 el aviso previo y el recordatorio del vencimiento de una tarea de la que la persona habló después
 de que se guardaron no salen (`TipoDeAviso.se_omite_si_ya_se_hablo`): lo ya hablado no se repite.
 Los que esperan siguen guardados, con su hora; los que vencen juntos salen juntos, como siempre.
+
+**Una pregunta sin contestar no frena para siempre** (decisión 21 del usuario, 2026-10-08;
+conversación 30; C-3d, D5b; `pregunta_sin_contestar.py`): la escalera la repite una vez en el día,
+a las 4 horas, si detrás espera otro tema que pide respuesta (`repeticion_del_dia`); cuando su
+turno termina (4 horas después de la repetición, o al día siguiente), de lo que espera sale aparte
+lo más urgente (`_un_tema_a_la_vez`, `_urgencia`), y la pregunta queda para después. Las dos
+quedan abiertas a la vez: cuando una se cierra, la otra vuelve en su propio mensaje
+(`vuelve_la_pregunta`, `guardar_la_que_vuelve`), sin esperar los 30 minutos de la conversación.
 """
 
 from __future__ import annotations
@@ -119,6 +127,9 @@ from ..incidentes import registrar_incidente
 from ..salida import MAX_ADJUNTOS, PayloadValidationError, enqueue_outbox
 
 from . import cambios_de_estado, entrega, no_interrumpir, preguntas
+from . import pregunta_sin_contestar as sin_contestar
+from .pregunta_sin_contestar import (LA_MISMA_PREGUNTA_YA_SALE, REPETICION_DEL_DIA,
+                                     VUELVE_LA_PREGUNTA, YA_NO_ES_EL_DIA)
 from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, anclaje,
                     clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
@@ -128,7 +139,7 @@ from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, FICHAS, LLEGA, NO_
 from .margen import sale_con_margen
 from .ia import IA
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
-from .tiempo import Reloj
+from .tiempo import Reloj, sale
 
 # Decisión 8, caso 2: tras el 1.º, 2.º, 3.º y 4.º fallo de la IA, la espera hasta el
 # intento siguiente; al quinto fallo, el aviso queda `fallido`.
@@ -213,6 +224,9 @@ class TipoDeAviso:
     # persona que no pide nada ni trae el acto de otra persona. Si la persona habló de esa tarea
     # después de que se guardó, ya está al tanto: no sale (`no_interrumpir.YA_SE_HABLO`).
     se_omite_si_ya_se_hablo: bool = False
+    # Si es parte de la conversación que sigue y no espera a que la persona deje de escribir
+    # (`no_interrumpir`): la pregunta que vuelve cuando se cerró la otra (decisión 21).
+    sigue_la_conversacion: bool = False
 
 
 # El hecho que le dice a la IA que el mensaje lleva al final el enlace a la página de la tarea.
@@ -281,9 +295,11 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
                 resumen[listo] += 1
             else:
                 listos.append(listo)
-        listos, esperan = _un_tema_a_la_vez(m, listos)
+        listos, esperan, omitidos = _un_tema_a_la_vez(m, listos)
         if esperan:
             resumen["en_espera"] += esperan
+        if omitidos:
+            resumen["omitido"] += omitidos
         for envio in _envios(listos):
             for resultado in _enviar(m, envio, ia):
                 resumen[resultado] += 1
@@ -303,40 +319,83 @@ class _Listo:
     solo: bool = False
 
 
-def _un_tema_a_la_vez(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], int]:
+def _un_tema_a_la_vez(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], int, int]:
     """Con una pregunta de Leda sin contestar (la abierta de la persona, `preguntas.actual`),
     ningún aviso sale junto con ella (decisión 13 del usuario, 2026-10-08; conversación 26):
 
     - la pregunta misma, cuando se repite, sale sola (`_Listo.solo`);
     - uno que pide respuesta (una pregunta, o decidir) espera a que se cierre: la persona nunca
-      tiene dos preguntas de Leda abiertas a la vez;
+      tiene dos preguntas de Leda en un mensaje;
     - uno de la misma tarea que no pide respuesta, también: de ese tema sólo le llega la pregunta;
     - uno de otra tarea que no pide respuesta sale aparte, sin pregunta.
 
-    Los que esperan siguen guardados y se vuelven a mirar en cada vuelta. Lo que sale y cuántos
-    esperan."""
-    abiertas: dict[str, dict[str, Any] | None] = {}
-    salen: list[_Listo] = []
-    esperan = 0
+    Cuando el turno de la pregunta terminó (decisión 21; `sin_contestar.termino_su_turno`), de
+    los que piden respuesta de otra tarea y la pregunta misma repetida sale uno solo, el más
+    urgente (`_urgencia`), aparte; los demás esperan. La misma pregunta nunca sale dos veces en
+    un momento: si la repite su escalera, la repetición del día y la que vuelve quedan omitidas.
+
+    Los que esperan siguen guardados y se vuelven a mirar en cada vuelta. Lo que sale, cuántos
+    esperan y cuántos quedaron omitidos."""
+    por_persona: dict[str, list[_Listo]] = {}
     for x in listos:
-        persona = str(x.destinatario["membership_id"])
-        if persona not in abiertas:
-            abiertas[persona] = preguntas.actual(m.cur, persona)
-        abierta = abiertas[persona]
+        por_persona.setdefault(str(x.destinatario["membership_id"]), []).append(x)
+    salen: list[_Listo] = []
+    esperan = omitidos = 0
+    for persona, suyos in por_persona.items():
+        abierta = preguntas.actual(m.cur, persona)
         if abierta is None:
-            salen.append(x)
+            salen.extend(suyos)
             continue
-        pregunta = _pregunta_del_aviso(m, x.aviso, x.hechos)
-        de_la_tarea = (x.aviso["task_id"] is not None and abierta["task_id"] is not None
-                       and str(x.aviso["task_id"]) == str(abierta["task_id"]))
-        if pregunta is not None and de_la_tarea and _es_la_misma(pregunta["tipo"],
-                                                               abierta["tipo"]):
-            salen.append(replace(x, solo=True))
-        elif pregunta is not None or de_la_tarea:
-            esperan += 1
-        else:
-            salen.append(x)
-    return salen, esperan
+        mismas: list[_Listo] = []
+        otros_temas: list[_Listo] = []
+        for x in suyos:
+            pregunta = _pregunta_del_aviso(m, x.aviso, x.hechos)
+            de_la_tarea = (x.aviso["task_id"] is not None and abierta["task_id"] is not None
+                           and str(x.aviso["task_id"]) == str(abierta["task_id"]))
+            if pregunta is not None and de_la_tarea and _es_la_misma(pregunta["tipo"],
+                                                                   abierta["tipo"]):
+                mismas.append(x)
+            elif pregunta is not None and not de_la_tarea:
+                otros_temas.append(x)
+            elif pregunta is not None or de_la_tarea:
+                esperan += 1
+            else:
+                salen.append(x)
+        mismas, repetidas = _sin_repetir_la_pregunta(mismas)
+        for x in repetidas:
+            omitir(m.cur, str(x.aviso["id"]), LA_MISMA_PREGUNTA_YA_SALE, m.ahora)
+        omitidos += len(repetidas)
+        elegidos = mismas
+        if otros_temas and sin_contestar.termino_su_turno(m.cur, m.cal, m.workspace_id,
+                                                          abierta, m.ahora):
+            primero = min(mismas[:1] + otros_temas,
+                          key=lambda x: _urgencia(m, x, es_la_abierta=x in mismas))
+            elegidos = mismas if primero in mismas else [primero]
+        salen.extend(replace(x, solo=True) for x in elegidos)
+        esperan += len(mismas) + len(otros_temas) - len(elegidos)
+    return salen, esperan, omitidos
+
+
+def _sin_repetir_la_pregunta(mismas: list[_Listo]) -> tuple[list[_Listo], list[_Listo]]:
+    """La pregunta abierta repetida por varios avisos del mismo momento: los de su escalera
+    salen; la repetición del día y la que vuelve, sólo si no sale ninguno de ésos, y una."""
+    repiten = (REPETICION_DEL_DIA, VUELVE_LA_PREGUNTA)
+    de_la_escalera = [x for x in mismas if x.aviso["tipo"] not in repiten]
+    otras = [x for x in mismas if x.aviso["tipo"] in repiten]
+    if de_la_escalera:
+        return de_la_escalera, otras
+    return otras[:1], otras[1:]
+
+
+def _urgencia(m: Momento, x: _Listo, *, es_la_abierta: bool) -> tuple:
+    """Lo más urgente primero (decisión 21: "primero la más urgente"; lectura de la regla,
+    `PENDIENTE` del usuario): el tipo de mensaje más urgente (mecánica §11) y, entre iguales, la
+    tarea que vence antes; si vencen juntas, la pregunta abierta, que es el tema en curso, y
+    después el que se guardó para antes."""
+    tarea = leer_tarea(m.cur, x.aviso["task_id"]) if x.aviso["task_id"] is not None else None
+    vence = tarea["fecha_objetivo"] if tarea is not None else None
+    return (-URGENCIA.index(x.tipo.tipo_de_mensaje), vence is None, vence or m.ahora,
+            not es_la_abierta, x.aviso["programado_para"], x.aviso["creado_en"])
 
 
 def _es_la_misma(tipo: str, abierta: str) -> bool:
@@ -414,8 +473,8 @@ def _preparar(m: Momento, aviso: dict[str, Any]) -> _Listo | str:
         return "omitido"
     if ausente(cur, str(aviso["destinatario_membership_id"]), m.hoy):
         return "en_espera"          # vuelve a mirarse cuando vuelva (mecánica §9, ausencias)
-    if no_interrumpir.conversando(cur, m.cal, m.workspace_id,
-                                  str(aviso["destinatario_membership_id"]), m.ahora):
+    if not (tipo is not None and tipo.sigue_la_conversacion) and no_interrumpir.conversando(
+            cur, m.cal, m.workspace_id, str(aviso["destinatario_membership_id"]), m.ahora):
         return "en_espera"          # está hablando con Leda: no se la interrumpe (decisión 13)
     if tipo is None:
         omitir(cur, aviso_id, "tipo_sin_declarar", m.ahora)
@@ -539,6 +598,7 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     turno = SimpleNamespace(cur=cur, ahora=m.ahora, preguntas_del_turno=[], dejadas=[],
                             quien=SimpleNamespace(workspace_id=m.workspace_id,
                                                   membership_id=persona))
+    antes = preguntas.actual(cur, persona)
     for x, q in zip(envio, preguntas_de):
         if (en_lista or x.tipo.ofrece_ver) and x.hechos.get("tarea"):
             _ofrecer_ver(turno, x.aviso, x.hechos["tarea"],
@@ -555,6 +615,12 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                             where task_id = %s and tipo = %s
                               and satisfecho_en is null and escalado_en is null""",
                         (m.ahora, x.aviso["task_id"], _espera_del_aviso(x.hechos)))
+    # La pregunta que el envío hizo (o volvió a hacer) queda preguntada ahora; si dejó para
+    # después la que estaba abierta, las dos vuelven aparte cuando se cierre la otra (decisión 21).
+    abierta = preguntas.actual(cur, persona)
+    if abierta is not None and str(abierta["id"]) in turno.preguntas_del_turno:
+        sin_contestar.marcar_preguntada(cur, str(abierta["id"]), m.ahora)
+        sin_contestar.quedaron_dos_abiertas(cur, antes, abierta)
     return ["enviado"] * len(envio)
 
 
@@ -624,6 +690,13 @@ def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, 
         pregunta["opciones"] = [{"etiqueta": FICHAS[n].boton} for n in tipo.ofrece]
     if tipo is not None and tipo.recuerda:
         pregunta["desde_antes"] = True      # la hizo el aviso que la ofreció
+    if aviso["tipo"] in (REPETICION_DEL_DIA, VUELVE_LA_PREGUNTA):
+        # Vuelve a hacer una pregunta: con lo que mostraba o proponía. La que vuelve aparte ya se
+        # había hecho y quedó para después (decisión 21).
+        q = pregunta_del_aviso(m.cur, aviso)
+        if q is not None:
+            pregunta.update(preguntas.lo_que_lleva(q))
+        pregunta["desde_antes"] = aviso["tipo"] == VUELVE_LA_PREGUNTA
     return pregunta
 
 
@@ -664,9 +737,11 @@ def _abrir_la_pregunta(m: Momento, turno, aviso: dict[str, Any]) -> None:
     respuesta la vuelve a hacer: es la abierta (`preguntas.retomar`)."""
     task_id, tipo_de_aviso = str(aviso["task_id"]), aviso["tipo"]
     persona = turno.quien.membership_id
-    if tipo_de_aviso == REPREGUNTA:
+    if tipo_de_aviso in (REPREGUNTA, REPETICION_DEL_DIA, VUELVE_LA_PREGUNTA):
         pregunta = pregunta_del_aviso(m.cur, aviso)
         preguntas.retomar(turno, str(pregunta["id"]))
+        if tipo_de_aviso == VUELVE_LA_PREGUNTA:
+            return              # no es un recordatorio: la conversación sigue
         espera = preguntas.TIPOS[pregunta["tipo"]].espera
     else:
         preguntas.cerrar_de_tipo(turno, preguntas.FECHA_DE_LA_TAREA, task_id, "sin_efecto",
@@ -1062,6 +1137,51 @@ def _vigencia_de_una_pregunta(m: Momento, aviso) -> tuple[str | None, dict[str, 
     return None, hechos_de_una_pregunta(m, tarea, dict(aviso["hechos"]))
 
 
+# --- Una pregunta sin contestar (decisión 21) ----------------------------------------------------
+
+def hechos_de_la_que_vuelve(pregunta: dict[str, Any], aviso: str) -> dict[str, Any]:
+    """Lo fijo de un aviso que vuelve a hacer una pregunta: qué aviso es, la pregunta y lo que
+    se había anotado cuando se hizo; lo de la tarea lo lee `hechos_de_una_pregunta`."""
+    sobre = preguntas.lo_anotado(pregunta)
+    return {"aviso": aviso, "pregunta": pregunta["tipo"], "necesita_respuesta": True,
+            **({"sobre": sobre} if sobre else {})}
+
+
+def guardar_la_que_vuelve(ctx, pregunta: dict[str, Any]) -> str:
+    """La pregunta que vuelve aparte cuando se cerró la otra de las dos abiertas a la vez
+    (decisión 21): enseguida, en su propio mensaje, dentro del horario."""
+    cal = Calendario.desde_base(ctx.cur, ctx.quien.workspace_id)
+    m = Momento(ctx.cur, ctx.quien.workspace_id, cal, ctx.ahora)
+    tarea = leer_tarea(ctx.cur, pregunta["task_id"])
+    base = hechos_de_la_que_vuelve(pregunta, VUELVE_LA_PREGUNTA)
+    aviso_id, _ = guardar(
+        ctx.cur, ctx.quien.workspace_id, VUELVE_LA_PREGUNTA, task_id=str(pregunta["task_id"]),
+        destinatario=ctx.quien.membership_id,
+        hechos={**base, **hechos_de_una_pregunta(m, tarea, base)},
+        programado_para=sale(cal, ctx.ahora),
+        clave=(f"motor:{VUELVE_LA_PREGUNTA}:{pregunta['task_id']}:q{pregunta['id']}:"
+               f"{int(ctx.ahora.timestamp())}"), ahora=ctx.ahora)
+    return aviso_id
+
+
+def _vigencia_de_la_que_se_repite(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    """La repetición del día y la que vuelve: mientras la pregunta siga sin cerrar, sea de la
+    persona a la que va y, la repetición, en su día."""
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return "tarea_inexistente", {}
+    if tarea["estado"] in ("terminada", "cancelada"):
+        return "tarea_cerrada", {}
+    pregunta = pregunta_del_aviso(m.cur, aviso)
+    if pregunta is None or pregunta["cerrada_en"] is not None:
+        return "ya_respondio", {}
+    if str(pregunta["membership_id"]) != str(aviso["destinatario_membership_id"]):
+        return "cambio_el_responsable", {}
+    if aviso["tipo"] == REPETICION_DEL_DIA and m.fecha(aviso["programado_para"]) != m.hoy:
+        return YA_NO_ES_EL_DIA, {}
+    return None, hechos_de_una_pregunta(m, tarea, dict(aviso["hechos"]))
+
+
 # --- Los avisos de una previsión ---------------------------------------------------------------
 
 def _vigencia_de_la_prevision(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
@@ -1357,6 +1477,11 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso(REPREGUNTA, "seguimiento", _vigencia_de_una_pregunta),
     TipoDeAviso(ESCALAMIENTO_DE_UNA_PREGUNTA, "prioritario", _vigencia_de_una_pregunta,
                 escala=True),
+    # Una pregunta sin contestar (decisión 21): la repetición del día, a las 4 horas, y la que
+    # vuelve aparte cuando se cerró la otra, enseguida (sigue la conversación).
+    TipoDeAviso(REPETICION_DEL_DIA, "seguimiento", _vigencia_de_la_que_se_repite),
+    TipoDeAviso(VUELVE_LA_PREGUNTA, "seguimiento", _vigencia_de_la_que_se_repite,
+                sigue_la_conversacion=True),
     # Lo que causa el acto de una persona: llega aunque se haya alcanzado el tope (§10).
     TipoDeAviso("nueva_prevision", "normal", _vigencia_de_la_prevision, es_coordinacion=True),
     TipoDeAviso("correccion_de_prevision", "normal", _vigencia_de_la_prevision,

@@ -76,7 +76,9 @@ def test_dos_pedidos_de_estado_juntos_preguntan_de_a_uno(conn, mundo, dias,
                                       q.para_despues_en is not null as para_despues
                                  from conversation_question q
                                  join conversation_state s on s.membership_id = q.membership_id
-                                where q.cerrada_en is null order by q.abierta_en""")
+                                where q.cerrada_en is null
+                                -- Las dos se abren en el mismo momento: la abierta primero.
+                                order by q.abierta_en, q.para_despues_en nulls first""")
     assert [(f["abierta"], f["para_despues"]) for f in abiertas] == [(True, False),
                                                                     (False, True)]
 

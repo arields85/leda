@@ -1225,6 +1225,8 @@ create table conversation_question (
   cerrada_en         timestamptz,
   cierre             text check (cierre in ('respondida', 'cancelada', 'sin_efecto')),
   cierre_detalle     jsonb,
+  preguntada_en      timestamptz,
+  vuelve_aparte      boolean not null default false,
   constraint conversation_question_workspace_id_unique unique (workspace_id, id),
   constraint conversation_question_membership
     foreign key (membership_id)
@@ -1365,6 +1367,10 @@ comment on column conversation_turn.numero is
   'El Motor (E2-3): el número del turno en la conversación de la persona (1, 2, 3...). Lo pone el motor; ordena los turnos de la misma hora.';
 comment on table conversation_question is
   'El Motor: las preguntas de Leda. Se cierran con cerrada_en y cierre; una pregunta dejada para después lleva para_despues_en.';
+comment on column conversation_question.preguntada_en is
+  'La última vez que Leda le hizo la pregunta a la persona (decisión 21 del usuario, 2026-10-08): las 4 horas de una pregunta sin contestar se cuentan desde ahí. Sin valor, desde abierta_en.';
+comment on column conversation_question.vuelve_aparte is
+  'Una de dos preguntas abiertas a la vez porque un aviso de Leda hizo la segunda (decisión 21): cuando una se cierra, el código trae la otra en un mensaje aparte.';
 comment on table conversation_option is
   'El Motor: las opciones de una duda (situación general 5). El token es único y es lo que vuelve con un toque.';
 comment on table scheduled_notice is

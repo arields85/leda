@@ -68,7 +68,8 @@ from ..incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
                           REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
 from ..salida import enqueue_outbox
 
-from . import aprobacion, archivos, cambios_de_estado, entrega, fichas, preguntas, registro
+from . import (aprobacion, archivos, cambios_de_estado, entrega, fichas, pregunta_sin_contestar,
+               preguntas, registro)
 from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
 from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
@@ -201,7 +202,8 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
             # Desde cuándo cada tarea está en su estado lo sabe el motor por lo que anota
             # (`cambios_de_estado.py`): los cambios de este turno, fuera de los hechos.
             cambios = cambios_de_estado.del_turno(cur, ctx.tareas)
-            pregunta = preguntas.al_terminar_el_turno(ctx)
+            # La que vuelve aparte no va en la respuesta (decisión 21).
+            pregunta = pregunta_sin_contestar.al_terminar_el_turno(ctx)
             # Lo que los hechos dejaron para después, como quedó después de todas las jugadas
             # (9k). También lo que un turno anterior dejó anunciado y ya no va a pasar, y lo
             # que sigue.

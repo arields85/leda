@@ -246,6 +246,21 @@ def _lo_mostrado(q) -> dict[str, Any]:
     return dicho
 
 
+def lo_que_lleva(q) -> dict[str, Any]:
+    """Lo que la pregunta propone o mostró, para volver a hacerla en un aviso (decisión 21)."""
+    return {**_lo_propuesto(q), **_lo_mostrado(q)}
+
+
+def lo_anotado(pregunta) -> dict[str, Any]:
+    """Lo que se había anotado cuando Leda hizo la pregunta (la jugada y sus datos, sin la
+    tarea ni ids): lo que recuerda un aviso que la vuelve a hacer."""
+    jugada = pregunta["jugada"] or {}
+    if not jugada.get("nombre"):
+        return {}
+    datos = {k: v for k, v in (jugada.get("datos") or {}).items() if k != "tarea"}
+    return {"jugada": jugada["nombre"], **datos}
+
+
 def _alias(tareas, task_id) -> str | None:
     if task_id is None:
         return None

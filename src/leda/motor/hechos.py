@@ -511,8 +511,10 @@ SIGNIFICADOS: Mapping[str, str] = {
     "fecha": "Una fecha.",
     "pide_el_estado_el": "El día en que Leda le va a preguntar cómo viene la tarea: todavía "
                          "no pasó.",
-    "si_no_hay_respuesta": "Lo que va a pasar si la persona no contesta: a quién se le va a "
-                           "avisar. Todavía no pasó.",
+    "si_no_hay_respuesta": "Lo que va a pasar si la persona no contesta: se informa que la "
+                           "tarea está atrasada, o que la pregunta quedó sin respuesta, a quien "
+                           "corresponde (se_avisa_a). Es sólo información: nadie toma la tarea "
+                           "ni la destraba por eso. Todavía no pasó.",
     "se_avisa_a": "A quiénes se les va a avisar.",
     "avance_anterior": "Lo que la persona contestó antes sin un hecho cierto, y cuándo.",
     "el": "El día en que pasó.",
@@ -649,6 +651,13 @@ SIGNIFICADOS: Mapping[str, str] = {
     "repregunta_de_estado": "Leda vuelve a preguntar cómo viene la tarea después de una "
                             "respuesta sin un hecho cierto.",
     "repregunta": "Leda vuelve a hacer una pregunta que no tuvo respuesta.",
+    "repeticion_del_dia": "Leda vuelve a hacer, una sola vez en el día, una pregunta que la "
+                          "persona todavía no contestó.",
+    "vuelve_la_pregunta": "Leda vuelve a una pregunta que había quedado para después: la "
+                          "persona ya contestó la otra que estaba abierta.",
+    "la_misma_pregunta_sale_en_otro_aviso": "La misma pregunta sale en otro mensaje de ese "
+                                            "momento: no se repite dos veces.",
+    "ya_no_es_el_dia_de_la_repeticion": "La repetición era para otro día: ese día ya pasó.",
     "escalamiento_de_una_pregunta": "Aviso a quien corresponde de que una pregunta quedó sin "
                                     "respuesta.",
     "nueva_prevision": "Aviso a quien aprueba el trabajo de la persona responsable: dio un "

@@ -71,6 +71,12 @@ fecha esperan con el pedido de estado: las repite la escalera de la tarea, no é
 cuya pregunta se cerró sin contestarse (una corrección la dejó sin efecto) ya no espera nada y
 se cierra. Una ausencia la pausa, como a la de la tarea.
 
+**Una pregunta sin contestar con otro tema esperando detrás** (decisión 21 del usuario,
+2026-10-08; conversación 30; `pregunta_sin_contestar.py`): además de su escalera, Leda la repite
+una sola vez en el día, a las 4 horas de haberla hecho, si detrás de ella espera otro tema que pide
+respuesta (`repeticion_del_dia`). Lo que pasa después, cuando su turno termina, es del envío
+(`avisos._un_tema_a_la_vez`).
+
 **La espera de una decisión: quien aprueba no contesta** (porción 3c de la C-3; usuario,
 2026-10-07, `odd/tasks/fase-c.md`, pregunta 3; conversación 24). Una entrega que espera la
 decisión de quien la aprueba tiene su propia escalera, contada en días hábiles desde que salió
@@ -124,7 +130,10 @@ from .avisos import (ABIERTOS, ANTES_LA_REVISABA_OTRA_PERSONA, APROBACION_TRABAD
                      aprobacion_vigente, ausente, aviso_de_la_entrega, espera_abierta, guardar,
                      hechos_de_la_escalera, hechos_de_una_decision, hechos_de_una_pregunta,
                      integrante, leer_tarea, omitir, quien_esta_arriba, quienes_escalan)
-from .preguntas import DECISION_DE_LA_ENTREGA
+from .avisos import REPETICION_DEL_DIA, hechos_de_la_que_vuelve
+from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir, preguntada_en,
+                                     se_repite)
+from .preguntas import DECISION_DE_LA_ENTREGA, lo_anotado
 from .tiempo import Reloj, sale
 
 ETAPA_ESCALERA = "motor_escalera"
@@ -185,6 +194,11 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
             guardado = _un_paso_de_una_pregunta(m, espera)
             if guardado:
                 resumen[guardado] += 1
+        # Una pregunta sin contestar con otro tema esperando detrás: su repetición del día
+        # (decisión 21).
+        guardadas = _repetir_las_preguntas_abiertas(m)
+        if guardadas:
+            resumen[REPETICION_DEL_DIA] += guardadas
         # Las entregas que esperan la decisión de quien las aprueba (porción 3c).
         cur.execute("""select t.id, m.aprobador_membership_id from task t
                          join membership m on m.id = t.responsable_membership_id
@@ -470,7 +484,7 @@ def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
         return None
     if dados and m.cal.habiles_entre(dados[-1]["resuelto_en"], m.ahora) < 1:
         return None                     # nunca dos pasos el mismo día hábil
-    sobre = _lo_anotado(pregunta)
+    sobre = lo_anotado(pregunta)        # lo que la repregunta recuerda
     if siguiente < PEDIDOS:
         base = {"aviso": REPREGUNTA, "pregunta": pregunta["tipo"], "numero": siguiente + 1,
                 "necesita_respuesta": True, **({"sobre": sobre} if sobre else {})}
@@ -501,16 +515,6 @@ def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
     return ESCALAMIENTO_DE_UNA_PREGUNTA
 
 
-def _lo_anotado(pregunta: dict[str, Any]) -> dict[str, Any]:
-    """Lo que se había anotado cuando Leda hizo la pregunta (la jugada y sus datos, sin la
-    tarea ni ids): lo que la repregunta recuerda."""
-    jugada = pregunta["jugada"] or {}
-    if not jugada.get("nombre"):
-        return {}
-    datos = {k: v for k, v in (jugada.get("datos") or {}).items() if k != "tarea"}
-    return {"jugada": jugada["nombre"], **datos}
-
-
 def _guardar_de_una_pregunta(m: Momento, tipo: str, tarea, base: dict[str, Any], de: str,
                              *resto, destinatario: str | None = None) -> str:
     aviso_id, _ = guardar(
@@ -520,6 +524,59 @@ def _guardar_de_una_pregunta(m: Momento, tipo: str, tarea, base: dict[str, Any],
         programado_para=sale(m.cal, m.ahora),
         clave=":".join(["motor", tipo, str(tarea["id"]), de, *map(str, resto)]), ahora=m.ahora)
     return aviso_id
+
+
+# --- Una pregunta sin contestar: la repetición del día (decisión 21) -----------------------------
+
+def _repetir_las_preguntas_abiertas(m: Momento) -> int:
+    """La repetición del día de cada pregunta abierta que lo necesita (decisión 21 del usuario,
+    2026-10-08; `pregunta_sin_contestar.py`): una sola vez en el día, a las 4 horas de haberla
+    hecho (o la espera del espacio), dentro del horario de ese mismo día, y sólo si detrás de
+    ella espera otro tema que pide respuesta (un aviso guardado de otra tarea cuya hora llegó).
+    Cuántas guardó."""
+    cur = m.cur
+    cur.execute("""select q.* from conversation_state s
+                     join conversation_question q on q.id = s.pregunta_abierta_id
+                    where q.cerrada_en is null and q.task_id is not null
+                    order by q.abierta_en""")
+    abiertas = cur.fetchall()
+    espera = espera_para_repetir(cur, m.workspace_id) if abiertas else None
+    guardadas = 0
+    for pregunta in abiertas:
+        if not se_repite(pregunta):
+            continue
+        desde = preguntada_en(pregunta)
+        cuando = sale(m.cal, desde + espera)
+        if m.fecha(desde) != m.hoy or m.fecha(cuando) != m.hoy or cuando > m.ahora:
+            continue
+        clave = clave_de_la_repeticion(pregunta, m.hoy)
+        cur.execute("""select 1 from scheduled_notice where workspace_id = %s and dedupe_key = %s""",
+                    (m.workspace_id, clave))
+        if cur.fetchone() is not None:
+            continue                    # una sola vez en el día
+        persona = str(pregunta["membership_id"])
+        if ausente(cur, persona, m.hoy) or not _otro_tema_espera(m, persona, pregunta):
+            continue
+        tarea = leer_tarea(cur, pregunta["task_id"])
+        if tarea is None or tarea["estado"] in ("terminada", "cancelada"):
+            continue
+        base = hechos_de_la_que_vuelve(pregunta, REPETICION_DEL_DIA)
+        guardar(cur, m.workspace_id, REPETICION_DEL_DIA, task_id=str(pregunta["task_id"]),
+                destinatario=persona, hechos={**base, **hechos_de_una_pregunta(m, tarea, base)},
+                programado_para=cuando, clave=clave, ahora=m.ahora)
+        guardadas += 1
+    return guardadas
+
+
+def _otro_tema_espera(m: Momento, persona: str, pregunta: dict[str, Any]) -> bool:
+    """Si detrás de la pregunta espera otro tema que pide respuesta: un aviso guardado para la
+    persona, de otra tarea, cuya hora llegó y que pide respuesta (`necesita_respuesta`)."""
+    m.cur.execute("""select 1 from scheduled_notice
+                      where destinatario_membership_id = %s and estado = 'guardado'
+                        and programado_para <= %s and task_id is distinct from %s
+                        and (hechos ->> 'necesita_respuesta')::boolean
+                      limit 1""", (persona, m.ahora, pregunta["task_id"]))
+    return m.cur.fetchone() is not None
 
 
 # --- La espera de una decisión: quien aprueba no contesta (porción 3c) ----------------------------
