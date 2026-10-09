@@ -129,11 +129,12 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
 12. **Lucas** escribe (martes 20, 12:00): "uh no puedo esta semana, estoy con lo del data center"
     →
     - Jugadas: `contestar_el_pase` sobre la del PLC, que no, con su motivo.
-    - Efecto: la tarea sigue de Marcos; se guarda el aviso a Marcos.
+    - Efecto: la tarea sigue de Marcos; se guardan los avisos a Marcos, que lo pidió, y a Martín, que lo
+      aprobó: quien autorizó el pase también se entera de cómo terminó (decisión 39, desde la C-5c).
     - La respuesta dice: que la tarea sigue con Marcos y que Marcos se va a enterar.
 
-13. **Leda**, por su cuenta, a Marcos (martes 20, 12:10): que Lucas no puede tomar la del PLC y que sigue
-    con él.
+13. **Leda**, por su cuenta, a Marcos y a Martín (martes 20, 12:10): que Lucas no puede tomar la del PLC y
+    que sigue con Marcos.
 
 14. **Martín** escribe (martes 20, 14:00): "pasale lo del servidor a marcos, me pidieron otra cosa urgente"
     →

@@ -5,7 +5,7 @@ titulo: "Ya hablé con él"
 mide: garantias
 persona: Marcos
 inicio: "2026-10-20 09:00"
-foco: [PLC, HMI]
+foco: [PLC, HMI, COM]
 
 tareas:
   PLC:
@@ -18,6 +18,13 @@ tareas:
   HMI:
     titulo: Instalar el panel HMI de la comprimidora
     criterio: "El panel HMI muestra el estado de la comprimidora y permite arrancarla y pararla desde la planta"
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
     responsable: Marcos
     vence: "2026-11-06"
     estado: en_curso
@@ -84,12 +91,18 @@ pasos:
     escribe: "si ya lo hable con marcos"
     jugadas:
       - {nombre: decir_cuando_destraba, ya_lo_hablaron: true, puede_traer: [tarea, lo_que_dice]}
-    # "Ya lo hablé" solo no se anota: la pregunta sigue abierta y ahora pide lo que arreglaron.
-    efectos: {}
+    # "Ya lo hablé" solo no se anota: la pregunta sigue abierta y ahora pide lo que arreglaron, y
+    # Leda le pregunta lo mismo a Marcos (decisión 48).
+    efectos:
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_esta_trabado, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: que_arreglaron,
+                    quien_destraba: Ariel De Simone}}
     hechos:
       - {jugada: decir_cuando_destraba, resultado: falta_dato, tarea: PLC,
          falta: [lo_que_arreglaron, para_cuando], ya_lo_hablaron: true,
-         pregunta: cuando_se_destraba, aviso_a_quien_esta_trabado: ausente}
+         pregunta: cuando_se_destraba, aviso_a_quien_esta_trabado: ausente,
+         le_pregunta_tambien_a: {a: Marcos Tarquini, llega: "~2026-10-20T11:15"}}
     pregunta: {tipo: cuando_se_destraba, tarea: PLC}
     estado_despues:
       de: Ariel
@@ -97,9 +110,9 @@ pasos:
       esperas_abiertas: [PLC]
     dice:
       - "una sola pregunta: qué arreglaron y para cuándo se la pasa"
+      - que a Marcos también se lo pregunta
     no_dice:
       - que quedó anotado
-      - que Marcos se va a enterar
       - un reproche
 
   - paso: 5
@@ -114,12 +127,17 @@ pasos:
       avisos_guardados:
         - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado,
            hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
-                    dice_quien_destraba: {para_cuando: "2026-10-22", ya_lo_hablaron: true}}}
+                    dice_quien_destraba: {para_cuando: "2026-10-22", ya_lo_hablaron: true},
+                    se_lo_pasa_si_contesta: true}}
     hechos:
       - {jugada: decir_cuando_destraba, resultado: anotado, tarea: PLC,
          dice_quien_destraba: {para_cuando: "2026-10-22", ya_lo_hablaron: true},
          aviso_a_quien_esta_trabado: {a: Marcos Tarquini, llega: "~2026-10-20T11:18"}}
     pregunta: null
+    # Vale lo que contestó el primero: la pregunta a Marcos ya no sale (decisión 48).
+    estado_avisos:
+      - {tipo: pregunta_a_quien_esta_trabado, tarea: PLC, a: Marcos, estado: omitido,
+         motivo: ya_lo_conto_quien_destraba}
     estado_despues:
       de: Ariel
       pregunta_abierta: null
@@ -138,14 +156,62 @@ pasos:
         tipo: lo_que_dijo_quien_destraba
         tarea: PLC
         hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
-                 dice_quien_destraba: {para_cuando: "2026-10-22", ya_lo_hablaron: true}}
+                 dice_quien_destraba: {para_cuando: "2026-10-22", ya_lo_hablaron: true},
+                 se_lo_pasa_si_contesta: true}
+    estado_despues:
+      pregunta_abierta: null
     dice:
       - la tarea del PLC
-      - "que quedó asentado lo que arreglaron con Ariel: que le pasa la IP el jueves (jue 22/10) temprano"
-      - que cuando pueda seguir, lo diga
-      - que no hace falta responder, en el último renglón
+      - "que Ariel dice que le pasa la IP el jueves (jue 22/10) temprano"
+      - que si es así, no hace falta que haga nada
+      - que si no es lo que entendió, que avise y Leda se lo pasa a Ariel
     no_dice:
       - que la tarea se destrabó
+
+  - paso: 6b
+    quien: Marcos
+    a_las: "2026-10-20 11:40"
+    escribe: "no, quedamos el miercoles a la mañana"
+    jugadas:
+      - {nombre: contar_lo_que_arreglaron, para_cuando: "2026-10-21",
+         puede_traer: [tarea, lo_que_dice]}
+    # La corrección le llega a Ariel y cierra el tema para los dos (decisiones 47 y 39).
+    efectos:
+      dicen_quien_destraba: [{tarea: PLC, de: Marcos, para_cuando: "2026-10-21", ya_esta: false}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_esta_trabado, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {necesita_respuesta: false, quien_esta_trabado: Marcos Tarquini,
+                    dice_quien_esta_trabado: {para_cuando: "2026-10-21"},
+                    cierra_el_tema: true, se_lo_pasa_si_contesta: ausente}}
+    hechos:
+      - {jugada: contar_lo_que_arreglaron, resultado: anotado, tarea: PLC,
+         dice_quien_esta_trabado: {para_cuando: "2026-10-21"}, cierra_el_tema: true,
+         aviso_a_quien_destraba: {a: Ariel De Simone, llega: "~2026-10-20T11:50"}}
+    pregunta: null
+    dice:
+      - que quedó anotado
+      - que Ariel se va a enterar
+    no_dice:
+      - que el bloqueo se cerró
+
+  - paso: 6c
+    quien: Leda
+    relojes: ["2026-10-20 11:50"]
+    salen:
+      - a: Ariel
+        tipo: lo_que_dijo_quien_esta_trabado
+        tarea: PLC
+        hechos: {necesita_respuesta: false, quien_esta_trabado: Marcos Tarquini,
+                 dice_quien_esta_trabado: {para_cuando: "2026-10-21"}, cierra_el_tema: true}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: null
+    dice:
+      - la tarea del PLC
+      - "que Marcos dice que quedaron el miércoles (mié 21/10) a la mañana"
+      - que no hace falta responder, en el último renglón
+    no_dice:
+      - que avise si no es así
 
   - paso: 7
     quien: Marcos
@@ -195,11 +261,13 @@ pasos:
       avisos_guardados:
         - {tipo: lo_que_dijo_quien_destraba, tarea: HMI, a: Marcos, estado: guardado,
            hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
-                    dice_quien_destraba: {para_cuando: "2026-10-23", ya_lo_hablaron: true}}}
+                    dice_quien_destraba: {para_cuando: "2026-10-23", ya_lo_hablaron: true},
+                    se_lo_pasa_si_contesta: true}}
     hechos:
       - {jugada: decir_cuando_destraba, resultado: anotado, tarea: HMI,
          dice_quien_destraba: {para_cuando: "2026-10-23", ya_lo_hablaron: true},
-         aviso_a_quien_esta_trabado: {a: Marcos Tarquini, llega: "~2026-10-20T14:40"}}
+         aviso_a_quien_esta_trabado: {a: Marcos Tarquini, llega: "~2026-10-20T14:40"},
+         le_pregunta_tambien_a: ausente}
     pregunta: null
     estado_despues:
       de: Ariel
@@ -219,8 +287,136 @@ pasos:
         tipo: lo_que_dijo_quien_destraba
         tarea: HMI
         hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
-                 dice_quien_destraba: {para_cuando: "2026-10-23", ya_lo_hablaron: true}}
+                 dice_quien_destraba: {para_cuando: "2026-10-23", ya_lo_hablaron: true},
+                 se_lo_pasa_si_contesta: true}
     dice:
       - la tarea del panel HMI
-      - "que quedó asentado lo que arreglaron con Ariel: que libera la licencia el viernes (vie 23/10)"
-      - que no hace falta responder, en el último renglón
+      - "que Ariel dice que libera la licencia el viernes (vie 23/10)"
+      - que si es así, no hace falta que haga nada, y que si no es lo que entendió, que avise
+
+  # --- "Ya lo hablé" sin decir qué, y contesta primero Marcos (decisión 48) ------------------------
+  - paso: 11
+    quien: Marcos
+    a_las: "2026-10-20 15:00"
+    escribe: "con comunicaciones tambien, ariel tiene q configurar el switch de la red"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: COM, causa: "ariel tiene q configurar el switch de la red"}
+      - {nombre: anotar_quien_destraba, quien: "ariel", puede_traer: [tarea]}
+    efectos:
+      estados: {COM: bloqueada}
+      bloqueos: [{tarea: COM, causa: presente}]
+      destraban: [{tarea: COM, integrante: Ariel, alguien: true, no_sabe: false, de: Marcos}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: COM, a: Ariel, estado: guardado}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: COM}
+      - {jugada: anotar_quien_destraba, resultado: anotado,
+         se_le_pregunta_a: {a: Ariel De Simone, llega: "~2026-10-20T15:10"}}
+    pregunta: null
+    dice:
+      - que quedó anotado el bloqueo y que lo destraba Ariel
+      - que le pregunta a Ariel y le avisa apenas sepa algo
+
+  - paso: 12
+    quien: Leda
+    relojes: ["2026-10-20 15:10"]
+    salen:
+      - a: Ariel
+        tipo: pregunta_a_quien_destraba
+        tarea: COM
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Marcos Tarquini, causa: presente}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: COM}
+      esperas_abiertas: [COM]
+
+  - paso: 13
+    quien: Ariel
+    a_las: "2026-10-20 15:25"
+    escribe: "ya lo hable con marcos"
+    jugadas:
+      - {nombre: decir_cuando_destraba, tarea: COM, ya_lo_hablaron: true,
+         puede_traer: [tarea, lo_que_dice]}
+    efectos:
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_esta_trabado, tarea: COM, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: que_arreglaron,
+                    quien_destraba: Ariel De Simone}}
+    hechos:
+      - {jugada: decir_cuando_destraba, resultado: falta_dato, tarea: COM,
+         falta: [lo_que_arreglaron, para_cuando], ya_lo_hablaron: true,
+         pregunta: cuando_se_destraba,
+         le_pregunta_tambien_a: {a: Marcos Tarquini, llega: "~2026-10-20T15:35"}}
+    pregunta: {tipo: cuando_se_destraba, tarea: COM}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: COM}
+      esperas_abiertas: [COM]
+    dice:
+      - "una sola pregunta: qué arreglaron y para cuándo"
+      - que a Marcos también se lo pregunta
+
+  - paso: 14
+    quien: Leda
+    relojes: ["2026-10-20 15:35"]
+    salen:
+      - a: Marcos
+        tipo: pregunta_a_quien_esta_trabado
+        tarea: COM
+        hechos: {necesita_respuesta: true, pregunta: que_arreglaron,
+                 quien_destraba: Ariel De Simone, ya_lo_hablaron: true}
+    estado_despues:
+      pregunta_abierta: {tipo: que_arreglaron, tarea: COM}
+      esperas_abiertas: [COM]
+    dice:
+      - la tarea de comunicaciones
+      - que Ariel dice que ya lo hablaron
+      - "la pregunta: qué arreglaron y para cuándo"
+
+  - paso: 15
+    quien: Marcos
+    a_las: "2026-10-20 15:50"
+    escribe: "quedamos q lo configura el jueves"
+    jugadas:
+      - {nombre: contar_lo_que_arreglaron, para_cuando: "2026-10-22",
+         puede_traer: [tarea, lo_que_dice]}
+    # Vale lo que contestó el primero: a Ariel se le cierra la pregunta y le llega lo acordado,
+    # para confirmarlo (decisiones 48 y 47).
+    efectos:
+      dicen_quien_destraba: [{tarea: COM, de: Marcos, para_cuando: "2026-10-22", ya_esta: false}]
+      avisos_guardados:
+        - {tipo: lo_que_dijo_quien_esta_trabado, tarea: COM, a: Ariel, estado: guardado,
+           hechos: {necesita_respuesta: false, quien_esta_trabado: Marcos Tarquini,
+                    dice_quien_esta_trabado: {para_cuando: "2026-10-22"},
+                    se_lo_pasa_si_contesta: true, cierra_el_tema: ausente}}
+    hechos:
+      - {jugada: contar_lo_que_arreglaron, resultado: anotado, tarea: COM,
+         dice_quien_esta_trabado: {para_cuando: "2026-10-22"}, cierra_el_tema: ausente,
+         aviso_a_quien_destraba: {a: Ariel De Simone, llega: "~2026-10-20T16:00"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      esperas_abiertas: []
+    dice:
+      - que quedó anotado
+      - que Ariel se va a enterar
+
+  - paso: 16
+    quien: Leda
+    relojes: ["2026-10-20 16:00"]
+    salen:
+      - a: Ariel
+        tipo: lo_que_dijo_quien_esta_trabado
+        tarea: COM
+        hechos: {necesita_respuesta: false, quien_esta_trabado: Marcos Tarquini,
+                 dice_quien_esta_trabado: {para_cuando: "2026-10-22"},
+                 se_lo_pasa_si_contesta: true}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: null
+      esperas_abiertas: []
+    dice:
+      - la tarea de comunicaciones
+      - "que Marcos dice que quedaron en que configura el switch el jueves (jue 22/10)"
+      - que si es así, no hace falta que haga nada, y que si no es lo que entendió, que avise

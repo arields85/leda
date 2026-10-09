@@ -283,10 +283,14 @@ pasos:
       avisos_guardados:
         - {tipo: como_termino_el_pase, tarea: PLC, a: Marcos, estado: guardado,
            hechos: {necesita_respuesta: false, la_tomo: false, pasaria_a: Lucas Natuche}}
+        # Quien autorizó el pase también se entera de cómo terminó (decisión 39).
+        - {tipo: como_termino_el_pase, tarea: PLC, a: Martin, estado: guardado,
+           hechos: {necesita_respuesta: false, la_tomo: false, pasaria_a: Lucas Natuche}}
     hechos:
       - {jugada: contestar_el_pase, resultado: anotado, tarea: PLC, la_toma: false,
          sigue_con: Marcos Tarquini,
-         aviso_a_quien_pidio: {a: Marcos Tarquini, llega: "~2026-10-20T12:10"}}
+         aviso_a_quien_pidio: {a: Marcos Tarquini, llega: "~2026-10-20T12:10"},
+         aviso_a_quien_decidio: {a: Martín Forte, llega: "~2026-10-20T12:10"}}
     pregunta: null
     botones: []
     estado_despues:
@@ -305,8 +309,13 @@ pasos:
         tipo: como_termino_el_pase
         tarea: PLC
         hechos: {necesita_respuesta: false, la_tomo: false, pasaria_a: Lucas Natuche}
+      - a: Martin
+        tipo: como_termino_el_pase
+        tarea: PLC
+        hechos: {necesita_respuesta: false, la_tomo: false, pasaria_a: Lucas Natuche}
     dice:
-      - que Lucas no puede tomar la del PLC y que sigue con él
+      - "a Marcos: que Lucas no puede tomar la del PLC y que sigue con él"
+      - "a Martín: que Lucas no la tomó y que la del PLC sigue con Marcos"
 
   # --- Martín → Marcos: Marcos, encargado de OT, decide y la toma con un solo "sí" ------------------
   - paso: 14

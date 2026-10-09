@@ -140,8 +140,11 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     4 del usuario, 2026-10-08, primera mitad; porción 1 de la C-5).
 33. [`33-ya-hable-con-el.md`](33-ya-hable-con-el.md): Ariel, a quien Leda le preguntó, contesta que
     ya lo habló con Marcos; Leda le pregunta qué arreglaron y para cuándo, para que quede asentado, y
-    con la respuesta a Marcos le llega lo arreglado, como información. Dicho todo junto, queda
-    anotado sin preguntar (decisión 4 del usuario, segunda mitad; porción 2 de la C-5).
+    le pregunta lo mismo a Marcos: vale lo que conteste el primero, y a Marcos le llega lo arreglado
+    para confirmarlo (si es así, nada; si no, que avise y Leda se lo pasa). Marcos corrige y la
+    corrección le llega a Ariel, que cierra el tema; con otra tarea contesta primero Marcos y a Ariel
+    le llega para confirmarlo. Dicho todo junto, queda anotado sin preguntar (decisión 4 del usuario,
+    segunda mitad; porción 2 de la C-5; decisiones 47 y 48, C-5c).
 34. [`34-no-me-corresponde.md`](34-no-me-corresponde.md): a quien Leda le pregunta por un bloqueo
     dice que no le corresponde; Leda pregunta quién se encarga y sigue con esa persona. Si la segunda
     también dice que no, que no sabe o nombra a otra, Leda le informa al referente con toda la cadena,
@@ -166,6 +169,13 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     asentado, como siempre (decisión 38 del usuario, con la 50; C-5b). La 32 suma, desde la C-5b,
     la decisión 37: a quien destraba sin Leda conectada no le escribe, le avisa al administrador
     para que lo conecte y le ofrece a la persona trabada salidas.
+43. [`43-cerrar-el-tema-para-todos.md`](43-cerrar-el-tema-para-todos.md): nunca un tema abierto sin
+    que todos sepan cómo se cerró. Marcos consigue por otro lado lo que Ariel le iba a conseguir y a
+    Ariel le llega que ya no hace falta; lo que Ariel contesta ("ya lo pedí") le llega a Marcos, que
+    decide, y su respuesta le llega a Ariel y cierra el tema. "No le escribas" después de que la
+    pregunta le llegó: Leda deja de preguntarle a Ariel y se lo dice. "Se lo pido yo y te cuento": Leda
+    no le escribe a nadie y al día hábil siguiente le pregunta a Marcos cómo le fue (decisión 39 del
+    usuario, con lo derivado en la 47 y la salida de la 37; C-5c).
 
 Los pedidos de estado con ritmo fijo (circuito 5; ADR 0017, decisión 3b, punto 5; `odd/tasks/fase-c.md`,
 decisión 8):
@@ -199,6 +209,7 @@ Delegar (ADR 0017, enmienda a la decisión 2; `odd/tasks/fase-c.md`, decisión 9
     "sí"; Nahuel no puede pasársela a otro sector (lo decide Marcos), y a Marcos sí, que dice que no. Vista
     previa y confirmación, la pregunta a quien decide y a quien recibe con dos botones, y el aviso de cómo
     terminó; el responsable cambia sólo con las tres confirmaciones, y a Ismael no le llega nada (C-7).
+    Desde la C-5c, quien aprobó un pase también se entera si quien lo recibía no la toma (decisión 39).
 39. [`39-pases-sin-respuesta-y-de-su-gente.md`](39-pases-sin-respuesta-y-de-su-gente.md): el encargado
     pasa una tarea de su gente (la de los sensores de Nahuel, a Lucas: decide Martín y Nahuel se entera;
     decisión 27); la de Nahuel que toma Marcos se cierra cuando él la entrega, aprobada por él y sin que
@@ -522,7 +533,13 @@ importa es el significado:
   corresponde y, si lo sabe, quién se encarga; Leda sigue con esa persona una vez y, si tampoco,
   informa la cadena al referente (conversación 34).
 - `no_escribirle`: la persona trabada pide que Leda no le escriba a quien destraba; si el mensaje
-  todavía no salió, no sale (conversación 32).
+  todavía no salió, no sale (conversación 32); si ya salió y Leda le sigue preguntando, deja de
+  preguntarle y se lo dice (conversación 43).
+- `contar_lo_que_arreglaron`: la persona trabada cuenta lo que arregló con quien destraba su tarea,
+  corrige lo que Leda le pasó de esa persona o le contesta algo que esa persona dijo; queda anotado y
+  Leda se lo pasa a la otra persona (conversaciones 33 y 43).
+- `pedirselo_y_contar`: la persona trabada se lo pide ella misma a quien destraba; Leda no le escribe
+  a nadie y al día hábil siguiente le pregunta cómo le fue (conversación 43).
 - `pedir_reasignacion`: la persona pide pasarle una tarea suya a otra persona; Leda muestra la vista
   previa del pase para confirmar, o dice por qué no se puede y, si es de otro sector, quién lo decide
   (conversaciones 12, 19 y 38). Hasta la C-7, Leda decía que no se hacía por chat (P16, más abajo).
