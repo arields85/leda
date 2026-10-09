@@ -386,6 +386,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     conteste el primero, y Leda se lo confirma al otro como en la decisión 47. Cambia la porción 2
     (hoy sólo le pregunta a quien destraba).
 
+49. **Antes de asentar un "ni idea", Leda le pregunta a la persona trabada** (de la C-5, porción
+    3): decidida (usuario, 2026-10-09, opción A). Si quien destraba dice "ni idea, no sé quién se
+    encarga", Leda le pregunta a Marcos si se le ocurre otra persona; si nombra a alguien, sigue con
+    esa persona; si no, lo deja asentado. **Qué es "dejar asentado"** (precisado con el usuario): queda
+    en la historia de la tarea; le llega a quien decide quién lo resuelve (decisión 24); figura en el
+    próximo informe al grupo (decisión 25); y a la persona trabada se le dice con la forma de la
+    decisión 35. Cambia la porción 3 (hoy, el "ni idea" de la primera persona va directo).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2154,7 +2162,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 48 del usuario (2026-10-09; la 30, la 40, la 43 y la 45 ya están), con test primero.
+- [ ] Las decisiones 24 a 49 del usuario (2026-10-09; la 30, la 40, la 43 y la 45 ya están), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
