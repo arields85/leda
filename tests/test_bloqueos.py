@@ -116,7 +116,7 @@ def test_resolver_bloqueo_con_otro_abierto_no_saca_a_la_tarea_de_bloqueada(corew
         assert cur.fetchone()["estado"] == "bloqueada"
 
 
-def test_resolver_bloqueo_requiere_ser_responsable_quien_lo_abrio_o_escalado(corework, conn):
+def test_resolver_bloqueo_requiere_ser_responsable_o_quien_lo_abrio(corework, conn):
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws)
@@ -143,7 +143,9 @@ def test_resolver_bloqueo_lo_puede_quien_lo_abrio_aunque_no_sea_el_responsable(c
         assert r["resuelto"] is True
 
 
-def test_resolver_bloqueo_lo_puede_a_quien_se_escalo(corework, conn):
+def test_resolver_bloqueo_no_lo_puede_a_quien_se_escalo(corework, conn):
+    # Decisión 41 del usuario (2026-10-09): lo da por destrabado quien está trabado. A quien se
+    # le informó el bloqueo (`escalado_a`) lo que diga queda anotado, pero no lo cierra.
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws)
@@ -155,9 +157,14 @@ def test_resolver_bloqueo_lo_puede_a_quien_se_escalo(corework, conn):
 
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ismael Soschinski", ws)
-        r = H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": bid, "resolucion": "lo resolvió dirección"}, ya_confirmada=True)
-        assert r["resuelto"] is True
+        with pytest.raises(Denegado):
+            H.ejecutar(cur, quien, "resolver_bloqueo",
+                       {"bloqueo_id": bid, "resolucion": "lo resolvió dirección"},
+                       ya_confirmada=True)
+
+    with admin(conn) as cur:
+        cur.execute("select resuelto_en from blocker where id = %s", (bid,))
+        assert cur.fetchone()["resuelto_en"] is None
 
 
 def test_resolver_bloqueo_exige_contar_la_resolucion(corework, conn):
