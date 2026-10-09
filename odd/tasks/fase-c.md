@@ -369,6 +369,17 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     ("Del PLC no me contaste el lunes, ¿cómo viene?"), y si no hay nada, no sale nada. Cambia la
     C-6 (hoy, la misma lista los tres días).
 
+47. **Lo acordado se confirma con la persona trabada, sin pedirle nada si está bien** (de la C-5,
+    porción 2): decidida (usuario, 2026-10-09, opción A ampliada). Si Ariel dice "ya lo hablé con
+    marcos, se la paso el jueves", Leda se lo manda a Marcos corto y le dice que, si está bien, no
+    tiene que hacer nada, y si no es lo que entendió, que le avise y Leda se lo pasa a Ariel: "Ariel
+    dice que te pasa la IP el jueves. Si es así, no hace falta que hagas nada; si no es lo que
+    entendiste, avisame y se lo paso." Si Marcos corrige, Leda le lleva la corrección a Ariel y les
+    cierra el tema a los dos (decisión 39). Cambia la porción 2 (hoy, sólo la información).
+    Derivado de la 39, sin preguntar: "no le escribas" después de que la pregunta salió hace que Leda
+    deje de preguntarle a quien destraba y le cierre el tema ("Marcos me contó que ya lo hablaron,
+    así que no te pregunto más").
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2137,7 +2148,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 46 del usuario (2026-10-09; la 30, la 40, la 43 y la 45 ya están), con test primero.
+- [ ] Las decisiones 24 a 47 del usuario (2026-10-09; la 30, la 40, la 43 y la 45 ya están), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
