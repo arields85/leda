@@ -123,8 +123,10 @@ llega al referente como información (`cadena_del_bloqueo`, porción 3; decisió
 bloqueo siga abierto. En una cadena de bloqueos (Marcos ← Juan ← Pedro), cada avance del medio le
 llega a quien espera más abajo, como información (`novedad_de_lo_que_espera`, porción 4; decisión
 6; `encadenados.py`), mientras siga esperando eso. Un bloqueo que sigue abierto a los días
-hábiles del espacio se le informa al referente, una vez, con su historia
-(`bloqueo_que_sigue_abierto`, porción 5; decisión 7; `bloqueo_viejo.py`).
+hábiles del espacio se le informa al referente, con su historia (`bloqueo_que_sigue_abierto`,
+porción 5; decisión 7; `bloqueo_viejo.py`), y otra vez cada esos días mientras siga (decisión
+36); a la persona trabada, a la vez, que quedó asentado (`asentado_que_sigue_trabada`, decisiones
+34 y 35; `asentado.py`).
 """
 
 from __future__ import annotations
@@ -151,6 +153,7 @@ from .pregunta_sin_contestar import (LA_MISMA_PREGUNTA_YA_SALE, REPETICION_DEL_D
 from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, anclaje,
                     clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
+from .asentado import QUEDA_ASENTADO, queda_asentado
 from .auditoria import auditar
 from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, FICHAS, LLEGA, NO_LE_LLEGO,
                      YA_LE_LLEGO, quien_revisa, referente)
@@ -1219,8 +1222,14 @@ def hechos_de_la_escalera(m: Momento, tipo: str, tarea: dict[str, Any],
     if base.get(AVISA_QUE_VA_A_ESCALAR):
         a_quienes = [d["nombre"] for d in quienes_escalan(m.cur, tarea)]
         if a_quienes:       # un efecto que pasa después: todavía no, y a quién
-            hechos["si_no_hay_respuesta"] = {"se_avisa_a": a_quienes}
+            hechos["si_no_hay_respuesta"] = _si_no_hay_respuesta(m, a_quienes)
     return hechos
+
+
+def _si_no_hay_respuesta(m: Momento, a_quienes: list[str]) -> dict[str, Any]:
+    """Lo que pasa si la persona no contesta: va a quedar asentado, sin nombrar a nadie por su
+    cuenta (decisión 35; `asentado.py`); a quiénes les llega, sólo si lo pregunta."""
+    return {QUEDA_ASENTADO: queda_asentado(m.cur, m.workspace_id), "se_avisa_a": a_quienes}
 
 
 def _desde_y_espera(m: Momento, tarea: dict[str, Any], hechos: dict[str, Any]) -> None:
@@ -1292,7 +1301,7 @@ def hechos_de_una_pregunta(m: Momento, tarea: dict[str, Any],
     if base.get(AVISA_QUE_VA_A_ESCALAR):
         a_quienes = [d["nombre"] for d in quienes_escalan(m.cur, tarea)]
         if a_quienes:       # un efecto que pasa después: todavía no, y a quién
-            hechos["si_no_hay_respuesta"] = {"se_avisa_a": a_quienes}
+            hechos["si_no_hay_respuesta"] = _si_no_hay_respuesta(m, a_quienes)
     if base.get("aviso") == "falta_de_respuesta":
         responsable = integrante(m.cur, tarea["responsable_membership_id"])
         hechos["responsable"] = responsable["nombre"] if responsable else None
@@ -1681,8 +1690,11 @@ CADENA_DEL_BLOQUEO = "cadena_del_bloqueo"
 # informativo, de coordinación; cuándo se guarda y su vigencia, `encadenados.py`.
 NOVEDAD_DE_LO_QUE_ESPERA = "novedad_de_lo_que_espera"
 # El bloqueo que sigue abierto a los días hábiles del espacio, al referente (porción 5; decisión
-# 7): informativo, una vez por bloqueo; cuándo se guarda y su vigencia, `bloqueo_viejo.py`.
+# 7): informativo, cada vez que llega a los días del espacio mientras siga abierto (decisión 36);
+# cuándo se guarda y su vigencia, `bloqueo_viejo.py`. A la persona trabada, a la vez, que quedó
+# asentado (decisiones 34 y 35).
 BLOQUEO_QUE_SIGUE_ABIERTO = "bloqueo_que_sigue_abierto"
+ASENTADO_QUE_SIGUE_TRABADA = "asentado_que_sigue_trabada"
 YA_SE_DESTRABO = "ya_se_destrabo"
 CAMBIO_QUIEN_DESTRABA = "cambio_quien_destraba"
 DIJO_ALGO_MAS_NUEVO = "dijo_algo_mas_nuevo"
@@ -1787,6 +1799,11 @@ def _vigencia_de_la_novedad(m: Momento, aviso) -> tuple[str | None, dict[str, An
 def _vigencia_del_bloqueo_viejo(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     from . import bloqueo_viejo         # bloqueo_viejo importa este módulo
     return bloqueo_viejo.vigencia(m, aviso)
+
+
+def _vigencia_de_lo_asentado(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import bloqueo_viejo
+    return bloqueo_viejo.vigencia_de_lo_asentado(m, aviso)
 
 
 def _a_quien_va_el_bloqueo_viejo(m: Momento, aviso) -> str | None:
@@ -1931,6 +1948,9 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # registrado que se informó.
     TipoDeAviso(BLOQUEO_QUE_SIGUE_ABIERTO, "informativo", _vigencia_del_bloqueo_viejo,
                 va_a=_a_quien_va_el_bloqueo_viejo, al_salir=_al_salir_el_bloqueo_viejo),
+    # A la persona trabada, que quedó asentado (decisiones 34 y 35): también seguimiento que
+    # Leda hace por su cuenta, sobre su propio bloqueo.
+    TipoDeAviso(ASENTADO_QUE_SIGUE_TRABADA, "informativo", _vigencia_de_lo_asentado),
     # El pedido de estado de la cadencia, con la lista de las tareas de la persona (C-6): el
     # seguimiento que Leda hace por su cuenta, un mensaje dentro del tope diario.
     TipoDeAviso(preguntas.COMO_VIENEN_SUS_TAREAS, "seguimiento", _vigencia_de_la_lista,

@@ -61,9 +61,10 @@ no sabe, otra fila de quién destraba dicha por esa persona. La cadena tiene un 
   la manda otra vez (si todavía no salió, sale una, con lo último). Va al del sector de lo que
   falta si se sabe (el de la persona que quedó nombrada como quien se encarga) y, si no, al del
   sector de la tarea trabada; nunca a la persona trabada misma (entonces, a quien aprueba su
-  trabajo; `a_quien_informar`). A la persona trabada le llega lo que pasó y que se informa, sin
-  nombrar a quién por su cuenta (decisión 11: `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`,
-  `aviso_de_la_cadena`). Sin referente, nada se promete y el hecho lo dice (`sin_referente`).
+  trabajo; `a_quien_informar`). A la persona trabada le llega lo que pasó y que quedó asentado,
+  sin decir que se le informa a alguien ni nombrar a quién por su cuenta (decisiones 11 y 35:
+  `queda_asentado`, `asentado.py`, `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`). Sin referente,
+  nada se promete y el hecho lo dice (`sin_referente`).
 
 **Está trabado con algo suyo** (porción 4; decisión 6, bloqueos encadenados; conversación 35):
 quien destraba puede decir que no puede porque una tarea suya está trabada (`su_tarea_trabada`).
@@ -82,6 +83,7 @@ from datetime import date
 from typing import Any
 
 from . import encadenados, preguntas
+from .asentado import QUEDA_ASENTADO, queda_asentado
 from .auditoria import auditar
 from .avisos import (CADENA_DEL_BLOQUEO, CAMBIO_QUIEN_DESTRABA, DIJO_ALGO_MAS_NUEVO,
                      LO_QUE_DIJO_QUIEN_DESTRABA, PREGUNTA_A_QUIEN_DESTRABA, guardar, integrante,
@@ -333,7 +335,7 @@ def _avisar_a_quien_esta_trabado(ctx: Contexto, tarea: dict[str, Any], destraba:
                                  mas: dict[str, Any] | None = None) -> dict[str, Any]:
     """Lo que dijo quien destraba le llega a la persona trabada como información, terminado el
     margen para corregir (`avisos.LO_QUE_DIJO_QUIEN_DESTRABA`), con lo que pasa después
-    (`mas`: a quién le pregunta Leda ahora, o que lo informa). Lo que dijo antes y todavía no le
+    (`mas`: a quién le pregunta Leda ahora, o que quedó asentado). Lo que dijo antes y todavía no le
     llegó queda atrás. Los hechos para quien escribe."""
     cur = ctx.cur
     responsable = str(destraba["responsable_membership_id"])
@@ -538,12 +540,23 @@ def decir_que_no_le_toca(ctx: Contexto, datos: dict[str, Any],
                                       sin_chat=sin_chat)
         _juntar(hecho, informe)
         mas = {**({"no_se_le_puede_escribir_a": sin_chat} if sin_chat else {}),
-               "aviso_de_la_cadena": {k: v for k, v in informe["aviso_de_la_cadena"].items()
-                                      if k != LLEGA or not _es_una_hora(v)}}
+               **_lo_que_queda_para_quien_esta_trabado(ctx, informe["aviso_de_la_cadena"])}
     _juntar(hecho, _avisar_a_quien_esta_trabado(ctx, tarea, destraba, dicho_id, dice, mas))
     # Quien espera esta tarea, más abajo en una cadena de bloqueos, se entera (porción 4).
     _juntar(hecho, encadenados.dijo_quien_destraba(ctx, tarea["id"], dicho_id, dice))
     return hecho
+
+
+def _lo_que_queda_para_quien_esta_trabado(ctx: Contexto, aviso: dict[str, Any]
+                                          ) -> dict[str, Any]:
+    """Lo que la persona trabada sabe del informe de la cadena: que quedó asentado (decisión
+    35), sin decir que se le informa a alguien ni nombrar a nadie por su cuenta (a quién le
+    llega, sólo si lo pregunta). Si no le va a llegar a nadie, nada quedó asentado: el hecho del
+    aviso, tal cual, con su motivo."""
+    if aviso.get(LLEGA) == NO_LE_VA_A_LLEGAR:
+        return {"aviso_de_la_cadena": {k: v for k, v in aviso.items()
+                                       if k != LLEGA or not _es_una_hora(v)}}
+    return {QUEDA_ASENTADO: queda_asentado(ctx.cur, ctx.quien.workspace_id, aviso.get("a"))}
 
 
 def _anotar_quien_destraba(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],

@@ -513,10 +513,11 @@ SIGNIFICADOS: Mapping[str, str] = {
     "fecha": "Una fecha.",
     "pide_el_estado_el": "El día en que Leda le va a preguntar cómo viene la tarea: todavía "
                          "no pasó.",
-    "si_no_hay_respuesta": "Lo que va a pasar si la persona no contesta: se informa que la "
-                           "tarea está atrasada, o que la pregunta quedó sin respuesta, a quien "
-                           "corresponde (se_avisa_a). Es sólo información: nadie toma la tarea "
-                           "ni la destraba por eso. Todavía no pasó.",
+    "si_no_hay_respuesta": "Lo que va a pasar si la persona no contesta: va a quedar asentado "
+                           "que la tarea está atrasada, o que la pregunta quedó sin respuesta "
+                           "(queda_asentado), y a quiénes les llega (se_avisa_a). Es sólo "
+                           "información: nadie toma la tarea ni la destraba por eso. Todavía no "
+                           "pasó.",
     "se_avisa_a": "A quiénes se les va a avisar.",
     "avance_anterior": "Lo que la persona contestó antes sin un hecho cierto, y cuándo.",
     "el": "El día en que pasó.",
@@ -818,7 +819,22 @@ SIGNIFICADOS: Mapping[str, str] = {
                                  "tarea, o a quien aprueba el trabajo de la persona trabada si "
                                  "la persona trabada está a cargo del sector: la tarea sigue "
                                  "trabada desde hace varios días hábiles, con lo que la traba y "
-                                 "todo lo que se dijo (historia). No le pide nada.",
+                                 "todo lo que se dijo (historia) o, si ya se le había contado, "
+                                 "lo que se dijo desde la vez anterior (desde_la_vez_anterior). "
+                                 "No le pide nada.",
+    "asentado_que_sigue_trabada": "Aviso informativo a la persona trabada: quedó asentado que "
+                                  "su tarea sigue trabada desde hace varios días hábiles "
+                                  "(queda_asentado). No le pide nada.",
+    "la_vez_anterior": "El día en que se contó la vez anterior que la tarea seguía trabada.",
+    "desde_la_vez_anterior": "Lo que se dijo de lo que traba la tarea desde la vez anterior, "
+                             "como en historia; vacío si nadie dijo nada desde entonces.",
+    # --- Quedó asentado (decisión 35; `asentado.py`) ------------------------------------------
+    "queda_asentado": "Queda asentado en la historia de la tarea (si todavía no pasó, va a "
+                      "quedar asentado). figura_en_el_informe_al_grupo dice si además figura en "
+                      "el informe al grupo del espacio. A quién le llega (a), si se sabe.",
+    "figura_en_el_informe_al_grupo": "Si figura en el informe al grupo del espacio, para que el "
+                                     "equipo esté al tanto. Si es falso, no figura en ningún "
+                                     "informe al grupo.",
     "trabada_desde": "El día en que la persona dijo que la tarea quedó trabada.",
     "dias_habiles_trabada": "Cuántos días hábiles lleva trabada la tarea, hasta hoy.",
     "historia": "Lo que se dijo de lo que traba la tarea, en el orden en que pasó, cada cosa con "
@@ -1131,6 +1147,9 @@ NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO: Mapping[str, str | None] = {
     "aviso_de_la_cadena": "a",
     "si_no_hay_respuesta": "se_avisa_a",
     "si_sigue_sin_decidir": "se_avisa_a",
+    # Lo que quedó asentado del atraso o del bloqueo de la persona (decisión 35): a quién le
+    # llegó, sólo si lo pregunta.
+    "queda_asentado": "a",
     "queda_esperando_la_aprobacion_de": None,
     "aprobada_por": None,
     "pidio_cambios": None,
