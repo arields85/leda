@@ -243,7 +243,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     aprobó Marcos, y a Ismael no le llega nada. Reemplaza lo construido en la C-7 (pasaba a quien
     aprueba el trabajo de Marcos). El porqué, del usuario: la gente del encargado hace partes de las
     tareas del encargado; mandarle a Ismael "el tornillito" para aprobar es la sobrecarga que no se
-    quiere.
+    quiere. **Ampliada por el usuario el mismo día:** quién revisa depende de quién era la tarea, no
+    de quién la termina haciendo. A Ismael le llegan para aprobar sólo las tareas de los encargados
+    de sector (las grandes); nunca las de su gente, la haga quien la haga. Tarea de Nahuel que hace
+    Marcos: la cierra Marcos. Tarea de Nahuel que hace Lucas: la revisa Marcos. Tarea de Marcos que
+    hace Nahuel: la revisa Ismael.
 
 ## Chequeo de rumbo (2026-10-07)
 
