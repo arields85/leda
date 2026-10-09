@@ -267,6 +267,9 @@ def para_la_ia(cur, tareas: Sequence[dict[str, Any]], zona) -> tuple[dict[str, A
                 t["evidencia_que_pide"] = [{"tipo_de_evidencia": tipo,
                                             "en_palabras": pol.en_palabras(tipo)}
                                            for tipo in pol.pide]
+            anterior = la_entrega_anterior(cur, t["id"])
+            if anterior is not None:
+                t["la_entrega_anterior"] = anterior
         elif t["estado"] == "en_revision":
             entregado = _lo_entregado(cur, t["id"])
             if entregado:
@@ -274,6 +277,40 @@ def para_la_ia(cur, tareas: Sequence[dict[str, Any]], zona) -> tuple[dict[str, A
                 t["lo_entregado"] = mostrar(entregado, pol, zona)
         con.append(t)
     return tuple(con)
+
+
+def la_entrega_anterior(cur, task_id: str) -> dict[str, Any] | None:
+    """Lo que describió la entrega anterior de una tarea a la que le pidieron cambios, con lo que
+    pidió el pedido de cambios (decisión 23 del usuario, 2026-10-08, opción A; D8). Al volver a
+    entregarla, eso sigue contando, salvo lo que el pedido de cambios pide cambiar: quien lo
+    juzga es la IA, que lo recibe para juzgar lo descrito de la entrega nueva junto con eso
+    (`lo_descrito_cubre`), y la cocina hace lo de siempre con su juicio. Leda pregunta sólo lo que
+    falta de verdad (decisión 10: nunca lo que la persona ya dijo). Son los textos de la entrega
+    que se devolvió (los del ciclo anterior al último pedido de cambios, sin los retirados), con
+    lo que describían del criterio; `None` si nunca le pidieron cambios."""
+    cur.execute("""select at, comentario from approval
+                    where sujeto_tipo = 'tarea' and sujeto_id = %s and decision = 'rechazado'
+                    order by at desc limit 2""", (task_id,))
+    pedidos = cur.fetchall()
+    if not pedidos:
+        return None
+    hasta, desde = pedidos[0]["at"], pedidos[1]["at"] if len(pedidos) > 1 else None
+    cur.execute("""select e.texto, e.describe_del_criterio d, e.es_ejemplo_aceptado
+                     from evidence e
+                    where e.task_id = %s and e.clase = 'texto' and e.at <= %s
+                      and (%s::timestamptz is null or e.at > %s::timestamptz)
+                      and not exists (select 1 from evidencia_retirada w
+                                       where w.evidence_id = e.id)
+                    order by e.at, e.id""", (task_id, hasta, desde, desde))
+    descrito = [{"es": EL_EJEMPLO_QUE_ACEPTO if f["es_ejemplo_aceptado"] else LO_QUE_ESCRIBIO,
+                 "dice": f["texto"], "describe": list(f["d"] or [])}
+                for f in cur.fetchall() if (f["texto"] or "").strip()]
+    if not descrito:
+        return None
+    anterior: dict[str, Any] = {"lo_que_describio": descrito}
+    if (pedidos[0]["comentario"] or "").strip():
+        anterior["cambios_pedidos"] = pedidos[0]["comentario"]
+    return anterior
 
 
 # --- El criterio de aceptación, por puntos (decisión 10 del usuario, 2026-10-08) -------------

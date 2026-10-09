@@ -120,9 +120,10 @@ DATOS = {
                                 "probó."),
     "lo_descrito_cubre": ("array", "Los puntos (C1, C2...) del criterio_de_aceptacion de la "
                                    "tarea que dice todo lo que la persona describió en la "
-                                   "entrega: lo que escribe ahora y lo que ya escribió en esta "
-                                   "entrega. Sólo los que dice; decir que terminó no es decir "
-                                   "lo que pide un punto."),
+                                   "entrega: lo que escribe ahora, lo que ya escribió en esta "
+                                   "entrega y lo que sigue valiendo de la entrega anterior "
+                                   "(la_entrega_anterior). Sólo los que dice; decir que terminó "
+                                   "no es decir lo que pide un punto."),
     "ejemplo": ("string", "Si a lo descrito le falta algún punto del criterio de aceptación, cómo "
                           "podría describirlo la persona, en una o dos oraciones: con las "
                           "palabras de ese punto y de lo que la persona ya dijo, sin ningún "

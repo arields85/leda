@@ -1091,3 +1091,55 @@ def test_el_aviso_que_sale_con_la_entrega_incompleta_no_sale(conn, mundo, marcos
     assert enviar(conn, mundo, IAQueRedacta(), AHORA + timedelta(minutes=13)) == {"omitido": 1}
     [aviso] = avisos_guardados(conn, "entrega_para_aprobar")
     assert aviso["motivo_omision"] == "la_entrega_esta_incompleta"
+
+
+# --- Entregar otra vez después de un pedido de cambios (decisión 23 del usuario, 2026-10-08) --
+
+CRITERIO_PLC = "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+
+
+def test_al_entregar_otra_vez_cuenta_lo_que_ya_describio_la_entrega_anterior(conn, mundo,
+                                                                            marcos):
+    """Prueba por Telegram del 2026-10-08, paso 19: después de un pedido de cambios, Marcos
+    volvió a entregar "completo los 20 ciclos sin fallas" y Leda le preguntó si arranca desde el
+    PLC, que su primera entrega ya decía: la entrega nueva sólo miraba lo mandado desde el pedido
+    de cambios. Decisión 23 (opción A): lo que describió la entrega anterior sigue contando, salvo
+    lo que el pedido de cambios pide cambiar, y Leda pregunta sólo lo que falta de verdad
+    (decisión 10). Quien juzga lo descrito es la IA: recibe lo que describió la entrega anterior,
+    con lo que pidió el pedido de cambios, para juzgar lo nuevo junto con eso."""
+    from leda import herramientas
+
+    tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO_PLC)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"]),
+                 texto="termine el plc, ya arranca desde el plc y completa los ciclos")
+    marcos.manda(Jugada("confirmar", {}), texto="dale")
+    with espacio(conn, mundo["id"]) as cur:
+        ismael = identificar_en_espacio(cur, mundo["personas"]["Ismael"]["telegram"],
+                                        mundo["id"])
+        herramientas.ejecutar(cur, ismael, "pedir_cambios_tarea",
+                              {"tarea_id": tarea, "comentario": "falta la foto del contador"},
+                              ya_confirmada=True)
+    conn.commit()
+    assert estado_de(conn, tarea) == "en_curso"
+
+    r = marcos.manda(_entregar(lo_descrito_cubre=["C1"]),
+                     texto="ahi va la del contador, completo los 20 ciclos sin fallas")
+
+    [la_tarea] = [t for t in marcos.situacion["tareas"] if t["alias"] == "T2"]
+    assert la_tarea["la_entrega_anterior"] == {
+        "lo_que_describio": [{"es": "lo_que_escribio",
+                              "dice": "termine el plc, ya arranca desde el plc y completa "
+                                      "los ciclos",
+                              "describe": [CRITERIO_PLC]}],
+        "cambios_pedidos": "falta la foto del contador"}
+    assert hechos.sin_significado(la_tarea) == set()
+    assert "sigue contando" in hechos.significado("la_entrega_anterior")
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "para_confirmar" and "le_falta_del_criterio" not in hecho
+
+
+def test_sin_un_pedido_de_cambios_no_hay_entrega_anterior(conn, mundo, marcos):
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO_PLC)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"]), texto="termine el plc")
+    [la_tarea] = [t for t in marcos.situacion["tareas"] if t["alias"] == "T2"]
+    assert "la_entrega_anterior" not in la_tarea

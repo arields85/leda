@@ -151,7 +151,14 @@ SIGNIFICADOS: Mapping[str, str] = {
              "nombrarlo en una jugada; nunca se le muestra a la persona.",
     "lo_que_pide": "Lo que pide ese punto del criterio de aceptación, tal cual está escrito.",
     "lo_descrito_cubre": "Los códigos de los puntos del criterio de aceptación que dice lo que "
-                         "la persona describió en la entrega.",
+                         "la persona describió en la entrega, contando lo que sigue valiendo de "
+                         "la entrega anterior (la_entrega_anterior).",
+    "la_entrega_anterior": "Lo que la persona describió en la entrega anterior de esta tarea, "
+                           "antes de que le pidieran cambios, y lo que pidió el pedido de "
+                           "cambios (cambios_pedidos): sigue contando como lo que describe, "
+                           "salvo lo que el pedido de cambios pide cambiar.",
+    "lo_que_describio": "Los textos de esa entrega, cada uno con lo que dice y los puntos del "
+                        "criterio que describía.",
     "acepta_el_ejemplo": "Si la persona aceptó, tal cual, el ejemplo que Leda le propuso para "
                          "describir lo que falta de la entrega.",
     "describe": "Los puntos del criterio de aceptación que dice lo que la persona escribió en "
