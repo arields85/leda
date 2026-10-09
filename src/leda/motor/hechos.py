@@ -661,6 +661,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "de_la_lista": "Las tareas de la lista por las que Leda pregunta: las que la persona todavía "
                    "no contó.",
     "vence_hoy": "La tarea vence hoy.",
+    "ya_conto_como_viene": "La persona ya había contado cómo viene la tarea y no cambió nada: "
+                           "no hacía falta preguntárselo ese día.",
     "ya_paso_su_momento": "El día de ese mensaje ya pasó: no se manda otro día.",
     "no_es_dia_habil": "Ese día no es de trabajo para el equipo.",
     "sin_tareas_abiertas": "La persona no tiene tareas por las que preguntarle.",

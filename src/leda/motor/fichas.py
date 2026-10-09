@@ -376,13 +376,12 @@ def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
                 # Lo que dice de una tarea de la lista de la cadencia la contesta en la lista
                 # (C-6, decisión 8): también lo que todavía no se anota (una entrega que espera
                 # su confirmación, un bloqueo sin su causa), que sigue su propia pregunta.
-                en_la_lista = preguntas.en_la_lista(ctx.cur, ctx.quien.membership_id,
-                                                    de_la_tarea["id"])
                 preguntas.marcar_en_la_lista(ctx, de_la_tarea["id"])
-                # Y, en la lista o fuera de ella, la deja contada en la última lista que le salió:
-                # lo contestado no se vuelve a preguntar (decisiones 31 y 46).
+                # Y, en la lista o fuera de ella, con el mismo efecto, la deja contada en la
+                # última lista que le salió: lo contestado no se vuelve a preguntar (decisiones
+                # 31 y 46; una sola regla, corrección de la C-6).
                 from . import cadencias     # cadencias importa este módulo por `avisos`
-                cadencias.anotar_lo_que_conto(ctx, de_la_tarea["id"], en_la_lista=en_la_lista)
+                cadencias.anotar_lo_que_conto(ctx, de_la_tarea["id"])
             if hecho.get("resultado") == "anotado" and hecho["jugada"] == ficha.nombre:
                 if de_la_tarea is not None:
                     preguntas.contestar(ctx, ficha.nombre, ficha.contesta, de_la_tarea["id"])

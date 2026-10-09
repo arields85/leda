@@ -117,9 +117,11 @@ guarda el pedido de cada persona con la lista de sus tareas, para la hora de la 
 los pasos de la escalera: lo que ésta tenga para ese día sobre esas tareas sale dentro de la lista
 (`avisos._a_la_lista`), no aparte, y cuenta como dado. **Lo contestado no se vuelve a preguntar**
 (decisión 31 del usuario, 2026-10-09; `cadencias.ya_lo_conto`): el primer pedido de estado, el día
-del vencimiento (o de la previsión), no se guarda si la persona contó cómo viene esa tarea al
-contestar la última lista que le salió y no cambió nada; si ese día le sale una lista, va en ella. Al día hábil
-siguiente, sin entregar, la tarea quedó atrasada (cambió) y la escalera empieza desde ahí.
+del vencimiento, no sale si la persona contó cómo viene esa tarea después de la última lista que le
+salió (en la lista o fuera de ella) y no cambió nada; si ese día le sale una lista, va en ella. El
+pedido queda dado por contestado (`cadencias.YA_LO_CONTO`), como el primer paso: la escalera sigue
+anclada al vencimiento (mecánica §9) y, sin entregar, el día hábil siguiente sale el segundo pedido
+y el escalamiento llega el mismo día que sin la lista. El día de una previsión no se saltea.
 
 **Sin `aviso_previo_dias_habiles`** (el plan lo dejó `PENDIENTE`): se usa el mínimo del núcleo,
 un día hábil (mecánica §9), y cada aviso previo que sale con él deja un incidente de severidad
@@ -154,7 +156,7 @@ from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir
                                      se_repite)
 from .avisos import BLOQUEO_QUE_SIGUE_ABIERTO, sigue_esperando_que_destrabe
 from .bloqueo_viejo import informar_los_viejos
-from .cadencias import guardar_los_pedidos, ya_lo_conto
+from .cadencias import YA_LO_CONTO, guardar_los_pedidos, ya_lo_conto
 from .pase import seguir_los_pases
 from .preguntas import COMO_VIENEN_SUS_TAREAS
 from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, lo_anotado
@@ -322,7 +324,9 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     ronda += [f"r{r}" for r in [sum(a["tipo"] == "reencuadre" for a in avisos)] if r]
     if siguiente == 0 and k == 0 and ya_lo_conto(m, tarea):
         # La persona contó cómo viene después de la última lista y no cambió nada: el pedido del
-        # día del vencimiento no sale (decisión 31). Si mañana sigue sin entregar, cambió.
+        # día del vencimiento no sale (decisión 31). Queda dado por contestado, como el primer
+        # paso: la escalera sigue anclada al vencimiento (mecánica §9).
+        _dar_por_contado(m, tarea, de, ronda, por)
         return None
     if siguiente < PEDIDOS:
         return _pedir_el_estado(m, tarea, de, siguiente, ronda, pedidos, por)
@@ -336,7 +340,20 @@ def _ultimo_avance(escalon: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 
 def _no_llegaron(pedidos: list[dict[str, Any]]) -> int:
-    return sum(a["estado"] != "enviado" for a in pedidos)
+    """Los pedidos que no le llegaron a la persona. Uno que no salió porque ya había contado cómo
+    venía la tarea (`YA_LO_CONTO`) no cuenta: lo contestó."""
+    return sum(a["estado"] != "enviado" and a["motivo_omision"] != YA_LO_CONTO
+               for a in pedidos)
+
+
+def _dar_por_contado(m: Momento, tarea, hasta: Anclaje, ronda: list[str],
+                     por: dict[str, str]) -> None:
+    """El pedido del día del vencimiento que no sale porque la persona ya contó cómo viene
+    (decisión 31): queda guardado y omitido con su motivo, como el primer paso de la escalera, sin
+    abrir ninguna espera ni pedir respuesta. Nunca en silencio."""
+    base = {"aviso": "pedido_de_estado", "numero": 1, **por}
+    aviso_id = _guardar(m, "pedido_de_estado", tarea, hasta, base, 0, *ronda)
+    omitir(m.cur, aviso_id, YA_LO_CONTO, m.ahora)
 
 
 def _paso(aviso) -> int:

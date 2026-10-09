@@ -23,13 +23,17 @@ la misma semana lleva sólo las tareas nuevas, las que se preguntaron y no conte
 ninguna, no sale (`SIN_NOVEDADES`).
 
 **Lo contestado no se vuelve a preguntar** (decisión 31; `anotar_lo_que_conto`, `ya_lo_conto`). Lo
-que la persona cuenta de una tarea suya, en la lista o fuera de ella, la deja contestada en la última
-lista que le salió, con la situación de después. Con eso, la lista siguiente no la trae si no cambió,
-y el pedido de estado del día del vencimiento (el primero de su escalera) no sale si la contestó en
-esa lista y no cambió nada: cubre hasta la lista siguiente. Lo que cuenta por su cuenta, fuera de la
-lista, no saltea ese pedido. Si ese día sale una lista, el
-pedido va en ella. Que llegue el día en que vence no es un cambio; quedar atrasada sin entregar, sí:
-el día hábil siguiente la escalera le pide el estado.
+que la persona cuenta de una tarea suya la deja contestada en la última lista que le salió, con la
+situación de después: una sola regla, en la lista o fuera de ella (corrección de la C-6, del
+coordinador). Con eso, la lista siguiente no la trae si no cambió, y el pedido de estado del día
+del vencimiento (el primero de su escalera) no sale si la contó después de esa lista y no cambió
+nada: cubre hasta la lista siguiente. Una respuesta vaga ("ya casi") también es contar cómo viene.
+Ese pedido queda dado, con su motivo (`YA_LO_CONTO`), como el primer paso de la escalera, que sigue
+anclada al vencimiento (mecánica §9): el día hábil siguiente, si sigue sin entregar, sale el
+segundo pedido, y el escalamiento llega el mismo día que sin la lista. Si ese día sale una lista,
+el pedido va en ella. Un día que dio la persona (una previsión, también dicha en la lista) se sigue
+como toda previsión: ese día se le pregunta. Que llegue el día en que vence no es un cambio;
+quedar atrasada sin entregar, sí.
 
 **El recordatorio del día va adentro** (`avisos._a_la_lista`): lo que la escalera tenía para ese día
 sobre una tarea de la lista (el aviso previo, el pedido de estado, el recordatorio del vencimiento con
@@ -45,7 +49,8 @@ siempre (un inicio o una fecha cierran su espera). "Viene bien" de una tarea que
 anota igual, aunque su escalera no haya pedido nada (`fichas._informar_avance`): Leda vuelve a
 preguntar en la próxima lista completa o cuando su escalera lo pida (el día del vencimiento, o el
 siguiente si lo contestado lo cubre), lo que llegue antes; y si su aviso previo todavía no salió, lo
-próximo es ese aviso, como siempre (decisión 44; `cuando_vuelve_a_preguntar`).
+próximo es ese aviso, como siempre (decisión 44; `cuando_vuelve_a_preguntar`). Con un día dado por
+la persona, Leda pregunta ese día.
 **Si contesta sólo una**, Leda la anota y, en la misma respuesta, pregunta una vez por las otras
 (`preguntas.al_terminar_el_turno`); si después contesta otra vez sólo una parte, la lista se cierra:
 no vuelve a preguntar. **Si no contesta**, la lista es una pregunta de Leda sin contestar (decisión 21,
@@ -67,8 +72,9 @@ repone nada: la primera vuelta marca desde cuándo se cuenta.
 **Un ritmo que no se entiende** (un cron editado a mano, `leer_ritmo`) no frena a las demás: deja un
 incidente por día mientras siga así, y su cadencia no corre hasta que se corrija.
 
-Las cadencias al grupo (`grupo`) no son un pedido a cada persona: el informe al grupo es otra pieza
-(`PENDIENTE`, `odd/tasks/fase-c.md`, C-6).
+Las cadencias al grupo (`grupo`) no son un pedido a cada persona: son el informe al grupo
+(`informe_al_grupo.py`, decisión 25), que usa la misma cuenta de los días de una cadencia
+(`atender`).
 """
 
 from __future__ import annotations
@@ -91,6 +97,9 @@ PRIVADO = "privado_cada_integrante"
 YA_PASO_SU_MOMENTO = "ya_paso_su_momento"
 NO_ES_DIA_HABIL = "no_es_dia_habil"
 SIN_TAREAS_ABIERTAS = "sin_tareas_abiertas"
+# El pedido de estado del día del vencimiento que no sale porque la persona ya contó cómo viene
+# la tarea (decisión 31): queda dado, con este motivo, como el primer paso de su escalera.
+YA_LO_CONTO = "ya_conto_como_viene"
 # Una lista de la semana que no es la primera y no tiene nada que no se haya contestado ni que haya
 # cambiado: no sale (decisión 46).
 SIN_NOVEDADES = "sin_novedades_para_la_lista"
@@ -160,6 +169,23 @@ def guardar_los_pedidos(m: Momento) -> int:
 
 
 def _una_cadencia(m: Momento, cadencia: dict[str, Any], ritmo: Ritmo) -> int:
+    def del_dia(dia: date, momento: datetime) -> list[tuple[str, bool]]:
+        return [guardar(m.cur, m.workspace_id, COMO_VIENEN_SUS_TAREAS, task_id=None,
+                        destinatario=persona,
+                        hechos={"aviso": COMO_VIENEN_SUS_TAREAS, "necesita_respuesta": True},
+                        programado_para=sale(m.cal, momento),
+                        clave=clave(cadencia["id"], persona, dia), ahora=m.ahora)
+                for persona in _con_tareas(m)]
+
+    return atender(m, cadencia, ritmo, del_dia)
+
+
+def atender(m: Momento, cadencia: dict[str, Any], ritmo: Ritmo, del_dia) -> int:
+    """Los días de una cadencia que tocan ahora: el último antes de hoy y hoy, si es su día.
+    `del_dia(dia, momento)` guarda lo de ese día y devuelve cada aviso (id, si es nuevo). Uno de
+    un día que pasó sin atenderse queda omitido (mecánica §12), uno de un feriado también; antes
+    de la primera vuelta no se repone nada. `cadence_job.ultima_corrida` dice hasta qué día se
+    atendió. Cuántos quedaron para salir."""
     ultima = cadencia["ultima_corrida"]
     atendida = None
     guardados = 0
@@ -171,13 +197,7 @@ def _una_cadencia(m: Momento, cadencia: dict[str, Any], ritmo: Ritmo) -> int:
             continue                    # ya se atendió
         if ultima is None and dia < m.hoy:
             continue                    # antes de la primera vuelta: no se repone
-        for persona in _con_tareas(m):
-            aviso_id, nuevo = guardar(
-                m.cur, m.workspace_id, COMO_VIENEN_SUS_TAREAS, task_id=None,
-                destinatario=persona,
-                hechos={"aviso": COMO_VIENEN_SUS_TAREAS, "necesita_respuesta": True},
-                programado_para=sale(m.cal, momento),
-                clave=clave(cadencia["id"], persona, dia), ahora=m.ahora)
+        for aviso_id, nuevo in del_dia(dia, momento):
             if not nuevo:
                 continue
             if dia < m.hoy:
@@ -381,12 +401,12 @@ def _la_ultima_que_salio(cur, persona: str) -> dict[str, Any] | None:
 
 # --- Lo contestado (decisión 31) ----------------------------------------------------------------
 
-def anotar_lo_que_conto(ctx, task_id, *, en_la_lista: bool = False) -> None:
+def anotar_lo_que_conto(ctx, task_id) -> None:
     """La persona contó algo de una tarea suya (una jugada sobre ella, en la lista o fuera de
-    ella): en la última lista que le salió, la tarea queda contestada, con su situación de
-    después. Así la lista siguiente no se la vuelve a preguntar si no cambió (decisión 46). Si lo
-    contó contestando la pregunta de la lista (`en_la_lista`), además el pedido del día del
-    vencimiento no sale si nada cambió (decisión 31, `ya_lo_conto`)."""
+    ella, con el mismo efecto): en la última lista que le salió, la tarea queda contestada, con su
+    situación de después. Así la lista siguiente no se la vuelve a preguntar si no cambió
+    (decisión 46), y el pedido del día del vencimiento no sale si nada cambió (decisión 31,
+    `ya_lo_conto`)."""
     cur = ctx.cur
     fila = _la_ultima_que_salio(cur, ctx.quien.membership_id)
     lleva = fila["tareas_de_la_lista"] if fila is not None else None
@@ -398,7 +418,6 @@ def anotar_lo_que_conto(ctx, task_id, *, en_la_lista: bool = False) -> None:
     tareas = dict(lleva["tareas"])
     antes = tareas[str(task_id)]
     tareas[str(task_id)] = {**antes, "contestada_en": ctx.ahora.isoformat(),
-                            "en_la_lista": bool(antes.get("en_la_lista") or en_la_lista),
                             "situacion": situacion(cur, ctx.calendario, ctx.ahora, tarea)}
     cur.execute("update scheduled_notice set tareas_de_la_lista = %s where id = %s",
                 (json.dumps({**lleva, "tareas": tareas}, ensure_ascii=False), fila["id"]))
@@ -406,10 +425,13 @@ def anotar_lo_que_conto(ctx, task_id, *, en_la_lista: bool = False) -> None:
 
 def ya_lo_conto(m: Momento, tarea: dict[str, Any]) -> bool:
     """Si el pedido de estado del día del vencimiento de la tarea no sale porque la persona ya
-    contó cómo viene en la lista (decisión 31): contestando la pregunta de la última lista que le
-    salió, y no cambió nada desde lo último que contó. Lo que cuenta por su cuenta, fuera de la
-    lista, no lo saltea. Si hoy le sale una lista, tampoco: el pedido va en ella."""
+    contó cómo viene (decisión 31): después de la última lista que le salió, en la lista o fuera
+    de ella, y no cambió nada desde lo último que contó. Si hoy le sale una lista, no: el pedido
+    va en ella. Con un día dado por la persona (una previsión vigente), tampoco: ese día se sigue
+    como toda previsión."""
     cur, persona = m.cur, str(tarea["responsable_membership_id"])
+    if prevision_vigente(cur, tarea["id"]) is not None:
+        return False
     cur.execute("""select programado_para from scheduled_notice
                     where destinatario_membership_id = %s and tipo = %s and estado = 'guardado'""",
                 (persona, COMO_VIENEN_SUS_TAREAS))
@@ -418,7 +440,7 @@ def ya_lo_conto(m: Momento, tarea: dict[str, Any]) -> bool:
     fila = _la_ultima_que_salio(cur, persona)
     lleva = (fila["tareas_de_la_lista"] if fila is not None else None) or {}
     dicha = (lleva.get("tareas") or {}).get(str(tarea["id"]))
-    if not dicha or not dicha.get("contestada_en") or not dicha.get("en_la_lista"):
+    if not dicha or not dicha.get("contestada_en"):
         return False
     return dicha.get("situacion") == situacion(cur, m.cal, m.ahora, tarea)
 
@@ -431,16 +453,18 @@ def cuando_vuelve_a_preguntar(cur, cal, workspace_id: str, tarea: dict[str, Any]
     lista sin que su escalera lo hubiera pedido, y cuándo le llega antes el aviso previo, si
     todavía no salió (decisión 44). Pregunta en la próxima lista completa (la primera de otra
     semana) o cuando su escalera lo pida, lo que llegue antes: el día de su seguimiento si sale
-    una lista en el medio (lo contestado cubre hasta la lista siguiente, decisión 31) y, si no, el
-    día hábil siguiente. `None` si nada de eso va a pasar."""
+    una lista en el medio (lo contestado cubre hasta la lista siguiente, decisión 31) o si es un
+    día que dio la persona (`ya_lo_conto`) y, si no, el día hábil siguiente. `None` si nada de eso
+    va a pasar."""
     candidatos = [proxima_lista_completa(cur, cal, ahora)]
     antes = None
     if tarea.get("fecha_objetivo") is not None:
         hoy = ahora.astimezone(cal.zona).date()
         vence = tarea["fecha_objetivo"].astimezone(cal.zona).date()
         hasta = anclaje(cur, tarea["id"], vence).fecha
-        dia = hasta if _hay_una_lista(cur, cal, hoy, hasta) else cal.proximo_habil(
-            hasta + timedelta(days=1))
+        cubre = prevision_vigente(cur, tarea["id"]) is None and not _hay_una_lista(
+            cur, cal, hoy, hasta)
+        dia = cal.proximo_habil(hasta + timedelta(days=1)) if cubre else hasta
         candidatos.append(sale_lo_del_dia(cur, cal, dia))
         if hasta == vence:
             antes = _el_aviso_previo_por_salir(cur, cal, workspace_id, tarea, vence, ahora)
