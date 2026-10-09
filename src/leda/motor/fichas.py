@@ -153,6 +153,10 @@ class Ficha:
     # chat (9g), o es de una situación general.
     se_ofrece: bool = True
     contesta: tuple[str, ...] = ()  # las preguntas sobre su tarea que contesta al anotarse
+    # Si al anotarse decide la entrega de su tarea (aprobar, pedir cambios): las demás preguntas
+    # sin cerrar sobre esa tarea, de cualquier persona, se cierran con esa decisión (D8: el botón
+    # para ver una entrega ya decidida quedaba abierto para siempre).
+    decide_la_tarea: bool = False
     # Cómo se deshace lo que anotó, agregando hechos (9f): `None` si no hay nada que deshacer;
     # si no, los hechos de la corrección y los datos para anotarlo en la tarea correcta.
     deshacer: Callable[[Contexto, dict[str, Any]], dict[str, Any] | None] | None = None
@@ -361,6 +365,10 @@ def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
             if hecho.get("resultado") == "anotado" and hecho["jugada"] == ficha.nombre:
                 if de_la_tarea is not None:
                     preguntas.contestar(ctx, ficha.nombre, ficha.contesta, de_la_tarea["id"])
+                    if ficha.decide_la_tarea:
+                        preguntas.cerrar_las_de_la_tarea(
+                            ctx, de_la_tarea["id"], "sin_efecto",
+                            {"tarea": de_la_tarea["id"], "ya_decidio": True})
             if hecho["jugada"] == ficha.nombre:
                 # Primero la pregunta de la tarea vencida (9j) y después lo propuesto: si ya se
                 # pregunta algo en esta respuesta, lo propuesto queda para después (un tema a
@@ -1382,6 +1390,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="le avisa al responsable enseguida; si no se cerró, el sistema la cierra solo "
                   "cuando se resuelve lo que faltaba y les avisa a los dos",
           manejar=_aprobar, boton="Aprobar", opuesta="pedir_cambios",
+          decide_la_tarea=True,
           contesta=(preguntas.DECISION_DE_LA_ENTREGA, preguntas.QUE_CAMBIOS_PIDE,
                     preguntas.CUAL_DE_LAS_DOS),
           es="La persona que escribe aprueba el trabajo entregado de una tarea que espera su "
@@ -1401,6 +1410,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                "entregarla",
           despues="le avisa al responsable enseguida, con lo que pidió",
           manejar=_pedir_cambios, boton="Pedir cambios", opuesta="aprobar",
+          decide_la_tarea=True,
           contesta=(preguntas.DECISION_DE_LA_ENTREGA, preguntas.QUE_CAMBIOS_PIDE,
                     preguntas.CUAL_DE_LAS_DOS),
           es="La persona que escribe le pide al responsable que cambie, complete o revise algo "

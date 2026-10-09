@@ -446,6 +446,22 @@ def cerrar_de_tipo(ctx, tipo: str, task_id: str, cierre: str, detalle: dict[str,
         cerrar(ctx, str(fila["id"]), cierre, detalle)
 
 
+def cerrar_las_de_la_tarea(ctx, task_id: str, cierre: str, detalle: dict[str, Any]) -> None:
+    """Las preguntas sin cerrar sobre esa tarea, de cualquier persona: lo que esperaba algo de
+    ella ya no espera nada (D8: después de decidir una entrega, el botón para verla seguía
+    abierto para siempre). La que una persona tenía abierta deja de serlo."""
+    ctx.cur.execute(
+        """update conversation_question
+              set cerrada_en = %s, cierre = %s, cierre_detalle = %s
+            where task_id = %s and cerrada_en is null
+        returning id, membership_id""", (ctx.ahora, cierre, _json(detalle), task_id))
+    for fila in ctx.cur.fetchall():
+        ctx.cur.execute(
+            """update conversation_state set pregunta_abierta_id = null, actualizado_en = %s
+                where membership_id = %s and pregunta_abierta_id = %s""",
+            (ctx.ahora, fila["membership_id"], fila["id"]))
+
+
 def cerrar_las_de_una_jugada(ctx, nombre: str, task_id: str, cierre: str,
                              detalle: dict[str, Any]) -> None:
     """Las preguntas sin cerrar que esperaban algo de esa jugada sobre esa tarea."""
@@ -532,6 +548,9 @@ def con_que_se_cerro(ctx, pregunta_id: str) -> dict[str, Any]:
     if detalle.get("reemplazada"):
         # Una vista previa que dejó de valer porque cambió lo que mostraba: la reemplazó otra.
         dicho["reemplazada"] = True
+    if detalle.get("ya_decidio"):
+        # Se cerró porque quien aprueba ya decidió sobre la entrega de su tarea (D8).
+        dicho["ya_decidio"] = True
     return dicho
 
 

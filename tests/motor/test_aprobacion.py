@@ -856,6 +856,33 @@ def test_despues_de_decidir_una_muestra_lo_que_queda_por_revisar(conn, mundo, tu
     assert "queda_por_revisar" not in _hecho(r, "aprobar")
 
 
+@pytest.mark.parametrize("decision", [
+    Jugada("aprobar", {"tarea": "T1"}),
+    Jugada("pedir_cambios", {"tarea": "T1", "comentario": "falta la foto del contador"}),
+], ids=["aprobar", "pedir_cambios"])
+def test_al_decidir_una_entrega_no_queda_abierta_ninguna_pregunta_de_su_tarea(
+        conn, mundo, turnos, decision):
+    """Prueba por Telegram del 2026-10-08 (D8, G3): el botón de la lista para ver una entrega
+    quedaba abierto para siempre después de decidirla (`leer` lo mostraba pendiente). Al
+    decidirla, toda pregunta sin cerrar sobre esa tarea se cierra, de cualquier persona; el botón
+    viejo dice que ya se decidió, sin cambiar nada."""
+    primera, segunda = _dos_entregadas(conn, mundo, turnos)
+    enviar(conn, mundo, IAQueRedacta(), DESPUES_DEL_MARGEN)       # la lista, con un Ver por tarea
+    ver_viejo = _token(conn, f"Ver {ENTREGADA}")
+
+    turnos.dice("Ismael", decision, texto="lo del tablero", at=DESPUES_DEL_MARGEN)
+
+    assert cuantas(conn, "conversation_question", "task_id = %s and cerrada_en is null",
+                   primera) == 0
+    # La de la otra tarea sigue: todavía espera su revisión.
+    assert cuantas(conn, "conversation_question", "task_id = %s and cerrada_en is null",
+                   segunda) >= 1
+    r = turnos.toca("Ismael", ver_viejo, at=DESPUES_DEL_MARGEN)
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "sin_efecto" and hecho["cerrada_con"]["ya_decidio"] is True
+    assert hechos.significado("ya_decidio")
+
+
 def test_lo_que_queda_por_revisar_se_recuerda_el_dia_habil_siguiente(conn, mundo, turnos):
     """Prueba por Telegram del 2026-10-08 (D8, G1): un viernes Leda prometió "Mañana te la
     recuerdo". La cocina da el día hábil siguiente del calendario del espacio (decisión 17), como
