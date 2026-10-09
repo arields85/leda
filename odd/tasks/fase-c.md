@@ -421,6 +421,25 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     tarea pasó a Marcos y, cuando Marcos dice "listo", se cierra ahí (decisión 28). Cambia lo
     construido en la C-7, que exigía que lo pidiera Nahuel.
 
+54. **El informe al grupo repite lo que sigue igual** (de la C-6; usuario, 2026-10-09, opción A).
+    Si el PLC sigue demorado, el informe lo vuelve a decir ("PLC: sigue demorada, falta que llegue
+    el cable"): "no es exponer, es informar", y nadie tiene que adivinar qué pasó con ese tema. Las
+    listas a cada persona (decisión 46) son otra cosa: preguntan; el informe al grupo sólo informa.
+    Cada cuánto sale se ajusta en la plataforma. Es como estaba construido; ahora con su prueba.
+
+55. **El informe al grupo sale siempre, también para decir que está todo en orden** (de la C-6;
+    usuario, 2026-10-09). Sale a su cadencia también como señal de que Leda funciona: si no hay nada
+    malo, dice que está todo en orden ("es una buena noticia recibir que todo está en orden"), pero
+    sólo cuando los datos lo prueban (constitución §4): lo que Leda no sabe lo dice como no sabido
+    (alguien que no contestó no está "bien" ni "atrasado"). Siempre lleva las buenas noticias: lo
+    que se terminó y quién lo hizo. Cuando la semana fue buena según reglas fijas del código (ningún
+    atraso nuevo, ningún bloqueo abierto, lo que vencía se entregó), un reconocimiento breve, sin
+    exagerar. Nunca compara personas, ni rankings, ni cuántas hizo cada uno: "nada de comparar ni
+    ranking, es un equipo no una competencia". La cocina decide los hechos (también si la semana
+    fue buena); la IA lo redacta con el tono de Leda, sin frases de felicitación armadas. Cambia la
+    C-6 (hoy, sin nada que informar no sale nada, y un atraso sin hablar no figura en ninguna
+    parte).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2466,6 +2485,72 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       - **La IA real** sobre la 40 y la 41 (la redacción de un mensaje al grupo, con instrucciones
         escritas para una persona) y **la prueba por Telegram** en el grupo "CoreWork IA", en la
         tanda posterior; `leda_motor` necesita la `0047` y la `0048`.
+  - **Las decisiones 54 y 55 y lo que dejaron las revisiones** (2026-10-09, escritor único; route:
+    delegada, 2+ archivos no triviales; sin migración). Revisiones de origen:
+    `review-f4d7f683f853df7c` (el informe al grupo), `review-52e1f429c07370b9` (la corrección de
+    la C-6) y `review-8d6e96daab3e588b` (la C-5b); de cada una llegó sólo el lugar, y el porqué se
+    reconstruyó leyendo el código.
+    - **El informe sale siempre** (decisión 55; `informe_al_grupo.armar`): sin nada malo,
+      `todo_en_orden`, sólo si el código lo comprueba (ningún atraso, ninguna trabada, nada que no
+      se sepa y ningún atraso que la persona todavía no habló). Lo que Leda no sabe
+      (`sin_saber_como_vienen`): Leda le preguntó otro día (su espera del estado, o la lista) y no
+      contestó; va sin el día en que vence, ni bien ni atrasada. Esto cambia la lectura de la
+      decisión 25 en un caso: lo que la persona no habló y además no contestó ya no queda fuera
+      del informe, sino como no sabido. Lo preguntado hoy sigue su curso. Sin nada que contar y
+      sin poder decir que está todo en orden (un atraso no hablado, sin una pregunta sin contestar),
+      `sin_novedades_para_el_grupo`. `nada_para_el_informe` queda sólo para los omitidos de antes.
+    - **La semana buena** (`_semana_buena`, reglas fijas): sin bloqueos abiertos; nadie dio en el
+      período un día posterior al vencimiento; lo que vencía en el período está entregado y por
+      ello no salió ningún paso de la escalera ya vencido; y algo se terminó o se entregó (sin eso,
+      todo en orden no es una semana buena: sin exagerar). Usa datos con el reloj del motor (los
+      avisos guardados, las previsiones y `cambios_de_estado`), porque `leda_app` no lee
+      `task_state_event` y sus horas son reales. Un dato del equipo: ningún conteo ni comparación
+      por persona (lo prueba la forma de los hechos). Sus significados, en `hechos.SIGNIFICADOS`,
+      describen el dato, sin frases para decir.
+    - **Lo que sigue igual se repite** (decisión 54): lo construido, con su prueba.
+    - **Lo del informe que dejó la revisión `review-f4d7f683f853df7c`:**
+      - `informe_al_grupo.py:208-215`: un informe que no salía perdía sus hechos; ahora quedan en
+        el aviso en cada intento fallido (también si el texto no se puede mandar).
+      - `avisos.py:362-365`: el informe corre en su savepoint; si se cae, lo de cada persona de la
+        misma pasada sale igual, y se reintenta con el mismo calendario y un incidente
+        (`motor_ciclo`). El reintento a mano (`enviar_avisos(solo=…, forzar=True)`) ahora lo
+        alcanza.
+      - `informe_al_grupo.py:246`: una terminada figura una sola vez: la que ningún informe
+        anterior llevó (sus ids, en `scheduled_notice.tareas_de_la_lista`, fuera de los hechos),
+        aunque después se toque su última actualización.
+      - `informe_al_grupo.py:143-147`: el informe sin grupo al salir y el texto que el outbox
+        rechaza, con su prueba.
+    - **`escalera.py:349-356`** (`review-52e1f429c07370b9`): después de un pedido dado por
+      contestado (`ya_conto_como_viene`), el pedido siguiente decía `numero: 2` ("cuántas veces
+      seguidas Leda le pregunta sin que conteste"), y era la primera. Ahora cuenta sólo las
+      preguntas que se le hicieron; los pasos siguen anclados al vencimiento. Cambian
+      `test_cadencias.py` y la 40 (pasos 4 y 6: 1 y 2).
+    - **De la C-5b** (`review-8d6e96daab3e588b`):
+      - `bloqueo_viejo.py:324-328`: si el aviso al referente quedó `fallido`, a la persona trabada
+        no se le dice que le llegó (constitución §4): `no_le_llega_a_nadie`.
+      - `pase.py:243-245`: si quien no tiene Leda conectada es quien decide el pase, el aviso al
+        administrador dice que es para que decida, no "para pasarle la tarea".
+      - Advertencias, sin cambio: `escalera.py:573-576` (la repregunta que nunca abandona): leído,
+        sin un defecto reproducible (con la rama tomada hay al menos dos pasos dados y cada
+        repetición tiene su clave); `fichas.py:825-827` (sugerencia): la pregunta abierta de quién
+        destraba ya se prefiere a las dejadas para después (`para_despues_en nulls first`).
+    - **Un hallazgo de la 41 extendida** (paso 10): entregar una tarea no cerraba la pregunta de
+      cómo venía (abierta por un pedido sin contestar), que volvía después de confirmar, sobre una
+      tarea ya en revisión. La entrega ahora la contesta (`entrega.py`, regla general: lo que
+      contesta la entrega, como toda jugada anotada).
+    - **La 41**, extendida: el miércoles, la integración de Ariel como no sabida; la semana
+      siguiente, Lucas se destraba, Marcos y Ariel entregan, y el informe del miércoles dice todo
+      en orden y la semana buena; el del viernes, sólo todo en orden.
+    - **Test primero:** `pytest tests/motor/test_informe_al_grupo.py`, con los nombres nuevos
+      solos: **12 failed, 16 passed** (`0753be1`); `test_cadencias.py`, `test_bloqueo_viejo.py` y
+      `test_delegar.py`: **4 failed, 86 passed**; `test_entrega.py` (el hallazgo): **1 failed**
+      (`df2b89e`). Verde: `7759904` y `f1b8976`.
+    - **Chequeos:** (2026-10-09, sobre `f1b8976`) `pytest tests/motor tests/garantias
+      tests/conversaciones`, **1582 passed**; en seco, `correr --ia guionada --veces 1
+      --sin-informe`, **43 de 43 bien**. Sin la IA real y sin nada al grupo de Telegram.
+    - `PENDIENTE`: la revisión RDD de este tramo (coordinador); la IA real sobre la 41 (la
+      redacción de "todo en orden" y del reconocimiento, sin frases armadas) y la prueba por
+      Telegram, en la tanda posterior.
 - [ ] **C-8.** Las ausencias (usuario, 2026-10-09: "nunca se trató"; pendiente para más adelante).
   La mecánica §9 ya lo pide: con la persona ausente, Leda no le escribe ni avanza su escalera, avisa
   al referente de lo que queda sin cobertura y, al volver, retoma con un mensaje de reencuadre. En
