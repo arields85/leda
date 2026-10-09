@@ -323,6 +323,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     no lo puedo cancelar"), Leda se lo lleva a quien decide (Marcos: "que llegue, queda de
     repuesto") y les cierra el tema a los dos. Cambia la porción 1 (hoy quien destraba no se entera).
 
+40. **Si quien destraba es la autoridad o un referente, Leda le escribe igual** (de la C-5,
+    porción 1): decidida (usuario, 2026-10-09, opción A). Si Marcos dice "esto lo tiene que
+    destrabar Ismael, que tiene que firmar la compra", Leda le escribe a Ismael como a cualquiera
+    que destraba: "Marcos está esperando tu firma para la compra del repuesto del PLC. ¿Para cuándo
+    podrías firmarla?". "No hay que tener miedo de pedirle cosas a Ismael." Confirma lo construido
+    (la porción 1 ya le escribe a quien la persona nombra); precisa la 9c, paso 4, del ADR 0018: el
+    referente no recibe avisos *por* el bloqueo, pero sí el pedido cuando él es quien destraba.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
