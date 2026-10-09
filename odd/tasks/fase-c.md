@@ -2070,6 +2070,91 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         al grupo: hay que construirlo antes de la prueba por Telegram, o decidir apagar el
         predicado hasta entonces (pregunta para el usuario).
       - **La IA real** sobre la 03, 04, 34 y 36, en la tanda de pruebas.
+  - [x] **C-5b: quien destraba sin Leda conectada y a quien no contesta no se lo abandona**
+    (decisiones 37 y 38 del usuario, 2026-10-09; y, derivado por el coordinador de la 49 y de
+    "nunca fallar en silencio", lo asentado sin nadie a quien informar). Route: delegada (escritor
+    único, 2+ archivos no triviales). Hecha el 2026-10-09:
+    - **Las conversaciones primero** (`67f7f3a`): la 32, paso 6, espera ahora el aviso al
+      administrador para que conecte a Mariano (un incidente `motor_sin_leda_conectada`, con su
+      aviso por el bot de administración) y las salidas como tema abierto; los pasos 6b y 6c
+      nuevos: Marcos nombra a Lucas y Leda le escribe. La 42 nueva (quien destraba no contesta):
+      Ariel recibe la pregunta el martes 20, el miércoles y el jueves; el viernes nada; el lunes
+      26 otra (dos días hábiles); escribe por su tarea y la pregunta vuelve aparte (decisión 50);
+      el martes 27 queda asentado el bloqueo viejo; el miércoles 28 otra, y contesta. El corredor
+      espera incidentes por su etapa (`incidentes`, en los efectos o en el paso de Leda; uno que
+      falta es del motor), con su prueba en `test_comprobar.py`. En seco, antes del código: la 32
+      con 9 fallas y la 42 con 2 (pasos 7 y 11: las repeticiones del día 5 y del 7); la vuelta
+      aparte de la pregunta ya funcionaba (la regla de la decisión 50 alcanza a quien destraba).
+    - **Test primero** (`43ad895`): `test_persecucion.py` (37: el aviso al administrador, sin un
+      administrador alcanzable no se promete, las salidas, nombrar a otra persona y destrabar las
+      cierran; 38: nunca lo abandona y deja de preguntar al destrabarse), `test_bloqueo_viejo.py`
+      y `test_cadena_del_bloqueo.py` (sin nadie a quien informar, y las dos advertencias de la
+      revisión), `test_delegar.py` (el pase a alguien sin Leda conectada). **Rojo:**
+      `test_persecucion.py` 5 fallas de 36; `test_bloqueo_viejo.py` y `test_cadena_del_bloqueo.py`
+      4 de 44; `test_delegar.py`, la nueva; `test_comprobar.py`, la nueva. **Verde** con el código
+      (`97c818e`): las 138 de esos cinco módulos; `pytest tests/motor tests/garantias
+      tests/test_aviso_incidente_legible.py tests/test_avisos_admin.py`, 1402 passed y 2 fallas que
+      eran del cambio (la frontera del motor no conocía la función nueva de `incidentes`, y un
+      significado decía "ella misma"), corregidas en el mismo commit.
+    - **37, sin Leda conectada** (`persecucion.avisar_para_que_lo_conecte`): a quien no tiene un
+      chat con Leda, un incidente `motor_sin_leda_conectada` que `registrar_incidente` lleva al bot
+      de administración (con su explicación en `incidentes.EXPLICACION_POR_ETAPA`: a quién conectar
+      y para qué). El hecho `se_le_aviso_al_administrador` dice a quién conectar y cuándo le llega,
+      o `no_le_va_a_llegar` si ningún administrador es alcanzable: para eso,
+      `incidentes.registrar_incidente_y_si_se_aviso` (el mismo incidente, devolviendo si alguien
+      quedó avisado; `registrar_incidente` sigue devolviendo sólo el id). A la persona trabada, las
+      salidas como tema abierto (`salidas`: `anotar_quien_destraba` y `pedirselo_y_contar`, por el
+      mismo camino que las de un bloqueo sin otra persona): nombrar a otra persona las contesta
+      (sin decir la tarea, la toma de ese tema), y `destrabar` las cierra ("me contás"). En la
+      cadena (porción 3), si la segunda persona no tiene Leda, el aviso al administrador sale igual
+      y la persona trabada lo sabe. A alguien inactivo no se le avisa al administrador (no es
+      conectarlo); las salidas, sí.
+    - **37 en los pases** (decisión 50, derivada): pedir un pase a alguien sin Leda conectada (o
+      que lo decida alguien sin ella) dice que no se puede, avisa al administrador igual y ofrece
+      pasársela a otra persona (`en_cambio_puede`: `pasarsela_a_otra_persona`, sin abrir un tema:
+      la jugada del pase no se anota hasta confirmar). Resuelve el `PENDIENTE` de la C-7.
+    - **38, nunca lo abandona** (`escalera._un_paso_de_una_pregunta`): una pregunta que no escala
+      (la de quien destraba), pasados sus tres días, se repite cada `CADA_CUANTO_SI_NO_ESCALA` (2)
+      días hábiles desde la repetición anterior, mientras siga esperando; se corta cuando se
+      destraba o la destraba otra persona (como antes). Lectura del coordinador: "cada 2 días
+      hábiles" cuenta desde la anterior, así que el día 4 no hay mensaje y el 5 sí. Si escribe por
+      otra cosa, la pregunta vuelve en un mensaje aparte: ya lo hacía la decisión 50, sin código
+      nuevo (la 42 lo prueba).
+    - **Sin nadie a quien informar** (decisión 49, qué es dejar asentado; `asentado.py`): queda
+      asentado igual. El bloqueo viejo: la vez queda contada con el aviso al referente omitido
+      (`sin_a_quien_informar`, a nombre de la persona trabada: no le llega a nadie), su fila de
+      auditoría con el motivo, un incidente `motor_sin_a_quien_informar` y, a la persona trabada,
+      `queda_asentado` sin `a` y con `solo_si_pregunta: {no_le_llega_a_nadie}`. Vale también si el
+      referente no tiene Leda conectada. La cadena que nadie toma: su fila de auditoría
+      (`asentar_la_cadena_del_bloqueo`, con la cadena), el incidente y, a la persona trabada, lo
+      mismo; a quien habló, el hecho sigue diciendo que no le llega a nadie.
+    - **Las advertencias de la revisión `review-1db0e16dfeacfc4f`:** `bloqueo_viejo.py:279-281`
+      (a la persona trabada se le decía que quedó asentado antes de que se resolviera el aviso al
+      referente): **lo asentado queda al guardarse** (`asentar_bloqueo_que_sigue_abierto`, una
+      fila de auditoría por vez, con a quién le va a llegar), así lo que se le dice ya es cierto
+      aunque el aviso al referente espere (Lucas ausente); a quién, sólo si su aviso no se omitió.
+      `persecucion.py:550-559` (sin referente la cadena se caía en silencio): ahora queda asentada.
+      Rojo de las dos visto antes del código (`test_lo_que_se_le_dice_a_la_persona_trabada_ya_
+      quedo_asentado`, `test_sin_referente_la_cadena_queda_asentada_igual`).
+    - **Las instrucciones de la IA no cambiaron** (huellas de `test_contratos.py` iguales): los
+      códigos nuevos van en `hechos.SIGNIFICADOS`; la ficha de `anotar_quien_destraba` dice en su
+      `despues` que también propone salidas si a quien nombró no le puede escribir.
+    - **Chequeos** (2026-10-09, sobre `97c818e`): `pytest tests/motor tests/garantias
+      tests/conversaciones`, **1532 passed**; en seco, `correr --ia guionada --veces 1
+      --sin-informe`, **42 de 42 bien**. Sin la IA real. Informes borrados, `gasto.json` sin
+      tocar.
+    - `PENDIENTE`:
+      - **La IA real** sobre la 32 y la 42, en la tanda de pruebas, y la prueba por Telegram.
+      - Si el referente deja de tener Leda conectada entre que se guarda el aviso del bloqueo
+        viejo y que sale, a la persona trabada se le dice que no le llega a nadie (cierto), pero
+        el incidente para el administrador no se registra en ese momento (sólo al guardarse).
+      - Un incidente por cada vez que se nombra a alguien sin Leda conectada (no se agrupan:
+        `leda_app` no puede leer `incident` para saber si ya se avisó ese día).
+      - La página de la tarea no muestra lo asentado en su historia (tampoco con referente): queda
+        en la auditoría y en el bloqueo (`escalado_a`, `escalado_en`).
+      - "Se lo pido yo" sin más, a la espera de lo que cuente, no tiene jugada: el tema de las
+        salidas queda abierto hasta que nombre a otra persona, diga que puede seguir, lo deje sin
+        efecto o pasen sus horas (decisión 21). Ver con la IA real.
 - [ ] **C-6.** Las cadencias (pregunta 8). El pedido de estado por persona, hecho y revisado el
   2026-10-09; el informe al grupo (decisión 25), construido el mismo día con su corrección (abajo,
   "La corrección de la C-6 y el informe al grupo"); falta la revisión RDD de ese tramo
@@ -2506,7 +2591,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         39 sin respuesta y sin efecto, y la carrera, que daba `no_autorizado`); en seco, la 39 con
         el YAML anterior y el motor nuevo, 1 falla (el aviso a Martín, que antes no salía).
         **Verde:** las 39 y las 29; en seco, la 39 extendida bien (pasos 19 a 23).
-      - `PENDIENTE`: un pase a alguien sin Leda conectada (decisión 37): se construye con la C-5b.
+      - ~~`PENDIENTE`: un pase a alguien sin Leda conectada (decisión 37)~~: hecho con la C-5b
+        (`97c818e`): no se puede, se le avisa al administrador y Leda ofrece pasársela a otra
+        persona.
     - `PENDIENTE`:
       - **La IA real** sobre la 12, la 19 y la 38 (la tanda posterior), y la prueba por Telegram, con
         `leda_motor` al día hasta la `0045` (respaldo previo).
@@ -2565,7 +2652,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
   - [x] C-5a: 35 ("quedó asentado"), 34 (se le cuenta a la persona trabada), 36 (se vuelve a
         asentar mientras siga); conversaciones 02, 03, 04, 30, 34 y 36, sin migración
         (`cc4d651`, `e91c38a`).
-  - [ ] C-5b: 37 (quien destraba sin Leda conectada), 38 (a quien no contesta no se lo abandona).
+  - [x] C-5b: 37 (quien destraba sin Leda conectada), 38 (a quien no contesta no se lo abandona);
+        conversaciones 32 y 42, sin migración (`67f7f3a`, `43ad895`, `97c818e`).
   - [ ] C-5c: 39 (cerrar el tema para todos), 47 (confirmar lo acordado), 48 ("ya lo hablé" sin
         decir qué).
   - [ ] C-5d: 24 (el informe, nunca a alguien de la cadena), 41 (destraba quien está trabado), 49
