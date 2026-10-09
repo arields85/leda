@@ -2071,8 +2071,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         predicado hasta entonces (pregunta para el usuario).
       - **La IA real** sobre la 03, 04, 34 y 36, en la tanda de pruebas.
 - [ ] **C-6.** Las cadencias (pregunta 8). El pedido de estado por persona, hecho y revisado el
-  2026-10-09; el informe al grupo, `PENDIENTE` (el grupo de CoreWork no existe en Telegram, el
-  aviso del motor exige una persona como destinatario y falta decidir los atrasos; ver abajo).
+  2026-10-09; el informe al grupo (decisión 25), construido el mismo día con su corrección (abajo,
+  "La corrección de la C-6 y el informe al grupo"); falta la revisión RDD de ese tramo
+  (coordinador), la IA real y la prueba por Telegram.
   - **Revisión RDD por tramos (coordinador), aprobadas y reconocidas:** `b5dc456..99169f8` (la 37)
     `review-09924d6e29f5635b`; `99169f8..ad1d06f` `review-1d9856275ebcb0f5`, advertencia: dos
     cadencias privadas el mismo día pueden chocar (`avisos.py:364-395`); sugerencias: un cron con
@@ -2228,6 +2229,73 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         cuenta empieza el día hábil siguiente). ¿Está bien, o debería escalar igual a los tres días
         hábiles del vencimiento?
     - `leda_motor` necesita la `0047`; la IA real sobre la 37 y la 40, en la tanda posterior.
+  - **La corrección de la C-6 y el informe al grupo** (2026-10-09, escritor único; route: delegada,
+    2+ archivos no triviales). Las tres lecturas de arriba y lo que dejó la revisión
+    `review-f853adf249068e7d` las derivó el coordinador de las decisiones 8, 25, 31 y 44 y de la
+    mecánica §9, como reglas generales; el informe al grupo es la decisión 25. Migración `0048`
+    con su rollback.
+    - **Una sola regla** (`507a45a` la prueba, `d4acea1` el código; `cadencias.ya_lo_conto`,
+      `anotar_lo_que_conto`): lo que la persona cuenta de una tarea tiene el mismo efecto en la
+      lista o fuera de ella; el pedido del día del vencimiento tampoco sale si lo contó por su
+      cuenta después de la última lista. Una respuesta vaga ("ya casi") también es contar cómo
+      viene (lo construido; ahora con su prueba).
+    - **Un día dado en la lista es una previsión** como cualquier otra: con una previsión vigente
+      no se saltea ningún pedido, y el día que dio la persona se le pregunta (también
+      `cuando_vuelve_a_preguntar`).
+    - **La escalera sigue anclada al vencimiento** (mecánica §9; `escalera._dar_por_contado`): el
+      pedido del día del vencimiento que no sale queda guardado y omitido con su motivo
+      (`ya_conto_como_viene`, nunca en silencio), como el primer paso, sin pedir respuesta ni
+      abrir espera; no cuenta como un pedido que no le llegó. El día hábil siguiente sale el
+      segundo pedido y el escalamiento llega al tercer día hábil del vencimiento, como sin lista.
+      Cambian la 40 (pasos 3, 4, 6 y 7: el viernes sale el escalamiento a Ismael) y las pruebas de
+      `test_cadencias.py` que lo esperaban un día después.
+    - **Lo que dejó la revisión `review-f853adf249068e7d`:** las dos aserciones que aceptaban
+      cualquiera de dos resultados en `test_pregunta_sin_contestar.py` dicen ahora el exacto (la
+      escalera de la pregunta la repite una vez al día hábil siguiente, `repregunta`), y el filtro
+      del envío fuera del horario (`avisos.enviar_avisos`) tiene su prueba.
+    - **Test primero:** `pytest -q tests/motor/test_cadencias.py tests/motor/
+      test_pregunta_sin_contestar.py`, con `YA_LO_CONTO` como único nombre nuevo: **6 failed, 55
+      passed**. Verde: 61 passed; `pytest tests/motor`, 967 passed; la 37 y la 40 en seco, bien.
+    - **El informe al grupo** (decisión 25; `d860168` la prueba, `8545f36` la base, `359d6ee` el
+      código, `4d2c25e` la conversación; `leda.motor.informe_al_grupo`): el día de una cadencia
+      al grupo del pack (`resumen_grupal` miércoles 15:30, `informe_semanal` viernes 16:15), a su
+      hora (`tiempo.sale`, decisión 45), Leda le manda al grupo del espacio las terminadas desde
+      el informe anterior, los atrasos ya hablados en privado (con el día en que vencían, el día
+      que dio la persona y su motivo), las trabadas (causas, desde cuándo, días hábiles y el día
+      que dio quien destraba), las entregadas y las que siguen, cada renglón con quien la tiene
+      (`la_tiene`). Hablado en privado: la persona dio un día posterior al vencimiento, o quedó
+      asentado porque no contestó (salió el escalamiento de ese vencimiento); un atraso que la
+      persona todavía no habló no figura en ninguna parte. Sin nada, queda omitido
+      (`nada_para_el_informe`). La misma cuenta de días que la lista (`cadencias.atender`): un día
+      que pasó sin atenderse no sale tarde, y la fila del outbox vence al cierre de ese día. Lo
+      redacta la IA desde los hechos (sus significados en `hechos.SIGNIFICADOS`; las instrucciones
+      no cambiaron); si no lo redacta, los reintentos de siempre y, al quinto, `fallido` con su
+      incidente. No pide respuesta, no abre preguntas, no es el último aviso de nadie y no cuenta
+      para el tope (no va a una persona); queda auditado sobre el aviso.
+    - **La base** (`0048`): `scheduled_notice.al_grupo`, el destinatario nulo sólo en un aviso al
+      grupo (`scheduled_notice_destino`), RLS forzado como antes; el chat del grupo no se guarda
+      ahí: sale de `workspace.grupo_chat_id` (del pack) al encolar. El rollback se niega con un
+      aviso al grupo guardado (probado). `asentado.hay_informe_al_grupo` es ahora verdadero sólo si
+      el informe de verdad corre (el grupo y una cadencia al grupo activa con un ritmo que se
+      entiende): el mismo predicado decide si se guarda.
+    - **La 41** (`41-el-informe-al-grupo.md`): dos informes de la semana, con el atraso de Marcos
+      hablado en privado, el de Ariel que no figura el miércoles y sí el viernes, después de
+      asentado, la tarea trabada de Lucas, la terminada de Nahuel sólo en el primero. El corredor
+      espera lo que va al grupo con `a: grupo` (`carga.GRUPO`). Se escribió después del código: sin
+      rojo propio (el rojo es el de `test_informe_al_grupo.py`).
+    - **Test primero:** `pytest -q tests/motor/test_informe_al_grupo.py tests/garantias/
+      test_informe_al_grupo.py`, con el módulo sólo con sus nombres y el esquema ya cambiado:
+      **14 failed, 7 passed** (pasaban las de la base: la restricción, la columna sin chat, la
+      guarda del rollback, y las de nada que guardar). Verde: con `test_asentado.py`, 31 passed.
+    - **Chequeos:** (2026-10-09, sobre `4d2c25e`) `pytest tests/motor tests/garantias
+      tests/conversaciones`, **1520 passed** (la paridad y el rollback de la `0048` incluidos); en
+      seco, `correr --ia guionada --veces 1 --sin-informe`, **41 de 41 bien**. Sin la IA real y
+      sin nada al grupo de Telegram.
+    - `PENDIENTE`:
+      - **La revisión RDD** de este tramo (coordinador).
+      - **La IA real** sobre la 40 y la 41 (la redacción de un mensaje al grupo, con instrucciones
+        escritas para una persona) y **la prueba por Telegram** en el grupo "CoreWork IA", en la
+        tanda posterior; `leda_motor` necesita la `0047` y la `0048`.
 - [ ] **C-8.** Las ausencias (usuario, 2026-10-09: "nunca se trató"; pendiente para más adelante).
   La mecánica §9 ya lo pide: con la persona ausente, Leda no le escribe ni avanza su escalera, avisa
   al referente de lo que queda sin cobertura y, al volver, retoma con un mensaje de reencuadre. En
@@ -2482,7 +2550,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porciones 2 y 3: "ya hablé con él" y "no me corresponde" con un salto (33, 34, `0043`).
 - [x] C-5, porción 4: bloqueos encadenados y avisos hacia abajo (decisión 6; 35, `0044`).
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
-- [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
+- [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, abajo.
 - [x] C-7, delegar (38, `0045`), revisada; las decisiones 26, 27 y 28, hechas (39, `0046`).
 - [ ] Las decisiones 24 a 52 del usuario (2026-10-09; la 30, la 40, la 43, la 45 y la 52 ya están o
       esperan la prueba), con test primero, una porción por grupo (sesión del 2026-10-09, mañana):
@@ -2505,7 +2573,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
   - [ ] C-5e: 42 (seguir la cadena hasta quien puede destrabarla).
   - [ ] El enlace: 33 (el resumen para cualquiera, el detalle a pedido).
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
-- [ ] El informe al grupo de la C-6 (decisión 25), cuando el usuario cree el grupo en Telegram.
+- [x] El informe al grupo de la C-6 (decisión 25; conversación 41, `0048`), con la corrección de
+      la C-6 (una sola regla para lo contado, el día dado en la lista como previsión, la escalera
+      anclada al vencimiento). Falta su revisión RDD, la IA real y la prueba por Telegram.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 38 (una ronda, cupo
       primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0045` (respaldo previo).
