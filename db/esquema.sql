@@ -1307,7 +1307,8 @@ create table scheduled_notice (
   workspace_id                uuid not null references workspace(id) on delete cascade,
   tipo                        text not null,
   task_id                     uuid,
-  destinatario_membership_id  uuid not null,
+  -- Nulo sólo en un aviso al grupo del espacio (migración 0048, `al_grupo`).
+  destinatario_membership_id  uuid,
   turno_id                    uuid,
   hechos                      jsonb not null,
   programado_para             timestamptz not null,
@@ -1322,6 +1323,9 @@ create table scheduled_notice (
   resuelto_en                 timestamptz,
   -- El Motor (migración 0047): lo que llevó la lista de la cadencia, fuera de los hechos.
   tareas_de_la_lista          jsonb,
+  -- El Motor (migración 0048): el aviso va al grupo del espacio (el informe al grupo), no a una
+  -- persona. El chat no se guarda acá: sale de `workspace.grupo_chat_id` al encolarlo.
+  al_grupo                    boolean not null default false,
   constraint scheduled_notice_workspace_id_unique unique (workspace_id, id),
   constraint scheduled_notice_dedupe unique (workspace_id, dedupe_key),
   constraint scheduled_notice_task_workspace
@@ -1337,7 +1341,9 @@ create table scheduled_notice (
     foreign key (workspace_id, outbox_id)
     references message_outbox(workspace_id, id) on delete set null (outbox_id),
   constraint scheduled_notice_resuelto check ((estado = 'guardado') = (resuelto_en is null)),
-  constraint scheduled_notice_omision check (estado <> 'omitido' or motivo_omision is not null)
+  constraint scheduled_notice_omision check (estado <> 'omitido' or motivo_omision is not null),
+  -- A una persona o al grupo, nunca a los dos ni a nadie (migración 0048).
+  constraint scheduled_notice_destino check (al_grupo = (destinatario_membership_id is null))
 );
 
 create index scheduled_notice_por_salir
@@ -1381,6 +1387,8 @@ comment on table scheduled_notice is
   'El Motor (ADR 0018, decisión 8, precisión del 2026-10-05): lo que Leda manda por su cuenta, guardado como hechos. Entra al outbox recién cuando la IA lo redactó.';
 comment on column scheduled_notice.tareas_de_la_lista is
   'El Motor (C-6, decisiones 31 y 46 del usuario, 2026-10-09): en la lista de la cadencia que salió, las tareas abiertas de la persona en ese momento, cada una con su situación, si se mostró, si se preguntó por ella, desde cuándo no la contesta y cuándo la contestó. Fuera de los hechos: lo lee sólo el código. Nulo en los demás avisos y en las listas de antes.';
+comment on column scheduled_notice.al_grupo is
+  'El Motor (C-6, decisión 25 del usuario, 2026-10-09): el aviso va al grupo del espacio (el informe al grupo de la cadencia), no a una persona; entonces no tiene destinatario. El chat del grupo no se guarda acá: sale de workspace.grupo_chat_id al encolarlo en el outbox.';
 
 create table task_forecast (
   id                       uuid primary key default gen_random_uuid(),
