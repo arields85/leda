@@ -415,6 +415,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     con la IA real falla ("tablro"), se agrega una búsqueda que tolere errores de tipeo. Lo mira la
     tanda de pruebas.
 
+53. **El encargado se queda él mismo con una tarea de su gente** (de la C-7; usuario,
+    2026-10-09, opción B, la que recomendó el agente). Si Marcos dice "la del tornillo de Nahuel la
+    hago yo", Leda lo deja, como cuando se la pasa a Pedro (decisión 27): le avisa a Nahuel que su
+    tarea pasó a Marcos y, cuando Marcos dice "listo", se cierra ahí (decisión 28). Cambia lo
+    construido en la C-7, que exigía que lo pidiera Nahuel.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
