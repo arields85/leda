@@ -1539,6 +1539,48 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       --ronda seco-c5-p23`, **34 de 34 bien**; `pytest tests/motor tests/conversaciones`, 985
       passed. Informes borrados, `gasto.json` sin tocar. Sin la IA real (van en la tanda
       posterior). Sin la suite completa.
+    - **Correcciones de la revisión** (advertencias de las revisiones RDD del 2026-10-09, todas
+      aprobadas; route: delegada, escritor único). Commit `4d67a31`, sólo `persecucion.py` y
+      sus pruebas:
+      - **La cadena salía más de una vez** (defecto): cada "no me corresponde" tenía su propia
+        clave, así que el segundo que lo repetía, o quien quedó nombrado al cortarse, le mandaba
+        otra cadena al referente. Ahora sale una por vuelta de la cadena (desde la última vez
+        que la persona trabada dijo quién lo destraba, `_cadenas_de_esta_vuelta`): si ya salió,
+        no se manda otra y los hechos dicen `ya_le_llego` con el día; si todavía no salió, la
+        anterior queda omitida (`dijo_algo_mas_nuevo`, nunca se borra) y sale una con lo último.
+        Una que falló al enviarse no cuenta como entregada: lo siguiente que se diga la vuelve a
+        guardar.
+      - **El segundo sin un chat con Leda dejaba la cadena trabada** (defecto): la primera
+        nombraba a alguien del equipo sin Telegram, a esa persona no se le escribía y nadie más
+        se enteraba. Leda no puede seguir con esa persona, así que la cadena se corta como
+        cualquier otra (decisión 5: no da más vueltas, le informa al referente) y el aviso lleva
+        `no_se_le_puede_escribir_a`; a la persona trabada le llegan las dos cosas. La porción 1
+        (quien nombra la persona trabada, sin chat) queda como estaba: ahí quien se entera es la
+        persona trabada misma, que puede decir otro nombre; en el segundo salto ya no hay a
+        quién más preguntarle sin dar otra vuelta. Cambia la lectura de la pregunta 7 de abajo.
+      - **Lo que dijo quien destraba se perdía** (defecto): "ya lo hablé" con sus palabras y sin
+        fecha abría la pregunta sin guardar las palabras; y en "no me corresponde", lo que decía
+        al contestar reemplazaba lo que había dicho antes. Ahora lo que dijo queda en los datos
+        de su pregunta y se anota junto con la respuesta (`_sus_palabras`: las dos partes, o la
+        más completa si una contiene a la otra), con cualquiera de las dos jugadas.
+      - **El `join` con `integrante` en "no le escribas"** (no era un defecto): la vista
+        `integrante` (`db/esquema.sql`, `create view integrante`) no filtra por `activo`, sólo
+        por el espacio de la sesión, y `scheduled_notice_recipient` borra el aviso en cascada con
+        la membresía, así que el destinatario siempre está en la vista. Queda una regresión: el
+        mensaje a quien dejó de estar activo se retira igual (verde desde el principio).
+      - **Desempates explícitos** en los `order by` de `_su_pregunta`,
+        `_de_la_pregunta_abierta`, `_lo_destraba` y "no le escribas" (`id` después de la hora);
+        sin prueba en rojo (dos filas con la misma hora no se arman sin forzar el reloj).
+      - **Test primero:** 7 nuevas en rojo (4 en `test_cadena_del_bloqueo.py` por la cadena y
+        el segundo sin chat, 1 allí y 2 en `test_persecucion.py` por las palabras); la del
+        `join`, en verde. **Verde:** las 50 de los dos archivos.
+      - **Ninguna conversación cambió.** Chequeos (2026-10-09, sobre `4d67a31`): `pytest
+        tests/motor tests/conversaciones`, 993 passed; `pytest tests/garantias`, 337 passed; en
+        seco, `correr --ia guionada --veces 1 --ronda seco-c5-fix`, **34 de 34 bien**. Informes
+        borrados, `gasto.json` sin tocar. Sin la IA real.
+      - **Quedó sin tocar:** con una fecha que no se entiende, `decir_cuando_destraba` devuelve
+        `falta_dato` sin guardar las palabras de ese turno (quedan en el registro de turnos y la
+        IA vuelve a preguntar).
   - `PENDIENTE` de las porciones 2 y 3:
     - **La IA real** sobre la 33 y la 34, y la prueba por Telegram, en la tanda posterior.
       `leda_motor` necesita la `0043` además de la `0039`, la `0040` y la `0042`.
@@ -1556,8 +1598,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
          aprueba su trabajo (Ismael).
       6. Quien queda nombrado al cortarse la cadena pasa a ser quien destraba en los datos: ve la
          tarea en su lista y lo que diga queda anotado, aunque Leda no le escriba.
-      7. Si la persona que nombra la primera no tiene un chat con Leda, Leda lo dice y no informa
-         a nadie (como la porción 1).
+      7. Si la persona que nombra la primera no tiene un chat con Leda, la cadena se corta y va
+         al referente, diciendo que a esa persona no se le puede escribir (corrección de la
+         revisión, `4d67a31`; antes Leda sólo lo decía y no informaba a nadie, como en la
+         porción 1).
   - **Lo que sigue de la C-5**, cada una con su conversación de prueba primero: los bloqueos
     encadenados y los avisos hacia abajo (decisión 6); el bloqueo viejo (7).
 - [ ] **C-6.** Las cadencias (pregunta 8).
