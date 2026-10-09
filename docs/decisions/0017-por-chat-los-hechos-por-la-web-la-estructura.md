@@ -132,8 +132,13 @@ palabras del usuario: unir todas las piezas del rompecabezas. Ejemplo:
 - **Qué existe hoy:** abrir y cerrar un bloqueo, las dependencias entre tareas, el aviso en cadena
   por atraso y el escalamiento de un bloqueo viejo ya funcionan. La conversación que pregunta,
   conecta y persigue no está construida (`docs/capacidades.md`, "Conversación de bloqueos").
-- `PENDIENTE`: cómo se guarda quién se encarga de destrabar un bloqueo, y qué hace Leda si esa
-  persona dice que no le corresponde.
+  **Nota (2026-10-09):** eso describía `main` antes del Motor. En el motor de conversación el
+  escalamiento del bloqueo viejo no corre: `bloqueos.escala_solo_a_los_dias` se importa del pack y
+  nadie lo lee, y `blocker.escalado_a` no se escribe. Vuelve con la C-5 (`odd/tasks/fase-c.md`,
+  decisión 7).
+- ~~`PENDIENTE`~~ **Resuelto:** quién destraba se guarda en `blocker_unblocker` (append-only, con
+  quién lo dijo), y lo que hace Leda si esa persona dice que no le corresponde es la decisión 5 de
+  `odd/tasks/fase-c.md` (usuario, 2026-10-08).
 
 **Conversación de prueba:** `PENDIENTE` (tarea E1-3). La cadena del ejemplo, de punta a punta.
 
