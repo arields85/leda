@@ -7,6 +7,8 @@ de mentira: la prueba no toca ninguna base.
 
 from __future__ import annotations
 
+import contextlib
+
 import importlib.util
 import pathlib
 from datetime import time
@@ -58,6 +60,11 @@ class _Conexion:
     def cursor(self) -> _Cursor:
         return self.cur
 
+    def transaction(self):
+        # `admin()` abre una transacción y toma el rol de administración (work_calendar tiene
+        # RLS forzado desde la 0041).
+        return contextlib.nullcontext()
+
 
 @pytest.mark.parametrize("base", ["leda", "leda_flujo", "leda_motor"])
 def test_admite_las_bases_de_desarrollo(monkeypatch, capsys, base):
@@ -70,6 +77,7 @@ def test_admite_las_bases_de_desarrollo(monkeypatch, capsys, base):
 
     salida = capsys.readouterr().out
     assert f"base: {base}" in salida and "restricción de horario: prendida" in salida
+    assert conexion.cur.sentencias[0] == "set local role leda_admin"
 
 
 def test_rechaza_cualquier_otra_base_sin_tocarla(monkeypatch, capsys):
