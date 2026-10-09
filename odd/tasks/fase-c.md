@@ -363,6 +363,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     de estado que el pack pone a las 9:15. En la plataforma queda una sola hora por espacio, que se
     elige ahí y usan todos (`docs/product/plataforma-pendientes.md`). Confirma lo construido.
 
+46. **La primera lista de la semana completa; las otras, sólo lo que falta** (de la C-6):
+    decidida (usuario, 2026-10-09, opción A). Con pedidos de estado lunes, miércoles y viernes, el
+    lunes va la lista completa; el miércoles y el viernes sólo lo que cambió o no se contestó
+    ("Del PLC no me contaste el lunes, ¿cómo viene?"), y si no hay nada, no sale nada. Cambia la
+    C-6 (hoy, la misma lista los tres días).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -2131,7 +2137,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 44 del usuario (2026-10-09; la 30, la 40 y la 43 ya están), con test primero.
+- [ ] Las decisiones 24 a 46 del usuario (2026-10-09; la 30, la 40, la 43 y la 45 ya están), con test primero.
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
