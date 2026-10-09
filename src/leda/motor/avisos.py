@@ -1743,6 +1743,10 @@ YA_SE_HABIA_DESTRABADO = "ya_se_habia_destrabado"
 # pueda destrabarlo. Al salir abre su pregunta de quién lo destraba. De coordinación: lo causa lo
 # que dijo otra persona. No sale si ya contestó o el bloqueo se cerró.
 QUIEN_MAS_PUEDE_DESTRABAR = "quien_mas_puede_destrabar"
+# El día que dijo quien destraba, la pregunta de si ya está (C-5e; decisión 42 del usuario,
+# 2026-10-09; `persecucion.py`): seguimiento que Leda hace por su cuenta; al salir abre su pregunta
+# de para cuándo, que la escalera de las preguntas repite sin escalar (decisión 38).
+EL_DIA_QUE_DIJO = "el_dia_que_dijo_quien_destraba"
 
 
 def quien_destraba(cur, destraba_id) -> dict[str, Any] | None:
@@ -1796,7 +1800,8 @@ def _vigencia_de_la_pregunta_a_quien_destraba(m: Momento, aviso
     if motivo is not None:
         return motivo, {}
     if ya_contesto_quien_destraba(m.cur, de_la_clave(aviso),
-                                  str(aviso["destinatario_membership_id"])):
+                                  str(aviso["destinatario_membership_id"]),
+                                  desde=aviso["creado_en"]):
         return "ya_respondio", {}
     return None, {**dict(aviso["hechos"]), "tarea": tarea["titulo"]}
 
@@ -1821,18 +1826,22 @@ def _vigencia_de_la_cadena(m: Momento, aviso) -> tuple[str | None, dict[str, Any
     return None, {**dict(aviso["hechos"]), "tarea": tarea["titulo"]}
 
 
-def ya_contesto_quien_destraba(cur, destraba_id, persona: str) -> bool:
+def ya_contesto_quien_destraba(cur, destraba_id, persona: str, *, desde=None) -> bool:
     """Si quien destraba ya habló de esa tarea antes de que le llegara la pregunta de Leda (la ve
     en su lista): dijo algo que quedó anotado, o Leda ya le preguntó en su chat (C-5, porción
-    2). Entonces la pregunta guardada ya no hace falta."""
+    2). Entonces la pregunta guardada ya no hace falta. `desde`: sólo lo de después de que se
+    guardó la pregunta (la que Leda le hace cuando pudo seguir, decisión 42: lo que dijo o se le
+    preguntó antes de trabarse ya no cuenta)."""
     cur.execute("""select exists (select 1 from dicho_de_quien_destraba
                                     where blocker_unblocker_id = %s
-                                      and dicho_por_membership_id = %s)
+                                      and dicho_por_membership_id = %s
+                                      and (%s::timestamptz is null or at >= %s))
                        or exists (select 1 from conversation_question
                                    where membership_id = %s and tipo = %s
-                                     and jugada ->> 'destraba_id' = %s) as ya""",
-                (str(destraba_id), persona, persona, preguntas.CUANDO_SE_DESTRABA,
-                 str(destraba_id)))
+                                     and jugada ->> 'destraba_id' = %s
+                                     and (%s::timestamptz is null or abierta_en >= %s)) as ya""",
+                (str(destraba_id), persona, desde, desde, persona, preguntas.CUANDO_SE_DESTRABA,
+                 str(destraba_id), desde, desde))
     return bool(cur.fetchone()["ya"])
 
 
@@ -1957,6 +1966,16 @@ def _vigencia_de_quien_mas(m: Momento, aviso) -> tuple[str | None, dict[str, Any
     return persecucion.vigencia_de_quien_mas(m, aviso)
 
 
+def _vigencia_del_dia_que_dijo(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import persecucion
+    return persecucion.vigencia_del_dia_que_dijo(m, aviso)
+
+
+def _abre_el_dia_que_dijo(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
+    from . import persecucion
+    return persecucion.abre_el_dia_que_dijo(m, aviso)
+
+
 def _abre_quien_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
     """La pregunta de quién destraba, otra vez, a la persona trabada (decisión 49): lo que
     recuerda al repetirla es lo que la traba (`preguntas.lo_anotado`)."""
@@ -2057,6 +2076,10 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # decisión 49): la causa lo que dijo otra persona; abre su pregunta de quién lo destraba.
     TipoDeAviso(QUIEN_MAS_PUEDE_DESTRABAR, "normal", _vigencia_de_quien_mas, es_coordinacion=True,
                 abre=_abre_quien_destraba),
+    # El día que dijo quien destraba, si ya está (C-5e, decisión 42): seguimiento que Leda hace
+    # por su cuenta; abre su pregunta de para cuándo.
+    TipoDeAviso(EL_DIA_QUE_DIJO, "seguimiento", _vigencia_del_dia_que_dijo,
+                abre=_abre_el_dia_que_dijo),
     # Un avance del medio a quien espera más abajo, en una cadena de bloqueos (porción 4):
     # informativo; lo causa el acto de otra persona.
     TipoDeAviso(NOVEDAD_DE_LO_QUE_ESPERA, "informativo", _vigencia_de_la_novedad,

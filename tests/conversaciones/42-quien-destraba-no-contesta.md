@@ -103,15 +103,17 @@ destraba nunca se le dice que se va a avisar a alguien si no contesta: no escala
     →
     - Jugadas: `decir_cuando_destraba` sobre la tarea del PLC, para el jueves 29.
     - Efecto: queda anotado, con sus palabras; su pregunta y su espera se cierran; se guarda el aviso
-      a Marcos, que sale a las 10:40.
+      a Marcos, que sale a las 10:40, y la pregunta a Ariel de si ya se la pasó, para el jueves 29 a
+      las 10:00 (decisión 42, C-5e).
     - La respuesta dice: que quedó anotado; que Marcos se va a enterar.
     - La respuesta no dice: un reproche por no haber contestado.
 
 13. **Leda**, por su cuenta, a Marcos (miércoles 28, 10:40): lo que dijo Ariel, como información.
 
-14. **Nadie** escribe hasta el viernes 30, 10:00.
+14. **Leda**, por su cuenta, a Ariel (jueves 29, 10:00): el día que dijo; si ya le pasó la IP a
+    Marcos (decisión 42, C-5e).
     →
-    - Efecto: ningún mensaje a Ariel: ya contestó.
+    - Efecto: la pregunta vieja no se repite más (ya contestó); sale sólo ésta, que abre su pregunta.
 
 ## Qué mide
 

@@ -913,8 +913,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                                 "espera su tarea, más arriba en la cadena (novedad). No le pide "
                                 "nada; su tarea sigue trabada hasta que diga que puede seguir.",
     "esperando_a": "Lo que espera la tarea trabada, en orden: la tarea de quien la destraba "
-                   "(de es quien la tiene) y, si esa también espera otra, la siguiente. La "
-                   "última es donde pasó la novedad.",
+                   "(de es quien la tiene) y, si esa también espera otra, la siguiente. En una "
+                   "novedad, la última es donde pasó; si no, la última es la que destraba quien "
+                   "puede destrabarla.",
     "novedad": "Lo que pasó en la última tarea de esperando_a (de es quien la tiene): que se "
                "trabó, lo que dice quien la destraba, que se destrabó, el día que dio para "
                "terminarla, que la entregó o que quedó terminada.",
@@ -931,7 +932,28 @@ SIGNIFICADOS: Mapping[str, str] = {
     "su_tarea_trabada": "La tarea de quien puede destrabar la de otra persona que está trabada "
                         "y por eso no puede destrabarla: la tarea, lo que la traba (causa) y "
                         "quién la puede destrabar (lo_destraba).",
-    "su_tarea_no_esta_trabada": "La tarea que nombró quien escribe no está trabada: lo que dice "
+    # --- Seguir la cadena hasta quien puede destrabarla (C-5e; decisión 42) -------------------
+    "ya_esta_trabado": "Quien puede destrabar la tarea (a) ya está trabado con lo que le falta: "
+                       "Leda no le pregunta lo que no puede dar. Lo que espera, hasta quien "
+                       "puede destrabarlo (esperando_a: cada tarea con quién la tiene, lo que la "
+                       "traba, quién la destraba y lo último que dijo esa persona).",
+    "se_entera_de_cada_avance": "La persona trabada se va a enterar de cada avance de lo que "
+                                "espera, con avisos que no piden respuesta.",
+    "dice_quien_lo_destraba": "Lo último que dijo quien destraba esa tarea: para cuándo, que ya "
+                              "está o sus palabras.",
+    "lo_esperan": "Las tareas trabadas de otras personas que esperaban lo que la persona que "
+                  "escribe acaba de destrabar: ahora puede dar lo que les falta, y Leda le "
+                  "pregunta para cuándo (le_pregunta_para_cuando).",
+    "le_pregunta_para_cuando": "La pregunta a la persona que escribe de para cuándo destraba la "
+                               "tarea de otra persona (responsable), con lo que le falta (causa) "
+                               "y cuándo le llega (llega).",
+    "le_vuelve_a_preguntar": "El día que dijo la persona que escribe, Leda le vuelve a preguntar "
+                             "si ya está (llega).",
+    "el_dia_que_dijo_quien_destraba": "Mensaje de Leda, como Leda, a quien puede destrabar la "
+                                      "tarea de otra persona: hoy es el día que dijo "
+                                      "(habia_dicho); la pregunta de si ya está o para cuándo. "
+                                      "Quién está trabado (responsable) y qué le falta (causa).",
+    "su_tarea_no_esta_trabada":"La tarea que nombró quien escribe no está trabada: lo que dice "
                                 "no queda anotado así.",
     "ya_no_espera_esa_tarea": "La tarea de la persona ya no espera esa otra: cambió quién la "
                               "destraba o ya no está trabada.",

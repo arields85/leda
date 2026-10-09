@@ -466,11 +466,12 @@ pasos:
          dice_quien_destraba: {su_tarea_trabada: {tarea: TAB}},
          aviso_a_quien_esta_trabado: {a: Nahuel Gimenez, llega: "~2026-10-23T11:25"}}
     pregunta: null
-    # La espera que queda es la de Lucas, por el tablero.
+    # Las esperas que quedan: la de Lucas, por el tablero, y la de Ariel, por el día que dijo
+    # (paso 13b).
     estado_despues:
       de: Mariano
       pregunta_abierta: null
-      esperas_abiertas: [TAB]
+      esperas_abiertas: [PLC, TAB]
     dice:
       - que quedó anotado
       - que Nahuel se va a enterar

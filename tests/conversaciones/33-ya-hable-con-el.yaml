@@ -125,6 +125,8 @@ pasos:
     efectos:
       dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: "2026-10-22", ya_esta: false}]
       avisos_guardados:
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {habia_dicho: {para_cuando: "2026-10-22"}}}
         - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado,
            hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
                     dice_quien_destraba: {para_cuando: "2026-10-22", ya_lo_hablaron: true},
@@ -259,6 +261,8 @@ pasos:
     efectos:
       dicen_quien_destraba: [{tarea: HMI, de: Ariel, para_cuando: "2026-10-23", ya_esta: false}]
       avisos_guardados:
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: HMI, a: Ariel, estado: guardado,
+           hechos: {habia_dicho: {para_cuando: "2026-10-23"}}}
         - {tipo: lo_que_dijo_quien_destraba, tarea: HMI, a: Marcos, estado: guardado,
            hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
                     dice_quien_destraba: {para_cuando: "2026-10-23", ya_lo_hablaron: true},

@@ -94,7 +94,8 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
    - Efecto: queda anotado, como un hecho del bloqueo, lo que arreglaron: para el jueves 22, con sus
      palabras, atribuido a Ariel; su pregunta y su espera se cierran. Vale lo que contestó el
      primero: la pregunta a Marcos no sale (queda retirada con su motivo). Se guarda el aviso a
-     Marcos, que sale terminado el margen para corregir (11:18), para confirmarle lo acordado. El
+     Marcos, que sale terminado el margen para corregir (11:18), para confirmarle lo acordado, y la
+     pregunta a Ariel de si ya se la pasó, para el jueves 22 a las 10:00 (decisión 42, C-5e). El
      bloqueo sigue abierto.
    - La respuesta dice: que quedó anotado lo que arreglaron; que Marcos se va a enterar.
    - La respuesta no dice: que el bloqueo se cerró.
@@ -143,7 +144,8 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
      ya lo habló con Marcos.
    - Efecto: queda anotado directo, sin preguntar: para el viernes 23, atribuido a Ariel; su pregunta y
      su espera se cierran. Ninguna pregunta a Marcos: ya se sabe qué arreglaron. Se guarda el aviso a
-     Marcos, que sale a las 14:40.
+     Marcos, que sale a las 14:40, y la pregunta a Ariel de si ya la liberó, para el viernes 23 a las
+     10:00 (decisión 42, C-5e).
    - La respuesta dice: que quedó anotado; que Marcos se va a enterar.
    - La respuesta no dice: una pregunta por lo que arreglaron.
 

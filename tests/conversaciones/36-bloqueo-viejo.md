@@ -11,7 +11,10 @@ trabada, pero el bloqueo sigue abierto hasta que ella diga que pudo seguir; ento
 todos los que estaban en el tema, también quien dijo que ya estaba (decisión 41 y la regla 39).
 Decisión 7 del usuario (`odd/tasks/fase-c.md`, 2026-10-08, opción A) y decisiones 34, 35 y 36
 (2026-10-09, C-5a); decisión 41 (2026-10-09, C-5d); mecánica §8 ("un bloqueo abierto hace más
-de [pack] días escala aunque nadie lo pida").
+de [pack] días escala aunque nadie lo pida"). Desde la C-5e (decisión 42): el día que dijo Ariel,
+Leda le vuelve a preguntar si ya está y, si no contesta, la regla de la decisión 38 (una vez por día
+los días 1 a 3); mientras esa pregunta sigue abierta, la del panel HMI espera (un tema a la vez,
+decisión 21).
 
 **Corre desde la porción 5 de la C-5** (`odd/tasks/fase-c.md`), entera, con su YAML.
 
@@ -78,31 +81,41 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
 4. **Ariel** escribe (martes 20, 11:00): "te la paso el jueves"
    →
    - Jugadas: `decir_cuando_destraba` sobre la tarea del PLC, para el jueves 22.
-   - Efecto: queda anotado; el aviso a Marcos sale a las 11:10.
+   - Efecto: queda anotado; el aviso a Marcos sale a las 11:10; la pregunta a Ariel de si ya está,
+     el jueves 22 a las 10:00.
 
 5. **Leda**, por su cuenta, a Marcos (martes 20, 11:10): lo que dijo Ariel.
+
+5b. **Leda**, por su cuenta, a Ariel (jueves 22, 10:00): el día que dijo; si ya se la puede pasar.
 
 6. **Ariel** escribe (jueves 22, 16:00): "se me complico con otra cosa, no llego, la tengo el lunes"
    →
    - Jugadas: `decir_cuando_destraba` sobre la tarea del PLC, para el lunes 26, con sus palabras.
-   - Efecto: queda anotado; el aviso a Marcos sale a las 16:10.
+   - Efecto: queda anotado; el aviso a Marcos sale a las 16:10; la pregunta a Ariel de si ya está, el
+     lunes 26 a las 10:00.
 
 7. **Leda**, por su cuenta, a Marcos (jueves 22, 16:10): lo que dijo Ariel.
+
+7b. **Leda**, por su cuenta, a Ariel (lunes 26, 10:00): el día que dijo, otra vez. Ariel no la contesta.
 
 8. **Marcos** escribe (lunes 26, 10:20): "el hmi tambien esta parado, ariel tiene q liberar la licencia"
    →
    - Jugadas: `anotar_bloqueo` sobre la tarea del panel HMI, con su causa, y `anotar_quien_destraba`,
      con Ariel. Se guarda el mensaje a Ariel, a las 10:30.
 
-9. **Leda**, por su cuenta, a Ariel (lunes 26, 10:30): la pregunta por el panel HMI.
+9. **Nadie** escribe (lunes 26, 10:30): la pregunta por el panel HMI espera: la del PLC, que Ariel
+   todavía no contestó, está abierta (un tema a la vez, decisión 21). Ariel ve el panel en su lista.
 
 10. **Ariel** escribe (lunes 26, 10:45): "la licencia la libero hoy a la tarde"
     →
     - Jugadas: `decir_cuando_destraba` sobre la tarea del panel HMI, para el lunes 26.
-    - Efecto: queda anotado; el aviso a Marcos sale a las 10:55.
+    - Efecto: queda anotado; el aviso a Marcos sale a las 10:55. Dijo "hoy": la pregunta de si ya
+      está, el día hábil siguiente (no sale: el panel se destraba antes). La pregunta del PLC vuelve
+      aparte (decisión 50).
 
-11. **Leda**, por su cuenta, a Marcos (lunes 26, 10:55): lo que dijo Ariel del panel HMI.
-    - El bloqueo del PLC lleva cuatro días hábiles: nada sale por él.
+11. **Leda**, por su cuenta (lunes 26, 10:55): a Marcos, lo que dijo Ariel del panel HMI; a Ariel, la
+    pregunta del PLC, en un mensaje aparte.
+    - El bloqueo del PLC lleva cuatro días hábiles: nada sale por él a Ismael.
 
 12. **Marcos** escribe (lunes 26, 15:00): "listo ya tengo la licencia sigo con el hmi"
     →
@@ -116,6 +129,7 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
     - Efecto: un mensaje privado a Ariel, informativo.
     - El mensaje dice: que lo del panel HMI ya se resolvió y no hace falta que libere la licencia;
       que no hace falta responder.
+    - A Ariel, también, la repetición del día de la pregunta del PLC (decisión 21).
 
 13. **Leda**, por su cuenta, a Ismael (martes 27, 10:00): el bloqueo del PLC lleva cinco días hábiles.
     →
@@ -129,23 +143,26 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
     - **A Marcos**, a la vez, un mensaje corto e informativo: que quedó asentado que el PLC lleva cinco
       días hábiles trabado, para que el equipo esté al tanto; que no hace falta responder.
     - El mensaje a Marcos no dice: que se le informó a alguien; el nombre de Ismael; una pregunta.
+    - **A Ariel**, la pregunta del PLC otra vez (decisión 38, día 2), sin decir que se avisa a nadie.
 
 14. **Ismael** escribe (martes 27, 10:40): "y eso quien lo tiene q resolver?"
     →
     - Jugadas: ninguna de la lista.
     - La respuesta dice: que lo destraba Ariel, que dio el lunes 26 y todavía no lo resolvió.
 
-15. **Leda**, por su cuenta (miércoles 28, 10:00): nada. El bloqueo del PLC ya se informó: no se informa
-    otra vez hasta dentro de cinco días hábiles.
+15. **Leda**, por su cuenta (miércoles 28, 10:00): a Ismael, nada. El bloqueo del PLC ya se informó: no
+    se informa otra vez hasta dentro de cinco días hábiles. A Ariel, la pregunta del PLC (día 3).
 
 16. **Ariel** escribe (jueves 29, 11:00): "todavia no la consegui, el lunes 2 sin falta"
     →
     - Jugadas: `decir_cuando_destraba` sobre la tarea del PLC, para el lunes 2, con sus palabras.
-    - Efecto: queda anotado; el aviso a Marcos sale a las 11:10.
+    - Efecto: queda anotado; el aviso a Marcos sale a las 11:10; la pregunta a Ariel de si ya está, el
+      lunes 2 a las 10:00.
 
 17. **Leda**, por su cuenta, a Marcos (jueves 29, 11:10): lo que dijo Ariel.
 
-18. **Leda**, por su cuenta (lunes 2, 10:00): nada. Desde la vez anterior van cuatro días hábiles.
+18. **Leda**, por su cuenta (lunes 2, 10:00): a Ismael, nada: desde la vez anterior van cuatro días
+    hábiles. A Ariel, el día que dijo: si ya la tiene.
 
 19. **Leda**, por su cuenta (martes 3, 10:00): el bloqueo del PLC lleva diez días hábiles y sigue
     abierto: se vuelve a asentar.
@@ -157,6 +174,7 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
     - A Marcos, informativo y corto: que volvió a quedar asentado que el PLC sigue trabado, ya diez
       días hábiles, para que el equipo esté al tanto; que no hace falta responder.
     - El mensaje a Marcos no dice: que se le informó a alguien; el nombre de Ismael.
+    - A Ariel, la pregunta del PLC otra vez (decisión 38, día 2).
 
 20. **Ismael** escribe (miércoles 4, 10:30): "ya esta, llega mañana"
     →
@@ -171,6 +189,7 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
     - El mensaje dice: que Ismael dice que ya está y que llega mañana (jue 5/11); que cuando pueda
       seguir, lo diga; que no hace falta responder.
     - El mensaje no dice: que la tarea ya se destrabó.
+    - A Ariel, la pregunta del PLC otra vez (decisión 38, día 3).
 
 22. **Marcos** escribe (jueves 5, 11:00): "llego la ip, sigo con el plc"
     →

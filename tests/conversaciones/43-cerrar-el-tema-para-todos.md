@@ -69,7 +69,8 @@ Cómo se leyó lo que la regla no dice:
    →
    - Jugadas: `decir_cuando_destraba` sobre la tarea del PLC, para el jueves 22.
    - Efecto: queda anotado, atribuido a Ariel; su pregunta y su espera se cierran; se guarda el aviso
-     a Marcos, que sale a las 11:00.
+     a Marcos, que sale a las 11:00, y la pregunta a Ariel de si ya lo llevó, para el jueves 22 a las
+     10:00 (decisión 42, C-5e; no sale: el bloqueo se cierra antes).
    - La respuesta dice: que quedó anotado; que Marcos se va a enterar.
 
 4. **Leda**, por su cuenta, a Marcos (martes 20, 11:00): lo que dijo Ariel.

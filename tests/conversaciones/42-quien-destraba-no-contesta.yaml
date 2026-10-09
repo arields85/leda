@@ -203,6 +203,8 @@ pasos:
     efectos:
       dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: "2026-10-29", ya_esta: false}]
       avisos_guardados:
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {habia_dicho: {para_cuando: "2026-10-29"}}}
         - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado}
     hechos:
       - {jugada: decir_cuando_destraba, resultado: anotado, tarea: PLC,
@@ -229,8 +231,12 @@ pasos:
       - que Ariel dice que mañana (jue 29/10) a primera hora le pasa la IP
       - que no hace falta responder, en el último renglón
 
-  # Ya contestó: no se le pregunta más.
+  # Ya contestó: la pregunta vieja no se repite más. El día que dijo, Leda le vuelve a preguntar
+  # si ya se la pasó (decisión 42, C-5e).
   - paso: 14
-    quien: nadie
-    relojes: ["2026-10-30 10:00"]
-    salen: []
+    quien: Leda
+    relojes: ["2026-10-29 10:00"]
+    salen:
+      - {a: Ariel, tipo: el_dia_que_dijo_quien_destraba, tarea: PLC,
+         hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                  habia_dicho: {para_cuando: "2026-10-29"}}}

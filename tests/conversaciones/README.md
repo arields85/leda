@@ -190,7 +190,9 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     que ya dijo, y que le avisa apenas se mueva. El día que Lucas dijo, Leda le vuelve a preguntar si
     llegó; la fecha nueva les llega a Ariel y a Marcos, y si Lucas no contesta rige la regla de la 42.
     Cuando Ariel puede seguir, Leda le pregunta para cuándo le pasa la IP a Marcos (decisión 42 del
-    usuario; C-5e). La 35 suma, desde la C-5e, la pregunta del día que dijo cada uno.
+    usuario; C-5e). Desde la C-5e, la 35, la 36 y la 42 esperan la pregunta del día que dijo
+    cada uno (en la 36, con la regla de la 42 mientras Ariel no la contesta), y la 32, la 33 y la 43
+    la guardan.
 
 Los pedidos de estado con ritmo fijo (circuito 5; ADR 0017, decisión 3b, punto 5; `odd/tasks/fase-c.md`,
 decisión 8):

@@ -33,6 +33,15 @@ a mirar que la tarea siga esperando eso y que el avance siga valiendo (`vigencia
 la tarea de la otra persona y su espera se cierran (`se_trabo`), y Leda sigue con quien lo
 destraba a él, como con cualquier bloqueo. Nunca da por destrabada una tarea porque se destrabó
 la que la frenaba: eso lo dice la persona trabada (`destrabar`).
+
+**Leda sigue la cadena hasta quien puede destrabarla** (C-5e; decisión 42 del usuario,
+2026-10-09; conversación 44). Si la persona nombrada como quien destraba ya está trabada con lo que
+le falta a la tarea (el mismo enlace por la estructura: `trabada_con_lo_que_falta`), Leda no le
+pide lo que no puede dar: a quien espera le cuenta enseguida con qué está trabada, hasta quien
+puede destrabarlo y lo último que dijo (`hasta_quien_puede`; `persecucion.preguntarle`), y
+quien espera se entera de cada avance, como siempre. Cuando esa persona pudo seguir, ahora sí
+puede dar lo que falta: Leda le pregunta para cuándo (`se_destrabo`), salvo que siga trabada con
+otra cosa que le falta a esa tarea.
 """
 
 from __future__ import annotations
@@ -44,7 +53,7 @@ from . import preguntas
 from .avisos import (DIJO_ALGO_MAS_NUEVO, NOVEDAD_DE_LO_QUE_ESPERA, PREGUNTA_A_QUIEN_DESTRABA,
                      YA_NO_ESTA_ENTREGADA, YA_SE_DESTRABO, Momento, guardar, integrante,
                      leer_tarea, omitir, ultimo_dicho_de_quien_destraba, ultimo_quien_destraba)
-from .fichas import AVISO, LLEGA, NO_LE_VA_A_LLEGAR, Contexto, nombrar_efecto
+from .fichas import AVISO, EFECTOS, LLEGA, NO_LE_VA_A_LLEGAR, Contexto, nombrar_efecto
 from .margen import sale_con_margen
 from .tiempo import sale
 
@@ -119,6 +128,68 @@ def aguas_abajo(cur, task_id: str) -> list[dict[str, Any]]:
                 frente.append((espera, [{"de": f["responsable"], "tarea": f["titulo"]}]
                                + camino))
     return resultado
+
+
+def trabada_con_lo_que_falta(cur, task_id: str, persona: str) -> dict[str, Any] | None:
+    """La tarea de esa persona que es lo que le falta a ésta y está trabada (C-5e; decisión 42):
+    la estructura dice que ésta depende de ella (`dependency`, como en `_lo_esperan`) y tiene un
+    bloqueo abierto. La de bloqueo más viejo, con su bloqueo y su causa; `None` si no hay."""
+    cur.execute("""select o.id as task_id, o.titulo, b.id as bloqueo_id, b.causa
+                     from dependency d
+                     join task o on o.id = d.origen_task_id
+                     join blocker b on b.task_id = o.id and b.resuelto_en is null
+                    where d.destino_task_id = %s and o.responsable_membership_id = %s
+                      and o.estado not in ('terminada', 'cancelada')
+                    order by b.abierto_en, b.id limit 1""", (str(task_id), str(persona)))
+    return cur.fetchone()
+
+
+def hasta_quien_puede(cur, task_id: str, persona: str, nombre: str) -> list[dict[str, Any]]:
+    """Si quien destraba esta tarea (`persona`, `nombre`) ya está trabado con lo que le falta, la
+    cadena hasta quien puede destrabarla (C-5e; decisión 42): cada tarea trabada, de la más
+    cercana a la más lejana, con quién la tiene (`de`), su causa, quién la destraba
+    (`lo_destraba`) y lo último que dijo esa persona (`dice_quien_lo_destraba`). Sigue mientras
+    quien destraba cada una esté trabado a su vez con lo que le falta a ésa; vacía si `persona`
+    no está trabada con lo que falta."""
+    camino: list[dict[str, Any]] = []
+    vistas = {str(task_id)}
+    while persona is not None and len(camino) < PROFUNDIDAD:
+        trabada = trabada_con_lo_que_falta(cur, task_id, persona)
+        if trabada is None or str(trabada["task_id"]) in vistas:
+            break
+        vistas.add(str(trabada["task_id"]))
+        paso: dict[str, Any] = {"de": nombre, "tarea": trabada["titulo"],
+                                "causa": trabada["causa"]}
+        ultimo = ultimo_quien_destraba(cur, trabada["bloqueo_id"])
+        lo_destraba = quien_lo_destraba(cur, trabada["bloqueo_id"])
+        if lo_destraba:
+            paso["lo_destraba"] = lo_destraba
+        siguiente = (str(ultimo["destraba_membership_id"])
+                     if ultimo is not None and ultimo["destraba_membership_id"] is not None
+                     else None)
+        if siguiente is not None:
+            dice = _lo_ultimo_que_dijo(cur, trabada["bloqueo_id"], siguiente)
+            if dice:
+                paso["dice_quien_lo_destraba"] = dice
+        camino.append(paso)
+        task_id, persona, nombre = str(trabada["task_id"]), siguiente, lo_destraba
+    return camino
+
+
+def _lo_ultimo_que_dijo(cur, bloqueo_id, persona: str) -> dict[str, Any]:
+    """Lo último que dijo esa persona de un bloqueo: para cuándo, que ya está o sus palabras."""
+    cur.execute("""select d.para_cuando, d.ya_esta, d.lo_que_dice
+                     from dicho_de_quien_destraba d
+                     join blocker_unblocker u on u.id = d.blocker_unblocker_id
+                    where u.blocker_id = %s and d.dicho_por_membership_id = %s
+                    order by d.at desc, d.id desc limit 1""", (str(bloqueo_id), persona))
+    d = cur.fetchone()
+    if d is None:
+        return {}
+    return {k: v for k, v in (("para_cuando", d["para_cuando"] and d["para_cuando"].isoformat()),
+                              ("ya_esta", d["ya_esta"] or None),
+                              ("lo_que_dice", d["lo_que_dice"]))
+            if v is not None}
 
 
 def quien_lo_destraba(cur, bloqueo_id) -> str | None:
@@ -201,8 +272,33 @@ def se_trabo(ctx: Contexto, task_id: str, bloqueo_id: str, causa: str) -> dict[s
 
 def se_destrabo(ctx: Contexto, task_id: str, bloqueo_id: str) -> dict[str, Any]:
     """La tarea de quien escribe se destrabó: quien espera, más abajo, se entera. La suya sigue
-    trabada hasta que lo diga."""
-    return avisar_hacia_abajo(ctx, task_id, {"se_destrabo": True}, f"{SE_DESTRABO}{bloqueo_id}")
+    trabada hasta que lo diga. Y a quien escribe, que la destraba, Leda no le preguntaba lo que no
+    podía dar (decisión 42): ahora puede, así que le pregunta para cuándo, como a cualquiera que
+    destraba (decisión 4), salvo que siga trabado con otra cosa que le falta a esa tarea."""
+    hecho = avisar_hacia_abajo(ctx, task_id, {"se_destrabo": True}, f"{SE_DESTRABO}{bloqueo_id}")
+    from . import persecucion               # persecucion importa este módulo
+    preguntas_: list[dict[str, Any]] = []
+    for f in _lo_esperan(ctx.cur, task_id):
+        if hasta_quien_puede(ctx.cur, str(f["task_id"]), ctx.quien.membership_id,
+                             ctx.quien.nombre):
+            continue
+        fila = ultimo_quien_destraba(ctx.cur, f["bloqueo_id"])
+        r = persecucion.preguntarle(
+            ctx, {"id": str(f["task_id"]), "titulo": f["titulo"]}, {"causa": f["causa"]},
+            str(fila["id"]), {"membership_id": ctx.quien.membership_id,
+                              "nombre": ctx.quien.nombre},
+            responsable=f["responsable"], vuelta=f"{SE_DESTRABO}{bloqueo_id}")
+        if "se_le_pregunta_a" not in r:
+            continue
+        item: dict[str, Any] = {"le_pregunta_para_cuando": {
+            "responsable": f["responsable"], "tarea": f["titulo"], "causa": f["causa"],
+            LLEGA: r["se_le_pregunta_a"][LLEGA]}}
+        for efecto in r.get(EFECTOS, ()):
+            nombrar_efecto(item, "le_pregunta_para_cuando", efecto["de"], efecto["id"])
+        preguntas_.append(item)
+    if preguntas_:
+        hecho["lo_esperan"] = preguntas_
+    return hecho
 
 
 def dio_otro_dia(ctx: Contexto, task_id: str, prevision_id: str, fecha: str) -> dict[str, Any]:

@@ -12,7 +12,7 @@ cualquiera que destraba.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from leda.motor import hechos as hechos_mod
 from leda.motor.avisos import TIPOS
@@ -242,7 +242,7 @@ def test_el_dia_que_dijo_se_le_vuelve_a_preguntar(conn, mundo, servidor, equipo)
     assert aviso["hechos"]["responsable"] == ARIEL and aviso["hechos"]["causa"] == SWITCH
     assert aviso["hechos"]["habia_dicho"] == {"para_cuando": "2026-10-07",
                                               "lo_que_dice": "llega el miercoles"}
-    assert r.hechos[0]["le_vuelve_a_preguntar"]["llega"] == octubre(7, 10).isoformat()
+    assert datetime.fromisoformat(r.hechos[0]["le_vuelve_a_preguntar"]["llega"]) == octubre(7, 10)
 
     # El día anterior, nada; ese día, la pregunta, con su espera.
     _salir(conn, mundo, octubre(6, 11))

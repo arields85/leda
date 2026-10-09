@@ -71,6 +71,9 @@ pasos:
       dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: "2026-10-22", ya_esta: false}]
       avisos_guardados:
         - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado}
+        # El día que dijo, Leda le vuelve a preguntar (decisión 42, C-5e).
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {habia_dicho: {para_cuando: "2026-10-22"}}}
     pregunta: null
 
   - paso: 5
@@ -78,6 +81,18 @@ pasos:
     relojes: ["2026-10-20 11:10"]
     salen:
       - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: PLC}
+
+  # El jueves, el día que dijo Ariel (decisión 42, C-5e).
+  - paso: 5b
+    quien: Leda
+    relojes: ["2026-10-22 10:00"]
+    salen:
+      - {a: Ariel, tipo: el_dia_que_dijo_quien_destraba, tarea: PLC,
+         hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                  habia_dicho: {para_cuando: "2026-10-22"}}}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLC}
 
   - paso: 6
     quien: Ariel
@@ -90,6 +105,8 @@ pasos:
       dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: "2026-10-26", ya_esta: false}]
       avisos_guardados:
         - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado}
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {habia_dicho: {para_cuando: "2026-10-26"}}}
     pregunta: null
 
   - paso: 7
@@ -98,6 +115,18 @@ pasos:
     salen:
       - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: PLC,
          hechos: {dice_quien_destraba: {para_cuando: "2026-10-26"}}}
+
+  # El lunes, el día que dijo Ariel otra vez.
+  - paso: 7b
+    quien: Leda
+    relojes: ["2026-10-26 10:00"]
+    salen:
+      - {a: Ariel, tipo: el_dia_que_dijo_quien_destraba, tarea: PLC,
+         hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                  habia_dicho: {para_cuando: "2026-10-26"}}}
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLC}
 
   - paso: 8
     quien: Marcos
@@ -114,14 +143,15 @@ pasos:
         - {tipo: pregunta_a_quien_destraba, tarea: HMI, a: Ariel, estado: guardado}
     pregunta: null
 
+  # La pregunta por el panel HMI espera: la del PLC, que Ariel todavía no contestó, está abierta
+  # (un tema a la vez, decisión 21). Ariel ve el panel en su lista y contesta igual.
   - paso: 9
-    quien: Leda
+    quien: nadie
     relojes: ["2026-10-26 10:30"]
-    salen:
-      - {a: Ariel, tipo: pregunta_a_quien_destraba, tarea: HMI}
+    salen: []
     estado_despues:
       de: Ariel
-      pregunta_abierta: {tipo: cuando_se_destraba, tarea: HMI}
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLC}
 
   - paso: 10
     quien: Ariel
@@ -132,16 +162,23 @@ pasos:
          puede_traer: [lo_que_dice]}
     efectos:
       dicen_quien_destraba: [{tarea: HMI, de: Ariel, para_cuando: "2026-10-26", ya_esta: false}]
+      # Dijo "hoy": la pregunta de si ya está, el día hábil siguiente (decisión 42).
       avisos_guardados:
         - {tipo: lo_que_dijo_quien_destraba, tarea: HMI, a: Marcos, estado: guardado}
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: HMI, a: Ariel, estado: guardado,
+           hechos: {habia_dicho: {para_cuando: "2026-10-26"}}}
+        - {tipo: vuelve_la_pregunta, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {pregunta: cuando_se_destraba, necesita_respuesta: true}}
     pregunta: null
 
-  # El bloqueo del PLC lleva cuatro días hábiles: nada sale por él.
+  # El bloqueo del PLC lleva cuatro días hábiles: nada sale por él a Ismael. A Ariel, la pregunta
+  # del PLC vuelve aparte (decisión 50).
   - paso: 11
     quien: Leda
     relojes: ["2026-10-26 10:55"]
     salen:
       - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: HMI}
+      - {a: Ariel, tipo: vuelve_la_pregunta, tarea: PLC}
 
   - paso: 12
     quien: Marcos
@@ -168,6 +205,8 @@ pasos:
         tipo: ya_no_hace_falta_que_destrabe
         tarea: HMI
         hechos: {necesita_respuesta: false, como_se_cerro: ya_se_destrabo}
+      # La del PLC, sin contestar: su repetición del día (decisión 21).
+      - {a: Ariel, tipo: repeticion_del_dia, tarea: PLC}
     dice:
       - que lo del panel HMI ya se resolvió y no hace falta que libere la licencia
       - que no hace falta responder, en el último renglón
@@ -190,6 +229,10 @@ pasos:
         hechos: {necesita_respuesta: false, causa: presente, trabada_desde: "2026-10-20",
                  dias_habiles_trabada: 5,
                  queda_asentado: {figura_en_el_informe_al_grupo: true, a: Ismael Soschinski}}
+      # Ariel no contestó lo del lunes: la regla de la decisión 38.
+      - {a: Ariel, tipo: repregunta, tarea: PLC,
+         hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba, numero: 2,
+                  avisa_que_va_a_escalar: ausente}}
     dice:
       - "a Ismael: que Marcos está trabado con la tarea del PLC desde el martes 20 (mar 20/10), hace cinco días hábiles, porque le falta la IP del servidor de CoreLabs"
       - "a Ismael: la historia: Marcos dijo que se la pasa Ariel; Ariel dijo que el jueves (jue 22/10) y después que el lunes (lun 26/10), porque se le complicó"
@@ -211,11 +254,15 @@ pasos:
     dice:
       - que lo destraba Ariel, que dio el lunes 26 y todavía no lo resolvió
 
-  # Ya se informó: no sale otra vez hasta dentro de cinco días hábiles.
+  # Ya se informó: no sale otra vez hasta dentro de cinco días hábiles. A Ariel, la pregunta del
+  # PLC otra vez (decisión 38).
   - paso: 15
     quien: Leda
     relojes: ["2026-10-28 10:00"]
-    salen: []
+    salen:
+      - {a: Ariel, tipo: repregunta, tarea: PLC,
+         hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba, numero: 3,
+                  avisa_que_va_a_escalar: ausente}}
 
   - paso: 16
     quien: Ariel
@@ -228,6 +275,8 @@ pasos:
       dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: "2026-11-02", ya_esta: false}]
       avisos_guardados:
         - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado}
+        - {tipo: el_dia_que_dijo_quien_destraba, tarea: PLC, a: Ariel, estado: guardado,
+           hechos: {habia_dicho: {para_cuando: "2026-11-02"}}}
     pregunta: null
 
   - paso: 17
@@ -237,11 +286,13 @@ pasos:
       - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: PLC,
          hechos: {dice_quien_destraba: {para_cuando: "2026-11-02"}}}
 
-  # Desde la vez anterior van cuatro días hábiles: nada.
+  # Desde la vez anterior van cuatro días hábiles: nada a Ismael. A Ariel, el día que dijo.
   - paso: 18
     quien: Leda
     relojes: ["2026-11-02 10:00"]
-    salen: []
+    salen:
+      - {a: Ariel, tipo: el_dia_que_dijo_quien_destraba, tarea: PLC,
+         hechos: {necesita_respuesta: true, habia_dicho: {para_cuando: "2026-11-02"}}}
 
   # Diez días hábiles y sigue abierto: se vuelve a asentar, con lo que pasó desde el martes 27.
   - paso: 19
@@ -262,6 +313,9 @@ pasos:
         tarea: PLC
         hechos: {necesita_respuesta: false, dias_habiles_trabada: 10,
                  queda_asentado: {figura_en_el_informe_al_grupo: true, a: Ismael Soschinski}}
+      - {a: Ariel, tipo: repregunta, tarea: PLC,
+         hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba, numero: 2,
+                  avisa_que_va_a_escalar: ausente}}
     dice:
       - "a Ismael: que Marcos sigue trabado con la tarea del PLC desde el martes 20, hace diez días hábiles"
       - "a Ismael: lo que pasó desde la vez anterior (mar 27/10): Ariel dijo el jueves 29 que todavía no la consiguió y que el lunes 2 sin falta"
@@ -301,6 +355,9 @@ pasos:
       - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: PLC,
          hechos: {necesita_respuesta: false, quien_destraba: Ismael Soschinski,
                   dice_quien_destraba: {ya_esta: true, para_cuando: "2026-11-05"}}}
+      - {a: Ariel, tipo: repregunta, tarea: PLC,
+         hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba, numero: 3,
+                  avisa_que_va_a_escalar: ausente}}
     dice:
       - "a Marcos: que Ismael dice que ya está y que llega mañana (jue 5/11)"
       - "a Marcos: que cuando pueda seguir, lo diga; que no hace falta responder"

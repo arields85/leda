@@ -134,6 +134,12 @@ preguntaba, deja de hacerlo y se lo dice) y al día hábil siguiente le pregunta
 trabada cómo le fue (`avisos.COMO_LE_FUE`, la pregunta de qué arreglaron, que la escalera de las
 preguntas repite sin escalar: decisión 38).
 
+**Seguir la cadena hasta quien puede destrabarla** (C-5e; decisión 42; conversación 44). A quien
+ya está trabado con lo que le falta a la tarea no se le pregunta (`preguntarle`,
+`YA_ESTA_TRABADO`; `encadenados.py`). Y a quien destraba y da un día, ese día Leda le vuelve a
+preguntar si ya está (`avisos.EL_DIA_QUE_DIJO`, `_volver_a_preguntar_el_dia`), con la regla de la
+decisión 38 si no contesta: una sola regla, para cualquiera que destraba.
+
 Fuera de estas porciones (`odd/tasks/fase-c.md`, C-5): el bloqueo viejo (decisión 7).
 """
 
@@ -148,7 +154,7 @@ from .asentado import (QUEDA_ASENTADO, SIN_A_QUIEN_INFORMAR, avisar_que_no_hay_a
                        por_que_no_hay_a_quien, queda_asentado)
 from .auditoria import auditar
 from .avisos import (CADENA_DEL_BLOQUEO, CAMBIO_QUIEN_DESTRABA, COMO_LE_FUE, DIJO_ALGO_MAS_NUEVO,
-                     LO_QUE_DIJO_QUIEN_DESTRABA, LO_QUE_DIJO_QUIEN_ESTA_TRABADO,
+                     EL_DIA_QUE_DIJO, LO_QUE_DIJO_QUIEN_DESTRABA, LO_QUE_DIJO_QUIEN_ESTA_TRABADO,
                      PREGUNTA_A_QUIEN_DESTRABA, PREGUNTA_A_QUIEN_ESTA_TRABADO,
                      QUIEN_MAS_PUEDE_DESTRABAR, VOLVIO_A_SER_QUIEN_DESTRABA,
                      YA_LO_CONTO_QUIEN_DESTRABA, YA_LO_CONTO_QUIEN_ESTA_TRABADO, YA_NO_HACE_FALTA,
@@ -213,6 +219,12 @@ LIMITE_DE_LA_CADENA = 3
 SE_LE_INFORMO_QUE_SIGUE_TRABADA = "se_le_informo_que_sigue_trabada"
 # Por qué la pregunta de si se le ocurre otra persona ya no sale: ya contestó.
 YA_CONTESTO = "ya_respondio"
+# Seguir la cadena hasta quien puede destrabarla (C-5e; decisión 42): quien destraba ya está
+# trabado con lo que le falta a la tarea (no se le pregunta), y la persona trabada se entera de
+# cada avance; a quien dio un día, ese día Leda le vuelve a preguntar.
+YA_ESTA_TRABADO = "ya_esta_trabado"
+SE_ENTERA_DE_CADA_AVANCE = "se_entera_de_cada_avance"
+LE_VUELVE_A_PREGUNTAR = "le_vuelve_a_preguntar"
 
 
 def alcanzable(cur, membership_id: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -246,11 +258,17 @@ def avisar_para_que_lo_conecte(ctx: Contexto, nombre: str, para: str) -> dict[st
 
 def preguntarle(ctx: Contexto, tarea: dict[str, Any], bloqueo: dict[str, Any], destraba_id: str,
                 destraba: dict[str, Any], *, responsable: str | None = None,
-                nombrado_por: str | None = None) -> dict[str, Any]:
+                nombrado_por: str | None = None, vuelta: str | None = None) -> dict[str, Any]:
     """Lo que pasa cuando la persona trabada nombra a otro integrante que destraba su tarea: lo
     que se le preguntaba a otra persona deja de esperar, y a ésta Leda le escribe si puede. Los
     hechos que se suman a los de `anotar_quien_destraba`. En la cadena (porción 3) la nombra
-    quien no lo tomó: `responsable` es quien está trabado y `nombrado_por`, quien la nombró."""
+    quien no lo tomó: `responsable` es quien está trabado y `nombrado_por`, quien la nombró.
+
+    Si esa persona ya está trabada con lo que le falta a la tarea (C-5e; decisión 42), Leda no le
+    pide lo que no puede dar: los hechos dicen con qué está trabada, hasta quien puede
+    destrabarlo (`YA_ESTA_TRABADO`, `encadenados.hasta_quien_puede`), y la persona trabada se
+    entera de cada avance (decisión 6). Cuando pueda seguir, Leda le pregunta
+    (`encadenados.se_destrabo`, con su `vuelta` en la clave: es otra pregunta)."""
     cur = ctx.cur
     task_id = str(tarea["id"])
     persona = str(destraba["membership_id"])
@@ -268,6 +286,16 @@ def preguntarle(ctx: Contexto, tarea: dict[str, Any], bloqueo: dict[str, Any], d
             mismo = viejo
         else:
             omitir(cur, str(viejo["id"]), CAMBIO_QUIEN_DESTRABA, ctx.ahora)
+    camino = encadenados.hasta_quien_puede(cur, task_id, persona, destraba["nombre"])
+    if camino:
+        if mismo is not None:
+            omitir(cur, str(mismo["id"]), YA_ESTA_TRABADO, ctx.ahora)
+        cur.execute("select responsable_membership_id from task where id = %s", (task_id,))
+        trabado = cur.fetchone()
+        se_entera = (trabado is not None
+                     and alcanzable(cur, str(trabado["responsable_membership_id"]))[1] is None)
+        return {YA_ESTA_TRABADO: {"a": destraba["nombre"], "esperando_a": camino,
+                                  **({SE_ENTERA_DE_CADA_AVANCE: True} if se_entera else {})}}
     quien, motivo = alcanzable(cur, persona)
     if motivo is not None:
         hecho = {"no_se_le_puede_escribir_a": {"a": destraba["nombre"], "motivo": motivo}}
@@ -289,7 +317,9 @@ def preguntarle(ctx: Contexto, tarea: dict[str, Any], bloqueo: dict[str, Any], d
                 "pregunta": preguntas.CUANDO_SE_DESTRABA, "tarea": tarea["titulo"],
                 "responsable": responsable or ctx.quien.nombre, "causa": bloqueo["causa"],
                 **({"nombrado_por": nombrado_por} if nombrado_por else {})},
-        programado_para=sale, clave=f"motor:{PREGUNTA_A_QUIEN_DESTRABA}:{task_id}:u{destraba_id}",
+        programado_para=sale,
+        clave=f"motor:{PREGUNTA_A_QUIEN_DESTRABA}:{task_id}:u{destraba_id}"
+              + (f":{vuelta}" if vuelta else ""),
         ahora=ctx.ahora)
     ctx.avisos_guardados.append(aviso_id)
     hecho: dict[str, Any] = {"se_le_pregunta_a": {"a": quien["nombre"], LLEGA: sale.isoformat()}}
@@ -666,7 +696,82 @@ def decir_cuando_destraba(ctx: Contexto, datos: dict[str, Any],
                                                 como_llega))
     if not ya_no_hacia_falta:
         _juntar(hecho, encadenados.dijo_quien_destraba(ctx, tarea["id"], dicho_id, dice))
+        if (para_cuando is not None and not ya_esta
+                and str(destraba.get("destraba_membership_id") or ctx.quien.membership_id)
+                == ctx.quien.membership_id):
+            _juntar(hecho, _volver_a_preguntar_el_dia(ctx, tarea, destraba, dicho_id, para_cuando,
+                                                      lo_que_dice))
     return hecho
+
+
+def _volver_a_preguntar_el_dia(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],
+                               dicho_id: str, para_cuando: date,
+                               lo_que_dice: str | None) -> dict[str, Any]:
+    """El día que dijo quien destraba, Leda le vuelve a preguntar si ya está (C-5e; decisión 42;
+    `avisos.EL_DIA_QUE_DIJO`): a la hora de lo que Leda manda por su cuenta y, si ese momento ya
+    pasó (dijo "hoy"), el día hábil siguiente. Al salir abre su pregunta de para cuándo, que la
+    escalera de las preguntas repite sin escalar si no contesta (decisión 38); no sale si después
+    dijo otra cosa, si el bloqueo se cerró o si lo destraba otra persona. Una sola regla, para
+    cualquiera que destraba y da un día. Los hechos para quien escribe: cuándo le pregunta."""
+    cal = ctx.calendario
+    cuando = sale_el(cal, cal.proximo_habil(para_cuando))
+    if cuando <= ctx.ahora:
+        hoy = ctx.ahora.astimezone(cal.zona).date()
+        cuando = sale_el(cal, cal.proximo_habil(hoy + timedelta(days=1)))
+    habia_dicho = {"para_cuando": para_cuando.isoformat(),
+                   **({"lo_que_dice": lo_que_dice} if lo_que_dice else {})}
+    aviso_id, _ = guardar(
+        ctx.cur, ctx.quien.workspace_id, EL_DIA_QUE_DIJO, task_id=tarea["id"],
+        destinatario=ctx.quien.membership_id,
+        hechos={"aviso": EL_DIA_QUE_DIJO, "necesita_respuesta": True,
+                "pregunta": preguntas.CUANDO_SE_DESTRABA, "tarea": tarea["titulo"],
+                "responsable": destraba["responsable"], "causa": destraba["causa"],
+                "habia_dicho": habia_dicho},
+        programado_para=cuando, clave=f"motor:{EL_DIA_QUE_DIJO}:{tarea['id']}:d{dicho_id}",
+        ahora=ctx.ahora)
+    ctx.avisos_guardados.append(aviso_id)
+    hecho: dict[str, Any] = {LE_VUELVE_A_PREGUNTAR: {LLEGA: cuando.isoformat()}}
+    nombrar_efecto(hecho, LE_VUELVE_A_PREGUNTAR, AVISO, aviso_id)
+    return hecho
+
+
+def vigencia_del_dia_que_dijo(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    """La pregunta del día que dijo quien destraba sale mientras la tarea siga trabada por eso,
+    la destrabe esa misma persona y lo que dijo ese día sea lo último que dijo."""
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return "tarea_inexistente", {}
+    if tarea["estado"] in ("terminada", "cancelada"):
+        return "tarea_cerrada", {}
+    dicho = _el_dicho(m.cur, de_la_clave(aviso))
+    if dicho is None:
+        return "tarea_inexistente", {}
+    motivo = sigue_esperando_que_destrabe(m.cur, dicho["blocker_unblocker_id"],
+                                          str(aviso["destinatario_membership_id"]))
+    if motivo is not None:
+        return motivo, {}
+    if ultimo_dicho_de_quien_destraba(m.cur, dicho["blocker_id"]) != str(dicho["id"]):
+        return DIJO_ALGO_MAS_NUEVO, {}
+    return None, {**dict(aviso["hechos"] or {}), "tarea": tarea["titulo"]}
+
+
+def abre_el_dia_que_dijo(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
+    """La pregunta de para cuándo, otra vez, atada a la fila de quien destraba sobre la que dijo
+    el día: lo que recuerda al repetirla es quién está trabado y por qué."""
+    hechos = aviso["hechos"] or {}
+    dicho = _el_dicho(m.cur, de_la_clave(aviso))
+    return preguntas.CUANDO_SE_DESTRABA, {
+        "nombre": "anotar_quien_destraba",
+        "datos": {k: hechos[k] for k in ("responsable", "causa") if hechos.get(k)},
+        "destraba_id": str(dicho["blocker_unblocker_id"]), "del_aviso": str(aviso["id"])}
+
+
+def _el_dicho(cur, dicho_id: str) -> dict[str, Any] | None:
+    cur.execute("""select d.id, d.blocker_unblocker_id, u.blocker_id
+                     from dicho_de_quien_destraba d
+                     join blocker_unblocker u on u.id = d.blocker_unblocker_id
+                    where d.id = %s""", (dicho_id,))
+    return cur.fetchone()
 
 
 def _como_llega(cierra: bool, *, acordado: bool) -> dict[str, Any]:
@@ -1050,6 +1155,10 @@ def decir_que_no_le_toca(ctx: Contexto, datos: dict[str, Any],
         _juntar(hecho, sigue)
     if "se_le_pregunta_a" in sigue:
         mas = {"se_le_pregunta_a": {"a": sigue["se_le_pregunta_a"]["a"]}}
+    elif YA_ESTA_TRABADO in sigue:
+        # Ya está trabada con lo que falta (decisión 42): la cadena no se corta, sigue sola más
+        # arriba, y la persona trabada se entera de con qué y de cada avance.
+        mas = {YA_ESTA_TRABADO: sigue[YA_ESTA_TRABADO]}
     elif hay_lugar and no_sabe and nueva is not None and alcanzable(cur, trabado)[1] is None:
         # "Ni idea", con lugar en la cadena: antes de asentarlo, Leda le pregunta a la persona
         # trabada si se le ocurre otra persona (decisión 49). Lo que dijo va en esa pregunta.

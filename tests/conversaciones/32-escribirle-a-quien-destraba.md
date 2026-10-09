@@ -102,7 +102,9 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
    - Jugadas: `decir_cuando_destraba` sobre la tarea del PLC, para el miércoles 21.
    - Efecto: queda anotado, como un hecho del bloqueo, que Ariel dice que lo resuelve el miércoles
      21, con sus palabras y atribuido a él; su pregunta y su espera se cierran. Se guarda el aviso
-     a Marcos, que sale terminado el margen para corregir (11:15). El bloqueo sigue abierto.
+     a Marcos, que sale terminado el margen para corregir (11:15), y la pregunta a Ariel de si ya
+     se la pasó, para el miércoles 21 a las 10:00 (decisión 42, C-5e; no sale si el bloqueo se
+     cierra antes). El bloqueo sigue abierto.
    - La respuesta dice: que quedó anotado; que Marcos se va a enterar.
    - La respuesta no dice: que el bloqueo se cerró; un reproche porque se olvidó.
    - Estado después (Ariel): sin tema abierto.
