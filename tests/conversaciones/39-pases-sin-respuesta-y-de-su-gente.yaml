@@ -27,6 +27,13 @@ tareas:
     vence: "2026-11-06"
     estado: en_curso
     desde: "2026-10-19"
+  FUS:
+    titulo: Cambiar el fusible del tablero de la envasadora
+    criterio: "El tablero de la envasadora enciende con el fusible nuevo del amperaje que indica el plano"
+    responsable: Nahuel
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
 
 # Más corta que la del pack: la entrega de la del tornillo pide sólo cómo quedó el trabajo.
 evidencia:
@@ -410,11 +417,107 @@ pasos:
         hechos: {necesita_respuesta: false, sin_respuesta: true, no_contesto: Martín Forte,
                  la_tiene: Marcos Tarquini, puede_pedirselo_a_otra_persona: true,
                  pasaria_a: Lucas Natuche}
+      # Decisión 39: a quien se le preguntaba, que el pase terminó y ya no hace falta que conteste.
+      - a: Martin
+        tipo: como_termino_el_pase
+        tarea: PLC
+        hechos: {necesita_respuesta: false, sin_respuesta: true, ya_no_espera_su_respuesta: true,
+                 pidio: Marcos Tarquini, la_tiene: Marcos Tarquini, pasaria_a: Lucas Natuche}
     estado_despues:
-      responsables: {PLC: Marcos, SEN: Lucas, TOR: Marcos}
+      responsables: {PLC: Marcos, SEN: Lucas, TOR: Marcos, FUS: Nahuel}
     dice:
-      - que Martín no contestó y la del PLC sigue con él
-      - que puede pedírselo a otra persona
+      - "a Marcos: que Martín no contestó y la del PLC sigue con él"
+      - "a Marcos: que puede pedírselo a otra persona"
+      - "a Martín: que el pase que pidió Marcos terminó, la del PLC sigue con Marcos y no hace falta que conteste"
       - que no hace falta contestar, en el último renglón
     no_dice:
       - un reproche a Martín
+
+  - paso: 20
+    quien: Martin
+    a_las: "2026-10-22 10:30"
+    escribe: "uh perdon recien lo veo, si dale"
+    jugadas:
+      - {nombre: contestar_el_pase, acepta: true}
+    efectos: {}
+    hechos:
+      - {jugada: contestar_el_pase, resultado: no_se_puede, motivo: no_hay_un_pase}
+    pregunta: null
+    botones: []
+    estado_despues:
+      de: Martin
+      pregunta_abierta: null
+      responsables: {PLC: Marcos}
+    dice:
+      - que ya no tiene nada que contestar
+    no_dice:
+      - que la del PLC pasó a Lucas
+      - que lo anotó
+
+  # --- El encargado se queda él mismo con una tarea de Nahuel (decisión 53) -----------------------
+  - paso: 21
+    quien: Marcos
+    a_las: "2026-10-22 11:00"
+    escribe: "la del fusible de nahuel la hago yo, el esta con la paila"
+    jugadas:
+      - {nombre: pedir_reasignacion, como_la_nombra: "fusible de nahuel", a: marcos}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_reasignacion, resultado: pase_para_confirmar, tarea: FUS,
+         pase: {la_tiene: Nahuel Gimenez, pasaria_a: Marcos Tarquini},
+         al_confirmar_el_pase: {la_toma_al_confirmar: true},
+         pregunta: confirmar_el_pase}
+    pregunta: {tipo: confirmar_el_pase, tarea: FUS}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_el_pase, tarea: FUS}
+      responsables: {FUS: Nahuel}
+    dice:
+      - "la vista previa: que la del fusible pasa de Nahuel a él"
+      - que al confirmarla queda a su cargo y le avisa a Nahuel
+      - que confirme con el botón o escribiéndolo
+    no_dice:
+      - que la tarea ya es suya
+      - que le pregunta a alguien si lo aprueba o si la toma
+
+  - paso: 22
+    quien: Marcos
+    a_las: "2026-10-22 11:01"
+    escribe: "dale"
+    jugadas:
+      - {nombre: confirmar, puede_traer: [tarea]}
+    efectos:
+      responsables: {FUS: Marcos}
+      avisos_guardados:
+        - {tipo: como_termino_el_pase, tarea: FUS, a: Nahuel, estado: guardado,
+           hechos: {necesita_respuesta: false, la_tomo: true, era_suya: true,
+                    pidio: Marcos Tarquini, la_tiene: Marcos Tarquini}}
+    hechos:
+      - {jugada: confirmar, resultado: anotado, tarea: FUS, la_toma: true,
+         aviso_a_quien_la_tenia: {a: Nahuel Gimenez, llega: "~2026-10-22T11:11"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+      responsables: {FUS: Marcos}
+    dice:
+      - que la del fusible quedó a su cargo, con su vencimiento
+      - que Nahuel se va a enterar
+    no_dice:
+      - que Ismael se entera
+      - que espera que alguien lo apruebe o la tome
+
+  - paso: 23
+    quien: Leda
+    relojes: ["2026-10-22 11:11"]
+    salen:
+      - a: Nahuel
+        tipo: como_termino_el_pase
+        tarea: FUS
+        hechos: {necesita_respuesta: false, la_tomo: true, era_suya: true,
+                 pidio: Marcos Tarquini, la_tiene: Marcos Tarquini}
+    estado_despues:
+      responsables: {FUS: Marcos, PLC: Marcos, SEN: Lucas, TOR: Marcos}
+    dice:
+      - "a Nahuel: que su tarea del fusible pasó a Marcos, a pedido de Marcos"
+      - que no hace falta contestar, en el último renglón

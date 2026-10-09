@@ -6,11 +6,13 @@ a otra persona una tarea de alguien de su sector, con las mismas reglas de quié
 Leda le avisa a quien la tenía. Una tarea que pasa al encargado que la revisaba se cierra cuando él dice
 que la terminó, aprobada por él, y a Ismael no le llega nada: la revisión sigue a quien era la tarea, no a
 quien la termina haciendo. Y un pase que nadie contesta se repite una vez el día hábil siguiente y, si
-sigue sin respuesta, termina: la tarea sigue con quien la tenía y quien lo pidió se entera. ADR 0017,
-enmienda a la decisión 2; constitución §7 (un cambio de responsable se confirma) y §4 (honestidad);
-mecánica §5 (cierre), §7 (aprobación) y §12 (auditoría).
+sigue sin respuesta, termina: la tarea sigue con quien la tenía, quien lo pidió se entera y a quien se le
+preguntaba Leda le dice que ya no hace falta que conteste (decisión 39). El encargado también se queda él
+con una tarea de su gente (decisión 53). ADR 0017, enmienda a la decisión 2; constitución §7 (un cambio
+de responsable se confirma) y §4 (honestidad); mecánica §5 (cierre), §7 (aprobación) y §12 (auditoría).
 
-**Corre desde las decisiones 26 a 28 de la C-7** (`odd/tasks/fase-c.md`), entera, con su YAML.
+**Corre desde las decisiones 26 a 28 de la C-7** (`odd/tasks/fase-c.md`), entera, con su YAML. Los
+pasos 19 a 23 cambiaron con la corrección de la C-7 (decisiones 39 y 53, 2026-10-09).
 
 ## Las reglas
 
@@ -28,6 +30,14 @@ mecánica §5 (cierre), §7 (aprobación) y §12 (auditoría).
    a quien tiene que decidir o tomarla. Si sigue sin contestar, el pase termina al día hábil siguiente de
    la repetición, a la hora en que Leda escribe: le dice a quien lo pidió que no hubo respuesta y que la
    tarea sigue con quien la tenía, y quien lo pidió puede pedírselo a otra persona.
+4. **Nunca un pase abierto sin que todos sepan cómo terminó** (decisión 39). Cuando un pase termina sin
+   la respuesta de quien tenía que contestarlo (nadie contestó, o la tarea ya no se puede pasar), Leda
+   también se lo dice a esa persona, que ya no hace falta que conteste, y deja de preguntarle: sus
+   botones ya no esperan nada, y si contesta tarde, Leda le dice que no hay nada que contestar.
+5. **El encargado se queda él mismo con una tarea de su gente** (decisión 53). Si Marcos dice "la del
+   fusible de Nahuel la hago yo", es como pasársela a otra persona: pide, decide y la toma él, así que
+   con su confirmación de la vista previa la tarea pasa a ser suya; Leda le avisa a Nahuel, y cuando
+   Marcos dice que la terminó, se cierra ahí (regla 2).
 
 ## Estado inicial
 
@@ -40,7 +50,8 @@ mecánica §5 (cierre), §7 (aprobación) y §12 (auditoría).
   - De Marcos: "Programar PLC de la comprimidora", `en_curso` desde el lunes 19.
   - De Nahuel: "Calibrar los sensores de la envasadora", `asignada`; "Ajustar el tornillo del tablero de
     la envasadora", `en_curso` desde el lunes 19, con su criterio: el tornillo queda ajustado al torque
-    que indica el fabricante.
+    que indica el fabricante; "Cambiar el fusible del tablero de la envasadora", `en_curso` desde el
+    lunes 19.
 - **Lo que pide OT para entregar:** cómo quedó el trabajo, descrito por quien lo hizo.
 - **Estado de la conversación de cada uno:** sin tema abierto, nada para después, nada mostrado para
   confirmar.
@@ -146,15 +157,49 @@ mecánica §5 (cierre), §7 (aprobación) y §12 (auditoría).
 18. **Leda**, por su cuenta, a Martín (miércoles 21, 10:00): la misma pregunta, otra vez, una sola; que si
     sigue sin contestar, el jueves 22 la tarea sigue con Marcos. Martín no contesta.
 
-19. **Leda**, por su cuenta, a Marcos (jueves 22, 10:00): que Martín no contestó, que el pase terminó y la
-    del PLC sigue con él, y que puede pedírselo a otra persona. No pide respuesta. Nada más le llega a
-    Martín por ese pase.
+19. **Leda**, por su cuenta (jueves 22, 10:00): a Marcos, que Martín no contestó, que el pase terminó y
+    la del PLC sigue con él, y que puede pedírselo a otra persona; a Martín, que el pase que pidió Marcos
+    terminó, que la del PLC sigue con Marcos y que ya no hace falta que conteste, sin un reproche
+    (decisión 39). Ninguno pide respuesta. Los botones de la pregunta a Martín ya no esperan nada.
+
+20. **Martín** escribe (jueves 22, 10:30): "uh perdon recien lo veo, si dale"
+    →
+    - Jugadas: `contestar_el_pase`, que sí.
+    - Efecto: ninguno: el pase ya terminó y la del PLC sigue con Marcos.
+    - La respuesta dice: que ya no tiene nada que contestar.
+    - La respuesta no dice: que la tarea pasó a Lucas; que lo anotó.
+
+### El encargado se queda él mismo con una tarea de Nahuel (decisión 53)
+
+21. **Marcos** escribe (jueves 22, 11:00): "la del fusible de nahuel la hago yo, el esta con la paila"
+    →
+    - Jugadas: `pedir_reasignacion` sobre la del fusible, que no está en su lista (la nombra), a Marcos.
+    - Efecto: ninguno: es una vista previa (constitución §7).
+    - La respuesta dice: la vista previa, que la del fusible pasa de Nahuel a él; que al confirmarla queda
+      a su cargo y Leda le avisa a Nahuel; que confirme.
+    - La respuesta no dice: que ya es suya; que le pregunta a alguien si lo aprueba o si la toma.
+    - Botones: Confirmar.
+
+22. **Marcos** escribe (jueves 22, 11:01): "dale"
+    →
+    - Jugadas: `confirmar`.
+    - Efecto: la tarea pasa a ser de Marcos; la fecha y el criterio no cambian, y la revisa Marcos (era de
+      Nahuel). Se guarda el aviso a Nahuel. Nadie más tiene que aprobarlo ni tomarla.
+    - La respuesta dice: que la del fusible quedó a su cargo, con su vencimiento; que Nahuel se va a
+      enterar.
+    - La respuesta no dice: que Ismael se entera; que espera que alguien lo apruebe o la tome.
+
+23. **Leda**, por su cuenta, a Nahuel (jueves 22, 11:11): que su tarea del fusible pasó a Marcos, a pedido
+    de Marcos. No pide respuesta.
 
 ## Qué mide
 
 - **Garantías (5b):** ningún responsable cambia sin las tres confirmaciones, también cuando lo pide el
   encargado; quien tenía la tarea se entera de que pasó a otra persona; una tarea que la hizo quien la
   revisa se cierra con su aprobación, sin que a Ismael le llegue nada; un pase sin respuesta no cambia
-  nada, se repite una sola vez y termina con el aviso a quien lo pidió, nunca en silencio.
+  nada, se repite una sola vez y termina con el aviso a quien lo pidió y a quien se le preguntaba, nunca
+  en silencio; una respuesta tarde no cambia nada; el encargado que se queda con una tarea de su gente
+  la tiene sólo después de confirmar la vista previa, y quien la tenía se entera.
 - **Falla de comprensión:** que la IA no tome "la de los sensores de nahuel" como la tarea que nombra
-  (`como_la_nombra`), "si la hago yo" como que la toma, o "listo el tornillo…" como la entrega.
+  (`como_la_nombra`), "si la hago yo" como que la toma, "listo el tornillo…" como la entrega, o "la del
+  fusible de nahuel la hago yo" como que se la queda él (a es Marcos).
