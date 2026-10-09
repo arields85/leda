@@ -40,8 +40,9 @@ Cómo se leyó lo que la regla no dice (decidido por el coordinador a partir de 
   la respuesta y el vencimiento hay otra lista (o la hay ese mismo día), el pedido sale, dentro de esa
   lista. Sin el pedido del vencimiento, Leda pregunta el día hábil siguiente si la tarea sigue sin
   entregar: ya atrasada, cambió.
-- **Lo que la persona cuenta fuera de la lista también cuenta como contestado**: no se le vuelve a
-  preguntar en la lista siguiente lo que acaba de decir.
+- **Lo que la persona cuenta fuera de la lista también cuenta como contestado para la lista
+  siguiente**: no se le vuelve a preguntar ahí lo que acaba de decir. Pero no saltea el pedido del día
+  del vencimiento: eso es sólo para lo contestado en la lista.
 
 ## Estado inicial
 

@@ -8,8 +8,28 @@ E3-7 con el ciclo viejo; vuelven acá, como una pasada más de la escalera.
 **Un pedido de estado por persona con la lista de sus tareas.** El día de una cadencia a cada
 integrante en privado (`privado_cada_integrante`), cada persona con tareas abiertas recibe un solo
 mensaje (`como_vienen_sus_tareas`) con sus tareas y una sola pregunta, por la lista entera. Van en la
-lista las tareas asignadas o en curso sin un bloqueo abierto (`tareas_de`): una trabada la sigue la
-persecución del bloqueo (C-5) y una entregada espera la revisión de otra persona.
+lista todas sus tareas abiertas, cada una con su situación (`tareas_de`, `renglon`; decisión 32 del
+usuario, 2026-10-09): también la trabada (con lo que la traba) y la entregada (esperando revisión),
+para que vea todo junto y avise si algo cambió. Leda pregunta cómo vienen sólo por las que se pueden
+mover (asignadas o en curso, sin un bloqueo: `se_puede_mover`); si no hay ninguna, la lista sale sin
+pregunta.
+
+**La primera lista de la semana es completa; las otras, sólo lo que falta** (decisión 46; `armar`).
+Cada lista que sale guarda, fuera de los hechos, las tareas abiertas de la persona con su situación
+(`situacion`: el estado, los bloqueos abiertos, el día que dio para terminarla y si ya quedó atrasada)
+y si se preguntó por cada una (`scheduled_notice.tareas_de_la_lista`, migración 0047). La siguiente de
+la misma semana lleva sólo las tareas nuevas, las que se preguntaron y no contestó (con desde cuándo,
+`sin_respuesta_desde`), las que cambiaron y las que traen algo de la escalera de ese día; si no hay
+ninguna, no sale (`SIN_NOVEDADES`).
+
+**Lo contestado no se vuelve a preguntar** (decisión 31; `anotar_lo_que_conto`, `ya_lo_conto`). Lo
+que la persona cuenta de una tarea suya, en la lista o fuera de ella, la deja contestada en la última
+lista que le salió, con la situación de después. Con eso, la lista siguiente no la trae si no cambió,
+y el pedido de estado del día del vencimiento (el primero de su escalera) no sale si la contestó en
+esa lista y no cambió nada: cubre hasta la lista siguiente. Lo que cuenta por su cuenta, fuera de la
+lista, no saltea ese pedido. Si ese día sale una lista, el
+pedido va en ella. Que llegue el día en que vence no es un cambio; quedar atrasada sin entregar, sí:
+el día hábil siguiente la escalera le pide el estado.
 
 **El recordatorio del día va adentro** (`avisos._a_la_lista`): lo que la escalera tenía para ese día
 sobre una tarea de la lista (el aviso previo, el pedido de estado, el recordatorio del vencimiento con
@@ -23,7 +43,9 @@ lo de la escalera de ese día espera y va en la lista.
 sobre una tarea de la lista la contesta en la lista, y la jugada hace lo suyo en su tarea, como
 siempre (un inicio o una fecha cierran su espera). "Viene bien" de una tarea que todavía no vence se
 anota igual, aunque su escalera no haya pedido nada (`fichas._informar_avance`): Leda vuelve a
-preguntar en la próxima lista o el día en que vence, lo que llegue antes (`cuando_vuelve_a_preguntar`).
+preguntar en la próxima lista completa o cuando su escalera lo pida (el día del vencimiento, o el
+siguiente si lo contestado lo cubre), lo que llegue antes; y si su aviso previo todavía no salió, lo
+próximo es ese aviso, como siempre (decisión 44; `cuando_vuelve_a_preguntar`).
 **Si contesta sólo una**, Leda la anota y, en la misma respuesta, pregunta una vez por las otras
 (`preguntas.al_terminar_el_turno`); si después contesta otra vez sólo una parte, la lista se cierra:
 no vuelve a preguntar. **Si no contesta**, la lista es una pregunta de Leda sin contestar (decisión 21,
@@ -51,13 +73,15 @@ Las cadencias al grupo (`grupo`) no son un pedido a cada persona: el informe al 
 
 from __future__ import annotations
 
+import json
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Any, NamedTuple
 
 from ..incidentes import registrar_incidente
 
-from .ancla import anclaje
-from .avisos import ABIERTOS, Momento, guardar, hechos_de_la_escalera, omitir
+from .ancla import anclaje, prevision_vigente
+from .avisos import ABIERTOS, Momento, guardar, hechos_de_la_escalera, leer_tarea, omitir
 from .preguntas import COMO_VIENEN_SUS_TAREAS
 from .tiempo import sale, sale_el
 
@@ -67,6 +91,17 @@ PRIVADO = "privado_cada_integrante"
 YA_PASO_SU_MOMENTO = "ya_paso_su_momento"
 NO_ES_DIA_HABIL = "no_es_dia_habil"
 SIN_TAREAS_ABIERTAS = "sin_tareas_abiertas"
+# Una lista de la semana que no es la primera y no tiene nada que no se haya contestado ni que haya
+# cambiado: no sale (decisión 46).
+SIN_NOVEDADES = "sin_novedades_para_la_lista"
+# Lo que dicen los hechos de una lista que no es la primera de la semana, y de una tarea que la
+# persona no contestó en la lista anterior (decisión 46); y, después de "viene bien", cuándo le
+# llega antes el aviso previo (decisión 44).
+SOLO_LO_QUE_FALTA = "solo_lo_que_cambio_o_falta"
+SIN_RESPUESTA_DESDE = "sin_respuesta_desde"
+ANTES_LE_RECUERDA = "antes_le_recuerda_que_vence"
+# Las tareas de la lista: todas las abiertas de la persona (decisión 32).
+ABIERTAS = ("asignada", "en_curso", "bloqueada", "en_revision")
 # La etapa de la escalera: la cadencia es una pasada suya.
 ETAPA = "motor_escalera"
 # Hasta dónde se busca el próximo día de una cadencia (una semana alcanza para cualquier ritmo
@@ -177,13 +212,11 @@ def dia_de_la_clave(aviso: dict[str, Any]) -> date:
 
 
 def _con_tareas(m: Momento) -> list[str]:
-    """Las personas activas con tareas para la lista."""
+    """Las personas activas con tareas abiertas para la lista."""
     m.cur.execute("""select distinct t.responsable_membership_id as persona
                        from task t join integrante i on i.membership_id = t.responsable_membership_id
                       where i.activo and t.estado::text = any(%s)
-                        and not exists (select 1 from blocker b
-                                         where b.task_id = t.id and b.resuelto_en is null)
-                      order by 1""", (list(ABIERTOS),))
+                      order by 1""", (list(ABIERTAS),))
     return [str(f["persona"]) for f in m.cur.fetchall()]
 
 
@@ -205,22 +238,28 @@ def _no_se_entiende(m: Momento, cadencia: dict[str, Any]) -> None:
 # --- La lista ----------------------------------------------------------------------------------
 
 def tareas_de(cur, persona: str) -> list[dict[str, Any]]:
-    """Las tareas de la persona para la lista, por su vencimiento y su título: asignadas o en
-    curso, sin un bloqueo abierto."""
+    """Las tareas abiertas de la persona para la lista, por su vencimiento y su título: asignadas,
+    en curso, trabadas o entregadas (decisión 32)."""
     cur.execute("""select t.id, t.titulo, t.estado::text estado, t.fecha_objetivo, t.area_id,
-                          t.responsable_membership_id, false as bloqueada
+                          t.responsable_membership_id,
+                          exists (select 1 from blocker b
+                                   where b.task_id = t.id and b.resuelto_en is null) bloqueada
                      from task t
                     where t.responsable_membership_id = %s and t.estado::text = any(%s)
-                      and not exists (select 1 from blocker b
-                                       where b.task_id = t.id and b.resuelto_en is null)
-                    order by t.fecha_objetivo nulls last, t.titulo""", (persona, list(ABIERTOS)))
+                    order by t.fecha_objetivo nulls last, t.titulo""", (persona, list(ABIERTAS)))
     return cur.fetchall()
+
+
+def se_puede_mover(tarea: dict[str, Any]) -> bool:
+    """Si Leda pregunta cómo viene: asignada o en curso, sin un bloqueo abierto. La trabada la sigue
+    la persecución del bloqueo (C-5) y la entregada espera la revisión de otra persona."""
+    return tarea["estado"] in ABIERTOS and not tarea["bloqueada"]
 
 
 def vigencia(m: Momento, aviso: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
     """Si el pedido todavía corresponde: es su día (mecánica §12) y la persona tiene tareas para
-    la lista. La lista misma la arma el envío (`avisos._a_la_lista`), con lo que la escalera
-    tenía para ese día adentro."""
+    la lista. La lista misma la arma el envío (`avisos._a_la_lista`, `armar`), con lo que la
+    escalera tenía para ese día adentro."""
     if dia_de_la_clave(aviso) != m.hoy:
         return YA_PASO_SU_MOMENTO, {}
     if not tareas_de(m.cur, str(aviso["destinatario_membership_id"])):
@@ -232,7 +271,8 @@ def renglon(m: Momento, tarea: dict[str, Any],
             del_dia: list[dict[str, Any]] = ()) -> dict[str, Any]:
     """Lo que la lista dice de una tarea: lo mismo que un pedido de estado de su escalera (cuánto
     falta o el atraso, el estado, el día que dio para terminarla, lo que depende de ella y qué
-    espera saber), si vence hoy y, encima, lo que la escalera tenía para ese día sobre ella."""
+    espera saber), si vence hoy, lo que la traba si está trabada y, encima, lo que la escalera
+    tenía para ese día sobre ella."""
     if tarea["fecha_objetivo"] is None:
         dicho: dict[str, Any] = {"tarea": tarea["titulo"], "estado": tarea["estado"]}
     else:
@@ -241,41 +281,235 @@ def renglon(m: Momento, tarea: dict[str, Any],
         dicho.pop("necesita_respuesta", None)       # la lista entera la pide, una vez
         if m.fecha(tarea["fecha_objetivo"]) == m.hoy:
             dicho["vence_hoy"] = True
+    if tarea["bloqueada"]:
+        # Trabada (decisión 32): con lo que la traba, como lo dijo la persona.
+        if dicho.get("estado") != "bloqueada":
+            dicho.pop("estado_desde", None)         # era desde cuándo tenía el otro estado
+        dicho["estado"] = "bloqueada"
+        m.cur.execute("""select causa from blocker where task_id = %s and resuelto_en is null
+                          order by abierto_en, id""", (str(tarea["id"]),))
+        dicho["causas"] = [f["causa"] for f in m.cur.fetchall()]
     for hechos in del_dia:
         dicho.update({k: v for k, v in hechos.items()
                       if k not in ("aviso", "necesita_respuesta")})
     return dicho
 
 
+def situacion(cur, cal, ahora: datetime, tarea: dict[str, Any]) -> dict[str, Any]:
+    """La situación de una tarea, para saber si cambió desde la lista anterior o desde que la
+    persona la contó (decisiones 31 y 46): su estado (trabada si tiene un bloqueo abierto), sus
+    bloqueos abiertos, el día que dio para terminarla y si pasó el día de su seguimiento (la fecha
+    comprometida, o la que dio si es posterior) sin entregarse. Que llegue el día en que vence no
+    la cambia."""
+    cur.execute("""select id from blocker where task_id = %s and resuelto_en is null
+                    order by id""", (str(tarea["id"]),))
+    bloqueos = [str(f["id"]) for f in cur.fetchall()]
+    prevision = prevision_vigente(cur, tarea["id"])
+    atrasada = False
+    if tarea["fecha_objetivo"] is not None:
+        vence = tarea["fecha_objetivo"].astimezone(cal.zona).date()
+        atrasada = ahora.astimezone(cal.zona).date() > anclaje(cur, tarea["id"], vence).fecha
+    return {"estado": "bloqueada" if tarea["bloqueada"] or bloqueos else tarea["estado"],
+            "bloqueos": bloqueos,
+            "prevision": prevision["fecha_prevista"].isoformat() if prevision else None,
+            "atrasada": atrasada}
+
+
+@dataclass(frozen=True)
+class Armada:
+    """La lista de una persona, armada al salir: sus renglones, las tareas por las que pregunta,
+    si es la primera de la semana y lo que lleva (lo que se guarda fuera de los hechos)."""
+
+    renglones: list[dict[str, Any]]
+    preguntadas: tuple[str, ...]
+    completa: bool
+    lleva: dict[str, Any]
+
+
+def armar(m: Momento, persona: str, del_dia: dict[str, list[dict[str, Any]]]) -> Armada:
+    """La lista de la persona (decisiones 32 y 46). La primera de la semana, con todas sus tareas
+    abiertas. Las otras, sólo con las tareas nuevas, las que se preguntaron en la anterior y no
+    contestó, las que cambiaron desde la anterior (o desde que las contó) y las que traen algo de
+    la escalera de ese día (`del_dia`, por tarea). Pregunta por las que se pueden mover."""
+    anterior = _la_anterior_de_la_semana(m, persona)
+    completa = anterior is None
+    ya = (anterior or {}).get("tareas") or {}
+    renglones: list[dict[str, Any]] = []
+    preguntadas: list[str] = []
+    lleva: dict[str, Any] = {}
+    for tarea in tareas_de(m.cur, persona):
+        tid = str(tarea["id"])
+        ahora = situacion(m.cur, m.cal, m.ahora, tarea)
+        antes = ya.get(tid)
+        sin_respuesta = bool(antes and antes.get("preguntada") and not antes.get("contestada_en"))
+        va = (completa or tid in del_dia or antes is None or sin_respuesta
+              or ahora != antes.get("situacion"))
+        pregunta = va and se_puede_mover(tarea)
+        desde = None
+        if pregunta:
+            desde = antes["sin_respuesta_desde"] if sin_respuesta else m.hoy.isoformat()
+        lleva[tid] = {"situacion": ahora, "mostrada": va, "preguntada": pregunta,
+                      "sin_respuesta_desde": desde, "contestada_en": None}
+        if not va:
+            continue
+        dicho = renglon(m, tarea, del_dia.get(tid, []))
+        if pregunta and sin_respuesta:
+            dicho[SIN_RESPUESTA_DESDE] = desde
+        renglones.append(dicho)
+        if pregunta:
+            preguntadas.append(tid)
+    return Armada(renglones, tuple(preguntadas), completa, {"tareas": lleva})
+
+
+def _la_anterior_de_la_semana(m: Momento, persona: str) -> dict[str, Any] | None:
+    """Lo que llevó la última lista que le salió a la persona esta semana, o `None` si ésta es la
+    primera (o si la anterior es de antes de la migración 0047: ésta va completa)."""
+    fila = _la_ultima_que_salio(m.cur, persona)
+    if fila is None or fila["tareas_de_la_lista"] is None:
+        return None
+    if m.fecha(fila["resuelto_en"]).isocalendar()[:2] != m.hoy.isocalendar()[:2]:
+        return None
+    return fila["tareas_de_la_lista"]
+
+
+def _la_ultima_que_salio(cur, persona: str) -> dict[str, Any] | None:
+    cur.execute("""select id, resuelto_en, tareas_de_la_lista from scheduled_notice
+                    where destinatario_membership_id = %s and tipo = %s and estado = 'enviado'
+                    order by resuelto_en desc limit 1""", (persona, COMO_VIENEN_SUS_TAREAS))
+    return cur.fetchone()
+
+
+# --- Lo contestado (decisión 31) ----------------------------------------------------------------
+
+def anotar_lo_que_conto(ctx, task_id, *, en_la_lista: bool = False) -> None:
+    """La persona contó algo de una tarea suya (una jugada sobre ella, en la lista o fuera de
+    ella): en la última lista que le salió, la tarea queda contestada, con su situación de
+    después. Así la lista siguiente no se la vuelve a preguntar si no cambió (decisión 46). Si lo
+    contó contestando la pregunta de la lista (`en_la_lista`), además el pedido del día del
+    vencimiento no sale si nada cambió (decisión 31, `ya_lo_conto`)."""
+    cur = ctx.cur
+    fila = _la_ultima_que_salio(cur, ctx.quien.membership_id)
+    lleva = fila["tareas_de_la_lista"] if fila is not None else None
+    if not lleva or str(task_id) not in (lleva.get("tareas") or {}):
+        return
+    tarea = leer_tarea(cur, task_id)
+    if tarea is None:
+        return
+    tareas = dict(lleva["tareas"])
+    antes = tareas[str(task_id)]
+    tareas[str(task_id)] = {**antes, "contestada_en": ctx.ahora.isoformat(),
+                            "en_la_lista": bool(antes.get("en_la_lista") or en_la_lista),
+                            "situacion": situacion(cur, ctx.calendario, ctx.ahora, tarea)}
+    cur.execute("update scheduled_notice set tareas_de_la_lista = %s where id = %s",
+                (json.dumps({**lleva, "tareas": tareas}, ensure_ascii=False), fila["id"]))
+
+
+def ya_lo_conto(m: Momento, tarea: dict[str, Any]) -> bool:
+    """Si el pedido de estado del día del vencimiento de la tarea no sale porque la persona ya
+    contó cómo viene en la lista (decisión 31): contestando la pregunta de la última lista que le
+    salió, y no cambió nada desde lo último que contó. Lo que cuenta por su cuenta, fuera de la
+    lista, no lo saltea. Si hoy le sale una lista, tampoco: el pedido va en ella."""
+    cur, persona = m.cur, str(tarea["responsable_membership_id"])
+    cur.execute("""select programado_para from scheduled_notice
+                    where destinatario_membership_id = %s and tipo = %s and estado = 'guardado'""",
+                (persona, COMO_VIENEN_SUS_TAREAS))
+    if any(m.fecha(f["programado_para"]) == m.hoy for f in cur.fetchall()):
+        return False
+    fila = _la_ultima_que_salio(cur, persona)
+    lleva = (fila["tareas_de_la_lista"] if fila is not None else None) or {}
+    dicha = (lleva.get("tareas") or {}).get(str(tarea["id"]))
+    if not dicha or not dicha.get("contestada_en") or not dicha.get("en_la_lista"):
+        return False
+    return dicha.get("situacion") == situacion(cur, m.cal, m.ahora, tarea)
+
+
 # --- Cuándo vuelve a preguntar ----------------------------------------------------------------
 
 def cuando_vuelve_a_preguntar(cur, cal, workspace_id: str, tarea: dict[str, Any],
-                              ahora: datetime) -> datetime | None:
-    """Cuándo Leda vuelve a preguntar por una tarea de la que la persona contó cómo viene sin que
-    su escalera lo hubiera pedido: en la próxima lista de una cadencia o el día en que su
-    escalera pide el estado, lo que llegue antes. `None` si nada de eso va a pasar."""
-    candidatos = [proximo_pedido(cur, cal, ahora)]
+                              ahora: datetime) -> tuple[datetime | None, datetime | None]:
+    """Cuándo Leda vuelve a preguntar por una tarea de la que la persona contó cómo viene en la
+    lista sin que su escalera lo hubiera pedido, y cuándo le llega antes el aviso previo, si
+    todavía no salió (decisión 44). Pregunta en la próxima lista completa (la primera de otra
+    semana) o cuando su escalera lo pida, lo que llegue antes: el día de su seguimiento si sale
+    una lista en el medio (lo contestado cubre hasta la lista siguiente, decisión 31) y, si no, el
+    día hábil siguiente. `None` si nada de eso va a pasar."""
+    candidatos = [proxima_lista_completa(cur, cal, ahora)]
+    antes = None
     if tarea.get("fecha_objetivo") is not None:
+        hoy = ahora.astimezone(cal.zona).date()
         vence = tarea["fecha_objetivo"].astimezone(cal.zona).date()
-        candidatos.append(sale_el(cal, anclaje(cur, tarea["id"], vence).fecha))
+        hasta = anclaje(cur, tarea["id"], vence).fecha
+        dia = hasta if _hay_una_lista(cur, cal, hoy, hasta) else cal.proximo_habil(
+            hasta + timedelta(days=1))
+        candidatos.append(sale_lo_del_dia(cur, cal, dia))
+        if hasta == vence:
+            antes = _el_aviso_previo_por_salir(cur, cal, workspace_id, tarea, vence, ahora)
     futuros = [c for c in candidatos if c is not None and c > ahora]
-    return min(futuros) if futuros else None
+    vuelve = min(futuros) if futuros else None
+    if antes is not None and vuelve is not None and antes >= vuelve:
+        antes = None
+    return vuelve, antes
 
 
-def proximo_pedido(cur, cal, ahora: datetime) -> datetime | None:
-    """Cuándo sale la próxima lista de una cadencia a cada integrante en privado: el próximo día
-    hábil de una cadencia que se entiende, a su hora (o a la hora en que Leda manda lo suyo)."""
+def _ritmos(cur) -> list[Ritmo]:
     cur.execute("select cron from cadence_job where activo and audiencia = %s", (PRIVADO,))
-    ritmos = [r for r in (leer_ritmo(f["cron"]) for f in cur.fetchall()) if r is not None]
+    return [r for r in (leer_ritmo(f["cron"]) for f in cur.fetchall()) if r is not None]
+
+
+def _listas_del_dia(cur, cal, dia: date) -> list[datetime]:
+    """A qué hora salen las listas de ese día, si es hábil y tiene una cadencia."""
+    if not cal.es_habil(dia):
+        return []
+    horas = [sale(cal, datetime.combine(dia, r.hora, tzinfo=cal.zona))
+             for r in _ritmos(cur) if dia.weekday() in r.dias]
+    return [h for h in horas if h.astimezone(cal.zona).date() == dia]
+
+
+def _hay_una_lista(cur, cal, desde: date, hasta: date) -> bool:
+    """Si sale una lista después del día `desde` y hasta el día `hasta`, inclusive."""
+    dia = desde + timedelta(days=1)
+    while dia <= hasta:
+        if _listas_del_dia(cur, cal, dia):
+            return True
+        dia += timedelta(days=1)
+    return False
+
+
+def sale_lo_del_dia(cur, cal, dia: date) -> datetime:
+    """Cuándo sale lo que la escalera tiene para ese día: a la hora de salida o, si ese día sale
+    una lista más tarde, con ella (lo espera y va adentro, `avisos._a_la_lista`)."""
+    return max([sale_el(cal, dia), *_listas_del_dia(cur, cal, dia)])
+
+
+def _el_aviso_previo_por_salir(cur, cal, workspace_id: str, tarea: dict[str, Any], vence: date,
+                               ahora: datetime) -> datetime | None:
+    """Cuándo sale el aviso previo de la tarea, si todavía no salió y su día no pasó."""
+    from .escalera import BLOQUEO_ABIERTO, MINIMO_DEL_NUCLEO, clave, dias_de_aviso_previo
+
+    base = clave("aviso_previo", tarea["id"], vence)
+    cur.execute("""select 1 from scheduled_notice
+                    where (dedupe_key = %s or dedupe_key like %s)
+                      and not (estado = 'omitido' and motivo_omision = %s)""",
+                (base, base + ":b%", BLOQUEO_ABIERTO))
+    if cur.fetchone() is not None:
+        return None
+    dia, faltan = vence, dias_de_aviso_previo(cur, workspace_id) or MINIMO_DEL_NUCLEO
+    while faltan > 0:
+        dia -= timedelta(days=1)
+        if cal.es_habil(dia):
+            faltan -= 1
+    cuando = sale_lo_del_dia(cur, cal, dia)
+    return cuando if cuando > ahora else None
+
+
+def proxima_lista_completa(cur, cal, ahora: datetime) -> datetime | None:
+    """Cuándo sale la próxima lista completa: la primera de una semana que no es ésta (decisión
+    46), a su hora (o a la hora en que Leda manda lo suyo)."""
     hoy = ahora.astimezone(cal.zona).date()
-    proximos = []
-    for ritmo in ritmos:
-        for adelante in range(_DIAS_HACIA_ADELANTE):
-            dia = hoy + timedelta(days=adelante)
-            if dia.weekday() not in ritmo.dias or not cal.es_habil(dia):
-                continue
-            cuando = sale(cal, datetime.combine(dia, ritmo.hora, tzinfo=cal.zona))
-            if cuando > ahora and cuando.astimezone(cal.zona).date() == dia:
-                proximos.append(cuando)
-                break
-    return min(proximos) if proximos else None
+    dia = hoy + timedelta(days=7 - hoy.weekday())
+    for _ in range(_DIAS_HACIA_ADELANTE):
+        listas = _listas_del_dia(cur, cal, dia)
+        if listas:
+            return min(listas)
+        dia += timedelta(days=1)
+    return None

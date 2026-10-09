@@ -115,7 +115,11 @@ siguiente; si sigue sin contestar, al otro día hábil el pase termina y quien l
 `cadencias.py`): el día de una cadencia del espacio a cada integrante en privado, la primera pasada
 guarda el pedido de cada persona con la lista de sus tareas, para la hora de la cadencia. Va antes que
 los pasos de la escalera: lo que ésta tenga para ese día sobre esas tareas sale dentro de la lista
-(`avisos._a_la_lista`), no aparte, y cuenta como dado.
+(`avisos._a_la_lista`), no aparte, y cuenta como dado. **Lo contestado no se vuelve a preguntar**
+(decisión 31 del usuario, 2026-10-09; `cadencias.ya_lo_conto`): el primer pedido de estado, el día
+del vencimiento (o de la previsión), no se guarda si la persona contó cómo viene esa tarea al
+contestar la última lista que le salió y no cambió nada; si ese día le sale una lista, va en ella. Al día hábil
+siguiente, sin entregar, la tarea quedó atrasada (cambió) y la escalera empieza desde ahí.
 
 **Sin `aviso_previo_dias_habiles`** (el plan lo dejó `PENDIENTE`): se usa el mínimo del núcleo,
 un día hábil (mecánica §9), y cada aviso previo que sale con él deja un incidente de severidad
@@ -150,7 +154,7 @@ from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir
                                      se_repite)
 from .avisos import BLOQUEO_QUE_SIGUE_ABIERTO, sigue_esperando_que_destrabe
 from .bloqueo_viejo import informar_los_viejos
-from .cadencias import guardar_los_pedidos
+from .cadencias import guardar_los_pedidos, ya_lo_conto
 from .pase import seguir_los_pases
 from .preguntas import COMO_VIENEN_SUS_TAREAS
 from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, lo_anotado
@@ -316,6 +320,10 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     # Los pasos de la cuenta que empieza después de un avance, también: la de sus avances.
     ronda = [f"a{v}" for v in [sum(a["tipo"] == REPREGUNTA_DE_ESTADO for a in avisos)] if v]
     ronda += [f"r{r}" for r in [sum(a["tipo"] == "reencuadre" for a in avisos)] if r]
+    if siguiente == 0 and k == 0 and ya_lo_conto(m, tarea):
+        # La persona contó cómo viene después de la última lista y no cambió nada: el pedido del
+        # día del vencimiento no sale (decisión 31). Si mañana sigue sin entregar, cambió.
+        return None
     if siguiente < PEDIDOS:
         return _pedir_el_estado(m, tarea, de, siguiente, ronda, pedidos, por)
     return _escalar(m, tarea, de, pedidos, ronda, avance, por)

@@ -376,7 +376,13 @@ def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
                 # Lo que dice de una tarea de la lista de la cadencia la contesta en la lista
                 # (C-6, decisión 8): también lo que todavía no se anota (una entrega que espera
                 # su confirmación, un bloqueo sin su causa), que sigue su propia pregunta.
+                en_la_lista = preguntas.en_la_lista(ctx.cur, ctx.quien.membership_id,
+                                                    de_la_tarea["id"])
                 preguntas.marcar_en_la_lista(ctx, de_la_tarea["id"])
+                # Y, en la lista o fuera de ella, la deja contada en la última lista que le salió:
+                # lo contestado no se vuelve a preguntar (decisiones 31 y 46).
+                from . import cadencias     # cadencias importa este módulo por `avisos`
+                cadencias.anotar_lo_que_conto(ctx, de_la_tarea["id"], en_la_lista=en_la_lista)
             if hecho.get("resultado") == "anotado" and hecho["jugada"] == ficha.nombre:
                 if de_la_tarea is not None:
                     preguntas.contestar(ctx, ficha.nombre, ficha.contesta, de_la_tarea["id"])
@@ -995,19 +1001,22 @@ def _avance_de_la_lista(ctx: Contexto, tarea: dict, dijo: str) -> dict:
     """Cómo viene una tarea de la lista de la cadencia que su escalera todavía no siguió (no
     vence todavía): Leda pidió el estado en la lista, así que se anota igual, con las palabras de
     la persona, atribuido y auditado (C-6, decisión 8). No abre ninguna espera: Leda vuelve a
-    preguntar en la próxima lista o el día en que la escalera pide el estado, lo que llegue
-    antes (`cadencias.cuando_vuelve_a_preguntar`), no al día hábil siguiente."""
+    preguntar en la próxima lista completa o cuando su escalera lo pida, lo que llegue antes, y
+    si el aviso previo todavía no salió, lo próximo es ese aviso (decisiones 31 y 44;
+    `cadencias.cuando_vuelve_a_preguntar`); nunca al día hábil siguiente de la respuesta."""
     from . import cadencias                 # cadencias importa este módulo por `avisos`
 
     _auditar(ctx, "informar_avance", "task", tarea["id"],
              {"dijo": dijo, "dicho_por_membership_id": ctx.quien.membership_id,
               "en_la_lista": True})
     fila = _exigir_responsable(ctx.cur, ctx.quien, tarea["id"])
-    vuelve = cadencias.cuando_vuelve_a_preguntar(
+    vuelve, antes = cadencias.cuando_vuelve_a_preguntar(
         ctx.cur, ctx.calendario, ctx.quien.workspace_id,
         {"id": tarea["id"], "fecha_objetivo": fila["fecha_objetivo"]}, ctx.ahora)
     hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
                              "avance": {"dijo": dijo}}
+    if antes is not None:
+        hecho[cadencias.ANTES_LE_RECUERDA] = {LLEGA: antes.isoformat()}
     if vuelve is not None:
         hecho["vuelve_a_pedir_el_estado"] = {LLEGA: vuelve.isoformat()}
     else:

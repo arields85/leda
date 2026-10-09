@@ -1320,6 +1320,8 @@ create table scheduled_notice (
   dedupe_key                  text not null,
   creado_en                   timestamptz not null,
   resuelto_en                 timestamptz,
+  -- El Motor (migración 0047): lo que llevó la lista de la cadencia, fuera de los hechos.
+  tareas_de_la_lista          jsonb,
   constraint scheduled_notice_workspace_id_unique unique (workspace_id, id),
   constraint scheduled_notice_dedupe unique (workspace_id, dedupe_key),
   constraint scheduled_notice_task_workspace
@@ -1377,6 +1379,8 @@ comment on table conversation_option is
   'El Motor: las opciones de una duda (situación general 5). El token es único y es lo que vuelve con un toque.';
 comment on table scheduled_notice is
   'El Motor (ADR 0018, decisión 8, precisión del 2026-10-05): lo que Leda manda por su cuenta, guardado como hechos. Entra al outbox recién cuando la IA lo redactó.';
+comment on column scheduled_notice.tareas_de_la_lista is
+  'El Motor (C-6, decisiones 31 y 46 del usuario, 2026-10-09): en la lista de la cadencia que salió, las tareas abiertas de la persona en ese momento, cada una con su situación, si se mostró, si se preguntó por ella, desde cuándo no la contesta y cuándo la contestó. Fuera de los hechos: lo lee sólo el código. Nulo en los demás avisos y en las listas de antes.';
 
 create table task_forecast (
   id                       uuid primary key default gen_random_uuid(),

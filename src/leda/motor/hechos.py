@@ -643,8 +643,20 @@ SIGNIFICADOS: Mapping[str, str] = {
                               "todas juntas en un solo mensaje, con el ritmo fijo del equipo: "
                               "espera algo cierto de cada una. Es una sola pregunta, por la "
                               "lista entera.",
-    "sus_tareas": "Las tareas de la persona por las que Leda le pregunta en este mensaje, en "
-                  "una lista: cada una con lo que se sabe de ella.",
+    "sus_tareas": "Las tareas abiertas de la persona en este mensaje, en una lista: cada una con "
+                  "lo que se sabe de ella, también las trabadas y las entregadas, para que vea "
+                  "todo junto y avise si algo cambió. Leda pregunta cómo vienen sólo por las que "
+                  "no están trabadas ni entregadas.",
+    "sin_respuesta_desde": "Leda le preguntó cómo viene esta tarea en un mensaje anterior, ese "
+                           "día, y la persona todavía no le contó.",
+    "solo_lo_que_cambio_o_falta": "Esta lista no es la primera de la semana: trae sólo las "
+                                  "tareas que cambiaron o por las que la persona todavía no "
+                                  "contó cómo vienen. Las demás siguen como las contó.",
+    "sin_novedades_para_la_lista": "No había nada nuevo para la lista: ninguna tarea cambió y "
+                                   "la persona ya había contado cómo venían todas.",
+    "antes_le_recuerda_que_vence": "Antes de volver a preguntarle, Leda le recuerda que la "
+                                   "tarea vence pronto, sin pedirle nada (llega, todavía no "
+                                   "pasó).",
     "de_la_lista": "Las tareas de la lista por las que Leda pregunta: las que la persona todavía "
                    "no contó.",
     "vence_hoy": "La tarea vence hoy.",

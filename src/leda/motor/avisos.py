@@ -341,9 +341,10 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
                 resumen[listo] += 1
             else:
                 listos.append(listo)
-        listos, por_la_lista = _a_la_lista(m, listos)
+        listos, por_la_lista, sin_novedades = _a_la_lista(m, listos)
         listos, esperan, omitidos = _un_tema_a_la_vez(m, listos)
         esperan += por_la_lista
+        omitidos += sin_novedades
         if esperan:
             resumen["en_espera"] += esperan
         if omitidos:
@@ -365,17 +366,22 @@ class _Listo:
     # La pregunta abierta de la persona, repetida (la de la escalera de esa pregunta, o el pedido
     # de estado de su tarea): sale sola, sin ningún aviso de otro tema (decisión 13, punto 2).
     solo: bool = False
-    # La lista de la cadencia (C-6): sus tareas, en el orden de la lista, y lo de la escalera de
-    # ese día que va adentro, que sale con ella.
+    # La lista de la cadencia (C-6): las tareas por las que pregunta, en el orden de la lista, lo
+    # de la escalera de ese día que va adentro, que sale con ella, y lo que lleva, que se guarda
+    # al salir fuera de los hechos (`scheduled_notice.tareas_de_la_lista`; decisiones 31 y 46).
     de_la_lista: tuple[str, ...] = ()
     plegados: tuple["_Listo", ...] = ()
+    lleva: dict[str, Any] | None = None
 
 
-def _a_la_lista(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], int]:
-    """La lista de la cadencia de cada persona (C-6, decisión 8; `cadencias.py`): sus tareas, cada
-    una con lo que se sabe de ella, y adentro lo que la escalera tenía para ese día sobre esas
-    tareas (`TipoDeAviso.entra_en_la_lista`), que sale con la lista y no aparte. Si la lista de la
-    persona sale más tarde ese día, lo de la escalera la espera. Lo que sale y cuántos esperan."""
+def _a_la_lista(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], int, int]:
+    """La lista de la cadencia de cada persona (C-6, decisión 8; `cadencias.py`): sus tareas
+    abiertas, cada una con lo que se sabe de ella, y adentro lo que la escalera tenía para ese día
+    sobre esas tareas (`TipoDeAviso.entra_en_la_lista`), que sale con la lista y no aparte. Si la
+    lista de la persona sale más tarde ese día, lo de la escalera la espera. La primera de la
+    semana lleva todas; las otras, sólo lo que cambió o no se contestó, y si no hay nada no sale
+    (decisiones 32 y 46; `cadencias.armar`). Lo que sale, cuántos esperan y cuántas listas
+    quedaron omitidas por no tener nada nuevo."""
     from . import cadencias             # cadencias importa este módulo
 
     listas = {str(x.destinatario["membership_id"]): x for x in listos if x.tipo.lista}
@@ -388,19 +394,28 @@ def _a_la_lista(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], int]:
             plegables.setdefault(persona, []).append(x)
         else:
             salen.append(x)
-    esperan = 0
+    esperan = omitidas = 0
     armadas: dict[str, _Listo] = {}
     for persona, lista in listas.items():
-        tareas = cadencias.tareas_de(m.cur, persona)
-        ids = [str(t["id"]) for t in tareas]
+        ids = {str(t["id"]) for t in cadencias.tareas_de(m.cur, persona)}
         suyos = plegables.pop(persona, [])
         adentro = [x for x in suyos if str(x.aviso["task_id"]) in ids]
         salen.extend(x for x in suyos if str(x.aviso["task_id"]) not in ids)
-        renglones = [cadencias.renglon(m, t, [x.hechos for x in adentro
-                                             if str(x.aviso["task_id"]) == str(t["id"])])
-                     for t in tareas]
-        armadas[persona] = replace(lista, hechos={**lista.hechos, "sus_tareas": renglones},
-                                   de_la_lista=tuple(ids), plegados=tuple(adentro))
+        del_dia: dict[str, list[dict[str, Any]]] = {}
+        for x in adentro:
+            del_dia.setdefault(str(x.aviso["task_id"]), []).append(x.hechos)
+        armada = cadencias.armar(m, persona, del_dia)
+        if not armada.renglones:
+            # Lo de la escalera de ese día siempre va en la lista: sin renglones, no había nada.
+            omitir(m.cur, str(lista.aviso["id"]), cadencias.SIN_NOVEDADES, m.ahora)
+            omitidas += 1
+            continue
+        hechos = {**lista.hechos, "necesita_respuesta": bool(armada.preguntadas),
+                  "sus_tareas": armada.renglones}
+        if not armada.completa:
+            hechos[cadencias.SOLO_LO_QUE_FALTA] = True
+        armadas[persona] = replace(lista, hechos=hechos, de_la_lista=armada.preguntadas,
+                                   plegados=tuple(adentro), lleva=armada.lleva)
     for resto in plegables.values():
         # Sin la lista ahora: o sale más tarde ese día (y la esperan), o no es de la lista.
         for x in resto:
@@ -408,8 +423,10 @@ def _a_la_lista(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], int]:
                 esperan += 1
             else:
                 salen.append(x)
-    return [armadas.get(str(x.destinatario["membership_id"]), x) if x.tipo.lista else x
-            for x in salen], esperan
+    return [armadas[str(x.destinatario["membership_id"])] if x.tipo.lista else x
+            for x in salen
+            if not x.tipo.lista or str(x.destinatario["membership_id"]) in armadas], \
+        esperan, omitidas
 
 
 def _la_lista_sale_mas_tarde(m: Momento, persona: str) -> bool:
@@ -689,6 +706,10 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                               intentos = intentos + 1, proximo_intento_en = null
                         where id = %s""", (outbox_id, m.ahora, _json(x.hechos), x.aviso["id"]))
         _auditar_el_envio(m, x.aviso, persona, outbox_id, len(adjuntos))
+        if x.lleva is not None:
+            # Lo que llevó la lista, fuera de los hechos (decisiones 31 y 46).
+            cur.execute("update scheduled_notice set tareas_de_la_lista = %s where id = %s",
+                        (_json(x.lleva), x.aviso["id"]))
         if x.tipo.al_salir is not None:
             x.tipo.al_salir(m, {**x.aviso, "hechos": x.hechos})
     registrar_salida(cur, m.workspace_id, persona, outbox_id, ia.nombre, m.ahora)
@@ -796,11 +817,14 @@ def _responsable_ausente(m: Momento, aviso) -> bool:
 def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, Any] | None:
     """Un aviso que necesita respuesta pide el estado de su tarea: es la única pregunta que
     se hace en él (la misma regla que en una respuesta). La lista de la cadencia hace una sola, por
-    todas sus tareas (C-6)."""
+    todas sus tareas (C-6): las que se pueden mover; sin ninguna, no pregunta (decisión 32)."""
     tipo = TIPOS.get(aviso["tipo"])
     if tipo is not None and tipo.lista:
+        if hechos.get("necesita_respuesta") is not True:
+            return None
         return {"tipo": preguntas.COMO_VIENEN_SUS_TAREAS, "desde_antes": False,
-                "de_la_lista": [{"titulo": t["tarea"]} for t in hechos.get("sus_tareas") or []]}
+                "de_la_lista": [{"titulo": t["tarea"]} for t in hechos.get("sus_tareas") or []
+                                if t.get("estado") in ABIERTOS]}
     if hechos.get("necesita_respuesta") is not True or aviso["task_id"] is None:
         return None
     pregunta: dict[str, Any] = {"tipo": hechos.get("pregunta") or ESPERA_DE_ESTADO,
@@ -890,7 +914,10 @@ def _abrir_la_lista(m: Momento, turno, lista: _Listo) -> None:
     """La pregunta de la lista de la cadencia, con sus tareas (C-6): una sola, por todas; la de
     una lista anterior sin cerrar queda reemplazada por ésta (`preguntas.abrir`, la misma). Lo de
     la escalera que fue adentro y pedía el estado cuenta en su espera, como un recordatorio, sin
-    abrir otra pregunta; reemplaza, como el pedido mismo, la pregunta de la fecha de su tarea."""
+    abrir otra pregunta; reemplaza, como el pedido mismo, la pregunta de la fecha de su tarea. Una
+    lista sin tareas que se puedan mover no pregunta nada (decisión 32): no abre la pregunta."""
+    if not lista.de_la_lista:
+        return
     preguntas.abrir(turno, preguntas.COMO_VIENEN_SUS_TAREAS, None,
                     jugada={"tareas": list(lista.de_la_lista), "contestadas": [],
                             "del_aviso": str(lista.aviso["id"])})

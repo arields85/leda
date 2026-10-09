@@ -421,6 +421,23 @@ def test_si_cambio_algo_despues_de_contestar_el_dia_que_vence_se_le_pregunta(con
     assert pedido["estado"] == "enviado"
 
 
+def test_lo_que_cuenta_fuera_de_la_lista_no_saltea_el_pedido_del_dia_que_vence(conn, mundo,
+                                                                             escribe, dias):
+    """La decisión 31 es sobre lo contestado en la lista: si Marcos cuenta algo de T1 por su cuenta,
+    con la lista ya cerrada, el día en que vence se le pide el estado como siempre."""
+    _pregunta_la_lista(conn, mundo, dias, (T2, octubre(30, 17)), (T3, octubre(30, 17)))
+    dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T2"}), at=octubre(5, 10, 30))
+    dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T3"}), at=octubre(5, 10, 40))
+    assert abierta(conn) is None                    # la lista se cerró sin contar T1
+    dias.ciclo(octubre(6, 10))
+    dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(6, 15))
+
+    dias.ciclo(octubre(9, 10))
+
+    [pedido] = avisos_guardados(conn, "pedido_de_estado")
+    assert pedido["estado"] == "enviado"
+
+
 def test_con_otra_lista_en_el_medio_el_dia_que_vence_se_le_pregunta(conn, mundo, escribe, dias):
     """Lo contestado cubre hasta la lista siguiente: con la del miércoles en el medio (que no la
     trae, porque no cambió), el viernes 9 el pedido del vencimiento sale."""
@@ -448,23 +465,33 @@ def _las_listas_para(dias) -> list[dict]:
     return [p for p in _para(dias) if p["hechos"][0]["aviso"] == LISTA]
 
 
+def _el_miercoles(dias) -> None:
+    """El martes 6 sale el aviso previo de T1 (vence el viernes 9: no tiene nada para la lista del
+    miércoles); el miércoles 7, a las 11:30, la lista."""
+    dias.ciclo(octubre(6, 10))
+    dias.ciclo(octubre(7, 11, 30))
+
+
 def test_la_lista_del_miercoles_trae_solo_lo_que_no_se_contesto(conn, mundo, escribe, dias):
-    """Decisión 46 del usuario (2026-10-09): Marcos contestó T1 y T2 el lunes y no T3. El
-    miércoles la lista trae sólo T3, con desde cuándo no la contestó ("del PLC no me contaste el
-    lunes")."""
+    """Decisión 46 del usuario (2026-10-09): Marcos contestó dos de las tres el lunes (la segunda
+    de la lista, por su alias, es la de los sensores) y no la de las comunicaciones. El miércoles
+    la lista trae sólo ésa, con desde cuándo no la contestó ("del PLC no me contaste el lunes")."""
     _dos_listas(conn, mundo, dias)
     dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "viene bien"}),
          Jugada("anotar_inicio", {"tarea": "T2"}), at=octubre(5, 10, 30))
+    assert estado_de(conn, uno(conn, "select id from task where titulo = %s", T3)["id"]) == \
+        "en_curso"
 
-    dias.ciclo(octubre(7, 11, 30))
+    _el_miercoles(dias)
 
     lunes, miercoles = _las_listas_para(dias)
     assert "solo_lo_que_cambio_o_falta" not in lunes["hechos"][0]
     [hechos] = miercoles["hechos"]
     assert hechos["solo_lo_que_cambio_o_falta"] is True
-    [t3] = hechos["sus_tareas"]
-    assert _titulos([t3]) == [T3] and t3["sin_respuesta_desde"] == "2026-10-05"
-    assert [t["titulo"] for t in miercoles["pregunta"]["de_la_lista"]] == [T3]
+    [sin_contestar] = hechos["sus_tareas"]
+    assert _titulos([sin_contestar]) == [T2]
+    assert sin_contestar["sin_respuesta_desde"] == "2026-10-05"
+    assert [t["titulo"] for t in miercoles["pregunta"]["de_la_lista"]] == [T2]
 
 
 def test_la_lista_del_miercoles_trae_lo_que_cambio(conn, mundo, escribe, dias):
@@ -477,7 +504,7 @@ def test_la_lista_del_miercoles_trae_lo_que_cambio(conn, mundo, escribe, dias):
     t2 = uno(conn, "select id from task where titulo = %s", T2)["id"]
     poner_estado(conn, str(t2), "en_revision")
 
-    dias.ciclo(octubre(7, 11, 30))
+    _el_miercoles(dias)
 
     miercoles = _las_listas_para(dias)[-1]
     [hechos] = miercoles["hechos"]
@@ -492,12 +519,12 @@ def test_si_no_hay_nada_nuevo_la_lista_del_miercoles_no_sale(conn, mundo, escrib
          Jugada("anotar_inicio", {"tarea": "T2"}), Jugada("anotar_inicio", {"tarea": "T3"}),
          at=octubre(5, 10, 30))
 
-    dias.ciclo(octubre(7, 11, 30))
+    _el_miercoles(dias)
 
     _, miercoles = _listas(conn)
     assert (miercoles["estado"], miercoles["motivo_omision"]) == (
         "omitido", "sin_novedades_para_la_lista")
-    assert len(_salieron_para(conn, mundo)) == 1           # sólo la del lunes
+    assert len(_salieron_para(conn, mundo)) == 2       # la lista del lunes y el aviso previo
 
 
 def test_lo_que_cuenta_fuera_de_la_lista_tambien_cuenta_como_contestado(conn, mundo, escribe,
@@ -508,6 +535,7 @@ def test_lo_que_cuenta_fuera_de_la_lista_tambien_cuenta_como_contestado(conn, mu
     dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "viene bien"}),
          Jugada("anotar_inicio", {"tarea": "T2"}), at=octubre(5, 10, 30))
     dice(conn, escribe, Jugada("dejar_para_despues", {}), at=octubre(5, 10, 40))
+    dias.ciclo(octubre(6, 10))
     dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T3"}), at=octubre(6, 15))
 
     dias.ciclo(octubre(7, 11, 30))
@@ -524,7 +552,7 @@ def test_la_primera_lista_de_la_semana_es_completa_aunque_no_sea_el_lunes(conn, 
     dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "viene bien"}),
          Jugada("anotar_inicio", {"tarea": "T2"}), Jugada("anotar_inicio", {"tarea": "T3"}),
          at=octubre(5, 10, 30))
-    dias.ciclo(octubre(7, 11, 30))
+    _el_miercoles(dias)
     dias.ciclo(octubre(12, 10))
 
     dias.ciclo(octubre(14, 11, 30))
