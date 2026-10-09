@@ -157,7 +157,7 @@ from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, FICHAS, LLEGA, NO_
 from .margen import sale_con_margen
 from .ia import IA
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
-from .tiempo import Reloj, sale
+from .tiempo import Reloj
 
 # Decisión 8, caso 2: tras el 1.º, 2.º, 3.º y 4.º fallo de la IA, la espera hasta el
 # intento siguiente; al quinto fallo, el aviso queda `fallido`.
@@ -243,7 +243,11 @@ class TipoDeAviso:
     # después de que se guardó, ya está al tanto: no sale (`no_interrumpir.YA_SE_HABLO`).
     se_omite_si_ya_se_hablo: bool = False
     # Si es parte de la conversación que sigue y no espera a que la persona deje de escribir
-    # (`no_interrumpir`): la pregunta que vuelve cuando se cerró la otra (decisión 21).
+    # (`no_interrumpir`): la pregunta que vuelve cuando se cerró la otra (decisión 21) o por un
+    # cambio de tema (decisión 50). Es parte de contestarle a lo que la persona escribió
+    # (mecánica §10: no es un mensaje automático), así que sale también fuera del horario y va
+    # por el outbox como una respuesta (`es_respuesta`): fuera del tope diario (decidido por el
+    # coordinador a partir de la decisión 50).
     sigue_la_conversacion: bool = False
     # La pregunta que abre al salir para quien lo recibe, si no es el pedido del estado de su
     # propia tarea: su tipo y la jugada que guarda (la pregunta a quien destraba una tarea de
@@ -312,8 +316,12 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
     resumen: Counter[str] = Counter()
     with espacio(conn, workspace_id) as cur:
         m = Momento(cur, workspace_id, Calendario.desde_base(cur, workspace_id), ahora)
+        # Fuera del horario sale sólo lo que sigue la conversación: es parte de contestarle a la
+        # persona (`TipoDeAviso.sigue_la_conversacion`).
+        tipos = None
         if not m.cal.en_horario(ahora):
-            return {"fuera_de_horario": 1}
+            resumen["fuera_de_horario"] = 1
+            tipos = [t.nombre for t in TIPOS.values() if t.sigue_la_conversacion]
         cur.execute(
             # Los de un mismo momento, por el título de su tarea: el orden de un envío que junta
             # varios (sus hechos y sus botones, `botones.py`) es siempre el mismo.
@@ -322,9 +330,10 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
                 where a.estado = 'guardado' and a.programado_para <= %s
                   and (%s or a.proximo_intento_en is null or a.proximo_intento_en <= %s)
                   and (%s::uuid is null or a.id = %s::uuid)
+                  and (%s::text[] is null or a.tipo = any(%s::text[]))
                 order by a.programado_para, a.creado_en, t.titulo, a.dedupe_key
                 for update of a skip locked""",
-            (ahora, forzar, ahora, solo, solo))
+            (ahora, forzar, ahora, solo, solo, tipos, tipos))
         listos: list[_Listo] = []
         for aviso in cur.fetchall():
             listo = _preparar(m, aviso)
@@ -647,10 +656,13 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     adjuntos = (tipo.adjuntos(m, envio[0].aviso)
                 if tipo.adjuntos is not None and len(envio) == 1 else [])
     tipo_de_mensaje = max((x.tipo.tipo_de_mensaje for x in envio), key=URGENCIA.index)
+    # La pregunta que vuelve es parte de contestarle a la persona (mecánica §10): una respuesta.
+    es_respuesta = all(x.tipo.sigue_la_conversacion for x in envio)
     try:
         enqueue_outbox(cur, workspace_id=m.workspace_id,
                        chat_id=destinatario["telegram_user_id"], text=texto, dedupe_key=clave,
                        recipient_membership_id=persona, message_type=tipo_de_mensaje,
+                       is_response=es_respuesta,
                        es_coordinacion=tipo.es_coordinacion, scheduled_for=m.ahora,
                        grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace)
         if adjuntos:
@@ -1302,10 +1314,10 @@ def hechos_de_la_que_vuelve(pregunta: dict[str, Any], aviso: str) -> dict[str, A
 def guardar_la_que_vuelve(ctx, pregunta: dict[str, Any]) -> str:
     """La pregunta que vuelve aparte (`pregunta_sin_contestar.al_terminar_el_turno`): cuando se
     cerró la otra de las dos abiertas a la vez (decisión 21) o cuando la respuesta del turno
-    habló de otro tema (decisión 50). Enseguida, en su propio mensaje: dentro del horario, en la
-    vuelta siguiente del ciclo (es la conversación que sigue, también antes de la hora en que
-    Leda escribe por su cuenta); fuera de él, el día hábil siguiente (`tiempo.sale`). Una sola
-    por pregunta: si ya hay una guardada, es ésa."""
+    habló de otro tema (decisión 50). Enseguida, en su propio mensaje, en la vuelta siguiente
+    del ciclo: es la conversación que sigue, también antes de la hora en que Leda escribe por su
+    cuenta y fuera del horario (`TipoDeAviso.sigue_la_conversacion`). Una sola por pregunta: si
+    ya hay una guardada, es ésa."""
     clave = f"motor:{VUELVE_LA_PREGUNTA}:{pregunta['task_id']}:q{pregunta['id']}:"
     ctx.cur.execute("""select id from scheduled_notice
                         where workspace_id = %s and tipo = %s and estado = 'guardado'
@@ -1322,7 +1334,7 @@ def guardar_la_que_vuelve(ctx, pregunta: dict[str, Any]) -> str:
         ctx.cur, ctx.quien.workspace_id, VUELVE_LA_PREGUNTA, task_id=str(pregunta["task_id"]),
         destinatario=ctx.quien.membership_id,
         hechos={**base, **hechos_de_una_pregunta(m, tarea, base)},
-        programado_para=ctx.ahora if cal.en_horario(ctx.ahora) else sale(cal, ctx.ahora),
+        programado_para=ctx.ahora,
         clave=f"{clave}{int(ctx.ahora.timestamp())}", ahora=ctx.ahora)
     return aviso_id
 

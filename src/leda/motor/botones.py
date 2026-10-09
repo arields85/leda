@@ -77,8 +77,10 @@ class ConOpciones:
             fila = next((f for f in cur.fetchall() if texto.endswith(f["cuerpo"])), None)
             if fila is None:
                 return []
-            if not fila["es_respuesta"]:
-                # Un aviso: las opciones de lo que ofrece decidir o ver, si siguen sin cerrar; de
+            cur.execute("select 1 from scheduled_notice where outbox_id = %s limit 1",
+                        (fila["id"],))
+            if not fila["es_respuesta"] or cur.fetchone() is not None:
+                # Un aviso (también la pregunta que vuelve, que sale como una respuesta): las opciones de lo que ofrece decidir o ver, si siguen sin cerrar; de
                 # un envío que junta varios (una lista, decisión 17), en el orden de sus avisos.
                 cur.execute("""select o.etiqueta, o.token
                                  from scheduled_notice a

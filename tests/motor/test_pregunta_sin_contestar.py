@@ -245,15 +245,20 @@ def test_al_contestar_la_primera_el_codigo_trae_la_segunda_aparte(conn, mundo, e
     assert abierta(conn) == (preguntas.ESTADO_DE_LA_TAREA, dos["T1"])
 
 
-def test_la_que_vuelve_no_repite_lo_mismo_dos_veces_el_dia_siguiente(conn, mundo, escribe, dos):
-    """Contestada la segunda fuera del horario, la primera vuelve el día hábil siguiente; si su
-    escalera también la repite ese día, sale una sola vez."""
+def test_la_que_vuelve_fuera_del_horario_sale_enseguida_y_una_sola_vez(conn, mundo, escribe,
+                                                                         dos):
+    """Contestada la segunda fuera del horario, la primera vuelve enseguida: es parte de
+    contestarle (mecánica §10; decidido por el coordinador a partir de la decisión 50, que
+    también rige la de la decisión 21). El día hábil siguiente, si su escalera la repite, sale
+    una sola vez."""
     dias = Dias(conn, mundo)
     _las_dos_abiertas(conn, escribe, dias, dos)
     dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(9, 17, 5))
-    assert dias.ciclo(octubre(9, 17, 6)) == []              # fuera del horario
-    [una] = dias.ciclo(octubre(13, 10))
-    assert una["pregunta"]["tipo"] == preguntas.QUIEN_DESTRABA
+    [vuelve] = dias.ciclo(octubre(9, 17, 6))                # fuera del horario
+    assert vuelve["pregunta"]["tipo"] == preguntas.QUIEN_DESTRABA
+    assert dias.ciclo(octubre(9, 17, 7)) == []
+    salen = [p for p in dias.ciclo(octubre(13, 10)) if p["pregunta"]]
+    assert [p["pregunta"]["tipo"] for p in salen] in ([], [preguntas.QUIEN_DESTRABA])
     assert dias.ciclo(octubre(13, 10, 1)) == []
 
 
@@ -334,19 +339,35 @@ def test_dos_cambios_de_tema_seguidos_traen_la_pregunta_una_sola_vez(conn, mundo
     assert len(_de_marcos(dias.ciclo(octubre(5, 10, 41)))) == 1
 
 
-def test_un_cambio_de_tema_fuera_del_horario_trae_la_pregunta_el_dia_habil_siguiente(
+def test_un_cambio_de_tema_fuera_del_horario_trae_la_pregunta_enseguida(
         conn, mundo, escribe, dos):
-    """Leda contesta a cualquier hora (9e), pero lo que manda por su cuenta espera el horario:
-    la pregunta vuelve el día hábil siguiente, una sola vez aunque su escalera también la
-    repita (lectura de la decisión 21, que la 50 no cambia)."""
+    """Decisión 50 ("en otro mensaje justo después") y mecánica §10 (una respuesta de Leda a lo
+    que la persona escribió no es un mensaje automático); decidido por el coordinador: la
+    pregunta que vuelve es parte de contestarle, así que sale enseguida también fuera del
+    horario, como una respuesta (no la frena el horario ni cuenta para el tope). Lo demás que
+    Leda manda por su cuenta sigue esperando el horario, y la pregunta sale una sola vez."""
+    from leda.despachador import TransporteDePrueba, despachar
+
     dias = Dias(conn, mundo)
     _trabada_a_las(conn, escribe, dias, octubre(5, 16))
     r = dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=octubre(5, 20))
     assert r.pregunta is None
-    assert dias.ciclo(octubre(5, 20, 1)) == []
-    # El martes también sale el aviso previo de T1, que no pregunta nada.
+    [vuelve] = dias.ciclo(octubre(5, 20, 1))
+    assert _vuelve(vuelve) and vuelve["pregunta"]["tipo"] == preguntas.QUIEN_DESTRABA
+    [fila] = todos(conn, """select o.es_respuesta from message_outbox o
+                             join scheduled_notice a on a.outbox_id = o.id
+                            where a.tipo = %s""", VUELVE_LA_PREGUNTA)
+    assert fila["es_respuesta"] is True
+    transporte = TransporteDePrueba()
+    with espacio(conn, mundo["id"]) as cur:
+        despachar(cur, mundo["id"], transporte, Calendario.desde_base(cur, mundo["id"]),
+                  octubre(5, 20, 1))
+    conn.commit()
+    assert transporte.enviados[-1].texto.endswith("Aviso 1.")
+    assert dias.ciclo(octubre(5, 20, 2)) == []
+    # El martes, la pregunta no sale dos veces (su escalera la puede repetir, una sola).
     salen = [p for p in _de_marcos(dias.ciclo(octubre(6, 10))) if p["pregunta"]]
-    assert [p["pregunta"]["tipo"] for p in salen] == [preguntas.QUIEN_DESTRABA]
+    assert [p["pregunta"]["tipo"] for p in salen] in ([], [preguntas.QUIEN_DESTRABA])
     assert _de_marcos(dias.ciclo(octubre(6, 10, 1))) == []
 
 

@@ -22,7 +22,9 @@ IA:
 3. **La otra vuelve aparte** (`al_terminar_el_turno`, `VUELVE_LA_PREGUNTA`): las dos preguntas que
    quedaron abiertas a la vez porque un aviso hizo la segunda llevan `vuelve_aparte`. La persona
    contesta cualquiera, y cuando una se cierra el código trae la otra enseguida, en un mensaje
-   aparte, que no espera los 30 minutos de la conversación (`no_interrumpir`) pero sí el horario.
+   aparte, que no espera los 30 minutos de la conversación (`no_interrumpir`) ni el horario: es
+   parte de contestarle a la persona (mecánica §10) y sale como una respuesta (decidido por el
+   coordinador a partir de la decisión 50).
 4. **La pregunta que quedó por un cambio de tema vuelve aparte** (decisión 50 del usuario,
    2026-10-09, opción A; conversación 08): un mensaje, un tema. Si la respuesta del turno habló de
    otra cosa que la tarea de la pregunta que vuelve (`hablo_de_otro_tema`), la respuesta es sólo

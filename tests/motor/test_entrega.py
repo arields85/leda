@@ -436,6 +436,36 @@ def test_un_cambio_de_tema_con_la_entrega_por_confirmar_la_trae_aparte_con_su_bo
     assert hecho["resultado"] == "entregada" and estado_de(conn, tarea) == "en_revision"
 
 
+def test_fuera_del_horario_la_entrega_por_confirmar_vuelve_enseguida_con_su_boton(
+        conn, mundo, marcos):
+    """Decisión 50 y mecánica §10 (decidido por el coordinador): la pregunta que vuelve es parte
+    de contestarle a la persona, así que también fuera del horario sale justo después de la
+    respuesta, con su botón Confirmar."""
+    from leda.despachador import TransporteDePrueba, despachar
+    from leda.motor.botones import ConOpciones
+
+    marcos.minuto = 10 * 60                     # las 20:00 del lunes, fuera del horario
+    _tarea(conn, mundo)
+    marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero",
+                 archivos=[(JPEG, "foto", None)])
+    r = marcos.manda(Jugada("consultar_pendientes", {}), texto="que mas tengo?")
+    assert r.pregunta is None
+    at = AHORA + timedelta(minutes=marcos.minuto + 1)
+    ia = IAQueRedacta()
+    enviar(conn, mundo, ia, at)
+    [pedido] = ia.pedidos_de_redaccion
+    assert pedido["hechos"][0]["aviso"] == "vuelve_la_pregunta"
+    transporte = TransporteDePrueba()
+    with espacio(conn, mundo["id"]) as cur:
+        despachar(cur, mundo["id"], ConOpciones(transporte, cur),
+                  Calendario.desde_base(cur, mundo["id"]), at)
+    conn.commit()
+    vista_previa, lo_nuevo, vuelve = transporte.enviados
+    assert [b.etiqueta for b in vista_previa.botones] == ["Confirmar"]
+    assert lo_nuevo.botones == []
+    assert [b.etiqueta for b in vuelve.botones] == ["Confirmar"]
+
+
 # --- Lo mandado antes y la corrección -------------------------------------------------------
 
 def test_lo_mandado_antes_entra_aparte_y_solo_si_queda(conn, mundo, marcos):

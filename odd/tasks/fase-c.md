@@ -1552,9 +1552,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         guardado sin salir la detiene), así que puede escalar más tarde.
       - ~~**El mensaje aparte** es sólo para las dos preguntas que abrió un aviso de Leda.~~
         Decidida: también aparte cuando la persona cambia de tema (decisión 50; hecha, abajo).
-      - **"Enseguida" fuera del horario**: si la persona contesta a las 17:05, la otra pregunta
-        vuelve el día hábil siguiente a las 10:00 (una sola vez, aunque su escalera también la
-        repita).
+      - ~~**"Enseguida" fuera del horario**: si la persona contesta a las 17:05, la otra pregunta
+        vuelve el día hábil siguiente a las 10:00.~~ Decidido por el coordinador a partir de la
+        decisión 50: sale justo después de la respuesta también fuera del horario (abajo, "La
+        pregunta que vuelve, fuera del horario").
       - **Una pregunta que se hace una sola vez** (`cual_de_las_dos`, decisión 12) o que no es de una
         tarea no se repite; su turno termina a las 8 horas, como si se hubiera repetido.
       - **La IA real** sobre la 30 (y el punto 5 sobre la 04), y la prueba por Telegram, en la tanda
@@ -1595,10 +1596,28 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       - **Chequeos** (2026-10-09, sobre `c3c1907`): `pytest tests/motor tests/garantias
         tests/conversaciones`, 1463 passed; en seco, `correr --ia guionada --veces 1 --sin-informe`,
         39 de 39 bien. Sin la IA real (va en la tanda posterior: la 03, 04, 08, 12 y 18 se suman).
-      - `PENDIENTE` (preguntas al usuario): si la pregunta que vuelve por un cambio de tema escrito
-        fuera del horario espera al día hábil siguiente (lo construido, como la decisión 21) o sale
-        enseguida porque la persona está escribiendo; y si dos mensajes por día a quien no contesta
-        un pedido de estado (la 04) es lo que se quiere.
+      - ~~`PENDIENTE` (preguntas al usuario): si la pregunta que vuelve por un cambio de tema
+        escrito fuera del horario espera al día hábil siguiente o sale enseguida.~~ Decidido por
+        el coordinador a partir de la decisión 50 ("en otro mensaje justo después") y de la
+        mecánica §10 (una respuesta a lo que la persona escribió no es un mensaje automático):
+        sale enseguida (abajo). `PENDIENTE` (pregunta al usuario): si dos mensajes por día a quien
+        no contesta un pedido de estado (la 04) es lo que se quiere.
+    - **La pregunta que vuelve, fuera del horario** (2026-10-09, escritor único; route:
+      delegada). Decidido por el coordinador a partir de la decisión 50: la pregunta que vuelve
+      es parte de contestarle a la persona, así que sale justo después de la respuesta también
+      fuera del horario; rige igual para la que vuelve al cerrarse la otra (decisión 21), por la
+      misma razón. `avisos.guardar_la_que_vuelve` la guarda para ese momento; fuera del horario
+      `enviar_avisos` sólo manda los tipos que siguen la conversación
+      (`TipoDeAviso.sigue_la_conversacion`), y su fila del outbox es una respuesta
+      (`es_respuesta`: el despachador no la frena por el horario ni la cuenta para el tope).
+      Sigue habiendo una sola por pregunta y los botones van con ella (`botones.py` reconoce el
+      aviso por su fila, no por `es_respuesta`). Sin migración.
+      - **Test primero:** `test_pregunta_sin_contestar.py` (la del cambio de tema fuera del
+        horario, reescrita) y `test_entrega.py` (la entrega por confirmar vuelve fuera del horario
+        con su botón): 2 failed en rojo (`pytest -q ... -k fuera_del_horario`). Verde después;
+        cambió por la misma regla la de la decisión 21 fuera del horario
+        (`test_la_que_vuelve_fuera_del_horario_sale_enseguida_y_una_sola_vez`). La 30 dice la regla
+        nueva.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
   - Primera ronda (2026-10-08, `resultados/fase-c-c3-regresion.md`, sobre `8b05495`): de la 01 a la 20 y
     la 24, garantías y comprensión 5 de 5; la 21 a la 23 no pasan. Diagnóstico en la bitácora ("La entrega

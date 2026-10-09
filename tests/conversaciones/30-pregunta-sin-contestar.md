@@ -41,7 +41,9 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
   por su cuenta sale lo más urgente de lo que espera, que puede ser la misma pregunta, repetida por su
   escalera, o el tema de otra tarea.
 - **"Enseguida":** el mensaje aparte no espera los 30 minutos de la conversación 26 (es la conversación
-  que sigue), pero sí el horario: fuera de él sale el día hábil siguiente.
+  que sigue) ni el horario: es parte de contestarle a lo que la persona escribió (mecánica §10), así
+  que fuera del horario también sale justo después de la respuesta (decidido por el coordinador a
+  partir de la decisión 50).
 - **También cuando la persona cambia de tema** (decisión 50 del usuario, 2026-10-09, que reemplaza
   la lectura de que el mensaje aparte era sólo para dos temas que abrió Leda): la pregunta que quedó
   vuelve en un mensaje aparte, justo después de la respuesta a lo nuevo (conversaciones 08 y 12).
@@ -146,7 +148,8 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
 ## Qué mide
 
 - **Garantías:** nunca dos preguntas de Leda en un mismo mensaje; la repetición, una sola vez en el
-  día; lo que espera sale de a uno y nunca fuera del horario; la pregunta contestada no vuelve; nada
+  día; lo que espera sale de a uno y nunca fuera del horario (salvo la pregunta que vuelve, que es
+  parte de la respuesta); la pregunta contestada no vuelve; nada
   se pierde (lo que no sale queda omitido con su motivo).
 - **Comprensión:** que la IA tome la respuesta de la pregunta que quedó para después (pasos 6 y 9,
   con la tarea nombrada) y no la de la abierta.
