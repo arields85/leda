@@ -1614,8 +1614,82 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
          al referente, diciendo que a esa persona no se le puede escribir (corrección de la
          revisión, `4d67a31`; antes Leda sólo lo decía y no informaba a nadie, como en la
          porción 1).
-  - **Lo que sigue de la C-5**, cada una con su conversación de prueba primero: los bloqueos
-    encadenados y los avisos hacia abajo (decisión 6); el bloqueo viejo (7).
+  - [x] **Porción 4: los bloqueos encadenados y los avisos hacia abajo** (decisión 6;
+    conversación 35). Route: delegada (escritor único, 2+ archivos no triviales). Hecha el
+    2026-10-09:
+    - **La conversación primero** (`ba71984`, junto con la 36): la 35. Marcos ← Ariel ← Lucas,
+      enlazados por la dependencia cargada (la tarea del PLC depende de la del servidor de Ariel):
+      Ariel, a quien Leda le pregunta, se traba con el servidor; Marcos se entera de que se trabó,
+      de la fecha que da Lucas, de que ya está y de que Ariel pudo seguir, siempre como
+      información. Otra cadena (Nahuel ← Mariano ← Lucas) sin dependencia: Mariano dice "sigo
+      parado con el tablero" y el enlace lo dice él. En seco, antes del código: 35 fallas en la 35
+      (pasos 4 a 21: ningún aviso hacia abajo, la pregunta a Ariel seguía abierta y se le
+      repetía, y `su_tarea_trabada` no tenía significado); las 01 a 34, bien. Dos ajustes del
+      YAML antes del commit, por cómo funciona lo que ya existe: lo que sale antes de las 10:00
+      espera a esa hora (`tiempo.sale`), así que la otra cadena corre desde las 10:20; y la tarea
+      de Ariel vence el 6/11 (con el 27/10, el aviso previo le salía el viernes). En el commit
+      del motor, otro: en el paso 18 queda abierta la espera de Lucas por el tablero
+      (`esperas_abiertas` mira las de todos).
+    - **El enlace se deriva, sin tabla nueva** (`leda.motor.encadenados`, `aguas_abajo`): un
+      bloqueo abierto de Marcos espera la tarea de Ariel cuando lo último que se dijo es que lo
+      destraba Ariel, y esa tarea es lo que le falta: la de Marcos depende de ella
+      (`dependency`, la estructura que carga la plataforma), o Ariel lo dijo al contestar
+      (`dicho_de_quien_destraba.espera_su_bloqueo_id`, migración `0044` con su rollback: una
+      columna con referencia del mismo espacio, que alcanza sola como algo dicho; el aislamiento
+      y los permisos de la `0042` siguen). Sin una de las dos, nada. La cadena sigue hacia abajo
+      (hasta 10 eslabones, sin vueltas).
+    - **Los avances del medio** (aviso `novedad_de_lo_que_espera`, informativo, de coordinación:
+      fuera del tope diario, mecánica §10, precisión del 2026-09-30, como lo aplica
+      `despachador._tope_diario`): que se trabó (con su causa y, al salir, quién lo destraba),
+      lo que dice quien la destraba (`decir_cuando_destraba` y `decir_que_no_le_toca`), que se
+      destrabó, un día nuevo para terminarla, que la entregó y que quedó terminada. A cada
+      persona trabada más abajo, salvo a quien hizo el avance; con el margen para corregir,
+      salvo la aprobación (decisión 19). Clave por tarea que espera y avance
+      (`motor:novedad_de_lo_que_espera:<tarea>:<letra><id>`). Al salir se relee
+      (`encadenados.vigencia`): la tarea sigue esperando esa otra (`ya_no_espera_esa_tarea`), el
+      bloqueo sigue abierto, lo dicho es lo último, el día es el que vale, sigue entregada; uno
+      que se trabó y destrabó dentro del margen no le llega (`no_se_entero_que_se_trabo`). Sin
+      chat con Leda, el hecho dice que no le va a llegar. A quien escribe, los hechos le dicen a
+      quién y cuándo (`avisos_a_quienes_esperan`). Nunca se da por destrabada la tarea de Marcos.
+    - **Quien se traba con lo que destraba a otra persona ya contestó:** su pregunta "para
+      cuándo" y su espera se cierran, y si el mensaje de Leda todavía no le llegó, no sale
+      (`ya_respondio`); la pregunta que sigue es quién lo destraba a él.
+    - **"Está trabado con algo suyo"**: dato nuevo `su_tarea_trabada` de `decir_cuando_destraba`
+      (el alias de una tarea suya; si no está trabada, `su_tarea_no_esta_trabada` y nada se
+      anota). Queda anotado con el bloqueo de esa tarea, y a la persona trabada le llega con qué
+      está trabado y quién lo destraba (`dice_quien_destraba.su_tarea_trabada`).
+    - **Ganchos** (sin frases ni casos): `fichas._anotar_bloqueo`, `_destrabar` y
+      `_anotar_prevision`; `entrega` (al confirmar) y `aprobacion.aprobar` (al cerrar);
+      `persecucion` (lo que dice quien destraba).
+    - **Test primero:** `tests/motor/test_bloqueos_encadenados.py`, 14 de 16 en rojo con el
+      motor de antes (las otras dos miran que algo no pase: otra persona destraba, y quien hizo
+      el avance no lo recibe); `tests/garantias/test_espera_su_bloqueo.py`, 2 de 2 en rojo sin
+      la columna. **Verde:** las 18. Una prueba suponía que la pregunta vieja seguía siendo la
+      abierta (la nueva pasa adelante, un tema a la vez): se corrigió para mirar que siga sin
+      contestar.
+    - **Las instrucciones de la IA no cambiaron** (huellas de `test_contratos.py` iguales): el
+      dato va en `ia_real.DATOS` y en la ficha (`opcional`, `hace`, `es`); los códigos nuevos, en
+      `hechos.SIGNIFICADOS`, con palabras de todos los días. El corredor traduce
+      `su_tarea_trabada` por su clave y mira `dicen_quien_destraba.espera_la_tarea`.
+      `test_corredor` cuenta 36 conversaciones.
+    - **Ninguna conversación anterior cambió.**
+    - **Chequeos** (2026-10-09, antes del commit): `pytest tests/motor tests/conversaciones`,
+      1010 passed y 1 failed (`test_corredor`, que contaba 34 conversaciones; corregido, en
+      verde); `pytest tests/garantias`, 339 passed (la paridad y el rollback de la `0044`
+      incluidos); en seco, `correr --ia guionada --veces 1 --ronda seco-c5-p4`, **35 de 36
+      bien** (la 36 es de la porción 5). Informes borrados, `gasto.json` sin tocar. Sin la IA
+      real. Sin la suite completa.
+    - `PENDIENTE`:
+      - **La IA real** sobre la 35 (y la tanda pendiente), y la prueba por Telegram.
+        `leda_motor` necesita la `0044` además de la `0039`, `0040`, `0042` y `0043`.
+      - **Preguntas para el usuario:** si quien nombra a alguien que ya está trabado con lo que
+        le falta (Marcos dice "lo tiene Ariel" cuando Ariel ya se trabó con el servidor) tiene que
+        enterarse en ese momento y Ariel no recibir la pregunta (hoy: Ariel recibe la pregunta y
+        Marcos se entera de los avances que vengan); si el cierre que hace el sistema solo
+        (`aprobacion.cerrar_las_que_ya_pueden`) también avisa hacia abajo (hoy no); si a quien
+        destraba se le avisa cuando la tarea que esperaba se destrabó por otro lado (sigue sin
+        aviso).
+  - **Lo que sigue de la C-5**, con su conversación de prueba primero: el bloqueo viejo (7).
 - [ ] **C-6.** Las cadencias (pregunta 8).
 - [ ] **C-7.** Delegar (pregunta 9 y su enmienda al ADR 0017).
   - Ya decidido como funcionalidad (`docs/ROADMAP.md`): un referente le pasa una tarea a alguien de su
@@ -1634,7 +1708,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] La enmienda al ADR 0017 para delegar, aceptada por el usuario con sus tres respuestas.
 - [x] C-5, porción 1: escribirle a quien destraba y "no le escribas" (conversación 32, `0042`).
 - [x] C-5, porciones 2 y 3: "ya hablé con él" y "no me corresponde" con un salto (33, 34, `0043`).
-- [ ] C-5, porciones 4 y 5: bloqueos encadenados y avisos hacia abajo (decisión 6); el bloqueo viejo (7).
+- [x] C-5, porción 4: bloqueos encadenados y avisos hacia abajo (decisión 6; 35, `0044`).
+- [ ] C-5, porción 5: el bloqueo viejo (decisión 7; 36).
 - [ ] C-6, las cadencias (decisión 8).
 - [ ] C-7, delegar (ADR 0017, enmienda a la decisión 2).
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.

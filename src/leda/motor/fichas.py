@@ -685,6 +685,10 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
              "fecha_comprometida": comprometida.astimezone(cal.zona).date().isoformat(),
              ATRASO_SI_SE_CUMPLE: atraso, "dependientes": dependientes,
              "aviso_al_referente": None}
+    # Quien espera esta tarea, más abajo en una cadena de bloqueos, se entera del día nuevo
+    # (C-5, porción 4: "Juan da fecha").
+    from . import encadenados               # encadenados importa este módulo
+    _juntar(hecho, encadenados.dio_otro_dia(ctx, tarea["id"], prevision_id, prevista.isoformat()))
 
     # Sin el porqué de un atraso, Leda pregunta qué la atrasa (con su espera, como toda pregunta
     # que espera respuesta). Con el porqué, o con una fecha que ya no atrasa, la pregunta que
@@ -750,6 +754,11 @@ def _anotar_bloqueo(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     # ficha de pregunta lo dice: abre su espera y la escalera la repite). Lo decide la respuesta
     # de la persona, no un juicio de la IA sobre la causa (9c, corregida el 2026-10-05).
     anotado = {"resultado": "anotado", "tarea": _tarea(tarea), "causa": causa}
+    # Si la tarea es lo que destraba la de otra persona, los dos bloqueos quedan enlazados: la
+    # pregunta de para cuándo la destraba ya tiene respuesta, y quien espera se entera (C-5,
+    # porción 4; `encadenados.py`). Antes de preguntar quién lo destraba: es la que sigue.
+    from . import encadenados               # encadenados importa este módulo
+    _juntar(anotado, encadenados.se_trabo(ctx, tarea["id"], r["bloqueo_id"], causa))
     _abrir_pregunta(ctx, anotado, preguntas.QUIEN_DESTRABA, tarea["id"],
                     jugada={**jugada, "bloqueo_id": r["bloqueo_id"]})
     return anotado
@@ -871,6 +880,9 @@ def _destrabar(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
                              "bloqueo_resuelto": {"causa": bloqueo["causa"]},
                              "estado": cur.fetchone()["estado"]}
+    # Quien espera esta tarea, más abajo en una cadena de bloqueos, se entera (C-5, porción 4).
+    from . import encadenados               # encadenados importa este módulo
+    _juntar(hecho, encadenados.se_destrabo(ctx, tarea["id"], str(bloqueo["id"])))
     fila = _exigir_responsable(cur, ctx.quien, tarea["id"])
     if fila["fecha_objetivo"] is not None:
         cal = ctx.calendario
@@ -1483,13 +1495,14 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
     Ficha("decir_cuando_destraba", "anotar para cuándo destraba la tarea trabada de otra "
                                    "persona",
           necesita=(), opcional=("tarea", "para_cuando", "ya_esta", "lo_que_dice",
-                                 "ya_lo_hablaron"),
+                                 "ya_lo_hablaron", "su_tarea_trabada"),
           comprueba="que quien escribe sea quien destraba ahora un bloqueo abierto de esa tarea "
                     "(lo último que dijo la persona trabada)",
           hace="anota lo que dice, atribuido y auditado, como un hecho del bloqueo: para "
                "cuándo, que ya está o sus palabras; no cierra el bloqueo. Si sólo dice que ya "
                "lo habló con la persona trabada, no anota nada todavía: pregunta una vez qué "
-               "arreglaron y para cuándo",
+               "arreglaron y para cuándo. Si dice que está trabado con una tarea suya, la anota "
+               "con el bloqueo de esa tarea, que enlaza los dos",
           despues="cierra su pregunta y su espera; la persona trabada se entera terminado el "
                   "margen para corregir, como información",
           manejar=_decir_cuando_destraba, se_ofrece=False,
@@ -1497,8 +1510,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona que escribe puede destrabar una tarea trabada de otra persona (está "
              "en la lista como espera_que_la_destrabe) y dice para cuándo lo resuelve "
              "(para_cuando), que ya lo resolvió (ya_esta), qué pasa con eso (lo_que_dice) o "
-             "que ya lo habló con la persona trabada (ya_lo_hablaron). Es lo que dice sobre lo "
-             "que traba la tarea de otro: no es un hecho de una tarea suya."),
+             "que ya lo habló con la persona trabada (ya_lo_hablaron), o que no puede porque "
+             "una tarea suya está trabada (su_tarea_trabada). Es lo que dice sobre lo que traba "
+             "la tarea de otro: no es un hecho de una tarea suya."),
     Ficha("decir_que_no_le_toca", "decir que no le corresponde destrabar la tarea trabada de "
                                   "otra persona",
           necesita=(), opcional=("tarea", "quien", "no_sabe", "lo_que_dice"),
@@ -1666,4 +1680,5 @@ tarea_hecho = _tarea
 nombrar_pregunta = _nombrar_pregunta
 no_hecho = _no_hecho
 cerrar_esperas = _cerrar_esperas
+juntar = _juntar
 abrir_pregunta = _abrir_pregunta

@@ -477,7 +477,7 @@ class _Corredor:
                      for o in abierta.get("opciones") or []}
         salida = {"nombre": nombre}
         for k, v in (datos or {}).items():
-            if k in ("tarea", "tarea_correcta"):
+            if k in ("tarea", "tarea_correcta", "su_tarea_trabada"):
                 v = de_alias.get(v, v)
             elif k == "opcion":
                 v = de_opcion.get(v, v)

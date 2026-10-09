@@ -65,8 +65,14 @@ no sabe, otra fila de quién destraba dicha por esa persona. La cadena tiene un 
   nombrar a quién por su cuenta (decisión 11: `hechos.NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`,
   `aviso_de_la_cadena`). Sin referente, nada se promete y el hecho lo dice (`sin_referente`).
 
-Fuera de estas porciones (`odd/tasks/fase-c.md`, C-5): los bloqueos encadenados y los avisos
-hacia abajo (decisión 6) y el bloqueo viejo (7).
+**Está trabado con algo suyo** (porción 4; decisión 6, bloqueos encadenados; conversación 35):
+quien destraba puede decir que no puede porque una tarea suya está trabada (`su_tarea_trabada`).
+Queda anotado con el bloqueo de esa tarea (`dicho_de_quien_destraba.espera_su_bloqueo_id`,
+migración 0044), que enlaza los dos bloqueos, y a la persona trabada le llega con qué está
+trabado y quién lo destraba. Lo que dice quien destraba le llega además, como un avance del
+medio, a quien espera más abajo en la cadena (`encadenados.py`).
+
+Fuera de estas porciones (`odd/tasks/fase-c.md`, C-5): el bloqueo viejo (decisión 7).
 """
 
 from __future__ import annotations
@@ -75,7 +81,7 @@ import re
 from datetime import date
 from typing import Any
 
-from . import preguntas
+from . import encadenados, preguntas
 from .auditoria import auditar
 from .avisos import (CADENA_DEL_BLOQUEO, CAMBIO_QUIEN_DESTRABA, DIJO_ALGO_MAS_NUEVO,
                      LO_QUE_DIJO_QUIEN_DESTRABA, PREGUNTA_A_QUIEN_DESTRABA, guardar, integrante,
@@ -232,13 +238,24 @@ def decir_cuando_destraba(ctx: Contexto, datos: dict[str, Any],
     if destraba is None:
         return {"resultado": "no_se_puede", "motivo": NO_LE_TOCA_DESTRABARLA,
                 "tarea": tarea_hecho(tarea)}
+    # Está trabado con algo suyo (porción 4): el bloqueo de esa tarea enlaza los dos.
+    su_bloqueo = None
+    if not vacio(datos.get("su_tarea_trabada")):
+        suya = ctx.suya(str(datos["su_tarea_trabada"]).strip())
+        if suya is None:
+            return {"resultado": "no_se_puede", "motivo": "tarea_desconocida",
+                    "tarea": tarea_hecho(tarea)}
+        su_bloqueo = _su_bloqueo(ctx, suya)
+        if su_bloqueo is None:
+            return {"resultado": "no_se_puede", "motivo": encadenados.SU_TAREA_NO_ESTA_TRABADA,
+                    "tarea": tarea_hecho(tarea), "su_tarea_trabada": tarea_hecho(suya)}
     # "Ya lo hablé con él" (porción 2): lo dice ahora o lo dijo antes, en la misma pregunta.
     pregunta = _su_pregunta(ctx, tarea["id"])
     jugada = dict((pregunta or {}).get("jugada") or {})
     lo_que_dice = _sus_palabras(datos, jugada)
     ya_lo_hablaron = (datos.get("ya_lo_hablaron") is True
                       or (jugada.get("datos") or {}).get(YA_LO_HABLARON) is True)
-    if (ya_lo_hablaron and para_cuando is None and not ya_esta
+    if (ya_lo_hablaron and para_cuando is None and not ya_esta and su_bloqueo is None
             and not jugada.get(PREGUNTO_QUE_ARREGLARON)):
         # Lo que queda asentado es lo que arreglaron y para cuándo: se pregunta una vez. Lo que
         # dijo queda en su pregunta y se anota con la respuesta.
@@ -248,26 +265,45 @@ def decir_cuando_destraba(ctx: Contexto, datos: dict[str, Any],
                           PREGUNTO_QUE_ARREGLARON,
                           {"resultado": "falta_dato", "falta": ["lo_que_arreglaron", "para_cuando"],
                            "tarea": tarea_hecho(tarea), YA_LO_HABLARON: True})
-    if para_cuando is None and not ya_esta and vacio(datos.get("lo_que_dice")):
+    if (para_cuando is None and not ya_esta and su_bloqueo is None
+            and vacio(datos.get("lo_que_dice"))):
         return {"resultado": "falta_dato", "falta": ["para_cuando"],
                 "puede_ser": ["para_cuando", "ya_esta", "lo_que_dice"],
                 "tarea": tarea_hecho(tarea)}
     dice = {k: v for k, v in (("para_cuando", para_cuando.isoformat() if para_cuando else None),
                               ("ya_esta", ya_esta or None), ("lo_que_dice", lo_que_dice),
-                              (YA_LO_HABLARON, ya_lo_hablaron or None))
+                              (YA_LO_HABLARON, ya_lo_hablaron or None),
+                              ("su_tarea_trabada", su_bloqueo and su_bloqueo["dice"]))
             if v is not None}
     dicho_id = _anotar_lo_que_dice(ctx, tarea, destraba, dice, para_cuando=para_cuando,
-                                   ya_esta=ya_esta, lo_que_dice=lo_que_dice)
+                                   ya_esta=ya_esta, lo_que_dice=lo_que_dice,
+                                   espera_su_bloqueo=su_bloqueo and su_bloqueo["id"])
     hecho: dict[str, Any] = {"resultado": "anotado", "tarea": tarea_hecho(tarea),
                              "dice_quien_destraba": dice}
     _juntar(hecho, _avisar_a_quien_esta_trabado(ctx, tarea, destraba, dicho_id, dice))
+    _juntar(hecho, encadenados.dijo_quien_destraba(ctx, tarea["id"], dicho_id, dice))
     return hecho
+
+
+def _su_bloqueo(ctx: Contexto, suya: dict[str, Any]) -> dict[str, Any] | None:
+    """El bloqueo abierto de una tarea de quien escribe, con lo que le llega de él a la persona
+    trabada (la tarea, su causa y quién lo destraba); `None` si no está trabada."""
+    ctx.cur.execute("""select id, causa from blocker where task_id = %s and resuelto_en is null
+                        order by abierto_en desc, id desc limit 1""", (suya["id"],))
+    bloqueo = ctx.cur.fetchone()
+    if bloqueo is None:
+        return None
+    lo_destraba = encadenados.quien_lo_destraba(ctx.cur, bloqueo["id"])
+    return {"id": str(bloqueo["id"]),
+            "dice": {"tarea": suya["titulo"], "causa": bloqueo["causa"],
+                     **({"lo_destraba": lo_destraba} if lo_destraba else {})}}
 
 
 def _anotar_lo_que_dice(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],
                         dice: dict[str, Any], *, para_cuando: date | None = None,
                         ya_esta: bool = False, lo_que_dice: str | None = None,
-                        no_le_corresponde: bool = False) -> str:
+                        no_le_corresponde: bool = False,
+                        espera_su_bloqueo: str | None = None) -> str:
     """Lo que dice quien destraba, como un hecho del bloqueo sobre la fila que lo nombró
     (`dicho_de_quien_destraba`, sólo se agrega), atribuido y auditado; su pregunta y su espera
     se cierran. El id de lo anotado."""
@@ -275,10 +311,11 @@ def _anotar_lo_que_dice(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str
     cur.execute(
         """insert into dicho_de_quien_destraba (workspace_id, blocker_unblocker_id,
                                                 dicho_por_membership_id, para_cuando, ya_esta,
-                                                lo_que_dice, no_le_corresponde, at)
-           values (%s, %s, %s, %s, %s, %s, %s, %s) returning id""",
+                                                lo_que_dice, no_le_corresponde,
+                                                espera_su_bloqueo_id, at)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id""",
         (ctx.quien.workspace_id, destraba["id"], ctx.quien.membership_id, para_cuando, ya_esta,
-         lo_que_dice, no_le_corresponde, ctx.ahora))
+         lo_que_dice, no_le_corresponde, espera_su_bloqueo, ctx.ahora))
     dicho_id = str(cur.fetchone()["id"])
     auditar(cur, accion=("anotar_que_no_le_toca" if no_le_corresponde
                          else "anotar_lo_que_dice_quien_destraba"),
@@ -504,6 +541,8 @@ def decir_que_no_le_toca(ctx: Contexto, datos: dict[str, Any],
                "aviso_de_la_cadena": {k: v for k, v in informe["aviso_de_la_cadena"].items()
                                       if k != LLEGA or not _es_una_hora(v)}}
     _juntar(hecho, _avisar_a_quien_esta_trabado(ctx, tarea, destraba, dicho_id, dice, mas))
+    # Quien espera esta tarea, más abajo en una cadena de bloqueos, se entera (porción 4).
+    _juntar(hecho, encadenados.dijo_quien_destraba(ctx, tarea["id"], dicho_id, dice))
     return hecho
 
 

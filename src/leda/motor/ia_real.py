@@ -158,6 +158,10 @@ DATOS = {
                               "lo que la traba, con sus palabras."),
     "ya_lo_hablaron": ("boolean", "Verdadero sólo si quien puede destrabar la tarea de otra "
                                   "persona dice que ya lo habló con esa persona."),
+    "su_tarea_trabada": ("string", "El alias de una tarea de la persona que escribe, trabada, "
+                                   "con la que dice que está trabado y por eso no puede "
+                                   "destrabar la tarea de otra persona. Sólo si lo dijo; si no "
+                                   "nombra cuál y tiene una sola trabada, ésa."),
 }
 
 # Qué es lo que no está en la lista: sólo un pedido de hacer algo (revisión del contrato,

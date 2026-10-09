@@ -118,7 +118,9 @@ son de coordinación; no salen si el bloqueo ya se cerró, la pregunta tampoco s
 persona (`sigue_esperando_que_destrabe`) o si quien destraba ya habló de esa tarea antes de que le
 llegara (`ya_contesto_quien_destraba`, porción 2). Si nadie toma el bloqueo, la cadena entera le
 llega al referente como información (`cadena_del_bloqueo`, porción 3; decisión 5), mientras el
-bloqueo siga abierto.
+bloqueo siga abierto. En una cadena de bloqueos (Marcos ← Juan ← Pedro), cada avance del medio le
+llega a quien espera más abajo, como información (`novedad_de_lo_que_espera`, porción 4; decisión
+6; `encadenados.py`), mientras siga esperando eso.
 """
 
 from __future__ import annotations
@@ -1510,6 +1512,9 @@ LO_QUE_DIJO_QUIEN_DESTRABA = "lo_que_dijo_quien_destraba"
 # La cadena de un bloqueo que nadie toma, al referente (porción 3; decisión 5): informativa, no le
 # pide nada; sale terminado el margen para corregir, mientras el bloqueo siga abierto.
 CADENA_DEL_BLOQUEO = "cadena_del_bloqueo"
+# Un avance del medio a quien espera más abajo, en una cadena de bloqueos (porción 4; decisión 6):
+# informativo, de coordinación; cuándo se guarda y su vigencia, `encadenados.py`.
+NOVEDAD_DE_LO_QUE_ESPERA = "novedad_de_lo_que_espera"
 YA_SE_DESTRABO = "ya_se_destrabo"
 CAMBIO_QUIEN_DESTRABA = "cambio_quien_destraba"
 DIJO_ALGO_MAS_NUEVO = "dijo_algo_mas_nuevo"
@@ -1606,6 +1611,11 @@ def ya_contesto_quien_destraba(cur, destraba_id, persona: str) -> bool:
     return bool(cur.fetchone()["ya"])
 
 
+def _vigencia_de_la_novedad(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import encadenados           # encadenados importa este módulo
+    return encadenados.vigencia(m, aviso)
+
+
 def _abre_cuando_se_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
     """La pregunta de quien destraba, atada a la fila que lo nombró: lo que recuerda al repetirla
     es quién está trabado y por qué (`preguntas.lo_anotado`)."""
@@ -1694,6 +1704,10 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
                 es_coordinacion=True),
     # La cadena al referente, cuando nadie toma el bloqueo (porción 3): informativa.
     TipoDeAviso(CADENA_DEL_BLOQUEO, "informativo", _vigencia_de_la_cadena, es_coordinacion=True),
+    # Un avance del medio a quien espera más abajo, en una cadena de bloqueos (porción 4):
+    # informativo; lo causa el acto de otra persona.
+    TipoDeAviso(NOVEDAD_DE_LO_QUE_ESPERA, "informativo", _vigencia_de_la_novedad,
+                es_coordinacion=True),
 )})
 
 

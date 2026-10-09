@@ -132,17 +132,21 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
         # Lo que dice quien destraba (C-5): de qué tarea, quién, para cuándo, si ya está y si
         # dijo que no le corresponde (porción 3).
         cur.execute("""select d.id, b.task_id, d.dicho_por_membership_id, d.para_cuando,
-                              d.ya_esta, d.no_le_corresponde
+                              d.ya_esta, d.no_le_corresponde, y.task_id as espera_la_tarea
                          from dicho_de_quien_destraba d
                          join blocker_unblocker u on u.id = d.blocker_unblocker_id
                          join blocker b on b.id = u.blocker_id
+                         left join blocker y on y.id = d.espera_su_bloqueo_id
                         where d.workspace_id = %s""", (ws,))
         dicen = {str(f["id"]): {"tarea": tarea(f["task_id"]),
                                 "de": persona(f["dicho_por_membership_id"]),
                                 "para_cuando": (f["para_cuando"].isoformat()
                                                 if f["para_cuando"] else None),
                                 "ya_esta": f["ya_esta"],
-                                "no_le_corresponde": f["no_le_corresponde"]}
+                                "no_le_corresponde": f["no_le_corresponde"],
+                                # Con qué tarea suya está trabado (C-5, porción 4).
+                                "espera_la_tarea": (tarea(f["espera_la_tarea"])
+                                                    if f["espera_la_tarea"] else None)}
                  for f in cur.fetchall()}
         cur.execute("""select * from scheduled_notice where workspace_id = %s""", (ws,))
         avisos = {str(f["id"]): {"tipo": f["tipo"], "tarea": tarea(f["task_id"]),

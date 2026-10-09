@@ -757,6 +757,35 @@ SIGNIFICADOS: Mapping[str, str] = {
                           "por qué no le llega.",
     "sin_referente": "No hay a quién informarle el bloqueo: el sector no tiene a nadie a "
                      "cargo.",
+    # --- Los bloqueos encadenados (C-5, porción 4; `encadenados.py`) -------------------------
+    "novedad_de_lo_que_espera": "Aviso informativo a una persona trabada: algo pasó con lo que "
+                                "espera su tarea, más arriba en la cadena (novedad). No le pide "
+                                "nada; su tarea sigue trabada hasta que diga que puede seguir.",
+    "esperando_a": "Lo que espera la tarea trabada, en orden: la tarea de quien la destraba "
+                   "(de es quien la tiene) y, si esa también espera otra, la siguiente. La "
+                   "última es donde pasó la novedad.",
+    "novedad": "Lo que pasó en la última tarea de esperando_a (de es quien la tiene): que se "
+               "trabó, lo que dice quien la destraba, que se destrabó, el día que dio para "
+               "terminarla, que la entregó o que quedó terminada.",
+    "se_trabo": "La tarea quedó trabada: lo que la traba (causa) y quién la puede destrabar "
+                "(lo_destraba), si se sabe.",
+    "lo_destraba": "Quién puede destrabarla, según quien la tiene.",
+    "se_destrabo": "Quien tiene esa tarea dijo que ya puede seguir con ella.",
+    "la_entrego": "Quien tiene esa tarea la entregó: pasa a revisión.",
+    "avisos_a_quienes_esperan": "Los avisos a las personas trabadas que esperan esta tarea, más "
+                                "abajo en la cadena: cada uno, a quién y cuándo se entera.",
+    "aviso_a_quien_espera": "El aviso a una persona trabada que espera esta tarea: a quién (a), "
+                            "con qué tarea suya (tarea) y cuándo se entera (llega), o por qué "
+                            "no le llega.",
+    "su_tarea_trabada": "La tarea de quien puede destrabar la de otra persona que está trabada "
+                        "y por eso no puede destrabarla: la tarea, lo que la traba (causa) y "
+                        "quién la puede destrabar (lo_destraba).",
+    "su_tarea_no_esta_trabada": "La tarea que nombró quien escribe no está trabada: lo que dice "
+                                "no queda anotado así.",
+    "ya_no_espera_esa_tarea": "La tarea de la persona ya no espera esa otra: cambió quién la "
+                              "destraba o ya no está trabada.",
+    "no_se_entero_que_se_trabo": "La persona no se había enterado de que esa tarea se trabó: "
+                                 "que se destrabó no le dice nada.",
 }
 
 

@@ -1023,6 +1023,10 @@ def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:
             hecho["aviso_a_quien_aprueba"] = {"a": quien["nombre"],
                                               fichas.LLEGA: sale.isoformat()}
             fichas.nombrar_efecto(hecho, "aviso_a_quien_aprueba", fichas.AVISO, aviso_id)
+    # Quien espera esta tarea, más abajo en una cadena de bloqueos, se entera de que la entregó
+    # (C-5, porción 4: "Juan terminó").
+    from . import encadenados       # encadenados importa fichas, que importa este módulo
+    fichas.juntar(hecho, encadenados.la_entrego(ctx, tarea_q["id"], r.get("entrega")))
     return hecho
 
 

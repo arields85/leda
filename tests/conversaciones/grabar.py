@@ -60,7 +60,7 @@ class IAPerfecta:
         jugadas = []
         for e in self.paso.get("jugadas") or []:
             datos = {k: v for k, v in e.items() if k not in ("nombre", *_SOLO_PARA_COMPROBAR)}
-            for k in ("tarea", "tarea_correcta"):
+            for k in ("tarea", "tarea_correcta", "su_tarea_trabada"):
                 if k in datos:
                     datos[k] = de_la_clave.get(datos[k]) or datos[k]
             if "opcion" in datos:

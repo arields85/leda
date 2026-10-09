@@ -185,6 +185,10 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
                              **({"comentario": comentario} if comentario else {})}
     if r["cerrada"]:
         hecho["quedo_terminada"] = True
+        # Quien espera esta tarea, más abajo en una cadena de bloqueos, se entera (C-5, porción
+        # 4).
+        from . import encadenados   # encadenados importa fichas, que importa este módulo
+        fichas.juntar(hecho, encadenados.quedo_terminada(ctx, tarea["id"], r["aprobacion_id"]))
     else:
         hecho.update(_frena(cur, tarea["id"]))
         hecho["se_cierra_sola"] = {"se_avisa_a": [responsable["nombre"], ctx.quien.nombre]}
