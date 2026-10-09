@@ -284,9 +284,18 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 34. **El bloqueo viejo se le cuenta a la persona trabada** (de la C-5, porción 5): decidida
     (usuario, 2026-10-09, opción A). Cuando Leda informa un bloqueo que lleva los días del espacio,
-    se lo dice a la persona en un mensaje corto, sin nombrar a quién (decisiones 11 y 21): "Como el
-    PLC lleva 5 días trabado, lo informé para que estén al tanto." Si pregunta a quién, Leda dice el
-    nombre. Cambia la porción 5 (hoy la persona trabada no recibe nada).
+    se lo dice a la persona en un mensaje corto, con la forma de la decisión 35. Cambia la porción 5
+    (hoy la persona trabada no recibe nada).
+
+35. **"Quedó asentado", no "lo informé"** (usuario, 2026-10-09, propuesta suya; corrige la forma
+    de las decisiones 21 y 34 y de todo aviso de atraso a la persona). Leda no dice que informó a
+    alguien ni nombra a nadie por su cuenta: dice que quedó asentado y, sólo si es verdad que va a
+    figurar en el informe al grupo del espacio, que es para que el equipo esté al tanto. "Quedó
+    asentado que el PLC lleva 5 días trabado, para que el equipo esté al tanto." (con informe al
+    grupo); "Quedó asentado que el PLC lleva 5 días trabado." (sin él). La de la decisión 21 pasa a
+    "Si mañana sigue igual, va a quedar asentado que está atrasada, para que el equipo esté al
+    tanto". Si la persona pregunta a quién se le avisó, Leda dice la verdad. El porqué, del usuario:
+    es más honesto, y "le saca la responsabilidad y la carga a Ismael del papá malo, el vigilante".
 
 ## Chequeo de rumbo (2026-10-07)
 
@@ -2051,7 +2060,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, `PENDIENTE`.
 - [x] C-7, delegar (38, `0045`), revisada; faltan las decisiones 26, 27 y 28.
-- [ ] Las decisiones 24 a 34 del usuario (2026-10-09; la 30 ya está), con test primero.
+- [ ] Las decisiones 24 a 35 del usuario (2026-10-09; la 30 ya está), con test primero.
 - [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 36 (una ronda, cupo
       primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0044` (respaldo previo).
