@@ -469,6 +469,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     nadie del equipo lo ve (constitución §12; ya construido). Revocar enlaces no cambia: queda a
     nombre de la administración, sin pedir quién (el usuario: "no es necesario").
 
+60. **A quien revisa se le avisa sólo si ya le llegó la entrega** (de la porción 5b; usuario,
+    2026-10-10, opción A, la que recomendó el agente). Si la administración retira una pieza
+    antes de que la entrega le llegue a Ismael (dentro del margen para corregir), a Ismael no le
+    llega nada de una entrega que nunca vio; cuando Marcos manda la pieza nueva, recibe la
+    entrega como siempre. Marcos se entera igual.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -1095,11 +1101,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       avisar); `recibir.py:531-538` (el rechazo de un archivo retirado, sin prueba). Sugerencias:
       el rollback de la `0053` (24-29), `cli.py:262-264` y `entrega.py:627-628` sin prueba.
     - `PENDIENTE`:
-      - **A quien revisa le llega aunque todavía no le haya llegado la entrega** (si el retiro
-        cae dentro del margen para corregir): el aviso de la entrega queda omitido por
-        incompleta y le llega "la entrega espera otra pieza" de una entrega que no vio. Se
-        construyó como lo decidió el usuario; preguntar si sólo tiene que llegarle cuando ya
-        recibió la entrega.
+      - ~~A quien revisa le llega aunque todavía no le haya llegado la entrega~~: decisión 60,
+        hecha por el coordinador (`_le_llego_la_entrega`; test primero: 1 failed, después 29
+        passed en `test_retiro_de_la_administracion.py` y `test_contenido_retirado.py`).
       - La IA real sobre los dos avisos nuevos, y `leda_motor` al día hasta la `0053`.
       - Si quien recibe un aviso es quien entregó y también quien revisa, le llega sólo el
         primero.
