@@ -66,6 +66,8 @@ agrega acá con dónde vive hoy.
   aprueba el trabajo de quién. Hoy sale del pack (`areas[].referente`, `aprobado_por`). Rige
   la decisión 28 de `odd/tasks/fase-c.md`: quién revisa depende de quién era la tarea; a la
   autoridad final (Ismael) le llegan para aprobar sólo las tareas de los encargados de sector.
+  Cambiar el encargado de un sector es un solo paso, sin un rato sin encargado: un sector sin
+  encargado termina los pedidos del detalle que esperaban su decisión (decisión 33; 2026-10-10).
 - **Qué avisos le llegan a cada persona se elige desde la plataforma.** Ejemplo: Ismael elige si
   le llega un aviso cuando Nahuel termina una tarea, o ninguno. Lo que la persona necesita para
   trabajar (pedidos de su decisión, la confirmación de lo suyo) no se apaga: se eligen los

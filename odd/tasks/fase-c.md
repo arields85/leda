@@ -3570,6 +3570,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] Un pedido del detalle cuyo sector se queda sin encargado mientras espera: a quien lo pidió
       se le dice lo mismo que si no hubiera tenido encargado desde el principio (decisión 33).
       Hecho el 2026-10-10 (`815754e`); falta la IA real sobre el aviso.
+- [ ] Al encargado anterior al que se le había pedido el detalle, que el pedido terminó (no hace
+      falta que conteste): la regla de cerrar el tema para todos (constitución §8, decisión 39),
+      resuelto por el coordinador el 2026-10-10. Hoy sólo se le cierran los botones.
+- [ ] Un sector sin encargado un rato (mientras se cambia uno por otro) termina los pedidos que
+      esperaban: para la plataforma, cambiar de encargado es un solo paso, sin hueco
+      (`docs/product/plataforma-pendientes.md`).
 - [ ] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
       conversación de prueba y construcción.
 - [ ] Los avisos que a veces no salen a su hora: buscar la causa.
