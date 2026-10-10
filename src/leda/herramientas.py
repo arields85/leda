@@ -3053,6 +3053,11 @@ def _tomar(cur, quien: Solicitante, pase: dict, momento: datetime) -> dict:
 # compartió y cuándo, y la base lo cuenta al decidir quién ve la página (`puede_ver_tarea`).
 # Dejar de compartirla (`dejar_de_compartir_tarea`) lo hace el encargado o quien la compartió.
 # La base hace cumplir quién comparte y que nada se borre (`vigilar_tarea_compartida`).
+#
+# El pedido sigue al encargado de ahora (migración 0051; decisión 33 con la 16 y la 43): lo decide
+# quien es el encargado del sector de la tarea al decidir, nunca uno anterior, ni que sí ni que no;
+# queda escrito quién lo decidió y la base lo comprueba (`vigilar_pedido_de_detalle`). Un pedido
+# que nadie contesta lo termina el sistema (`terminar_pedido_de_detalle`, decisión 26).
 
 
 def _tarea_del_espacio(cur, tarea_id) -> dict | None:
@@ -3092,18 +3097,32 @@ def _pedir_detalle_de_tarea(cur, quien: Solicitante, tarea_id, at=None):
     if abierto is not None:
         return {"error": "ya_lo_pidio", "pedido_id": str(abierto["id"]),
                 "decide_membership_id": decide}
+    # Dos pedidos a la vez de la misma persona (dos mensajes que se cruzan) no son dos: el
+    # segundo encuentra el primero (la base admite uno abierto por tarea y persona).
     cur.execute(
         """insert into pedido_de_detalle (workspace_id, task_id, pedido_por_membership_id,
                                           decide_membership_id, estado, pedido_en)
-           values (%s, %s, %s, %s, 'esperando_decision', %s) returning id""",
+           values (%s, %s, %s, %s, 'esperando_decision', %s)
+           on conflict (task_id, pedido_por_membership_id)
+             where estado = 'esperando_decision' do nothing
+           returning id""",
         (quien.workspace_id, tarea["id"], quien.membership_id, decide, _momento(at)))
-    return {"pedido_id": str(cur.fetchone()["id"]), "decide_membership_id": decide}
+    nuevo = cur.fetchone()
+    if nuevo is None:
+        cur.execute("""select id from pedido_de_detalle
+                        where task_id = %s and pedido_por_membership_id = %s
+                          and estado = 'esperando_decision'""",
+                    (tarea["id"], quien.membership_id))
+        return {"error": "ya_lo_pidio", "pedido_id": str(cur.fetchone()["id"]),
+                "decide_membership_id": decide}
+    return {"pedido_id": str(nuevo["id"]), "decide_membership_id": decide}
 
 
 @herramienta(
     "decidir_detalle_de_tarea", "consultar",
-    "El encargado del sector de una tarea decide si le comparte su detalle a quien lo pidió. Si "
-    "la comparte, esa persona ve la página de la tarea desde ese momento.",
+    "El encargado del sector de una tarea decide si le comparte su detalle a quien lo pidió (el "
+    "encargado de ahora, aunque al pedirlo fuera otro). Si la comparte, esa persona ve la página "
+    "de la tarea desde ese momento.",
     {"pedido_id": {"type": "string", "requerido": True},
      "comparte": {"type": "boolean", "requerido": True},
      "motivo": {"type": "string"}, "at": {"type": "string"}},
@@ -3116,19 +3135,32 @@ def _decidir_detalle_de_tarea(cur, quien: Solicitante, pedido_id, comparte, moti
     if pedido is not None:
         cur.execute("select * from pedido_de_detalle where id = %s for update", (pedido,))
         fila = cur.fetchone()
-    if fila is None or str(fila["decide_membership_id"]) != str(quien.membership_id):
+    # Lo decide el encargado de ahora del sector de la tarea, nunca uno anterior: el pedido
+    # sigue al encargado (migración 0051; como la revisión sigue a quien aprueba, decisión 43).
+    if fila is None or encargado_de_la_tarea(cur, fila["task_id"]) != str(quien.membership_id):
         raise Denegado("No sos quien decide ese pedido.")
     if fila["estado"] != "esperando_decision":
         return {"error": "el_pedido_ya_termino", "estado": fila["estado"]}
     momento = _momento(at)
     motivo = (motivo or "").strip() or None
+    yo = str(quien.membership_id)
     if not comparte:
         cur.execute("""update pedido_de_detalle set estado = 'no_compartida', decidido_en = %s,
-                              motivo = %s
-                        where id = %s""", (momento, motivo, fila["id"]))
+                              motivo = %s, decidido_por_membership_id = %s
+                        where id = %s""", (momento, motivo, yo, fila["id"]))
+        # Constitución §12: un "no" también es una decisión con efecto (el pedido termina).
+        registrar_auditoria(
+            cur, accion="no_compartir_tarea", workspace_id=quien.workspace_id,
+            actor_app_user_id=quien.app_user_id, actor_kind="persona", sujeto_tipo="task",
+            sujeto_id=str(fila["task_id"]),
+            detalle={"pedido_id": str(fila["id"]), "con": str(fila["pedido_por_membership_id"]),
+                     "decidido_por": yo, "at": momento.isoformat()},
+            pack_hash=versiones.pack_hash(cur, quien.workspace_id),
+            nucleo_hash=versiones.nucleo_hash())
         return {"pedido_id": str(fila["id"]), "estado": "no_compartida"}
     compartida = None
-    if not _puede_verla(cur, fila["pedido_por_membership_id"], fila["task_id"]):
+    ya_la_veia = _puede_verla(cur, fila["pedido_por_membership_id"], fila["task_id"])
+    if not ya_la_veia:
         # La base comprueba otra vez que quien la comparte es el encargado del sector de la
         # tarea (`vigilar_tarea_compartida`).
         cur.execute(
@@ -3139,20 +3171,47 @@ def _decidir_detalle_de_tarea(cur, quien: Solicitante, pedido_id, comparte, moti
              quien.membership_id, fila["id"], momento))
         compartida = str(cur.fetchone()["id"])
     cur.execute("""update pedido_de_detalle set estado = 'compartida', decidido_en = %s,
-                          motivo = %s
-                    where id = %s""", (momento, motivo, fila["id"]))
-    # Constitución §12: quién la compartió, con quién, de qué tarea y cuándo, con la versión de
-    # las reglas del núcleo y del pack.
+                          motivo = %s, decidido_por_membership_id = %s
+                    where id = %s""", (momento, motivo, yo, fila["id"]))
+    # Constitución §12: lo que pasó de verdad, con la versión de las reglas del núcleo y del pack.
+    # Si la compartió: quién, con quién, de qué tarea y cuándo. Si quien la pidió ya la veía (la
+    # empezó a ver por otro lado mientras esperaba), no se compartió nada: se registra que dijo
+    # que sí y que ya la veía, nunca una tarea compartida que no existe.
+    detalle = {"pedido_id": str(fila["id"]), "con": str(fila["pedido_por_membership_id"]),
+               "at": momento.isoformat()}
     registrar_auditoria(
-        cur, accion="compartir_tarea", workspace_id=quien.workspace_id,
-        actor_app_user_id=quien.app_user_id, actor_kind="persona", sujeto_tipo="task",
-        sujeto_id=str(fila["task_id"]),
-        detalle={"pedido_id": str(fila["id"]), "compartida_id": compartida,
-                 "con": str(fila["pedido_por_membership_id"]),
-                 "compartida_por": str(quien.membership_id), "at": momento.isoformat()},
+        cur, accion="compartir_tarea" if compartida else "decidir_detalle_de_tarea",
+        workspace_id=quien.workspace_id, actor_app_user_id=quien.app_user_id,
+        actor_kind="persona", sujeto_tipo="task", sujeto_id=str(fila["task_id"]),
+        detalle=({**detalle, "compartida_id": compartida, "compartida_por": yo} if compartida
+                 else {**detalle, "comparte": True, "ya_la_veia": True, "decidido_por": yo}),
         pack_hash=versiones.pack_hash(cur, quien.workspace_id),
         nucleo_hash=versiones.nucleo_hash())
     return {"pedido_id": str(fila["id"]), "estado": "compartida", "compartida_id": compartida}
+
+
+def terminar_pedido_de_detalle(cur, pedido_id, momento: datetime) -> dict | None:
+    """El sistema da por terminado, sin respuesta, un pedido del detalle que el encargado no
+    contestó después de que se le repitió la pregunta una vez (lo llama el motor,
+    `motor.detalle.seguir_los_pedidos`; decisión 26 del usuario, la misma regla que los pases).
+    No es el acto de una persona: queda en la auditoría como acto del sistema, con la versión de
+    las reglas. No comparte nada. `None` si el pedido ya no espera la decisión."""
+    cur.execute("select * from pedido_de_detalle where id = %s for update", (str(pedido_id),))
+    pedido = cur.fetchone()
+    if pedido is None or pedido["estado"] != "esperando_decision":
+        return None
+    cur.execute("""update pedido_de_detalle set estado = 'sin_respuesta', decidido_en = %s
+                    where id = %s""", (momento, pedido["id"]))
+    registrar_auditoria(
+        cur, accion="pedido_de_detalle_sin_respuesta", workspace_id=str(pedido["workspace_id"]),
+        actor_kind="sistema", sujeto_tipo="task", sujeto_id=str(pedido["task_id"]),
+        detalle={"pedido_id": str(pedido["id"]),
+                 "pedido_por": str(pedido["pedido_por_membership_id"]),
+                 "esperaba_a": encargado_de_la_tarea(cur, pedido["task_id"]),
+                 "at": momento.isoformat()},
+        pack_hash=versiones.pack_hash(cur, str(pedido["workspace_id"])),
+        nucleo_hash=versiones.nucleo_hash())
+    return {"pedido_id": str(pedido["id"]), "estado": "sin_respuesta"}
 
 
 @herramienta(

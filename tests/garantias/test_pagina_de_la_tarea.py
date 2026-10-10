@@ -466,6 +466,37 @@ def test_lo_asentado_de_un_bloqueo_no_se_ve_en_otra_tarea(conn, mundo):
                 if h["que"] in ("quien_destraba", "dicho_del_bloqueo", "asentado")]
 
 
+def test_quien_hablo_sin_decir_quien_la_destraba_no_figura_como_quien_la_destraba(conn,
+                                                                                  mundo):
+    """Migración 0051 (decisión 41, revisión de la C-5d): a quien se le informó que la tarea sigue
+    trabada dice algo sin que nadie haya dicho quién la destraba. La historia trae lo que dijo,
+    nunca que la destraba esa persona (constitución §4)."""
+    ws, tarea = mundo["north-lab"]["id"], mundo["norte"]["id"]
+    sam, taylor = _persona(mundo, "Sam Noble"), _persona(mundo, "Taylor Quinn")
+    with admin(conn) as cur:
+        cur.execute("""insert into blocker (workspace_id, task_id, causa, abierto_por, abierto_en)
+                       values (%s, %s, 'falta la pesa patrón', %s, %s) returning id""",
+                    (ws, tarea, sam, datetime(2026, 10, 19, 13, 0, tzinfo=timezone.utc)))
+        bloqueo = str(cur.fetchone()["id"])
+        cur.execute("""insert into blocker_unblocker (workspace_id, blocker_id, sin_decir_quien,
+                                                      dicho_por_membership_id, at)
+                       values (%s, %s, true, %s, %s) returning id""",
+                    (ws, bloqueo, taylor, datetime(2026, 10, 26, 14, 0, tzinfo=timezone.utc)))
+        fila = str(cur.fetchone()["id"])
+        cur.execute("""insert into dicho_de_quien_destraba (workspace_id, blocker_unblocker_id,
+                                                            dicho_por_membership_id, para_cuando,
+                                                            at)
+                       values (%s, %s, %s, '2026-10-27', %s)""",
+                    (ws, fila, taylor, datetime(2026, 10, 26, 14, 0, tzinfo=timezone.utc)))
+    conn.commit()
+
+    historia = _leer(conn, _emitir(conn, mundo, "Taylor Quinn"))["historia"]
+
+    assert not [h for h in historia if h["que"] == "quien_destraba"]
+    dicho = next(h for h in historia if h["que"] == "dicho_del_bloqueo")
+    assert (dicho["quien"], dicho["para_cuando"]) == ("Taylor Quinn 1", "2026-10-27")
+
+
 def test_cada_vista_y_cada_descarga_quedan_registradas(conn, mundo):
     token = _emitir(conn, mundo, "Taylor Quinn")
     _leer(conn, token)

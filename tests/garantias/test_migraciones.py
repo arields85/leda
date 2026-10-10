@@ -816,7 +816,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # `membership` que la vuelta atrás de la 0002 borra (la 0045 primero: vuelve a
             # dejar las funciones de la página como las dejó la 0036), y antes de la 0045, la
             # 0046, que deja la tarea y el pase como los espera aquélla. Antes de todas, la 0050,
-            # cuyas claves también apuntan ahí (el detalle de una tarea, decisión 33).
+            # cuyas claves también apuntan ahí (el detalle de una tarea, decisión 33), y antes
+            # de ella la 0051, que suma otra (quién decidió el pedido).
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0051_las_revisiones_de_la_c5d_y_del_detalle.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0050_el_detalle_de_una_tarea.sql"))
             db.execute(_sql_script(

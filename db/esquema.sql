@@ -1425,6 +1425,8 @@ create table blocker_unblocker (
   no_sabe                  boolean not null default false,
   dicho_por_membership_id  uuid not null,
   at                       timestamptz not null,
+  -- Migración 0051: habló del bloqueo sin decir quién lo destraba (decisión 41).
+  sin_decir_quien          boolean not null default false,
   constraint blocker_unblocker_blocker_workspace
     foreign key (workspace_id, blocker_id)
     references blocker(workspace_id, id) on delete cascade,
@@ -1437,7 +1439,8 @@ create table blocker_unblocker (
   constraint blocker_unblocker_exactamente_uno check (
     (destraba_membership_id is not null)::int
     + (destraba_externo is not null)::int
-    + no_sabe::int = 1),
+    + no_sabe::int
+    + sin_decir_quien::int = 1),
   -- Migración 0042: para la clave foránea con el espacio de `dicho_de_quien_destraba`.
   constraint blocker_unblocker_workspace_id_unique unique (workspace_id, id)
 );
@@ -1568,12 +1571,13 @@ create table pedido_de_detalle (
   task_id                   uuid not null,
   pedido_por_membership_id  uuid not null,
   decide_membership_id      uuid not null,
-  estado                    text not null check (estado in (
-                              'esperando_decision', 'compartida', 'no_compartida',
-                              'sin_efecto')),
+  estado                    text not null,
   pedido_en                 timestamptz not null,
   decidido_en               timestamptz,
   motivo                    text check (btrim(motivo) <> ''),
+  -- Migración 0051: quién lo decidió, el encargado de ahora del sector de la tarea;
+  -- decide_membership_id es a quién se le preguntó al pedirlo.
+  decidido_por_membership_id uuid,
   constraint pedido_de_detalle_workspace_id_unique unique (workspace_id, id),
   constraint pedido_de_detalle_tarea
     foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
@@ -1583,7 +1587,14 @@ create table pedido_de_detalle (
     foreign key (workspace_id, decide_membership_id) references membership(workspace_id, id),
   constraint pedido_de_detalle_a_otra_persona check (decide_membership_id <> pedido_por_membership_id),
   constraint pedido_de_detalle_decidido check (
-    estado = 'esperando_decision' or decidido_en is not null)
+    estado = 'esperando_decision' or decidido_en is not null),
+  constraint pedido_de_detalle_decidido_por
+    foreign key (workspace_id, decidido_por_membership_id) references membership(workspace_id, id),
+  constraint pedido_de_detalle_quien_lo_decidio check (
+    (estado in ('compartida', 'no_compartida')) = (decidido_por_membership_id is not null)),
+  -- Migración 0051: `sin_respuesta`, el pedido que nadie contestó (decisión 26).
+  constraint pedido_de_detalle_estado_check check (estado in (
+    'esperando_decision', 'compartida', 'no_compartida', 'sin_efecto', 'sin_respuesta'))
 );
 
 -- Un pedido abierto por tarea y persona.
@@ -2032,6 +2043,7 @@ begin
           left join membership dm on dm.id = u.destraba_membership_id
           left join app_user du on du.id = dm.app_user_id
          where b.task_id = t.id
+           and not u.sin_decir_quien
         union all
         select d.at, 6,
                jsonb_build_object('que', 'dicho_del_bloqueo', 'quien', pu.nombre,
@@ -2626,16 +2638,19 @@ create trigger trg_aplicar_cambio_de_responsable
 
 -- Un pedido del detalle lo decide el encargado del sector de la tarea, empieza esperando su
 -- decisión y sólo avanza: los datos del pedido no cambian y uno terminado no se reabre
--- (migración 0050).
+-- (migración 0050). Lo decide el encargado de ahora, nunca uno anterior (migración
+-- 0051).
 create or replace function vigilar_pedido_de_detalle() returns trigger as $$
+declare encargado uuid;
 begin
+  select a.referente_membership_id into encargado
+    from task t join area a on a.id = t.area_id
+   where t.id = new.task_id and t.workspace_id = new.workspace_id;
   if tg_op = 'INSERT' then
     if new.estado <> 'esperando_decision' then
       raise exception 'pedido_de_detalle: un pedido nuevo espera la decisión';
     end if;
-    if new.decide_membership_id is distinct from (
-         select a.referente_membership_id from task t join area a on a.id = t.area_id
-          where t.id = new.task_id and t.workspace_id = new.workspace_id) then
+    if new.decide_membership_id is distinct from encargado then
       raise exception 'pedido_de_detalle: lo decide el encargado del sector de la tarea';
     end if;
     return new;
@@ -2649,6 +2664,12 @@ begin
   end if;
   if old.estado <> 'esperando_decision' and new is distinct from old then
     raise exception 'pedido_de_detalle: el pedido ya terminó';
+  end if;
+  -- Lo decide el encargado de ahora del sector de la tarea, nunca uno anterior: el pedido sigue
+  -- al encargado (migración 0051).
+  if new.estado in ('compartida', 'no_compartida')
+     and new.decidido_por_membership_id is distinct from encargado then
+    raise exception 'pedido_de_detalle: lo decide el encargado de ahora del sector de la tarea';
   end if;
   return new;
 end $$ language plpgsql;

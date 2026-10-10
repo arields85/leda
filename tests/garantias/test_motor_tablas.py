@@ -151,14 +151,15 @@ def _prevision(cur, e: Espacio, ws: str | None = None, tarea: str | None = None,
 
 
 def _quien_destraba(cur, e: Espacio, *, integrante=None, externo=None, no_sabe=False,
-                    ws: str | None = None, bloqueo: str | None = None) -> str:
+                    sin_decir_quien=False, ws: str | None = None,
+                    bloqueo: str | None = None) -> str:
     cur.execute(
         """insert into blocker_unblocker
              (workspace_id, blocker_id, destraba_membership_id, destraba_externo,
-              no_sabe, dicho_por_membership_id, at)
-           values (%s, %s, %s, %s, %s, %s, %s) returning id""",
-        (ws or e.id, bloqueo or e.bloqueo, integrante, externo, no_sabe, e.persona,
-         AHORA))
+              no_sabe, sin_decir_quien, dicho_por_membership_id, at)
+           values (%s, %s, %s, %s, %s, %s, %s, %s) returning id""",
+        (ws or e.id, bloqueo or e.bloqueo, integrante, externo, no_sabe, sin_decir_quien,
+         e.persona, AHORA))
     return str(cur.fetchone()["id"])
 
 
@@ -408,7 +409,11 @@ def test_quien_destraba_es_exactamente_uno(conn, espacios):
         _quien_destraba(cur, norte, integrante=norte.referente)
         _quien_destraba(cur, norte, externo="el proveedor de cables")
         _quien_destraba(cur, norte, no_sabe=True)
+        # Migración 0051: habló del bloqueo sin decir quién lo destraba (decisión 41).
+        _quien_destraba(cur, norte, sin_decir_quien=True)
         for valores in ({},
+                        {"integrante": norte.referente, "sin_decir_quien": True},
+                        {"no_sabe": True, "sin_decir_quien": True},
                         {"externo": "   "},
                         {"integrante": norte.referente, "externo": "el proveedor"},
                         {"integrante": norte.referente, "no_sabe": True},

@@ -212,8 +212,9 @@ def test_un_pedido_del_detalle_lo_decide_el_encargado_y_solo_avanza(conn, con_en
             (norte["id"], con_encargado["norte"]["id"], _persona(con_encargado, "Sam North"),
              _persona(con_encargado, "Taylor Quinn"), AHORA))
         pedido = cur.fetchone()["id"]
-        cur.execute("""update pedido_de_detalle set estado = 'no_compartida', decidido_en = %s
-                        where id = %s""", (AHORA, pedido))
+        cur.execute("""update pedido_de_detalle set estado = 'no_compartida', decidido_en = %s,
+                              decidido_por_membership_id = %s
+                        where id = %s""", (AHORA, _persona(con_encargado, "Taylor Quinn"), pedido))
         with pytest.raises(psycopg.errors.RaiseException), conn.transaction():
             cur.execute("""update pedido_de_detalle set estado = 'compartida' where id = %s""",
                         (pedido,))
@@ -221,6 +222,88 @@ def test_un_pedido_del_detalle_lo_decide_el_encargado_y_solo_avanza(conn, con_en
             cur.execute("""update pedido_de_detalle set pedido_por_membership_id = %s
                             where id = %s""", (_persona(con_encargado, "Sam Noble"), pedido))
     conn.commit()
+
+
+def _pedido(conn, mundo) -> str:
+    norte = mundo["north-lab"]
+    with espacio(conn, norte["id"]) as cur:
+        cur.execute(
+            """insert into pedido_de_detalle (workspace_id, task_id, pedido_por_membership_id,
+                                              decide_membership_id, estado, pedido_en)
+               values (%s, %s, %s, %s, 'esperando_decision', %s) returning id""",
+            (norte["id"], mundo["norte"]["id"], _persona(mundo, "Sam North"),
+             _persona(mundo, "Taylor Quinn"), AHORA))
+        pedido = str(cur.fetchone()["id"])
+    conn.commit()
+    return pedido
+
+
+def _otro_encargado(conn, mundo, nombre: str = "Morgan Hale") -> None:
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = %s where id = %s",
+                    (_persona(mundo, nombre), mundo["north-lab"]["areas"]["quality"]))
+    conn.commit()
+
+
+@pytest.mark.parametrize("estado", ["compartida", "no_compartida"])
+def test_un_encargado_anterior_no_decide_el_pedido_ni_que_si_ni_que_no(conn, con_encargado,
+                                                                       estado):
+    """El pedido sigue al encargado de ahora (migración 0051; decisión 33 con la 43): si cambió
+    el encargado del sector, quien lo era ya no decide, y el de ahora sí."""
+    pedido = _pedido(conn, con_encargado)
+    _otro_encargado(conn, con_encargado)
+    with espacio(conn, con_encargado["north-lab"]["id"]) as cur:
+        with pytest.raises(psycopg.errors.RaiseException, match="encargado de ahora"), \
+                conn.transaction():
+            cur.execute("""update pedido_de_detalle set estado = %s, decidido_en = %s,
+                                  decidido_por_membership_id = %s where id = %s""",
+                        (estado, AHORA, _persona(con_encargado, "Taylor Quinn"), pedido))
+        cur.execute("""update pedido_de_detalle set estado = %s, decidido_en = %s,
+                              decidido_por_membership_id = %s where id = %s""",
+                    (estado, AHORA, _persona(con_encargado, "Morgan Hale"), pedido))
+    conn.commit()
+
+
+def test_un_pedido_decidido_dice_quien_lo_decidio_y_uno_sin_respuesta_no(conn, con_encargado):
+    pedido = _pedido(conn, con_encargado)
+    with espacio(conn, con_encargado["north-lab"]["id"]) as cur:
+        # Sin quién lo decidió no hay decisión: la frena la base (el disparador, antes que la
+        # restricción).
+        with pytest.raises((psycopg.errors.CheckViolation, psycopg.errors.RaiseException)),                 conn.transaction():
+            cur.execute("""update pedido_de_detalle set estado = 'no_compartida',
+                                  decidido_en = %s where id = %s""", (AHORA, pedido))
+        with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():
+            cur.execute("""update pedido_de_detalle set estado = 'sin_respuesta', decidido_en = %s,
+                                  decidido_por_membership_id = %s where id = %s""",
+                        (AHORA, _persona(con_encargado, "Taylor Quinn"), pedido))
+        cur.execute("""update pedido_de_detalle set estado = 'sin_respuesta', decidido_en = %s
+                        where id = %s""", (AHORA, pedido))
+        with pytest.raises(psycopg.errors.RaiseException), conn.transaction():
+            cur.execute("""update pedido_de_detalle set estado = 'esperando_decision',
+                                  decidido_en = null where id = %s""", (pedido,))
+    conn.commit()
+
+
+def test_el_rollback_de_la_0051_se_niega_con_un_pedido_sin_respuesta(conn, con_encargado):
+    """Deshacerla perdería cómo terminó un pedido (constitución §12). Se ejercita la guarda tal
+    como está escrita en el archivo."""
+    import re
+    from pathlib import Path
+
+    script = (Path(__file__).resolve().parents[2] / "db" / "rollbacks"
+              / "0051_las_revisiones_de_la_c5d_y_del_detalle.sql").read_text("utf-8")
+    guarda = re.findall(r"do \$\$.*?end \$\$;", script, re.S)[1]
+    pedido = _pedido(conn, con_encargado)
+    with espacio(conn, con_encargado["north-lab"]["id"]) as cur:
+        cur.execute("""update pedido_de_detalle set estado = 'sin_respuesta', decidido_en = %s
+                        where id = %s""", (AHORA, pedido))
+    conn.commit()
+    with admin(conn) as cur:
+        with pytest.raises(psycopg.errors.RaiseException, match="0051 se niega"), \
+                conn.transaction():
+            cur.execute("set local search_path = leda, public")
+            cur.execute(guarda)
+    conn.rollback()
 
 
 # --- Revocable, nunca borrado -----------------------------------------------------------------
