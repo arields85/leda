@@ -1656,11 +1656,14 @@ comment on column dicho_de_quien_destraba.espera_su_bloqueo_id is
 -- arrastre el contenido. La base garantiza la huella y el tamaño (60 MB, el
 -- límite del producto), un archivo por huella y espacio, nunca compartido, y que
 -- nada se modifica ni se borra: `leda_app` sólo agrega y lee, y un disparador
--- rechaza el resto (`rechazar_cambios_de_archivo`).
+-- rechaza el resto (`rechazar_cambios_de_archivo`). La única excepción
+-- (decisión 57; migración 0053): la administración borra el contenido de un
+-- archivo que retiró; queda la huella y la hora del retiro
+-- (`contenido_retirado_en`), sin vuelta atrás.
 create table archivo (
   id                         uuid primary key default gen_random_uuid(),
   workspace_id               uuid not null references workspace(id) on delete cascade,
-  contenido                  bytea not null,
+  contenido                  bytea,
   sha256                     text not null,
   tamano                     bigint not null,
   tipo                       text not null,
@@ -1668,12 +1671,16 @@ create table archivo (
   nombre_original            text,
   enviado_por_membership_id  uuid not null references membership(id),
   recibido_en                timestamptz not null,
+  contenido_retirado_en      timestamptz,
   constraint archivo_workspace_id_unique unique (workspace_id, id),
   constraint archivo_unico_por_huella unique (workspace_id, sha256),
   constraint archivo_huella_del_contenido
-    check (sha256 = encode(sha256(contenido), 'hex')),
+    check (contenido is null or sha256 = encode(sha256(contenido), 'hex')),
   constraint archivo_tamano_del_contenido
-    check (tamano = octet_length(contenido) and tamano between 1 and 62914560),
+    check (tamano between 1 and 62914560
+           and (contenido is null or tamano = octet_length(contenido))),
+  constraint archivo_contenido_o_su_retiro
+    check ((contenido is null) = (contenido_retirado_en is not null)),
   constraint archivo_clase check (
     clase in ('imagen', 'video', 'pdf', 'documento', 'texto', 'comprimido')),
   constraint archivo_nombre_original check (
@@ -1706,7 +1713,7 @@ create table archivo_de_mensaje (
     unique (inbound_message_id, telegram_message_id),
   constraint archivo_de_mensaje_que_llego check (que_llego in ('foto', 'video', 'archivo')),
   constraint archivo_de_mensaje_rechazo check (
-    rechazo in ('demasiado_grande', 'tipo_no_admitido')),
+    rechazo in ('demasiado_grande', 'tipo_no_admitido', 'contenido_retirado')),
   constraint archivo_de_mensaje_guardado_o_rechazado check (
     (archivo_id is null) <> (rechazo is null))
 );
@@ -1716,6 +1723,8 @@ create index archivo_de_mensaje_por_album on archivo_de_mensaje (telegram_media_
 
 comment on table archivo is
   'ADR 0019, decisiones 2 y 3: el contenido de cada archivo recibido, con su huella (la garantiza la base). Un archivo por huella y espacio. Sólo se agrega: no se modifica ni se borra.';
+comment on column archivo.contenido_retirado_en is
+  'Decisión 57 del usuario (porción 5b; migración 0053): cuándo la administración borró el contenido de este archivo al retirarlo. Desde entonces `contenido` es nulo y la fila guarda la huella, para reconocerlo si alguien lo vuelve a mandar. No tiene vuelta atrás.';
 comment on table archivo_de_mensaje is
   'ADR 0019, decisión 4: qué archivo trajo cada mensaje entrante, con los identificadores de Telegram, o por qué no se guardó. Un álbum es un solo mensaje.';
 
@@ -2117,7 +2126,8 @@ begin
                'tipo_de_archivo', a.tipo, 'cubre', e.cubre,
                'ejemplo_aceptado', e.es_ejemplo_aceptado, 'quien', u.nombre, 'cuando', e.at,
                'retirada', r.retirada, 'retirada_el', r.retirada_el,
-               'retirada_por_la_administracion', r.por_la_administracion)
+               'retirada_por_la_administracion', r.por_la_administracion,
+               'motivo_del_retiro', r.motivo_de_la_administracion)
              order by e.at, e.id)
         from evidence e
         left join archivo a on a.workspace_id = e.workspace_id and a.id = e.archivo_id
@@ -2125,12 +2135,16 @@ begin
         left join app_user u on u.id = m.app_user_id
         -- Retirada por quien la entregó, o su contenido por la administración: la pieza o
         -- cualquier otra del espacio con el mismo archivo (un archivo se guarda una vez por
-        -- huella). De una pieza retirada no sale su contenido (ADR 0019, decisión 3).
+        -- huella). De una pieza retirada no sale su contenido (ADR 0019, decisión 3). De un
+        -- retiro de la administración sale el motivo, nunca quién lo hizo (decisión 59).
         cross join lateral (
           select adm.at is not null or per.at is not null as retirada,
                  coalesce(adm.at, per.at) as retirada_el,
-                 adm.at is not null as por_la_administracion
-            from (select min(x.at) as at from evidencia_retirada x
+                 adm.at is not null as por_la_administracion,
+                 adm.motivo as motivo_de_la_administracion
+            from (select min(x.at) as at,
+                         (array_agg(x.motivo order by x.at, x.id))[1] as motivo
+                    from evidencia_retirada x
                     join evidence o on o.id = x.evidence_id
                    where x.retirada_por_app_user_id is not null
                      and (o.id = e.id
@@ -2812,14 +2826,29 @@ create trigger trg_exigir_referencias_del_espacio
   for each row execute function exigir_referencias_del_espacio(
     'inbound_message_id', 'inbound_message');
 
--- Un archivo recibido no se modifica ni se borra (ADR 0019, decisión 3). Es una
--- garantía aparte de los privilegios de `leda_app`: vale también para la conexión
--- administrativa. El retiro del contenido por la administración (migración 0052)
--- no lo borra: lo marca (`evidencia_retirada.retirada_por_app_user_id`) y la página
--- deja de servirlo.
+-- Un archivo recibido no se modifica ni se borra (ADR 0019, decisión 3). Es una garantía aparte
+-- de los privilegios de `leda_app`: vale también para la conexión administrativa. La única
+-- excepción (decisión 57; migración 0053): la conexión administrativa vacía el contenido de un
+-- archivo que la administración retiró (`evidencia_retirada.retirada_por_app_user_id` de una
+-- pieza con ese archivo) y anota cuándo; nada más cambia, y no se vuelve atrás. Las columnas se
+-- comparan una por una para no copiar el contenido entero.
 create or replace function rechazar_cambios_de_archivo() returns trigger as $$
 begin
-  raise exception 'archivo: un archivo recibido no se modifica ni se borra';
+  if tg_op = 'UPDATE' and current_user = 'leda_admin'
+     and old.contenido is not null and new.contenido is null
+     and new.contenido_retirado_en is not null
+     and (new.id, new.workspace_id, new.sha256, new.tamano, new.tipo, new.clase,
+          new.nombre_original, new.enviado_por_membership_id, new.recibido_en)
+         is not distinct from
+         (old.id, old.workspace_id, old.sha256, old.tamano, old.tipo, old.clase,
+          old.nombre_original, old.enviado_por_membership_id, old.recibido_en)
+     and exists (select 1 from evidencia_retirada x
+                   join evidence e on e.id = x.evidence_id
+                  where x.retirada_por_app_user_id is not null
+                    and e.workspace_id = old.workspace_id and e.archivo_id = old.id) then
+    return new;
+  end if;
+  raise exception 'archivo: un archivo recibido no se modifica ni se borra (sólo la administración vacía el contenido de uno que retiró)';
 end $$ language plpgsql;
 
 create trigger trg_rechazar_cambios_de_archivo

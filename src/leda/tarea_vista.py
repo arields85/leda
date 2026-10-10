@@ -161,13 +161,17 @@ def _pieza(p: dict[str, Any], token: str, palabras: dict[str, str], zona: ZoneIn
     """Una pieza de la evidencia, ya escapada: qué es, quién la mandó y cuándo, y qué cubre. Una
     imagen se ve; otro archivo se baja; una pieza retirada sólo figura como retirada (ADR 0019,
     decisión 3): ni su texto, ni su enlace, ni el nombre o el contenido de su archivo; si su
-    contenido lo retiró la administración (porción 5), la página lo dice así. Se mira primero,
+    contenido lo retiró la administración (porción 5), la página lo dice así, con el motivo y
+    sin quién (decisión 59). Se mira primero,
     antes que la clase, para que ninguna clase muestre lo retirado (la base tampoco lo manda)."""
     clase, retirada = p.get("clase"), bool(p.get("retirada"))
     archivo = f'{_e(token)}/evidencia/{_e(p.get("id"))}'
     nombre = _e(p.get("nombre"))
     if p.get("retirada_por_la_administracion"):
+        # Con el motivo y sin quién (decisión 59): quién lo retiró queda en la auditoría.
         contenido = f"{QUE_ERA.get(clase, 'Una pieza')}: contenido retirado por la administración"
+        if (p.get("motivo_del_retiro") or "").strip():
+            contenido += f" (motivo: «{_e(p['motivo_del_retiro'].strip())}»)"
         retirada = True
     elif retirada:
         contenido = f"{QUE_ERA.get(clase, 'Una pieza')} que se retiró"

@@ -19,7 +19,8 @@ reglas y una diferencia, decidida por el usuario: no vence (ADR 0019, decisión 
   (`leda.motor.administracion`); vale mientras tenga el rol y cada vista suya queda además en
   `audit_log`, con la versión del núcleo que esta capa le pasa a la base
   (`leda.nucleo_hash`). La administración también retira el contenido de una pieza
-  (`retirar_contenido`): la página dice "retirado por la administración".
+  (`retirar_contenido`): se borra de la base, queda su huella, y la página dice "contenido
+  retirado por la administración" con el motivo, sin quién (decisiones 57 a 59).
 - **La regla de quién ve qué vive en SQL**, en funciones `security definer` con dueño
   `leda_owner`: este módulo no filtra nada, sólo pasa el hash.
 
@@ -180,9 +181,12 @@ def revocar(cur, workspace_id: str, *, membership_id: str | None = None,
 def retirar_contenido(cur, workspace_id: str, evidence_id: str, admin_app_user_id: str,
                       motivo: str) -> list[str]:
     """El retiro del contenido de una pieza de evidencia por la administración (ADR 0019,
-    decisión 3): la pieza y su archivo no se borran; la página dice "retirado por la
-    administración" y nunca su contenido, y el archivo no se sirve. Un archivo se guarda una vez
-    por huella, así que se retiran también las otras piezas del espacio con el mismo archivo.
+    decisión 3; decisiones 57 a 59 del usuario, porción 5b): la pieza no se borra y deja de
+    contar para la política; el contenido de su archivo, sí, de la base (queda la huella, para
+    reconocerlo si alguien lo vuelve a mandar), sin vuelta atrás. La página dice "contenido
+    retirado por la administración" y el motivo, nunca quién. Un archivo se guarda una vez por
+    huella, así que se retiran también las otras piezas del espacio con el mismo archivo.
+
     Devuelve las piezas que se retiraron ahora (una ya retirada por la administración no se
     vuelve a retirar). Queda en `audit_log` con quién y por qué.
 
@@ -214,9 +218,20 @@ def retirar_contenido(cur, workspace_id: str, evidence_id: str, admin_app_user_i
             (str(workspace_id), pieza, str(admin_app_user_id), motivo.strip()))
         if cur.fetchone() is not None:
             retiradas.append(pieza)
-    if retiradas:
-        _auditar(cur, workspace_id, "retirar_contenido_de_evidencia",
-                 actor_app_user_id=str(admin_app_user_id), actor_kind="persona",
-                 sujeto_tipo="evidence", sujeto_id=str(evidence_id),
-                 detalle={"motivo": motivo.strip(), "piezas": retiradas})
+    if not retiradas:
+        return retiradas
+    archivo_borrado = False
+    if fila["archivo_id"] is not None:
+        # Decisión 57: el contenido se borra de la base. La única excepción a que un archivo no
+        # cambia, que la base deja sólo a la conexión administrativa y sólo después del retiro
+        # de arriba (`rechazar_cambios_de_archivo`).
+        cur.execute("""update archivo set contenido = null, contenido_retirado_en = now()
+                        where workspace_id = %s and id = %s and contenido is not null""",
+                    (str(workspace_id), fila["archivo_id"]))
+        archivo_borrado = cur.rowcount == 1
+    _auditar(cur, workspace_id, "retirar_contenido_de_evidencia",
+             actor_app_user_id=str(admin_app_user_id), actor_kind="persona",
+             sujeto_tipo="evidence", sujeto_id=str(evidence_id),
+             detalle={"motivo": motivo.strip(), "piezas": retiradas,
+                      "contenido_borrado": archivo_borrado})
     return retiradas

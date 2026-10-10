@@ -987,6 +987,14 @@ def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
             return
         if antes == "espera":
             return "espera"
+        if not _adjuntos_que_salen(cur, m):
+            # Todo lo que llevaba lo retiró la administración después de encolarlo (decisión
+            # 57): no sale un álbum vacío, y no en silencio.
+            cur.execute(
+                "update message_outbox set estado = 'descartado' where id = %s", (m["id"],))
+            _avisar_lo_retirado(cur, workspace_id, m, len(m["adjuntos"]), sale_el_resto=False)
+            resumen["descartados"] += 1
+            return
     # Contestarle a quien escribió no es "escribir fuera de horario", ni
     # cuenta contra el tope de mensajes automáticos: no es automático.
     if m["es_respuesta"]:
@@ -1048,10 +1056,45 @@ def _el_texto_del_album(cur, workspace_id: str, m) -> str:
     return "espera" if estados - {"enviado"} else "sale"
 
 
+ETAPA_CONTENIDO_RETIRADO = "contenido_retirado_del_envio"
+
+
+class ContenidoRetirado(Exception):
+    """El contenido de un adjunto se retiró mientras salía: el envío falla y se reintenta, y en
+    la pasada siguiente el adjunto ya no va."""
+
+
+def _adjuntos_que_salen(cur, m) -> list[str]:
+    """Los archivos de una fila con adjuntos cuyo contenido sigue en la base: lo que la
+    administración retiró después de encolarlo no sale (decisión 57)."""
+    cur.execute("""select x.archivo_id from message_outbox_adjunto x
+                     join archivo a on a.workspace_id = x.workspace_id and a.id = x.archivo_id
+                    where x.outbox_id = %s and a.contenido_retirado_en is null
+                    order by x.orden""", (m["id"],))
+    return [str(f["archivo_id"]) for f in cur.fetchall()]
+
+
+def _avisar_lo_retirado(cur, workspace_id: str, m, cuantos: int, *,
+                        sale_el_resto: bool) -> None:
+    """El incidente de un adjunto que no salió porque la administración retiró su contenido:
+    nunca en silencio, y sin el aviso a la administración, que es la que lo retiró."""
+    que = ("el resto del mensaje salió" if sale_el_resto
+           else "no quedó nada que mandar y esa parte del mensaje no salió")
+    registrar_incidente(
+        cur, workspace_id,
+        f"{cuantos} archivo(s) adjunto(s) de un mensaje no salieron: la administración retiró "
+        f"su contenido después de encolarlo; {que}.",
+        severidad="baja", etapa=ETAPA_CONTENIDO_RETIRADO, referencia_tipo="message_outbox",
+        referencia_id=str(m["id"]), avisar_admin=False,
+        sin_avisar_porque="lo retiró la administración")
+
+
 def _adjuntos(cur, m) -> list[Adjunto]:
     """Las fotos de una fila con adjuntos, en su orden, cada una con el identificador que
     Telegram le dio al recibirla como foto en este espacio (del mismo bot), si lo hay. El
-    contenido se lee sólo si el transporte tiene que subir la copia propia."""
+    contenido se lee sólo si el transporte tiene que subir la copia propia. Lo que retiró la
+    administración (decisión 57) no va: ni su copia, que ya no está, ni el identificador del
+    canal, que la volvería a mostrar."""
     cur.execute(
         """select a.id, a.nombre_original, a.tipo,
                   (select d.telegram_file_id from archivo_de_mensaje d
@@ -1060,13 +1103,16 @@ def _adjuntos(cur, m) -> list[Adjunto]:
                     order by d.at desc limit 1) as file_id
              from message_outbox_adjunto x
              join archivo a on a.workspace_id = x.workspace_id and a.id = x.archivo_id
-            where x.outbox_id = %s
+            where x.outbox_id = %s and a.contenido_retirado_en is null
             order by x.orden""", (m["id"],))
 
     def leer(archivo_id):
         def contenido() -> bytes:
             cur.execute("select contenido from archivo where id = %s", (archivo_id,))
-            return bytes(cur.fetchone()["contenido"])
+            fila = cur.fetchone()
+            if fila is None or fila["contenido"] is None:
+                raise ContenidoRetirado("el contenido de un adjunto se retiró")
+            return bytes(fila["contenido"])
         return contenido
 
     return [Adjunto(f["nombre_original"], f["tipo"], f["file_id"], leer(f["id"]))
@@ -1166,7 +1212,15 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
             if m.get("adjuntos"):
                 # Un álbum sale sin texto, sin botones y sin el saludo del día: el saludo, si
                 # toca, ya lo llevó el texto de su respuesta, que salió antes.
-                tg_id = transporte.enviar_album(m["chat_id"], _adjuntos(cur, m))
+                adjuntos = _adjuntos(cur, m)
+                if not adjuntos:
+                    raise ContenidoRetirado("ya no queda ningún adjunto")
+                if len(adjuntos) < len(m["adjuntos"]):
+                    # Dentro del punto de retorno del envío: si el envío falla, el incidente
+                    # se deshace con él y queda el de la vez que salga.
+                    _avisar_lo_retirado(cur, workspace_id, m,
+                                        len(m["adjuntos"]) - len(adjuntos), sale_el_resto=True)
+                tg_id = transporte.enviar_album(m["chat_id"], adjuntos)
                 try:
                     with cur.connection.transaction():
                         _guardar_id_telegram(cur, tg_id, m["id"])
