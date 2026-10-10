@@ -1,0 +1,252 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/45-el-detalle-de-una-tarea.md
+numero: "45"
+titulo: "El resumen para cualquiera, el detalle a pedido"
+mide: garantias
+persona: Nahuel
+inicio: "2026-10-26 09:00"
+
+tareas:
+  SW:
+    titulo: Configurar el switch de la planta
+    criterio: "El switch de la planta da red a las doce máquinas de la línea y responde al monitoreo"
+    responsable: Lucas
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  SRV:
+    titulo: Instalar el servidor de la planta
+    criterio: "El servidor queda en el rack de la planta, con su respaldo diario funcionando y probado una vez"
+    responsable: Lucas
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  ENV:
+    titulo: Calibrar el sensor de la envasadora
+    criterio: "El sensor de la envasadora mide dentro de la tolerancia del fabricante en una prueba de una hora"
+    responsable: Mariano
+    vence: "2026-10-30"
+  PAI:
+    titulo: Cambiar el sensor de la paila
+    criterio: "El sensor nuevo de la paila queda conectado y el panel muestra su lectura"
+    responsable: Ariel
+    vence: "2026-10-30"
+
+pasos:
+  # Nahuel no tiene nada que ver con la del switch: el resumen, sin enlace, y Leda le ofrece
+  # pedirle el detalle a Martín, el encargado de Infraestructura IT (decisión 33).
+  - paso: 1
+    quien: Nahuel
+    a_las: "2026-10-26 10:00"
+    escribe: "pasame el link de la tarea del switch"
+    jugadas:
+      - {nombre: pedir_enlace, como_la_nombra: "switch"}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_enlace, resultado: solo_el_resumen, tarea: SW, responsable: Lucas Natuche,
+         estado: en_curso, vence: "2026-10-30", el_detalle_lo_ve: Infraestructura IT,
+         se_lo_puede_pedir_a: Martín Forte, pregunta: propuesta,
+         lleva_el_enlace_a_la_pagina_de_la_tarea: ausente}
+    pregunta: {tipo: propuesta, tarea: SW}
+    botones: []
+    enlace: false
+    estado_despues:
+      pregunta_abierta: {tipo: propuesta, tarea: SW}
+    dice:
+      - "el resumen: la del switch, de Lucas, en curso, vence el vie 30/10"
+      - que el detalle con fotos y correcciones lo ve Infraestructura IT y que, si lo necesita, le pregunta a Martín
+    no_dice:
+      - que no la puede ver
+      - nombres de la base, de funciones o de permisos
+
+  - paso: 2
+    quien: Nahuel
+    a_las: "2026-10-26 10:02"
+    escribe: "si dale"
+    jugadas:
+      - {nombre: pedir_el_detalle}
+    efectos:
+      avisos_guardados:
+        - {tipo: pedido_del_detalle, tarea: SW, a: Martin, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: compartir_el_detalle,
+                    pide_ver_el_detalle: Nahuel Gimenez, la_tiene: Lucas Natuche}}
+    hechos:
+      - {jugada: pedir_el_detalle, resultado: detalle_pedido, tarea: SW,
+         le_pregunta_a: {a: Martín Forte, llega: "~2026-10-26T10:12"}}
+    pregunta: null
+    botones: []
+    enlace: false
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que le pregunta a Martín y le avisa cuando conteste
+    no_dice:
+      - que ya se la compartieron
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-26 10:12"]
+    salen:
+      - a: Martin
+        tipo: pedido_del_detalle
+        tarea: SW
+        hechos: {necesita_respuesta: true, pregunta: compartir_el_detalle,
+                 pide_ver_el_detalle: Nahuel Gimenez, la_tiene: Lucas Natuche}
+        botones: [Compartirla, No compartirla]
+    dice:
+      - que Nahuel pide ver el detalle de la del switch, de Lucas
+      - "la pregunta: si se la comparte"
+
+  - paso: 4
+    quien: Martin
+    a_las: "2026-10-26 10:30"
+    toca: Compartirla
+    efectos:
+      compartidas:
+        - {tarea: SW, con: Nahuel, por: Martin}
+      avisos_guardados:
+        - {tipo: como_termino_el_pedido_del_detalle, tarea: SW, a: Nahuel, estado: guardado,
+           hechos: {necesita_respuesta: false, la_compartio: true}}
+    hechos:
+      - {jugada: contestar_el_pedido_del_detalle, resultado: anotado, tarea: SW,
+         la_compartio: true,
+         aviso_a_quien_lo_pidio: {a: Nahuel Gimenez, llega: "~2026-10-26T10:40"}}
+    pregunta: null
+    botones: []
+    dice:
+      - que se la comparte a Nahuel y que Nahuel se va a enterar
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-26 10:40"]
+    salen:
+      - a: Nahuel
+        tipo: como_termino_el_pedido_del_detalle
+        tarea: SW
+        hechos: {necesita_respuesta: false, la_compartio: true}
+        enlace: true
+    dice:
+      - que Martín le compartió la del switch
+      - que no hace falta contestar, en el último renglón
+
+  # Desde que Martín se la compartió, Nahuel la ve: la base lo cuenta (`puede_ver_tarea`).
+  - paso: 6
+    quien: Nahuel
+    a_las: "2026-10-26 11:00"
+    escribe: "pasame de nuevo el link del switch"
+    jugadas:
+      - {nombre: pedir_enlace, como_la_nombra: "switch"}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_enlace, resultado: leido, tarea: SW, responsable: Lucas Natuche,
+         lleva_el_enlace_a_la_pagina_de_la_tarea: true}
+    pregunta: null
+    botones: []
+    enlace: true
+    dice:
+      - que ahí va el enlace a la página de la tarea del switch
+
+  - paso: 7
+    quien: Nahuel
+    a_las: "2026-10-26 11:05"
+    escribe: "y el del servidor de lucas?"
+    jugadas:
+      - {nombre: pedir_enlace, como_la_nombra: "servidor de lucas"}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_enlace, resultado: solo_el_resumen, tarea: SRV, responsable: Lucas Natuche,
+         estado: en_curso, vence: "2026-11-06", el_detalle_lo_ve: Infraestructura IT,
+         se_lo_puede_pedir_a: Martín Forte, pregunta: propuesta,
+         lleva_el_enlace_a_la_pagina_de_la_tarea: ausente}
+    pregunta: {tipo: propuesta, tarea: SRV}
+    botones: []
+    enlace: false
+    dice:
+      - "el resumen del servidor: de Lucas, en curso, vence el vie 6/11"
+      - que el detalle lo ve Infraestructura IT y que, si lo necesita, le pregunta a Martín
+    no_dice:
+      - que no la puede ver
+
+  - paso: 8
+    quien: Nahuel
+    a_las: "2026-10-26 11:06"
+    escribe: "si porfa"
+    jugadas:
+      - {nombre: pedir_el_detalle}
+    efectos:
+      avisos_guardados:
+        - {tipo: pedido_del_detalle, tarea: SRV, a: Martin, estado: guardado,
+           hechos: {necesita_respuesta: true, pide_ver_el_detalle: Nahuel Gimenez}}
+    hechos:
+      - {jugada: pedir_el_detalle, resultado: detalle_pedido, tarea: SRV,
+         le_pregunta_a: {a: Martín Forte, llega: "~2026-10-26T11:16"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+
+  - paso: 9
+    quien: Leda
+    relojes: ["2026-10-26 11:16"]
+    salen:
+      - a: Martin
+        tipo: pedido_del_detalle
+        tarea: SRV
+        hechos: {necesita_respuesta: true, pide_ver_el_detalle: Nahuel Gimenez}
+        botones: [Compartirla, No compartirla]
+    dice:
+      - que Nahuel pide ver el detalle de la del servidor
+      - "la pregunta: si se la comparte"
+
+  - paso: 10
+    quien: Martin
+    a_las: "2026-10-26 11:30"
+    escribe: "ese no, en las fotos se ven las claves del rack"
+    jugadas:
+      - {nombre: contestar_el_pedido_del_detalle, tarea: SRV, acepta: false,
+         puede_traer: [por_que]}
+    efectos:
+      avisos_guardados:
+        - {tipo: como_termino_el_pedido_del_detalle, tarea: SRV, a: Nahuel, estado: guardado,
+           hechos: {necesita_respuesta: false, la_compartio: false}}
+    hechos:
+      - {jugada: contestar_el_pedido_del_detalle, resultado: anotado, tarea: SRV,
+         la_compartio: false,
+         aviso_a_quien_lo_pidio: {a: Nahuel Gimenez, llega: "~2026-10-26T11:40"}}
+    pregunta: null
+    botones: []
+    dice:
+      - que no se la comparte y que Nahuel se va a enterar
+
+  - paso: 11
+    quien: Leda
+    relojes: ["2026-10-26 11:40"]
+    salen:
+      - a: Nahuel
+        tipo: como_termino_el_pedido_del_detalle
+        tarea: SRV
+        hechos: {necesita_respuesta: false, la_compartio: false}
+        enlace: false
+    dice:
+      - que Martín no le compartió el detalle del servidor
+    no_dice:
+      - el enlace
+
+  # Dos tareas que coinciden: la regla de siempre, Leda las nombra y Nahuel contesta (decisión 50,
+  # lo derivado de la 33).
+  - paso: 12
+    quien: Nahuel
+    a_las: "2026-10-26 12:00"
+    escribe: "y el link del sensor?"
+    jugadas:
+      - {nombre: pedir_enlace, como_la_nombra: "sensor"}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_enlace, resultado: falta_dato, falta: [tarea],
+         coinciden: [{titulo: ENV, responsable: Mariano Naim},
+                     {titulo: PAI, responsable: Ariel De Simone}]}
+    pregunta: null
+    botones: []
+    enlace: false
+    dice:
+      - que hay dos con ese nombre, la de la envasadora y la de la paila, y pregunta cuál

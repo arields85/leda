@@ -82,7 +82,9 @@ pasos:
       - que ahí va el enlace a la página de la tarea del servidor
 
   # Nahuel no es su responsable, no aprueba el trabajo de Marcos ni decidió sobre ella, no es
-  # el referente del área ni la autoridad final: ningún enlace.
+  # el referente del área ni la autoridad final: ningún enlace. Desde la decisión 33, el
+  # resumen, que ve cualquiera del equipo, y Leda le ofrece pedirle el detalle al encargado del
+  # sector de la tarea (Marcos, el de OT); el camino entero es la 45.
   - paso: 4
     quien: Nahuel
     a_las: "2026-10-23 11:00"
@@ -91,14 +93,17 @@ pasos:
       - {nombre: pedir_enlace, como_la_nombra: "plc de marcos"}
     efectos: {}
     hechos:
-      - {jugada: pedir_enlace, resultado: no_se_puede, motivo: no_puede_ver_esa_tarea,
-         lleva_el_enlace_a_la_pagina_de_la_tarea: ausente}
-    pregunta: null
+      - {jugada: pedir_enlace, resultado: solo_el_resumen, tarea: PLC,
+         responsable: Marcos Tarquini, estado: en_curso, vence: "2026-10-30",
+         el_detalle_lo_ve: OT y automatización, se_lo_puede_pedir_a: Marcos Tarquini,
+         pregunta: propuesta, lleva_el_enlace_a_la_pagina_de_la_tarea: ausente}
+    pregunta: {tipo: propuesta, tarea: PLC}
     botones: []
     enlace: false
     dice:
-      - que el enlace de esa tarea no se lo puede pasar, en palabras simples
+      - "el resumen: la del PLC, de Marcos, en curso, vence el vie 30/10"
+      - que el detalle lo ve OT y que, si lo necesita, le pregunta a Marcos
     no_dice:
-      - quién puede verla
+      - que no la puede ver
       - nombres de la base, de funciones o de permisos
       - que la tarea no existe

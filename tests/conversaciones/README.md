@@ -126,7 +126,16 @@ La página de la tarea (ADR 0019, decisión 7):
     tarea: Marcos, el de una suya; Ismael, el de una de Marcos ya terminada y el de una de Lucas,
     que no están en su lista (es la autoridad final); Nahuel, el de una que no puede ver, y Leda le
     dice que ése no se lo puede pasar, sin enlace y sin decir quién la ve (lo que quedó de la
-    porción 4 de la C-3).
+    porción 4 de la C-3). Desde la decisión 33 del usuario, a Nahuel le da el resumen y le ofrece
+    pedirle el detalle al encargado del sector de la tarea.
+45. [`45-el-detalle-de-una-tarea.md`](45-el-detalle-de-una-tarea.md): el resumen para cualquiera,
+    el detalle a pedido. Nahuel pide el enlace de una tarea de Lucas que no le toca ver: Leda le da
+    el resumen (qué tarea, de quién, para cuándo y cómo quedó), nunca "no la podés ver", y le
+    ofrece pedirle el detalle a Martín, el encargado del sector de la tarea. Nahuel dice que sí,
+    Leda le pregunta a Martín con dos botones, Martín la comparte y a Nahuel le llega el enlace,
+    que desde entonces puede pedir como cualquiera que la ve; con otra tarea, Martín dice que no y
+    Nahuel se entera. Dos tareas que coinciden: Leda las nombra y Nahuel contesta (decisión 33 del
+    usuario, 2026-10-09).
 
 La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, decisiones 4 a 7):
 
@@ -408,6 +417,10 @@ clave de la tarea y el nombre corto de la persona): uno de más es de garantía,
 manos sin la confirmación de quien pide, la decisión de quien decide y la de quien recibe. El estado de
 después puede decir quién tiene cada tarea (`responsables`), también para mirar que un "no" no la movió.
 
+**El detalle de una tarea** (decisión 33; la 45): los efectos suman las tareas compartidas con
+alguien que no las veía (`compartidas`, por la clave de la tarea, con quién y por quién): una de más es
+de garantía, porque nada se comparte sin la decisión del encargado del sector de la tarea.
+
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 
 ## Formato de cada conversación
@@ -541,7 +554,12 @@ importa es el significado:
 - `aprobar` y `pedir_cambios`: quien aprueba decide sobre una entrega, directo cuando es claro
   (conversaciones 23 y 24).
 - `pedir_enlace`: la persona pide el enlace a la página de una tarea; sale sólo si puede verla
-  (conversación 31).
+  (conversación 31). Si no puede, Leda le da el resumen y le ofrece pedir el detalle
+  (decisión 33; conversación 45).
+- `pedir_el_detalle`: la persona acepta que Leda le pida el detalle de una tarea que no le toca
+  ver al encargado del sector de la tarea, que decide si se la comparte (conversación 45).
+- `contestar_el_pedido_del_detalle`: el encargado dice si le comparte la tarea a quien pidió el
+  detalle (`acepta`), tocando o escribiendo (conversación 45).
 - `decir_cuando_destraba`: quien puede destrabar una tarea de otra persona dice para cuándo lo
   resuelve, que ya está o lo que pasa; queda anotado y la persona trabada se entera (conversación
   32). Si dice que ya lo habló con la persona trabada (`ya_lo_hablaron`) sin decir para cuándo,

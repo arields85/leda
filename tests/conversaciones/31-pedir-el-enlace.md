@@ -21,8 +21,9 @@ con su YAML.
 2. **Quién puede verla lo decide la base** (`puede_ver_tarea`, ADR 0019, 7b): la persona responsable,
    quien aprueba su trabajo, quien ya decidió sobre esa tarea, el referente del área y la autoridad
    final. El enlace se emite al mandar y la base lo vuelve a comprobar (7a).
-3. **Si no puede verla, ningún enlace sale**, y Leda dice que ese no se lo puede pasar: sin nombres
-   de la base, sin decir quién sí la ve.
+3. **Si no puede verla, ningún enlace sale**: sin nombres de la base. Desde la decisión 33 del
+   usuario, Leda le da el resumen y le ofrece pedirle el detalle al encargado del sector de la
+   tarea (la 45).
 
 ## Estado inicial
 
@@ -71,9 +72,12 @@ con su YAML.
    →
    - Jugadas: `pedir_enlace`, nombrada por cómo la dijo.
    - Efecto: ninguno; no se emite ningún enlace.
-   - La respuesta dice: que el enlace de esa tarea no se lo puede pasar, en palabras simples.
-   - La respuesta no dice: quién puede verla; nombres de la base, de funciones o de permisos; que la
-     tarea no existe.
+   - La respuesta dice (desde la decisión 33 del usuario): el resumen, que ve cualquiera del
+     equipo (la del PLC, de Marcos, en curso, vence el vie 30/10); que el detalle lo ve OT y que,
+     si lo necesita, le pregunta a Marcos, el encargado del sector de la tarea. El camino entero,
+     con el pedido y la respuesta del encargado, es la 45.
+   - La respuesta no dice: que no la puede ver; nombres de la base, de funciones o de permisos; que
+     la tarea no existe.
    - Sin enlace al final.
 
 ## Qué mide
@@ -82,6 +86,6 @@ con su YAML.
   no (paso 4); la IA nunca escribe una dirección; ningún efecto en las tareas.
 - **Comprensión:** la IA elige `pedir_enlace` y nombra la tarea por su alias cuando está en la lista
   (paso 1) y por cómo la dijo la persona cuando no está (pasos 2 a 4).
-- **Las palabras:** sin nombres del sistema (constitución §10); a Nahuel no se le nombra quién ve la
-  tarea (decisión 11).
+- **Las palabras:** sin nombres del sistema (constitución §10); a Nahuel no se le dice que no la
+  puede ver, y se le nombra a quién le puede pedir el detalle (decisión 33, que precisa la 11).
 - **El formato:** el de la conversación 20 en cada mensaje.

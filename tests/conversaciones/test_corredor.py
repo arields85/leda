@@ -47,7 +47,7 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_cuarenta_y_tres_conversaciones_y_cada_una_nombra_su_fuente():
+def test_hay_cuarenta_y_cinco_conversaciones_y_cada_una_nombra_su_fuente():
     # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega), la 23 desde la 3b (la
     # aprobación), la 24 desde la 3c (quien aprueba no contesta), la 27 desde la D3 de la C-3d
     # (la entrega frente al criterio), la 28 y la 29 desde la D4 (las entregas en listas y si
@@ -62,9 +62,10 @@ def test_hay_cuarenta_y_tres_conversaciones_y_cada_una_nombra_su_fuente():
     # 40 desde las decisiones 31, 32, 44 y 46 de la C-6 (la semana de las listas), y la 41 desde
     # la decisión 25 (el informe al grupo), y la 42 desde la C-5b (a quien destraba y no
     # contesta, Leda nunca lo abandona), y la 43 desde la C-5c (cerrar el tema para todos), y la
-    # 44 desde la C-5e (seguir la cadena hasta quien puede destrabarla).
+    # 44 desde la C-5e (seguir la cadena hasta quien puede destrabarla), y la 45 desde la
+    # decisión 33 (el resumen para cualquiera, el detalle a pedido).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 45)]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 46)]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]

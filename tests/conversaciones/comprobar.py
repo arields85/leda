@@ -214,6 +214,14 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                        for p in (f["jugada"] or {}).get("piezas") or []
                        if not p.get("evidencia_id")]}
             for f in cur.fetchall()}
+        # Las tareas compartidas con alguien que no las veía (decisión 33; la 45): de qué tarea,
+        # con quién y quién la compartió.
+        cur.execute("""select id, task_id, membership_id, compartida_por_membership_id
+                         from tarea_compartida where workspace_id = %s""", (ws,))
+        compartidas = {str(f["id"]): {"tarea": tarea(f["task_id"]),
+                                      "con": persona(f["membership_id"]),
+                                      "por": persona(f["compartida_por_membership_id"])}
+                       for f in cur.fetchall()}
         cur.execute("""select id, task_id from archivo_de_tarea where workspace_id = %s""",
                     (ws,))
         archivos_de_tarea = {str(f["id"]): {"tarea": tarea(f["task_id"])}
@@ -259,7 +267,8 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
             "incidentes": incidentes, "avisos_admin": avisos_admin, "avances": avances,
             "esperas": esperas, "preguntas": preguntas, "ultimo_aviso": ultimo_aviso,
             "evidencias": evidencias, "archivos_de_tarea": archivos_de_tarea,
-            "aprobaciones": aprobaciones, "confirmadas": confirmadas}
+            "aprobaciones": aprobaciones, "confirmadas": confirmadas,
+            "compartidas": compartidas}
 
 
 def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
@@ -292,6 +301,7 @@ def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
         "archivos_de_tarea": nuevas("archivos_de_tarea"),
         "aprobaciones": nuevas("aprobaciones"),
         "confirmadas": nuevas("confirmadas"),
+        "compartidas": nuevas("compartidas"),
     }
 
 
@@ -591,6 +601,9 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
     # La decisión de quien aprueba (porción 3b): una de más es de garantía (nadie aprueba sin
     # haberlo dicho).
     filas("aprobaciones", hubo.get("aprobaciones") or [], "decisión sobre una entrega")
+    # Una tarea compartida con alguien que no la veía (decisión 33): una de más es de garantía
+    # (nada se comparte sin la decisión del encargado del sector de la tarea).
+    filas("compartidas", hubo.get("compartidas") or [], "tarea compartida")
     al_admin_e = esperados.get("avisos_al_administrador", 0)
     fuera = [i for i in hubo["incidentes"] if i["etapa"] == ETAPA_FUERA_DE_LA_LISTA]
     if len(fuera) != al_admin_e:
