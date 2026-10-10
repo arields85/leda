@@ -3101,24 +3101,33 @@ def _pedir_detalle_de_tarea(cur, quien: Solicitante, tarea_id, at=None):
         return {"error": "ya_lo_pidio", "pedido_id": str(abierto["id"]),
                 "decide_membership_id": decide}
     # Dos pedidos a la vez de la misma persona (dos mensajes que se cruzan) no son dos: el
-    # segundo encuentra el primero (la base admite uno abierto por tarea y persona).
-    cur.execute(
-        """insert into pedido_de_detalle (workspace_id, task_id, pedido_por_membership_id,
-                                          decide_membership_id, estado, pedido_en)
-           values (%s, %s, %s, %s, 'esperando_decision', %s)
-           on conflict (task_id, pedido_por_membership_id)
-             where estado = 'esperando_decision' do nothing
-           returning id""",
-        (quien.workspace_id, tarea["id"], quien.membership_id, decide, _momento(at)))
-    nuevo = cur.fetchone()
-    if nuevo is None:
+    # segundo encuentra el primero (la base admite uno abierto por tarea y persona). Si el que
+    # se cruzó termina antes de que se lo vuelva a buscar (lo decidió el encargado en el medio),
+    # ya no hay ninguno abierto: el pedido nuevo vale, y se intenta otra vez (revisión del
+    # detalle a pedido, la carrera en el otro orden).
+    for _ in range(2):
+        cur.execute(
+            """insert into pedido_de_detalle (workspace_id, task_id, pedido_por_membership_id,
+                                              decide_membership_id, estado, pedido_en)
+               values (%s, %s, %s, %s, 'esperando_decision', %s)
+               on conflict (task_id, pedido_por_membership_id)
+                 where estado = 'esperando_decision' do nothing
+               returning id""",
+            (quien.workspace_id, tarea["id"], quien.membership_id, decide, _momento(at)))
+        nuevo = cur.fetchone()
+        if nuevo is not None:
+            return {"pedido_id": str(nuevo["id"]), "decide_membership_id": decide}
         cur.execute("""select id from pedido_de_detalle
                         where task_id = %s and pedido_por_membership_id = %s
                           and estado = 'esperando_decision'""",
                     (tarea["id"], quien.membership_id))
-        return {"error": "ya_lo_pidio", "pedido_id": str(cur.fetchone()["id"]),
-                "decide_membership_id": decide}
-    return {"pedido_id": str(nuevo["id"]), "decide_membership_id": decide}
+        abierto = cur.fetchone()
+        if abierto is not None:
+            return {"error": "ya_lo_pidio", "pedido_id": str(abierto["id"]),
+                    "decide_membership_id": decide}
+    # Dos veces se cruzó otro pedido que terminó en el medio: lo que pidió ya se está
+    # decidiendo, sin caerse.
+    return {"error": "ya_lo_pidio", "decide_membership_id": decide}
 
 
 @herramienta(

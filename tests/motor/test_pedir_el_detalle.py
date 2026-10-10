@@ -543,6 +543,62 @@ def test_dos_pedidos_que_se_cruzan_son_uno(conn, equipo):
     assert cuantas(conn, "pedido_de_detalle") == 1
 
 
+class _SeCruzaYTermina(_SeCruzaOtroPedido):
+    """Como `_SeCruzaOtroPedido`, y además el pedido que se cruzó termina (el encargado lo
+    decide) justo después de que el `insert` de la cocina chocó con él y antes de que lo vuelva a
+    buscar: cuando lo busca, ya no hay ninguno abierto."""
+
+    def __init__(self, cur, otro, termina) -> None:
+        super().__init__(cur, otro)
+        self._termina, self.termino = termina, False
+
+    def execute(self, sql, params=None, **kw):
+        r = super().execute(sql, params, **kw)
+        if (self.cruzo and not self.termino and sql.lstrip().startswith("insert")
+                and "pedido_de_detalle" in sql):
+            self.termino = True
+            self._termina()
+        return r
+
+
+def test_si_el_pedido_que_se_cruzo_termina_en_el_medio_queda_el_nuevo(conn, equipo):
+    """La carrera al pedirlo, el otro orden (revisión del detalle a pedido,
+    `herramientas.py:3111-3117`): el pedido que se cruzó termina antes de que la cocina lo
+    vuelva a buscar. Antes se caía (`None["id"]`); ahora el pedido nuevo queda, porque el de
+    antes ya no está abierto."""
+    from psycopg.rows import dict_row
+    nahuel = _personas(equipo, "Nahuel")
+    with espacio(conn, equipo.carga.workspace_id) as cur:
+        quien = identificar_en_espacio(cur, nahuel["telegram"], equipo.carga.workspace_id)
+
+        def otro():
+            with conn.cursor(row_factory=dict_row) as aparte:
+                aparte.execute(
+                    """insert into pedido_de_detalle (workspace_id, task_id,
+                                                      pedido_por_membership_id,
+                                                      decide_membership_id, estado, pedido_en)
+                       values (%s, %s, %s, %s, 'esperando_decision', %s)""",
+                    (equipo.carga.workspace_id, equipo.carga.tareas["SW"],
+                     nahuel["membership_id"], _personas(equipo, "Martin")["membership_id"],
+                     AHORA))
+
+        def termina():
+            with conn.cursor() as aparte:
+                aparte.execute("""update pedido_de_detalle
+                                     set estado = 'no_compartida', decidido_en = %s,
+                                         decidido_por_membership_id = %s
+                                   where estado = 'esperando_decision'""",
+                               (AHORA, _personas(equipo, "Martin")["membership_id"]))
+
+        r = ejecutar(_SeCruzaYTermina(cur, otro, termina), quien, "pedir_detalle_de_tarea",
+                     {"tarea_id": equipo.carga.tareas["SW"], "at": AHORA.isoformat()},
+                     ya_confirmada=True)
+    conn.commit()
+    assert "error" not in r, r
+    estados = sorted(f["estado"] for f in todos(conn, "select estado from pedido_de_detalle"))
+    assert estados == ["esperando_decision", "no_compartida"]
+
+
 # --- Una oferta "si lo necesitás" no se repite ni vuelve (decisión 33; constitución §8) ---------
 
 def test_la_oferta_no_se_repite_a_las_cuatro_horas_y_sin_respuesta_es_un_no(conn, equipo):
