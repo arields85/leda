@@ -99,6 +99,10 @@ ETAPA_ENTREGA_MENSAJE = "entrega_mensaje"
 # reintenta. Queda sólo como rastro; el quinto fallo deja su propio incidente (`entrega_mensaje`).
 ETAPA_ENTREGA_REINTENTO = "entrega_mensaje_reintento"
 ETAPA_ENTREGA_AVISO_ADMIN = "entrega_aviso_admin"
+# La respuesta del bot de administración (migración 0054): un intento que no salió (se reintenta)
+# o una respuesta que se descartó al mandarla (quien la pidió dejó de ser administrador, o falta
+# la dirección pública de la página). Nunca se avisa por el mismo canal.
+ETAPA_RESPUESTA_ADMIN = "respuesta_del_bot_de_administracion"
 ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
@@ -286,6 +290,17 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_vio="Nada: es un aviso interno, no le llega a nadie más.",
         que_hacer=(_BUSCAR_DETALLE + " y revisá que cada administrador haya "
                    "escrito al bot de administración y que Telegram responda.")),
+    ETAPA_RESPUESTA_ADMIN: ExplicacionDeEtapa(
+        titulo="Una respuesta del bot de administración no salió",
+        que_paso=("La respuesta del bot de administración a un pedido de un administrador de "
+                  "plataforma (el enlace de una tarea) no salió en este intento, o se descartó "
+                  "al mandarla: quien la pidió ya no es administrador, o falta la dirección "
+                  "pública de la página. Si no salió, no quedó ningún enlace vigente. El resumen "
+                  "dice cuál fue."),
+        que_vio=("Todavía nada: si se reintenta, le llega cuando Telegram responda; si se "
+                 "descartó, no le llega."),
+        que_hacer=(_BUSCAR_DETALLE + ". Si se repite, revisá que Telegram responda; si se "
+                   "descartó, el administrador puede volver a pedirlo.")),
     ETAPA_EVIDENCIA_INVALIDA: ExplicacionDeEtapa(
         que_paso=("La evidencia que exige la política de un área tiene más "
                   "texto del que Telegram puede mostrar."),

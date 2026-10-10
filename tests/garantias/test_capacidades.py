@@ -56,11 +56,9 @@ PROMESAS_SIN_CUMPLIR = {
         "Cuándo se importó una versión de paquete.",
     "importado_por":
         "Quién aprobó una versión de paquete.",
-    "destinatario_app_user_id":
-        "Qué administrador de plataforma en particular recibió un aviso de "
-        "incidente (`admin_notice`). El despacho manda por chat_id, sin "
-        "necesitarla; queda para auditoría o soporte (\"¿le llegó a Ariel?\"), "
-        "igual que otorgado_por en platform_role.",
+    # `admin_notice.destinatario_app_user_id` salió de esta lista con la migración 0054: la
+    # respuesta del bot de administración la escribe (`despachador.encolar_respuesta_admin`,
+    # a quien se le contesta).
     "confirmado_por":
         "Quién confirmó un mensaje que esperaba confirmación humana en la cola "
         "(`message_outbox`, estado `esperando_confirmacion`, mecánica §12). La "

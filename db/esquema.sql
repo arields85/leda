@@ -2397,9 +2397,11 @@ create table conversation_access_log (
 -- arma la misma transacción, en ese orden, porque el texto del aviso no
 -- necesita el resumen que arma Python del lado de la aplicación) y una
 -- clave foránea en ese sentido rompería el insert.
+-- La migración 0054 suma las respuestas del bot de administración (`es_respuesta`), que no son
+-- incidentes: `incident_id` admite nulo, y una fila es exactamente una de las dos cosas.
 create table admin_notice (
   id                       uuid primary key default gen_random_uuid(),
-  incident_id              uuid not null,
+  incident_id              uuid,
   workspace_id             uuid references workspace(id) on delete set null,
   destinatario_app_user_id uuid not null references app_user(id) on delete cascade,
   chat_id                  bigint not null,
@@ -2410,11 +2412,36 @@ create table admin_notice (
   telegram_message_id      bigint,
   dedupe_key               text not null unique,
   intentos                 integer not null default 0,
-  ultimo_error             text
+  ultimo_error             text,
+  es_respuesta             boolean not null default false,
+  constraint admin_notice_incidente_o_respuesta
+    check ((incident_id is null) = es_respuesta)
 );
 
 comment on table admin_notice is
   'Cola de salida del bot de administración: un aviso por incidente y por administrador de plataforma alcanzable. Sin política de aislamiento por espacio -- no tiene un único espacio dueño -- y sin concesión a leda_app: sólo la escribe avisar_incidente_admin() (security definer) y sólo la despacha leda_admin (despachador.despachar_avisos_admin).';
+comment on column admin_notice.es_respuesta is
+  'La respuesta del bot de administración a un pedido de un administrador (migración 0054), no un aviso de incidente: sin incident_id. Si lleva el enlace de una tarea, su marca está en admin_notice_enlace y el despachador lo emite al mandarla.';
+
+-- La respuesta del bot de administración que lleva el enlace de una tarea (migración 0054; ADR
+-- 0019, 7a y 7b): la marca, como `message_outbox_enlace` para una persona del equipo. El
+-- despachador emite el acceso al mandarla (`pagina_de_tarea.emitir_para_administrador`, que
+-- revalida el rol), dentro del punto de retorno del envío: la base guarda sólo su hash y un
+-- envío que falla no deja ningún acceso. Sin política por espacio ni privilegio para leda_app,
+-- como `admin_notice`; la tarea es del espacio de la marca (clave compuesta).
+create table admin_notice_enlace (
+  id                 uuid primary key default gen_random_uuid(),
+  admin_notice_id    uuid not null references admin_notice(id) on delete cascade,
+  workspace_id       uuid not null references workspace(id) on delete cascade,
+  task_id            uuid not null,
+  admin_app_user_id  uuid not null references app_user(id) on delete cascade,
+  constraint admin_notice_enlace_task
+    foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
+  constraint admin_notice_enlace_uno_por_aviso unique (admin_notice_id)
+);
+
+comment on table admin_notice_enlace is
+  'Migración 0054 (ADR 0019, 7a y 7b): la respuesta del bot de administración lleva el enlace de esta tarea para este administrador de plataforma. El despachador lo emite al mandar; la base guarda sólo su hash (acceso_tarea). Sin privilegio para leda_app. Sólo se agrega.';
 
 -- Fan-out del aviso de un incidente a cada administrador de plataforma
 -- alcanzable. `security definer`, mismo motivo que `emitir_acceso_tablero`/

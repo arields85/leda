@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import itertools
 
 import pytest
 
@@ -52,11 +53,17 @@ def ada(conn, mundo) -> str:
     return usuario
 
 
+_MENSAJES = itertools.count(1)
+
+
 def _pedir(conn, texto: str, de: int = ADA, falla: bool = False) -> TransporteDePrueba:
+    """Un pedido por el bot de administración, cada uno en su propio mensaje de Telegram (uno
+    mismo entregado dos veces tiene una sola respuesta)."""
     salida = TransporteDePrueba()
     if falla:
         salida.falla_en.add(de)
-    atender_admin(conn, mensaje_de_telegram(1, texto, de), salida, imprimir=lambda *_: None)
+    atender_admin(conn, mensaje_de_telegram(next(_MENSAJES), texto, de), salida,
+                  imprimir=lambda *_: None)
     return salida
 
 

@@ -28,8 +28,8 @@ import psycopg
 from . import saludo
 from .calendario import Calendario
 from .incidentes import (ETAPA_ENTREGA_AVISO_ADMIN, ETAPA_ENTREGA_MENSAJE,
-                         ETAPA_ENTREGA_REINTENTO, REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
-                         registrar_incidente)
+                         ETAPA_ENTREGA_REINTENTO, ETAPA_RESPUESTA_ADMIN, REFERENCIA_ADMIN_NOTICE,
+                         redactar_secreto_telegram, registrar_incidente)
 from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, formatear, prepare_buttons,
                      prepare_payload, texto_y_entidades)
 
@@ -1288,7 +1288,7 @@ def _reportar_falla_saludo_aislada(cur, workspace_id: str,
 
 def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
                            ahora: datetime | None = None,
-                           lote: int = 50) -> dict[str, int]:
+                           lote: int = 50, solo: list[str] | None = None) -> dict[str, int]:
     """Entrega los avisos de incidente encolados para la administración de
     plataforma (`admin_notice`, T28, Constitución §10).
 
@@ -1324,24 +1324,50 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
     `'listo'` y se reenviarían. Con él se deshace sólo esa escritura, y el
     fallo no queda en silencio: se cuenta en
     `resumen["incidentes_sin_registrar"]` y deja una marca en el
-    `ultimo_error` del aviso."""
+    `ultimo_error` del aviso.
+
+    La cola lleva también las respuestas del bot de administración
+    (`es_respuesta`, migración 0054; `encolar_respuesta_admin`). La que lleva
+    el enlace de una tarea lo recibe recién al salir
+    (`_mandar_la_respuesta_con_enlace`): la base nunca guarda el token, y un
+    envío que falla no deja ningún acceso. Cada intento de una respuesta que
+    no sale deja su rastro (`_incidente_de_la_respuesta`); una que ya no puede
+    llevar su enlace se descarta (`resumen["descartados"]`). `solo` acota la
+    pasada a esas filas: la respuesta sale enseguida, sin esperar al ciclo."""
     ahora = ahora or datetime.now(timezone.utc)
     resumen = {"enviados": 0, "fallidos": 0, "agotados": 0,
-               "incidentes_sin_registrar": 0}
+               "incidentes_sin_registrar": 0, "descartados": 0}
 
     cur.execute(
-        """select id, workspace_id, chat_id, cuerpo, intentos
-             from admin_notice
-            where estado = 'listo' and programado_para <= %s
-            order by programado_para
+        """select a.id, a.workspace_id, a.chat_id, a.cuerpo, a.intentos, a.es_respuesta,
+                  e.task_id as enlace_tarea, e.workspace_id as enlace_espacio,
+                  e.admin_app_user_id as enlace_admin
+             from admin_notice a
+             left join admin_notice_enlace e on e.admin_notice_id = a.id
+            where a.estado = 'listo' and a.programado_para <= %s
+              and (%s::uuid[] is null or a.id = any(%s::uuid[]))
+            order by a.programado_para
             limit %s
-            for update skip locked""",
-        (ahora, lote))
+            for update of a skip locked""",
+        (ahora, solo, solo, lote))
     pendientes = cur.fetchall()
 
     for n in pendientes:
         try:
-            tg_id = transporte.enviar(n["chat_id"], n["cuerpo"])
+            if n["enlace_tarea"] is not None:
+                tg_id = _mandar_la_respuesta_con_enlace(cur, transporte, n, ahora)
+            else:
+                tg_id = transporte.enviar(n["chat_id"], n["cuerpo"])
+        except RespuestaSinEnlace as e:
+            # No se inventa un enlace ni sale una respuesta que lo promete: se descarta, con su
+            # incidente, sin avisar por el mismo canal.
+            cur.execute("update admin_notice set estado = 'descartado' where id = %s",
+                        (n["id"],))
+            _incidente_de_la_respuesta(
+                cur, n, f"Una respuesta del bot de administración con el enlace de una tarea se "
+                        f"descartó al mandarla: {e}. No quedó ningún enlace.")
+            resumen["descartados"] += 1
+            continue
         except Exception as e:  # noqa: BLE001 — se registra, no se propaga
             intentos = n["intentos"] + 1
             agotado = intentos >= MAX_INTENTOS
@@ -1358,6 +1384,13 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
                     where id = %s""",
                 (intentos, ultimo_error, estado, proximo, n["id"]))
             resumen["fallidos"] += 1
+            if n["es_respuesta"] and not agotado:
+                # La respuesta a un pedido de un administrador: cada intento que no salió deja su
+                # rastro (nunca en silencio); el que agota los intentos deja el suyo, abajo.
+                _incidente_de_la_respuesta(
+                    cur, n, f"La respuesta del bot de administración no salió en el intento "
+                            f"{intentos} de {MAX_INTENTOS} (no quedó ningún enlace): se "
+                            f"reintenta.", referencia_cruda=ultimo_error)
             if agotado:
                 resumen["agotados"] += 1
                 try:
@@ -1381,14 +1414,96 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
                          f"{type(exc_incidente).__name__}", n["id"]))
             continue
 
-        cur.execute(
-            """update admin_notice
-                  set estado = 'enviado', enviado_en = %s, telegram_message_id = %s
-                where id = %s""",
-            (ahora, tg_id, n["id"]))
+        if n["enlace_tarea"] is None:
+            cur.execute(
+                """update admin_notice
+                      set estado = 'enviado', enviado_en = %s, telegram_message_id = %s
+                    where id = %s""",
+                (ahora, tg_id, n["id"]))
         resumen["enviados"] += 1
 
     return resumen
+
+
+def encolar_respuesta_admin(cur, admin_app_user_id: str, chat_id: int, texto: str, *,
+                            clave: str,
+                            enlace_de: tuple[str, str] | None = None) -> str | None:
+    """La respuesta del bot de administración a un pedido de un administrador, en su cola
+    (`admin_notice`, `es_respuesta`; migración 0054), bajo la conexión administrativa. Sin el
+    enlace: si lo lleva (`enlace_de`: el espacio y la tarea), queda su marca
+    (`admin_notice_enlace`) y `despachar_avisos_admin` lo emite al mandarla, así la base nunca
+    guarda el token. `clave` la deduplica (el mensaje del pedido): ya encolada, `None`."""
+    cur.execute(
+        """insert into admin_notice (es_respuesta, workspace_id, destinatario_app_user_id,
+                                     chat_id, cuerpo, dedupe_key)
+           values (true, %s, %s, %s, %s, %s)
+           on conflict (dedupe_key) do nothing returning id""",
+        (enlace_de[0] if enlace_de else None, str(admin_app_user_id), chat_id, texto, clave))
+    fila = cur.fetchone()
+    if fila is None:
+        return None
+    if enlace_de is not None:
+        cur.execute(
+            """insert into admin_notice_enlace (admin_notice_id, workspace_id, task_id,
+                                                admin_app_user_id)
+               values (%s, %s, %s, %s)""",
+            (fila["id"], enlace_de[0], enlace_de[1], str(admin_app_user_id)))
+    return str(fila["id"])
+
+
+class RespuestaSinEnlace(Exception):
+    """Al mandar la respuesta con el enlace de una tarea, el enlace no se puede emitir: quien lo
+    pidió ya no es administrador de plataforma, o falta la dirección pública de la página."""
+
+
+def _mandar_la_respuesta_con_enlace(cur, transporte: Transporte, n, ahora: datetime) -> int:
+    """La respuesta del bot de administración que lleva el enlace de una tarea (migración 0054;
+    ADR 0019, 7a y 7b): en un punto de retorno propio se marca enviada, se emite el acceso
+    (`pagina_de_tarea.emitir_para_administrador`, que revalida el rol y lo audita) y se manda.
+    La base guarda sólo el hash; si el envío falla, el punto de retorno deshace la marca y el
+    acceso, y no queda ningún enlace vigente. El id de Telegram se guarda aparte: perderlo no
+    deshace un mensaje que ya salió."""
+    from . import pagina_de_tarea
+    from .config import config
+
+    if not config.base_url:
+        raise RespuestaSinEnlace("falta la dirección pública de la página (LEDA_BASE_URL)")
+    with cur.connection.transaction():
+        cur.execute("""update admin_notice set estado = 'enviado', enviado_en = %s
+                        where id = %s""", (ahora, n["id"]))
+        token = pagina_de_tarea.emitir_para_administrador(
+            cur, str(n["enlace_admin"]), str(n["enlace_espacio"]), str(n["enlace_tarea"]))
+        if token is None:
+            raise RespuestaSinEnlace("quien lo pidió ya no es administrador de plataforma")
+        tg_id = transporte.enviar(
+            n["chat_id"], f"{n['cuerpo']}\n{pagina_de_tarea.enlace(config.base_url, token)}",
+            None, sin_vista_previa=True)
+    try:
+        with cur.connection.transaction():
+            cur.execute("update admin_notice set telegram_message_id = %s where id = %s",
+                        (tg_id, n["id"]))
+    except Exception as exc_id:  # noqa: BLE001 -- se aísla, no deshace la marca
+        print(f"  ! no se pudo guardar el id de Telegram de la respuesta {n['id']} "
+              f"({type(exc_id).__name__}).")
+    return tg_id
+
+
+def _incidente_de_la_respuesta(cur, n, resumen: str, *,
+                               referencia_cruda: str | None = None) -> None:
+    """El incidente de una respuesta del bot de administración que no salió o se descartó, en
+    su propio punto de retorno (como el rastro de `_fallo`): sin avisar a la administración por
+    el mismo canal, y apuntando a la fila de la cola."""
+    try:
+        with cur.connection.transaction():
+            registrar_incidente(
+                cur, n["workspace_id"], resumen, severidad="baja",
+                referencia_cruda=referencia_cruda, etapa=ETAPA_RESPUESTA_ADMIN,
+                referencia_tipo=REFERENCIA_ADMIN_NOTICE, referencia_id=str(n["id"]),
+                chat_id=n["chat_id"], avisar_admin=False,
+                sin_avisar_porque="es la respuesta del mismo canal de administración.")
+    except Exception as e:  # noqa: BLE001 -- el rastro no puede tirar la pasada
+        print(f"  ! no se pudo registrar el incidente de la respuesta {n['id']} "
+              f"({type(e).__name__}).")
 
 
 def _fallo(cur, workspace_id: str, m, error: Exception, cal: Calendario,

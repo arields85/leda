@@ -22,11 +22,15 @@ tiene respuesta. Sólo en un chat privado: un enlace nunca sale a un grupo.
 (`pagina_de_tarea.emitir_para_administrador`: sólo el hash en la base, auditado); vale mientras
 tenga el rol y cada vez que lo abre queda en `audit_log` (la base, `leer_pagina_de_tarea`).
 
-**Sale directo, no por una cola.** La respuesta del bot de administración no pasa por
-`admin_notice` (la cola de los avisos de incidentes), porque esa cola guarda el texto y el token
-en claro no puede quedar en la base (ADR 0019, 7a). Es la respuesta inmediata a un pedido del
-administrador, como el acuse de un toque: se emite el acceso, se manda, y sólo si salió se
-confirma; si no sale, no queda ningún acceso y la falla queda como incidente.
+**Sale por la cola, y el enlace se emite al mandarla** (migración 0054; la corrección chica de
+la Fase C). La respuesta queda en `admin_notice` como respuesta (`es_respuesta`, sin incidente),
+sin el enlace: la cola guarda el texto, y el token en claro no puede quedar en la base (ADR 0019,
+7a). Si lleva el enlace, una marca dice de qué tarea y para quién (`admin_notice_enlace`), y el
+despachador lo emite recién al mandarla (`despachador.despachar_avisos_admin`), como el enlace de
+una persona del equipo (`message_outbox_enlace`): revalida el rol, la base guarda sólo el hash y,
+si el envío falla, no queda ningún acceso y queda un incidente; se reintenta como todo aviso a la
+administración. Se manda enseguida, por el mismo bot; un pedido que Telegram entrega dos veces
+tiene una sola respuesta (la clave es el mensaje).
 """
 
 from __future__ import annotations
@@ -35,9 +39,9 @@ from typing import Any, Callable
 
 from ..autoridad import Canal, Denegado, identificar
 from ..db import admin, espacio
-from ..despachador import Transporte, texto_error_seguro
+from ..despachador import (Transporte, despachar_avisos_admin, encolar_respuesta_admin,
+                           texto_error_seguro)
 from ..incidentes import registrar_incidente
-from ..pagina_de_tarea import emitir_para_administrador, enlace
 from .enlace import que_nombra, tareas_que_nombra
 from .recibir import registrar_admin
 
@@ -72,7 +76,14 @@ def atender_admin(conn, u: dict[str, Any], transporte: Transporte | None,
         with admin(conn) as cur:
             quien = identificar(cur, mensaje["from"]["id"], Canal.ADMINISTRACION, None)
         conn.commit()
-        _pedir_enlace(conn, quien.app_user_id, chat["id"], partes[1:], transporte)
+        texto, de_la_tarea = _pedir_enlace(conn, partes[1:])
+        aviso = _encolar(conn, quien.app_user_id, chat["id"], mensaje.get("message_id"), texto,
+                         de_la_tarea)
+        if aviso is not None:
+            # Enseguida, por el mismo bot: el despachador emite el enlace al mandarla.
+            with admin(conn) as cur:
+                despachar_avisos_admin(cur, transporte, solo=[aviso])
+            conn.commit()
         imprimir("  ← [admin] pedido de enlace atendido")
     except Denegado:
         conn.rollback()
@@ -92,45 +103,44 @@ def atender_admin(conn, u: dict[str, Any], transporte: Transporte | None,
     return True
 
 
-def _pedir_enlace(conn, usuario: str, chat_id: int, palabras: list[str],
-                  transporte: Transporte) -> None:
-    """El pedido: el espacio, la tarea y el enlace, o lo que falta. Si el mensaje no sale, la
-    transacción que emitió el acceso se deshace y la excepción sube."""
+def _pedir_enlace(conn, palabras: list[str]) -> tuple[str, dict[str, str] | None]:
+    """El pedido: el texto de la respuesta y, si es el enlace de una tarea, de qué espacio y qué
+    tarea (el enlace no va en el texto: lo agrega el despachador al mandarla)."""
     if len(palabras) < 2 or not que_nombra(" ".join(palabras[1:])):
-        _mandar(transporte, chat_id, USO)
-        return
+        return USO, None
     slug, dicho = palabras[0], " ".join(palabras[1:])
     with admin(conn) as cur:
         cur.execute("select id::text id, nombre from workspace where slug = %s", (slug,))
         ws = cur.fetchone()
     conn.commit()
     if ws is None:
-        _mandar(transporte, chat_id, f"No hay ningún espacio «{slug}».")
-        return
+        return f"No hay ningún espacio «{slug}».", None
     with espacio(conn, ws["id"]) as cur:
         coinciden = tareas_que_nombra(cur, ws["id"], dicho)
     conn.commit()
     if not coinciden:
-        _mandar(transporte, chat_id, f"En {ws['nombre']} no hay ninguna tarea que se llame así.")
-        return
+        return f"En {ws['nombre']} no hay ninguna tarea que se llame así.", None
     if len(coinciden) > 1:
-        _mandar(transporte, chat_id, _cual(ws, slug, coinciden))
-        return
+        return _cual(ws, slug, coinciden), None
     [tarea] = coinciden
     from ..config import config         # se lee al pedir: la dirección puede cambiar
     if not config.base_url:
-        _mandar(transporte, chat_id, SIN_PAGINA)
-        return
+        return SIN_PAGINA, None
+    return (f"La página de «{tarea['titulo']}» ({ws['nombre']}), sólo para vos. Cada vez que la "
+            f"abras queda registrado.", {"espacio": ws["id"], "tarea": str(tarea["id"])})
+
+
+def _encolar(conn, usuario: str, chat_id: int, message_id: int | None, texto: str,
+             de_la_tarea: dict[str, str] | None) -> str | None:
+    """La respuesta en la cola del bot de administración, sin el enlace
+    (`despachador.encolar_respuesta_admin`). Una por mensaje del pedido: si Telegram lo entrega
+    otra vez, ya tiene su respuesta (`None`)."""
     with admin(conn) as cur:
-        token = emitir_para_administrador(cur, usuario, ws["id"], tarea["id"])
-        if token is None:                  # dejó de ser administrador en el medio
-            raise Denegado("No sos administrador de plataforma.")
-        _mandar(transporte, chat_id,
-                f"La página de «{tarea['titulo']}» ({ws['nombre']}), sólo para vos. Cada vez "
-                f"que la abras queda registrado.\n"
-                f"{enlace(config.base_url, token)}",
-                sin_vista_previa=True)
+        aviso = encolar_respuesta_admin(
+            cur, usuario, chat_id, texto, clave=f"respuesta-admin:{chat_id}:{message_id}",
+            enlace_de=((de_la_tarea["espacio"], de_la_tarea["tarea"]) if de_la_tarea else None))
     conn.commit()
+    return aviso
 
 
 def _cual(ws: dict, slug: str, coinciden: list[dict]) -> str:
@@ -142,6 +152,3 @@ def _cual(ws: dict, slug: str, coinciden: list[dict]) -> str:
     return (f"En {ws['nombre']} coinciden {len(coinciden)}:\n" + "\n".join(renglones)
             + f"\n¿Cuál? Volvé a escribir /enlace {slug} con más palabras del título.")
 
-
-def _mandar(transporte: Transporte, chat_id: int, texto: str, **mas: Any) -> None:
-    transporte.enviar(chat_id, texto, None, **mas)

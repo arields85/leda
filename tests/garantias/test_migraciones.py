@@ -88,6 +88,11 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
 TABLAS_DE_CONFIGURACION = ("work_calendar", "holiday", "persona_config",
                            "workspace_version", "model_config")
 
+# La cola del bot de administración y la marca del enlace de una respuesta (migración 0054): sin
+# política por espacio (excepciones de `test_aislamiento.py`), pero sus columnas, restricciones y
+# privilegios tienen que converger y volver atrás como las demás.
+TABLAS_DE_LA_ADMINISTRACION = ("admin_notice", "admin_notice_enlace")
+
 # Las políticas de más de una tabla, además de la de aislamiento: `acceso_tarea` (migración
 # 0036) se encuentra por el hash del token antes de saber su espacio, sólo desde las funciones
 # de `leda_owner`.
@@ -225,7 +230,7 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "greeting_state",
               "message_outbox", "inbound_message") + TABLAS_DEL_MOTOR
-    tablas += TABLAS_DE_CONFIGURACION
+    tablas += TABLAS_DE_CONFIGURACION + TABLAS_DE_LA_ADMINISTRACION
     nombre = f"leda_rollback_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(nombre)))
@@ -291,8 +296,8 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "acceso_tablero",
               "greeting_state", "message_outbox", "inbound_message"
-              ) + TABLAS_DEL_MOTOR + TABLAS_DE_CONFIGURACION
-    con_politica = set(tablas) - {"acceso_tablero"}
+              ) + TABLAS_DEL_MOTOR + TABLAS_DE_CONFIGURACION + TABLAS_DE_LA_ADMINISTRACION
+    con_politica = set(tablas) - {"acceso_tablero"} - set(TABLAS_DE_LA_ADMINISTRACION)
     sufijo = uuid.uuid4().hex[:10]
     nombres = {"limpia": f"leda_limpia_{sufijo}",
                "migrada": f"leda_migrada_{sufijo}"}

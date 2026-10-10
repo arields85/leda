@@ -263,7 +263,7 @@ def test_despachar_avisos_admin_entrega_por_el_transporte_del_bot_de_administrac
     conn.commit()
 
     assert resumen == {"enviados": 1, "fallidos": 0, "agotados": 0,
-                       "incidentes_sin_registrar": 0}
+                       "incidentes_sin_registrar": 0, "descartados": 0}
     assert len(transporte.enviados) == 1
     assert transporte.enviados[0].chat_id == 644001
     assert fila["estado"] == "enviado"
@@ -286,7 +286,7 @@ def test_despachar_avisos_admin_reintenta_si_el_transporte_falla(conn, corework)
     conn.commit()
 
     assert resumen == {"enviados": 0, "fallidos": 1, "agotados": 0,
-                       "incidentes_sin_registrar": 0}
+                       "incidentes_sin_registrar": 0, "descartados": 0}
     assert fila["estado"] == "listo"          # menos de MAX_INTENTOS: reintenta
     assert fila["intentos"] == 1
     assert fila["ultimo_error"]
@@ -327,7 +327,7 @@ def test_despachar_avisos_admin_pospone_con_backoff_creciente(conn, corework):
             resumen_inmediato = despachar_avisos_admin(cur, transporte, ahora)
         conn.commit()
         assert resumen_inmediato == {"enviados": 0, "fallidos": 0, "agotados": 0,
-                                     "incidentes_sin_registrar": 0}
+                                     "incidentes_sin_registrar": 0, "descartados": 0}
 
         ahora = fila["programado_para"]  # simula que pasó el backoff
 

@@ -183,6 +183,10 @@ EXCEPCIONES_SIN_RLS = {
         "la cola del bot de administración: no tiene un único espacio dueño (workspace_id "
         "admite nulo y queda en nulo si se borra el espacio); la escribe "
         "avisar_incidente_admin() y la despacha leda_admin"),
+    "admin_notice_enlace": (
+        "la marca del enlace de una respuesta del bot de administración (migración 0054): como "
+        "admin_notice, la escribe y la despacha sólo leda_admin; la tarea es del espacio de la "
+        "marca por su clave compuesta"),
     "conversation_access_log": (
         "el registro de accesos del administrador a conversaciones (constitución §12): lo "
         "escribe y lo lee sólo la administración de plataforma"),
