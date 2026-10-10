@@ -702,7 +702,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         la redacción y el envío), sale sin el enlace con un incidente de severidad baja, y el
         texto de la IA pudo haberlo anunciado: caso de borde.
       - **Revocar los enlaces** de una persona o de una tarea (7a) existe en la base
-        (`acceso_tarea.revocado_en`), sin comando todavía: va con la porción 5.
+        (`acceso_tarea.revocado_en`), sin comando todavía: va con la porción 5. Hecho en la
+        porción 5 (`python -m leda revocar-enlaces`).
     - **Para la porción 5** (el acceso del administrador por el bot de administración): un acceso
       atado al usuario de plataforma y no a una membresía (`acceso_tarea.membership_id` es
       obligatorio: otra tabla o una columna nueva), cada vista también en `audit_log`, el comando
@@ -933,7 +934,86 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           --veces 1 --sin-informe`, **45 de 45 bien**. Sin la IA real; informes borrados.
         - `PENDIENTE`: **el porqué de un "no"** (sigue la pregunta de arriba); la IA real sobre la
           31 y la 45 (la redacción de una oferta opcional, `opcional`, y del fin sin respuesta).
-  - [ ] Porción 5: el acceso del administrador.
+  - [x] **Porción 5: el acceso del administrador** (2026-10-09; ADR 0019, decisiones 3 y 7b, y la
+    nota "Para la porción 5" de la porción 4; migración `0052`). Route: delegada (escritor único,
+    2+ archivos no triviales).
+    - **El enlace del administrador** (`pagina_de_tarea.emitir_para_administrador`): atado a su
+      usuario de plataforma y a una tarea de un espacio, no a una membresía
+      (`acceso_tarea.admin_app_user_id`, exactamente uno de los dos con `membership_id`). Lo
+      emite la conexión administrativa (`leda_admin`); la clave compuesta de siempre lo ata a una
+      tarea de ese espacio, y la página lee sólo esa tarea. Vale mientras tenga el rol de
+      plataforma (`acceso_tarea_vigente` lo revalida en cada pedido); `puede_ver_tarea` no sabe
+      nada de la plataforma. Una guarda de la base (`exigir_administrador_de_plataforma`, al
+      agregar) deja escribir lo de un administrador sólo a `leda_admin` y sólo para quien tiene
+      el rol. La emisión queda auditada (`emitir_acceso_tarea_de_administrador`).
+    - **Por el bot de administración** (`leda.motor.administracion`; el escuchador y el
+      webhook): no tiene IA ni motor, así que atiende un solo pedido cerrado, `/enlace <espacio>
+      <palabras del título o el nombre de quien la tiene>`, sólo en un chat privado. La tarea se
+      busca con la regla de `pedir_enlace` (`enlace.tareas_que_nombra`, sacada de
+      `_las_que_coinciden`), en la transacción de ese espacio; si coinciden varias, las nombra y
+      pregunta cuál; si ninguna, o el espacio no existe, lo dice; cualquier otro mensaje no tiene
+      respuesta. Por el bot del espacio, un administrador es sólo su rol en ese espacio
+      (constitución §2): sin cambios, con su prueba.
+    - **La respuesta sale directo, no por `admin_notice`**: esa cola guarda el texto, y el token en
+      claro no puede quedar en la base (7a). Se emite el acceso, se manda y sólo si salió se
+      confirma; si no sale, no queda ningún acceso y queda un incidente (sin aviso por el mismo
+      canal que falló).
+    - **Cada vista y cada descarga del administrador van además a `audit_log`**
+      (`ver_pagina_de_tarea`, `bajar_archivo_de_tarea`; 7b, 7e, constitución §12), escritas por
+      las funciones de la página con el espacio del token, la versión del pack y la del núcleo
+      (que pasa `pagina_de_tarea.leer` en `leda.nucleo_hash`). Las de una persona del equipo, no.
+    - **Revocar** (`pagina_de_tarea.revocar`; `python -m leda revocar-enlaces <espacio>
+      --persona | --tarea | --administrador`): los enlaces vigentes de una persona, de una tarea o
+      de un administrador, en un espacio; un enlace ya mandado deja de abrir; sólo lo revocado de
+      verdad queda auditado (`revocar_enlaces_de_tarea`, actor `sistema`, como `administrador`).
+      Se revocan también los de quien ya no es administrador.
+    - **El retiro de contenido por la administración** (`pagina_de_tarea.retirar_contenido`;
+      `python -m leda retirar-contenido <espacio> --tarea ...`, que sin `--pieza` lista lo
+      entregado y con `--pieza N --administrador NOMBRE --motivo TEXTO` retira): una fila de
+      `evidencia_retirada` con `retirada_por_app_user_id` (una vez por quien la entregó y una por
+      la administración: dos índices únicos parciales en lugar de `evidencia_retirada_una_vez`),
+      también para las otras piezas del espacio con el mismo archivo (uno por huella). Nada se
+      borra. La página dice "contenido retirado por la administración"; la base ya no devuelve el
+      texto, el enlace ni el nombre de ninguna pieza retirada, y no sirve un archivo cuyo
+      contenido retiró la administración por ninguna pieza. Como cualquier retirada, deja de
+      contar para la política y no va en los avisos. Auditado con quién y por qué
+      (`retirar_contenido_de_evidencia`).
+    - **Test primero:** `tests/garantias/test_acceso_del_administrador.py` y
+      `tests/test_cli_enlaces_de_tarea.py` en rojo, **28 failed, 2 passed** (las dos miran que algo
+      no pase: las vistas de una persona no se auditan; `revocar-enlaces` sin criterio sale con
+      error); `tests/motor/test_bot_de_administracion.py`, 13, en rojo por error de colección
+      (no existía `leda.motor.administracion`). Con la `0052` y sin el código, 17 failed. La de
+      revocar a quien ya no es administrador se escribió después, sin rojo observado (con la
+      guarda también al cambiar, hubiera fallado). **Verde:** las de la base y la página, 69
+      passed (con `test_pagina_de_la_tarea.py` y `test_pagina_web_de_la_tarea.py`); las del bot,
+      el escuchador y el enlace, 92 passed; las de la consola, 27 passed (con `test_cli.py` y
+      `test_administrador_plataforma.py`); `test_migraciones.py` y `test_aislamiento.py`, 22
+      passed (vuelta atrás de la `0052` ensayada; paridad limpia y migrada).
+    - **Commits:** `a6c3a07` (la `0052`, la página y las funciones de la administración),
+      `9fc1191` (el bot de administración), `3c9e150` (la consola), `c06fa6d` (la frontera del motor declara el uso de la credencial) y el
+      que registra esto.
+    - **Chequeos** (2026-10-10, sobre `c06fa6d`): `pytest tests/motor tests/garantias tests/conversaciones tests/test_administrador_plataforma.py`, **1740 passed** (22 min; la primera corrida, sobre `3c9e150`, dio 1739 y 1 falla: `test_frontera.py`, el motor importaba `leda.pagina_de_tarea` sin declararlo, corregido en `c06fa6d`); en seco, `correr --ia guionada --veces 1 --sin-informe`, **45 de 45 bien** (sin informes escritos). Sin la IA
+      real (no cambia nada de la conversación con el equipo).
+    - `PENDIENTE` (preguntas para el usuario, sin decidir):
+      - **Borrar los bytes del archivo.** El ADR (decisión 3) dice que la administración "puede
+        borrar el contenido de `archivo`"; esta porción lo marca y nunca lo muestra ni lo sirve,
+        pero el contenido sigue guardado (se pidió que nada se borre). Borrarlo pide aflojar la
+        inmutabilidad de `archivo` (su huella y su disparador). ¿Se borra o alcanza con
+        retirarlo?
+      - **¿Lo retirado por la administración sigue contando para la política?** Hoy, como
+        cualquier retirada, deja de contar: una entrega en revisión puede quedar sin cubrir.
+      - **Quién revoca:** la consola no sabe qué administrador la corre; la revocación queda como
+        acto del `sistema` (como `administrador`). ¿Hace falta nombrar quién, como al retirar?
+    - `PENDIENTE` (casos de borde, fuera de esta porción):
+      - **La misma foto mandada otra vez** después del retiro crea otra pieza con el mismo
+        archivo: la página no la muestra ni la sirve, pero los avisos del motor
+        (`entrega.py`, `herramientas.py`) miran sólo el retiro de cada pieza y la podrían
+        adjuntar; y un adjunto ya encolado en `message_outbox_adjunto` antes del retiro sale
+        igual (el despachador quedó fuera de esta porción).
+      - **La respuesta del bot de administración no pasa por una cola** (arriba, el porqué): si
+        se quiere por `admin_notice`, el despachador tendría que emitir el token al mandar, como
+        con `message_outbox_enlace`.
+      - **Cuando exista el panel de plataforma** (ADR 0004), este acceso se muda allá (7b).
 - [ ] **C-3d.** Lo que decidió el usuario el 2026-10-08 (preguntas 10 a 20), en este orden. Route de
   cada una: delegada (escritor único, 2+ archivos no triviales), una por vez, revisión RDD por commit.
   - [x] **D1.** El comparador del corredor: la garantía es "lo escrito es lo confirmado"; mostrar lo
@@ -3162,7 +3242,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] El informe al grupo de la C-6 (decisión 25; conversación 41, `0048`), con la corrección de
       la C-6 (una sola regla para lo contado, el día dado en la lista como previsión, la escalera
       anclada al vencimiento). Falta su revisión RDD, la IA real y la prueba por Telegram.
-- [ ] Porción 5 de la C-3: el acceso del administrador por el bot de administración.
+- [x] Porción 5 de la C-3: el acceso del administrador por el bot de administración (`0052`;
+      `a6c3a07`, `9fc1191`, `3c9e150`, `c06fa6d`).
 - [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 38 (una ronda, cupo
       primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0045` (respaldo previo).
 
