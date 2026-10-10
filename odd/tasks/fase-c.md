@@ -3577,9 +3577,53 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       sin otra ronda después: `despachador.py:1373-1374` (la respuesta inmediata saltea la espera
       entre reintentos), `despachador.py:1426-1430` (la falla al anotar un intento, sin prueba),
       `herramientas.py:3236-3238` (el motivo de un pedido terminado se puede pisar).
-- [ ] Al encargado anterior al que se le había pedido el detalle, que el pedido terminó (no hace
+- [x] Al encargado anterior al que se le había pedido el detalle, que el pedido terminó (no hace
       falta que conteste): la regla de cerrar el tema para todos (constitución §8, decisión 39),
-      resuelto por el coordinador el 2026-10-10. Hoy sólo se le cierran los botones.
+      resuelto por el coordinador el 2026-10-10. Hecho el 2026-10-10, con las tres advertencias
+      de la revisión de arriba (sin migración). Route: delegada (escritor único, 2+ archivos no
+      triviales).
+      - **El aviso al encargado anterior** (`detalle._sin_encargado`, `_a_quien_se_le_pregunto`):
+        cuando el pedido termina porque el sector se quedó sin encargado, a quien le llegó la
+        última pregunta (la repetición si salió; si no, la primera; con el pedido que sigue al
+        encargado de ahora, puede ser otro que el del principio) le llega una vez, como
+        información de coordinación a la hora en que Leda escribe y redactada por la IA, el tipo
+        que ya existía (`como_termino_el_pedido_del_detalle`) con los hechos que ya tenían
+        significado: `ya_no_espera_su_respuesta` y `pidio` (sólo quien lo pidió, como en la
+        pregunta que recibió; nada de la administración ni del sector sin encargado). Si la
+        pregunta no le llegó, si ya no está en el espacio o si Leda no le puede escribir
+        (`persecucion.alcanzable`), no se le guarda nada. Los significados de `pidio` y del aviso
+        ahora nombran también el pedido del detalle (`hechos.py`).
+      - **`herramientas.py:3236-3238`, el motivo de un pedido terminado:** la base ya negaba
+        pisarlo (`vigilar_pedido_de_detalle`), pero con un error que volvía atrás la vuelta entera
+        de la escalera. Ahora la escritura sostiene la guarda (`and estado =
+        'esperando_decision' returning id`): uno que ya terminó conserva estado, motivo y fecha,
+        sin otra auditoría, y la función devuelve `None`.
+      - **`despachador.py:1373-1374`, la respuesta inmediata y la espera entre reintentos:** con
+        `solo`, la pasada ignora la hora sólo en el primer envío (`intentos = 0`); una respuesta
+        que ya falló espera la hora de su reintento.
+      - **`despachador.py:1426-1430`, la falla al anotar un intento:** prueba nueva (un error de
+        la base al anotarlo): la pasada sigue, el enlace que ya salió en ella abre, la otra
+        respuesta queda en la cola como estaba (sin un intento contado ni acceso) y la pasada
+        siguiente la intenta. Sin defecto: la prueba pasó al primer intento.
+      - **Test primero:** las seis pruebas nuevas de los tres primeros puntos y la del cuarto,
+        **4 failed, 6 passed** (el aviso al encargado anterior, dos; el motivo, con el error de
+        la base; la respuesta que ya falló salía igual); verde,
+        `test_pedir_el_detalle.py` y `test_respuesta_del_bot_de_administracion.py`, **61 passed**.
+      - **Commits:** `80554c0` (el aviso y el motivo), `fbd5439` (el despachador) y el que
+        registra esto.
+      - **Chequeos** (2026-10-10, sobre `fbd5439`):
+        - `pytest tests/motor tests/garantias tests/conversaciones tests/test_administrador_plataforma.py tests/test_cli_enlaces_de_tarea.py tests/test_avisos_admin.py`: **1841 passed** (24 min 30 s).
+        - En seco, `correr --ia guionada --veces 1 --sin-informe`: **45 de 45 bien** (garantías 45 de 45).
+      - `PENDIENTE`:
+        - La IA real sobre el aviso al encargado anterior (va con la tanda de pruebas).
+        - Una respuesta del bot de administración cuyo intento no se pudo anotar se reintenta en
+          la pasada siguiente sin espera (no se contó el intento) y sin incidente de ese intento
+          (sólo la consola y `resumen["fallidos"]`).
+        - Correr juntos `tests/motor/test_pedir_el_detalle.py`,
+          `tests/garantias/test_respuesta_del_bot_de_administracion.py`,
+          `tests/test_avisos_admin.py` y `tests/motor/test_bot_de_administracion.py` da
+          `fixture 'mundo' not found` en las 14 de esta última (orden de recolección; sola, 14
+          passed; no se tocó).
 - [ ] Un sector sin encargado un rato (mientras se cambia uno por otro) termina los pedidos que
       esperaban: para la plataforma, cambiar de encargado es un solo paso, sin hueco
       (`docs/product/plataforma-pendientes.md`).
