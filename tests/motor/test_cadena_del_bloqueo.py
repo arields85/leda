@@ -186,6 +186,27 @@ def test_sin_decir_de_quien_es_pregunta_quien_se_encarga(conn, mundo, equipo):
                    _membresia(mundo, "Ariel")) == 1
 
 
+def test_la_pregunta_de_quien_se_encarga_recuerda_lo_que_pregunta(conn, mundo, equipo):
+    """La pregunta abierta es de quien destraba (`cuando_se_destraba`), pero lo que se le pregunta
+    ahora es quién se encarga: queda en la pregunta, y lo lleva cada aviso que la vuelve a hacer
+    (`preguntas.lo_anotado`), para que nunca se repita como si fuera para cuándo (ronda real del
+    2026-10-10, conversación 34)."""
+    from leda.motor.preguntas import lo_anotado
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+
+    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"lo_que_dice": "no me corresponde eso"}))
+
+    pregunta = _su_pregunta(conn, mundo, "Ariel")
+    assert lo_anotado(pregunta)["falta"] == ["quien_se_encarga"]
+
+
+def test_lo_que_pregunta_la_pregunta_a_quien_destraba_lo_dice_lo_que_falta():
+    """El significado del tipo de la pregunta a quien destraba no contradice lo que falta: la
+    misma pregunta abierta pregunta para cuándo, quién se encarga o qué arreglaron."""
+    significado = hechos_mod.SIGNIFICADOS["cuando_se_destraba"]
+    assert "(falta)" in significado
+
+
 def test_el_segundo_sin_decir_de_quien_es_tambien_pregunta_quien_se_encarga(conn, mundo,
                                                                            equipo):
     """Con lugar en la cadena (decisión 51), el segundo que no dice de quién es recibe la misma

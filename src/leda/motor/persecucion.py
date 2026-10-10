@@ -1051,17 +1051,19 @@ def _preguntar(ctx: Contexto, tarea: dict[str, Any], destraba: dict[str, Any],
     """Lo que dijo quien destraba no alcanza para anotarlo: su pregunta sigue abierta, con su
     espera, y recuerda lo que ya dijo (`recuerda`, en los datos de su jugada: lo dice la
     repetición, `preguntas.lo_anotado`) y lo que Leda ya le preguntó (`pregunto`, aparte: no se
-    vuelve a preguntar). Si el mensaje de Leda todavía no le llegó, se la hace
-    ahora, atada a la misma fila que la habría abierto (`avisos._abre_cuando_se_destraba`); ese
-    mensaje ya no sale (`avisos.ya_contesto_quien_destraba`). Los hechos la nombran como a toda
-    pregunta."""
+    vuelve a preguntar). Lo que se le pregunta ahora (lo que falta, `hecho["falta"]`) también
+    queda en sus datos: la pregunta es siempre de tipo `cuando_se_destraba`, y sin eso el aviso
+    que la repite la haría como si fuera para cuándo. Si el mensaje de Leda todavía no le llegó,
+    se la hace ahora, atada a la misma fila que la habría abierto
+    (`avisos._abre_cuando_se_destraba`); ese mensaje ya no sale
+    (`avisos.ya_contesto_quien_destraba`). Los hechos la nombran como a toda pregunta."""
     if pregunta is not None:
         jugada = dict(pregunta["jugada"] or {})
     else:
         jugada = {"nombre": "anotar_quien_destraba",
                   "datos": {"responsable": destraba["responsable"], "causa": destraba["causa"]},
                   "destraba_id": str(destraba["id"])}
-    jugada["datos"] = {**(jugada.get("datos") or {}), **recuerda}
+    jugada["datos"] = {**(jugada.get("datos") or {}), **recuerda, "falta": list(hecho["falta"])}
     jugada[pregunto] = True
     ahora, pregunta_id = preguntas.abrir_con_id(ctx, preguntas.CUANDO_SE_DESTRABA, tarea["id"],
                                                 jugada=jugada)

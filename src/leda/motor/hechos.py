@@ -859,8 +859,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "espera_que_la_destrabe": "Una tarea de otra persona, trabada, que la persona que escribe "
                               "puede destrabar: lo dijo quien la tiene (responsable), con lo "
                               "que la traba (causa). No es una tarea suya.",
-    "cuando_se_destraba": "Pregunta a quien puede destrabar la tarea de otra persona para "
-                          "cuándo lo resuelve: espera su respuesta.",
+    "cuando_se_destraba": "Pregunta a quien puede destrabar la tarea de otra persona lo que "
+                          "falta saber de eso (falta) o, si no dice qué falta, para cuándo lo "
+                          "resuelve: espera su respuesta.",
     "pregunta_a_quien_destraba": "Mensaje de Leda, como Leda, a quien puede destrabar la tarea "
                                  "de otra persona: quién está trabado (responsable), con qué "
                                  "tarea y qué le falta (causa), como lo dijo esa persona, y la "
