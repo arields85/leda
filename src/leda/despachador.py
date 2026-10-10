@@ -1261,9 +1261,7 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
     except NoQuedaNingunAdjunto:
         # El punto de retorno ya deshizo la marca: se descarta, con su incidente, sin contar
         # un intento ni dejar el rastro de una falla de Telegram que no hubo.
-        cur.execute("update message_outbox set estado = 'descartado' where id = %s", (m["id"],))
-        _avisar_lo_retirado(cur, workspace_id, m, len(m["adjuntos"]), sale_el_resto=False)
-        return None
+        return _descartar_el_album_vacio(cur, workspace_id, m)
     except Exception as e:  # noqa: BLE001 — se registra, no se propaga
         _fallo(cur, workspace_id, m, e, cal, ahora)
         enviado = False
@@ -1272,6 +1270,31 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
     if falla_saludo is not None:
         _reportar_falla_saludo_aislada(cur, workspace_id, falla_saludo)
     return enviado
+
+
+def _descartar_el_album_vacio(cur, workspace_id: str, m) -> bool | None:
+    """El álbum que se quedó sin nada al salir se descarta, con su incidente, cada uno en su
+    propio punto de retorno (revisión de la corrección chica): un error de la base en cualquiera
+    de los dos no puede abortar la transacción de la pasada, que deshacería lo que ya salió en
+    ella y lo volvería a mandar. Si el descarte no se pudo escribir, la fila sigue en la cola y
+    la pasada siguiente lo intenta otra vez (`False`, sin contar un intento de Telegram); si
+    sólo falló el incidente, el álbum queda descartado igual (`None`). Las dos fallas quedan en
+    la consola, sin el texto crudo."""
+    try:
+        with cur.connection.transaction():
+            cur.execute("update message_outbox set estado = 'descartado' where id = %s",
+                        (m["id"],))
+    except Exception as e:  # noqa: BLE001 -- se aísla, no tira la pasada
+        print(f"  ! no se pudo descartar el álbum vacío {m['id']} ({type(e).__name__}); "
+              f"se intenta en la pasada siguiente.")
+        return False
+    try:
+        with cur.connection.transaction():
+            _avisar_lo_retirado(cur, workspace_id, m, len(m["adjuntos"]), sale_el_resto=False)
+    except Exception as e:  # noqa: BLE001 -- se aísla, no tira la pasada
+        print(f"  ! no se pudo registrar el incidente del álbum vacío {m['id']} "
+              f"({type(e).__name__}).")
+    return None
 
 
 def _reportar_falla_saludo_aislada(cur, workspace_id: str,
@@ -1333,7 +1356,10 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
     envío que falla no deja ningún acceso. Cada intento de una respuesta que
     no sale deja su rastro (`_incidente_de_la_respuesta`); una que ya no puede
     llevar su enlace se descarta (`resumen["descartados"]`). `solo` acota la
-    pasada a esas filas: la respuesta sale enseguida, sin esperar al ciclo."""
+    pasada a esas filas: la respuesta sale enseguida, sin esperar al ciclo ni su hora (la cola
+    la anota con el reloj de la base, que puede ir un poco adelantado del de la aplicación).
+    Lo que falla al anotar o descartar una fila va en su propio punto de retorno: nunca vuelve
+    atrás la pasada, que dejaría sin abrir los enlaces que ya salieron en ella."""
     ahora = ahora or datetime.now(timezone.utc)
     resumen = {"enviados": 0, "fallidos": 0, "agotados": 0,
                "incidentes_sin_registrar": 0, "descartados": 0}
@@ -1344,12 +1370,13 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
                   e.admin_app_user_id as enlace_admin
              from admin_notice a
              left join admin_notice_enlace e on e.admin_notice_id = a.id
-            where a.estado = 'listo' and a.programado_para <= %s
+            where a.estado = 'listo'
+              and (a.programado_para <= %s or %s::uuid[] is not null)
               and (%s::uuid[] is null or a.id = any(%s::uuid[]))
             order by a.programado_para
             limit %s
             for update of a skip locked""",
-        (ahora, solo, solo, lote))
+        (ahora, solo, solo, solo, lote))
     pendientes = cur.fetchall()
 
     for n in pendientes:
@@ -1360,9 +1387,18 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
                 tg_id = transporte.enviar(n["chat_id"], n["cuerpo"])
         except RespuestaSinEnlace as e:
             # No se inventa un enlace ni sale una respuesta que lo promete: se descarta, con su
-            # incidente, sin avisar por el mismo canal.
-            cur.execute("update admin_notice set estado = 'descartado' where id = %s",
-                        (n["id"],))
+            # incidente, sin avisar por el mismo canal. En su propio punto de retorno: si el
+            # descarte falla, la pasada no vuelve atrás (los enlaces que ya salieron en ella
+            # siguen abriendo) y la respuesta queda en la cola para la pasada siguiente.
+            try:
+                with cur.connection.transaction():
+                    cur.execute("update admin_notice set estado = 'descartado' where id = %s",
+                                (n["id"],))
+            except Exception as exc:  # noqa: BLE001 -- se aísla, no tira la pasada
+                print(f"  ! no se pudo descartar la respuesta {n['id']} "
+                      f"({type(exc).__name__}); se intenta en la pasada siguiente.")
+                resumen["fallidos"] += 1
+                continue
             _incidente_de_la_respuesta(
                 cur, n, f"Una respuesta del bot de administración con el enlace de una tarea se "
                         f"descartó al mandarla: {e}. No quedó ningún enlace.")
@@ -1377,12 +1413,21 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
             # recortar primero podría cortar un token a la mitad y dejar
             # el resto sin que el patrón lo reconozca.
             ultimo_error = redactar_secreto_telegram(str(e))[:500]
-            cur.execute(
-                """update admin_notice
-                      set intentos = %s, ultimo_error = %s, estado = %s,
-                          programado_para = coalesce(%s, programado_para)
-                    where id = %s""",
-                (intentos, ultimo_error, estado, proximo, n["id"]))
+            try:
+                # En su propio punto de retorno, como el descarte de arriba: anotar el intento
+                # no puede volver atrás lo que ya salió en la pasada.
+                with cur.connection.transaction():
+                    cur.execute(
+                        """update admin_notice
+                              set intentos = %s, ultimo_error = %s, estado = %s,
+                                  programado_para = coalesce(%s, programado_para)
+                            where id = %s""",
+                        (intentos, ultimo_error, estado, proximo, n["id"]))
+            except Exception as exc:  # noqa: BLE001 -- se aísla, no tira la pasada
+                print(f"  ! no se pudo anotar el intento del aviso {n['id']} "
+                      f"({type(exc).__name__}).")
+                resumen["fallidos"] += 1
+                continue
             resumen["fallidos"] += 1
             if n["es_respuesta"] and not agotado:
                 # La respuesta a un pedido de un administrador: cada intento que no salió deja su
@@ -1395,10 +1440,12 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
                 resumen["agotados"] += 1
                 try:
                     with cur.connection.transaction(force_rollback=False):
+                        que = ("Una respuesta del bot de administración (no quedó ningún "
+                               "enlace)" if n["es_respuesta"]
+                               else "Un aviso a la administración")
                         registrar_incidente(
                             cur, n["workspace_id"],
-                            f"Un aviso a la administración no se pudo entregar "
-                            f"tras {MAX_INTENTOS} intentos.",
+                            f"{que} no se pudo entregar tras {MAX_INTENTOS} intentos.",
                             severidad="alta", referencia_cruda=ultimo_error,
                             etapa=ETAPA_ENTREGA_AVISO_ADMIN,
                             referencia_tipo=REFERENCIA_ADMIN_NOTICE,

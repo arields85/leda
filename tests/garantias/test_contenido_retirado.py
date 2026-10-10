@@ -382,6 +382,39 @@ def test_un_album_que_se_queda_sin_nada_al_salir_se_descarta_sin_contar_un_inten
     assert incidente["severidad"] == "baja"
 
 
+def test_si_falla_el_incidente_del_album_vacio_la_pasada_sigue(conn, mundo, ada, monkeypatch):
+    """Revisión de la corrección chica (`despachador.py:1261-1266`): el descarte del álbum que se
+    quedó sin nada al salir corría sin su propio punto de retorno. Si su incidente fallaba con un
+    error de la base, la transacción de la pasada quedaba abortada y lo que ya había salido en
+    ella (el texto del aviso) volvía atrás, para salir otra vez. Ahora el descarte y su incidente
+    van aislados, como los demás rastros del despachador: la pasada sigue y el álbum queda
+    descartado."""
+    from leda import despachador
+
+    foto = mundo["norte"]["piezas"]["foto"]
+    _album(conn, mundo, [foto])
+    _retirar(conn, mundo, ada, foto)
+    monkeypatch.setattr(despachador, "_adjuntos_que_salen", lambda cur, m: ["antes"])
+    original = despachador._avisar_lo_retirado
+
+    def falla_si_no_queda_nada(cur, workspace_id, m, cuantos, *, sale_el_resto):
+        if not sale_el_resto:
+            cur.execute("select 1 / 0")         # una falla de la base: aborta la transacción
+        return original(cur, workspace_id, m, cuantos, sale_el_resto=sale_el_resto)
+
+    monkeypatch.setattr(despachador, "_avisar_lo_retirado", falla_si_no_queda_nada)
+
+    transporte = TransporteQueLeeLosAdjuntos()
+    r = _despachar(conn, mundo, transporte)
+    assert r["descartados"] == 1 and r["fallidos"] == 0 and r["enviados"] == 1
+    with admin(conn) as cur:
+        cur.execute("""select dedupe_key, estado, intentos from message_outbox
+                        where dedupe_key like 'aviso:1%%' order by dedupe_key""")
+        filas = {f["dedupe_key"]: (f["estado"], f["intentos"]) for f in cur.fetchall()}
+    conn.commit()
+    assert filas == {"aviso:1": ("enviado", 0), "aviso:1:adjuntos": ("descartado", 0)}
+
+
 # --- La vuelta atrás ---------------------------------------------------------------------------
 
 def test_el_rollback_de_la_0053_se_niega_con_un_contenido_borrado(conn, mundo, ada):

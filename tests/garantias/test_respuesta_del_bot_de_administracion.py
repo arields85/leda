@@ -187,6 +187,147 @@ def test_sin_la_direccion_publica_al_salir_no_sale_un_enlace_inventado(conn, mun
     assert _respuestas(conn)[0]["estado"] == "descartado"
 
 
+def test_si_la_pasada_vuelve_atras_no_queda_ningun_acceso_vigente(conn, mundo, ada):
+    """Revisión de la corrección chica (`despachador.py:1471-1480`): el acceso se emite dentro
+    de la transacción de la pasada. Si la pasada entera vuelve atrás después de mandarla (el
+    `commit` de quien llama falla), el acceso vuelve atrás con ella: el enlace que salió no abre
+    nada, la respuesta vuelve a la cola y la pasada siguiente manda uno nuevo, el único
+    vigente. Nunca queda un acceso de un envío que la base no registró."""
+    falla = TransporteDePrueba(falla_en={ADA})
+    _pedir(conn, falla)
+    [respuesta] = _respuestas(conn)
+
+    salio = TransporteDePrueba()
+    with admin(conn) as cur:
+        despachar_avisos_admin(cur, salio, ahora=respuesta["programado_para"])
+        raise psycopg.Rollback()        # la pasada vuelve atrás: el commit no llegó
+    [enviado] = salio.enviados
+    perdido = hashlib.sha256(_el_token(enviado.texto).encode()).hexdigest()
+    assert _accesos(conn) == []
+    assert _respuestas(conn)[0]["estado"] == "listo"
+
+    anda = TransporteDePrueba()
+    _despachar(conn, anda, ahora=respuesta["programado_para"])
+    [acceso] = _accesos(conn)
+    assert acceso["token_hash"] == hashlib.sha256(_el_token(anda.enviados[0].texto)
+                                                  .encode()).hexdigest()
+    assert acceso["token_hash"] != perdido
+
+
+class _ElDescarteFalla:
+    """Un cursor cuya escritura del descarte de una respuesta falla con un error de la base."""
+
+    def __init__(self, cur) -> None:
+        self._cur = cur
+
+    def execute(self, sql, params=None, **kw):
+        if "set estado = 'descartado'" in sql:
+            return self._cur.execute("select 1 / 0")
+        return self._cur.execute(sql, params, **kw)
+
+    def __getattr__(self, nombre):
+        return getattr(self._cur, nombre)
+
+
+def test_una_falla_de_otra_respuesta_no_deja_muerto_el_enlace_que_ya_salio(conn, mundo, ada):
+    """Revisión de la corrección chica (el enlace muerto si la pasada vuelve atrás): en la misma
+    pasada, la respuesta de Ada sale con su enlace y la de otra persona, que ya no es
+    administradora, se descarta. Si ese descarte fallaba con un error de la base, la pasada
+    entera volvía atrás y el enlace que Ada ya tenía en Telegram no abría (y le llegaba otro
+    después). Ahora el descarte va aislado: el enlace de Ada sigue vigente, y la otra respuesta
+    queda en la cola, sin ningún acceso, para la pasada siguiente."""
+    from leda.despachador import encolar_respuesta_admin
+    with admin(conn) as cur:
+        encolar_respuesta_admin(cur, ada, ADA, "La página, sólo para vos.", clave="prueba:ada",
+                                enlace_de=(mundo["north-lab"]["id"], mundo["norte"]["id"]))
+    conn.commit()
+    with admin(conn) as cur:
+        cur.execute("""insert into app_user (telegram_user_id, nombre)
+                       values (79002, 'Bob Ex') returning id""")
+        bob = str(cur.fetchone()["id"])
+        encolar_respuesta_admin(cur, bob, 79002, "La página, sólo para vos.", clave="prueba:bob",
+                                enlace_de=(mundo["north-lab"]["id"], mundo["norte"]["id"]))
+    conn.commit()
+    hasta = max(f["programado_para"] for f in _respuestas(conn))
+
+    salida = TransporteDePrueba()
+    try:
+        with admin(conn) as cur:
+            despachar_avisos_admin(_ElDescarteFalla(cur), salida, ahora=hasta)
+    except psycopg.Error:
+        conn.rollback()
+    else:
+        conn.commit()
+    [enviado] = salida.enviados
+    assert enviado.chat_id == ADA
+    [acceso] = _accesos(conn)
+    assert acceso["token_hash"] == hashlib.sha256(_el_token(enviado.texto).encode()).hexdigest()
+    assert str(acceso["admin_app_user_id"]) == ada
+    estados = {str(f["destinatario_app_user_id"]): f["estado"] for f in _respuestas(conn)}
+    assert estados == {ada: "enviado", bob: "listo"}
+
+
+def test_dos_pedidos_distintos_con_el_mismo_texto_tienen_cada_uno_su_respuesta(conn, mundo,
+                                                                               ada):
+    """Sugerencia de la revisión (`administracion.py:80`, la clave de la respuesta): la clave es
+    el chat y el mensaje del pedido. Dos mensajes distintos con el mismo texto son dos pedidos y
+    tienen dos respuestas; el mismo mensaje que Telegram entrega otra vez (otro update, el mismo
+    mensaje), una. Sin defecto: lo fija."""
+    salida = TransporteDePrueba()
+    atender_admin(conn, mensaje_de_telegram(11, "/enlace north-lab balanza", ADA,
+                                            message_id=501), salida, imprimir=lambda *_: None)
+    atender_admin(conn, mensaje_de_telegram(12, "/enlace north-lab balanza", ADA,
+                                            message_id=502), salida, imprimir=lambda *_: None)
+    atender_admin(conn, mensaje_de_telegram(13, "/enlace north-lab balanza", ADA,
+                                            message_id=502), salida, imprimir=lambda *_: None)
+    assert len(salida.enviados) == 2
+    assert len(_respuestas(conn)) == 2 and len(_accesos(conn)) == 2
+
+
+def test_la_respuesta_de_ahora_sale_aunque_el_reloj_de_la_base_vaya_adelantado(conn, mundo,
+                                                                               ada):
+    """Sugerencia de la revisión (`despachador.py:1347-1348`): la respuesta se manda enseguida
+    (`solo`), con la hora de la aplicación, y la cola la anota con la hora de la base. Si la
+    base iba un poco adelantada, la pasada inmediata no la encontraba y la respuesta esperaba
+    al ciclo siguiente. Lo que se manda enseguida no espera su hora: ya es su hora."""
+    from datetime import timedelta
+    from leda.despachador import encolar_respuesta_admin
+    with admin(conn) as cur:
+        aviso = encolar_respuesta_admin(cur, ada, ADA, "Para pedir el enlace…",
+                                        clave="prueba:reloj")
+        cur.execute("""update admin_notice set programado_para = now() + interval '2 minutes'
+                        where id = %s returning programado_para""", (aviso,))
+        programado = cur.fetchone()["programado_para"]
+    conn.commit()
+    salida = TransporteDePrueba()
+    r = _despachar(conn, salida, ahora=programado - timedelta(minutes=2), solo=[aviso])
+    assert r["enviados"] == 1 and len(salida.enviados) == 1
+
+
+def test_una_respuesta_que_agota_los_intentos_deja_su_rastro_y_ningun_acceso(conn, mundo, ada):
+    """Sugerencia de la revisión (`despachador.py:1387-1393`, los reintentos de una respuesta,
+    sin prueba): cada intento que no sale deja su rastro; el quinto la da por perdida, con el
+    incidente de severidad alta que dice que era una respuesta del bot de administración, sin
+    avisar por el mismo canal, y nunca queda un acceso."""
+    from leda.despachador import MAX_INTENTOS
+    falla = TransporteDePrueba(falla_en={ADA})
+    _pedir(conn, falla)
+    for _ in range(MAX_INTENTOS - 1):
+        [respuesta] = _respuestas(conn)
+        _despachar(conn, falla, ahora=respuesta["programado_para"])
+    [respuesta] = _respuestas(conn)
+    assert (respuesta["estado"], respuesta["intentos"]) == ("fallido", MAX_INTENTOS)
+    assert falla.enviados == [] and _accesos(conn) == []
+    incidentes = _filas(conn, """select etapa, severidad, resumen_sanitizado, notificado_admin_en
+                                   from incident order by at""")
+    assert [i["etapa"] for i in incidentes] == (
+        ["respuesta_del_bot_de_administracion"] * (MAX_INTENTOS - 1) + ["entrega_aviso_admin"])
+    ultimo = incidentes[-1]
+    assert ultimo["severidad"] == "alta" and ultimo["notificado_admin_en"] is None
+    assert "respuesta del bot de administración" in ultimo["resumen_sanitizado"]
+    assert len(_filas(conn, "select 1 from admin_notice where not es_respuesta")) == 0
+
+
 # --- La base ---------------------------------------------------------------------------------------
 
 def test_la_aplicacion_no_llega_a_la_cola_ni_a_la_marca(conn):
