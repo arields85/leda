@@ -3570,6 +3570,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] Un pedido del detalle cuyo sector se queda sin encargado mientras espera: a quien lo pidió
       se le dice lo mismo que si no hubiera tenido encargado desde el principio (decisión 33).
       Hecho el 2026-10-10 (`815754e`); falta la IA real sobre el aviso.
+- [x] Revisión RDD de la corrección de casos de borde, por commit, todas aprobadas y selladas, sin
+      hallazgos graves (2026-10-10): `6578ddf` `review-bd0958d5bdae65b0`, `7efa04f`
+      `review-6fcfdd37ef931743`, `815754e` `review-12551f15c1ba6780`. Control del coordinador:
+      `test_pedir_el_detalle.py`, 39 passed. Advertencias, con el aviso al encargado anterior y
+      sin otra ronda después: `despachador.py:1373-1374` (la respuesta inmediata saltea la espera
+      entre reintentos), `despachador.py:1426-1430` (la falla al anotar un intento, sin prueba),
+      `herramientas.py:3236-3238` (el motivo de un pedido terminado se puede pisar).
 - [ ] Al encargado anterior al que se le había pedido el detalle, que el pedido terminó (no hace
       falta que conteste): la regla de cerrar el tema para todos (constitución §8, decisión 39),
       resuelto por el coordinador el 2026-10-10. Hoy sólo se le cierran los botones.
