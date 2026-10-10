@@ -887,6 +887,10 @@ SIGNIFICADOS: Mapping[str, str] = {
     "ya_se_destrabo": "La tarea ya no está trabada por eso.",
     "cambio_quien_destraba": "La persona trabada dijo después que la tarea la destraba otra "
                              "persona.",
+    "no_sabe_quien_destraba": "La persona trabada dijo después que no sabe quién destraba la "
+                              "tarea.",
+    "nadie_mas_puede_destrabar": "La persona trabada dijo después que no hay nadie más que pueda "
+                                 "destrabar la tarea.",
     "dijo_algo_mas_nuevo": "Quien puede destrabar la tarea dijo algo más nuevo, que sale en su "
                            "lugar.",
     "no_le_toca_destrabarla": "La persona que escribe no es quien puede destrabar esa tarea: "
@@ -925,7 +929,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                       "queda cerrado para los dos y no se le pide nada más a nadie.",
     "como_se_cerro": "Cómo se cerró el tema para quien recibe el aviso: la tarea ya no está "
                      "trabada por eso (ya_se_destrabo), la destraba otra persona "
-                     "(cambio_quien_destraba), la persona trabada dijo que ya lo hablaron "
+                     "(cambio_quien_destraba), la persona trabada dijo que no sabe quién "
+                     "la destraba (no_sabe_quien_destraba) o que no hay nadie más que pueda "
+                     "destrabarla (nadie_mas_puede_destrabar), que ya lo hablaron "
                      "(dijo_que_ya_lo_hablaron) o que se lo pide directamente "
                      "(se_lo_pide_quien_esta_trabado), o el bloqueo se había anotado por error "
                      "(quedo_sin_efecto).",

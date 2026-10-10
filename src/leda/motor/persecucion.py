@@ -203,6 +203,15 @@ COMO_SE_CERRO = "como_se_cerro"
 DIJO_QUE_YA_LO_HABLARON = "dijo_que_ya_lo_hablaron"
 SE_LO_PIDE_QUIEN_ESTA_TRABADO = "se_lo_pide_quien_esta_trabado"
 QUEDO_SIN_EFECTO = "quedo_sin_efecto"
+# La persona trabada contestó quién destraba sin nombrar a nadie: no sabe quién, o no hay nadie
+# más. A quien Leda le preguntaba se le cierra el tema con eso, nunca con que la destraba otra
+# persona (ronda real del 2026-10-10, conversación 34).
+NO_SABE_QUIEN_DESTRABA = "no_sabe_quien_destraba"
+NADIE_MAS_PUEDE_DESTRABAR = "nadie_mas_puede_destrabar"
+# Cómo se cerró el tema porque la persona trabada volvió a decir quién destraba: si antes de que
+# salga lo vuelve a nombrar a él, ya no es cierto.
+POR_LO_QUE_DIJO_LA_PERSONA_TRABADA = (CAMBIO_QUIEN_DESTRABA, NO_SABE_QUIEN_DESTRABA,
+                                      NADIE_MAS_PUEDE_DESTRABAR)
 YA_NO_HACE_FALTA_QUE_DESTRABEN = "ya_no_hace_falta_que_destraben"
 AVISO_A_QUIEN_DESTRABABA = "aviso_a_quien_destrababa"
 # Lo que se dicen los dos, por Leda (decisiones 47 y 48): llega para confirmarlo (si no es así,
@@ -488,7 +497,7 @@ def vigencia_de_ya_no_hace_falta(m: Momento, aviso) -> tuple[str | None, dict[st
         return "tarea_inexistente", {}
     como = aviso["dedupe_key"].split(":")[4]
     persona = str(aviso["destinatario_membership_id"])
-    if como == CAMBIO_QUIEN_DESTRABA:
+    if como in POR_LO_QUE_DIJO_LA_PERSONA_TRABADA:
         ultimo = ultimo_quien_destraba(m.cur, fila["blocker_id"])
         if (fila["resuelto_en"] is None and ultimo is not None
                 and str(ultimo["destraba_membership_id"]) == persona):

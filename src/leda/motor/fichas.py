@@ -888,9 +888,14 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
     # Si contesta la pregunta de si se le ocurre otra persona (decisión 49): sigue la misma cadena
     # y, si no se le ocurre nadie, queda asentado.
     sigue_la_cadena = persecucion.contesta_si_hay_otra(cur, anotado)
-    # A quien Leda le preguntaba antes ya no le hace falta: se entera (C-5c, decisión 39).
+    # A quien Leda le preguntaba antes ya no le hace falta: se entera (C-5c, decisión 39), con
+    # lo que pasó. Sin nombrar a nadie, no es que la destrabe otra persona: no sabe quién, o no
+    # hay nadie más (ronda real del 2026-10-10, conversación 34).
+    como = (persecucion.NO_SABE_QUIEN_DESTRABA if no_sabe
+            else persecucion.NADIE_MAS_PUEDE_DESTRABAR if nadie_mas
+            else persecucion.CAMBIO_QUIEN_DESTRABA)
     _juntar(hecho, persecucion.cerrar_el_tema(
-        ctx, task_id, str(bloqueo["id"]), persecucion.CAMBIO_QUIEN_DESTRABA,
+        ctx, task_id, str(bloqueo["id"]), como,
         salvo=(str(integrante["membership_id"]),) if integrante is not None else ()))
     if integrante is not None and not nadie_mas:
         _juntar(hecho, persecucion.preguntarle(ctx, fila, bloqueo, anotado, integrante))

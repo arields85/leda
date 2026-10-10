@@ -817,7 +817,36 @@ def test_si_dice_que_no_sabe_quien_a_quien_le_preguntaba_tambien_se_le_avisa(con
     equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"tarea": "T1", "no_sabe": True}))
 
     [aviso] = avisos_guardados(conn, YA_NO_HACE_FALTA)
-    assert aviso["hechos"]["como_se_cerro"] == "cambio_quien_destraba"
+    # Lo que pasó, no que la destraba otra persona: nadie nombró a nadie (ronda real del
+    # 2026-10-10, conversación 34).
+    assert aviso["hechos"]["como_se_cerro"] == "no_sabe_quien_destraba"
+    assert _abiertas(conn, mundo, "Ariel") == 0
+
+
+def test_si_dice_que_no_hay_nadie_mas_a_quien_le_preguntaba_se_le_avisa_eso(conn, mundo,
+                                                                            equipo):
+    _le_pregunto(conn, mundo, equipo)
+
+    equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"tarea": "T1", "nadie_mas": True}))
+
+    [aviso] = avisos_guardados(conn, YA_NO_HACE_FALTA)
+    assert str(aviso["destinatario_membership_id"]) == _membresia(mundo, "Ariel")
+    assert aviso["hechos"]["como_se_cerro"] == "nadie_mas_puede_destrabar"
+    assert _abiertas(conn, mundo, "Ariel") == 0
+
+
+def test_si_dice_que_no_sabe_y_despues_vuelve_a_nombrarlo_el_aviso_no_sale(conn, mundo, equipo):
+    """Como con otra persona: si antes de que salga lo vuelve a nombrar, ya no es cierto."""
+    _le_pregunto(conn, mundo, equipo)
+    equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"tarea": "T1", "no_sabe": True}))
+    equipo.minuto = 33
+    equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"tarea": "T1", "quien": "ariel"}))
+
+    _salir(conn, mundo, AHORA + timedelta(minutes=60))
+
+    [aviso] = avisos_guardados(conn, YA_NO_HACE_FALTA)
+    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido",
+                                                          "volvio_a_ser_quien_destraba")
 
 
 def test_nombrar_otra_vez_a_quien_le_preguntaba_no_le_cierra_nada(conn, mundo, equipo):
@@ -1201,5 +1230,6 @@ def test_las_jugadas_y_los_codigos_de_la_c5c_tienen_sus_significados():
                    "aviso_a_quien_destraba", "le_pregunta_tambien_a", "ya_se_habia_destrabado",
                    "ya_no_hace_falta_que_la_destrabe", "se_lo_pide_a", "le_pregunta_como_le_fue",
                    "ya_lo_conto_quien_destraba", "ya_lo_conto_quien_esta_trabado",
-                   "sin_quien_destraba", "volvio_a_ser_quien_destraba"):
+                   "sin_quien_destraba", "volvio_a_ser_quien_destraba",
+                   "no_sabe_quien_destraba", "nadie_mas_puede_destrabar"):
         assert hechos_mod.significado(codigo), codigo
