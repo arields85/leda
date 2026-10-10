@@ -274,6 +274,12 @@ la suscripción:
   incidente de severidad baja, sin avisar a la administración, y el informe de la ronda lo muestra con el tipo
   de error y nada más. La regresión siguiente dio **95 de 95** (`985b099`), sin ningún aviso atrasado y
   con "previsión" en 0 de 500 mensajes: la causa sigue sin conocerse, y el rastro queda para la próxima vez.
+- **La causa (2026-10-10, `507b21e`):** el rastro la mostró: una falla del servicio de la IA (429, 503,
+  plazo agotado, `ReadError`) deja el aviso para reintentarlo al minuto, y el corredor, que sólo corría el
+  ciclo en los relojes de cada paso, no lo reintentaba. Es del corredor, no de Leda. **Conclusión
+  vigente:** desde este arreglo el corredor reintenta el aviso en el mismo paso y el informe lo lista como
+  `[servicio]`, fuera de las fallas de Leda; sólo un aviso que no sale tras sus cinco intentos sigue
+  siendo una falla del motor.
 
 ## El formato de los mensajes (2026-10-07)
 

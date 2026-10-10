@@ -3634,7 +3634,36 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       (`docs/product/plataforma-pendientes.md`).
 - [ ] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
       conversación de prueba y construcción.
-- [ ] Los avisos que a veces no salen a su hora: buscar la causa.
+- [x] Los avisos que a veces no salen a su hora: buscar la causa. **Hecho (2026-10-10).**
+      - **La causa:** un artefacto del corredor sobre una falla del servicio de la IA, no un
+        defecto de Leda. Cuando el servicio falla al redactar un aviso (429, 503, plazo agotado,
+        `ReadError`), el aviso queda guardado con su próximo intento a 1, 2, 4 u 8 minutos
+        (decisión 8, caso 2; `avisos._si_la_ia_no_redacta`) y un incidente `motor_aviso_reintento`.
+        El ciclo del escuchador corre cada minuto y lo manda un minuto tarde; el corredor sólo
+        corría el ciclo en los relojes de un paso (el despacho de un mensaje o un toque no manda
+        avisos guardados), así que el reintento no salía o caía en otro paso, y el informe lo
+        contaba como `[motor]`. Evidencia: `resultados/fase-c-d6-01-20.md:79-80` (la 16, vez 4,
+        paso 6, `PlazoAgotado`), `resultados/fase-c-d7c.md:50-51` (la 23, vez 1, paso 4b,
+        `ReadError`) y `resultados/fase-c-d6-21-29.md` (13 renglones, la 23, la 25 y la 26 con
+        HTTP 429, cuando la cuenta se quedaba sin cupo).
+      - **Lo que cambió** (sólo `tests/conversaciones/`, `src/` no se tocó):
+        - el corredor, después de cada vuelta de un reloj, adelanta el reloj al reintento
+          pendiente más cercano (dentro de los 15 minutos de las cuatro esperas) y vuelve a correr
+          el ciclo, a lo sumo una vez por espera; lo que sale entra en el mismo paso y el reloj
+          nunca vuelve atrás (`_hasta_los_reintentos`; las esperas llegan por `motores.Motor`);
+        - el informe clasifica el intento fallido como `[servicio]` (clase nueva
+          `comprobar.SERVICIO`), aparte de las fallas de Leda, y `Corrida.bien` no lo cuenta; un
+          aviso que no salió tras sus cinco intentos (`fallido`) sigue siendo `[motor]`;
+        - después de un mensaje o un toque no hace falta: su despacho no manda avisos guardados,
+          así que ahí no queda ningún reintento.
+      - **Test primero:** las pruebas nuevas o cambiadas de `test_corredor.py` (el aviso sale en
+        su paso tras el reintento; tras cinco fallos sigue siendo una falla) y `test_comprobar.py`,
+        **4 failed** (el aviso no salía en el paso; no existía `SERVICIO`); verde, **4 passed**.
+      - **Commits:** `507b21e` y el que registra esto.
+      - **Chequeos** (2026-10-10, sobre `507b21e`):
+        - `pytest -q tests/conversaciones`: **161 passed** (1 min 30 s).
+        - En seco, `correr --ia guionada --veces 1 --sin-informe`: **45 de 45 bien** (garantías
+          45 de 45).
 - [ ] La prueba de cupo antes de una ronda con la IA real.
 - [ ] Cierre de la Fase C: suite completa, `docs/capacidades.md` y limpieza.
 - [ ] La tanda de pruebas: una ronda con la IA real sobre las conversaciones nuevas y cambiadas
