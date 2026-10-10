@@ -332,6 +332,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "nada_para_decidir": "No hay una entrega de esa persona esperando la decisión de quien "
                          "escribe.",
     "persona_desconocida": "No hay nadie en el equipo con ese nombre.",
+    "nombre_que_no_esta": "El nombre, como lo dijo la persona, que no es de nadie del equipo.",
     "ya_la_aprobo": "La persona que escribe ya la había aprobado: no se anota otra vez.",
     "la_entrega_se_esta_completando": "La persona responsable sacó algo de lo que entregó y "
                                       "está completando la entrega: así todavía no se aprueba "
@@ -1343,7 +1344,8 @@ _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", 
 _NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_evidencia",
                               "el_texto_cubre", "lo_que_pide", "describe",
                               "le_falta_del_criterio", "ejemplo", "lo_descrito_cubre",
-                              "lo_que_dice", "motivo_del_retiro", "referencias"})
+                              "lo_que_dice", "motivo_del_retiro", "referencias",
+                              "nombre_que_no_esta"})
 
 
 def para_redactar(valor: Any) -> Any:

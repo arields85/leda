@@ -170,8 +170,9 @@ def pedir(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
         return {"resultado": "falta_dato", "falta": ["a"], "tarea": tarea_hecho(tarea),
                 "coinciden": [c["nombre"] for c in coinciden]}
     if not coinciden:
+        # Qué nombre no está, como lo dijo: sin él, la IA nombró a otra persona (la 39).
         return {"resultado": "no_se_puede", "motivo": "persona_desconocida",
-                "tarea": tarea_hecho(tarea)}
+                "nombre_que_no_esta": str(datos["a"]).strip(), "tarea": tarea_hecho(tarea)}
     return _mostrar(ctx, tarea, str(coinciden[0]["membership_id"]))
 
 

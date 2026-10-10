@@ -344,6 +344,9 @@ def test_alguien_que_no_es_del_equipo_o_la_misma_persona_no(conn, equipo):
     r = _pedir(equipo, "Marcos", "COM", "roberto")
     assert (r.hechos[0]["resultado"], r.hechos[0]["motivo"]) == ("no_se_puede",
                                                                  "persona_desconocida")
+    # Qué nombre no encontró, como lo dijo: sin él, la IA nombró a otra persona (la 39).
+    assert r.hechos[0]["nombre_que_no_esta"] == "roberto"
+    assert hechos.sin_significado(r.hechos[0]) == set()
     r = _pedir(equipo, "Marcos", "COM", "marcos")
     assert r.hechos[0]["motivo"] == "es_la_misma_persona"
 
