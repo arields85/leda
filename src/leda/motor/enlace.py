@@ -11,7 +11,8 @@ tarea terminada, o una de otra persona que la autoridad final o el referente del
 La cocina la busca entre las tareas del espacio de quien escribe, también las terminadas y las
 canceladas: cada palabra que dijo tiene que estar, entera, en el título de la tarea o en el nombre
 de quien la tiene (sin mayúsculas ni acentos, y un plural vale por su singular). Las palabras de
-unión ("la del tablero de marcos") no cuentan: no nombran nada. Se compara acá, nunca con un patrón
+unión ("la del tablero de marcos") y la clase de cosa ("la tarea del switch") no cuentan: no
+nombran cuál. Se compara acá, nunca con un patrón
 de la base, así nada de lo dicho actúa como comodín (como `fichas.integrantes_que_coinciden`), y la
 búsqueda la arma el código, nunca la IA.
 
@@ -54,6 +55,12 @@ YA_LLEVA_OTRO = "ya_lleva_el_enlace_de_otra_tarea"
 PALABRAS_DE_UNION = frozenset({
     "el", "la", "los", "las", "lo", "un", "una", "unos", "unas", "de", "del", "al", "a", "en",
     "con", "para", "por", "y", "e", "o", "u", "que", "su", "sus", "mi", "mis", "tu", "tus"})
+# Las palabras que dicen qué clase de cosa es y no cuál: "la tarea del switch" nombra el switch,
+# no pide "tarea" en el título (la conversación 45). Son los nombres del núcleo para los niveles
+# que se nombran por chat (mecánica §1). Los nombres visibles de cada nivel son del pack
+# (`niveles`), pero el importador todavía no los guarda en la base: cuando estén, se suman acá.
+NOMBRES_DE_LA_CLASE = frozenset({"tarea", "tareas", "subtarea", "subtareas"})
+NO_NOMBRAN = PALABRAS_DE_UNION | NOMBRES_DE_LA_CLASE
 
 
 def pedir_enlace(ctx, datos: dict, tarea: dict | None) -> dict[str, Any]:
@@ -124,8 +131,9 @@ def puede_verla(cur, persona: str, task_id: str) -> bool:
 
 
 def _que_nombra(dicho: str) -> list[str]:
-    """Las palabras de lo dicho que nombran algo: sin mayúsculas, acentos ni palabras de unión."""
-    return [p for p in fichas.palabras(dicho) if p not in PALABRAS_DE_UNION]
+    """Las palabras de lo dicho que nombran algo: sin mayúsculas, acentos, palabras de unión ni
+    la clase de cosa que es ("tarea")."""
+    return [p for p in fichas.palabras(dicho) if p not in NO_NOMBRAN]
 
 
 def _misma_palabra(a: str, b: str) -> bool:

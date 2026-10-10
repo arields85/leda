@@ -675,6 +675,17 @@ def test_el_encargado_pasa_la_de_alguien_de_su_sector_nombrandola(conn, equipo):
     assert all(hechos.sin_significado(p) == set() for p in ia.pedidos_de_redaccion)
 
 
+def test_la_palabra_tarea_no_nombra_la_de_nahuel(conn, equipo):
+    """"La tarea de los sensores de Nahuel" nombra los sensores y a Nahuel: la palabra que dice
+    qué clase de cosa es no tiene que estar en el título (como en `enlace`)."""
+    r = equipo.dice("Marcos", Jugada("pedir_reasignacion",
+                                     {"como_la_nombra": "la tarea de los sensores de Nahuel",
+                                      "a": "pedro"}))
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "pase_para_confirmar"
+    assert hecho["tarea"]["titulo"] == "Calibrar los sensores"
+
+
 def test_el_encargado_de_otro_sector_no_pasa_la_de_nahuel(conn, equipo):
     r = equipo.dice("Martin", Jugada("pedir_reasignacion",
                                      {"como_la_nombra": "sensores", "a": "lucas"}))

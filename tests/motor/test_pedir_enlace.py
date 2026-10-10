@@ -139,6 +139,22 @@ def test_se_busca_por_palabras_enteras_sin_mayusculas_ni_acentos(conn, mundo, es
     assert hecho["motivo"] == "ninguna_tarea_con_ese_nombre"
 
 
+def test_la_palabra_tarea_no_nombra_una_tarea(conn, mundo, escribe, direccion):
+    """"La tarea del switch" nombra el switch: la palabra que dice qué clase de cosa es (tarea,
+    subtarea) no tiene que estar en el título (la conversación 45)."""
+    _tarea(conn, mundo, titulo="Configurar el switch de la planta")
+    hecho, _ = _pide(conn, escribe, "Ismael", como_la_nombra="la tarea del switch")
+    assert hecho["resultado"] == "leido"
+    assert hecho["tarea"] == {"titulo": "Configurar el switch de la planta"}
+    hecho, _ = _pide(conn, escribe, "Ismael", como_la_nombra="las tareas del Switch")
+    assert hecho["tarea"] == {"titulo": "Configurar el switch de la planta"}
+    hecho, _ = _pide(conn, escribe, "Ismael", como_la_nombra="la subtarea del switch")
+    assert hecho["tarea"] == {"titulo": "Configurar el switch de la planta"}
+    # Sólo "la tarea" no nombra ninguna: falta cuál.
+    hecho, _ = _pide(conn, escribe, "Ismael", como_la_nombra="la tarea")
+    assert hecho == {"jugada": "pedir_enlace", "resultado": "falta_dato", "falta": ["tarea"]}
+
+
 # --- Quien no puede verla no recibe nada -----------------------------------------------------
 
 def test_quien_no_puede_verla_no_recibe_el_enlace_sino_el_resumen(conn, mundo, escribe,
