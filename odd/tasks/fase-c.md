@@ -440,6 +440,15 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     C-6 (hoy, sin nada que informar no sale nada, y un atraso sin hablar no figura en ninguna
     parte).
 
+56. **Una tarea no vence sábado ni domingo** (de la escalera en fin de semana; usuario,
+    2026-10-10, opción C, la que recomendó el agente). La plataforma no deja cargar ni cambiar
+    una fecha objetivo que cae en un día no hábil del espacio, y le pide al administrador un día
+    hábil. Es una regla de la plataforma (`docs/product/plataforma-pendientes.md`): hoy no hay
+    código que cambiar, porque las tareas sólo entran por la semilla ficticia (`sembrar`). Una
+    fecha de fin de semana que llegue por otro lado (una semilla con días relativos, la previsión
+    que dice una persona) sigue contando como si venciera el viernes anterior, como hoy
+    (`tests/motor/test_escalera_fin_de_semana.py`).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3249,7 +3258,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       `tests/test_cli_enlaces_de_tarea.py:59` (decía que la prueba fallaba siempre; pasaba, pero la
       aserción era confusa): aserción corregida en la rama; la revisión quedó trabada en `_rdd-adm`.
 - [x] La escalera con un vencimiento en fin de semana: probada, siete pruebas, sin cambios (`c48ed43`).
-- [ ] Pregunta al usuario: una tarea que vence sábado o domingo (hoy cuenta como el viernes anterior).
+- [x] Pregunta al usuario: una tarea que vence sábado o domingo. Decisión 56 (opción C): la
+      plataforma no la deja cargar; sin código hasta la plataforma.
 - [ ] La corrección chica: `persecucion.py:703`, `herramientas.py:3111-3117`, `detalle.py:400-403`,
       avisar al administrador si un sector no tiene encargado, y lo que deje la revisión de la porción 5
       (más su respuesta sin outbox, a arreglar en `despachador.py`).

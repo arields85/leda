@@ -59,9 +59,8 @@ Dos revisiones quedaron trabadas en las carpetas temporales `_rdd-c7` y `_rdd-c5
 pasaba; corregida en la rama); liberarlas pide la autorización del mantenedor (el usuario). No traban la rama; las demás carpetas `_rdd-*` se pueden borrar.
 
 **Lo que sigue:**
-1. **Pregunta al usuario:** una tarea que vence sábado o domingo. Hoy cuenta como si venciera el viernes
-   anterior (A); B, el lunes siguiente; C, la plataforma no deja cargarla. El agente recomendó C con A de
-   respaldo.
+1. **Hecho (2026-10-10):** una tarea que vence sábado o domingo; el usuario eligió C (decisión 56): la
+   plataforma no la deja cargar. Sin código hasta la plataforma.
 2. **De la porción 5 (en el plan):** borrar o sólo ocultar el contenido retirado (ADR 0019 §3); si lo
    retirado deja de cubrir la evidencia; si revocar por terminal exige nombrar al administrador. La respuesta
    del bot de administración sale sin outbox, para no guardar el token en claro: arreglarlo en
@@ -249,9 +248,9 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
 - **Una pregunta "para después" vuelve días más tarde en medio de otro tema** (prueba de M3).
 - **Vencimiento en fin de semana:** la escalera alrededor de un fin de semana está probada
   (`tests/motor/test_escalera_fin_de_semana.py`, 2026-10-09: un viernes escala el miércoles, el
-  aviso previo cruza fines de semana y feriados, la comprimida no saltea pasos). `PENDIENTE` de
-  decisión: un vencimiento que cae sábado o domingo no tiene regla; hoy la escalera cuenta como si
-  venciera el viernes anterior (pide el estado ese viernes y escala el miércoles).
+  aviso previo cruza fines de semana y feriados, la comprimida no saltea pasos). Un vencimiento
+  sábado o domingo: la plataforma no lo dejará cargar (decisión 56, 2026-10-10); el que entre por
+  otro lado cuenta como si venciera el viernes anterior.
 - **`apscheduler`** sigue en `pyproject.toml` y ya no lo usa nadie.
 - **Contexto de la IA:** comparar el contexto amplio con variantes reducidas; requiere ADR antes de operar en
   internet.

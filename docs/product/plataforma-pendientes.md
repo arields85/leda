@@ -29,6 +29,10 @@ agrega acá con dónde vive hoy.
 - **Todo cambio queda auditado**, con quién, cuándo, el valor anterior y el nuevo.
 - **Un valor inválido nunca falla en silencio:** se usa el valor por omisión y queda un
   incidente (el patrón ya implementado para `alta`, `redaccion` y `horizonte_tarea`).
+- **Una tarea no vence en un día no hábil** (usuario, 2026-10-10; `odd/tasks/fase-c.md`,
+  decisión 56): el formulario no acepta una fecha objetivo, ni un cambio de fecha, que caiga
+  sábado, domingo o feriado del calendario del espacio, y pide un día hábil. Si una entra por
+  otro lado, la escalera la cuenta como si venciera el día hábil anterior.
 - **Los valores no fijan el comportamiento:** topes, márgenes y fechas son datos del
   cliente; Leda no se ajusta a sus valores actuales (decisión del usuario, 2026-10-01).
 
