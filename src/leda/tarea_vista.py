@@ -160,12 +160,16 @@ def _lo_que_dijo_del_bloqueo(h: dict[str, Any], quien: str, zona: ZoneInfo) -> s
 def _pieza(p: dict[str, Any], token: str, palabras: dict[str, str], zona: ZoneInfo) -> str:
     """Una pieza de la evidencia, ya escapada: qué es, quién la mandó y cuándo, y qué cubre. Una
     imagen se ve; otro archivo se baja; una pieza retirada sólo figura como retirada (ADR 0019,
-    decisión 3): ni su texto, ni su enlace, ni el nombre o el contenido de su archivo. Se mira
-    primero, antes que la clase, para que ninguna clase muestre lo retirado."""
+    decisión 3): ni su texto, ni su enlace, ni el nombre o el contenido de su archivo; si su
+    contenido lo retiró la administración (porción 5), la página lo dice así. Se mira primero,
+    antes que la clase, para que ninguna clase muestre lo retirado (la base tampoco lo manda)."""
     clase, retirada = p.get("clase"), bool(p.get("retirada"))
     archivo = f'{_e(token)}/evidencia/{_e(p.get("id"))}'
     nombre = _e(p.get("nombre"))
-    if retirada:
+    if p.get("retirada_por_la_administracion"):
+        contenido = f"{QUE_ERA.get(clase, 'Una pieza')}: contenido retirado por la administración"
+        retirada = True
+    elif retirada:
         contenido = f"{QUE_ERA.get(clase, 'Una pieza')} que se retiró"
     elif clase == "texto" and p.get("ejemplo_aceptado"):
         # Lo propuso Leda y la persona lo aceptó tal cual: nunca "lo que escribió" (D8).

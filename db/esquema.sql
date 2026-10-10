@@ -1731,14 +1731,24 @@ create table evidencia_retirada (
   id                          uuid primary key default gen_random_uuid(),
   workspace_id                uuid not null references workspace(id) on delete cascade,
   evidence_id                 uuid not null,
-  retirada_por_membership_id  uuid not null references membership(id),
+  -- Quien la entregó, o la administración de plataforma que retiró su contenido (porción 5;
+  -- migración 0052): exactamente uno de los dos.
+  retirada_por_membership_id  uuid references membership(id),
+  retirada_por_app_user_id    uuid references app_user(id),
   motivo                      text,
   at                          timestamptz not null default clock_timestamp(),
   constraint evidencia_retirada_evidence
     foreign key (workspace_id, evidence_id) references evidence(workspace_id, id)
     on delete cascade,
-  constraint evidencia_retirada_una_vez unique (evidence_id)
+  constraint evidencia_retirada_de_quien
+    check ((retirada_por_membership_id is null) <> (retirada_por_app_user_id is null))
 );
+
+-- Una vez por quien la entregó y una vez por la administración.
+create unique index evidencia_retirada_una_vez_por_quien_la_entrego
+  on evidencia_retirada (evidence_id) where retirada_por_membership_id is not null;
+create unique index evidencia_retirada_una_vez_por_la_administracion
+  on evidencia_retirada (evidence_id) where retirada_por_app_user_id is not null;
 
 -- Lo que la persona dijo que es de una tarea antes de entregarla ("es del PLC"). No
 -- es evidencia: la vista previa de la entrega lo muestra y entra sólo si queda.
@@ -1758,7 +1768,7 @@ create table archivo_de_tarea (
 create index archivo_de_tarea_de on archivo_de_tarea (task_id, at);
 
 comment on table evidencia_retirada is
-  'ADR 0019, decisión 3: una pieza de evidencia retirada por quien la entregó, mientras la tarea no está aprobada. Sólo se agrega; la evidencia no se borra y deja de contar para la política.';
+  'ADR 0019, decisión 3: una pieza de evidencia retirada por quien la entregó (retirada_por_membership_id), mientras la tarea no está aprobada, o su contenido retirado por la administración de plataforma (retirada_por_app_user_id, porción 5): una vez cada uno. Sólo se agrega; la evidencia no se borra, deja de contar para la política y de lo retirado no se muestra el contenido.';
 comment on table archivo_de_tarea is
   'ADR 0019, decisión 4: un archivo que la persona dijo que es de una tarea antes de entregarla. No es evidencia: la vista previa de la entrega lo muestra y entra sólo si la persona lo deja.';
 
@@ -1799,7 +1809,10 @@ comment on table message_outbox_adjunto is
 create table acceso_tarea (
   id             uuid primary key default gen_random_uuid(),
   workspace_id   uuid not null references workspace(id) on delete cascade,
-  membership_id  uuid not null,
+  -- De una persona del equipo o de un administrador de plataforma (porción 5; migración 0052):
+  -- exactamente uno de los dos.
+  membership_id  uuid,
+  admin_app_user_id uuid references app_user(id),
   task_id        uuid not null,
   token_hash     text not null,
   emitido_en     timestamptz not null default now(),
@@ -1807,6 +1820,8 @@ create table acceso_tarea (
   constraint acceso_tarea_workspace_id_unique unique (workspace_id, id),
   constraint acceso_tarea_token_unico unique (token_hash),
   constraint acceso_tarea_hash check (token_hash ~ '^[0-9a-f]{64}$'),
+  constraint acceso_tarea_de_quien
+    check ((membership_id is null) <> (admin_app_user_id is null)),
   constraint acceso_tarea_membership
     foreign key (workspace_id, membership_id) references membership(workspace_id, id)
     on delete cascade,
@@ -1817,7 +1832,7 @@ create table acceso_tarea (
 create index acceso_tarea_de on acceso_tarea (task_id, membership_id);
 
 comment on table acceso_tarea is
-  'ADR 0019, decisión 7a: el enlace personal a la página de una tarea. Sólo el hash del token; sin vencimiento; el derecho a ver se revalida en cada pedido. leda_app no tiene privilegios: sólo execute sobre sus funciones.';
+  'ADR 0019, decisiones 7a y 7b: el enlace personal a la página de una tarea, de una persona del equipo (membership_id) o de un administrador de plataforma (admin_app_user_id, porción 5), exactamente uno. Sólo el hash del token; sin vencimiento; el derecho a ver (o el rol de plataforma) se revalida en cada pedido. leda_app no tiene privilegios: sólo execute sobre sus funciones.';
 
 create table vista_de_tarea (
   id               uuid primary key default gen_random_uuid(),
@@ -1937,7 +1952,15 @@ begin
     return null;
   end if;
   perform set_config('leda.workspace_id', acceso.workspace_id::text, true);
-  if not puede_ver_tarea(acceso.membership_id, acceso.task_id) then
+  -- El de un administrador de plataforma (porción 5) vale mientras tenga el rol; el de una
+  -- persona del equipo, mientras pueda ver la tarea.
+  if acceso.admin_app_user_id is not null then
+    if not exists (select 1 from platform_role p
+                    where p.app_user_id = acceso.admin_app_user_id
+                      and p.rol = 'administrador') then
+      return null;
+    end if;
+  elsif not puede_ver_tarea(acceso.membership_id, acceso.task_id) then
     return null;
   end if;
   return acceso;
@@ -1960,6 +1983,17 @@ begin
   end if;
   insert into vista_de_tarea (workspace_id, acceso_tarea_id, que)
        values (acceso.workspace_id, acceso.id, 'pagina');
+  -- La vista de un administrador de plataforma va además a la auditoría (ADR 0019, 7b y 7e;
+  -- constitución §12), con la versión del pack del espacio; la del núcleo la pasa quien llama.
+  if acceso.admin_app_user_id is not null then
+    insert into audit_log (workspace_id, actor_app_user_id, actor_kind, accion, sujeto_tipo,
+                           sujeto_id, detalle, pack_hash, nucleo_hash)
+    values (acceso.workspace_id, acceso.admin_app_user_id, 'persona', 'ver_pagina_de_tarea',
+            'task', acceso.task_id, jsonb_build_object('acceso_tarea_id', acceso.id),
+            (select v.pack_hash from workspace_version v
+              where v.workspace_id = acceso.workspace_id order by v.version desc limit 1),
+            nullif(current_setting('leda.nucleo_hash', true), ''));
+  end if;
   select * into t from task where id = acceso.task_id;
   faltan := tipos_de_evidencia_que_faltan(t.id);
   select p.tipos into tipos from task_evidence_policy p
@@ -1967,8 +2001,11 @@ begin
   select jsonb_build_object(
     'espacio', w.nombre,
     'zona_horaria', w.zona_horaria,
-    'persona', (select u.nombre from membership m join app_user u on u.id = m.app_user_id
-                 where m.id = acceso.membership_id),
+    'persona', coalesce((select u.nombre from membership m
+                           join app_user u on u.id = m.app_user_id
+                          where m.id = acceso.membership_id),
+                        (select u.nombre from app_user u
+                          where u.id = acceso.admin_app_user_id)),
     'tarea', jsonb_build_object(
       'titulo', t.titulo,
       'objetivo', (select o.titulo from objective o where o.id = t.objective_id),
@@ -2073,16 +2110,35 @@ begin
                             'asentar_la_cadena_del_bloqueo')) h), '[]'::jsonb),
     'evidencia', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'id', e.id, 'clase', e.clase, 'texto', e.texto,
-               'enlace', case when e.clase = 'enlace' then e.uri end,
-               'nombre', a.nombre_original, 'tipo_de_archivo', a.tipo, 'cubre', e.cubre,
+               'id', e.id, 'clase', e.clase,
+               'texto', case when not r.retirada then e.texto end,
+               'enlace', case when e.clase = 'enlace' and not r.retirada then e.uri end,
+               'nombre', case when not r.retirada then a.nombre_original end,
+               'tipo_de_archivo', a.tipo, 'cubre', e.cubre,
                'ejemplo_aceptado', e.es_ejemplo_aceptado, 'quien', u.nombre, 'cuando', e.at,
-               'retirada', x.id is not null, 'retirada_el', x.at) order by e.at, e.id)
+               'retirada', r.retirada, 'retirada_el', r.retirada_el,
+               'retirada_por_la_administracion', r.por_la_administracion)
+             order by e.at, e.id)
         from evidence e
         left join archivo a on a.workspace_id = e.workspace_id and a.id = e.archivo_id
         left join membership m on m.id = e.entregado_por
         left join app_user u on u.id = m.app_user_id
-        left join evidencia_retirada x on x.evidence_id = e.id
+        -- Retirada por quien la entregó, o su contenido por la administración: la pieza o
+        -- cualquier otra del espacio con el mismo archivo (un archivo se guarda una vez por
+        -- huella). De una pieza retirada no sale su contenido (ADR 0019, decisión 3).
+        cross join lateral (
+          select adm.at is not null or per.at is not null as retirada,
+                 coalesce(adm.at, per.at) as retirada_el,
+                 adm.at is not null as por_la_administracion
+            from (select min(x.at) as at from evidencia_retirada x
+                    join evidence o on o.id = x.evidence_id
+                   where x.retirada_por_app_user_id is not null
+                     and (o.id = e.id
+                          or (e.archivo_id is not null and o.workspace_id = e.workspace_id
+                              and o.archivo_id = e.archivo_id))) adm,
+                 (select min(x.at) as at from evidencia_retirada x
+                   where x.evidence_id = e.id
+                     and x.retirada_por_membership_id is not null) per) r
        where e.task_id = t.id), '[]'::jsonb))
     into resultado
     from workspace w where w.id = acceso.workspace_id;
@@ -2110,10 +2166,27 @@ begin
      where e.id = p_evidence_id
        and e.workspace_id = acceso.workspace_id
        and e.task_id = acceso.task_id
-       and not exists (select 1 from evidencia_retirada x where x.evidence_id = e.id);
+       and not exists (select 1 from evidencia_retirada x where x.evidence_id = e.id)
+       -- Un archivo cuyo contenido retiró la administración no se sirve por ninguna pieza.
+       and not exists (select 1 from evidencia_retirada x
+                         join evidence o on o.id = x.evidence_id
+                        where x.retirada_por_app_user_id is not null
+                          and o.workspace_id = e.workspace_id
+                          and o.archivo_id = e.archivo_id);
     if v_contenido is not null then
       insert into vista_de_tarea (workspace_id, acceso_tarea_id, que, evidence_id)
            values (acceso.workspace_id, acceso.id, 'archivo', p_evidence_id);
+    -- La vista de un administrador de plataforma va además a la auditoría (ADR 0019, 7b y 7e;
+    -- constitución §12), con la versión del pack del espacio; la del núcleo la pasa quien llama.
+    if acceso.admin_app_user_id is not null then
+      insert into audit_log (workspace_id, actor_app_user_id, actor_kind, accion, sujeto_tipo,
+                             sujeto_id, detalle, pack_hash, nucleo_hash)
+      values (acceso.workspace_id, acceso.admin_app_user_id, 'persona', 'bajar_archivo_de_tarea',
+              'evidence', p_evidence_id, jsonb_build_object('acceso_tarea_id', acceso.id, 'task_id', acceso.task_id),
+              (select v.pack_hash from workspace_version v
+                where v.workspace_id = acceso.workspace_id order by v.version desc limit 1),
+              nullif(current_setting('leda.nucleo_hash', true), ''));
+    end if;
     end if;
   end if;
   perform set_config('leda.workspace_id', previo, true);
@@ -2741,8 +2814,9 @@ create trigger trg_exigir_referencias_del_espacio
 
 -- Un archivo recibido no se modifica ni se borra (ADR 0019, decisión 3). Es una
 -- garantía aparte de los privilegios de `leda_app`: vale también para la conexión
--- administrativa. Retirar el contenido por la administración es otra decisión,
--- con su propio camino y su auditoría, cuando se construya.
+-- administrativa. El retiro del contenido por la administración (migración 0052)
+-- no lo borra: lo marca (`evidencia_retirada.retirada_por_app_user_id`) y la página
+-- deja de servirlo.
 create or replace function rechazar_cambios_de_archivo() returns trigger as $$
 begin
   raise exception 'archivo: un archivo recibido no se modifica ni se borra';
@@ -2762,6 +2836,35 @@ create trigger trg_exigir_referencias_del_espacio
   before insert or update on evidencia_retirada
   for each row execute function exigir_referencias_del_espacio(
     'retirada_por_membership_id', 'membership');
+
+-- El acceso de un administrador de plataforma a la página de una tarea y el retiro de contenido
+-- por la administración (porción 5 de la C-3; migración 0052): sólo los escribe la conexión
+-- administrativa y sólo para quien tiene el rol de plataforma. Vale también contra una
+-- aplicación que nombre a un administrador de verdad: `leda_app` puede agregar retiros, los de
+-- quien entregó la pieza. Sólo al agregar: revocar el enlace de quien ya no es administrador
+-- tiene que poder hacerse.
+create or replace function exigir_administrador_de_plataforma() returns trigger as $$
+declare usuario uuid := (to_jsonb(new) ->> tg_argv[0])::uuid;
+begin
+  if usuario is not null then
+    if current_user <> 'leda_admin' then
+      raise exception '%: lo de un administrador de plataforma lo escribe sólo la administración',
+        tg_table_name;
+    end if;
+    if not exists (select 1 from platform_role p
+                    where p.app_user_id = usuario and p.rol = 'administrador') then
+      raise exception '%: % no es administrador de plataforma', tg_table_name, tg_argv[0];
+    end if;
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_exigir_administrador_de_plataforma
+  before insert on acceso_tarea
+  for each row execute function exigir_administrador_de_plataforma('admin_app_user_id');
+create trigger trg_exigir_administrador_de_plataforma
+  before insert on evidencia_retirada
+  for each row execute function exigir_administrador_de_plataforma('retirada_por_app_user_id');
 create trigger trg_exigir_referencias_del_espacio
   before insert or update on archivo_de_tarea
   for each row execute function exigir_referencias_del_espacio(
