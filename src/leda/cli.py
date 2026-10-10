@@ -11,6 +11,9 @@
     python -m leda webhooks                 registra el webhook de cada bot
     python -m leda chatgpt login|estado|salir   la sesión de la suscripción de ChatGPT
     python -m leda modelo gpt-6-sol --proveedor chatgpt
+    python -m leda revocar-enlaces corework --persona "Marcos"   (o --tarea, o --administrador)
+    python -m leda retirar-contenido corework --tarea "tablero"   (lista lo entregado; con
+        --pieza N --administrador NOMBRE --motivo TEXTO, retira el contenido de esa pieza)
 """
 
 from __future__ import annotations
@@ -118,6 +121,160 @@ def _resolver_integrante(cur, ws: str, nombre: str) -> list[dict]:
     return exactos or candidatos
 
 
+def _por_nombre(filas: list[dict], nombre: str) -> list[dict]:
+    """Por subcadena sin mayúsculas, y una coincidencia exacta gana (como
+    `_resolver_integrante`)."""
+    buscado = nombre.strip().lower()
+    candidatos = [f for f in filas if buscado and buscado in f["nombre"].lower()]
+    return [f for f in candidatos if f["nombre"].lower() == buscado] or candidatos
+
+
+def _uno_por_nombre(filas: list[dict], nombre: str, que: str) -> dict | None:
+    """La única fila que nombra `nombre`, o `None` diciendo por qué (ninguna o varias)."""
+    candidatos = _por_nombre(filas, nombre)
+    if not candidatos:
+        print(f"No hay ningún {que} llamado «{nombre}».")
+        return None
+    if len(candidatos) > 1:
+        print(f"«{nombre}» es ambiguo: coinciden "
+              + ", ".join(c["nombre"] for c in candidatos) + ". Usá un nombre más específico.")
+        return None
+    return candidatos[0]
+
+
+def _administradores(cur) -> list[dict]:
+    cur.execute("""select u.id::text id, u.nombre from app_user u
+                     join platform_role p on p.app_user_id = u.id
+                    where p.rol = 'administrador' order by u.nombre""")
+    return cur.fetchall()
+
+
+def _tarea_que_nombra(conn, ws: str, slug: str, dicho: str) -> dict | None:
+    """La única tarea del espacio que nombra lo dicho, con la regla de la jugada `pedir_enlace`
+    (`motor.enlace.tareas_que_nombra`), buscada en la transacción del espacio; o `None`
+    diciendo por qué."""
+    from .motor.enlace import que_nombra, tareas_que_nombra
+
+    if not que_nombra(dicho):
+        print("Nombrá la tarea con palabras de su título o el nombre de quien la tiene.")
+        return None
+    with espacio(conn, ws) as cur:
+        coinciden = tareas_que_nombra(cur, ws, dicho)
+    conn.commit()
+    if not coinciden:
+        print(f"En '{slug}' no hay ninguna tarea que se llame así.")
+        return None
+    if len(coinciden) > 1:
+        print(f"En '{slug}' coinciden {len(coinciden)}:")
+        for t in coinciden:
+            print(f"  {t['titulo']}" + (f" (de {t['responsable']})" if t["responsable"] else ""))
+        print("Usá más palabras del título.")
+        return None
+    return coinciden[0]
+
+
+def _revocar_enlaces(conn, ws: str, a) -> int:
+    """Revoca los enlaces a la página de las tareas de una persona, de una tarea o de un
+    administrador de plataforma (ADR 0019, 7a): un enlace ya mandado deja de abrir. Auditado."""
+    from . import pagina_de_tarea
+
+    criterio: dict[str, str] = {}
+    de = ""
+    if a.tarea:
+        tarea = _tarea_que_nombra(conn, ws, a.slug, a.tarea)
+        if tarea is None:
+            return 1
+        criterio, de = {"task_id": tarea["id"]}, f"la tarea «{tarea['titulo']}»"
+    with admin(conn) as cur:
+        if a.persona:
+            cur.execute("""select m.id::text id, u.nombre from membership m
+                             join app_user u on u.id = m.app_user_id
+                            where m.workspace_id = %s order by u.nombre""", (ws,))
+            persona = _uno_por_nombre(cur.fetchall(), a.persona, f"integrante en '{a.slug}'")
+            if persona is None:
+                return 1
+            criterio, de = {"membership_id": persona["id"]}, persona["nombre"]
+        elif a.administrador:
+            quien = _uno_por_nombre(_administradores(cur), a.administrador,
+                                    "administrador de plataforma")
+            if quien is None:
+                return 1
+            criterio, de = {"admin_app_user_id": quien["id"]}, quien["nombre"]
+        cantidad = pagina_de_tarea.revocar(cur, ws, **criterio)
+    conn.commit()
+    if cantidad:
+        print(f"Revocados {cantidad} enlaces de {de}: ya no abren.")
+    else:
+        print(f"No había enlaces vigentes de {de}.")
+    return 0
+
+
+def _retirar_contenido(conn, ws: str, a) -> int:
+    """Sin `--pieza`, lista lo que se entregó en la tarea, numerado. Con `--pieza`, retira su
+    contenido por la administración (ADR 0019, decisión 3): la pieza no se borra, la página
+    dice "retirado por la administración" y el archivo no se sirve. Auditado con quién y por
+    qué."""
+    from . import pagina_de_tarea
+
+    tarea = _tarea_que_nombra(conn, ws, a.slug, a.tarea)
+    if tarea is None:
+        return 1
+    with admin(conn) as cur:
+        cur.execute(
+            """select e.id::text id, e.clase, e.texto, e.uri, a.nombre_original nombre,
+                      u.nombre quien, e.at,
+                      exists (select 1 from evidencia_retirada x where x.evidence_id = e.id
+                                 and x.retirada_por_app_user_id is not null) por_la_admin,
+                      exists (select 1 from evidencia_retirada x where x.evidence_id = e.id
+                                 and x.retirada_por_membership_id is not null) por_quien
+                 from evidence e
+                 left join archivo a on a.workspace_id = e.workspace_id and a.id = e.archivo_id
+                 left join membership m on m.id = e.entregado_por
+                 left join app_user u on u.id = m.app_user_id
+                where e.task_id = %s and e.workspace_id = %s
+                order by e.at, e.id""", (tarea["id"], ws))
+        piezas = cur.fetchall()
+    conn.commit()
+    if a.pieza is None:
+        print(f"Lo que se entregó en «{tarea['titulo']}»:")
+        for numero, p in enumerate(piezas, start=1):
+            que = {"texto": "Un texto", "enlace": "Un enlace", "imagen": "Una foto"}.get(
+                p["clase"], "Un archivo")
+            dato = p["nombre"] or p["uri"] or (p["texto"] or "")[:80]
+            marca = (" (contenido retirado por la administración)" if p["por_la_admin"]
+                     else " (retirada por quien la entregó)" if p["por_quien"] else "")
+            print(f"  {numero}. {que}: {dato} - {p['quien'] or 'alguien del equipo'}, "
+                  f"{p['at']:%d/%m/%Y %H:%M}{marca}")
+        if not piezas:
+            print("  (nada)")
+        print("Para retirar el contenido de una: --pieza N --administrador NOMBRE "
+              "--motivo TEXTO")
+        return 0
+    if not a.administrador or not (a.motivo or "").strip():
+        print("Para retirar una pieza hacen falta --administrador (quién) y --motivo (por qué).")
+        return 1
+    if not 1 <= a.pieza <= len(piezas):
+        print(f"No hay una pieza {a.pieza} en «{tarea['titulo']}».")
+        return 1
+    pieza = piezas[a.pieza - 1]
+    with admin(conn) as cur:
+        quien = _uno_por_nombre(_administradores(cur), a.administrador,
+                                "administrador de plataforma")
+        if quien is None:
+            return 1
+        retiradas = pagina_de_tarea.retirar_contenido(cur, ws, pieza["id"], quien["id"],
+                                                      a.motivo)
+    conn.commit()
+    if not retiradas:
+        print(f"La pieza {a.pieza} ya tenía el contenido retirado por la administración.")
+        return 0
+    print(f"Pieza {a.pieza}: contenido retirado por la administración ({quien['nombre']}). "
+          "La pieza no se borró; la página ya no lo muestra.")
+    if len(retiradas) > 1:
+        print(f"También {len(retiradas) - 1} pieza(s) más con el mismo archivo.")
+    return 0
+
+
 def _estado(conn, ws: str, slug: str) -> int:
     """Una foto de cómo va la prueba, sin entrar a la base."""
     with admin(conn) as cur:
@@ -220,6 +377,26 @@ def main(argv: list[str] | None = None) -> int:
     adm = sub.add_parser("administrador")
     adm.add_argument("slug")
     adm.add_argument("nombre", help="nombre del integrante, entre comillas si tiene espacios")
+
+    # La página de una tarea (ADR 0019, decisiones 3 y 7a; porción 5 de la C-3): revocar los
+    # enlaces y retirar el contenido de una pieza. La consola es de la administración
+    # (constitución §2): nunca por el bot de un espacio.
+    rev = sub.add_parser("revocar-enlaces",
+                         help="revoca los enlaces a la página de las tareas de un espacio")
+    rev.add_argument("slug")
+    de = rev.add_mutually_exclusive_group(required=True)
+    de.add_argument("--persona", help="los de un integrante, por su nombre")
+    de.add_argument("--tarea", help="los de una tarea, por palabras de su título")
+    de.add_argument("--administrador",
+                    help="los de un administrador de plataforma, por su nombre")
+
+    ret = sub.add_parser("retirar-contenido",
+                         help="retira el contenido de una pieza de evidencia (no la borra)")
+    ret.add_argument("slug")
+    ret.add_argument("--tarea", required=True, help="palabras del título de la tarea")
+    ret.add_argument("--pieza", type=int, help="el número de la pieza, de la lista")
+    ret.add_argument("--administrador", help="quién la retira: un administrador de plataforma")
+    ret.add_argument("--motivo", help="por qué se retira")
 
     sub.add_parser("presentar").add_argument("slug")
 
@@ -567,6 +744,12 @@ def main(argv: list[str] | None = None) -> int:
                   "deja que un bot le escriba primero a quien nunca le "
                   "escribió, así que sin eso no hay a qué chat avisarle.")
         return 0
+
+    if a.cmd == "revocar-enlaces":
+        return _revocar_enlaces(conn, ws, a)
+
+    if a.cmd == "retirar-contenido":
+        return _retirar_contenido(conn, ws, a)
 
     if a.cmd == "estado":
         return _estado(conn, ws, a.slug)
