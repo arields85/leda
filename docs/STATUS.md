@@ -233,7 +233,11 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
   - el aviso al administrador;
   - los códigos de `hechos`.
 - **Una pregunta "para después" vuelve días más tarde en medio de otro tema** (prueba de M3).
-- **Vencimiento en fin de semana:** la escalera no lo tiene probado.
+- **Vencimiento en fin de semana:** la escalera alrededor de un fin de semana está probada
+  (`tests/motor/test_escalera_fin_de_semana.py`, 2026-10-09: un viernes escala el miércoles, el
+  aviso previo cruza fines de semana y feriados, la comprimida no saltea pasos). `PENDIENTE` de
+  decisión: un vencimiento que cae sábado o domingo no tiene regla; hoy la escalera cuenta como si
+  venciera el viernes anterior (pide el estado ese viernes y escala el miércoles).
 - **`apscheduler`** sigue en `pyproject.toml` y ya no lo usa nadie.
 - **Contexto de la IA:** comparar el contexto amplio con variantes reducidas; requiere ADR antes de operar en
   internet.
