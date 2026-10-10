@@ -3125,9 +3125,16 @@ def _pedir_detalle_de_tarea(cur, quien: Solicitante, tarea_id, at=None):
         if abierto is not None:
             return {"error": "ya_lo_pidio", "pedido_id": str(abierto["id"]),
                     "decide_membership_id": decide}
-    # Dos veces se cruzó otro pedido que terminó en el medio: lo que pidió ya se está
-    # decidiendo, sin caerse.
-    return {"error": "ya_lo_pidio", "decide_membership_id": decide}
+    # Dos veces se cruzó otro pedido suyo que terminó en el medio: ya lo pidió, y de cómo
+    # terminó se entera por ese pedido (decisión 39). La forma de todo `ya_lo_pidio`: el pedido
+    # (el último que se cruzó) y quién lo decide (revisión de la corrección chica).
+    cur.execute("""select id from pedido_de_detalle
+                    where task_id = %s and pedido_por_membership_id = %s
+                    order by pedido_en desc, id desc limit 1""",
+                (tarea["id"], quien.membership_id))
+    ultimo = cur.fetchone()
+    return {"error": "ya_lo_pidio", "pedido_id": str(ultimo["id"]) if ultimo else None,
+            "decide_membership_id": decide}
 
 
 @herramienta(

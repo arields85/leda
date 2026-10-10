@@ -640,9 +640,85 @@ def test_si_el_pedido_que_se_cruzo_termina_en_el_medio_queda_el_nuevo(conn, equi
                      {"tarea_id": equipo.carga.tareas["SW"], "at": AHORA.isoformat()},
                      ya_confirmada=True)
     conn.commit()
-    assert "error" not in r, r
+    # El pedido nuevo es el que quedó esperando, con la forma de siempre (advertencia de la
+    # revisión: antes sólo se miraba que no hubiera error).
+    [nuevo] = todos(conn, """select id::text id, decide_membership_id::text decide
+                               from pedido_de_detalle where estado = 'esperando_decision'""")
+    assert r == {"pedido_id": nuevo["id"], "decide_membership_id": nuevo["decide"]}
+    assert nuevo["decide"] == _personas(equipo, "Martin")["membership_id"]
     estados = sorted(f["estado"] for f in todos(conn, "select estado from pedido_de_detalle"))
     assert estados == ["esperando_decision", "no_compartida"]
+
+
+class _SeCruzaYTerminaCadaVez:
+    """Cada vez que la cocina intenta anotar el pedido, otro mensaje de la misma persona se le
+    adelanta (el `insert` choca con él) y el encargado lo decide antes de que la cocina lo vuelva
+    a buscar: los dos intentos chocan con un pedido que ya terminó."""
+
+    def __init__(self, cur, otro, termina) -> None:
+        self._cur, self._otro, self._termina = cur, otro, termina
+
+    def execute(self, sql, params=None, **kw):
+        anota = sql.lstrip().startswith("insert") and "pedido_de_detalle" in sql
+        if anota:
+            self._otro()
+        r = self._cur.execute(sql, params, **kw)
+        if anota:
+            self._termina()
+        return r
+
+    def __getattr__(self, nombre):
+        return getattr(self._cur, nombre)
+
+
+def test_si_se_cruzan_dos_veces_y_terminan_el_respaldo_tiene_la_forma_de_siempre(conn, equipo):
+    """El respaldo de la carrera (revisión de la corrección chica, `herramientas.py:3108-3130`,
+    sin prueba hasta acá): los dos intentos chocan con un pedido de la misma persona que terminó
+    en el medio. La cocina no se cae y contesta con la forma de todo `ya_lo_pidio`: el pedido
+    (el último que se cruzó, del que la persona se entera cómo terminó) y quién lo decide. Nada
+    queda esperando: no se inventa un pedido."""
+    from psycopg.rows import dict_row
+    nahuel, martin = _personas(equipo, "Nahuel"), _personas(equipo, "Martin")
+    with espacio(conn, equipo.carga.workspace_id) as cur:
+        quien = identificar_en_espacio(cur, nahuel["telegram"], equipo.carga.workspace_id)
+
+        def otro():
+            with conn.cursor(row_factory=dict_row) as aparte:
+                aparte.execute(
+                    """insert into pedido_de_detalle (workspace_id, task_id,
+                                                      pedido_por_membership_id,
+                                                      decide_membership_id, estado, pedido_en)
+                       values (%s, %s, %s, %s, 'esperando_decision', clock_timestamp())""",
+                    (equipo.carga.workspace_id, equipo.carga.tareas["SW"],
+                     nahuel["membership_id"], martin["membership_id"]))
+
+        def termina():
+            with conn.cursor() as aparte:
+                aparte.execute("""update pedido_de_detalle
+                                     set estado = 'no_compartida', decidido_en = %s,
+                                         decidido_por_membership_id = %s
+                                   where estado = 'esperando_decision'""",
+                               (AHORA, martin["membership_id"]))
+
+        r = ejecutar(_SeCruzaYTerminaCadaVez(cur, otro, termina), quien,
+                     "pedir_detalle_de_tarea",
+                     {"tarea_id": equipo.carga.tareas["SW"], "at": AHORA.isoformat()},
+                     ya_confirmada=True)
+    conn.commit()
+    pedidos = todos(conn, "select id::text id, estado from pedido_de_detalle order by pedido_en")
+    assert [p["estado"] for p in pedidos] == ["no_compartida", "no_compartida"]
+    assert r == {"error": "ya_lo_pidio", "pedido_id": pedidos[-1]["id"],
+                 "decide_membership_id": martin["membership_id"]}
+
+
+def test_toda_tarea_tiene_su_sector(conn):
+    """`detalle.py:422-426` (revisión de la corrección chica, un área nula): el aviso del sector
+    sin encargado usa el área de la tarea del pedido. No hay tarea sin área: la base lo exige, y
+    esta prueba lo fija para que esa lectura siga valiendo."""
+    [columna] = todos(conn, """select is_nullable from information_schema.columns
+                                where table_schema = 'leda' and table_name = 'task'
+                                  and column_name = 'area_id'""")
+    assert columna["is_nullable"] == "NO"
 
 
 # --- Una oferta "si lo necesitás" no se repite ni vuelve (decisión 33; constitución §8) ---------

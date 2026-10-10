@@ -301,6 +301,45 @@ def test_un_integrante_de_un_sector_sin_encargado_que_la_pasa_a_otro_tambien(con
     assert "OT y automatización" in incidente["resumen_sanitizado"]
 
 
+def test_el_sector_sin_encargado_de_otro_sector_es_el_de_quien_pide(conn, equipo):
+    """`pase.py:295-301` (revisión de la corrección chica, cómo se deduce "otro sector"): la
+    regla del pase (`autoridad.regla_del_pase`) compara el sector de quien pide con el de quien
+    recibe, por sus membresías, y pasarla a otro sector lo decide el encargado del sector de
+    quien pide (decisión 27). Sin encargado ahí, el aviso nombra ese sector: ni el de quien
+    recibe ni el de la tarea. Nahuel se mudó a Infraestructura IT (sin encargado) con su tarea
+    de OT y pide pasársela a Pedro, de OT: el sector que falta es el suyo de ahora. Sin defecto:
+    lo fija."""
+    administrador(conn)
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = null where id = %s",
+                    (equipo.carga.areas["it"],))
+        cur.execute("update membership set area_id = %s where id = %s",
+                    (equipo.carga.areas["it"], equipo.mundo["personas"]["Nahuel"][
+                        "membership_id"]))
+    conn.commit()
+    [hecho] = _pedir(equipo, "Nahuel", "SEN", "pedro").hechos
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "otro_sector")
+    assert "quien_decide" not in hecho
+    [incidente] = _sin_encargado(conn)
+    assert "Infraestructura IT" in incidente["resumen_sanitizado"]
+    assert "OT y automatización" not in incidente["resumen_sanitizado"]
+
+
+def test_con_encargado_en_su_sector_pasarla_a_otro_no_avisa_aunque_al_otro_le_falte(conn,
+                                                                                     equipo):
+    """La otra cara: si el sector de quien pide tiene encargado, él decide (`quien_decide`), y
+    que al sector de quien recibe le falte el suyo no es lo que frena este pedido."""
+    administrador(conn)
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = null where id = %s",
+                    (equipo.carga.areas["it"],))
+    conn.commit()
+    [hecho] = _pedir(equipo, "Nahuel", "SEN", "lucas").hechos
+    assert (hecho["resultado"], hecho["motivo"], hecho["quien_decide"]) == (
+        "no_se_puede", "otro_sector", MARCOS)
+    assert _sin_encargado(conn) == []
+
+
 def test_alguien_que_no_es_del_equipo_o_la_misma_persona_no(conn, equipo):
     r = _pedir(equipo, "Marcos", "COM", "roberto")
     assert (r.hechos[0]["resultado"], r.hechos[0]["motivo"]) == ("no_se_puede",
