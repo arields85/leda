@@ -65,6 +65,9 @@ PERMITIDOS: dict[str, set[str] | None] = {
     # La ventana del turno en curso: los álbumes que esperan su turno más que eso quedan para
     # el barrido de huérfanos (ADR 0019, decisión 4).
     "entrada": {"clave_de_candado_del_mensaje", "sql_respondido", "VENTANA_TURNO_EN_CURSO"},
+    # El bot de administración (porción 5 de la C-3, `administracion.py`): el enlace de un
+    # administrador de plataforma a la página de una tarea, que emite la conexión administrativa.
+    "pagina_de_tarea": {"emitir_para_administrador", "enlace"},
 }
 
 # Los módulos de los flujos A y B, borrados en la E3-4, por si volvieran. La escalera, el reloj

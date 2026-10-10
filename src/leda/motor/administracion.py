@@ -37,7 +37,7 @@ from ..autoridad import Canal, Denegado, identificar
 from ..db import admin, espacio
 from ..despachador import Transporte, texto_error_seguro
 from ..incidentes import registrar_incidente
-from .. import pagina_de_tarea
+from ..pagina_de_tarea import emitir_para_administrador, enlace
 from .enlace import que_nombra, tareas_que_nombra
 from .recibir import registrar_admin
 
@@ -117,13 +117,13 @@ def _pedir_enlace(conn, usuario: str, chat_id: int, palabras: list[str],
         _mandar(transporte, chat_id, SIN_PAGINA)
         return
     with admin(conn) as cur:
-        token = pagina_de_tarea.emitir_para_administrador(cur, usuario, ws["id"], tarea["id"])
+        token = emitir_para_administrador(cur, usuario, ws["id"], tarea["id"])
         if token is None:                  # dejó de ser administrador en el medio
             raise Denegado("No sos administrador de plataforma.")
         _mandar(transporte, chat_id,
                 f"La página de «{tarea['titulo']}» ({ws['nombre']}), sólo para vos. Cada vez "
                 f"que la abras queda registrado.\n"
-                f"{pagina_de_tarea.enlace(config.base_url, token)}",
+                f"{enlace(config.base_url, token)}",
                 sin_vista_previa=True)
     conn.commit()
 
