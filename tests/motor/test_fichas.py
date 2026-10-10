@@ -127,7 +127,10 @@ def test_la_lista_cerrada_tiene_una_ficha_por_jugada_del_recordatorio():
         # Lo que arregló la persona trabada y "se lo pido yo y te cuento" (C-5c).
         + ("contar_lo_que_arreglaron", "pedirselo_y_contar")
         # Delegar (C-7): la respuesta de quien decide un pase o de quien lo recibe.
-        + ("contestar_el_pase",))
+        + ("contestar_el_pase",)
+        # El detalle de una tarea (decisión 33): pedirlo, aceptando lo que Leda ofreció con el
+        # resumen, y la respuesta del encargado del sector de la tarea.
+        + ("pedir_el_detalle", "contestar_el_pedido_del_detalle"))
     assert not any(FICHAS[n].se_ofrece for n in SITUACIONES)
     for ficha in FICHAS.values():
         assert ficha.para_que and ficha.comprueba and ficha.hace and ficha.despues

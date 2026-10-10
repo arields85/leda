@@ -250,9 +250,11 @@ def _pide_por_chat(conn, mundo, persona: str, como_la_nombra: str) -> dict:
 
 
 def test_quien_no_ve_la_tarea_nunca_recibe_su_enlace_por_chat(conn, mundo, direccion):
-    """Sam North es del equipo y no tiene nada que ver con la tarea (ADR 0019, 7b)."""
+    """Sam North es del equipo y no tiene nada que ver con la tarea (ADR 0019, 7b): el resumen,
+    que ve cualquiera del equipo (decisión 33), nunca el enlace."""
     hecho = _pide_por_chat(conn, mundo, "Sam North", "la balanza")
-    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "no_puede_ver_esa_tarea")
+    assert hecho["resultado"] == "solo_el_resumen"
+    assert hecho["tarea"] == {"titulo": "Calibrar la balanza"}
     transporte = TransporteDePrueba()
     _despachar(conn, mundo, transporte)
     assert _filas(conn, "select * from message_outbox_enlace") == []
@@ -281,4 +283,14 @@ def test_una_tarea_de_otro_espacio_no_se_encuentra_por_chat(conn, mundo, direcci
     assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede",
                                                      "ninguna_tarea_con_ese_nombre")
     assert "tarea" not in hecho
+
+
+def test_alguien_de_otro_espacio_nunca_recibe_el_resumen(conn, mundo, direccion):
+    """El resumen lo ve cualquiera del equipo de la tarea (decisión 33), nunca alguien de otro
+    espacio: para Sam North, de North Lab, "Secreto del oeste" no existe, y nada de su título,
+    su responsable ni su estado llega a los hechos."""
+    hecho = _pide_por_chat(conn, mundo, "Sam North", "secreto del oeste")
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede",
+                                                     "ninguna_tarea_con_ese_nombre")
+    assert set(hecho) == {"jugada", "resultado", "motivo"}
     assert _filas(conn, "select * from message_outbox_enlace") == []

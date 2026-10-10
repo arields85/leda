@@ -86,7 +86,7 @@ def test_pedir_el_enlace_es_una_ficha_de_la_lista_cerrada():
     # La redacción la recibe por lo que hace, y sus códigos tienen significado.
     assert hechos_mod.es_un_concepto_de_la_cocina("pedir_enlace")
     assert "pedir_enlace" in hechos_mod.PARA_LA_REDACCION
-    for codigo in ("como_la_nombra", "no_puede_ver_esa_tarea", "ninguna_tarea_con_ese_nombre",
+    for codigo in ("como_la_nombra", "solo_el_resumen", "ninguna_tarea_con_ese_nombre",
                    "la_pagina_no_esta_disponible", "ya_lleva_el_enlace_de_otra_tarea"):
         assert hechos_mod.significado(codigo), codigo
 
@@ -141,18 +141,22 @@ def test_se_busca_por_palabras_enteras_sin_mayusculas_ni_acentos(conn, mundo, es
 
 # --- Quien no puede verla no recibe nada -----------------------------------------------------
 
-def test_quien_no_puede_verla_no_recibe_el_enlace(conn, mundo, escribe, direccion):
+def test_quien_no_puede_verla_no_recibe_el_enlace_sino_el_resumen(conn, mundo, escribe,
+                                                                  direccion):
     """Nahuel no es su responsable, no aprueba el trabajo de Marcos ni decidió sobre ella, no
-    es referente del área ni la autoridad final (ADR 0019, 7b)."""
+    es referente del área ni la autoridad final (ADR 0019, 7b): ningún enlace. Desde la decisión
+    33 del usuario, el resumen, que ve cualquiera del equipo; el área de este mundo no tiene
+    encargado, así que no hay a quién pedirle el detalle, y los hechos lo dicen
+    (`tests/motor/test_pedir_el_detalle.py`, con encargado)."""
     _nahuel(conn, mundo)
     hecho, pedido = _pide(conn, escribe, "Nahuel", como_la_nombra="tablero de marcos")
-    assert hecho == {"jugada": "pedir_enlace", "resultado": "no_se_puede",
-                     "motivo": "no_puede_ver_esa_tarea"}
+    assert hecho == {"jugada": "pedir_enlace", "resultado": "solo_el_resumen",
+                     "tarea": {"titulo": "Revisar el tablero"}, "responsable": "Marcos",
+                     "estado": "asignada", "vence": "2026-10-09", "el_detalle_lo_ve": "Campo",
+                     "sin_encargado_del_sector": True}
     assert _enlaces(conn) == []
-    # Nada dice quién sí la ve (decisión 11), ni un nombre de la base (constitución §10), ni el
-    # título entero de una tarea que no puede ver: sólo lo que la persona ya dijo.
-    assert "Ismael" not in repr(pedido) and "puede_ver_tarea" not in repr(pedido)
-    assert "Revisar el tablero" not in repr(pedido)
+    # Ningún nombre de la base (constitución §10).
+    assert "puede_ver_tarea" not in repr(pedido)
 
 
 def test_entre_varias_que_coinciden_sale_la_unica_que_puede_ver(conn, mundo, escribe,

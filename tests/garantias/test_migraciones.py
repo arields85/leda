@@ -78,7 +78,10 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "evidence", "task_evidence_policy", "evidencia_retirada",
                     "archivo_de_tarea", "message_outbox_adjunto",
                     "area", "acceso_tarea", "vista_de_tarea", "message_outbox_enlace",
-                    "dicho_de_quien_destraba", "pase_de_tarea", "cambio_de_responsable")
+                    "dicho_de_quien_destraba", "pase_de_tarea", "cambio_de_responsable",
+                    # El detalle de una tarea (migración 0050; decisión 33): el pedido y lo
+                    # compartido.
+                    "pedido_de_detalle", "tarea_compartida")
 
 # La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
 # política. `model_config` admite espacio nulo para el modelo global.
