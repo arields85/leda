@@ -483,6 +483,15 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     antes. Ninguna tarea queda abandonada y Leda corrige lo que dijo mal. Dentro del margen para
     corregir, el aviso equivocado no sale (`835b658`).
 
+62. **La oferta de pasarle algo deja una pregunta liviana, si no hay otra abierta** (de la ronda
+    de las 30 a 45 con la IA real, conversación 43, paso 9; usuario, 2026-10-10, opción B, la que
+    recomendó el agente). Cuando Leda le cuenta a alguien lo que dijo otra persona y le ofrece
+    pasarle algo ("si querés decirle algo, se lo paso"), deja anotada una pregunta opcional, como
+    las ofertas de una respuesta (`preguntas.OPCIONAL`): lo que la persona conteste se lee como
+    respuesta a esa oferta; si no contesta, Leda no insiste y la pregunta vence sola. Sólo si la
+    persona no tiene otra pregunta abierta: una pregunta que hace falta contestar nunca queda
+    tapada por una opcional; en ese caso la respuesta se lee como hoy.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
