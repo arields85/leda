@@ -25,7 +25,8 @@ from leda.motor.ia import Jugada
 from leda.motor.tiempo import RelojFijo
 
 from tests.conversaciones.carga import cargar
-from tests.motor.ayudantes import AHORA, IAQueRedacta, avisos_guardados, todos, uno
+from tests.motor.ayudantes import (AHORA, IAQueRedacta, administrador, avisos_guardados, todos,
+                                   uno)
 from tests.motor.test_aprobacion import Turnos
 
 PASE_PARA_DECIDIR, PASE_PARA_TOMAR = "pase_para_decidir", "pase_para_tomar"
@@ -257,6 +258,47 @@ def test_un_integrante_no_se_la_pasa_a_otro_sector_y_lo_decide_su_encargado(conn
         "no_se_puede", "otro_sector", MARCOS)
     assert _pases(conn) == [] and avisos_guardados(conn) == []
     assert todos(conn, "select * from incident") == []
+
+
+def _ot_sin_encargado(conn, t: Turnos) -> None:
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = null where id = %s",
+                    (t.carga.areas["ot"],))
+    conn.commit()
+
+
+def _sin_encargado(conn) -> list[dict]:
+    return todos(conn, """select resumen_sanitizado, notificado_admin_en from incident
+                           where etapa = 'motor_sector_sin_encargado'""")
+
+
+def test_un_pase_sin_encargado_que_lo_decida_no_se_puede_y_se_entera_el_administrador(conn,
+                                                                                       equipo):
+    """La corrección chica: sin encargado en el sector de quien recibe, nadie decide el pase.
+    A Nahuel, lo de siempre (no se puede, sin encargado); al administrador, por su canal, que
+    ese sector no tiene encargado, una vez por día aunque se pida otra vez."""
+    administrador(conn)
+    _ot_sin_encargado(conn, equipo)
+    [hecho] = _pedir(equipo, "Nahuel", "SEN", "pedro").hechos
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "sin_encargado")
+    assert "se_le_aviso_al_administrador" not in hecho
+    _pedir(equipo, "Nahuel", "SEN", "pedro")
+    [incidente] = _sin_encargado(conn)
+    assert "OT y automatización" in incidente["resumen_sanitizado"]
+    assert incidente["notificado_admin_en"] is not None
+    assert _pases(conn) == [] and avisos_guardados(conn) == []
+
+
+def test_un_integrante_de_un_sector_sin_encargado_que_la_pasa_a_otro_tambien(conn, equipo):
+    """Pasarla a otro sector la decide el encargado del suyo: si no hay, tampoco hay quien lo
+    decida, y el administrador se entera."""
+    administrador(conn)
+    _ot_sin_encargado(conn, equipo)
+    [hecho] = _pedir(equipo, "Nahuel", "SEN", "lucas").hechos
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "otro_sector")
+    assert "quien_decide" not in hecho
+    [incidente] = _sin_encargado(conn)
+    assert "OT y automatización" in incidente["resumen_sanitizado"]
 
 
 def test_alguien_que_no_es_del_equipo_o_la_misma_persona_no(conn, equipo):

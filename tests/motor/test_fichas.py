@@ -704,8 +704,9 @@ def test_una_tarea_sin_arrancar_se_entrega_con_su_vista_previa(conn, mundo, escr
 
 def test_un_pase_sin_quien_lo_decida_no_se_puede_y_no_avisa_a_nadie(conn, mundo, escribe):
     """Delegar (C-7): decide el encargado del sector de quien recibe. En este espacio el área no
-    tiene encargado: no hay quien decida, y nada cambia ni le llega a nadie. Los demás casos, con
-    los sectores de CoreWork, en `test_delegar.py`."""
+    tiene encargado: no hay quien decida, y nada cambia ni le llega a nadie del equipo. Queda el
+    incidente para la administración, que es quien puede asignar un encargado (la corrección
+    chica). Los demás casos, con los sectores de CoreWork, en `test_delegar.py`."""
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada(
         "pedir_reasignacion", {"tarea": "T1", "a": "Ismael"}),
         texto="me la podés pasar a Ismael?")
@@ -715,7 +716,9 @@ def test_un_pase_sin_quien_lo_decida_no_se_puede_y_no_avisa_a_nadie(conn, mundo,
                      "tarea": {"alias": "T1", "titulo": "Revisar el tablero"}}
     assert _uno(conn, "select responsable_membership_id r from task where id = %s",
                 mundo["tarea"])["r"] is not None
-    assert _cuantas(conn, "incident") == 0 and _cuantas(conn, "scheduled_notice") == 0
+    assert _cuantas(conn, "scheduled_notice") == 0
+    [incidente] = _todos(conn, "select etapa from incident")
+    assert incidente["etapa"] == "motor_sector_sin_encargado"
 
 
 # --- Fuera de la lista ----------------------------------------------------------------------

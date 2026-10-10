@@ -30,6 +30,7 @@ quién decide (`avisar_que_no_hay_a_quien`).
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 # Lo que la persona sabe y Leda dice sólo si lo pregunta (`turno.SOLO_SI_PREGUNTA`).
@@ -82,6 +83,30 @@ def avisar_que_no_hay_a_quien(cur, workspace_id: str, resumen: str, **referencia
     from ..incidentes import registrar_incidente
     registrar_incidente(cur, workspace_id, resumen, severidad="media",
                         etapa=ETAPA_SIN_A_QUIEN_INFORMAR, **referencia)
+
+
+ETAPA_SECTOR_SIN_ENCARGADO = "motor_sector_sin_encargado"
+
+
+def avisar_que_el_sector_no_tiene_encargado(cur, workspace_id: str, area_id: str, para: str,
+                                            hoy: date) -> None:
+    """El incidente para el administrador, por su canal, de un sector sin encargado (el
+    referente de su área) cuando alguien necesitaba que decidiera algo: sólo la administración
+    lo puede completar (la corrección chica de la Fase C). Una vez por sector y por día (`clave`):
+    los pedidos de ese día no repiten el aviso, y si sigue así al día siguiente, vuelve. `para`,
+    en palabras y sin texto de mensajes: qué hacía falta decidir. A la persona no le llega nada
+    técnico (constitución §10): sus hechos siguen diciendo sólo que no hay encargado."""
+    from ..incidentes import registrar_incidente
+    cur.execute("select nombre from area where id = %s", (str(area_id),))
+    fila = cur.fetchone()
+    nombre = fila["nombre"] if fila else "(sin nombre)"
+    registrar_incidente(
+        cur, workspace_id,
+        f"El sector «{nombre}» no tiene encargado (el referente de su área), y {para}: nadie lo "
+        f"puede decidir hasta que tenga uno.",
+        severidad="media", etapa=ETAPA_SECTOR_SIN_ENCARGADO, referencia_tipo="area",
+        referencia_id=str(area_id),
+        clave=f"{ETAPA_SECTOR_SIN_ENCARGADO}:{area_id}:{hoy.isoformat()}")
 
 
 def por_que_no_hay_a_quien(motivo: str) -> str:

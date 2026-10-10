@@ -44,6 +44,8 @@ from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import psycopg
+
 from .db import registrar_auditoria
 
 # Segunda capa de defensa (R1-001, revisión 2026-09-28): traduce cualquier
@@ -69,6 +71,10 @@ def redactar_secreto_telegram(texto: str | None) -> str | None:
 # `inbound_message` es por cliente). La referencia a un toque
 # (`pending_action`) se retiró con los flujos A y B (E3-3).
 REFERENCIA_INBOUND_MESSAGE = "inbound_message"
+# El espacio de nombres de los ids de un incidente con clave (`registrar_incidente_y_si_se_aviso`,
+# `clave`): la misma clave en el mismo espacio da siempre el mismo id.
+_CLAVES_DE_INCIDENTE = uuid.UUID("6f1c2a52-3a5e-4b8e-9f0e-1d4c7b2a9e51")
+
 # Un aviso de `admin_notice` que agotó sus reintentos (T28, despachador.py
 # `despachar_avisos_admin`): apunta a esa fila, no a un mensaje ni una
 # acción -- `referencia_tipo` es texto libre, sin restricción en el esquema
@@ -387,6 +393,20 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=("Completá en el espacio el referente del sector o quien aprueba el trabajo "
                    "de esa persona, o conectá a quien está en ese lugar, y mirá el bloqueo: "
                    "nadie que decida se enteró todavía.")),
+    # El Motor (`motor/asentado.py`, la corrección chica de la Fase C): un sector sin encargado
+    # (el referente de su área) deja sin nadie que decida un pase o si se comparte el detalle de
+    # una tarea. Sólo la administración lo arregla. Una vez por sector y por día.
+    "motor_sector_sin_encargado": ExplicacionDeEtapa(
+        titulo="Un sector no tiene encargado",
+        que_paso=("Alguien del equipo necesitó que el encargado de un sector (el referente de su "
+                  "área) decidiera algo —pasar una tarea, o compartir el detalle de una— y ese "
+                  "sector no tiene encargado: nadie lo puede decidir. El resumen dice qué sector "
+                  "y para qué hacía falta."),
+        que_vio=("Que eso no se puede por ahora, sin nada técnico. Un pedido que ya estaba "
+                 "hecho espera, sin repetirse, hasta que el sector tenga encargado."),
+        que_hacer=("Completá el referente del área en el pack del espacio. Este aviso vuelve "
+                   "una vez por día mientras el sector siga sin encargado y alguien lo "
+                   "necesite.")),
     "motor_sin_bot": ExplicacionDeEtapa(
         titulo="Un espacio activo no tiene su bot configurado",
         que_paso=("El servidor de Leda (`servir`) encontró un espacio activo sin el token de "
@@ -526,7 +546,8 @@ def registrar_incidente_y_si_se_aviso(cur, workspace_id: str | None, resumen: st
                         app_user_id: str | None = None,
                         notificado_en=None,
                         avisar_admin: bool = True,
-                        sin_avisar_porque: str | None = None) -> tuple[str, bool]:
+                        sin_avisar_porque: str | None = None,
+                        clave: str | None = None) -> tuple[str, bool]:
     """Inserta un incidente sanitizado y avisa a la administración de
     plataforma (Constitución §10). Helper compartido para que quien necesite
     registrar un incidente no arme el insert a mano en cada lugar nuevo.
@@ -561,10 +582,19 @@ def registrar_incidente_y_si_se_aviso(cur, workspace_id: str | None, resumen: st
     el corte es por otra razón (el Motor, un intento fallido que se
     reintenta: `motor.avisos`), así el resumen no miente sobre por qué.
 
+    `clave` hace que una misma situación deje un solo incidente (y un solo aviso a la
+    administración): el id del incidente sale de la clave y del espacio, así que registrarlo otra
+    vez no inserta nada ni vuelve a avisar (la cola de la administración ya lo tiene, con la
+    misma clave de deduplicación). Quien llama elige qué es "la misma situación" (por ejemplo, un
+    sector sin encargado en un día: la corrección chica de la Fase C). `leda_app` no lee
+    `incident`: por eso la deduplicación es por el id, sin leer la tabla.
+
     Devuelve el id del incidente insertado y si algún administrador quedó avisado de verdad
     (lo que permite decirle a una persona que el administrador se enteró sólo si es cierto;
-    decisión 37 del usuario, C-5b). `registrar_incidente` devuelve sólo el id."""
-    incident_id = str(uuid.uuid4())
+    decisión 37 del usuario, C-5b); con `clave`, si ya estaba, su id y `False` (no se avisó
+    ahora). `registrar_incidente` devuelve sólo el id."""
+    incident_id = (str(uuid.uuid5(_CLAVES_DE_INCIDENTE, f"{workspace_id}:{clave}")) if clave
+                   else str(uuid.uuid4()))
     referencia_cruda = redactar_secreto_telegram(referencia_cruda)
 
     resumen_final = resumen
@@ -590,15 +620,24 @@ def registrar_incidente_y_si_se_aviso(cur, workspace_id: str | None, resumen: st
                           "administración es justamente el que falló -- "
                           "revisar con `python -m leda incidentes <espacio>`.")
 
-    cur.execute(
-        """insert into incident (id, workspace_id, severidad, resumen_sanitizado,
-                                 referencia_cruda, etapa, referencia_tipo,
-                                 referencia_id, chat_id, app_user_id,
-                                 notificado_en, notificado_admin_en)
-           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-        (incident_id, workspace_id, severidad, resumen_final, referencia_cruda,
-         etapa, referencia_tipo, referencia_id, chat_id, app_user_id,
-         notificado_en, notificado_admin_en))
+    datos = (incident_id, workspace_id, severidad, resumen_final, referencia_cruda,
+             etapa, referencia_tipo, referencia_id, chat_id, app_user_id,
+             notificado_en, notificado_admin_en)
+    insertar = """insert into incident (id, workspace_id, severidad, resumen_sanitizado,
+                                        referencia_cruda, etapa, referencia_tipo,
+                                        referencia_id, chat_id, app_user_id,
+                                        notificado_en, notificado_admin_en)
+                  values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+    if clave is None:
+        cur.execute(insertar, datos)
+        return incident_id, notificado_admin_en is not None
+    # `on conflict` pediría leer la tabla: en su propio punto de retorno, el choque con el id de
+    # la misma situación deshace sólo este insert.
+    try:
+        with cur.connection.transaction():
+            cur.execute(insertar, datos)
+    except psycopg.errors.UniqueViolation:
+        return incident_id, False       # la misma situación ya tenía su incidente
     return incident_id, notificado_admin_en is not None
 
 

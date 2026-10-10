@@ -72,6 +72,7 @@ from ..herramientas import (EstadoCambio, NecesitaConfirmacion, ejecutar,
 
 from . import entrega, preguntas
 from .ancla import candado
+from .asentado import avisar_que_el_sector_no_tiene_encargado
 from .avisos import (COMO_TERMINO_EL_PASE, PASE_PARA_DECIDIR, PASE_PARA_TOMAR,
                      RECORDATORIO_DEL_PASE, ausente, guardar, integrante)
 from .enlace import NINGUNA_CON_ESE_NOMBRE, misma_palabra, que_nombra
@@ -93,6 +94,9 @@ LA_TAREA_CAMBIO = "la_tarea_cambio"
 # La tarea nombrada no es de quien escribe ni de alguien de su sector, si es el encargado
 # (decisión 27): no la puede pasar.
 NO_ES_DE_SU_SECTOR = "no_es_de_su_sector"
+# Los motivos de la regla del pase (`autoridad.regla_del_pase`) en que falta un encargado.
+SIN_ENCARGADO = "sin_encargado"
+OTRO_SECTOR = "otro_sector"
 # Los botones de las preguntas a quien decide y a quien recibe: cada uno corre `contestar_el_pase`
 # con lo que dice (`acepta`).
 BOTONES_PARA_DECIDIR = (("Aprobar el pase", True), ("No aprobarlo", False))
@@ -229,7 +233,7 @@ def _mostrar(ctx: Contexto, tarea: dict, recibe: str) -> dict:
     except NecesitaConfirmacion as e:
         huella = e.huella
     else:
-        return _no_se_puede(ctx, r, tarea)
+        return _no_se_puede(ctx, r, tarea, recibe)
     decide = regla_del_pase(cur, ctx.quien.membership_id, recibe).decide
     for persona in dict.fromkeys(p for p in (recibe, decide) if p != ctx.quien.membership_id):
         quien, motivo = alcanzable(cur, persona)
@@ -279,11 +283,38 @@ def _mostrar(ctx: Contexto, tarea: dict, recibe: str) -> dict:
     return hecho
 
 
-def _no_se_puede(ctx: Contexto, rechazo: dict, tarea: dict) -> dict:
-    """Un rechazo de la cocina, en hechos: nunca su texto ni un id."""
+def _si_falta_un_encargado(ctx: Contexto, motivo: str, rechazo: dict, tarea: dict,
+                          recibe: str | None) -> None:
+    if motivo == SIN_ENCARGADO and recibe is not None:
+        persona = integrante(ctx.cur, recibe)
+        if persona is None:
+            return
+        area, para = persona["area_id"], (
+            f"{ctx.quien.nombre} quiere pasarle la tarea «{tarea['titulo']}» a "
+            f"{persona['nombre']}, y el pase lo decide el encargado del sector de quien la recibe")
+    elif motivo == OTRO_SECTOR and not rechazo.get("lo_decide"):
+        persona = integrante(ctx.cur, ctx.quien.membership_id)
+        if persona is None:
+            return
+        area, para = persona["area_id"], (
+            f"{ctx.quien.nombre} quiere pasarle la tarea «{tarea['titulo']}» a alguien de otro "
+            f"sector, y eso lo decide el encargado de su sector")
+    else:
+        return
+    avisar_que_el_sector_no_tiene_encargado(
+        ctx.cur, ctx.quien.workspace_id, str(area), para,
+        ctx.ahora.astimezone(ctx.calendario.zona).date())
+
+
+def _no_se_puede(ctx: Contexto, rechazo: dict, tarea: dict, recibe: str | None = None) -> dict:
+    """Un rechazo de la cocina, en hechos: nunca su texto ni un id. Si no hay quien decida el
+    pase porque un sector no tiene encargado (el de quien recibe o, para pasarla a otro sector,
+    el de quien pide), el administrador se entera por su canal (la corrección chica); a la
+    persona, sólo el motivo de siempre."""
     motivo = str(rechazo.get("error"))
     hecho: dict[str, Any] = {"resultado": "no_se_puede", "motivo": motivo,
                              "tarea": tarea_hecho(tarea)}
+    _si_falta_un_encargado(ctx, motivo, rechazo, tarea, recibe)
     if motivo == "estado":
         hecho["estado"] = rechazo.get("estado")
     if rechazo.get("lo_decide"):
@@ -361,7 +392,7 @@ def confirmar(ctx: Contexto, datos: dict, q: dict) -> dict:
         if q["cerrada_en"] is None:
             preguntas.cerrar(ctx, str(q["id"]), "sin_efecto", {"tarea": tarea["id"]})
         entrega.que_sea_lo_mostrado(ctx, None, None)
-        return _no_se_puede(ctx, r, tarea)
+        return _no_se_puede(ctx, r, tarea, jugada["a_membership_id"])
     if q["cerrada_en"] is None:
         preguntas.cerrar(ctx, str(q["id"]), "respondida",
                          {"jugada": "confirmar", "tarea": tarea["id"]})

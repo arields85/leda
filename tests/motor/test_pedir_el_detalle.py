@@ -195,6 +195,52 @@ def test_sin_encargado_del_sector_el_resumen_lo_dice(conn, equipo):
     assert hecho["sin_encargado_del_sector"] is True and "pregunta" not in hecho
 
 
+SECTOR_SIN_ENCARGADO = "motor_sector_sin_encargado"
+
+
+def _it_sin_encargado(conn, t: Turnos) -> None:
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = null where id = %s",
+                    (t.carga.areas["it"],))
+    conn.commit()
+
+
+def _incidentes_sin_encargado(conn) -> list[dict]:
+    return todos(conn, """select resumen_sanitizado, notificado_admin_en from incident
+                           where etapa = %s order by at""", SECTOR_SIN_ENCARGADO)
+
+
+def test_sin_encargado_del_sector_se_entera_el_administrador_una_vez_por_dia(conn, equipo):
+    """La corrección chica: un sector sin encargado deja sin nadie que decida, y eso lo arregla
+    sólo la administración. Se entera por su canal (un incidente con su aviso), una vez por
+    sector y por día aunque se pida varias veces; a la persona no le llega nada técnico."""
+    administrador(conn)
+    _it_sin_encargado(conn, equipo)
+    [hecho] = _pide_el_enlace(equipo, "Nahuel", "switch").hechos
+    assert hecho["sin_encargado_del_sector"] is True
+    assert "se_le_aviso_al_administrador" not in hecho
+    avisos_a_la_administracion = cuantas(conn, "admin_notice")
+    assert avisos_a_la_administracion >= 1
+    r = equipo.dice("Nahuel", Jugada("pedir_el_detalle", {"como_la_nombra": "switch"}),
+                    at=AHORA + timedelta(hours=2))
+    assert (r.hechos[0]["resultado"], r.hechos[0]["motivo"]) == ("no_se_puede",
+                                                                 "sin_encargado_del_sector")
+
+    [incidente] = _incidentes_sin_encargado(conn)
+    assert "Infraestructura IT" in incidente["resumen_sanitizado"]
+    assert SWITCH in incidente["resumen_sanitizado"]
+    assert incidente["notificado_admin_en"] is not None
+    assert cuantas(conn, "admin_notice") == avisos_a_la_administracion
+
+    _pide_el_enlace_el(equipo, "Nahuel", "switch", _dia(6))
+    assert len(_incidentes_sin_encargado(conn)) == 2
+
+
+def _pide_el_enlace_el(t: Turnos, nombre: str, como: str, at):
+    return t.dice(nombre, Jugada("pedir_enlace", {"como_la_nombra": como}),
+                  texto=f"pasame el link de {como}", at=at)
+
+
 # --- Pedir el detalle -----------------------------------------------------------------------
 
 def test_aceptar_la_oferta_le_pregunta_al_encargado_terminado_el_margen(conn, equipo):
@@ -735,6 +781,31 @@ def test_la_repeticion_va_al_encargado_de_ahora(conn, equipo):
     [otra_vez] = avisos_guardados(conn, RECORDATORIO)
     assert str(otra_vez["destinatario_membership_id"]) == _personas(equipo, "Ariel")[
         "membership_id"]
+
+
+def test_un_pedido_que_se_queda_sin_encargado_espera_y_el_administrador_se_entera(conn,
+                                                                                  equipo):
+    """La corrección chica (`detalle.py:400-403`): si el sector se queda sin encargado después de
+    pedirlo, nadie puede decidirlo; el pedido espera (como con el encargado ausente) y ya no se
+    queda callado: el administrador se entera, una vez por día mientras siga así."""
+    administrador(conn)
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    _it_sin_encargado(conn, equipo)
+
+    _ciclo(conn, equipo, _dia(6))
+    _ciclo(conn, equipo, _dia(6, 15))
+    [incidente] = _incidentes_sin_encargado(conn)
+    assert NAHUEL in incidente["resumen_sanitizado"] and SWITCH in incidente[
+        "resumen_sanitizado"]
+    assert avisos_guardados(conn, RECORDATORIO) == []
+    [pedido] = todos(conn, "select estado from pedido_de_detalle")
+    assert pedido["estado"] == "esperando_decision"
+
+    _ciclo(conn, equipo, _dia(7))
+    assert len(_incidentes_sin_encargado(conn)) == 2
+    [pedido] = todos(conn, "select estado from pedido_de_detalle")
+    assert pedido["estado"] == "esperando_decision"
 
 
 def test_el_recordatorio_del_pedido_esta_declarado():

@@ -62,6 +62,7 @@ from ..herramientas import terminar_pedido_de_detalle
 
 from . import preguntas
 from .ancla import candado
+from .asentado import avisar_que_el_sector_no_tiene_encargado
 from .avisos import (COMO_TERMINO_EL_PEDIDO_DEL_DETALLE, PEDIDO_DEL_DETALLE,
                      RECORDATORIO_DEL_PEDIDO_DEL_DETALLE, ausente, guardar, integrante)
 from .fichas import AVISO, LLEGA, Contexto, juntar, nombrar_efecto, nombrar_pregunta, vacio
@@ -98,6 +99,7 @@ def ofrecer(ctx: Contexto, task_id: str, hecho: dict[str, Any]) -> None:
     encargado = encargado_de_la_tarea(cur, task_id)
     if encargado is None:
         hecho[SIN_ENCARGADO] = True
+        _avisar_sin_encargado(ctx, task_id)
         return
     if _pedido_abierto(cur, task_id, yo) is not None:
         hecho["ya_se_lo_pidio_a"] = integrante(cur, encargado)["nombre"]
@@ -114,6 +116,18 @@ def ofrecer(ctx: Contexto, task_id: str, hecho: dict[str, Any]) -> None:
                 preguntas.OPCIONAL: True})
     nombrar_pregunta(hecho, "pregunta" if ahora else "pregunta_para_despues",
                      preguntas.PROPUESTA, pregunta_id)
+
+
+def _avisar_sin_encargado(ctx: Contexto, task_id: str) -> None:
+    """Sin encargado en el sector de la tarea, nadie decide si se comparte su detalle: el
+    administrador se entera por su canal, una vez por sector y por día (la corrección chica). A
+    la persona, sólo el hecho de siempre (`SIN_ENCARGADO`)."""
+    ctx.cur.execute("select area_id, titulo from task where id = %s", (task_id,))
+    tarea = ctx.cur.fetchone()
+    avisar_que_el_sector_no_tiene_encargado(
+        ctx.cur, ctx.quien.workspace_id, str(tarea["area_id"]),
+        f"{ctx.quien.nombre} quiere ver el detalle de la tarea «{tarea['titulo']}», que no ve",
+        ctx.ahora.astimezone(ctx.calendario.zona).date())
 
 
 def _sin_leda_conectada(ctx: Contexto, quien: dict | None, motivo: str,
@@ -185,6 +199,7 @@ def pedir(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     hecho: dict[str, Any] = {"tarea": preguntas.tarea_dicha(ctx, task_id)}
     encargado = encargado_de_la_tarea(cur, task_id)
     if encargado is None:
+        _avisar_sin_encargado(ctx, task_id)
         return {**hecho, "resultado": "no_se_puede", "motivo": SIN_ENCARGADO}
     quien, motivo = alcanzable(cur, encargado)
     if motivo is not None:
@@ -212,7 +227,8 @@ def _el_pedido(cur, pedido_id: str) -> dict:
     """Un pedido con los nombres de quién lo pidió, quién tiene la tarea y quién lo decidió (o,
     mientras espera, a quién se le preguntó al pedirlo)."""
     cur.execute(
-        """select p.*, t.titulo, t.fecha_objetivo, pide.nombre pidio, tiene.nombre la_tiene,
+        """select p.*, t.titulo, t.fecha_objetivo, t.area_id, pide.nombre pidio,
+                  tiene.nombre la_tiene,
                   decide.nombre decide
              from pedido_de_detalle p
              join task t on t.id = p.task_id
@@ -400,6 +416,14 @@ def seguir_los_pedidos(m) -> list[str]:
         encargado = encargado_de_la_tarea(cur, pedido["task_id"])
         pregunta = _el_aviso(cur, PEDIDO_DEL_DETALLE, pedido)
         otra_vez = _el_aviso(cur, RECORDATORIO_DEL_PEDIDO_DEL_DETALLE, pedido)
+        # Sin encargado, nadie lo puede decidir: espera (como con el encargado ausente), y no
+        # callado: el administrador se entera, una vez por día mientras siga así (la corrección
+        # chica; antes esperaba sin que nadie lo supiera).
+        if encargado is None:
+            avisar_que_el_sector_no_tiene_encargado(
+                cur, m.workspace_id, str(pedido["area_id"]),
+                f"el pedido de {pedido['pidio']} para ver el detalle de la tarea "
+                f"«{pedido['titulo']}» espera sin nadie que lo decida", m.hoy)
         pausado = encargado is None or ausente(cur, encargado, m.hoy)
         if vencio(m, otra_vez, pausado=pausado) and terminar_pedido_de_detalle(
                 cur, pedido["id"], m.ahora) is not None:
