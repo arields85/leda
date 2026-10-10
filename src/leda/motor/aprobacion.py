@@ -353,7 +353,10 @@ def _la_tarea(ctx, nombre: str, datos: dict, tarea: dict | None
             return None, {"resultado": "falta_dato", "falta": ["de"],
                           "coinciden": [c["nombre"] for c in coinciden]}
         if not coinciden:
-            return None, {"resultado": "no_se_puede", "motivo": PERSONA_DESCONOCIDA}
+            # Qué nombre no está, como lo dijo: sin él, la IA puede nombrar a otra persona (como
+            # en un pase, la 39).
+            return None, {"resultado": "no_se_puede", "motivo": PERSONA_DESCONOCIDA,
+                          "nombre_que_no_esta": de}
         persona = str(coinciden[0]["membership_id"])
         if persona == yo:
             return None, _su_propio_trabajo(ctx, None)

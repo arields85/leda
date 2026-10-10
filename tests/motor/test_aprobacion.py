@@ -260,6 +260,20 @@ def test_quien_no_aprueba_ese_trabajo_recibe_un_no_y_nada_cambia(conn, mundo, tu
     assert cuantas(conn, "incident", "etapa = 'motor_fuera_de_la_lista'") == 0
 
 
+def test_decidir_lo_de_alguien_que_no_es_del_equipo_dice_que_nombre_no_esta(conn, mundo,
+                                                                          turnos):
+    """Como en un pase (la 39): sin el nombre que no encontró, la IA puede nombrar a otra
+    persona. El hecho lo lleva tal como lo dijo."""
+    tarea = _entregada(conn, mundo, turnos)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"de": "roberto"}),
+                    texto="lo de roberto aprobalo")
+    hecho = _hecho(r, "aprobar")
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "persona_desconocida")
+    assert hecho["nombre_que_no_esta"] == "roberto"
+    assert hechos_mod.sin_significado(hecho) == set()
+    assert estado_de(conn, tarea) == "en_revision" and _decisiones(conn, tarea) == []
+
+
 def test_sin_tarea_con_una_sola_entrega_de_esa_persona_es_esa(conn, mundo, turnos):
     tarea = _entregada(conn, mundo, turnos)
     turnos.dice("Ismael", Jugada("aprobar", {"de": "Marcos"}), texto="lo de marcos aprobado")
