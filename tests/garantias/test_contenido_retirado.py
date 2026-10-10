@@ -54,7 +54,8 @@ def ada(conn, mundo) -> str:
 
 def _retirar(conn, mundo, ada: str, pieza: str, motivo: str = MOTIVO) -> list[str]:
     with admin(conn) as cur:
-        retiradas = P.retirar_contenido(cur, mundo["north-lab"]["id"], pieza, ada, motivo)
+        retiradas = P.retirar_contenido(cur, mundo["north-lab"]["id"], pieza, ada, motivo,
+                                        ahora=AHORA)
     conn.commit()
     return retiradas
 

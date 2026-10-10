@@ -1772,9 +1772,12 @@ def _resolver_piezas(cur, tarea_id, piezas: list[dict]) -> list[dict]:
             raise ValueError("pieza")
         cubre = [str(t) for t in pieza.get("cubre") or []]
         if pieza.get("archivo_id"):
-            cur.execute("select clase from archivo where id = %s", (str(pieza["archivo_id"]),))
+            cur.execute("select clase, contenido_retirado_en from archivo where id = %s",
+                        (str(pieza["archivo_id"]),))
             fila = cur.fetchone()
-            if fila is None:
+            # Un archivo cuyo contenido retiró la administración (decisión 57) no es evidencia:
+            # como uno que no existe.
+            if fila is None or fila["contenido_retirado_en"] is not None:
                 raise ValueError("archivo")
             clase = _clase_de_un_archivo(fila["clase"])
             aceptados = _tipos_que_acepta(cur, tarea_id, clase)

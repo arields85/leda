@@ -131,6 +131,12 @@ tema se cerró sin esa persona, que ya no hace falta (`ya_no_hace_falta_que_dest
 persona trabada, la pregunta de qué arregló (`pregunta_a_quien_esta_trabado`) o de cómo le fue
 (`como_le_fue_con_quien_destraba`), que abren `preguntas.QUE_ARREGLARON`; y a quien destraba, lo
 que dijo la persona trabada (`lo_que_dijo_quien_esta_trabado`).
+
+**Lo que retira la administración** (decisión 58 del usuario, 2026-10-10; porción 5b de la C-3;
+`retiro_de_la_administracion.py`): a quien entregó la pieza, que se retiró, con el motivo y lo
+que falta para que revisen la entrega (`contenido_retirado_por_la_administracion`); a quien la
+revisa, si quedó sin cubrir, que la entrega espera otra pieza (`la_entrega_espera_otra_pieza`).
+Los dos, de coordinación: los causa el acto de la administración.
 """
 
 from __future__ import annotations
@@ -1607,6 +1613,25 @@ def _vigencia_de_un_pedido_de_cambios(m: Momento, aviso) -> tuple[str | None, di
     return None, hechos
 
 
+# --- Lo que retira la administración (decisión 58; `retiro_de_la_administracion.py`) ----------
+
+CONTENIDO_RETIRADO_POR_LA_ADMINISTRACION = "contenido_retirado_por_la_administracion"
+LA_ENTREGA_ESPERA_OTRA_PIEZA = "la_entrega_espera_otra_pieza"
+# Por qué ya no sale: la tarea quedó aprobada (o cerrada), o la entrega ya se completó.
+YA_ESTA_APROBADA = "ya_esta_aprobada"
+LA_ENTREGA_YA_ESTA_COMPLETA = "la_entrega_ya_esta_completa"
+
+
+def _vigencia_del_retiro(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import retiro_de_la_administracion as retiro    # importa este módulo
+    return retiro.vigencia_a_quien_la_entrego(m, aviso)
+
+
+def _vigencia_de_la_espera_de_otra_pieza(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import retiro_de_la_administracion as retiro
+    return retiro.vigencia_a_quien_la_revisa(m, aviso)
+
+
 # --- Quien aprueba no contesta (porción 3c; `escalera.py`, "La espera de una decisión") ---------
 
 RECORDATORIO_DE_LA_DECISION = "recordatorio_de_la_decision"
@@ -2153,6 +2178,13 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # o con los botones de la primera.
     TipoDeAviso(RECORDATORIO_DEL_PEDIDO_DEL_DETALLE, "seguimiento", _vigencia_del_detalle,
                 recuerda=preguntas.COMPARTIR_EL_DETALLE, va_a=_al_encargado_de_ahora),
+    # Lo que retira la administración (decisión 58): a quien entregó la pieza (le puede hacer
+    # falta otra para que revisen su entrega) y, si quedó sin cubrir, a quien la revisa (sólo
+    # información). De coordinación: los causa el acto de otra persona.
+    TipoDeAviso(CONTENIDO_RETIRADO_POR_LA_ADMINISTRACION, "normal", _vigencia_del_retiro,
+                es_coordinacion=True),
+    TipoDeAviso(LA_ENTREGA_ESPERA_OTRA_PIEZA, "informativo",
+                _vigencia_de_la_espera_de_otra_pieza, es_coordinacion=True),
 )})
 
 

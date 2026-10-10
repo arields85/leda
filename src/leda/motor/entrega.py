@@ -624,6 +624,8 @@ def _mandado_antes(ctx, task_id: str) -> list[dict[str, Any]]:
              join archivo a on a.workspace_id = d.workspace_id and a.id = d.archivo_id
             where d.task_id = %s and d.dicho_por_membership_id = %s
               and (%s::timestamptz is null or d.at > %s::timestamptz)
+              -- Lo que retiró la administración no vuelve (decisión 57).
+              and a.contenido_retirado_en is null
               and not exists (select 1 from evidence e
                                where e.task_id = d.task_id and e.archivo_id = a.id
                                  and (%s::timestamptz is null or e.at > %s::timestamptz))

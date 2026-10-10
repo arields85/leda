@@ -528,10 +528,14 @@ class Recepcion:
                                                               llegada)
             archivo_id = None
             if rechazo is None:
-                archivo_id = archivos.guardar(
-                    cur, workspace_id=self.ws, contenido=contenido, tipo=tipo,
-                    nombre=llegada.nombre, enviado_por=quien.membership_id,
-                    ahora=self.reloj.ahora())
+                try:
+                    archivo_id = archivos.guardar(
+                        cur, workspace_id=self.ws, contenido=contenido, tipo=tipo,
+                        nombre=llegada.nombre, enviado_por=quien.membership_id,
+                        ahora=self.reloj.ahora())
+                except archivos.Rechazo as r:
+                    # Lo que retiró la administración no vuelve (decisión 57).
+                    rechazo = r.motivo
             archivos.anotar(cur, workspace_id=self.ws, entrante_id=entrante, llegada=llegada,
                             archivo_id=archivo_id, rechazo=rechazo)
         self.conn.commit()

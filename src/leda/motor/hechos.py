@@ -118,6 +118,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "mandar_uno_mas_chico": "Mandar uno más chico o más corto.",
     "mandar_un_enlace": "Mandar un enlace para verlo o bajarlo de otro lado (por ejemplo, de "
                         "una carpeta compartida).",
+    "contenido_retirado": "Es un archivo que la administración de Leda ya retiró: no se vuelve "
+                          "a recibir.",
+    "mandar_otro": "Mandar otra foto u otro archivo en su lugar.",
     # --- La entrega de una tarea con su evidencia (ADR 0019, decisiones 4 y 5) -----------------
     "evidencia_que_pide": "Lo que la tarea pide para entregarla, cada cosa con su código (para "
                           "nombrarla en una jugada) y cómo se le dice a la persona.",
@@ -208,6 +211,40 @@ SIGNIFICADOS: Mapping[str, str] = {
     "sacadas": "Las piezas que la persona sacó de la entrega antes de confirmarla: no van.",
     "retiradas": "Las piezas ya entregadas que la persona retiró: dejan de valer, nada se "
                  "borra.",
+    # --- Lo que retira la administración (decisión 58 del usuario, 2026-10-10; porción 5b) ----
+    "contenido_retirado_por_la_administracion": "Aviso a quien entregó una o más piezas de una "
+                                                "entrega: la administración de Leda las "
+                                                "retiró, por el motivo que dio "
+                                                "(motivo_del_retiro), y dejaron de contar para "
+                                                "la entrega. Quién de la administración lo hizo "
+                                                "no se sabe. No pide respuesta.",
+    "motivo_del_retiro": "Por qué la administración de Leda retiró esas piezas, como lo "
+                         "escribió.",
+    "piezas_retiradas_por_tarea": "De cada tarea, las piezas que se retiraron y, si su entrega "
+                                  "está en revisión y quedó sin cubrir, lo que falta para que "
+                                  "la revisen.",
+    "piezas_retiradas": "Las piezas que se retiraron de esa tarea: qué era cada una, qué cubría "
+                        "y qué día la entregó la persona. Su contenido ya no está.",
+    "cubria": "Lo que pide la tarea que cubría esa pieza, en palabras de todos los días.",
+    "la_entrego_el": "El día en que la persona entregó esa pieza.",
+    "la_revision_espera_otra_pieza": "La entrega de esa tarea, que está en revisión, quedó sin "
+                                     "algo de lo que pide (le_falta, le_falta_del_criterio): la "
+                                     "revisión espera a que la persona lo mande; con eso, quien "
+                                     "la revisa recibe un aviso nuevo con todo.",
+    "la_entrega_espera_otra_pieza": "Aviso a quien revisa una entrega: la administración de "
+                                    "Leda retiró una pieza y a la entrega le falta algo de lo "
+                                    "que pide la tarea (le_falta, le_falta_del_criterio). La "
+                                    "revisión espera a que la persona responsable lo mande; "
+                                    "cuando esté completa, le llega un aviso nuevo con todo. No "
+                                    "pide respuesta.",
+    "entregas_que_esperan_otra_pieza": "Las entregas que esperan una pieza nueva, cada una con "
+                                       "su tarea, su responsable y lo que le falta.",
+    "ya_esta_aprobada": "La tarea ya está aprobada o cerrada: el retiro no le cambia nada.",
+    "la_entrega_ya_esta_completa": "La entrega ya tiene otra vez todo lo que pide la tarea: "
+                                   "quien la revisa recibe la entrega completa en su propio "
+                                   "aviso.",
+    "referencias": "Referencias internas del sistema: nunca se le muestran ni se le dicen a la "
+                   "persona.",
     "como_queda": "Cómo queda lo que se confirmaba (la entrega o el pase) después de esto, con "
                   "su código.",
     "reemplazada": "Esa vista de la entrega dejó de valer porque cambió lo que mostraba: la "
@@ -1285,14 +1322,15 @@ _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 # le puso a un archivo.
 _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", "dice",
                                       "enlace", "lo_que_pide", "describe",
-                                      "le_falta_del_criterio", "ejemplo", "lo_que_dice"})
+                                      "le_falta_del_criterio", "ejemplo", "lo_que_dice",
+                                      "motivo_del_retiro", "referencias"})
 # El nombre de un archivo nunca es un código, aunque se escriba como uno (`informe_final`).
 # Ni lo que escribió en una pieza de una entrega, ni un enlace, ni el código de una cosa que
 # pide la tarea, que es dato del pack (va con sus palabras, `en_palabras`).
 _NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_evidencia",
                               "el_texto_cubre", "lo_que_pide", "describe",
                               "le_falta_del_criterio", "ejemplo", "lo_descrito_cubre",
-                              "lo_que_dice"})
+                              "lo_que_dice", "motivo_del_retiro", "referencias"})
 
 
 def para_redactar(valor: Any) -> Any:

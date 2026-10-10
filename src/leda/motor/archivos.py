@@ -25,6 +25,8 @@ migración 0033).
   contenido sea de la lista.
 - **Fuera de límite** (`Rechazo`, con su motivo): nunca en silencio. El adaptador anota qué
   llegó y por qué no se guardó, y la IA se lo cuenta a la persona (`hechos.SIGNIFICADOS`).
+- **Lo que retiró la administración** (decisión 57; migración 0053): su contenido se borró y
+  quedó la huella. Lo que llega con esa huella no se guarda otra vez (`CONTENIDO_RETIRADO`).
 """
 
 from __future__ import annotations
@@ -42,6 +44,8 @@ CLAVE_DEL_LIMITE = "archivo_tamano_maximo_mb"
 # Por qué no se guardó lo que llegó (los códigos de `archivo_de_mensaje.rechazo`).
 DEMASIADO_GRANDE = "demasiado_grande"
 TIPO_NO_ADMITIDO = "tipo_no_admitido"
+# Llegó con la huella de un archivo cuyo contenido retiró la administración (decisión 57).
+CONTENIDO_RETIRADO = "contenido_retirado"
 
 # Las clases de lo que se guarda (`archivo.clase`).
 IMAGEN, VIDEO, PDF, DOCUMENTO, TEXTO, COMPRIMIDO = (
@@ -79,7 +83,8 @@ class Tipo:
 
 
 class Rechazo(Exception):
-    """Lo que llegó no se guarda, por `motivo` (`DEMASIADO_GRANDE` o `TIPO_NO_ADMITIDO`)."""
+    """Lo que llegó no se guarda, por `motivo` (`DEMASIADO_GRANDE`, `TIPO_NO_ADMITIDO` o
+    `CONTENIDO_RETIRADO`)."""
 
     def __init__(self, motivo: str) -> None:
         super().__init__(motivo)
@@ -228,7 +233,8 @@ def limite(cur, workspace_id: str) -> int:
 def guardar(cur, *, workspace_id: str, contenido: bytes, tipo: Tipo, nombre: str | None,
             enviado_por: str, ahora: datetime) -> str:
     """El id del archivo guardado. Si el espacio ya lo tenía (la misma huella), el de entonces:
-    se guarda una vez, con el nombre y quien lo mandó la primera vez."""
+    se guarda una vez, con el nombre y quien lo mandó la primera vez. Si es uno cuyo contenido
+    retiró la administración, `Rechazo(CONTENIDO_RETIRADO)`: lo retirado no vuelve."""
     huella = hashlib.sha256(contenido).hexdigest()
     cur.execute(
         """insert into archivo (workspace_id, contenido, sha256, tamano, tipo, clase,
@@ -240,9 +246,11 @@ def guardar(cur, *, workspace_id: str, contenido: bytes, tipo: Tipo, nombre: str
          nombre_valido(nombre), enviado_por, ahora))
     fila = cur.fetchone()
     if fila is None:
-        cur.execute("select id from archivo where workspace_id = %s and sha256 = %s",
-                    (workspace_id, huella))
+        cur.execute("""select id, contenido_retirado_en from archivo
+                        where workspace_id = %s and sha256 = %s""", (workspace_id, huella))
         fila = cur.fetchone()
+        if fila["contenido_retirado_en"] is not None:
+            raise Rechazo(CONTENIDO_RETIRADO)
     return str(fila["id"])
 
 

@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 # El camino de la página, después de la dirección pública (`config.base_url`).
@@ -179,13 +180,18 @@ def revocar(cur, workspace_id: str, *, membership_id: str | None = None,
 
 
 def retirar_contenido(cur, workspace_id: str, evidence_id: str, admin_app_user_id: str,
-                      motivo: str) -> list[str]:
+                      motivo: str, *, ahora: datetime | None = None) -> list[str]:
     """El retiro del contenido de una pieza de evidencia por la administración (ADR 0019,
     decisión 3; decisiones 57 a 59 del usuario, porción 5b): la pieza no se borra y deja de
     contar para la política; el contenido de su archivo, sí, de la base (queda la huella, para
     reconocerlo si alguien lo vuelve a mandar), sin vuelta atrás. La página dice "contenido
     retirado por la administración" y el motivo, nunca quién. Un archivo se guarda una vez por
     huella, así que se retiran también las otras piezas del espacio con el mismo archivo.
+
+    A quien entregó cada pieza de una tarea que no está aprobada, y a quien revisa una entrega
+    que quedó sin cubrir, Leda les avisa por el motor, en la misma transacción
+    (`leda.motor.retiro_de_la_administracion`), con el momento `ahora` (el del reloj de Leda; si
+    no se da, el real).
 
     Devuelve las piezas que se retiraron ahora (una ya retirada por la administración no se
     vuelve a retirar). Queda en `audit_log` con quién y por qué.
@@ -229,9 +235,14 @@ def retirar_contenido(cur, workspace_id: str, evidence_id: str, admin_app_user_i
                         where workspace_id = %s and id = %s and contenido is not null""",
                     (str(workspace_id), fila["archivo_id"]))
         archivo_borrado = cur.rowcount == 1
+    from .motor import retiro_de_la_administracion
+
+    avisos = retiro_de_la_administracion.avisar(
+        cur, str(workspace_id), retiradas, motivo.strip(),
+        ahora or datetime.now(timezone.utc))
     _auditar(cur, workspace_id, "retirar_contenido_de_evidencia",
              actor_app_user_id=str(admin_app_user_id), actor_kind="persona",
              sujeto_tipo="evidence", sujeto_id=str(evidence_id),
              detalle={"motivo": motivo.strip(), "piezas": retiradas,
-                      "contenido_borrado": archivo_borrado})
+                      "contenido_borrado": archivo_borrado, "avisos": avisos})
     return retiradas

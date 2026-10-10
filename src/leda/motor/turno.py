@@ -100,6 +100,7 @@ SOLO_SI_PREGUNTA = "solo_si_pregunta"
 EN_CAMBIO_PUEDE: Mapping[str, tuple[str, ...]] = {
     archivos.DEMASIADO_GRANDE: ("mandar_uno_mas_chico", "mandar_un_enlace"),
     archivos.TIPO_NO_ADMITIDO: ("mandar_un_enlace",),
+    archivos.CONTENIDO_RETIRADO: ("mandar_otro",),
 }
 
 

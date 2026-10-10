@@ -211,10 +211,12 @@ def _revocar_enlaces(conn, ws: str, a) -> int:
 
 def _retirar_contenido(conn, ws: str, a) -> int:
     """Sin `--pieza`, lista lo que se entregó en la tarea, numerado. Con `--pieza`, retira su
-    contenido por la administración (ADR 0019, decisión 3): la pieza no se borra, la página
-    dice "retirado por la administración" y el archivo no se sirve. Auditado con quién y por
-    qué."""
+    contenido por la administración (ADR 0019, decisión 3; decisiones 57 a 59): la pieza no se
+    borra, el contenido de su archivo sí (queda la huella), la página dice "contenido retirado
+    por la administración" con el motivo, y Leda les avisa a quien la entregó y, si la entrega
+    quedó sin cubrir, a quien la revisa, con el reloj de Leda. Auditado con quién y por qué."""
     from . import pagina_de_tarea
+    from .motor.reloj import RelojDeLeda
 
     tarea = _tarea_que_nombra(conn, ws, a.slug, a.tarea)
     if tarea is None:
@@ -257,19 +259,23 @@ def _retirar_contenido(conn, ws: str, a) -> int:
         print(f"No hay una pieza {a.pieza} en «{tarea['titulo']}».")
         return 1
     pieza = piezas[a.pieza - 1]
+    reloj = RelojDeLeda()
+    reloj.refrescar(conn, ws)
+    conn.commit()
     with admin(conn) as cur:
         quien = _uno_por_nombre(_administradores(cur), a.administrador,
                                 "administrador de plataforma")
         if quien is None:
             return 1
         retiradas = pagina_de_tarea.retirar_contenido(cur, ws, pieza["id"], quien["id"],
-                                                      a.motivo)
+                                                      a.motivo, ahora=reloj.ahora())
     conn.commit()
     if not retiradas:
         print(f"La pieza {a.pieza} ya tenía el contenido retirado por la administración.")
         return 0
     print(f"Pieza {a.pieza}: contenido retirado por la administración ({quien['nombre']}). "
-          "La pieza no se borró; la página ya no lo muestra.")
+          "Su contenido se borró de la base (queda la huella); la página dice el motivo. "
+          "Leda les avisa a quien la entregó y, si hace falta, a quien la revisa.")
     if len(retiradas) > 1:
         print(f"También {len(retiradas) - 1} pieza(s) más con el mismo archivo.")
     return 0
@@ -391,7 +397,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="los de un administrador de plataforma, por su nombre")
 
     ret = sub.add_parser("retirar-contenido",
-                         help="retira el contenido de una pieza de evidencia (no la borra)")
+                         help="retira el contenido de una pieza de evidencia (lo borra; la pieza queda)")
     ret.add_argument("slug")
     ret.add_argument("--tarea", required=True, help="palabras del título de la tarea")
     ret.add_argument("--pieza", type=int, help="el número de la pieza, de la lista")
