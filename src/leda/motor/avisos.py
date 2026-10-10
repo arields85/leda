@@ -1896,6 +1896,28 @@ def _opciones_del_pase(m: Momento, aviso):
     return pase.opciones(m, aviso)
 
 
+# --- El detalle de una tarea, a pedido (decisión 33; `detalle.py`) -----------------------------
+#
+# La pregunta al encargado del sector de la tarea, si le comparte el detalle a quien lo pidió
+# (`PEDIDO_DEL_DETALLE`), con dos botones, y cómo terminó, a quien lo pidió
+# (`COMO_TERMINO_EL_PEDIDO_DEL_DETALLE`, información; si se la compartió, con el enlace a la
+# página). Las dos las causa lo que dijo otra persona: de coordinación, terminado el margen para
+# corregir. La pregunta no sale si el pedido ya no espera la decisión.
+
+PEDIDO_DEL_DETALLE = "pedido_del_detalle"
+COMO_TERMINO_EL_PEDIDO_DEL_DETALLE = "como_termino_el_pedido_del_detalle"
+
+
+def _vigencia_del_detalle(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import detalle                # detalle importa este módulo
+    return detalle.vigencia(m, aviso)
+
+
+def _opciones_del_detalle(m: Momento, aviso):
+    from . import detalle
+    return detalle.opciones(m, aviso)
+
+
 def _vigencia_de_la_lista(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     from . import cadencias             # cadencias importa este módulo
     return cadencias.vigencia(m, aviso)
@@ -2109,6 +2131,13 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # (`pase.hechos_de_la_pregunta`), y eso lleva la redacción.
     TipoDeAviso(RECORDATORIO_DEL_PASE, "seguimiento", _vigencia_del_pase,
                 recuerda=preguntas.DECIDIR_EL_PASE),
+    # El detalle de una tarea, a pedido (decisión 33): la pregunta al encargado, con sus dos
+    # botones, y cómo terminó, a quien lo pidió, con el enlace si se lo compartió (la base
+    # decide al salir si lo puede ver). De coordinación: los causa lo que dijo otra persona.
+    TipoDeAviso(PEDIDO_DEL_DETALLE, "normal", _vigencia_del_detalle, es_coordinacion=True,
+                opciones=_opciones_del_detalle),
+    TipoDeAviso(COMO_TERMINO_EL_PEDIDO_DEL_DETALLE, "informativo", _vigencia_del_detalle,
+                es_coordinacion=True, enlace="destinatario"),
 )})
 
 

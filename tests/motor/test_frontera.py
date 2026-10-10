@@ -93,7 +93,9 @@ BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 # cada área, a quien va la cadena de un bloqueo que nadie toma (`area`, sólo lee; porción 3).
 # Las cadencias del espacio (C-6, `cadencias.py`): su ritmo y hasta qué día se atendió
 # (`cadence_job`). Delegar (C-7, `pase.py`): los pases que esperan algo de la persona
-# (`pase_de_tarea`, sólo lee: escribe la cocina).
+# (`pase_de_tarea`, sólo lee: escribe la cocina). El detalle de una tarea (decisión 33,
+# `detalle.py`): los pedidos que esperan la decisión del encargado (`pedido_de_detalle`, sólo lee:
+# escribe la cocina; lo compartido lo lee sólo la base, `puede_ver_tarea`).
 TABLAS_PERMITIDAS = {
     "absence", "app_user", "approval", "archivo", "archivo_de_mensaje", "archivo_de_tarea",
     "area",
@@ -102,7 +104,8 @@ TABLAS_PERMITIDAS = {
     "conversation_state", "conversation_turn", "dependency", "dicho_de_quien_destraba",
     "escalation_route", "evidence",
     "evidencia_retirada", "inbound_message", "integrante", "membership", "message_outbox",
-    "model_config", "pase_de_tarea", "pending_reply", "persona_config", "scheduled_notice",
+    "model_config", "pase_de_tarea", "pedido_de_detalle", "pending_reply", "persona_config",
+    "scheduled_notice",
     "task",
     "task_evidence_policy", "task_forecast", "workspace", "workspace_setting",
 }

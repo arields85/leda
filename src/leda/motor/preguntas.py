@@ -133,6 +133,11 @@ COMO_VIENEN_SUS_TAREAS = "como_vienen_sus_tareas"
 CONFIRMAR_EL_PASE = "confirmar_el_pase"
 DECIDIR_EL_PASE = "decidir_el_pase"
 TOMAR_LA_TAREA = "tomar_la_tarea"
+# El detalle de una tarea (decisión 33 del usuario; `detalle.py`): lo que ofrece la pregunta al
+# encargado del sector de la tarea, si le comparte el detalle a quien lo pidió, con dos botones:
+# como la del pase, no es un tema abierto (`ofrecer`); se contesta tocando o escribiendo
+# (`contestar_el_pedido_del_detalle`).
+COMPARTIR_EL_DETALLE = "compartir_el_detalle"
 
 
 @dataclass(frozen=True)
@@ -176,6 +181,7 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(CONFIRMAR_EL_PASE),
     TipoDePregunta(DECIDIR_EL_PASE),
     TipoDePregunta(TOMAR_LA_TAREA),
+    TipoDePregunta(COMPARTIR_EL_DETALLE),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
@@ -313,11 +319,13 @@ def _alias(tareas, task_id) -> str | None:
 def _todas(ctx) -> tuple:
     """Las tareas que la persona nombra por su alias: las suyas, las entregas que esperan su
     decisión (`fichas.Contexto.para_aprobar`), las de otras personas que espera que destrabe
-    (`fichas.Contexto.para_destrabar`) y las de otras personas cuyo pase espera algo de ella
-    (`fichas.Contexto.pases`, C-7)."""
+    (`fichas.Contexto.para_destrabar`), las de otras personas cuyo pase espera algo de ella
+    (`fichas.Contexto.pases`, C-7) y las que alguien pidió ver y espera que decida si las comparte
+    (`fichas.Contexto.para_compartir`, decisión 33)."""
     return (tuple(ctx.tareas) + tuple(getattr(ctx, "para_aprobar", ()) or ())
             + tuple(getattr(ctx, "para_destrabar", ()) or ())
-            + tuple(getattr(ctx, "pases", ()) or ()))
+            + tuple(getattr(ctx, "pases", ()) or ())
+            + tuple(getattr(ctx, "para_compartir", ()) or ()))
 
 
 # --- Abrir, cerrar y retomar ------------------------------------------------------------------

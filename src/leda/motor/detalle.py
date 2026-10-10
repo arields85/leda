@@ -1,0 +1,335 @@
+"""El resumen para cualquiera, el detalle a pedido (decisión 33 del usuario, 2026-10-09).
+
+`odd/tasks/fase-c.md`, decisión 33; ADR 0019, decisión 7b (quién ve el detalle, igual); ADR 0018,
+decisión 1 (la IA elige la jugada; la cocina decide si vale); constitución §7 (antes de prometer un
+envío, Leda comprueba que el destinatario esté conectado) y §12 (auditoría); conversación 45. La
+regla la hace cumplir la cocina (`herramientas`: `pedir_detalle_de_tarea`,
+`decidir_detalle_de_tarea` y `dejar_de_compartir_tarea`) y la base (`pedido_de_detalle`,
+`tarea_compartida`, `puede_ver_tarea`; migración 0050); acá está la conversación.
+
+**Dos niveles.** El resumen de una tarea (qué tarea, de quién, para cuándo, cómo quedó) lo ve
+cualquiera del equipo; el detalle (la página: fotos, archivos, correcciones pedidas), sólo quienes
+tienen que ver con ella. Leda nunca contesta "no la podés ver" ni deja a la persona sin un próximo
+paso: cuando pide el enlace de una tarea que no ve (`enlace.pedir_enlace`), le da el resumen y,
+con él, lo que puede hacer (`ofrecer`): pedirle el detalle al encargado del sector de la tarea (el
+referente de su área), que Leda le ofrece como una propuesta, un tema abierto como cualquier otro.
+Sin encargado, o si Leda no le puede escribir, no se ofrece, y los hechos dicen por qué.
+
+**Pedirlo** (`pedir`, la jugada `pedir_el_detalle`): con lo que Leda ofreció, o nombrando la
+tarea. La cocina anota el pedido y Leda le pregunta al encargado, como Leda, terminado el margen
+para corregir (`PEDIDO_DEL_DETALLE`), con dos botones (`TipoDeAviso.opciones`). Si ya la ve, el
+enlace; si ya lo pidió, lo dice.
+
+**El encargado decide** (`contestar`, la jugada `contestar_el_pedido_del_detalle`): la tarea está
+en su lista como un pedido que espera su decisión (`para_contestar`). Si la comparte, queda
+compartida con quien la pidió, auditado y revocable, y la base la cuenta para ver la página; si
+no, nada cambia. Quien la pidió se entera de cómo terminó (decisión 39: nunca un tema abierto sin
+que todos sepan cómo se cerró; `COMO_TERMINO_EL_PEDIDO_DEL_DETALLE`), con el enlace si se la
+compartió, que la base vuelve a comprobar al mandar.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from ..autoridad import encargado_de_la_tarea
+from ..herramientas import ejecutar
+
+from . import preguntas
+from .avisos import (COMO_TERMINO_EL_PEDIDO_DEL_DETALLE, PEDIDO_DEL_DETALLE, guardar,
+                     integrante)
+from .fichas import AVISO, LLEGA, Contexto, juntar, nombrar_efecto, nombrar_pregunta, vacio
+from .margen import sale_con_margen
+from .persecucion import alcanzable
+
+PEDIR_EL_DETALLE = "pedir_el_detalle"
+CONTESTAR = "contestar_el_pedido_del_detalle"
+# Los resultados y los motivos (sus significados, en `hechos.py`).
+DETALLE_PEDIDO = "detalle_pedido"
+YA_LO_PIDIO = "ya_lo_pidio"
+SIN_ENCARGADO = "sin_encargado_del_sector"
+NO_HAY_UN_PEDIDO = "no_hay_un_pedido_del_detalle"
+EL_PEDIDO_YA_NO_ESPERA = "el_pedido_ya_no_espera"
+# Los botones de la pregunta al encargado: cada uno corre `contestar_el_pedido_del_detalle` con lo
+# que dice (`acepta`) y el pedido que contesta.
+BOTONES = (("Compartirla", True), ("No compartirla", False))
+_ESPERA = "esperando_decision"
+
+
+# --- Lo que Leda ofrece con el resumen ----------------------------------------------------------
+
+def ofrecer(ctx: Contexto, task_id: str, hecho: dict[str, Any]) -> None:
+    """Lo que se suma al resumen de una tarea que la persona no ve: qué sector ve el detalle y, si
+    se puede, a quién se lo puede pedir, como una propuesta (un tema abierto). Si ya se lo pidió,
+    a quién; sin encargado, o si Leda no le puede escribir, por qué no se ofrece."""
+    cur, yo = ctx.cur, ctx.quien.membership_id
+    cur.execute("""select a.nombre from task t join area a on a.id = t.area_id
+                    where t.id = %s""", (task_id,))
+    hecho["el_detalle_lo_ve"] = cur.fetchone()["nombre"]
+    encargado = encargado_de_la_tarea(cur, task_id)
+    if encargado is None:
+        hecho[SIN_ENCARGADO] = True
+        return
+    if _pedido_abierto(cur, task_id, yo) is not None:
+        hecho["ya_se_lo_pidio_a"] = integrante(cur, encargado)["nombre"]
+        return
+    quien, motivo = alcanzable(cur, encargado)
+    if motivo is not None:
+        hecho["no_se_le_puede_escribir_a"] = {"a": quien["nombre"] if quien else None,
+                                              "motivo": motivo}
+        return
+    hecho["se_lo_puede_pedir_a"] = quien["nombre"]
+    ahora, pregunta_id = preguntas.abrir_con_id(
+        ctx, preguntas.PROPUESTA, task_id,
+        jugada={"nombre": "pedir_enlace", "propone": [PEDIR_EL_DETALLE]})
+    nombrar_pregunta(hecho, "pregunta" if ahora else "pregunta_para_despues",
+                     preguntas.PROPUESTA, pregunta_id)
+
+
+def _pedido_abierto(cur, task_id: str, persona: str) -> dict | None:
+    cur.execute("""select * from pedido_de_detalle
+                    where task_id = %s and pedido_por_membership_id = %s and estado = %s""",
+                (task_id, persona, _ESPERA))
+    return cur.fetchone()
+
+
+def _la_propuesta(cur, persona: str) -> dict | None:
+    """Lo que Leda le ofreció a la persona y sigue abierto: pedir el detalle de una tarea, la más
+    nueva."""
+    cur.execute("""select * from conversation_question
+                    where membership_id = %s and tipo = %s and cerrada_en is null
+                      and task_id is not null and jugada -> 'propone' ? %s
+                    order by abierta_en desc limit 1""",
+                (persona, preguntas.PROPUESTA, PEDIR_EL_DETALLE))
+    return cur.fetchone()
+
+
+def _cerrar_la_propuesta(ctx: Contexto, task_id: str) -> None:
+    """Lo que Leda le ofreció sobre esa tarea quedó contestado."""
+    ctx.cur.execute("""select id from conversation_question
+                        where membership_id = %s and tipo = %s and task_id = %s
+                          and cerrada_en is null and jugada -> 'propone' ? %s""",
+                    (ctx.quien.membership_id, preguntas.PROPUESTA, task_id, PEDIR_EL_DETALLE))
+    for fila in ctx.cur.fetchall():
+        preguntas.cerrar(ctx, str(fila["id"]), "respondida",
+                         {"jugada": PEDIR_EL_DETALLE, "tarea": task_id})
+
+
+# --- Pedirlo ----------------------------------------------------------------------------------
+
+def pedir(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    """La persona acepta que Leda le pida el detalle al encargado del sector de la tarea: la de
+    su lista, la que nombra (`como_la_nombra`) o la de lo que Leda le ofreció."""
+    from . import enlace                # enlace importa este módulo al ofrecer
+    cur, yo = ctx.cur, ctx.quien.membership_id
+    if tarea is not None:
+        task_id = tarea["id"]
+    elif not vacio(datos.get("como_la_nombra")):
+        una = enlace.la_que_nombra(ctx, str(datos["como_la_nombra"]))
+        if "resultado" in una:
+            return una
+        task_id = una["id"]
+    else:
+        propuesta = _la_propuesta(cur, yo)
+        if propuesta is None:
+            return {"resultado": "falta_dato", "falta": ["tarea"]}
+        task_id = str(propuesta["task_id"])
+    if enlace.puede_verla(cur, yo, task_id):
+        # Ya la ve (la tiene, la revisa, se la compartieron): el enlace, como a cualquiera.
+        _cerrar_la_propuesta(ctx, task_id)
+        return enlace.pedir_enlace(ctx, {}, {"id": task_id})
+    hecho: dict[str, Any] = {"tarea": preguntas.tarea_dicha(ctx, task_id)}
+    encargado = encargado_de_la_tarea(cur, task_id)
+    if encargado is None:
+        return {**hecho, "resultado": "no_se_puede", "motivo": SIN_ENCARGADO}
+    quien, motivo = alcanzable(cur, encargado)
+    if motivo is not None:
+        # Nunca se promete un mensaje que no sale (constitución §7).
+        return {**hecho, "resultado": "no_se_puede", "motivo": motivo,
+                "no_se_le_puede_escribir_a": {"a": quien["nombre"] if quien else None,
+                                              "motivo": motivo}}
+    r = ejecutar(cur, ctx.quien, "pedir_detalle_de_tarea",
+                 {"tarea_id": task_id, "at": ctx.ahora.isoformat()}, ya_confirmada=True)
+    if r.get("error") == YA_LO_PIDIO:
+        return {**hecho, "resultado": "no_se_puede", "motivo": YA_LO_PIDIO,
+                "ya_se_lo_pidio_a": quien["nombre"]}
+    if "error" in r:
+        return {**hecho, "resultado": "no_se_puede", "motivo": r["error"]}
+    _cerrar_la_propuesta(ctx, task_id)
+    pedido = _el_pedido(cur, r["pedido_id"])
+    aviso_id, sale = _guardar(ctx, pedido, PEDIDO_DEL_DETALLE, encargado,
+                              hechos_de_la_pregunta(pedido, ctx.calendario.zona), "")
+    hecho.update({"resultado": DETALLE_PEDIDO,
+                  "le_pregunta_a": {"a": quien["nombre"], LLEGA: sale.isoformat()}})
+    nombrar_efecto(hecho, "le_pregunta_a", AVISO, aviso_id)
+    return hecho
+
+
+def _el_pedido(cur, pedido_id: str) -> dict:
+    """Un pedido con los nombres de quién lo pidió, quién tiene la tarea y quién decide."""
+    cur.execute(
+        """select p.*, t.titulo, t.fecha_objetivo, pide.nombre pidio, tiene.nombre la_tiene,
+                  decide.nombre decide
+             from pedido_de_detalle p
+             join task t on t.id = p.task_id
+             join integrante pide on pide.membership_id = p.pedido_por_membership_id
+             join integrante tiene on tiene.membership_id = t.responsable_membership_id
+             join integrante decide on decide.membership_id = p.decide_membership_id
+            where p.id = %s""", (str(pedido_id),))
+    pedido = dict(cur.fetchone())
+    for clave in ("id", "task_id", "pedido_por_membership_id", "decide_membership_id"):
+        pedido[clave] = str(pedido[clave])
+    return pedido
+
+
+def hechos_de_la_pregunta(pedido: dict, zona) -> dict[str, Any]:
+    """Lo que lleva la pregunta al encargado: quién pide ver el detalle, de quién es la tarea y
+    cuándo vence."""
+    hechos: dict[str, Any] = {"necesita_respuesta": True,
+                              "pregunta": preguntas.COMPARTIR_EL_DETALLE,
+                              "pide_ver_el_detalle": pedido["pidio"],
+                              "la_tiene": pedido["la_tiene"]}
+    if pedido["fecha_objetivo"] is not None:
+        hechos["vence"] = pedido["fecha_objetivo"].astimezone(zona).date().isoformat()
+    return hechos
+
+
+def _guardar(ctx: Contexto, pedido: dict, tipo: str, destinatario: str, hechos: dict,
+             clave: str) -> tuple[str, Any]:
+    """Un aviso del pedido, terminado el margen para corregir: lo causa lo que dijo otra
+    persona."""
+    sale = sale_con_margen(ctx.cur, ctx.calendario, ctx.quien.workspace_id, ctx.ahora)
+    aviso_id, _ = guardar(
+        ctx.cur, ctx.quien.workspace_id, tipo, task_id=pedido["task_id"],
+        destinatario=destinatario, hechos={"aviso": tipo, "tarea": pedido["titulo"], **hechos},
+        programado_para=sale, clave=f"motor:{tipo}:{pedido['task_id']}:d{pedido['id']}{clave}",
+        ahora=ctx.ahora)
+    ctx.avisos_guardados.append(aviso_id)
+    return aviso_id, sale
+
+
+# --- Lo que ve el encargado ---------------------------------------------------------------------
+
+def para_contestar(cur, membership_id: str, desde: int) -> tuple[dict[str, Any], ...]:
+    """Las tareas cuyo detalle alguien pidió ver y esperan que quien escribe, el encargado de su
+    sector, decida si se lo comparte (`espera_que_decida_si_la_comparte`), con su alias
+    (siguiendo los anteriores, desde `desde`), quién la tiene y quiénes lo pidieron. No son
+    tareas suyas."""
+    cur.execute(
+        """select t.id, t.titulo, t.estado::text estado, t.fecha_objetivo,
+                  tiene.nombre la_tiene,
+                  array_agg(pide.nombre order by p.pedido_en, p.id) piden
+             from pedido_de_detalle p
+             join task t on t.id = p.task_id
+             join integrante tiene on tiene.membership_id = t.responsable_membership_id
+             join integrante pide on pide.membership_id = p.pedido_por_membership_id
+            where p.estado = %s and p.decide_membership_id = %s
+            group by t.id, t.titulo, t.estado, t.fecha_objetivo, tiene.nombre
+            order by t.fecha_objetivo nulls last, t.titulo""", (_ESPERA, membership_id))
+    return tuple(
+        {"alias": f"T{i}", "id": str(f["id"]), "titulo": f["titulo"], "estado": f["estado"],
+         "fecha_objetivo": f["fecha_objetivo"].isoformat() if f["fecha_objetivo"] else None,
+         "la_tiene": f["la_tiene"], "espera_que_decida_si_la_comparte": True,
+         "pide_ver_el_detalle": list(f["piden"])}
+        for i, f in enumerate(cur.fetchall(), desde + 1))
+
+
+# --- Contestarlo: el encargado ------------------------------------------------------------------
+
+def contestar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    """El encargado dice si comparte el detalle: el del botón que tocó (su pedido) o, escrito, el
+    de la tarea que nombra o el único que espera su decisión. La cocina lo anota y, si la
+    comparte, queda compartida; quien la pidió se entera."""
+    cur, yo = ctx.cur, ctx.quien.membership_id
+    if tarea is None:
+        if len(ctx.para_compartir) > 1:
+            return {"resultado": "falta_dato", "falta": ["tarea"]}
+        tarea = ctx.para_compartir[0] if ctx.para_compartir else None
+    if tarea is None or not any(t["id"] == tarea["id"] for t in ctx.para_compartir):
+        return {"resultado": "no_se_puede", "motivo": NO_HAY_UN_PEDIDO,
+                **({"tarea": preguntas.tarea_dicha(ctx, tarea["id"])} if tarea else {})}
+    acepta = datos.get("acepta")
+    dicha = preguntas.tarea_dicha(ctx, tarea["id"])
+    if not isinstance(acepta, bool):
+        return {"resultado": "falta_dato", "falta": ["acepta"], "tarea": dicha}
+    # El pedido del botón tocado, si lo trae (un identificador que no es tal no nombra ninguno).
+    del_boton = datos.get("pedido")
+    if del_boton is not None:
+        try:
+            del_boton = str(uuid.UUID(str(del_boton)))
+        except ValueError:
+            return {"resultado": "no_se_puede", "motivo": NO_HAY_UN_PEDIDO, "tarea": dicha}
+    cur.execute("""select id from pedido_de_detalle
+                    where task_id = %s and decide_membership_id = %s and estado = %s
+                      and (%s::uuid is null or id = %s::uuid)
+                    order by pedido_en, id""",
+                (tarea["id"], yo, _ESPERA, del_boton, del_boton))
+    abiertos = [str(f["id"]) for f in cur.fetchall()]
+    if not abiertos:
+        # El botón de un pedido que ya se decidió: no hace nada y lo dice.
+        return {"resultado": "no_se_puede", "motivo": NO_HAY_UN_PEDIDO, "tarea": dicha}
+    por_que = None if vacio(datos.get("por_que")) else str(datos["por_que"]).strip()
+    hecho: dict[str, Any] = {"resultado": "anotado", "tarea": dicha, "la_compartio": acepta}
+    avisados: list[str] = []
+    for pedido_id in abiertos:
+        r = ejecutar(cur, ctx.quien, "decidir_detalle_de_tarea",
+                     {"pedido_id": pedido_id, "comparte": acepta, "at": ctx.ahora.isoformat(),
+                      **({"motivo": por_que} if por_que else {})}, ya_confirmada=True)
+        if "error" in r:
+            continue
+        pedido = _el_pedido(cur, pedido_id)
+        _cerrar_las_preguntas(cur, pedido, ctx.ahora)
+        termino = {"necesita_respuesta": False, "la_compartio": acepta,
+                   "lo_decidio": pedido["decide"], **({"por_que": por_que} if por_que else {})}
+        aviso_id, sale = _guardar(ctx, pedido, COMO_TERMINO_EL_PEDIDO_DEL_DETALLE,
+                                  pedido["pedido_por_membership_id"], termino, ":termino")
+        if not avisados:
+            nombrar_efecto(hecho, "aviso_a_quien_lo_pidio", AVISO, aviso_id)
+            hecho["aviso_a_quien_lo_pidio"] = {"a": pedido["pidio"], LLEGA: sale.isoformat()}
+        avisados.append(pedido["pidio"])
+    if len(avisados) > 1:
+        # Varias personas pidieron la misma tarea: la respuesta escrita vale para todas.
+        juntar(hecho, {"aviso_a_quienes_lo_pidieron": {
+            "a": avisados, LLEGA: hecho["aviso_a_quien_lo_pidio"][LLEGA]}})
+    return hecho
+
+
+def _cerrar_las_preguntas(cur, pedido: dict, ahora) -> None:
+    """La pregunta del pedido, con sus botones, deja de esperar: ya se decidió (un botón viejo,
+    igual, no hace nada y lo dice: `contestar`)."""
+    cur.execute("""update conversation_question
+                      set cerrada_en = %s, cierre = 'sin_efecto', cierre_detalle = %s
+                    where task_id = %s and tipo = %s and cerrada_en is null
+                      and jugada ->> 'pedido' = %s""",
+                (ahora, preguntas.json_de({"tarea": pedido["task_id"],
+                                           "el_pedido_ya_no_espera": True}),
+                 pedido["task_id"], preguntas.COMPARTIR_EL_DETALLE, pedido["id"]))
+
+
+# --- Lo que un aviso del pedido necesita al salir -------------------------------------------------
+
+def vigencia(m, aviso) -> tuple[str | None, dict[str, Any]]:
+    """La pregunta al encargado sale mientras el pedido espere su decisión; cómo terminó,
+    siempre."""
+    from .avisos import de_la_clave       # avisos importa este módulo al salir
+    if aviso["tipo"] == COMO_TERMINO_EL_PEDIDO_DEL_DETALLE:
+        return None, dict(aviso["hechos"])
+    m.cur.execute("select estado from pedido_de_detalle where id = %s", (de_la_clave(aviso),))
+    pedido = m.cur.fetchone()
+    if pedido is None:
+        return "tarea_inexistente", {}
+    if pedido["estado"] != _ESPERA:
+        return EL_PEDIDO_YA_NO_ESPERA, {}
+    return None, dict(aviso["hechos"])
+
+
+def opciones(m, aviso) -> tuple[str, dict[str, Any], list[tuple[str, dict[str, Any]]]]:
+    """La decisión que ofrece la pregunta al encargado al salir, con sus dos botones."""
+    from .avisos import de_la_clave
+    task_id, pedido_id = str(aviso["task_id"]), de_la_clave(aviso)
+    return preguntas.COMPARTIR_EL_DETALLE, {"nombre": CONTESTAR, "del_aviso": str(aviso["id"]),
+                                            "pedido": pedido_id}, [
+        (etiqueta, {"tarea": task_id, "jugada": CONTESTAR,
+                    "datos": {"acepta": acepta, "pedido": pedido_id}})
+        for etiqueta, acepta in BOTONES]

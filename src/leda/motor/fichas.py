@@ -107,6 +107,10 @@ class Contexto:
     # Las tareas de otras personas cuyo pase espera algo de quien escribe: su decisión o que la
     # tome (C-7; `pase.para_contestar`), con su alias, después de las anteriores.
     pases: tuple[dict[str, Any], ...] = ()
+    # Las tareas de otras personas cuyo detalle alguien pidió ver y espera que quien escribe, el
+    # encargado de su sector, decida si se lo comparte (decisión 33; `detalle.para_contestar`),
+    # con su alias, después de las anteriores.
+    para_compartir: tuple[dict[str, Any], ...] = ()
     # Las decisiones ofrecidas en la respuesta de este turno (`preguntas.ofrecer_en_la_
     # respuesta`): sus botones salen con ella, sin ser un tema abierto (C-3d, D4).
     ofrecidas: list[str] = field(default_factory=list)
@@ -122,9 +126,9 @@ class Contexto:
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
         """Una tarea por su alias: de las suyas, de las que esperan su decisión, de las que
-        destraba o de las que le quieren pasar."""
+        destraba, de las que le quieren pasar o de las que esperan que decida si las comparte."""
         return next((t for t in self.tareas + self.para_aprobar + self.para_destrabar
-                     + self.pases if t["alias"] == alias), None)
+                     + self.pases + self.para_compartir if t["alias"] == alias), None)
 
     def suya(self, alias: str) -> dict[str, Any] | None:
         """Una tarea suya por su alias: de la que es responsable."""
@@ -1223,6 +1227,19 @@ def _contestar_el_pase(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     return pase.contestar(ctx, datos, tarea)
 
 
+# El detalle de una tarea, a pedido (decisión 33): las jugadas están en `detalle.py`, que importa
+# este módulo.
+
+def _pedir_el_detalle(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import detalle
+    return detalle.pedir(ctx, datos, tarea)
+
+
+def _contestar_el_pedido_del_detalle(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import detalle
+    return detalle.contestar(ctx, datos, tarea)
+
+
 # --- Cómo se deshace lo anotado (9f) -------------------------------------------------------
 #
 # Una corrección agrega hechos, nunca borra (constitución §12): la tarea vuelve a como estaba
@@ -1601,15 +1618,47 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           necesita=(), opcional=("tarea", "como_la_nombra"),
           comprueba="que la tarea sea del espacio y que la persona pueda verla (la base: quien "
                     "la tiene, quien aprueba su trabajo, quien decidió sobre ella, el referente "
-                    "del área y la autoridad final)",
+                    "del área, la autoridad final y a quien se la compartieron)",
           hace="lee la tarea; no cambia nada",
           despues="la respuesta lleva al final el enlace personal a la página de la tarea, que "
-                  "el código agrega; si no puede verla, ningún enlace sale",
+                  "el código agrega; si no puede verla, ningún enlace sale: el resumen de la "
+                  "tarea, que ve cualquiera del equipo, y Leda le ofrece pedirle el detalle al "
+                  "encargado del sector de la tarea (decisión 33)",
           manejar=_pedir_enlace,
           es="La persona pide el enlace (o el link) a la página de una tarea, para verla: una "
              "suya, una que espera su revisión o cualquier otra que nombre. Si la tarea no está "
              "en la lista, como_la_nombra dice cómo la nombró. Pedir ver lo entregado de una "
              "tarea que espera su revisión es otra jugada."),
+    Ficha("pedir_el_detalle", "pedirle al encargado del sector de una tarea que le comparta su "
+                              "detalle",
+          necesita=(), opcional=("tarea", "como_la_nombra"),
+          comprueba="que la persona no vea la tarea, que el sector de la tarea tenga encargado y "
+                    "Leda le pueda escribir, y que no lo haya pedido ya (la cocina)",
+          hace="anota el pedido (pedir_detalle_de_tarea); no comparte nada",
+          despues="Leda le pregunta al encargado si se la comparte, como Leda, terminado el "
+                  "margen para corregir, con dos botones; quien pidió se entera de cómo "
+                  "terminó y, si la comparten, le llega el enlace. Si ya la ve, el enlace",
+          manejar=_pedir_el_detalle, se_ofrece=False,
+          es="La persona quiere el detalle de una tarea que no ve (sus fotos, archivos y "
+             "correcciones) y acepta que Leda se lo pida al encargado del sector de la tarea, "
+             "como Leda le ofreció con el resumen, o se lo pide ella. Si la tarea no está en la "
+             "lista, como_la_nombra dice cómo la nombró; si contesta lo que Leda le ofreció, no "
+             "hace falta."),
+    Ficha("contestar_el_pedido_del_detalle", "decir si le comparte el detalle de una tarea a "
+                                             "quien lo pidió",
+          necesita=(), opcional=("tarea", "acepta", "por_que"),
+          comprueba="que quien escribe sea el encargado del sector de la tarea y que alguien "
+                    "espere su decisión (la cocina)",
+          hace="anota la decisión (decidir_detalle_de_tarea); si la comparte, queda compartida "
+               "con quien la pidió, auditado y revocable",
+          despues="quien la pidió se entera de cómo terminó y, si se la compartió, recibe el "
+                  "enlace a la página de la tarea",
+          manejar=_contestar_el_pedido_del_detalle, se_ofrece=False,
+          contesta=(preguntas.COMPARTIR_EL_DETALLE,),
+          es="La persona es el encargado del sector de una tarea que alguien pidió ver (está en "
+             "la lista como espera_que_decida_si_la_comparte) y dice si se la comparte, tocando "
+             "su botón o escribiéndolo: acepta es verdadero si dice que sí, falso si dice que "
+             "no; por_que, sus palabras si dice por qué."),
     Ficha("decir_cuando_destraba", "anotar para cuándo destraba la tarea trabada de otra "
                                    "persona",
           necesita=(), opcional=("tarea", "para_cuando", "ya_esta", "lo_que_dice",

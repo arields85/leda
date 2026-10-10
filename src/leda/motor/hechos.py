@@ -750,9 +750,51 @@ SIGNIFICADOS: Mapping[str, str] = {
     "no_salio_un_aviso": "Un aviso que la persona causó no le llegó a quien iba.",
     # --- El enlace a la página de una tarea, pedido por chat (`enlace.py`) ---------------------
     "como_la_nombra": "Cómo nombró la persona una tarea que no está en su lista.",
-    "no_puede_ver_esa_tarea": "La página de esa tarea la ven sólo las personas que tienen que "
-                              "ver con ella: la persona que escribe no está entre ellas, y "
-                              "ningún enlace sale.",
+    # --- El resumen para cualquiera, el detalle a pedido (decisión 33; `detalle.py`) -------------
+    "solo_el_resumen": "La persona que escribe no ve el detalle de esa tarea (sus fotos, archivos "
+                       "y correcciones), que ven sólo quienes tienen que ver con ella: recibe su "
+                       "resumen, que ve cualquiera del equipo (la tarea, quién la tiene, cómo "
+                       "está y cuándo vence), y ningún enlace.",
+    "el_detalle_lo_ve": "El sector que ve el detalle de la tarea: el de la tarea.",
+    "se_lo_puede_pedir_a": "A quién le puede pedir Leda el detalle de la tarea, si la persona "
+                           "quiere: el encargado del sector de la tarea, que decide si se la "
+                           "comparte. Leda se lo ofrece; no se lo pidió todavía.",
+    "sin_encargado_del_sector": "El sector de la tarea no tiene un encargado que pueda "
+                                "compartir su detalle: no hay a quién pedírselo.",
+    "ya_se_lo_pidio_a": "La persona ya le pidió el detalle de esa tarea a esta persona, el "
+                        "encargado del sector, que todavía no contestó: no se pide otra vez.",
+    "ya_lo_pidio": "La persona ya pidió el detalle de esa tarea y todavía no le contestaron.",
+    "ya_la_ve": "La persona ya ve el detalle de esa tarea: no hace falta pedirlo.",
+    "detalle_pedido": "Quedó pedido el detalle de la tarea: Leda le pregunta al encargado del "
+                      "sector de la tarea si se la comparte (le_pregunta_a) y le avisa a la "
+                      "persona cuando conteste. Todavía no se la compartió.",
+    "compartir_el_detalle": "Pregunta al encargado del sector de una tarea si le comparte su "
+                            "detalle a quien lo pidió, con dos botones; también se contesta "
+                            "escribiendo.",
+    "pedido_del_detalle": "Mensaje de Leda, como Leda, al encargado del sector de una tarea: "
+                          "quién pide ver su detalle (pide_ver_el_detalle), de quién es la tarea "
+                          "(la_tiene) y cuándo vence; pregunta si se la comparte.",
+    "pide_ver_el_detalle": "Quién pide ver el detalle de la tarea (sus fotos, archivos y "
+                           "correcciones).",
+    "espera_que_decida_si_la_comparte": "Una tarea de otra persona (la_tiene) cuyo detalle "
+                                        "alguien pidió ver (pide_ver_el_detalle): espera que la "
+                                        "persona que escribe, encargado de su sector, decida si "
+                                        "se la comparte. No es una tarea suya.",
+    "la_compartio": "Si el encargado del sector le compartió el detalle de la tarea a quien lo "
+                    "pidió (verdadero: desde ahora ve su página) o no (falso: no cambió nada).",
+    "aviso_a_quien_lo_pidio": "Lo que se le avisa a quien pidió el detalle, de cómo terminó: a "
+                              "quién (a) y cuándo se entera (llega).",
+    "aviso_a_quienes_lo_pidieron": "Lo que se les avisa a todos los que pidieron el detalle de "
+                                   "esa tarea, de cómo terminó: a quiénes (a) y cuándo se "
+                                   "enteran (llega).",
+    "como_termino_el_pedido_del_detalle": "Aviso de cómo terminó el pedido del detalle de una "
+                                          "tarea: si el encargado del sector (lo_decidio) se lo "
+                                          "compartió (la_compartio) y, si dijo por qué, sus "
+                                          "palabras (por_que). Es información: no pide "
+                                          "respuesta.",
+    "no_hay_un_pedido_del_detalle": "Ninguna tarea espera que la persona decida si comparte su "
+                                    "detalle.",
+    "el_pedido_ya_no_espera": "El pedido del detalle ya no espera esa decisión: ya se decidió.",
     "ninguna_tarea_con_ese_nombre": "Ninguna tarea del equipo se llama como la nombró la "
                                     "persona.",
     "la_pagina_no_esta_disponible": "La página de las tareas no está disponible ahora: no hay "
@@ -1059,7 +1101,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "la_tomo": "Si quien recibía la tarea la tomó (verdadero) o no (falso).",
     "no_lo_aprobo": "Quien decidía no aprobó que la tarea pase: sigue con quien la tenía.",
     "lo_decidio": "Quién decidió el pase.",
-    "por_que": "Por qué no aprobó el pase o no tomó la tarea, con sus palabras.",
+    "por_que": "Por qué no aprobó el pase, no tomó la tarea o no compartió su detalle, con sus "
+               "palabras.",
     "acepta": "Si la persona dice que sí (verdadero) o que no (falso).",
     "espera_su_decision_del_pase": "Una tarea de otra persona que quien la tiene (la_tiene) pidió "
                                    "pasar a alguien (pasaria_a): espera que la persona que "
@@ -1211,6 +1254,8 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "informar_avance": "anotar_como_viene_sin_algo_cierto",
     "pedir_reasignacion": "pasarle_la_tarea_a_otra_persona",
     "contestar_el_pase": "decir_si_aprueba_el_pase_o_si_toma_la_tarea",
+    "pedir_el_detalle": "pedirle_el_detalle_de_la_tarea_al_encargado_de_su_sector",
+    "contestar_el_pedido_del_detalle": "decir_si_le_comparte_el_detalle_a_quien_lo_pidio",
     "aprobar": "aprobar_la_entrega",
     "pedir_cambios": "devolver_la_entrega_con_cambios",
     "ver_entrega": "mostrar_la_entrega_para_revisar",

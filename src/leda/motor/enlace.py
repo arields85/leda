@@ -16,10 +16,16 @@ de la base, así nada de lo dicho actúa como comodín (como `fichas.integrantes
 búsqueda la arma el código, nunca la IA.
 
 **Quién la ve lo decide la base** (`puede_ver_tarea`): la persona responsable, quien aprueba su
-trabajo, quien ya decidió sobre esa tarea, el referente del área y la autoridad final. De las que
-coinciden con lo dicho cuentan sólo las que la persona puede ver; si no puede ver ninguna, Leda le
-dice que ese enlace no se lo puede pasar, sin decir quién sí la ve (decisión 11 del usuario) ni
-nada de la base (constitución §10), y ningún enlace sale. Si puede ver varias, pregunta cuál.
+trabajo, quien ya decidió sobre esa tarea, el referente del área, la autoridad final y a quien el
+encargado del sector de la tarea se la compartió (decisión 33). De las que coinciden con lo dicho
+cuentan primero las que la persona puede ver: una, su enlace; varias, pregunta cuál.
+
+**Si no la ve, el resumen** (decisión 33 del usuario, 2026-10-09): el resumen de una tarea (qué
+tarea, de quién, para cuándo, cómo quedó) lo ve cualquiera del equipo; el detalle, sólo quienes
+tienen que ver con ella. Leda nunca contesta "no la podés ver": le da el resumen, ningún enlace, y
+le ofrece pedirle el detalle al encargado del sector de la tarea (`detalle.ofrecer`). Si no ve
+ninguna de las que coinciden y son varias, las nombra y pregunta cuál, como siempre. Nada de la
+base (constitución §10).
 
 **El enlace nunca pasa por la IA** (ADR 0019, decisión 6): la respuesta lleva la marca `(tarea,
 persona)` (`Contexto.enlace_de_la_respuesta`, como `aprobacion.ver_entrega`) y el despachador lo
@@ -35,8 +41,10 @@ from typing import Any
 from . import fichas
 from .avisos import LLEVA_EL_ENLACE, enlace_a_la_pagina
 
-# Por qué no sale el enlace (sus significados, en `hechos.py`).
-NO_PUEDE_VER = "no_puede_ver_esa_tarea"
+# Por qué no sale el enlace (sus significados, en `hechos.py`): la persona no ve la tarea y recibe
+# su resumen (decisión 33), no hay ninguna con ese nombre, la página no está disponible o el
+# mensaje ya lleva el de otra.
+SOLO_EL_RESUMEN = "solo_el_resumen"
 NINGUNA_CON_ESE_NOMBRE = "ninguna_tarea_con_ese_nombre"
 SIN_PAGINA = "la_pagina_no_esta_disponible"
 YA_LLEVA_OTRO = "ya_lleva_el_enlace_de_otra_tarea"
@@ -54,27 +62,20 @@ def pedir_enlace(ctx, datos: dict, tarea: dict | None) -> dict[str, Any]:
     yo = ctx.quien.membership_id
     if tarea is not None:
         una = _una_por_id(ctx, tarea["id"])
+        if una is None:
+            return {"resultado": "no_se_puede", "motivo": NINGUNA_CON_ESE_NOMBRE}
     else:
         dicho = datos.get("como_la_nombra")
         if fichas.vacio(dicho) or not _que_nombra(str(dicho)):
             return {"resultado": "falta_dato", "falta": ["tarea"]}
-        coinciden = _las_que_coinciden(ctx, str(dicho))
-        visibles = [t for t in coinciden if t["ve"]]
-        if not coinciden:
-            return {"resultado": "no_se_puede", "motivo": NINGUNA_CON_ESE_NOMBRE}
-        if not visibles:
-            # Sin el título: de una tarea que no puede ver, sólo lo que la persona ya dijo.
-            return {"resultado": "no_se_puede", "motivo": NO_PUEDE_VER}
-        if len(visibles) > 1:
-            return {"resultado": "falta_dato", "falta": ["tarea"],
-                    "coinciden": [{"titulo": t["titulo"], "responsable": t["responsable"]}
-                                  for t in visibles]}
-        una = visibles[0]
-    if una is None or not una["ve"]:
-        return {"resultado": "no_se_puede", "motivo": NO_PUEDE_VER}
+        una = la_que_nombra(ctx, str(dicho))
+        if "resultado" in una:
+            return una
     hecho: dict[str, Any] = {"resultado": "leido", "tarea": _tarea(ctx, una)}
     if una["responsable_id"] != yo and una["responsable"]:
         hecho["responsable"] = una["responsable"]
+    if not una["ve"]:
+        return _resumen(ctx, una, hecho)
     ya = ctx.enlace_de_la_respuesta
     if ya:
         if ya[0][0] != una["id"]:
@@ -85,6 +86,41 @@ def pedir_enlace(ctx, datos: dict, tarea: dict | None) -> dict[str, Any]:
         return {**hecho, "resultado": "no_se_puede", "motivo": SIN_PAGINA}
     ya.append(enlace)
     return {**hecho, LLEVA_EL_ENLACE: True}
+
+
+def la_que_nombra(ctx, dicho: str) -> dict[str, Any]:
+    """La tarea del espacio que nombra lo dicho, con si la persona la ve, o el hecho de por qué no
+    hay una (con `resultado`): ninguna, o varias. Cuentan primero las que la persona ve; si no ve
+    ninguna, todas, porque el resumen lo ve cualquiera del equipo (decisión 33)."""
+    coinciden = _las_que_coinciden(ctx, dicho)
+    if not coinciden:
+        return {"resultado": "no_se_puede", "motivo": NINGUNA_CON_ESE_NOMBRE}
+    visibles = [t for t in coinciden if t["ve"]] or coinciden
+    if len(visibles) > 1:
+        return {"resultado": "falta_dato", "falta": ["tarea"],
+                "coinciden": [{"titulo": t["titulo"], "responsable": t["responsable"]}
+                              for t in visibles]}
+    return visibles[0]
+
+
+def _resumen(ctx, una: dict[str, Any], hecho: dict[str, Any]) -> dict[str, Any]:
+    """El resumen de una tarea que la persona no ve (decisión 33): cómo quedó y cuándo vence,
+    nunca su detalle ni su enlace, y lo que puede hacer para verlo (`detalle.ofrecer`)."""
+    from . import detalle                # detalle importa este módulo al pedir
+    cur = ctx.cur
+    cur.execute("select estado::text estado, fecha_objetivo from task where id = %s",
+                (una["id"],))
+    fila = cur.fetchone()
+    hecho = {**hecho, "resultado": SOLO_EL_RESUMEN, "estado": fila["estado"]}
+    if fila["fecha_objetivo"] is not None:
+        hecho["vence"] = fila["fecha_objetivo"].astimezone(ctx.calendario.zona).date().isoformat()
+    detalle.ofrecer(ctx, una["id"], hecho)
+    return hecho
+
+
+def puede_verla(cur, persona: str, task_id: str) -> bool:
+    """Si la persona ve la tarea: la regla vive en la base (`puede_ver_tarea`)."""
+    return _puede_verla(cur, persona, task_id)
 
 
 def _que_nombra(dicho: str) -> list[str]:

@@ -237,6 +237,17 @@ def encargado_del_sector(cur: psycopg.Cursor, membership_id: str) -> str | None:
         else None
 
 
+def encargado_de_la_tarea(cur: psycopg.Cursor, task_id) -> str | None:
+    """El encargado del sector de una tarea: el referente del área de la tarea. Decide si se le
+    comparte el detalle a quien no la ve (decisión 33 del usuario; la regla también la hace
+    cumplir la base, `vigilar_tarea_compartida`)."""
+    cur.execute("""select a.referente_membership_id from task t
+                     join area a on a.id = t.area_id where t.id = %s""", (str(task_id),))
+    fila = cur.fetchone()
+    return str(fila["referente_membership_id"]) if fila and fila["referente_membership_id"] \
+        else None
+
+
 def regla_del_pase(cur: psycopg.Cursor, pide: str, recibe: str) -> ReglaDelPase:
     """Quién puede pedir un pase y quién lo decide (ADR 0017, enmienda a la decisión 2).
 

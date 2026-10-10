@@ -26,9 +26,9 @@ from typing import Any, Callable
 import psycopg
 from psycopg.types.json import Jsonb
 
-from .autoridad import (Denegado, Solicitante, encargado_del_sector, puede_revisar_la_tarea,
-                         quien_revisa_la_tarea, regla_del_pase, requiere_confirmacion,
-                         verificar)
+from .autoridad import (Denegado, Solicitante, encargado_de_la_tarea, encargado_del_sector,
+                         puede_revisar_la_tarea, quien_revisa_la_tarea, regla_del_pase,
+                         requiere_confirmacion, verificar)
 from . import versiones
 from .db import registrar_auditoria
 from .incidentes import ETAPA_EVIDENCIA_INVALIDA, registrar_incidente
@@ -3040,3 +3040,152 @@ def _tomar(cur, quien: Solicitante, pase: dict, momento: datetime) -> dict:
         nucleo_hash=versiones.nucleo_hash())
     return {"pase_id": str(pase["id"]), "estado": "la_tomo", "tomada": True,
             "responsable": str(quien.membership_id), "revisa": revisa}
+
+
+# ---------------------------------------------------------------------------
+# El detalle de una tarea, a pedido (decisión 33 del usuario, 2026-10-09; migración 0050)
+# ---------------------------------------------------------------------------
+#
+# El resumen de una tarea lo ve cualquiera del equipo; el detalle (la página: fotos, archivos,
+# correcciones pedidas), sólo quienes tienen que ver con ella (ADR 0019, 7b). Quien no la ve pide
+# el detalle (`pedir_detalle_de_tarea`), y lo decide el encargado del sector de la tarea
+# (`decidir_detalle_de_tarea`): si la comparte, queda escrito por tarea y persona, con quién la
+# compartió y cuándo, y la base lo cuenta al decidir quién ve la página (`puede_ver_tarea`).
+# Dejar de compartirla (`dejar_de_compartir_tarea`) lo hace el encargado o quien la compartió.
+# La base hace cumplir quién comparte y que nada se borre (`vigilar_tarea_compartida`).
+
+
+def _tarea_del_espacio(cur, tarea_id) -> dict | None:
+    """Una tarea de este espacio (la RLS esconde las de otros)."""
+    tarea = _uuid_normalizado(tarea_id)
+    if tarea is None:
+        return None
+    cur.execute("select id, titulo from task where id = %s", (tarea,))
+    return cur.fetchone()
+
+
+def _puede_verla(cur, membership_id, tarea_id) -> bool:
+    cur.execute("select puede_ver_tarea(%s, %s) ve", (str(membership_id), str(tarea_id)))
+    return bool(cur.fetchone()["ve"])
+
+
+@herramienta(
+    "pedir_detalle_de_tarea", "consultar",
+    "Quien no ve el detalle de una tarea le pide al encargado del sector de la tarea que se la "
+    "comparta. No comparte nada: queda el pedido, que decide el encargado.",
+    {"tarea_id": {"type": "string", "requerido": True}, "at": {"type": "string"}},
+    valida_en_handler=True)
+def _pedir_detalle_de_tarea(cur, quien: Solicitante, tarea_id, at=None):
+    _exigir_espacio(quien)
+    tarea = _tarea_del_espacio(cur, tarea_id)
+    if tarea is None:
+        return {"error": "tarea_desconocida"}
+    if _puede_verla(cur, quien.membership_id, tarea["id"]):
+        return {"error": "ya_la_ve"}
+    decide = encargado_de_la_tarea(cur, tarea["id"])
+    if decide is None:
+        return {"error": "sin_encargado_del_sector"}
+    cur.execute("""select id from pedido_de_detalle
+                    where task_id = %s and pedido_por_membership_id = %s
+                      and estado = 'esperando_decision'""", (tarea["id"], quien.membership_id))
+    abierto = cur.fetchone()
+    if abierto is not None:
+        return {"error": "ya_lo_pidio", "pedido_id": str(abierto["id"]),
+                "decide_membership_id": decide}
+    cur.execute(
+        """insert into pedido_de_detalle (workspace_id, task_id, pedido_por_membership_id,
+                                          decide_membership_id, estado, pedido_en)
+           values (%s, %s, %s, %s, 'esperando_decision', %s) returning id""",
+        (quien.workspace_id, tarea["id"], quien.membership_id, decide, _momento(at)))
+    return {"pedido_id": str(cur.fetchone()["id"]), "decide_membership_id": decide}
+
+
+@herramienta(
+    "decidir_detalle_de_tarea", "consultar",
+    "El encargado del sector de una tarea decide si le comparte su detalle a quien lo pidió. Si "
+    "la comparte, esa persona ve la página de la tarea desde ese momento.",
+    {"pedido_id": {"type": "string", "requerido": True},
+     "comparte": {"type": "boolean", "requerido": True},
+     "motivo": {"type": "string"}, "at": {"type": "string"}},
+    valida_en_handler=True)
+def _decidir_detalle_de_tarea(cur, quien: Solicitante, pedido_id, comparte, motivo=None,
+                              at=None):
+    _exigir_espacio(quien)
+    pedido = _uuid_normalizado(pedido_id)
+    fila = None
+    if pedido is not None:
+        cur.execute("select * from pedido_de_detalle where id = %s for update", (pedido,))
+        fila = cur.fetchone()
+    if fila is None or str(fila["decide_membership_id"]) != str(quien.membership_id):
+        raise Denegado("No sos quien decide ese pedido.")
+    if fila["estado"] != "esperando_decision":
+        return {"error": "el_pedido_ya_termino", "estado": fila["estado"]}
+    momento = _momento(at)
+    motivo = (motivo or "").strip() or None
+    if not comparte:
+        cur.execute("""update pedido_de_detalle set estado = 'no_compartida', decidido_en = %s,
+                              motivo = %s
+                        where id = %s""", (momento, motivo, fila["id"]))
+        return {"pedido_id": str(fila["id"]), "estado": "no_compartida"}
+    compartida = None
+    if not _puede_verla(cur, fila["pedido_por_membership_id"], fila["task_id"]):
+        # La base comprueba otra vez que quien la comparte es el encargado del sector de la
+        # tarea (`vigilar_tarea_compartida`).
+        cur.execute(
+            """insert into tarea_compartida (workspace_id, task_id, membership_id,
+                                             compartida_por_membership_id, pedido_id, at)
+               values (%s, %s, %s, %s, %s, %s) returning id""",
+            (quien.workspace_id, fila["task_id"], fila["pedido_por_membership_id"],
+             quien.membership_id, fila["id"], momento))
+        compartida = str(cur.fetchone()["id"])
+    cur.execute("""update pedido_de_detalle set estado = 'compartida', decidido_en = %s,
+                          motivo = %s
+                    where id = %s""", (momento, motivo, fila["id"]))
+    # Constitución §12: quién la compartió, con quién, de qué tarea y cuándo, con la versión de
+    # las reglas del núcleo y del pack.
+    registrar_auditoria(
+        cur, accion="compartir_tarea", workspace_id=quien.workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="persona", sujeto_tipo="task",
+        sujeto_id=str(fila["task_id"]),
+        detalle={"pedido_id": str(fila["id"]), "compartida_id": compartida,
+                 "con": str(fila["pedido_por_membership_id"]),
+                 "compartida_por": str(quien.membership_id), "at": momento.isoformat()},
+        pack_hash=versiones.pack_hash(cur, quien.workspace_id),
+        nucleo_hash=versiones.nucleo_hash())
+    return {"pedido_id": str(fila["id"]), "estado": "compartida", "compartida_id": compartida}
+
+
+@herramienta(
+    "dejar_de_compartir_tarea", "consultar",
+    "El encargado del sector de una tarea, o quien la compartió, deja de compartírsela a una "
+    "persona: desde ese momento ya no ve su página, tampoco con un enlace que ya tenía.",
+    {"tarea_id": {"type": "string", "requerido": True},
+     "membership_id": {"type": "string", "requerido": True}, "at": {"type": "string"}},
+    valida_en_handler=True)
+def _dejar_de_compartir_tarea(cur, quien: Solicitante, tarea_id, membership_id, at=None):
+    _exigir_espacio(quien)
+    tarea, persona = _tarea_del_espacio(cur, tarea_id), _uuid_normalizado(membership_id)
+    if tarea is None or persona is None:
+        return {"error": "no_estaba_compartida"}
+    cur.execute("""select * from tarea_compartida
+                    where task_id = %s and membership_id = %s and revocada_en is null
+                    for update""", (tarea["id"], persona))
+    fila = cur.fetchone()
+    if fila is None:
+        return {"error": "no_estaba_compartida"}
+    yo = str(quien.membership_id)
+    if yo not in (encargado_de_la_tarea(cur, tarea["id"]),
+                  str(fila["compartida_por_membership_id"])):
+        raise Denegado("La deja de compartir el encargado del sector de la tarea.")
+    momento = _momento(at)
+    cur.execute("""update tarea_compartida set revocada_en = %s, revocada_por_membership_id = %s
+                    where id = %s""", (momento, yo, fila["id"]))
+    registrar_auditoria(
+        cur, accion="dejar_de_compartir_tarea", workspace_id=quien.workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="persona", sujeto_tipo="task",
+        sujeto_id=str(tarea["id"]),
+        detalle={"compartida_id": str(fila["id"]), "con": persona, "revocada_por": yo,
+                 "at": momento.isoformat()},
+        pack_hash=versiones.pack_hash(cur, quien.workspace_id),
+        nucleo_hash=versiones.nucleo_hash())
+    return {"compartida_id": str(fila["id"]), "revocada": True}
