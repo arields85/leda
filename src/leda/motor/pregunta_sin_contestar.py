@@ -36,6 +36,12 @@ IA:
    visible por mensaje" (ADR 0013): el mensaje de la persona tiene una sola respuesta, y la
    pregunta que vuelve es un aviso aparte, como la de la regla 3.
 
+5. **Una oferta opcional no es una pregunta sin contestar** (`preguntas.OPCIONAL`, "si lo
+   necesitás"): no se repite (`se_repite`), no frena los otros temas (`termino_su_turno`) y no
+   vuelve después de un cambio de tema (`al_terminar_el_turno`): sin respuesta es un no, y se
+   cierra (la escalera la cierra a la hora en que se habría repetido;
+   `escalera._repetir_las_preguntas_abiertas`).
+
 **Cuándo se hizo una pregunta** (`preguntada_en`, migración 0040): la última vez que salió en un
 mensaje de Leda, una respuesta (`al_terminar_el_turno`) o un aviso (`avisos._enviar`). Las filas de
 antes de la migración cuentan desde `abierta_en`.
@@ -78,7 +84,7 @@ def se_repite(pregunta: dict[str, Any]) -> bool:
     es de una tarea (la duda de cuál, que vuelve en la respuesta siguiente)."""
     tipo = preguntas.TIPOS.get(pregunta["tipo"])
     return (pregunta["task_id"] is not None and tipo is not None
-            and tipo.sin_elegir_queda is None)
+            and tipo.sin_elegir_queda is None and not preguntas.es_opcional(pregunta))
 
 
 def preguntada_en(pregunta: dict[str, Any]) -> datetime:
@@ -108,6 +114,8 @@ def termino_su_turno(cur, cal, workspace_id: str, pregunta: dict[str, Any],
     las 4 horas desde que se repitió hoy (la repetición la vuelve a hacer: cuenta desde ella).
     Una que no se repite, o cuya repetición no salió (omitida o fallida), cuenta las 4 horas de
     la repetición que no tuvo, más las del tema siguiente: nunca frena el resto del día."""
+    if preguntas.es_opcional(pregunta):
+        return True                     # una oferta opcional nunca frena nada
     zona = cal.zona
     hoy = ahora.astimezone(zona).date()
     desde = preguntada_en(pregunta)
@@ -144,6 +152,9 @@ def al_terminar_el_turno(ctx, temas: set[str] | None = None) -> dict[str, Any] |
                     (abierta["id"],))
         return None
     if pregunta["desde_antes"] and hablo_de_otro_tema(abierta, temas):
+        if preguntas.es_opcional(abierta):
+            preguntas.caducar(cur, abierta, ctx.ahora)     # una oferta opcional no vuelve
+            return None
         guardar_la_que_vuelve(ctx, abierta)
         return None
     marcar_preguntada(cur, str(abierta["id"]), ctx.ahora)

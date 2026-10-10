@@ -98,6 +98,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "opcion": "El alias de una opción.",
     "etiqueta": "Lo que dice una opción, como la ve la persona.",
     "propone": "Lo que Leda le propuso a la persona para que elija.",
+    "opcional": "Lo que Leda propone es por si la persona lo necesita: si no lo toma, no pasa "
+                "nada y Leda no vuelve a ofrecerlo.",
     "desde_antes": "La pregunta ya se había hecho en un mensaje anterior: se vuelve a esa pregunta sin "
                    "pedir que se repita lo que la persona ya dijo.",
     # --- Lo que la persona mandó con su mensaje (ADR 0019, decisión 4) --------------------------
@@ -1130,12 +1132,23 @@ SIGNIFICADOS: Mapping[str, str] = {
                              "pase que la persona todavía no contestó (si lo aprueba o si toma "
                              "la tarea), por única vez; se contesta igual que la primera.",
     "se_lo_pregunto_el": "El día en que Leda le hizo la pregunta por primera vez.",
-    "si_sigue_sin_contestar": "Lo que pasa si la persona sigue sin contestar: ese día (fecha) el "
-                              "pase termina y la tarea sigue con quien la tiene (sigue_con).",
-    "sin_respuesta": "Nadie contestó la pregunta del pase (no_contesto dice quién tenía que "
-                     "hacerlo), ni la primera vez ni cuando Leda la repitió: el pase terminó y "
-                     "la tarea sigue con quien la tenía.",
-    "no_contesto": "Quién tenía que contestar la pregunta del pase y no contestó.",
+    "si_sigue_sin_contestar": "Lo que pasa si la persona sigue sin contestar: ese día (fecha) "
+                              "el pase termina y la tarea sigue con quien la tiene (sigue_con), "
+                              "o el pedido del detalle termina sin compartirla "
+                              "(no_se_comparte).",
+    "no_se_comparte": "El detalle de la tarea no se comparte: nada cambia.",
+    "sin_respuesta": "Nadie contestó la pregunta del pase o del pedido del detalle (no_contesto "
+                     "dice quién tenía que hacerlo), ni la primera vez ni cuando Leda la "
+                     "repitió: terminó sin que nada cambie (la tarea sigue con quien la tenía; "
+                     "el detalle no se compartió).",
+    "no_contesto": "Quién tenía que contestar la pregunta del pase o del pedido del detalle y no "
+                   "contestó.",
+    "puede_volver_a_pedirlo": "Quien pidió el detalle de la tarea puede volver a pedirlo.",
+    "recordatorio_del_pedido_del_detalle": "Mensaje de Leda, como Leda, al encargado del sector "
+                                           "de una tarea, que vuelve a hacer la pregunta del "
+                                           "pedido del detalle que todavía no contestó (si se lo "
+                                           "comparte a pide_ver_el_detalle), por única vez; se "
+                                           "contesta igual que la primera.",
     "puede_pedirselo_a_otra_persona": "Quien pidió el pase puede pedir pasarle la tarea a otra "
                                       "persona.",
     "era_suya": "La tarea era de quien recibe este mensaje: la pidió pasar el encargado de su "
@@ -1146,9 +1159,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                                       "y no llegó a contestar, de cómo terminó: a quién (a) y "
                                       "cuándo se entera (llega).",
     "ya_no_espera_su_respuesta": "Leda le preguntaba a quien recibe este mensaje por el pase "
-                                 "(si lo aprobaba o si tomaba la tarea), que pidió pidio; el "
-                                 "pase terminó y ya no hace falta que conteste: Leda no le "
-                                 "pregunta más.",
+                                 "(si lo aprobaba o si tomaba la tarea) o por el pedido del "
+                                 "detalle (si lo compartía), que pidió pidio; terminó y ya no "
+                                 "hace falta que conteste: Leda no le pregunta más.",
     "no_es_de_su_sector": "La tarea nombrada es de otra persona (la_tiene) que no es de su "
                           "sector: quien escribe no la puede pasar.",
     "ya_la_tiene": "Quien recibiría la tarea es quien ya la tiene.",

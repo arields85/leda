@@ -250,3 +250,97 @@ pasos:
     enlace: false
     dice:
       - que hay dos con ese nombre, la de la envasadora y la de la paila, y pregunta cuál
+
+  # La oferta es opcional ("si lo necesitás"): si Nahuel cambia de tema, no vuelve; es un no
+  # (derivado de la decisión 33 por el coordinador; constitución §8).
+  - paso: 13
+    quien: Nahuel
+    a_las: "2026-10-26 12:05"
+    escribe: "el de la envasadora"
+    jugadas:
+      - {nombre: pedir_enlace, como_la_nombra: "envasadora"}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_enlace, resultado: solo_el_resumen, tarea: ENV, responsable: Mariano Naim,
+         se_lo_puede_pedir_a: Mariano Naim, pregunta: propuesta,
+         lleva_el_enlace_a_la_pagina_de_la_tarea: ausente}
+    pregunta: {tipo: propuesta, tarea: ENV}
+    botones: []
+    enlace: false
+    dice:
+      - "el resumen de la de la envasadora: de Mariano, vence el vie 30/10"
+      - que el detalle lo ve su sector y que, si lo necesita, le pregunta a Mariano
+    no_dice:
+      - que no la puede ver
+
+  - paso: 14
+    quien: Nahuel
+    a_las: "2026-10-26 12:10"
+    escribe: "y el del servidor pediselo de nuevo a martin, ya sacaron las claves de las fotos"
+    jugadas:
+      - {nombre: pedir_el_detalle, como_la_nombra: "servidor"}
+    efectos:
+      avisos_guardados:
+        - {tipo: pedido_del_detalle, tarea: SRV, a: Martin, estado: guardado,
+           hechos: {necesita_respuesta: true, pide_ver_el_detalle: Nahuel Gimenez}}
+    hechos:
+      - {jugada: pedir_el_detalle, resultado: detalle_pedido, tarea: SRV,
+         le_pregunta_a: {a: Martín Forte, llega: "~2026-10-26T12:20"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que le pregunta a Martín por la del servidor y le avisa cuando conteste
+    no_dice:
+      - la de la envasadora
+
+  - paso: 15
+    quien: Leda
+    relojes: ["2026-10-26 12:20"]
+    salen:
+      - a: Martin
+        tipo: pedido_del_detalle
+        tarea: SRV
+        hechos: {necesita_respuesta: true, pide_ver_el_detalle: Nahuel Gimenez}
+        botones: [Compartirla, No compartirla]
+    dice:
+      - que Nahuel pide otra vez ver el detalle de la del servidor
+      - "la pregunta: si se la comparte"
+
+  # Martín no contesta: la pregunta otra vez, una sola, el día hábil siguiente; si sigue sin
+  # contestar, el pedido termina y se enteran los dos (la regla de la decisión 26, como un pase).
+  - paso: 16
+    quien: Leda
+    relojes: ["2026-10-27 10:00"]
+    salen:
+      - a: Martin
+        tipo: recordatorio_del_pedido_del_detalle
+        tarea: SRV
+        hechos: {pide_ver_el_detalle: Nahuel Gimenez, se_lo_pregunto_el: "2026-10-26",
+                 si_sigue_sin_contestar: {no_se_comparte: true, fecha: "2026-10-28"}}
+      # El aviso previo de siempre de las que vencen el viernes (tres días hábiles antes).
+      - {a: Lucas, tipo: aviso_previo, tarea: SW}
+      - {a: Mariano, tipo: aviso_previo, tarea: ENV}
+      - {a: Ariel, tipo: aviso_previo, tarea: PAI}
+    dice:
+      - que Nahuel sigue esperando saber si le comparte la del servidor
+      - que si no contesta, mañana el pedido termina sin compartirla
+
+  - paso: 17
+    quien: Leda
+    relojes: ["2026-10-28 10:00"]
+    salen:
+      - a: Nahuel
+        tipo: como_termino_el_pedido_del_detalle
+        tarea: SRV
+        hechos: {necesita_respuesta: false, sin_respuesta: true, no_contesto: Martín Forte,
+                 puede_volver_a_pedirlo: true}
+        enlace: false
+      - a: Martin
+        tipo: como_termino_el_pedido_del_detalle
+        tarea: SRV
+        hechos: {necesita_respuesta: false, sin_respuesta: true, ya_no_espera_su_respuesta: true}
+    dice:
+      - a Nahuel, que Martín no contestó, que no se compartió y que lo puede volver a pedir
+      - a Martín, que ya no hace falta que conteste

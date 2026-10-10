@@ -32,7 +32,8 @@ from leda.motor.ia import Jugada
 from leda.motor.tiempo import RelojFijo
 
 from tests.conversaciones.carga import cargar
-from tests.motor.ayudantes import AHORA, IAQueRedacta, avisos_guardados, cuantas, todos, uno
+from tests.motor.ayudantes import (AHORA, IAQueRedacta, administrador, avisos_guardados,
+                                   cuantas, octubre, todos, uno)
 from tests.motor.test_aprobacion import Turnos
 
 DIRECCION = "https://leda.invalid/"
@@ -164,7 +165,9 @@ def test_varias_que_coinciden_y_no_ve_las_nombra_y_pregunta_cual(conn, equipo):
 
 def test_sin_encargado_que_le_pueda_escribir_no_se_le_ofrece(conn, equipo):
     """Antes de prometer un envío, Leda comprueba que el destinatario esté conectado
-    (constitución §7): sin Martín conectado, el resumen sin la oferta, y dice por qué."""
+    (constitución §7): sin Martín conectado, el resumen sin la oferta, y dice por qué. Y el
+    administrador se entera, de verdad, para que lo conecte (decisión 37, su mecanismo)."""
+    administrador(conn)
     with admin(conn) as cur:
         cur.execute("update app_user set telegram_user_id = null where id = %s",
                     (equipo.mundo["personas"]["Martin"]["app_user_id"],))
@@ -174,6 +177,12 @@ def test_sin_encargado_que_le_pueda_escribir_no_se_le_ofrece(conn, equipo):
     assert "se_lo_puede_pedir_a" not in hecho and "pregunta" not in hecho
     assert hecho["no_se_le_puede_escribir_a"] == {"a": MARTIN,
                                                   "motivo": "destinatario_sin_telegram"}
+    assert hecho["se_le_aviso_al_administrador"]["para_que_conecte"] == MARTIN
+    assert hecho["se_le_aviso_al_administrador"]["llega"] != "no_le_va_a_llegar"
+    [incidente] = todos(conn, "select etapa, resumen_sanitizado from incident")
+    assert incidente["etapa"] == "motor_sin_leda_conectada"
+    assert MARTIN in incidente["resumen_sanitizado"]
+    assert cuantas(conn, "pedido_de_detalle") == 0
 
 
 def test_sin_encargado_del_sector_el_resumen_lo_dice(conn, equipo):
@@ -385,3 +394,297 @@ def test_dejar_de_compartirla_no_es_de_cualquiera(conn, equipo):
                      ya_confirmada=True)
     conn.rollback()
     assert cuantas(conn, "tarea_compartida", "revocada_en is null") == 1
+
+
+# --- Lo que dejaron la revisión y la impugnación del detalle a pedido (2026-10-09) ----------------
+
+def _personas(t: Turnos, nombre: str) -> dict:
+    return t.mundo["personas"][nombre]
+
+
+def _otro_encargado_de_it(conn, t: Turnos, nombre: str = "Ariel") -> None:
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = %s where id = %s",
+                    (_personas(t, nombre)["membership_id"], t.carga.areas["it"]))
+    conn.commit()
+
+
+def test_si_cambia_el_encargado_antes_de_preguntarle_la_pregunta_va_al_de_ahora(conn, equipo):
+    """El pedido sigue al encargado de ahora (como la revisión sigue a quien aprueba, decisiones
+    16 y 43): si el sector cambió de encargado antes de que saliera la pregunta, le llega al
+    nuevo, y es él quien lo ve en su lista."""
+    _pedido_hecho(conn, equipo)
+    _otro_encargado_de_it(conn, equipo)
+
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+
+    [aviso] = avisos_guardados(conn, PEDIDO)
+    assert aviso["estado"] == "enviado"
+    assert str(aviso["destinatario_membership_id"]) == _personas(equipo, "Ariel")["membership_id"]
+    equipo.dice("Ariel", at=AHORA + timedelta(hours=1))
+    assert any(x.get("espera_que_decida_si_la_comparte") for x in equipo.situacion["tareas"])
+    equipo.dice("Martin", at=AHORA + timedelta(hours=1))
+    assert not any(x.get("espera_que_decida_si_la_comparte")
+                   for x in equipo.situacion["tareas"])
+
+
+@pytest.mark.parametrize("acepta", [True, False])
+def test_un_encargado_anterior_no_decide_ni_que_si_ni_que_no(conn, equipo, acepta):
+    """A Martín le llegó la pregunta y después dejó de ser el encargado: su botón (o lo que
+    escriba) no decide nada, ni que sí ni que no; el pedido sigue esperando al de ahora, que lo
+    decide (revisión del detalle a pedido: la base comprobaba al encargado de ahora y la cocina al
+    de entonces, y el pedido quedaba trabado)."""
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    token = _boton(conn, equipo, "Martin", "Compartirla" if acepta else "No compartirla")
+    _otro_encargado_de_it(conn, equipo)
+
+    r = equipo.toca("Martin", token, at=AHORA + timedelta(minutes=40))
+
+    # Su botón viejo se lo dice como todo botón de una tarea que ya no le corresponde.
+    assert (r.hechos[0]["resultado"], r.hechos[0]["motivo"]) == ("no_se_puede",
+                                                                 "ya_no_le_corresponde")
+    [pedido] = todos(conn, "select estado from pedido_de_detalle")
+    assert pedido["estado"] == "esperando_decision"
+    assert cuantas(conn, "tarea_compartida") == 0
+    alias = _alias_de(equipo, "Ariel", SWITCH)
+    r = equipo.dice("Ariel", Jugada("contestar_el_pedido_del_detalle",
+                                    {"tarea": alias, "acepta": acepta}),
+                    at=AHORA + timedelta(minutes=50))
+    assert (r.hechos[0]["resultado"], r.hechos[0]["la_compartio"]) == ("anotado", acepta)
+    [pedido] = todos(conn, "select estado, decidido_por_membership_id::text por "
+                           "from pedido_de_detalle")
+    assert pedido["estado"] == ("compartida" if acepta else "no_compartida")
+    assert pedido["por"] == _personas(equipo, "Ariel")["membership_id"]
+    # Quien lo pidió se entera de quién lo decidió de verdad.
+    [aviso] = avisos_guardados(conn, COMO_TERMINO)
+    assert aviso["hechos"]["lo_decidio"] == "Ariel De Simone"
+
+
+def test_si_ya_la_veia_la_auditoria_dice_lo_que_paso(conn, equipo):
+    """Nahuel la empezó a ver por otro lado mientras esperaba (pasó a aprobar el trabajo de
+    Lucas): decir que sí no comparte nada, y la auditoría lo dice así, nunca una tarea compartida
+    sin fila (revisión del detalle a pedido, `herramientas.py:3131-3152`)."""
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    with admin(conn) as cur:
+        cur.execute("update membership set aprobador_membership_id = %s where id = %s",
+                    (_personas(equipo, "Nahuel")["membership_id"],
+                     _personas(equipo, "Lucas")["membership_id"]))
+    conn.commit()
+
+    equipo.toca("Martin", _boton(conn, equipo, "Martin", "Compartirla"),
+                at=AHORA + timedelta(minutes=40))
+
+    assert cuantas(conn, "tarea_compartida") == 0
+    assert cuantas(conn, "audit_log", "accion = 'compartir_tarea'") == 0
+    [fila] = todos(conn, """select detalle from audit_log
+                             where accion = 'decidir_detalle_de_tarea'""")
+    assert fila["detalle"]["ya_la_veia"] is True and fila["detalle"]["comparte"] is True
+    assert "compartida_id" not in fila["detalle"]
+
+
+def test_un_no_tambien_queda_en_la_auditoria(conn, equipo):
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+
+    equipo.toca("Martin", _boton(conn, equipo, "Martin", "No compartirla"),
+                at=AHORA + timedelta(minutes=40))
+
+    [fila] = todos(conn, "select actor_app_user_id::text actor, detalle from audit_log "
+                         "where accion = 'no_compartir_tarea'")
+    assert fila["actor"] == _personas(equipo, "Martin")["app_user_id"]
+    assert fila["detalle"]["con"] == _personas(equipo, "Nahuel")["membership_id"]
+
+
+class _SeCruzaOtroPedido:
+    """Un cursor que, apenas la cocina mira si ya hay un pedido abierto y no lo ve, deja que
+    llegue el de otro mensaje de la misma persona (la carrera de dos mensajes que se cruzan)."""
+
+    def __init__(self, cur, otro) -> None:
+        self._cur, self._otro, self.cruzo = cur, otro, False
+
+    def execute(self, sql, params=None, **kw):
+        r = self._cur.execute(sql, params, **kw)
+        if (not self.cruzo and "from pedido_de_detalle" in sql
+                and "esperando_decision" in sql and sql.lstrip().startswith("select")):
+            self.cruzo = True
+            self._otro()
+        return r
+
+    def __getattr__(self, nombre):
+        return getattr(self._cur, nombre)
+
+
+def test_dos_pedidos_que_se_cruzan_son_uno(conn, equipo):
+    """La carrera al pedirlo (revisión del detalle a pedido, `herramientas.py:3088-3099`): el
+    segundo encuentra el primero y dice que ya lo pidió, sin caerse."""
+    from psycopg.rows import dict_row
+    nahuel = _personas(equipo, "Nahuel")
+    with espacio(conn, equipo.carga.workspace_id) as cur:
+        quien = identificar_en_espacio(cur, nahuel["telegram"], equipo.carga.workspace_id)
+
+        def otro():
+            with conn.cursor(row_factory=dict_row) as aparte:
+                aparte.execute(
+                    """insert into pedido_de_detalle (workspace_id, task_id,
+                                                      pedido_por_membership_id,
+                                                      decide_membership_id, estado, pedido_en)
+                       values (%s, %s, %s, %s, 'esperando_decision', %s)""",
+                    (equipo.carga.workspace_id, equipo.carga.tareas["SW"],
+                     nahuel["membership_id"], _personas(equipo, "Martin")["membership_id"],
+                     AHORA))
+
+        r = ejecutar(_SeCruzaOtroPedido(cur, otro), quien, "pedir_detalle_de_tarea",
+                     {"tarea_id": equipo.carga.tareas["SW"], "at": AHORA.isoformat()},
+                     ya_confirmada=True)
+    conn.commit()
+    assert r["error"] == "ya_lo_pidio"
+    assert cuantas(conn, "pedido_de_detalle") == 1
+
+
+# --- Una oferta "si lo necesitás" no se repite ni vuelve (decisión 33; constitución §8) ---------
+
+def test_la_oferta_no_se_repite_a_las_cuatro_horas_y_sin_respuesta_es_un_no(conn, equipo):
+    """La oferta es opcional ("si lo necesitás, le pregunto"): Leda no la repite a las 4 horas
+    como una pregunta que espera respuesta (decisión 29); si la persona no contesta, es un no, y
+    la oferta se cierra."""
+    from leda.motor.escalera import correr_escalera
+    _pide_el_enlace(equipo, "Marcos", "switch")
+
+    for horas in (4, 5, 9):
+        correr_escalera(conn, equipo.carga.workspace_id,
+                        RelojFijo(AHORA + timedelta(hours=horas, minutes=5)))
+        conn.commit()
+
+    assert avisos_guardados(conn, "repeticion_del_dia") == []
+    assert cuantas(conn, "conversation_question",
+                   "tipo = 'propuesta' and cerrada_en is null") == 0
+    assert cuantas(conn, "pedido_de_detalle") == 0
+
+
+def test_la_oferta_no_vuelve_despues_de_un_cambio_de_tema(conn, equipo):
+    """Marcos pide el enlace del switch, que no ve, y en vez de contestar la oferta habla de su
+    PLC: la respuesta es lo nuevo y la oferta no vuelve aparte (decisión 50 es para lo que Leda
+    necesita saber); se cierra como un no."""
+    _pide_el_enlace(equipo, "Marcos", "switch")
+    plc = _alias_de(equipo, "Marcos", "Programar el PLC")
+
+    equipo.dice("Marcos", Jugada("anotar_inicio", {"tarea": plc}), texto="arranque el plc",
+                at=AHORA + timedelta(minutes=20))
+
+    assert avisos_guardados(conn, "vuelve_la_pregunta") == []
+    assert cuantas(conn, "conversation_question",
+                   "tipo = 'propuesta' and cerrada_en is null") == 0
+
+
+def test_la_oferta_no_frena_lo_que_espera_a_la_persona(conn, equipo):
+    """Una oferta sin contestar no es una pregunta que Leda necesita: no frena los otros temas
+    (decisión 21 es para lo que Leda pregunta)."""
+    from leda.motor import pregunta_sin_contestar
+    _pide_el_enlace(equipo, "Marcos", "switch")
+    abierta = uno(conn, """select q.* from conversation_state s
+                             join conversation_question q on q.id = s.pregunta_abierta_id
+                            where s.membership_id = %s""",
+                  _personas(equipo, "Marcos")["membership_id"])
+    with espacio(conn, equipo.carga.workspace_id) as cur:
+        from leda.calendario import Calendario
+        cal = Calendario.desde_base(cur, equipo.carga.workspace_id)
+        assert pregunta_sin_contestar.termino_su_turno(
+            cur, cal, equipo.carga.workspace_id, abierta, AHORA + timedelta(minutes=10))
+    conn.commit()
+
+
+# --- El encargado que no contesta (decisión 26, la misma regla que los pases) ---------------------
+
+def _dia(dia: int, hora: int = 10):
+    return octubre(dia, hora)
+
+
+def _ciclo(conn, equipo, at) -> IAQueRedacta:
+    from leda.motor.escalera import correr_escalera
+    correr_escalera(conn, equipo.carga.workspace_id, RelojFijo(at))
+    conn.commit()
+    return _salir(conn, equipo, at)
+
+
+RECORDATORIO = "recordatorio_del_pedido_del_detalle"
+
+
+def test_si_el_encargado_no_contesta_se_le_repite_una_vez_y_termina(conn, equipo):
+    """Lunes 5: Nahuel lo pide y a Martín le llega. Martes 6, el día hábil siguiente: la pregunta
+    otra vez, una sola. Miércoles 7, a la hora en que Leda escribe, sigue sin contestar: el pedido
+    termina sin respuesta y Nahuel se entera de que Martín no contestó; a Martín, que ya no hace
+    falta (decisión 39). Nunca un tema abierto para siempre."""
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+
+    _ciclo(conn, equipo, _dia(6))
+    [otra_vez] = avisos_guardados(conn, RECORDATORIO)
+    assert otra_vez["estado"] == "enviado"
+    assert str(otra_vez["destinatario_membership_id"]) == _personas(equipo, "Martin")[
+        "membership_id"]
+    assert otra_vez["hechos"]["pide_ver_el_detalle"] == NAHUEL
+    assert otra_vez["hechos"]["si_sigue_sin_contestar"]["fecha"] == "2026-10-07"
+    _ciclo(conn, equipo, _dia(6, 15))
+    assert len(avisos_guardados(conn, RECORDATORIO)) == 1      # una sola vez
+    [pedido] = todos(conn, "select estado from pedido_de_detalle")
+    assert pedido["estado"] == "esperando_decision"
+
+    _ciclo(conn, equipo, _dia(7))
+
+    [pedido] = todos(conn, "select estado from pedido_de_detalle")
+    assert pedido["estado"] == "sin_respuesta"
+    assert cuantas(conn, "audit_log", "accion = 'pedido_de_detalle_sin_respuesta'") == 1
+    terminos = avisos_guardados(conn, COMO_TERMINO)
+    a_nahuel = next(a for a in terminos if str(a["destinatario_membership_id"])
+                    == _personas(equipo, "Nahuel")["membership_id"])
+    assert a_nahuel["hechos"]["sin_respuesta"] is True
+    assert a_nahuel["hechos"]["no_contesto"] == MARTIN
+    a_martin = next(a for a in terminos if str(a["destinatario_membership_id"])
+                    == _personas(equipo, "Martin")["membership_id"])
+    assert a_martin["hechos"]["ya_no_espera_su_respuesta"] is True
+    assert cuantas(conn, "tarea_compartida") == 0
+    # Los botones de la pregunta ya no deciden nada.
+    assert cuantas(conn, "conversation_question",
+                   "tipo = %s and cerrada_en is null", preguntas.COMPARTIR_EL_DETALLE) == 0
+    # Y puede volver a pedirlo.
+    r = equipo.dice("Nahuel", Jugada("pedir_el_detalle", {"como_la_nombra": "switch"}),
+                    at=_dia(7, 11))
+    assert r.hechos[0]["resultado"] == "detalle_pedido"
+
+
+def test_si_contesta_despues_de_la_repeticion_no_termina(conn, equipo):
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    _ciclo(conn, equipo, _dia(6))
+    equipo.toca("Martin", _boton(conn, equipo, "Martin", "No compartirla"), at=_dia(6, 11))
+
+    _ciclo(conn, equipo, _dia(7))
+
+    [pedido] = todos(conn, "select estado from pedido_de_detalle")
+    assert pedido["estado"] == "no_compartida"
+    assert cuantas(conn, "audit_log", "accion = 'pedido_de_detalle_sin_respuesta'") == 0
+
+
+def test_la_repeticion_va_al_encargado_de_ahora(conn, equipo):
+    """Si el encargado cambió después de la primera pregunta, la repetición le llega al nuevo
+    (decisión 16: al nuevo, lo que espera su decisión)."""
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    _otro_encargado_de_it(conn, equipo)
+
+    _ciclo(conn, equipo, _dia(6))
+
+    [otra_vez] = avisos_guardados(conn, RECORDATORIO)
+    assert str(otra_vez["destinatario_membership_id"]) == _personas(equipo, "Ariel")[
+        "membership_id"]
+
+
+def test_el_recordatorio_del_pedido_esta_declarado():
+    from leda.motor.avisos import TIPOS
+    tipo = TIPOS[RECORDATORIO]
+    assert tipo.tipo_de_mensaje == "seguimiento" and tipo.va_a is not None
+    for codigo in (RECORDATORIO, "sin_respuesta", "no_contesto",
+                   "ya_no_espera_su_respuesta", "si_sigue_sin_contestar"):
+        assert hechos_mod.significado(codigo), codigo

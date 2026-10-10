@@ -479,7 +479,8 @@ def _un_tema_a_la_vez(m: Momento, listos: list[_Listo]) -> tuple[list[_Listo], i
     esperan = omitidos = 0
     for persona, suyos in por_persona.items():
         abierta = preguntas.actual(m.cur, persona)
-        if abierta is None:
+        if abierta is None or preguntas.es_opcional(abierta):
+            # Sin pregunta, o con una oferta opcional, que no frena nada (decisión 33).
             salen.extend(suyos)
             continue
         mismas: list[_Listo] = []
@@ -1906,11 +1907,19 @@ def _opciones_del_pase(m: Momento, aviso):
 
 PEDIDO_DEL_DETALLE = "pedido_del_detalle"
 COMO_TERMINO_EL_PEDIDO_DEL_DETALLE = "como_termino_el_pedido_del_detalle"
+# Si el encargado no contesta, la pregunta otra vez, una sola (la regla de la decisión 26, la
+# misma que los pases; `detalle.seguir_los_pedidos`).
+RECORDATORIO_DEL_PEDIDO_DEL_DETALLE = "recordatorio_del_pedido_del_detalle"
 
 
 def _vigencia_del_detalle(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     from . import detalle                # detalle importa este módulo
     return detalle.vigencia(m, aviso)
+
+
+def _al_encargado_de_ahora(m: Momento, aviso) -> str | None:
+    from . import detalle
+    return detalle.al_encargado_de_ahora(m, aviso)
 
 
 def _opciones_del_detalle(m: Momento, aviso):
@@ -2134,10 +2143,16 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # El detalle de una tarea, a pedido (decisión 33): la pregunta al encargado, con sus dos
     # botones, y cómo terminó, a quien lo pidió, con el enlace si se lo compartió (la base
     # decide al salir si lo puede ver). De coordinación: los causa lo que dijo otra persona.
+    # Las dos preguntas van al encargado de ahora (el pedido lo sigue, decisiones 16 y 43).
     TipoDeAviso(PEDIDO_DEL_DETALLE, "normal", _vigencia_del_detalle, es_coordinacion=True,
-                opciones=_opciones_del_detalle),
+                opciones=_opciones_del_detalle, va_a=_al_encargado_de_ahora),
     TipoDeAviso(COMO_TERMINO_EL_PEDIDO_DEL_DETALLE, "informativo", _vigencia_del_detalle,
                 es_coordinacion=True, enlace="destinatario"),
+    # Si el encargado no contesta, la pregunta otra vez, una sola (decisión 26, como el pase):
+    # seguimiento que Leda hace por su cuenta, sin botones (`recuerda`); se contesta escribiendo
+    # o con los botones de la primera.
+    TipoDeAviso(RECORDATORIO_DEL_PEDIDO_DEL_DETALLE, "seguimiento", _vigencia_del_detalle,
+                recuerda=preguntas.COMPARTIR_EL_DETALLE, va_a=_al_encargado_de_ahora),
 )})
 
 

@@ -42,6 +42,14 @@ contexto): cuando una jugada le propone algo a la persona (las salidas de un blo
 previsión en lugar de una reasignación), queda como pregunta, con lo propuesto. Se contesta
 haciendo una de las cosas propuestas, se puede cancelar o dejar para después, y vale un tema a
 la vez como para cualquier otra.
+
+**Una oferta opcional** (`OPCIONAL` en su jugada; `es_opcional`): lo que Leda ofrece "si lo
+necesitás" (pedir el detalle de una tarea, decisión 33) es un tema abierto liviano (constitución
+§8: "liviana en todo lo demás"). Se contesta como cualquier propuesta, pero si la persona no la
+contesta es un no: no se repite a las 4 horas (decisión 29 es para lo que Leda necesita saber),
+no frena los otros temas, y no vuelve después de un cambio de tema ni cuando otro tema la deja
+para después (decisión 50): se cierra (`sin_efecto`, `NO_LA_TOMO`). Una regla de las preguntas,
+para cualquier oferta así, no de una jugada (derivado por el coordinador, 2026-10-09).
 """
 
 from __future__ import annotations
@@ -70,6 +78,10 @@ CAUSA_DEL_BLOQUEO = "causa_del_bloqueo"
 QUIEN_DESTRABA = "quien_destraba"
 # Lo que Leda le propone a la persona: lo propuesto va en la jugada de la pregunta (`propone`).
 PROPUESTA = "propuesta"
+# Una oferta opcional ("si lo necesitás"), en la jugada de su pregunta: sin respuesta es un no
+# (ver el módulo). Cómo se cierra cuando la persona no la tomó.
+OPCIONAL = "opcional"
+NO_LA_TOMO = "oferta_sin_respuesta"
 # Qué atrasa la tarea hasta la fecha que dio la persona, cuando queda después del vencimiento y
 # no dio el porqué (usuario, 2026-10-07: "pasar una fecha sin motivo no es una buena idea, tiene
 # que haber una explicación"; ADR 0018, 9n). Espera respuesta con su propia espera, como la de
@@ -275,9 +287,31 @@ def _corre_otra_jugada(opcion) -> bool:
     return bool((opcion["valor"] or {}).get("jugada"))
 
 
+def es_opcional(q) -> bool:
+    """Si la pregunta es una oferta opcional: sin respuesta, es un no (ver el módulo)."""
+    return bool(q is not None and (q.get("jugada") or {}).get(OPCIONAL))
+
+
+def caducar(cur, q, ahora) -> None:
+    """Una oferta opcional que la persona no tomó se cierra (ver el módulo): deja de ser su tema
+    abierto y nada la vuelve a traer."""
+    cur.execute("""update conversation_question
+                      set cerrada_en = %s, cierre = 'sin_efecto', cierre_detalle = %s
+                    where id = %s and cerrada_en is null""",
+                (ahora, _json({NO_LA_TOMO: True, **({"tarea": str(q["task_id"])}
+                                                     if q.get("task_id") else {})}),
+                 str(q["id"])))
+    cur.execute("""update conversation_state set pregunta_abierta_id = null, actualizado_en = %s
+                    where membership_id = %s and pregunta_abierta_id = %s""",
+                (ahora, str(q["membership_id"]), str(q["id"])))
+
+
 def _lo_propuesto(q) -> dict[str, Any]:
-    propone = (q["jugada"] or {}).get("propone")
-    return {"propone": list(propone)} if propone else {}
+    jugada = q["jugada"] or {}
+    propone = jugada.get("propone")
+    if not propone:
+        return {}
+    return {"propone": list(propone), **({OPCIONAL: True} if jugada.get(OPCIONAL) else {})}
 
 
 def _lo_mostrado(q) -> dict[str, Any]:
@@ -749,6 +783,14 @@ def _que_sea_la_abierta(ctx, pregunta_id: str) -> None:
 
 
 def _dejar_para_despues(ctx, pregunta_id: str) -> None:
+    """La pregunta queda para después. Una oferta opcional que ya se hizo (no en este mismo
+    mensaje) no queda para después: si otro tema la deja de lado, es un no (ver el módulo)."""
+    if pregunta_id not in ctx.preguntas_del_turno:
+        ctx.cur.execute("select * from conversation_question where id = %s", (pregunta_id,))
+        q = ctx.cur.fetchone()
+        if es_opcional(q):
+            caducar(ctx.cur, q, ctx.ahora)
+            return
     ctx.cur.execute("""update conversation_question set para_despues_en = %s
                         where id = %s and cerrada_en is null""", (ctx.ahora, pregunta_id))
     ctx.cur.execute(

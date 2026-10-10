@@ -110,11 +110,39 @@ persona contesta. Decisión 33 del usuario (2026-10-09; `odd/tasks/fase-c.md`); 
     - La respuesta dice: que hay dos tareas con ese nombre (la de la envasadora, de Mariano, y la de
       la paila, de Ariel) y pregunta cuál.
 
+13. **Nahuel** escribe (12:05): "el de la envasadora"
+    →
+    - Jugadas: `pedir_enlace`, nombrada por cómo la dijo.
+    - La respuesta dice: el resumen de la de la envasadora (de Mariano, vence el vie 30/10); que el
+      detalle lo ve su sector y que, si lo necesita, le pregunta a Mariano. Sin enlace.
+
+14. **Nahuel** escribe (12:10): "y el del servidor pediselo de nuevo a martin, ya sacaron las claves
+    de las fotos"
+    →
+    - Jugadas: `pedir_el_detalle`, la del servidor, nombrada.
+    - Efecto: la pregunta a Martín, guardada.
+    - La respuesta dice: que le pregunta a Martín por la del servidor. La oferta de la envasadora no
+      vuelve: es opcional ("si lo necesitás") y, con el cambio de tema, es un no (derivado de la
+      decisión 33; constitución §8).
+
+15. **Leda** (12:20) le escribe a **Martín**: que Nahuel pide otra vez ver el detalle del servidor;
+    si se la comparte, con los dos botones. A Nahuel no le vuelve la oferta de la envasadora.
+
+16. **Leda** (martes 27, 10:00) le escribe a **Martín**, que no contestó: la pregunta otra vez, una
+    sola; si sigue sin contestar, mañana el pedido termina sin compartirla (la regla de la decisión
+    26, como un pase). Sale también el aviso previo de siempre de las tres que vencen el viernes, a
+    Lucas, Mariano y Ariel.
+
+17. **Leda** (miércoles 28, 10:00): el pedido terminó sin respuesta. A **Nahuel**: que Martín no
+    contestó, que no se compartió y que lo puede volver a pedir; sin enlace. A **Martín**: que ya no
+    hace falta que conteste (decisión 39).
+
 ## Qué mide
 
 - **Garantías:** el enlace sale sólo para quien puede ver la tarea, también por haberla
   compartido el encargado (pasos 5 y 6), y nunca antes de que lo comparta ni si dice que no (pasos
-  1, 7 y 11); nada queda compartido sin la decisión del encargado (pasos 2 y 10); ningún efecto en
+  1, 7, 11 y 17); nada queda compartido sin la decisión del encargado (pasos 2, 10 y 17); una oferta
+  opcional no vuelve (pasos 14 y 15) y un pedido sin respuesta termina para todos (16 y 17); ningún efecto en
   las tareas; la IA nunca escribe una dirección.
 - **Comprensión:** la IA elige `pedir_enlace` con la tarea por cómo la dijo, `pedir_el_detalle`
   cuando Nahuel acepta lo que Leda le ofreció, y `contestar_el_pedido_del_detalle` con lo que dice

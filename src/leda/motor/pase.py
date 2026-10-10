@@ -81,6 +81,7 @@ from .margen import sale_con_margen
 from .persecucion import (SE_LE_AVISO_AL_ADMINISTRADOR, SIN_TELEGRAM, alcanzable,
                           avisar_para_que_lo_conecte)
 from .tiempo import sale
+from .una_vez_y_termina import salio, toca_repetir, vencio
 
 # Lo que Leda ofrece en lugar de un pase a alguien sin Leda conectada (decisión 37; C-5b).
 PASARSELA_A_OTRA_PERSONA = "pasarsela_a_otra_persona"
@@ -681,16 +682,11 @@ def _el_aviso(cur, tipo: str, pase: dict, resto: str = "") -> dict | None:
     return cur.fetchone()
 
 
-def _salio(aviso: dict | None) -> bool:
-    """Si un aviso ya salió (o se dio por dado: no se pudo mandar, con su incidente)."""
-    return aviso is not None and aviso["estado"] != "guardado" and aviso["resuelto_en"] is not None
-
-
 def seguir_los_pases(m) -> list[str]:
     """Lo que toca de cada pase que espera una respuesta que no llega (decisión 26 del usuario,
-    2026-10-09): la pregunta otra vez, una sola, el día hábil siguiente de haber salido; y, al día
-    hábil siguiente de la repetición, a la hora en que Leda escribe, el fin del pase sin
-    respuesta. Si la tarea ya no se puede pasar, el fin sin efecto, en cualquier vuelta. Lo
+    2026-10-09; la regla, en `una_vez_y_termina`, la misma que para el pedido del detalle): la
+    pregunta otra vez, una sola, el día hábil siguiente de haber salido; y, al día hábil
+    siguiente de la repetición, a la hora en que Leda escribe, el fin del pase sin respuesta. Si la tarea ya no se puede pasar, el fin sin efecto, en cualquier vuelta. Lo
     decide la cocina (`terminar_pase`), y de cómo terminó se enteran todos (`_al_terminar_solo`).
     Corre en la escalera (`escalera.correr_escalera`). Los tipos de lo que guardó."""
     cur = m.cur
@@ -706,17 +702,13 @@ def seguir_los_pases(m) -> list[str]:
         etapa = f":{tipo}"
         otra_vez = _el_aviso(cur, RECORDATORIO_DEL_PASE, pase, etapa)
         pausado = ausente(cur, espera_de, m.hoy)    # no avanza mientras no está
-        vencido = (not pausado and _salio(otra_vez)
-                   and m.cal.habiles_entre(otra_vez["resuelto_en"], m.ahora) >= 1
-                   and sale(m.cal, m.ahora) <= m.ahora)
-        termino = terminar_pase(cur, pase["id"], m.ahora, vencido=vencido)
+        termino = terminar_pase(cur, pase["id"], m.ahora,
+                                vencido=vencio(m, otra_vez, pausado=pausado))
         if termino is not None:
-            _al_terminar_solo(m, pase, termino["estado"], espera_de if _salio(pregunta) else None)
+            _al_terminar_solo(m, pase, termino["estado"], espera_de if salio(pregunta) else None)
             guardados.append(COMO_TERMINO_EL_PASE)
             continue
-        if pausado or not _salio(pregunta) or otra_vez is not None:
-            continue                    # todavía no se le preguntó, o ya se repitió
-        if m.cal.habiles_entre(pregunta["resuelto_en"], m.ahora) >= 1:
+        if toca_repetir(m, pregunta, otra_vez, pausado=pausado):
             _repetir(m, pase, tipo, espera_de, pregunta, etapa)
             guardados.append(RECORDATORIO_DEL_PASE)
     return guardados

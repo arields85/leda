@@ -165,8 +165,9 @@ from .avisos import BLOQUEO_QUE_SIGUE_ABIERTO, de_quien_es_la_pregunta
 from .bloqueo_viejo import informar_los_viejos
 from .cadencias import YA_LO_CONTO, guardar_los_pedidos, ya_lo_conto
 from .informe_al_grupo import INFORME_AL_GRUPO, guardar_los_informes
+from .detalle import seguir_los_pedidos
 from .pase import seguir_los_pases
-from .preguntas import COMO_VIENEN_SUS_TAREAS
+from .preguntas import COMO_VIENEN_SUS_TAREAS, caducar, es_opcional
 from .preguntas import CUANDO_SE_DESTRABA, DECISION_DE_LA_ENTREGA, QUE_ARREGLARON, lo_anotado
 from .preguntas import TIPOS as TIPOS_DE_PREGUNTA
 from .tiempo import Reloj, sale
@@ -260,6 +261,8 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
         # Los pases que nadie contesta: la pregunta otra vez y, si sigue, el fin del pase
         # (decisión 26).
         resumen.update(seguir_los_pases(m))
+        # Los pedidos del detalle que el encargado no contesta: la misma regla (decisión 26).
+        resumen.update(seguir_los_pedidos(m))
     return dict(resumen)
 
 
@@ -647,9 +650,15 @@ def _repetir_las_preguntas_abiertas(m: Momento) -> int:
     espera = espera_para_repetir(cur, m.workspace_id) if abiertas else None
     guardadas = 0
     for pregunta in abiertas:
+        desde = preguntada_en(pregunta)
+        if es_opcional(pregunta):
+            # Una oferta opcional no se repite: a la hora en que se habría repetido (o al día
+            # siguiente), sin respuesta, es un no y se cierra (`preguntas.OPCIONAL`).
+            if m.fecha(desde) != m.hoy or desde + espera <= m.ahora:
+                caducar(cur, pregunta, m.ahora)
+            continue
         if not se_repite(pregunta):
             continue
-        desde = preguntada_en(pregunta)
         cuando = sale(m.cal, desde + espera)
         if m.fecha(desde) != m.hoy or m.fecha(cuando) != m.hoy or cuando > m.ahora:
             continue
