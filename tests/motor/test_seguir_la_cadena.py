@@ -374,3 +374,22 @@ def test_ya_esta_no_deja_nada_para_otro_dia(conn, mundo, servidor, equipo):
 
     assert _preguntas_a(conn, mundo, "Lucas", EL_DIA) == []
     assert "le_vuelve_a_preguntar" not in r.hechos[0]
+
+
+def test_si_la_persona_trabada_pidio_que_no_le_escriba_no_sale(conn, mundo, servidor, equipo):
+    """Lucas dio un día y después Ariel dijo "no le escribas, ya lo hablamos": a Lucas le llega
+    que ya no hace falta y que Leda no le va a preguntar más (decisión 39, derivada en la 47 y en
+    la C-5d). La pregunta de ese día ya no sale: lo contradiría."""
+    _ariel_trabado(equipo)
+    _salir(conn, mundo, AHORA + timedelta(hours=2))          # a Lucas le llegó la pregunta
+    equipo.dice("Lucas", Jugada("decir_cuando_destraba",
+                                {"tarea": "T1", "para_cuando": "2026-10-07"}))
+    r = equipo.dice("Ariel", Jugada("no_escribirle", {"tarea": "T1"}))
+    assert r.hechos[0]["ya_no_hace_falta_que_destraben"]
+
+    _salir(conn, mundo, octubre(7, 10))
+
+    [aviso] = _preguntas_a(conn, mundo, "Lucas", EL_DIA)
+    assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "se_le_cerro_el_tema")
+    assert _su_pregunta(conn, mundo, "Lucas") is None
+    assert hechos_mod.significado("se_le_cerro_el_tema")

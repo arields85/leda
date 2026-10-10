@@ -236,6 +236,8 @@ YA_CONTESTO = "ya_respondio"
 YA_ESTA_TRABADO = "ya_esta_trabado"
 SE_ENTERA_DE_CADA_AVANCE = "se_entera_de_cada_avance"
 LE_VUELVE_A_PREGUNTAR = "le_vuelve_a_preguntar"
+# Por qué no sale la pregunta del día que dijo: después Leda le cerró el tema ("no le escribas").
+SE_LE_CERRO_EL_TEMA = "se_le_cerro_el_tema"
 
 
 def alcanzable(cur, membership_id: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -750,7 +752,8 @@ def _volver_a_preguntar_el_dia(ctx: Contexto, tarea: dict[str, Any], destraba: d
 
 def vigencia_del_dia_que_dijo(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     """La pregunta del día que dijo quien destraba sale mientras la tarea siga trabada por eso,
-    la destrabe esa misma persona y lo que dijo ese día sea lo último que dijo."""
+    la destrabe esa misma persona, lo que dijo ese día sea lo último que dijo y Leda no le haya
+    cerrado el tema después (`_se_le_cerro_el_tema`)."""
     tarea = leer_tarea(m.cur, aviso["task_id"])
     if tarea is None:
         return "tarea_inexistente", {}
@@ -765,7 +768,21 @@ def vigencia_del_dia_que_dijo(m: Momento, aviso) -> tuple[str | None, dict[str, 
         return motivo, {}
     if ultimo_dicho_de_quien_destraba(m.cur, dicho["blocker_id"]) != str(dicho["id"]):
         return DIJO_ALGO_MAS_NUEVO, {}
+    if _se_le_cerro_el_tema(m.cur, str(aviso["task_id"]),
+                            str(aviso["destinatario_membership_id"]), desde=dicho["at"]):
+        return SE_LE_CERRO_EL_TEMA, {}
     return None, {**dict(aviso["hechos"] or {}), "tarea": tarea["titulo"]}
+
+
+def _se_le_cerro_el_tema(cur, task_id: str, persona: str, *, desde) -> bool:
+    """Si después de `desde` Leda le guardó a esa persona que ya no hace falta que destrabe la
+    tarea (`cerrar_el_tema`; p. ej. "no le escribas, ya lo hablamos"): ya se le dijo que no le
+    va a preguntar más (decisión 39). Uno retirado (`deshacer_no_escribirle`) no cuenta."""
+    cur.execute("""select 1 from scheduled_notice
+                    where tipo = %s and task_id = %s and destinatario_membership_id = %s
+                      and estado <> 'omitido' and creado_en >= %s limit 1""",
+                (YA_NO_HACE_FALTA, task_id, persona, desde))
+    return cur.fetchone() is not None
 
 
 def abre_el_dia_que_dijo(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
@@ -780,7 +797,7 @@ def abre_el_dia_que_dijo(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
 
 
 def _el_dicho(cur, dicho_id: str) -> dict[str, Any] | None:
-    cur.execute("""select d.id, d.blocker_unblocker_id, u.blocker_id
+    cur.execute("""select d.id, d.blocker_unblocker_id, d.at, u.blocker_id
                      from dicho_de_quien_destraba d
                      join blocker_unblocker u on u.id = d.blocker_unblocker_id
                     where d.id = %s""", (dicho_id,))

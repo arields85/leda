@@ -1044,6 +1044,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                                "y cuándo le llega (llega).",
     "le_vuelve_a_preguntar": "El día que dijo la persona que escribe, Leda le vuelve a preguntar "
                              "si ya está (llega).",
+    "se_le_cerro_el_tema": "Después de que esa persona dio un día, Leda le avisó que ya no hace "
+                           "falta que destrabe la tarea y que no le va a preguntar más: no se "
+                           "le pregunta.",
     "el_dia_que_dijo_quien_destraba": "Mensaje de Leda, como Leda, a quien puede destrabar la "
                                       "tarea de otra persona: hoy es el día que dijo "
                                       "(habia_dicho); la pregunta de si ya está o para cuándo. "
