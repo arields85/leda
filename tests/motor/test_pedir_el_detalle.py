@@ -947,6 +947,138 @@ def test_si_el_sector_tiene_otro_encargado_el_pedido_sigue_esperando(conn, equip
     assert _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Nahuel") == []
 
 
+def test_al_encargado_anterior_se_le_dice_que_el_pedido_termino(conn, equipo):
+    """Cerrar el tema para todos (constitución §8, decisión 39): a Martín le habían preguntado
+    si compartía el detalle y el sector se quedó sin encargado. El pedido termina y él también
+    se entera, una vez, como información de coordinación redactada por la IA: ya no hace falta
+    que conteste. Sus hechos nombran sólo a quien lo pidió, como la pregunta que recibió, y no
+    cuentan nada de la administración."""
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    _it_sin_encargado(conn, equipo)
+
+    ia = _ciclo(conn, equipo, _dia(6))
+
+    [aviso] = _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Martin")
+    assert aviso["estado"] == "enviado"
+    hechos = aviso["hechos"]
+    assert hechos["ya_no_espera_su_respuesta"] is True and hechos["pidio"] == NAHUEL
+    assert hechos["necesita_respuesta"] is False and hechos["la_compartio"] is False
+    assert "sin_encargado_del_sector" not in hechos and "el_detalle_lo_ve" not in hechos
+    assert "sin_respuesta" not in hechos
+    redactado = [p["hechos"] for p in ia.pedidos_de_redaccion
+                 if "ya_no_espera_su_respuesta" in str(p["hechos"])]
+    assert redactado
+    # Una sola vez.
+    _ciclo(conn, equipo, _dia(6, 15))
+    _ciclo(conn, equipo, _dia(7))
+    assert len(_a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Martin")) == 1
+
+
+def test_al_encargado_anterior_se_le_dice_a_quien_se_le_pregunto_la_ultima_vez(conn, equipo):
+    """El pedido sigue al encargado de ahora: si la repetición le llegó a Ariel, el nuevo
+    encargado, y después el sector se queda sin encargado, el fin se lo cuenta a Ariel, a quien
+    se le preguntaba, no a Martín."""
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    _otro_encargado_de_it(conn, equipo)
+    _ciclo(conn, equipo, _dia(6))
+    [otra_vez] = avisos_guardados(conn, RECORDATORIO)
+    assert otra_vez["estado"] == "enviado"
+    _it_sin_encargado(conn, equipo)
+
+    _ciclo(conn, equipo, _dia(6, 15))
+
+    [aviso] = _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Ariel")
+    assert aviso["hechos"]["ya_no_espera_su_respuesta"] is True
+    assert _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Martin") == []
+
+
+def test_si_la_pregunta_no_le_llego_al_encargado_anterior_no_se_le_dice_nada(conn, equipo):
+    """Si el sector se queda sin encargado antes de que la pregunta salga, nadie le preguntó
+    nada: no hay un tema abierto con él."""
+    _pedido_hecho(conn, equipo)
+    _it_sin_encargado(conn, equipo)
+
+    _ciclo(conn, equipo, _dia(6))
+
+    [pedido] = todos(conn, "select estado from pedido_de_detalle")
+    assert pedido["estado"] == "sin_efecto"
+    assert _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Martin") == []
+    assert len(_a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Nahuel")) == 1
+
+
+@pytest.mark.parametrize("como", ["fuera_del_espacio", "sin_telegram"])
+def test_al_encargado_anterior_que_no_se_puede_alcanzar_no_se_le_guarda_nada(conn, equipo,
+                                                                            como):
+    """Si Martín ya no está en el espacio o Leda no le puede escribir, no hay a quién contarle:
+    no se le guarda ningún aviso (y no es un error). A Nahuel sí."""
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    _it_sin_encargado(conn, equipo)
+    martin = _personas(equipo, "Martin")
+    with admin(conn) as cur:
+        if como == "fuera_del_espacio":
+            cur.execute("update membership set activo = false where id = %s",
+                        (martin["membership_id"],))
+        else:
+            cur.execute("update app_user set telegram_user_id = null where id = %s",
+                        (martin["app_user_id"],))
+    conn.commit()
+
+    _ciclo(conn, equipo, _dia(6))
+
+    assert _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Martin") == []
+    [aviso] = _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Nahuel")
+    assert aviso["estado"] == "enviado"
+
+
+class _LecturaVieja:
+    """Un cursor cuya lectura del pedido devuelve que todavía espera, aunque ya terminó: la
+    escritura del fin tiene que sostener la guarda por sí misma, no sólo la lectura de antes."""
+
+    def __init__(self, cur) -> None:
+        self._cur, self._del_pedido = cur, False
+
+    def execute(self, sql, params=None, **kw):
+        self._del_pedido = sql.lstrip().startswith("select * from pedido_de_detalle")
+        return self._cur.execute(sql, params, **kw)
+
+    def fetchone(self):
+        fila = self._cur.fetchone()
+        if self._del_pedido and fila is not None:
+            fila = {**fila, "estado": "esperando_decision"}
+        self._del_pedido = False
+        return fila
+
+    def __getattr__(self, nombre):
+        return getattr(self._cur, nombre)
+
+
+def test_un_pedido_que_ya_termino_conserva_su_primer_motivo(conn, equipo):
+    """Revisión de la corrección de casos de borde (`herramientas.py:3236-3238`): el fin de un
+    pedido escribe su estado y su motivo sólo si el pedido sigue esperando; uno que ya terminó
+    (acá, porque el sector se quedó sin encargado) conserva su estado, su motivo y su fecha, y
+    no deja otra auditoría. La base ya lo negaba (`vigilar_pedido_de_detalle`), pero con un
+    error que volvía atrás la vuelta entera de la escalera; ahora no hay nada que terminar."""
+    from leda.herramientas import terminar_pedido_de_detalle
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    _it_sin_encargado(conn, equipo)
+    _ciclo(conn, equipo, _dia(6))
+    [antes] = todos(conn, "select id, estado, motivo, decidido_en from pedido_de_detalle")
+    assert antes["estado"] == "sin_efecto" and antes["motivo"]
+
+    with admin(conn) as cur:
+        r = terminar_pedido_de_detalle(_LecturaVieja(cur), antes["id"], _dia(7))
+    conn.commit()
+
+    assert r is None
+    [despues] = todos(conn, "select id, estado, motivo, decidido_en from pedido_de_detalle")
+    assert despues == antes
+    assert cuantas(conn, "audit_log", "accion = 'pedido_de_detalle_sin_respuesta'") == 0
+
+
 def test_el_recordatorio_del_pedido_esta_declarado():
     from leda.motor.avisos import TIPOS
     tipo = TIPOS[RECORDATORIO]

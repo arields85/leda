@@ -47,7 +47,8 @@ decisiones del usuario, sin preguntar):
   `seguir_los_pedidos`): nadie lo puede decidir, así que el pedido termina (la cocina,
   `terminar_pedido_de_detalle(sin_encargado=True)`) y a quien lo pidió se le dice lo mismo que si
   no hubiera tenido encargado al pedirlo, una vez, sin nombrar a quién se le había preguntado
-  (decisión 35); el administrador se entera por su canal.
+  (decisión 35); a quien se le había preguntado, que ya no hace falta que conteste (decisión
+  39); el administrador se entera por su canal.
 - **Un encargado sin Leda conectada** (el mecanismo de la decisión 37): no se ofrece ni se pide,
   los hechos dicen la verdad (a quién no se le puede escribir) y el administrador recibe el
   aviso, de verdad, para que lo conecte (`persecucion.avisar_para_que_lo_conecte`).
@@ -428,7 +429,7 @@ def seguir_los_pedidos(m) -> list[str]:
         if encargado is None:
             if terminar_pedido_de_detalle(cur, pedido["id"], m.ahora,
                                           sin_encargado=True) is not None:
-                _sin_encargado(m, pedido)
+                _sin_encargado(m, pedido, _a_quien_se_le_pregunto(pregunta, otra_vez))
                 avisar_que_el_sector_no_tiene_encargado(
                     cur, m.workspace_id, str(pedido["area_id"]),
                     f"el pedido de {pedido['pidio']} para ver el detalle de la tarea "
@@ -493,14 +494,37 @@ def _sin_respuesta(m, pedido: dict, otra_vez: dict) -> None:
                       f":d{pedido['id']}{clave}", ahora=m.ahora)
 
 
-def _sin_encargado(m, pedido: dict) -> None:
+def _a_quien_se_le_pregunto(pregunta: dict | None, otra_vez: dict | None) -> str | None:
+    """A quién le llegó la última pregunta del pedido (la repetición, si salió; si no, la
+    primera): `None` si no le llegó a nadie. El pedido sigue al encargado de ahora, así que
+    puede ser otro que el del principio (decisiones 16 y 43)."""
+    for aviso in (otra_vez, pregunta):
+        if aviso is not None and aviso["estado"] == "enviado":
+            return str(aviso["destinatario_membership_id"])
+    return None
+
+
+def _sin_encargado(m, pedido: dict, preguntado: str | None) -> None:
     """El fin de un pedido cuyo sector se quedó sin encargado mientras esperaba (decisión 33):
     a quien lo pidió, lo mismo que si no hubiera tenido encargado al pedirlo (qué sector ve el
     detalle y que no hay a quién pedírselo, `ofrecer`), sin nombrar a quién se le había
-    preguntado (decisión 35). Una vez (la clave del fin del pedido), información de
+    preguntado (decisión 35). Y a quien se le había preguntado (`preguntado`, el encargado
+    anterior), que ya no hace falta que conteste: el tema se cierra para todos (constitución
+    §8, decisión 39); sus hechos nombran sólo a quien lo pidió, como la pregunta que recibió, y
+    nada de la administración. Si ya no está en el espacio o Leda no le puede escribir, no hay a
+    quién contárselo. Cada uno una vez (la clave del fin del pedido), información de
     coordinación, a la hora en que Leda escribe. Las preguntas del pedido, con sus botones,
     dejan de esperar."""
     _cerrar_las_preguntas(m.cur, pedido, m.ahora)
+    if preguntado is not None and preguntado != pedido["pedido_por_membership_id"]             and alcanzable(m.cur, preguntado)[1] is None:
+        guardar(m.cur, m.workspace_id, COMO_TERMINO_EL_PEDIDO_DEL_DETALLE,
+                task_id=pedido["task_id"], destinatario=preguntado,
+                hechos={"aviso": COMO_TERMINO_EL_PEDIDO_DEL_DETALLE, "tarea": pedido["titulo"],
+                        "necesita_respuesta": False, "la_compartio": False,
+                        "ya_no_espera_su_respuesta": True, "pidio": pedido["pidio"]},
+                programado_para=sale(m.cal, m.ahora),
+                clave=f"motor:{COMO_TERMINO_EL_PEDIDO_DEL_DETALLE}:{pedido['task_id']}"
+                      f":d{pedido['id']}:a_quien_se_le_preguntaba", ahora=m.ahora)
     m.cur.execute("select nombre from area where id = %s", (str(pedido["area_id"]),))
     area = m.cur.fetchone()
     hechos = {"aviso": COMO_TERMINO_EL_PEDIDO_DEL_DETALLE, "tarea": pedido["titulo"],

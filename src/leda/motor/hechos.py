@@ -832,8 +832,11 @@ SIGNIFICADOS: Mapping[str, str] = {
                                           "palabras (por_que); o que terminó porque el sector "
                                           "de la tarea se quedó sin encargado mientras "
                                           "esperaba (sin_encargado_del_sector, el_detalle_lo_ve), "
-                                          "lo mismo que si no lo hubiera tenido al pedirlo. Es "
-                                          "información: no pide respuesta.",
+                                          "lo mismo que si no lo hubiera tenido al pedirlo; o, "
+                                          "a quien Leda le preguntaba si lo compartía, que ya "
+                                          "no hace falta que conteste "
+                                          "(ya_no_espera_su_respuesta). Es información: no pide "
+                                          "respuesta.",
     "no_hay_un_pedido_del_detalle": "Ninguna tarea espera que la persona decida si comparte su "
                                     "detalle.",
     "el_pedido_ya_no_espera": "El pedido del detalle ya no espera esa decisión: ya se decidió.",
@@ -1136,7 +1139,7 @@ SIGNIFICADOS: Mapping[str, str] = {
                             "(no_lo_aprobo, lo_decidio), si nadie contestó (sin_respuesta) o si "
                             "la tarea ya no se podía pasar (la_tarea_cambio), y quién la tiene "
                             "ahora (la_tiene). Es información: no pide respuesta.",
-    "pidio": "Quién pidió pasar la tarea.",
+    "pidio": "Quién pidió pasar la tarea o, en el pedido del detalle, quién pidió verlo.",
     "lo_aprobo": "Quién aprobó que la tarea pase: el encargado del sector de quien la recibe.",
     "tambien_lo_decide": "Quien recibe este mensaje es también quien decide el pase: su "
                          "respuesta vale como la decisión.",

@@ -3234,8 +3234,15 @@ def terminar_pedido_de_detalle(cur, pedido_id, momento: datetime, *,
                                   "el sector de la tarea se quedó sin encargado")
     else:
         estado, accion, motivo = "sin_respuesta", "pedido_de_detalle_sin_respuesta", None
+    # La escritura sostiene la guarda por sí misma (revisión de la corrección de casos de
+    # borde): un pedido que ya terminó conserva su estado, su motivo y su fecha. La base también
+    # lo exige (`vigilar_pedido_de_detalle`), pero con un error que volvería atrás la vuelta
+    # entera de la escalera; acá, simplemente, no hay nada que terminar.
     cur.execute("""update pedido_de_detalle set estado = %s, decidido_en = %s, motivo = %s
-                    where id = %s""", (estado, momento, motivo, pedido["id"]))
+                    where id = %s and estado = 'esperando_decision' returning id""",
+                (estado, momento, motivo, pedido["id"]))
+    if cur.fetchone() is None:
+        return None
     registrar_auditoria(
         cur, accion=accion, workspace_id=str(pedido["workspace_id"]),
         actor_kind="sistema", sujeto_tipo="task", sujeto_id=str(pedido["task_id"]),
