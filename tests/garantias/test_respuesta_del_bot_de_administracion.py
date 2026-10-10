@@ -304,6 +304,79 @@ def test_la_respuesta_de_ahora_sale_aunque_el_reloj_de_la_base_vaya_adelantado(c
     assert r["enviados"] == 1 and len(salida.enviados) == 1
 
 
+def test_una_respuesta_que_ya_fallo_espera_su_reintento_aunque_se_pida_enseguida(conn, mundo,
+                                                                                 ada):
+    """Revisión de la corrección de casos de borde (`despachador.py:1373-1374`): sólo el primer
+    envío de una respuesta es inmediato (`solo`). Una que ya falló espera la hora de su
+    reintento, aunque se la vuelva a pedir enseguida: la espera creciente entre intentos rige
+    también para ella."""
+    falla = TransporteDePrueba(falla_en={ADA})
+    _pedir(conn, falla)
+    [respuesta] = _respuestas(conn)
+    assert (respuesta["estado"], respuesta["intentos"]) == ("listo", 1)
+
+    anda = TransporteDePrueba()
+    r = _despachar(conn, anda, solo=[respuesta["id"]])
+    assert anda.enviados == [] and r["enviados"] == 0
+    [igual] = _respuestas(conn)
+    assert (igual["estado"], igual["intentos"]) == ("listo", 1)
+
+    r = _despachar(conn, anda, ahora=respuesta["programado_para"], solo=[respuesta["id"]])
+    assert r["enviados"] == 1 and len(anda.enviados) == 1
+
+
+class _AnotarElIntentoFalla:
+    """Un cursor cuya anotación de un intento fallido falla con un error de la base."""
+
+    def __init__(self, cur) -> None:
+        self._cur = cur
+
+    def execute(self, sql, params=None, **kw):
+        if "set intentos = %s, ultimo_error = %s" in sql:
+            return self._cur.execute("select 1 / 0")
+        return self._cur.execute(sql, params, **kw)
+
+    def __getattr__(self, nombre):
+        return getattr(self._cur, nombre)
+
+
+def test_si_falla_anotar_un_intento_la_pasada_sigue_y_el_enlace_que_salio_abre(conn, mundo,
+                                                                              ada):
+    """Revisión de la corrección de casos de borde (`despachador.py:1426-1430`, sin prueba): en
+    la misma pasada sale la respuesta de Ada con su enlace y la de otra persona no sale; si
+    anotar ese intento falla con un error de la base, la pasada no vuelve atrás: el enlace de
+    Ada sigue vigente, y la otra respuesta queda en la cola como estaba, sin un intento contado
+    y sin ningún acceso, para la pasada siguiente."""
+    from leda.despachador import encolar_respuesta_admin
+    with admin(conn) as cur:
+        encolar_respuesta_admin(cur, ada, ADA, "La página, sólo para vos.", clave="prueba:ada",
+                                enlace_de=(mundo["north-lab"]["id"], mundo["norte"]["id"]))
+    conn.commit()
+    with admin(conn) as cur:
+        encolar_respuesta_admin(cur, ada, 79003, "Para pedir el enlace…", clave="prueba:otra")
+    conn.commit()
+    hasta = max(f["programado_para"] for f in _respuestas(conn))
+
+    salida = TransporteDePrueba(falla_en={79003})
+    with admin(conn) as cur:
+        r = despachar_avisos_admin(_AnotarElIntentoFalla(cur), salida, ahora=hasta)
+    conn.commit()
+
+    assert (r["enviados"], r["fallidos"]) == (1, 1)
+    [enviado] = salida.enviados
+    assert enviado.chat_id == ADA
+    [acceso] = _accesos(conn)
+    assert acceso["token_hash"] == hashlib.sha256(_el_token(enviado.texto).encode()).hexdigest()
+    filas = {f["chat_id"]: f for f in _respuestas(conn)}
+    assert filas[ADA]["estado"] == "enviado"
+    assert (filas[79003]["estado"], filas[79003]["intentos"]) == ("listo", 0)
+
+    # La pasada siguiente la vuelve a intentar.
+    anda = TransporteDePrueba()
+    _despachar(conn, anda, ahora=hasta)
+    assert [e.chat_id for e in anda.enviados] == [79003]
+
+
 def test_una_respuesta_que_agota_los_intentos_deja_su_rastro_y_ningun_acceso(conn, mundo, ada):
     """Sugerencia de la revisión (`despachador.py:1387-1393`, los reintentos de una respuesta,
     sin prueba): cada intento que no sale deja su rastro; el quinto la da por perdida, con el

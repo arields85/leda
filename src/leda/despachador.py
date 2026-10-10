@@ -1358,6 +1358,8 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
     llevar su enlace se descarta (`resumen["descartados"]`). `solo` acota la
     pasada a esas filas: la respuesta sale enseguida, sin esperar al ciclo ni su hora (la cola
     la anota con el reloj de la base, que puede ir un poco adelantado del de la aplicación).
+    Sólo el primer envío es inmediato: una que ya falló espera la hora de su reintento, también
+    con `solo` (la espera creciente entre intentos rige para ella).
     Lo que falla al anotar o descartar una fila va en su propio punto de retorno: nunca vuelve
     atrás la pasada, que dejaría sin abrir los enlaces que ya salieron en ella."""
     ahora = ahora or datetime.now(timezone.utc)
@@ -1371,7 +1373,7 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
              from admin_notice a
              left join admin_notice_enlace e on e.admin_notice_id = a.id
             where a.estado = 'listo'
-              and (a.programado_para <= %s or %s::uuid[] is not null)
+              and (a.programado_para <= %s or (%s::uuid[] is not null and a.intentos = 0))
               and (%s::uuid[] is null or a.id = any(%s::uuid[]))
             order by a.programado_para
             limit %s
