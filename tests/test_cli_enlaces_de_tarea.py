@@ -56,7 +56,7 @@ def test_revocar_los_enlaces_de_una_persona(conn, mundo, correr):
     de_taylor = _emitir(conn, mundo, "Taylor Quinn")
     codigo, salida = correr("revocar-enlaces", "north-lab", "--persona", "Sam Noble")
     assert codigo == 0
-    assert "1" in salida and "Sam Noble 1" in salida
+    assert "Revocados 1 enlaces de Sam Noble" in salida
     assert _leer(conn, de_sam) is None
     assert _leer(conn, de_taylor) is not None
     assert _auditadas(conn, "revocar_enlaces_de_tarea") == 1
