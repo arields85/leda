@@ -815,7 +815,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # cuyas claves compuestas por espacio apuntan a la restricción única de
             # `membership` que la vuelta atrás de la 0002 borra (la 0045 primero: vuelve a
             # dejar las funciones de la página como las dejó la 0036), y antes de la 0045, la
-            # 0046, que deja la tarea y el pase como los espera aquélla.
+            # 0046, que deja la tarea y el pase como los espera aquélla. Antes de todas, la 0050,
+            # cuyas claves también apuntan ahí (el detalle de una tarea, decisión 33).
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0050_el_detalle_de_una_tarea.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0046_la_revision_sigue_a_quien_era_la_tarea.sql"))
             db.execute(_sql_script(

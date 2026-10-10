@@ -1559,6 +1559,75 @@ comment on table pase_de_tarea is
 comment on table cambio_de_responsable is
   'El Motor (C-7): el cambio de quién tiene una tarea, con el pase que lo autorizó, quién la tenía, quién la tomó y quién revisaba su trabajo en ese momento (después, quien aprueba el trabajo de quien era la tarea, migración 0046). Sólo se agrega; agregarlo aplica el cambio en la tarea.';
 
+-- El detalle de una tarea, a pedido (migración 0050; decisión 33 del usuario): quien no ve una
+-- tarea pide su detalle, y lo decide el encargado del sector de la tarea. Un "no" lo termina sin
+-- compartir nada. Nada se borra.
+create table pedido_de_detalle (
+  id                        uuid primary key default gen_random_uuid(),
+  workspace_id              uuid not null references workspace(id) on delete cascade,
+  task_id                   uuid not null,
+  pedido_por_membership_id  uuid not null,
+  decide_membership_id      uuid not null,
+  estado                    text not null check (estado in (
+                              'esperando_decision', 'compartida', 'no_compartida',
+                              'sin_efecto')),
+  pedido_en                 timestamptz not null,
+  decidido_en               timestamptz,
+  motivo                    text check (btrim(motivo) <> ''),
+  constraint pedido_de_detalle_workspace_id_unique unique (workspace_id, id),
+  constraint pedido_de_detalle_tarea
+    foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
+  constraint pedido_de_detalle_pedido_por
+    foreign key (workspace_id, pedido_por_membership_id) references membership(workspace_id, id),
+  constraint pedido_de_detalle_decide
+    foreign key (workspace_id, decide_membership_id) references membership(workspace_id, id),
+  constraint pedido_de_detalle_a_otra_persona check (decide_membership_id <> pedido_por_membership_id),
+  constraint pedido_de_detalle_decidido check (
+    estado = 'esperando_decision' or decidido_en is not null)
+);
+
+-- Un pedido abierto por tarea y persona.
+create unique index pedido_de_detalle_uno_abierto on pedido_de_detalle (task_id, pedido_por_membership_id)
+  where estado = 'esperando_decision';
+create index pedido_de_detalle_de_quien on pedido_de_detalle (workspace_id, decide_membership_id, estado);
+
+-- Una tarea compartida con alguien que no la veía: quién, quién la compartió y cuándo; si se dejó
+-- de compartir, cuándo y quién. Una vigente por tarea y persona.
+create table tarea_compartida (
+  id                            uuid primary key default gen_random_uuid(),
+  workspace_id                  uuid not null references workspace(id) on delete cascade,
+  task_id                       uuid not null,
+  membership_id                 uuid not null,
+  compartida_por_membership_id  uuid not null,
+  pedido_id                     uuid,
+  at                            timestamptz not null,
+  revocada_en                   timestamptz,
+  revocada_por_membership_id    uuid,
+  constraint tarea_compartida_tarea
+    foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
+  constraint tarea_compartida_con
+    foreign key (workspace_id, membership_id) references membership(workspace_id, id),
+  constraint tarea_compartida_por
+    foreign key (workspace_id, compartida_por_membership_id) references membership(workspace_id, id),
+  constraint tarea_compartida_pedido
+    foreign key (workspace_id, pedido_id) references pedido_de_detalle(workspace_id, id)
+    on delete cascade,
+  constraint tarea_compartida_revocada_por
+    foreign key (workspace_id, revocada_por_membership_id)
+    references membership(workspace_id, id),
+  constraint tarea_compartida_con_otra_persona check (membership_id <> compartida_por_membership_id),
+  constraint tarea_compartida_revocada check (
+    (revocada_en is null) = (revocada_por_membership_id is null))
+);
+
+create unique index tarea_compartida_vigente on tarea_compartida (task_id, membership_id)
+  where revocada_en is null;
+
+comment on table pedido_de_detalle is
+  'El Motor (decisión 33 del usuario): el pedido del detalle de una tarea que la persona no ve, quién lo decide (el encargado del sector de la tarea) y cómo terminó. Cambia de estado sólo hacia adelante.';
+comment on table tarea_compartida is
+  'El Motor (decisión 33 del usuario): una tarea compartida con alguien que no la veía, quién la compartió (el encargado del sector de la tarea) y cuándo. Cuenta para ver la página (puede_ver_tarea). Sólo se revoca, una vez; nunca se borra.';
+
 comment on table task_forecast is
   'El Motor (ADR 0018, 9b y 9f): las previsiones de una tarea. Sólo se agregan; una corrección reemplaza a otra con una fila nueva. El atraso lo calcula el código en días hábiles del espacio.';
 comment on table blocker_unblocker is
@@ -1817,7 +1886,11 @@ language sql stable set search_path = leda, public, pg_temp as $$
             or exists (select 1 from approval ap
                         where ap.workspace_id = t.workspace_id
                           and ap.sujeto_tipo = 'tarea' and ap.sujeto_id = t.id
-                          and ap.aprobador_membership_id = m.id)));
+                          and ap.aprobador_membership_id = m.id)
+            or exists (select 1 from tarea_compartida c
+                        where c.workspace_id = t.workspace_id
+                          and c.task_id = t.id and c.membership_id = m.id
+                          and c.revocada_en is null)));
 $$;
 
 create or replace function emitir_acceso_tarea(
@@ -2551,6 +2624,89 @@ create trigger trg_aplicar_cambio_de_responsable
   before insert on cambio_de_responsable
   for each row execute function aplicar_cambio_de_responsable();
 
+-- Un pedido del detalle lo decide el encargado del sector de la tarea, empieza esperando su
+-- decisión y sólo avanza: los datos del pedido no cambian y uno terminado no se reabre
+-- (migración 0050).
+create or replace function vigilar_pedido_de_detalle() returns trigger as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.estado <> 'esperando_decision' then
+      raise exception 'pedido_de_detalle: un pedido nuevo espera la decisión';
+    end if;
+    if new.decide_membership_id is distinct from (
+         select a.referente_membership_id from task t join area a on a.id = t.area_id
+          where t.id = new.task_id and t.workspace_id = new.workspace_id) then
+      raise exception 'pedido_de_detalle: lo decide el encargado del sector de la tarea';
+    end if;
+    return new;
+  end if;
+  if new.workspace_id is distinct from old.workspace_id
+     or new.task_id is distinct from old.task_id
+     or new.pedido_por_membership_id is distinct from old.pedido_por_membership_id
+     or new.decide_membership_id is distinct from old.decide_membership_id
+     or new.pedido_en is distinct from old.pedido_en then
+    raise exception 'pedido_de_detalle: los datos del pedido no cambian';
+  end if;
+  if old.estado <> 'esperando_decision' and new is distinct from old then
+    raise exception 'pedido_de_detalle: el pedido ya terminó';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_vigilar_pedido_de_detalle
+  before insert or update on pedido_de_detalle
+  for each row execute function vigilar_pedido_de_detalle();
+
+-- Una tarea se comparte vigente y sólo la comparte el encargado del sector de la tarea; si viene
+-- de un pedido, es lo que se pidió. Después, lo único que cambia es dejarla de compartir, una
+-- vez, por el encargado o por quien la compartió (migración 0050).
+create or replace function vigilar_tarea_compartida() returns trigger as $$
+declare encargado uuid;
+begin
+  select a.referente_membership_id into encargado
+    from task t join area a on a.id = t.area_id
+   where t.id = new.task_id and t.workspace_id = new.workspace_id;
+  if tg_op = 'INSERT' then
+    if new.revocada_en is not null then
+      raise exception 'tarea_compartida: una tarea se comparte vigente';
+    end if;
+    if encargado is null or new.compartida_por_membership_id is distinct from encargado then
+      raise exception 'tarea_compartida: la comparte el encargado del sector de la tarea';
+    end if;
+    if new.pedido_id is not null and not exists (
+         select 1 from pedido_de_detalle p
+          where p.id = new.pedido_id and p.task_id = new.task_id
+            and p.pedido_por_membership_id = new.membership_id) then
+      raise exception 'tarea_compartida: no es lo que se pidió';
+    end if;
+    return new;
+  end if;
+  if new.workspace_id is distinct from old.workspace_id
+     or new.task_id is distinct from old.task_id
+     or new.membership_id is distinct from old.membership_id
+     or new.compartida_por_membership_id is distinct from old.compartida_por_membership_id
+     or new.pedido_id is distinct from old.pedido_id
+     or new.at is distinct from old.at then
+    raise exception 'tarea_compartida: lo compartido no cambia';
+  end if;
+  if old.revocada_en is not null then
+    if new is distinct from old then
+      raise exception 'tarea_compartida: ya se dejó de compartir';
+    end if;
+    return new;
+  end if;
+  if new.revocada_en is not null
+     and new.revocada_por_membership_id is distinct from encargado
+     and new.revocada_por_membership_id is distinct from old.compartida_por_membership_id then
+    raise exception 'tarea_compartida: la deja de compartir el encargado del sector de la tarea';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_vigilar_tarea_compartida
+  before insert or update on tarea_compartida
+  for each row execute function vigilar_tarea_compartida();
+
 -- Los archivos recibidos (migración 0033): quién lo mandó y el mensaje que lo trajo
 -- son del mismo espacio.
 create trigger trg_exigir_referencias_del_espacio
@@ -3185,7 +3341,8 @@ begin
     'scheduled_notice','conversation_state','task_forecast','blocker_unblocker',
     'archivo','archivo_de_mensaje','evidencia_retirada','archivo_de_tarea',
     'message_outbox_adjunto','acceso_tarea','vista_de_tarea','message_outbox_enlace',
-    'dicho_de_quien_destraba','pase_de_tarea','cambio_de_responsable']
+    'dicho_de_quien_destraba','pase_de_tarea','cambio_de_responsable',
+    'pedido_de_detalle','tarea_compartida']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -3234,6 +3391,9 @@ revoke update, delete on dicho_de_quien_destraba from leda_app;
 -- sólo se agrega.
 revoke delete on pase_de_tarea from leda_app;
 revoke update, delete on cambio_de_responsable from leda_app;
+-- El detalle de una tarea (migración 0050): un pedido avanza y lo compartido se revoca; nada
+-- se borra.
+revoke delete on pedido_de_detalle, tarea_compartida from leda_app;
 -- La página de la tarea (migración 0036): `leda_app` no tiene nada sobre los accesos ni las
 -- vistas, sólo `execute` sobre sus funciones; la marca del enlace en la salida, agregar y leer.
 revoke all on acceso_tarea, vista_de_tarea from public, leda_app;

@@ -32,6 +32,9 @@ from tests.garantias.test_pagina_de_la_tarea import (_emitir, _leer, _persona,  
 
 AHORA = datetime(2026, 10, 22, 18, 0, tzinfo=timezone.utc)
 NUEVAS = ("pedido_de_detalle", "tarea_compartida")
+# Una referencia a otro espacio no se escribe: la frena la clave del mismo espacio o, antes,
+# la regla de quién comparte, que busca la tarea en el espacio de la fila.
+NO_SE_ESCRIBE = (psycopg.errors.ForeignKeyViolation, psycopg.errors.RaiseException)
 
 
 @pytest.fixture
@@ -147,7 +150,7 @@ def test_no_se_comparte_con_alguien_de_otro_espacio(conn, con_encargado):
     Studio, o al revés, no se escriben."""
     norte, oeste = con_encargado["north-lab"], con_encargado["west-studio"]
     with admin(conn) as cur:
-        with pytest.raises(psycopg.errors.ForeignKeyViolation), conn.transaction():
+        with pytest.raises(NO_SE_ESCRIBE), conn.transaction():
             cur.execute(
                 """insert into tarea_compartida (workspace_id, task_id, membership_id,
                                                  compartida_por_membership_id, at)
@@ -155,7 +158,7 @@ def test_no_se_comparte_con_alguien_de_otro_espacio(conn, con_encargado):
                 (norte["id"], con_encargado["norte"]["id"],
                  _persona(con_encargado, "Sam North", "west-studio"),
                  _persona(con_encargado, "Taylor Quinn"), AHORA))
-        with pytest.raises(psycopg.errors.ForeignKeyViolation), conn.transaction():
+        with pytest.raises(NO_SE_ESCRIBE), conn.transaction():
             cur.execute(
                 """insert into tarea_compartida (workspace_id, task_id, membership_id,
                                                  compartida_por_membership_id, at)
@@ -262,3 +265,21 @@ def test_lo_compartido_solo_cambia_para_revocarse_una_vez(conn, con_encargado):
                                   revocada_por_membership_id = null where id = %s""",
                         (compartida,))
     conn.commit()
+
+
+def test_el_rollback_de_la_0050_se_niega_con_algo_compartido(conn, con_encargado):
+    """Deshacerla borraría quién compartió qué con quién, que es auditoría (constitución §12).
+    Se ejercita la guarda tal como está escrita en el archivo."""
+    import re
+    from pathlib import Path
+
+    script = (Path(__file__).resolve().parents[2] / "db" / "rollbacks"
+              / "0050_el_detalle_de_una_tarea.sql").read_text("utf-8")
+    guarda = re.search(r"do \$\$.*?end \$\$;", script, re.S).group(0)
+    _compartir(conn, con_encargado)
+    with admin(conn) as cur:
+        with pytest.raises(psycopg.errors.RaiseException, match="0050 se niega"), \
+                conn.transaction():
+            cur.execute("set local search_path = leda, public")
+            cur.execute(guarda)
+    conn.rollback()
