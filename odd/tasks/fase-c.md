@@ -1235,6 +1235,79 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       - La `0053` con un dueño del esquema sin `bypassrls`: el borrado de lo retirado antes y la
         guarda de su vuelta atrás no verían filas. Hoy no aplica (superusuario).
       - `leda_motor` al día hasta la `0054` antes de la prueba por Telegram (respaldo previo).
+  - [x] **Las advertencias de casos de borde de la corrección chica y la decisión 33, el caso
+    raro** (2026-10-10; sin migración). Route: delegada (escritor único, 2+ archivos no
+    triviales). Los números de línea son los de `54b2e83`.
+    - **`herramientas.py:3108-3130`, la forma del respaldo:** cuando los dos intentos chocan con
+      un pedido de la misma persona que termina en el medio, el respaldo devolvía `ya_lo_pidio`
+      sin `pedido_id`, distinto de todo otro `ya_lo_pidio`. Ahora lleva el último pedido que se
+      cruzó (de su fin se entera la persona por ese pedido, decisión 39) y quién lo decide.
+      Prueba nueva con un cursor que se cruza y termina en cada intento. Matiz: el significado
+      de `ya_lo_pidio` dice "todavía no le contestaron"; en este caso, casi imposible (dos
+      cruces seguidos de milisegundos), ya le contestaron.
+    - **`detalle.py:422-426`, un área nula: no es un defecto.** `task.area_id` es `not null` en
+      la base; una prueba lo fija.
+    - **`pase.py:295-301`, cómo se deduce "otro sector": no es un defecto.** `otro_sector` sin
+      `lo_decide` ocurre sólo si el sector de quien pide (por su membresía, como
+      `autoridad.regla_del_pase`) no tiene encargado, y el aviso nombra ese sector (decisiones
+      27 y 53). Dos pruebas lo fijan: quien se mudó de sector con su tarea, y el sector de quien
+      recibe sin encargado cuando el de quien pide sí lo tiene (no avisa).
+    - **`despachador.py:1261-1266`, el descarte del álbum vacío:** corría sin su punto de
+      retorno; un error de la base en su incidente abortaba la pasada (y lo que ya había salido
+      en ella volvía a la cola). Ahora el descarte y su incidente van cada uno en el suyo
+      (`_descartar_el_album_vacio`); si el descarte no se escribe, la fila queda para la pasada
+      siguiente sin contar un intento.
+    - **`despachador.py:1471-1480`, el enlace del administrador si la pasada vuelve atrás:** el
+      acceso se emite en la transacción de la pasada; si la pasada vuelve atrás, no queda
+      ningún acceso vigente (prueba que lo fija: el enlace que salió no abre, la respuesta vuelve
+      a la cola y la pasada siguiente emite uno nuevo, el único vigente). El defecto real era el
+      otro lado: un error de la base al descartar o anotar otra fila de la misma pasada la
+      volvía atrás entera y dejaba muerto un enlace que el administrador ya tenía. Ahora el
+      descarte de una respuesta sin enlace y la anotación de un intento fallido van en su propio
+      punto de retorno.
+    - **Sugerencias:** `test_pedir_el_detalle.py:597` (la aserción débil) ahora compara el
+      resultado entero con el pedido que quedó esperando; `despachador.py:1347` (el reloj de la
+      respuesta inmediata): con `solo`, la pasada no filtra por `programado_para` (la base puede
+      ir adelantada); `1387-1393` (los reintentos de una respuesta): prueba nueva hasta agotar
+      los intentos, y el incidente final dice que era una respuesta del bot de administración;
+      `administracion.py:80`: **no es un defecto**, la clave ya lleva el chat y el mensaje (prueba
+      nueva: dos mensajes con el mismo texto, dos respuestas; el mismo mensaje entregado otra
+      vez, una); `despachador.py:1035` lo cubre la prueba del álbum vacío (`descartados`, no
+      `fallidos`). El rollback de la `0054` (24-28) no se tocó (no se editan migraciones).
+    - **La decisión 33, el caso raro** (`detalle.seguir_los_pedidos`): un pedido que ya le llegó
+      al encargado y cuyo sector se queda sin encargado mientras espera ya no espera para
+      siempre: termina (la cocina, `terminar_pedido_de_detalle(sin_encargado=True)`: estado
+      `sin_efecto`, con el motivo, auditado `pedido_de_detalle_sin_encargado`, y sólo si de
+      verdad sigue sin encargado) y a quien lo pidió le llega una vez, como información de
+      coordinación a la hora en que Leda escribe y redactado por la IA, lo mismo que al pedirlo
+      sin encargado (`sin_encargado_del_sector`, `el_detalle_lo_ve`), sin nombrar a quién se le
+      había preguntado (decisión 35). Las preguntas al encargado anterior, con sus botones,
+      dejan de esperar; el aviso al administrador sigue (ahora dice que el pedido terminó). Con
+      otro encargado, el pedido lo sigue a él y no termina.
+    - **Test primero:**
+      - Lo del detalle y el pase: las cinco pruebas nuevas, **1 failed, 6 passed** (la forma del
+        respaldo; las otras fijan lo que ya andaba); verde, `test_pedir_el_detalle.py` y
+        `test_delegar.py`, **75 passed**.
+      - El despachador: `test_contenido_retirado.py -k album`, **1 failed, 2 passed**
+        (`DivisionByZero` fuera de la pasada); `test_respuesta_del_bot_de_administracion.py`,
+        **3 failed, 11 passed** (el enlace muerto, el reloj y el texto del incidente final);
+        verde, con `test_avisos_admin.py` y `test_bot_de_administracion.py`, **63 passed**.
+      - La decisión 33: **2 failed, 4 passed** (el pedido seguía esperando); verde,
+        `test_pedir_el_detalle.py`, **39 passed**.
+    - **Commits:** `6578ddf` (el detalle y el pase), `7efa04f` (el despachador), `815754e` (la
+      decisión 33) y el que registra esto.
+    - **Chequeos** (2026-10-10, sobre `815754e`):
+      - `pytest tests/motor tests/garantias tests/conversaciones tests/test_administrador_plataforma.py tests/test_cli_enlaces_de_tarea.py tests/test_avisos_admin.py`: **1833 passed** (24 min).
+      - En seco, `correr --ia guionada --veces 1 --sin-informe`: **45 de 45 bien** (garantías 45 de 45).
+      Sin la IA real: el aviso nuevo es un tipo que ya existía con dos hechos que ya tenían
+      significado; queda para la tanda de pruebas.
+    - `PENDIENTE`:
+      - El encargado anterior al que ya se le había preguntado no recibe "ya no hace falta que
+        contestes" (sus botones se cierran y, si toca uno, se le dice que no hay un pedido):
+        se siguió el pedido, que nombra sólo a quien lo pidió.
+      - Un sector que queda sin encargado un rato (mientras la administración cambia de
+        encargado) termina los pedidos que esperan en la vuelta de la escalera que lo vea.
+      - La IA real sobre el aviso nuevo.
 - [ ] **C-3d.** Lo que decidió el usuario el 2026-10-08 (preguntas 10 a 20), en este orden. Route de
   cada una: delegada (escritor único, 2+ archivos no triviales), una por vez, revisión RDD por commit.
   - [x] **D1.** El comparador del corredor: la garantía es "lo escrito es lo confirmado"; mostrar lo
@@ -3486,15 +3559,17 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       `review-b2c2b37dcf93061b`, `review-885686e2c29bd3e9` (cuatro lentes),
       `review-ab08910e12a3bc9b`. Lo de `persecucion.py:703` se cierra sin cambios: la advertencia
       original ya no existe y la lectura del código no muestra un defecto (coordinador).
-- [ ] Advertencias de esas revisiones, casos de borde para una corrección posterior (sin otra
-      ronda ahora): `herramientas.py:3108-3130` (la forma del respaldo, sin prueba); `detalle.py:422-426`
+- [x] Advertencias de esas revisiones, casos de borde para una corrección posterior (hechas el
+      2026-10-10, `6578ddf` y `7efa04f`; detalle en "Las advertencias de casos de borde de la
+      corrección chica"; el rollback de la `0054` sin tocar): `herramientas.py:3108-3130` (la forma del respaldo, sin prueba); `detalle.py:422-426`
       (un área nula); `pase.py:295-301` (cómo se deduce "otro sector"); `despachador.py:1261-1266`
       (el descarte sin aislar en su propio punto de guardado); `despachador.py:1471-1480` (un
       enlace emitido que queda si el pase vuelve atrás). Sugerencias: `test_pedir_el_detalle.py:597`,
       `despachador.py:1035`, `1347` y `1387-1393`, `administracion.py:80` (la clave sin el id del
       mensaje), el rollback de la `0054` (24-28).
-- [ ] Un pedido del detalle cuyo sector se queda sin encargado mientras espera: a quien lo pidió
+- [x] Un pedido del detalle cuyo sector se queda sin encargado mientras espera: a quien lo pidió
       se le dice lo mismo que si no hubiera tenido encargado desde el principio (decisión 33).
+      Hecho el 2026-10-10 (`815754e`); falta la IA real sobre el aviso.
 - [ ] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
       conversación de prueba y construcción.
 - [ ] Los avisos que a veces no salen a su hora: buscar la causa.
