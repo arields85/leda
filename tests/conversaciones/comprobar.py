@@ -27,6 +27,10 @@ Una vez para todas las conversaciones: ninguna regla sabe de qué conversación 
 - `formato`: un mensaje de Leda que no tiene la forma que pidió el usuario (segunda vuelta del
   formato, 2026-10-07; `fallas_de_formato`). Es aparte de las otras tres: dice cómo se lee un
   mensaje, no qué hizo el código ni si la IA entendió.
+- `servicio`: el servicio de la IA falló al redactar un aviso (un 429, un 503, un plazo agotado)
+  y Leda lo reintentó, como dice la decisión 8 (caso 2). Se informa aparte y no es de Leda, como
+  las demás fallas del servicio; un aviso que no salió tras sus cinco intentos sí es una falla
+  del motor (su incidente y lo que no salió).
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ from .motores import Motor
 from .motores import cargar as cargar_motor
 
 GARANTIA, COMPRENSION, MOTOR, FORMATO = "garantia", "comprension", "motor", "formato"
+SERVICIO = "servicio"
 
 # Los datos de una jugada que son palabras de la persona: se compara sólo si están. Con
 # `puede_traer`, pueden venir, pero sólo con las palabras de la persona (revisión del contrato,
@@ -53,17 +58,18 @@ DATOS_LIBRES = frozenset({"motivo", "causa", "palabras", "quien", "a", "que_pide
                           "comentario", "de", "como_la_nombra", "lo_que_dice", "por_que"})
 FUERA_DE_LA_LISTA = "fuera_de_la_lista"
 ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
-# Un aviso cuya redacción falló y se reintenta (usuario, 2026-10-07): en la corrida es un aviso
-# que no salió a su hora. El informe se publica: de la falla dice sólo su clase y su código
-# HTTP, nunca su texto (`falla_sin_texto`).
-AVISO_SIN_REDACTAR = "el aviso no salió a su hora: la IA no lo redactó"
+# Un aviso cuya redacción falló y se reintenta (usuario, 2026-10-07): una falla del servicio de
+# la IA, que el corredor reintenta en el mismo paso (`corredor._hasta_los_reintentos`). El
+# informe se publica: de la falla dice sólo su clase y su código HTTP, nunca su texto
+# (`falla_sin_texto`).
+AVISO_SIN_REDACTAR = "el servicio de la IA no redactó un aviso al primer intento: se reintentó"
 _CLASE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
 _HTTP = re.compile(r"\bHTTP (\d{3})\b|'(\d{3}) [A-Z]")
 
 
 @dataclass
 class Falla:
-    clase: str              # garantia | comprension | motor | formato
+    clase: str              # garantia | comprension | motor | formato | servicio
     que: str                # qué se comprobó
     esperado: Any
     real: Any
@@ -320,13 +326,14 @@ def comprobar_incidentes(c: Comprobacion, incidentes: list[dict[str, Any]],
                          esperados: list[str] | None = None) -> None:
     """Los incidentes nuevos de un paso, salvo los de un pedido fuera de la lista (que se
     comparan con los avisos al administrador esperados). Un intento de redactar un aviso que
-    falló se dice como lo que es, con su falla sin texto. Los que el paso espera (`incidentes`,
+    falló se dice como lo que es, una falla del servicio, con su falla sin texto. Los que el
+    paso espera (`incidentes`,
     por su etapa: lo que tiene que llegarle al administrador por su canal, como que alguien no
     tiene Leda conectada, C-5b) no son una falla, y uno esperado que falta es del motor;
     cualquier otro, como incidente."""
     for i in incidentes:
         if i["etapa"] == ETAPA_AVISO_REINTENTO:
-            c.falla(MOTOR, AVISO_SIN_REDACTAR, None, i["falla"])
+            c.falla(SERVICIO, AVISO_SIN_REDACTAR, None, i["falla"])
     otros = [i for i in incidentes
              if i["etapa"] not in (ETAPA_FUERA_DE_LA_LISTA, ETAPA_AVISO_REINTENTO)]
     faltan = list(esperados or [])

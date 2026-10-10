@@ -321,9 +321,22 @@ def test_de_la_falla_de_un_aviso_el_informe_sabe_la_clase_y_el_codigo_nunca_el_t
         {"etapa": "motor_aviso_reintento", "severidad": "baja", "falla": {"falla": "X"}},
         {"etapa": cp.ETAPA_FUERA_DE_LA_LISTA, "severidad": "baja"},
         {"etapa": "motor_ciclo", "severidad": "alta"}])
+    # Un intento que se reintenta es una falla del servicio de la IA (429, 503, un plazo
+    # agotado), que Leda reintentó como dice la decisión 8: se informa aparte y no es de Leda.
     assert [(f.clase, f.que, f.real) for f in c.fallas] == [
-        (cp.MOTOR, cp.AVISO_SIN_REDACTAR, {"falla": "X"}),
+        (cp.SERVICIO, cp.AVISO_SIN_REDACTAR, {"falla": "X"}),
         (cp.MOTOR, "incidente", [{"etapa": "motor_ciclo", "severidad": "alta"}])]
+
+
+def test_un_aviso_que_no_salio_tras_sus_intentos_sigue_siendo_una_falla_del_motor():
+    """El quinto fallo deja el aviso `fallido`, con su incidente: eso sí se cuenta, como hoy;
+    los cuatro intentos antes, como fallas del servicio."""
+    c = cp.Comprobacion()
+    cp.comprobar_incidentes(c, [
+        *[{"etapa": "motor_aviso_reintento", "severidad": "baja", "falla": {"falla": "X"}}] * 4,
+        {"etapa": "motor_aviso_guardado", "severidad": "media"}])
+    assert [f.clase for f in c.fallas] == [cp.SERVICIO] * 4 + [cp.MOTOR]
+    assert c.fallas[-1].que == "incidente"
 
 
 def test_un_incidente_esperado_no_es_una_falla_y_uno_que_falta_si():

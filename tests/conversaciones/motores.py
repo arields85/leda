@@ -33,6 +33,9 @@ class Motor:
     IAReal: type
     Tono: type
     Jugada: type
+    # Las esperas entre los intentos de redactar un aviso que la IA no redactó (decisión 8, caso
+    # 2): el corredor adelanta su reloj a cada reintento dentro del mismo paso.
+    esperas_tras_un_fallo: tuple = ()
 
 
 _CARGADOS: dict[str, Motor] = {}
@@ -59,5 +62,6 @@ def cargar(nombre: str = POR_OMISION) -> Motor:
             IAReal=de("ia_real").IAReal,
             Tono=de("instrucciones").Tono,
             Jugada=de("ia").Jugada,
+            esperas_tras_un_fallo=tuple(de("avisos").ESPERAS_TRAS_UN_FALLO),
         )
     return _CARGADOS[nombre]

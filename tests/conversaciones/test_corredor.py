@@ -255,36 +255,72 @@ class _ProveedorCaido(Exception):
     """Una falla del proveedor de la IA, con un texto que no puede llegar al informe."""
 
 
-def test_un_aviso_que_la_ia_no_redacto_a_su_hora_se_informa_sin_el_texto_de_la_falla(conn):
-    """Usuario, 2026-10-07: en las rondas con la IA real, a veces un aviso no salía a su hora y
-    no quedaba rastro de por qué. El intento fallido deja su incidente, y el informe lo dice
-    con la clase de la falla y su código HTTP, nunca con su texto: los informes se publican."""
-    [conv] = elegir(["01"])
-    ia = _perfecta(conv)
+def _que_falla_al_redactar(ia, veces: int) -> list:
+    """La IA guionada, con las primeras `veces` redacciones caídas como se cae el proveedor."""
     redactar = ia.ia.redactar
-    pendientes = [_ProveedorCaido("ChatGPT respondió HTTP 503 (texto crudo del proveedor).")]
+    pendientes = [_ProveedorCaido("ChatGPT respondió HTTP 503 (texto crudo del proveedor).")
+                  for _ in range(veces)]
 
-    def una_vez_no(pedido):
+    def no_redacta(pedido):
         if pendientes:
             raise pendientes.pop()
         return redactar(pedido)
 
-    ia.ia.redactar = una_vez_no
+    ia.ia.redactar = no_redacta
+    return pendientes
+
+
+def test_un_aviso_que_la_ia_no_redacto_sale_en_su_paso_tras_el_reintento(conn):
+    """Usuario, 2026-10-07, y la causa de los avisos que a veces no salían a su hora (1 o 2 de
+    cada 95 corridas): una falla del servicio de la IA (429, 503, un plazo agotado) deja el aviso
+    guardado para reintentarlo al minuto (decisión 8, caso 2). El ciclo del escuchador corre cada
+    minuto y lo manda; el corredor sólo corría en los relojes del paso, así que el reintento no
+    salía o caía en otro paso. Ahora el corredor adelanta su reloj al reintento y el aviso sale
+    en el mismo paso. El intento fallido se informa como una falla del servicio, con la clase de
+    la falla y su código HTTP, nunca con su texto (los informes se publican), y no es de Leda."""
+    [conv] = elegir(["01"])
+    ia = _perfecta(conv)
+    pendientes = _que_falla_al_redactar(ia, 1)
 
     corrida = correr_conversacion(conn, conv, ia)
 
     assert corrida.error is None and not pendientes
-    primero = corrida.pasos[0].paso
-    del_paso = [f for p, f in corrida.fallas() if p == primero]
-    [rastro] = [f for f in del_paso if f.que == cp.AVISO_SIN_REDACTAR]
-    assert rastro.que == "el aviso no salió a su hora: la IA no lo redactó"
-    assert (rastro.clase, rastro.real) == (cp.MOTOR, {"falla": "_ProveedorCaido", "http": 503})
-    assert any(f.que == "no salió lo esperado" for f in del_paso)
-    assert not any(f.que == "incidente" for f in del_paso)     # no se cuenta dos veces
+    primero = corrida.pasos[0]
+    [aviso] = primero.salidas
+    assert (aviso.a, aviso.tipo, aviso.tareas) == ("Marcos", "aviso_previo", ["PLC"])
+    [rastro] = primero.fallas
+    assert rastro.que == cp.AVISO_SIN_REDACTAR
+    assert (rastro.clase, rastro.real) == (cp.SERVICIO,
+                                           {"falla": "_ProveedorCaido", "http": 503})
+    # Lo de Leda está bien: la falla del servicio no se cuenta como suya.
+    assert [f for _, f in corrida.fallas() if f.clase != cp.SERVICIO] == []
+    assert corrida.bien and corrida.garantias and corrida.comprension and corrida.motor
     texto = (informe.resumen([corrida], ronda="r", cabecera={}, transcripciones="t.md")
              + informe.transcripciones([corrida], ronda="r"))
-    assert "la IA no lo redactó" in texto and "_ProveedorCaido" in texto and "503" in texto
+    assert "G ok · C ok · M ok · F ok" in texto
+    assert "[servicio]" in texto and "[motor]" not in texto
+    assert "_ProveedorCaido" in texto and "503" in texto
     assert "texto crudo" not in texto and "ChatGPT respondió" not in texto
+
+
+def test_un_aviso_que_no_salio_tras_los_cinco_intentos_sigue_siendo_una_falla(conn):
+    """Si el servicio falla los cinco intentos, el aviso queda `fallido` y no sale: eso sí es
+    una falla, como hoy. Los cuatro reintentos corren dentro del mismo paso."""
+    [conv] = elegir(["01"])
+    ia = _perfecta(conv)
+    pendientes = _que_falla_al_redactar(ia, 5)
+
+    corrida = correr_conversacion(conn, conv, ia)
+
+    assert corrida.error is None and not pendientes
+    primero = corrida.pasos[0]
+    assert primero.salidas == []
+    del_paso = [(f.clase, f.que) for f in primero.fallas]
+    assert del_paso.count((cp.SERVICIO, cp.AVISO_SIN_REDACTAR)) == 4
+    assert (cp.MOTOR, "no salió lo esperado") in del_paso
+    # El quinto fallo, en el mismo paso: el aviso `fallido` con su incidente.
+    assert (cp.MOTOR, "incidente") in del_paso
+    assert not corrida.motor and not corrida.bien
 
 
 def test_un_texto_con_formato_se_enlaza_con_su_fila_y_el_informe_lo_muestra_entero(conn):

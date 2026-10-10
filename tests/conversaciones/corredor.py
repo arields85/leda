@@ -18,7 +18,9 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
      aviso de una de varias entregas);
    - **Leda por su cuenta o nadie escribe** (`relojes`): en cada momento, una vuelta del ciclo
      (`ciclo.Ciclo`): la escalera, los cierres que esperaban, los avisos guardados, el despacho
-     y los avisos a la administración;
+     y los avisos a la administración. Si la IA no redactó un aviso (una falla del servicio,
+     decisión 8, caso 2), el reloj se adelanta a cada reintento y el ciclo vuelve a correr en
+     el mismo paso, como el del escuchador, que corre cada minuto (`_hasta_los_reintentos`);
    - **lo que pasa aparte** (`aparte: true`): un paso que la conversación da por pasado en el
      medio sin mirarlo (la entrega y la aprobación de otra tarea), corrido por el motor como el
      preludio, con las jugadas del YAML, y sin comprobar;
@@ -45,7 +47,7 @@ import time
 import traceback
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
@@ -232,7 +234,8 @@ class Corrida:
 
     @property
     def bien(self) -> bool:
-        return self.error is None and not self.fallas()
+        # Una falla del servicio de la IA no es de Leda: se informa, pero no se le cuenta.
+        return self.error is None and all(f.clase == cp.SERVICIO for _, f in self.fallas())
 
     def latencias(self) -> list[int]:
         return [p.latencia_ms for p in self.pasos if p.latencia_ms is not None and
@@ -300,6 +303,7 @@ class _Corredor:
             for cuando in paso.get("relojes") or []:
                 self.reloj.momento = momento(cuando)
                 self.ciclo.vuelta()
+                self._hasta_los_reintentos()
                 r.salidas += self._salidas(entregados, cp.foto(self.conn, self.mundo))
                 entregados = len(self.transporte.enviados)
             r.cuando = ", ".join(paso.get("relojes") or [paso.get("a_las", "")])
@@ -320,6 +324,32 @@ class _Corredor:
                                          sorted(self.sin_significado)))
                 self.sin_significado.clear()
         return r
+
+    def _hasta_los_reintentos(self) -> None:
+        """Los avisos que la IA no redactó, reintentados en el mismo paso. Un aviso que no se
+        redactó queda guardado con su próximo intento a 1, 2, 4 u 8 minutos (decisión 8, caso
+        2); el ciclo del escuchador corre cada minuto y lo manda, pero el corredor sólo corre en
+        los relojes del paso, y sin esto el reintento no salía o caía en otro paso (la causa de
+        los avisos que a veces no salían a su hora). Mientras haya uno pendiente dentro de las
+        esperas, el reloj avanza al más cercano y el ciclo vuelve a correr, a lo sumo una vez
+        por espera. El reloj no vuelve atrás: el paso siguiente pone el suyo.
+
+        Sólo después de un reloj: el despacho de un mensaje o de un toque no manda avisos
+        guardados (`seguimiento=False`), así que ahí no queda ningún reintento."""
+        esperas = self.motor.esperas_tras_un_fallo
+        hasta = sum(esperas, timedelta())
+        for _ in esperas:
+            ahora = self.reloj.ahora()
+            with espacio(self.conn, self.mundo.workspace_id) as cur:
+                cur.execute("""select min(proximo_intento_en) proximo from scheduled_notice
+                                where estado = 'guardado' and proximo_intento_en > %s
+                                  and proximo_intento_en <= %s""", (ahora, ahora + hasta))
+                proximo = cur.fetchone()["proximo"]
+            self.conn.commit()
+            if proximo is None:
+                return
+            self.reloj.momento = proximo
+            self.ciclo.vuelta()
 
     def _turno(self, paso, ia):
         quien_corto = paso.get("quien", self.persona)
