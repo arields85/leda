@@ -829,8 +829,11 @@ SIGNIFICADOS: Mapping[str, str] = {
     "como_termino_el_pedido_del_detalle": "Aviso de cómo terminó el pedido del detalle de una "
                                           "tarea: si el encargado del sector (lo_decidio) se lo "
                                           "compartió (la_compartio) y, si dijo por qué, sus "
-                                          "palabras (por_que). Es información: no pide "
-                                          "respuesta.",
+                                          "palabras (por_que); o que terminó porque el sector "
+                                          "de la tarea se quedó sin encargado mientras "
+                                          "esperaba (sin_encargado_del_sector, el_detalle_lo_ve), "
+                                          "lo mismo que si no lo hubiera tenido al pedirlo. Es "
+                                          "información: no pide respuesta.",
     "no_hay_un_pedido_del_detalle": "Ninguna tarea espera que la persona decida si comparte su "
                                     "detalle.",
     "el_pedido_ya_no_espera": "El pedido del detalle ya no espera esa decisión: ya se decidió.",

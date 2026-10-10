@@ -43,6 +43,11 @@ decisiones del usuario, sin preguntar):
   sigue sin contestar, el pedido termina sin respuesta (la cocina, `terminar_pedido_de_detalle`)
   y se enteran quien lo pidió (que puede volver a pedirlo) y el encargado, que ya no hace falta
   que conteste (decisión 39).
+- **Si el sector se queda sin encargado mientras el pedido espera** (decisión 33, el caso raro;
+  `seguir_los_pedidos`): nadie lo puede decidir, así que el pedido termina (la cocina,
+  `terminar_pedido_de_detalle(sin_encargado=True)`) y a quien lo pidió se le dice lo mismo que si
+  no hubiera tenido encargado al pedirlo, una vez, sin nombrar a quién se le había preguntado
+  (decisión 35); el administrador se entera por su canal.
 - **Un encargado sin Leda conectada** (el mecanismo de la decisión 37): no se ofrece ni se pide,
   los hechos dicen la verdad (a quién no se le puede escribir) y el administrador recibe el
   aviso, de verdad, para que lo conecte (`persecucion.avisar_para_que_lo_conecte`).
@@ -416,15 +421,22 @@ def seguir_los_pedidos(m) -> list[str]:
         encargado = encargado_de_la_tarea(cur, pedido["task_id"])
         pregunta = _el_aviso(cur, PEDIDO_DEL_DETALLE, pedido)
         otra_vez = _el_aviso(cur, RECORDATORIO_DEL_PEDIDO_DEL_DETALLE, pedido)
-        # Sin encargado, nadie lo puede decidir: espera (como con el encargado ausente), y no
-        # callado: el administrador se entera, una vez por día mientras siga así (la corrección
-        # chica; antes esperaba sin que nadie lo supiera).
+        # Sin encargado, nadie lo puede decidir (decisión 33, el caso raro): el pedido termina,
+        # a quien lo pidió se le dice lo mismo que si el sector no hubiera tenido encargado al
+        # pedirlo, y el administrador se entera por su canal (la corrección chica). El área no
+        # es nula: toda tarea tiene la suya (la base lo exige).
         if encargado is None:
-            avisar_que_el_sector_no_tiene_encargado(
-                cur, m.workspace_id, str(pedido["area_id"]),
-                f"el pedido de {pedido['pidio']} para ver el detalle de la tarea "
-                f"«{pedido['titulo']}» espera sin nadie que lo decida", m.hoy)
-        pausado = encargado is None or ausente(cur, encargado, m.hoy)
+            if terminar_pedido_de_detalle(cur, pedido["id"], m.ahora,
+                                          sin_encargado=True) is not None:
+                _sin_encargado(m, pedido)
+                avisar_que_el_sector_no_tiene_encargado(
+                    cur, m.workspace_id, str(pedido["area_id"]),
+                    f"el pedido de {pedido['pidio']} para ver el detalle de la tarea "
+                    f"«{pedido['titulo']}» se quedó sin nadie que lo decida y terminó (a "
+                    f"{pedido['pidio']} se le dijo que el sector no tiene encargado)", m.hoy)
+                guardados.append(COMO_TERMINO_EL_PEDIDO_DEL_DETALLE)
+            continue
+        pausado = ausente(cur, encargado, m.hoy)
         if vencio(m, otra_vez, pausado=pausado) and terminar_pedido_de_detalle(
                 cur, pedido["id"], m.ahora) is not None:
             _sin_respuesta(m, pedido, otra_vez)
@@ -479,6 +491,26 @@ def _sin_respuesta(m, pedido: dict, otra_vez: dict) -> None:
                 hechos={**base, **propio}, programado_para=sale(m.cal, m.ahora),
                 clave=f"motor:{COMO_TERMINO_EL_PEDIDO_DEL_DETALLE}:{pedido['task_id']}"
                       f":d{pedido['id']}{clave}", ahora=m.ahora)
+
+
+def _sin_encargado(m, pedido: dict) -> None:
+    """El fin de un pedido cuyo sector se quedó sin encargado mientras esperaba (decisión 33):
+    a quien lo pidió, lo mismo que si no hubiera tenido encargado al pedirlo (qué sector ve el
+    detalle y que no hay a quién pedírselo, `ofrecer`), sin nombrar a quién se le había
+    preguntado (decisión 35). Una vez (la clave del fin del pedido), información de
+    coordinación, a la hora en que Leda escribe. Las preguntas del pedido, con sus botones,
+    dejan de esperar."""
+    _cerrar_las_preguntas(m.cur, pedido, m.ahora)
+    m.cur.execute("select nombre from area where id = %s", (str(pedido["area_id"]),))
+    area = m.cur.fetchone()
+    hechos = {"aviso": COMO_TERMINO_EL_PEDIDO_DEL_DETALLE, "tarea": pedido["titulo"],
+              "necesita_respuesta": False, "la_compartio": False, SIN_ENCARGADO: True,
+              **({"el_detalle_lo_ve": area["nombre"]} if area else {})}
+    guardar(m.cur, m.workspace_id, COMO_TERMINO_EL_PEDIDO_DEL_DETALLE,
+            task_id=pedido["task_id"], destinatario=pedido["pedido_por_membership_id"],
+            hechos=hechos, programado_para=sale(m.cal, m.ahora),
+            clave=f"motor:{COMO_TERMINO_EL_PEDIDO_DEL_DETALLE}:{pedido['task_id']}"
+                  f":d{pedido['id']}:termino", ahora=m.ahora)
 
 
 def opciones(m, aviso) -> tuple[str, dict[str, Any], list[tuple[str, dict[str, Any]]]]:

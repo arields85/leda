@@ -3209,20 +3209,35 @@ def _decidir_detalle_de_tarea(cur, quien: Solicitante, pedido_id, comparte, moti
     return {"pedido_id": str(fila["id"]), "estado": "compartida", "compartida_id": compartida}
 
 
-def terminar_pedido_de_detalle(cur, pedido_id, momento: datetime) -> dict | None:
-    """El sistema da por terminado, sin respuesta, un pedido del detalle que el encargado no
-    contestó después de que se le repitió la pregunta una vez (lo llama el motor,
-    `motor.detalle.seguir_los_pedidos`; decisión 26 del usuario, la misma regla que los pases).
+def terminar_pedido_de_detalle(cur, pedido_id, momento: datetime, *,
+                               sin_encargado: bool = False) -> dict | None:
+    """El sistema da por terminado un pedido del detalle que ya no va a tener respuesta (lo
+    llama el motor, `motor.detalle.seguir_los_pedidos`):
+
+    - el encargado no contestó después de que se le repitió la pregunta una vez (decisión 26
+      del usuario, la misma regla que los pases): termina sin respuesta (`sin_respuesta`);
+    - `sin_encargado`: el sector de la tarea se quedó sin encargado mientras esperaba, y nadie
+      lo puede decidir (decisión 33, el caso raro): termina sin efecto (`sin_efecto`), con el
+      motivo. Sólo si de verdad sigue sin encargado: si ya tiene uno, el pedido lo sigue a él.
+
     No es el acto de una persona: queda en la auditoría como acto del sistema, con la versión de
-    las reglas. No comparte nada. `None` si el pedido ya no espera la decisión."""
+    las reglas. No comparte nada. `None` si el pedido ya no espera la decisión (o, con
+    `sin_encargado`, si el sector tiene encargado)."""
     cur.execute("select * from pedido_de_detalle where id = %s for update", (str(pedido_id),))
     pedido = cur.fetchone()
     if pedido is None or pedido["estado"] != "esperando_decision":
         return None
-    cur.execute("""update pedido_de_detalle set estado = 'sin_respuesta', decidido_en = %s
-                    where id = %s""", (momento, pedido["id"]))
+    if sin_encargado:
+        if encargado_de_la_tarea(cur, pedido["task_id"]) is not None:
+            return None
+        estado, accion, motivo = ("sin_efecto", "pedido_de_detalle_sin_encargado",
+                                  "el sector de la tarea se quedó sin encargado")
+    else:
+        estado, accion, motivo = "sin_respuesta", "pedido_de_detalle_sin_respuesta", None
+    cur.execute("""update pedido_de_detalle set estado = %s, decidido_en = %s, motivo = %s
+                    where id = %s""", (estado, momento, motivo, pedido["id"]))
     registrar_auditoria(
-        cur, accion="pedido_de_detalle_sin_respuesta", workspace_id=str(pedido["workspace_id"]),
+        cur, accion=accion, workspace_id=str(pedido["workspace_id"]),
         actor_kind="sistema", sujeto_tipo="task", sujeto_id=str(pedido["task_id"]),
         detalle={"pedido_id": str(pedido["id"]),
                  "pedido_por": str(pedido["pedido_por_membership_id"]),
@@ -3230,7 +3245,7 @@ def terminar_pedido_de_detalle(cur, pedido_id, momento: datetime) -> dict | None
                  "at": momento.isoformat()},
         pack_hash=versiones.pack_hash(cur, str(pedido["workspace_id"])),
         nucleo_hash=versiones.nucleo_hash())
-    return {"pedido_id": str(pedido["id"]), "estado": "sin_respuesta"}
+    return {"pedido_id": str(pedido["id"]), "estado": estado}
 
 
 @herramienta(

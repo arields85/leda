@@ -859,29 +859,92 @@ def test_la_repeticion_va_al_encargado_de_ahora(conn, equipo):
         "membership_id"]
 
 
-def test_un_pedido_que_se_queda_sin_encargado_espera_y_el_administrador_se_entera(conn,
+def _a(conn, t: Turnos, avisos: list[dict], nombre: str) -> list[dict]:
+    persona = _personas(t, nombre)["membership_id"]
+    return [a for a in avisos if str(a["destinatario_membership_id"]) == persona]
+
+
+def test_un_pedido_que_se_queda_sin_encargado_termina_y_se_le_dice_como_al_pedirlo(conn,
                                                                                   equipo):
-    """La corrección chica (`detalle.py:400-403`): si el sector se queda sin encargado después de
-    pedirlo, nadie puede decidirlo; el pedido espera (como con el encargado ausente) y ya no se
-    queda callado: el administrador se entera, una vez por día mientras siga así."""
+    """Decisión 33, el caso raro: el pedido ya le llegó a Martín y, mientras espera, el sector
+    se queda sin encargado. Nadie lo puede decidir, así que no espera para siempre: termina, y a
+    Nahuel se le dice lo mismo que si el sector no hubiera tenido encargado al pedirlo (no hay
+    a quién pedírselo, y qué sector ve el detalle), una sola vez, como información de
+    coordinación, a la hora en que Leda escribe, redactado por la IA desde los hechos. No se
+    nombra a quién se le había preguntado (decisión 35). El administrador se entera por su
+    canal (la corrección chica), y los botones de la pregunta a Martín dejan de esperar."""
     administrador(conn)
     _pedido_hecho(conn, equipo)
     _salir(conn, equipo, AHORA + timedelta(minutes=30))
     _it_sin_encargado(conn, equipo)
 
-    _ciclo(conn, equipo, _dia(6))
-    _ciclo(conn, equipo, _dia(6, 15))
+    ia = _ciclo(conn, equipo, _dia(6))
+
+    [pedido] = todos(conn, "select estado, motivo, decidido_en from pedido_de_detalle")
+    assert pedido["estado"] == "sin_efecto" and pedido["decidido_en"] is not None
+    assert pedido["motivo"]
+    assert cuantas(conn, "audit_log", "accion = 'pedido_de_detalle_sin_encargado'") == 1
+    [aviso] = _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Nahuel")
+    assert aviso["estado"] == "enviado"
+    hechos = aviso["hechos"]
+    assert hechos["sin_encargado_del_sector"] is True
+    assert hechos["el_detalle_lo_ve"] == "Infraestructura IT"
+    assert hechos["la_compartio"] is False and hechos["necesita_respuesta"] is False
+    assert "no_contesto" not in hechos and "puede_volver_a_pedirlo" not in hechos
+    assert MARTIN not in str(hechos)
+    # Lo redacta la IA desde esos hechos, que no nombran a Martín (lo que la conversación ya
+    # dijo antes es contexto, no un hecho nuevo).
+    redactado = [p["hechos"] for p in ia.pedidos_de_redaccion if COMO_TERMINO in str(p["hechos"])]
+    assert redactado and MARTIN not in str(redactado)
+    # Lo mismo que se le dice al pedirlo sin encargado.
+    r = equipo.dice("Nahuel", Jugada("pedir_el_detalle", {"como_la_nombra": "switch"}),
+                    at=_dia(6, 11))
+    assert (r.hechos[0]["resultado"], r.hechos[0]["motivo"]) == ("no_se_puede",
+                                                                 "sin_encargado_del_sector")
+    assert cuantas(conn, "pedido_de_detalle") == 1
+    # La pregunta a Martín, con sus botones, ya no espera; a él no se le repite.
+    assert cuantas(conn, "conversation_question",
+                   "tipo = %s and cerrada_en is null", preguntas.COMPARTIR_EL_DETALLE) == 0
+    assert avisos_guardados(conn, RECORDATORIO) == []
     [incidente] = _incidentes_sin_encargado(conn)
     assert NAHUEL in incidente["resumen_sanitizado"] and SWITCH in incidente[
         "resumen_sanitizado"]
-    assert avisos_guardados(conn, RECORDATORIO) == []
-    [pedido] = todos(conn, "select estado from pedido_de_detalle")
-    assert pedido["estado"] == "esperando_decision"
 
+    # Una sola vez: los días siguientes no se repite nada.
+    _ciclo(conn, equipo, _dia(6, 15))
     _ciclo(conn, equipo, _dia(7))
-    assert len(_incidentes_sin_encargado(conn)) == 2
+    assert len(_a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Nahuel")) == 1
+    assert len(_incidentes_sin_encargado(conn)) == 1
+
+
+def test_un_pedido_sin_encargado_fuera_de_hora_se_dice_a_la_hora_en_que_leda_escribe(conn,
+                                                                                    equipo):
+    """El aviso de cómo terminó sale a la hora en que Leda escribe: si la escalera lo ve a la
+    noche, se guarda para la mañana siguiente."""
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    _it_sin_encargado(conn, equipo)
+
+    _ciclo(conn, equipo, _dia(5, 20))
+
+    [aviso] = _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Nahuel")
+    assert aviso["estado"] == "guardado"
+    assert aviso["programado_para"] > _dia(5, 20)
+    _salir(conn, equipo, aviso["programado_para"])
+    [aviso] = _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Nahuel")
+    assert aviso["estado"] == "enviado"
+
+
+def test_si_el_sector_tiene_otro_encargado_el_pedido_sigue_esperando(conn, equipo):
+    """Sólo termina si nadie lo puede decidir: con un encargado nuevo, el pedido lo sigue a él
+    (decisiones 16 y 43) y no termina."""
+    _pedido_hecho(conn, equipo)
+    _salir(conn, equipo, AHORA + timedelta(minutes=30))
+    _otro_encargado_de_it(conn, equipo)
+    _ciclo(conn, equipo, _dia(6))
     [pedido] = todos(conn, "select estado from pedido_de_detalle")
     assert pedido["estado"] == "esperando_decision"
+    assert _a(conn, equipo, avisos_guardados(conn, COMO_TERMINO), "Nahuel") == []
 
 
 def test_el_recordatorio_del_pedido_esta_declarado():
