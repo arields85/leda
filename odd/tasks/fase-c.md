@@ -1103,7 +1103,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     - `PENDIENTE`:
       - ~~A quien revisa le llega aunque todavía no le haya llegado la entrega~~: decisión 60,
         hecha por el coordinador (`_le_llego_la_entrega`; test primero: 1 failed, después 29
-        passed en `test_retiro_de_la_administracion.py` y `test_contenido_retirado.py`).
+        passed en `test_retiro_de_la_administracion.py` y `test_contenido_retirado.py`;
+        `pytest tests/motor tests/garantias/test_contenido_retirado.py`, 1175 passed). Commit
+        `dbb03cf`; revisión `review-cd485b98338a8455`, aprobada y sellada. Advertencia, para la
+        corrección chica: falta probar que, con la pieza nueva, a quien revisa le llega la
+        entrega cuando la primera nunca le había llegado; sugerencia: el caso de un aviso de
+        entrega a otra persona (`retiro_de_la_administracion.py:143-149`).
       - La IA real sobre los dos avisos nuevos, y `leda_motor` al día hasta la `0053`.
       - Si quien recibe un aviso es quien entregó y también quien revisa, le llega sólo el
         primero.

@@ -62,7 +62,9 @@ pasaba; corregida en la rama); liberarlas pide la autorización del mantenedor (
 1. **Hecho (2026-10-10):** una tarea que vence sábado o domingo; el usuario eligió C (decisión 56): la
    plataforma no la deja cargar. Sin código hasta la plataforma.
 2. **De la porción 5:** las tres preguntas, decididas el 2026-10-10 (decisiones 57 a 59: se borra de
-   verdad, deja de contar y Leda avisa, la página muestra el motivo); se construyen en la porción 5b. La respuesta
+   verdad, deja de contar y Leda avisa, la página muestra el motivo) y la 60 (a quien revisa, sólo si ya le
+   llegó la entrega): construidas en la porción 5b (`0053`), revisadas y selladas. Falta la IA real sobre
+   los dos avisos nuevos y `leda_motor` hasta la `0053`. La respuesta
    del bot de administración sale sin outbox, para no guardar el token en claro: arreglarlo en
    `despachador.py`, que agregue el enlace al enviar, como con los integrantes.
 3. **Corrección chica:** `persecucion.py:703`, `herramientas.py:3111-3117`, `detalle.py:400-403`, avisar al
