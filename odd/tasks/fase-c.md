@@ -1038,9 +1038,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         (`entrega.py`, `herramientas.py`) miran sólo el retiro de cada pieza y la podrían
         adjuntar; y un adjunto ya encolado en `message_outbox_adjunto` antes del retiro sale
         igual (el despachador quedó fuera de esta porción).
-      - **La respuesta del bot de administración no pasa por una cola** (arriba, el porqué): si
+      - ~~**La respuesta del bot de administración no pasa por una cola** (arriba, el porqué): si
         se quiere por `admin_notice`, el despachador tendría que emitir el token al mandar, como
-        con `message_outbox_enlace`.
+        con `message_outbox_enlace`.~~ Hecho en la corrección chica (2026-10-10, `0054`,
+        `54b2e83`).
       - **Cuando exista el panel de plataforma** (ADR 0004), este acceso se muda allá (7b).
   - [x] **Porción 5b: lo que retira la administración** (2026-10-10; decisiones 57 a 59;
     migración `0053`). Route: delegada (escritor único; la base, la página, el despachador y el
@@ -1112,6 +1113,126 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       - La IA real sobre los dos avisos nuevos, y `leda_motor` al día hasta la `0053`.
       - Si quien recibe un aviso es quien entregó y también quien revisa, le llega sólo el
         primero.
+  - [x] **La corrección chica** (2026-10-10; las advertencias que quedaron con su lugar en el
+    código, avisar al administrador si un sector no tiene encargado, lo que dejaron las
+    revisiones de las porciones 5 y 5b, y la respuesta del bot de administración por la cola;
+    migración `0054`). Route: delegada (escritor único, 2+ archivos no triviales). Las
+    advertencias de `persecucion.py:703`, `herramientas.py:3111-3117` y `detalle.py:400-403`
+    (sobre `dffb854`) llegaron sólo con el lugar: la revisión que las dejó no quedó guardada
+    (las transacciones que se reconocen se borran), así que el porqué se reconstruyó leyendo el
+    código; donde no se pudo probar un defecto, no se tocó.
+    - **`herramientas.py:3111-3117`, la carrera al pedir el detalle, en el otro orden:** el
+      pedido que se cruzó termina (lo decide el encargado) entre el `insert` que choca con él y
+      la búsqueda que lo vuelve a leer; la búsqueda no encontraba nada y la cocina se caía
+      (`None["id"]`). Ahora, si ya no hay ninguno abierto, el pedido nuevo vale (se intenta otra
+      vez, dos como mucho). Prueba con un cursor que cruza y termina el otro pedido en el medio.
+    - **`detalle.py:400-403` y "avisar al administrador si un sector no tiene encargado":** un
+      pedido del detalle cuyo sector se queda sin encargado esperaba para siempre, en silencio
+      (`pausado` sin aviso a nadie). Sigue esperando (nadie lo puede decidir, como con el
+      encargado ausente), y ahora el administrador se entera por su canal: un incidente
+      `motor_sector_sin_encargado` con su aviso (`asentado.avisar_que_el_sector_no_tiene_encargado`).
+      Lo mismo cuando la falta del encargado frena algo en el momento: ofrecer o pedir el
+      detalle (`detalle.ofrecer`, `detalle.pedir`), un pase sin quien lo decida (`sin_encargado`,
+      el sector de quien recibe) y pasarla a otro sector desde un sector sin encargado
+      (`otro_sector` sin `lo_decide`). **Una vez por sector y por día**: el incidente lleva una
+      clave (`incidentes.registrar_incidente_y_si_se_aviso(clave=...)`, el id sale de la clave y
+      del espacio; `leda_app` no lee `incident`, así que el choque se ataja en un punto de
+      retorno). A la persona no le llega nada técnico: sus hechos son los de siempre. El
+      `persecucion.SIN_REFERENTE` de un bloqueo ya avisaba (C-5b) y no cambió.
+    - **`persecucion.py:703` (C-5e/C-5f), sin cambio:** la condición compara la fila de quién
+      destraba con quien escribe; las tres filas posibles (`_lo_destraba`, `_lo_destrababa`,
+      `_se_le_informo`) traen `destraba_membership_id`, `ctx.quien.membership_id` es texto, y
+      una fila de alguien de afuera, de nadie o `sin_decir_quien` da `"None"` y no pregunta. No
+      se encontró el defecto: queda como pregunta (abajo).
+    - **Porción 5, sus advertencias** (`review-97a7e59264f494f0`, leída de la transacción que
+      quedó trabada):
+      - `administracion.py:68-70`: identificar a quien pide estaba fuera de la guarda; si perdía
+        el rol en el medio o la base fallaba, la excepción salía de `atender_admin` (en el
+        escuchador el update se perdía en silencio; en el webhook, un 500). Ahora adentro:
+        perdió el rol, no se le contesta; otra falla, incidente.
+      - `entrada.py:162`, el pedido `/enlace` por el webhook, sin prueba: prueba nueva en
+        `test_webhook.py` (sin rojo: el código ya andaba).
+      - `cli.py:263-270` (sugerencia, la pieza por su número): **no es un defecto**; la lista es
+        por momento de entrega, lo que llega después va al final y el número leído sigue siendo
+        esa pieza. Prueba nueva que lo fija.
+    - **Porción 5b, sus advertencias:**
+      - `despachador.py:1215-1223`: si el retiro caía entre la mirada previa del despachador y el
+        armado del álbum, el álbum vacío contaba como un intento fallido de Telegram (un rastro
+        que decía que no se pudo entregar y, al quinto, un mensaje perdido con aviso a la
+        administración). Ahora se descarta como el álbum que llega sin nada, con su incidente
+        `contenido_retirado_del_envio`, sin contar un intento (`NoQuedaNingunAdjunto`).
+      - `retiro_de_la_administracion.py:73-76`: si guardar los avisos fallaba con la transacción
+        abortada, devolver el espacio en el `finally` fallaba también y tapaba el error de verdad
+        (`InFailedSqlTransaction`). Ahora no se devuelve a mano en ese caso (lo devuelve el
+        rollback: `set_config` es local a la transacción).
+      - `recibir.py:531-538` (el rechazo de un archivo retirado por la entrada de verdad),
+        `entrega.py:627-628` (lo mandado antes que se retiró no entra en la vista previa),
+        `cli.py:262-264` (la consola pasa el reloj de Leda a los avisos), la segunda mitad de la
+        decisión 60 (con la pieza nueva, a quien revisa le llega la entrega completa, una vez,
+        cuando la primera nunca le llegó) y la sugerencia de `retiro_de_la_administracion.py:143-149`
+        (si la última entrega le llegó a otra persona, a quien revisa ahora no se le avisa):
+        pruebas nuevas, sin rojo (el código ya lo hacía).
+      - La `0053`, líneas 72-84 y 113-115, y su vuelta atrás (24-29): **sin defecto encontrado**
+        en el camino que se usa. El borrado de lo que la `0052` ya había retirado y la guarda de
+        la vuelta atrás leen tablas con RLS forzada; corren como el dueño del esquema, que en la
+        instalación de siempre es superusuario (`README` de las migraciones, paso 5; la `0004`) y
+        no pasa por la RLS. Con un dueño sin `bypassrls`, el `update` no tocaría ninguna fila sin
+        avisar: queda anotado abajo. La `0053` no se tocó.
+    - **La respuesta del bot de administración por la cola** (el `PENDIENTE` de la porción 5;
+      `0054`): la respuesta a `/enlace` (y las otras: el uso, el espacio que no existe, cuál de
+      varias, sin dirección pública) queda en `admin_notice` como respuesta (`es_respuesta`, sin
+      incidente; una fila es exactamente una de las dos cosas) y sale enseguida por el mismo bot
+      (`despachar_avisos_admin(solo=...)`). Sin el enlace: si lo lleva, una marca
+      (`admin_notice_enlace`: la tarea, su espacio por clave compuesta, y el administrador) y el
+      despachador lo emite recién al mandarla, en el punto de retorno del envío
+      (`_mandar_la_respuesta_con_enlace`, con `pagina_de_tarea.emitir_para_administrador`, que
+      revalida el rol y lo audita). La base guarda sólo el hash; si el envío falla, no queda
+      ningún acceso y queda un incidente `respuesta_del_bot_de_administracion` por intento (sin
+      avisar por el mismo canal), y se reintenta con la espera de los avisos a la
+      administración; si al mandarla ya no es administrador, o falta la dirección pública, se
+      descarta con su incidente. Un pedido que Telegram entrega dos veces tiene una respuesta
+      (la clave es el mensaje). La cola la escribe el despachador (`encolar_respuesta_admin`,
+      fuera del motor, que no toca esas tablas). `leda_app` no tiene ningún privilegio sobre
+      las dos (excepción declarada en `test_aislamiento.py`); la vuelta atrás de la `0054` se
+      niega si hay respuestas en la cola. `admin_notice.destinatario_app_user_id` salió de las
+      promesas sin cumplir de `test_capacidades.py` (ahora se escribe).
+    - **Test primero:**
+      - Lo del detalle: `pytest tests/motor/test_pedir_el_detalle.py -k se_cruz`, **1 failed, 1
+        passed** (`TypeError`); verde, el archivo entero, **33 passed**.
+      - El sector sin encargado: `pytest tests/motor/test_fichas.py tests/motor/test_delegar.py
+        tests/motor/test_pedir_el_detalle.py -k "sin_encargado or sin_quien_lo_decida"`, **5
+        failed, 2 passed** (ningún incidente); verde, con `test_aviso_incidente_legible.py` y
+        `tests/garantias/test_frontera.py`, **158 passed**; `pytest tests/motor`, **1162
+        passed**.
+      - Las advertencias de las porciones 5 y 5b: las doce pruebas nuevas, **4 failed, 8
+        passed** (las cuatro de arriba con defecto; las ocho, cobertura de lo que ya andaba);
+        verde, en los seis archivos, **150 passed** y 15 errores de `test_archivos.py` por
+        correr dos pytest a la vez (bases de prueba); `test_archivos.py` solo, **18 passed**.
+      - La respuesta por la cola: `tests/garantias/test_respuesta_del_bot_de_administracion.py`,
+        **9 failed** (sin la `0054`); verde, con el bot y la frontera del motor, **32 passed**;
+        `tests/garantias` entero, **456 passed, 1 failed** (`test_capacidades.py`, la promesa de
+        arriba; corregida, **3 passed**), y la sonda de `test_frontera.py`, **2 passed**;
+        `test_migraciones.py` y `test_aislamiento.py`, **22 passed** (vuelta atrás de la `0054`
+        ensayada; paridad limpia y migrada, con `admin_notice` y `admin_notice_enlace`).
+    - **Commits:** `3295a4f` (el detalle), `f765e7a` (el sector sin encargado), `18507e6` (las
+      advertencias de las porciones 5 y 5b), `54b2e83` (la respuesta por la cola, `0054`) y el
+      que registra esto.
+    - **Chequeos** (2026-10-10, sobre `54b2e83`):
+      - `pytest tests/motor tests/garantias tests/conversaciones tests/test_administrador_plataforma.py tests/test_cli_enlaces_de_tarea.py`: **1806 passed** (24 min).
+      - En seco, `correr --ia guionada --veces 1 --sin-informe`: **45 de 45 bien** (garantías 45 de 45).
+      Sin la IA real (no cambia lo que la IA recibe: los hechos del equipo son los de siempre).
+    - `PENDIENTE`:
+      - **Pregunta al usuario, `persecucion.py:703`:** no se encontró el defecto; si alguien
+        guardó el texto de esa advertencia, revisarlo con él.
+      - **Pregunta al usuario, el pedido del detalle sin encargado:** hoy espera (sin repetirse
+        ni terminar) hasta que el sector tenga encargado, y el administrador se entera una vez
+        por día. ¿A quien lo pidió hay que decirle algo mientras espera, o terminarlo después de
+        un tiempo como el que no contesta?
+      - **"Una vez por sector y por día"** es lectura del escritor de "una vez por situación":
+        el aviso vuelve al día siguiente si sigue sin encargado y alguien lo necesita.
+      - La `0053` con un dueño del esquema sin `bypassrls`: el borrado de lo retirado antes y la
+        guarda de su vuelta atrás no verían filas. Hoy no aplica (superusuario).
+      - `leda_motor` al día hasta la `0054` antes de la prueba por Telegram (respaldo previo).
 - [ ] **C-3d.** Lo que decidió el usuario el 2026-10-08 (preguntas 10 a 20), en este orden. Route de
   cada una: delegada (escritor único, 2+ archivos no triviales), una por vez, revisión RDD por commit.
   - [x] **D1.** El comparador del corredor: la garantía es "lo escrito es lo confirmado"; mostrar lo
@@ -3353,9 +3474,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] La escalera con un vencimiento en fin de semana: probada, siete pruebas, sin cambios (`c48ed43`).
 - [x] Pregunta al usuario: una tarea que vence sábado o domingo. Decisión 56 (opción C): la
       plataforma no la deja cargar; sin código hasta la plataforma.
-- [ ] La corrección chica: `persecucion.py:703`, `herramientas.py:3111-3117`, `detalle.py:400-403`,
+- [x] La corrección chica: `persecucion.py:703`, `herramientas.py:3111-3117`, `detalle.py:400-403`,
       avisar al administrador si un sector no tiene encargado, y lo que deje la revisión de la porción 5
-      (más su respuesta sin outbox, a arreglar en `despachador.py`).
+      (más su respuesta sin outbox, a arreglar en `despachador.py`). Hecha el 2026-10-10 (`0054`;
+      `3295a4f`, `f765e7a`, `18507e6`, `54b2e83`), salvo `persecucion.py:703`, sin defecto
+      encontrado (pregunta abierta en su entrada, "La corrección chica").
 - [ ] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
       conversación de prueba y construcción.
 - [ ] Los avisos que a veces no salen a su hora: buscar la causa.
