@@ -790,3 +790,73 @@ def test_la_pregunta_a_quien_esta_trabado_es_de_coordinacion_y_abre_su_pregunta(
     tipo = TIPOS[QUIEN_MAS]
     assert tipo.es_coordinacion and tipo.abre is not None
     assert tipo.tipo_de_mensaje == "normal"
+
+
+# --- Las advertencias de la revisión de la C-5d ----------------------------------------------------
+
+def test_si_nombra_a_alguien_de_afuera_la_cadena_queda_asentada(conn, mundo, equipo):
+    """A la pregunta de si se le ocurre otra persona, Marcos nombra a alguien de afuera del equipo:
+    Leda no le puede escribir, así que la cadena se corta y queda asentada (decisión 49), con lo
+    que dijo, y Marcos se entera de que quedó asentado: nunca silencio (revisión de la C-5d,
+    `fichas.py:895-898`)."""
+    _ariel_no_sabe_y_se_lo_pregunto_a_marcos(conn, mundo, equipo)
+
+    r = equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"quien": "el proveedor"}))
+
+    [cadena] = avisos_guardados(conn, CADENA)
+    assert str(cadena["destinatario_membership_id"]) == _membresia(mundo, "Ismael")
+    assert cadena["hechos"]["cadena"] == [
+        {"de": "Marcos", "le_toca_a": ARIEL},
+        {"de": ARIEL, "no_le_corresponde": True, "no_sabe": True, "lo_que_dice": "ni idea"},
+        {"de": "Marcos", "le_toca_a": "el proveedor"}]
+    [hecho] = r.hechos
+    assert hecho["quien_destraba"] == {"externo": "el proveedor"}
+    assert hecho["queda_asentado"] == {"figura_en_el_informe_al_grupo": False, "a": "Ismael"}
+    assert _su_pregunta(conn, mundo, "Marcos") is None
+
+
+def test_quien_recibio_la_cadena_la_ve_en_su_lista(conn, mundo, equipo):
+    """A quien le llegó la cadena (`para_destrabar`, revisión de la C-5d,
+    `persecucion.py:509-516`) la ve como una tarea que se le informó que sigue trabada; no como
+    una que espera que la destrabe."""
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _salir(conn, mundo, AHORA + timedelta(minutes=45))
+
+    equipo.dice("Ismael", at=AHORA + timedelta(hours=2))
+
+    [tarea] = [t for t in equipo.situacion["tareas"] if t.get("responsable") == "Marcos"]
+    assert tarea["se_le_informo_que_sigue_trabada"] is True
+    assert "espera_que_la_destrabe" not in tarea
+    assert tarea["causa"] == CAUSA
+
+
+def test_la_cadena_que_todavia_no_salio_no_la_pone_en_su_lista(conn, mundo, equipo):
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+
+    equipo.dice("Ismael")
+
+    assert not [t for t in equipo.situacion["tareas"] if t.get("responsable") == "Marcos"]
+
+
+def test_la_cadena_no_pone_la_tarea_en_la_lista_de_otra_persona(conn, mundo, equipo):
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _salir(conn, mundo, AHORA + timedelta(minutes=45))
+
+    equipo.dice("Pedro", at=AHORA + timedelta(hours=2))
+
+    assert not [t for t in equipo.situacion["tareas"] if t.get("responsable") == "Marcos"]
+
+
+def test_destrabada_la_tarea_sale_de_la_lista_de_quien_recibio_la_cadena(conn, mundo, equipo):
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _salir(conn, mundo, AHORA + timedelta(minutes=45))
+    equipo.dice("Marcos", Jugada("destrabar", {"tarea": "T1"}), at=AHORA + timedelta(hours=1))
+
+    equipo.dice("Ismael", at=AHORA + timedelta(hours=2))
+
+    assert not [t for t in equipo.situacion["tareas"]
+                if t.get("responsable") == "Marcos" and t.get("se_le_informo_que_sigue_trabada")]

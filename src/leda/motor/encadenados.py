@@ -274,7 +274,9 @@ def se_destrabo(ctx: Contexto, task_id: str, bloqueo_id: str) -> dict[str, Any]:
     """La tarea de quien escribe se destrabó: quien espera, más abajo, se entera. La suya sigue
     trabada hasta que lo diga. Y a quien escribe, que la destraba, Leda no le preguntaba lo que no
     podía dar (decisión 42): ahora puede, así que le pregunta para cuándo, como a cualquiera que
-    destraba (decisión 4), salvo que siga trabado con otra cosa que le falta a esa tarea."""
+    destraba (decisión 4), salvo que siga trabado con otra cosa que le falta a esa tarea o que
+    la persona trabada haya dicho que se lo pide ella ("se lo pido yo y te cuento": Leda no le
+    escribe; revisión de la C-5e)."""
     hecho = avisar_hacia_abajo(ctx, task_id, {"se_destrabo": True}, f"{SE_DESTRABO}{bloqueo_id}")
     from . import persecucion               # persecucion importa este módulo
     preguntas_: list[dict[str, Any]] = []
@@ -283,6 +285,8 @@ def se_destrabo(ctx: Contexto, task_id: str, bloqueo_id: str) -> dict[str, Any]:
                              ctx.quien.nombre):
             continue
         fila = ultimo_quien_destraba(ctx.cur, f["bloqueo_id"])
+        if persecucion.se_lo_pide_quien_esta_trabado(ctx.cur, str(fila["id"])):
+            continue
         r = persecucion.preguntarle(
             ctx, {"id": str(f["task_id"]), "titulo": f["titulo"]}, {"causa": f["causa"]},
             str(fila["id"]), {"membership_id": ctx.quien.membership_id,

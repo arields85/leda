@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping
-from datetime import tzinfo
+from datetime import datetime, tzinfo
 from typing import Any
 
 CLAVE = "cambios_de_estado"
@@ -50,6 +50,16 @@ def desde(cur, task_id: Any, responsable_membership_id: Any, estado: str,
           zona: tzinfo) -> str | None:
     """El día (AAAA-MM-DD) en que la tarea entró en `estado`, según los turnos de su
     responsable; `DESCONOCIDO` si el motor no lo anotó; `None` si está como llegó."""
+    momento = momento_desde(cur, task_id, responsable_membership_id, estado)
+    if isinstance(momento, datetime):
+        return momento.astimezone(zona).date().isoformat()
+    return momento
+
+
+def momento_desde(cur, task_id: Any, responsable_membership_id: Any,
+                  estado: str) -> datetime | str | None:
+    """El momento en que la tarea entró en `estado` (el del turno que lo anotó), según los turnos
+    de su responsable; `DESCONOCIDO` si el motor no lo anotó; `None` si está como llegó."""
     if estado == COMO_LLEGA:
         return None
     tarea = str(task_id)
@@ -67,7 +77,7 @@ def desde(cur, task_id: Any, responsable_membership_id: Any, estado: str,
                 continue
             de, a = cambio.get("de"), cambio.get("a")
             if a == estado and de != BLOQUEADA:
-                return fila["at"].astimezone(zona).date().isoformat()
+                return fila["at"]
             if (a == estado and de == BLOQUEADA) or (de == estado and a == BLOQUEADA):
                 continue        # un bloqueo y su salida: sigue en el mismo estado
             return DESCONOCIDO

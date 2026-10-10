@@ -243,7 +243,7 @@ def historia(m: Momento, bloqueo_id: str, desde: datetime | None = None) -> list
                      from blocker_unblocker u
                      left join integrante d on d.membership_id = u.destraba_membership_id
                      join integrante p on p.membership_id = u.dicho_por_membership_id
-                    where u.blocker_id = %s
+                    where u.blocker_id = %s and not u.sin_decir_quien
                       and (%s::timestamptz is null or u.at > %s::timestamptz)""",
                 (bloqueo_id, desde, desde))
     eventos: list[tuple[Any, int, str, dict[str, Any]]] = []
@@ -315,8 +315,11 @@ def vigencia_de_lo_asentado(m: Momento, aviso: dict[str, Any]
                             ) -> tuple[str | None, dict[str, Any]]:
     """Lo de la persona trabada sale si el bloqueo sigue abierto y la tarea sin cerrar y con el
     mismo responsable. Lo asentado ya quedó al guardarse (`_asentar`): no espera al aviso al
-    referente (revisión `review-1db0e16dfeacfc4f`). A quién le llega, releído, sólo si el aviso
-    de esa vez al referente no se omitió ni falló; si no salió, a nadie (decisión 49)."""
+    referente (revisión `review-1db0e16dfeacfc4f`). A quién le llega, según el aviso de esa vez
+    al referente: si salió, a quien le salió de verdad (aunque después cambie el referente); si
+    todavía no salió, a quien le va a llegar; si falló una vez y se está reintentando, todavía no
+    se sabe y no se nombra a nadie ni se dice que a nadie; si no salió (omitido o fallido), a
+    nadie (decisión 49; revisión `review-8d6e96daab3e588b`, `bloqueo_viejo.py:327`)."""
     motivo, tarea = _sigue_abierto(m, aviso)
     if motivo is not None:
         return motivo, {}
@@ -324,17 +327,22 @@ def vigencia_de_lo_asentado(m: Momento, aviso: dict[str, Any]
         return CAMBIO_EL_RESPONSABLE, {}
     al_referente = aviso["dedupe_key"].replace(ASENTADO_QUE_SIGUE_TRABADA,
                                                BLOQUEO_QUE_SIGUE_ABIERTO, 1)
-    m.cur.execute("""select estado from scheduled_notice
+    m.cur.execute("""select estado, intentos, destinatario_membership_id from scheduled_notice
                       where workspace_id = %s and dedupe_key = %s""",
                   (m.workspace_id, al_referente))
     suyo = m.cur.fetchone()
     # Uno que no salió (omitido, o `fallido` porque la IA no lo redactó) no le llegó a nadie:
     # nunca se nombra a quien no lo recibió (constitución §4; revisión `review-8d6e96daab3e588b`).
-    destino = (a_quien(m.cur, tarea, de_la_clave(aviso))
-               if suyo is not None and suyo["estado"] not in ("omitido", "fallido") else None)
+    if suyo is None or suyo["estado"] in ("omitido", "fallido"):
+        return None, hechos_de_lo_asentado(m, de_la_clave(aviso), None, a_nadie=True)
+    if suyo["estado"] == "enviado":
+        destino = integrante(m.cur, suyo["destinatario_membership_id"])
+    elif suyo["intentos"]:
+        destino = None                  # se está reintentando: todavía no se sabe
+    else:
+        destino = a_quien(m.cur, tarea, de_la_clave(aviso))
     return None, hechos_de_lo_asentado(m, de_la_clave(aviso),
-                                       destino["nombre"] if destino else None,
-                                       a_nadie=destino is None)
+                                       destino["nombre"] if destino else None)
 
 
 def va_a(m: Momento, aviso: dict[str, Any]) -> str | None:

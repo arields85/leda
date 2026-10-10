@@ -696,9 +696,11 @@ def decir_cuando_destraba(ctx: Contexto, datos: dict[str, Any],
                                                 como_llega))
     if not ya_no_hacia_falta:
         _juntar(hecho, encadenados.dijo_quien_destraba(ctx, tarea["id"], dicho_id, dice))
+        # Sólo a quien la destraba ahora (lo último que se dijo la nombra a ella): nunca a quien
+        # se le informó que sigue trabada y habla sobre la fila de otro, de alguien de afuera o
+        # de nadie (decisión 41; revisión de la C-5e).
         if (para_cuando is not None and not ya_esta
-                and str(destraba.get("destraba_membership_id") or ctx.quien.membership_id)
-                == ctx.quien.membership_id):
+                and str(destraba["destraba_membership_id"]) == ctx.quien.membership_id):
             _juntar(hecho, _volver_a_preguntar_el_dia(ctx, tarea, destraba, dicho_id, para_cuando,
                                                       lo_que_dice))
     return hecho
@@ -809,8 +811,11 @@ def _contesta_lo_que_se_le_paso(cur, blocker_id, persona: str) -> bool:
 def _se_le_informo(ctx: Contexto, tarea: dict[str, Any]) -> dict[str, Any] | None:
     """A quien Leda le informó que la tarea sigue trabada (decisión 41): lo que dice se anota
     sobre la fila de quién la destraba ahora, dicho por esa persona; si nadie dijo nunca quién la
-    destraba, sobre una fila nueva, dicha por ella misma, que dice que la destraba ella. Nunca
-    cierra el bloqueo: lo da por destrabado la persona trabada. `None` si no se le informó."""
+    destraba, sobre una fila nueva, dicha por ella, que dice eso mismo: que habló sin decir quién
+    la destraba (`sin_decir_quien`, migración 0051). Nunca la vuelve quien la destraba, que nadie
+    dijo (constitución §4; revisión de la C-5d): no la espera en su lista, no se le vuelve a
+    preguntar el día que dijo y la historia no la nombra. Nunca cierra el bloqueo: lo da por
+    destrabado la persona trabada. `None` si no se le informó."""
     vista = next((t for t in ctx.para_destrabar if t["id"] == tarea["id"]), None)
     if vista is None or not vista.get(SE_LE_INFORMO_QUE_SIGUE_TRABADA):
         return None
@@ -823,9 +828,19 @@ def _se_le_informo(ctx: Contexto, tarea: dict[str, Any]) -> dict[str, Any] | Non
     ultimo = ultimo_quien_destraba(cur, bloqueo["id"])
     if ultimo is not None:
         return _la_fila(cur, str(ultimo["id"]))
-    yo = {"membership_id": ctx.quien.membership_id, "nombre": ctx.quien.nombre}
-    return _la_fila(cur, _anotar_quien_destraba(ctx, tarea, {"blocker_id": str(bloqueo["id"])},
-                                                yo, None, False))
+    cur.execute(
+        """insert into blocker_unblocker (workspace_id, blocker_id, sin_decir_quien,
+                                          dicho_por_membership_id, at)
+           values (%s, %s, true, %s, %s) returning id""",
+        (ctx.quien.workspace_id, bloqueo["id"], ctx.quien.membership_id, ctx.ahora))
+    fila = str(cur.fetchone()["id"])
+    auditar(cur, accion="hablar_de_un_bloqueo_sin_decir_quien_lo_destraba",
+            workspace_id=ctx.quien.workspace_id, sujeto_tipo="blocker", sujeto_id=bloqueo["id"],
+            quien=ctx.quien,
+            detalle={"blocker_unblocker_id": fila, "task_id": tarea["id"],
+                     "sin_decir_quien": True, "at": ctx.ahora.isoformat(),
+                     "inbound_message_id": ctx.entrante_id})
+    return _la_fila(cur, fila)
 
 
 def _lo_destrababa(ctx: Contexto, task_id: str) -> dict[str, Any] | None:
@@ -1005,8 +1020,8 @@ def _lo_destraba(ctx: Contexto, task_id: str) -> dict[str, Any] | None:
     """La fila de quién destraba el bloqueo abierto de esa tarea, si quien escribe es quien la
     destraba ahora (lo último que se dijo), con el bloqueo, la tarea y quién la tiene."""
     ctx.cur.execute(
-        """select u.id, u.blocker_id, u.dicho_por_membership_id, b.causa, t.area_id,
-                  t.responsable_membership_id, i.nombre as responsable
+        """select u.id, u.blocker_id, u.dicho_por_membership_id, u.destraba_membership_id,
+                  b.causa, t.area_id, t.responsable_membership_id, i.nombre as responsable
              from blocker b
              join task t on t.id = b.task_id
              join integrante i on i.membership_id = t.responsable_membership_id
@@ -1310,7 +1325,8 @@ def _filas_del_bloqueo(cur, blocker_id) -> list[dict[str, Any]]:
                      from blocker_unblocker u
                      left join integrante d on d.membership_id = u.destraba_membership_id
                      join integrante p on p.membership_id = u.dicho_por_membership_id
-                    where u.blocker_id = %s order by u.at, u.id""", (str(blocker_id),))
+                    where u.blocker_id = %s and not u.sin_decir_quien
+                    order by u.at, u.id""", (str(blocker_id),))
     return cur.fetchall()
 
 
@@ -1838,7 +1854,7 @@ def pedirselo_y_contar(ctx: Contexto, datos: dict[str, Any],
                              "inbound_message_id": ctx.entrante_id})
             _juntar(hecho, cerrar_el_tema(ctx, tarea["id"], blocker_id, CAMBIO_QUIEN_DESTRABA,
                                           salvo=(nuevo_id,) if nuevo_id else ()))
-    if ultimo is None or ultimo["no_sabe"] or (
+    if ultimo is None or ultimo["no_sabe"] or ultimo["sin_decir_quien"] or (
             ultimo["destraba_membership_id"] is not None
             and str(ultimo["destraba_membership_id"]) == ctx.quien.membership_id):
         return {"resultado": "falta_dato", "falta": ["quien"], "tarea": tarea_hecho(tarea)}
@@ -1879,6 +1895,16 @@ def pedirselo_y_contar(ctx: Contexto, datos: dict[str, Any],
     hecho["le_pregunta_como_le_fue"] = {LLEGA: cuando.isoformat()}
     nombrar_efecto(hecho, "le_pregunta_como_le_fue", AVISO, aviso_id)
     return hecho
+
+
+def se_lo_pide_quien_esta_trabado(cur, fila_id: str) -> bool:
+    """Si la persona trabada dijo que se lo pide ella a quien nombra esa fila ("se lo pido yo y te
+    cuento", `pedirselo_y_contar`, cuyo aviso de cómo le fue nombra la fila): Leda no le escribe
+    por su cuenta a esa persona por ese bloqueo."""
+    cur.execute("""select 1 from scheduled_notice
+                    where tipo = %s and split_part(dedupe_key, ':', 4) = %s limit 1""",
+                (COMO_LE_FUE, f"u{fila_id}"))
+    return cur.fetchone() is not None
 
 
 def _la_trabada_de_lo_que_se_hablaba(ctx: Contexto) -> dict[str, Any] | None:

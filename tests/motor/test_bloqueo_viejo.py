@@ -387,6 +387,45 @@ def test_si_el_aviso_al_referente_no_salio_no_se_dice_que_le_llega(conn, mundo, 
                                         "solo_si_pregunta": {"no_le_llega_a_nadie": True}}
 
 
+def test_si_el_aviso_al_referente_se_esta_reintentando_no_se_nombra_a_nadie(conn, mundo, equipo,
+                                                                           dias):
+    """El aviso a Lucas falló una vez y espera su reintento cuando sale el de Marcos: todavía no
+    se sabe si le va a llegar, así que no se nombra a Lucas ni se dice que no le llega a nadie
+    (constitución §4; revisión `review-8d6e96daab3e588b`, `bloqueo_viejo.py:327`)."""
+    _marcos_trabado(equipo)
+    dias.ciclo(octubre(13, 8))                  # fuera del horario: los dos, guardados
+    [viejo] = _viejos(conn)
+    with admin(conn) as cur:
+        cur.execute("""update scheduled_notice set intentos = 1, proximo_intento_en = %s
+                        where id = %s""", (octubre(13, 11), str(viejo["id"])))
+    conn.commit()
+
+    dias.ciclo(octubre(13, 10))
+
+    assert _viejos(conn)[0]["estado"] == "guardado"
+    [hechos] = _asentado_para(dias, "Marcos")
+    assert hechos["queda_asentado"] == {"figura_en_el_informe_al_grupo": False}
+
+
+def test_a_quien_le_llego_es_a_quien_le_salio_el_aviso(conn, mundo, equipo, dias):
+    """Si después de que salió el aviso al referente cambió el referente, a la persona trabada se
+    le dice a quién le llegó de verdad, no a quién le llegaría ahora."""
+    _marcos_trabado(equipo)
+    with admin(conn) as cur:
+        cur.execute("""insert into absence (workspace_id, membership_id, desde, hasta)
+                       values (%s, %s, '2026-10-13', '2026-10-13')""",
+                    (mundo["id"], _membresia(mundo, "Marcos")))
+    conn.commit()
+    dias.ciclo(octubre(13, 10))                 # a Lucas le sale; a Marcos, ausente, no
+    assert _viejos(conn)[0]["estado"] == "enviado"
+    _referente(conn, mundo["area"], _membresia(mundo, "Ariel"))
+
+    dias.ciclo(octubre(14, 10))
+
+    [hechos] = _asentado_para(dias, "Marcos")
+    assert hechos["queda_asentado"]["a"] == LUCAS
+
+
 # --- Se vuelve a asentar mientras siga (decisión 36) ---------------------------------------------
 
 def test_mientras_siga_trabada_se_vuelve_a_asentar_con_lo_que_paso_desde_la_vez_anterior(
@@ -456,6 +495,7 @@ def test_si_la_vez_anterior_no_salio_no_se_guarda_otra(conn, mundo, equipo, dias
 
 YA_NO_HACE_FALTA = "ya_no_hace_falta_que_destrabe"
 LO_QUE_DIJO = "lo_que_dijo_quien_destraba"
+EL_DIA = "el_dia_que_dijo_quien_destraba"
 
 
 def _se_le_informo_a_lucas(equipo, dias) -> None:
@@ -523,9 +563,13 @@ def test_cuando_quien_esta_trabado_lo_destraba_se_enteran_los_que_dijeron_que_ya
     assert de_lucas["hechos"]["habia_dicho"] == {"ya_esta": True}
 
 
-def test_sin_nadie_que_lo_destrabe_lo_que_dice_queda_como_suyo(conn, mundo, equipo, dias):
-    """Marcos nunca dijo quién lo destraba: lo que dice Lucas queda anotado igual, como que lo
-    destraba él (dicho por él)."""
+def test_sin_nadie_que_lo_destrabe_lo_que_dice_no_lo_vuelve_quien_lo_destraba(conn, mundo,
+                                                                             equipo, dias):
+    """Marcos nunca dijo quién lo destraba: lo que dice Lucas queda anotado y le llega a Marcos,
+    pero Lucas no pasa a ser quien lo destraba, porque nadie lo dijo (constitución §4; revisión
+    de la C-5d, `persecucion.py:721-723`): la fila dice que habló sin decir quién lo destraba, en
+    su lista sigue como a quien se le informó, no se le vuelve a preguntar el día que dijo y lo
+    que se vuelve a asentar no dice que lo destraba él."""
     equipo.dice("Marcos", Jugada("anotar_bloqueo", {"tarea": "T1", "causa": CAUSA}))
     dias.ciclo(octubre(13, 10))
 
@@ -533,12 +577,48 @@ def test_sin_nadie_que_lo_destrabe_lo_que_dice_queda_como_suyo(conn, mundo, equi
                                 {"tarea": "T1", "para_cuando": "2026-10-14"}),
                 at=octubre(13, 11))
 
-    fila = uno(conn, """select destraba_membership_id::text destraba,
-                               dicho_por_membership_id::text de from blocker_unblocker""")
-    assert fila == {"destraba": _membresia(mundo, "Lucas"), "de": _membresia(mundo, "Lucas")}
+    fila = uno(conn, """select destraba_membership_id, destraba_externo, no_sabe,
+                               sin_decir_quien, dicho_por_membership_id::text de
+                          from blocker_unblocker""")
+    assert fila == {"destraba_membership_id": None, "destraba_externo": None, "no_sabe": False,
+                    "sin_decir_quien": True, "de": _membresia(mundo, "Lucas")}
     assert cuantas(conn, "dicho_de_quien_destraba") == 1
     assert avisos_guardados(conn, LO_QUE_DIJO)[-1]["hechos"]["quien_destraba"] == LUCAS
     assert cuantas(conn, "blocker", "resuelto_en is null") == 1
+    assert avisos_guardados(conn, EL_DIA) == []
+    equipo.dice("Lucas", at=octubre(13, 12))
+    [tarea] = equipo.situacion["tareas"]
+    assert tarea["se_le_informo_que_sigue_trabada"] is True
+    assert "espera_que_la_destrabe" not in tarea
+    # Lo que habla otra vez sigue sobre la misma fila: no se agrega otra.
+    equipo.dice("Lucas", Jugada("decir_cuando_destraba",
+                                {"tarea": "T1", "lo_que_dice": "sigue en camino"}),
+                at=octubre(14, 11))
+    assert cuantas(conn, "blocker_unblocker") == 1
+    # La vez siguiente, lo que pasó desde la anterior es lo que dijo, no que lo destraba él.
+    dias.ciclo(octubre(20, 10))
+    [_, hechos] = _para(dias, LUCAS)
+    assert hechos["desde_la_vez_anterior"] == [
+        {"el": "2026-10-13", "de": LUCAS, "para_cuando": "2026-10-14"},
+        {"el": "2026-10-14", "de": LUCAS, "lo_que_dice": "sigue en camino"}]
+
+
+def test_el_dia_que_dijo_no_es_para_quien_recibio_el_bloqueo_viejo(conn, mundo, equipo, dias):
+    """Lo destraba alguien de afuera del equipo y Lucas, que recibió el bloqueo viejo, da un día:
+    queda anotado, pero el día que dijo no se le vuelve a preguntar a él, que no lo destraba
+    (C-5e, decisión 41; revisión de la C-5e, `persecucion.py:699-703`)."""
+    equipo.dice("Marcos", Jugada("anotar_bloqueo", {"tarea": "T1", "causa": CAUSA}))
+    equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"quien": "el proveedor"}))
+    dias.ciclo(octubre(13, 10))
+
+    r = equipo.dice("Lucas", Jugada("decir_cuando_destraba",
+                                    {"tarea": "T1", "para_cuando": "2026-10-15"}),
+                    at=octubre(13, 11))
+
+    assert cuantas(conn, "dicho_de_quien_destraba", "dicho_por_membership_id = %s",
+                   _membresia(mundo, "Lucas")) == 1
+    assert avisos_guardados(conn, EL_DIA) == []
+    assert "le_vuelve_a_preguntar" not in r.hechos[0]
 
 
 def test_quien_no_recibio_el_bloqueo_viejo_no_puede_decirlo(conn, mundo, equipo, dias):

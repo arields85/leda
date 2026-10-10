@@ -896,8 +896,10 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
         _juntar(hecho, persecucion.preguntarle(ctx, fila, bloqueo, anotado, integrante))
         if "no_se_le_puede_escribir_a" in hecho:
             return {**hecho, "salidas": list(persecucion.SALIDAS_SIN_LEDA_CONECTADA)}
-    if sigue_la_cadena and no_sabe:
-        # Nadie más: queda asentado, y el tema se cierra así (decisión 49), sin salidas.
+    if sigue_la_cadena and (no_sabe or (integrante is None and quien_texto is not None)):
+        # Nadie más, o alguien de afuera del equipo, a quien Leda no le puede escribir: la cadena
+        # se corta, queda asentado y el tema se cierra así (decisión 49), sin salidas. Nunca en
+        # silencio (revisión de la C-5d).
         _juntar(hecho, persecucion.sin_otra_persona(ctx, fila, anotado))
         return hecho
     sin_otra_persona = no_sabe or nadie_mas

@@ -225,6 +225,34 @@ def test_si_sigue_trabado_con_otra_tarea_previa_no_se_le_pregunta(conn, mundo, s
     assert _preguntas_a(conn, mundo, "Ariel") == []
 
 
+def test_si_se_lo_pide_quien_esta_trabado_cuando_puede_seguir_no_se_le_pregunta(
+        conn, mundo, servidor, equipo):
+    """Marcos dijo que se lo pide él a Ariel ("se lo pido yo y te cuento"): cuando Ariel puede
+    seguir, Leda no le escribe por su cuenta. La pregunta de cuando pudo seguir no miraba quién se
+    ocupa de hablar con quien destraba (revisión de la C-5e, `encadenados.py:280-289`)."""
+    _ariel_trabado(equipo)
+    _marcos_nombra_a_ariel(equipo)
+    equipo.dice("Marcos", Jugada("pedirselo_y_contar", {"tarea": "T1"}))
+
+    r = equipo.dice("Ariel", Jugada("destrabar", {"tarea": "T1"}))
+
+    assert _preguntas_a(conn, mundo, "Ariel") == []
+    assert "lo_esperan" not in r.hechos[0]
+
+
+def test_si_marcos_nombro_a_otra_persona_cuando_ariel_puede_seguir_no_se_le_pregunta(
+        conn, mundo, servidor, equipo):
+    """Marcos nombró después a Juan: Ariel ya no es quien lo destraba (lo último que se dijo), y
+    cuando puede seguir, Leda no le pregunta por lo de Marcos."""
+    _ariel_trabado(equipo)
+    _marcos_nombra_a_ariel(equipo)
+    equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"tarea": "T1", "quien": "juan"}))
+
+    equipo.dice("Ariel", Jugada("destrabar", {"tarea": "T1"}))
+
+    assert _preguntas_a(conn, mundo, "Ariel") == []
+
+
 # --- El día que dijo, otra vez ----------------------------------------------------------------
 
 def test_el_dia_que_dijo_se_le_vuelve_a_preguntar(conn, mundo, servidor, equipo):

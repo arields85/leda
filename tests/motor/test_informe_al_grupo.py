@@ -479,6 +479,80 @@ def test_una_terminada_cuenta_por_el_dia_en_que_se_termino(conn, mundo, dias):
     assert "terminadas" not in hechos
 
 
+def _entregada(conn, tarea: str, at: datetime) -> None:
+    with admin(conn) as cur:
+        cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                     actor_kind, motivo, at)
+                       values (%s, 'en_curso', 'en_revision', 'sistema', 'prueba', %s)""",
+                    (tarea, at))
+    conn.commit()
+
+
+def test_lo_entregado_el_primer_dia_del_periodo_cuenta_para_la_semana_buena(conn, mundo, dias):
+    """El primer informe cuenta desde el lunes: una entrega del mismo lunes es de la semana
+    (revisión `review-f4d7f683f853df7c`, `informe_al_grupo.py:424`: se comparaban días, y lo del
+    mismo día que el informe anterior no contaba)."""
+    _con_informe(conn, mundo)
+    _cancelar_el_tablero(conn, mundo)
+    t2 = _estado(conn, mundo, T2, "en_curso", octubre(1, 10), vence=octubre(23, 17))
+    _entregada(conn, t2, octubre(5, 11))
+
+    hechos = _el_informe(dias, octubre(9, 16, 15))
+
+    assert _titulos(hechos["entregadas"]) == [T2]
+    assert hechos[TODO_EN_ORDEN] is True and hechos[SEMANA_BUENA] is True
+
+
+def test_lo_entregado_despues_del_informe_del_mismo_dia_cuenta_para_el_siguiente(conn, mundo,
+                                                                                dias):
+    """Una entrega del viernes después del informe de ese viernes es del período siguiente; una
+    de antes del informe ya contó en él y no vuelve a contar."""
+    _con_informe(conn, mundo)
+    _cancelar_el_tablero(conn, mundo)
+    t2 = _estado(conn, mundo, T2, "en_curso", octubre(1, 10), vence=octubre(23, 17))
+    t3 = _estado(conn, mundo, T3, "en_curso", octubre(1, 10), vence=octubre(23, 17))
+    _entregada(conn, t3, octubre(9, 11))
+    primero = _el_informe(dias, octubre(9, 16, 15))
+    assert primero[SEMANA_BUENA] is True
+    _entregada(conn, t2, octubre(9, 17))
+
+    hechos = _el_informe(dias, octubre(16, 16, 15))
+
+    assert hechos[SEMANA_BUENA] is True
+
+
+def test_lo_entregado_antes_del_informe_anterior_no_vuelve_a_contar(conn, mundo, dias):
+    _con_informe(conn, mundo)
+    _cancelar_el_tablero(conn, mundo)
+    t3 = _estado(conn, mundo, T3, "en_curso", octubre(1, 10), vence=octubre(23, 17))
+    _entregada(conn, t3, octubre(9, 11))
+    _el_informe(dias, octubre(9, 16, 15))
+
+    hechos = _el_informe(dias, octubre(16, 16, 15))
+
+    assert hechos[TODO_EN_ORDEN] is True and SEMANA_BUENA not in hechos
+
+
+def test_con_un_atraso_de_antes_no_hay_semana_buena(conn, mundo, escribe, dias):
+    """La semana buena es un reconocimiento cuando está todo en orden (decisión 55): con un atraso
+    que sigue de antes (ya hablado), el informe lo dice y no reconoce la semana, aunque algo se
+    haya terminado y no haya atrasos nuevos (revisión `review-f4d7f683f853df7c`,
+    `informe_al_grupo.py:334-335`)."""
+    _con_informe(conn, mundo, "15 16 * * 2,5")
+    dias.ciclo(octubre(9, 10))
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-20",
+                                                    "motivo": "falta el cable"}),
+         at=octubre(9, 10, 30))
+    _el_informe(dias, octubre(13, 16, 15))
+    _estado(conn, mundo, T2, "terminada", octubre(14, 11), vence=octubre(23, 17))
+
+    hechos = _el_informe(dias, octubre(16, 16, 15))
+
+    assert _titulos(hechos["atrasadas"]) == ["Revisar el tablero"]
+    assert _titulos(hechos["terminadas"]) == [T2]
+    assert TODO_EN_ORDEN not in hechos and SEMANA_BUENA not in hechos
+
+
 # --- Cuando algo falla ----------------------------------------------------------------------------
 
 def _guardar_el_del_viernes(conn, mundo):

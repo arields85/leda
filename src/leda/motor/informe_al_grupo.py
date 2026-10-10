@@ -331,7 +331,10 @@ def armar(m: Momento, desde: datetime) -> tuple[dict[str, Any], dict[str, Any]]:
         hechos[TODO_EN_ORDEN] = True
     elif not hechos:
         hechos[SIN_NOVEDADES] = True
-    if not informe["trabadas"] and _semana_buena(m, desde, bool(informe["terminadas"])):
+    # La semana buena es un reconocimiento cuando está todo en orden: con un atraso que sigue de
+    # antes, algo que no se sabe o algo trabado, no (decisión 55; revisión
+    # `review-f4d7f683f853df7c`, `informe_al_grupo.py:334-335`).
+    if en_orden and _semana_buena(m, desde, bool(informe["terminadas"])):
         hechos[SEMANA_BUENA] = True
     return ({"aviso": INFORME_AL_GRUPO, "necesita_respuesta": False, **hechos},
             {"terminadas": terminadas})
@@ -421,7 +424,10 @@ def _semana_buena(m: Momento, desde: datetime, hubo_terminadas: bool) -> bool:
             return False
     if hubo_terminadas:
         return True
-    return any(_entregada_desde(m, t) > m.fecha(desde) for t in _entregadas(m))
+    # Por el momento, no por el día: lo entregado el mismo día que el informe anterior, después
+    # de él, es de este período; lo de antes ya contó en aquél (revisión
+    # `review-f4d7f683f853df7c`, `informe_al_grupo.py:424`).
+    return any(_entregada_en(m, t) > desde for t in _entregadas(m))
 
 
 def _entregadas(m: Momento) -> list[dict[str, Any]]:
@@ -432,15 +438,13 @@ def _entregadas(m: Momento) -> list[dict[str, Any]]:
     return m.cur.fetchall()
 
 
-def _entregada_desde(m: Momento, t: dict[str, Any]) -> date:
-    """El día en que la tarea quedó entregada: el que anotó el motor en el turno de quien la
-    entregó (`cambios_de_estado`, con su reloj) o, si la entregó otro camino, su última
+def _entregada_en(m: Momento, t: dict[str, Any]) -> datetime:
+    """El momento en que la tarea quedó entregada: el del turno de quien la entregó, que anotó el
+    motor (`cambios_de_estado`, con su reloj) o, si la entregó otro camino, su última
     actualización (la proyección del evento que la puso en revisión)."""
-    dia = cambios_de_estado.desde(m.cur, t["id"], t["responsable_membership_id"], "en_revision",
-                                  m.cal.zona)
-    if dia and dia != cambios_de_estado.DESCONOCIDO:
-        return date.fromisoformat(dia)
-    return m.fecha(t["actualizado_en"])
+    momento = cambios_de_estado.momento_desde(m.cur, t["id"], t["responsable_membership_id"],
+                                              "en_revision")
+    return momento if isinstance(momento, datetime) else t["actualizado_en"]
 
 
 def _quedo_asentado_el_atraso(m: Momento, task_id, vence: date) -> bool:
