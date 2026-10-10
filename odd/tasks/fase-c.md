@@ -816,6 +816,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       - **Pregunta para el usuario:** "no podés ver esa" y "ninguna se llama así" son respuestas
         distintas, así que Nahuel puede saber que existe una tarea con esas palabras aunque no la
         vea (no su título ni nada más). ¿Alcanza, o las dos respuestas tienen que ser iguales?
+        **Superada por la decisión 33** (el resumen lo ve cualquiera del equipo): hecha abajo.
       - **Un nombre con un error de tipeo que la IA copie tal cual** ("tablro") no encuentra la
         tarea: Leda dice que ninguna se llama así. El dato le pide a la IA las palabras bien
         escritas; si con la IA real falla, se mira la comparación, no una lista de errores.
@@ -823,6 +824,59 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         botones (la duda de siempre ofrece sólo tareas de la lista de la persona, por su alias).
       - **El administrador de plataforma** pide su enlace por el bot de administración (porción
         5), no por esta jugada.
+    - [x] **El resumen para cualquiera, el detalle a pedido** (decisión 33; 2026-10-09;
+      conversaciones 31 y 45, migración `0050`). Route: delegada (escritor único, 2+ archivos
+      no triviales).
+      - **Qué:** quien pide el enlace de una tarea que no ve recibe su resumen (qué tarea, de
+        quién, cómo está y cuándo vence; `solo_el_resumen`), nunca "no la podés ver" ni el
+        enlace, y Leda le ofrece pedirle el detalle al encargado del sector de la tarea (el
+        referente de su área), como una propuesta (`detalle.ofrecer`). Si dice que sí
+        (`pedir_el_detalle`, una jugada nueva; también nombrando la tarea), la cocina anota el
+        pedido (`pedir_detalle_de_tarea`) y Leda le pregunta al encargado, como Leda, terminado
+        el margen, con dos botones, "Compartirla" y "No compartirla" (`pedido_del_detalle`); el
+        encargado la ve en su lista como un pedido que espera su decisión y contesta tocando o
+        escribiendo (`contestar_el_pedido_del_detalle`). Si la comparte, queda escrito por tarea
+        y persona (`tarea_compartida`: quién la compartió y cuándo, auditado como
+        `compartir_tarea`), la base la cuenta para ver la página (`puede_ver_tarea`) y a quien la
+        pidió le llega cómo terminó con el enlace (`como_termino_el_pedido_del_detalle`); si no,
+        se lo cuenta, con su porqué (decisión 39). Sin encargado, o si Leda no le puede
+        escribir, no se ofrece y los hechos dicen por qué (constitución §7); si ya lo pidió, lo
+        dice; si ya la ve, el enlace. Varias que coinciden y no ve: las nombra, como siempre.
+        Dejar de compartirla (`dejar_de_compartir_tarea`) la hace el encargado o quien la
+        compartió, auditado, y corta también el enlace ya emitido; sin jugada por chat.
+      - **La base** (`0050`, con su vuelta atrás, que se niega si hay algo compartido o pedido):
+        `pedido_de_detalle` y `tarea_compartida`, espacio obligatorio, RLS forzado con su
+        política, referencias con el espacio, sin `delete` para `leda_app`. La regla de quién
+        comparte (el encargado del sector de la tarea, buscada en el espacio de la fila), que lo
+        compartido sólo se revoca, una vez, y que un pedido sólo avanza la hacen cumplir dos
+        disparadores (`vigilar_tarea_compartida`, `vigilar_pedido_de_detalle`), sin funciones
+        `security definer` nuevas. `puede_ver_tarea` suma lo compartido vigente.
+      - **Test primero:** en rojo, 36 de 129 (`tests/motor/test_pedir_el_detalle.py`,
+        `test_pedir_enlace.py`, `test_fichas.py`, `tests/garantias/test_tarea_compartida.py` y
+        `test_enlace_de_la_tarea.py`); en seco, antes del código del motor, la 31 con 2 fallas y
+        la 45 con error. **Verde:** las del motor y `test_enlace_de_la_tarea.py`, 116 passed, y
+        las de la base, 14 de 14; en seco la 31 y la 45 bien; `pytest tests/garantias/test_migraciones.py` 16
+        passed (la vuelta atrás de la 0050 entra antes de la de la 0046 en el ensayo de la 0002).
+      - **Commits:** `aabbc7c` (las conversaciones 31 y 45, el corredor con `compartidas`),
+        `7862e95` (las pruebas del motor y de la base), `4c7ad1a` (la `0050`), `c72085e` (el
+        motor y la cocina) y el commit que registra esto.
+      - **Chequeos** (2026-10-09, sobre `c72085e`): `pytest tests/motor tests/garantias tests/conversaciones`, 1663
+        passed (1 aviso); en seco,
+        `correr --ia guionada --veces 1 --sin-informe`, 45 de 45 bien. Sin la IA real.
+      - `PENDIENTE` (preguntas para el usuario, sin decidir):
+        - **El ofrecimiento es una propuesta como cualquier otra:** se repite una vez a las 4
+          horas si no la contesta (decisión 29) y vuelve aparte después de un cambio de tema
+          (decisión 50). ¿Está bien para algo que es "si lo necesitás", o tiene que caerse sola?
+        - **Si el encargado no contesta:** hoy el pedido espera sin repetirse (los pases se
+          repiten una vez y terminan, decisión 26). ¿Lo mismo?
+        - **Quién deja de compartirla y por dónde:** la cocina deja al encargado o a quien la
+          compartió; no hay jugada por chat ni comando. ¿Por la plataforma, por chat, o también la
+          persona que la recibió? ¿Lo compartido vence solo (por ejemplo, al cerrarse la tarea)?
+        - **El porqué de un "no":** a quien pidió le llega con las palabras del encargado, como en
+          los pases. ¿O sólo que no se la compartió?
+        - **Encargado sin Leda conectada:** no se ofrece y se dice por qué, sin avisar al
+          administrador (la decisión 37 lo avisa para un bloqueo o un pase). ¿Se avisa también?
+        - **La IA real** sobre la 31 y la 45, en la tanda posterior.
   - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-3d.** Lo que decidió el usuario el 2026-10-08 (preguntas 10 a 20), en este orden. Route de
   cada una: delegada (escritor único, 2+ archivos no triviales), una por vez, revisión RDD por commit.
@@ -2982,7 +3036,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         (preguntarle a la persona trabada antes de asentar), 51 (hasta tres personas);
         conversaciones 34 y 36, sin migración (`4cadd41`, `86a5cdd`).
   - [x] C-5e: 42 (seguir la cadena hasta quien puede destrabarla; conversación 44, `ef860f3`).
-  - [ ] El enlace: 33 (el resumen para cualquiera, el detalle a pedido).
+  - [x] El enlace: 33 (el resumen para cualquiera, el detalle a pedido); conversaciones 31 y
+        45, migración `0050` (`4c7ad1a`, `c72085e`).
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [x] El informe al grupo de la C-6 (decisión 25; conversación 41, `0048`), con la corrección de
       la C-6 (una sola regla para lo contado, el día dado en la lista como previsión, la escalera
