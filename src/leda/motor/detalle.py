@@ -516,7 +516,8 @@ def _sin_encargado(m, pedido: dict, preguntado: str | None) -> None:
     coordinación, a la hora en que Leda escribe. Las preguntas del pedido, con sus botones,
     dejan de esperar."""
     _cerrar_las_preguntas(m.cur, pedido, m.ahora)
-    if preguntado is not None and preguntado != pedido["pedido_por_membership_id"]             and alcanzable(m.cur, preguntado)[1] is None:
+    if (preguntado is not None and preguntado != str(pedido["pedido_por_membership_id"])
+            and alcanzable(m.cur, preguntado)[1] is None):
         guardar(m.cur, m.workspace_id, COMO_TERMINO_EL_PEDIDO_DEL_DETALLE,
                 task_id=pedido["task_id"], destinatario=preguntado,
                 hechos={"aviso": COMO_TERMINO_EL_PEDIDO_DEL_DETALLE, "tarea": pedido["titulo"],
