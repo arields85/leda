@@ -2032,6 +2032,11 @@ def _abre_el_dia_que_dijo(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
     return persecucion.abre_el_dia_que_dijo(m, aviso)
 
 
+def _al_salir_la_pregunta_a_quien_destraba(m: Momento, aviso) -> None:
+    from . import persecucion
+    persecucion.al_salir_la_pregunta(m, aviso)
+
+
 def _abre_quien_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
     """La pregunta de quién destraba, otra vez, a la persona trabada (decisión 49): lo que
     recuerda al repetirla es lo que la traba (`preguntas.lo_anotado`)."""
@@ -2108,9 +2113,12 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso(APROBACION_TRABADA, "informativo", _vigencia_de_una_decision),
     TipoDeAviso(APROBACION_DESTRABADA, "informativo", _siempre, es_coordinacion=True),
     # La persecución del bloqueo (C-5): la pregunta a quien destraba, que lo causa lo que dijo la
-    # persona trabada, y lo que contesta, a la persona trabada. Los dos, de coordinación.
+    # persona trabada, y lo que contesta, a la persona trabada. Los dos, de coordinación. La
+    # pregunta que le corrige que ya no hacía falta (decisión 61) reabre al salir la que aquel
+    # aviso le cerró, la misma.
     TipoDeAviso(PREGUNTA_A_QUIEN_DESTRABA, "normal", _vigencia_de_la_pregunta_a_quien_destraba,
-                es_coordinacion=True, abre=_abre_cuando_se_destraba),
+                es_coordinacion=True, abre=_abre_cuando_se_destraba,
+                al_salir=_al_salir_la_pregunta_a_quien_destraba),
     TipoDeAviso(LO_QUE_DIJO_QUIEN_DESTRABA, "informativo", _vigencia_de_lo_que_dijo,
                 es_coordinacion=True),
     # Cerrar el tema para todos y lo acordado (C-5c): la pregunta a la persona trabada de qué

@@ -948,6 +948,17 @@ SIGNIFICADOS: Mapping[str, str] = {
                                       "(aviso_a_quien_destrababa).",
     "aviso_a_quien_destrababa": "El aviso de que ya no hace falta, a quien Leda le preguntaba "
                                 "por la tarea trabada: a quién (a) y cuándo se entera (llega).",
+    # Un "no le escribas" corregido tarde (decisión 61): a quien ya le llegó que no hacía falta.
+    "lo_de_antes_era_por_otra_tarea": "Lo que Leda le dijo antes a quien recibe el mensaje, que "
+                                      "ya no hacía falta que destrabara esta tarea, era por otra "
+                                      "tarea (la nombrada, si se nombra): se había anotado en la "
+                                      "equivocada. Para esta tarea sigue haciendo falta. Si el "
+                                      "mensaje no pregunta nada, Leda le pregunta el día que "
+                                      "había dicho (habia_dicho).",
+    "aviso_de_que_sigue_haciendo_falta": "El aviso a quien Leda le había dicho que ya no hacía "
+                                         "falta que destrabara la tarea: eso era por otra tarea y "
+                                         "para ésta sigue haciendo falta. A quién (a) y cuándo se "
+                                         "entera (llega).",
     "quien_esta_trabado": "Quién tiene la tarea trabada: la persona que dijo lo que llega.",
     "dice_quien_esta_trabado": "Lo que dijo la persona trabada sobre lo que arregló con quien "
                                "destraba su tarea, o lo que contestó: para cuándo y sus "
