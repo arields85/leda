@@ -70,7 +70,7 @@ pasaba; corregida en la rama); liberarlas pide la autorización del mantenedor (
    con el pedido del detalle cuyo sector se queda sin encargado mientras espera (decisión 33).
 4. **Los apodos:** el ADR 0020 (reemplaza la parte de apodos del ADR 0005), que el usuario lo acepte, la
    conversación de prueba y la construcción.
-5. **Los avisos que a veces no salen a su hora** (1 o 2 de cada 95): buscar la causa.
+5. **Hecho (2026-10-10):** los avisos que a veces no salían a su hora eran del corredor (no corría los reintentos tras una falla del servicio de la IA); corregido en `507b21e` y revisado.
 6. **La prueba de cupo antes de una ronda:** `leda chatgpt estado` mira sólo la sesión, no el cupo.
 7. **Cierre de la Fase C:** suite completa (`pytest -q`), `docs/capacidades.md` y limpieza (`apscheduler`,
    `mostrado_para_confirmar`, la fila "Delegar por chat" del roadmap).

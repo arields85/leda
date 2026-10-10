@@ -3635,6 +3635,11 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [ ] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
       conversación de prueba y construcción.
 - [x] Los avisos que a veces no salen a su hora: buscar la causa. **Hecho (2026-10-10).**
+      Revisión RDD de `507b21e`: `review-853aff8cab407c36`, aprobada y sellada; control del
+      coordinador: `test_comprobar.py`, 29 passed. Advertencias del corredor, conocidas y
+      aceptadas (no tocan el producto): el reloj puede volver atrás en el paso siguiente
+      (`corredor.py:351`), `motores.py:65` exige `esperas_tras_un_fallo` del motor, y la ventana
+      toma cualquier aviso guardado con `proximo_intento_en` (`corredor.py:344-346`).
       - **La causa:** un artefacto del corredor sobre una falla del servicio de la IA, no un
         defecto de Leda. Cuando el servicio falla al redactar un aviso (429, 503, plazo agotado,
         `ReadError`), el aviso queda guardado con su próximo intento a 1, 2, 4 u 8 minutos
