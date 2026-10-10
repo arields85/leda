@@ -864,19 +864,75 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         passed (1 aviso); en seco,
         `correr --ia guionada --veces 1 --sin-informe`, 45 de 45 bien. Sin la IA real.
       - `PENDIENTE` (preguntas para el usuario, sin decidir):
-        - **El ofrecimiento es una propuesta como cualquier otra:** se repite una vez a las 4
-          horas si no la contesta (decisión 29) y vuelve aparte después de un cambio de tema
-          (decisión 50). ¿Está bien para algo que es "si lo necesitás", o tiene que caerse sola?
-        - **Si el encargado no contesta:** hoy el pedido espera sin repetirse (los pases se
-          repiten una vez y terminan, decisión 26). ¿Lo mismo?
+        - **El ofrecimiento:** ~~una propuesta como cualquier otra~~ (derivado por el coordinador:
+          es opcional, no se repite ni vuelve, y sin respuesta es un no; hecho abajo).
+        - **Si el encargado no contesta:** ~~hoy el pedido espera sin repetirse~~ (derivado por el
+          coordinador de la decisión 26: lo mismo que los pases; hecho abajo).
         - **Quién deja de compartirla y por dónde:** la cocina deja al encargado o a quien la
           compartió; no hay jugada por chat ni comando. ¿Por la plataforma, por chat, o también la
           persona que la recibió? ¿Lo compartido vence solo (por ejemplo, al cerrarse la tarea)?
+          Anotado en `docs/product/plataforma-pendientes.md`.
         - **El porqué de un "no":** a quien pidió le llega con las palabras del encargado, como en
           los pases. ¿O sólo que no se la compartió?
-        - **Encargado sin Leda conectada:** no se ofrece y se dice por qué, sin avisar al
-          administrador (la decisión 37 lo avisa para un bloqueo o un pase). ¿Se avisa también?
+        - **Encargado sin Leda conectada:** ~~sin avisar al administrador~~ (derivado por el
+          coordinador de la decisión 37: se avisa; hecho abajo).
         - **La IA real** sobre la 31 y la 45, en la tanda posterior.
+      - [x] **El detalle a pedido: lo que dejaron la revisión y la impugnación** (2026-10-09; la
+        revisión RDD y una impugnación de seguridad independiente, sin BLOCKER ni CRITICAL; y lo
+        derivado por el coordinador de la decisión 33 con las reglas que ya rigen). Route:
+        delegada (escritor único, 2+ archivos no triviales).
+        - **El pedido sigue al encargado de ahora** (`detalle.py:263-267`, `herramientas.py:3122`,
+          `detalle.py:227`): se guardaba quién decidía al pedirlo, la lista filtraba por él y la base
+          comprobaba al de ahora, así que con un cambio de encargado el pedido quedaba trabado (y un
+          encargado anterior podía decir que no). Ahora, como la revisión sigue a quien aprueba
+          (decisiones 16 y 43): la pregunta va al encargado de ahora al salir
+          (`detalle.al_encargado_de_ahora`, `va_a`), lo ve en su lista y lo decide él; un
+          encargado anterior no decide nada, ni que sí ni que no (cocina y base: la `0051` guarda
+          quién lo decidió, `decidido_por_membership_id`, y `vigilar_pedido_de_detalle` exige que
+          sea el encargado de ahora); su botón viejo se lo dice como todo botón de una tarea que ya
+          no le corresponde. `decide_membership_id` sigue siendo a quién se le preguntó al pedirlo.
+        - **La auditoría dice lo que pasó** (`herramientas.py:3131-3152`): si quien lo pidió ya la
+          veía, decir que sí no comparte nada y queda `decidir_detalle_de_tarea` con `ya_la_veia`,
+          nunca `compartir_tarea` con `compartida_id` nulo. Un "no" también queda
+          (`no_compartir_tarea`), que antes no dejaba nada.
+        - **La carrera al pedirlo** (`herramientas.py:3088-3099`): dos mensajes que se cruzan
+          chocaban con el índice de uno abierto por persona y tarea; ahora el segundo encuentra el
+          primero (`on conflict do nothing`) y dice que ya lo pidió.
+        - **Una oferta opcional** (`preguntas.OPCIONAL`, una regla de las preguntas, no del enlace):
+          "si lo necesitás, le pregunto" no se repite a las 4 horas, no frena los otros temas, no
+          vuelve después de un cambio de tema ni cuando otro tema la deja de lado; sin respuesta es
+          un no y se cierra (`preguntas.caducar`; la escalera la cierra a la hora en que se habría
+          repetido). Constitución §8, "liviana en todo lo demás".
+        - **El encargado que no contesta** (`detalle.seguir_los_pedidos`, en la escalera): la
+          pregunta otra vez, una sola, el día hábil siguiente (`recordatorio_del_pedido_del_detalle`,
+          al encargado de ahora); al día hábil siguiente, a la hora de salida, el pedido termina sin
+          respuesta (la cocina, `terminar_pedido_de_detalle`, acto del sistema auditado; estado
+          `sin_respuesta` de la `0051`) y se enteran quien lo pidió (quién no contestó, que puede
+          volver a pedirlo) y el encargado (que ya no hace falta que conteste; decisión 39). La regla
+          es la misma que la de los pases, ahora en un solo lugar (`una_vez_y_termina`, que usan
+          `pase.seguir_los_pases` y `detalle.seguir_los_pedidos`).
+        - **Un encargado sin Leda conectada**: al ofrecerlo o pedirlo, los hechos dicen la verdad
+          (a quién no se le puede escribir) y el administrador recibe el aviso para que lo conecte
+          (el mecanismo de la decisión 37, `persecucion.avisar_para_que_lo_conecte`).
+        - **La plataforma:** quién deja de compartir una tarea y si vence, anotado en
+          `docs/product/plataforma-pendientes.md`.
+        - **La conversación 45**, extendida (pasos 13 a 17): la oferta de la envasadora no vuelve
+          después del cambio de tema; Martín no contesta el segundo pedido del servidor, se le
+          repite el martes y el miércoles termina para los dos (escrita después del código; en seco,
+          bien).
+        - **Test primero:** `tests/motor/test_pedir_el_detalle.py`, con la cocina ya cambiada: **10
+          failed, 22 passed** (el encargado de ahora, la oferta opcional, el que no contesta, el
+          administrador). Contra la cocina anterior (la de `HEAD`, con la `0051`): las de la
+          auditoría y la carrera, **3 failed** (la carrera, `UniqueViolation`; las de la auditoría,
+          sin su fila, aunque con la base nueva la decisión de la cocina vieja también chocaba con la
+          regla de quién decide). Verde: **32 passed**; `tests/garantias/test_tarea_compartida.py`,
+          18 passed.
+        - **Commits:** `08b1633` (la `0051` y la cocina), `a9b09fe` (el motor y la conversación 45) y
+          el que registra esto.
+        - **Chequeos** (2026-10-09, sobre `a9b09fe`): `pytest tests/motor tests/garantias tests/conversaciones tests/test_bloqueos.py`, **1716 passed** (22 min); en seco, `correr --ia guionada
+          --veces 1 --sin-informe`, **45 de 45 bien**. Sin la IA real; informes borrados.
+        - `PENDIENTE`: **el porqué de un "no"** (sigue la pregunta de arriba); la IA real sobre la
+          31 y la 45 (la redacción de una oferta opcional, `opcional`, y del fin sin respuesta).
   - [ ] Porción 5: el acceso del administrador.
 - [ ] **C-3d.** Lo que decidió el usuario el 2026-10-08 (preguntas 10 a 20), en este orden. Route de
   cada una: delegada (escritor único, 2+ archivos no triviales), una por vez, revisión RDD por commit.
@@ -2394,8 +2450,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         (incidente para el administrador); si la persona trabada no contesta la pregunta de si se
         le ocurre otra persona, la escalera de esa pregunta termina avisando como cualquier
         pregunta de quién lo destraba; a quien recibió la cadena (no sólo el bloqueo viejo) también
-        se le toma lo que dice; si la persona trabada nombra fuera del equipo al contestar, queda
-        anotado como siempre (Leda no le escribe) y la cadena no se asienta.
+        se le toma lo que dice; ~~si la persona trabada nombra fuera del equipo al contestar, queda
+        anotado como siempre (Leda no le escribe) y la cadena no se asienta~~ (corregido en la
+        C-5f: la cadena se corta y queda asentada).
   - [x] **C-5e: seguir la cadena hasta quien puede destrabarla** (decisión 42 del usuario,
     2026-10-09; con la 6, la 38 y la regla 39). Route: delegada (escritor único, 2+ archivos no
     triviales). Hecha el 2026-10-09:
@@ -2463,6 +2520,62 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         pregunta y, como siempre, puede decir que está trabado con algo suyo); cuando pudo seguir,
         la pregunta de para cuándo le llega aparte, pasada la media hora de conversación, y no en
         la misma respuesta.
+  - [x] **C-5f: las advertencias de las revisiones RDD de la C-5d, la C-5e y el informe al grupo**
+    (2026-10-09; revisiones aprobadas con advertencias, de las que llegó sólo el lugar; el porqué se
+    reconstruyó leyendo el código). Route: delegada (escritor único, 2+ archivos no triviales).
+    - **Qué se corrigió** (cada una como regla general, con su prueba vista en rojo):
+      1. `fichas.py:895-898` (C-5d): a la pregunta de si se le ocurre otra persona, la persona
+         trabada nombra a alguien de afuera del equipo: antes quedaba anotado y nada más (ni
+         cadena asentada ni nada que decirle). Ahora, como cuando quien no lo toma nombra a
+         alguien de afuera: la cadena se corta, queda asentada (decisión 49) y se le dice que
+         quedó asentado. Nunca en silencio.
+      2. `persecucion.py:509-516` (C-5d): la lista de quien recibió la cadena no tenía prueba.
+         Cuatro pruebas nuevas: la ve como que se le informó que sigue trabada (no como que la
+         destraba), no antes de que le salga, no otra persona, y no después de destrabarse (sin
+         rojo: el código ya lo hacía).
+      3. `persecucion.py:721-723` (C-5d): a quien se le informó que sigue trabada y habla cuando
+         nadie dijo nunca quién la destraba, la fila decía que la destrababa esa persona, un hecho
+         que nadie dijo (constitución §4): la esperaba en su lista, la perseguía el día que dijo
+         (C-5e) y la historia y la página decían "no hay otra persona que la destrabe". Ahora la
+         fila dice eso mismo, que habló sin decir quién la destraba (`sin_decir_quien`, migración
+         `0051`, la cuarta forma de la fila), y no cuenta para la cadena, la historia ni la
+         página; lo que dijo, sí. Auditado (`hablar_de_un_bloqueo_sin_decir_quien_lo_destraba`).
+      4. `persecucion.py:699-703` (C-5e): la pregunta del día que dijo comparaba con un valor por
+         omisión que, con la fila de alguien de afuera (o de nadie), le daba la pregunta a quien
+         sólo recibió el bloqueo viejo. Ahora va sólo a quien la fila nombra (`_lo_destraba` trae
+         `destraba_membership_id`).
+      5. `encadenados.py:280-289` (C-5e): cuando quien destraba pudo seguir, Leda le preguntaba
+         para cuándo sin mirar si la persona trabada había dicho "se lo pido yo y te cuento".
+         Ahora no le escribe (`persecucion.se_lo_pide_quien_esta_trabado`, por el aviso de cómo
+         le fue, que nombra la fila). Que lo destrabe otra persona ya lo cuidaba `_lo_esperan`
+         (prueba nueva, sin rojo).
+      6. `bloqueo_viejo.py:327` (C-5b): a la persona trabada se le nombraba a quien le iba a
+         llegar el bloqueo viejo releyendo al referente de ahora, aunque el aviso se estuviera
+         reintentando o hubiera salido a otro. Ahora: si salió, a quien le salió de verdad; si
+         espera su primer intento, a quien le va a llegar; si se está reintentando, a nadie
+         todavía (ni que no le llega a nadie); si no salió, que a nadie. Advertencia: si el
+         primer intento al referente falla en la misma pasada en que sale el de la persona
+         trabada, a ésta ya se le nombró (sólo si lo pregunta); los dos salen en la misma pasada.
+      7. `informe_al_grupo.py:424` (el informe): lo entregado se comparaba por día con el informe
+         anterior, así que lo entregado el mismo día (después del informe, o el lunes del primer
+         informe) no contaba. Ahora por el momento (`cambios_de_estado.momento_desde`).
+      8. `informe_al_grupo.py:334-335` (el informe): la semana buena se reconocía aunque el informe
+         trajera un atraso que sigue de antes. Ahora sólo con todo en orden (decisión 55).
+    - **Test primero:** rojo, `pytest tests/motor/test_cadena_del_bloqueo.py -k afuera_la_cadena`
+      1 failed (antes de la ficha) y, con las demás pruebas nuevas, `pytest
+      tests/motor/test_bloqueo_viejo.py tests/motor/test_cadena_del_bloqueo.py
+      tests/motor/test_seguir_la_cadena.py tests/motor/test_informe_al_grupo.py`, **8 failed, 119
+      passed**. Verde: las mismas, con las del detalle, **159 passed**.
+    - **La base** (`0051`, con su vuelta atrás, que se niega si alguna fila usa lo nuevo):
+      `blocker_unblocker.sin_decir_quien` y su restricción de exactamente una de cuatro;
+      `leer_pagina_de_tarea` (sigue de `leda_owner`, `security definer`) no muestra esa fila como
+      quién la destraba. Pruebas en `tests/garantias` (`test_motor_tablas.py`,
+      `test_pagina_de_la_tarea.py`); `test_migraciones.py` con la vuelta atrás de la 0051 antes que
+      la de la 0050: 16 passed.
+    - **Commits:** `08b1633` (la `0051` y la cocina), `c9707c0` (el motor) y el que registra esto.
+    - **Chequeos** (2026-10-09, sobre `a9b09fe`, con el detalle): `pytest tests/motor tests/garantias
+      tests/conversaciones tests/test_bloqueos.py`, **1716 passed**; en seco, 45 de 45 bien.
+    - `PENDIENTE`: la IA real sobre la 34, la 36 y la 44, en la tanda posterior.
 - [ ] **C-6.** Las cadencias (pregunta 8). El pedido de estado por persona, hecho y revisado el
   2026-10-09; el informe al grupo (decisión 25), construido el mismo día con su corrección (abajo,
   "La corrección de la C-6 y el informe al grupo"); falta la revisión RDD de ese tramo
@@ -2752,6 +2865,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     - **Chequeos:** (2026-10-09, sobre `f1b8976`) `pytest tests/motor tests/garantias
       tests/conversaciones`, **1582 passed**; en seco, `correr --ia guionada --veces 1
       --sin-informe`, **43 de 43 bien**. Sin la IA real y sin nada al grupo de Telegram.
+    - **Las advertencias de su revisión** (`informe_al_grupo.py:424` y `:334-335`) se corrigieron
+      en la C-5f (arriba): lo entregado cuenta por el momento, y la semana buena, sólo con todo en
+      orden.
     - `PENDIENTE`: la revisión RDD de este tramo (coordinador); la IA real sobre la 41 (la
       redacción de "todo en orden" y del reconocimiento, sin frases armadas) y la prueba por
       Telegram, en la tanda posterior.
@@ -3038,6 +3154,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
   - [x] C-5e: 42 (seguir la cadena hasta quien puede destrabarla; conversación 44, `ef860f3`).
   - [x] El enlace: 33 (el resumen para cualquiera, el detalle a pedido); conversaciones 31 y
         45, migración `0050` (`4c7ad1a`, `c72085e`).
+  - [x] Las advertencias de las revisiones de la C-5d, la C-5e, el informe y el detalle a pedido,
+        y lo derivado de la 33 (oferta opcional, el encargado que no contesta, sin Leda
+        conectada): C-5f y "El detalle a pedido: lo que dejaron la revisión y la impugnación";
+        migración `0051` (`08b1633`, `c9707c0`, `a9b09fe`).
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [x] El informe al grupo de la C-6 (decisión 25; conversación 41, `0048`), con la corrección de
       la C-6 (una sola regla para lo contado, el día dado en la lista como previsión, la escalera

@@ -102,6 +102,7 @@ de `workspace_setting` (se cambia por SQL).
 | Variante de redacción (`redaccion`: A o B) | `workspace_setting`, sembrado por el importador | Experimento del ADR 0014 |
 | Retención y visibilidad de las conversaciones | Fijado para el piloto por el ADR 0002 | Pasa a ser del cliente; requiere un ADR nuevo |
 | Revisión periódica del pack (cada N meses) | No existe | `nucleo/alta-de-equipo.md`, "Revisión periódica" |
+| Quién deja de compartir el detalle de una tarea y desde dónde, y si lo compartido vence solo (por ejemplo, cuando la tarea se cierra) | No hay jugada por chat ni comando: sólo la operación de la cocina `dejar_de_compartir_tarea`, que puede usar el encargado del sector de la tarea o quien la compartió (auditada; corta también el enlace ya emitido). Lo compartido no vence: vale hasta que alguien lo revoca | Decisión 33 del usuario (2026-10-09; `odd/tasks/fase-c.md`, "El resumen para cualquiera, el detalle a pedido"). `PENDIENTE` con el usuario: si se revoca desde la plataforma, por chat o también por quien lo recibió, y si vence al cerrarse la tarea |
 
 ## Decisiones abiertas que la plataforma va a necesitar
 
