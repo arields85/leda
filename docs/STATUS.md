@@ -3,8 +3,8 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-09, cierre a la mañana: la C-5, la C-6 (por persona) y la
-C-7 construidas y revisadas; las decisiones del usuario 24 a 52.
+**Última actualización documental:** 2026-10-10, madrugada: las decisiones 24 a 55 construidas y revisadas,
+la porción 5 de la C-3, la constitución 1.1 y el ADR 0021.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -33,42 +33,54 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-09, mañana, con el usuario)
+## Punto exacto para retomar (2026-10-10, madrugada, cierre con el usuario)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
-Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 52 (**todas
-contestadas**), el registro de cada unidad y la lista de tareas en "Próximo paso".
+Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 55, el registro de
+cada unidad y la lista de tareas en "Próximo paso".
 
-**Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`); al cerrar la sesión se apaga. Si
-está caído, levantarlo con `levantar-postgres.bat` (o `pg_ctl ... start`, fuera del sandbox). Si `pg_ctl` dice
-que otro servidor puede estar en ejecución, cerrar los procesos `postgres` colgados y reintentar. Comprobar que
-no quede un escuchador viejo corriendo.
+**Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si está caído, levantarlo con
+`levantar-postgres.bat` (o `pg_ctl ... start`, fuera del sandbox). Si `pg_ctl` dice que otro servidor puede
+estar en ejecución, cerrar los procesos `postgres` colgados y reintentar. Comprobar que no quede un escuchador
+viejo corriendo.
 
-**Lo hecho la noche del 2026-10-09 (sola, con el usuario dormido):** la D5b (decisión 21,
-conversación 30, `0040`), la `0041` (RLS forzado en cinco tablas de configuración y una prueba que
-recorre todas), pedir el enlace a la página por chat (conversación 31), la C-5 entera
-(perseguir un bloqueo, decisiones 4 a 7; conversaciones 32 a 36, `0042` a `0044`), el pedido de estado
-de la C-6 (conversación 37; el informe al grupo, `PENDIENTE`) y la C-7, delegar
-(conversación 38, `0045`). Con el usuario a la mañana: sus decisiones 24 a 52, los pedidos para la plataforma (jerarquía,
-avisos de cada uno, la vista de todo) y la C-8 (ausencias, para más adelante). Todo revisado por
-tramos y subido (`b21053c`); suite completa sobre `e082010`, 1857 passed.
+**Lo hecho el 2026-10-09 (de 10:22 a 00:30, con el usuario):** las decisiones 24 a 55, con test primero y
+revisadas por tramos: C-7 (26 a 28 y 53), D5b (29 y 50), C-6 (31, 32, 44 y 46), el informe al grupo (25, 54
+y 55; el grupo es "CoreWork IA", ya en el pack), la C-5 de la a a la f (24, 34 a 42, 47 a 49 y 51), el
+enlace (33, `0050`), una corrección acumulada (`0051`), la escalera en fin de semana (probada, sin cambios) y
+la porción 5 de la C-3 (el acceso del administrador, `0052`). Las reglas generales del usuario pasaron a la
+constitución 1.1 (§8, principios 13 y 14), con su porqué en el ADR 0021. Suite `tests/motor`,
+`tests/garantias`, `tests/conversaciones` y `test_administrador_plataforma.py` sobre `c06fa6d`: 1740 passed;
+en seco, 45 de 45.
 
-**Lo que sigue (pedido del usuario: avanzar todo lo posible solo, sin esperar pruebas):**
-1. **Construir las decisiones 24 a 52** (plan, "Preguntas al usuario"; la 30, la 40, la 43, la 45 y
-   la 52 no piden código), con test primero, una porción por grupo: C-5 (24, 34 a 42, 47 a 49,
-   51), C-7 (26 a 28), D5b (29, 50), C-6 (31, 32, 44, 46) y el enlace (33).
-2. **El informe al grupo de la C-6** (decisión 25): el usuario crea el grupo en Telegram; falta el
-   camino de un aviso al grupo y ver cómo toma Leda su identificador.
-3. **Las preguntas al usuario están todas contestadas** (decisiones 24 a 52); las nuevas, de a una y
-   con ejemplos simples.
-4. **La porción 5:** el acceso del administrador por el bot de administración.
-5. **Las pruebas pendientes van juntas, en una tanda posterior** (pedido del usuario): la IA real
-   sobre la 03, 05, 21, 23, 27, 28 y 30 a 38 (una vez, sin repetir sin preguntar) y la prueba por
-   Telegram, con `leda_motor` al día hasta la `0045` (respaldo previo; autorizado) y el guion en
-   tandas cortas de unos 15 minutos.
+**La revisión de la C-5c quedó sin sello:** su único CRÍTICO es un falso positivo verificado (en el plan).
+Dos revisiones quedaron trabadas en las carpetas temporales `_rdd-c7` y `_rdd-c5c`, y una tercera en
+`_rdd-adm` (la porción 5: pidió corregir una aserción confusa de `test_cli_enlaces_de_tarea.py`, que
+pasaba; corregida en la rama); liberarlas pide la autorización del mantenedor (el usuario). No traban la rama; las demás carpetas `_rdd-*` se pueden borrar.
 
-**La IA real:** antes de cada ronda, comprobar el cupo (`leda chatgpt estado`); una ronda por vez y ninguna
-repetición sin preguntarle al usuario. El corredor se corta solo al primer error de cupo (sale con 4). Si se
+**Lo que sigue:**
+1. **Pregunta al usuario:** una tarea que vence sábado o domingo. Hoy cuenta como si venciera el viernes
+   anterior (A); B, el lunes siguiente; C, la plataforma no deja cargarla. El agente recomendó C con A de
+   respaldo.
+2. **De la porción 5 (en el plan):** borrar o sólo ocultar el contenido retirado (ADR 0019 §3); si lo
+   retirado deja de cubrir la evidencia; si revocar por terminal exige nombrar al administrador. La respuesta
+   del bot de administración sale sin outbox, para no guardar el token en claro: arreglarlo en
+   `despachador.py`, que agregue el enlace al enviar, como con los integrantes.
+3. **Corrección chica:** `persecucion.py:703`, `herramientas.py:3111-3117`, `detalle.py:400-403`, avisar al
+   administrador si un sector no tiene encargado, y las advertencias de la revisión de la porción 5.
+4. **Los apodos:** el ADR 0020 (reemplaza la parte de apodos del ADR 0005), que el usuario lo acepte, la
+   conversación de prueba y la construcción.
+5. **Los avisos que a veces no salen a su hora** (1 o 2 de cada 95): buscar la causa.
+6. **La prueba de cupo antes de una ronda:** `leda chatgpt estado` mira sólo la sesión, no el cupo.
+7. **Cierre de la Fase C:** suite completa (`pytest -q`), `docs/capacidades.md` y limpieza (`apscheduler`,
+   `mostrado_para_confirmar`, la fila "Delegar por chat" del roadmap).
+8. **La tanda de pruebas:** una ronda con la IA real sobre las conversaciones nuevas y cambiadas, y la
+   prueba por Telegram con `leda_motor` al día hasta la `0052` (respaldo previo; autorizado).
+9. **La plataforma:** su ADR, con el usuario.
+
+**La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
+en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
+proceso de 90 minutos sobrevivió y avisó al terminar); nunca un escritor. El corredor se corta solo al primer error de cupo (sale con 4). Si se
 corta, el usuario cambia de cuenta a mano (`leda chatgpt salir` y `login`); decidió no rotar cuentas
 automáticamente. Una ronda completa de las 29 cuesta unas 1.500 a 1.800 llamadas.
 
@@ -83,7 +95,7 @@ guion es `docs/product/guion-telegram-fase-c-parte-1.md`):
 - **Ojo:** nunca el escuchador y una ronda del corredor a la vez, ni una ronda real mientras se edita `src/`.
 
 **`leda_motor`:** recreada el 2026-10-08 (D6) con las tareas de la prueba (vencen el viernes 16/10);
-respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`. Le falta la `0039`. El usuario autorizó
+respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`. Le faltan de la `0039` a la `0052`. El usuario autorizó
 ponerla al día o recrearla cuando haga falta, con respaldo previo; nunca `leda` ni `leda_flujo`.
 
 **Acuerdos de trabajo** (detalle en la memoria del agente):
@@ -140,7 +152,7 @@ validador de invariantes. Destino de cada uno:
   `deteccion_pregunta`, `jev` y `local`) y la escalera, el reloj y el ciclo viejos.
 - **La auditoría vuelve a la cocina:** cada `herramientas.ejecutar` y cada efecto propio del motor deja su fila
   en `audit_log`, con `pack_hash` y `nucleo_hash`.
-- **Migraciones:** hasta `0025` en `main`, más `0030` a `0045` en la rama. La `0032` borra las tablas del alta.
+- **Migraciones:** hasta `0025` en `main`, más `0030` a `0052` en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   `PENDIENTE`: un ensayo de propiedad sobre un clúster limpio.
@@ -178,6 +190,8 @@ validador de invariantes. Destino de cada uno:
 | Rama del Motor, ídem | `pytest tests/garantias` | 2026-10-08 | 326 passed |
 | Rama del Motor, ídem | `correr --ia guionada --veces 1` (en seco) | 2026-10-08 | 29 de 29 bien |
 | Rama del Motor, con la C-5, la C-6 y la C-7 (`e082010`) | suite completa | 2026-10-09 | 1857 passed |
+| Rama del Motor, con las decisiones 24 a 55 y la porción 5 (`c06fa6d`) | `pytest tests/motor tests/garantias tests/conversaciones tests/test_administrador_plataforma.py` | 2026-10-10 | 1740 passed |
+| Rama del Motor, ídem | `correr --ia guionada --veces 1` (en seco) | 2026-10-10 | 45 de 45 bien |
 
 **Conversaciones con la IA real** (bitácora de flujos):
 - La ronda 3 de la prueba chica dio 85 de 85.
@@ -203,8 +217,8 @@ Las cifras de pruebas miden el código: **una suite en verde no es evidencia de 
 - **La sesión de ChatGPT del usuario** está en `~/.leda/chatgpt.json`, fuera del repositorio, y se renueva sola
   (`leda chatgpt estado`).
 - **En OpenRouter** quedan unos USD 2 de crédito. Con la suscripción no hace falta para sol.
-- **El escuchador** lo corre el usuario en su terminal; las tareas en segundo plano del agente se cortan por
-  tiempo.
+- **El escuchador** lo corre el usuario en su terminal. Un comando en segundo plano del agente no se corta por
+  tiempo (probado el 2026-10-09 con 90 minutos), pero el escuchador sigue siendo del usuario.
 
 ## Riesgos prioritarios
 

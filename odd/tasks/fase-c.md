@@ -3194,7 +3194,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           una tarea (Leda no le puede preguntar si la toma), ni a alguien de Electricidad, que
           decide Mariano. ¿Está bien, o se puede decidir por la plataforma?
 
-## Próximo paso (cierre del 2026-10-09, a la mañana)
+## Próximo paso (cierre del 2026-10-10, de madrugada)
 
 **Lista de tareas de la noche** (pedido del usuario: ver lo hecho y lo que falta):
 
@@ -3209,7 +3209,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [x] C-5, porción 5: el bloqueo viejo (decisión 7; 36). **La C-5, completa y revisada.**
 - [x] C-6, el pedido de estado por persona (decisión 8; 37); el informe al grupo, abajo.
 - [x] C-7, delegar (38, `0045`), revisada; las decisiones 26, 27 y 28, hechas (39, `0046`).
-- [ ] Las decisiones 24 a 52 del usuario (2026-10-09; la 30, la 40, la 43, la 45 y la 52 ya están o
+- [x] Las decisiones 24 a 55 del usuario (2026-10-09; la 30, la 40, la 43, la 45 y la 52 ya estaban o
       esperan la prueba), con test primero, una porción por grupo (sesión del 2026-10-09, mañana):
   - [x] C-7: 26 (un pase sin respuesta), 27 (el encargado pasa una tarea de su gente), 28 (la
         revisión sigue a quien era la tarea); conversación 39, migración `0046`. Con su
@@ -3241,13 +3241,29 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [x] El informe al grupo de la C-6 (decisión 25; conversación 41, `0048`), con la corrección de
       la C-6 (una sola regla para lo contado, el día dado en la lista como previsión, la escalera
-      anclada al vencimiento). Falta su revisión RDD, la IA real y la prueba por Telegram.
+      anclada al vencimiento) y las decisiones 54 y 55. Revisado; faltan la IA real y la prueba por
+      Telegram.
 - [x] Porción 5 de la C-3: el acceso del administrador por el bot de administración (`0052`;
       `a6c3a07`, `9fc1191`, `3c9e150`, `c06fa6d`).
-- [ ] La tanda de pruebas: la IA real sobre la 03, 05, 21, 23, 27, 28 y 30 a 38 (una ronda, cupo
-      primero) y la prueba por Telegram, con `leda_motor` al día hasta la `0045` (respaldo previo).
+      Revisión RDD `review-97a7e59264f494f0`: pidió corregir un CRÍTICO de
+      `tests/test_cli_enlaces_de_tarea.py:59` (decía que la prueba fallaba siempre; pasaba, pero la
+      aserción era confusa): aserción corregida en la rama; la revisión quedó trabada en `_rdd-adm`.
+- [x] La escalera con un vencimiento en fin de semana: probada, siete pruebas, sin cambios (`c48ed43`).
+- [ ] Pregunta al usuario: una tarea que vence sábado o domingo (hoy cuenta como el viernes anterior).
+- [ ] La corrección chica: `persecucion.py:703`, `herramientas.py:3111-3117`, `detalle.py:400-403`,
+      avisar al administrador si un sector no tiene encargado, y lo que deje la revisión de la porción 5
+      (más su respuesta sin outbox, a arreglar en `despachador.py`).
+- [ ] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
+      conversación de prueba y construcción.
+- [ ] Los avisos que a veces no salen a su hora: buscar la causa.
+- [ ] La prueba de cupo antes de una ronda con la IA real.
+- [ ] Cierre de la Fase C: suite completa, `docs/capacidades.md` y limpieza.
+- [ ] La tanda de pruebas: una ronda con la IA real sobre las conversaciones nuevas y cambiadas
+      (lanzada por el coordinador en segundo plano) y la prueba por Telegram, con `leda_motor` al
+      día hasta la `0052` (respaldo previo).
+- [ ] La plataforma: su ADR, con el usuario.
 
 **Preguntas juntadas para el usuario: contestadas todas** (2026-10-09, a la mañana, de a una y
-con ejemplos simples). Son las decisiones 24 a 52 de "Preguntas al usuario", más los pedidos para
+con ejemplos simples). Son las decisiones 24 a 55 de "Preguntas al usuario", más los pedidos para
 la plataforma (`docs/product/plataforma-pendientes.md`, "La jerarquía, los avisos de cada uno y la
 vista de todo") y la C-8 (las ausencias), pendiente para más adelante.
