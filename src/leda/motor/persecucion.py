@@ -53,6 +53,8 @@ mensaje no sale (`avisos.ya_contesto_quien_destraba`).
 **"No le escribas"** (`no_escribirle`): la persona trabada pide que Leda no le escriba a quien
 destraba. Si el mensaje todavía no salió, queda omitido con su motivo (nunca se borra) y
 auditado; si ya salió, el hecho dice que ya le llegó y cuándo: nunca se hace como que se retira.
+Si quedó anotado en la tarea equivocada, se corrige como cualquier hecho (9f y 9n,
+`deshacer_no_escribirle`): lo que todavía no salió vuelve a como estaba y pasa a la tarea correcta.
 
 Lo que espera de quien destraba se cierra cuando la tarea se destraba (`al_destrabarse`) o la
 destraba otra persona (`preguntarle`); por cualquier otro camino, la escalera lo cierra al mirarlo
@@ -1602,6 +1604,146 @@ def no_escribirle(ctx: Contexto, datos: dict[str, Any],
                                  else NO_LE_VA_A_LLEGAR,
                                  **({"motivo": aviso["motivo_omision"]}
                                     if aviso["motivo_omision"] else {})}}
+
+
+def deshacer_no_escribirle(ctx: Contexto, tarea: dict[str, Any]) -> dict[str, Any] | None:
+    """Corrige un "no le escribas" anotado en la tarea equivocada (ADR 0018, 9f y 9n; ronda real
+    del 2026-10-10, conversación 32): lo que hizo en esa tarea vuelve a como estaba, agregando
+    hechos, y `corregir` lo anota en la correcta, para la misma persona.
+
+    - **El mensaje que retiró** (todavía no había salido) vuelve a quedar guardado, el mismo, y
+      sale terminado el margen para corregir: la corrección también es algo que dijo la persona
+      trabada. Si después se guardó otro mensaje para esa tarea, ése es el que vale y no vuelve.
+    - **Que ya no hace falta** (Leda dejaba de preguntarle a quien destraba): si todavía no salió,
+      se retira (`se_anoto_en_la_tarea_equivocada`) y su pregunta y su espera, cerradas por él,
+      vuelven como estaban. El aviso retirado libera su clave: si la persona pide lo mismo por
+      esta tarea, se vuelve a guardar. Si ya salió, los hechos dicen que ya le llegó y cuándo:
+      nunca se hace como que no pasó.
+
+    `None` si en esa tarea no hay nada de un "no le escribas" que deshacer. La corrección queda
+    auditada (`corregir_no_escribirle`)."""
+    cur = ctx.cur
+    task_id = str(tarea["id"])
+    cur.execute(
+        """select a.*, i.nombre as a_nombre from scheduled_notice a
+             join integrante i on i.membership_id = a.destinatario_membership_id
+            where a.tipo = %s and a.task_id = %s and a.estado = 'omitido'
+              and a.motivo_omision = %s
+              and not exists (select 1 from scheduled_notice b
+                               where b.tipo = a.tipo and b.task_id = a.task_id
+                                 and b.creado_en > a.creado_en)
+            order by a.resuelto_en desc limit 1""",
+        (PREGUNTA_A_QUIEN_DESTRABA, task_id, PIDIO_QUE_NO_LE_ESCRIBA))
+    retirado = cur.fetchone()
+    cur.execute(
+        """select a.*, i.nombre as a_nombre from scheduled_notice a
+             join integrante i on i.membership_id = a.destinatario_membership_id
+            where a.tipo = %s and a.task_id = %s and a.estado <> 'omitido'
+              and split_part(a.dedupe_key, ':', 5) = %s
+            order by a.creado_en desc, a.id desc limit 1""",
+        (YA_NO_HACE_FALTA, task_id, DIJO_QUE_YA_LO_HABLARON))
+    cerrado = cur.fetchone()
+    if retirado is not None and (cerrado is None
+                                 or retirado["resuelto_en"] >= cerrado["creado_en"]):
+        hechos, aviso, persona = _devolver_el_mensaje(ctx, retirado), retirado, retirado
+    elif cerrado is not None:
+        hechos, aviso, persona = _volver_a_preguntarle(ctx, cerrado), cerrado, cerrado
+    else:
+        return None
+    auditar(cur, accion="corregir_no_escribirle", workspace_id=ctx.quien.workspace_id,
+            sujeto_tipo="scheduled_notice", sujeto_id=aviso["id"], quien=ctx.quien,
+            detalle={"aviso_id": str(aviso["id"]), "tipo": aviso["tipo"], "task_id": task_id,
+                     "destinatario_membership_id": str(aviso["destinatario_membership_id"]),
+                     "motivo": "se_anoto_en_la_tarea_equivocada",
+                     "at": ctx.ahora.isoformat(), "inbound_message_id": ctx.entrante_id})
+    return {"hechos": hechos, "datos": {"quien": persona["a_nombre"]}}
+
+
+def _devolver_el_mensaje(ctx: Contexto, retirado: dict[str, Any]) -> dict[str, Any]:
+    """El mensaje a quien destraba que "no le escribas" retiró vuelve a quedar guardado: el
+    mismo, con su clave y sus hechos (su vigencia lo mira al salir, como a cualquiera), terminado
+    el margen para corregir si su hora ya no lo deja."""
+    sale = max(retirado["programado_para"],
+               sale_con_margen(ctx.cur, ctx.calendario, ctx.quien.workspace_id, ctx.ahora))
+    ctx.cur.execute("""update scheduled_notice
+                          set estado = 'guardado', motivo_omision = null, resuelto_en = null,
+                              programado_para = %s
+                        where id = %s and estado = 'omitido'""", (sale, retirado["id"]))
+    hecho: dict[str, Any] = {"se_le_pregunta_a": {
+        "a": retirado["a_nombre"], LLEGA: sale.astimezone(ctx.calendario.zona).isoformat()}}
+    nombrar_efecto(hecho, "se_le_pregunta_a", AVISO, retirado["id"])
+    return hecho
+
+
+def _volver_a_preguntarle(ctx: Contexto, cerrado: dict[str, Any]) -> dict[str, Any]:
+    """El aviso de que ya no hace falta: si no salió, se retira y lo que Leda le preguntaba a
+    esa persona vuelve como estaba (lo que se cerró con él, en el mismo momento); si salió, los
+    hechos dicen que ya le llegó."""
+    cur, cal = ctx.cur, ctx.calendario
+    if cerrado["estado"] != "guardado":
+        llego: dict[str, Any] = {"a": cerrado["a_nombre"]}
+        if cerrado["estado"] == "enviado":
+            llego.update({LLEGA: YA_LE_LLEGO, "el": cerrado["resuelto_en"].astimezone(
+                cal.zona).date().isoformat()})
+        else:
+            llego[LLEGA] = NO_LE_LLEGO
+        return {YA_NO_HACE_FALTA_QUE_DESTRABEN: [{AVISO_A_QUIEN_DESTRABABA: llego}]}
+    # Retirado, libera su clave: lo mismo por esta tarea se puede volver a guardar.
+    cur.execute("""update scheduled_notice
+                      set estado = 'omitido', motivo_omision = 'se_anoto_en_la_tarea_equivocada',
+                          resuelto_en = %s, proximo_intento_en = null,
+                          dedupe_key = dedupe_key || ':c' || id::text
+                    where id = %s and estado = 'guardado'""", (ctx.ahora, cerrado["id"]))
+    persona, task_id = str(cerrado["destinatario_membership_id"]), str(cerrado["task_id"])
+    _seguir_preguntandole(ctx, persona, task_id, cerrado["creado_en"])
+    avisado: dict[str, Any] = {AVISO_A_QUIEN_DESTRABABA: {"a": cerrado["a_nombre"],
+                                                          LLEGA: NO_LE_VA_A_LLEGAR}}
+    nombrar_efecto(avisado, AVISO_A_QUIEN_DESTRABABA, AVISO, cerrado["id"])
+    hecho: dict[str, Any] = {YA_NO_HACE_FALTA_QUE_DESTRABEN: [avisado]}
+    cur.execute("""select resuelto_en from scheduled_notice
+                    where tipo = %s and task_id = %s and destinatario_membership_id = %s
+                      and estado = 'enviado'
+                    order by resuelto_en desc limit 1""",
+                (PREGUNTA_A_QUIEN_DESTRABA, task_id, persona))
+    pregunta = cur.fetchone()
+    if pregunta is not None:
+        hecho["se_le_pregunta_a"] = {"a": cerrado["a_nombre"], LLEGA: YA_LE_LLEGO,
+                                     "el": pregunta["resuelto_en"].astimezone(
+                                         cal.zona).date().isoformat()}
+    return hecho
+
+
+def _seguir_preguntandole(ctx: Contexto, persona: str, task_id: str, cuando) -> None:
+    """Lo que `_ya_no_le_pregunta` cerró en ese momento vuelve a estar abierto: la pregunta de
+    esa persona (la misma, con sus repeticiones) y su espera. Si no tiene otra pregunta abierta,
+    vuelve a ser la que se le hace; si tiene otra, queda para después (un tema a la vez)."""
+    cur = ctx.cur
+    cur.execute("""update conversation_question
+                      set cerrada_en = null, cierre = null, cierre_detalle = null
+                    where membership_id = %s and task_id = %s and tipo = %s
+                      and cerrada_en = %s and cierre = 'sin_efecto'
+                      and cierre_detalle ->> 'ya_no_hace_falta' = 'true'
+                returning id, para_despues_en""",
+                (persona, task_id, preguntas.CUANDO_SE_DESTRABA, cuando))
+    for q in cur.fetchall():
+        cur.execute("""select q.id from conversation_state s
+                         join conversation_question q on q.id = s.pregunta_abierta_id
+                        where s.membership_id = %s and q.cerrada_en is null""", (persona,))
+        if cur.fetchone() is None and q["para_despues_en"] is None:
+            cur.execute("""update conversation_state set pregunta_abierta_id = %s,
+                                                         actualizado_en = %s
+                            where membership_id = %s""", (q["id"], ctx.ahora, persona))
+        elif q["para_despues_en"] is None:
+            cur.execute("update conversation_question set para_despues_en = %s where id = %s",
+                        (ctx.ahora, q["id"]))
+    cur.execute("""update pending_reply set satisfecho_en = null
+                    where membership_id = %s and task_id = %s and tipo = %s
+                      and satisfecho_en = %s
+                      and not exists (select 1 from pending_reply p
+                                       where p.membership_id = %s and p.task_id = %s
+                                         and p.tipo = %s and p.satisfecho_en is null)""",
+                (persona, task_id, preguntas.CUANDO_SE_DESTRABA, cuando,
+                 persona, task_id, preguntas.CUANDO_SE_DESTRABA))
 
 
 def _dio_un_dia(cur, persona: str, blocker_id: str) -> bool:

@@ -25,7 +25,7 @@ from leda.motor import hechos as hechos_mod
 from leda.motor.tiempo import RelojFijo
 
 from tests.motor.ayudantes import (AHORA, IAQueRedacta, administrador, avisos_guardados,
-                                   cuantas, enviar, octubre, todos, uno)
+                                   cuantas, enviar, nueva_tarea, octubre, todos, uno)
 from tests.motor.test_aprobacion import Turnos
 
 ARIEL, MARIANO = "Ariel De Simone", "Mariano Naim"
@@ -961,6 +961,141 @@ def test_no_le_escribas_con_la_pregunta_abierta_deja_de_preguntarle_y_se_lo_dice
     # Quién destraba sigue anotado y el bloqueo, abierto.
     assert cuantas(conn, "blocker_unblocker") == 1
     assert cuantas(conn, "blocker", "resuelto_en is null") == 1
+
+
+# Corregir "no le escribas" anotado en la otra tarea (9f y 9n; ronda real del 2026-10-10,
+# conversación 32: Marcos pidió no escribirle a Ariel por una tarea y quedó anotado en la otra, que
+# también destraba Ariel; la corrección decía que no cambiaba nada).
+
+COMUNICACIONES = "Probar las comunicaciones"
+EQUIVOCADA = "se_anoto_en_la_tarea_equivocada"
+
+
+def _trabada_tambien(conn, mundo, equipo) -> str:
+    """Marcos se traba también con T2, que destraba Ariel: la id de T2."""
+    t2 = nueva_tarea(conn, mundo, COMUNICACIONES)
+    equipo.dice("Marcos", Jugada("anotar_bloqueo", {"tarea": "T2", "causa": "falta la licencia"}))
+    equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"tarea": "T2", "quien": "ariel"}))
+    return t2
+
+
+def _pregunta_a_ariel(conn, task_id: str) -> dict:
+    return uno(conn, "select * from scheduled_notice where tipo = %s and task_id = %s",
+               PREGUNTA_A_QUIEN_DESTRABA, task_id)
+
+
+def _corregir_a_t2(equipo, *mas: Jugada):
+    return equipo.dice("Marcos", Jugada("corregir", {"corrige": "no_escribirle", "tarea": "T1",
+                                                     "tarea_correcta": "T2"}), *mas)
+
+
+def test_corregir_no_le_escribas_devuelve_el_mensaje_y_lo_retira_de_la_tarea_correcta(
+        conn, mundo, equipo):
+    """Ningún mensaje salió todavía: el de T1, retirado por error, vuelve a salir (terminado el
+    margen de la corrección, que es algo que dijo Marcos); el de T2 queda retirado."""
+    _trabada(equipo)
+    t2 = _trabada_tambien(conn, mundo, equipo)
+    equipo.dice("Marcos", Jugada("no_escribirle", {"tarea": "T1", "quien": "ariel"}))
+    assert _pregunta_a_ariel(conn, mundo["tarea"])["estado"] == "omitido"
+
+    r = _corregir_a_t2(equipo)
+
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["tarea"]["titulo"]) == ("corregido", "Revisar el tablero")
+    assert hecho["se_le_pregunta_a"] == {"a": ARIEL, "llega": "2026-10-05T10:16:00-03:00"}
+    aplicado = hecho["aplicado"]
+    assert (aplicado["resultado"], aplicado["tarea"]["titulo"]) == ("anotado", COMUNICACIONES)
+    assert aplicado["se_le_pregunta_a"] == {"a": ARIEL, "llega": "no_le_va_a_llegar",
+                                            "motivo": "pidio_que_no_le_escriba"}
+    de_t1, de_t2 = _pregunta_a_ariel(conn, mundo["tarea"]), _pregunta_a_ariel(conn, t2)
+    assert (de_t1["estado"], de_t1["motivo_omision"]) == ("guardado", None)
+    assert de_t1["programado_para"] == AHORA + timedelta(minutes=6 + 10)
+    assert (de_t2["estado"], de_t2["motivo_omision"]) == ("omitido", "pidio_que_no_le_escriba")
+    # Nada se borra: la corrección queda auditada, junto a los dos "no le escribas".
+    assert cuantas(conn, "audit_log", "accion = 'corregir_no_escribirle'") == 1
+    assert cuantas(conn, "audit_log", "accion = 'no_escribirle'") == 2
+
+    _salir(conn, mundo, AHORA + timedelta(minutes=20))
+
+    assert cuantas(conn, "message_outbox", "destinatario_membership_id = %s",
+                   _membresia(mundo, "Ariel")) == 1
+    assert _su_pregunta(conn, mundo)["tarea"] == mundo["tarea"]
+
+
+def test_corregir_no_le_escribas_vuelve_a_preguntarle_como_antes(conn, mundo, equipo):
+    """La pregunta de T1 ya le había llegado y Leda le dejaba de preguntar: el aviso de que ya no
+    hace falta, que todavía no salió, se retira, y su pregunta y su espera vuelven como estaban."""
+    _le_pregunto(conn, mundo, equipo)
+    _trabada_tambien(conn, mundo, equipo)
+    equipo.dice("Marcos", Jugada("no_escribirle", {"tarea": "T1", "quien": "ariel"}))
+    assert _abiertas(conn, mundo, "Ariel") == 0
+
+    r = _corregir_a_t2(equipo)
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "corregido"
+    assert hecho["se_le_pregunta_a"] == {"a": ARIEL, "llega": "ya_le_llego", "el": "2026-10-05"}
+    [avisado] = hecho["ya_no_hace_falta_que_destraben"]
+    assert avisado["aviso_a_quien_destrababa"] == {"a": ARIEL, "llega": "no_le_va_a_llegar",
+                                                   "motivo": EQUIVOCADA}
+    [cerrado] = avisos_guardados(conn, YA_NO_HACE_FALTA)
+    assert (cerrado["estado"], cerrado["motivo_omision"]) == ("omitido", EQUIVOCADA)
+    assert _abiertas(conn, mundo, "Ariel", "cuando_se_destraba") == 1
+    assert _esperas(conn, mundo, "Ariel") == 1
+    assert _su_pregunta(conn, mundo)["tarea"] == mundo["tarea"]
+    assert hecho["aplicado"]["se_le_pregunta_a"]["llega"] == "no_le_va_a_llegar"
+
+    _salir(conn, mundo, AHORA + timedelta(minutes=60))
+
+    assert avisos_guardados(conn, YA_NO_HACE_FALTA)[0]["estado"] == "omitido"
+
+
+def test_corregir_y_pedir_lo_mismo_por_la_otra_en_el_mismo_mensaje(conn, mundo, equipo):
+    """La ronda real: Ariel ya había dado un día por T1; "no le escribas" por T2 quedó en T1, y
+    Marcos corrige y pide lo mismo por T1 en un mensaje. El aviso equivocado se retira y el de
+    T1 se vuelve a guardar: la corrección no le quita su lugar."""
+    _le_pregunto(conn, mundo, equipo)
+    _ariel_dice(equipo, para_cuando="2026-10-06")
+    t2 = _trabada_tambien(conn, mundo, equipo)
+    equipo.dice("Marcos", Jugada("no_escribirle", {"tarea": "T1", "quien": "ariel"}))
+
+    r = _corregir_a_t2(equipo, Jugada("no_escribirle", {"tarea": "T1", "quien": "ariel"}))
+
+    corregido, otra_vez = r.hechos
+    assert corregido["resultado"] == "corregido"
+    assert corregido["aplicado"]["se_le_pregunta_a"]["llega"] == "no_le_va_a_llegar"
+    assert _pregunta_a_ariel(conn, t2)["motivo_omision"] == "pidio_que_no_le_escriba"
+    assert otra_vez["resultado"] == "anotado"
+    [avisado] = otra_vez["ya_no_hace_falta_que_destraben"]
+    assert avisado["aviso_a_quien_destrababa"]["a"] == ARIEL
+    equivocado, vale = avisos_guardados(conn, YA_NO_HACE_FALTA)
+    assert (equivocado["estado"], equivocado["motivo_omision"]) == ("omitido", EQUIVOCADA)
+    assert vale["estado"] == "guardado"
+    assert vale["hechos"]["habia_dicho"] == {"para_cuando": "2026-10-06"}
+
+
+def test_corregir_no_le_escribas_que_ya_le_llego_lo_dice_y_no_lo_deshace(conn, mundo, equipo):
+    """El aviso de que ya no hace falta ya le llegó a Ariel: no se hace como que no pasó (sus
+    hechos lo dicen) y la corrección pasa igual a la tarea correcta."""
+    _le_pregunto(conn, mundo, equipo)
+    t2 = _trabada_tambien(conn, mundo, equipo)
+    equipo.dice("Marcos", Jugada("no_escribirle", {"tarea": "T1", "quien": "ariel"}))
+    with admin(conn) as cur:
+        cur.execute("update scheduled_notice set estado = 'enviado', resuelto_en = %s "
+                    "where tipo = %s", (AHORA + timedelta(minutes=34), YA_NO_HACE_FALTA))
+    conn.commit()
+
+    r = _corregir_a_t2(equipo)
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "corregido"
+    [avisado] = hecho["ya_no_hace_falta_que_destraben"]
+    assert avisado["aviso_a_quien_destrababa"] == {"a": ARIEL, "llega": "ya_le_llego",
+                                                   "el": "2026-10-05"}
+    assert "se_le_pregunta_a" not in hecho
+    assert _abiertas(conn, mundo, "Ariel", "cuando_se_destraba") == 0
+    assert hecho["aplicado"]["resultado"] == "anotado"
+    assert _pregunta_a_ariel(conn, t2)["motivo_omision"] == "pidio_que_no_le_escriba"
 
 
 # Decisiones 47 y 48: lo acordado se confirma con el otro; "ya lo hablé" sin decir qué, a los dos.

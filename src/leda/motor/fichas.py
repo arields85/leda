@@ -1415,6 +1415,13 @@ def _deshacer_bloqueo(ctx: Contexto, tarea: dict) -> dict | None:
             "datos": {"causa": bloqueo["causa"]}}
 
 
+def _deshacer_no_escribirle(ctx: Contexto, tarea: dict) -> dict | None:
+    """El mensaje a quien destraba que retiró vuelve, o lo que Leda le preguntaba sigue, si
+    todavía no salió nada que lo cierre (`persecucion.deshacer_no_escribirle`)."""
+    from . import persecucion               # persecucion importa este módulo
+    return persecucion.deshacer_no_escribirle(ctx, tarea)
+
+
 FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
     Ficha("anotar_inicio", "anotar que arrancó una tarea",
           necesita=("tarea",), opcional=(),
@@ -1722,6 +1729,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="la respuesta dice que no le escribe o, si ya salió, que ya le llegó y, si "
                   "le seguía preguntando, que no le pregunta más y esa persona se entera",
           manejar=_no_escribirle, del_responsable=True, se_ofrece=False,
+          deshacer=_deshacer_no_escribirle,
           es="La persona trabada pide que Leda no le escriba a quien destraba su tarea (por "
              "ejemplo, porque ya habló con esa persona). quien es a quién, como lo nombró. No "
              "cambia quién destraba ni cierra el bloqueo."),
