@@ -3673,7 +3673,42 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [ ] Cierre de la Fase C: suite completa, `docs/capacidades.md` y limpieza.
 - [ ] La tanda de pruebas: una ronda con la IA real sobre las conversaciones nuevas y cambiadas
       (lanzada por el coordinador en segundo plano) y la prueba por Telegram, con `leda_motor` al
-      día hasta la `0052` (respaldo previo).
+      día hasta la `0054` (respaldo previo).
+  - [x] **La ronda de las 30 a 45 con la IA real** (2026-10-10, de tarde; sol por la suscripción,
+        5 veces, código de `39b21f1`). Primera vez con la IA real para las 30 a 45 (la D6 cubrió
+        las 01 a 29). En dos partes: `resultados/fase-c-30-45.md` (30 a 38; cortada por cupo en la
+        38, vez 5, después de 44 corridas, salida 4) y, con otra cuenta, `fase-c-38b.md` (la 38,
+        una vez) y `fase-c-39-45.md` (39 a 45). La segunda parte corrió Leda desde una carpeta
+        aparte en `39b21f1` (`PYTHONPATH` a su `src`) mientras un escritor editaba la rama: el
+        renglón "Commit" de esos informes dice el de la carpeta del corredor, no el del código.
+        - **Resultado:** 30 a 38, garantías 31 de 44 y todo bien 14; 38b, garantías 1 de 1; 39 a
+          45, garantías 30 de 35 y todo bien 8. Ninguna escritura sin confirmación ni filtración.
+        - **Lo que era de Leda (arreglado):** (1) al decir la persona trabada "no sé quién" o
+          "nadie más", a quien Leda le preguntaba antes le llegaba que "otra persona se encarga"
+          (falso; la 34): ahora el aviso dice el motivo cierto (`19f93d6`); (2) la pregunta "¿quién
+          se encarga?" se guardaba como "¿para cuándo?" y la IA preguntaba la fecha (`aebf331`).
+          Revisión RDD de `39b21f1..19f93d6`, aprobada y reconocida (`review-1d84fc4e33d172a3`).
+        - **De Leda, por arreglar:** (3) "no le escribas" no se podía corregir dentro del margen
+          (la 32; ADR 0018, 9n; escritor en curso); (4) "la tarea del switch" no encuentra "Configurar
+          el switch de la planta" porque "tarea" no está entre las palabras que no nombran
+          (`enlace.py:54`): Leda dice que no existe, y la 45 falla 13 o más cada vez; (5) el hecho
+          `persona_desconocida` no dice qué nombre no encontró y la IA nombró a otra persona (la 39,
+          `pase.py:172`); (6) la oferta de pasarle algo a quien destraba no deja una pregunta
+          abierta, así que la respuesta "que llegue nomás" se lee suelta (la 43, paso 9).
+        - **De la IA, aceptado por Leda:** "el motor ya lo arranqué" leído como avance y no como
+          inicio (la 40, 2 de 5); "no le escribas" a la tarea equivocada (la 32, 2 de 5); `a: "yo"`
+          en un pase (la 39, una vez).
+        - **De las pruebas:** el comparador cuenta como garantía una fila que difiere en un dato
+          (`comprobar.py:553`) y las filas correctas después de una cascada; el corredor sigue el
+          guion después de que el estado se separó (la 34 y la 44, 25 y 50 fallas); no marca como
+          `[servicio]` un turno en el que la IA no respondió (sólo los avisos); YAML más estrictos
+          que la ficha (36 paso 20 `ya_esta`, 35 paso 4, 39 paso 20).
+        - **Formato:** unas 6 de cada 10 fallas (renglones de más de 140 caracteres y dos
+          preguntas al cierre); la instrucción de la redacción dice sólo "renglones cortos".
+        - **El cupo:** la primera parte gastó la ventana entera de 5 horas en unas 9 conversaciones
+          de 5 veces. El servicio informa el cupo en las cabeceras de cada respuesta
+          (`x-codex-primary-used-percent`, ventana de 300 minutos, y `secondary`, semanal); base de
+          la prueba de cupo.
 - [ ] La plataforma: su ADR, con el usuario.
 
 **Preguntas juntadas para el usuario: contestadas todas** (2026-10-09, a la mañana, de a una y

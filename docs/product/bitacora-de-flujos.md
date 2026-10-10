@@ -365,6 +365,36 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   - **Conclusión vigente:** la regla del motivo funciona con la IA real; la inestabilidad del servicio no
     oficial de ChatGPT (riesgo 5) pesa en las rondas, aunque la cocina la maneja sin silencio.
 
+## Las conversaciones 30 a 45 con la IA real (Fase C, 2026-10-10, de tarde)
+
+Primera ronda con la IA real de las conversaciones 30 a 45 (la D6 cubrió las 01 a 29): sol por la
+suscripción, 5 veces, código de `39b21f1`. Cortada por cupo en la 38 y seguida con otra cuenta
+(`resultados/fase-c-30-45.md`, `fase-c-38b.md`, `fase-c-39-45.md`).
+
+| Parte | Corridas | Garantías | Todo bien |
+|---|---|---|---|
+| 30 a 38 | 44 | 31 | 14 |
+| 38 (otra vez) | 1 | 1 | 0 |
+| 39 a 45 | 35 | 30 | 8 |
+
+- **Ninguna escritura sin confirmación, filtración ni aviso a quien no correspondía.** Las fallas
+  de garantía son tres errores de Leda, errores de la IA que Leda aceptó, y cascadas o filas que el
+  comparador cuenta como garantía aunque sean lo correcto para el estado que quedó.
+- **Errores de Leda:** el aviso de "ya no hace falta" decía que otra persona se encargaba cuando la
+  persona trabada dijo "no sé quién" (arreglado, `19f93d6`); la pregunta "¿quién se encarga?" se
+  guardaba como "¿para cuándo?" (arreglado, `aebf331`); "no le escribas" no se podía corregir; "la
+  tarea del switch" no encuentra la tarea (la 45 falla siempre por eso); un pase a un nombre que no
+  existe no dice cuál; la oferta de pasarle algo a quien destraba no deja una pregunta abierta.
+- **Errores de la IA:** "el motor ya lo arranqué" leído como avance y no como inicio (2 de 5); "no le
+  escribas a Ariel" aplicado a la otra tarea de Ariel (2 de 5).
+- **Formato:** unas 6 de cada 10 fallas, como en las rondas anteriores.
+- **El cupo:** la ventana de 5 horas de una cuenta alcanzó para unas 9 conversaciones de 5 veces.
+
+**Conclusión vigente:** los circuitos de la C-5 a la C-7 pasan las garantías con la IA real salvo
+errores de Leda puntuales, que se arreglan en su causa; la comprensión depende de cómo se nombra una
+tarea y de las preguntas que quedan abiertas. Falta la ronda sobre los arreglos y la prueba por
+Telegram.
+
 ## La entrega y la aprobación con la IA real (Fase C, C-4, 2026-10-08, de noche)
 
 Primera ronda con la IA real de los circuitos nuevos (`resultados/fase-c-c3-regresion.md`, sobre
