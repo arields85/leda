@@ -61,8 +61,8 @@ pasaba; corregida en la rama); liberarlas pide la autorización del mantenedor (
 **Lo que sigue:**
 1. **Hecho (2026-10-10):** una tarea que vence sábado o domingo; el usuario eligió C (decisión 56): la
    plataforma no la deja cargar. Sin código hasta la plataforma.
-2. **De la porción 5 (en el plan):** borrar o sólo ocultar el contenido retirado (ADR 0019 §3); si lo
-   retirado deja de cubrir la evidencia; si revocar por terminal exige nombrar al administrador. La respuesta
+2. **De la porción 5:** las tres preguntas, decididas el 2026-10-10 (decisiones 57 a 59: se borra de
+   verdad, deja de contar y Leda avisa, la página muestra el motivo); se construyen en la porción 5b. La respuesta
    del bot de administración sale sin outbox, para no guardar el token en claro: arreglarlo en
    `despachador.py`, que agregue el enlace al enviar, como con los integrantes.
 3. **Corrección chica:** `persecucion.py:703`, `herramientas.py:3111-3117`, `detalle.py:400-403`, avisar al

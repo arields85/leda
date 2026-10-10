@@ -449,6 +449,26 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     que dice una persona) sigue contando como si venciera el viernes anterior, como hoy
     (`tests/motor/test_escalera_fin_de_semana.py`).
 
+57. **Lo que retira la administración se borra de verdad** (de la porción 5 de la C-3; usuario,
+    2026-10-10, la que recomendó el agente). Si en una foto se ve una contraseña, retirarla tiene que
+    sacarla de la base, no sólo ocultarla. Se borra el contenido del archivo y queda su huella, para
+    reconocerlo si alguien lo vuelve a mandar. Es la única excepción a que un archivo guardado no
+    cambia: sólo la administración y sólo para vaciar el contenido. No tiene vuelta atrás.
+
+58. **Lo retirado por la administración deja de contar, y Leda avisa** (de la porción 5; usuario,
+    2026-10-10, opción A, la que recomendó el agente). Como hoy, la pieza deja de contar como
+    evidencia. Si la tarea no está aprobada, Leda le dice a quien la entregó que la administración
+    retiró esa pieza, con el motivo, y, si la entrega quedó sin cubrir, que hace falta otra para que
+    la revisen. Si la tarea está en revisión y quedó sin cubrir, a quien la revisa le dice que la
+    entrega espera esa pieza nueva. Hoy nadie se entera y la aprobación queda trabada ("Falta la
+    evidencia requerida") sin que nadie sepa por qué.
+
+59. **Qué se muestra y qué se guarda de un retiro de la administración** (de la porción 5;
+    usuario, 2026-10-10). La página de la tarea dice "contenido retirado por la administración" y
+    el motivo, sin nombre (hoy no muestra el motivo). Quién lo retiró queda guardado adentro, donde
+    nadie del equipo lo ve (constitución §12; ya construido). Revocar enlaces no cambia: queda a
+    nombre de la administración, sin pedir quién (el usuario: "no es necesario").
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -1003,16 +1023,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       que registra esto.
     - **Chequeos** (2026-10-10, sobre `c06fa6d`): `pytest tests/motor tests/garantias tests/conversaciones tests/test_administrador_plataforma.py`, **1740 passed** (22 min; la primera corrida, sobre `3c9e150`, dio 1739 y 1 falla: `test_frontera.py`, el motor importaba `leda.pagina_de_tarea` sin declararlo, corregido en `c06fa6d`); en seco, `correr --ia guionada --veces 1 --sin-informe`, **45 de 45 bien** (sin informes escritos). Sin la IA
       real (no cambia nada de la conversación con el equipo).
-    - `PENDIENTE` (preguntas para el usuario, sin decidir):
-      - **Borrar los bytes del archivo.** El ADR (decisión 3) dice que la administración "puede
-        borrar el contenido de `archivo`"; esta porción lo marca y nunca lo muestra ni lo sirve,
-        pero el contenido sigue guardado (se pidió que nada se borre). Borrarlo pide aflojar la
-        inmutabilidad de `archivo` (su huella y su disparador). ¿Se borra o alcanza con
-        retirarlo?
-      - **¿Lo retirado por la administración sigue contando para la política?** Hoy, como
-        cualquier retirada, deja de contar: una entrega en revisión puede quedar sin cubrir.
-      - **Quién revoca:** la consola no sabe qué administrador la corre; la revocación queda como
-        acto del `sistema` (como `administrador`). ¿Hace falta nombrar quién, como al retirar?
+    - Preguntas al usuario, decididas el 2026-10-10: borrar los bytes del archivo (decisión 57),
+      lo retirado deja de contar y Leda avisa (58), qué se muestra y quién revoca (59). Se
+      construyen en la porción 5b.
     - `PENDIENTE` (casos de borde, fuera de esta porción):
       - **La misma foto mandada otra vez** después del retiro crea otra pieza con el mismo
         archivo: la página no la muestra ni la sirve, pero los avisos del motor
@@ -3257,6 +3270,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       Revisión RDD `review-97a7e59264f494f0`: pidió corregir un CRÍTICO de
       `tests/test_cli_enlaces_de_tarea.py:59` (decía que la prueba fallaba siempre; pasaba, pero la
       aserción era confusa): aserción corregida en la rama; la revisión quedó trabada en `_rdd-adm`.
+- [ ] Porción 5b de la C-3: las decisiones 57 a 59 (borrar de verdad lo que retira la
+      administración, avisar a quien entregó y a quien revisa, el motivo en la página). Route:
+      delegada (escritor único; la base, la página y el motor, 2+ archivos no triviales).
 - [x] La escalera con un vencimiento en fin de semana: probada, siete pruebas, sin cambios (`c48ed43`).
 - [x] Pregunta al usuario: una tarea que vence sábado o domingo. Decisión 56 (opción C): la
       plataforma no la deja cargar; sin código hasta la plataforma.
