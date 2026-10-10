@@ -2342,6 +2342,73 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         pregunta de quién lo destraba; a quien recibió la cadena (no sólo el bloqueo viejo) también
         se le toma lo que dice; si la persona trabada nombra fuera del equipo al contestar, queda
         anotado como siempre (Leda no le escribe) y la cadena no se asienta.
+  - [x] **C-5e: seguir la cadena hasta quien puede destrabarla** (decisión 42 del usuario,
+    2026-10-09; con la 6, la 38 y la regla 39). Route: delegada (escritor único, 2+ archivos no
+    triviales). Hecha el 2026-10-09:
+    - **Las conversaciones primero** (`d4a0717`): la 44 nueva (Ariel ya está trabado con el
+      servidor cuando Marcos lo nombra: no se le pregunta y Marcos se entera enseguida de qué espera
+      Ariel, quién lo destraba y lo que dijo Lucas; el día que dijo Lucas, la pregunta de si llegó;
+      la fecha nueva le llega a Ariel y a Marcos; Lucas no contesta y rige la decisión 38; Ariel
+      pudo seguir y Leda le pregunta para cuándo le pasa la IP a Marcos). La 35 suma la pregunta del
+      día que dijo Lucas (paso 7b) y Ariel (13b), y la pregunta a Ariel cuando pudo seguir (paso 10;
+      no sale: lo dice antes). En seco, contra el código anterior: **44 con 24 fallas y 35 con 13**.
+    - **Test primero** (`d406cb8`): `tests/motor/test_seguir_la_cadena.py`, **16 de 20 en rojo**
+      (las otras cuatro miran que algo no pase o lo que ya existía). **Verde:** las 20.
+    - **El motor** (`ef860f3`):
+      - **(a) A quien ya está trabado no se le pregunta** (`persecucion.preguntarle`, que usan
+        `anotar_quien_destraba` y la cadena de "no me corresponde"): si la tarea trabada depende de
+        una tarea de esa persona con un bloqueo abierto (el mismo enlace por la estructura de la
+        decisión 6, `encadenados.trabada_con_lo_que_falta`; nunca por adivinar), no se guarda la
+        pregunta; los hechos dicen `ya_esta_trabado` con la cadena hasta quien puede destrabarlo
+        (`encadenados.hasta_quien_puede`: cada tarea trabada, quién la tiene, la causa, quién la
+        destraba y lo último que dijo esa persona; sigue más arriba mientras quien destraba también
+        esté trabado con lo que falta) y `se_entera_de_cada_avance` (si la persona trabada tiene
+        Leda conectada). Lo que sigue lo hacen los mecanismos de siempre: quien espera ya está
+        aguas abajo y le llega cada avance (decisión 6); a quien destraba a Ariel ya se le preguntó
+        por el bloqueo de Ariel. En la cadena de "no me corresponde", la cadena no se corta: la
+        persona trabada se entera con el aviso de lo que dijo quien no lo toma.
+      - **Cuando pudo seguir, ahora sí** (`encadenados.se_destrabo`): al destrabar su tarea, a quien
+        destraba otra que la esperaba se le guarda la pregunta de para cuándo, como en la decisión 4
+        (otra clave: `...:u<fila>:r<bloqueo>`), salvo que siga trabado con otra cosa que le falta a
+        esa tarea; los hechos de quien escribe dicen `lo_esperan`. `ya_contesto_quien_destraba`
+        sólo cuenta lo dicho o preguntado desde que se guardó esa pregunta (`desde`): si lo dice
+        antes de que le llegue, no sale.
+      - **(b) La vuelta a preguntar el día de la fecha no existía; ahora es una regla para
+        cualquiera que destraba y da un día** (`persecucion._volver_a_preguntar_el_dia`, aviso nuevo
+        `el_dia_que_dijo_quien_destraba`, seguimiento que Leda hace por su cuenta): a la hora de
+        salida de ese día y, si ya pasó (dijo "hoy"), el día hábil siguiente. Al salir abre la
+        pregunta de para cuándo (`cuando_se_destraba`, con su espera), así que la escalera de las
+        preguntas la repite sin escalar (decisión 38). No sale si después dijo otra cosa
+        (`dijo_algo_mas_nuevo`), si el bloqueo se cerró o si lo destraba otra persona. Sólo para
+        quien destraba esa tarea ahora (no para quien recibió el bloqueo viejo y habla sobre la fila
+        de otro, decisión 41). Los hechos de quien escribe dicen `le_vuelve_a_preguntar`.
+      - **El tope de la decisión 51** no cambia: quien no se pregunta porque está trabado no cuenta
+        como preguntado. **La regla 39** sigue igual: al cerrarse, se enteran quienes tenían el
+        tema abierto (también quien recibió la pregunta del día que dijo).
+      - Sin esquema nuevo. Las instrucciones de la IA no cambiaron: los códigos nuevos van en
+        `hechos.SIGNIFICADOS` (y `esperando_a` dice también la cadena que no es una novedad).
+    - **Cambiaron otras conversaciones** por la pregunta del día que dijo: la 36 (pasos 5b, 7b; la
+      pregunta del panel espera mientras la del PLC está abierta, paso 9; la del PLC vuelve aparte y
+      se repite por la decisión 38 en los pasos 11, 12b, 13, 15, 18, 19 y 21), la 42 (el paso 14
+      es la pregunta del jueves 29) y la 35 (paso 18, la espera de Ariel); la 32, la 33 y la 43 la
+      guardan (no llega a salir).
+    - **Chequeos** (2026-10-09, sobre `ef860f3`): `pytest tests/motor/test_seguir_la_cadena.py`, 20
+      passed; `pytest` de persecución, cadena, encadenados, bloqueo viejo, hechos, fichas,
+      contratos, escalera, preguntas que esperan y asentado, 281 passed; en seco, `correr --ia
+      guionada --veces 1 --sin-informe`, **44 de 44 bien**; `pytest tests/motor tests/garantias
+      tests/conversaciones tests/test_bloqueos.py`, **1642 passed** (20 min). Sin la IA real;
+      informes borrados, `gasto.json` sin tocar.
+    - `PENDIENTE`:
+      - **La IA real** sobre la 44 (y la 35, 36 y 42 cambiadas), y la prueba por Telegram.
+      - **Preguntas para el usuario** (cómo se leyó lo que la decisión no dice): la pregunta del
+        día que dijo vale para cualquiera que destraba y da un día, no sólo al final de una cadena
+        (en la 36, Ariel recibe la pregunta del PLC cada día hábil desde el lunes que no cumplió);
+        si dijo "hoy", la pregunta va el día hábil siguiente a las 10:00; mientras esa pregunta
+        está sin contestar, otra pregunta a la misma persona espera (decisión 21: en la 36, la del
+        panel HMI); "ya está trabado" se sabe sólo por la dependencia cargada (si no, se le
+        pregunta y, como siempre, puede decir que está trabado con algo suyo); cuando pudo seguir,
+        la pregunta de para cuándo le llega aparte, pasada la media hora de conversación, y no en
+        la misma respuesta.
 - [ ] **C-6.** Las cadencias (pregunta 8). El pedido de estado por persona, hecho y revisado el
   2026-10-09; el informe al grupo (decisión 25), construido el mismo día con su corrección (abajo,
   "La corrección de la C-6 y el informe al grupo"); falta la revisión RDD de ese tramo
@@ -2914,7 +2981,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
   - [x] C-5d: 24 (el informe, nunca a alguien de la cadena), 41 (destraba quien está trabado), 49
         (preguntarle a la persona trabada antes de asentar), 51 (hasta tres personas);
         conversaciones 34 y 36, sin migración (`4cadd41`, `86a5cdd`).
-  - [ ] C-5e: 42 (seguir la cadena hasta quien puede destrabarla).
+  - [x] C-5e: 42 (seguir la cadena hasta quien puede destrabarla; conversación 44, `ef860f3`).
   - [ ] El enlace: 33 (el resumen para cualquiera, el detalle a pedido).
 - [ ] C-8, las ausencias (vacaciones, licencia), pendiente para más adelante.
 - [x] El informe al grupo de la C-6 (decisión 25; conversación 41, `0048`), con la corrección de
