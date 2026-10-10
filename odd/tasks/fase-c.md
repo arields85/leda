@@ -1085,6 +1085,15 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     - **Sin conversación de prueba:** el corredor no puede expresar un acto de la
       administración (haría falta un paso nuevo en `corredor.py`, como `cambia_quien_aprueba`);
       no se extendió.
+    - **Control del coordinador** (2026-10-10): las pruebas nuevas y `test_cli_enlaces_de_tarea.py`,
+      **39 passed**.
+    - **Revisión RDD por tramos** (2026-10-10, `tools/rdd_ciclo.py` en carpetas temporales,
+      borradas): `eb73b08..01ea90d`, `review-5c6e042c9461e1d0`, aprobada y sellada;
+      `01ea90d..a343322`, `review-5c3e6fc95edc026e`, aprobada y sellada. Ningún hallazgo grave.
+      Advertencias, para la corrección chica: `despachador.py:1215-1223`; la `0053`, líneas 72-84 y
+      113-115; `retiro_de_la_administracion.py:73-76` (un error tapado en el `finally` de
+      avisar); `recibir.py:531-538` (el rechazo de un archivo retirado, sin prueba). Sugerencias:
+      el rollback de la `0053` (24-29), `cli.py:262-264` y `entrega.py:627-628` sin prueba.
     - `PENDIENTE`:
       - **A quien revisa le llega aunque todavía no le haya llegado la entrega** (si el retiro
         cae dentro del margen para corregir): el aviso de la entrega queda omitido por
