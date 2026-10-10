@@ -3478,7 +3478,21 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       avisar al administrador si un sector no tiene encargado, y lo que deje la revisión de la porción 5
       (más su respuesta sin outbox, a arreglar en `despachador.py`). Hecha el 2026-10-10 (`0054`;
       `3295a4f`, `f765e7a`, `18507e6`, `54b2e83`), salvo `persecucion.py:703`, sin defecto
-      encontrado (pregunta abierta en su entrada, "La corrección chica").
+      encontrado (pregunta abierta en su entrada, "La corrección chica"). Control del
+      coordinador: `test_respuesta_del_bot_de_administracion.py`, 9 passed. Revisión RDD por
+      commit, todas aprobadas y selladas, sin hallazgos graves: `review-63ff51bcd58ea8cc`,
+      `review-b2c2b37dcf93061b`, `review-885686e2c29bd3e9` (cuatro lentes),
+      `review-ab08910e12a3bc9b`. Lo de `persecucion.py:703` se cierra sin cambios: la advertencia
+      original ya no existe y la lectura del código no muestra un defecto (coordinador).
+- [ ] Advertencias de esas revisiones, casos de borde para una corrección posterior (sin otra
+      ronda ahora): `herramientas.py:3108-3130` (la forma del respaldo, sin prueba); `detalle.py:422-426`
+      (un área nula); `pase.py:295-301` (cómo se deduce "otro sector"); `despachador.py:1261-1266`
+      (el descarte sin aislar en su propio punto de guardado); `despachador.py:1471-1480` (un
+      enlace emitido que queda si el pase vuelve atrás). Sugerencias: `test_pedir_el_detalle.py:597`,
+      `despachador.py:1035`, `1347` y `1387-1393`, `administracion.py:80` (la clave sin el id del
+      mensaje), el rollback de la `0054` (24-28).
+- [ ] Pregunta al usuario: qué se le dice a quien pidió algo que espera porque el sector no tiene
+      encargado (hoy sólo se entera el administrador).
 - [ ] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
       conversación de prueba y construcción.
 - [ ] Los avisos que a veces no salen a su hora: buscar la causa.

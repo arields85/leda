@@ -64,11 +64,11 @@ pasaba; corregida en la rama); liberarlas pide la autorización del mantenedor (
 2. **De la porción 5:** las tres preguntas, decididas el 2026-10-10 (decisiones 57 a 59: se borra de
    verdad, deja de contar y Leda avisa, la página muestra el motivo) y la 60 (a quien revisa, sólo si ya le
    llegó la entrega): construidas en la porción 5b (`0053`), revisadas y selladas. Falta la IA real sobre
-   los dos avisos nuevos y `leda_motor` hasta la `0053`. La respuesta
-   del bot de administración sale sin outbox, para no guardar el token en claro: arreglarlo en
-   `despachador.py`, que agregue el enlace al enviar, como con los integrantes.
-3. **Corrección chica:** `persecucion.py:703`, `herramientas.py:3111-3117`, `detalle.py:400-403`, avisar al
-   administrador si un sector no tiene encargado, y las advertencias de la revisión de la porción 5.
+   los dos avisos nuevos y `leda_motor` hasta la `0054`.
+3. **Hecho (2026-10-10):** la corrección chica y la respuesta del bot de administración por la cola
+   (`0054`), revisadas y selladas por commit. Quedan sus advertencias de casos de borde (en el plan) y
+   una pregunta al usuario: qué se le dice a quien pidió algo que espera porque el sector no tiene
+   encargado.
 4. **Los apodos:** el ADR 0020 (reemplaza la parte de apodos del ADR 0005), que el usuario lo acepte, la
    conversación de prueba y la construcción.
 5. **Los avisos que a veces no salen a su hora** (1 o 2 de cada 95): buscar la causa.
@@ -76,7 +76,7 @@ pasaba; corregida en la rama); liberarlas pide la autorización del mantenedor (
 7. **Cierre de la Fase C:** suite completa (`pytest -q`), `docs/capacidades.md` y limpieza (`apscheduler`,
    `mostrado_para_confirmar`, la fila "Delegar por chat" del roadmap).
 8. **La tanda de pruebas:** una ronda con la IA real sobre las conversaciones nuevas y cambiadas, y la
-   prueba por Telegram con `leda_motor` al día hasta la `0052` (respaldo previo; autorizado).
+   prueba por Telegram con `leda_motor` al día hasta la `0054` (respaldo previo; autorizado).
 9. **La plataforma:** su ADR, con el usuario.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
@@ -96,7 +96,7 @@ guion es `docs/product/guion-telegram-fase-c-parte-1.md`):
 - **Ojo:** nunca el escuchador y una ronda del corredor a la vez, ni una ronda real mientras se edita `src/`.
 
 **`leda_motor`:** recreada el 2026-10-08 (D6) con las tareas de la prueba (vencen el viernes 16/10);
-respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`. Le faltan de la `0039` a la `0052`. El usuario autorizó
+respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`. Le faltan de la `0039` a la `0054`. El usuario autorizó
 ponerla al día o recrearla cuando haga falta, con respaldo previo; nunca `leda` ni `leda_flujo`.
 
 **Acuerdos de trabajo** (detalle en la memoria del agente):
@@ -153,7 +153,7 @@ validador de invariantes. Destino de cada uno:
   `deteccion_pregunta`, `jev` y `local`) y la escalera, el reloj y el ciclo viejos.
 - **La auditoría vuelve a la cocina:** cada `herramientas.ejecutar` y cada efecto propio del motor deja su fila
   en `audit_log`, con `pack_hash` y `nucleo_hash`.
-- **Migraciones:** hasta `0025` en `main`, más `0030` a `0052` en la rama. La `0032` borra las tablas del alta.
+- **Migraciones:** hasta `0025` en `main`, más `0030` a `0054` en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   `PENDIENTE`: un ensayo de propiedad sobre un clúster limpio.
