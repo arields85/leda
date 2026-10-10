@@ -3579,7 +3579,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       `herramientas.py:3236-3238` (el motivo de un pedido terminado se puede pisar).
 - [x] Al encargado anterior al que se le había pedido el detalle, que el pedido terminó (no hace
       falta que conteste): la regla de cerrar el tema para todos (constitución §8, decisión 39),
-      resuelto por el coordinador el 2026-10-10. Hecho el 2026-10-10, con las tres advertencias
+      resuelto por el coordinador el 2026-10-10. Revisión RDD por commit, aprobadas y selladas:
+      `80554c0` `review-fe3782589fd90f6f`, `fbd5439` `review-eb17d661565c63d2`; su advertencia
+      (`detalle.py:519`, el encargado preguntado comparado como texto contra un UUID, siempre
+      distinto) la corrigió el coordinador en `c723359` (`review-a332327e5d8175ae`, aprobada;
+      54 passed); sin prueba propia, porque quien pide el detalle no puede ser el encargado al
+      que se le pregunta; fin de esta línea de correcciones. Hecho el 2026-10-10, con las tres advertencias
       de la revisión de arriba (sin migración). Route: delegada (escritor único, 2+ archivos no
       triviales).
       - **El aviso al encargado anterior** (`detalle._sin_encargado`, `_a_quien_se_le_pregunto`):
