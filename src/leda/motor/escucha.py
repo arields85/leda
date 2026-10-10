@@ -10,8 +10,9 @@ escuchar:
 
 - **Bot del equipo:** saca un webhook si lo hay (bloquea `getUpdates`) y pide los mensajes y
   los toques. Después de recibirlos, el ciclo despacha lo que quedó en el outbox.
-- **Bot de administración:** se lo sondea sin esperar, sólo para registrar el chat de un
-  administrador de plataforma que le escribe, y por él salen los avisos de incidentes
+- **Bot de administración:** se lo sondea sin esperar, para registrar el chat de un
+  administrador de plataforma que le escribe y contestarle su pedido del enlace de una tarea
+  (`administracion.atender_admin`), y por él salen los avisos de incidentes
   (`despachador.despachar_avisos_admin`). Un bot de administración con webhook puesto no se
   toca ni se sondea.
 - **El reloj de Leda** (`reloj.py`): el comando lo prende con el adelanto que se guarda en
@@ -52,10 +53,11 @@ from ..db import admin, espacio
 from ..despachador import Transporte, pedido_telegram, texto_error_seguro
 
 from . import archivos, recibir
+from .administracion import atender_admin
 from .ciclo import Ciclo
 from .ia import IA
 from .recibir import (INTENTOS_POR_UPDATE, AbrirIndicador, Bajar, IntentosPorUpdate,
-                      Recepcion, recibir_update, registrar_admin)
+                      Recepcion, recibir_update)
 from .tiempo import Reloj
 
 ESPERA_S = 25
@@ -215,7 +217,7 @@ class Escucha(Recepcion):
             return 0
         for u in updates:
             self.offset_admin = u["update_id"] + 1
-            registrar_admin(self.conn, u, self.imprimir)
+            atender_admin(self.conn, u, self.transporte_admin, self.imprimir)
         return len(updates)
 
     # -- lo que sale ---------------------------------------------------------------------

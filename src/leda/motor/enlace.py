@@ -137,21 +137,29 @@ def _misma_palabra(a: str, b: str) -> bool:
 def _las_que_coinciden(ctx, dicho: str) -> list[dict[str, Any]]:
     """Las tareas del espacio de quien escribe que tienen cada palabra de lo dicho en su título
     o en el nombre de su responsable, con si la persona puede verla (la regla, en la base)."""
+    coinciden = tareas_que_nombra(ctx.cur, ctx.quien.workspace_id, dicho)
+    for t in coinciden:
+        t["ve"] = _puede_verla(ctx.cur, ctx.quien.membership_id, t["id"])
+    return coinciden
+
+
+def tareas_que_nombra(cur, workspace_id: str, dicho: str) -> list[dict[str, Any]]:
+    """Las tareas del espacio, también las terminadas y canceladas, que tienen cada palabra de lo
+    dicho en su título o en el nombre de su responsable (la misma regla para la jugada y para el
+    bot de administración, `administracion.py`). Corre en la transacción del espacio
+    (`db.espacio`): la vista `integrante` y la RLS la acotan a él."""
     buscadas = _que_nombra(dicho)
-    cur = ctx.cur
     cur.execute("""select t.id::text id, t.titulo, t.responsable_membership_id::text
                           responsable_id, i.nombre responsable
                      from task t
                      left join integrante i on i.membership_id = t.responsable_membership_id
                     where t.workspace_id = %s
-                    order by t.titulo, t.id""", (ctx.quien.workspace_id,))
+                    order by t.titulo, t.id""", (str(workspace_id),))
     coinciden = []
     for t in cur.fetchall():
         nombre = fichas.palabras(t["titulo"]) + fichas.palabras(t["responsable"] or "")
         if all(any(_misma_palabra(b, n) for n in nombre) for b in buscadas):
             coinciden.append(dict(t))
-    for t in coinciden:
-        t["ve"] = _puede_verla(cur, ctx.quien.membership_id, t["id"])
     return coinciden
 
 

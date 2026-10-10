@@ -144,11 +144,13 @@ async def webhook(slug: str, request: Request,
 
 def atender_update(slug: str, update: dict[str, Any]) -> dict[str, bool]:
     """Lo que el webhook hace con un update, ya verificado su origen: el del bot de
-    administración registra el chat de un administrador; el del bot de un espacio pasa por el
-    motor (`recibir.recibir_update`), igual que en el escuchador."""
+    administración registra el chat de un administrador y le contesta su pedido del enlace de
+    una tarea (`administracion.atender_admin`); el del bot de un espacio pasa por el motor
+    (`recibir.recibir_update`), igual que en el escuchador."""
     from .motor import recibir
     from .motor.recibir import (IntentosPorUpdate, Recepcion, bot_id_del_token,
-                                recibir_update, registrar_admin)
+                                recibir_update)
+    from .motor.administracion import atender_admin
 
     with _ATENCION:
         conn = _conn()
@@ -157,7 +159,7 @@ def atender_update(slug: str, update: dict[str, Any]) -> dict[str, bool]:
         except LookupError:
             raise HTTPException(status_code=404, detail="bot desconocido") from None
         if slug == "admin":
-            registrar_admin(conn, update, _imprimir)
+            atender_admin(conn, update, _transporte_de(token), _imprimir)
             return {"ok": True}
         with admin(conn) as cur:
             cur.execute("select id from workspace where slug = %s and activo", (slug,))
