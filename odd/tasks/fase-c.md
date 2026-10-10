@@ -475,6 +475,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     llega nada de una entrega que nunca vio; cuando Marcos manda la pieza nueva, recibe la
     entrega como siempre. Marcos se entera igual.
 
+61. **Un "no le escribas" corregido tarde se le corrige a quien destraba** (de la ronda de las 30
+    a 45 con la IA real, conversación 32; usuario, 2026-10-10, opción A, la que recomendó el
+    agente). Si el "ya no hace falta que lo destrabes" ya le llegó a quien destraba y después la
+    persona trabada corrige que era por la otra tarea, Leda le escribe a quien destraba que lo de
+    recién era por la otra tarea, que de esta sigue haciendo falta, y le vuelve a preguntar como
+    antes. Ninguna tarea queda abandonada y Leda corrige lo que dijo mal. Dentro del margen para
+    corregir, el aviso equivocado no sale (`835b658`).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3689,7 +3697,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           se encarga?" se guardaba como "¿para cuándo?" y la IA preguntaba la fecha (`aebf331`).
           Revisión RDD de `39b21f1..19f93d6`, aprobada y reconocida (`review-1d84fc4e33d172a3`).
         - **De Leda, por arreglar:** (3) "no le escribas" no se podía corregir dentro del margen
-          (la 32; ADR 0018, 9n; escritor en curso); (4) "la tarea del switch" no encuentra "Configurar
+          (la 32; ADR 0018, 9n): hecho en `835b658` (el mensaje guardado vuelve, el "ya no hace
+          falta" pendiente se retira y la pregunta a quien destraba se reabre; revisión
+          `review-edec74984d2835c5`, aprobada, con tres advertencias de casos de borde en
+          `persecucion.py:1668-1727`); el caso tardío, decisión 61, por construir; (4) "la tarea del switch" no encuentra "Configurar
           el switch de la planta" porque "tarea" no está entre las palabras que no nombran
           (`enlace.py:54`): Leda dice que no existe, y la 45 falla 13 o más cada vez; (5) el hecho
           `persona_desconocida` no dice qué nombre no encontró y la IA nombró a otra persona (la 39,
