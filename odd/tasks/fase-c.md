@@ -1036,6 +1036,64 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         se quiere por `admin_notice`, el despachador tendría que emitir el token al mandar, como
         con `message_outbox_enlace`.
       - **Cuando exista el panel de plataforma** (ADR 0004), este acceso se muda allá (7b).
+  - [x] **Porción 5b: lo que retira la administración** (2026-10-10; decisiones 57 a 59;
+    migración `0053`). Route: delegada (escritor único; la base, la página, el despachador y el
+    motor, 2+ archivos no triviales).
+    - **Se borra de verdad** (57): `retirar_contenido` vacía `archivo.contenido` y anota
+      `contenido_retirado_en`; la fila queda con su huella, su tamaño, su tipo y quién lo mandó.
+      Es la única excepción a que un archivo no cambia, y la garantiza la base
+      (`rechazar_cambios_de_archivo`): sólo `leda_admin`, sólo con un retiro de la
+      administración de una pieza con ese archivo, ninguna otra columna, sin vuelta atrás y sin
+      borrar la fila. La `0053` vacía también lo que la `0052` ya había retirado; su vuelta atrás
+      se niega si ya se borró algún contenido.
+    - **Ningún camino se cae ni manda un archivo vacío:** la página no lo sirve (ya no lo
+      servía); el despachador saca de un álbum ya encolado lo retirado después (con lo que
+      queda sale, con un incidente de severidad baja; si no queda nada, el álbum se descarta,
+      con su incidente), sin el identificador de Telegram, que lo volvería a mostrar.
+    - **Lo retirado no vuelve** (el caso de borde de la porción 5): la misma foto mandada otra
+      vez no se guarda (`archivo_de_mensaje.rechazo = 'contenido_retirado'`; la IA lo cuenta,
+      con "mandar otro" en cambio); la cocina no acepta como pieza un archivo retirado
+      (`_resolver_piezas`) y la vista previa no lo trae de lo mandado antes (`_mandado_antes`).
+    - **Leda avisa** (58; `leda.motor.retiro_de_la_administracion`): en la transacción del
+      retiro se guardan avisos de coordinación del motor, uno por persona aunque sean varias
+      piezas o varias tareas: a quien entregó la pieza, si la tarea no está aprobada
+      (terminada o con la aprobación vigente), con el motivo y, si la entrega en revisión quedó
+      sin cubrir (`falta_algo_de_lo_entregado`, la regla de la decisión 15), lo que falta; a
+      quien la revisa, si quedó sin cubrir, que la entrega espera otra pieza, sin el motivo.
+      Nunca el nombre de quien retiró. Al salir se releen: si la entrega ya se completó, el de
+      quien revisa queda omitido (`la_entrega_ya_esta_completa`) y le llega la entrega completa
+      como siempre. La consola pasa el reloj de Leda.
+    - **La página** (59): "contenido retirado por la administración (motivo: «...»)", sin
+      nombre; quién lo retiró sigue en `evidencia_retirada` y en la auditoría.
+    - **Test primero:** `tests/garantias/test_contenido_retirado.py` y
+      `tests/motor/test_retiro_de_la_administracion.py` en rojo, **27 failed, 1 passed** (la que
+      pasó mira que el motivo de quien entregó no se muestre como de la administración, que
+      ya era así). **Verde:** 28 passed. Un caso se ajustó después de verlo en rojo: la cocina
+      devuelve el rechazo (`pieza inválida: archivo`), no lanza `ValueError`.
+    - **Commits:** `01ea90d` (la `0053`, la guarda, el borrado, el despachador y la página),
+      `a343322` (los avisos del motor y lo retirado que no vuelve) y el que registra esto.
+    - **Chequeos** (2026-10-10, sobre `a343322`):
+      - `pytest tests/garantias/test_contenido_retirado.py tests/motor/test_retiro_de_la_administracion.py tests/test_cli_enlaces_de_tarea.py`: **39 passed**.
+      - `pytest tests/garantias/test_migraciones.py tests/garantias/test_aislamiento.py`: **22 passed** (vuelta atrás de la `0053` ensayada; paridad limpia y migrada). Los
+        `tests/test_migraciones.py` y `tests/test_aislamiento.py` del pedido no existen: están en
+        `tests/garantias/`.
+      - `pytest tests/motor tests/garantias tests/conversaciones tests/test_administrador_plataforma.py tests/test_cli_enlaces_de_tarea.py`: **1778 passed, 1 failed** (23 min). La falla,
+        `test_corredor.py::test_la_corrida_en_seco_por_linea_de_comandos_graba_y_repite`, es del
+        entorno: cinco bases `leda_corrida_*` del 2026-10-09 que quedaron de una corrida cortada
+        y que la limpieza borró en medio de la prueba; corrida sola enseguida, **1 passed**.
+      - En seco, `correr --ia guionada --veces 1 --sin-informe`: **45 de 45 bien**. Sin la IA real.
+    - **Sin conversación de prueba:** el corredor no puede expresar un acto de la
+      administración (haría falta un paso nuevo en `corredor.py`, como `cambia_quien_aprueba`);
+      no se extendió.
+    - `PENDIENTE`:
+      - **A quien revisa le llega aunque todavía no le haya llegado la entrega** (si el retiro
+        cae dentro del margen para corregir): el aviso de la entrega queda omitido por
+        incompleta y le llega "la entrega espera otra pieza" de una entrega que no vio. Se
+        construyó como lo decidió el usuario; preguntar si sólo tiene que llegarle cuando ya
+        recibió la entrega.
+      - La IA real sobre los dos avisos nuevos, y `leda_motor` al día hasta la `0053`.
+      - Si quien recibe un aviso es quien entregó y también quien revisa, le llega sólo el
+        primero.
 - [ ] **C-3d.** Lo que decidió el usuario el 2026-10-08 (preguntas 10 a 20), en este orden. Route de
   cada una: delegada (escritor único, 2+ archivos no triviales), una por vez, revisión RDD por commit.
   - [x] **D1.** El comparador del corredor: la garantía es "lo escrito es lo confirmado"; mostrar lo
@@ -3270,9 +3328,10 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       Revisión RDD `review-97a7e59264f494f0`: pidió corregir un CRÍTICO de
       `tests/test_cli_enlaces_de_tarea.py:59` (decía que la prueba fallaba siempre; pasaba, pero la
       aserción era confusa): aserción corregida en la rama; la revisión quedó trabada en `_rdd-adm`.
-- [ ] Porción 5b de la C-3: las decisiones 57 a 59 (borrar de verdad lo que retira la
+- [x] Porción 5b de la C-3: las decisiones 57 a 59 (borrar de verdad lo que retira la
       administración, avisar a quien entregó y a quien revisa, el motivo en la página). Route:
       delegada (escritor único; la base, la página y el motor, 2+ archivos no triviales).
+      Migración `0053`; `01ea90d`, `a343322`.
 - [x] La escalera con un vencimiento en fin de semana: probada, siete pruebas, sin cambios (`c48ed43`).
 - [x] Pregunta al usuario: una tarea que vence sábado o domingo. Decisión 56 (opción C): la
       plataforma no la deja cargar; sin código hasta la plataforma.
