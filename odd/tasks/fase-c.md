@@ -1224,10 +1224,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     - `PENDIENTE`:
       - **Pregunta al usuario, `persecucion.py:703`:** no se encontró el defecto; si alguien
         guardó el texto de esa advertencia, revisarlo con él.
-      - **Pregunta al usuario, el pedido del detalle sin encargado:** hoy espera (sin repetirse
-        ni terminar) hasta que el sector tenga encargado, y el administrador se entera una vez
-        por día. ¿A quien lo pidió hay que decirle algo mientras espera, o terminarlo después de
-        un tiempo como el que no contesta?
+      - ~~Pregunta al usuario, el pedido del detalle sin encargado~~: cubierta por la decisión 33
+        (el usuario, 2026-10-10: "ya la habíamos resuelto"). Sin encargado al pedirlo, Leda ya se
+        lo dice (`detalle.ofrecer`). Si el sector se queda sin encargado mientras el pedido
+        espera, se aplica la misma regla: a quien lo pidió se le dice lo mismo que si no hubiera
+        tenido encargado desde el principio (coordinador). Va con las advertencias de casos de
+        borde.
       - **"Una vez por sector y por día"** es lectura del escritor de "una vez por situación":
         el aviso vuelve al día siguiente si sigue sin encargado y alguien lo necesita.
       - La `0053` con un dueño del esquema sin `bypassrls`: el borrado de lo retirado antes y la
@@ -3491,8 +3493,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
       enlace emitido que queda si el pase vuelve atrás). Sugerencias: `test_pedir_el_detalle.py:597`,
       `despachador.py:1035`, `1347` y `1387-1393`, `administracion.py:80` (la clave sin el id del
       mensaje), el rollback de la `0054` (24-28).
-- [ ] Pregunta al usuario: qué se le dice a quien pidió algo que espera porque el sector no tiene
-      encargado (hoy sólo se entera el administrador).
+- [ ] Un pedido del detalle cuyo sector se queda sin encargado mientras espera: a quien lo pidió
+      se le dice lo mismo que si no hubiera tenido encargado desde el principio (decisión 33).
 - [ ] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
       conversación de prueba y construcción.
 - [ ] Los avisos que a veces no salen a su hora: buscar la causa.

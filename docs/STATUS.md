@@ -66,9 +66,8 @@ pasaba; corregida en la rama); liberarlas pide la autorización del mantenedor (
    llegó la entrega): construidas en la porción 5b (`0053`), revisadas y selladas. Falta la IA real sobre
    los dos avisos nuevos y `leda_motor` hasta la `0054`.
 3. **Hecho (2026-10-10):** la corrección chica y la respuesta del bot de administración por la cola
-   (`0054`), revisadas y selladas por commit. Quedan sus advertencias de casos de borde (en el plan) y
-   una pregunta al usuario: qué se le dice a quien pidió algo que espera porque el sector no tiene
-   encargado.
+   (`0054`), revisadas y selladas por commit. Quedan sus advertencias de casos de borde (en el plan),
+   con el pedido del detalle cuyo sector se queda sin encargado mientras espera (decisión 33).
 4. **Los apodos:** el ADR 0020 (reemplaza la parte de apodos del ADR 0005), que el usuario lo acepte, la
    conversación de prueba y la construcción.
 5. **Los avisos que a veces no salen a su hora** (1 o 2 de cada 95): buscar la causa.
