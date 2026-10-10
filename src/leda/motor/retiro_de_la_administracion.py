@@ -46,6 +46,8 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from psycopg.pq import TransactionStatus
+
 from . import entrega
 from .avisos import (CONTENIDO_RETIRADO_POR_LA_ADMINISTRACION, LA_ENTREGA_ESPERA_OTRA_PIEZA,
                      LA_ENTREGA_YA_ESTA_COMPLETA, YA_ESTA_APROBADA, YA_NO_ESTA_ENTREGADA,
@@ -68,14 +70,18 @@ def avisar(cur, workspace_id: str, piezas: Sequence[str], motivo: str,
            ahora: datetime) -> int:
     """Guarda los avisos del retiro de `piezas` por la administración y devuelve cuántos. Corre
     en la transacción del retiro, bajo la conexión administrativa: el espacio de la
-    transacción se fija acá para leer a sus personas (y se devuelve como estaba)."""
+    transacción se fija acá para leer a sus personas (y se devuelve como estaba). Si guardar
+    falla con la transacción abortada, el espacio no se devuelve a mano (fallaría también y
+    taparía el error de verdad): lo devuelve el rollback, porque `set_config` es local a la
+    transacción (revisión de la porción 5b)."""
     cur.execute("select coalesce(current_setting('leda.workspace_id', true), '') as previo")
     previo = cur.fetchone()["previo"]
     cur.execute("select set_config('leda.workspace_id', %s, true)", (workspace_id,))
     try:
         return _avisar(cur, workspace_id, list(piezas), motivo, ahora)
     finally:
-        cur.execute("select set_config('leda.workspace_id', %s, true)", (previo,))
+        if cur.connection.info.transaction_status != TransactionStatus.INERROR:
+            cur.execute("select set_config('leda.workspace_id', %s, true)", (previo,))
 
 
 def _avisar(cur, workspace_id: str, piezas: list[str], motivo: str, ahora: datetime) -> int:

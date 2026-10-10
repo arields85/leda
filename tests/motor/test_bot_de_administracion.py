@@ -152,6 +152,40 @@ def test_si_el_mensaje_no_sale_no_queda_ningun_acceso(conn, mundo, ada, direccio
     assert cuantas(conn, "incident") == 1
 
 
+def test_si_deja_de_ser_administrador_en_el_medio_no_se_cae_ni_contesta(conn, mundo, ada,
+                                                                         direccion, monkeypatch):
+    """Revisión de la porción 5 (`administracion.py:68-70`): quién pide se identifica otra vez
+    después de registrar su chat; si en el medio perdió el rol, no se le contesta nada y nada se
+    cae (en el escuchador, el update se perdía en silencio; en el webhook, un 500)."""
+    from leda.autoridad import Denegado
+    from leda.motor import administracion
+
+    def ya_no(*_a, **_k):
+        raise Denegado("No sos administrador de plataforma.")
+
+    monkeypatch.setattr(administracion, "identificar", ya_no)
+    salida = _pedir(conn, "/enlace prueba tablero de marcos")
+    assert salida.enviados == []
+    assert _accesos(conn) == []
+
+
+def test_si_identificar_falla_queda_un_incidente_y_no_se_cae(conn, mundo, ada, direccion,
+                                                            monkeypatch):
+    """Nunca en silencio: una falla al identificar a quien pide (la base, por ejemplo) deja su
+    incidente, como cualquier otra falla del pedido."""
+    from leda.motor import administracion
+
+    def se_cae(*_a, **_k):
+        raise RuntimeError("la base no contestó")
+
+    monkeypatch.setattr(administracion, "identificar", se_cae)
+    salida = _pedir(conn, "/enlace prueba tablero de marcos")
+    assert salida.enviados == []
+    assert _accesos(conn) == []
+    [incidente] = todos(conn, "select etapa from incident")
+    assert incidente["etapa"] == "bot_de_administracion"
+
+
 def test_el_escuchador_atiende_el_pedido_por_el_bot_de_administracion(conn, mundo, ada,
                                                                       direccion):
     telegram, telegram_admin = TelegramFalso(), TelegramFalso()

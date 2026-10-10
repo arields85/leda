@@ -998,10 +998,7 @@ def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
     # Contestarle a quien escribió no es "escribir fuera de horario", ni
     # cuenta contra el tope de mensajes automáticos: no es automático.
     if m["es_respuesta"]:
-        if _intentar_envio(cur, workspace_id, transporte, cal, ahora, m):
-            resumen["enviados"] += 1
-        else:
-            resumen["fallidos"] += 1
+        _contar_el_envio(resumen, _intentar_envio(cur, workspace_id, transporte, cal, ahora, m))
         return
 
     # Un mensaje de cadencia cuya ventana ya pasó no se manda tarde.
@@ -1032,10 +1029,12 @@ def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
         resumen["pospuestos"] += 1
         return
 
-    if _intentar_envio(cur, workspace_id, transporte, cal, ahora, m):
-        resumen["enviados"] += 1
-    else:
-        resumen["fallidos"] += 1
+    _contar_el_envio(resumen, _intentar_envio(cur, workspace_id, transporte, cal, ahora, m))
+
+
+def _contar_el_envio(resumen: dict, enviado: bool | None) -> None:
+    """Lo que dio un intento de envío (`_intentar_envio`): salió, falló o se descartó."""
+    resumen["enviados" if enviado else "fallidos" if enviado is False else "descartados"] += 1
 
 
 def _el_texto_del_album(cur, workspace_id: str, m) -> str:
@@ -1062,6 +1061,12 @@ ETAPA_CONTENIDO_RETIRADO = "contenido_retirado_del_envio"
 class ContenidoRetirado(Exception):
     """El contenido de un adjunto se retiró mientras salía: el envío falla y se reintenta, y en
     la pasada siguiente el adjunto ya no va."""
+
+
+class NoQuedaNingunAdjunto(ContenidoRetirado):
+    """Al armar el envío de un álbum ya no queda ningún adjunto (la administración retiró todo
+    después de la mirada previa de `_despachar_fila`): no es una falla del envío, y la fila se
+    descarta como el álbum que llega sin nada (revisión de la porción 5b)."""
 
 
 def _adjuntos_que_salen(cur, m) -> list[str]:
@@ -1167,9 +1172,10 @@ def _guardar_id_telegram(cur: psycopg.Cursor, tg_id: int, outbox_id) -> None:
 
 
 def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
-                    cal: Calendario, ahora: datetime, m) -> bool:
+                    cal: Calendario, ahora: datetime, m) -> bool | None:
     """Marca 'enviado' y envía, en ese orden, dentro de un punto de retorno
-    propio. Devuelve si se entregó.
+    propio. Devuelve si se entregó, o `None` si se descartó (un álbum que se quedó sin
+    adjuntos al armarlo).
 
     Antes se enviaba primero y se marcaba después: si el UPDATE de la marca
     fallaba, Telegram ya había entregado el mensaje, el punto de retorno
@@ -1214,7 +1220,7 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
                 # toca, ya lo llevó el texto de su respuesta, que salió antes.
                 adjuntos = _adjuntos(cur, m)
                 if not adjuntos:
-                    raise ContenidoRetirado("ya no queda ningún adjunto")
+                    raise NoQuedaNingunAdjunto("ya no queda ningún adjunto")
                 if len(adjuntos) < len(m["adjuntos"]):
                     # Dentro del punto de retorno del envío: si el envío falla, el incidente
                     # se deshace con él y queda el de la vez que salga.
@@ -1252,6 +1258,12 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
             except Exception as exc_id:  # noqa: BLE001 -- se aísla, no deshace la marca
                 print(f"  ! no se pudo guardar el id de Telegram del mensaje "
                      f"{m['id']} ({type(exc_id).__name__}).")
+    except NoQuedaNingunAdjunto:
+        # El punto de retorno ya deshizo la marca: se descarta, con su incidente, sin contar
+        # un intento ni dejar el rastro de una falla de Telegram que no hubo.
+        cur.execute("update message_outbox set estado = 'descartado' where id = %s", (m["id"],))
+        _avisar_lo_retirado(cur, workspace_id, m, len(m["adjuntos"]), sale_el_resto=False)
+        return None
     except Exception as e:  # noqa: BLE001 — se registra, no se propaga
         _fallo(cur, workspace_id, m, e, cal, ahora)
         enviado = False

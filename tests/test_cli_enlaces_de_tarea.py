@@ -150,3 +150,64 @@ def test_un_numero_de_pieza_que_no_existe(conn, mundo, ada, correr):
                             "--pieza", "9", "--administrador", "Ada", "--motivo", "no")
     assert codigo == 1
     assert _auditadas(conn, "retirar_contenido_de_evidencia") == 0
+
+
+def test_retirar_usa_el_reloj_de_leda_para_los_avisos(conn, mundo, ada, correr, monkeypatch):
+    """Revisión de la porción 5b (`cli.py:262-264`, sin prueba): la consola pasa el momento del
+    reloj de Leda (el que se adelanta en las pruebas por Telegram), no el de la máquina: los
+    avisos del retiro salen con ese momento."""
+    from datetime import datetime, timezone
+
+    from leda.motor import reloj as reloj_mod
+
+    momento = datetime(2026, 10, 14, 13, 0, tzinfo=timezone.utc)
+
+    class RelojAdelantado:
+        def refrescar(self, conn, ws):
+            return True
+
+        def ahora(self):
+            return momento
+
+    monkeypatch.setattr(reloj_mod, "RelojDeLeda", RelojAdelantado)
+    _, lista = correr("retirar-contenido", "north-lab", "--tarea", "balanza")
+    codigo, _ = correr("retirar-contenido", "north-lab", "--tarea", "balanza",
+                       "--pieza", _numero(lista, "pantalla.jpg"),
+                       "--administrador", "Ada", "--motivo", "una contraseña en un papel")
+    assert codigo == 0
+    with admin(conn) as cur:
+        cur.execute("""select programado_para from scheduled_notice
+                        where tipo = 'contenido_retirado_por_la_administracion'""")
+        avisos = cur.fetchall()
+    conn.commit()
+    assert avisos and all(a["programado_para"] == momento for a in avisos)
+
+
+def test_el_numero_de_una_pieza_no_cambia_si_se_entrega_otra_en_el_medio(conn, mundo, ada,
+                                                                        correr):
+    """Sugerencia de la revisión de la porción 5 (`cli.py:263-270`): la pieza se elige por su
+    número en una lista que mostró otro comando antes. Lo que se entrega después va al final
+    (la lista es por momento de entrega), así que el número que se leyó sigue siendo esa pieza
+    y nunca se retira otra."""
+    from tests.garantias.test_pagina_de_la_tarea import JPEG, _archivo, _persona
+
+    _, antes = correr("retirar-contenido", "north-lab", "--tarea", "balanza")
+    numero = _numero(antes, "pantalla.jpg")
+    ws = mundo["north-lab"]["id"]
+    with admin(conn) as cur:
+        archivo = _archivo(cur, ws, _persona(mundo, "Sam Noble"), JPEG + b"tarde",
+                           "image/jpeg", "imagen", "tarde.jpg")
+        cur.execute("""insert into evidence (workspace_id, task_id, tipo, clase, archivo_id,
+                                             entregado_por)
+                       values (%s, %s, 'imagen', 'imagen', %s, %s)""",
+                    (ws, mundo["norte"]["id"], archivo, _persona(mundo, "Sam Noble")))
+    conn.commit()
+    _, despues = correr("retirar-contenido", "north-lab", "--tarea", "balanza")
+    assert _numero(despues, "pantalla.jpg") == numero
+    assert int(_numero(despues, "tarde.jpg")) > int(numero)
+
+    codigo, _ = correr("retirar-contenido", "north-lab", "--tarea", "balanza",
+                       "--pieza", numero, "--administrador", "Ada", "--motivo", "no va")
+    assert codigo == 0
+    token = _emitir(conn, mundo, "Taylor Quinn")
+    assert _leer_archivo(conn, token, mundo["norte"]["piezas"]["foto"]) is None

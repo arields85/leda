@@ -269,6 +269,38 @@ def test_el_bot_de_administracion_registra_el_chat_de_un_administrador(conn, web
     assert registro["detalle"] == {"chat_id": morgan["telegram"]}
 
 
+def test_por_el_webhook_el_administrador_pide_el_enlace_de_una_tarea(conn, webhook,
+                                                                     monkeypatch):
+    """Revisión de la porción 5 (`entrada.py:162`, sin prueba): el pedido `/enlace` por el
+    webhook del bot de administración se contesta por el bot de administración, con el enlace
+    atado a quien lo pidió, como en el escuchador."""
+    from tests.garantias.test_pagina_de_la_tarea import _tarea
+
+    monkeypatch.setattr(config_mod, "config",
+                        dataclasses.replace(config_mod.config, base_url="https://leda.example"))
+    morgan = webhook["mundo"]["north-lab"]["people"]["Morgan Hale"]
+    with admin(conn) as cur:
+        cur.execute("insert into platform_role (app_user_id, rol) values (%s, 'administrador')",
+                    (morgan["app_user_id"],))
+        tarea = _tarea(cur, webhook["mundo"]["north-lab"], titulo="Calibrar la balanza")
+    conn.commit()
+
+    r = _post(webhook["cliente"], "admin",
+              mensaje_de_telegram(42, "/enlace north-lab balanza", morgan["telegram"]),
+              entrada.secreto_del_bot("admin"))
+
+    assert r.status_code == 200
+    [enviado] = webhook["salida"].enviados
+    assert enviado.chat_id == morgan["telegram"]
+    assert enviado.texto.rsplit("\n", 1)[-1].startswith("https://leda.example/tarea/")
+    with admin(conn) as cur:
+        cur.execute("select admin_app_user_id, task_id from acceso_tarea")
+        [acceso] = cur.fetchall()
+    conn.commit()
+    assert (str(acceso["admin_app_user_id"]), str(acceso["task_id"])) == (
+        morgan["app_user_id"], tarea["id"])
+
+
 def test_registrar_webhooks_le_da_a_cada_bot_su_direccion_y_su_secreto(webhook, monkeypatch):
     telegram = TelegramFalso()
     monkeypatch.setattr(entrada.config.__class__, "espacios_con_token",

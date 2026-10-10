@@ -520,6 +520,41 @@ def test_lo_mandado_antes_entra_aparte_y_solo_si_queda(conn, mundo, marcos):
     assert cuantas(conn, "evidence") == 0
 
 
+def test_lo_mandado_antes_cuyo_contenido_retiro_la_administracion_no_entra(conn, mundo, marcos):
+    """Revisión de la porción 5b (`entrega.py:627-628`, sin prueba): la foto que Marcos dijo
+    que era de la tarea no entra en la vista previa de la entrega si la administración retiró su
+    contenido después (decisión 57: lo retirado no vuelve)."""
+    from leda import pagina_de_tarea
+
+    tarea = _tarea(conn, mundo)
+    marcos.manda(archivos=[(JPEG, "foto", None)])
+    marcos.manda(Jugada("elegir", {"opcion": "O2"}), texto="es del tablero")
+    assert cuantas(conn, "archivo_de_tarea", "task_id = %s", tarea) == 1
+    # La misma foto, entregada en otra tarea y retirada ahí por la administración: se retira
+    # el archivo, para todas sus piezas.
+    archivo = uno(conn, "select archivo_id from archivo_de_tarea")["archivo_id"]
+    with admin(conn) as cur:
+        cur.execute("""insert into app_user (telegram_user_id, nombre)
+                       values (79301, 'Ada Admin') returning id""")
+        ada = str(cur.fetchone()["id"])
+        cur.execute("insert into platform_role (app_user_id, rol) values (%s, 'administrador')",
+                    (ada,))
+        cur.execute("""insert into evidence (workspace_id, task_id, tipo, clase, archivo_id,
+                                             entregado_por)
+                       values (%s, %s, 'imagen', 'imagen', %s, %s) returning id""",
+                    (mundo["id"], mundo["tarea"], archivo,
+                     mundo["personas"]["Marcos"]["membership_id"]))
+        pieza = str(cur.fetchone()["id"])
+        assert pagina_de_tarea.retirar_contenido(cur, mundo["id"], pieza, ada,
+                                                 "se ve una contraseña", ahora=AHORA)
+    conn.commit()
+
+    r = marcos.manda(_entregar(el_texto_cubre=["explicacion"]), texto="termine el tablero")
+    hecho = _hecho(r, "entregar")
+    assert [p["es"] for p in hecho["entrega"]] == ["lo_que_escribio"]
+    assert not any("mandado_antes_el" in p for p in hecho["entrega"])
+
+
 def test_lo_que_llego_y_tomo_una_jugada_no_se_vuelve_a_atender(conn, mundo, marcos):
     """Hallazgo de la D1 (conversación 22, paso 1): si la IA elige guardar el archivo sin decir
     de qué tarea es, la duda de esa jugada ya atendió lo que llegó. Al terminar las jugadas no

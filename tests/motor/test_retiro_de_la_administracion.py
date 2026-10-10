@@ -207,6 +207,25 @@ def test_a_quien_revisa_no_le_llega_si_todavia_no_recibio_la_entrega(conn, mundo
     assert guardados[A_QUIEN_LA_REVISA] == []
 
 
+def test_si_la_entrega_le_llego_a_otra_persona_a_quien_revisa_ahora_no_le_llega(conn, mundo,
+                                                                                  ada):
+    """Revisión de la decisión 60 (`retiro_de_la_administracion.py:143-149`): la última entrega
+    le llegó a otra persona (quien revisaba antes): a quien revisa ahora no se le avisa de una
+    entrega que nunca vio."""
+    tarea = _entregada(conn, mundo)
+    with admin(conn) as cur:
+        cur.execute("""update scheduled_notice set destinatario_membership_id = %s
+                        where dedupe_key = %s""",
+                    (mundo["personas"]["Marcos"]["membership_id"],
+                     f"prueba:entrega:{tarea['id']}"))
+    conn.commit()
+    _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
+
+    guardados = _avisos_del_retiro(conn)
+    assert _de(conn, mundo, guardados[A_QUIEN_LA_ENTREGO]) == ["Marcos"]
+    assert guardados[A_QUIEN_LA_REVISA] == []
+
+
 def test_si_la_entrega_sigue_cubierta_solo_se_entera_quien_la_entrego(conn, mundo, ada):
     tarea = _entregada(conn, mundo, fotos=(JPEG + b"1", JPEG + b"2"))
     _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
@@ -273,6 +292,36 @@ def test_fuera_del_horario_espera_a_la_jornada(conn, mundo, ada):
     assert enviar(conn, mundo, ia, AHORA + timedelta(days=1)) == {"enviado": 2}
 
 
+def test_una_falla_al_guardar_los_avisos_sube_tal_cual(conn, mundo, monkeypatch):
+    """Revisión de la porción 5b (`retiro_de_la_administracion.py:73-76`): si guardar los avisos
+    falla, la transacción queda abortada y devolver el espacio en el `finally` fallaba también,
+    tapando el error de verdad con otro (`InFailedSqlTransaction`). Sube el de verdad; el espacio
+    vuelve solo con el rollback (`set_config` local a la transacción)."""
+    import psycopg
+
+    from leda.motor import retiro_de_la_administracion as retiro
+
+    def se_cae(cur, *_a):
+        cur.execute("select 1 / 0")
+
+    monkeypatch.setattr(retiro, "_avisar", se_cae)
+    with pytest.raises(psycopg.errors.DivisionByZero):
+        with admin(conn) as cur:
+            retiro.avisar(cur, mundo["id"], ["x"], MOTIVO, RETIRO)
+    conn.rollback()
+
+
+def test_si_sale_bien_el_espacio_vuelve_a_como_estaba(conn, mundo):
+    from leda.motor import retiro_de_la_administracion as retiro
+
+    with admin(conn) as cur:
+        cur.execute("select set_config('leda.workspace_id', '', true)")
+        assert retiro.avisar(cur, mundo["id"], [], MOTIVO, RETIRO) == 0
+        cur.execute("select current_setting('leda.workspace_id', true) as ws")
+        assert cur.fetchone()["ws"] == ""
+    conn.rollback()
+
+
 # --- La pieza nueva ---------------------------------------------------------------------------
 
 def _manda_otra_foto_y_confirma(conn, mundo, contenido: bytes = JPEG + b"nueva") -> None:
@@ -333,6 +382,30 @@ def test_con_la_pieza_nueva_la_entrega_se_completa_y_el_aviso_a_quien_revisa_no_
         mundo["personas"]["Ismael"]["membership_id"]
 
 
+def test_si_la_primera_entrega_nunca_le_llego_con_la_pieza_nueva_le_llega_completa(conn, mundo,
+                                                                                    ada):
+    """Decisión 60, la segunda mitad (revisión de `dbb03cf`): el retiro cae antes de que la
+    entrega le llegue a quien revisa; a Ismael no le llega nada del retiro, y cuando Marcos manda
+    la pieza nueva, le llega la entrega completa, una sola vez."""
+    tarea = _entregada(conn, mundo, aviso_de_la_entrega="guardado")
+    _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
+    assert _avisos_del_retiro(conn)[A_QUIEN_LA_REVISA] == []
+    # Al salir, la entrega incompleta no sale (decisión 15); a Marcos le llega el retiro.
+    assert enviar(conn, mundo, IAQueRedacta(), AL_SALIR) == {
+        "enviado": 1, "omitido": 1}
+    [primera] = [a for a in avisos_guardados(conn, "entrega_para_aprobar")]
+    assert primera["estado"] == "omitido"
+    _manda_otra_foto_y_confirma(conn, mundo)
+
+    enviar(conn, mundo, IAQueRedacta(), AHORA + timedelta(minutes=85))
+    entregas = [a for a in avisos_guardados(conn, "entrega_para_aprobar")
+                if not a["dedupe_key"].startswith("prueba:")]
+    [entrega] = [a for a in entregas if a["estado"] == "enviado"]
+    assert str(entrega["destinatario_membership_id"]) == \
+        mundo["personas"]["Ismael"]["membership_id"]
+    assert avisos_guardados(conn, A_QUIEN_LA_REVISA) == []
+
+
 # --- Lo retirado no vuelve -------------------------------------------------------------------
 
 def test_la_misma_foto_mandada_otra_vez_no_se_guarda(conn, mundo, ada):
@@ -350,6 +423,26 @@ def test_la_misma_foto_mandada_otra_vez_no_se_guarda(conn, mundo, ada):
     # Lo que le dice el turno: no se pudo recibir, y qué puede hacer en cambio.
     from leda.motor.turno import EN_CAMBIO_PUEDE
     assert all(hechos.significado(c) for c in EN_CAMBIO_PUEDE[archivos.CONTENIDO_RETIRADO])
+
+
+def test_la_misma_foto_por_telegram_queda_rechazada_y_la_ia_lo_sabe(conn, mundo, ada):
+    """Revisión de la porción 5b (`recibir.py:531-538`, sin prueba): por la entrada de verdad
+    (bajar, revisar, guardar), la foto cuyo contenido retiró la administración no se guarda: el
+    mensaje queda con su rechazo y la IA sabe que no se pudo recibir, con qué puede hacer."""
+    from tests.motor.test_archivos import Bajadas, _foto, _recepcion, _recibir
+
+    tarea = _entregada(conn, mundo)
+    _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
+    ia = IAGuionada(jugadas=[[]], redacciones=["Esa foto no la puedo recibir."])
+
+    _recibir(_recepcion(conn, mundo, ia, Bajadas({"F9": JPEG})),
+             _foto(990, "F9", contenido=JPEG))
+
+    atado = uno(conn, "select archivo_id, rechazo from archivo_de_mensaje")
+    assert (atado["archivo_id"], atado["rechazo"]) == (None, archivos.CONTENIDO_RETIRADO)
+    assert uno(conn, "select count(*) n from archivo where contenido is not null")["n"] == 0
+    [llego] = ia.pedidos_de_jugadas[0]["archivos"]
+    assert llego["no_se_pudo_recibir"] == archivos.CONTENIDO_RETIRADO
 
 
 def test_la_base_acepta_el_motivo_de_un_rechazo_por_contenido_retirado(conn, mundo):

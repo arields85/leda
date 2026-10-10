@@ -65,13 +65,17 @@ def atender_admin(conn, u: dict[str, Any], transporte: Transporte | None,
     if (not partes or partes[0].split("@", 1)[0].lower() != COMANDO
             or chat.get("type") != "private" or transporte is None):
         return True
-    with admin(conn) as cur:
-        quien = identificar(cur, mensaje["from"]["id"], Canal.ADMINISTRACION, None)
-    conn.commit()
+    quien = None
     try:
+        # Se identifica otra vez, dentro de la guarda: si en el medio perdió el rol, no se le
+        # contesta; si identificarlo falla, queda el incidente (revisión de la porción 5).
+        with admin(conn) as cur:
+            quien = identificar(cur, mensaje["from"]["id"], Canal.ADMINISTRACION, None)
+        conn.commit()
         _pedir_enlace(conn, quien.app_user_id, chat["id"], partes[1:], transporte)
         imprimir("  ← [admin] pedido de enlace atendido")
     except Denegado:
+        conn.rollback()
         return True
     except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y consola
         conn.rollback()
@@ -81,7 +85,8 @@ def atender_admin(conn, u: dict[str, Any], transporte: Transporte | None,
                 cur, None, "No se pudo contestarle a un administrador de plataforma su pedido "
                 "del enlace de una tarea por el bot de administración; no quedó ningún enlace.",
                 severidad="baja", etapa=ETAPA, referencia_cruda=texto_error_seguro(e),
-                app_user_id=quien.app_user_id, avisar_admin=False,
+                app_user_id=quien.app_user_id if quien is not None else None,
+                avisar_admin=False,
                 sin_avisar_porque="falló el mismo canal de administración.")
         conn.commit()
     return True

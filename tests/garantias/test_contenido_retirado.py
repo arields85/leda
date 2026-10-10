@@ -349,6 +349,39 @@ def test_un_album_con_todo_retirado_no_sale_y_deja_un_incidente(conn, mundo, ada
     assert len(_incidentes(conn)) == 1
 
 
+def test_un_album_que_se_queda_sin_nada_al_salir_se_descarta_sin_contar_un_intento(
+        conn, mundo, ada, monkeypatch):
+    """Revisión de la porción 5b (`despachador.py:1215-1223`): el retiro cae entre la mirada
+    previa del despachador (todavía quedaba algo) y el armado del envío (ya no queda nada).
+    Antes contaba como un intento fallido de Telegram (un rastro que decía que no se pudo
+    entregar y, al quinto, un mensaje perdido con aviso a la administración); ahora se
+    descarta como el álbum que llega sin nada, con su incidente, y no cuenta un intento."""
+    from leda import despachador
+
+    foto = mundo["norte"]["piezas"]["foto"]
+    _album(conn, mundo, [foto])
+    _retirar(conn, mundo, ada, foto)
+    # La mirada previa, de antes del retiro: todavía veía el archivo.
+    monkeypatch.setattr(despachador, "_adjuntos_que_salen", lambda cur, m: ["antes"])
+
+    transporte = TransporteQueLeeLosAdjuntos()
+    r = _despachar(conn, mundo, transporte)
+    assert r["descartados"] == 1 and r["fallidos"] == 0
+    assert transporte.contenidos == []
+    with admin(conn) as cur:
+        cur.execute("""select estado, intentos from message_outbox
+                        where dedupe_key = 'aviso:1:adjuntos'""")
+        fila = cur.fetchone()
+        cur.execute("""select count(*) n from incident
+                        where etapa in ('entrega_mensaje_reintento', 'entrega_mensaje')""")
+        de_telegram = cur.fetchone()["n"]
+    conn.commit()
+    assert (fila["estado"], fila["intentos"]) == ("descartado", 0)
+    assert de_telegram == 0
+    [incidente] = _incidentes(conn)
+    assert incidente["severidad"] == "baja"
+
+
 # --- La vuelta atrás ---------------------------------------------------------------------------
 
 def test_el_rollback_de_la_0053_se_niega_con_un_contenido_borrado(conn, mundo, ada):
