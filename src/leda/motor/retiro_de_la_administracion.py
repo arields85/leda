@@ -16,7 +16,9 @@ de coordinación del motor (los causa el acto de otra persona: fuera del tope di
   vuelve a contar.
 - **A quien revisa la tarea** (`LA_ENTREGA_ESPERA_OTRA_PIEZA`), si está en revisión y quedó sin
   cubrir: que la entrega espera esa pieza nueva. Sin el motivo, que es para quien la entregó; si
-  quien la revisa es quien la entregó, le llega sólo el primero.
+  quien la revisa es quien la entregó, le llega sólo el primero. Si a quien revisa todavía no le
+  llegó la entrega (el retiro cayó dentro del margen para corregir), no le llega nada: cuando
+  llegue la pieza nueva, recibe la entrega como siempre (decisión 60).
 
 Nunca se nombra a quien retiró: la administración, sin nombre (decisión 59; quién fue queda en
 la auditoría). Una tarea aprobada (terminada, o con la aprobación vigente de quien la revisa) o
@@ -47,7 +49,7 @@ from zoneinfo import ZoneInfo
 from . import entrega
 from .avisos import (CONTENIDO_RETIRADO_POR_LA_ADMINISTRACION, LA_ENTREGA_ESPERA_OTRA_PIEZA,
                      LA_ENTREGA_YA_ESTA_COMPLETA, YA_ESTA_APROBADA, YA_NO_ESTA_ENTREGADA,
-                     Momento, aprobacion_vigente, guardar, leer_tarea)
+                     Momento, aprobacion_vigente, aviso_de_la_entrega, guardar, leer_tarea)
 from .fichas import quien_revisa
 
 # Las claves de los hechos (sus significados, en `hechos.SIGNIFICADOS`).
@@ -105,6 +107,8 @@ def _avisar(cur, workspace_id: str, piezas: list[str], motivo: str, ahora: datet
             quien = quien_revisa(cur, task_id)
             if quien is None or quien["membership_id"] == persona:
                 continue
+            if not _le_llego_la_entrega(cur, task_id, quien["membership_id"]):
+                continue
             if task_id not in esperan.setdefault(quien["membership_id"], []):
                 esperan[quien["membership_id"]].append(task_id)
 
@@ -134,6 +138,15 @@ def _avisar(cur, workspace_id: str, piezas: list[str], motivo: str, ahora: datet
                            clave=f"motor:{LA_ENTREGA_ESPERA_OTRA_PIEZA}:{primera}:{revisor}")
         guardados += nuevo
     return guardados
+
+
+def _le_llego_la_entrega(cur, task_id: str, revisor: str) -> bool:
+    """Si a quien revisa ya le llegó el aviso de la última entrega de la tarea. Si el retiro cae
+    antes (dentro del margen para corregir), no se le avisa de una entrega que nunca vio: cuando
+    llegue la pieza nueva, le llega la entrega como siempre (decisión 60 del usuario)."""
+    aviso = aviso_de_la_entrega(cur, task_id)
+    return (aviso is not None and aviso["estado"] == "enviado"
+            and str(aviso["destinatario_membership_id"]) == revisor)
 
 
 def _una_sola(tareas) -> str | None:

@@ -79,9 +79,11 @@ def _archivo(cur, mundo, contenido: bytes) -> str:
 
 
 def _entregada(conn, mundo, titulo: str = "Armar el tablero", fotos=(JPEG,),
-               estado: str = "en_revision") -> dict:
+               estado: str = "en_revision", aviso_de_la_entrega: str = "enviado") -> dict:
     """Una tarea de Marcos que pide su explicación y una foto, entregada con lo que escribió y
-    `fotos`. Las piezas, por clave: `texto`, `foto0`, `foto1`..."""
+    `fotos`, con el aviso de la entrega a Ismael en `aviso_de_la_entrega` (`guardado`: todavía
+    no le llegó, por ejemplo dentro del margen para corregir). Las piezas, por clave: `texto`,
+    `foto0`, `foto1`..."""
     marcos = mundo["personas"]["Marcos"]["membership_id"]
     with admin(conn) as cur:
         cur.execute("""insert into task_evidence_policy (workspace_id, area_id,
@@ -110,6 +112,16 @@ def _entregada(conn, mundo, titulo: str = "Armar el tablero", fotos=(JPEG,),
                         (mundo["id"], tarea, _archivo(cur, mundo, contenido), ["foto"],
                          marcos))
             piezas[f"foto{i}"] = str(cur.fetchone()["id"])
+        if estado == "en_revision":
+            cur.execute(
+                """insert into scheduled_notice (workspace_id, tipo, task_id,
+                                                 destinatario_membership_id, hechos,
+                                                 programado_para, estado, dedupe_key, creado_en,
+                                                 resuelto_en)
+                   values (%s, 'entrega_para_aprobar', %s, %s, '{}', %s, %s, %s, %s, %s)""",
+                (mundo["id"], tarea, mundo["personas"]["Ismael"]["membership_id"], AHORA,
+                 aviso_de_la_entrega, f"prueba:entrega:{tarea}", AHORA,
+                 AHORA if aviso_de_la_entrega == "enviado" else None))
     conn.commit()
     return {"id": tarea, "titulo": titulo, "piezas": piezas}
 
@@ -181,6 +193,18 @@ def test_si_la_entrega_queda_sin_cubrir_se_enteran_quien_la_entrego_y_quien_la_r
     salida = todos(conn, "select es_coordinacion from message_outbox where not es_respuesta")
     assert len(salida) == 2 and all(f["es_coordinacion"] for f in salida)
     assert uno(conn, "select count(*) n from audit_log where accion = 'enviar_aviso'")["n"] == 2
+
+
+def test_a_quien_revisa_no_le_llega_si_todavia_no_recibio_la_entrega(conn, mundo, ada):
+    """Decisión 60 del usuario (2026-10-10): si el retiro cae antes de que la entrega le llegue
+    a quien revisa (dentro del margen para corregir), no le llega nada de una entrega que nunca
+    vio; cuando quien la entregó mande la pieza nueva, le llega la entrega como siempre."""
+    tarea = _entregada(conn, mundo, aviso_de_la_entrega="guardado")
+    _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
+
+    guardados = _avisos_del_retiro(conn)
+    assert _de(conn, mundo, guardados[A_QUIEN_LA_ENTREGO]) == ["Marcos"]
+    assert guardados[A_QUIEN_LA_REVISA] == []
 
 
 def test_si_la_entrega_sigue_cubierta_solo_se_entera_quien_la_entrego(conn, mundo, ada):
@@ -304,7 +328,7 @@ def test_con_la_pieza_nueva_la_entrega_se_completa_y_el_aviso_a_quien_revisa_no_
     assert "le_falta" not in hecho[EN_CADA_TAREA][0]
     # Y quien la revisa recibe la entrega completa, como siempre (decisión 15).
     [entrega] = [a for a in avisos_guardados(conn, "entrega_para_aprobar")
-                 if a["estado"] == "enviado"]
+                 if a["estado"] == "enviado" and not a["dedupe_key"].startswith("prueba:")]
     assert str(entrega["destinatario_membership_id"]) == \
         mundo["personas"]["Ismael"]["membership_id"]
 
