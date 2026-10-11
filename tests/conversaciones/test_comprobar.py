@@ -827,6 +827,21 @@ def test_un_nombre_se_compara_sin_mayusculas_ni_acentos():
         "el chino es marcos")
     assert not cp.jugada_coincide(esperada, {"nombre": "decir_quien_es", "quien_es": "Marcos"},
                                   "mariano")
+    # Los valores especiales del YAML siguen valiendo para un nombre.
+    def quien(esperado, real):
+        jugada = {"nombre": "decir_quien_es"}
+        if real is not None:
+            jugada["quien_es"] = real
+        return cp.jugada_coincide({"nombre": "decir_quien_es", "quien_es": esperado}, jugada,
+                                  "mariano")
+    assert quien("presente", "Mariano")
+    assert not quien("presente", "")
+    assert quien("ausente", "")
+    assert quien("ausente", None)
+    assert not quien("ausente", "Mariano")
+    assert quien("~mar", "Mariano")
+    assert quien("~már", "mariano")
+    assert not quien("~mart", "Mariano")
     # Un dato que no nombra a nadie se sigue comparando igual que siempre.
     assert not cp.jugada_coincide({"nombre": "anotar_prevision", "tarea": "PLC",
                                    "fecha": "2026-10-30"},

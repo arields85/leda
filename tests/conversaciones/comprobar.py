@@ -417,8 +417,11 @@ def palabras_que_no_dijo(dato: str, mensaje: str, palabras) -> list[str]:
 
 def _mismo_valor(clave: str, esperado: Any, real: Any, palabras) -> bool:
     """Un dato estructurado contra lo esperado; uno que nombra a una persona, sin mayúsculas
-    ni acentos (`DATOS_DE_NOMBRE`)."""
-    if clave in DATOS_DE_NOMBRE and isinstance(esperado, str) and isinstance(real, str):
+    ni acentos (`DATOS_DE_NOMBRE`), sin perder los valores especiales de `coincide`."""
+    if clave in DATOS_DE_NOMBRE and isinstance(esperado, str) and isinstance(real, str) \
+            and esperado not in ("presente", "ausente"):
+        if esperado.startswith("~"):
+            return " ".join(palabras(real)).startswith(" ".join(palabras(esperado[1:])))
         return palabras(esperado) == palabras(real)
     return coincide(esperado, real)
 
