@@ -618,6 +618,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     `review-1736c4b8c0d76d02`, aprobada; advertencia: una respuesta escrita que no la contesta
     (`fichas.py:1856`).
 
+74. **El cierre de un mensaje va siempre aparte, aunque no sea una pregunta** (usuario,
+    2026-10-11, "si, me parece bien. va siempre aparte"). La cocina le da la forma a cada
+    mensaje (`c304b23`, `salida.dar_forma`) y no reconoce qué dice una oración: separar sólo la
+    pregunta o el "no hace falta responder" pediría una lista de frases. La última oración del
+    mensaje va sola en su renglón, con un renglón en blanco antes, diga lo que diga ("Te aviso
+    el jueves si sigue en pie." también). Un mensaje de un solo renglón queda como está.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3659,8 +3666,12 @@ Vigente; lo de abajo ("cierre del 2026-10-10") es el registro de lo anterior.
       Escritor delegado (2+ archivos).
 - [ ] **Una lectura de la IA:** la 35 paso 18 (1 de 5): "sigo parado con el tablero" queda como
       texto y no como su tarea trabada, y a Nahuel no le llega la novedad posterior.
-- [ ] **Advertencias de las revisiones de hoy** (casos de borde y pruebas que faltan), anotadas
+- [x] **Advertencias de las revisiones de hoy** (casos de borde y pruebas que faltan), anotadas
       en cada decisión (66 a 73) y en la 72 (el orden de las jugadas).
+      Cubiertas en `0749a26` (sólo pruebas; ninguna encontró un defecto de Leda), revisión
+      `review-6360d388274381ed`, aprobada. Encontraron un defecto del corredor: los nombres
+      perdían los valores especiales del YAML (`presente`, `ausente`, `~prefijo`), sin efecto en
+      ninguna conversación; arreglado en `10a9728`, revisión `review-8c67dc7cbe8ff57d`, aprobada.
 - [ ] **C-8, las ausencias:** para más adelante.
 - [ ] **Un sector sin encargado un rato:** para la plataforma (`docs/product/plataforma-pendientes.md`).
 
