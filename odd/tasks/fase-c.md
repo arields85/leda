@@ -3838,6 +3838,17 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           Leda pregunta, guarda el pedido, confirma con nombre y apellido (botón y "sí" escrito
           iguales), aprende el apodo y hace lo pedido; un apodo de dos personas, un botón por
           persona. Rojo: `tests/motor/test_quien_es.py`, 15 de 15.
+        - **Revisiones RDD** (por tramo, en carpeta aparte): `3e56662..bbe40de`
+          `review-7ff2f1b5ae800922` y `bbe40de..1c9f8fe` `review-c6537bce8562f19a`, aprobadas.
+          Advertencias: dos personas que enseñan el mismo apodo a la vez pueden dejar dos filas
+          (`apodos.py`, aprender; inocuo para reconocer); una pregunta "¿quién es?" vieja puede
+          quedar para después si se abre otra (`apodos.py:163`); la aprobación guarda el pedido
+          sin `tarea` (`apodos.py:145-146`): no aplica, porque `de` sólo se mira cuando no se
+          nombró tarea. Sugerencias: "el" solo coincide con todos los apodos que empiezan con
+          "el" (`fichas.py:987-989`; da la duda con botones, nunca una elección), `adelantar` y
+          la duda desde la aprobación sin prueba propia, el trigger sin guarda de id
+          (`0055:90-97`), la hora de la carga del corredor (`carga.py:165`). Se miran con la
+          tercera porción, que toca `apodos.py`.
         - Verificación del escritor (en serie): `tests/motor` 1237, `tests/garantias` 472,
           `tests/conversaciones` 166 passed; en seco, 45 de 45. Correr las suites en paralelo las
           rompe entre sí.
