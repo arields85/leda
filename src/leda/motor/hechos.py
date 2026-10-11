@@ -364,6 +364,20 @@ SIGNIFICADOS: Mapping[str, str] = {
     "aprendio_como_le_dicen_a": "La persona del equipo, por su nombre, que desde ahora Leda "
                                 "también reconoce como la nombró quien escribe: lo confirmó esa "
                                 "persona.",
+    # --- De quién es un apodo, dicho sin que Leda lo pregunte (decisión 67) --------------------
+    "apodo": "Un apodo, como lo dijo la persona que escribe.",
+    "a_quienes_les_dicen_asi": "Pregunta si a todas las personas a las que ya les dicen así "
+                               "(ya_le_dicen_asi_a) y a la que nombró quien escribe (integrante) "
+                               "les dicen como lo dijo (como_lo_nombro), o sólo a esta: Leda no "
+                               "cambia nada sin la respuesta.",
+    "ya_le_dicen_asi_a": "A quiénes del equipo, por su nombre, Leda ya reconoce como lo dijo "
+                         "quien escribe.",
+    "sigue_reconociendo_asi_a": "A quiénes del equipo, por su nombre, Leda sigue reconociendo "
+                                "también así.",
+    "dejo_de_reconocer_asi_a": "A quiénes del equipo, por su nombre, Leda deja de reconocer "
+                               "así desde ahora, porque lo dijo quien escribe.",
+    "ya_lo_reconocia_asi": "Leda ya reconocía así a esa persona (integrante), y a nadie más: no "
+                           "cambió nada.",
     "ya_la_aprobo": "La persona que escribe ya la había aprobado: no se anota otra vez.",
     "la_entrega_se_esta_completando": "La persona responsable sacó algo de lo que entregó y "
                                       "está completando la entrega: así todavía no se aprueba "

@@ -107,6 +107,9 @@ DATOS = {
                            "nombre de esa persona, como lo dice. Sólo si lo dijo."),
     "de_afuera": ("boolean", "Verdadero sólo si la persona dice que a quien nombró no es del "
                              "equipo."),
+    "apodo": ("string", "Cuando la persona dice, sin que Leda se lo pregunte, de quién es un "
+                        "apodo (también para corregir a quién reconoció Leda): el apodo, como lo "
+                        "dice. Sólo si lo dijo."),
     "se_la_queda": ("boolean", "Verdadero sólo si la persona que escribe dice que se queda "
                                "con la tarea de otra persona, para hacerla; entonces a va vacío."),
     "acepta": ("boolean", "Verdadero si la persona dice que sí (aprueba el pase o toma la "

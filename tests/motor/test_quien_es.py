@@ -415,3 +415,170 @@ def test_un_apodo_de_dos_personas_para_quien_destraba_se_elige(conn, turnos):
 
     assert r.hechos[0]["quien_destraba"] == {"integrante": MARTIN}
     assert _destraban(conn) == [(MARTIN, None)]
+
+
+# --- Corregir un apodo que ya tiene dueño: Leda pregunta (decisión 67 del usuario, 2026-10-11) --
+#
+# Si "el tano" es Mariano y alguien dice "no, el tano es Nahuel", Leda no cambia nada sin
+# preguntar: si a los dos les dicen así ("A los dos": desde entonces "el tano" da la duda con un
+# botón por persona) o sólo a Nahuel ("Sólo a Nahuel Gimenez": el de Mariano se deja de usar, con
+# quién y cuándo, y se le enseña a Nahuel). Escribirlo vale igual que el botón.
+
+NAHUEL = "Nahuel Gimenez"
+A_QUIENES = "a_quienes_les_dicen_asi"
+
+
+def _el_tano_es_mariano(conn, t: Turnos) -> None:
+    _que_es_mariano(conn, t)
+    t.toca("Marcos", _boton(conn, t, "Marcos", "Confirmar"))
+    t.dice("Marcos", Jugada("cancelar", {}), texto="deja, no se la paso")
+
+
+def _el_tano_es_nahuel(t: Turnos):
+    return t.dice("Marcos", Jugada("decir_quien_es", {"apodo": "el tano", "quien_es": "nahuel"}),
+                  texto="no, el tano es nahuel")
+
+
+def _vigentes_del_tano(conn) -> list[str]:
+    return [f["nombre"] for f in todos(
+        conn, """select u.nombre from apodo a
+                   join membership m on m.id = a.membership_id
+                   join app_user u on u.id = m.app_user_id
+                  where a.apodo = 'el tano' and a.borrado_en is null order by u.nombre""")]
+
+
+def test_corregir_un_apodo_que_ya_tiene_dueno_pregunta_a_quienes_sin_cambiar_nada(conn, turnos):
+    _el_tano_es_mariano(conn, turnos)
+
+    r = _el_tano_es_nahuel(turnos)
+
+    [hecho] = r.hechos
+    assert hecho["jugada"] == "decir_quien_es"
+    assert (hecho["resultado"], hecho["falta"]) == ("falta_dato", [A_QUIENES])
+    assert hecho["como_lo_nombro"] == "el tano" and hecho["integrante"] == NAHUEL
+    assert hecho["ya_le_dicen_asi_a"] == [MARIANO]
+    assert hecho["pregunta"] == A_QUIENES
+    assert r.pregunta["tipo"] == A_QUIENES
+    assert [o["etiqueta"] for o in r.pregunta["opciones"]] == ["A los dos", f"Sólo a {NAHUEL}"]
+    assert _vigentes_del_tano(conn) == [MARIANO]
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+
+def test_a_los_dos_les_ensena_el_apodo_y_desde_entonces_pregunta_cual(conn, turnos):
+    _el_tano_es_mariano(conn, turnos)
+    _el_tano_es_nahuel(turnos)
+
+    r = turnos.toca("Marcos", _boton(conn, turnos, "Marcos", "A los dos"))
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["aprendio_como_le_dicen_a"] == NAHUEL
+    assert hecho["sigue_reconociendo_asi_a"] == [MARIANO]
+    assert _vigentes_del_tano(conn) == [MARIANO, NAHUEL]
+    assert _pregunta(conn, turnos, "Marcos") is None
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+    r = _pedir(turnos, "el tano")
+    assert r.pregunta["tipo"] == CUAL
+    assert [o["etiqueta"] for o in r.pregunta["opciones"]] == [MARIANO, NAHUEL]
+
+
+def test_solo_a_el_deja_de_usar_el_de_antes_con_quien_y_cuando_y_se_lo_ensena(conn, turnos):
+    _el_tano_es_mariano(conn, turnos)
+    _el_tano_es_nahuel(turnos)
+
+    r = turnos.toca("Marcos", _boton(conn, turnos, "Marcos", f"Sólo a {NAHUEL}"))
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["aprendio_como_le_dicen_a"] == NAHUEL
+    assert hecho["dejo_de_reconocer_asi_a"] == [MARIANO]
+    assert _vigentes_del_tano(conn) == [NAHUEL]
+    marcos = turnos.mundo["personas"]["Marcos"]["app_user_id"]
+    [retirado] = todos(conn, """select a.id, a.borrado_en, a.borrado_por_app_user_id
+                                  from apodo a where a.apodo = 'el tano'
+                                   and a.borrado_en is not null""")
+    assert str(retirado["borrado_por_app_user_id"]) == marcos
+    [auditoria] = todos(conn, """select * from audit_log where accion = 'dejar_de_usar_apodo'""")
+    assert str(auditoria["sujeto_id"]) == str(retirado["id"])
+    assert str(auditoria["actor_app_user_id"]) == marcos
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+    r = _pedir(turnos, "el tano")
+    assert r.hechos[0]["pase"]["pasaria_a"] == NAHUEL
+
+
+def test_elegirlo_por_escrito_vale_igual_que_el_boton(conn, turnos):
+    _el_tano_es_mariano(conn, turnos)
+    _el_tano_es_nahuel(turnos)
+
+    r = turnos.dice("Marcos", Jugada("elegir", {"opcion": "O2"}), texto="solo a nahuel")
+
+    assert r.hechos[0]["dejo_de_reconocer_asi_a"] == [MARIANO]
+    assert _vigentes_del_tano(conn) == [NAHUEL]
+
+
+def test_nombrar_solo_a_la_nueva_persona_es_solo_a_ella(conn, turnos):
+    _el_tano_es_mariano(conn, turnos)
+    _el_tano_es_nahuel(turnos)
+
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"quien_es": "nahuel"}),
+                    texto="solo nahuel")
+
+    assert r.hechos[0]["dejo_de_reconocer_asi_a"] == [MARIANO]
+    assert _vigentes_del_tano(conn) == [NAHUEL]
+
+
+def test_dejar_la_pregunta_sin_efecto_no_cambia_nada(conn, turnos):
+    _el_tano_es_mariano(conn, turnos)
+    _el_tano_es_nahuel(turnos)
+
+    turnos.dice("Marcos", Jugada("cancelar", {}), texto="deja, olvidate")
+
+    assert _vigentes_del_tano(conn) == [MARIANO]
+    assert _pregunta(conn, turnos, "Marcos") is None
+
+
+def test_decir_que_el_apodo_es_de_quien_ya_lo_tiene_no_cambia_nada(conn, turnos):
+    _el_tano_es_mariano(conn, turnos)
+
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"apodo": "el tano",
+                                                        "quien_es": "mariano"}),
+                    texto="el tano es mariano")
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "ya_lo_reconocia_asi" and hecho["integrante"] == MARIANO
+    assert r.pregunta is None
+    assert _vigentes_del_tano(conn) == [MARIANO]
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+
+def test_un_apodo_que_no_es_de_nadie_se_confirma_antes_de_aprenderlo(conn, turnos):
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"apodo": "el tano",
+                                                        "quien_es": "mariano"}),
+                    texto="al tano le decimos a mariano")
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "quien_es_para_confirmar" and hecho["integrante"] == MARIANO
+    assert r.pregunta["tipo"] == CONFIRMAR
+    assert _vigentes_del_tano(conn) == []
+
+    r = turnos.toca("Marcos", _boton(conn, turnos, "Marcos", "Confirmar"))
+
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["aprendio_como_le_dicen_a"]) == ("anotado", MARIANO)
+    assert _vigentes_del_tano(conn) == [MARIANO]
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+
+def test_con_la_pregunta_de_quien_es_abierta_el_apodo_la_contesta(conn, turnos):
+    """Si Leda preguntaba quién es "el tano", decir "el tano es mariano" es la respuesta, no una
+    corrección."""
+    _pedir(turnos, "el tano")
+
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"apodo": "el tano",
+                                                        "quien_es": "mariano"}),
+                    texto="el tano es mariano")
+
+    assert r.hechos[0]["resultado"] == "quien_es_para_confirmar"
+    assert r.pregunta["tipo"] == CONFIRMAR

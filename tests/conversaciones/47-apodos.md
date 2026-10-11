@@ -8,8 +8,8 @@ personas se aclara con nombre y apellido, y Leda nunca usa el apodo para nombrar
 (no inventa una identidad), §5 (la confirmación es de una persona), §8 (trato) y §13 (aislamiento);
 mecánica §14 (aprendizaje).
 
-**Estado:** construida (pasos 1 a 11): corre en seco con su YAML (`47-apodos.yaml`); falta la ronda
-con la IA real. El tramo "Por decidir con el usuario" no se construyó.
+**Estado:** construida (pasos 1 a 13): corre en seco con su YAML (`47-apodos.yaml`). Los pasos 12 y
+13 (decisión 67 del usuario, 2026-10-11) esperan su ronda con la IA real.
 
 ## Las reglas
 
@@ -23,6 +23,11 @@ con la IA real. El tramo "Por decidir con el usuario" no se construyó.
 5. **El apodo sirve para entender, no para hablar.** Las respuestas y los avisos nombran a Mariano por su
    nombre, nunca "el Tano".
 6. **Cada apodo aprendido queda auditado** con quién lo enseñó y cuándo.
+7. **Corregir un apodo que ya tiene dueño se pregunta** (decisión 67 del usuario, 2026-10-11). Si un
+   apodo ya es de una persona y alguien dice que es de otra, Leda no cambia nada sin preguntar si a
+   las dos les dicen así: "A los dos" se lo enseña también a la nueva (desde entonces da la duda,
+   como un apodo de dos personas); "Sólo a" la nueva deja de usar el de la otra, con quién y cuándo,
+   auditado, y se lo enseña a la nueva. Escribirlo vale igual que el botón.
 
 ## Estado inicial
 
@@ -105,9 +110,19 @@ con la IA real. El tramo "Por decidir con el usuario" no se construyó.
 
 11. **Nahuel** toca Martín Forte → quien destraba pasa a ser Martín; ningún apodo cambia.
 
-## Por decidir con el usuario
+### Corregir un apodo que ya tiene dueño (regla 7)
 
-- **Corregir un apodo que ya tiene dueño.** Si "el flaco" es Martín y alguien dice "no, el flaco es
-  Marcos", ¿Leda lo cambia, o pregunta si a los dos les dicen así? Propuesta del agente: preguntar con
-  dos botones, "A los dos" y "Sólo a Marcos Tarquini". Hasta que el usuario lo decida, este tramo no se
-  escribe ni se construye.
+12. **Nahuel** escribe (martes 20, 15:30): "el chino no es mariano, es marcos"
+    →
+    - Jugadas: `decir_quien_es`, con el apodo como lo dijo ("el chino") y Marcos.
+    - Efecto: ninguno: "el chino" sigue siendo de Mariano (lo enseñó Lucas en el paso 8).
+    - La respuesta dice: si a Mariano Naim y a Marcos Tarquini les dicen «el Chino», o sólo a Marcos
+      Tarquini; una sola pregunta.
+    - Botones: "A los dos" y "Sólo a Marcos Tarquini".
+    - La respuesta no dice: que ya lo cambió.
+
+13. **Nahuel** toca "A los dos" → "el chino" queda aprendido también para Marcos, auditado con Nahuel
+    como quien lo enseñó, y sigue siendo de Mariano: desde ahora "el chino" da la duda con un botón
+    por persona, como "el flaco". Con "Sólo a Marcos Tarquini", el de Mariano se dejaría de usar, con
+    quién y cuándo, auditado (lo prueba `tests/motor/test_quien_es.py`: el corredor no mira un apodo
+    que se deja de usar).

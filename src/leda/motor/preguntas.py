@@ -162,6 +162,10 @@ CONFIRMAR_QUIEN_ES = "confirmar_quien_es_esa_persona"
 # Cuál de varias personas: un apodo de dos, o uno que coincide con el nombre de otra (decisión 3),
 # con un botón por persona, por su nombre y apellido; escribirlo vale igual.
 CUAL_DE_ESAS_PERSONAS = "cual_de_esas_personas"
+# Si a todas esas personas les dicen como dijo quien escribe, o sólo a la que nombró (decisión
+# 67; `apodos.py`): un apodo que ya era de otra persona, con dos botones; se puede dejar, y
+# entonces no cambia nada.
+A_QUIENES = "a_quienes_les_dicen_asi"
 
 
 @dataclass(frozen=True)
@@ -209,6 +213,7 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(QUIEN_ES),
     TipoDePregunta(CONFIRMAR_QUIEN_ES),
     TipoDePregunta(CUAL_DE_ESAS_PERSONAS),
+    TipoDePregunta(A_QUIENES),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token

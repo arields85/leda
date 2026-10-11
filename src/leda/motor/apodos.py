@@ -50,6 +50,15 @@ reconocida.
 
 **Cada apodo aprendido queda auditado** (decisión 8; `aprender`): en `apodo`, con quién lo enseñó,
 cuándo y por qué canal, y en `audit_log`.
+
+**Decir de quién es un apodo, sin que Leda lo pregunte** (decisión 67 del usuario, 2026-10-11;
+`_de_quien_es_el_apodo`): "no, el flaco es Marcos". Si el apodo ya es de otra persona, Leda no
+cambia nada sin preguntar si a las dos les dicen así (`A_QUIENES`, con dos botones): "A los dos"
+le enseña el apodo también a la nueva (desde entonces da la duda, como dos nombres iguales);
+"Sólo a" la nueva deja de usar el de las otras, con quién y cuándo (`dejar_de_usar`, auditado), y
+se lo enseña a ella. Escribirlo vale igual que el botón. Si el apodo no es de nadie, es como
+contestar quién es: Leda confirma con nombre y apellido antes de aprenderlo. Si ya es sólo de
+esa persona, no cambia nada.
 """
 
 from __future__ import annotations
@@ -83,8 +92,19 @@ SIN_PREGUNTA = "sin_pregunta_abierta"
 # El dato de una opción de "cuál de esas personas": el integrante elegido.
 INTEGRANTE_ID = "integrante_id"
 BOTON_CONFIRMAR = "Confirmar"
+# Decir de quién es un apodo sin que Leda lo pregunte (decisión 67): el apodo, como lo dice; a
+# quiénes se lo dicen ya; lo que falta saber (si a todas o sólo a la nueva, la pregunta
+# `preguntas.A_QUIENES`, que también es el dato de sus opciones), y cómo quedó.
+APODO = "apodo"
+YA_LE_DICEN_ASI_A = "ya_le_dicen_asi_a"
+A_QUIENES = preguntas.A_QUIENES
+SIGUE_RECONOCIENDO_ASI_A = "sigue_reconociendo_asi_a"
+DEJO_DE_RECONOCER_ASI_A = "dejo_de_reconocer_asi_a"
+YA_LO_RECONOCIA_ASI = "ya_lo_reconocia_asi"
+A_TODOS, SOLO_A_ESA = "a_todos", "solo_a_esa"
 
-_DE_QUIEN_ES = (preguntas.QUIEN_ES, preguntas.CONFIRMAR_QUIEN_ES, preguntas.CUAL_DE_ESAS_PERSONAS)
+_DE_QUIEN_ES = (preguntas.QUIEN_ES, preguntas.CONFIRMAR_QUIEN_ES, preguntas.CUAL_DE_ESAS_PERSONAS,
+                preguntas.A_QUIENES)
 
 
 def normalizar(dicho: str) -> str:
@@ -131,6 +151,26 @@ def aprender(cur: psycopg.Cursor, quien: Solicitante, membership_id: str, dicho:
     return True
 
 
+def dejar_de_usar(cur: psycopg.Cursor, quien: Solicitante, membership_ids: list[str], dicho: str,
+                  ahora: datetime, *, inbound_message_id: str | None = None) -> list[str]:
+    """El apodo vigente de esos integrantes deja de usarse, con quién y cuándo (nada se borra:
+    la fila queda, con `borrado_en`), y su fila de auditoría (decisión 67). Los integrantes a los
+    que se les dejó de usar."""
+    apodo = normalizar(dicho)
+    cur.execute("""update apodo set borrado_en = %s, borrado_por_app_user_id = %s
+                    where membership_id = any(%s::uuid[]) and apodo = %s and borrado_en is null
+                returning id, membership_id""",
+                (ahora, quien.app_user_id, membership_ids, apodo))
+    filas = cur.fetchall()
+    for f in filas:
+        auditar(cur, accion="dejar_de_usar_apodo", workspace_id=quien.workspace_id,
+                sujeto_tipo="apodo", sujeto_id=f["id"], quien=quien,
+                detalle={"membership_id": str(f["membership_id"]), "apodo": apodo,
+                         "canal": CHAT, "dejado_por_membership_id": quien.membership_id,
+                         "at": ahora.isoformat(), "inbound_message_id": inbound_message_id})
+    return [str(f["membership_id"]) for f in filas]
+
+
 # --- Reconocer, o preguntar quién es ------------------------------------------------------------
 
 def quien_es(ctx, dicho: str, *, jugada: str, datos: dict[str, Any], task_id: str | None
@@ -170,7 +210,7 @@ def _abrir(ctx, tipo: str, pedido: dict[str, Any], task_id: str | None, *,
     vigente = preguntas.actual(ctx.cur, ctx.quien.membership_id)
     ahora, pregunta_id = preguntas.abrir_con_id(ctx, tipo, task_id, jugada=jugada,
                                                 opciones=opciones)
-    ficha = FICHAS.get(pedido["nombre"])
+    ficha = FICHAS.get(pedido.get("nombre"))
     if (not ahora and vigente is not None and ficha is not None
             and vigente["tipo"] in ficha.contesta
             and str(vigente["task_id"]) == str(task_id)):
@@ -197,7 +237,7 @@ def _preguntar_cual(ctx, pedido: dict[str, Any], task_id: str | None,
     refería (un apodo ya aprendido de dos)."""
     from .fichas import nombrar_pregunta      # fichas importa este módulo
     preguntas.cerrar_las_de_una_jugada_de_tipo(
-        ctx, preguntas.CUAL_DE_ESAS_PERSONAS, pedido["nombre"], task_id, "sin_efecto",
+        ctx, preguntas.CUAL_DE_ESAS_PERSONAS, pedido.get("nombre"), task_id, "sin_efecto",
         {"reemplazada": True, **({"tarea": task_id} if task_id else {})})
     jugada = {**pedido, "candidatos": [str(c["membership_id"]) for c in coinciden],
               "aprende": aprende}
@@ -221,10 +261,15 @@ def decir(ctx, datos: dict[str, Any], tarea: dict[str, Any] | None) -> dict[str,
     from .fichas import integrantes_que_coinciden, vacio       # fichas importa este módulo
     cur = ctx.cur
     q = _la_pregunta(ctx, datos)
+    tocada = bool(datos.get("de_la_pregunta"))
+    apodo = None if vacio(datos.get(APODO)) else str(datos[APODO]).strip()
+    if apodo is not None and not tocada and not _la_contesta(q, apodo):
+        return _de_quien_es_el_apodo(ctx, apodo, datos.get(QUIEN_ES))
     if q is None:
         return {"resultado": "no_se_puede", "motivo": SIN_PREGUNTA}
     pedido = dict(q["jugada"] or {})
-    tocada = bool(datos.get("de_la_pregunta"))
+    if q["tipo"] == preguntas.A_QUIENES:
+        return _a_quienes(ctx, q, pedido, datos, tocada=tocada)
     if tocada and datos.get(INTEGRANTE_ID):
         # El botón de una persona: es una de las que Leda ofreció.
         integrante = (_integrante(cur, str(datos[INTEGRANTE_ID]))
@@ -269,6 +314,14 @@ def decir(ctx, datos: dict[str, Any], tarea: dict[str, Any] | None) -> dict[str,
     return _mostrar_para_confirmar(ctx, pedido, _task(q), coinciden[0])
 
 
+def _la_contesta(q: dict[str, Any] | None, apodo: str) -> bool:
+    """Si decir de quién es ese apodo contesta la pregunta de quién es (o de a quiénes) que Leda
+    hizo por él: entonces no es una corrección."""
+    if q is None:
+        return False
+    return normalizar(str((q["jugada"] or {}).get(COMO_LO_NOMBRO) or "")) == normalizar(apodo)
+
+
 def _la_pregunta(ctx, datos: dict[str, Any]) -> dict[str, Any] | None:
     """La pregunta que contesta: la del botón tocado; si no, la abierta si es de quién es; si
     no, la más nueva de quién es que quedó para después."""
@@ -306,7 +359,7 @@ def _mostrar_para_confirmar(ctx, pedido: dict[str, Any], task_id: str | None,
     jugada = {**pedido, INTEGRANTE_ID: str(integrante["membership_id"]),
               "integrante": integrante["nombre"]}
     preguntas.cerrar_las_de_una_jugada_de_tipo(
-        ctx, preguntas.CONFIRMAR_QUIEN_ES, pedido["nombre"], task_id, "sin_efecto",
+        ctx, preguntas.CONFIRMAR_QUIEN_ES, pedido.get("nombre"), task_id, "sin_efecto",
         {"reemplazada": True, **({"tarea": task_id} if task_id else {})})
     ahora, pregunta_id = preguntas.abrir_con_id(
         ctx, preguntas.CONFIRMAR_QUIEN_ES, task_id, jugada=jugada,
@@ -381,6 +434,91 @@ def confirmar(ctx, datos: dict[str, Any], q: dict[str, Any]) -> dict[str, Any]:
                    aprendio=integrante["nombre"], tocada=tocada)
 
 
+# --- Decir de quién es un apodo, sin que Leda lo pregunte (decisión 67) -------------------------
+
+def _de_quien_es_el_apodo(ctx, apodo: str, dicho: Any) -> dict[str, Any]:
+    """"El flaco es Marcos": si ya es de otra persona, Leda pregunta a quiénes les dicen así, con
+    dos botones, y no cambia nada todavía; si no es de nadie, confirma con nombre y apellido antes
+    de aprenderlo; si ya es sólo de esa persona, no cambia nada (ver el módulo)."""
+    from .fichas import integrantes_que_coinciden, nombrar_pregunta, vacio
+    cur = ctx.cur
+    if vacio(dicho):
+        return {"resultado": "falta_dato", "falta": [QUIEN_ES], COMO_LO_NOMBRO: apodo}
+    dicho = str(dicho).strip()
+    coinciden = integrantes_que_coinciden(cur, dicho)
+    if not coinciden:
+        return {"resultado": "no_se_puede", "motivo": "persona_desconocida",
+                "nombre_que_no_esta": dicho, COMO_LO_NOMBRO: apodo}
+    if len(coinciden) > 1:
+        return {"resultado": "falta_dato", "falta": [QUIEN_ES], COMO_LO_NOMBRO: apodo,
+                "coinciden": [c["nombre"] for c in coinciden]}
+    nueva = coinciden[0]
+    nueva_id = str(nueva["membership_id"])
+    duenos = {str(a["membership_id"]) for a in vigentes(cur) if a["apodo"] == normalizar(apodo)}
+    if not duenos:
+        # Un apodo que no es de nadie: como contestar quién es (ADR 0020, decisión 1).
+        return _mostrar_para_confirmar(ctx, {COMO_LO_NOMBRO: apodo}, None, nueva)
+    otras = sorted((_integrante(cur, d) for d in duenos - {nueva_id}),
+                   key=lambda i: i["nombre"])
+    if not otras:
+        return {"resultado": YA_LO_RECONOCIA_ASI, COMO_LO_NOMBRO: apodo,
+                "integrante": nueva["nombre"]}
+    jugada = {"nombre": "decir_quien_es", COMO_LO_NOMBRO: apodo, INTEGRANTE_ID: nueva_id,
+              "integrante": nueva["nombre"], "otras": [str(o["membership_id"]) for o in otras]}
+    preguntas.cerrar_las_de_una_jugada_de_tipo(ctx, A_QUIENES, "decir_quien_es", None,
+                                               "sin_efecto", {"reemplazada": True})
+    ahora, pregunta_id = preguntas.abrir_con_id(
+        ctx, A_QUIENES, None, jugada=jugada,
+        opciones=[("A los dos" if len(otras) == 1 else "A todos",
+                   {"jugada": "decir_quien_es", "datos": {A_QUIENES: A_TODOS}}),
+                  (f"Sólo a {nueva['nombre']}",
+                   {"jugada": "decir_quien_es", "datos": {A_QUIENES: SOLO_A_ESA}})])
+    hecho = {"resultado": "falta_dato", "falta": [A_QUIENES], COMO_LO_NOMBRO: apodo,
+             "integrante": nueva["nombre"], YA_LE_DICEN_ASI_A: [o["nombre"] for o in otras]}
+    nombrar_pregunta(hecho, "pregunta" if ahora else "pregunta_para_despues", A_QUIENES,
+                     pregunta_id)
+    return hecho
+
+
+def _a_quienes(ctx, q: dict[str, Any], pedido: dict[str, Any], datos: dict[str, Any], *,
+               tocada: bool) -> dict[str, Any]:
+    """La respuesta a si a todas les dicen así o sólo a la nueva: tocada, la opción; escrita,
+    nombrar sólo a la nueva es "sólo a ella" (elegir la opción por escrito la corre como el
+    botón). Lo demás no la contesta: la pregunta sigue."""
+    from .fichas import integrantes_que_coinciden, vacio
+    nueva = _integrante(ctx.cur, str(pedido.get(INTEGRANTE_ID)))
+    if nueva is None:
+        _cerrar(ctx, q, "sin_efecto", {"jugada": "decir_quien_es"})
+        return {"resultado": "no_se_puede", "motivo": "persona_desconocida",
+                "nombre_que_no_esta": pedido.get("integrante")}
+    eleccion = datos.get(A_QUIENES) if tocada else None
+    if not tocada and not vacio(datos.get(QUIEN_ES)):
+        coinciden = integrantes_que_coinciden(ctx.cur, str(datos[QUIEN_ES]))
+        if [str(c["membership_id"]) for c in coinciden] == [str(nueva["membership_id"])]:
+            eleccion = SOLO_A_ESA
+    if eleccion not in (A_TODOS, SOLO_A_ESA):
+        return {"resultado": "falta_dato", "falta": [A_QUIENES],
+                COMO_LO_NOMBRO: pedido.get(COMO_LO_NOMBRO), "integrante": nueva["nombre"]}
+    _cerrar(ctx, q, "respondida", {"jugada": "decir_quien_es", A_QUIENES: eleccion})
+    apodo = pedido[COMO_LO_NOMBRO]
+    otras = [str(o) for o in pedido.get("otras") or []]
+    hecho: dict[str, Any] = {"resultado": "anotado", COMO_LO_NOMBRO: apodo}
+    if eleccion == SOLO_A_ESA:
+        dejadas = dejar_de_usar(ctx.cur, ctx.quien, otras, apodo, ctx.ahora,
+                                inbound_message_id=ctx.entrante_id)
+        hecho[DEJO_DE_RECONOCER_ASI_A] = _nombres(ctx.cur, dejadas)
+    else:
+        hecho[SIGUE_RECONOCIENDO_ASI_A] = _nombres(ctx.cur, otras)
+    aprender(ctx.cur, ctx.quien, str(nueva["membership_id"]), apodo, ctx.ahora,
+             inbound_message_id=ctx.entrante_id)
+    hecho[APRENDIO] = nueva["nombre"]
+    return hecho
+
+
+def _nombres(cur, membership_ids: list[str]) -> list[str]:
+    return sorted(i["nombre"] for i in (_integrante(cur, m) for m in membership_ids) if i)
+
+
 # --- Seguir con lo pedido -----------------------------------------------------------------------
 
 def _seguir(ctx, q: dict[str, Any], pedido: dict[str, Any], nombrado: str, *,
@@ -391,6 +529,10 @@ def _seguir(ctx, q: dict[str, Any], pedido: dict[str, Any], nombrado: str, *,
     from .fichas import JUGADAS               # fichas importa este módulo
     from .situaciones import LO_ELEGIDO_QUEDA
     ctx.nombrados[normalizar(pedido[COMO_LO_NOMBRO])] = nombrado
+    if not pedido.get("nombre"):
+        # Sólo decía de quién es un apodo (decisión 67): no había nada más pedido.
+        return {"resultado": "anotado", COMO_LO_NOMBRO: pedido[COMO_LO_NOMBRO],
+                **({APRENDIO: aprendio} if aprendio is not None else {})}
     datos = dict(pedido.get("datos") or {})
     if q["task_id"] is not None:
         alias = preguntas.tarea_dicha(ctx, q["task_id"]).get("alias")

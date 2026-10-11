@@ -1838,16 +1838,19 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "verdadero si dice que sí, falso si dice que no; por_que, sus palabras si dice "
              "por qué."),
     Ficha("decir_quien_es", "decir quién es una persona que nombró y Leda no reconoce",
-          necesita=(), opcional=("quien_es", "de_afuera"),
+          necesita=(), opcional=("quien_es", "de_afuera", "apodo"),
           comprueba="que Leda le haya preguntado quién es alguien que nombró, o cuál de varias "
-                    "personas; que el nombre sea de alguien del equipo (de las que ofreció, si "
-                    "preguntó cuál)",
+                    "personas, o que diga de quién es un apodo; que el nombre sea de alguien del "
+                    "equipo (de las que ofreció, si preguntó cuál)",
           hace="nada todavía: muestra a quién reconoce, con nombre y apellido, para que lo "
                "confirme; si es una de las personas que Leda ofreció, o no es del equipo, "
-               "hace lo que se había pedido",
+               "hace lo que se había pedido; si el apodo ya es de otra persona, pregunta si a "
+               "las dos les dicen así o sólo a la que nombró, con dos botones",
           despues="con la confirmación (botón o escrita) aprende cómo le dicen a esa persona, "
                   "auditado, y hace lo que se había pedido como si la hubieran nombrado por su "
-                  "nombre; si el nombre no es de nadie del equipo, lo dice y sigue preguntando",
+                  "nombre; si el nombre no es de nadie del equipo, lo dice y sigue preguntando; "
+                  "de un apodo que ya era de otra persona, con a las dos se lo aprende también a "
+                  "la nueva, y con sólo a la nueva deja de usar el de la otra, auditado",
           manejar=_decir_quien_es, se_ofrece=False,
           contesta=(preguntas.QUIEN_ES, preguntas.CONFIRMAR_QUIEN_ES,
                     preguntas.CUAL_DE_ESAS_PERSONAS),
@@ -1855,7 +1858,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "reconoce como del equipo (como_lo_nombro, en la pregunta abierta): quien_es es el "
              "nombre de esa persona, como lo dice; de_afuera, si dice que no es del equipo. "
              "También cuando elige una de las personas que Leda le ofreció, o nombra a otra en "
-             "lugar de confirmar la que Leda le mostró."),
+             "lugar de confirmar la que Leda le mostró. Y cuando dice, sin que Leda se lo "
+             "pregunte, de quién es un apodo (apodo), también para corregir a quién reconoció "
+             "Leda: quien_es es esa persona."),
     # Las situaciones generales (`situaciones.py`): valen igual para todas las fichas.
     Ficha("elegir", "elegir una de las opciones de la pregunta abierta",
           necesita=("opcion",), opcional=(),

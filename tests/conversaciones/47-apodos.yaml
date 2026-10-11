@@ -274,3 +274,47 @@ pasos:
       - que le pregunta a Martín y le avisa apenas sepa algo
     no_dice:
       - "«el Flaco» para nombrar a Martín"
+
+  # --- Corregir un apodo que ya tiene dueño (regla 7; decisión 67 del usuario, 2026-10-11) -------
+  # "el chino" es de Mariano (lo enseñó Lucas en el paso 8). Nahuel dice que es de Marcos: Leda no
+  # cambia nada sin preguntar si a los dos les dicen así.
+  - paso: 12
+    quien: Nahuel
+    a_las: "2026-10-20 15:30"
+    escribe: "el chino no es mariano, es marcos"
+    jugadas:
+      - {nombre: decir_quien_es, apodo: "el chino", quien_es: "marcos"}
+    efectos: {}
+    hechos:
+      - {jugada: decir_quien_es, resultado: falta_dato, falta: [a_quienes_les_dicen_asi],
+         como_lo_nombro: "el chino", integrante: Marcos Tarquini,
+         ya_le_dicen_asi_a: [Mariano Naim], pregunta: a_quienes_les_dicen_asi}
+    pregunta: {tipo: a_quienes_les_dicen_asi}
+    botones: [A los dos, Sólo a Marcos Tarquini]
+    estado_despues:
+      pregunta_abierta: {tipo: a_quienes_les_dicen_asi}
+      para_despues: []
+    dice:
+      - "una sola pregunta: si a Mariano Naim y a Marcos Tarquini les dicen «el Chino», o sólo a Marcos Tarquini"
+    no_dice:
+      - que ya lo cambió
+
+  - paso: 13
+    quien: Nahuel
+    a_las: "2026-10-20 15:31"
+    toca: A los dos
+    efectos:
+      apodos: [{de: Marcos, apodo: "el chino", enseno: Nahuel, canal: chat, auditado: true,
+                vigente: true}]
+    hechos:
+      - {jugada: decir_quien_es, resultado: anotado, como_lo_nombro: "el chino",
+         aprendio_como_le_dicen_a: Marcos Tarquini, sigue_reconociendo_asi_a: [Mariano Naim],
+         dejo_de_reconocer_asi_a: ausente}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que desde ahora reconoce así a Marcos Tarquini, y también sigue reconociendo así a Mariano Naim
+    no_dice:
+      - que dejó de reconocer así a Mariano
