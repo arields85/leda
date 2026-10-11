@@ -526,22 +526,39 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     en este caso). Si el martes Leda ya le preguntó a Ariel "¿pudiste pasársela?" y, antes de que
     conteste, Nahuel dice "se lo pido yo", el compromiso de Ariel sigue en pie: la pregunta queda
     abierta y, si Ariel no contesta, Leda le vuelve a preguntar contándole que Nahuel le iba a
-    pedir la lista directamente (como la 64). Por construir, con su prueba, cuando termine el
-    escritor de los apodos.
+    pedir la lista directamente (como la 64). Hecha en `9d28a4c` (`persecucion.su_dia_en_pie`:
+    "se lo pido yo" cierra el tema con quien destraba sólo si no dio un día; cada repetición lleva
+    `dijo_que_se_lo_pedia`). Revisión `review-b6c2c0d1156c3653`, aprobada; advertencia: la
+    repetición del día en el aviso no tiene prueba propia (`avisos.py:1441-1442`); sugerencia:
+    probar un día nuevo o una respuesta después (`persecucion.py:2282-2310`).
 
 67. **Corregir un apodo que ya tiene dueño: Leda pregunta** (pregunta 2, conversación 47 "Por
     decidir"; usuario, 2026-10-11, "vamos con preguntar, como sugeris"). Si "el flaco" es Martín
     y Nahuel dice "no, el flaco es Marcos", Leda pregunta si a los dos les dicen así, con dos
     botones: "A los dos" (desde entonces "el flaco" da la duda con botones, como dos nombres
     iguales) y "Sólo a Marcos Tarquini" (se retira el apodo de Martín, con quién y cuándo, y se
-    le enseña a Marcos). Nunca se cambia sin preguntar. Por construir, con su prueba y su paso
-    en la 47, cuando termine el escritor de los apodos.
+    le enseña a Marcos). Nunca se cambia sin preguntar. Hecha en `e932186` (la jugada
+    `decir_quien_es` con `apodo`, la pregunta `a_quienes_les_dicen_asi`; con más de un dueño
+    anterior el botón dice "A todos"; lo anotado antes con el dueño anterior no cambia; la 47,
+    pasos 12 y 13, con "A los dos": el corredor no ve los apodos retirados, "Sólo a" lo cubren
+    las pruebas del motor). Revisión `review-326914ea068107e9`, aprobada; advertencias: la ficha
+    no lista `a_quienes_les_dicen_asi` entre las preguntas que contesta (`fichas.py:1841`), y
+    repetir por escrito "el flaco es Marcos" con esa pregunta abierta cuenta como "Sólo a"
+    (`apodos.py:495-498`); sugerencias: probar "A todos" y un nombre que coincide con varias
+    personas (`apodos.py:445-454`, `472`).
 
 68. **Un archivo para una tarea que espera cambios: se guarda y se ofrece volver a entregarla**
     (pregunta 4, la 23 paso 12; usuario, 2026-10-11, "va la propuesta"). Si a Mariano le pidieron
     cambios y manda "ahi va el diagrama del tablero" con una foto, Leda la guarda y en la misma
     respuesta le ofrece "¿La volvés a entregar con esto?" con Confirmar. La entrega sale sólo con
-    su sí; si no contesta, nada cambia. Por construir, con su prueba y el paso 12 de la 23.
+    su sí; si no contesta, nada cambia. Hecha en `6789e4c` (`entrega._ofrecer_volver_a_entregarla`:
+    la vista previa de `entregar`, con lo que trajo el mensaje; el hecho
+    `le_ofrece_entregarla_con_esto`; la 23 paso 12 con un `o_bien`). Revisión
+    `review-2b8ab052374c9a43`, aprobada; advertencias: el mensaje sin texto propio no tiene
+    prueba (`entrega.py:946-948`) y la oferta pasa el resultado de `entregar` sin mirarlo
+    (`entrega.py:1005-1014`); sugerencia: probar los casos en que no se ofrece (`995-997`).
+    `PENDIENTE` (pregunta al usuario): la oferta abre una confirmación de entrega, que se repite
+    una vez por día como cualquier vista previa sin confirmar; ¿o no se repite?
 
 69. **"Pedíselo igual a Martín" sin encargado: las dos lecturas valen** (pregunta 5, la 48 paso
     10; usuario, 2026-10-11, "aceptarlo", la que recomendó el agente; como la 63). Que la IA lo
