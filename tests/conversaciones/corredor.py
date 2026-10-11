@@ -32,9 +32,9 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
      (`OPERACIONES_DE_LA_ADMINISTRACION`), corrida como la corre la administración (la consola
      o la plataforma), con el reloj del paso; sus efectos se comparan como los de un turno, y
      lo que falta es del código, porque nadie eligió jugadas;
-   - **otra lectura válida** del mensaje (`o_bien`; decisión 63): si la IA eligió sus jugadas, el
-     paso se compara con lo que ella espera y corren sus pasos (`luego`) antes de seguir
-     (`comprobar.elegir_lectura`);
+   - **otra lectura válida** del mensaje (`o_bien`; decisión 63; una lista si hay varias,
+     decisión 75): si la IA eligió sus jugadas, el paso se compara con lo que ella espera y
+     corren sus pasos (`luego`) antes de seguir (`comprobar.elegir_lectura`);
 3. compara lo que pasó con lo esperado (`comprobar.py`), mide el formato de cada mensaje de Leda
    (`comprobar.fallas_de_formato`) y guarda lo que la persona que lee la
    corrida necesita: lo que dijo cada uno, las jugadas, los hechos y la latencia.
@@ -211,8 +211,8 @@ class ResultadoPaso:
     dice: list[str] = field(default_factory=list)
     no_dice: list[str] = field(default_factory=list)
     preludio: bool = False
-    # La lectura del mensaje con que se comparó el paso: `comprobar.O_BIEN` si la IA eligió la
-    # otra (decisión 63), y los pasos que corren después sólo por ella.
+    # La lectura del mensaje con que se comparó el paso: `comprobar.O_BIEN` si la IA eligió una
+    # otra (decisiones 63 y 75), y los pasos que corren después sólo por ella.
     lectura: str | None = None
     luego: list[dict[str, Any]] = field(default_factory=list)
 

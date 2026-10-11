@@ -222,22 +222,35 @@ pasos:
     no_dice:
       - que le pregunta a Martín
       - que Martín dejó de ser el encargado, o algo de la administración o de la plataforma
-    # La otra lectura válida (decisión 69): la IA lo lee como un pedido fuera de la lista. Nahuel
-    # recibe la misma respuesta, y la nota al administrador de un pedido fuera de la lista es
-    # cierta. Nada se anota ni se le pregunta a Martín.
+    # Las otras lecturas válidas. La primera (decisión 69): la IA lo lee como un pedido fuera de
+    # la lista. Nahuel recibe la misma respuesta, y la nota al administrador de un pedido fuera de
+    # la lista es cierta. Nada se anota ni se le pregunta a Martín.
     o_bien:
-      jugadas:
-        - {nombre: fuera_de_la_lista}
-      efectos:
-        avisos_al_administrador: 1
-      hechos:
-        - {resultado: fuera_de_la_lista, lo_que_puede_hacer: presente}
-      pregunta: null
-      botones: []
-      enlace: false
-      dice:
-        - que el detalle de la del switch lo ve Infraestructura IT y que por ahora no tiene a quién pedírselo
-      no_dice:
-        - que le pregunta a Martín
-        - que Martín dejó de ser el encargado, o algo de la administración o de la plataforma
-        - que le avisó al administrador
+      - jugadas:
+          - {nombre: fuera_de_la_lista}
+        efectos:
+          avisos_al_administrador: 1
+        hechos:
+          - {resultado: fuera_de_la_lista, lo_que_puede_hacer: presente}
+        pregunta: null
+        botones: []
+        enlace: false
+        dice:
+          - que el detalle de la del switch lo ve Infraestructura IT y que por ahora no tiene a quién pedírselo
+        no_dice:
+          - que le pregunta a Martín
+          - que Martín dejó de ser el encargado, o algo de la administración o de la plataforma
+          - que le avisó al administrador
+      # La segunda (decisión 75): la IA no elige ninguna jugada y Leda contesta por el contexto.
+      # Es cierto y no queda nada sin hacer: con la jugada esperada tampoco se podía pedir.
+      - jugadas: []
+        efectos: {}
+        hechos: []
+        pregunta: null
+        botones: []
+        enlace: false
+        dice:
+          - que el detalle de la del switch lo ve Infraestructura IT y que por ahora no tiene a quién pedírselo
+        no_dice:
+          - que le pregunta a Martín
+          - que Martín dejó de ser el encargado, o algo de la administración o de la plataforma

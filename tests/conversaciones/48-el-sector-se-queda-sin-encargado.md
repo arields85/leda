@@ -111,6 +111,9 @@ Repite el comienzo de la 45.
     - **O bien** (decisión 69, la otra lectura válida): la IA lo lee como un pedido fuera de la
       lista. Nahuel recibe la misma respuesta; la nota al administrador de un pedido fuera de la
       lista es cierta. Nada se anota ni se le pregunta a Martín.
+    - **O bien** (decisión 75, la tercera lectura válida): la IA no elige ninguna jugada y Leda
+      contesta por el contexto, con la misma respuesta. Nada se anota, no hay hechos ni efectos,
+      y no se le pregunta a Martín.
 
 ## Qué mide
 

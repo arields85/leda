@@ -6,6 +6,8 @@ clasifica cada diferencia (garantía, comprensión o motor).
 
 from __future__ import annotations
 
+import pytest
+
 from leda import salida
 from tests.conversaciones import comprobar as cp
 
@@ -677,6 +679,109 @@ def test_otra_lectura_mal_escrita_es_un_error_del_yaml():
                 "o_bien": {"jugadas": []}}
     with pytest.raises(ValueError, match="toque"):
         cp.elegir_lectura(un_toque, [])
+
+
+# --- Más de una otra lectura de un mensaje (`o_bien` como lista; decisión 75, la 48, paso 10) --
+
+_FUERA_DE_LA_LISTA = {"jugadas": [{"nombre": "fuera_de_la_lista"}],
+                      "efectos": {"avisos_al_administrador": 1},
+                      "dice": ["que por ahora no tiene a quién pedírselo"]}
+_SIN_JUGADA = {"jugadas": [], "efectos": {}, "hechos": [],
+               "dice": ["que por ahora no tiene a quién pedírselo"],
+               "luego": [{"paso": "10b", "quien": "Nahuel", "a_las": "2026-10-26 11:31",
+                          "escribe": "ok", "jugadas": []}]}
+_PASO_CON_DOS_OTRAS = {
+    "paso": 10, "quien": "Nahuel", "a_las": "2026-10-26 11:30",
+    "escribe": "y lo del switch no se lo podes pedir igual a martin?",
+    "jugadas": [{"nombre": "pedir_el_detalle", "tarea": "SW"}],
+    "efectos": {},
+    "dice": ["que por ahora no tiene a quién pedírselo"],
+    "o_bien": [_FUERA_DE_LA_LISTA, _SIN_JUGADA]}
+
+
+def _lo_que_hace(paso: dict) -> dict:
+    return {k: paso[k] for k in ("paso", "quien", "a_las", "escribe")}
+
+
+def test_con_varias_otras_lecturas_se_elige_la_primera_cuyas_jugadas_coinciden():
+    """Decisión 75: un paso puede tener más de una otra lectura (`o_bien` como lista). Con las
+    jugadas de la principal, la principal; si no, la primera otra cuyas jugadas coinciden, con sus
+    propias expectativas y sus pasos (`luego`); con las de ninguna, la principal."""
+    paso = _PASO_CON_DOS_OTRAS
+
+    esperado, luego = cp.elegir_lectura(paso, [{"nombre": "pedir_el_detalle", "tarea": "SW"}])
+    assert esperado is paso and luego == []
+
+    esperado, luego = cp.elegir_lectura(paso, [{"nombre": "fuera_de_la_lista"}])
+    assert esperado == {**_lo_que_hace(paso), **_FUERA_DE_LA_LISTA, "lectura": cp.O_BIEN}
+    assert luego == []
+
+    esperado, luego = cp.elegir_lectura(paso, [])
+    assert esperado == {**_lo_que_hace(paso),
+                        **{k: v for k, v in _SIN_JUGADA.items() if k != "luego"},
+                        "lectura": cp.O_BIEN}
+    assert [p["paso"] for p in luego] == ["10b"]
+
+    # Ninguna: se compara con la principal, y la falla es la de siempre.
+    esperado, luego = cp.elegir_lectura(paso, [{"nombre": "anotar_inicio", "tarea": "SW"}])
+    assert esperado is paso and luego == []
+
+
+def test_con_dos_otras_lecturas_que_coinciden_vale_la_primera():
+    primera = {**_SIN_JUGADA, "dice": ["la primera"], "luego": []}
+    paso = {**_PASO_CON_DOS_OTRAS, "o_bien": [primera, _SIN_JUGADA]}
+
+    esperado, luego = cp.elegir_lectura(paso, [])
+
+    assert esperado["dice"] == ["la primera"] and luego == []
+
+
+def test_un_solo_o_bien_y_una_lista_de_uno_eligen_lo_mismo():
+    otra = [{"nombre": "decir_que_no_le_toca", "lo_que_dice": "yo eso no lo manejo"}]
+    como_lista = {**_PASO_CON_OTRA_LECTURA, "o_bien": [_PASO_CON_OTRA_LECTURA["o_bien"]]}
+
+    assert cp.elegir_lectura(como_lista, otra) == cp.elegir_lectura(_PASO_CON_OTRA_LECTURA, otra)
+    assert cp.elegir_lectura(como_lista, [])[0] is como_lista
+
+
+@pytest.mark.parametrize("mal", [{"escribe": "otra cosa"}, {"toca": "PLC"}, {"relojes": []},
+                                 {"o_bien": {"jugadas": []}}, {"manda": "foto"}],
+                         ids=["escribe", "toca", "relojes", "o_bien", "manda"])
+def test_cada_otra_lectura_de_la_lista_se_valida(mal):
+    """Cada otra lectura de la lista es del mismo mensaje: la segunda se valida como la primera,
+    aunque la IA elija la principal."""
+    paso = {**_PASO_CON_DOS_OTRAS, "o_bien": [_FUERA_DE_LA_LISTA, {**_SIN_JUGADA, **mal}]}
+
+    with pytest.raises(ValueError, match="no lleva"):
+        cp.elegir_lectura(paso, [{"nombre": "pedir_el_detalle", "tarea": "SW"}])
+
+
+def test_una_lista_de_otras_lecturas_no_vale_en_un_toque_ni_con_algo_que_no_es_una_lectura():
+    un_toque = {"paso": 3, "quien": "Marcos", "a_las": "2026-10-20 11:40", "toca": "PLC",
+                "o_bien": [{"jugadas": []}, {"jugadas": [{"nombre": "fuera_de_la_lista"}]}]}
+    with pytest.raises(ValueError, match="toque"):
+        cp.elegir_lectura(un_toque, [])
+    con_un_texto = {**_PASO_CON_DOS_OTRAS, "o_bien": [_FUERA_DE_LA_LISTA, "sin jugadas"]}
+    with pytest.raises(ValueError, match="o_bien"):
+        cp.elegir_lectura(con_un_texto, [])
+
+
+def test_la_48_paso_10_admite_la_lectura_sin_ninguna_jugada():
+    """La ronda real `fase-c-formato-2` (la 48, vez 2, paso 10): la IA no eligió ninguna jugada y
+    Leda contestó por el contexto, sin hacer nada (decisión 75). Es la segunda otra lectura del
+    paso, después del pedido fuera de la lista (decisión 69)."""
+    from tests.conversaciones.corredor import elegir
+
+    [conv] = elegir(["48"])
+    paso = next(p for p in conv["pasos"] if p["paso"] == 10)
+
+    esperado, luego = cp.elegir_lectura(paso, [])
+
+    assert esperado.get("lectura") == cp.O_BIEN and luego == []
+    assert esperado["jugadas"] == [] and esperado["hechos"] == [] and esperado["efectos"] == {}
+    assert esperado["dice"] == paso["dice"] and esperado["no_dice"] == paso["no_dice"]
+    fuera, _ = cp.elegir_lectura(paso, [{"nombre": "fuera_de_la_lista"}])
+    assert fuera["jugadas"] == [{"nombre": "fuera_de_la_lista"}]
 
 
 # --- El orden en que la IA nombra las jugadas de un mensaje no importa (la 35, paso 4) ---------

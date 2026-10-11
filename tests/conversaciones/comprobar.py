@@ -561,35 +561,57 @@ def palabras_no_dichas(esperadas: list[dict], reales: list[dict], mensaje: str |
 # Otra lectura válida de un mismo mensaje (decisión 63, la 34, paso 7): la IA puede leer "no sabe"
 # de entrada o no leerlo, y entonces Leda pregunta una vez y la persona contesta. El paso declara
 # la otra con `o_bien`: sus jugadas, todo lo que se espera de ella y los pasos que corren sólo si
-# la IA la eligió (`luego`), hasta volver al mismo estado que la principal.
+# la IA la eligió (`luego`), hasta volver al mismo estado que la principal. Si hay más de una
+# otra lectura, `o_bien` es una lista de ellas, cada una con la misma forma (decisión 75, la 48,
+# paso 10).
 O_BIEN, LUEGO = "o_bien", "luego"
-# Lo que el paso hace (quién, cuándo y qué escribe o manda): es de las dos lecturas.
+# Lo que el paso hace (quién, cuándo y qué escribe o manda): es de todas las lecturas.
 _LO_QUE_HACE = ("paso", "quien", "a_las", "escribe", "manda")
+
+
+def otras_lecturas(paso: dict[str, Any]) -> list[dict[str, Any]]:
+    """Las otras lecturas válidas del paso (`o_bien`), en el orden del YAML: ninguna, una sola
+    (un diccionario) o varias (una lista). Cada una se valida aunque la IA elija la principal:
+    es de lo que una persona escribe y no cambia lo que hace el paso."""
+    otras = paso.get(O_BIEN)
+    if not otras:
+        return []
+    if not isinstance(otras, list):
+        otras = [otras]
+    if "escribe" not in paso and "manda" not in paso:
+        raise ValueError(f"Paso {paso.get('paso')}: un toque o un reloj no tiene otra lectura "
+                         "(o_bien es de lo que una persona escribe)")
+    for otra in otras:
+        if not isinstance(otra, dict):
+            raise ValueError(f"Paso {paso.get('paso')}: cada lectura de o_bien es un "
+                             f"diccionario, no {otra!r}")
+        repetidas = sorted(set(otra) & {*_LO_QUE_HACE, "toca", "relojes", O_BIEN})
+        if repetidas:
+            raise ValueError(f"Paso {paso.get('paso')}: o_bien es otra lectura del mismo mensaje; "
+                             f"no lleva {', '.join(repetidas)}")
+    return otras
 
 
 def elegir_lectura(paso: dict[str, Any], reales: list[dict], *,
                    motor: Motor | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Lo esperado del paso según la lectura que eligió la IA, y los pasos que siguen sólo por
     ella. Con las jugadas de la principal, o con las de ninguna, es el paso mismo (y las fallas,
-    las de siempre). Con las de la otra (`o_bien`), es lo que hace el paso más lo que espera la
-    otra, sin heredar nada de la principal: un efecto, un aviso o un botón que la otra no declara
-    es de más, como en cualquier paso. La IA guionada sigue la principal."""
-    otra = paso.get(O_BIEN)
-    if not otra:
+    las de siempre). Si no, la primera otra (`o_bien`) cuyas jugadas coinciden: lo que hace el
+    paso más lo que espera esa otra, sin heredar nada de la principal: un efecto, un aviso o un
+    botón que la otra no declara es de más, como en cualquier paso. La IA guionada sigue la
+    principal."""
+    otras = otras_lecturas(paso)
+    if not otras:
         return paso, []
-    if "escribe" not in paso and "manda" not in paso:
-        raise ValueError(f"Paso {paso.get('paso')}: un toque o un reloj no tiene otra lectura "
-                         "(o_bien es de lo que una persona escribe)")
-    repetidas = sorted(set(otra) & {*_LO_QUE_HACE, "toca", "relojes", O_BIEN})
-    if repetidas:
-        raise ValueError(f"Paso {paso.get('paso')}: o_bien es otra lectura del mismo mensaje; "
-                         f"no lleva {', '.join(repetidas)}")
     mensaje = paso.get("escribe", "")
 
     def coinciden(esperadas: list[dict]) -> bool:
         return jugadas_coinciden(esperadas, reales, mensaje, motor=motor)
 
-    if coinciden(paso.get("jugadas") or []) or not coinciden(otra.get("jugadas") or []):
+    if coinciden(paso.get("jugadas") or []):
+        return paso, []
+    otra = next((o for o in otras if coinciden(o.get("jugadas") or [])), None)
+    if otra is None:
         return paso, []
     esperado = {k: paso[k] for k in _LO_QUE_HACE if k in paso}
     esperado.update({k: v for k, v in otra.items() if k != LUEGO})

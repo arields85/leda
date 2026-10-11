@@ -339,13 +339,15 @@ def test_la_23_por_la_otra_lectura_del_archivo_ofrece_la_misma_entrega(conn):
 
 
 def _por_la_otra_lectura(conn, numero: str, paso: int, sin: tuple[str, ...] = (),
-                         orden: tuple[int, ...] | None = None):
+                         orden: tuple[int, ...] | None = None, cual: int = 0):
     """La conversación entera con la IA guionada que lee ese paso como su otra lectura (`o_bien`)
     y los demás como el YAML. `sin`: los datos de `puede_traer` que la IA no trae; `orden`: en qué
-    orden nombra la IA las jugadas de la otra lectura (sus posiciones en el YAML)."""
+    orden nombra la IA las jugadas de la otra lectura (sus posiciones en el YAML); `cual`: cuál de
+    las otras, si el paso tiene una lista (decisión 75)."""
     [conv] = elegir([numero])
-    otra = [{k: v for k, v in j.items() if k not in sin}
-            for j in next(p for p in conv["pasos"] if p["paso"] == paso)["o_bien"]["jugadas"]]
+    otras = next(p for p in conv["pasos"] if p["paso"] == paso)["o_bien"]
+    otras = otras if isinstance(otras, list) else [otras]
+    otra = [{k: v for k, v in j.items() if k not in sin} for j in otras[cual]["jugadas"]]
     if orden is not None:
         otra = [otra[i] for i in orden]
     ia = _perfecta(conv)
@@ -396,6 +398,18 @@ def test_las_otras_lecturas_de_las_decisiones_69_y_71_llegan_al_mismo_lugar(conn
 
     assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
     assert next(p for p in corrida.pasos if p.paso == paso).lectura == cp.O_BIEN
+
+
+def test_la_48_por_la_lectura_sin_ninguna_jugada_pasa_sin_fallas(conn):
+    """Decisión 75 (la ronda real `fase-c-formato-2`, la 48, vez 2, paso 10): la IA no elige
+    ninguna jugada y Leda contesta por el contexto, sin hacer nada. Es la segunda otra lectura del
+    paso (la primera, el pedido fuera de la lista de la decisión 69), y la conversación entera
+    pasa sin fallas."""
+    corrida = _por_la_otra_lectura(conn, "48", 10, cual=1)
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    paso_10 = next(p for p in corrida.pasos if p.paso == 10)
+    assert paso_10.lectura == cp.O_BIEN and paso_10.jugadas == [] and paso_10.hechos == []
 
 
 def test_una_grabacion_repite_la_corrida(conn):

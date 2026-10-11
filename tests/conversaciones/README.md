@@ -471,6 +471,12 @@ toque no compara jugadas), y la otra no cambia lo que la persona escribe ni qui�
 mensaje y sus `hechos` se comparan sin importar el orden en que la IA las nombra, para elegir la
 lectura y en cualquier paso, porque la cocina las juzga con lo que deja el mensaje entero
 (`comprobar.jugadas_coinciden` y `hechos_coinciden`; la 35, paso 4, ronda `fase-c-formato`).
+Si el mensaje admite más de una otra lectura, `o_bien` es una lista de ellas, cada una con la misma
+forma (decisión 75, la 48, paso 10: el pedido como fuera de la lista o ninguna jugada). El
+corredor se queda con la principal si sus jugadas coinciden; si no, con la primera de la lista
+cuyas jugadas coinciden; y si ninguna coincide, compara con la principal, así las fallas son las
+de siempre. Cada otra lectura de la lista se valida como una sola, con sus propios pasos de
+`luego`.
 La IA guionada sigue siempre la principal, así la corrida en seco no cambia; el informe muestra los pasos de `luego` cuando
 corrieron, y la estimación de llamadas cuenta sólo la principal.
 
@@ -480,8 +486,9 @@ Los pasos con otra lectura válida, cada uno por una decisión del usuario: la 2
 archivo para una tarea que espera cambios, decisión 68); la 34, paso 7 (el "ni idea", decisión
 63); la 35, paso 4 (lo que dice de más quien destraba, decisión 72: los avisos a Marcos salen en
 un mensaje por cualquiera de las dos); la 36, paso 20 (la fecha sin "ya está", decisión 71); la
-39, paso 20 (ninguna jugada para un pase cerrado, decisión 71); y la 48, paso 10 (el pedido como
-fuera de la lista, decisión 69). Las corre por la otra lectura `test_corredor.py`.
+39, paso 20 (ninguna jugada para un pase cerrado, decisión 71); y la 48, paso 10, con dos (el
+pedido como fuera de la lista, decisión 69, o ninguna jugada, decisión 75). Las corre por cada
+otra lectura `test_corredor.py`.
 
 ## Formato de cada conversación
 
