@@ -451,3 +451,34 @@ pasos:
     no_dice:
       - que falta saber si quedó cableado según el diagrama o si pasó continuidad y aislación (ya lo dijo en la primera entrega)
       - que la tarea quedó entregada o en revisión
+    # La otra lectura válida (decisión 68; primera ronda real, 4 de 5): un archivo para la tarea.
+    # Leda lo guarda y en la misma respuesta ofrece volver a entregarla con eso: la misma vista
+    # previa, con Confirmar. Nada se entrega sin su sí.
+    o_bien:
+      jugadas:
+        - {nombre: guardar_para_la_entrega, tarea: TAB, lo_descrito_cubre: [C1],
+           puede_traer: [el_texto_cubre]}
+      efectos:
+        archivos_de_tarea: [{tarea: TAB}]
+      hechos:
+        - {jugada: guardar_para_la_entrega, resultado: anotado, tarea: TAB,
+           para_cuando_la_entregue: [{es: una_foto}], pregunta: confirmar_la_entrega,
+           le_ofrece_entregarla_con_esto: {
+             resultado: para_confirmar, le_falta_del_criterio: ausente, ejemplo: ausente,
+             entrega: [
+               {pieza: P1, es: lo_que_escribio, dice: "ahi va el diagrama del tablero",
+                describe: ["El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba de continuidad y de aislación"]},
+               {pieza: P2, es: una_foto, mandado_antes_el: ausente}]}}
+      pregunta: {tipo: confirmar_la_entrega, tarea: TAB}
+      botones: [Confirmar]
+      estado_despues:
+        de: Mariano
+        pregunta_abierta: {tipo: confirmar_la_entrega, tarea: TAB}
+      dice:
+        - que la foto quedó guardada para la tarea
+        - la entrega nueva, una pieza por renglón
+        - que al confirmarla vuelve a revisión, sin nombrar a Ismael
+        - "el cierre, aparte: si la vuelve a entregar con esto"
+      no_dice:
+        - que falta saber si quedó cableado según el diagrama o si pasó continuidad y aislación (ya lo dijo en la primera entrega)
+        - que la tarea quedó entregada o en revisión

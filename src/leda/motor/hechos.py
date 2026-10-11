@@ -256,6 +256,11 @@ SIGNIFICADOS: Mapping[str, str] = {
     "para_cuando_la_entregue": "Lo que la persona mandó y queda en la conversación para "
                                "mostrárselo cuando entregue esa tarea: no es parte de una "
                                "entrega todavía.",
+    "le_ofrece_entregarla_con_esto": "A la tarea le pidieron cambios: con lo que mandó, Leda le "
+                                     "ofrece volver a entregarla, con la entrega como se le "
+                                     "muestra (entrega), lo que le falta si le falta algo y lo "
+                                     "que pasa al confirmarla. No se entrega sin su sí; lo que "
+                                     "mandó sigue con la tarea para cuando la entregue.",
     "lo_que_escribio": "Lo que escribió quien entrega la tarea: su descripción del trabajo.",
     "el_ejemplo_que_acepto": "Una descripción que Leda le propuso a quien entrega la tarea "
                              "para lo que faltaba y que esa persona aceptó tal cual: vale como "

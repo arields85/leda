@@ -203,6 +203,13 @@ decisión 12 llama el comentario: va con la aprobación, no como un pedido de ca
       y aislación (ya lo dijo en la primera entrega: decisión 10, nunca lo que ya dijo); que la tarea
       quedó entregada o en revisión.
     - Estado de Mariano después: lo mostrado para confirmar.
+    - **Otra lectura válida** (decisión 68 del usuario, 2026-10-11; primera ronda real, 4 de 5):
+      la IA no lo lee como una entrega sino como un archivo para la tarea
+      (`guardar_para_la_entrega`, con lo que describe juzgado igual, `lo_descrito_cubre`). Leda lo
+      guarda y, en la misma respuesta, le ofrece volver a entregarla con eso ("¿La volvés a
+      entregar con esto?"): la misma vista previa, con Confirmar. La entrega sale sólo con su sí
+      (botón o escrito); si no contesta, nada cambia. Efecto: la foto queda guardada para la
+      tarea. Estado de Mariano después: lo mismo, lo mostrado para confirmar.
 
 ## Qué mide
 

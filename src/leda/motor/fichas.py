@@ -1591,17 +1591,21 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "si Leda le dijo que le falta algo. Una respuesta con un pero, una pregunta o un "
              "cambio no es una confirmación."),
     Ficha("guardar_para_la_entrega", "dejar un archivo para cuando entregue una tarea",
-          necesita=("tarea",), opcional=(),
+          necesita=("tarea",), opcional=("el_texto_cubre", "lo_descrito_cubre", "ejemplo"),
           comprueba="que sea el responsable y que la tarea esté abierta, sin entregar",
           hace="deja dicho de qué tarea son los archivos del mensaje (o los de la pregunta que "
                "contesta), sin que sean evidencia",
           despues="los muestra en la vista previa cuando entregue esa tarea, aparte, y entran "
-                  "sólo si los deja",
+                  "sólo si los deja; si a la tarea le pidieron cambios, en la misma respuesta "
+                  "le ofrece volver a entregarla con eso: la vista previa de la entrega, que "
+                  "sale sólo si la confirma (botón o escrito)",
           manejar=_guardar_para_la_entrega, del_responsable=True,
           estados=frozenset({"asignada", "en_curso", "bloqueada"}), se_ofrece=False,
           toma_lo_que_llego=True,
           es="La persona dice de qué tarea es una foto, un video o un archivo que mandó, sin "
-             "decir que la terminó."),
+             "decir que la terminó. Si a la tarea le pidieron cambios (la_entrega_anterior), "
+             "el_texto_cubre, lo_descrito_cubre y ejemplo son los de la entrega que Leda le "
+             "ofrece con eso, como al entregar."),
     Ficha("aprobar", "aprobar la entrega de una tarea que espera su decisión",
           necesita=(), opcional=("tarea", "comentario", "el_comentario_pide_algo", "de"),
           comprueba="que quien escribe sea quien aprueba el trabajo del responsable, que la "

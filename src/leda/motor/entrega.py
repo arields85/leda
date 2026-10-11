@@ -848,7 +848,11 @@ def entregar(ctx, datos: dict, tarea: dict) -> dict:
     nuevos = [p for p in suma if p["clase"] == "texto" and p is not aceptado]
     for p in nuevos:
         p["describe"] = list(juzgado or [])
-    piezas = _sin_repetidas(piezas + suma)
+    # Lo que llega con este mensaje es de esta entrega, aunque ya se hubiera dicho que era de la
+    # tarea (el archivo guardado justo antes de ofrecer entregarla, decisión 68).
+    del_mensaje = {p["id"] for p in suma}
+    piezas = _sin_repetidas([p for p in piezas
+                             if not (p.get("antes") and p["id"] in del_mensaje)] + suma)
     if dicho is not None and not nuevos:
         # Lo que dice que cubre lo que escribió antes en esta entrega.
         for p in piezas:
@@ -939,6 +943,9 @@ def guardar_para_la_entrega(ctx, datos: dict, tarea: dict) -> dict:
     tarea, sin ser evidencia, para mostrárselo cuando la entregue (ADR 0019, decisión 4). Los
     archivos son los de la pregunta que contesta o, si no, los de este mensaje."""
     archivos = [str(a) for a in datos.get("archivos") or []]
+    # Lo que trajo el mensaje que leyó la jugada, antes de tomarlo: con eso se ofrece volver a
+    # entregar la tarea (decisión 68). Unos archivos que ninguna jugada tomó no traen texto suyo.
+    llegada = None if archivos else dict(_la_llegada(ctx, datos) or {})
     if not archivos:
         archivos = [p["archivo_id"] for p in _piezas_del_mensaje(
                         ctx, None, con_el_texto=False, llegada=_la_llegada(ctx, datos))
@@ -960,12 +967,51 @@ def guardar_para_la_entrega(ctx, datos: dict, tarea: dict) -> dict:
             sujeto_tipo="task", sujeto_id=tarea["id"], quien=ctx.quien,
             detalle={"archivos": [str(f["id"]) for f in filas], "at": ctx.ahora.isoformat(),
                      "inbound_message_id": ctx.entrante_id})
-    return {"resultado": "anotado", "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]},
-            "para_cuando_la_entregue": [
-                {"es": UNA_FOTO if f["clase"] == "imagen"
-                 else UN_VIDEO if f["clase"] == "video" else UN_ARCHIVO,
-                 **({"nombre_del_archivo": f["nombre_original"]} if f["nombre_original"]
-                    else {})} for f in filas]}
+    hecho = {"resultado": "anotado",
+             "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]},
+             "para_cuando_la_entregue": [
+                 {"es": UNA_FOTO if f["clase"] == "imagen"
+                  else UN_VIDEO if f["clase"] == "video" else UN_ARCHIVO,
+                  **({"nombre_del_archivo": f["nombre_original"]} if f["nombre_original"]
+                     else {})} for f in filas]}
+    _ofrecer_volver_a_entregarla(ctx, datos, tarea, [str(f["id"]) for f in filas], llegada,
+                                 hecho)
+    return hecho
+
+
+LE_OFRECE_ENTREGARLA = "le_ofrece_entregarla_con_esto"
+
+
+def _ofrecer_volver_a_entregarla(ctx, datos: dict, tarea: dict, archivos: list[str],
+                                 llegada: dict[str, Any] | None, hecho: dict) -> None:
+    """Un archivo para una tarea a la que le pidieron cambios (decisión 68 del usuario,
+    2026-10-11; la 23, paso 12): Leda lo guarda y, en la misma respuesta, le ofrece volver a
+    entregarla con eso. La oferta es la entrega de siempre (`entregar`), con lo que trajo el
+    mensaje: su vista previa, con Confirmar si está completa o con lo que le falta, que se
+    confirma con el botón o por escrito, con la guarda. Sin su sí no se entrega nada; el
+    archivo queda guardado igual. Con una entrega de esa tarea ya abierta, no se ofrece otra."""
+    fichas = _fichas()
+    cur = ctx.cur
+    if (tarea.get("estado") not in ("asignada", "en_curso")
+            or _ciclo_desde(cur, tarea["id"]) is None or abierta(ctx, tarea["id"]) is not None):
+        return
+    cur.execute("""select id, clase, sha256, nombre_original, recibido_en from archivo
+                    where id = any(%s::uuid[]) order by recibido_en""", (archivos,))
+    piezas = [_pieza_de_archivo(f) for f in cur.fetchall()]
+    lo_que_llego = {"texto": (llegada or {}).get("texto"),
+                    "enlaces": list((llegada or {}).get("enlaces") or []),
+                    "archivos": piezas,
+                    "entrante": (llegada or {}).get("entrante") or ctx.entrante_id}
+    oferta = entregar(ctx, {**{k: datos[k] for k in ("el_texto_cubre", "lo_descrito_cubre",
+                                                     "ejemplo") if k in datos},
+                            "lo_que_llego": lo_que_llego}, tarea)
+    # La pregunta y sus efectos van en los hechos de la jugada, que el turno lee; la tarea ya
+    # está nombrada ahí, y lo que se sumó es todo lo del mensaje.
+    afuera = ("pregunta", "pregunta_para_despues", fichas.OTRAS_PARA_DESPUES, fichas.EFECTOS)
+    fichas.juntar(hecho, {k: oferta.pop(k) for k in afuera if k in oferta})
+    for k in ("tarea", "sumo"):
+        oferta.pop(k, None)
+    hecho[LE_OFRECE_ENTREGARLA] = oferta
 
 
 def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:

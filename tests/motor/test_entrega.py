@@ -1267,3 +1267,89 @@ def test_sin_un_pedido_de_cambios_no_hay_entrega_anterior(conn, mundo, marcos):
     marcos.manda(_entregar(lo_descrito_cubre=["C1"]), texto="termine el plc")
     [la_tarea] = [t for t in marcos.situacion["tareas"] if t["alias"] == "T2"]
     assert "la_entrega_anterior" not in la_tarea
+
+
+# --- Un archivo para una tarea que espera cambios (decisión 68 del usuario, 2026-10-11) -------
+
+def _le_pidieron_cambios(conn, mundo, marcos) -> str:
+    """La tarea del PLC, entregada y devuelta por Ismael con un pedido de cambios."""
+    from leda import herramientas
+
+    tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO_PLC)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"]),
+                 texto="termine el plc, ya arranca desde el plc y completa los ciclos")
+    marcos.manda(Jugada("confirmar", {}), texto="dale")
+    with espacio(conn, mundo["id"]) as cur:
+        ismael = identificar_en_espacio(cur, mundo["personas"]["Ismael"]["telegram"],
+                                        mundo["id"])
+        herramientas.ejecutar(cur, ismael, "pedir_cambios_tarea",
+                              {"tarea_id": tarea, "comentario": "falta la foto del contador"},
+                              ya_confirmada=True)
+        # El pedido de cambios, en el reloj de la prueba: entre la entrega y lo que sigue.
+        cur.execute("""update approval set at = %s
+                        where sujeto_id = %s and decision = 'rechazado'""",
+                    (AHORA + timedelta(minutes=marcos.minuto, seconds=30), tarea))
+    conn.commit()
+    assert estado_de(conn, tarea) == "en_curso"
+    return tarea
+
+
+def _guarda_la_foto(marcos, **datos):
+    return marcos.manda(Jugada("guardar_para_la_entrega", {"tarea": "T2", **datos}),
+                        texto="ahi va la foto del contador", archivos=[(JPEG, "foto", None)])
+
+
+def test_un_archivo_para_una_tarea_que_espera_cambios_ofrece_volver_a_entregarla(conn, mundo,
+                                                                               marcos):
+    """La 23, paso 12, primera ronda real: Leda guardaba el archivo "para cuando vuelvas a
+    entregar la tarea" y no ofrecía el paso obvio. Decisión 68: lo guarda y, en la misma
+    respuesta, ofrece volver a entregarla con eso: la vista previa de la entrega, con Confirmar.
+    Nada se entrega sin su sí."""
+    tarea = _le_pidieron_cambios(conn, mundo, marcos)
+    evidencias = cuantas(conn, "evidence")
+
+    r = _guarda_la_foto(marcos, lo_descrito_cubre=["C1"])
+
+    hecho = _hecho(r, "guardar_para_la_entrega")
+    assert hecho["resultado"] == "anotado"
+    assert hecho["para_cuando_la_entregue"] == [{"es": "una_foto"}]
+    oferta = hecho["le_ofrece_entregarla_con_esto"]
+    assert oferta["resultado"] == "para_confirmar"
+    assert "le_falta_del_criterio" not in oferta
+    assert [(p["es"], p.get("dice")) for p in oferta["entrega"]] == [
+        ("lo_que_escribio", "ahi va la foto del contador"), ("una_foto", None)]
+    assert not any("mandado_antes_el" in p for p in oferta["entrega"])
+    assert oferta["al_confirmar"]["estado"] == "en_revision"
+    assert hecho["pregunta"] == "confirmar_la_entrega"
+    assert r.pregunta["tipo"] == "confirmar_la_entrega"
+    assert hechos.sin_significado(hecho) == set()
+    # Sin su sí, nada cambia: la tarea sigue esperando los cambios.
+    assert estado_de(conn, tarea) == "en_curso"
+    assert cuantas(conn, "evidence") == evidencias
+
+    marcos.toca(_token_de(conn))
+
+    assert estado_de(conn, tarea) == "en_revision"
+    assert cuantas(conn, "evidence", "clase = 'imagen'") == 1
+
+
+def test_la_entrega_que_ofrece_se_confirma_tambien_por_escrito(conn, mundo, marcos):
+    tarea = _le_pidieron_cambios(conn, mundo, marcos)
+    _guarda_la_foto(marcos, lo_descrito_cubre=["C1"])
+
+    r = marcos.manda(Jugada("confirmar", {}), texto="si")
+
+    assert _hecho(r, "confirmar")["resultado"] == "entregada"
+    assert estado_de(conn, tarea) == "en_revision"
+
+
+def test_un_archivo_para_una_tarea_sin_pedido_de_cambios_no_ofrece_nada(conn, mundo, marcos):
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO_PLC)
+
+    r = _guarda_la_foto(marcos)
+
+    hecho = _hecho(r, "guardar_para_la_entrega")
+    assert hecho["resultado"] == "anotado"
+    assert "le_ofrece_entregarla_con_esto" not in hecho
+    assert r.pregunta is None
+    assert cuantas(conn, "conversation_question", "tipo = 'confirmar_la_entrega'") == 0

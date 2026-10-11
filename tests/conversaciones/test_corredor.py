@@ -320,6 +320,24 @@ def test_la_34_vuelve_al_mismo_estado_por_los_dos_caminos_del_ni_idea(conn):
     assert pasos[pasos.index(7):pasos.index(7) + 3] == [7, "7b", 8]
 
 
+def test_la_23_por_la_otra_lectura_del_archivo_ofrece_la_misma_entrega(conn):
+    """Decisión 68: si la IA lee la foto de Mariano (paso 12) como un archivo para la tarea y no
+    como una entrega, Leda lo guarda y le ofrece volver a entregarla con eso: la misma vista
+    previa, con Confirmar, y nada entregado."""
+    [conv] = elegir(["23"])
+    otra = next(p for p in conv["pasos"] if p["paso"] == 12)["o_bien"]["jugadas"]
+    ia = _perfecta(conv)
+    guion = copy.deepcopy(conv)
+    next(p for p in guion["pasos"] if p["paso"] == 12)["jugadas"] = otra
+    ia.ia.preparar = lambda paso: setattr(ia.ia, "paso", next(
+        (p for p in guion["pasos"] if p.get("paso") == paso.get("paso")), paso))
+
+    corrida = correr_conversacion(conn, conv, ia)
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    assert next(p for p in corrida.pasos if p.paso == 12).lectura == cp.O_BIEN
+
+
 def test_una_grabacion_repite_la_corrida(conn):
     [conv] = elegir(["01"])
     grabada = correr_conversacion(conn, conv, _perfecta(conv))
