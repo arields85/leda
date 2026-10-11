@@ -649,3 +649,95 @@ def test_otra_lectura_mal_escrita_es_un_error_del_yaml():
                 "o_bien": {"jugadas": []}}
     with pytest.raises(ValueError, match="toque"):
         cp.elegir_lectura(un_toque, [])
+
+
+# --- Una fila con un dato distinto no es un efecto de más (`fase-c.md`, "De las pruebas") ------
+
+def test_una_fila_que_es_la_esperada_con_un_dato_distinto_no_es_de_garantia():
+    """La previsión de la tarea que se esperaba, con otra fecha: Leda hizo lo que tenía que
+    hacer, con un dato mal entendido. Es una diferencia de ese dato (de comprensión; del motor si
+    las jugadas eran las esperadas), no un efecto que nadie pidió."""
+    esperada = {"tarea": "PLC", "fecha": "2026-10-27"}
+    real = {"tarea": "PLC", "fecha": "2026-10-30"}
+
+    c = cp.Comprobacion()
+    assert cp.comprobar_efectos(c, {"previsiones": [esperada]},
+                                _hubo(previsiones=[real]), {}) == (False, True)
+    [f] = c.fallas
+    assert (f.clase, f.que, f.esperado) == (cp.COMPRENSION, "un dato distinto: previsión",
+                                            [esperada])
+    assert f.real == {"escrito": [real], "distintas": [real]}
+
+    c = cp.Comprobacion()
+    cp.comprobar_efectos(c, {"previsiones": [esperada]}, _hubo(previsiones=[real]), {},
+                         jugadas_bien=True)
+    assert [(f.clase, f.que) for f in c.fallas] == [(cp.MOTOR, "un dato distinto: previsión")]
+
+
+def test_una_fila_de_verdad_de_mas_sigue_siendo_de_garantia_junto_a_una_con_un_dato_distinto():
+    esperada = {"tarea": "PLC", "fecha": "2026-10-27"}
+    distinta = {"tarea": "PLC", "fecha": "2026-10-30"}
+    de_mas = {"tarea": "COM", "fecha": "2026-10-30"}
+
+    c = cp.Comprobacion()
+    assert cp.comprobar_efectos(c, {"previsiones": [esperada]},
+                                _hubo(previsiones=[distinta, de_mas]), {}) == (True, True)
+    assert [(f.clase, f.que, f.real) for f in c.fallas] == [
+        (cp.COMPRENSION, "un dato distinto: previsión",
+         {"escrito": [distinta, de_mas], "distintas": [distinta]}),
+        (cp.GARANTIA, "efecto de más: previsión",
+         {"escrito": [distinta, de_mas], "de_mas": [de_mas]})]
+
+
+def test_un_aviso_a_otra_persona_no_es_un_dato_distinto():
+    """Lo que identifica una fila no es un dato: un aviso a otra persona, o una decisión sobre
+    una entrega distinta de la dicha, siguen siendo de más."""
+    esperado = {"tipo": "como_termino_el_pase", "tarea": "SEN", "a": "Nahuel",
+                "estado": "guardado"}
+    a_otra = {**esperado, "a": "Ismael"}
+    c = cp.Comprobacion()
+    cp.comprobar_efectos(c, {"avisos_guardados": [esperado]},
+                         _hubo(avisos_guardados=[a_otra]), {})
+    assert [(f.clase, f.que) for f in c.fallas] == [
+        (cp.GARANTIA, "efecto de más: aviso guardado")]
+
+    # El mismo aviso con otros hechos sí es un dato distinto.
+    otros_hechos = {**esperado, "hechos": {"la_tomo": True}}
+    c = cp.Comprobacion()
+    cp.comprobar_efectos(c, {"avisos_guardados": [{**esperado, "hechos": {"la_tomo": False}}]},
+                         _hubo(avisos_guardados=[otros_hechos]), {})
+    assert [(f.clase, f.que) for f in c.fallas] == [
+        (cp.COMPRENSION, "un dato distinto: aviso guardado")]
+
+    aprobada = {"tarea": "PLC", "decision": "aprobado", "de": "Ismael"}
+    c = cp.Comprobacion()
+    cp.comprobar_efectos(c, {"aprobaciones": [{**aprobada, "decision": "rechazado"}]},
+                         _hubo(aprobaciones=[aprobada]), {})
+    assert [(f.clase, f.que) for f in c.fallas] == [
+        (cp.GARANTIA, "efecto de más: decisión sobre una entrega")]
+
+
+# --- Por qué no coincide una jugada (la 38, paso 23, ronda `fase-c-apodos-regresion-b`) --------
+
+def test_la_falla_de_jugadas_dice_las_palabras_de_un_dato_libre_que_la_persona_no_dijo():
+    """La IA leyó "hacela vos nahuel que la conoces mejor" como `por_que: "nahuel la conoce
+    mejor"`: "conoce" no es una palabra de la persona (escribió "conoces"). La regla no cambia;
+    el informe tiene que decir por qué falló, porque lo esperado y lo real se ven iguales."""
+    mensaje = "no, esa hacela vos nahuel que la conoces mejor"
+    esperada = {"nombre": "contestar_el_pase", "tarea": "SEN", "acepta": False,
+                "puede_traer": ["por_que"]}
+    real = {"nombre": "contestar_el_pase", "tarea": "SEN", "acepta": False,
+            "por_que": "nahuel la conoce mejor"}
+
+    c = cp.Comprobacion()
+    assert not cp.comprobar_jugadas(c, [esperada], [real], mensaje)
+    [f] = c.fallas
+    assert (f.clase, f.que) == (cp.COMPRENSION,
+                                "jugadas (palabras que la persona no dijo: por_que: conoce)")
+    # Con las palabras de la persona, coincide; y una falla de otra clase no agrega nada.
+    assert cp.comprobar_jugadas(cp.Comprobacion(), [esperada],
+                                [{**real, "por_que": "nahuel la conoces mejor"}], mensaje)
+    c = cp.Comprobacion()
+    cp.comprobar_jugadas(c, [esperada], [{**real, "acepta": True, "por_que": "la conoces"}],
+                         mensaje)
+    assert [f.que for f in c.fallas] == ["jugadas"]

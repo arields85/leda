@@ -467,8 +467,31 @@ def comprobar_jugadas(c: Comprobacion, esperadas: list[dict], reales: list[dict]
     ok = len(esperadas) == len(reales) and all(
         jugada_coincide(e, r, mensaje, motor=motor) for e, r in zip(esperadas, reales))
     if not ok:
-        c.falla(COMPRENSION, "jugadas", esperadas, reales)
+        no_dichas = palabras_no_dichas(esperadas, reales, mensaje, motor=motor)
+        c.falla(COMPRENSION, f"jugadas (palabras que la persona no dijo: {no_dichas})"
+                if no_dichas else "jugadas", esperadas, reales)
     return ok
+
+
+def palabras_no_dichas(esperadas: list[dict], reales: list[dict], mensaje: str | None, *,
+                       motor: Motor | None = None) -> str:
+    """Por qué una jugada no coincide cuando lo esperado y lo real se ven iguales: las palabras
+    de un dato libre que la persona no escribió (la regla de `jugada_coincide`; la 38, paso 23,
+    `por_que: "nahuel la conoce mejor"` de "que la conoces mejor"). Vacío si no hay ninguna."""
+    if not mensaje:
+        return ""
+    palabras = (motor or cargar_motor()).palabras
+    dichas = set(palabras(mensaje))
+    partes = []
+    for e, r in zip(esperadas, reales):
+        if e.get("nombre") != r.get("nombre"):
+            continue
+        for k in sorted(DATOS_LIBRES & set(r)):
+            if isinstance(r[k], str) and r[k]:
+                faltan = [p for p in palabras(r[k]) if p not in dichas]
+                if faltan:
+                    partes.append(f"{k}: {', '.join(faltan)}")
+    return "; ".join(partes)
 
 
 # Otra lectura válida de un mismo mensaje (decisión 63, la 34, paso 7): la IA puede leer "no sabe"
@@ -518,11 +541,14 @@ def _cuenta(lista: list) -> dict[str, int]:
     return out
 
 
-def _emparejar(esperados: list[dict], reales: list[dict]) -> tuple[list[dict], list[dict]]:
+def _emparejar(esperados: list[dict], reales: list[dict], cumple=None
+               ) -> tuple[list[dict], list[dict]]:
     """(los esperados sin uno real que los cumpla, los reales que sobran), con el mayor número
     de pares posible: un esperado general no se queda con el real que otro más preciso necesita
-    (revisión de la E2-7; caminos de aumento, las listas de un paso son cortas)."""
-    puede = [[j for j, r in enumerate(reales) if coincide(e, r)] for e in esperados]
+    (revisión de la E2-7; caminos de aumento, las listas de un paso son cortas). `cumple` es la
+    regla del par; si no se dice, `coincide`."""
+    cumple = cumple or coincide
+    puede = [[j for j, r in enumerate(reales) if cumple(e, r)] for e in esperados]
     de_real: dict[int, int] = {}            # real → el esperado con que quedó emparejado
 
     def emparejar(i: int, vistos: set[int]) -> bool:
@@ -551,16 +577,52 @@ def _mismas(a: list[dict], b: list[dict]) -> bool:
     return cuenta(a) == cuenta(b)
 
 
-def _como_fue(escrito: list[dict], *, de_mas: list[dict] = (), faltan: list[dict] = ()
-              ) -> dict[str, list[dict]]:
-    """Lo real de una falla de filas: todo lo escrito, y lo que sobra o lo esperado que falta
-    (revisión de la C-4: antes iba sólo lo que no se emparejó)."""
+def _como_fue(escrito: list[dict], *, de_mas: list[dict] = (), faltan: list[dict] = (),
+              distintas: list[dict] = ()) -> dict[str, list[dict]]:
+    """Lo real de una falla de filas: todo lo escrito, y lo que sobra, lo esperado que falta o
+    las filas escritas con un dato distinto (revisión de la C-4: antes iba sólo lo que no se
+    emparejó)."""
     real: dict[str, list[dict]] = {"escrito": list(escrito)}
     if de_mas:
         real["de_mas"] = list(de_mas)
     if faltan:
         real["faltan"] = list(faltan)
+    if distintas:
+        real["distintas"] = list(distintas)
     return real
+
+
+# Lo que identifica una fila de cada clase de efecto: una fila escrita que es la de un esperado
+# por esto, pero difiere en otro dato, es esa fila con un dato distinto (de comprensión, o del
+# motor si las jugadas eran las esperadas), no un efecto que nadie pidió (`fase-c.md`, "De las
+# pruebas"). Lo que no está acá no se empareja así, a propósito:
+# - `evidencias`: una pieza de una tarea que nadie confirmó en el paso es de garantía (las de lo
+#   confirmado se comparan aparte, en `evidencias` de `comprobar_efectos`);
+# - `aprobaciones`: la decisión misma es lo que la identifica (nadie aprueba sin haberlo dicho);
+# - `apodos`: que quedó auditado y quién lo enseñó son garantías (ADR 0020);
+# - las que no tienen otro dato que su identidad (`avances`, `retiradas`, `bloqueos_resueltos`).
+# A quién va un aviso y con quién se comparte una tarea son identidad: a otra persona es de más.
+IDENTIDAD_DE_LAS_FILAS: dict[str, tuple[str, ...]] = {
+    "previsiones": ("tarea",),
+    "bloqueos": ("tarea",),
+    "destraban": ("tarea", "de"),
+    "dicen_quien_destraba": ("tarea", "de"),
+    "avisos_guardados": ("tipo", "tarea", "a"),
+    "archivos_de_tarea": ("tarea",),
+    "compartidas": ("tarea", "con"),
+}
+
+
+def _misma_fila(identidad: tuple[str, ...]):
+    """La regla del par de una fila con un dato distinto: el esperado nombra algo de lo que la
+    identifica, y lo real es eso."""
+    def misma(esperada: Any, real: Any) -> bool:
+        if not isinstance(esperada, dict) or not isinstance(real, dict):
+            return False
+        claves = [k for k in identidad if k in esperada]
+        return bool(claves) and all(coincide(esperada[k], real.get(k)) for k in claves)
+
+    return misma
 
 
 def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str, Any],
@@ -610,6 +672,18 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
         esperadas = (esperados.get(nombre) or []) if esperadas is None else esperadas
         reales = [normalizar(r, titulos) for r in reales]
         faltan, sobran = _emparejar(esperadas, reales)
+        identidad = IDENTIDAD_DE_LAS_FILAS.get(nombre)
+        if identidad and faltan and sobran:
+            # Una fila esperada y una escrita que son la misma salvo un dato: esa diferencia,
+            # no un efecto de más.
+            sin_par, sobran_aun = _emparejar(faltan, sobran, _misma_fila(identidad))
+            distintas = [e for e in faltan if not any(e is s for s in sin_par)]
+            if distintas:
+                falta = True
+                c.falla(MOTOR if jugadas_bien else COMPRENSION, f"un dato distinto: {que}",
+                        distintas, _como_fue(reales, distintas=[
+                            r for r in sobran if not any(r is s for s in sobran_aun)]))
+            faltan, sobran = sin_par, sobran_aun
         if sobran:
             de_mas = True
             c.falla(GARANTIA, f"efecto de más: {que}", esperadas,
