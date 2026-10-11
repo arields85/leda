@@ -625,6 +625,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     mensaje va sola en su renglón, con un renglón en blanco antes, diga lo que diga ("Te aviso
     el jueves si sigue en pie." también). Un mensaje de un solo renglón queda como está.
 
+75. **La 48, paso 10, sin ninguna jugada también vale** (usuario, 2026-10-11, "si, aceptamos";
+    2 de 5 en `fase-c-formato-2`). A "y lo del switch no se lo podes pedir igual a martin?" la
+    IA puede no elegir jugada y contestar por el contexto: "No puedo pedírselo a Martín:
+    Infraestructura IT se quedó sin encargado". Es cierto y no queda nada sin hacer (con la jugada
+    esperada tampoco se podía pedir), como en la 71 (la 39, paso 20). Es la tercera lectura del
+    paso, con la 69: el corredor admite más de una otra lectura por paso.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3671,7 +3678,7 @@ Vigente; lo de abajo ("cierre del 2026-10-10") es el registro de lo anterior.
       un título pegado a la tarea (10) y una oración después de la pregunta (2), contenido de la
       IA. El corredor ahora compara las jugadas y los hechos de un mensaje sin mirar el orden
       (`1079b18`, revisión `review-3ea697867c8f9323`, aprobada).
-- [ ] **La 48, paso 10, sin ninguna jugada** (2 de 5 en `fase-c-formato-2`; ya visto antes): "y
+- [x] **La 48, paso 10, sin ninguna jugada** (decisión 75) (2 de 5 en `fase-c-formato-2`; ya visto antes): "y
       lo del switch no se lo podes pedir igual a martin?" sin jugada; Leda contesta lo cierto por
       el contexto. Pregunta al usuario.
 - [ ] **Una lectura de la IA:** la 35 paso 18 (1 de 5): "sigo parado con el tablero" queda como
