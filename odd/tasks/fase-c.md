@@ -514,6 +514,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     `EL_DIA_QUE_DIJO` (quién dijo que se lo pedía, por la fila que nombra `COMO_LE_FUE`) y la IA
     lo cuenta con sus palabras; por construir, con su prueba.
 
+65. **Quién destraba con un nombre que no es nadie del equipo: Leda pregunta siempre** (de los
+    apodos, pregunta 3; usuario, 2026-10-11, opción A, contra la B que recomendaban el agente y
+    el escritor: "prefiero la A, una pregunta de mas y estar seguro, que no preguntar"). Si
+    Mariano dice "me tiene que mandar el plano el proveedor", Leda pregunta quién es; sólo si
+    Mariano contesta que no es del equipo queda anotado como alguien de afuera. La IA nunca
+    decide sola que alguien es de afuera (ADR 0020 al pie de la letra).
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3825,7 +3832,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         2. **Corregir un apodo que ya tiene dueño** (conversación 47, "Por decidir"): si "el flaco"
            es Martín y alguien dice "no, el flaco es Marcos", ¿Leda lo cambia o pregunta si a los
            dos les dicen así? Propuesta: dos botones, "A los dos" y "Sólo a Marcos Tarquini".
-        3. **Quién destraba con un nombre que no es nadie del equipo** (frena la tercera porción de
+        3. **Contestada: decisión 65, opción A.** **Quién destraba con un nombre que no es nadie del equipo** (frena la tercera porción de
            los apodos y la conversación 47): hoy "me lo pasa el proveedor" o "pedro de compras"
            queda anotado como alguien de afuera, sin preguntar. Con los apodos, ¿Leda pregunta
            siempre "¿quién es?" (A: el ADR al pie de la letra; las 25 y 30 suman un paso de
