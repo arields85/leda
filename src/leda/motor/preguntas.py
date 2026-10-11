@@ -312,6 +312,13 @@ def es_opcional(q) -> bool:
     return bool(q is not None and (q.get("jugada") or {}).get(OPCIONAL))
 
 
+def ya_no_es_opcional(cur, pregunta_id: str) -> None:
+    """La persona tomó la oferta como suya (empezó lo que Leda le ofrecía): desde ahora es una
+    pregunta como las demás."""
+    cur.execute("update conversation_question set jugada = jugada - %s where id = %s",
+                (OPCIONAL, pregunta_id))
+
+
 def caducar(cur, q, ahora) -> None:
     """Una oferta opcional que la persona no tomó se cierra (ver el módulo): deja de ser su tema
     abierto y nada la vuelve a traer."""

@@ -1353,3 +1353,167 @@ def test_un_archivo_para_una_tarea_sin_pedido_de_cambios_no_ofrece_nada(conn, mu
     assert "le_ofrece_entregarla_con_esto" not in hecho
     assert r.pregunta is None
     assert cuantas(conn, "conversation_question", "tipo = 'confirmar_la_entrega'") == 0
+
+
+# --- La oferta de volver a entregar no se repite (decisión 73 del usuario, 2026-10-11) ---------
+#
+# La ofreció Leda, no la empezó la persona: es una oferta opcional (`preguntas.OPCIONAL`), como
+# todas. Si no contesta, no se le vuelve a ofrecer y nada cambia; el archivo sigue guardado y se
+# suma solo cuando entregue. Mientras la oferta sigue abierta, su sí la entrega.
+
+def _ofrecida(conn, mundo, marcos) -> str:
+    tarea = _le_pidieron_cambios(conn, mundo, marcos)
+    r = _guarda_la_foto(marcos, lo_descrito_cubre=["C1"])
+    assert _hecho(r, "guardar_para_la_entrega")["le_ofrece_entregarla_con_esto"]
+    return tarea
+
+
+def _a_las(marcos, at: datetime) -> None:
+    """Los mensajes siguientes de Marcos, desde esa hora."""
+    marcos.minuto = int((at - AHORA).total_seconds() // 60)
+
+
+def test_la_oferta_de_volver_a_entregarla_no_se_repite(conn, mundo, marcos):
+    from tests.motor.ayudantes import Dias, octubre
+
+    tarea = _ofrecida(conn, mundo, marcos)
+    dias = Dias(conn, mundo)
+
+    assert dias.ciclo(octubre(5, 14, 30)) == []         # la hora en que se habría repetido
+    assert dias.ciclo(octubre(6, 10)) == []             # ni al día siguiente
+    assert dias.ciclo(octubre(7, 10)) == []
+    assert avisos_guardados(conn, "repeticion_del_dia") == []
+    assert estado_de(conn, tarea) == "en_curso"
+    assert cuantas(conn, "conversation_question",
+                   "tipo = 'confirmar_la_entrega' and cerrada_en is null") == 0
+
+
+def test_un_si_mas_tarde_con_la_oferta_abierta_la_entrega_con_el_boton(conn, mundo, marcos):
+    from tests.motor.ayudantes import Dias, octubre
+
+    tarea = _ofrecida(conn, mundo, marcos)
+    assert Dias(conn, mundo).ciclo(octubre(5, 12)) == []
+    _a_las(marcos, octubre(5, 12, 30))
+
+    marcos.toca(_token_de(conn))
+
+    assert estado_de(conn, tarea) == "en_revision"
+    assert cuantas(conn, "evidence", "clase = 'imagen'") == 1
+
+
+def test_un_si_escrito_mas_tarde_con_la_oferta_abierta_la_entrega(conn, mundo, marcos):
+    from tests.motor.ayudantes import Dias, octubre
+
+    tarea = _ofrecida(conn, mundo, marcos)
+    assert Dias(conn, mundo).ciclo(octubre(5, 12)) == []
+    _a_las(marcos, octubre(5, 12, 30))
+
+    r = marcos.manda(Jugada("confirmar", {}), texto="si, entregala")
+
+    assert _hecho(r, "confirmar")["resultado"] == "entregada"
+    assert estado_de(conn, tarea) == "en_revision"
+
+
+def test_sin_respuesta_la_entrega_de_siempre_suma_el_archivo_guardado(conn, mundo, marcos):
+    from tests.motor.ayudantes import Dias, octubre
+
+    tarea = _ofrecida(conn, mundo, marcos)
+    dias = Dias(conn, mundo)
+    dias.ciclo(octubre(5, 14, 30))
+    dias.ciclo(octubre(6, 10))
+    _a_las(marcos, octubre(6, 11))
+
+    r = marcos.manda(_entregar(lo_descrito_cubre=["C1"]),
+                     texto="ya hice los cambios, arranca desde el plc y completa los ciclos")
+
+    hecho = _hecho(r, "entregar")
+    assert hecho["resultado"] == "para_confirmar"
+    assert "una_foto" in [p["es"] for p in hecho["entrega"]]
+    marcos.manda(Jugada("confirmar", {}), texto="dale")
+    assert estado_de(conn, tarea) == "en_revision"
+    assert cuantas(conn, "evidence", "clase = 'imagen'") == 1
+
+
+def test_la_entrega_que_empieza_la_persona_sigue_repitiendose(conn, mundo, marcos):
+    """Sólo la oferta de Leda deja de repetirse: una entrega que empezó la persona y no confirmó
+    se repite como siempre."""
+    from tests.motor.ayudantes import Dias, octubre
+
+    _le_pidieron_cambios(conn, mundo, marcos)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"]), texto="ya arranca desde el plc",
+                 archivos=[(JPEG, "foto", None)])
+
+    [repeticion] = Dias(conn, mundo).ciclo(octubre(5, 14, 30))
+
+    assert repeticion["hechos"][0]["aviso"] == "repeticion_del_dia"
+
+
+def test_si_con_la_oferta_abierta_la_entrega_el_la_entrega_es_suya(conn, mundo, marcos):
+    """Con la oferta abierta, Marcos dice que la entrega: ya no es una oferta de Leda sino su
+    entrega, que se repite como cualquier otra sin confirmar."""
+    from tests.motor.ayudantes import Dias, octubre
+
+    _ofrecida(conn, mundo, marcos)
+    r = marcos.manda(_entregar(lo_descrito_cubre=["C1"]), texto="la entrego, arranca del plc")
+    assert _hecho(r, "entregar")["resultado"] == "para_confirmar"
+
+    [repeticion] = Dias(conn, mundo).ciclo(octubre(5, 14, 30))
+
+    assert repeticion["hechos"][0]["aviso"] == "repeticion_del_dia"
+
+
+def test_un_archivo_mas_con_la_oferta_abierta_sigue_siendo_una_oferta(conn, mundo, marcos):
+    from tests.motor.ayudantes import Dias, octubre
+
+    _ofrecida(conn, mundo, marcos)
+    r = marcos.manda(texto="", archivos=[(JPEG, "foto", None)])
+    assert _hecho(r, "entregar")["resultado"] == "para_confirmar"
+
+    assert Dias(conn, mundo).ciclo(octubre(5, 14, 30)) == []
+    assert avisos_guardados(conn, "repeticion_del_dia") == []
+
+
+# --- Revisión de `6789e4c` ---------------------------------------------------------------------
+
+def test_un_archivo_sin_texto_ni_jugada_ofrece_la_entrega_solo_con_el_archivo(conn, mundo,
+                                                                             marcos):
+    """Un mensaje que sólo trae la foto: Leda pregunta de qué tarea es y, con la respuesta, la
+    oferta lleva sólo la foto (no hay texto suyo que mostrar)."""
+    tarea = _le_pidieron_cambios(conn, mundo, marcos)
+    r = marcos.manda(archivos=[(JPEG, "foto", None)])
+    if r.pregunta is not None and r.pregunta["tipo"] == "cual_tarea":
+        r = marcos.toca(_token_de(conn, "Armar el tablero"))
+
+    hecho = _hecho(r, "guardar_para_la_entrega")
+    oferta = hecho["le_ofrece_entregarla_con_esto"]
+    assert "lo_que_escribio" not in [p["es"] for p in oferta["entrega"]]
+    assert "una_foto" in [p["es"] for p in oferta["entrega"]]
+    assert hechos.sin_significado(hecho) == set()
+    assert estado_de(conn, tarea) == "en_curso"
+
+
+def test_con_una_entrega_de_esa_tarea_abierta_no_ofrece_otra(conn, mundo, marcos):
+    _le_pidieron_cambios(conn, mundo, marcos)
+    marcos.manda(_entregar(lo_descrito_cubre=["C1"]), texto="ya arranca desde el plc")
+
+    r = _guarda_la_foto(marcos)
+
+    assert "le_ofrece_entregarla_con_esto" not in _hecho(r, "guardar_para_la_entrega")
+    assert cuantas(conn, "conversation_question",
+                   "tipo = any(array['confirmar_la_entrega', 'lo_que_falta_de_la_entrega']) "
+                   "and cerrada_en is null") == 1
+
+
+def test_una_tarea_trabada_no_ofrece_entregarla(conn, mundo, marcos):
+    tarea = _le_pidieron_cambios(conn, mundo, marcos)
+    marcos.manda(Jugada("anotar_bloqueo", {"tarea": "T2", "causa": "falta el contador"}),
+                 texto="estoy trabado, falta el contador")
+    assert estado_de(conn, tarea) == "bloqueada"
+
+    r = _guarda_la_foto(marcos)
+
+    hecho = _hecho(r, "guardar_para_la_entrega")
+    assert hecho["resultado"] == "anotado"
+    assert "le_ofrece_entregarla_con_esto" not in hecho
+    assert cuantas(conn, "conversation_question",
+                   "tipo = 'confirmar_la_entrega' and cerrada_en is null") == 0

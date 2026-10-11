@@ -716,11 +716,17 @@ def _la_revisa_quien_la_entrega(ctx, quien: Mapping[str, Any] | None) -> bool:
 
 
 def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]],
-                        vieja: dict[str, Any] | None, *, ejemplo: Any = None) -> dict[str, Any]:
+                        vieja: dict[str, Any] | None, *, ejemplo: Any = None,
+                        ofrecida: bool | None = None) -> dict[str, Any]:
     """Calcula la vista previa de la entrega (qué cubre cada pieza, qué falta de la política y
     del criterio, y su huella), la deja como el tema abierto y devuelve sus hechos. Si no
     cambió, la de antes sigue valiendo; si cambió, la de antes queda reemplazada (situación
-    general 7). `ejemplo`: el que propuso la IA para lo que falta del criterio, si lo hizo."""
+    general 7). `ejemplo`: el que propuso la IA para lo que falta del criterio, si lo hizo.
+
+    `ofrecida`: si es una entrega que ofreció Leda, sin que la persona la empezara (decisión 73
+    del usuario, 2026-10-11): una oferta opcional (`preguntas.OPCIONAL`), que sin respuesta no
+    se repite ni vuelve. `False`: la empieza la persona, y deja de ser una oferta. `None`: lo que
+    era la de antes (lo que se le suma sin que la persona la empiece no cambia de quién es)."""
     cur = ctx.cur
     piezas = _ordenar(piezas)
     pol = politica(cur, tarea["id"])
@@ -742,12 +748,15 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
 
     sigue = (vieja is not None and vieja["tipo"] == tipo
              and (vieja["jugada"] or {}).get("huella") == huella)
+    es_oferta = ofrecida if ofrecida is not None else preguntas.es_opcional(vieja)
     if sigue:
         pregunta_id = str(vieja["id"])
         ahora_si = True
         vigente = preguntas.actual(cur, ctx.quien.membership_id)
         if vigente is None or str(vigente["id"]) != pregunta_id:
             preguntas.retomar(ctx, pregunta_id)
+        if not es_oferta and preguntas.es_opcional(vieja):
+            preguntas.ya_no_es_opcional(ctx.cur, pregunta_id)
         # La de antes sigue: lo que falta y su ejemplo son los que ya se le dijeron.
         lo_que_falta = {k: v for k, v in (vieja["jugada"] or {}).items()
                         if k in ("le_falta", "le_falta_del_criterio", "ejemplo")}
@@ -759,6 +768,8 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
                   **lo_que_falta}
         if falta_criterio:
             jugada["ejemplo_para"] = list(falta_criterio)
+        if es_oferta:
+            jugada[preguntas.OPCIONAL] = True
         opciones = ([(BOTON_CONFIRMAR, {"tarea": tarea["id"], "jugada": "confirmar"})]
                     if completa else [])
         ahora_si, pregunta_id = preguntas.abrir_con_id(ctx, tipo, tarea["id"], jugada=jugada,
@@ -818,10 +829,11 @@ def _piezas_de(q: Mapping[str, Any] | None) -> list[dict[str, Any]]:
 
 # --- Las jugadas -----------------------------------------------------------------------------
 
-def entregar(ctx, datos: dict, tarea: dict) -> dict:
+def entregar(ctx, datos: dict, tarea: dict, *, ofrecida: bool = False) -> dict:
     """"Terminé", con o sin fotos: la vista previa de la entrega, con lo que trae el mensaje (y
     lo que escribió) sumado a la entrega abierta de esa tarea o, si no hay, a lo que mandó antes
-    durante la tarea. Nada se escribe en la tarea hasta confirmar."""
+    durante la tarea. Nada se escribe en la tarea hasta confirmar. `ofrecida`: la ofrece Leda
+    (`_ofrecer_volver_a_entregarla`); si no, la empieza la persona."""
     vieja = abierta(ctx, tarea["id"])
     if tarea["estado"] == "en_revision":
         # Entregada: sólo se completa lo que le falta después de retirar algo (decisión 15).
@@ -861,7 +873,7 @@ def entregar(ctx, datos: dict, tarea: dict) -> dict:
     if juzgado is not None and not nuevos and aceptado is None:
         _aplicar_lo_descrito(piezas, juzgado, respeta_lo_aceptado=True)
     hecho = _mostrar_la_entrega(ctx, _tarea_de(ctx, tarea["id"]), piezas, vieja,
-                                ejemplo=datos.get("ejemplo"))
+                                ejemplo=datos.get("ejemplo"), ofrecida=ofrecida)
     if suma:
         hecho["sumo"] = mostrar_sumadas(ctx, suma, hecho)
     return hecho
@@ -989,7 +1001,13 @@ def _ofrecer_volver_a_entregarla(ctx, datos: dict, tarea: dict, archivos: list[s
     entregarla con eso. La oferta es la entrega de siempre (`entregar`), con lo que trajo el
     mensaje: su vista previa, con Confirmar si está completa o con lo que le falta, que se
     confirma con el botón o por escrito, con la guarda. Sin su sí no se entrega nada; el
-    archivo queda guardado igual. Con una entrega de esa tarea ya abierta, no se ofrece otra."""
+    archivo queda guardado igual. Con una entrega de esa tarea ya abierta, no se ofrece otra.
+
+    La ofrece Leda, no la empezó la persona (decisión 73 del usuario, 2026-10-11): es una oferta
+    opcional, que sin respuesta no se repite (`preguntas.OPCIONAL`); el archivo se suma solo
+    cuando la entregue, y el seguimiento de la tarea por su fecha sigue igual. Si la entrega no
+    se puede mostrar (`entregar` dice que no se puede), no se ofrece nada: nunca una
+    confirmación que no puede salir."""
     fichas = _fichas()
     cur = ctx.cur
     if (tarea.get("estado") not in ("asignada", "en_curso")
@@ -1004,7 +1022,9 @@ def _ofrecer_volver_a_entregarla(ctx, datos: dict, tarea: dict, archivos: list[s
                     "entrante": (llegada or {}).get("entrante") or ctx.entrante_id}
     oferta = entregar(ctx, {**{k: datos[k] for k in ("el_texto_cubre", "lo_descrito_cubre",
                                                      "ejemplo") if k in datos},
-                            "lo_que_llego": lo_que_llego}, tarea)
+                            "lo_que_llego": lo_que_llego}, tarea, ofrecida=True)
+    if oferta.get("resultado") not in (PARA_CONFIRMAR, LE_FALTA_EVIDENCIA):
+        return
     # La pregunta y sus efectos van en los hechos de la jugada, que el turno lee; la tarea ya
     # está nombrada ahí, y lo que se sumó es todo lo del mensaje.
     afuera = ("pregunta", "pregunta_para_despues", fichas.OTRAS_PARA_DESPUES, fichas.EFECTOS)
