@@ -392,6 +392,14 @@ textos de las fichas).
 **Conclusión vigente:** las garantías se sostienen con la IA real; las dos lecturas repetidas
 piden revisar el diseño de esas jugadas, no otro texto (`AGENTS.md`, punto 4).
 
+**Rediseño y control (2026-10-11, de madrugada; `resultados/fase-c-dos-lecturas.md`, código de
+`af3263f`).** "La hago yo" pasó a ser un dato que la IA marca (`se_la_queda`) y la cocina completa con
+quien escribe: la 39, paso 21, bien 5 de 5 (antes 1, 1 y 3 de 5 mal). "Ni idea" se aceptó como dos
+lecturas válidas (decisión 63; la prueba admite el camino en que Leda pregunta una vez): la 34, 4 de
+5 sin fallas fuera del formato, garantías 9 de 10. La vez restante: tras "¿Sabés quién se encarga?",
+el "no" de Mariano no se leyó como respuesta (la pregunta abierta es la de "para cuándo"); una sola
+vez, a mirar en la próxima ronda.
+
 ## Las conversaciones 30 a 45 con la IA real (Fase C, 2026-10-10, de tarde)
 
 Primera ronda con la IA real de las conversaciones 30 a 45 (la D6 cubrió las 01 a 29): sol por la
