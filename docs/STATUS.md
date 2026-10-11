@@ -62,8 +62,7 @@ commit de código, revisado por RDD y aprobado. Detalle y evidencia en el plan y
 2. **La tanda de pruebas:** la prueba por Telegram con `leda_motor` al día hasta la última migración
    (respaldo previo; autorizado). Necesita al usuario.
 3. **La plataforma:** su ADR, con el usuario.
-4. **El ADR 0018, 9m.1:** `f0d18e6` lo precisa (una jugada que mira otra tarea de quien escribe se
-   juzga después del resto del mensaje); falta anotarlo en el ADR si el usuario está de acuerdo.
+4. **El ADR 0018, 9m.1:** precisado (`8e64719`), con el acuerdo del usuario.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
