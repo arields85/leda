@@ -11,6 +11,11 @@
 > `contexto`, `ingreso_tareas`, `respuesta_unica`, `deteccion_pregunta`, `jev`, `local`) y las
 > tablas del alta guiada (migración `0032`) están borrados. Las filas marcadas "Borrado" quedan
 > como historia de lo que hubo; hasta la entrada del motor (E3-7), Leda no recibe mensajes.
+>
+> **Nota del 2026-10-11.** Las tablas describen ahora la rama del Motor
+> (`feat/motor-de-conversacion`): el motor de conversación está construido (`src/leda/motor/`) y lo
+> que sumó está en las dos últimas secciones. Las notas de arriba y las filas "Borrado" o "Sin
+> código" son historia de lo que había antes.
 
 Para entender en cinco minutos dónde está parado el proyecto, sin volver a
 auditarlo. El detalle vive en los documentos que se citan; acá está el mapa.
@@ -174,8 +179,49 @@ Código en `src/leda/motor/`, `src/leda/salida.py` y `src/leda/despachador.py`; 
 | No interrumpir una conversación (C-3d, D5; decisión 13 del usuario, conversación 26): lo que Leda manda por su cuenta a una persona, también un aviso de coordinación, espera 30 minutos desde lo último que esa persona escribió o tocó (`no_interrumpir_minutos` del espacio), y cada mensaje vuelve a contar; nunca fuera del horario (si la espera cruza el cierre, sale el día hábil siguiente a la hora de salida); a otra persona no la demora. Con una pregunta de Leda sin contestar, ningún aviso sale junto con ella: la pregunta misma, repetida por la escalera, sale sola; uno de otra tarea que no pide respuesta sale aparte, sin pregunta; uno que pide respuesta (una pregunta o decidir) y uno de la misma tarea esperan a que se cierre. Al salir se relee, y el aviso previo y el recordatorio del vencimiento de una tarea de la que la persona habló después de que se guardaron no salen (`ya_se_hablo_de_la_tarea`). Lo que se le cuenta a otra persona dice cuándo se entera de verdad (si está conversando, al terminar su espera). Avisos de entrega confirmados con minutos de diferencia que esperan juntos salen en una lista | `no_interrumpir.py`, `avisos.py` (`_preparar`, `_un_tema_a_la_vez`, `TipoDeAviso.se_omite_si_ya_se_hablo`), `efectos.py` |
 | El lector de turnos y avisos guardados | `leda.motor.leer` |
 
+## Lo que agregó la Fase C (2026-10-08 a 11)
+
+Plan, decisiones del usuario (los números entre paréntesis) y evidencia en
+[`odd/tasks/fase-c.md`](../odd/tasks/fase-c.md); conversaciones de prueba en `tests/conversaciones/`.
+Casi todo está revisado y probado con la IA guionada; la IA real y la prueba por Telegram de varias
+filas están `PENDIENTE` (la tanda de pruebas del plan).
+
+| Capacidad | Dónde |
+|---|---|
+| Una pregunta de Leda sin contestar frena los otros temas hasta que se repite, una vez, a las 4 horas; la repetición sale siempre (21, 29), y la pregunta que quedó por un cambio de tema vuelve en un mensaje aparte (50) | `pregunta_sin_contestar.py`, migración `0040` |
+| Cinco tablas de configuración con `workspace_id` pasaron a RLS forzado; las otras cinco son excepciones escritas en la prueba de aislamiento | migración `0041`, `tests/garantias/test_aislamiento.py` |
+| Pedir por chat el enlace a la página de una tarea (conversación 31): la IA nombra la tarea y la cocina decide si la persona la puede ver | `enlace.py` (la jugada `pedir_enlace`) |
+| Perseguir un bloqueo: cuando la persona trabada nombra a otro integrante, Leda le escribe a quien destraba (terminado el margen) y le pregunta para cuándo; lo que contesta queda anotado y le llega a la persona trabada. Nunca promete un mensaje que no va a salir, y a alguien de afuera del equipo no le escribe (4) | `persecucion.py` (`preguntarle`, `decir_cuando_destraba`), migración `0042` |
+| "No le escribas": si el mensaje no salió, queda omitido con su motivo; si ya salió, se dice. Corregido tarde (era otra tarea), Leda le escribe a quien destraba que de ésta sigue haciendo falta (61) | `persecucion.py` (`no_escribirle`, `_decirle_que_sigue_haciendo_falta`) |
+| "Ya lo hablé con él": Leda pregunta una vez qué arreglaron y para cuándo, y lo acordado le llega a la otra parte para que lo confirme (47); "ya lo hablé" sin decir qué, les pregunta a los dos (48); la oferta de pasarle algo deja una pregunta opcional (62) | `persecucion.py` (`contar_lo_que_arreglaron`), `avisos.py` (`la_oferta_de_pasarle_algo`) |
+| "No me corresponde": queda anotado y, si nombra a otro, Leda sigue con esa persona; la cadena llega hasta tres personas preguntadas (5, 51); "ni idea" primero le pregunta a la persona trabada si se le ocurre otra (49). Si la cadena se corta, se le informa una vez al referente del sector, nunca a alguien de la cadena (24) | `persecucion.py` (`decir_que_no_le_toca`, `LIMITE_DE_LA_CADENA`), migraciones `0043` y `0051` |
+| Quien destraba sin Leda conectada: el administrador recibe el aviso para conectarlo y a la persona trabada se le ofrecen salidas (37); a quien no contesta se le repite la pregunta un día por vez y después cada 2 días hábiles, sin escalar (38) | `persecucion.py` (`avisar_para_que_lo_conecte`), `escalera.py` (`_un_paso_de_una_pregunta`) |
+| "Se lo pido yo y te cuento": Leda no le escribe a quien destraba y al día hábil siguiente le pregunta a la persona trabada cómo le fue; si quien destraba ya había dado un día, ese día igual le pregunta, mencionando quién dijo que se lo pedía (64) | `persecucion.py` (`pedirselo_y_contar`), `avisos.py` (`EL_DIA_QUE_DIJO`), hecho `dijo_que_se_lo_pedia` |
+| Bloqueos encadenados: quien destraba puede decir que está trabado con algo suyo; los dos bloqueos quedan enlazados y quien espera más abajo se entera de cada avance del medio (6) | `encadenados.py` (`aguas_abajo`), migración `0044` |
+| Seguir la cadena hasta quien puede destrabarla: a quien ya está trabado con lo que falta no se le pregunta, se le pregunta cuando puede seguir, y a quien dio un día ese día Leda le pregunta si ya está (42) | `encadenados.py`, `persecucion.py` (`_volver_a_preguntar_el_dia`) |
+| Sólo la persona trabada da por cerrado su bloqueo; a quien se le informó que seguía trabada puede contar cómo va (41) | `herramientas.py` (`resolver_bloqueo`), `persecucion.py` |
+| El bloqueo viejo: a los días hábiles del pack, Leda le informa al referente con la historia y las fechas, se lo cuenta a la persona trabada y lo vuelve a asentar mientras siga (7, 34, 36) | `bloqueo_viejo.py` (`informar_los_viejos`) |
+| "Quedó asentado": Leda no dice a quién le informó ni lo nombra por su cuenta; si le preguntan, dice la verdad (35). Sin nadie a quien informar, queda asentado igual, con un incidente para el administrador (49); la historia de la página de la tarea muestra lo asentado | `asentado.py`, migración `0049` |
+| Cerrar el tema para todos: cuando un bloqueo, un pase o un pedido del detalle termina, cada persona que estaba en él se entera una vez de cómo terminó y Leda deja de preguntarle (39) | `persecucion.py` (`cerrar_el_tema`), `pase.py` (`_al_terminar`), `detalle.py` |
+| Delegar por chat (enmienda al ADR 0017; 9): pasarle una tarea asignada, en curso o trabada a otra persona del equipo, con vista previa y confirmación; un integrante sólo a alguien de su sector (si no, Leda dice quién lo decide); decide el encargado del sector de quien recibe y quien recibe la toma o no; la fecha, el criterio y la evidencia no cambian | `pase.py` (la jugada `pedir_reasignacion`), `herramientas.py` (`pedir_pase_de_tarea`), `autoridad.regla_del_pase`, migración `0045` |
+| El encargado de un sector pasa una tarea de su gente (27) o se la queda él (53; la IA marca `se_la_queda` y la cocina pone a quien escribe); la revisión sigue a quien aprobaba el trabajo de quien era la tarea (28); un nombre que no es nadie del equipo, Leda dice cuál no encontró | `pase.py`, migración `0046` |
+| Una pregunta a otra persona que nadie contesta (un pase, un pedido del detalle) se repite una sola vez el día hábil siguiente y, sin respuesta, termina, y quien pidió se entera (26) | `una_vez_y_termina.py`, `pase.seguir_los_pases`, `detalle.seguir_los_pedidos` |
+| El resumen para cualquiera, el detalle a pedido (33): quien pide el enlace de una tarea que no ve recibe el resumen y la oferta de pedirle el detalle al encargado de su sector, que la comparte o no con dos botones (compartida por persona, revocable); el pedido sigue al encargado de ahora y, si el sector se queda sin encargado, termina y se avisa al administrador | `detalle.py` (`pedir_el_detalle`, `contestar_el_pedido_del_detalle`), migraciones `0050` y `0051` |
+| Las listas de la semana (8): el día de la cadencia, cada persona recibe en privado un mensaje con todas sus tareas abiertas y su situación y una sola pregunta (32); las siguientes de la semana traen sólo lo que falta o cambió (46); lo contestado no se repite (31); "viene bien" deja como próximo el aviso previo (44); el recordatorio del día va adentro de la lista | `cadencias.py` (`armar`, `anotar_lo_que_conto`), migración `0047` |
+| El informe al grupo (25): al grupo del espacio, en su cadencia, las terminadas con quién las hizo, las atrasadas ya habladas en privado, las trabadas, las entregadas, las que no se sabe cómo vienen y las que siguen; sale siempre, dice que está todo en orden sólo si los hechos lo prueban y reconoce una buena semana sin comparar personas (54, 55) | `informe_al_grupo.py`, migración `0048` |
+| Acceso del administrador de plataforma a la página de una tarea, sólo por el bot de administración (`/enlace <espacio> <palabras>`): un enlace atado a esa persona y esa tarea, revalidado por su rol y auditado en cada vista; la respuesta sale por la cola y el enlace se emite recién al mandarla | `administracion.py`, `pagina_de_tarea.emitir_para_administrador`, `despachador.despachar_avisos_admin`, migraciones `0052` y `0054` |
+| Revocar los enlaces a la página de las tareas de una persona, de una tarea o de un administrador, por la consola; un enlace ya mandado deja de abrir | `python -m leda revocar-enlaces`, `pagina_de_tarea.revocar` |
+| Retiro de contenido por la administración: borra de verdad el contenido de una pieza (queda la pieza y su huella), deja de contar para la política, la página muestra el motivo sin decir quién (57, 59), y Leda les avisa a quien la entregó y a quien revisa, a éste sólo si ya le llegó la entrega (58, 60) | `python -m leda retirar-contenido`, `pagina_de_tarea.retirar_contenido`, `retiro_de_la_administracion.py`, migración `0053` |
+| Vencimiento en fin de semana: la escalera alrededor de un fin de semana está probada, sin cambios de código; que una tarea no venza sábado ni domingo lo hará cumplir la plataforma (56), `PENDIENTE` hasta que exista | `tests/motor/test_escalera_fin_de_semana.py` |
+| Los apodos (ADR 0020): un apodo es del espacio, una persona puede tener varios y un apodo puede ser de dos; se aprende sólo con la confirmación de una persona, queda auditado y no se borra (se retira); sirve para entender, nunca para hablar ni para conceder nada | migración `0055` (tabla `apodo`), `apodos.py` (`aprender`) |
+| Reconocer a alguien por su nombre o por su apodo, en un solo lugar para todas las jugadas que nombran a alguien | `fichas.integrantes_que_coinciden` |
+| "¿Quién es?": al pasar una tarea o al aprobar, si Leda no reconoce el nombre, pregunta, confirma con nombre y apellido, aprende el apodo y hace lo pedido; un apodo de dos personas lleva un botón por persona. `PENDIENTE`: lo mismo para quien destraba un bloqueo y "no me toca, es de X" (espera una decisión del usuario) | `apodos.quien_es`, la jugada `decir_quien_es`, `pase.pedir`, `aprobacion._la_tarea` |
+| El cupo de la suscripción de ChatGPT: se lee de las cabeceras de cada respuesta del servicio (ventana de 5 horas y semanal); el corredor lo consulta antes de una ronda y, con una ventana al 100 %, no la empieza y sale con 4 | `python -m leda chatgpt cupo`, `chatgpt.consultar_cupo`, `tests/conversaciones/correr.py` (`SALIDA_SIN_CUOTA`) |
+| El corredor de conversaciones acepta una segunda lectura válida de un paso (63) y separa como `[servicio]` un aviso que la IA no pudo redactar y salió en su reintento | `tests/conversaciones/corredor.py`, `comprobar.py` (`o_bien`, `SERVICIO`) |
+
 ## Vigencia
 
 Levantado el 2026-09-22 auditando `nucleo/`, la especificación funcional y el
-código completo; notas del 2026-10-04 con los ADR 0017 y 0018. Todo lo de arriba es
+código completo; notas del 2026-10-04 con los ADR 0017 y 0018. Puesto al día el 2026-10-11 con lo
+que construyó la Fase C, contrastado contra `src/leda/` y el plan. Todo lo de arriba es
 una foto y envejece; la única parte que se mantiene sola es la prueba.
