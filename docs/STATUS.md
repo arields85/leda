@@ -57,8 +57,9 @@ commit de código, revisado por RDD y aprobado. Detalle y evidencia en el plan y
 **Lo que sigue:**
 1. **Cierre de la Fase C:** suite completa, `docs/capacidades.md`, el corredor, la fecha de un retiro
    y los YAML estrictos, hechos. Queda una lectura de la IA sin arreglar (la 35 paso 18, 1 de 5: lo
-   que dice Mariano queda como texto y a Nahuel no le llega la novedad posterior) y el formato (unas
-   87 fallas en 35 corridas: renglones largos y dos preguntas al cierre).
+   que dice Mariano queda como texto y a Nahuel no le llega la novedad posterior) y la 48 paso 10
+   sin ninguna jugada (2 de 5). El formato lo da la cocina (`c304b23`, decisión 74): de 87 fallas
+   en 35 corridas a 15.
 2. **La tanda de pruebas:** la prueba por Telegram con `leda_motor` al día hasta la última migración
    (respaldo previo; autorizado). Necesita al usuario.
 3. **La plataforma:** su ADR, con el usuario.
@@ -192,7 +193,8 @@ validador de invariantes. Destino de cada uno:
   formato de los mensajes, 100 de 100 (20 conversaciones); con el margen para corregir, 100 de 100 en las 01 a 20
   y la corrección de la 25 bien 5 de 5. El mensaje sin puntuación del usuario se lee mal 5 de 5.
 - Fase C, 2026-10-11: las siete conversaciones tocadas por las decisiones 66 a 73, garantías 35 de 35;
-  la 35 con el orden de las jugadas, garantías y comprensión 5 de 5.
+  la 35 con el orden de las jugadas, garantías y comprensión 5 de 5; con la forma que da la cocina,
+  las mismas siete: garantías 39 de 40 (la falla era del corredor, arreglado) y formato 87 → 15.
 
 Las cifras de pruebas miden el código: **una suite en verde no es evidencia de que la conversación funcione**
 (`AGENTS.md`, punto 12).
@@ -264,5 +266,5 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
   anuncia el día en que se entera quien está arriba contando desde que se guardó, no desde que salió; la
   página del tablero se arma fuera de la guarda (la de la tarea ya no); advertencias de casos de borde de
   cada porción, listadas en `odd/tasks/fase-c.md`.
-- **Formato:** a veces la IA junta dos ideas en un renglón o hace dos preguntas al cierre (el chequeo del
-  corredor lo mide).
+- **Formato:** la cocina parte los renglones largos y separa el cierre (`c304b23`); quedan, de la IA,
+  un título pegado a la tarea y una oración después de la pregunta (el chequeo del corredor lo mide).

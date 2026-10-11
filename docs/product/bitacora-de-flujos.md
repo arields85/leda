@@ -430,6 +430,20 @@ mensaje (`Ficha.mira_otra_tarea`), y el motivo `su_tarea_no_esta_trabada` dice d
 Garantías y comprensión 5 de 5; la IA usó la lectura que antes daba "esa tarea no está trabada"
 en 3 de 5, y ahora la cocina la acepta. Sólo 8 fallas de formato. Cupo: 16 % de la ventana corta.
 
+**La forma de los mensajes la da la cocina** (`resultados/fase-c-formato.md`, código de `10a9728`,
+23, 35, 36 y 38, cortada por el cupo; `resultados/fase-c-formato-2.md`, código de `1b7a48e`, 39,
+47, 48 y 35; 2026-10-11, cinco veces). El arreglo (`c304b23`, decisión 74): antes de encolar, el
+código parte un renglón de más de 140 caracteres entre oraciones y deja la última oración sola,
+con un renglón en blanco antes, sin cambiar una palabra. Las mismas siete conversaciones: **87
+fallas de formato → 15** en 35 corridas; renglones largos 63 → 2 (oraciones que solas pasan de
+140), el cierre pegado 20 → 0. Quedan dos clases que son contenido de la IA: un título pegado a
+la tarea en el mismo bloque (la 23, 10; antes las tapaba la falla del renglón largo, porque se
+anota una por mensaje) y una oración después de la pregunta (2). Garantías 39 de 40: la única
+falla era del corredor, que comparaba las jugadas por posición (la 35, vez 5, con las jugadas de
+la otra lectura en otro orden; Leda hizo lo correcto); arreglado en `1079b18`, y la 35 dio 5 de
+5 en la segunda ronda. Comprensión: la 48, paso 10, sin ninguna jugada 2 de 5 (Leda contesta
+bien por el contexto). Cupo: una ventana corta entera para 20 corridas; 45 % para otras 20.
+
 ## Los arreglos de las 30 a 45, controlados con la IA real (Fase C, 2026-10-10, de noche)
 
 Sol por la suscripción, 5 veces. Dos rondas: `resultados/fase-c-arreglos.md` (32, 34, 39, 43 y 45,
