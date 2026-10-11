@@ -62,7 +62,7 @@ aprobado. Detalle y evidencia en el plan.
    nombre que no es nadie del equipo; un archivo para una tarea que espera cambios (la 23, paso 12).
 3. **La prueba de cupo:** hecha (`bb862e4`, `python -m leda chatgpt cupo`; el corredor la mira antes
    de cada ronda por la suscripción). 50 llamadas gastan el 4 % de la ventana de 5 horas.
-4. **Cierre de la Fase C:** suite completa (`pytest -q`), `docs/capacidades.md` (hecho, `7d20bb2`),
+4. **Cierre de la Fase C:** suite completa (hecha: 2350 passed, `e4d4f3a`), `docs/capacidades.md` (hecho, `7d20bb2`),
    y los arreglos del corredor (fila con un dato distinto
    contada como garantía, `comprobar.py:553`; YAML estrictos: la 39 paso 20, la 36 paso 20, la 35 paso 4).
 5. **La tanda de pruebas:** las conversaciones de los dos avisos están hechas (la 48 y la 49, con la IA
@@ -184,6 +184,8 @@ validador de invariantes. Destino de cada uno:
 | Rama del Motor, con la C-5, la C-6 y la C-7 (`e082010`) | suite completa | 2026-10-09 | 1857 passed |
 | Rama del Motor, con las decisiones 24 a 55 y la porción 5 (`c06fa6d`) | `pytest tests/motor tests/garantias tests/conversaciones tests/test_administrador_plataforma.py` | 2026-10-10 | 1740 passed |
 | Rama del Motor, ídem | `correr --ia guionada --veces 1` (en seco) | 2026-10-10 | 45 de 45 bien |
+| Rama del Motor, con los apodos (dos porciones), el cupo y las 48 y 49 (`e4d4f3a`) | `pytest -q` (suite completa) | 2026-10-11 | 2350 passed (30 min) |
+| Rama del Motor, ídem (`65086af`) | `correr --ia guionada --veces 1` (en seco) | 2026-10-11 | 47 de 47 bien |
 
 **Conversaciones con la IA real** (bitácora de flujos):
 - La ronda 3 de la prueba chica dio 85 de 85.
