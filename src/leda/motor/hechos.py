@@ -359,6 +359,14 @@ SIGNIFICADOS: Mapping[str, str] = {
     "la_entrega_se_esta_completando": "La persona responsable sacó algo de lo que entregó y "
                                       "está completando la entrega: así todavía no se aprueba "
                                       "y no cambió nada.",
+    "la_entrega_espera_lo_que_retiro_la_administracion": "La administración de Leda retiró una "
+                                                         "pieza de lo que entregó la persona "
+                                                         "responsable, y a la entrega le falta "
+                                                         "lo que cubría: la revisión espera a "
+                                                         "que la persona mande una pieza nueva. "
+                                                         "Así todavía no se aprueba y no cambió "
+                                                         "nada. Quién de la administración la "
+                                                         "retiró no se sabe.",
     "se_le_avisa_cuando_este_completa": "Cuando la entrega esté completa, a quien la revisa le "
                                         "llega un aviso nuevo con todo. Todavía no pasó.",
     "cambio_la_entrega": "La entrega cambió desde el aviso que tenía ese botón: el botón ya no "

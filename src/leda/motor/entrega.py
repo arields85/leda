@@ -385,6 +385,29 @@ def falta_del_criterio_de_lo_entregado(cur, task_id: str) -> list[str]:
     return [p for p in puntos if p in faltan] + sorted(faltan - set(puntos))
 
 
+def lo_que_falta_lo_retiro_la_administracion(cur, task_id: str) -> bool:
+    """Si a la entrega vigente de una tarea en revisión le falta algo que cubría una pieza que
+    retiró la administración (decisiones 58 y 59 del usuario, 2026-10-10): una pieza del ciclo
+    cuyo primer retiro fue de la administración y que cubría un tipo que ahora falta o describía
+    un punto del criterio que dejó de estar dicho. Así la IA no le atribuye el retiro a la
+    persona responsable (constitución §4); quién de la administración fue no se dice."""
+    faltan = set(_faltan(cur, task_id, []))
+    del_criterio = set(falta_del_criterio_de_lo_entregado(cur, task_id))
+    if not faltan and not del_criterio:
+        return False
+    desde = _ciclo_desde(cur, task_id)
+    cur.execute("""select e.cubre, e.describe_del_criterio d
+                     from evidence e
+                    where e.task_id = %s
+                      and (%s::timestamptz is null or e.at > %s::timestamptz)
+                      and (select w.retirada_por_app_user_id is not null
+                             from evidencia_retirada w where w.evidence_id = e.id
+                            order by w.at, w.id limit 1)""",
+                (task_id, desde, desde))
+    return any(faltan & set(f["cubre"] or []) or del_criterio & set(f["d"] or [])
+               for f in cur.fetchall())
+
+
 def _falta_del_criterio(cur, tarea: Mapping[str, Any],
                         piezas: Sequence[dict[str, Any]]) -> list[str]:
     """Los puntos del criterio que lo descrito todavía no dice: de una tarea en revisión, lo

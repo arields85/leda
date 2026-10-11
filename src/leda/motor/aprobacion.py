@@ -91,6 +91,7 @@ NADA_PARA_DECIDIR = "nada_para_decidir"
 PERSONA_DESCONOCIDA = "persona_desconocida"
 YA_LA_APROBO = "ya_la_aprobo"
 SE_ESTA_COMPLETANDO = "la_entrega_se_esta_completando"
+ESPERA_LO_QUE_RETIRO_LA_ADMINISTRACION = "la_entrega_espera_lo_que_retiro_la_administracion"
 CAMBIO_LA_ENTREGA = "cambio_la_entrega"
 # Lo que se resolvió cuando el sistema cierra solo una tarea aprobada.
 TAREAS_QUE_ESPERABA = "tareas_que_esperaba"
@@ -156,9 +157,10 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
         return no
     cur = ctx.cur
     if entrega.falta_algo_de_lo_entregado(cur, tarea["id"]):
-        # El responsable retiró algo y está completando la entrega: no cambia nada, y cuando
-        # esté completa a quien aprueba le llega un aviso nuevo (decisión 15 del usuario).
-        return {"resultado": "no_se_puede", "motivo": SE_ESTA_COMPLETANDO,
+        # Se retiró algo y la entrega espera una pieza nueva: no cambia nada, y cuando esté
+        # completa a quien aprueba le llega un aviso nuevo (decisión 15 del usuario). El motivo
+        # dice quién la retiró, sin nombre (decisiones 58 y 59).
+        return {"resultado": "no_se_puede", "motivo": _por_que_espera(cur, tarea["id"]),
                 "tarea": _tarea(tarea), "se_le_avisa_cuando_este_completa": True}
     no = _la_guarda(ctx, datos, tarea)
     if no is not None:
@@ -275,7 +277,7 @@ def ver_entrega(ctx, datos: dict, tarea: dict | None) -> dict:
     hecho: dict[str, Any] = {"resultado": "leido", "tarea": _tarea(tarea),
                              "responsable": _responsable(cur, tarea["id"])["nombre"]}
     if entrega.falta_algo_de_lo_entregado(cur, tarea["id"]):
-        return {**hecho, "la_entrega_se_esta_completando": True,
+        return {**hecho, _por_que_espera(cur, tarea["id"]): True,
                 "se_le_avisa_cuando_este_completa": True}
     vistas, adjuntas = lo_entregado_para_revisar(cur, tarea["id"], zona)
     lugar = max(MAX_ADJUNTOS - len(ctx.adjuntos_de_la_respuesta), 0)
@@ -398,6 +400,15 @@ def _su_propio_trabajo(ctx, tarea: dict | None) -> dict:
     return {"resultado": "no_se_puede", "motivo": SU_PROPIO_TRABAJO,
             **({"tarea": _tarea(tarea)} if tarea else {}),
             **({"quien_aprueba": quien_aprueba["nombre"]} if quien_aprueba else {})}
+
+
+def _por_que_espera(cur, task_id: str) -> str:
+    """Por qué la entrega espera una pieza nueva, con quién la retiró: la administración (lo que
+    falta lo cubría una pieza que retiró ella) o, si no, la persona responsable. Nunca el
+    nombre de quien la retiró (decisión 59)."""
+    if entrega.lo_que_falta_lo_retiro_la_administracion(cur, task_id):
+        return ESPERA_LO_QUE_RETIRO_LA_ADMINISTRACION
+    return SE_ESTA_COMPLETANDO
 
 
 def _la_guarda(ctx, datos: dict, tarea: dict) -> dict | None:

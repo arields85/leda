@@ -406,6 +406,73 @@ def test_si_la_primera_entrega_nunca_le_llego_con_la_pieza_nueva_le_llega_comple
     assert avisos_guardados(conn, A_QUIEN_LA_REVISA) == []
 
 
+# --- Lo que se le dice a quien la revisa, si intenta decidir -------------------------------------
+#
+# La regla del mozo (AGENTS.md, punto 11) y la constitución §4: la cocina le pasa a la IA quién
+# retiró la pieza que falta. Si la retiró la administración, decir que la sacó la persona
+# responsable es falso; nunca se nombra a quien la retiró (decisión 59).
+
+ESPERA_LO_QUE_RETIRO_LA_ADMINISTRACION = "la_entrega_espera_lo_que_retiro_la_administracion"
+SE_ESTA_COMPLETANDO = "la_entrega_se_esta_completando"
+
+
+def _hecho_de(r, jugada: str) -> dict:
+    return next(h for h in r.hechos if h.get("jugada") == jugada)
+
+
+def test_aprobar_lo_que_espera_una_pieza_que_retiro_la_administracion_lo_dice(conn, mundo, ada):
+    from tests.motor.test_aprobacion import Turnos
+
+    tarea = _entregada(conn, mundo)
+    _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
+    turnos = Turnos(conn, mundo)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"de": "Marcos"}), texto="aprobado lo de marcos",
+                    at=AL_SALIR)
+    hecho = _hecho_de(r, "aprobar")
+    assert hecho["resultado"] == "no_se_puede"
+    assert hecho["motivo"] == ESPERA_LO_QUE_RETIRO_LA_ADMINISTRACION
+    assert hecho["se_le_avisa_cuando_este_completa"] is True
+    significado = hechos.significado(ESPERA_LO_QUE_RETIRO_LA_ADMINISTRACION)
+    assert significado and "administración" in significado
+    assert "Ada" not in json.dumps(turnos.redaccion, ensure_ascii=False)
+    assert uno(conn, "select count(*) n from approval where sujeto_id = %s",
+               tarea["id"])["n"] == 0
+
+
+def test_ver_la_entrega_que_espera_lo_que_retiro_la_administracion_lo_dice(conn, mundo, ada):
+    from tests.motor.test_aprobacion import Turnos
+
+    tarea = _entregada(conn, mundo)
+    _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
+    turnos = Turnos(conn, mundo)
+    r = turnos.dice("Ismael", Jugada("ver_entrega", {"de": "Marcos"}),
+                    texto="mostrame lo de marcos", at=AL_SALIR)
+    hecho = _hecho_de(r, "ver_entrega")
+    assert hecho[ESPERA_LO_QUE_RETIRO_LA_ADMINISTRACION] is True
+    assert SE_ESTA_COMPLETANDO not in hecho
+    assert "botones" not in hecho
+
+
+def test_si_la_pieza_que_falta_la_saco_la_persona_se_dice_como_antes(conn, mundo, ada):
+    """La administración retiró una foto que sobraba (la otra la cubre) y Marcos sacó lo que
+    escribió: lo que falta lo sacó él."""
+    from tests.motor.test_aprobacion import Turnos
+
+    tarea = _entregada(conn, mundo, fotos=(JPEG, JPEG + b"otra"))
+    _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
+    with admin(conn) as cur:
+        cur.execute("""insert into evidencia_retirada (workspace_id, evidence_id,
+                                                       retirada_por_membership_id)
+                       values (%s, %s, %s)""",
+                    (mundo["id"], tarea["piezas"]["texto"],
+                     mundo["personas"]["Marcos"]["membership_id"]))
+    conn.commit()
+    turnos = Turnos(conn, mundo)
+    r = turnos.dice("Ismael", Jugada("aprobar", {"de": "Marcos"}), texto="aprobado lo de marcos",
+                    at=AL_SALIR)
+    assert _hecho_de(r, "aprobar")["motivo"] == SE_ESTA_COMPLETANDO
+
+
 # --- Lo retirado no vuelve -------------------------------------------------------------------
 
 def test_la_misma_foto_mandada_otra_vez_no_se_guarda(conn, mundo, ada):
