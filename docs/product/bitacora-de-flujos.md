@@ -408,6 +408,20 @@ la 25 (6b) y la 30 (9b), donde Marcos contesta que no es del equipo, bien en las
 30: garantías y comprensión 5 de 5. La 25: 0 de 5, por los pasos 2 y 3, la falla ya conocida del
 mensaje sin puntuación (la fecha en la tarea del PLC, que Marcos corrige dentro del margen; a
 Ismael nunca le llega el aviso equivocado). Cupo: 23 % de la ventana corta.
+**Las decisiones 66 a 73** (`resultados/fase-c-decisiones-66-73.md`, código de `fcb8c17`,
+2026-10-11; la 23, 35, 36, 38, 39, 47 y 48, cinco veces). Garantías 35 de 35. Comprensión 5 de 5
+en todas salvo la 35 (3 de 5). Lo construido hoy, bien con la IA real: a Marcos le llega un solo
+aviso en la 35 paso 5 (decisión 72; antes, dos en 5 de 5); la oferta de volver a entregar en la
+23 paso 12 (68); "A los dos" en la 47 (67); las otras lecturas de la 36, 39 y 48 y el verbo en
+otra persona de la 38 (69 a 71). Las dos fallas de la 35: en la vez 3, paso 4, la IA usó una
+tercera lectura (`decir_cuando_destraba` con `su_tarea_trabada` SRV, antes que `anotar_bloqueo`
+SRV en el mismo mensaje); la cocina la rechazó porque el servidor todavía no estaba trabado, y
+Leda le dijo a Ariel "esa tarea no está trabada", que no es cierto (defecto de honestidad, de la
+cocina: el orden de las jugadas de un mensaje). En la vez 2, paso 18, la IA anotó lo que dijo
+Mariano como texto libre y no como su tarea trabada, y a Nahuel no le llegó después la novedad
+de cuándo se destraba el tablero (una lectura de la IA, 1 de 5). El resto, 87 fallas de formato
+(renglones largos y dos preguntas al cierre, la clase ya conocida). Cupo: la ventana corta
+entera (de 0 a 100 %) y 15 puntos de la larga.
 
 ## Los arreglos de las 30 a 45, controlados con la IA real (Fase C, 2026-10-10, de noche)
 
