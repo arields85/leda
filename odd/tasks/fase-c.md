@@ -634,6 +634,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     (`o_bien` puede ser una lista; `comprobar.otras_lecturas`), revisión
     `review-282ea7ac37a964a8`, aprobada.
 
+76. **Repetir el nombre con la pregunta de la 67 abierta es "Sólo a"** (usuario, 2026-10-11,
+    "si"). Con "¿A Mariano Naim y a Marcos Tarquini les dicen «el Chino», o sólo a Marcos?"
+    abierta, si Nahuel vuelve a escribir "el chino es marcos", cuenta como "Sólo a Marcos
+    Tarquini": el de Mariano se deja de usar, con quién y cuándo. Una respuesta que no la contesta
+    la deja abierta y no cambia nada. Ya era así (`apodos.py`); probado en `0749a26`.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
