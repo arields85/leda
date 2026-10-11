@@ -596,6 +596,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     enlace o deja una oferta. Revisión `review-49cb735c5655ada3`, aprobada; advertencia: la
     prueba no demuestra que el aviso juntado siga vigente (`test_bloqueos_encadenados.py:461`);
     sugerencia: los límites de qué se junta (`avisos.py:576-583`).
+    En la ronda real de las decisiones 66 a 73 (`088a0ab`) apareció una tercera lectura del
+    paso 4 (`su_tarea_trabada` SRV antes de `anotar_bloqueo` SRV) y Leda le dijo a Ariel "esa tarea
+    no está trabada", falso: arreglado en `f0d18e6` (una jugada que mira otra tarea de quien
+    escribe se juzga después del resto del mensaje, `Ficha.mira_otra_tarea`; precisa el ADR 0018,
+    9m.1, sin cambiar el orden de los hechos). Revisión `review-f64d3946fb8e5909`, aprobada;
+    advertencia: no se prueba que el reorden no cambie jugadas dependientes (`fichas.py:1934`);
+    sugerencia: un par con una jugada diferida (`turno.py:499-504`). Ronda real de la 35:
+    garantías y comprensión 5 de 5 (`fase-c-orden-de-jugadas.md`).
 
 73. **La oferta de volver a entregar no se repite** (la 68; usuario, 2026-10-11, "Si, vamos con tu
     recomendacion"). La ofreció Leda, no la empezó la persona: si Mariano no contesta, Leda no se

@@ -423,6 +423,13 @@ de cuándo se destraba el tablero (una lectura de la IA, 1 de 5). El resto, 87 f
 (renglones largos y dos preguntas al cierre, la clase ya conocida). Cupo: la ventana corta
 entera (de 0 a 100 %) y 15 puntos de la larga.
 
+**El orden de las jugadas de un mensaje** (`resultados/fase-c-orden-de-jugadas.md`, código de
+`f0d18e6`, 2026-10-11; la 35, cinco veces, con la otra cuenta). El arreglo: una jugada que mira
+otra tarea de quien escribe (`su_tarea_trabada`) se juzga después de las demás jugadas del
+mensaje (`Ficha.mira_otra_tarea`), y el motivo `su_tarea_no_esta_trabada` dice de qué tarea es.
+Garantías y comprensión 5 de 5; la IA usó la lectura que antes daba "esa tarea no está trabada"
+en 3 de 5, y ahora la cocina la acepta. Sólo 8 fallas de formato. Cupo: 16 % de la ventana corta.
+
 ## Los arreglos de las 30 a 45, controlados con la IA real (Fase C, 2026-10-10, de noche)
 
 Sol por la suscripción, 5 veces. Dos rondas: `resultados/fase-c-arreglos.md` (32, 34, 39, 43 y 45,
