@@ -3,8 +3,8 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-10, madrugada: las decisiones 24 a 55 construidas y revisadas,
-la porción 5 de la C-3, la constitución 1.1 y el ADR 0021.
+**Última actualización documental:** 2026-10-11, tarde: las decisiones 65 a 73 construidas y revisadas,
+los apodos completos y el orden de las jugadas de un mensaje.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -33,10 +33,10 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-11, madrugada, 04:40; el agente sigue solo, el usuario duerme)
+## Punto exacto para retomar (2026-10-11, tarde)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
-Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 64, el registro de
+Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 73, el registro de
 cada unidad (al final de "La tanda de pruebas") y la lista de tareas en "Próximo paso".
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si está caído, levantarlo con
@@ -44,34 +44,26 @@ cada unidad (al final de "La tanda de pruebas") y la lista de tareas en "Próxim
 estar en ejecución, cerrar los procesos `postgres` colgados y reintentar. Comprobar que no quede un escuchador
 viejo corriendo.
 
-**Lo hecho el 2026-10-10 y la madrugada del 11:** la primera ronda con la IA real de las 30 a 45 y sus
-arreglos (el motivo cierto al cerrar el tema, el enlace, el nombre que no se encontró, las decisiones 61
-y 62), dos rondas de control (garantías sin ningún defecto de Leda), el rediseño de las dos lecturas que
-la IA repetía mal ("la hago yo" → `se_la_queda`; "ni idea" → la decisión 63 y las dos lecturas válidas
-del corredor, `o_bien`), la decisión 64 (el día de quien destraba sigue en pie tras "se lo pido yo", y la
-pregunta lo menciona), el ADR 0020 de los apodos (aceptado) con su conversación 47 diseñada, y la
-limpieza de `apscheduler` y la fila de delegar del roadmap. Cada commit de código, revisado por RDD y
-aprobado. Detalle y evidencia en el plan.
+**Lo hecho el 2026-10-11:** las preguntas 1 a 6 del plan y tres más, contestadas (decisiones 65 a 73) y
+construidas: quién destraba con un nombre de afuera (65, la tercera porción de los apodos), "se lo pido
+yo" con la pregunta del día ya enviada (66), corregir un apodo con dueño (67), el archivo para una
+tarea que espera cambios y su oferta que no se repite (68 y 73), las lecturas válidas de la 36, 39 y
+48 (69 y 71), el verbo en otra persona (70) y un solo aviso por persona y tarea trabada por mensaje
+(72). Los apodos (ADR 0020) quedaron completos. La ronda con la IA real de las siete conversaciones
+tocadas dio garantías 35 de 35 y encontró un defecto de honestidad ("esa tarea no está trabada"),
+arreglado en `f0d18e6` (el orden de las jugadas de un mensaje) y controlado con la 35: 5 de 5. Cada
+commit de código, revisado por RDD y aprobado. Detalle y evidencia en el plan y la bitácora.
 
 **Lo que sigue:**
-1. **Los apodos (ADR 0020):** hechas y revisadas dos de tres porciones (`bbe40de`, `1c9f8fe`: la
-   tabla `apodo` y "¿quién es?" en el pase y la aprobación). La tercera (quién destraba) y la
-   conversación 47 esperan la pregunta 3; están en un parche sin aplicar (plan, "Los apodos").
-2. **Preguntas para el usuario** (en el plan, "Preguntas para el usuario", 1 a 6): "se lo pido yo"
-   con la pregunta del día ya enviada; corregir un apodo que ya tiene dueño; quién destraba con un
-   nombre que no es nadie del equipo; un archivo para una tarea que espera cambios (la 23, paso 12);
-   "pedíselo igual" sin encargado (la 48, paso 10); el motivo con el verbo en otra persona (la 38,
-   paso 23).
-3. **La prueba de cupo:** hecha (`bb862e4`, `python -m leda chatgpt cupo`; el corredor la mira antes
-   de cada ronda por la suscripción). 50 llamadas gastan el 4 % de la ventana de 5 horas.
-4. **Cierre de la Fase C:** suite completa (hecha: 2350 passed, `e4d4f3a`), `docs/capacidades.md` (hecho, `7d20bb2`),
-   el arreglo del corredor (hecho: `090016a`, una fila con un dato distinto ya no cuenta como
-   garantía), la fecha de un retiro que sobrevive a un respaldo (hecha: `a839c1e`, migración `0056`),
-   ambos revisados y aprobados; faltan los YAML estrictos (la 39 paso 20, la 36 paso 20, la 35 paso 4).
-5. **La tanda de pruebas:** las conversaciones de los dos avisos están hechas (la 48 y la 49, con la IA
-   real; la 49 encontró y arregló dos defectos de honestidad); falta la prueba por Telegram con `leda_motor` al día hasta la
-   última migración (respaldo previo; autorizado). Necesita al usuario.
-6. **La plataforma:** su ADR, con el usuario.
+1. **Cierre de la Fase C:** suite completa, `docs/capacidades.md`, el corredor, la fecha de un retiro
+   y los YAML estrictos, hechos. Queda una lectura de la IA sin arreglar (la 35 paso 18, 1 de 5: lo
+   que dice Mariano queda como texto y a Nahuel no le llega la novedad posterior) y el formato (unas
+   87 fallas en 35 corridas: renglones largos y dos preguntas al cierre).
+2. **La tanda de pruebas:** la prueba por Telegram con `leda_motor` al día hasta la última migración
+   (respaldo previo; autorizado). Necesita al usuario.
+3. **La plataforma:** su ADR, con el usuario.
+4. **El ADR 0018, 9m.1:** `f0d18e6` lo precisa (una jugada que mira otra tarea de quien escribe se
+   juzga después del resto del mensaje); falta anotarlo en el ADR si el usuario está de acuerdo.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
