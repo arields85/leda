@@ -3834,6 +3834,41 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
            ofrece entregarla. Propuesta: guardarlo y ofrecer en la misma respuesta "¿La volvés a
            entregar con esto?" con Confirmar (la persona elige; nada cambia sin su sí). La otra
            salida es aceptar las dos lecturas en la prueba y no cambiar nada.
+        5. **"Pedíselo igual a Martín" cuando el sector ya no tiene encargado** (la 48, paso 10,
+           primera ronda real): en 4 de 5 la IA lo leyó como un pedido que Leda no sabe hacer
+           (`fuera_de_la_lista`), no como pedir el detalle. Leda le dice igual que no puede, pero
+           eso le deja un aviso al administrador (el de los pedidos fuera de la lista). ¿Se acepta
+           como la otra lectura válida (como la decisión 63), o un pedido así no tiene que avisarle
+           al administrador?
+  - [x] **Las conversaciones 48 y 49** (los dos avisos que no tenían conversación; escritores
+        delegados, 2+ archivos):
+        - `d5aa7e3`: la 48 (el sector se queda sin encargado mientras se espera su decisión: a
+          quien le llegó la pregunta le llega una vez que ya no hace falta, al que no le llegó
+          nada) y el paso `administracion` del corredor (lista cerrada: `cambiar_el_encargado`,
+          `retirar_contenido`). Revisión `review-0fc4fbf4a87d5b28`, aprobada, tres sugerencias.
+        - La 49 encontró dos defectos de honestidad, arreglados en su causa:
+          - `f27913d`: al intentar aprobar (o ver) una entrega a la que la administración le
+            retiró una pieza, la IA recibía que "la persona responsable sacó algo"; ahora recibe
+            `la_entrega_espera_lo_que_retiro_la_administracion` (constitución §4; decisiones 58 y
+            59). Revisión `review-f91bc89734ab5f9a`, aprobada; advertencia: si retiraron piezas la
+            administración y la persona, se dice sólo lo de la administración
+            (`entrega.py:407-408`).
+          - `65086af`: la fecha de entrega del aviso del retiro salía con el reloj de la base, no
+            el de Leda (en corridas y pruebas con el reloj movido, la fecha real); ahora sale del
+            aviso de la entrega, como `aprobacion.aprobada_el`. Mover sólo `evidence.at` al reloj
+            de Leda rompía el orden frente a aprobaciones y pedidos de cambios (T6j). Además, el
+            aviso retenido por un retiro de la administración (decisión 60) tenía un motivo que
+            culpaba a la persona: ahora tiene el suyo. Revisión `review-1831155009989b77`,
+            aprobada; advertencia: las piezas de una entrega se agrupan por `xmin` (la misma
+            transacción); después de restaurar la base, todas las de una tarea comparten `xmin`
+            y la fecha saldría la de la primera entrega. `PENDIENTE`: guardar a qué entrega
+            pertenece cada pieza (una columna, con migración).
+        - `ca02a63`: la 49. Revisión `review-538db78b22524dab`, aprobada, dos sugerencias.
+        - Verificación final (`65086af`): `tests/motor` 1257, `tests/garantias` 472,
+          `tests/conversaciones` 180 passed; en seco, 47 de 47.
+        - **Ronda real** (`resultados/fase-c-48-49.md`, 5 veces): la 49, garantías y comprensión
+          5 de 5; la 48, pasos 1 a 9 bien, el paso 10 en 4 de 5 con la otra lectura (pregunta 5).
+          Cupo: 10 % de la ventana corta.
   - [x] **La prueba de cupo** (`bb862e4`, escritor delegado): `python -m leda chatgpt cupo` lee
         las cabeceras `x-codex-primary-*` (ventana de 5 horas) y `x-codex-secondary-*` (7 días);
         el corredor lo mira antes de una ronda por la suscripción (sale con 4 si una ventana está

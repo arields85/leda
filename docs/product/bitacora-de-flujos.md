@@ -393,6 +393,13 @@ prueba de cupo). Dos rondas: `resultados/fase-c-apodos-regresion.md` (la 29) y
 **Conclusión vigente:** sin cambios: las garantías se sostienen con la IA real; la falla de la 23 es
 una pregunta de diseño (qué hace Leda con un archivo para una tarea que espera cambios).
 
+**Las 48 y 49, por primera vez con la IA real** (`resultados/fase-c-48-49.md`, código de
+`65086af`). La 49 (la administración retira una pieza de una entrega): garantías y comprensión 5 de
+5, con los dos arreglos de honestidad que encontró en seco (quién retiró la pieza y la fecha de la
+entrega). La 48 (el sector se queda sin encargado): pasos 1 a 9 bien; en el paso 10, "pediselo
+igual a martin", 4 de 5 leídos como un pedido fuera de la lista, que avisa al administrador (una
+pregunta para el usuario).
+
 ## Los arreglos de las 30 a 45, controlados con la IA real (Fase C, 2026-10-10, de noche)
 
 Sol por la suscripción, 5 veces. Dos rondas: `resultados/fase-c-arreglos.md` (32, 34, 39, 43 y 45,
