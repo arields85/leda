@@ -168,6 +168,8 @@ pasos 19 a 23 cambiaron con la corrección de la C-7 (decisiones 39 y 53, 2026-1
     - Efecto: ninguno: el pase ya terminó y la del PLC sigue con Marcos.
     - La respuesta dice: que ya no tiene nada que contestar.
     - La respuesta no dice: que la tarea pasó a Lucas; que lo anotó.
+    - **O bien** (decisión 71, la otra lectura válida): la IA no elige ninguna jugada. Leda le dice
+      lo mismo y nada cambia.
 
 ### El encargado se queda él mismo con una tarea de Nahuel (decisión 53)
 

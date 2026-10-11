@@ -363,6 +363,17 @@ def test_la_35_por_la_otra_lectura_le_manda_a_marcos_un_solo_mensaje(conn):
     assert a_marcos.tipos == ["lo_que_dijo_quien_destraba", "novedad_de_lo_que_espera"]
 
 
+@pytest.mark.parametrize(("numero", "paso"), [("36", 20), ("39", 20), ("48", 10)])
+def test_las_otras_lecturas_de_las_decisiones_69_y_71_llegan_al_mismo_lugar(conn, numero, paso):
+    """Decisión 69 (la 48, paso 10: el pedido leído como fuera de la lista) y 71 (la 36, paso 20:
+    la fecha sin "ya está"; la 39, paso 20: ninguna jugada para un pase cerrado): por la otra
+    lectura, la conversación entera pasa sin fallas."""
+    corrida = _por_la_otra_lectura(conn, numero, paso)
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    assert next(p for p in corrida.pasos if p.paso == paso).lectura == cp.O_BIEN
+
+
 def test_una_grabacion_repite_la_corrida(conn):
     [conv] = elegir(["01"])
     grabada = correr_conversacion(conn, conv, _perfecta(conv))

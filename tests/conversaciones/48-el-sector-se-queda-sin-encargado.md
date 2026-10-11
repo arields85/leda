@@ -108,6 +108,9 @@ Repite el comienzo de la 45.
       tiene a quién pedírselo. Si nombra lo del servidor (la pregunta anunciada en el paso 5 ya no
       sale), lo mismo que se le dijo a las 10:51.
     - La respuesta no dice: que le pregunta a Martín; nada de la administración o de la plataforma.
+    - **O bien** (decisión 69, la otra lectura válida): la IA lo lee como un pedido fuera de la
+      lista. Nahuel recibe la misma respuesta; la nota al administrador de un pedido fuera de la
+      lista es cierta. Nada se anota ni se le pregunta a Martín.
 
 ## Qué mide
 

@@ -720,20 +720,19 @@ def test_un_aviso_a_otra_persona_no_es_un_dato_distinto():
 # --- Por qué no coincide una jugada (la 38, paso 23, ronda `fase-c-apodos-regresion-b`) --------
 
 def test_la_falla_de_jugadas_dice_las_palabras_de_un_dato_libre_que_la_persona_no_dijo():
-    """La IA leyó "hacela vos nahuel que la conoces mejor" como `por_que: "nahuel la conoce
-    mejor"`: "conoce" no es una palabra de la persona (escribió "conoces"). La regla no cambia;
-    el informe tiene que decir por qué falló, porque lo esperado y lo real se ven iguales."""
+    """Lo esperado y lo real se ven iguales: el informe dice qué palabra del dato libre no
+    escribió la persona."""
     mensaje = "no, esa hacela vos nahuel que la conoces mejor"
     esperada = {"nombre": "contestar_el_pase", "tarea": "SEN", "acepta": False,
                 "puede_traer": ["por_que"]}
     real = {"nombre": "contestar_el_pase", "tarea": "SEN", "acepta": False,
-            "por_que": "nahuel la conoce mejor"}
+            "por_que": "nahuel la sabe mejor"}
 
     c = cp.Comprobacion()
     assert not cp.comprobar_jugadas(c, [esperada], [real], mensaje)
     [f] = c.fallas
     assert (f.clase, f.que) == (cp.COMPRENSION,
-                                "jugadas (palabras que la persona no dijo: por_que: conoce)")
+                                "jugadas (palabras que la persona no dijo: por_que: sabe)")
     # Con las palabras de la persona, coincide; y una falla de otra clase no agrega nada.
     assert cp.comprobar_jugadas(cp.Comprobacion(), [esperada],
                                 [{**real, "por_que": "nahuel la conoces mejor"}], mensaje)
@@ -741,3 +740,52 @@ def test_la_falla_de_jugadas_dice_las_palabras_de_un_dato_libre_que_la_persona_n
     cp.comprobar_jugadas(c, [esperada], [{**real, "acepta": True, "por_que": "la conoces"}],
                          mensaje)
     assert [f.que for f in c.fallas] == ["jugadas"]
+
+
+def test_un_dato_libre_puede_llevar_el_verbo_de_la_persona_en_otra_persona():
+    """Decisión 70 del usuario (2026-10-11; la 38, paso 23): la IA anota `por_que: "nahuel la
+    conoce mejor"` de "que la conoces mejor". Se compara la raíz de cada palabra, no su forma
+    exacta; una palabra que la persona no dijo sigue fallando."""
+    mensaje = "no, esa hacela vos nahuel que la conoces mejor"
+    esperada = {"nombre": "contestar_el_pase", "tarea": "SEN", "acepta": False,
+                "puede_traer": ["por_que"]}
+
+    def real(por_que: str) -> dict:
+        return {"nombre": "contestar_el_pase", "tarea": "SEN", "acepta": False,
+                "por_que": por_que}
+
+    assert cp.jugada_coincide(esperada, real("nahuel la conoce mejor"), mensaje)
+    assert cp.jugada_coincide(esperada, real("Nahuel la CONOCE mejor"), mensaje)
+    assert not cp.jugada_coincide(esperada, real("nahuel la sabe mejor"), mensaje)
+    assert not cp.jugada_coincide(esperada, real("nahuel la conoce mejor que nadie"), mensaje)
+    assert cp.palabras_no_dichas([esperada], [real("nahuel la conoce mejor")], mensaje) == ""
+
+
+def test_la_raiz_saca_solo_la_terminacion_y_deja_las_palabras_cortas():
+    assert cp.raiz("conoces") == cp.raiz("conoce") == "conoc"
+    assert cp.raiz("termino") == cp.raiz("terminas") == "termin"
+    assert cp.raiz("la") == "la" and cp.raiz("los") == "los"
+    assert cp.raiz("mejor") == "mejor"
+    assert cp.raiz("sabe") != cp.raiz("conoce")
+
+
+def test_un_nombre_se_compara_sin_mayusculas_ni_acentos():
+    """La 47, paso 7: la IA escribió "Mariano" y el YAML espera "mariano". Otro nombre sigue
+    siendo otro."""
+    esperada = {"nombre": "decir_quien_es", "quien_es": "mariano"}
+
+    assert cp.jugada_coincide(esperada, {"nombre": "decir_quien_es", "quien_es": "Mariano"},
+                              "mariano")
+    assert cp.jugada_coincide({"nombre": "decir_quien_es", "quien_es": "martin"},
+                              {"nombre": "decir_quien_es", "quien_es": "Martín"}, "martin")
+    assert cp.jugada_coincide(
+        {"nombre": "decir_quien_es", "apodo": "el chino", "quien_es": "marcos"},
+        {"nombre": "decir_quien_es", "apodo": "El Chino", "quien_es": "Marcos"},
+        "el chino es marcos")
+    assert not cp.jugada_coincide(esperada, {"nombre": "decir_quien_es", "quien_es": "Marcos"},
+                                  "mariano")
+    # Un dato que no nombra a nadie se sigue comparando igual que siempre.
+    assert not cp.jugada_coincide({"nombre": "anotar_prevision", "tarea": "PLC",
+                                   "fecha": "2026-10-30"},
+                                  {"nombre": "anotar_prevision", "tarea": "plc",
+                                   "fecha": "2026-10-30"}, "la termino el 30")

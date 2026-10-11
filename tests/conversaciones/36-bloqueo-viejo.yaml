@@ -347,6 +347,27 @@ pasos:
       - que Marcos se va a enterar
     no_dice:
       - que la tarea ya se destrabó
+    # La otra lectura válida (decisión 71): la IA anota la fecha sin `ya_esta`. Leda guarda la
+    # fecha y sus palabras, le avisa a Marcos y no da la tarea por destrabada, como en la
+    # principal; el paso 21 vale para las dos (lo que dijo Ismael lleva la fecha en las dos).
+    o_bien:
+      jugadas:
+        - {nombre: decir_cuando_destraba, tarea: PLC, para_cuando: "2026-11-05",
+           lo_que_dice: "ya esta, llega mañana"}
+      efectos:
+        dicen_quien_destraba: [{tarea: PLC, de: Ismael, para_cuando: "2026-11-05", ya_esta: false}]
+        avisos_guardados:
+          - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado,
+             hechos: {quien_destraba: Ismael Soschinski}}
+      hechos:
+        - {jugada: decir_cuando_destraba, resultado: anotado, tarea: PLC,
+           aviso_a_quien_esta_trabado: {a: Marcos Tarquini, llega: "~2026-11-04T10:40"}}
+      pregunta: null
+      dice:
+        - que quedó anotado
+        - que Marcos se va a enterar
+      no_dice:
+        - que la tarea ya se destrabó
 
   - paso: 21
     quien: Leda
@@ -354,7 +375,7 @@ pasos:
     salen:
       - {a: Marcos, tipo: lo_que_dijo_quien_destraba, tarea: PLC,
          hechos: {necesita_respuesta: false, quien_destraba: Ismael Soschinski,
-                  dice_quien_destraba: {ya_esta: true, para_cuando: "2026-11-05"}}}
+                  dice_quien_destraba: {para_cuando: "2026-11-05"}}}
       - {a: Ariel, tipo: repregunta, tarea: PLC,
          hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba, numero: 3,
                   avisa_que_va_a_escalar: ausente}}

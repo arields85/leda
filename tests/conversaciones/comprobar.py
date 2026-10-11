@@ -56,6 +56,17 @@ SERVICIO = "servicio"
 # 2026-10-05): uno inventado sigue siendo una falla.
 DATOS_LIBRES = frozenset({"motivo", "causa", "palabras", "quien", "a", "que_pide",
                           "comentario", "de", "como_la_nombra", "lo_que_dice", "por_que"})
+# Los datos que nombran a una persona o cómo le dicen: su valor se compara sin mayúsculas ni
+# acentos ("Mariano" es "mariano"; la 47, paso 7). Otro nombre sigue siendo otro.
+DATOS_DE_NOMBRE = frozenset({"quien_es", "apodo"})
+# Un dato libre puede llevar el verbo de la persona en otra persona (decisión 70 del usuario,
+# 2026-10-11; la 38, paso 23: "nahuel la conoce mejor" de "que la conoces mejor"): se compara la
+# raíz de cada palabra, sin la terminación de persona, número o género más común del castellano.
+# Una palabra que la persona no dijo sigue sin estar. Las terminaciones, de la más larga a la
+# más corta; la raíz que queda tiene al menos `_RAIZ_MINIMA` letras.
+_TERMINACIONES = ("amos", "emos", "imos", "ais", "eis", "as", "es", "os", "an", "en",
+                  "a", "e", "o", "s", "n")
+_RAIZ_MINIMA = 3
 FUERA_DE_LA_LISTA = "fuera_de_la_lista"
 ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
 # Un aviso cuya redacción falló y se reintenta (usuario, 2026-10-07): una falla del servicio de
@@ -388,6 +399,29 @@ def normalizar(valor: Any, titulos: dict[str, str]) -> Any:
 
 # --- Comparar ---------------------------------------------------------------------------------
 
+def raiz(palabra: str) -> str:
+    """La palabra (ya sin mayúsculas ni acentos) sin su terminación más común: "conoces" y
+    "conoce" son "conoc"; una palabra corta queda igual."""
+    for terminacion in _TERMINACIONES:
+        if palabra.endswith(terminacion) and len(palabra) - len(terminacion) >= _RAIZ_MINIMA:
+            return palabra[:-len(terminacion)]
+    return palabra
+
+
+def palabras_que_no_dijo(dato: str, mensaje: str, palabras) -> list[str]:
+    """Las palabras del dato cuya raíz no está entre las del mensaje (`raiz`), en su orden."""
+    dichas = {raiz(p) for p in palabras(mensaje)}
+    return [p for p in palabras(dato) if raiz(p) not in dichas]
+
+
+def _mismo_valor(clave: str, esperado: Any, real: Any, palabras) -> bool:
+    """Un dato estructurado contra lo esperado; uno que nombra a una persona, sin mayúsculas
+    ni acentos (`DATOS_DE_NOMBRE`)."""
+    if clave in DATOS_DE_NOMBRE and isinstance(esperado, str) and isinstance(real, str):
+        return palabras(esperado) == palabras(real)
+    return coincide(esperado, real)
+
+
 def coincide(esperado: Any, real: Any) -> bool:
     """Si lo real cumple lo esperado (ver el módulo: `presente`, `ausente`, `~prefijo`,
     subconjunto de un dict, lista elemento por elemento)."""
@@ -419,8 +453,9 @@ def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any],
 
     Los de `puede_traer` pueden venir o no, y sólo pueden ser datos que la ficha declara
     opcionales (un YAML no afloja más de lo que permite la ficha; si no, es un error del YAML).
-    Si vienen: uno libre, sólo con palabras de la persona (todas las del dato están en su
-    `mensaje`, sin importar mayúsculas ni acentos); uno estructurado con su valor en lo
+    Si vienen: uno libre, sólo con palabras de la persona (la raíz de cada palabra del dato
+    está en su `mensaje`, sin importar mayúsculas ni acentos ni la persona del verbo: decisión
+    70); uno estructurado con su valor en lo
     esperado, igual a ése (C-3d, D1: la tarea de `confirmar` puede faltar, pero si viene es la
     de la entrega)."""
     motor = motor or cargar_motor()
@@ -445,9 +480,9 @@ def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any],
                 continue
             if k in DATOS_LIBRES:
                 if (mensaje is not None and isinstance(r, str)
-                        and not set(palabras(r)) <= set(palabras(mensaje))):
+                        and palabras_que_no_dijo(r, mensaje, palabras)):
                     return False
-            elif e is not None and not coincide(e, r):
+            elif e is not None and not _mismo_valor(k, e, r, palabras):
                 return False
             continue
         e, r = datos_e.get(k), datos_r.get(k)
@@ -457,7 +492,7 @@ def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any],
         elif e is None:
             if r not in (None, False, ""):
                 return False
-        elif not coincide(e, r):
+        elif not _mismo_valor(k, e, r, palabras):
             return False
     return True
 
@@ -476,19 +511,18 @@ def comprobar_jugadas(c: Comprobacion, esperadas: list[dict], reales: list[dict]
 def palabras_no_dichas(esperadas: list[dict], reales: list[dict], mensaje: str | None, *,
                        motor: Motor | None = None) -> str:
     """Por qué una jugada no coincide cuando lo esperado y lo real se ven iguales: las palabras
-    de un dato libre que la persona no escribió (la regla de `jugada_coincide`; la 38, paso 23,
-    `por_que: "nahuel la conoce mejor"` de "que la conoces mejor"). Vacío si no hay ninguna."""
+    de un dato libre que la persona no escribió, comparadas por su raíz como en
+    `jugada_coincide`. Vacío si no hay ninguna."""
     if not mensaje:
         return ""
     palabras = (motor or cargar_motor()).palabras
-    dichas = set(palabras(mensaje))
     partes = []
     for e, r in zip(esperadas, reales):
         if e.get("nombre") != r.get("nombre"):
             continue
         for k in sorted(DATOS_LIBRES & set(r)):
             if isinstance(r[k], str) and r[k]:
-                faltan = [p for p in palabras(r[k]) if p not in dichas]
+                faltan = palabras_que_no_dijo(r[k], mensaje, palabras)
                 if faltan:
                     partes.append(f"{k}: {', '.join(faltan)}")
     return "; ".join(partes)

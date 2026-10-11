@@ -453,6 +453,23 @@ pasos:
     no_dice:
       - que la del PLC pasó a Lucas
       - que lo anotó
+    # La otra lectura válida (decisión 71): la IA no elige ninguna jugada para un pase que ya
+    # terminó. Leda le dice lo mismo y nada cambia.
+    o_bien:
+      jugadas: []
+      efectos: {}
+      hechos: []
+      pregunta: null
+      botones: []
+      estado_despues:
+        de: Martin
+        pregunta_abierta: null
+        responsables: {PLC: Marcos}
+      dice:
+        - que ya no tiene nada que contestar
+      no_dice:
+        - que la del PLC pasó a Lucas
+        - que lo anotó
 
   # --- El encargado se queda él mismo con una tarea de Nahuel (decisión 53) -----------------------
   - paso: 21

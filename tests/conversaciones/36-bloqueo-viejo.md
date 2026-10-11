@@ -183,6 +183,8 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
       abierto y la tarea, trabada: lo da por destrabado Marcos.
     - La respuesta dice: que quedó anotado; que Marcos se va a enterar.
     - La respuesta no dice: que la tarea ya se destrabó.
+    - **O bien** (decisión 71, la otra lectura válida): la IA anota la fecha y sus palabras sin
+      "ya está". Leda guarda lo mismo, le avisa a Marcos igual y no da la tarea por destrabada.
 
 21. **Leda**, por su cuenta, a Marcos (miércoles 4, 10:40): lo que dijo Ismael.
     →

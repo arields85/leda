@@ -405,7 +405,13 @@ dato viene, uno libre (un comentario, un motivo) tiene que ser palabras de la pe
 estructurado con su valor en lo esperado (`{nombre: confirmar, tarea: COM, puede_traer: [tarea]}`)
 tiene que ser ése. No es una regla para todos los opcionales: un motivo o un comentario que la
 persona no dio como tal sigue siendo una falla donde el YAML no lo permite (la 08: "no llegó al 30"
-guardado como motivo le llegaría a Ismael).
+guardado como motivo le llegaría a Ismael). Las palabras de un dato libre se comparan por su raíz,
+sin mayúsculas ni acentos (`comprobar.raiz`; decisión 70, la 38, paso 23): "nahuel la conoce
+mejor" de "que la conoces mejor" vale, porque la IA puede poner el verbo de la persona en otra
+persona; una palabra que la persona no dijo sigue fallando, y la falla la nombra.
+
+**Un nombre** (`quien_es`, `apodo`; la 47, paso 7): se compara sin mayúsculas ni acentos
+(`comprobar.DATOS_DE_NOMBRE`): "Mariano" es "mariano"; otro nombre sigue siendo otro.
 
 **La persecución del bloqueo** (porción 1 de la C-5): el estado inicial puede nombrar a las personas
 sin un chat con Leda (`sin_telegram`, como en el pack las que tienen su Telegram `PENDIENTE`), y los
@@ -466,6 +472,13 @@ siempre la principal, así la corrida en seco no cambia; el informe muestra los 
 corrieron, y la estimación de llamadas cuenta sólo la principal.
 
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
+
+Los pasos con otra lectura válida, cada uno por una decisión del usuario: la 23, paso 12 (el
+archivo para una tarea que espera cambios, decisión 68); la 34, paso 7 (el "ni idea", decisión
+63); la 35, paso 4 (lo que dice de más quien destraba, decisión 72: los avisos a Marcos salen en
+un mensaje por cualquiera de las dos); la 36, paso 20 (la fecha sin "ya está", decisión 71); la
+39, paso 20 (ninguna jugada para un pase cerrado, decisión 71); y la 48, paso 10 (el pedido como
+fuera de la lista, decisión 69). Las corre por la otra lectura `test_corredor.py`.
 
 ## Formato de cada conversación
 
