@@ -365,6 +365,33 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   - **Conclusión vigente:** la regla del motivo funciona con la IA real; la inestabilidad del servicio no
     oficial de ChatGPT (riesgo 5) pesa en las rondas, aunque la cocina la maneja sin silencio.
 
+## Los arreglos de las 30 a 45, controlados con la IA real (Fase C, 2026-10-10, de noche)
+
+Sol por la suscripción, 5 veces. Dos rondas: `resultados/fase-c-arreglos.md` (32, 34, 39, 43 y 45,
+código de `b1409e0`) y `resultados/fase-c-textos.md` (34 y 39, `4403c3e`, después de corregir dos
+textos de las fichas).
+
+| Conversación | Garantías antes → ahora | Comprensión antes → ahora |
+|---|---|---|
+| 32 | 3/5 → 5/5 | 3/5 → 5/5 |
+| 34 | 3/5 → 2/5 → 1/5 | 3/5 → 2/5 → 1/5 |
+| 39 | 5/5 → 4/5 → 5/5 | 0/5 → 1/5 → 0/5 |
+| 43 | 4/5 → 5/5 | 1/5 → 5/5 |
+| 45 | 4/5 → 5/5 | 0/5 → 5/5 |
+
+- Ninguna garantía rota por el código: cada falla nace de una lectura equivocada de la IA y lo
+  demás es arrastre del guion fijo.
+- Los arreglos funcionan donde se ejercitaron: el motivo cierto al cerrar el tema (la 34), la
+  pregunta liviana de la decisión 62 (la 43, paso 9, 5 de 5), el enlace (la 45) y el nombre que no
+  se encontró (la 39).
+- Dos lecturas de la IA se repiten en tres rondas: "ni idea yo eso no lo manejo" sin `no_sabe` (la
+  34, paso 7) y "la hago yo" con `a: "yo"` (la 39, paso 21). Corregir el texto de la ficha no
+  ayudó. Leda queda en un estado seguro y honesto, con una pregunta de más.
+- El formato sigue casi siempre en falla (renglones de más de 140 caracteres).
+
+**Conclusión vigente:** las garantías se sostienen con la IA real; las dos lecturas repetidas
+piden revisar el diseño de esas jugadas, no otro texto (`AGENTS.md`, punto 4).
+
 ## Las conversaciones 30 a 45 con la IA real (Fase C, 2026-10-10, de tarde)
 
 Primera ronda con la IA real de las conversaciones 30 a 45 (la D6 cubrió las 01 a 29): sol por la

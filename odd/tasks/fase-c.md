@@ -3729,6 +3729,35 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           de 5 veces. El servicio informa el cupo en las cabeceras de cada respuesta
           (`x-codex-primary-used-percent`, ventana de 300 minutos, y `secondary`, semanal); base de
           la prueba de cupo.
+  - [x] **Los arreglos de la ronda y su control con la IA real** (2026-10-10, de noche).
+        - **Construido y revisado:** el enlace ignora "tarea" y "subtarea" (`b9081e1`); el pase y
+          la aprobación dicen qué nombre no encontraron (`8c1db94`, `8ea5a13`); el día de quien
+          destraba con el tema cerrado (`62e4d7d`); la decisión 61 (`299f172`); la decisión 62 y
+          dos casos de borde de la 61: el aviso equivocado que falló reabre la pregunta y una
+          repetición salteada no corta la que se reabre (`05951e5`, `b1409e0`). Revisiones
+          `review-77f1a4506f956083`, `review-f0ff9a58a2a07c1d` y `review-35d2f79e86ef8c6b`
+          (aprobadas; advertencias: `persecucion.py:1833-1834`, `escalera.py:577-580`, que no
+          aplica porque `bloqueo_abierto` sólo omite recordatorios de la tarea, y la oferta de
+          la 62 se registra sin mirar si el aviso salió, `avisos.py:785-789`).
+        - **Ronda de control** (`resultados/fase-c-arreglos.md`, 32, 34, 39, 43 y 45, 5 veces,
+          `b1409e0`): garantías 21 de 25 y todo bien 2. Las cuatro garantías en falla nacen de
+          una lectura equivocada de la IA y el resto es arrastre; ningún defecto de Leda que
+          rompa una garantía. Antes y después: la 32, 3 → 5 de 5; la 43, comprensión 1 → 5 de 5
+          (la 62); la 45, comprensión 0 → 5 de 5 (el enlace); la 34, igual; la 39, parecida.
+          La decisión 61 no la ejercita ninguna conversación (sólo los tests de unidad).
+        - **Un defecto de Leda sin garantía rota:** la lista de lo que puede hacer
+          (`fuera_de_la_lista`) decía que sólo se pasan tareas propias, y la IA le dijo a Marcos
+          que no podía pasar la de Nahuel (falso: es el encargado, decisión 27). Arreglado en
+          `1b0e179` con el texto del `hace` de `decir_que_no_le_toca`, que estaba atrasado
+          respecto de la decisión 51 (revisión `review-09bdc8f9a22756dd`, aprobada).
+        - **Ronda corta de los textos** (`resultados/fase-c-textos.md`, 34 y 39, 5 veces,
+          `4403c3e`): garantías 6 de 10. La 39, paso 1, bien 5 de 5. Dos lecturas de la IA
+          que se repiten en tres rondas (disparador del punto 4: no se propone otro arreglo de
+          texto): "ni idea yo eso no lo manejo" sin `no_sabe` (la 34, paso 7: 2, 3 y 4 de 5;
+          Leda pregunta "¿Sabés quién se encarga?" y el guion sigue como si no) y "la hago yo"
+          con `a: "yo"` (la 39, paso 21: 1, 1 y 3 de 5; Leda contesta que "yo" no figura).
+          En los dos casos Leda queda en un estado seguro y honesto; el costo es una pregunta
+          de más. Se discute el diseño con el usuario.
 - [ ] La plataforma: su ADR, con el usuario.
 
 **Preguntas juntadas para el usuario: contestadas todas** (2026-10-09, a la mañana, de a una y
