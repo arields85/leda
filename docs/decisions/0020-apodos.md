@@ -1,8 +1,9 @@
 # ADR 0020: Los apodos
 
-- **Estado:** propuesto. Las tres decisiones de fondo son del usuario (2026-10-11): Leda aprende los
-  apodos por chat, ante un apodo de dos personas pregunta con nombre y apellido, y la plataforma los
-  muestra y deja agregarlos o cambiarlos sin que Leda deje de aprenderlos por chat.
+- **Estado:** aceptado por el usuario (2026-10-11). Las decisiones de fondo son suyas: Leda aprende
+  los apodos por chat, una persona puede tener varios, ante un apodo de dos personas pregunta con
+  nombre y apellido, y la plataforma los muestra y deja agregarlos o cambiarlos sin que Leda deje de
+  aprenderlos por chat.
 - **Fecha:** 2026-10-11.
 - **Reemplaza:** el punto 5 del [ADR 0005](0005-interpretacion-y-confirmacion.md) ("Los apodos se
   aprenden preguntando"), escrito para los flujos congelados.
@@ -27,23 +28,25 @@ cargada a mano envejece (ADR 0005): la gente cambia de apodo y nadie la mantiene
    Gimenez?". Con el sí, el apodo queda registrado para esa persona y la jugada sigue como si la
    hubieran nombrado por su nombre. La confirmación es de una persona, nunca de la IA (constitución
    §5).
-2. **Un apodo de dos personas se aclara con nombre y apellido.** Si un apodo aprendido corresponde a
+2. **Una persona puede tener varios apodos.** Uno le dice "el Chino" y otro "el Gordo", y los dos son
+   Nahuel: Leda aprende cada uno cuando aparece, sin reemplazar los que ya sabía.
+3. **Un apodo de dos personas se aclara con nombre y apellido.** Si un apodo aprendido corresponde a
    dos personas, o coincide con el nombre de otra, Leda pregunta con el nombre y apellido de cada
    una: "¿«Juan» es Juan Pérez o Juan Gómez?". Nunca elige por su cuenta.
-3. **La plataforma los muestra y los deja cambiar.** La plataforma web muestra los apodos que Leda
+4. **La plataforma los muestra y los deja cambiar.** La plataforma web muestra los apodos que Leda
    fue aprendiendo, con quién lo enseñó y cuándo, y deja agregarlos, cambiarlos y borrarlos. Por
    chat Leda sigue aprendiéndolos y corrigiéndolos: "el Tano no es Nahuel, es Lucas" cambia el
    apodo, también con confirmación.
-4. **El apodo sirve para entender, nunca para hablar.** Leda reconoce a alguien por su apodo, pero
+5. **El apodo sirve para entender, nunca para hablar.** Leda reconoce a alguien por su apodo, pero
    siempre lo nombra por su nombre: en la confirmación, en los avisos y en el grupo. Un apodo puede
    ser burlón o íntimo y no le corresponde a Leda usarlo (constitución §8).
-5. **El apodo es del espacio.** Lo que enseñó una persona lo entiende Leda con todo el equipo de ese
+6. **El apodo es del espacio.** Lo que enseñó una persona lo entiende Leda con todo el equipo de ese
    espacio, y nunca en otro (constitución §13): el aislamiento se garantiza en la base, como el
    resto.
-6. **No concede nada.** Un apodo no da identidad, autoridad ni permisos: sólo dice a qué integrante
+7. **No concede nada.** Un apodo no da identidad, autoridad ni permisos: sólo dice a qué integrante
    se refiere un nombre. Quién puede pedir qué lo sigue decidiendo el código con la persona ya
    reconocida.
-7. **Todo queda auditado.** Cada apodo aprendido, cambiado o borrado deja su fila en `audit_log`, con
+8. **Todo queda auditado.** Cada apodo aprendido, cambiado o borrado deja su fila en `audit_log`, con
    quién lo enseñó o lo cambió, cuándo y por qué canal (chat o plataforma).
 
 ## Por qué
@@ -69,7 +72,7 @@ cargada a mano envejece (ADR 0005): la gente cambia de apodo y nadie la mantiene
 ## Consecuencias
 
 - **Una tabla nueva** de apodos del espacio (`workspace_id`, integrante, apodo, quién lo enseñó y
-  cuándo), con `row level security` forzado y su migración con rollback y ensayo de paridad.
+  cuándo; varias filas por integrante, un apodo puede repetirse entre integrantes), con `row level security` forzado y su migración con rollback y ensayo de paridad.
 - **Es aprendizaje persistente, acotado.** El ADR 0018 (decisión 3) reserva la memoria por integrante
   para su propio ADR; este cubre sólo los apodos, como antes el ADR 0005. Cualquier otro aprendizaje
   sigue fuera.
