@@ -577,7 +577,7 @@ importa es el significado:
   Leda se lo pasa a la otra persona (conversaciones 33 y 43).
 - `pedirselo_y_contar`: la persona trabada se lo pide ella misma a quien destraba; Leda no le escribe
   a nadie y al día hábil siguiente le pregunta cómo le fue (conversación 43).
-- `pedir_reasignacion`: la persona pide pasarle una tarea suya a otra persona; Leda muestra la vista
+- `pedir_reasignacion`: la persona pide pasarle una tarea suya (o el encargado, una de su sector) a otra persona; Leda muestra la vista
   previa del pase para confirmar, o dice por qué no se puede y, si es de otro sector, quién lo decide
   (conversaciones 12, 19 y 38). Hasta la C-7, Leda decía que no se hacía por chat (P16, más abajo).
 - `contestar_el_pase`: quien decide un pase dice si lo aprueba, y quien recibe la tarea dice si la toma

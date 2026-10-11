@@ -1707,8 +1707,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           necesita=(), opcional=("tarea", "quien", "no_sabe", "lo_que_dice"),
           comprueba="que quien escribe sea quien destraba ahora un bloqueo abierto de esa tarea",
           hace="anota que no le corresponde y, si lo dice, quién se encarga, atribuido y "
-               "auditado; si es la primera persona de la cadena y no dice de quién es, no anota "
-               "nada todavía: pregunta una vez quién se encarga",
+               "auditado; si no dice de quién es ni que no sabe, y la cadena todavía tiene "
+               "lugar, no anota nada todavía: pregunta una vez quién se encarga",
           despues="cierra su pregunta y su espera; con un integrante nombrado por la primera, "
                   "Leda le escribe a esa persona; si no, le informa la cadena entera al "
                   "referente, sin pedirle nada; la persona trabada se entera, como información",
@@ -1766,7 +1766,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "tarea y que después le cuenta a Leda: quien es a quién se lo pide, como lo "
              "nombró, si lo dice. Pedir que Leda no le escriba porque ya lo hablaron es otra "
              "jugada."),
-    Ficha("pedir_reasignacion", "pasarle una tarea suya a otra persona del equipo",
+    Ficha("pedir_reasignacion", "pasarle una tarea suya, o una de su sector si es el "
+                                "encargado, a otra persona del equipo",
           necesita=(), opcional=("tarea", "a", "como_la_nombra"),
           comprueba="que sea el responsable o, si nombra una que no está en su lista, el "
                     "encargado del sector de quien la tiene (decisión 27), que la tarea esté "
