@@ -3821,6 +3821,31 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         2. **Corregir un apodo que ya tiene dueño** (conversación 47, "Por decidir"): si "el flaco"
            es Martín y alguien dice "no, el flaco es Marcos", ¿Leda lo cambia o pregunta si a los
            dos les dicen así? Propuesta: dos botones, "A los dos" y "Sólo a Marcos Tarquini".
+        3. **Quién destraba con un nombre que no es nadie del equipo** (frena la tercera porción de
+           los apodos y la conversación 47): hoy "me lo pasa el proveedor" o "pedro de compras"
+           queda anotado como alguien de afuera, sin preguntar. Con los apodos, ¿Leda pregunta
+           siempre "¿quién es?" (A: el ADR al pie de la letra; las 25 y 30 suman un paso de
+           respuesta, "no es del equipo") o la IA marca `de_afuera` cuando la persona dijo
+           claramente que es de afuera, y sólo si no lo dijo Leda pregunta (B: más fluido, pero
+           la IA juzga quién es de afuera)? El escritor recomienda B.
+  - [ ] **Los apodos (ADR 0020), en construcción** (escritor único, delegado; 2+ archivos no
+        triviales). Hechas dos de tres porciones:
+        - `bbe40de`: la tabla `apodo` (migración `0055`, con rollback, RLS forzado,
+          sin borrado: sólo se retira; cada apodo aprendido deja su fila en `audit_log`) y el
+          reconocimiento en `fichas.integrantes_que_coinciden` (la unión de nombres y apodos, con
+          la misma normalización de palabras). Rojo: `tests/motor/test_apodos.py`, 5 de 15.
+        - `1c9f8fe`: "¿quién es?" en `pase.pedir` (campo `a`) y en la aprobación (campo `de`):
+          Leda pregunta, guarda el pedido, confirma con nombre y apellido (botón y "sí" escrito
+          iguales), aprende el apodo y hace lo pedido; un apodo de dos personas, un botón por
+          persona. Rojo: `tests/motor/test_quien_es.py`, 15 de 15.
+        - Verificación del escritor (en serie): `tests/motor` 1237, `tests/garantias` 472,
+          `tests/conversaciones` 166 passed; en seco, 45 de 45. Correr las suites en paralelo las
+          rompe entre sí.
+        - **Retenida, sin aplicar** (`porcion3-quien-destraba.patch`, en el scratchpad de la
+          sesión del 2026-10-11): "¿quién es?" en quién destraba y en "no me toca, es de X", la
+          47 en YAML (pasa en seco) y su `.md`. Espera la pregunta 3. Cambios del diseño de la 47
+          a contarle al usuario: el paso 1 anota el bloqueo con su causa y deja pendiente sólo
+          quién destraba; los botones del paso 11 salen por orden alfabético.
 - [ ] La plataforma: su ADR, con el usuario.
 
 **Preguntas juntadas para el usuario: contestadas todas** (2026-10-09, a la mañana, de a una y
