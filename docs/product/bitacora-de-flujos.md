@@ -365,6 +365,34 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   - **Conclusión vigente:** la regla del motivo funciona con la IA real; la inestabilidad del servicio no
     oficial de ChatGPT (riesgo 5) pesa en las rondas, aunque la cocina la maneja sin silencio.
 
+## Los apodos sin romper el pase ni la aprobación, con la IA real (Fase C, 2026-10-11, de madrugada)
+
+Sol por la suscripción, 5 veces, código de `bb862e4` (los apodos en el pase y la aprobación, y la
+prueba de cupo). Dos rondas: `resultados/fase-c-apodos-regresion.md` (la 29) y
+`resultados/fase-c-apodos-regresion-b.md` (23, 38 y 39).
+
+| Conversación | Garantías | Comprensión | Lo que falló |
+|---|---|---|---|
+| 29 | 5/5 | 5/5 | nada |
+| 38 | 5/5 | 4/5 | una vez, la jugada con `por_que` permitido (a revisar en el corredor) |
+| 39 | 5/5 | 1/5 | sólo el paso 20, el YAML estricto conocido; "la hago yo", bien 5 de 5 |
+| 23 | 1/5 | 1/5 | el paso 12, nuevo desde el 10-08 (decisión 23), en su primera ronda real |
+
+- **Los apodos no rompieron nada:** ningún "¿quién es?" de más en el pase ni en la aprobación.
+- **La 23, paso 12:** Mariano manda "ahi va el diagrama del tablero" con una foto, después de un
+  pedido de cambios. En 4 de 5 la IA no lo leyó como una entrega sino como un archivo para cuando
+  entregue (`guardar_para_la_entrega`), y Leda contestó "Dejé la foto para cuando vuelvas a
+  entregar la tarea. Todavía no forma parte de la entrega." La garantía que falla es ese archivo
+  guardado (un efecto que el guion no esperaba), no un cambio de estado: la tarea sigue esperando
+  los cambios. Es honesto, pero deja a Mariano sin el paso obvio (entregarla con eso). Se lleva al
+  usuario como pregunta de diseño, no se arregla con texto.
+- **El cupo:** 50 llamadas gastaron el 4 % de la ventana de 5 horas; las 15 corridas de 23, 38 y 39,
+  el 52 %. Una ronda completa de las 29 no entra en una ventana.
+- El formato sigue en falla casi siempre (renglones de más de 140 caracteres).
+
+**Conclusión vigente:** sin cambios: las garantías se sostienen con la IA real; la falla de la 23 es
+una pregunta de diseño (qué hace Leda con un archivo para una tarea que espera cambios).
+
 ## Los arreglos de las 30 a 45, controlados con la IA real (Fase C, 2026-10-10, de noche)
 
 Sol por la suscripción, 5 veces. Dos rondas: `resultados/fase-c-arreglos.md` (32, 34, 39, 43 y 45,

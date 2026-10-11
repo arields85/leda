@@ -3828,6 +3828,26 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
            respuesta, "no es del equipo") o la IA marca `de_afuera` cuando la persona dijo
            claramente que es de afuera, y sólo si no lo dijo Leda pregunta (B: más fluido, pero
            la IA juzga quién es de afuera)? El escritor recomienda B.
+        4. **Un archivo para una tarea que espera cambios** (la 23, paso 12, primera ronda real):
+           Mariano manda "ahi va el diagrama del tablero" con una foto después de que le pidieron
+           cambios. En 4 de 5 Leda lo guarda "para cuando vuelvas a entregar la tarea" y no le
+           ofrece entregarla. Propuesta: guardarlo y ofrecer en la misma respuesta "¿La volvés a
+           entregar con esto?" con Confirmar (la persona elige; nada cambia sin su sí). La otra
+           salida es aceptar las dos lecturas en la prueba y no cambiar nada.
+  - [x] **La prueba de cupo** (`bb862e4`, escritor delegado): `python -m leda chatgpt cupo` lee
+        las cabeceras `x-codex-primary-*` (ventana de 5 horas) y `x-codex-secondary-*` (7 días);
+        el corredor lo mira antes de una ronda por la suscripción (sale con 4 si una ventana está
+        al 100 %), lo imprime al terminar con el último visto y lo anota en el informe. Rojo: 23
+        pruebas nuevas; verde: `tests/motor/test_chatgpt.py tests/conversaciones` 236 passed,
+        `tests/motor` 1252 passed, en seco 45 de 45. Revisión `review-3bdddee415d2725f`,
+        aprobada; advertencia: el cupo de una respuesta cuyo stream se corta no se guarda
+        (`chatgpt.py:852-856`). Medido: 50 llamadas, 4 % de la ventana corta.
+  - [x] **`docs/capacidades.md` al día** (`7d20bb2`): la sección de la Fase C, 31 filas.
+  - [x] **Ronda de control de los apodos** (bitácora, 2026-10-11): 29 5/5; 38 garantías 5/5;
+        39 garantías 5/5 (sólo el paso 20 conocido); 23 garantías 1/5 por el paso 12 (pregunta
+        4). En la 38, vez 4, la jugada falla con `por_que`, que el paso permite: revisar el
+        corredor. Atención: `--conversacion` toma varios números después de una sola bandera
+        (`--conversacion 38 39 23`); repetida, vale sólo la última.
   - [ ] **Los apodos (ADR 0020), en construcción** (escritor único, delegado; 2+ archivos no
         triviales). Hechas dos de tres porciones:
         - `bbe40de`: la tabla `apodo` (migración `0055`, con rollback, RLS forzado,
