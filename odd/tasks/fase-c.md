@@ -529,6 +529,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     pedir la lista directamente (como la 64). Por construir, con su prueba, cuando termine el
     escritor de los apodos.
 
+67. **Corregir un apodo que ya tiene dueño: Leda pregunta** (pregunta 2, conversación 47 "Por
+    decidir"; usuario, 2026-10-11, "vamos con preguntar, como sugeris"). Si "el flaco" es Martín
+    y Nahuel dice "no, el flaco es Marcos", Leda pregunta si a los dos les dicen así, con dos
+    botones: "A los dos" (desde entonces "el flaco" da la duda con botones, como dos nombres
+    iguales) y "Sólo a Marcos Tarquini" (se retira el apodo de Martín, con quién y cuándo, y se
+    le enseña a Marcos). Nunca se cambia sin preguntar. Por construir, con su prueba y su paso
+    en la 47, cuando termine el escritor de los apodos.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3837,7 +3845,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
            contestar todavía: hoy cuenta como que Leda le sigue preguntando y "se lo pido yo" le
            cierra el tema (decisión 37). ¿Vale lo mismo que la 64 (su compromiso sigue y Leda le
            sigue preguntando) o la 37?
-        2. **Corregir un apodo que ya tiene dueño** (conversación 47, "Por decidir"): si "el flaco"
+        2. **Contestada: decisión 67, preguntar.** **Corregir un apodo que ya tiene dueño** (conversación 47, "Por decidir"): si "el flaco"
            es Martín y alguien dice "no, el flaco es Marcos", ¿Leda lo cambia o pregunta si a los
            dos les dicen así? Propuesta: dos botones, "A los dos" y "Sólo a Marcos Tarquini".
         3. **Contestada: decisión 65, opción A.** **Quién destraba con un nombre que no es nadie del equipo** (frena la tercera porción de
