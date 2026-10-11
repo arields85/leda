@@ -3631,6 +3631,32 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           una tarea (Leda no le puede preguntar si la toma), ni a alguien de Electricidad, que
           decide Mariano. ¿Está bien, o se puede decidir por la plataforma?
 
+## Próximo paso (2026-10-11, tarde)
+
+Vigente; lo de abajo ("cierre del 2026-10-10") es el registro de lo anterior.
+
+**Hecho el 2026-10-11** (cada commit de código, revisado por RDD y aprobado):
+- [x] Decisiones 65 a 73 del usuario, construidas: 65 y la tercera porción de los apodos
+      (`ce0cf04`); 66 (`9d28a4c`); 67 (`e932186`, `7d0cbcd`); 68 y 73 (`6789e4c`, `4bec127`); 69 a
+      71, el corredor (`fcb8c17`); 72 (`6886ea8`). Detalle en cada decisión.
+- [x] El orden de las jugadas de un mensaje (`f0d18e6`; ADR 0018, 9m.1, precisado en `8e64719`).
+- [x] Rondas con la IA real: los apodos (`87ee579`), las decisiones 66 a 73 (`088a0ab`: garantías
+      35 de 35) y el orden de las jugadas (`88e56a1`: la 35, 5 de 5). Bitácora de flujos.
+- [x] Suites sobre `f0d18e6`: motor 1302, garantías 475, conversaciones 194; en seco, 48 de 48.
+
+**Lo que queda:**
+- [ ] **La prueba por Telegram** con `leda_motor` al día hasta la `0056` (respaldo previo;
+      autorizado; guion `docs/product/guion-telegram-fase-c-parte-1.md`). Necesita al usuario.
+- [ ] **La plataforma web:** su ADR, con el usuario.
+- [ ] **Formato:** unas 87 fallas en 35 corridas (renglones de más de 140 caracteres, dos
+      preguntas al cierre); la instrucción de la redacción dice sólo "renglones cortos".
+- [ ] **Una lectura de la IA:** la 35 paso 18 (1 de 5): "sigo parado con el tablero" queda como
+      texto y no como su tarea trabada, y a Nahuel no le llega la novedad posterior.
+- [ ] **Advertencias de las revisiones de hoy** (casos de borde y pruebas que faltan), anotadas
+      en cada decisión (66 a 73) y en la 72 (el orden de las jugadas).
+- [ ] **C-8, las ausencias:** para más adelante.
+- [ ] **Un sector sin encargado un rato:** para la plataforma (`docs/product/plataforma-pendientes.md`).
+
 ## Próximo paso (cierre del 2026-10-10, de madrugada)
 
 **Lista de tareas de la noche** (pedido del usuario: ver lo hecho y lo que falta):
@@ -3775,8 +3801,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 - [ ] Un sector sin encargado un rato (mientras se cambia uno por otro) termina los pedidos que
       esperaban: para la plataforma, cambiar de encargado es un solo paso, sin hueco
       (`docs/product/plataforma-pendientes.md`).
-- [ ] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
-      conversación de prueba y construcción.
+- [x] Los apodos: ADR 0020 (reemplaza la parte de apodos del ADR 0005), aceptación del usuario,
+      conversación de prueba y construcción. **Completos (2026-10-11):** tres porciones y la 67;
+      la 47 con la IA real, garantías y comprensión 5 de 5.
 - [x] Los avisos que a veces no salen a su hora: buscar la causa. **Hecho (2026-10-10).**
       Revisión RDD de `507b21e`: `review-853aff8cab407c36`, aprobada y sellada; control del
       coordinador: `test_comprobar.py`, 29 passed. Advertencias del corredor, conocidas y
@@ -3812,11 +3839,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         - `pytest -q tests/conversaciones`: **161 passed** (1 min 30 s).
         - En seco, `correr --ia guionada --veces 1 --sin-informe`: **45 de 45 bien** (garantías
           45 de 45).
-- [ ] La prueba de cupo antes de una ronda con la IA real.
-- [ ] Cierre de la Fase C: suite completa, `docs/capacidades.md` y limpieza.
+- [x] La prueba de cupo antes de una ronda con la IA real (`bb862e4`).
+- [x] Cierre de la Fase C: suite completa, `docs/capacidades.md` y limpieza (2026-10-11; los YAML
+      estrictos, decisiones 71 y 72; queda el formato y una lectura de la IA, abajo).
 - [ ] La tanda de pruebas: una ronda con la IA real sobre las conversaciones nuevas y cambiadas
       (lanzada por el coordinador en segundo plano) y la prueba por Telegram, con `leda_motor` al
-      día hasta la `0054` (respaldo previo).
+      día hasta la `0056` (respaldo previo). Las rondas con la IA real, hechas (2026-10-11); falta
+      la prueba por Telegram, con el usuario.
   - [x] **La ronda de las 30 a 45 con la IA real** (2026-10-10, de tarde; sol por la suscripción,
         5 veces, código de `39b21f1`). Primera vez con la IA real para las 30 a 45 (la D6 cubrió
         las 01 a 29). En dos partes: `resultados/fase-c-30-45.md` (30 a 38; cortada por cupo en la
@@ -3921,7 +3950,8 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         (`resultados/fase-c-decision-64.md`, la 42, 5 veces): garantías 5 de 5; la pregunta del día
         menciona a Marcos en las tres corridas en que salió; una dijo "Marcos te dijo" (se lo dijo a
         Leda): el significado del hecho lo aclara ahora.
-  - [ ] **Preguntas para el usuario (juntadas la noche del 2026-10-10 al 11):**
+  - [x] **Preguntas para el usuario (juntadas la noche del 2026-10-10 al 11):** todas contestadas
+        (decisiones 65 a 70) y construidas.
         1. **Contestada: decisión 66, como la 64.** **"Se lo pido yo" después de que la pregunta del día ya le llegó a quien destraba**, sin
            contestar todavía: hoy cuenta como que Leda le sigue preguntando y "se lo pido yo" le
            cierra el tema (decisión 37). ¿Vale lo mismo que la 64 (su compromiso sigue y Leda le
@@ -4004,7 +4034,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         4). En la 38, vez 4, la jugada falla con `por_que`, que el paso permite: revisar el
         corredor. Atención: `--conversacion` toma varios números después de una sola bandera
         (`--conversacion 38 39 23`); repetida, vale sólo la última.
-  - [ ] **Los apodos (ADR 0020), en construcción** (escritor único, delegado; 2+ archivos no
+  - [x] **Los apodos (ADR 0020), completos el 2026-10-11 (antes, en construcción)** (escritor único, delegado; 2+ archivos no
         triviales). Hechas dos de tres porciones:
         - `bbe40de`: la tabla `apodo` (migración `0055`, con rollback, RLS forzado,
           sin borrado: sólo se retira; cada apodo aprendido deja su fila en `audit_log`) y el

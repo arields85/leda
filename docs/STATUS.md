@@ -138,7 +138,7 @@ validador de invariantes. Destino de cada uno:
   `deteccion_pregunta`, `jev` y `local`) y la escalera, el reloj y el ciclo viejos.
 - **La auditoría vuelve a la cocina:** cada `herramientas.ejecutar` y cada efecto propio del motor deja su fila
   en `audit_log`, con `pack_hash` y `nucleo_hash`.
-- **Migraciones:** hasta `0025` en `main`, más `0030` a `0054` en la rama. La `0032` borra las tablas del alta.
+- **Migraciones:** hasta `0025` en `main`, más `0030` a `0056` en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   `PENDIENTE`: un ensayo de propiedad sobre un clúster limpio.
@@ -180,6 +180,10 @@ validador de invariantes. Destino de cada uno:
 | Rama del Motor, ídem | `correr --ia guionada --veces 1` (en seco) | 2026-10-10 | 45 de 45 bien |
 | Rama del Motor, con los apodos (dos porciones), el cupo y las 48 y 49 (`e4d4f3a`) | `pytest -q` (suite completa) | 2026-10-11 | 2350 passed (30 min) |
 | Rama del Motor, ídem (`65086af`) | `correr --ia guionada --veces 1` (en seco) | 2026-10-11 | 47 de 47 bien |
+| Rama del Motor, con las decisiones 65 a 73 y el orden de las jugadas (`f0d18e6`) | `pytest -q tests/motor` | 2026-10-11 | 1302 passed |
+| Rama del Motor, ídem | `pytest -q tests/garantias` | 2026-10-11 | 475 passed |
+| Rama del Motor, ídem | `pytest -q tests/conversaciones` | 2026-10-11 | 194 passed |
+| Rama del Motor, ídem | `correr --ia guionada --veces 1` (en seco) | 2026-10-11 | 48 de 48 bien |
 
 **Conversaciones con la IA real** (bitácora de flujos):
 - La ronda 3 de la prueba chica dio 85 de 85.
@@ -187,6 +191,8 @@ validador de invariantes. Destino de cada uno:
 - Con sol por la suscripción dio 90 de 90; con las palabras de todos los días, 94 de 95 y 95 de 95; con el
   formato de los mensajes, 100 de 100 (20 conversaciones); con el margen para corregir, 100 de 100 en las 01 a 20
   y la corrección de la 25 bien 5 de 5. El mensaje sin puntuación del usuario se lee mal 5 de 5.
+- Fase C, 2026-10-11: las siete conversaciones tocadas por las decisiones 66 a 73, garantías 35 de 35;
+  la 35 con el orden de las jugadas, garantías y comprensión 5 de 5.
 
 Las cifras de pruebas miden el código: **una suite en verde no es evidencia de que la conversación funcione**
 (`AGENTS.md`, punto 12).
