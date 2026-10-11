@@ -974,13 +974,21 @@ def palabras(texto: str) -> list[str]:
 
 def integrantes_que_coinciden(cur, dicho: str) -> list[dict[str, Any]]:
     """Los integrantes del espacio cuyo nombre tiene, como palabras enteras, todas las
-    palabras de lo dicho: "ismael" es Ismael Soschinski; "Mar" no es Marcos. Se compara
-    acá y no con un patrón de la base, así nada de lo dicho actúa como comodín."""
-    buscadas = palabras(dicho)
+    palabras de lo dicho: "ismael" es Ismael Soschinski; "Mar" no es Marcos. Y los que tienen un
+    apodo vigente con todas esas palabras, comparado igual: "Tano" es quien tiene el apodo "el
+    tano" (ADR 0020; `apodos.py`). Un apodo de dos personas, o uno que coincide con el nombre de
+    otra, son las dos (decisión 3: Leda no elige). Se compara acá y no con un patrón de la base,
+    así nada de lo dicho actúa como comodín. Cada integrante, una vez, por su nombre: el apodo
+    sirve para reconocerlo, nunca para nombrarlo (decisión 5)."""
+    buscadas = set(palabras(dicho))
     if not buscadas:
         return []
+    from . import apodos            # apodos importa este módulo
+    por_apodo = {str(a["membership_id"]) for a in apodos.vigentes(cur)
+                 if buscadas <= set(a["apodo"].split())}
     cur.execute("select membership_id, nombre from integrante where activo order by nombre")
-    return [f for f in cur.fetchall() if set(buscadas) <= set(palabras(f["nombre"]))]
+    return [f for f in cur.fetchall()
+            if buscadas <= set(palabras(f["nombre"])) or str(f["membership_id"]) in por_apodo]
 
 
 def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:

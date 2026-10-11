@@ -56,6 +56,10 @@ PROMESAS_SIN_CUMPLIR = {
         "Cuándo se importó una versión de paquete.",
     "importado_por":
         "Quién aprobó una versión de paquete.",
+    # Los apodos (migración 0055; ADR 0020, decisión 4): dejar de usar uno lo hace la plataforma
+    # web, que todavía no existe; el motor sólo lee los vigentes (`borrado_en`).
+    "borrado_por_app_user_id":
+        "Quién dejó de usar un apodo (la plataforma lo borra; ADR 0020, decisión 4).",
     # `admin_notice.destinatario_app_user_id` salió de esta lista con la migración 0054: la
     # respuesta del bot de administración la escribe (`despachador.encolar_respuesta_admin`,
     # a quien se le contesta).

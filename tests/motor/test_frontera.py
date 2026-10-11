@@ -102,7 +102,7 @@ BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 # `detalle.py`): los pedidos que esperan la decisión del encargado (`pedido_de_detalle`, sólo lee:
 # escribe la cocina; lo compartido lo lee sólo la base, `puede_ver_tarea`).
 TABLAS_PERMITIDAS = {
-    "absence", "app_user", "approval", "archivo", "archivo_de_mensaje", "archivo_de_tarea",
+    "absence", "apodo", "app_user", "approval", "archivo", "archivo_de_mensaje", "archivo_de_tarea",
     "area",
     "blocker", "blocker_unblocker", "cadence_job", "conversation_option",
     "conversation_question",

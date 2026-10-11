@@ -105,7 +105,10 @@ quién destraba, y no borra preguntas, opciones ni avisos guardados. El aviso pr
 es el ajuste `aviso_previo_dias_habiles` de `workspace_setting` (entero, mínimo 1). Un
 mensaje de Telegram que el motor recibe lleva `inbound_message.telegram_bot_id`, y el
 índice único `inbound_message_unico_por_mensaje` hace que una reentrega entre una sola
-vez.
+vez. Los apodos (`apodo`, migración 0055; ADR 0020): cómo le dicen en el equipo a un
+integrante, con las palabras normalizadas como el código compara los nombres, quién lo enseñó,
+cuándo y por qué canal (`chat` o `plataforma`); `leda_app` los aprende y los deja de usar,
+nunca los borra, y cada uno aprendido queda en `audit_log`.
 
 **Sistema** — `model_config`, `learning`, `incident`, `audit_log`,
 `conversation_access_log`.

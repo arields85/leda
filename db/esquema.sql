@@ -1639,6 +1639,34 @@ comment on table pedido_de_detalle is
 comment on table tarea_compartida is
   'El Motor (decisión 33 del usuario): una tarea compartida con alguien que no la veía, quién la compartió (el encargado del sector de la tarea) y cuándo. Cuenta para ver la página (puede_ver_tarea). Sólo se revoca, una vez; nunca se borra.';
 
+-- Los apodos (migración 0055; ADR 0020): cómo le dicen en el equipo a un integrante, con las
+-- palabras normalizadas como el código compara los nombres; quién lo enseñó, cuándo y por qué
+-- canal. Varios por persona; uno puede ser de dos personas. Se deja de usar, nunca se borra.
+create table apodo (
+  id                        uuid primary key default gen_random_uuid(),
+  workspace_id              uuid not null references workspace(id) on delete cascade,
+  membership_id             uuid not null,
+  apodo                     text not null,
+  ensenado_por_app_user_id  uuid not null references app_user(id),
+  canal                     text not null check (canal in ('chat', 'plataforma')),
+  at                        timestamptz not null,
+  borrado_en                timestamptz,
+  borrado_por_app_user_id   uuid references app_user(id),
+  constraint apodo_de_un_integrante
+    foreign key (workspace_id, membership_id) references membership(workspace_id, id)
+    on delete cascade,
+  -- Las palabras normalizadas, separadas por un solo espacio: nada que actúe como comodín.
+  constraint apodo_normalizado check (apodo ~ '^[^ ]+( [^ ]+)*$'),
+  constraint apodo_borrado check ((borrado_en is null) = (borrado_por_app_user_id is null))
+);
+
+-- Vigente, uno por persona y apodo; el mismo apodo puede ser de dos personas.
+create unique index apodo_vigente on apodo (workspace_id, membership_id, apodo)
+  where borrado_en is null;
+
+comment on table apodo is
+  'El Motor (ADR 0020): cómo le dicen en el equipo a un integrante, con las palabras normalizadas como el código compara los nombres; quién lo enseñó, cuándo y por qué canal (chat o plataforma). Sirve para entender, nunca para hablar ni para conceder nada. Sólo se deja de usar, una vez; nunca se borra.';
+
 comment on table task_forecast is
   'El Motor (ADR 0018, 9b y 9f): las previsiones de una tarea. Sólo se agregan; una corrección reemplaza a otra con una fila nueva. El atraso lo calcula el código en días hábiles del espacio.';
 comment on table blocker_unblocker is
@@ -2842,6 +2870,34 @@ create trigger trg_vigilar_tarea_compartida
   before insert or update on tarea_compartida
   for each row execute function vigilar_tarea_compartida();
 
+-- Un apodo nace vigente y lo único que cambia después es dejarlo de usar, una vez, con quién y
+-- cuándo (migración 0055).
+create or replace function vigilar_apodo() returns trigger as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.borrado_en is not null then
+      raise exception 'apodo: un apodo se aprende vigente';
+    end if;
+    return new;
+  end if;
+  if new.workspace_id is distinct from old.workspace_id
+     or new.membership_id is distinct from old.membership_id
+     or new.apodo is distinct from old.apodo
+     or new.ensenado_por_app_user_id is distinct from old.ensenado_por_app_user_id
+     or new.canal is distinct from old.canal
+     or new.at is distinct from old.at then
+    raise exception 'apodo: lo aprendido no cambia';
+  end if;
+  if old.borrado_en is not null and new is distinct from old then
+    raise exception 'apodo: ya se dejó de usar';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_vigilar_apodo
+  before insert or update on apodo
+  for each row execute function vigilar_apodo();
+
 -- Los archivos recibidos (migración 0033): quién lo mandó y el mensaje que lo trajo
 -- son del mismo espacio.
 create trigger trg_exigir_referencias_del_espacio
@@ -3522,7 +3578,7 @@ begin
     'archivo','archivo_de_mensaje','evidencia_retirada','archivo_de_tarea',
     'message_outbox_adjunto','acceso_tarea','vista_de_tarea','message_outbox_enlace',
     'dicho_de_quien_destraba','pase_de_tarea','cambio_de_responsable',
-    'pedido_de_detalle','tarea_compartida']
+    'pedido_de_detalle','tarea_compartida','apodo']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -3574,6 +3630,8 @@ revoke update, delete on cambio_de_responsable from leda_app;
 -- El detalle de una tarea (migración 0050): un pedido avanza y lo compartido se revoca; nada
 -- se borra.
 revoke delete on pedido_de_detalle, tarea_compartida from leda_app;
+-- Los apodos (migración 0055): se aprenden y se dejan de usar; nada se borra.
+revoke delete on apodo from leda_app;
 -- La página de la tarea (migración 0036): `leda_app` no tiene nada sobre los accesos ni las
 -- vistas, sólo `execute` sobre sus funciones; la marca del enlace en la salida, agregar y leer.
 revoke all on acceso_tarea, vista_de_tarea from public, leda_app;

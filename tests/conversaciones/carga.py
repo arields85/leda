@@ -33,7 +33,9 @@ lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Forma
 - **el grupo del espacio** (`grupo`), el identificador de su chat de Telegram, como
   `telegram.grupo_gestion_id` del pack: con una cadencia al grupo (`audiencia: grupo`), el espacio
   tiene informe al grupo (decisión 35; la 36), que sale a ese chat (decisión 25; la 41): lo que
-  Leda manda al grupo se espera con `a: grupo`.
+  Leda manda al grupo se espera con `a: grupo`;
+- **los apodos cargados por la plataforma** (`apodos`, cada uno con `apodo` y de quién es, `de`;
+  ADR 0020, decisión 4; la 47): enseñados por el administrador de plataforma y auditados.
 
 Lo que pasó antes en la conversación (avisos ya enviados, una pregunta ya contestada) no se
 escribe a mano: lo corre el motor mismo como **preludio** (`corredor.py`), así queda igual que
@@ -139,12 +141,43 @@ def cargar(conn, conversacion: dict[str, Any]) -> Mundo:
         _mandado_antes(cur, mundo, conversacion.get("mandado_antes") or [])
         _sin_telegram(cur, mundo, conversacion.get("sin_telegram") or [])
         _cadencias(cur, mundo, conversacion.get("cadencias") or [])
+        _apodos(cur, mundo, conversacion.get("apodos") or [], conversacion.get("inicio"))
         if conversacion.get("grupo") is not None:
             cur.execute("update workspace set grupo_chat_id = %s where id = %s",
                         (int(conversacion["grupo"]), mundo.workspace_id))
             mundo.grupo = int(conversacion["grupo"])
     conn.commit()
     return mundo
+
+
+def _apodos(cur, mundo: Mundo, apodos: list[dict[str, Any]], inicio: str | None) -> None:
+    """Los apodos que la conversación da por cargados por la plataforma (ADR 0020, decisión 4;
+    la 47): cada uno de una persona, con las palabras normalizadas como las compara el código,
+    enseñado por el administrador de plataforma por el canal `plataforma`, y auditado como lo
+    auditaría la plataforma."""
+    from leda.motor.apodos import PLATAFORMA, normalizar
+
+    if not apodos:
+        return
+    cur.execute("select id from app_user where telegram_user_id = %s", (TELEGRAM_ADMIN,))
+    administrador = str(cur.fetchone()["id"])
+    at = momento(inicio) if inicio else datetime.now(ZONA)
+    for a in apodos:
+        persona = mundo.personas[a["de"]]
+        cur.execute(
+            """insert into apodo (workspace_id, membership_id, apodo, ensenado_por_app_user_id,
+                                  canal, at)
+               values (%s, %s, %s, %s, %s, %s) returning id""",
+            (mundo.workspace_id, persona["membership_id"], normalizar(a["apodo"]),
+             administrador, PLATAFORMA, at))
+        apodo_id = str(cur.fetchone()["id"])
+        cur.execute(
+            """insert into audit_log (workspace_id, actor_app_user_id, actor_kind, accion,
+                                      sujeto_tipo, sujeto_id, detalle)
+               values (%s, %s, 'persona', 'aprender_apodo', 'apodo', %s, %s)""",
+            (mundo.workspace_id, administrador, apodo_id,
+             json.dumps({"membership_id": persona["membership_id"],
+                         "apodo": normalizar(a["apodo"]), "canal": PLATAFORMA})))
 
 
 def _cadencias(cur, mundo: Mundo, cadencias: list[dict[str, Any]]) -> None:

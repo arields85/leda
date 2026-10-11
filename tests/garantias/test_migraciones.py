@@ -81,7 +81,9 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "dicho_de_quien_destraba", "pase_de_tarea", "cambio_de_responsable",
                     # El detalle de una tarea (migración 0050; decisión 33): el pedido y lo
                     # compartido.
-                    "pedido_de_detalle", "tarea_compartida")
+                    "pedido_de_detalle", "tarea_compartida",
+                    # Los apodos (migración 0055; ADR 0020).
+                    "apodo")
 
 # La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
 # política. `model_config` admite espacio nulo para el modelo global.
@@ -822,7 +824,9 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # dejar las funciones de la página como las dejó la 0036), y antes de la 0045, la
             # 0046, que deja la tarea y el pase como los espera aquélla. Antes de todas, la 0050,
             # cuyas claves también apuntan ahí (el detalle de una tarea, decisión 33), y antes
-            # de ella la 0051, que suma otra (quién decidió el pedido).
+            # de ella la 0051, que suma otra (quién decidió el pedido). Antes de todas, la 0055,
+            # cuya persona del apodo también apunta ahí (ADR 0020).
+            db.execute(_sql_script(ROOT / "db" / "rollbacks" / "0055_los_apodos.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0051_las_revisiones_de_la_c5d_y_del_detalle.sql"))
             db.execute(_sql_script(

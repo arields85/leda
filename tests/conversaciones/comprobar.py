@@ -228,6 +228,24 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                                       "con": persona(f["membership_id"]),
                                       "por": persona(f["compartida_por_membership_id"])}
                        for f in cur.fetchall()}
+        # Los apodos (ADR 0020; la 47): de quién, cuál, quién lo enseñó (una persona del equipo,
+        # o `plataforma`), por qué canal y si quedó auditado.
+        cur.execute("""select a.id, a.membership_id, a.apodo, a.canal, a.borrado_en,
+                              m.id as enseno_membership_id,
+                              exists (select 1 from audit_log l
+                                       where l.accion = 'aprender_apodo'
+                                         and l.sujeto_id = a.id
+                                         and l.actor_app_user_id = a.ensenado_por_app_user_id)
+                                as auditado
+                         from apodo a
+                         left join membership m on m.workspace_id = a.workspace_id
+                                               and m.app_user_id = a.ensenado_por_app_user_id
+                        where a.workspace_id = %s""", (ws,))
+        apodos = {str(f["id"]): {"de": persona(f["membership_id"]), "apodo": f["apodo"],
+                                 "enseno": persona(f["enseno_membership_id"]) or "plataforma",
+                                 "canal": f["canal"], "auditado": f["auditado"],
+                                 "vigente": f["borrado_en"] is None}
+                  for f in cur.fetchall()}
         cur.execute("""select id, task_id from archivo_de_tarea where workspace_id = %s""",
                     (ws,))
         archivos_de_tarea = {str(f["id"]): {"tarea": tarea(f["task_id"])}
@@ -274,7 +292,7 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
             "esperas": esperas, "preguntas": preguntas, "ultimo_aviso": ultimo_aviso,
             "evidencias": evidencias, "archivos_de_tarea": archivos_de_tarea,
             "aprobaciones": aprobaciones, "confirmadas": confirmadas,
-            "compartidas": compartidas}
+            "compartidas": compartidas, "apodos": apodos}
 
 
 def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
@@ -308,6 +326,7 @@ def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
         "aprobaciones": nuevas("aprobaciones"),
         "confirmadas": nuevas("confirmadas"),
         "compartidas": nuevas("compartidas"),
+        "apodos": nuevas("apodos"),
     }
 
 
@@ -651,6 +670,9 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
     # Una tarea compartida con alguien que no la veía (decisión 33): una de más es de garantía
     # (nada se comparte sin la decisión del encargado del sector de la tarea).
     filas("compartidas", hubo.get("compartidas") or [], "tarea compartida")
+    # Un apodo aprendido (ADR 0020): uno de más es de garantía (Leda no aprende un apodo sin la
+    # confirmación de una persona).
+    filas("apodos", hubo.get("apodos") or [], "apodo aprendido")
     al_admin_e = esperados.get("avisos_al_administrador", 0)
     fuera = [i for i in hubo["incidentes"] if i["etapa"] == ETAPA_FUERA_DE_LA_LISTA]
     if len(fuera) != al_admin_e:
