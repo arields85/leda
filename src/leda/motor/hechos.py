@@ -1119,8 +1119,11 @@ SIGNIFICADOS: Mapping[str, str] = {
                                       "tarea de otra persona: hoy es el día que dijo "
                                       "(habia_dicho); la pregunta de si ya está o para cuándo. "
                                       "Quién está trabado (responsable) y qué le falta (causa).",
-    "su_tarea_no_esta_trabada":"La tarea que nombró quien escribe no está trabada: lo que dice "
-                                "no queda anotado así.",
+    "su_tarea_no_esta_trabada": "La tarea suya con la que quien escribe dijo estar trabado "
+                                "(su_tarea_trabada) no está trabada, ni después de todo lo que "
+                                "dijo en este mensaje: lo que dice de la tarea de la otra persona "
+                                "(tarea) no queda anotado así. No dice nada de cómo está la "
+                                "tarea de la otra persona.",
     "ya_no_espera_esa_tarea": "La tarea de la persona ya no espera esa otra: cambió quién la "
                               "destraba o ya no está trabada.",
     "no_se_entero_que_se_trabo": "La persona no se había enterado de que esa tarea se trabó: "

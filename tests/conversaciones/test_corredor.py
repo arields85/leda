@@ -338,11 +338,12 @@ def test_la_23_por_la_otra_lectura_del_archivo_ofrece_la_misma_entrega(conn):
     assert next(p for p in corrida.pasos if p.paso == 12).lectura == cp.O_BIEN
 
 
-def _por_la_otra_lectura(conn, numero: str, paso: int):
+def _por_la_otra_lectura(conn, numero: str, paso: int, sin: tuple[str, ...] = ()):
     """La conversación entera con la IA guionada que lee ese paso como su otra lectura (`o_bien`)
-    y los demás como el YAML."""
+    y los demás como el YAML. `sin`: los datos de `puede_traer` que la IA no trae."""
     [conv] = elegir([numero])
-    otra = next(p for p in conv["pasos"] if p["paso"] == paso)["o_bien"]["jugadas"]
+    otra = [{k: v for k, v in j.items() if k not in sin}
+            for j in next(p for p in conv["pasos"] if p["paso"] == paso)["o_bien"]["jugadas"]]
     ia = _perfecta(conv)
     guion = copy.deepcopy(conv)
     next(p for p in guion["pasos"] if p["paso"] == paso)["jugadas"] = otra
@@ -351,13 +352,19 @@ def _por_la_otra_lectura(conn, numero: str, paso: int):
     return correr_conversacion(conn, conv, ia)
 
 
-def test_la_35_por_la_otra_lectura_le_manda_a_marcos_un_solo_mensaje(conn):
+@pytest.mark.parametrize("sin", [(), ("su_tarea_trabada",)], ids=["con_el_enlace", "sin_el_enlace"])
+def test_la_35_por_la_otra_lectura_le_manda_a_marcos_un_solo_mensaje(conn, sin):
     """Decisión 72: si la IA también anota lo que dice Ariel del PLC (paso 4), lo que dijo y que
-    se trabó le llegan a Marcos en un mensaje (paso 5), y la conversación sigue igual."""
-    corrida = _por_la_otra_lectura(conn, "35", 4)
+    se trabó le llegan a Marcos en un mensaje (paso 5), y la conversación sigue igual. Con el
+    enlace a la tarea del servidor puesto antes de trabarla (ronda real de las decisiones 66 a 73,
+    vez 3), lo mismo: se juzga con lo que deja el mensaje entero."""
+    corrida = _por_la_otra_lectura(conn, "35", 4, sin)
 
     assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
-    assert next(p for p in corrida.pasos if p.paso == 4).lectura == cp.O_BIEN
+    paso_4 = next(p for p in corrida.pasos if p.paso == 4)
+    assert paso_4.lectura == cp.O_BIEN
+    [decir] = [j for j in paso_4.jugadas if j["nombre"] == "decir_cuando_destraba"]
+    assert ("su_tarea_trabada" in decir) == (not sin)
     [a_marcos] = [s for s in next(p for p in corrida.pasos if p.paso == 5).salidas
                   if s.a == "Marcos"]
     assert a_marcos.tipos == ["lo_que_dijo_quien_destraba", "novedad_de_lo_que_espera"]

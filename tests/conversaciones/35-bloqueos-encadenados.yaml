@@ -132,10 +132,14 @@ pasos:
     # lo que dice Ariel de la tarea del PLC ("todavia no la tengo"). Queda anotado y se guarda
     # para Marcos, que lo recibe junto con que Ariel se trabó, en un solo mensaje: los avisos de
     # un mismo mensaje a la misma persona sobre la misma tarea trabada van en uno. El paso 5 vale
-    # para las dos.
+    # para las dos. La IA puede, además, enlazar lo que dice con la tarea del servidor
+    # (su_tarea_trabada; ronda real de las decisiones 66 a 73, vez 3): aunque lo ponga antes del
+    # bloqueo del servidor, se juzga con lo que deja el mensaje entero (`fichas.en_orden`), y lo
+    # esperado es lo mismo.
     o_bien:
       jugadas:
-        - {nombre: decir_cuando_destraba, tarea: PLC, lo_que_dice: "todavia no la tengo"}
+        - {nombre: decir_cuando_destraba, tarea: PLC, lo_que_dice: "todavia no la tengo",
+           su_tarea_trabada: SRV, puede_traer: [su_tarea_trabada]}
         - {nombre: anotar_bloqueo, tarea: SRV, causa: "falta el switch nuevo"}
         - {nombre: anotar_quien_destraba, quien: "lucas", puede_traer: [tarea]}
       efectos:

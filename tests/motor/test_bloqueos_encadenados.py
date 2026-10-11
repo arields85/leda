@@ -461,3 +461,104 @@ def test_si_uno_ya_no_corresponde_sale_solo_el_otro(conn, mundo, servidor, equip
     [_mensaje] = _a_marcos(conn, mundo)
     [lo_que_dijo] = avisos_guardados(conn, LO_QUE_DIJO)
     assert lo_que_dijo["estado"] == "enviado"
+
+
+# --- Lo que una jugada mira de otra tarea se juzga con lo que deja el mensaje ------------------
+#
+# La 35, paso 4 (ronda real de las decisiones 66 a 73, vez 3): la IA puso primero lo que Ariel dice
+# de lo de Marcos, enlazado con la tarea del servidor (`su_tarea_trabada`), y después el bloqueo
+# del servidor. Manejadas en ese orden, la primera se rechazaba porque el servidor todavía no
+# estaba trabado, y Leda le decía a Ariel algo falso. Una jugada que mira cómo está otra tarea de
+# quien escribe (`Ficha.mira_otra_tarea`) se maneja después de las demás del mensaje; los hechos
+# quedan en el orden en que la persona lo dijo.
+
+_LO_QUE_DICE_ARIEL = ("todavia no la tengo, estoy parado con el servidor xq falta el switch "
+                      "nuevo, lo pone lucas")
+
+
+def _decir_enlazado() -> Jugada:
+    return Jugada("decir_cuando_destraba", {"tarea": "T2", "su_tarea_trabada": "T1",
+                                            "lo_que_dice": "todavia no la tengo"})
+
+
+def _trabarse() -> tuple[Jugada, Jugada]:
+    return (Jugada("anotar_bloqueo", {"tarea": "T1", "causa": SWITCH}),
+            Jugada("anotar_quien_destraba", {"tarea": "T1", "quien": "lucas"}))
+
+
+def _todo_anotado_y_enlazado(conn, mundo, r, jugadas: list[str]) -> None:
+    assert [(h["jugada"], h["resultado"]) for h in r.hechos] == [
+        (j, "anotado") for j in jugadas]
+    [decir] = [h for h in r.hechos if h["jugada"] == "decir_cuando_destraba"]
+    assert decir["dice_quien_destraba"]["su_tarea_trabada"] == {
+        "tarea": SERVIDOR, "causa": SWITCH, "lo_destraba": LUCAS}
+    dicho = uno(conn, """select b.task_id::text tarea from dicho_de_quien_destraba d
+                           join blocker b on b.id = d.espera_su_bloqueo_id""")
+    assert dicho["tarea"] != mundo["tarea"]
+
+
+def test_el_enlace_dicho_antes_de_trabarse_se_juzga_con_lo_que_deja_el_mensaje(conn, mundo,
+                                                                               equipo):
+    _tarea_de(conn, mundo, "Ariel", SERVIDOR)          # sin la dependencia: el enlace lo dice él
+    _marcos_espera_a_ariel(conn, mundo, equipo)
+
+    r = equipo.dice("Ariel", _decir_enlazado(), *_trabarse(), texto=_LO_QUE_DICE_ARIEL)
+
+    _todo_anotado_y_enlazado(conn, mundo, r, ["decir_cuando_destraba", "anotar_bloqueo",
+                                              "anotar_quien_destraba"])
+    # La IA eligió en el orden en que Ariel lo dijo, y así queda en el registro.
+    assert [j.nombre for j in r.jugadas] == ["decir_cuando_destraba", "anotar_bloqueo",
+                                             "anotar_quien_destraba"]
+    _salir(conn, mundo, AHORA + timedelta(minutes=70))
+    [_mensaje] = _a_marcos(conn, mundo)
+    [a_marcos] = avisos_guardados(conn, LO_QUE_DIJO)
+    assert a_marcos["hechos"]["dice_quien_destraba"]["su_tarea_trabada"]["lo_destraba"] == LUCAS
+
+
+def test_con_la_dependencia_y_el_enlace_dicho_antes_a_marcos_le_llega_uno(conn, mundo, servidor,
+                                                                          equipo):
+    """Como en la 35: la tarea del servidor es la previa de la del PLC. Que Ariel se trabó y lo
+    que dijo le llegan a Marcos en un solo mensaje (decisión 72)."""
+    _marcos_espera_a_ariel(conn, mundo, equipo)
+
+    r = equipo.dice("Ariel", _decir_enlazado(), *_trabarse(), texto=_LO_QUE_DICE_ARIEL)
+
+    _todo_anotado_y_enlazado(conn, mundo, r, ["decir_cuando_destraba", "anotar_bloqueo",
+                                              "anotar_quien_destraba"])
+    _salir(conn, mundo, AHORA + timedelta(minutes=70))
+    [mensaje] = _a_marcos(conn, mundo)
+    a_marcos = [a for a in avisos_guardados(conn)
+                if str(a["destinatario_membership_id"]) == _membresia(mundo, "Marcos")]
+    assert sorted(a["tipo"] for a in a_marcos) == [LO_QUE_DIJO, NOVEDAD]
+    assert {(a["estado"], str(a["outbox_id"])) for a in a_marcos} == {
+        ("enviado", str(mensaje["id"]))}
+
+
+def test_el_enlace_dicho_despues_de_trabarse_sigue_igual(conn, mundo, equipo):
+    _tarea_de(conn, mundo, "Ariel", SERVIDOR)
+    _marcos_espera_a_ariel(conn, mundo, equipo)
+
+    r = equipo.dice("Ariel", *_trabarse(), _decir_enlazado(), texto=_LO_QUE_DICE_ARIEL)
+
+    _todo_anotado_y_enlazado(conn, mundo, r, ["anotar_bloqueo", "anotar_quien_destraba",
+                                              "decir_cuando_destraba"])
+
+
+def test_una_tarea_suya_que_el_mensaje_no_traba_sigue_sin_anotarse_asi(conn, mundo, equipo):
+    """Juzgarla con lo que deja el mensaje no la vuelve cierta: si al final la tarea suya no está
+    trabada, no se anota así."""
+    _tarea_de(conn, mundo, "Ariel", SERVIDOR)
+    _marcos_espera_a_ariel(conn, mundo, equipo)
+
+    r = equipo.dice("Ariel", _decir_enlazado(),
+                    Jugada("informar_avance", {"tarea": "T1", "palabras": "ya instale el sistema"}),
+                    texto="todavia no la tengo, estoy con el servidor, ya instale el sistema")
+
+    assert (r.hechos[0]["jugada"], r.hechos[0]["resultado"], r.hechos[0]["motivo"]) == (
+        "decir_cuando_destraba", "no_se_puede", "su_tarea_no_esta_trabada")
+    assert cuantas(conn, "dicho_de_quien_destraba") == 0
+
+
+def test_el_motivo_dice_cual_tarea_no_esta_trabada():
+    """Para que la IA no lo diga de la tarea de la otra persona: es la suya que nombró."""
+    assert "su_tarea_trabada" in hechos_mod.significado("su_tarea_no_esta_trabada")

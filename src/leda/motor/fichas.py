@@ -201,6 +201,10 @@ class Ficha:
     # falta la tarea, su duda se queda con eso (`_duda`): lo que una jugada ya atendió no se
     # vuelve a atender al terminar las jugadas, y la elección lo usa.
     toma_lo_que_llego: bool = False
+    # Los datos que nombran otra tarea de quien escribe para mirar cómo está (si está trabada):
+    # con uno de ellos, la jugada se maneja después de las demás del mensaje, que pueden anotar
+    # algo en esa tarea (`en_orden`).
+    mira_otra_tarea: tuple[str, ...] = ()
 
 
 # Lo que Leda propone cuando no hay otra persona que destrabe el bloqueo (la persona no sabe
@@ -1722,7 +1726,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "margen para corregir: como información, para que lo confirme si es lo que "
                   "arreglaron, o como cierre del tema si contesta lo que Leda le pasó",
           manejar=_decir_cuando_destraba, se_ofrece=False,
-          contesta=(preguntas.CUANDO_SE_DESTRABA,),
+          contesta=(preguntas.CUANDO_SE_DESTRABA,), mira_otra_tarea=("su_tarea_trabada",),
           es="La persona que escribe puede destrabar una tarea trabada de otra persona (está "
              "en la lista como espera_que_la_destrabe) y dice para cuándo lo resuelve "
              "(para_cuando), que ya lo resolvió (ya_esta), qué pasa con eso (lo_que_dice) o "
@@ -1914,6 +1918,21 @@ def _manejador(ficha: Ficha) -> Manejador:
 
 
 # --- Lo que admite dos lecturas ------------------------------------------------------------
+
+def en_orden(jugadas: list[Jugada]) -> list[int]:
+    """En qué orden se manejan las jugadas de un mensaje (sus índices). Por regla, en el que la
+    persona las dijo (ADR 0018, 9m.1): cada una se apoya en lo que anotó otra anterior. Una que
+    mira cómo está otra tarea de quien escribe (`Ficha.mira_otra_tarea`) va después de las demás,
+    en el mismo orden entre ellas: así se juzga con lo que el mensaje entero dice de esa tarea, y
+    no con el orden en que la IA puso las jugadas ("todavía no la tengo, estoy parado con el
+    servidor" dice lo de la otra persona antes de trabarse, pero los dos hechos son a la vez)."""
+    def mira(jugada: Jugada) -> bool:
+        ficha = FICHAS.get(jugada.nombre)
+        return ficha is not None and any(not _vacio((jugada.datos or {}).get(k))
+                                         for k in ficha.mira_otra_tarea)
+
+    return sorted(range(len(jugadas)), key=lambda i: mira(jugadas[i]))
+
 
 def opuestas(jugadas: list[Jugada]) -> dict[int, int]:
     """Las jugadas del mensaje que dicen lo contrario de otra sobre la misma tarea (`Ficha.

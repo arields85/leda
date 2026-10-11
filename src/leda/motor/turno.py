@@ -488,18 +488,21 @@ def contesta_la_abierta(ctx: Contexto, jugada: Jugada,
 
 def _manejar_todas(ctx: Contexto, elegidas: list[Jugada],
                    jugadas: Mapping[str, Manejador]) -> list[dict[str, Any]]:
-    """Cada jugada, en el orden en que la persona las dijo (9m.1); un par de jugadas opuestas
-    sobre la misma tarea, en un solo hecho que pregunta cuál de las dos (`fichas.dos_lecturas`)."""
+    """Cada jugada, en el orden en que la persona las dijo (9m.1), salvo la que mira cómo está
+    otra tarea suya, que se juzga con lo que deja el mensaje entero (`fichas.en_orden`); un par
+    de jugadas opuestas sobre la misma tarea, en un solo hecho que pregunta cuál de las dos
+    (`fichas.dos_lecturas`). Los hechos quedan en el orden en que la persona lo dijo."""
     pares = {i: j for i, j in fichas.opuestas(elegidas).items()
              if elegidas[i].nombre in jugadas and elegidas[j].nombre in jugadas}
     segundas = set(pares.values())
-    hechos = []
-    for i, jugada in enumerate(elegidas):
+    hechos: dict[int, dict[str, Any]] = {}
+    for i in fichas.en_orden(elegidas):
+        jugada = elegidas[i]
         if i in pares:
-            hechos.append(fichas.dos_lecturas(ctx, jugada, elegidas[pares[i]]))
+            hechos[i] = fichas.dos_lecturas(ctx, jugada, elegidas[pares[i]])
         elif i not in segundas:
-            hechos.append(_manejar(ctx, jugada, jugadas))
-    return hechos
+            hechos[i] = _manejar(ctx, jugada, jugadas)
+    return [hechos[i] for i in sorted(hechos)]
 
 
 def _manejar(ctx: Contexto, jugada: Jugada, jugadas: Mapping[str, Manejador]) -> dict:
