@@ -3840,6 +3840,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
            eso le deja un aviso al administrador (el de los pedidos fuera de la lista). ¿Se acepta
            como la otra lectura válida (como la decisión 63), o un pedido así no tiene que avisarle
            al administrador?
+        6. **El motivo con otras palabras** (la 38, paso 23; encontrado en `090016a`): Marcos
+           escribe "no, esa hacela vos nahuel que la conoces mejor" y la IA anota el motivo
+           "nahuel la conoce mejor". La prueba exige que un dato libre use sólo palabras de la
+           persona, y "conoce" no lo es ("conoces" sí), así que lo cuenta como mala comprensión.
+           ¿Se acepta el mismo verbo en otra persona (la prueba compara la raíz de la palabra) o
+           el motivo tiene que ir con las palabras exactas? Propuesta: aceptarlo; no agrega nada
+           que la persona no dijo.
   - [x] **Las conversaciones 48 y 49** (los dos avisos que no tenían conversación; escritores
         delegados, 2+ archivos):
         - `d5aa7e3`: la 48 (el sector se queda sin encargado mientras se espera su decisión: a
