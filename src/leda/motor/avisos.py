@@ -281,6 +281,11 @@ class TipoDeAviso:
     # (C-7, `pase.opciones`).
     opciones: Callable[["Momento", dict[str, Any]],
                        tuple[str, dict[str, Any], list[tuple[str, dict[str, Any]]]]] | None = None
+    # La oferta que deja al salir un aviso que no pide respuesta pero ofrece algo ("si querés
+    # decirle algo, se lo paso", decisión 62): la jugada de la oferta (lo que propone), o `None`
+    # si esta vez no ofrece nada. Queda como una pregunta opcional, sólo si la persona no tiene
+    # otra sin contestar (`preguntas.dejar_una_oferta`).
+    deja_una_oferta: Callable[["Momento", dict[str, Any]], dict[str, Any] | None] | None = None
 
 
 # El hecho que le dice a la IA que el mensaje lleva al final el enlace a la página de la tarea.
@@ -775,6 +780,13 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                             where task_id = %s and tipo = %s
                               and satisfecho_en is null and escalado_en is null""",
                         (m.ahora, x.aviso["task_id"], _espera_del_aviso(x.hechos)))
+    # Lo que ofrece un aviso que no pregunta nada, después de las preguntas del envío: si alguna
+    # quedó sin contestar, la oferta no la tapa (decisión 62).
+    for x, q in zip(envio, preguntas_de):
+        if q is None and x.tipo.deja_una_oferta is not None and x.aviso["task_id"] is not None:
+            oferta = x.tipo.deja_una_oferta(m, {**x.aviso, "hechos": x.hechos})
+            if oferta is not None:
+                preguntas.dejar_una_oferta(turno, str(x.aviso["task_id"]), jugada=oferta)
     # La pregunta que el envío hizo (o volvió a hacer) queda preguntada ahora; si dejó para
     # después la que estaba abierta, las dos vuelven aparte cuando se cierre la otra (decisión 21).
     abierta = preguntas.actual(cur, persona)
@@ -2037,6 +2049,11 @@ def _al_salir_la_pregunta_a_quien_destraba(m: Momento, aviso) -> None:
     persecucion.al_salir_la_pregunta(m, aviso)
 
 
+def _la_oferta_de_pasarle_algo(m: Momento, aviso) -> dict[str, Any] | None:
+    from . import persecucion
+    return persecucion.la_oferta_de_pasarle_algo(aviso)
+
+
 def _abre_quien_destraba(m: Momento, aviso) -> tuple[str, dict[str, Any]]:
     """La pregunta de quién destraba, otra vez, a la persona trabada (decisión 49): lo que
     recuerda al repetirla es lo que la traba (`preguntas.lo_anotado`)."""
@@ -2120,7 +2137,7 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
                 es_coordinacion=True, abre=_abre_cuando_se_destraba,
                 al_salir=_al_salir_la_pregunta_a_quien_destraba),
     TipoDeAviso(LO_QUE_DIJO_QUIEN_DESTRABA, "informativo", _vigencia_de_lo_que_dijo,
-                es_coordinacion=True),
+                es_coordinacion=True, deja_una_oferta=_la_oferta_de_pasarle_algo),
     # Cerrar el tema para todos y lo acordado (C-5c): la pregunta a la persona trabada de qué
     # arregló, si quien destraba dice que ya lo hablaron (la causa lo que dijo otra persona); la de
     # cómo le fue, al día hábil siguiente de "se lo pido yo" (seguimiento que Leda hace por su
@@ -2130,8 +2147,11 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
                 es_coordinacion=True, abre=_abre_que_arreglaron),
     TipoDeAviso(COMO_LE_FUE, "seguimiento", _vigencia_de_que_arreglaron,
                 abre=_abre_que_arreglaron),
+    # Lo que se dicen los dos, si llega para confirmarlo, deja la oferta de pasarle algo como una
+    # pregunta opcional (decisión 62).
     TipoDeAviso(LO_QUE_DIJO_QUIEN_ESTA_TRABADO, "informativo",
-                _vigencia_de_lo_que_dijo_quien_esta_trabado, es_coordinacion=True),
+                _vigencia_de_lo_que_dijo_quien_esta_trabado, es_coordinacion=True,
+                deja_una_oferta=_la_oferta_de_pasarle_algo),
     TipoDeAviso(YA_NO_HACE_FALTA, "informativo", _vigencia_de_ya_no_hace_falta,
                 es_coordinacion=True),
     # La cadena al referente, cuando nadie toma el bloqueo (porción 3): informativa.

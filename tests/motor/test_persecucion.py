@@ -941,6 +941,122 @@ def test_la_respuesta_de_quien_decide_le_llega_y_cierra_el_tema(conn, mundo, equ
     assert equipo.situacion["tareas"] == []
 
 
+# Decisión 62: la oferta de pasarle algo deja una pregunta liviana, si no hay otra abierta.
+
+def _la_oferta(conn, mundo, corto: str) -> dict | None:
+    """La oferta opcional que Leda le dejó a esa persona (`preguntas.OPCIONAL`), la última."""
+    return uno(conn, """select * from conversation_question
+                         where membership_id = %s and tipo = 'propuesta'
+                           and (jugada ->> 'opcional')::boolean
+                         order by abierta_en desc limit 1""", _membresia(mundo, corto))
+
+
+def _a_marcos_le_llega_lo_que_dijo(conn, mundo, equipo, *antes) -> IAQueRedacta:
+    """Ariel contesta después de que el tema se cerró y a Marcos le llega, con la oferta de
+    pasarle algo (`se_lo_pasa_si_contesta`). `antes`: lo que hace Marcos antes de que le llegue."""
+    _cerrado_por_otro_lado(conn, mundo, equipo)
+    _ariel_dice(equipo, at=AHORA + timedelta(minutes=100),
+                lo_que_dice="ya lo pedi, no lo puedo cancelar")
+    for jugada in antes:
+        equipo.dice("Marcos", jugada, at=AHORA + timedelta(minutes=102))
+    return _salir(conn, mundo, AHORA + timedelta(minutes=140))
+
+
+def test_la_oferta_de_pasarle_algo_deja_una_pregunta_opcional(conn, mundo, equipo):
+    """La conversación 43, paso 9: lo que Marcos contesta se lee como respuesta a la oferta. El
+    aviso sale como información (la oferta la dicen sus hechos) y deja anotada la pregunta."""
+    ia = _a_marcos_le_llega_lo_que_dijo(conn, mundo, equipo)
+
+    [pedido] = [p for p in ia.pedidos_de_redaccion if p["persona"] == "Marcos"]
+    assert pedido["pregunta"] is None
+    assert pedido["hechos"][0]["se_lo_pasa_si_contesta"] is True
+    oferta = _la_oferta(conn, mundo, "Marcos")
+    assert oferta is not None and oferta["cerrada_en"] is None
+    assert str(oferta["task_id"]) == mundo["tarea"]
+    assert oferta["jugada"]["propone"] == ["contar_lo_que_arreglaron"]
+    assert _su_pregunta(conn, mundo, "Marcos")["tipo"] == "propuesta"
+    # No espera respuesta: no abre ninguna espera.
+    assert _esperas(conn, mundo, "Marcos") == 0
+
+    r = _marcos_cuenta(equipo, at=AHORA + timedelta(minutes=150),
+                       lo_que_dice="que llegue nomas, queda de repuesto")
+
+    assert equipo.situacion["estado"]["pregunta_abierta"] == {
+        "tipo": "propuesta", "tarea": "T1", "propone": ["contar_lo_que_arreglaron"],
+        "opcional": True}
+    assert hechos_mod.sin_significado(equipo.situacion["estado"]) == set()
+    assert r.hechos[0]["cierra_el_tema"] is True
+    cerrada = uno(conn, "select cierre from conversation_question where id = %s", oferta["id"])
+    assert cerrada["cierre"] == "respondida"
+
+
+def test_la_oferta_sin_respuesta_vence_sola(conn, mundo, equipo):
+    """Sin respuesta es un no: Leda no insiste y la oferta se cierra sola, como las de una
+    respuesta."""
+    _a_marcos_le_llega_lo_que_dijo(conn, mundo, equipo)
+    oferta = _la_oferta(conn, mundo, "Marcos")
+
+    correr_escalera(conn, mundo["id"], RelojFijo(octubre(6, 10)))
+    conn.commit()
+
+    cerrada = uno(conn, "select cierre, cierre_detalle from conversation_question where id = %s",
+                  oferta["id"])
+    assert cerrada["cierre"] == "sin_efecto"
+    assert cerrada["cierre_detalle"]["oferta_sin_respuesta"] is True
+    assert avisos_guardados(conn, "repeticion_del_dia") == []
+
+
+def test_con_otra_pregunta_abierta_la_oferta_no_deja_ninguna(conn, mundo, equipo):
+    """Una pregunta que hace falta contestar nunca queda tapada por una opcional: Marcos tiene
+    abierta la de quién destraba T2, así que el aviso no deja ninguna oferta, y lo que conteste
+    se lee como hoy (sin límite de tiempo, `_contesta_lo_que_se_le_paso`)."""
+    nueva_tarea(conn, mundo, COMUNICACIONES)
+    _a_marcos_le_llega_lo_que_dijo(
+        conn, mundo, equipo, Jugada("anotar_bloqueo", {"tarea": "T2", "causa": "la licencia"}))
+
+    [_] = [a for a in avisos_guardados(conn, LO_QUE_DIJO) if a["estado"] == "enviado"
+           and a["hechos"].get("se_lo_pasa_si_contesta")]
+    assert _la_oferta(conn, mundo, "Marcos") is None
+    assert _su_pregunta(conn, mundo, "Marcos")["tipo"] == "quien_destraba"
+
+    r = _marcos_cuenta(equipo, at=AHORA + timedelta(minutes=150), tarea="T1",
+                       lo_que_dice="que llegue nomas, queda de repuesto")
+
+    assert r.hechos[0]["cierra_el_tema"] is True
+
+
+def test_la_oferta_a_quien_destraba_tambien_deja_su_pregunta(conn, mundo, equipo):
+    """Lo mismo del otro lado: lo que Marcos cuenta de lo acordado le llega a Ariel para que lo
+    confirme, y lo que Ariel conteste se lee como respuesta a esa oferta."""
+    _le_pregunto(conn, mundo, equipo)
+    _ariel_dice(equipo, ya_lo_hablaron=True)
+    _salir(conn, mundo, AHORA + timedelta(minutes=90))
+    _marcos_cuenta(equipo, at=AHORA + timedelta(minutes=100), para_cuando="2026-10-08")
+    _salir(conn, mundo, AHORA + timedelta(minutes=150))
+
+    oferta = _la_oferta(conn, mundo, "Ariel")
+    assert oferta is not None and oferta["cerrada_en"] is None
+    assert str(oferta["task_id"]) == mundo["tarea"]
+    assert oferta["jugada"]["propone"] == ["decir_cuando_destraba"]
+
+    r = _ariel_dice(equipo, at=AHORA + timedelta(minutes=160), para_cuando="2026-10-09")
+
+    assert equipo.situacion["estado"]["pregunta_abierta"]["propone"] == ["decir_cuando_destraba"]
+    assert r.hechos[0]["resultado"] == "anotado"
+    assert uno(conn, "select cierre from conversation_question where id = %s",
+               oferta["id"])["cierre"] == "respondida"
+
+
+def test_una_fecha_que_es_solo_informacion_no_deja_ninguna_oferta(conn, mundo, equipo):
+    _le_pregunto(conn, mundo, equipo)
+    _ariel_dice(equipo, para_cuando="2026-10-08")
+
+    _salir(conn, mundo, AHORA + timedelta(minutes=90))
+
+    assert avisos_guardados(conn, LO_QUE_DIJO)[0]["estado"] == "enviado"
+    assert _la_oferta(conn, mundo, "Marcos") is None
+
+
 # "No le escribas" después de que la pregunta salió (derivado de la 39 en la decisión 47).
 
 def test_no_le_escribas_con_la_pregunta_abierta_deja_de_preguntarle_y_se_lo_dice(conn, mundo,

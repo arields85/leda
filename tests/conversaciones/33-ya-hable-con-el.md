@@ -103,7 +103,9 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
 
 6. **Leda**, por su cuenta, a Marcos (martes 20, 11:18): lo que arreglaron.
    →
-   - Efecto: un mensaje privado a Marcos, informativo.
+   - Efecto: un mensaje privado a Marcos, informativo. Como Marcos no tiene otra pregunta sin
+     contestar, la oferta queda como su tema abierto, una pregunta opcional sobre la tarea del PLC
+     (decisión 62): lo que conteste se lee como respuesta a ella; si no contesta, vence sola.
    - El mensaje dice: la tarea del PLC; que Ariel dice que le pasa la IP el jueves (jue 22/10)
      temprano; que si es así, no hace falta que haga nada, y que si no es lo que entendió, que avise
      y Leda se lo pasa a Ariel.
@@ -194,7 +196,10 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
 
 16. **Leda**, por su cuenta, a Ariel (martes 20, 16:00): lo que arreglaron, según Marcos.
     →
-    - Efecto: un mensaje privado a Ariel, informativo.
+    - Efecto: un mensaje privado a Ariel, informativo. Como Ariel no tiene otra pregunta sin
+      contestar, la oferta queda como su tema abierto, una pregunta opcional sobre la tarea de
+      comunicaciones (decisión 62): lo que conteste se lee como respuesta a ella; si no contesta,
+      vence sola.
     - El mensaje dice: la tarea de comunicaciones; que Marcos dice que quedaron en que configura el
       switch el jueves (jue 22/10); que si es así, no hace falta que haga nada, y que si no es lo que
       entendió, que avise y Leda se lo pasa a Marcos.

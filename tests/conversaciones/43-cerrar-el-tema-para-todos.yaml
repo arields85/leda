@@ -187,8 +187,10 @@ pasos:
         tarea: PLC
         hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
                  ya_se_habia_destrabado: true, se_lo_pasa_si_contesta: true}
+    # La oferta queda como una pregunta opcional: Marcos no tiene otra (decisión 62).
     estado_despues:
-      pregunta_abierta: null
+      pregunta_abierta: {tipo: propuesta, tarea: PLC}
+      esperas_abiertas: []
     dice:
       - la tarea del PLC
       - que Ariel ya pidió el cable y no lo puede cancelar
@@ -211,6 +213,8 @@ pasos:
       - {jugada: contar_lo_que_arreglaron, resultado: anotado, tarea: PLC, cierra_el_tema: true,
          aviso_a_quien_destraba: {a: Ariel De Simone, llega: "~2026-10-20T15:10"}}
     pregunta: null
+    estado_despues:
+      pregunta_abierta: null
     dice:
       - que Ariel se va a enterar
 

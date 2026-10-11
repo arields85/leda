@@ -49,7 +49,9 @@ necesitás" (pedir el detalle de una tarea, decisión 33) es un tema abierto liv
 contesta es un no: no se repite a las 4 horas (decisión 29 es para lo que Leda necesita saber),
 no frena los otros temas, y no vuelve después de un cambio de tema ni cuando otro tema la deja
 para después (decisión 50): se cierra (`sin_efecto`, `NO_LA_TOMO`). Una regla de las preguntas,
-para cualquier oferta así, no de una jugada (derivado por el coordinador, 2026-10-09).
+para cualquier oferta así, no de una jugada (derivado por el coordinador, 2026-10-09). Un aviso
+también deja una al salir, si ofrece algo y la persona no tiene otra pregunta sin contestar
+(`dejar_una_oferta`; decisión 62).
 """
 
 from __future__ import annotations
@@ -429,6 +431,19 @@ def abrir_con_id(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
     if pregunta not in ctx.preguntas_del_turno:
         ctx.preguntas_del_turno.append(pregunta)
     return ahora_si, pregunta
+
+
+def dejar_una_oferta(ctx, task_id: str, *, jugada: dict[str, Any]) -> bool:
+    """Una oferta opcional que deja un aviso al salir (decisión 62 del usuario, 2026-10-10: "si
+    querés decirle algo, se lo paso"): lo que la persona conteste se lee como respuesta a ella, y
+    si no contesta vence sola, como cualquier oferta opcional (ver el módulo). Sólo si la persona
+    no tiene otra pregunta sin contestar, abierta o para después: una pregunta que hace falta
+    contestar nunca queda tapada por una opcional. Devuelve si la dejó."""
+    persona = ctx.quien.membership_id
+    if actual(ctx.cur, persona) is not None or para_despues(ctx.cur, persona):
+        return False
+    abrir(ctx, PROPUESTA, task_id, jugada={**jugada, OPCIONAL: True})
+    return True
 
 
 def ofrecer(ctx, tipo: str, task_id: str, *, jugada: dict[str, Any],

@@ -160,8 +160,9 @@ pasos:
         hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
                  dice_quien_destraba: {para_cuando: "2026-10-22", ya_lo_hablaron: true},
                  se_lo_pasa_si_contesta: true}
+    # La oferta queda como una pregunta opcional: Marcos no tiene otra (decisión 62).
     estado_despues:
-      pregunta_abierta: null
+      pregunta_abierta: {tipo: propuesta, tarea: PLC}
     dice:
       - la tarea del PLC
       - "que Ariel dice que le pasa la IP el jueves (jue 22/10) temprano"
@@ -416,9 +417,10 @@ pasos:
         hechos: {necesita_respuesta: false, quien_esta_trabado: Marcos Tarquini,
                  dice_quien_esta_trabado: {para_cuando: "2026-10-22"},
                  se_lo_pasa_si_contesta: true}
+    # La oferta queda como una pregunta opcional: Ariel no tiene otra (decisión 62).
     estado_despues:
       de: Ariel
-      pregunta_abierta: null
+      pregunta_abierta: {tipo: propuesta, tarea: COM}
       esperas_abiertas: []
     dice:
       - la tarea de comunicaciones

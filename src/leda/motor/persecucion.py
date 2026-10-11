@@ -127,9 +127,11 @@ que Leda le mandó, `para_destrabar`).
 partes dice de lo acordado le llega a la otra: quien destraba (`decir_cuando_destraba`) o la
 persona trabada (`contar_lo_que_arreglaron`). Si es lo acordado (ya lo hablaron) o contesta algo
 después de que el tema se cerró, llega para que la otra lo confirme: si es así, no hace falta que
-haga nada; si no, que avise y Leda se lo pasa (`SE_LO_PASA_SI_CONTESTA`). Si contesta a eso (lo
-corrige, o decide), llega como cierre del tema para los dos (`CIERRA_EL_TEMA`): no le pide nada
-más a nadie. "Ya lo hablé" sin decir qué: Leda les pregunta a los dos qué arreglaron
+haga nada; si no, que avise y Leda se lo pasa (`SE_LO_PASA_SI_CONTESTA`). Ese aviso deja la
+oferta como una pregunta opcional, si la persona no tiene otra sin contestar (decisión 62,
+`la_oferta_de_pasarle_algo`): lo que conteste se lee como respuesta a ella, y sin respuesta vence
+sola. Si contesta a eso (lo corrige, o decide), con la oferta o sin ella, llega como cierre del
+tema para los dos (`CIERRA_EL_TEMA`): no le pide nada más a nadie. "Ya lo hablé" sin decir qué: Leda les pregunta a los dos qué arreglaron
 (`avisos.PREGUNTA_A_QUIEN_ESTA_TRABADO`); vale lo que conteste el primero, y al otro se le cierra
 la pregunta.
 
@@ -846,6 +848,20 @@ def _como_llega(cierra: bool, *, acordado: bool) -> dict[str, Any]:
     if cierra:
         return {CIERRA_EL_TEMA: True}
     return {SE_LO_PASA_SI_CONTESTA: True} if acordado else {}
+
+
+def la_oferta_de_pasarle_algo(aviso) -> dict[str, Any] | None:
+    """La oferta que deja lo que Leda le pasa de la otra persona para que lo confirme
+    (`SE_LO_PASA_SI_CONTESTA`; decisión 62): lo que conteste se lee como su respuesta, con la
+    jugada de quien lo recibe (la persona trabada cuenta lo que arreglaron; quien destraba dice
+    para cuándo o lo que pasa). `None` si llega como información o como cierre del tema."""
+    if not (aviso["hechos"] or {}).get(SE_LO_PASA_SI_CONTESTA):
+        return None
+    contesta = {LO_QUE_DIJO_QUIEN_DESTRABA: "contar_lo_que_arreglaron",
+                LO_QUE_DIJO_QUIEN_ESTA_TRABADO: "decir_cuando_destraba"}.get(aviso["tipo"])
+    if contesta is None:
+        return None
+    return {"nombre": aviso["tipo"], "propone": [contesta], "del_aviso": str(aviso["id"])}
 
 
 def _contesta_lo_que_se_le_paso(cur, blocker_id, persona: str) -> bool:

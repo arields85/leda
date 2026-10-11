@@ -101,15 +101,17 @@ Cómo se leyó lo que la regla no dice:
 
 8. **Leda**, por su cuenta, a Marcos (martes 20, 14:40): lo que dijo Ariel.
    →
-   - Efecto: un mensaje privado a Marcos, informativo.
+   - Efecto: un mensaje privado a Marcos, informativo. Como Marcos no tiene otra pregunta sin
+     contestar, la oferta queda como su tema abierto, una pregunta opcional sobre la tarea del PLC
+     (decisión 62): lo que conteste se lee como respuesta a ella; si no contesta, vence sola.
    - El mensaje dice: la tarea del PLC; que Ariel ya pidió el cable y no lo puede cancelar; que si
      quiere decirle algo, Leda se lo pasa; si no, no hace falta que haga nada.
 
 9. **Marcos** escribe (martes 20, 15:00): "que llegue nomas, queda de repuesto"
    →
    - Jugadas: `contar_lo_que_arreglaron` sobre la tarea del PLC, con sus palabras.
-   - Efecto: queda anotado lo que dice, atribuido a Marcos. Se guarda el aviso a Ariel con lo que
-     dijo Marcos, que sale a las 15:10 y cierra el tema para los dos.
+   - Efecto: queda anotado lo que dice, atribuido a Marcos; la oferta queda contestada. Se guarda
+     el aviso a Ariel con lo que dijo Marcos, que sale a las 15:10 y cierra el tema para los dos.
    - La respuesta dice: que Ariel se va a enterar.
 
 10. **Leda**, por su cuenta, a Ariel (martes 20, 15:10): lo que dijo Marcos.
