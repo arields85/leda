@@ -769,6 +769,55 @@ def test_el_encargado_se_queda_con_la_de_nahuel_al_confirmar(conn, equipo):
             if str(a["destinatario_membership_id"]) == ismael] == []
 
 
+def test_se_la_queda_es_un_pase_a_quien_lo_pide(conn, equipo):
+    """"La del fusible de Nahuel la hago yo" (la 39, paso 21; tres rondas con la IA real): la IA
+    marca que se la queda (`se_la_queda`) en lugar de escribir su propio nombre, que leía "yo"
+    (`persona_desconocida`). La cocina pone de recibe a quien escribe."""
+    r = equipo.dice("Marcos", Jugada("pedir_reasignacion",
+                                     {"como_la_nombra": "sensores de Nahuel",
+                                      "se_la_queda": True}))
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "pase_para_confirmar"
+    assert hecho["pase"] == {"la_tiene": NAHUEL, "pasaria_a": MARCOS}
+    assert hecho["al_confirmar_el_pase"] == {"la_toma_al_confirmar": True}
+    assert hechos.sin_significado(equipo.redaccion) == set()
+    assert _pases(conn) == [] and _quien_la_tiene(conn, equipo, "SEN") == NAHUEL
+    r = equipo.dice("Marcos", Jugada("confirmar", {}))
+    assert (r.hechos[0]["resultado"], r.hechos[0]["la_toma"]) == ("anotado", True)
+    assert _quien_la_tiene(conn, equipo, "SEN") == MARCOS
+
+
+def test_se_la_queda_con_su_propio_nombre_tambien(conn, equipo):
+    r = equipo.dice("Marcos", Jugada("pedir_reasignacion",
+                                     {"como_la_nombra": "sensores de Nahuel", "a": "marcos",
+                                      "se_la_queda": True}))
+    [hecho] = r.hechos
+    assert hecho["pase"] == {"la_tiene": NAHUEL, "pasaria_a": MARCOS}
+    assert hecho["al_confirmar_el_pase"] == {"la_toma_al_confirmar": True}
+
+
+def test_se_la_queda_con_el_nombre_de_otra_persona_vale_lo_que_nombra(conn, equipo):
+    """Si nombra a otra persona, se la queda no gana: el pase es a quien nombró, con la vista
+    previa de siempre para confirmarlo (la cocina no adivina cuál de los dos quiso decir)."""
+    r = equipo.dice("Marcos", Jugada("pedir_reasignacion",
+                                     {"como_la_nombra": "sensores de Nahuel", "a": "pedro",
+                                      "se_la_queda": True}))
+    [hecho] = r.hechos
+    assert hecho["pase"] == {"la_tiene": NAHUEL, "pasaria_a": PEDRO}
+    assert hecho["al_confirmar_el_pase"] == {"la_tiene_que_tomar": PEDRO}
+
+
+def test_la_ficha_del_pase_marca_que_se_la_queda_en_lugar_de_su_nombre():
+    from leda.motor.fichas import FICHAS
+    from leda.motor.ia_real import DATOS
+
+    ficha = FICHAS["pedir_reasignacion"]
+    assert "se_la_queda" in ficha.opcional
+    assert "se_la_queda" in ficha.es and "propio nombre" not in ficha.es
+    assert DATOS["se_la_queda"][0] == "boolean"
+    assert hechos.significado("se_la_queda")
+
+
 # --- Nunca un pase abierto sin que todos sepan cómo terminó (decisión 39) ---------------------
 
 def _preguntas_del_pase_abiertas(conn, t: Turnos, nombre: str) -> list[dict]:

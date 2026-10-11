@@ -1125,6 +1125,7 @@ SIGNIFICADOS: Mapping[str, str] = {
                             "decide y la toma la misma persona, así que al confirmar la tarea "
                             "pasa a ser suya, con la misma fecha y lo que pide para terminarla, "
                             "y Leda le avisa a quien la tenía.",
+    "se_la_queda": "La persona que escribe se queda con la tarea de otra persona, para hacerla.",
     "pase_pedido": "El pase quedó pedido: la tarea sigue con quien la tiene hasta que la tomen, "
                    "y Leda le pregunta a quien sigue (le_pregunta_a).",
     "le_pregunta_a": "A quién le pregunta Leda por el pase, como Leda y no en nombre de nadie "

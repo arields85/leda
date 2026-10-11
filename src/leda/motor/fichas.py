@@ -1768,7 +1768,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "jugada."),
     Ficha("pedir_reasignacion", "pasarle una tarea suya, o una de su sector si es el "
                                 "encargado, a otra persona del equipo",
-          necesita=(), opcional=("tarea", "a", "como_la_nombra"),
+          necesita=(), opcional=("tarea", "a", "como_la_nombra", "se_la_queda"),
           comprueba="que sea el responsable o, si nombra una que no está en su lista, el "
                     "encargado del sector de quien la tiene (decisión 27), que la tarea esté "
                     "asignada, en curso o trabada, que quien la recibe sea del equipo y tenga un "
@@ -1786,8 +1786,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona pide que una tarea suya pase a otra persona del equipo (a, como la "
              "nombró): que se la pasen, que la haga o la tome otra persona. El encargado de un "
              "sector también puede pedirlo para una tarea de alguien de su sector, que no está "
-             "en su lista (como_la_nombra dice cómo la nombró), y quedársela él: entonces a es "
-             "su propio nombre."),
+             "en su lista (como_la_nombra dice cómo la nombró), y quedársela él: entonces "
+             "se_la_queda, sin a."),
     Ficha("contestar_el_pase", "decir si aprueba que una tarea pase a otra persona, o si toma "
                                "la que le quieren pasar",
           necesita=(), opcional=("tarea", "acepta", "por_que"),

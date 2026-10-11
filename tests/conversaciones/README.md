@@ -244,7 +244,7 @@ Delegar (ADR 0017, enmienda a la decisión 2; `odd/tasks/fase-c.md`, decisión 9
     a Ismael le llegue nada (la revisión sigue a quien era la tarea, decisión 28); un pase que Martín no
     contesta se repite una vez y termina, y se enteran Marcos y Martín, que ya no tiene que contestar
     (decisiones 26 y 39); y Marcos se queda él con la del fusible de Nahuel al confirmar la vista previa
-    (decisión 53).
+    (decisión 53; la IA lo marca con `se_la_queda`, sin escribir su nombre en `a`).
 
 **La 21 y la 22 corren desde la porción 2 de la C-3** (la entrega con evidencia y la política por tipo),
 con su YAML para los pasos que esa porción cubre:

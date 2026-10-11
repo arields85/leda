@@ -173,7 +173,8 @@ pasos 19 a 23 cambiaron con la corrección de la C-7 (decisiones 39 y 53, 2026-1
 
 21. **Marcos** escribe (jueves 22, 11:00): "la del fusible de nahuel la hago yo, el esta con la paila"
     →
-    - Jugadas: `pedir_reasignacion` sobre la del fusible, que no está en su lista (la nombra), a Marcos.
+    - Jugadas: `pedir_reasignacion` sobre la del fusible, que no está en su lista (la nombra), diciendo
+      que se la queda él (`se_la_queda`; la cocina pone a Marcos como quien la recibe).
     - Efecto: ninguno: es una vista previa (constitución §7).
     - La respuesta dice: la vista previa, que la del fusible pasa de Nahuel a él; que al confirmarla queda
       a su cargo y Leda le avisa a Nahuel; que confirme.
@@ -202,4 +203,4 @@ pasos 19 a 23 cambiaron con la corrección de la C-7 (decisiones 39 y 53, 2026-1
   la tiene sólo después de confirmar la vista previa, y quien la tenía se entera.
 - **Falla de comprensión:** que la IA no tome "la de los sensores de nahuel" como la tarea que nombra
   (`como_la_nombra`), "si la hago yo" como que la toma, "listo el tornillo…" como la entrega, o "la del
-  fusible de nahuel la hago yo" como que se la queda él (a es Marcos).
+  fusible de nahuel la hago yo" como que se la queda él (`se_la_queda`, sin `a`).

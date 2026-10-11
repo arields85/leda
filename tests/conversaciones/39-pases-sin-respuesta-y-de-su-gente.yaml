@@ -460,7 +460,8 @@ pasos:
     a_las: "2026-10-22 11:00"
     escribe: "la del fusible de nahuel la hago yo, el esta con la paila"
     jugadas:
-      - {nombre: pedir_reasignacion, como_la_nombra: "fusible de nahuel", a: marcos}
+      # Se la queda él: la IA lo marca (se_la_queda), sin escribir su nombre en a, que leía "yo".
+      - {nombre: pedir_reasignacion, como_la_nombra: "fusible de nahuel", se_la_queda: true}
     efectos: {}
     hechos:
       - {jugada: pedir_reasignacion, resultado: pase_para_confirmar, tarea: FUS,

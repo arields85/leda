@@ -13,7 +13,8 @@ que nombra como la dijo porque no está en su lista (`como_la_nombra`; decisión
 "pasale la de los sensores de Nahuel a Pedro", con las mismas reglas de quién decide y quién la
 toma). El encargado también se queda él con la de alguien de su sector ("la del tornillo de
 Nahuel la hago yo"; decisión 53): pide, decide y la toma la misma persona, así que al confirmar la
-vista previa la tarea pasa a ser suya. Leda muestra la vista previa (de quién a quién, quién lo
+vista previa la tarea pasa a ser suya. La IA lo marca (`se_la_queda`) y la cocina pone de quien recibe
+a quien escribe: escribir su propio nombre la IA lo leía "yo" (la 39, paso 21). Leda muestra la vista previa (de quién a quién, quién lo
 decide si es otra persona y que quien la recibe tiene que tomarla) y espera la confirmación, con el
 botón "Confirmar" o escrita,
 con la guarda de la decisión 2 (`confirmar`): lo último que la persona vio, en un mensaje
@@ -163,6 +164,11 @@ def pedir(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
         tarea = _la_nombrada(ctx, str(dicho))
         if "resultado" in tarea:
             return tarea
+    if datos.get("se_la_queda") is True and vacio(datos.get("a")):
+        # Se la queda quien escribe (decisión 53): la IA lo marca en lugar de escribir su propio
+        # nombre, que leía "yo" (la 39, paso 21). Si además nombra a alguien, vale lo que nombra,
+        # con su vista previa: su propio nombre da lo mismo, y otra persona es el pase a ésa.
+        return _mostrar(ctx, tarea, ctx.quien.membership_id)
     if vacio(datos.get("a")):
         return {"resultado": "falta_dato", "falta": ["a"], "tarea": tarea_hecho(tarea)}
     coinciden = integrantes_que_coinciden(ctx.cur, str(datos["a"]).strip())
