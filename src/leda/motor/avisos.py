@@ -1355,7 +1355,15 @@ def _vigencia_de_una_pregunta(m: Momento, aviso) -> tuple[str | None, dict[str, 
         return motivo, {}
     if espera_de_la_pregunta(m.cur, pregunta) is None:
         return "ya_respondio", {}
-    return None, hechos_de_una_pregunta(m, tarea, dict(aviso["hechos"]))
+    return None, {**hechos_de_una_pregunta(m, tarea, dict(aviso["hechos"])),
+                  **_lo_que_dijo_la_persona_trabada(m.cur, pregunta)}
+
+
+def _lo_que_dijo_la_persona_trabada(cur, pregunta: dict[str, Any]) -> dict[str, Any]:
+    """Al volver a hacerle a quien destraba la pregunta del día que dio: si la persona trabada
+    dijo después que se lo pedía ella, quién (decisión 66; `persecucion.dijo_que_se_lo_pedia`)."""
+    from . import persecucion           # persecucion importa este módulo
+    return persecucion.dijo_que_se_lo_pedia(cur, pregunta)
 
 
 def de_quien_es_la_pregunta(cur, tarea: dict[str, Any], pregunta: dict[str, Any]) -> str | None:
@@ -1430,7 +1438,8 @@ def _vigencia_de_la_que_se_repite(m: Momento, aviso) -> tuple[str | None, dict[s
         return "cambio_el_responsable", {}
     if aviso["tipo"] == REPETICION_DEL_DIA and m.fecha(aviso["programado_para"]) != m.hoy:
         return YA_NO_ES_EL_DIA, {}
-    return None, hechos_de_una_pregunta(m, tarea, dict(aviso["hechos"]))
+    return None, {**hechos_de_una_pregunta(m, tarea, dict(aviso["hechos"])),
+                  **_lo_que_dijo_la_persona_trabada(m.cur, pregunta)}
 
 
 # --- Los avisos de una previsión ---------------------------------------------------------------

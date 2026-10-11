@@ -137,9 +137,11 @@ la pregunta.
 
 **"Se lo pido yo y te cuento"** (la salida de la decisión 37; `pedirselo_y_contar`): queda
 anotado; Leda no le escribe a quien destraba (si el mensaje no salió, no sale; si Leda ya le
-preguntaba, deja de hacerlo y se lo dice) y al día hábil siguiente le pregunta a la persona
-trabada cómo le fue (`avisos.COMO_LE_FUE`, la pregunta de qué arreglaron, que la escalera de las
-preguntas repite sin escalar: decisión 38).
+preguntaba, deja de hacerlo y se lo dice, salvo que ya haya dado un día: ese compromiso sigue en
+pie, haya salido o no la pregunta de ese día, y lo que se la vuelve a hacer le cuenta quién dijo
+que se lo pedía; decisiones 64 y 66, `su_dia_en_pie`) y al día hábil siguiente le pregunta a
+la persona trabada cómo le fue (`avisos.COMO_LE_FUE`, la pregunta de qué arreglaron, que la
+escalera de las preguntas repite sin escalar: decisión 38).
 
 **Seguir la cadena hasta quien puede destrabarla** (C-5e; decisión 42; conversación 44). A quien
 ya está trabado con lo que le falta a la tarea no se le pregunta (`preguntarle`,
@@ -2223,7 +2225,10 @@ def pedirselo_y_contar(ctx: Contexto, datos: dict[str, Any],
                 (tarea["id"], PREGUNTA_A_QUIEN_DESTRABA))
     for aviso in cur.fetchall():
         omitir(cur, str(aviso["id"]), SE_LO_PIDE_QUIEN_ESTA_TRABADO, ctx.ahora)
-    if persona is not None and _le_pregunta_todavia(cur, persona, tarea["id"]):
+    # Si ya dio un día, es un compromiso suyo: lo que Leda le pregunta de ese día sigue en pie,
+    # haya salido o no la pregunta (decisiones 64 y 66).
+    if (persona is not None and _le_pregunta_todavia(cur, persona, tarea["id"])
+            and su_dia_en_pie(cur, blocker_id, persona) is None):
         _juntar(hecho, cerrar_el_tema(ctx, tarea["id"], blocker_id, SE_LO_PIDE_QUIEN_ESTA_TRABADO,
                                       solo={persona}))
     # Al día hábil siguiente, a la hora en que Leda escribe, cómo le fue: la pregunta de qué
@@ -2272,6 +2277,37 @@ def quien_se_lo_pide(cur, fila_id: str, *, desde) -> str | None:
                 (COMO_LE_FUE, f"u{fila_id}", desde))
     fila = cur.fetchone()
     return fila["nombre"] if fila is not None else None
+
+
+def su_dia_en_pie(cur, blocker_id: str, persona: str) -> dict[str, Any] | None:
+    """El día que dio esa persona sobre el bloqueo, si sigue en pie: lo último que dijo quien lo
+    destraba es suyo y es un día. Es un compromiso suyo, registrado, que la palabra de otro no
+    anula (decisiones 64 y 66)."""
+    dicho_id = ultimo_dicho_de_quien_destraba(cur, blocker_id)
+    if dicho_id is None:
+        return None
+    cur.execute("select * from dicho_de_quien_destraba where id = %s", (dicho_id,))
+    dicho = cur.fetchone()
+    if str(dicho["dicho_por_membership_id"]) != persona or dicho["para_cuando"] is None:
+        return None
+    return dicho
+
+
+def dijo_que_se_lo_pedia(cur, pregunta: dict[str, Any]) -> dict[str, Any]:
+    """Para lo que vuelve a hacerle a quien destraba la pregunta de para cuándo (la escalera de
+    las preguntas, la repetición del día): si después del día que dio la persona trabada dijo que
+    se lo pedía ella directamente, quién (decisión 66, como la 64 en la pregunta de ese día)."""
+    if pregunta["tipo"] != preguntas.CUANDO_SE_DESTRABA:
+        return {}
+    destraba_id = (pregunta["jugada"] or {}).get("destraba_id")
+    fila = quien_destraba(cur, destraba_id) if destraba_id else None
+    if fila is None:
+        return {}
+    dia = su_dia_en_pie(cur, str(fila["blocker_id"]), str(pregunta["membership_id"]))
+    if dia is None:
+        return {}
+    quien = quien_se_lo_pide(cur, str(destraba_id), desde=dia["at"])
+    return {DIJO_QUE_SE_LO_PEDIA: quien} if quien is not None else {}
 
 
 def _la_trabada_de_lo_que_se_hablaba(ctx: Contexto) -> dict[str, Any] | None:

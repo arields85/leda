@@ -1669,6 +1669,60 @@ def test_se_lo_pido_yo_antes_del_dia_que_dio_despues_no_lo_menciona(conn, mundo,
     assert "dijo_que_se_lo_pedia" not in _lo_que_se_le_redacta_a_ariel(ia)
 
 
+# Decisión 66: "se lo pido yo" después de que la pregunta del día ya le llegó a Ariel. Vale la 64:
+# su día es un compromiso suyo, la pregunta sigue abierta y, si no contesta, Leda se la vuelve a
+# hacer contándole que Marcos se lo iba a pedir directamente.
+
+def _a_ariel_le_llego_el_dia_y_marcos_se_lo_pide(conn, mundo, equipo, *, dias=None) -> None:
+    _le_pregunto(conn, mundo, equipo)
+    _ariel_dice(equipo, para_cuando="2026-10-08")
+    if dias:
+        _los_dias(conn, mundo, dias)
+    else:
+        _salir(conn, mundo, octubre(8, 10))
+    [el_dia] = avisos_guardados(conn, EL_DIA)
+    assert el_dia["estado"] == "enviado"
+    equipo.dice("Marcos", Jugada("pedirselo_y_contar", {"tarea": "T1"}), at=octubre(8, 11))
+
+
+def test_se_lo_pido_yo_despues_de_que_le_llego_el_dia_no_le_cierra_el_tema(conn, mundo, equipo):
+    _a_ariel_le_llego_el_dia_y_marcos_se_lo_pide(conn, mundo, equipo)
+
+    assert avisos_guardados(conn, YA_NO_HACE_FALTA) == []
+    assert _su_pregunta(conn, mundo)["tipo"] == "cuando_se_destraba"
+    assert _abiertas(conn, mundo, "Ariel") == 1
+    assert _esperas(conn, mundo, "Ariel") == 1
+    [como] = avisos_guardados(conn, COMO_LE_FUE)
+    assert str(como["destinatario_membership_id"]) == _membresia(mundo, "Marcos")
+
+
+def test_si_no_contesta_el_dia_se_lo_repite_contandole_que_marcos_se_lo_iba_a_pedir(
+        conn, espacio_con_escalera, equipo):
+    mundo = espacio_con_escalera
+    _a_ariel_le_llego_el_dia_y_marcos_se_lo_pide(conn, mundo, equipo, dias=(6, 7, 8))
+
+    ia = _los_dias(conn, mundo, (9,))
+
+    [repregunta] = [r for r in _repreguntas(conn) if r["a"] == _membresia(mundo, "Ariel")]
+    assert repregunta["hechos"]["pregunta"] == "cuando_se_destraba"
+    hechos = _lo_que_se_le_redacta_a_ariel(ia)
+    assert hechos["aviso"] == "repregunta"
+    assert hechos["dijo_que_se_lo_pedia"] == "Marcos"
+
+
+def test_la_repeticion_sin_se_lo_pido_yo_no_lo_menciona(conn, espacio_con_escalera, equipo):
+    mundo = espacio_con_escalera
+    _le_pregunto(conn, mundo, equipo)
+    _ariel_dice(equipo, para_cuando="2026-10-08")
+    _los_dias(conn, mundo, (6, 7, 8))
+
+    ia = _los_dias(conn, mundo, (9,))
+
+    hechos = _lo_que_se_le_redacta_a_ariel(ia)
+    assert hechos["aviso"] == "repregunta"
+    assert "dijo_que_se_lo_pedia" not in hechos
+
+
 def test_se_lo_pido_yo_sin_un_dia_dado_deja_de_escribirle(conn, espacio_con_escalera, equipo):
     """Decisión 37, sin cambios: Ariel no se comprometió a nada; con "se lo pido yo" Leda deja de
     preguntarle y no le repite nada. A Marcos sí le pregunta cómo le fue."""
