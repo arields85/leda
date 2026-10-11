@@ -3780,6 +3780,20 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           con `a: "yo"` (la 39, paso 21: 1, 1 y 3 de 5; Leda contesta que "yo" no figura).
           En los dos casos Leda queda en un estado seguro y honesto; el costo es una pregunta
           de más. Se discute el diseño con el usuario.
+  - [x] **Las dos lecturas repetidas, por diseño** (2026-10-11, de madrugada; decisiones 63 y 64).
+        - **"La hago yo"** (la 39, paso 21): `pedir_reasignacion` tiene `se_la_queda`; la IA marca
+          que el encargado se la queda y la cocina pone a quien escribe (`af3263f`; `ia_real.DATOS`
+          y `hechos.SIGNIFICADOS` con su entrada). Si la IA igual escribe `a` con algo que no es
+          nadie, hoy gana `a` (`persona_desconocida`): se decide con la ronda real.
+        - **"Ni idea"** (la 34, paso 7; decisión 63): el corredor acepta una segunda lectura válida
+          de un paso (`o_bien`, con sus propios efectos esperados y pasos `luego` que vuelven al
+          mismo estado; nada se hereda, así que las garantías se siguen mirando) (`bc54b4b`).
+          Revisión `review-0ed808042ebcf393`, aprobada; advertencias del corredor:
+          `comprobar.py:489-491` (la otra lectura descarta claves del paso) y `corredor.py:309-315`.
+        - **Verificación de `af3263f`:** `tests/motor` 1208, `tests/garantias` 466,
+          `tests/conversaciones` 166 passed; en seco, 45 de 45.
+        - **ADR 0020 (los apodos), aceptado** (`8b2b82d`): por construir, con su conversación de
+          prueba primero.
 - [ ] La plataforma: su ADR, con el usuario.
 
 **Preguntas juntadas para el usuario: contestadas todas** (2026-10-09, a la mañana, de a una y
