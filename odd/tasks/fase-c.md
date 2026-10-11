@@ -557,8 +557,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     `review-2b8ab052374c9a43`, aprobada; advertencias: el mensaje sin texto propio no tiene
     prueba (`entrega.py:946-948`) y la oferta pasa el resultado de `entregar` sin mirarlo
     (`entrega.py:1005-1014`); sugerencia: probar los casos en que no se ofrece (`995-997`).
-    `PENDIENTE` (pregunta al usuario): la oferta abre una confirmación de entrega, que se repite
-    una vez por día como cualquier vista previa sin confirmar; ¿o no se repite?
+    Ajuste: la decisión 73.
 
 69. **"Pedíselo igual a Martín" sin encargado: las dos lecturas valen** (pregunta 5, la 48 paso
     10; usuario, 2026-10-11, "aceptarlo", la que recomendó el agente; como la 63). Que la IA lo
@@ -589,6 +588,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     general de la cocina, no una rama para este caso; la jugada de más de la IA sigue valiendo
     (`o_bien` del paso 4). Por construir, con su prueba y la 35, cuando termine el escritor de
     los apodos.
+
+73. **La oferta de volver a entregar no se repite** (la 68; usuario, 2026-10-11, "Si, vamos con tu
+    recomendacion"). La ofreció Leda, no la empezó la persona: si Mariano no contesta, Leda no se
+    la vuelve a ofrecer cada día como a una vista previa sin confirmar. El archivo queda guardado
+    y se suma solo cuando entregue; el seguimiento de la tarea por su fecha sigue igual. Por
+    construir, con su prueba.
 
 ## Chequeo de rumbo (2026-10-07)
 
