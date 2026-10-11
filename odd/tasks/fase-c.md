@@ -543,6 +543,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     respuesta le ofrece "¿La volvés a entregar con esto?" con Confirmar. La entrega sale sólo con
     su sí; si no contesta, nada cambia. Por construir, con su prueba y el paso 12 de la 23.
 
+69. **"Pedíselo igual a Martín" sin encargado: las dos lecturas valen** (pregunta 5, la 48 paso
+    10; usuario, 2026-10-11, "aceptarlo", la que recomendó el agente; como la 63). Que la IA lo
+    lea como `pedir_el_detalle` o como `fuera_de_la_lista` está bien: Nahuel recibe la misma
+    respuesta, y la nota de pedido fuera de la lista al administrador es cierta. Por hacer: el
+    `o_bien` del paso 10 de la 48, cuando termine el escritor de los apodos.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3867,7 +3873,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
            ofrece entregarla. Propuesta: guardarlo y ofrecer en la misma respuesta "¿La volvés a
            entregar con esto?" con Confirmar (la persona elige; nada cambia sin su sí). La otra
            salida es aceptar las dos lecturas en la prueba y no cambiar nada.
-        5. **"Pedíselo igual a Martín" cuando el sector ya no tiene encargado** (la 48, paso 10,
+        5. **Contestada: decisión 69, aceptarlo.** **"Pedíselo igual a Martín" cuando el sector ya no tiene encargado** (la 48, paso 10,
            primera ronda real): en 4 de 5 la IA lo leyó como un pedido que Leda no sabe hacer
            (`fuera_de_la_lista`), no como pedir el detalle. Leda le dice igual que no puede, pero
            eso le deja un aviso al administrador (el de los pedidos fuera de la lista). ¿Se acepta
