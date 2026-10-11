@@ -113,3 +113,57 @@ def test_las_instrucciones_describen_jugadas_en_orden_sin_la_regla_de_una_sola_j
 def test_las_jugadas_sobre_un_bloqueo_admiten_el_que_anota_el_mismo_mensaje():
     for nombre in ("anotar_quien_destraba", "destrabar"):
         assert "mismo mensaje" in FICHAS[nombre].es, nombre
+
+
+
+# --- Revisión de `f0d18e6`: lo que se difiere y lo que no (ADR 0018, 9m.1) ----------------------
+#
+# Una jugada que mira cómo está otra tarea de quien escribe (`Ficha.mira_otra_tarea`) se maneja
+# después de las demás del mensaje. El resto conserva su orden entre sí, así que lo que una jugada
+# anota sigue estando para las que vienen después; dos diferidas conservan el suyo; y los hechos
+# quedan en el orden en que la persona lo dijo.
+
+def _enlazada(tarea: str) -> Jugada:
+    return Jugada("decir_cuando_destraba", {"tarea": tarea, "su_tarea_trabada": "T1",
+                                            "lo_que_dice": "todavia no la tengo"})
+
+
+def test_las_que_miran_otra_tarea_van_al_final_en_su_orden():
+    from leda.motor.fichas import en_orden
+
+    jugadas = [_enlazada("T2"), _bloqueo(), _enlazada("T3"), _destraba(tarea="T1"),
+               Jugada("decir_cuando_destraba", {"tarea": "T4", "lo_que_dice": "el lunes"})]
+
+    assert en_orden(jugadas) == [1, 3, 4, 0, 2]
+
+
+def test_diferir_no_cambia_lo_que_ven_las_demas_y_los_hechos_quedan_como_se_dijeron():
+    """Con manejadores que anotan lo que ven: cada jugada no diferida ve lo de las anteriores
+    no diferidas, como sin diferir; las diferidas ven todo el mensaje y conservan su orden."""
+    from types import SimpleNamespace
+
+    from leda.motor.turno import _manejar_todas
+
+    vistos: list[tuple[str, tuple[str, ...]]] = []
+
+    def anota(ctx, jugada):
+        clave = f"{jugada.nombre}:{(jugada.datos or {}).get('tarea')}"
+        vistos.append((clave, tuple(ctx.anotado)))
+        ctx.anotado.append(clave)
+        return {"jugada": jugada.nombre, "tarea": (jugada.datos or {}).get("tarea")}
+
+    jugadas = {n: anota for n in ("decir_cuando_destraba", "anotar_bloqueo",
+                                  "anotar_quien_destraba")}
+    elegidas = [_enlazada("T2"), _bloqueo(), _enlazada("T3"), _destraba(tarea="T1")]
+
+    hechos = _manejar_todas(SimpleNamespace(anotado=[]), elegidas, jugadas)
+
+    assert vistos == [
+        ("anotar_bloqueo:T1", ()),
+        ("anotar_quien_destraba:T1", ("anotar_bloqueo:T1",)),
+        ("decir_cuando_destraba:T2", ("anotar_bloqueo:T1", "anotar_quien_destraba:T1")),
+        ("decir_cuando_destraba:T3", ("anotar_bloqueo:T1", "anotar_quien_destraba:T1",
+                                      "decir_cuando_destraba:T2"))]
+    assert [(h["jugada"], h["tarea"]) for h in hechos] == [
+        ("decir_cuando_destraba", "T2"), ("anotar_bloqueo", "T1"),
+        ("decir_cuando_destraba", "T3"), ("anotar_quien_destraba", "T1")]

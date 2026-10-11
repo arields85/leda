@@ -797,6 +797,20 @@ def test_la_raiz_saca_solo_la_terminacion_y_deja_las_palabras_cortas():
     assert cp.raiz("sabe") != cp.raiz("conoce")
 
 
+def test_dos_palabras_distintas_con_la_misma_raiz_cuentan_como_dichas():
+    """Revisión de `fcb8c17`: comparar raíces (decisión 70) deja pasar una palabra distinta que
+    termina igual que una de la persona ("caso" por "casa", "paso" por "pase"): el corredor es
+    más laxo en eso, a sabiendas. Una palabra con otra raíz sigue faltando, y una corta
+    (`_RAIZ_MINIMA`) se compara entera: "mes" no es "mas"."""
+    from tests.conversaciones.motores import cargar
+
+    palabras = cargar().palabras
+    assert cp.raiz("caso") == cp.raiz("casa") and cp.raiz("paso") == cp.raiz("pase")
+    assert cp.palabras_que_no_dijo("el caso", "la casa", palabras) == ["el"]
+    assert cp.palabras_que_no_dijo("nahuel la sabe mejor", "que la conoces mejor",
+                                   palabras) == ["nahuel", "sabe"]
+    assert cp.palabras_que_no_dijo("mes", "mas", palabras) == ["mes"]
+
 
 def test_un_nombre_se_compara_sin_mayusculas_ni_acentos():
     """La 47, paso 7: la IA escribió "Mariano" y el YAML espera "mariano". Otro nombre sigue

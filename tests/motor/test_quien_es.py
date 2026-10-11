@@ -655,3 +655,43 @@ def test_un_nombre_que_coincide_con_varias_personas_no_elige_ni_cambia_nada(conn
     assert _vigentes_del_tano(conn) == [MARIANO]
     assert _vigentes_del_flaco(conn) == [MARCOS, MARTIN]
     assert hechos.sin_significado(turnos.redaccion) == set()
+
+
+# --- Revisiones de `e932186` y `7d0cbcd`: la pregunta de a quiénes, contestada por escrito -------
+
+def test_repetir_la_correccion_con_la_pregunta_abierta_cuenta_como_solo_a_esa_persona(conn,
+                                                                                    turnos):
+    """Con "¿a los dos o sólo a Nahuel?" abierta, volver a escribir "el tano es nahuel" nombra
+    sólo a la nueva persona: es "Sólo a Nahuel", como el botón (`apodos._a_quienes`). Retira el
+    apodo de Mariano, auditado."""
+    _el_tano_es_mariano(conn, turnos)
+    _el_tano_es_nahuel(turnos)
+
+    r = _el_tano_es_nahuel(turnos)
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["dejo_de_reconocer_asi_a"] == [MARIANO]
+    assert _vigentes_del_tano(conn) == [NAHUEL]
+    assert _pregunta(conn, turnos, "Marcos") is None
+
+
+def test_una_respuesta_escrita_que_no_contesta_a_quienes_la_deja_abierta(conn, turnos):
+    """Nombrar a quien ya tenía el apodo no dice si a los dos o sólo a Nahuel: la pregunta
+    sigue abierta y ningún apodo cambia."""
+    _el_tano_es_mariano(conn, turnos)
+    _el_tano_es_nahuel(turnos)
+
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"quien_es": "mariano"}),
+                    texto="mariano")
+
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["falta"]) == ("falta_dato", [A_QUIENES])
+    assert _pregunta(conn, turnos, "Marcos")["tipo"] == A_QUIENES
+    assert _vigentes_del_tano(conn) == [MARIANO]
+    assert _auditorias(conn, "dejar_de_usar_apodo") == 0
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+
+def _auditorias(conn, accion: str) -> int:
+    return len(todos(conn, "select 1 from audit_log where accion = %s", accion))

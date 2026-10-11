@@ -456,11 +456,21 @@ def test_si_uno_ya_no_corresponde_sale_solo_el_otro(conn, mundo, servidor, equip
     _ariel_contesta_todo_junto(equipo)
     equipo.dice("Ariel", Jugada("destrabar", {"tarea": "T1"}), texto="ah no, ya llego")
 
-    _salir(conn, mundo, AHORA + timedelta(minutes=70))
+    ia = _salir(conn, mundo, AHORA + timedelta(minutes=70))
 
-    [_mensaje] = _a_marcos(conn, mundo)
+    [mensaje] = _a_marcos(conn, mundo)
     [lo_que_dijo] = avisos_guardados(conn, LO_QUE_DIJO)
-    assert lo_que_dijo["estado"] == "enviado"
+    assert (lo_que_dijo["estado"], str(lo_que_dijo["outbox_id"])) == ("enviado",
+                                                                      str(mensaje["id"]))
+    # Lo que se juntaba con él se miró al salir y ya no corresponde: queda omitido, con su
+    # motivo, y no entra en lo que redacta la IA.
+    [novedad] = [a for a in avisos_guardados(conn, NOVEDAD)
+                 if str(a["destinatario_membership_id"]) == _membresia(mundo, "Marcos")
+                 and a["turno_id"] == lo_que_dijo["turno_id"]]
+    assert novedad["estado"] == "omitido" and novedad["motivo_omision"]
+    assert novedad["outbox_id"] is None
+    [pedido] = [p for p in ia.pedidos_de_redaccion if p["persona"] == "Marcos"]
+    assert [h["aviso"] for h in pedido["hechos"]] == [LO_QUE_DIJO]
 
 
 # --- Lo que una jugada mira de otra tarea se juzga con lo que deja el mensaje ------------------

@@ -1723,6 +1723,66 @@ def test_la_repeticion_sin_se_lo_pido_yo_no_lo_menciona(conn, espacio_con_escale
     assert "dijo_que_se_lo_pedia" not in hechos
 
 
+# Revisión de la 66 (`9d28a4c`): la repetición del día de la pregunta abierta (decisión 29) y lo
+# que pasa si quien destraba contesta o da otro día después de "se lo pido yo".
+
+def _la_repeticion_del_dia(conn, mundo) -> IAQueRedacta:
+    """La escalera a las 14:30 del jueves 8 (cuatro horas después de la pregunta de las 10) y
+    lo que sale a esa hora."""
+    correr_escalera(conn, mundo["id"], RelojFijo(octubre(8, 14, 30)))
+    conn.commit()
+    return _salir(conn, mundo, octubre(8, 14, 30))
+
+
+def test_la_repeticion_del_dia_le_cuenta_que_marcos_se_lo_iba_a_pedir(conn, mundo, equipo):
+    _a_ariel_le_llego_el_dia_y_marcos_se_lo_pide(conn, mundo, equipo)
+
+    ia = _la_repeticion_del_dia(conn, mundo)
+
+    [repeticion] = avisos_guardados(conn, "repeticion_del_dia")
+    assert repeticion["estado"] == "enviado"
+    hechos = _lo_que_se_le_redacta_a_ariel(ia)
+    assert hechos["aviso"] == "repeticion_del_dia"
+    assert hechos["pregunta"] == "cuando_se_destraba"
+    assert hechos["dijo_que_se_lo_pedia"] == "Marcos"
+
+
+def test_la_repeticion_del_dia_sin_se_lo_pido_yo_no_lo_menciona(conn, mundo, equipo):
+    _le_pregunto(conn, mundo, equipo)
+    _ariel_dice(equipo, para_cuando="2026-10-08")
+    _salir(conn, mundo, octubre(8, 10))
+
+    ia = _la_repeticion_del_dia(conn, mundo)
+
+    hechos = _lo_que_se_le_redacta_a_ariel(ia)
+    assert hechos["aviso"] == "repeticion_del_dia"
+    assert "dijo_que_se_lo_pedia" not in hechos
+
+
+def test_si_contesta_despues_de_se_lo_pido_yo_no_se_le_repite(conn, mundo, equipo):
+    _a_ariel_le_llego_el_dia_y_marcos_se_lo_pide(conn, mundo, equipo)
+    _ariel_dice(equipo, at=octubre(8, 12), ya_esta=True)
+
+    _la_repeticion_del_dia(conn, mundo)
+
+    assert avisos_guardados(conn, "repeticion_del_dia") == []
+    assert _abiertas(conn, mundo, "Ariel", "cuando_se_destraba") == 0
+
+
+def test_un_dia_nuevo_despues_de_se_lo_pido_yo_ya_no_lo_menciona(conn, mundo, equipo):
+    """Lo que dijo Marcos ya no explica nada: Ariel habló con Leda después y dio otro día, que
+    es su compromiso ahora. Ese día Leda le pregunta sin contarle lo de Marcos."""
+    _a_ariel_le_llego_el_dia_y_marcos_se_lo_pide(conn, mundo, equipo)
+    _ariel_dice(equipo, at=octubre(8, 12), para_cuando="2026-10-09")
+
+    ia = _salir(conn, mundo, octubre(9, 10))
+
+    hechos = _lo_que_se_le_redacta_a_ariel(ia)
+    assert hechos["aviso"] == EL_DIA
+    assert hechos["habia_dicho"]["para_cuando"] == "2026-10-09"
+    assert "dijo_que_se_lo_pedia" not in hechos
+
+
 def test_se_lo_pido_yo_sin_un_dia_dado_deja_de_escribirle(conn, espacio_con_escalera, equipo):
     """Decisión 37, sin cambios: Ariel no se comprometió a nada; con "se lo pido yo" Leda deja de
     preguntarle y no le repite nada. A Marcos sí le pregunta cómo le fue."""

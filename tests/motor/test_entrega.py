@@ -1481,8 +1481,8 @@ def test_un_archivo_sin_texto_ni_jugada_ofrece_la_entrega_solo_con_el_archivo(co
     oferta lleva sólo la foto (no hay texto suyo que mostrar)."""
     tarea = _le_pidieron_cambios(conn, mundo, marcos)
     r = marcos.manda(archivos=[(JPEG, "foto", None)])
-    if r.pregunta is not None and r.pregunta["tipo"] == "cual_tarea":
-        r = marcos.toca(_token_de(conn, "Armar el tablero"))
+    assert r.pregunta["tipo"] == "cual_tarea"
+    r = marcos.toca(_token_de(conn, "Armar el tablero"))
 
     hecho = _hecho(r, "guardar_para_la_entrega")
     oferta = hecho["le_ofrece_entregarla_con_esto"]
@@ -1517,3 +1517,52 @@ def test_una_tarea_trabada_no_ofrece_entregarla(conn, mundo, marcos):
     assert "le_ofrece_entregarla_con_esto" not in hecho
     assert cuantas(conn, "conversation_question",
                    "tipo = 'confirmar_la_entrega' and cerrada_en is null") == 0
+
+
+# --- Revisión de `4bec127` (decisión 73) --------------------------------------------------------
+
+def _la_oferta(conn) -> dict:
+    return uno(conn, """select id, jugada, cerrada_en from conversation_question
+                         where tipo = 'confirmar_la_entrega' order by abierta_en desc limit 1""")
+
+
+def test_si_la_entrega_sin_nada_nuevo_con_la_oferta_abierta_la_oferta_pasa_a_ser_suya(
+        conn, mundo, marcos):
+    """Con la oferta abierta, Marcos dice que la entrega sin sumar nada: es la misma vista previa
+    (la misma pregunta), que deja de ser una oferta de Leda y se repite como cualquier entrega
+    sin confirmar."""
+    from leda.motor import preguntas
+    from tests.motor.ayudantes import Dias, octubre
+
+    _ofrecida(conn, mundo, marcos)
+    oferta = _la_oferta(conn)
+    assert preguntas.es_opcional(oferta)
+
+    r = marcos.manda(_entregar(), texto="")
+
+    assert _hecho(r, "entregar")["resultado"] == "para_confirmar"
+    despues = _la_oferta(conn)
+    assert despues["id"] == oferta["id"] and despues["cerrada_en"] is None
+    assert not preguntas.es_opcional(despues)
+    [repeticion] = Dias(conn, mundo).ciclo(octubre(5, 14, 30))
+    assert repeticion["hechos"][0]["aviso"] == "repeticion_del_dia"
+
+
+def test_si_la_entrega_no_se_puede_mostrar_no_ofrece_nada(conn, mundo, marcos, monkeypatch):
+    """La oferta mira lo que dice `entregar`: si no hay una vista previa que mostrar, no ofrece
+    nada (nunca una confirmación que no puede salir), y el archivo queda guardado igual."""
+    _le_pidieron_cambios(conn, mundo, marcos)
+    monkeypatch.setattr(entrega, "entregar",
+                        lambda ctx, datos, tarea, **_: {"resultado": "no_se_puede",
+                                                        "motivo": "estado"})
+
+    r = _guarda_la_foto(marcos, lo_descrito_cubre=["C1"])
+
+    hecho = _hecho(r, "guardar_para_la_entrega")
+    assert hecho["resultado"] == "anotado"
+    assert hecho["para_cuando_la_entregue"] == [{"es": "una_foto"}]
+    assert "le_ofrece_entregarla_con_esto" not in hecho
+    assert r.pregunta is None
+    assert cuantas(conn, "conversation_question",
+                   "tipo = any(array['confirmar_la_entrega', 'lo_que_falta_de_la_entrega'])"
+                   " and cerrada_en is null") == 0
