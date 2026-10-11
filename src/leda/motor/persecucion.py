@@ -209,6 +209,8 @@ SALIDAS_SIN_LEDA_CONECTADA = ("anotar_quien_destraba", PEDIRSELO_Y_CONTAR)
 COMO_SE_CERRO = "como_se_cerro"
 DIJO_QUE_YA_LO_HABLARON = "dijo_que_ya_lo_hablaron"
 SE_LO_PIDE_QUIEN_ESTA_TRABADO = "se_lo_pide_quien_esta_trabado"
+# Decisión 64: quién dijo que se lo pedía, en la pregunta del día que dio quien destraba.
+DIJO_QUE_SE_LO_PEDIA = "dijo_que_se_lo_pedia"
 QUEDO_SIN_EFECTO = "quedo_sin_efecto"
 # La persona trabada contestó quién destraba sin nombrar a nadie: no sabe quién, o no hay nadie
 # más. A quien Leda le preguntaba se le cierra el tema con eso, nunca con que la destraba otra
@@ -787,7 +789,9 @@ def _volver_a_preguntar_el_dia(ctx: Contexto, tarea: dict[str, Any], destraba: d
 def vigencia_del_dia_que_dijo(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     """La pregunta del día que dijo quien destraba sale mientras la tarea siga trabada por eso,
     la destrabe esa misma persona, lo que dijo ese día sea lo último que dijo y Leda no le haya
-    cerrado el tema después (`_se_le_cerro_el_tema`)."""
+    cerrado el tema después (`_se_le_cerro_el_tema`). Que la persona trabada diga después "se lo
+    pido yo" no la frena (decisión 64): el día es un compromiso de quien destraba, y los hechos
+    dicen quién dijo que se lo pedía (`DIJO_QUE_SE_LO_PEDIA`)."""
     tarea = leer_tarea(m.cur, aviso["task_id"])
     if tarea is None:
         return "tarea_inexistente", {}
@@ -805,7 +809,13 @@ def vigencia_del_dia_que_dijo(m: Momento, aviso) -> tuple[str | None, dict[str, 
     if _se_le_cerro_el_tema(m.cur, str(aviso["task_id"]),
                             str(aviso["destinatario_membership_id"]), desde=dicho["at"]):
         return SE_LE_CERRO_EL_TEMA, {}
-    return None, {**dict(aviso["hechos"] or {}), "tarea": tarea["titulo"]}
+    hechos = {**dict(aviso["hechos"] or {}), "tarea": tarea["titulo"]}
+    # Decisión 64: si después del día que dio la persona trabada dijo que se lo pedía ella, Leda
+    # le pregunta igual (el día es un compromiso suyo) y le cuenta quién lo dijo.
+    quien = quien_se_lo_pide(m.cur, str(dicho["blocker_unblocker_id"]), desde=dicho["at"])
+    if quien is not None:
+        hechos[DIJO_QUE_SE_LO_PEDIA] = quien
+    return None, hechos
 
 
 def _se_le_cerro_el_tema(cur, task_id: str, persona: str, *, desde) -> bool:
@@ -2246,6 +2256,19 @@ def se_lo_pide_quien_esta_trabado(cur, fila_id: str) -> bool:
                     where tipo = %s and split_part(dedupe_key, ':', 4) = %s limit 1""",
                 (COMO_LE_FUE, f"u{fila_id}"))
     return cur.fetchone() is not None
+
+
+def quien_se_lo_pide(cur, fila_id: str, *, desde) -> str | None:
+    """El nombre de la persona trabada si dijo, después de `desde`, que se lo pide ella a quien
+    nombra esa fila (`pedirselo_y_contar`, por el aviso de cómo le fue que nombra la fila)."""
+    cur.execute("""select i.nombre from scheduled_notice a
+                     join integrante i on i.membership_id = a.destinatario_membership_id
+                    where a.tipo = %s and split_part(a.dedupe_key, ':', 4) = %s
+                      and a.creado_en >= %s
+                    order by a.creado_en desc limit 1""",
+                (COMO_LE_FUE, f"u{fila_id}", desde))
+    fila = cur.fetchone()
+    return fila["nombre"] if fila is not None else None
 
 
 def _la_trabada_de_lo_que_se_hablaba(ctx: Contexto) -> dict[str, Any] | None:

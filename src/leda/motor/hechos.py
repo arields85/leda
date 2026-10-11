@@ -942,6 +942,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                                "tarea.",
     "se_lo_pide_quien_esta_trabado": "La persona trabada dijo que se lo pide directamente a "
                                      "quien destraba su tarea.",
+    "dijo_que_se_lo_pedia": "La persona trabada que, después de que quien recibe el aviso dio "
+                            "su día, dijo que se lo pedía directamente. Ese día sigue valiendo, "
+                            "y por eso Leda le pregunta igual.",
     "quedo_sin_efecto": "El bloqueo se había anotado por error y quedó sin efecto.",
     "ya_no_hace_falta_que_destraben": "A quiénes Leda les preguntaba por la tarea trabada y "
                                       "ahora les avisa que ya no hace falta "

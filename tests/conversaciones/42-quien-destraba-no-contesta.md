@@ -110,16 +110,34 @@ destraba nunca se le dice que se va a avisar a alguien si no contesta: no escala
 
 13. **Leda**, por su cuenta, a Marcos (miércoles 28, 10:40): lo que dijo Ariel, como información.
 
-14. **Leda**, por su cuenta, a Ariel (jueves 29, 10:00): el día que dijo; si ya le pasó la IP a
-    Marcos (decisión 42, C-5e).
+13b. **Marcos** escribe (miércoles 28, 10:50): "dale igual mañana se la pido yo y te cuento"
     →
-    - Efecto: la pregunta vieja no se repite más (ya contestó); sale sólo ésta, que abre su pregunta.
+    - Jugadas: `pedirselo_y_contar` sobre la tarea del PLC.
+    - Efecto: se guarda la pregunta a Marcos de cómo le fue, para el jueves 29 a las 10:00. Ariel ya
+      dio un día: la pregunta de ese día sigue guardada y a Ariel no se le cierra el tema (decisión
+      64).
+    - La respuesta dice: que mañana le pregunta cómo le fue.
+    - La respuesta no dice: que Leda ya no le va a preguntar a Ariel.
+
+14. **Leda**, por su cuenta, a Ariel (jueves 29, 10:00): el día que dijo; si ya le pasó la IP a
+    Marcos (decisión 42, C-5e). Y a Marcos, cómo le fue con Ariel.
+    →
+    - Efecto: la pregunta vieja no se repite más (ya contestó); a Ariel le sale sólo ésta, que abre
+      su pregunta. A Marcos, la suya de qué arreglaron.
+    - El mensaje a Ariel dice: que Marcos le comentó a Leda que se la iba a pedir él directamente;
+      que hoy era el día que dijo; si ya se la pasó (decisión 64: el día que dio es un compromiso
+      suyo, y se le cuenta para que entienda por qué le pregunta Leda).
+    - El mensaje a Ariel no dice: que Marcos no le confirmó a Leda si habló con él (sería exponerlo
+      delante de un compañero; constitución §8).
 
 ## Qué mide
 
 - **Garantías (5b):** a quien destraba nunca se lo deja de preguntar mientras siga el bloqueo, y
   nunca más de una vez por día de la escalera; no se escala a nadie por su silencio; no se le
   reprocha ni se le dice que se va a avisar a alguien; lo que vuelve por un cambio de tema sale en
-  un mensaje aparte; ya contestado, no se le pregunta más.
+  un mensaje aparte; ya contestado, no se le pregunta más. Si ya dio un día, "se lo pido yo" de
+  Marcos no se lo anula: ese día Leda le pregunta igual y le cuenta quién dijo que se lo pedía
+  (decisión 64), y a Marcos le pregunta cómo le fue.
 - **Falla de comprensión:** que la IA no tome "arranque con la instalacion del servidor" como el
-  inicio de su tarea, o "mañana a primera hora se la paso" como lo que dice quien destraba.
+  inicio de su tarea, o "mañana a primera hora se la paso" como lo que dice quien destraba, o que
+  no tome "igual mañana se la pido yo y te cuento" como que Marcos se lo pide él.

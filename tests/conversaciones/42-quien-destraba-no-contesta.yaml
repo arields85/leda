@@ -231,12 +231,49 @@ pasos:
       - que Ariel dice que mañana (jue 29/10) a primera hora le pasa la IP
       - que no hace falta responder, en el último renglón
 
+  # Ariel ya dio un día: "se lo pido yo" no se lo cierra (decisión 64). A Marcos, mañana le
+  # pregunta cómo le fue.
+  - paso: 13b
+    quien: Marcos
+    a_las: "2026-10-28 10:50"
+    escribe: "dale igual mañana se la pido yo y te cuento"
+    jugadas:
+      - {nombre: pedirselo_y_contar, tarea: PLC, puede_traer: [quien]}
+    efectos:
+      avisos_guardados:
+        - {tipo: como_le_fue_con_quien_destraba, tarea: PLC, a: Marcos, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: que_arreglaron,
+                    se_lo_pide_a: Ariel De Simone}}
+    hechos:
+      - {jugada: pedirselo_y_contar, resultado: anotado, tarea: PLC,
+         se_lo_pide_a: Ariel De Simone, ya_no_hace_falta_que_destraben: ausente,
+         le_pregunta_como_le_fue: {llega: "~2026-10-29T10:00"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que mañana le pregunta cómo le fue
+    no_dice:
+      - que Leda ya no le va a preguntar a Ariel
+
   # Ya contestó: la pregunta vieja no se repite más. El día que dijo, Leda le vuelve a preguntar
-  # si ya se la pasó (decisión 42, C-5e).
+  # si ya se la pasó (decisión 42, C-5e), aunque Marcos dijo que se lo pedía él, y se lo cuenta
+  # para que entienda por qué le pregunta (decisión 64). A Marcos, cómo le fue.
   - paso: 14
     quien: Leda
     relojes: ["2026-10-29 10:00"]
     salen:
       - {a: Ariel, tipo: el_dia_que_dijo_quien_destraba, tarea: PLC,
          hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
-                  habia_dicho: {para_cuando: "2026-10-29"}}}
+                  habia_dicho: {para_cuando: "2026-10-29"},
+                  dijo_que_se_lo_pedia: Marcos Tarquini}}
+      - {a: Marcos, tipo: como_le_fue_con_quien_destraba, tarea: PLC,
+         hechos: {necesita_respuesta: true, pregunta: que_arreglaron,
+                  se_lo_pide_a: Ariel De Simone}}
+    dice:
+      - "a Ariel: que Marcos dijo que se la iba a pedir él directamente"
+      - "a Ariel: que hoy era el día que dijo; si ya le pasó la IP a Marcos"
+      - "a Marcos: cómo le fue con Ariel, qué arreglaron"
+    no_dice:
+      - "a Ariel: que Marcos no le confirmó a Leda si habló con él"

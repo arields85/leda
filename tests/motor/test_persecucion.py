@@ -1591,6 +1591,96 @@ def test_se_lo_pido_yo_despues_de_que_le_llego_le_cierra_el_tema(conn, mundo, eq
     assert _esperas(conn, mundo, "Ariel") == 0
 
 
+# Decisión 64: "se lo pido yo" no anula el día que ya dio quien destraba.
+
+EL_DIA = "el_dia_que_dijo_quien_destraba"
+
+
+def _ariel_dio_el_jueves_y_marcos_se_lo_pide(conn, mundo, equipo) -> None:
+    _le_pregunto(conn, mundo, equipo)
+    _ariel_dice(equipo, para_cuando="2026-10-08")
+    equipo.dice("Marcos", Jugada("pedirselo_y_contar", {"tarea": "T1"}),
+                at=AHORA + timedelta(minutes=60))
+
+
+def _lo_que_se_le_redacta_a_ariel(ia: IAQueRedacta) -> dict:
+    [pedido] = [p for p in ia.pedidos_de_redaccion if p["persona"] == ARIEL]
+    [hechos] = pedido["hechos"]
+    return hechos
+
+
+def test_se_lo_pido_yo_despues_del_dia_que_dio_no_le_cierra_el_tema(conn, mundo, equipo):
+    """Ariel ya dio un día: es un compromiso suyo, registrado. Que Marcos diga que se lo pide él
+    no se lo cierra ni le retira la pregunta de ese día; a Marcos le pregunta cómo le fue."""
+    _ariel_dio_el_jueves_y_marcos_se_lo_pide(conn, mundo, equipo)
+
+    assert avisos_guardados(conn, YA_NO_HACE_FALTA) == []
+    [el_dia] = avisos_guardados(conn, EL_DIA)
+    assert el_dia["estado"] == "guardado"
+    [como] = avisos_guardados(conn, COMO_LE_FUE)
+    assert str(como["destinatario_membership_id"]) == _membresia(mundo, "Marcos")
+
+
+def test_el_dia_que_dio_le_pregunta_igual_y_le_cuenta_que_marcos_se_lo_iba_a_pedir(conn, mundo,
+                                                                                   equipo):
+    """Decisión 64, con el ajuste del usuario: el jueves Leda le pregunta a Ariel si pudo, y le
+    cuenta que Marcos dijo que se lo pedía él directamente, para que entienda por qué le
+    pregunta. Nada sobre si Marcos le confirmó a Leda que habló con él."""
+    _ariel_dio_el_jueves_y_marcos_se_lo_pide(conn, mundo, equipo)
+    _salir(conn, mundo, octubre(6, 10))
+    [como] = avisos_guardados(conn, COMO_LE_FUE)
+    assert como["estado"] == "enviado"
+
+    ia = _salir(conn, mundo, octubre(8, 10))
+
+    [el_dia] = avisos_guardados(conn, EL_DIA)
+    assert el_dia["estado"] == "enviado"
+    hechos = _lo_que_se_le_redacta_a_ariel(ia)
+    assert hechos["aviso"] == EL_DIA
+    assert hechos["dijo_que_se_lo_pedia"] == "Marcos"
+    assert hechos["habia_dicho"]["para_cuando"] == "2026-10-08"
+    assert _su_pregunta(conn, mundo)["tipo"] == "cuando_se_destraba"
+    assert hechos_mod.significado("dijo_que_se_lo_pedia")
+
+
+def test_el_dia_que_dio_sin_se_lo_pido_yo_no_lo_menciona(conn, mundo, equipo):
+    _le_pregunto(conn, mundo, equipo)
+    _ariel_dice(equipo, para_cuando="2026-10-08")
+
+    ia = _salir(conn, mundo, octubre(8, 10))
+
+    assert "dijo_que_se_lo_pedia" not in _lo_que_se_le_redacta_a_ariel(ia)
+
+
+def test_se_lo_pido_yo_antes_del_dia_que_dio_despues_no_lo_menciona(conn, mundo, equipo):
+    """Si Marcos dijo que se lo pedía y después Ariel dio un día, eso que dijo Marcos ya no
+    explica nada: Ariel habló con Leda después."""
+    _le_pregunto(conn, mundo, equipo)
+    equipo.dice("Marcos", Jugada("pedirselo_y_contar", {"tarea": "T1"}))
+    _ariel_dice(equipo, para_cuando="2026-10-08")
+
+    ia = _salir(conn, mundo, octubre(8, 10))
+
+    assert "dijo_que_se_lo_pedia" not in _lo_que_se_le_redacta_a_ariel(ia)
+
+
+def test_se_lo_pido_yo_sin_un_dia_dado_deja_de_escribirle(conn, espacio_con_escalera, equipo):
+    """Decisión 37, sin cambios: Ariel no se comprometió a nada; con "se lo pido yo" Leda deja de
+    preguntarle y no le repite nada. A Marcos sí le pregunta cómo le fue."""
+    mundo = espacio_con_escalera
+    _le_pregunto(conn, mundo, equipo)
+
+    equipo.dice("Marcos", Jugada("pedirselo_y_contar", {"tarea": "T1"}))
+    _los_dias(conn, mundo, (6, 7, 8))
+
+    assert avisos_guardados(conn, EL_DIA) == []
+    [cerrado] = avisos_guardados(conn, YA_NO_HACE_FALTA)
+    assert str(cerrado["destinatario_membership_id"]) == _membresia(mundo, "Ariel")
+    assert [r["a"] for r in _repreguntas(conn)] == [_membresia(mundo, "Marcos")] * 2
+    [como] = avisos_guardados(conn, COMO_LE_FUE)
+    assert como["estado"] == "enviado"
+
+
 def test_la_pregunta_de_como_le_fue_nunca_se_abandona(conn, espacio_con_escalera, equipo):
     """Al salir abre la pregunta de lo que arregló, con su espera; si no contesta, la escalera de
     las preguntas se la repite sin escalar (decisión 38)."""
@@ -1662,5 +1752,6 @@ def test_las_jugadas_y_los_codigos_de_la_c5c_tienen_sus_significados():
                    "ya_no_hace_falta_que_la_destrabe", "se_lo_pide_a", "le_pregunta_como_le_fue",
                    "ya_lo_conto_quien_destraba", "ya_lo_conto_quien_esta_trabado",
                    "sin_quien_destraba", "volvio_a_ser_quien_destraba",
-                   "no_sabe_quien_destraba", "nadie_mas_puede_destrabar"):
+                   "no_sabe_quien_destraba", "nadie_mas_puede_destrabar",
+                   "dijo_que_se_lo_pedia"):
         assert hechos_mod.significado(codigo), codigo

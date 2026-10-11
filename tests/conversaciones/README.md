@@ -183,7 +183,9 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     contesta, Leda nunca lo abandona: los días 1 a 3, una vez por día; desde el 4, cada 2 días
     hábiles mientras siga el bloqueo, sin escalar por su silencio; si escribe por otra cosa, Leda le
     contesta lo suyo y le recuerda la pregunta en un mensaje aparte; a los días del espacio queda
-    asentado, como siempre (decisión 38 del usuario, con la 50; C-5b). La 32 suma, desde la C-5b,
+    asentado, como siempre (decisión 38 del usuario, con la 50; C-5b). Al final Ariel da un día y
+    Marcos dice que se lo pide él: ese día Leda le pregunta igual a Ariel, le cuenta que Marcos dijo
+    que se lo pedía y a Marcos le pregunta cómo le fue (decisión 64). La 32 suma, desde la C-5b,
     la decisión 37: a quien destraba sin Leda conectada no le escribe, le avisa al administrador
     para que lo conecte y le ofrece a la persona trabada salidas.
 43. [`43-cerrar-el-tema-para-todos.md`](43-cerrar-el-tema-para-todos.md): nunca un tema abierto sin
