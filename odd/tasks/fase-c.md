@@ -537,6 +537,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     le enseña a Marcos). Nunca se cambia sin preguntar. Por construir, con su prueba y su paso
     en la 47, cuando termine el escritor de los apodos.
 
+68. **Un archivo para una tarea que espera cambios: se guarda y se ofrece volver a entregarla**
+    (pregunta 4, la 23 paso 12; usuario, 2026-10-11, "va la propuesta"). Si a Mariano le pidieron
+    cambios y manda "ahi va el diagrama del tablero" con una foto, Leda la guarda y en la misma
+    respuesta le ofrece "¿La volvés a entregar con esto?" con Confirmar. La entrega sale sólo con
+    su sí; si no contesta, nada cambia. Por construir, con su prueba y el paso 12 de la 23.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3855,7 +3861,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
            respuesta, "no es del equipo") o la IA marca `de_afuera` cuando la persona dijo
            claramente que es de afuera, y sólo si no lo dijo Leda pregunta (B: más fluido, pero
            la IA juzga quién es de afuera)? El escritor recomienda B.
-        4. **Un archivo para una tarea que espera cambios** (la 23, paso 12, primera ronda real):
+        4. **Contestada: decisión 68, la propuesta.** **Un archivo para una tarea que espera cambios** (la 23, paso 12, primera ronda real):
            Mariano manda "ahi va el diagrama del tablero" con una foto después de que le pidieron
            cambios. En 4 de 5 Leda lo guarda "para cuando vuelvas a entregar la tarea" y no le
            ofrece entregarla. Propuesta: guardarlo y ofrecer en la misma respuesta "¿La volvés a
