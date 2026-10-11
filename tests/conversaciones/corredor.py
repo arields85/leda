@@ -27,6 +27,9 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
    - **la plataforma cambia quién aprueba** el trabajo de una persona (`cambia_quien_aprueba`,
      con `de` y `a`; C-3d, D4): se escribe como la escribiría la plataforma, en el momento del
      paso, antes de sus relojes;
+   - **otra lectura válida** del mensaje (`o_bien`; decisión 63): si la IA eligió sus jugadas, el
+     paso se compara con lo que ella espera y corren sus pasos (`luego`) antes de seguir
+     (`comprobar.elegir_lectura`);
 3. compara lo que pasó con lo esperado (`comprobar.py`), mide el formato de cada mensaje de Leda
    (`comprobar.fallas_de_formato`) y guarda lo que la persona que lee la
    corrida necesita: lo que dijo cada uno, las jugadas, los hechos y la latencia.
@@ -194,6 +197,10 @@ class ResultadoPaso:
     dice: list[str] = field(default_factory=list)
     no_dice: list[str] = field(default_factory=list)
     preludio: bool = False
+    # La lectura del mensaje con que se comparó el paso: `comprobar.O_BIEN` si la IA eligió la
+    # otra (decisión 63), y los pasos que corren después sólo por ella.
+    lectura: str | None = None
+    luego: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -299,6 +306,13 @@ class _Corredor:
                                      paso["toca"], None)]
                 return r
             self.despacho.vuelta()
+            if not preludio:
+                # Lo esperado, según cómo leyó la IA el mensaje: la principal o la otra (`o_bien`).
+                paso, r.luego = cp.elegir_lectura(paso, r.jugadas, motor=self.motor)
+                if paso.get("lectura"):
+                    r.lectura = paso["lectura"]
+                    r.dice = list(paso.get("dice") or [])
+                    r.no_dice = list(paso.get("no_dice") or [])
         else:
             for cuando in paso.get("relojes") or []:
                 self.reloj.momento = momento(cuando)
@@ -815,8 +829,13 @@ def _correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int,
         corredor = _Corredor(conn, conv, ia, motor)
         for paso in conv.get("preludio") or []:
             corrida.pasos.append(corredor.correr(paso, preludio=True))
-        for paso in conv["pasos"]:
-            corrida.pasos.append(corredor.correr(paso, preludio=bool(paso.get("aparte"))))
+        pendientes = list(conv["pasos"])
+        while pendientes:
+            paso = pendientes.pop(0)
+            r = corredor.correr(paso, preludio=bool(paso.get("aparte")))
+            corrida.pasos.append(r)
+            # Los pasos de la otra lectura, si la IA la eligió, antes de seguir con los demás.
+            pendientes[:0] = r.luego
     except Exception as e:      # una corrida que se cae se informa entera, nunca se pierde
         conn.rollback()
         corrida.error = "".join(traceback.format_exception_only(type(e), e)).strip()

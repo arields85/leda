@@ -590,3 +590,62 @@ def test_una_falla_de_formato_es_de_su_propia_clase_con_el_renglon():
     assert all(f.que == "formato del mensaje a Marcos" for f in c.fallas)
     assert (cp.SIN_NEGRITA, REAL_AVISO_PREVIO) in {(f.esperado, f.real) for f in c.fallas}
     assert not c.de(cp.GARANTIA) and not c.de(cp.COMPRENSION) and not c.de(cp.MOTOR)
+
+
+# --- Otra lectura válida de un mensaje (`o_bien`; decisión 63, la 34) --------------------------
+
+_PASO_CON_OTRA_LECTURA = {
+    "paso": 7, "quien": "Mariano", "a_las": "2026-10-20 11:40",
+    "escribe": "ni idea yo eso no lo manejo",
+    "jugadas": [{"nombre": "decir_que_no_le_toca", "no_sabe": True,
+                 "puede_traer": ["tarea", "lo_que_dice"]}],
+    "efectos": {"destraban": [{"tarea": "PLA", "no_sabe": True, "de": "Mariano"}]},
+    "dice": ["que quedó anotado"],
+    "o_bien": {
+        "jugadas": [{"nombre": "decir_que_no_le_toca", "puede_traer": ["tarea", "lo_que_dice"]}],
+        "pregunta": {"tipo": "cuando_se_destraba", "tarea": "PLA"},
+        "dice": ["una sola pregunta: quién se encarga de eso"],
+        "luego": [{"paso": "7b", "quien": "Mariano", "a_las": "2026-10-20 11:40",
+                   "escribe": "no", "jugadas": [{"nombre": "decir_que_no_le_toca"}]}]}}
+
+
+def test_un_paso_se_compara_con_la_lectura_que_eligio_la_ia_y_la_otra_trae_sus_pasos():
+    """Un mensaje con dos lecturas válidas (`o_bien`): con las jugadas de la principal, lo
+    esperado es el paso y no sigue nada; con las de la otra, lo esperado es sólo lo de la otra
+    (lo que el paso escribe, más sus propias expectativas: nada se hereda de la principal, así un
+    efecto que la otra no declara es de más) y siguen sus pasos (`luego`)."""
+    principal = [{"nombre": "decir_que_no_le_toca", "no_sabe": True}]
+    otra = [{"nombre": "decir_que_no_le_toca", "lo_que_dice": "yo eso no lo manejo"}]
+
+    esperado, luego = cp.elegir_lectura(_PASO_CON_OTRA_LECTURA, principal)
+    assert esperado is _PASO_CON_OTRA_LECTURA and luego == []
+
+    esperado, luego = cp.elegir_lectura(_PASO_CON_OTRA_LECTURA, otra)
+    assert esperado == {"paso": 7, "quien": "Mariano", "a_las": "2026-10-20 11:40",
+                        "escribe": "ni idea yo eso no lo manejo",
+                        "jugadas": _PASO_CON_OTRA_LECTURA["o_bien"]["jugadas"],
+                        "pregunta": {"tipo": "cuando_se_destraba", "tarea": "PLA"},
+                        "dice": ["una sola pregunta: quién se encarga de eso"],
+                        "lectura": cp.O_BIEN}
+    assert [p["paso"] for p in luego] == ["7b"]
+
+    # Ninguna de las dos: se compara con la principal, y la falla es la de siempre.
+    esperado, luego = cp.elegir_lectura(_PASO_CON_OTRA_LECTURA, [])
+    assert esperado is _PASO_CON_OTRA_LECTURA and luego == []
+    sin_otra = {k: v for k, v in _PASO_CON_OTRA_LECTURA.items() if k != "o_bien"}
+    assert cp.elegir_lectura(sin_otra, otra) == (sin_otra, [])
+
+
+def test_otra_lectura_mal_escrita_es_un_error_del_yaml():
+    """La otra lectura es del mismo mensaje: no cambia lo que la persona escribe ni quién, y un
+    toque no tiene lecturas (sus jugadas no se comparan)."""
+    import pytest
+
+    con_otro_texto = {**_PASO_CON_OTRA_LECTURA,
+                      "o_bien": {**_PASO_CON_OTRA_LECTURA["o_bien"], "escribe": "otra cosa"}}
+    with pytest.raises(ValueError, match="escribe"):
+        cp.elegir_lectura(con_otro_texto, [])
+    un_toque = {"paso": 3, "quien": "Marcos", "a_las": "2026-10-20 11:40", "toca": "PLC",
+                "o_bien": {"jugadas": []}}
+    with pytest.raises(ValueError, match="toque"):
+        cp.elegir_lectura(un_toque, [])

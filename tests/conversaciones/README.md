@@ -162,7 +162,7 @@ La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, deci
     más, Leda le informa la cadena entera a quien decide quién lo resuelve, nunca a alguien de la
     cadena, sin pedirle nada, y a Nahuel le dice que quedó asentado, sin decir que se lo informa a
     alguien ni a quién (decisión 5 del usuario; porción 3 de la C-5; decisión 35; decisiones 24, 49 y
-    51, C-5d).
+    51, C-5d). El "ni idea" de Mariano (paso 7) acepta las dos lecturas de la decisión 63 (`o_bien`).
 35. [`35-bloqueos-encadenados.md`](35-bloqueos-encadenados.md): los bloqueos se enlazan solos
     (Marcos ← Ariel ← Lucas): por la dependencia cargada entre las dos tareas, o porque quien destraba
     dice que está trabado con una tarea suya. Leda no le sigue preguntando a Ariel y sigue con quien
@@ -420,6 +420,20 @@ después puede decir quién tiene cada tarea (`responsables`), también para mir
 **El detalle de una tarea** (decisión 33; la 45): los efectos suman las tareas compartidas con
 alguien que no las veía (`compartidas`, por la clave de la tarea, con quién y por quién): una de más es
 de garantía, porque nada se comparte sin la decisión del encargado del sector de la tarea.
+
+**Otra lectura válida de un mensaje** (`o_bien`; decisión 63, la 34, paso 7): cuando lo que una
+persona escribe admite dos lecturas que llevan al mismo lugar ("ni idea yo eso no lo manejo": la IA
+lee que no sabe, o no lo lee y Leda pregunta una vez quién se encarga), el paso declara la otra con
+`o_bien`: sus `jugadas`, todo lo que se espera de ella (`efectos`, `hechos`, `pregunta`, `botones`,
+`estado_despues`, `dice`, `no_dice`…) y, en `luego`, los pasos que corren sólo si la IA la eligió,
+hasta volver al mismo estado que la principal. Lo elige el corredor por las jugadas
+(`comprobar.elegir_lectura`): con las de la principal, o con las de ninguna, el paso se compara como
+siempre; con las de la otra, se compara con lo que el paso hace (quién, cuándo y qué escribe) más lo
+que declara la otra, sin heredar nada de la principal: un efecto, un aviso o un botón que la otra no
+declara es de más, así que ninguna garantía se afloja. Sólo en un paso escrito o con archivos (un
+toque no compara jugadas), y la otra no cambia lo que la persona escribe ni quién. La IA guionada sigue
+siempre la principal, así la corrida en seco no cambia; el informe muestra los pasos de `luego` cuando
+corrieron, y la estimación de llamadas cuenta sólo la principal.
 
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 

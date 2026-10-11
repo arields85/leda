@@ -118,6 +118,10 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
      que dijo Mariano y si se le ocurre otra persona que pueda destrabarlo.
    - La respuesta dice: que quedó anotado; que Nahuel se va a enterar.
    - La respuesta no dice: el nombre de Marcos; que se lo informa a alguien.
+   - **O bien** (decisión 63, la otra lectura válida): la IA no lee que no sabe. Entonces nada se
+     anota todavía y Leda pregunta una vez quién se encarga, como en el paso 4; la pregunta sigue
+     abierta. Mariano contesta (martes 20, 11:40): "no" → queda todo como arriba (lo mismo anotado,
+     el mismo mensaje guardado para Nahuel a las 11:50 y la misma respuesta), y el hilo sigue igual.
 
 8. **Leda**, por su cuenta, a Nahuel (martes 20, 11:50):
    →

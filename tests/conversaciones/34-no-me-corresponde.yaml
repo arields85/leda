@@ -188,6 +188,58 @@ pasos:
     no_dice:
       - el nombre de Marcos
       - que se lo informa a alguien
+    # La otra lectura válida (decisión 63): la IA no lee "no sabe" y Leda pregunta una vez quién se
+    # encarga, como en el paso 4; Mariano contesta que no (7b) y queda como en la principal. El 7b va
+    # en el mismo minuto, así el aviso a Nahuel sale a las 11:50, como en la principal.
+    o_bien:
+      jugadas:
+        - {nombre: decir_que_no_le_toca, puede_traer: [tarea, lo_que_dice]}
+      efectos: {}
+      hechos:
+        - {jugada: decir_que_no_le_toca, resultado: falta_dato, tarea: PLA,
+           falta: [quien_se_encarga], pregunta: cuando_se_destraba}
+      pregunta: {tipo: cuando_se_destraba, tarea: PLA}
+      estado_despues:
+        de: Mariano
+        pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLA}
+        esperas_abiertas: [PLA]
+      dice:
+        - "una sola pregunta: quién se encarga de eso"
+      no_dice:
+        - un reproche
+        - el nombre de Marcos
+        - que se lo informa a alguien
+      luego:
+        - paso: 7b
+          quien: Mariano
+          a_las: "2026-10-20 11:40"
+          escribe: "no"
+          jugadas:
+            - {nombre: decir_que_no_le_toca, puede_traer: [tarea, lo_que_dice, no_sabe]}
+          efectos:
+            destraban: [{tarea: PLA, no_sabe: true, de: Mariano}]
+            dicen_quien_destraba: [{tarea: PLA, de: Mariano, no_le_corresponde: true}]
+            avisos_guardados:
+              - {tipo: quien_mas_puede_destrabar, tarea: PLA, a: Nahuel, estado: guardado,
+                 hechos: {necesita_respuesta: true, pregunta: quien_destraba,
+                          quien_destraba: Mariano Naim,
+                          dice_quien_destraba: {no_le_corresponde: true, no_sabe: true}}}
+          hechos:
+            - {jugada: decir_que_no_le_toca, resultado: anotado, tarea: PLA,
+               dice_quien_destraba: {no_le_corresponde: true, no_sabe: true},
+               se_le_pregunta_a: ausente, aviso_de_la_cadena: ausente,
+               aviso_a_quien_esta_trabado: {a: Nahuel Gimenez, llega: "~2026-10-20T11:50"}}
+          pregunta: null
+          estado_despues:
+            de: Mariano
+            pregunta_abierta: null
+            esperas_abiertas: []
+          dice:
+            - que quedó anotado
+            - que Nahuel se va a enterar
+          no_dice:
+            - el nombre de Marcos
+            - que se lo informa a alguien
 
   - paso: 8
     quien: Leda

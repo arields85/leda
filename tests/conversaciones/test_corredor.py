@@ -240,6 +240,83 @@ def test_no_entender_y_no_hacer_nada_es_de_comprension_no_de_garantia(conn):
                                                                    "falta un efecto: estado"}
 
 
+# --- Otra lectura válida de un mensaje (`o_bien`; decisión 63, la 34) --------------------------
+
+def _con_otra_lectura(conv, jugadas_de_la_otra, **de_la_otra):
+    """La 01 con otra lectura válida del "arranqué" (paso 2): la IA no sabe de cuál tarea habla y
+    pregunta; Marcos toca la del PLC (paso 2b) y la conversación vuelve a la principal."""
+    otra = copy.deepcopy(conv)
+    otra["pasos"][1]["o_bien"] = {
+        "jugadas": jugadas_de_la_otra,
+        "botones": ["PLC", "COM"],
+        "pregunta": {"tipo": "cual_tarea"},
+        **de_la_otra,
+        "luego": [{"paso": "2b", "quien": "Marcos", "a_las": "2026-10-20 11:16", "toca": "PLC",
+                   "efectos": {"estados": {"PLC": "en_curso"}},
+                   "estado_despues": {"pregunta_abierta": None}}]}
+    return otra
+
+
+def _que_lee(conv, ia, jugadas_del_paso_2):
+    """La IA guionada que lee el paso 2 como dicen `jugadas_del_paso_2`; los demás, como el YAML."""
+    guion = copy.deepcopy(conv)
+    guion["pasos"][1]["jugadas"] = jugadas_del_paso_2
+    ia.ia.preparar = lambda paso: setattr(ia.ia, "paso", next(
+        (p for p in guion["pasos"] if p.get("paso") == paso.get("paso")), paso))
+    return ia
+
+
+def test_la_otra_lectura_corre_sus_pasos_y_la_conversacion_vuelve_a_la_principal(conn):
+    [conv] = elegir(["01"])
+    pregunta = [{"nombre": "anotar_inicio"}]
+    otra = _con_otra_lectura(conv, pregunta)
+
+    corrida = correr_conversacion(conn, otra, _que_lee(conv, _perfecta(conv), pregunta))
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    assert [p.paso for p in corrida.pasos] == [1, 2, "2b", 3, 4]
+    assert [p.lectura for p in corrida.pasos] == [None, cp.O_BIEN, None, None, None]
+
+    # La guionada sigue la principal: los pasos de la otra no corren.
+    _limpiar(conn)
+    principal = correr_conversacion(conn, otra, _perfecta(conv))
+    assert principal.error is None and principal.fallas() == [], principal.fallas()
+    assert [p.paso for p in principal.pasos] == [1, 2, 3, 4]
+
+
+def test_la_otra_lectura_no_saltea_las_garantias(conn):
+    """Lo esperado de la otra lectura es sólo lo suyo: un efecto que no declara es de más, como
+    en cualquier paso (la otra lectura nunca afloja una garantía)."""
+    [conv] = elegir(["01"])
+    la_otra_tarea = [{"nombre": "anotar_inicio", "tarea": "COM"}]
+    otra = _con_otra_lectura(conv, la_otra_tarea, botones=[], pregunta=None)
+
+    corrida = correr_conversacion(conn, otra, _que_lee(conv, _perfecta(conv), la_otra_tarea))
+
+    paso_2 = next(p for p in corrida.pasos if p.paso == 2)
+    assert paso_2.lectura == cp.O_BIEN
+    assert any(f.clase == cp.GARANTIA and f.que == "efecto de más: estado"
+               and f.real == {"COM": "en_curso"} for f in paso_2.fallas), paso_2.fallas
+
+
+def test_la_34_vuelve_al_mismo_estado_por_los_dos_caminos_del_ni_idea(conn):
+    """Decisión 63: si la IA no lee "no sabe" en el "ni idea" de Mariano (paso 7), Leda le
+    pregunta una vez quién se encarga, él contesta que no (7b) y la conversación sigue igual."""
+    [conv] = elegir(["34"])
+    otra = next(p for p in conv["pasos"] if p["paso"] == 7)["o_bien"]["jugadas"]
+    ia = _perfecta(conv)
+    guion = copy.deepcopy(conv)
+    next(p for p in guion["pasos"] if p["paso"] == 7)["jugadas"] = otra
+    ia.ia.preparar = lambda paso: setattr(ia.ia, "paso", next(
+        (p for p in guion["pasos"] if p.get("paso") == paso.get("paso")), paso))
+
+    corrida = correr_conversacion(conn, conv, ia)
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    pasos = [p.paso for p in corrida.pasos]
+    assert pasos[pasos.index(7):pasos.index(7) + 3] == [7, "7b", 8]
+
+
 def test_una_grabacion_repite_la_corrida(conn):
     [conv] = elegir(["01"])
     grabada = correr_conversacion(conn, conv, _perfecta(conv))
