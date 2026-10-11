@@ -564,6 +564,15 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     jugada está bien: Leda le dice que ya no tiene nada que contestar y nada cambia. Por hacer:
     los `o_bien` de los dos pasos, cuando termine el escritor de los apodos.
 
+72. **Los avisos de un mismo mensaje a la misma persona sobre la misma tarea trabada van en uno**
+    (la 35 paso 4, 5 de 5 en la primera ronda real; usuario, 2026-10-11, "Si, juntamos", la que
+    recomendó el agente). Si Ariel contesta "todavia no la tengo, estoy parado con el servidor xq
+    falta el switch nuevo, lo pone lucas", a Marcos no le llegan dos avisos ("todavía no tiene la
+    IP" y "se trabó con el servidor, lo destraba Lucas") sino uno con los dos hechos. Regla
+    general de la cocina, no una rama para este caso; la jugada de más de la IA sigue valiendo
+    (`o_bien` del paso 4). Por construir, con su prueba y la 35, cuando termine el escritor de
+    los apodos.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3798,7 +3807,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           filas correctas después de una cascada; el corredor sigue el
           guion después de que el estado se separó (la 34 y la 44, 25 y 50 fallas); no marca como
           `[servicio]` un turno en el que la IA no respondió (sólo los avisos); YAML más estrictos
-          que la ficha (36 paso 20 `ya_esta` y 39 paso 20: decisión 71, las dos lecturas valen; 35 paso 4).
+          que la ficha (36 paso 20 `ya_esta` y 39 paso 20: decisión 71, las dos lecturas valen; 35 paso 4: decisión 72, un solo aviso a Marcos).
         - **Formato:** unas 6 de cada 10 fallas (renglones de más de 140 caracteres y dos
           preguntas al cierre); la instrucción de la redacción dice sólo "renglones cortos".
         - **El cupo:** la primera parte gastó la ventana entera de 5 horas en unas 9 conversaciones
