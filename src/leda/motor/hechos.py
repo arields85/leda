@@ -207,6 +207,10 @@ SIGNIFICADOS: Mapping[str, str] = {
                         "todo lo entregado.",
     "la_entrega_esta_incompleta": "A la entrega le falta algo porque la persona sacó una pieza "
                                   "después de entregarla: la revisión espera a que se complete.",
+    "la_entrega_esta_incompleta_por_un_retiro_de_la_administracion": (
+        "A la entrega le falta algo porque la administración de Leda retiró una pieza después "
+        "de entregarla: la revisión espera a que la persona responsable mande una pieza nueva. "
+        "Quién de la administración la retiró no se sabe."),
     "sumo": "Las piezas (por su alias) que se sumaron a la entrega con este mensaje.",
     "sacadas": "Las piezas que la persona sacó de la entrega antes de confirmarla: no van.",
     "retiradas": "Las piezas ya entregadas que la persona retiró: dejan de valer, nada se "

@@ -60,8 +60,10 @@ Nadie nombra a quien la retiró (decisión 59). `odd/tasks/fase-c.md`, decisione
      guardan los dos avisos: a Marcos y a Ismael.
 
 5. **Leda** (10:45):
-   - A **Marcos**: que la administración retiró la foto de la entrega del PLC, con el motivo, y que
-     hace falta otra para que la revisen. No hace falta contestar.
+   - A **Marcos**: que la administración retiró la foto de la entrega del PLC, que entregó hoy, con
+     el motivo, y que hace falta otra para que la revisen. No hace falta contestar. El día de la
+     foto es el de la entrega en el reloj de Leda (el del aviso a Ismael), no el que guardó la
+     base.
    - A **Ismael**: que la entrega del PLC espera una pieza nueva de Marcos y que le avisa cuando
      esté completa. Sin el motivo. No hace falta contestar.
    - A ninguno: quién de la administración la retiró.

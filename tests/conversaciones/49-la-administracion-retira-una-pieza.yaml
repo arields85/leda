@@ -87,8 +87,12 @@ pasos:
       - a: Marcos
         tipo: contenido_retirado_por_la_administracion
         tarea: PLC
+        # El día de la foto es el de la entrega en el reloj de Leda, no el de la base.
         hechos: {necesita_respuesta: false,
-                 motivo_del_retiro: "en la foto se ve la clave del PLC"}
+                 motivo_del_retiro: "en la foto se ve la clave del PLC",
+                 piezas_retiradas_por_tarea: [
+                   {piezas_retiradas: [{es: una_foto, la_entrego_el: "2026-10-22"}],
+                    la_revision_espera_otra_pieza: true}]}
       - a: Ismael
         tipo: la_entrega_espera_otra_pieza
         tarea: PLC

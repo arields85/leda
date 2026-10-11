@@ -49,7 +49,8 @@ from zoneinfo import ZoneInfo
 from psycopg.pq import TransactionStatus
 
 from . import entrega
-from .avisos import (CONTENIDO_RETIRADO_POR_LA_ADMINISTRACION, LA_ENTREGA_ESPERA_OTRA_PIEZA,
+from .avisos import (CONTENIDO_RETIRADO_POR_LA_ADMINISTRACION, ENTREGA_PARA_APROBAR,
+                     LA_ENTREGA_ESPERA_OTRA_PIEZA,
                      LA_ENTREGA_YA_ESTA_COMPLETA, YA_ESTA_APROBADA, YA_NO_ESTA_ENTREGADA,
                      Momento, aprobacion_vigente, aviso_de_la_entrega, guardar, leer_tarea)
 from .fichas import quien_revisa
@@ -202,14 +203,28 @@ def _lo_que_falta(cur, task_id: str) -> dict[str, Any]:
 
 def _piezas(cur, ids: Sequence[str], zona: ZoneInfo, pol) -> list[dict[str, Any]]:
     """Cada pieza retirada como la recibe la IA: qué era, qué cubría y qué día la entregó. Nunca
-    su contenido, su nombre ni quién la retiró."""
+    su contenido, su nombre ni quién la retiró.
+
+    El día es el del reloj de Leda, como `aprobacion.aprobada_el`: el del aviso de esa entrega a
+    quien la revisa, que guardó el turno que la confirmó. La fila de la evidencia la fecha la
+    base (`clock_timestamp()`), porque su orden frente a las decisiones sobre la tarea lo exige
+    (T6j); en una corrida con el reloj movido, esa fecha no es la de Leda. El aviso se ata a la
+    primera pieza del acto (`herramientas._entregar_tarea`, `entrega`), y las piezas de un mismo
+    acto se escriben en una sola transacción, la misma `xmin` (una evidencia no se modifica).
+    Sin ese aviso (nadie la revisa, o la entregó quien la revisa), el de la fila."""
     cur.execute("""select e.clase, e.cubre, e.at, e.es_ejemplo_aceptado,
-                          a.clase as clase_del_archivo
+                          a.clase as clase_del_archivo,
+                          (select min(n.creado_en)
+                             from evidence f
+                             join scheduled_notice n
+                               on n.dedupe_key = %s || f.id::text
+                            where f.task_id = e.task_id and f.xmin = e.xmin) as en_el_reloj
                      from evidence e
                      left join archivo a on a.workspace_id = e.workspace_id
                                         and a.id = e.archivo_id
                     where e.id = any(%s::uuid[])
-                    order by e.at, e.id""", (list(ids),))
+                    order by e.at, e.id""",
+                (f"motor:{ENTREGA_PARA_APROBAR}:", list(ids)))
     vistas = []
     for f in cur.fetchall():
         es = {"texto": entrega.LO_QUE_ESCRIBIO, "enlace": entrega.UN_ENLACE,
@@ -219,7 +234,8 @@ def _piezas(cur, ids: Sequence[str], zona: ZoneInfo, pol) -> list[dict[str, Any]
         if f["es_ejemplo_aceptado"]:
             es = entrega.EL_EJEMPLO_QUE_ACEPTO
         vistas.append({"es": es, "cubria": [pol.en_palabras(t) for t in f["cubre"] or []],
-                       "la_entrego_el": f["at"].astimezone(zona).date().isoformat()})
+                       "la_entrego_el": (f["en_el_reloj"] or f["at"]).astimezone(zona)
+                                        .date().isoformat()})
     return vistas
 
 

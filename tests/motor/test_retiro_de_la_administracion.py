@@ -473,6 +473,48 @@ def test_si_la_pieza_que_falta_la_saco_la_persona_se_dice_como_antes(conn, mundo
     assert _hecho_de(r, "aprobar")["motivo"] == SE_ESTA_COMPLETANDO
 
 
+def test_la_entrega_que_no_llego_dice_que_espera_lo_que_retiro_la_administracion(conn, mundo,
+                                                                                 ada):
+    """El aviso de la entrega que todavía no le había llegado a Ismael no sale (decisión 60), y
+    su motivo, que la IA lee si el turno lo había anunciado, dice que la pieza la retiró la
+    administración, no que la sacó Marcos (constitución §4)."""
+    tarea = _entregada(conn, mundo, aviso_de_la_entrega="guardado")
+    _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
+    enviar(conn, mundo, IAQueRedacta(), AL_SALIR)
+    [primera] = avisos_guardados(conn, "entrega_para_aprobar")
+    assert primera["estado"] == "omitido"
+    assert primera["motivo_omision"] == (
+        "la_entrega_esta_incompleta_por_un_retiro_de_la_administracion")
+    assert "administración" in hechos.significado(primera["motivo_omision"])
+
+
+# --- El día en que se entregó cada pieza, en el reloj de Leda ----------------------------------
+
+def test_el_dia_de_la_pieza_retirada_es_el_de_la_entrega_en_el_reloj_de_leda(conn, mundo, ada):
+    """La fila de la evidencia la fecha la base (su orden frente a las decisiones lo exige); el
+    día que se le dice a la IA es el del aviso de esa entrega a quien la revisa, que guardó el
+    turno que la confirmó con el reloj de Leda, como `aprobacion.aprobada_el`. En una corrida
+    con el reloj movido, el de la base daba la fecha real."""
+    tarea = _entregada(conn, mundo)
+    _retirar(conn, mundo, ada, tarea["piezas"]["foto0"])
+    _manda_otra_foto_y_confirma(conn, mundo)          # el lunes 5, en el reloj de Leda
+    nueva = uno(conn, """select e.id from evidence e
+                          where e.task_id = %s and e.clase = 'imagen'
+                            and not exists (select 1 from evidencia_retirada w
+                                             where w.evidence_id = e.id)""", tarea["id"])["id"]
+    # La fila la fechó la base, no el reloj de Leda (sin eso, la prueba no prueba nada).
+    assert uno(conn, "select at from evidence where id = %s", nueva)["at"].date() \
+        != AHORA.date()
+    with admin(conn) as cur:
+        pagina_de_tarea.retirar_contenido(cur, mundo["id"], str(nueva), ada, MOTIVO,
+                                          ahora=AHORA + timedelta(days=1))
+    conn.commit()
+    [aviso] = [a for a in avisos_guardados(conn, A_QUIEN_LA_ENTREGO)
+               if str(nueva) in a["dedupe_key"]]
+    [de_la_tarea] = aviso["hechos"][EN_CADA_TAREA]
+    assert [p["la_entrego_el"] for p in de_la_tarea["piezas_retiradas"]] == ["2026-10-05"]
+
+
 # --- Lo retirado no vuelve -------------------------------------------------------------------
 
 def test_la_misma_foto_mandada_otra_vez_no_se_guarda(conn, mundo, ada):

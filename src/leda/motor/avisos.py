@@ -1553,7 +1553,11 @@ def _vigencia_de_la_entrega(m: Momento, aviso) -> tuple[str | None, dict[str, An
         return YA_DECIDIO, {}
     if entrega.falta_algo_de_lo_entregado(m.cur, str(tarea["id"])):
         # Se retiró algo y la entrega quedó incompleta: la revisión espera; cuando esté completa
-        # sale un aviso nuevo con todo (decisión 15 del usuario, 2026-10-08).
+        # sale un aviso nuevo con todo (decisión 15 del usuario, 2026-10-08). El motivo dice
+        # quién la retiró, sin nombre: la IA lo lee si el turno había anunciado este aviso
+        # (constitución §4; decisiones 58 y 59).
+        if entrega.lo_que_falta_lo_retiro_la_administracion(m.cur, str(tarea["id"])):
+            return INCOMPLETA_POR_UN_RETIRO_DE_LA_ADMINISTRACION, {}
         return entrega.LA_ENTREGA_ESTA_INCOMPLETA, {}
     vistas, adjuntas = _lo_entregado_para_aprobar(m, tarea["id"])
     hechos = {k: v for k, v in dict(aviso["hechos"]).items()
@@ -1632,6 +1636,10 @@ LA_ENTREGA_ESPERA_OTRA_PIEZA = "la_entrega_espera_otra_pieza"
 # Por qué ya no sale: la tarea quedó aprobada (o cerrada), o la entrega ya se completó.
 YA_ESTA_APROBADA = "ya_esta_aprobada"
 LA_ENTREGA_YA_ESTA_COMPLETA = "la_entrega_ya_esta_completa"
+# Por qué no sale el aviso de una entrega a quien la revisa: le falta lo que cubría una pieza que
+# retiró la administración (la que retira la persona es `entrega.LA_ENTREGA_ESTA_INCOMPLETA`).
+INCOMPLETA_POR_UN_RETIRO_DE_LA_ADMINISTRACION = (
+    "la_entrega_esta_incompleta_por_un_retiro_de_la_administracion")
 
 
 def _vigencia_del_retiro(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
