@@ -562,23 +562,27 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 69. **"Pedíselo igual a Martín" sin encargado: las dos lecturas valen** (pregunta 5, la 48 paso
     10; usuario, 2026-10-11, "aceptarlo", la que recomendó el agente; como la 63). Que la IA lo
     lea como `pedir_el_detalle` o como `fuera_de_la_lista` está bien: Nahuel recibe la misma
-    respuesta, y la nota de pedido fuera de la lista al administrador es cierta. Por hacer: el
-    `o_bien` del paso 10 de la 48, cuando termine el escritor de los apodos.
+    respuesta, y la nota de pedido fuera de la lista al administrador es cierta. Hecha en `fcb8c17`
+    (el `o_bien` del paso 10 de la 48; la lectura sin ninguna jugada, vista en la primera ronda,
+    no está cubierta). Revisión `review-c8af6bc8d375ef19` del corredor (`fcb8c17`), aprobada.
 
 70. **Un dato libre puede llevar el verbo de la persona en otra persona** (pregunta 6, la 38 paso
     23; usuario, 2026-10-11, "aceptarlo", la que recomendó el agente). Si Marcos escribe "que la
     conoces mejor" y la IA anota `por_que: "nahuel la conoce mejor"`, la prueba lo da por bien: el
     corredor compara la raíz de cada palabra contra las de la persona, no la forma exacta. Una
-    palabra que la persona no dijo sigue fallando. Por hacer en `comprobar.py`, con su prueba,
-    cuando termine el escritor de los apodos.
+    palabra que la persona no dijo sigue fallando. Hecha en `fcb8c17` (`comprobar.raiz`: la
+    raíz sin sufijos, sin mayúsculas ni tildes; y los nombres, `quien_es` y `apodo`, sin
+    mayúsculas ni tildes). Revisión `review-c8af6bc8d375ef19` del corredor (`fcb8c17`), aprobada; advertencia: los valores centinela de los
+    nombres (`comprobar.py:420-421`); sugerencia: raíces que chocan (`comprobar.py:56-69`).
 
 71. **"Ya está, llega mañana" y "si dale" a un pase cerrado: las dos lecturas valen** (la 36
     paso 20 y la 39 paso 20; usuario, 2026-10-11, "Si, aceptamos", la que recomendó el agente;
     como la 63 y la 69). En la 36, que la IA anote o no `ya_esta` junto con la fecha está bien:
     Leda guarda la fecha, le avisa a Marcos y no da la tarea por destrabada. En la 39, si Martín
     acepta un pase que ya terminó, que la IA intente `contestar_el_pase` o no elija ninguna
-    jugada está bien: Leda le dice que ya no tiene nada que contestar y nada cambia. Por hacer:
-    los `o_bien` de los dos pasos, cuando termine el escritor de los apodos.
+    jugada está bien: Leda le dice que ya no tiene nada que contestar y nada cambia. Hecha en
+    `fcb8c17` (la 36 paso 21 espera sólo `para_cuando`, para servir a las dos lecturas). Revisión `review-c8af6bc8d375ef19` del corredor (`fcb8c17`), aprobada;
+    sugerencia: el paso 21 de la 36 ya no comprueba `ya_esta` (`36-bloqueo-viejo.yaml:378`).
 
 72. **Los avisos de un mismo mensaje a la misma persona sobre la misma tarea trabada van en uno**
     (la 35 paso 4, 5 de 5 en la primera ronda real; usuario, 2026-10-11, "Si, juntamos", la que
@@ -586,14 +590,25 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     falta el switch nuevo, lo pone lucas", a Marcos no le llegan dos avisos ("todavía no tiene la
     IP" y "se trabó con el servidor, lo destraba Lucas") sino uno con los dos hechos. Regla
     general de la cocina, no una rama para este caso; la jugada de más de la IA sigue valiendo
-    (`o_bien` del paso 4). Por construir, con su prueba y la 35, cuando termine el escritor de
-    los apodos.
+    (`o_bien` del paso 4). Hecha en `6886ea8`: se junta al
+    enviar, no al guardar (`avisos._se_junta`): avisos informativos del mismo turno, a la misma
+    persona y de la misma tarea; nunca uno que abre una pregunta, tiene botones, adjuntos, el
+    enlace o deja una oferta. Revisión `review-49cb735c5655ada3`, aprobada; advertencia: la
+    prueba no demuestra que el aviso juntado siga vigente (`test_bloqueos_encadenados.py:461`);
+    sugerencia: los límites de qué se junta (`avisos.py:576-583`).
 
 73. **La oferta de volver a entregar no se repite** (la 68; usuario, 2026-10-11, "Si, vamos con tu
     recomendacion"). La ofreció Leda, no la empezó la persona: si Mariano no contesta, Leda no se
     la vuelve a ofrecer cada día como a una vista previa sin confirmar. El archivo queda guardado
-    y se suma solo cuando entregue; el seguimiento de la tarea por su fecha sigue igual. Por
-    construir, con su prueba.
+    y se suma solo cuando entregue; el seguimiento de la tarea por su fecha sigue igual. Hecha
+    en `4bec127` con la marca general de las ofertas (`preguntas.OPCIONAL`): la oferta sin
+    contestar se cierra sola a la hora en que se habría repetido; después un "si" ya no la
+    entrega, pero el archivo se suma a la próxima entrega. Revisión `review-ea77a0abef86ddaa`,
+    aprobada; advertencia: una oferta guardada antes de este cambio cuenta como entrega común
+    (`entrega.py:832`; ninguna en la base); sugerencias: tres ramas sin prueba. El arreglo de
+    la revisión de la 67 (la ficha contesta `a_quienes_les_dicen_asi`): `7d0cbcd`, revisión
+    `review-1736c4b8c0d76d02`, aprobada; advertencia: una respuesta escrita que no la contesta
+    (`fichas.py:1856`).
 
 ## Chequeo de rumbo (2026-10-07)
 
