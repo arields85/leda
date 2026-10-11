@@ -71,7 +71,7 @@ from ..autoridad import encargado_del_sector, regla_del_pase
 from ..herramientas import (EstadoCambio, NecesitaConfirmacion, ejecutar,
                             terminar_pase)
 
-from . import entrega, preguntas
+from . import apodos, entrega, preguntas
 from .ancla import candado
 from .asentado import avisar_que_el_sector_no_tiene_encargado
 from .avisos import (COMO_TERMINO_EL_PASE, PASE_PARA_DECIDIR, PASE_PARA_TOMAR,
@@ -171,15 +171,19 @@ def pedir(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
         return _mostrar(ctx, tarea, ctx.quien.membership_id)
     if vacio(datos.get("a")):
         return {"resultado": "falta_dato", "falta": ["a"], "tarea": tarea_hecho(tarea)}
-    coinciden = integrantes_que_coinciden(ctx.cur, str(datos["a"]).strip())
-    if len(coinciden) > 1:
-        return {"resultado": "falta_dato", "falta": ["a"], "tarea": tarea_hecho(tarea),
-                "coinciden": [c["nombre"] for c in coinciden]}
-    if not coinciden:
-        # Qué nombre no está, como lo dijo: sin él, la IA nombró a otra persona (la 39).
+    # A quién: si Leda no lo reconoce, pregunta quién es; si son varias personas, cuál (ADR 0020,
+    # `apodos.quien_es`). Nada se escribe hasta saberlo.
+    integrante, pregunta = apodos.quien_es(ctx, str(datos["a"]).strip(),
+                                           jugada="pedir_reasignacion", datos=datos,
+                                           task_id=tarea["id"])
+    if pregunta is not None:
+        return {**pregunta, "tarea": tarea_hecho(tarea)}
+    if integrante is None:
+        # No es del equipo: qué nombre no está, como lo dijo (sin él, la IA nombró a otra
+        # persona, la 39).
         return {"resultado": "no_se_puede", "motivo": "persona_desconocida",
                 "nombre_que_no_esta": str(datos["a"]).strip(), "tarea": tarea_hecho(tarea)}
-    return _mostrar(ctx, tarea, str(coinciden[0]["membership_id"]))
+    return _mostrar(ctx, tarea, str(integrante["membership_id"]))
 
 
 def tarea_hecho(tarea: dict) -> dict[str, str]:

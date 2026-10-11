@@ -348,15 +348,19 @@ def _la_tarea(ctx, nombre: str, datos: dict, tarea: dict | None
     candidatas = list(ctx.para_aprobar)
     de = None if fichas.vacio(datos.get("de")) else str(datos["de"]).strip()
     if de is not None:
-        coinciden = fichas.integrantes_que_coinciden(cur, de)
-        if len(coinciden) > 1:
-            return None, {"resultado": "falta_dato", "falta": ["de"],
-                          "coinciden": [c["nombre"] for c in coinciden]}
-        if not coinciden:
-            # Qué nombre no está, como lo dijo: sin él, la IA puede nombrar a otra persona (como
-            # en un pase, la 39).
+        # De quién: si Leda no lo reconoce, pregunta quién es; si son varias personas, cuál (ADR
+        # 0020, `apodos.quien_es`). Nada se decide hasta saberlo.
+        from . import apodos             # apodos importa fichas
+        integrante, pregunta = apodos.quien_es(ctx, de, jugada=nombre, datos=datos,
+                                               task_id=None)
+        if pregunta is not None:
+            return None, pregunta
+        if integrante is None:
+            # No es del equipo: qué nombre no está, como lo dijo (sin él, la IA puede nombrar a
+            # otra persona, como en un pase, la 39).
             return None, {"resultado": "no_se_puede", "motivo": PERSONA_DESCONOCIDA,
                           "nombre_que_no_esta": de}
+        coinciden = [integrante]
         persona = str(coinciden[0]["membership_id"])
         if persona == yo:
             return None, _su_propio_trabajo(ctx, None)

@@ -152,6 +152,16 @@ TOMAR_LA_TAREA = "tomar_la_tarea"
 # como la del pase, no es un tema abierto (`ofrecer`); se contesta tocando o escribiendo
 # (`contestar_el_pedido_del_detalle`).
 COMPARTIR_EL_DETALLE = "compartir_el_detalle"
+# Quién es alguien que la persona nombró y Leda no reconoce como del equipo (ADR 0020, decisión 1;
+# `apodos.py`): la pregunta guarda lo pedido (la jugada y sus datos) y lo que dijo la persona
+# (`como_lo_nombro`). La contesta `decir_quien_es`; se puede dejar, y entonces no se anota nada.
+QUIEN_ES = "quien_es_esa_persona"
+# A quién reconoce Leda, con nombre y apellido, para que la persona lo confirme antes de aprender
+# el apodo: con el botón "Confirmar" o escrito, con la guarda de la decisión 2 del ADR 0018.
+CONFIRMAR_QUIEN_ES = "confirmar_quien_es_esa_persona"
+# Cuál de varias personas: un apodo de dos, o uno que coincide con el nombre de otra (decisión 3),
+# con un botón por persona, por su nombre y apellido; escribirlo vale igual.
+CUAL_DE_ESAS_PERSONAS = "cual_de_esas_personas"
 
 
 @dataclass(frozen=True)
@@ -196,6 +206,9 @@ TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
     TipoDePregunta(DECIDIR_EL_PASE),
     TipoDePregunta(TOMAR_LA_TAREA),
     TipoDePregunta(COMPARTIR_EL_DETALLE),
+    TipoDePregunta(QUIEN_ES),
+    TipoDePregunta(CONFIRMAR_QUIEN_ES),
+    TipoDePregunta(CUAL_DE_ESAS_PERSONAS),
 )})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
@@ -326,6 +339,11 @@ def _lo_mostrado(q) -> dict[str, Any]:
     if jugada.get("muestra"):
         dicho["lo_mostrado"] = list(jugada["muestra"])
     for clave in ("le_falta", "le_falta_del_criterio", "ejemplo"):
+        if jugada.get(clave):
+            dicho[clave] = jugada[clave]
+    # De quién es alguien que nombró (`apodos.py`): cómo lo nombró, tal cual, y a quién reconoce
+    # Leda, con nombre y apellido, si lo muestra para confirmar.
+    for clave in ("como_lo_nombro", "integrante"):
         if jugada.get(clave):
             dicho[clave] = jugada[clave]
     return dicho
@@ -607,6 +625,31 @@ def cerrar_las_de_otras_personas(ctx, tipo: str, task_id: str, cierre: str,
                   and membership_id is distinct from %s::uuid""",
             (ctx.ahora, task_id, espera, salvo))
     return len(cerradas)
+
+
+def cerrar_las_de_una_jugada_de_tipo(ctx, tipo: str, nombre: str, task_id: str | None,
+                                     cierre: str, detalle: dict[str, Any]) -> None:
+    """Las preguntas sin cerrar de la persona, de ese tipo, que esperaban esa jugada sobre esa
+    tarea (o sin tarea): una nueva igual las reemplaza."""
+    ctx.cur.execute("""select id from conversation_question
+                        where membership_id = %s and tipo = %s and cerrada_en is null
+                          and task_id is not distinct from %s
+                          and jugada ->> 'nombre' = %s""",
+                    (ctx.quien.membership_id, tipo, task_id, nombre))
+    for fila in ctx.cur.fetchall():
+        cerrar(ctx, str(fila["id"]), cierre, detalle)
+
+
+def adelantar(ctx, pregunta_id: str) -> None:
+    """La pregunta va primero, aunque la abierta haya salido en este mismo mensaje: precisa la
+    respuesta a esa otra (quién es la persona que la persona nombró al contestar quién lo
+    destraba; `apodos.py`), que queda para después. Un tema a la vez igual."""
+    vigente = actual(ctx.cur, ctx.quien.membership_id)
+    if vigente is not None and str(vigente["id"]) != pregunta_id:
+        _dejar_para_despues(ctx, str(vigente["id"]))
+    _que_sea_la_abierta(ctx, pregunta_id)
+    if pregunta_id not in ctx.preguntas_del_turno:
+        ctx.preguntas_del_turno.append(pregunta_id)
 
 
 def cerrar_las_de_una_jugada(ctx, nombre: str, task_id: str, cierre: str,

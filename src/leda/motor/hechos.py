@@ -333,6 +333,28 @@ SIGNIFICADOS: Mapping[str, str] = {
                          "escribe.",
     "persona_desconocida": "No hay nadie en el equipo con ese nombre.",
     "nombre_que_no_esta": "El nombre, como lo dijo la persona, que no es de nadie del equipo.",
+    # --- Quién es alguien que nombró (ADR 0020; `apodos.py`) --------------------------------
+    "quien_es": "Quién es la persona que nombró la persona que escribe: el nombre que dice, "
+                "como lo dice.",
+    "de_afuera": "Verdadero si la persona que escribe dice que a quien nombró no es del equipo.",
+    "como_lo_nombro": "Cómo nombró la persona que escribe a alguien, con sus palabras: es lo que "
+                      "dijo, nunca el nombre de nadie, y se cita entre comillas.",
+    "quien_es_esa_persona": "Pregunta quién es alguien que nombró la persona (como_lo_nombro), "
+                            "porque no hay nadie así en el equipo; lo que pidió espera la "
+                            "respuesta y todavía no se hizo.",
+    "confirmar_quien_es_esa_persona": "Pregunta si la persona del equipo que Leda reconoce "
+                                      "(integrante, con nombre y apellido) es a quien nombró "
+                                      "(como_lo_nombro); con su confirmación, Leda lo recuerda y "
+                                      "hace lo que pidió.",
+    "cual_de_esas_personas": "Pregunta a cuál de las personas del equipo (las opciones, con "
+                             "nombre y apellido) se refería quien escribe con lo que dijo "
+                             "(como_lo_nombro): son varias y Leda no elige.",
+    "quien_es_para_confirmar": "Leda reconoce a la persona del equipo que dijo quien escribe "
+                               "(integrante) y espera su confirmación: todavía no recuerda nada "
+                               "ni hizo lo que pidió.",
+    "aprendio_como_le_dicen_a": "La persona del equipo, por su nombre, que desde ahora Leda "
+                                "también reconoce como la nombró quien escribe: lo confirmó esa "
+                                "persona.",
     "ya_la_aprobo": "La persona que escribe ya la había aprobado: no se anota otra vez.",
     "la_entrega_se_esta_completando": "La persona responsable sacó algo de lo que entregó y "
                                       "está completando la entrega: así todavía no se aprueba "
@@ -1348,12 +1370,14 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "decir_que_no_le_toca": "anotar_que_no_le_toca_destrabar_la_tarea_de_otra_persona",
     "contar_lo_que_arreglaron": "anotar_lo_que_arreglo_con_quien_la_destraba",
     "pedirselo_y_contar": "se_lo_pide_directamente_y_despues_cuenta",
+    "decir_quien_es": "contestar_quien_es_alguien_que_nombro",
 }
 _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 
 # Lo que alguien escribió, tal cual: un mensaje entero nunca se traduce, ni el nombre que alguien
 # le puso a un archivo.
 _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", "dice",
+                                      "como_lo_nombro",
                                       "enlace", "lo_que_pide", "describe",
                                       "le_falta_del_criterio", "ejemplo", "lo_que_dice",
                                       "motivo_del_retiro", "referencias"})
@@ -1364,7 +1388,7 @@ _NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_e
                               "el_texto_cubre", "lo_que_pide", "describe",
                               "le_falta_del_criterio", "ejemplo", "lo_descrito_cubre",
                               "lo_que_dice", "motivo_del_retiro", "referencias",
-                              "nombre_que_no_esta"})
+                              "nombre_que_no_esta", "como_lo_nombro"})
 
 
 def para_redactar(valor: Any) -> Any:

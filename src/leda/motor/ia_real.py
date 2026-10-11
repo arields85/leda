@@ -103,6 +103,10 @@ DATOS = {
                              "Leda)."),
     "palabras": ("string", "Lo que la persona contó de cómo viene la tarea, con sus palabras."),
     "a": ("string", "A quién quiere pasarle la tarea, como lo nombró la persona."),
+    "quien_es": ("string", "Cuando Leda pregunta quién es alguien que la persona nombró: el "
+                           "nombre de esa persona, como lo dice. Sólo si lo dijo."),
+    "de_afuera": ("boolean", "Verdadero sólo si la persona dice que a quien nombró no es del "
+                             "equipo."),
     "se_la_queda": ("boolean", "Verdadero sólo si la persona que escribe dice que se queda "
                                "con la tarea de otra persona, para hacerla; entonces a va vacío."),
     "acepta": ("boolean", "Verdadero si la persona dice que sí (aprueba el pase o toma la "

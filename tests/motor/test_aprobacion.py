@@ -263,10 +263,16 @@ def test_quien_no_aprueba_ese_trabajo_recibe_un_no_y_nada_cambia(conn, mundo, tu
 def test_decidir_lo_de_alguien_que_no_es_del_equipo_dice_que_nombre_no_esta(conn, mundo,
                                                                           turnos):
     """Como en un pase (la 39): sin el nombre que no encontró, la IA puede nombrar a otra
-    persona. El hecho lo lleva tal como lo dijo."""
+    persona. Leda pregunta quién es (ADR 0020) y, si no es del equipo, el hecho lo lleva tal como
+    lo dijo."""
     tarea = _entregada(conn, mundo, turnos)
     r = turnos.dice("Ismael", Jugada("aprobar", {"de": "roberto"}),
                     texto="lo de roberto aprobalo")
+    hecho = _hecho(r, "aprobar")
+    assert (hecho["resultado"], hecho["falta"]) == ("falta_dato", ["quien_es"])
+    assert hecho["como_lo_nombro"] == "roberto"
+    r = turnos.dice("Ismael", Jugada("decir_quien_es", {"de_afuera": True}),
+                    texto="no es del equipo")
     hecho = _hecho(r, "aprobar")
     assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "persona_desconocida")
     assert hecho["nombre_que_no_esta"] == "roberto"

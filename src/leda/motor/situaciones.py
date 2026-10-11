@@ -28,6 +28,12 @@ from . import preguntas
 from .ia import Jugada
 
 
+# En el hecho de una opción que corre su propia jugada: lo que esa opción hizo ya quedó hecho (un
+# apodo confirmado, `apodos.py`), aunque lo que sigue no se pueda; la elección no se deshace. No
+# llega a la IA: se saca acá.
+LO_ELEGIDO_QUEDA = "_lo_elegido_queda"
+
+
 def _fichas():
     from . import fichas            # se importan entre sí: fichas declara estas jugadas
     return fichas
@@ -85,7 +91,8 @@ def elegir_opcion(ctx, opcion: dict[str, Any]) -> dict[str, Any]:
         # duda sigue abierta, con sus opciones (revisión de la E2-4).
         with ctx.cur.connection.transaction():
             hecho = _elegir_y_correr(ctx, opcion, pregunta_id, task_id, eligio)
-            if hecho.get("resultado") == "no_se_puede":
+            if hecho.get("resultado") == "no_se_puede" and not hecho.pop(LO_ELEGIDO_QUEDA,
+                                                                          False):
                 raise _NoSirve(hecho)
     except _NoSirve as no_sirve:
         return {**no_sirve.hecho, "pregunta_sigue_abierta": True}
@@ -125,12 +132,15 @@ def _elegir_y_correr(ctx, opcion, pregunta_id: str, task_id, eligio: dict) -> di
         return {"jugada": nombre, "resultado": "no_se_puede", "motivo": "fuera_de_la_lista",
                 "eligio": eligio}
     alias = eligio.get("tarea", {}).get("alias")
-    if alias is None:
+    # Una opción que corre su propia jugada sin una tarea (quién es una persona, `apodos.py`) no
+    # elige una tarea: corre sin ella.
+    sin_tarea = bool(valor.get("jugada")) and not task_id
+    if alias is None and not sin_tarea:
         return {"jugada": nombre, "resultado": "no_se_puede",
                 **_por_que_ya_no_esta(ctx, task_id), "eligio": eligio}
     datos = ({**(valor.get("datos") or {}), "de_la_pregunta": pregunta_id}
              if valor.get("jugada") else dict(esperaba.get("datos") or {}))
-    hecho = manejador(ctx, Jugada(nombre, {**datos, "tarea": alias}))
+    hecho = manejador(ctx, Jugada(nombre, {**datos, **({"tarea": alias} if alias else {})}))
     return {**hecho, "eligio": eligio}
 
 

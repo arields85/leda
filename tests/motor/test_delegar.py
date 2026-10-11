@@ -341,12 +341,18 @@ def test_con_encargado_en_su_sector_pasarla_a_otro_no_avisa_aunque_al_otro_le_fa
 
 
 def test_alguien_que_no_es_del_equipo_o_la_misma_persona_no(conn, equipo):
+    # A quien no reconoce, Leda le pregunta quién es (ADR 0020), con el nombre como lo dijo: sin
+    # él, la IA nombró a otra persona (la 39). Si no es del equipo, no se puede.
     r = _pedir(equipo, "Marcos", "COM", "roberto")
+    assert (r.hechos[0]["resultado"], r.hechos[0]["falta"]) == ("falta_dato", ["quien_es"])
+    assert r.hechos[0]["como_lo_nombro"] == "roberto"
+    assert hechos.sin_significado(r.hechos[0]) == set()
+    r = equipo.dice("Marcos", Jugada("decir_quien_es", {"de_afuera": True}))
     assert (r.hechos[0]["resultado"], r.hechos[0]["motivo"]) == ("no_se_puede",
                                                                  "persona_desconocida")
-    # Qué nombre no encontró, como lo dijo: sin él, la IA nombró a otra persona (la 39).
     assert r.hechos[0]["nombre_que_no_esta"] == "roberto"
     assert hechos.sin_significado(r.hechos[0]) == set()
+    assert _pases(conn) == []
     r = _pedir(equipo, "Marcos", "COM", "marcos")
     assert r.hechos[0]["motivo"] == "es_la_misma_persona"
 

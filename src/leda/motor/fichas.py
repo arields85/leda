@@ -123,6 +123,9 @@ class Contexto:
     # de la lista: una jugada mira si el mensaje también dice otra cosa (`entrega.
     # _contesta_otra_cosa`, D7).
     elegidas: list[str] = field(default_factory=list)
+    # Lo que la persona confirmó en este turno sobre quién es alguien que nombró (`apodos.py`):
+    # lo dicho, normalizado → el integrante, o `apodos.DE_AFUERA`. La jugada que sigue lo usa.
+    nombrados: dict[str, str] = field(default_factory=dict)
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
         """Una tarea por su alias: de las suyas, de las que esperan su decisión, de las que
@@ -1155,13 +1158,21 @@ def _entregar(ctx: Contexto, datos: dict, tarea: dict) -> dict:
 
 
 def _confirmar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
-    """Lo último que Leda mostró para confirmar: la vista previa de un pase (C-7) o una
-    entrega."""
-    from . import entrega, pase
+    """Lo último que Leda mostró para confirmar: quién es alguien que la persona nombró (ADR
+    0020), la vista previa de un pase (C-7) o una entrega."""
+    from . import apodos, entrega, pase
+    q = apodos.la_que_se_confirma(ctx, datos, tarea)
+    if q is not None:
+        return apodos.confirmar(ctx, datos, q)
     q = pase.la_que_se_confirma(ctx, datos, tarea)
     if q is not None:
         return pase.confirmar(ctx, datos, q)
     return entrega.confirmar(ctx, datos, tarea)
+
+
+def _decir_quien_es(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    from . import apodos
+    return apodos.decir(ctx, datos, tarea)
 
 
 def _guardar_para_la_entrega(ctx: Contexto, datos: dict, tarea: dict) -> dict:
@@ -1560,14 +1571,17 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           comprueba="la guarda: que lo que confirma sea lo último que la persona vio, en un "
                     "mensaje anterior, y que no haya cambiado desde entonces (su huella)",
           hace="entrega la tarea: las piezas de evidencia y el paso a revisión en un solo acto "
-               "(entregar_tarea), nunca a terminada; o pide el pase de una tarea a otra persona "
-               "(pedir_pase_de_tarea), que todavía no la cambia de manos",
+               "(entregar_tarea), nunca a terminada; pide el pase de una tarea a otra persona "
+               "(pedir_pase_de_tarea), que todavía no la cambia de manos; o aprende cómo le "
+               "dicen a una persona del equipo, auditado",
           despues="de una entrega, quien aprueba se entera; de un pase, Leda le pregunta a quien "
-                  "lo decide o a quien la recibe; si la guarda falla, muestra lo nuevo y no hace "
-                  "nada",
+                  "lo decide o a quien la recibe; de quién es una persona, hace lo que se había "
+                  "pedido como si la hubieran nombrado por su nombre; si la guarda falla, "
+                  "muestra lo nuevo y no hace nada",
           manejar=_confirmar, se_ofrece=False,
           es="La persona confirma, sin dudas, lo último que Leda le mostró para confirmar (la "
-             "entrega de una tarea o pasarle una tarea a otra persona), escribiendo en lugar de "
+             "entrega de una tarea, pasarle una tarea a otra persona o quién es una persona que "
+             "nombró), escribiendo en lugar de "
              "tocar el botón, o pide que la entrega que Leda le mostró vaya como está, también "
              "si Leda le dijo que le falta algo. Una respuesta con un pero, una pregunta o un "
              "cambio no es una confirmación."),
@@ -1814,6 +1828,25 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "quieren pasar (espera_que_la_tome), tocando su botón o escribiéndolo: acepta es "
              "verdadero si dice que sí, falso si dice que no; por_que, sus palabras si dice "
              "por qué."),
+    Ficha("decir_quien_es", "decir quién es una persona que nombró y Leda no reconoce",
+          necesita=(), opcional=("quien_es", "de_afuera"),
+          comprueba="que Leda le haya preguntado quién es alguien que nombró, o cuál de varias "
+                    "personas; que el nombre sea de alguien del equipo (de las que ofreció, si "
+                    "preguntó cuál)",
+          hace="nada todavía: muestra a quién reconoce, con nombre y apellido, para que lo "
+               "confirme; si es una de las personas que Leda ofreció, o no es del equipo, "
+               "hace lo que se había pedido",
+          despues="con la confirmación (botón o escrita) aprende cómo le dicen a esa persona, "
+                  "auditado, y hace lo que se había pedido como si la hubieran nombrado por su "
+                  "nombre; si el nombre no es de nadie del equipo, lo dice y sigue preguntando",
+          manejar=_decir_quien_es, se_ofrece=False,
+          contesta=(preguntas.QUIEN_ES, preguntas.CONFIRMAR_QUIEN_ES,
+                    preguntas.CUAL_DE_ESAS_PERSONAS),
+          es="La persona contesta la pregunta de Leda de quién es alguien que nombró y Leda no "
+             "reconoce como del equipo (como_lo_nombro, en la pregunta abierta): quien_es es el "
+             "nombre de esa persona, como lo dice; de_afuera, si dice que no es del equipo. "
+             "También cuando elige una de las personas que Leda le ofreció, o nombra a otra en "
+             "lugar de confirmar la que Leda le mostró."),
     # Las situaciones generales (`situaciones.py`): valen igual para todas las fichas.
     Ficha("elegir", "elegir una de las opciones de la pregunta abierta",
           necesita=("opcion",), opcional=(),

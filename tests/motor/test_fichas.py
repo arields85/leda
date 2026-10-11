@@ -130,7 +130,9 @@ def test_la_lista_cerrada_tiene_una_ficha_por_jugada_del_recordatorio():
         + ("contestar_el_pase",)
         # El detalle de una tarea (decisión 33): pedirlo, aceptando lo que Leda ofreció con el
         # resumen, y la respuesta del encargado del sector de la tarea.
-        + ("pedir_el_detalle", "contestar_el_pedido_del_detalle"))
+        + ("pedir_el_detalle", "contestar_el_pedido_del_detalle")
+        # Quién es alguien que la persona nombró y Leda no reconoce (ADR 0020).
+        + ("decir_quien_es",))
     assert not any(FICHAS[n].se_ofrece for n in SITUACIONES)
     for ficha in FICHAS.values():
         assert ficha.para_que and ficha.comprueba and ficha.hace and ficha.despues
