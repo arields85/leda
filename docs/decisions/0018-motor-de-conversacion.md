@@ -622,6 +622,12 @@ generales y ningún caso (5c.1); la tercera ronda corre sólo con GPT-6 sol.
    otra anterior del mismo mensaje (quién destraba y destrabar, sobre el bloqueo que anota la
    jugada anterior). Lo que evita anotar dos veces una misma cosa son las definiciones de las
    jugadas (9k.2: una fecha es una previsión, no un bloqueo), no una regla de "una sola jugada".
+   *Precisión (2026-10-11, aceptada por el usuario; `f0d18e6`):* una jugada que mira cómo está otra
+   tarea de quien escribe (declarado en su ficha, `mira_otra_tarea`; hoy, `su_tarea_trabada` de
+   `decir_cuando_destraba`) se aplica después de las demás jugadas del mensaje, que pueden ser las
+   que dejan esa tarea en ese estado (la conversación 35, paso 4: "estoy parado con el servidor xq
+   falta el switch" anota el bloqueo del servidor aunque la IA nombre antes la tarea trabada). Las
+   demás siguen el orden de la persona, y los hechos se le cuentan a la IA en ese orden.
 2. **El próximo paso** (definición del usuario). Reemplaza qué cuenta como próximo paso en 9k.5:
    todo mensaje de Leda termina con algo concreto que va a pasar o que la persona puede hacer,
    dicho una vez y en pocas palabras: lo que Leda va a hacer (por ejemplo, cuándo le vuelve a
