@@ -3803,6 +3803,19 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           pregunta abierta es `cuando_se_destraba` (con `falta: quien_se_encarga` en sus datos), y un
           "no" suelto no le contesta un "para cuándo". Una sola vez; se mira en la próxima ronda
           antes de tocar nada (si se repite: un tipo de pregunta propio para "quién se encarga").
+  - [x] **La decisión 64, construida** (`3e56662`): el día que dijo quien destraba, la pregunta
+        sale igual y lleva `dijo_que_se_lo_pedia` (quién dijo que se lo pedía, sólo si lo dijo
+        después de que quien destraba dio el día; nada de si confirmó o no). La conversación 42
+        suma el paso 13b. Verificación: `tests/motor` 1213, `tests/garantias` 466,
+        `tests/conversaciones` 166 passed; en seco, 45 de 45.
+  - [ ] **Preguntas para el usuario (juntadas la noche del 2026-10-10 al 11):**
+        1. **"Se lo pido yo" después de que la pregunta del día ya le llegó a quien destraba**, sin
+           contestar todavía: hoy cuenta como que Leda le sigue preguntando y "se lo pido yo" le
+           cierra el tema (decisión 37). ¿Vale lo mismo que la 64 (su compromiso sigue y Leda le
+           sigue preguntando) o la 37?
+        2. **Corregir un apodo que ya tiene dueño** (conversación 47, "Por decidir"): si "el flaco"
+           es Martín y alguien dice "no, el flaco es Marcos", ¿Leda lo cambia o pregunta si a los
+           dos les dicen así? Propuesta: dos botones, "A los dos" y "Sólo a Marcos Tarquini".
 - [ ] La plataforma: su ADR, con el usuario.
 
 **Preguntas juntadas para el usuario: contestadas todas** (2026-10-09, a la mañana, de a una y
