@@ -187,13 +187,39 @@ pasos:
     escribe: "el cable lo consigue pedro de compras"
     jugadas:
       - {nombre: anotar_quien_destraba, tarea: PLC, quien: "pedro de compras"}
+    # "pedro de compras" no es nadie del equipo: Leda pregunta quién es antes de anotarlo
+    # (decisión 65 del usuario, 2026-10-11; ADR 0020). Marcos habla del PLC: esa pregunta es la
+    # de ahora, y la de quién destraba y el estado de comunicaciones quedan para después.
+    efectos: {}
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: falta_dato, falta: [quien_es],
+         como_lo_nombro: presente, pregunta: quien_es_esa_persona}
+    pregunta: {tipo: quien_es_esa_persona, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_es_esa_persona, tarea: PLC}
+      para_despues: [{tipo: quien_destraba, tarea: PLC}, {tipo: estado_de_la_tarea, tarea: COM}]
+    dice:
+      - que no tiene a nadie en el equipo como "Pedro de compras"
+      - "una sola pregunta: quién es"
+    no_dice:
+      - que quedó anotado quién destraba
+      - a alguien del equipo como si fuera Pedro de compras
+      - la pregunta de cómo viene comunicaciones
+
+  - paso: 9b
+    quien: Marcos
+    a_las: "2026-10-29 10:21"
+    escribe: "no es del equipo, es el de compras"
+    jugadas:
+      - {nombre: decir_quien_es, de_afuera: true}
     efectos:
-      destraban: [{tarea: PLC, alguien: true, no_sabe: false}]
+      destraban: [{tarea: PLC, alguien: true, no_sabe: false, externo: presente, de: Marcos}]
       avisos_guardados:
         - {tipo: vuelve_la_pregunta, tarea: COM, a: Marcos, estado: guardado,
            hechos: {pregunta: estado_de_la_tarea, necesita_respuesta: true}}
     hechos:
-      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente}
+      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente,
+         aprendio_como_le_dicen_a: ausente}
     pregunta: null
     estado_despues:
       pregunta_abierta: {tipo: estado_de_la_tarea, tarea: COM}
@@ -205,7 +231,7 @@ pasos:
 
   - paso: 10
     quien: Leda
-    relojes: ["2026-10-29 10:21"]
+    relojes: ["2026-10-29 10:22"]
     salen:
       - a: Marcos
         tipo: vuelve_la_pregunta

@@ -23,7 +23,9 @@ IA (constitución §5), aprende el apodo (`aprender`) y hace lo que se le había
 hubieran nombrado por su nombre (`_seguir`): la misma jugada, por el manejador de la lista
 cerrada, con lo que dijo la persona y la persona ya reconocida. Si el nombre que da no es de
 nadie, lo dice y sigue preguntando: nunca inventa una identidad (§4). Si dice que no es del
-equipo, la jugada sigue con alguien de afuera, sin aprender nada.
+equipo, la jugada sigue con alguien de afuera, sin aprender nada; eso lo contesta la persona a la
+pregunta, en un mensaje posterior, y nunca lo decide la IA leyendo el mismo mensaje que la nombró
+(decisión 65 del usuario, 2026-10-11: Leda pregunta siempre).
 
 **Un apodo de dos personas se aclara con nombre y apellido** (decisión 3; `CUAL_DE_ESAS_PERSONAS`):
 un botón por persona (elegir entre opciones es un uso válido de los botones), y escribirlo vale
@@ -33,8 +35,12 @@ quién es, el apodo se aprende para la elegida; si era un apodo ya aprendido de 
 **Qué jugadas preguntan** (el alcance, decidido con el ADR): las que nombran a una persona para
 hacer algo con ella y hoy, sin reconocerla, terminaban sin salida (`persona_desconocida`): a quién
 se le pasa una tarea (`pase.pedir`) y de quién es el trabajo que se aprueba, se devuelve o se mira
-(`aprobacion._la_tarea`). Las demás que nombran a alguien lo reconocen también por su apodo, pero
-un nombre desconocido sigue como antes.
+(`aprobacion._la_tarea`); y quién destraba un bloqueo y a quién le toca (`fichas._anotar_quien_
+destraba`, `persecucion.decir_que_no_le_toca`), que sin reconocerla la anotaban como alguien de
+afuera: ahora es de afuera sólo si la persona lo dice. Las que nombran a alguien que la
+conversación ya tiene (a quién no escribirle, a quién se lo pide la persona trabada) lo reconocen
+también por su apodo, pero un nombre desconocido sigue como antes: preguntar quién es no cambia lo
+que hacen.
 
 **El apodo sirve para entender, nunca para hablar** (decisión 5): lo que se reconoce es el
 integrante, con su nombre; los hechos que llegan a la IA lo nombran por su nombre, y lo que dijo la
@@ -155,18 +161,28 @@ def _integrante(cur, membership_id: str) -> dict[str, Any] | None:
     return cur.fetchone()
 
 
-def _preguntar_quien_es(ctx, pedido: dict[str, Any], task_id: str | None) -> dict[str, Any]:
-    """La pregunta de quién es, con lo pedido guardado. Si la jugada contestaba la pregunta que
-    está abierta (quién lo destraba), ésta va antes: precisa esa respuesta."""
-    from .fichas import FICHAS, nombrar_pregunta      # fichas importa este módulo
+def _abrir(ctx, tipo: str, pedido: dict[str, Any], task_id: str | None, *,
+           jugada: dict[str, Any], opciones=()) -> tuple[bool, str]:
+    """Abre la pregunta de quién es (o de cuál de esas personas), con lo pedido guardado. Si la
+    jugada contestaba la pregunta que está abierta (quién lo destraba), ésta va antes: precisa esa
+    respuesta, que queda para después (un tema a la vez igual). Devuelve si se hace ahora y su id."""
+    from .fichas import FICHAS      # fichas importa este módulo
     vigente = preguntas.actual(ctx.cur, ctx.quien.membership_id)
-    ahora, pregunta_id = preguntas.abrir_con_id(ctx, preguntas.QUIEN_ES, task_id, jugada=pedido)
+    ahora, pregunta_id = preguntas.abrir_con_id(ctx, tipo, task_id, jugada=jugada,
+                                                opciones=opciones)
     ficha = FICHAS.get(pedido["nombre"])
     if (not ahora and vigente is not None and ficha is not None
             and vigente["tipo"] in ficha.contesta
             and str(vigente["task_id"]) == str(task_id)):
         preguntas.adelantar(ctx, pregunta_id)
         ahora = True
+    return ahora, pregunta_id
+
+
+def _preguntar_quien_es(ctx, pedido: dict[str, Any], task_id: str | None) -> dict[str, Any]:
+    """La pregunta de quién es, con lo pedido guardado (`_abrir`)."""
+    from .fichas import nombrar_pregunta      # fichas importa este módulo
+    ahora, pregunta_id = _abrir(ctx, preguntas.QUIEN_ES, pedido, task_id, jugada=pedido)
     hecho = {"resultado": "falta_dato", "falta": [QUIEN_ES],
              COMO_LO_NOMBRO: pedido[COMO_LO_NOMBRO]}
     nombrar_pregunta(hecho, "pregunta" if ahora else "pregunta_para_despues",
@@ -176,17 +192,17 @@ def _preguntar_quien_es(ctx, pedido: dict[str, Any], task_id: str | None) -> dic
 
 def _preguntar_cual(ctx, pedido: dict[str, Any], task_id: str | None,
                     coinciden: list[dict[str, Any]], *, aprende: bool) -> dict[str, Any]:
-    """Cuál de esas personas, con un botón por persona, por su nombre y apellido; `aprende`: si
-    lo elegido enseña el apodo (la respuesta a quién es) o sólo dice a quién se refería (un apodo
-    ya aprendido de dos)."""
+    """Cuál de esas personas, con un botón por persona, por su nombre y apellido (`_abrir`);
+    `aprende`: si lo elegido enseña el apodo (la respuesta a quién es) o sólo dice a quién se
+    refería (un apodo ya aprendido de dos)."""
     from .fichas import nombrar_pregunta      # fichas importa este módulo
     preguntas.cerrar_las_de_una_jugada_de_tipo(
         ctx, preguntas.CUAL_DE_ESAS_PERSONAS, pedido["nombre"], task_id, "sin_efecto",
         {"reemplazada": True, **({"tarea": task_id} if task_id else {})})
     jugada = {**pedido, "candidatos": [str(c["membership_id"]) for c in coinciden],
               "aprende": aprende}
-    ahora, pregunta_id = preguntas.abrir_con_id(
-        ctx, preguntas.CUAL_DE_ESAS_PERSONAS, task_id, jugada=jugada,
+    ahora, pregunta_id = _abrir(
+        ctx, preguntas.CUAL_DE_ESAS_PERSONAS, pedido, task_id, jugada=jugada,
         opciones=[(c["nombre"], {"jugada": "decir_quien_es",
                                  "datos": {INTEGRANTE_ID: str(c["membership_id"])}})
                   for c in coinciden])
@@ -217,6 +233,12 @@ def decir(ctx, datos: dict[str, Any], tarea: dict[str, Any] | None) -> dict[str,
             return {"resultado": "no_se_puede", "motivo": "persona_desconocida"}
         return _elegida(ctx, q, pedido, integrante, tocada=True)
     if datos.get(DE_AFUERA) is True:
+        if str(q["id"]) in ctx.preguntas_del_turno:
+            # Que no es del equipo lo contesta la persona, a la pregunta que vio en un mensaje
+            # anterior: leído del mismo mensaje que la nombró, lo decidiría la IA (decisión 65
+            # del usuario, 2026-10-11). La pregunta sigue.
+            return {"resultado": "falta_dato", "falta": [QUIEN_ES],
+                    COMO_LO_NOMBRO: pedido.get(COMO_LO_NOMBRO)}
         _cerrar(ctx, q, "respondida", {"jugada": "decir_quien_es", DE_AFUERA: True})
         return _seguir(ctx, q, pedido, DE_AFUERA)
     if vacio(datos.get(QUIEN_ES)):

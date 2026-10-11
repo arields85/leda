@@ -21,7 +21,7 @@ from leda.motor.hechos import sin_significado
 from leda.motor.ia import Jugada
 from leda.motor.instrucciones import INSTRUCCIONES_JUGADAS
 
-from tests.motor.ayudantes import dice, octubre, uno
+from tests.motor.ayudantes import dice, no_es_del_equipo, octubre, uno
 
 CAUSA = "falta que martin de IT me habilite el acceso a la red de planta"
 
@@ -43,12 +43,20 @@ def test_la_causa_y_quien_destraba_en_una_frase_se_anotan_las_dos(conn, mundo, e
     resultado = dice(conn, escribe, _bloqueo(), _destraba(tarea="T1"), at=octubre(6, 16, 35))
 
     bloqueo, destraba = resultado.hechos
-    assert bloqueo["resultado"] == destraba["resultado"] == "anotado"
+    assert bloqueo["resultado"] == "anotado"
+    # "martin de IT" no es nadie del equipo: antes de anotarlo, Leda pregunta quién es (decisión
+    # 65 del usuario, 2026-10-11); la pregunta de quién lo destraba espera esa respuesta.
+    assert (destraba["resultado"], destraba["falta"]) == ("falta_dato", ["quien_es"])
+    assert resultado.pregunta["tipo"] == "quien_es_esa_persona"
+    assert _pregunta_de_quien_destraba(conn)["cerrada_en"] is None
+    assert sin_significado(resultado.hechos) == set()
+
+    resultado = dice(conn, escribe, no_es_del_equipo(), at=octubre(6, 16, 37))
+
+    [destraba] = resultado.hechos
+    assert destraba["resultado"] == "anotado"
     assert destraba["quien_destraba"] == {"externo": "martin de IT"}
     assert "salidas" not in destraba
-    # La pregunta que abrió el bloqueo ya la contestó la jugada siguiente: no se hace.
-    assert "pregunta" not in bloqueo
-    assert bloqueo["preguntas_ya_cerradas"] == ["quien_destraba"]
     assert resultado.pregunta is None
     assert _pregunta_de_quien_destraba(conn)["cerrada_en"] is not None
     assert uno(conn, "select destraba_externo from blocker_unblocker")["destraba_externo"] \
@@ -61,9 +69,11 @@ def test_quien_destraba_sin_tarea_se_apoya_en_el_bloqueo_que_anoto_la_jugada_ant
     resultado = dice(conn, escribe, _bloqueo(), _destraba(), at=octubre(6, 16, 35))
 
     _, destraba = resultado.hechos
-    assert destraba["resultado"] == "anotado"
+    # Encontró el bloqueo de T1 (sin él diría `sin_bloqueo_abierto`); como "martin de IT" no es
+    # nadie del equipo, pregunta quién es antes de anotarlo (decisión 65).
+    assert destraba["resultado"] == "falta_dato"
     assert destraba["tarea"]["alias"] == "T1"
-    assert resultado.pregunta is None
+    assert resultado.pregunta["tipo"] == "quien_es_esa_persona"
 
 
 def test_destrabar_se_apoya_en_el_bloqueo_que_anoto_la_jugada_anterior(conn, mundo, escribe):

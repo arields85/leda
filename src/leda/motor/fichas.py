@@ -849,11 +849,14 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
 
     integrante = None
     if quien_texto is not None:
-        coinciden = integrantes_que_coinciden(cur, quien_texto)
-        if len(coinciden) > 1:
-            return {"resultado": "falta_dato", "falta": ["integrante"],
-                    "coinciden": [c["nombre"] for c in coinciden]}
-        integrante = coinciden[0] if coinciden else None
+        # Si Leda no lo reconoce, pregunta quién es; si son varias personas, cuál (ADR 0020,
+        # `apodos.quien_es`): nada de quién lo destraba se anota hasta saberlo. Si la persona
+        # dice que no es del equipo, es alguien de afuera.
+        from . import apodos                # apodos importa este módulo
+        integrante, pregunta = apodos.quien_es(ctx, quien_texto, jugada="anotar_quien_destraba",
+                                               datos=datos, task_id=task_id)
+        if pregunta is not None:
+            return {**pregunta, **({"tarea": _tarea(alias)} if alias else {})}
         # Nombrarse a sí misma es decir que le toca a la persona que escribe.
         nadie_mas = (integrante is not None
                      and str(integrante["membership_id"]) == ctx.quien.membership_id)
@@ -1490,7 +1493,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           necesita=(), opcional=("tarea", "quien", "no_sabe", "nadie_mas"),
           comprueba="que haya un bloqueo abierto en una tarea suya",
           hace="anota quién destraba: un integrante, alguien de afuera, que no se sabe o "
-               "que le toca a la persona misma",
+               "que le toca a la persona misma; a quien Leda no reconoce, primero pregunta "
+               "quién es (ADR 0020)",
           despues="cierra la pregunta y la espera; si no se sabe, le toca a la persona "
                   "que escribe o a quien nombró Leda no le puede escribir, propone salidas, "
                   "que quedan como tema abierto; si contesta si se le ocurre otra persona y no "
@@ -1499,7 +1503,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           contesta=(preguntas.QUIEN_DESTRABA, preguntas.ESTADO_DE_LA_TAREA),
           propone=lambda hecho: hecho.get("salidas"),
           es="La persona dice quién puede destrabar un bloqueo (alguien del equipo o de "
-             "afuera), que no sabe quién, o que nadie más: le toca a la persona que escribe. "
+             "afuera, como lo nombró), que no sabe quién, o que nadie más: le toca a la "
+             "persona que escribe. "
              "El bloqueo es uno abierto antes o el que anota una jugada anterior del mismo "
              "mensaje. Quién lo destraba es un hecho distinto de la causa, aunque los dos "
              "vengan en la misma frase: cada uno va en su jugada."),

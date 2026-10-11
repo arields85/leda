@@ -158,6 +158,13 @@ def octubre(dia: int, hora: int, minuto: int = 0) -> datetime:
     return datetime(2026, 10, dia, hora + 3, minuto, tzinfo=timezone.utc)
 
 
+def no_es_del_equipo() -> Jugada:
+    """La respuesta a la pregunta de Leda de quién es alguien que nombró: no es del equipo. Un
+    nombre que no es nadie del equipo queda como alguien de afuera sólo así (decisión 65 del
+    usuario, 2026-10-11; ADR 0020)."""
+    return Jugada("decir_quien_es", {"de_afuera": True})
+
+
 def dice(conn, escribe, *jugadas: Jugada, at: datetime = AHORA):
     """Un mensaje de Marcos, con las jugadas que elige la IA guionada."""
     quien, entrante = escribe("Marcos", "-", at=at)

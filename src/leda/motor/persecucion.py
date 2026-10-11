@@ -1211,14 +1211,17 @@ def decir_que_no_le_toca(ctx: Contexto, datos: dict[str, Any],
     integrante, externo = None, None
     if not no_sabe and not vacio(datos.get("quien")):
         texto = str(datos["quien"]).strip()
-        coinciden = integrantes_que_coinciden(cur, texto)
-        if len(coinciden) > 1:
-            return {"resultado": "falta_dato", "falta": ["integrante"],
-                    "coinciden": [c["nombre"] for c in coinciden], "tarea": tarea_hecho(tarea)}
-        if coinciden:
+        # Si Leda no lo reconoce, pregunta quién es; si son varias personas, cuál (ADR 0020,
+        # `apodos.quien_es`). Si la persona dice que no es del equipo, es alguien de afuera.
+        from . import apodos                # apodos importa fichas
+        reconocido, pregunta_quien = apodos.quien_es(
+            ctx, texto, jugada="decir_que_no_le_toca", datos=datos, task_id=tarea["id"])
+        if pregunta_quien is not None:
+            return {**pregunta_quien, "tarea": tarea_hecho(tarea)}
+        if reconocido is not None:
             # Nombrarse a sí misma no es decir de quién es.
-            if str(coinciden[0]["membership_id"]) != ctx.quien.membership_id:
-                integrante = coinciden[0]
+            if str(reconocido["membership_id"]) != ctx.quien.membership_id:
+                integrante = reconocido
         else:
             externo = texto
     # Hasta tres personas preguntadas (decisión 51): mientras haya lugar en la cadena, quien no

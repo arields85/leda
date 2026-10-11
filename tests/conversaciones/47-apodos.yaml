@@ -1,0 +1,276 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/47-apodos.md
+numero: "47"
+titulo: "Los apodos"
+mide: garantias
+persona: Nahuel
+inicio: "2026-10-20 09:00"
+foco: [PLC, RACK, SW]
+# "el flaco", cargado por la plataforma para Martín y para Marcos (el paso 9 del .md; ADR 0020,
+# decisión 4): no lo nombra nadie antes del paso 10.
+apodos:
+  - {apodo: "el flaco", de: Martin}
+  - {apodo: "el flaco", de: Marcos}
+
+tareas:
+  PLC:
+    titulo: Programar el PLC de la envasadora
+    criterio: "La envasadora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Nahuel
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  RACK:
+    titulo: Armar el rack del servidor
+    criterio: "El rack del servidor queda armado, con el servidor montado y conectado a la red de planta"
+    responsable: Lucas
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+  SW:
+    titulo: Configurar el switch de la planta
+    criterio: "El switch de la planta queda configurado y todas las máquinas se ven en la red"
+    responsable: Lucas
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+
+pasos:
+  # --- Un apodo nuevo (reglas 1, 5 y 6) ---------------------------------------------------------
+  - paso: 1
+    quien: Nahuel
+    a_las: "2026-10-20 10:00"
+    escribe: "el plc esta trabado, me falta el plano del tablero y me lo tiene que pasar el tano"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC, causa: "me falta el plano del tablero"}
+      - {nombre: anotar_quien_destraba, quien: "el tano", puede_traer: [tarea]}
+    efectos:
+      estados: {PLC: bloqueada}
+      bloqueos: [{tarea: PLC, causa: presente}]
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC,
+         pregunta_para_despues: quien_destraba}
+      - {jugada: anotar_quien_destraba, resultado: falta_dato, falta: [quien_es],
+         como_lo_nombro: "el tano", pregunta: quien_es_esa_persona}
+    pregunta: {tipo: quien_es_esa_persona, tarea: PLC}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: quien_es_esa_persona, tarea: PLC}
+      para_despues: [{tipo: quien_destraba, tarea: PLC}]
+    dice:
+      - que quedó anotado que el PLC está trabado por el plano del tablero
+      - que no tiene a nadie en el equipo como "el Tano"
+      - "una sola pregunta: quién es"
+    no_dice:
+      - que le va a preguntar a alguien
+      - un nombre de alguien del equipo como si fuera "el Tano"
+
+  - paso: 2
+    quien: Nahuel
+    a_las: "2026-10-20 10:01"
+    escribe: "mariano"
+    jugadas:
+      - {nombre: decir_quien_es, quien_es: "mariano"}
+    efectos: {}
+    hechos:
+      - {jugada: decir_quien_es, resultado: quien_es_para_confirmar, como_lo_nombro: "el tano",
+         integrante: Mariano Naim, pregunta: confirmar_quien_es_esa_persona}
+    pregunta: {tipo: confirmar_quien_es_esa_persona, tarea: PLC}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_quien_es_esa_persona, tarea: PLC}
+      para_despues: [{tipo: quien_destraba, tarea: PLC}]
+    dice:
+      - "la confirmación con nombre y apellido: si «el Tano» es Mariano Naim"
+    no_dice:
+      - que ya lo anotó o que le pregunta a Mariano
+
+  - paso: 3
+    quien: Nahuel
+    a_las: "2026-10-20 10:02"
+    toca: Confirmar
+    efectos:
+      destraban: [{tarea: PLC, integrante: Mariano, alguien: true, no_sabe: false, de: Nahuel}]
+      apodos: [{de: Mariano, apodo: "el tano", enseno: Nahuel, canal: chat, auditado: true,
+                vigente: true}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: PLC, a: Mariano, estado: guardado}
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado, tarea: PLC,
+         quien_destraba: {integrante: Mariano Naim},
+         aprendio_como_le_dicen_a: Mariano Naim,
+         se_le_pregunta_a: {a: Mariano Naim, llega: "~2026-10-20T10:12"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que el PLC quedó trabado esperando el plano de Mariano
+      - que le pregunta a Mariano para cuándo y le avisa apenas sepa algo
+    no_dice:
+      - "«el Tano» para nombrar a Mariano"
+
+  - paso: 4
+    quien: Leda
+    relojes: ["2026-10-20 10:12"]
+    salen:
+      - a: Mariano
+        tipo: pregunta_a_quien_destraba
+        tarea: PLC
+        hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                 responsable: Nahuel Gimenez, causa: presente}
+    estado_despues:
+      de: Mariano
+      pregunta_abierta: {tipo: cuando_se_destraba, tarea: PLC}
+    dice:
+      - que Nahuel está trabado con el PLC porque le falta el plano del tablero
+      - "la pregunta: para cuándo se lo puede pasar"
+    no_dice:
+      - "«el Tano»"
+
+  # --- El apodo vale para todo el espacio (regla 2) ---------------------------------------------
+  - paso: 5
+    quien: Lucas
+    a_las: "2026-10-20 11:00"
+    escribe: "lo del rack esta trabado, el tano me tiene q pasar la medida del tablero"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: RACK, causa: "me falta la medida del tablero"}
+      - {nombre: anotar_quien_destraba, quien: "el tano", puede_traer: [tarea]}
+    efectos:
+      estados: {RACK: bloqueada}
+      bloqueos: [{tarea: RACK, causa: presente}]
+      destraban: [{tarea: RACK, integrante: Mariano, alguien: true, no_sabe: false, de: Lucas}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: RACK, a: Mariano, estado: guardado}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: RACK}
+      - {jugada: anotar_quien_destraba, resultado: anotado,
+         quien_destraba: {integrante: Mariano Naim}, aprendio_como_le_dicen_a: ausente}
+    pregunta: null
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: null
+    dice:
+      - que el rack quedó trabado esperando la medida del tablero de Mariano
+    no_dice:
+      - "«el Tano» para nombrar a Mariano"
+      - que no sabe quién es
+
+  # --- Varios apodos para la misma persona (regla 3) --------------------------------------------
+  - paso: 6
+    quien: Lucas
+    a_las: "2026-10-20 11:30"
+    escribe: "y lo del switch tambien, me falta que el chino me habilite el tablero"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: SW, causa: "me falta que me habiliten el tablero"}
+      - {nombre: anotar_quien_destraba, quien: "el chino", puede_traer: [tarea]}
+    efectos:
+      estados: {SW: bloqueada}
+      bloqueos: [{tarea: SW, causa: presente}]
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: SW}
+      - {jugada: anotar_quien_destraba, resultado: falta_dato, falta: [quien_es],
+         como_lo_nombro: "el chino", pregunta: quien_es_esa_persona}
+    pregunta: {tipo: quien_es_esa_persona, tarea: SW}
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: {tipo: quien_es_esa_persona, tarea: SW}
+      para_despues: [{tipo: quien_destraba, tarea: SW}]
+    dice:
+      - que no tiene a nadie en el equipo como "el Chino"
+      - "una sola pregunta: quién es"
+
+  - paso: 7
+    quien: Lucas
+    a_las: "2026-10-20 11:31"
+    escribe: "mariano tambien"
+    jugadas:
+      - {nombre: decir_quien_es, quien_es: "mariano"}
+    efectos: {}
+    hechos:
+      - {jugada: decir_quien_es, resultado: quien_es_para_confirmar, como_lo_nombro: "el chino",
+         integrante: Mariano Naim}
+    pregunta: {tipo: confirmar_quien_es_esa_persona, tarea: SW}
+    botones: [Confirmar]
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: {tipo: confirmar_quien_es_esa_persona, tarea: SW}
+    dice:
+      - "la confirmación con nombre y apellido: si «el Chino» es Mariano Naim"
+
+  - paso: 8
+    quien: Lucas
+    a_las: "2026-10-20 11:32"
+    toca: Confirmar
+    efectos:
+      destraban: [{tarea: SW, integrante: Mariano, alguien: true, no_sabe: false, de: Lucas}]
+      apodos: [{de: Mariano, apodo: "el chino", enseno: Lucas, canal: chat, auditado: true,
+                vigente: true}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: SW, a: Mariano, estado: guardado}
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado, tarea: SW,
+         quien_destraba: {integrante: Mariano Naim}, aprendio_como_le_dicen_a: Mariano Naim}
+    pregunta: null
+    estado_despues:
+      de: Lucas
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que el switch quedó trabado esperando que Mariano habilite el tablero
+    no_dice:
+      - "«el Chino» o «el Tano» para nombrar a Mariano"
+
+  # --- Un apodo de dos personas (regla 4): "el flaco", de Martín y de Marcos --------------------
+  - paso: 10
+    quien: Nahuel
+    a_las: "2026-10-20 15:00"
+    escribe: "la del plc ya no esta trabada por el plano, ahora me falta que el flaco me de acceso a la red"
+    jugadas:
+      - {nombre: destrabar, tarea: PLC}
+      - {nombre: anotar_bloqueo, tarea: PLC, causa: "me falta el acceso a la red"}
+      - {nombre: anotar_quien_destraba, quien: "el flaco", puede_traer: [tarea]}
+    efectos:
+      bloqueos: [{tarea: PLC, causa: presente}]
+      bloqueos_resueltos: [PLC]
+      # A Mariano ya no hace falta que lo destrabe: se entera (decisión 39).
+      avisos_guardados:
+        - {tipo: ya_no_hace_falta_que_destrabe, tarea: PLC, a: Mariano, estado: guardado}
+    hechos:
+      - {jugada: destrabar, resultado: anotado, tarea: PLC}
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC,
+         pregunta_para_despues: quien_destraba}
+      - {jugada: anotar_quien_destraba, resultado: falta_dato, falta: [quien_es],
+         como_lo_nombro: "el flaco", coinciden: [Marcos Tarquini, Martín Forte],
+         pregunta: cual_de_esas_personas}
+    pregunta: {tipo: cual_de_esas_personas, tarea: PLC}
+    botones: [Marcos Tarquini, Martín Forte]
+    estado_despues:
+      pregunta_abierta: {tipo: cual_de_esas_personas, tarea: PLC}
+      para_despues: [{tipo: quien_destraba, tarea: PLC}]
+    dice:
+      - "la pregunta, con nombre y apellido de cada uno: si «el Flaco» es Martín Forte o Marcos Tarquini"
+    no_dice:
+      - que lo destraba Martín o Marcos
+
+  - paso: 11
+    quien: Nahuel
+    a_las: "2026-10-20 15:01"
+    toca: Martín Forte
+    efectos:
+      destraban: [{tarea: PLC, integrante: Martin, alguien: true, no_sabe: false, de: Nahuel}]
+      avisos_guardados:
+        - {tipo: pregunta_a_quien_destraba, tarea: PLC, a: Martin, estado: guardado}
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado, tarea: PLC,
+         quien_destraba: {integrante: Martín Forte}, aprendio_como_le_dicen_a: ausente}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que la del PLC quedó trabada esperando el acceso a la red de Martín
+      - que le pregunta a Martín y le avisa apenas sepa algo
+    no_dice:
+      - "«el Flaco» para nombrar a Martín"

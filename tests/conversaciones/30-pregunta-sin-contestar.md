@@ -125,12 +125,27 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
    consigue pedro de compras"
    →
    - Jugadas: `anotar_quien_destraba` sobre el PLC, "pedro de compras".
-   - Efecto: quién destraba queda anotado y la pregunta del PLC se cierra.
+   - Efecto: ninguno todavía: "pedro de compras" no es nadie del equipo ni un apodo aprendido, así que
+     Leda pregunta quién es (decisión 65 del usuario, 2026-10-11; ADR 0020). Como Marcos habla del PLC,
+     esa pregunta es la de ahora; la de quién destraba el PLC y el estado de comunicaciones quedan
+     para después.
+   - La respuesta dice: que no tiene a nadie en el equipo como "Pedro de compras", y una sola pregunta:
+     quién es.
+   - La respuesta no dice: que quedó anotado quién destraba; a alguien del equipo como si fuera Pedro
+     de compras; la pregunta de comunicaciones.
+   - Estado después: tema abierto, quién es "pedro de compras"; para después, quién destraba el PLC y
+     el estado de comunicaciones.
+
+9b. **Marcos** contesta (jueves 29, 10:21): "no es del equipo, es el de compras"
+   →
+   - Jugadas: `decir_quien_es`, que no es del equipo.
+   - Efecto: Pedro de compras queda anotado como quien destraba el PLC, alguien de afuera; las
+     preguntas de quién es y de quién destraba se cierran. No se aprende ningún apodo.
    - La respuesta dice: que quedó anotado que el cable lo consigue Pedro de compras.
    - La respuesta no dice: la pregunta de comunicaciones (la trae el código aparte).
    - Estado después: tema abierto, el estado de comunicaciones.
 
-10. **Leda**, a las 10:21, trae la otra pregunta, en un mensaje aparte.
+10. **Leda**, a las 10:22, trae la otra pregunta, en un mensaje aparte.
     →
     - Efecto: sale el pedido de estado de comunicaciones otra vez. La repetición del PLC, que esperaba,
       no sale: Marcos está conversando, y ya contestó.
@@ -151,6 +166,7 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
 - **Garantías:** nunca dos preguntas de Leda en un mismo mensaje; la repetición, una sola vez en el
   día; lo que espera sale de a uno y nunca fuera del horario (salvo la pregunta que vuelve, que es
   parte de la respuesta); la pregunta contestada no vuelve; nada
-  se pierde (lo que no sale queda omitido con su motivo).
+  se pierde (lo que no sale queda omitido con su motivo); nadie queda anotado como alguien de afuera
+  sin que Marcos lo diga (pasos 9 y 9b, decisión 65).
 - **Comprensión:** que la IA tome la respuesta de la pregunta que quedó para después (pasos 6 y 9,
   con la tarea nombrada) y no la de la abierta.

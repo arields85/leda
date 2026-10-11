@@ -428,6 +428,8 @@ def test_todo_bloqueo_con_causa_pregunta_quien_lo_puede_destrabar(conn, mundo, e
 
 @pytest.mark.parametrize("dicho, esperado, columna", [
     ({"quien": "Ismael"}, {"integrante": "Ismael"}, "destraba_membership_id"),
+    # Un nombre que no es nadie del equipo: Leda pregunta quién es, y la persona contesta que no
+    # es del equipo (decisión 65 del usuario, 2026-10-11).
     ({"quien": "el de compras"}, {"externo": "el de compras"}, "destraba_externo"),
     ({"no_sabe": True}, {"no_sabe": True}, "no_sabe"),
     # "Nadie, me falta saber cómo": le toca a la persona, que queda como quien destraba.
@@ -440,7 +442,15 @@ def test_quien_destraba_se_anota_y_cierra_la_pregunta(conn, mundo, escribe, dich
     _jugar(conn, escribe, "Marcos", Jugada(
         "anotar_bloqueo", {"tarea": "T1", "causa": "falta el repuesto"}))
 
-    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba", dicho))
+    hechos_del_turno = _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba", dicho))
+    if "externo" in esperado:
+        [pregunta] = hechos_del_turno
+        assert (pregunta["resultado"], pregunta["falta"]) == ("falta_dato", ["quien_es"])
+        assert _cuantas(conn, "blocker_unblocker") == 0
+        hechos_del_turno = _jugar(conn, escribe, "Marcos",
+                                  Jugada("decir_quien_es", {"de_afuera": True}),
+                                  texto="no es del equipo")
+    [hecho] = hechos_del_turno
 
     assert hecho["resultado"] == "anotado" and hecho["quien_destraba"] == esperado
     assert hecho["tarea"] == {"alias": "T1", "titulo": "Revisar el tablero"}
@@ -472,11 +482,12 @@ def test_quien_destraba_se_anota_y_cierra_la_pregunta(conn, mundo, escribe, dich
     # Mayúsculas y acentos no cuentan; un nombre de pila o un apellido entero, sí.
     ("ismaél", {"integrante": "Ismael"}),
     ("ISMAEL", {"integrante": "Ismael"}),
-    # Un pedazo de un nombre no es ese nombre, y `%` o `_` no son comodines.
-    ("Mar", {"externo": "Mar"}),
-    ("%", {"externo": "%"}),
-    ("_", {"externo": "_"}),
-    ("el de compras", {"externo": "el de compras"}),
+    # Un pedazo de un nombre no es ese nombre, y `%` o `_` no son comodines: no es nadie del
+    # equipo, así que Leda pregunta quién es (decisión 65 del usuario, 2026-10-11).
+    ("Mar", None),
+    ("%", None),
+    ("_", None),
+    ("el de compras", None),
 ])
 def test_quien_destraba_reconoce_un_integrante_por_nombre_entero(conn, mundo, escribe, dicho,
                                                                  esperado):
@@ -488,7 +499,12 @@ def test_quien_destraba_reconoce_un_integrante_por_nombre_entero(conn, mundo, es
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba",
                                                      {"quien": dicho}))
 
-    assert hecho["resultado"] == "anotado" and hecho["quien_destraba"] == esperado
+    if esperado is None:
+        assert (hecho["resultado"], hecho["falta"]) == ("falta_dato", ["quien_es"])
+        assert hecho["como_lo_nombro"] == dicho
+        assert _cuantas(conn, "blocker_unblocker") == 0
+    else:
+        assert hecho["resultado"] == "anotado" and hecho["quien_destraba"] == esperado
 
 
 def test_quien_destraba_con_dos_integrantes_que_coinciden_es_un_dato_que_falta(conn, mundo,
@@ -510,8 +526,10 @@ def test_quien_destraba_con_dos_integrantes_que_coinciden_es_un_dato_que_falta(c
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba",
                                                      {"quien": "Ismael"}))
 
-    assert hecho == {"jugada": "anotar_quien_destraba", "resultado": "falta_dato",
-                     "falta": ["integrante"], "coinciden": ["Ismael", "Ismael Otero"]}
+    # Leda pregunta cuál, con un botón por persona, y nunca elige (ADR 0020, decisión 3).
+    assert (hecho["resultado"], hecho["falta"]) == ("falta_dato", ["quien_es"])
+    assert hecho["coinciden"] == ["Ismael", "Ismael Otero"]
+    assert hecho["pregunta"] == "cual_de_esas_personas"
     assert _cuantas(conn, "blocker_unblocker") == 0
 
 

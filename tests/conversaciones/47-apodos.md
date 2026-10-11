@@ -8,8 +8,8 @@ personas se aclara con nombre y apellido, y Leda nunca usa el apodo para nombrar
 (no inventa una identidad), §5 (la confirmación es de una persona), §8 (trato) y §13 (aislamiento);
 mecánica §14 (aprendizaje).
 
-**Estado:** diseño. El YAML se escribe con la construcción; la conversación corre después, con la IA
-real.
+**Estado:** construida (pasos 1 a 11): corre en seco con su YAML (`47-apodos.yaml`); falta la ronda
+con la IA real. El tramo "Por decidir con el usuario" no se construyó.
 
 ## Las reglas
 
@@ -42,15 +42,17 @@ real.
 1. **Nahuel** escribe (martes 20, 10:00): "el plc esta trabado, me falta el plano del tablero y me lo
    tiene que pasar el tano"
    →
-   - Jugadas: `avisar_bloqueo` sobre el PLC, con la causa y quién lo destraba como lo nombró ("el
-     tano").
-   - Efecto: ninguno todavía: "el tano" no es nadie del equipo ni un apodo aprendido.
+   - Jugadas: `anotar_bloqueo` sobre el PLC, con la causa, y `anotar_quien_destraba` con quién lo
+     destraba como lo nombró ("el tano").
+   - Efecto: el bloqueo del PLC queda anotado con su causa; quién lo destraba, todavía no: "el
+     tano" no es nadie del equipo ni un apodo aprendido.
    - La respuesta dice: que no tiene a nadie como "el Tano" en el equipo y le pregunta quién es.
-   - Estado después: la pregunta de quién es "el tano", con el pedido de Nahuel guardado.
+   - Estado después: la pregunta de quién es "el tano", con el pedido de Nahuel guardado; la de
+     quién lo destraba queda para después (la de quién es la precisa).
 
 2. **Nahuel** escribe (10:01): "mariano"
    →
-   - Jugadas: la respuesta a quién es: Mariano.
+   - Jugadas: `decir_quien_es`, Mariano.
    - Efecto: ninguno todavía.
    - La respuesta dice: "¿«El Tano» es Mariano Naim?", para confirmar.
    - Botones: Confirmar.
@@ -94,9 +96,12 @@ real.
 10. **Nahuel** escribe (martes 20, 15:00): "la del plc ya no esta trabada por el plano, ahora me falta
     que el flaco me de acceso a la red"
     →
-    - Efecto: ninguno todavía.
+    - Jugadas: `destrabar` el PLC (ya no es el plano), `anotar_bloqueo` con la causa nueva y
+      `anotar_quien_destraba` con "el flaco".
+    - Efecto: el bloqueo del plano se cierra (a Mariano le llega que ya no hace falta) y el nuevo
+      queda anotado; quién lo destraba, todavía no.
     - La respuesta dice: "¿«El Flaco» es Martín Forte o Marcos Tarquini?".
-    - Botones: Martín Forte, Marcos Tarquini.
+    - Botones: uno por persona, con nombre y apellido (Marcos Tarquini, Martín Forte).
 
 11. **Nahuel** toca Martín Forte → quien destraba pasa a ser Martín; ningún apodo cambia.
 

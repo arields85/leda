@@ -112,25 +112,40 @@ del día; acá llega antes (paso 6) y a Ismael le llega un solo aviso, con el po
 6. **Marcos** escribe (lunes 19, 11:00): "el cable lo consigue martin de compras y comunicaciones al final
    es el lunes 26 xq me falta el switch tmb"
    →
-   - Jugadas: dos, que contestan las dos preguntas. Quién destraba la del PLC, Martín de compras (como en
-     la conversación 05, paso 5), la que había quedado para después; y `anotar_prevision` sobre la de
-     comunicaciones, con fecha lunes 26 y motivo "me falta el switch", que contesta qué la atrasa. El
-     switch es el motivo de la fecha, no otra causa del bloqueo del PLC.
-   - Efecto: Martín queda anotado como quien destraba la del PLC; en la de comunicaciones, la fecha nueva
-     del lunes 26 con su motivo (dos días hábiles de atraso) y otro aviso a Ismael guardado como hechos,
-     con el margen para corregir; el que esperaba el porqué del viernes 23 ya no sale (lo deja atrás
-     éste).
-   - La respuesta dice: cada tarea en su bloque con 📋 primero; en la del PLC, con ✏️, que Martín de compras
-     consigue el cable; en la de comunicaciones, con ✏️, que la termina el lun 26/10 porque le falta el
-     switch, y con ⚠️ la consecuencia (vence el jue 22/10: dos días hábiles de atraso); que la fecha
-     nueva queda informada, en pasiva y en futuro, sin nombrar a Ismael; el próximo paso, aparte y al final.
+   - Jugadas: dos, que contestan las dos preguntas. Quién destraba la del PLC, "martin de compras" como
+     lo nombró (como en la conversación 05, paso 5), la que había quedado para después; y
+     `anotar_prevision` sobre la de comunicaciones, con fecha lunes 26 y motivo "me falta el switch", que
+     contesta qué la atrasa. El switch es el motivo de la fecha, no otra causa del bloqueo del PLC.
+   - Efecto: en la de comunicaciones, la fecha nueva del lunes 26 con su motivo (dos días hábiles de
+     atraso) y otro aviso a Ismael guardado como hechos, con el margen para corregir; el que esperaba el
+     porqué del viernes 23 ya no sale (lo deja atrás éste). Quién destraba la del PLC, todavía no:
+     "martin de compras" no es nadie del equipo ni un apodo aprendido, así que Leda pregunta quién es
+     (decisión 65 del usuario, 2026-10-11; ADR 0020): sólo es alguien de afuera si Marcos lo dice.
+   - La respuesta dice: en el bloque de la de comunicaciones, con 📋 primero y ✏️ debajo, que la termina el
+     lun 26/10 porque le falta el switch, y con ⚠️ la consecuencia (vence el jue 22/10: dos días hábiles de
+     atraso); que la fecha nueva queda informada, en pasiva y en futuro, sin nombrar a Ismael; que no
+     tiene a nadie en el equipo como "Martín de compras", y una sola pregunta, sola en el último renglón:
+     quién es.
    - La respuesta no dice: el switch como causa del bloqueo del PLC; Martín en la tarea de comunicaciones;
+     que quedó anotado quién destraba la del PLC; a alguien del equipo como si fuera Martín de compras;
      que Leda le escribió a Martín o lo va a seguir; otra vez la pregunta de quién destraba o la de qué
      atrasa la de comunicaciones.
+   - Estado después: tema abierto, quién es "martin de compras", con lo que dijo Marcos guardado; para
+     después, quién destraba la del PLC (la de quién es la precisa).
+
+6b. **Marcos** contesta (lunes 19, 11:02), con el mismo estilo: "no no es del equipo es de compras"
+   →
+   - Jugadas: `decir_quien_es`, que no es del equipo.
+   - Efecto: Martín de compras queda anotado como quien destraba la del PLC, alguien de afuera, dicho por
+     Marcos; las preguntas de quién es y de quién destraba se cierran. No se aprende ningún apodo.
+   - La respuesta dice: en el bloque de la del PLC, con 📋 primero y ✏️ debajo, que Martín de compras
+     consigue el cable; el próximo paso, aparte y al final.
+   - La respuesta no dice: a alguien del equipo como si fuera Martín de compras; que Leda le escribió a
+     Martín o lo va a seguir; otra vez la pregunta de quién es o la de quién destraba.
    - Estado después: sin tema abierto, nada para después.
 
 7. **Leda**, por su cuenta, a Ismael (lunes 19, 11:10, terminado el margen para corregir): el aviso de la
-   fecha nueva del lunes 26, el único que le llega por los pasos 2 a 6.
+   fecha nueva del lunes 26, el único que le llega por los pasos 2 a 6b.
    →
    - El mensaje dice: la tarea de comunicaciones en su renglón con 📋, el primero de su bloque; debajo,
      que Marcos dijo que la termina el lun 26/10 porque le falta el switch; que vence el jue 22/10 y, con
@@ -164,7 +179,8 @@ del día; acá llega antes (paso 6) y a Ismael le llega un solo aviso, con el po
   paso 6 es de comunicaciones; el "termine" del paso 8, de comunicaciones); ningún aviso a Ismael con una
   fecha en la tarea equivocada, tampoco si el paso 2 se leyó mal y Marcos lo corrigió dentro del margen
   para corregir (pasos 3 a 5), ni uno sin el porqué mientras Marcos todavía puede darlo; una pregunta por
-  vez (pasos 2 y 3).
+  vez (pasos 2, 3 y 6); nadie queda anotado como alguien de afuera sin que Marcos lo diga (pasos 6 y
+  6b, decisión 65).
 - **El formato:** el corredor lo mide solo en cada mensaje (`comprobar.fallas_de_formato`), como en la
   conversación 20.
 - **Falla de comprensión:** pegar la fecha a la tarea que se nombró primero; meter en la causa o en el

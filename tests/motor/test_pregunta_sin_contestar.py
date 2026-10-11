@@ -38,7 +38,7 @@ from leda.motor.pregunta_sin_contestar import (CLAVE, ESPERA_POR_OMISION, REPETI
 from leda.calendario import Calendario
 
 from tests.motor.ayudantes import (Dias, abierta, avisos_guardados, dice, jugada_bloqueo,
-                                   nueva_tarea, octubre, todos)
+                                   no_es_del_equipo, nueva_tarea, octubre, todos)
 
 
 @pytest.fixture
@@ -238,8 +238,11 @@ def test_al_contestar_la_primera_el_codigo_trae_la_segunda_aparte(conn, mundo, e
     _las_dos_abiertas(conn, escribe, dias, dos)
     r = dice(conn, escribe, Jugada("anotar_quien_destraba", {"tarea": "T2", "quien": "pedro"}),
              at=octubre(9, 16, 57))
+    # "pedro" no es nadie del equipo: primero, quién es (decisión 65 del usuario, 2026-10-11).
+    assert r.pregunta["tipo"] == "quien_es_esa_persona"
+    r = dice(conn, escribe, no_es_del_equipo(), at=octubre(9, 16, 58))
     assert r.pregunta is None
-    [vuelve] = dias.ciclo(octubre(9, 16, 58))
+    [vuelve] = dias.ciclo(octubre(9, 16, 59))
     assert vuelve["hechos"][0]["aviso"] == VUELVE_LA_PREGUNTA
     assert _tareas(vuelve) == ["Revisar el tablero"]
     assert vuelve["pregunta"]["tipo"] == preguntas.ESTADO_DE_LA_TAREA

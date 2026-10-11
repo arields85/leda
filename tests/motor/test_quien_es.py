@@ -317,3 +317,101 @@ def test_lo_que_lee_la_ia_nombra_a_la_persona_por_su_nombre(conn, turnos):
     claves = {k for k, v in _con_clave(turnos.redaccion["hechos"])
               if isinstance(v, str) and "tano" in v.lower()}
     assert claves == set(), claves
+
+
+# --- Quién destraba también pregunta (decisión 65 del usuario, 2026-10-11) ---------------------
+#
+# Un nombre que no es nadie del equipo ("el proveedor", "pedro de compras") no se anota como
+# alguien de afuera: Leda pregunta quién es, y sólo si la persona contesta que no es del equipo
+# queda así. La IA nunca lo decide sola, tampoco leyendo el mismo mensaje que nombró a la persona.
+
+def _trabada(t: Turnos) -> str:
+    alias = _alias(t, "Marcos", "Revisar comunicaciones")
+    t.dice("Marcos", Jugada("anotar_bloqueo", {"tarea": alias, "causa": "me falta el cable"}),
+           texto="la de comunicaciones esta trabada, me falta el cable")
+    return alias
+
+
+def _destraban(conn) -> list[tuple[str | None, str | None]]:
+    return [(f["nombre"], f["destraba_externo"]) for f in todos(
+        conn, """select u.nombre, b.destraba_externo from blocker_unblocker b
+                   left join membership m on m.id = b.destraba_membership_id
+                   left join app_user u on u.id = m.app_user_id
+                  order by b.at, b.id""")]
+
+
+def _lo_destraba(t: Turnos, alias: str, quien: str):
+    return t.dice("Marcos", Jugada("anotar_quien_destraba", {"tarea": alias, "quien": quien}),
+                  texto=f"me lo consigue {quien}")
+
+
+def test_quien_destraba_con_un_nombre_que_no_conoce_pregunta_quien_es(conn, turnos):
+    alias = _trabada(turnos)
+
+    r = _lo_destraba(turnos, alias, "el proveedor")
+
+    [hecho] = r.hechos
+    assert hecho["jugada"] == "anotar_quien_destraba"
+    assert (hecho["resultado"], hecho["falta"]) == ("falta_dato", ["quien_es"])
+    assert hecho["como_lo_nombro"] == "el proveedor" and hecho["pregunta"] == QUIEN_ES
+    assert _pregunta(conn, turnos, "Marcos")["tipo"] == QUIEN_ES
+    assert _destraban(conn) == []
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+
+def test_si_contesta_que_no_es_del_equipo_queda_como_alguien_de_afuera(conn, turnos):
+    alias = _trabada(turnos)
+    _lo_destraba(turnos, alias, "el proveedor")
+
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"de_afuera": True}),
+                    texto="no es del equipo, es el proveedor del cable")
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["quien_destraba"] == {"externo": "el proveedor"}
+    assert _destraban(conn) == [(None, "el proveedor")]
+    assert _pregunta(conn, turnos, "Marcos") is None
+    assert len(_apodos(conn)) == 2          # no aprende nada
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+
+def test_la_ia_no_decide_sola_que_es_de_afuera_en_el_mismo_mensaje(conn, turnos):
+    """Que no es del equipo lo contesta la persona a la pregunta de Leda, en un mensaje
+    posterior: leído del mismo mensaje que la nombró, es la IA la que lo decide, y no vale."""
+    alias = _trabada(turnos)
+
+    r = turnos.dice("Marcos",
+                    Jugada("anotar_quien_destraba", {"tarea": alias, "quien": "el proveedor"}),
+                    Jugada("decir_quien_es", {"de_afuera": True}),
+                    texto="me lo consigue el proveedor")
+
+    assert r.hechos[1]["resultado"] == "falta_dato" and r.hechos[1]["falta"] == ["quien_es"]
+    assert _destraban(conn) == []
+    assert _pregunta(conn, turnos, "Marcos")["tipo"] == QUIEN_ES
+
+
+def test_si_es_alguien_del_equipo_confirma_aprende_y_lo_anota(conn, turnos):
+    alias = _trabada(turnos)
+    _lo_destraba(turnos, alias, "el tano")
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"quien_es": "mariano"}), texto="mariano")
+    assert r.pregunta["tipo"] == CONFIRMAR and _destraban(conn) == []
+
+    r = turnos.toca("Marcos", _boton(conn, turnos, "Marcos", "Confirmar"))
+
+    [hecho] = r.hechos
+    assert (hecho["jugada"], hecho["resultado"]) == ("anotar_quien_destraba", "anotado")
+    assert hecho["quien_destraba"] == {"integrante": MARIANO}
+    assert hecho["aprendio_como_le_dicen_a"] == MARIANO
+    assert _destraban(conn) == [(MARIANO, None)]
+    assert _el_tano(conn) == [(MARIANO, "el tano", "chat")]
+
+
+def test_un_apodo_de_dos_personas_para_quien_destraba_se_elige(conn, turnos):
+    alias = _trabada(turnos)
+
+    r = _lo_destraba(turnos, alias, "el flaco")
+    assert r.pregunta["tipo"] == CUAL
+    r = turnos.toca("Marcos", _boton(conn, turnos, "Marcos", MARTIN))
+
+    assert r.hechos[0]["quien_destraba"] == {"integrante": MARTIN}
+    assert _destraban(conn) == [(MARTIN, None)]

@@ -152,7 +152,6 @@ pasos:
       - {nombre: anotar_quien_destraba, quien: "martin de compras", puede_traer: [tarea]}
       - {nombre: anotar_prevision, tarea: COM, fecha: "2026-10-26", motivo: "me falta el switch"}
     efectos:
-      destraban: [{tarea: PLC, alguien: true, no_sabe: false}]
       previsiones: [{tarea: COM, fecha: "2026-10-26", motivo: presente}]
       avisos_guardados:
         - tipo: nueva_prevision
@@ -162,28 +161,57 @@ pasos:
                    atraso_si_se_cumple_la_prevision_dias_habiles: 2, motivo: presente}
     # Contesta las dos preguntas: quién destraba la del PLC y, con la fecha nueva, qué atrasa la
     # de comunicaciones. El aviso que esperaba el porqué del 23 ya no sale: lo deja atrás éste.
+    # "martin de compras" no es nadie del equipo: Leda pregunta quién es antes de anotarlo
+    # (decisión 65 del usuario, 2026-10-11; ADR 0020), y la de quién destraba queda para después.
     hechos:
-      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente}
+      - {jugada: anotar_quien_destraba, resultado: falta_dato, falta: [quien_es],
+         como_lo_nombro: presente, pregunta: quien_es_esa_persona}
       - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-10-26",
          fecha_comprometida: "2026-10-22", atraso_si_se_cumple_la_prevision_dias_habiles: 2,
          motivo: presente, pregunta: ausente,
          aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-19T11:10",
                               espera_el_motivo: ausente}}
+    pregunta: {tipo: quien_es_esa_persona, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_es_esa_persona, tarea: PLC}
+      para_despues: [{tipo: quien_destraba, tarea: PLC}]
+    dice:
+      - "en el bloque de la de comunicaciones, con 📋 primero y ✏️ debajo: que la termina el lun 26/10 porque le falta el switch"
+      - "con ⚠️, la consecuencia de la de comunicaciones: vence el jue 22/10, dos días hábiles de atraso"
+      - que la fecha nueva queda informada, en pasiva y en futuro, sin nombrar a Ismael
+      - que no tiene a nadie en el equipo como "Martín de compras"
+      - "una sola pregunta, sola y en el último renglón: quién es"
+    no_dice:
+      - el switch como causa del bloqueo del PLC
+      - Martín en la tarea de comunicaciones
+      - que quedó anotado quién destraba la del PLC
+      - a alguien del equipo como si fuera Martín de compras
+      - que Leda le escribió a Martín o lo va a seguir
+      - otra vez la pregunta de quién destraba la del PLC
+      - otra vez la pregunta de qué atrasa la de comunicaciones
+
+  - paso: 6b
+    quien: Marcos
+    a_las: "2026-10-19 11:02"
+    escribe: "no no es del equipo es de compras"
+    jugadas:
+      - {nombre: decir_quien_es, de_afuera: true}
+    efectos:
+      destraban: [{tarea: PLC, alguien: true, no_sabe: false, externo: presente, de: Marcos}]
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente,
+         aprendio_como_le_dicen_a: ausente}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
       para_despues: []
     dice:
-      - "cada tarea en su bloque con 📋 primero: en la del PLC, con ✏️, que Martín de compras consigue el cable; en la de comunicaciones, con ✏️, que la termina el lun 26/10 porque le falta el switch"
-      - "con ⚠️, la consecuencia de la de comunicaciones: vence el jue 22/10, dos días hábiles de atraso"
-      - que la fecha nueva queda informada, en pasiva y en futuro, sin nombrar a Ismael
+      - "en el bloque de la del PLC, con 📋 primero y ✏️ debajo: que Martín de compras consigue el cable"
       - el próximo paso, aparte y al final
     no_dice:
-      - el switch como causa del bloqueo del PLC
-      - Martín en la tarea de comunicaciones
+      - a alguien del equipo como si fuera Martín de compras
       - que Leda le escribió a Martín o lo va a seguir
-      - otra vez la pregunta de quién destraba la del PLC
-      - otra vez la pregunta de qué atrasa la de comunicaciones
+      - otra vez la pregunta de quién es o la de quién destraba
 
   - paso: 7
     quien: Leda

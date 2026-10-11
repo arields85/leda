@@ -18,8 +18,8 @@ from leda.motor.ia import Jugada
 from leda.motor.tiempo import RelojFijo
 
 from tests.motor.ayudantes import (AHORA, T1, T2, IAQueRedacta, cuantas, dice, estado_de,
-                                   jugada_bloqueo, lo_que_salio_para, nueva_tarea, octubre,
-                                   poner_estado, abierta, todos, uno)
+                                   jugada_bloqueo, lo_que_salio_para, no_es_del_equipo,
+                                   nueva_tarea, octubre, poner_estado, abierta, todos, uno)
 
 # --- Ayudas ---------------------------------------------------------------------------------
 
@@ -67,14 +67,19 @@ def test_la_causa_y_quien_destraba_en_un_mensaje_cierran_las_dos_preguntas(conn,
 
     r = marcos.dice(jugada_bloqueo("T1", "falta que me habiliten el acceso a la red"),
                     Jugada("anotar_quien_destraba", {"quien": "martin de IT"}))
+    # "martin de IT" no es nadie del equipo: antes, quién es (decisión 65 del usuario,
+    # 2026-10-11); Marcos contesta que no es del equipo.
+    assert r.pregunta["tipo"] == "quien_es_esa_persona"
+    r = marcos.dice(no_es_del_equipo(), texto="no es del equipo")
 
-    assert [h["resultado"] for h in r.hechos] == ["anotado", "anotado"]
-    assert r.hechos[1]["quien_destraba"] == {"externo": "martin de IT"}
-    assert "salidas" not in r.hechos[1]             # hay otra persona que lo destraba (9c)
+    [destraba] = r.hechos
+    assert destraba["resultado"] == "anotado"
+    assert destraba["quien_destraba"] == {"externo": "martin de IT"}
+    assert "salidas" not in destraba                # hay otra persona que lo destraba (9c)
     assert estado_de(conn, tareas["T1"]) == "bloqueada"
     assert [q["cierre"] for q in todos(
         conn, "select cierre from conversation_question order by abierta_en")] == [
-        "respondida", "respondida"]
+        "respondida", "respondida", "respondida"]
     assert r.pregunta is None and abierta(conn) is None and _para_despues(conn) == []
 
 
@@ -92,6 +97,8 @@ def test_dos_cosas_que_preguntan_van_de_a_una_en_el_orden_dicho(conn, tareas, ma
 
     # Con alguien que lo destraba no hay salidas que propone (que serían el tema nuevo).
     r = marcos.dice(Jugada("anotar_quien_destraba", {"quien": "el de compras"}))
+    assert r.pregunta["tipo"] == "quien_es_esa_persona"     # no es nadie del equipo (decisión 65)
+    r = marcos.dice(no_es_del_equipo(), texto="no es del equipo")
     # Cerrada la de T1, vuelve la que quedó para después: retomarla (9d), en un mensaje aparte
     # porque es otra tarea (decisión 50).
     assert r.pregunta is None
@@ -137,6 +144,8 @@ def test_si_lo_nuevo_tambien_pregunta_leda_sigue_a_la_persona(conn, tareas, marc
 
     r = marcos.dice(jugada_bloqueo("T2", "falta el cable"),
                     Jugada("anotar_quien_destraba", {"tarea": "T2", "quien": "el de compras"}))
+    assert r.pregunta["tipo"] == "quien_es_esa_persona"     # no es nadie del equipo (decisión 65)
+    r = marcos.dice(no_es_del_equipo(), texto="no es del equipo")
     # Cerrado lo nuevo, Leda vuelve a la pendiente, en un mensaje aparte (decisión 50).
     assert r.pregunta is None
     assert _vuelve_aparte(conn) == [("causa_del_bloqueo", tareas["T1"])]

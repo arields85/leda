@@ -144,6 +144,16 @@ def _ariel_no_sabe_y_se_lo_pregunto_a_marcos(conn, mundo, t: Turnos) -> None:
     t.minuto = 60
 
 
+def _de_afuera(t: Turnos, corto: str, jugada: Jugada):
+    """Nombra a alguien que no es nadie del equipo: Leda pregunta quién es y la persona contesta,
+    en otro mensaje, que no es del equipo (decisión 65 del usuario, 2026-10-11). Devuelve el
+    turno de esa respuesta, que hace lo que se había pedido con alguien de afuera."""
+    r = t.dice(corto, jugada)
+    assert r.pregunta["tipo"] == "quien_es_esa_persona", r.hechos
+    return t.dice(corto, Jugada("decir_quien_es", {"de_afuera": True}),
+                  texto="no es del equipo")
+
+
 def _su_pregunta(conn, mundo, corto: str) -> dict | None:
     return uno(conn, """select q.tipo, q.task_id::text tarea, q.jugada
                           from conversation_state s
@@ -369,7 +379,7 @@ def test_el_tercero_que_solo_dice_que_no_le_corresponde_corta_sin_preguntar(conn
 def test_el_primero_que_nombra_a_alguien_de_afuera_corta_la_cadena(conn, mundo, equipo):
     _le_pregunto_a_ariel(conn, mundo, equipo)
 
-    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
 
     assert len(avisos_guardados(conn, PREGUNTA_A_QUIEN_DESTRABA)) == 1
     assert _destraban(conn)[-1]["destraba_externo"] == "el proveedor"
@@ -377,6 +387,46 @@ def test_el_primero_que_nombra_a_alguien_de_afuera_corta_la_cadena(conn, mundo, 
     assert str(cadena["destinatario_membership_id"]) == _membresia(mundo, "Ismael")
     assert cadena["hechos"]["cadena"][-1] == {"de": ARIEL, "no_le_corresponde": True,
                                               "le_toca_a": "el proveedor"}
+
+
+def test_un_nombre_que_no_es_del_equipo_pregunta_quien_es_antes_de_anotar_nada(conn, mundo,
+                                                                              equipo):
+    """Decisión 65 del usuario (2026-10-11; ADR 0020): "es del proveedor" no se anota como alguien
+    de afuera hasta que Ariel contesta que no es del equipo; mientras tanto, nada de lo que dijo
+    queda anotado ni le llega a nadie."""
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+
+    r = equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor",
+                                                              "lo_que_dice": "no es mio"}))
+
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["falta"]) == ("falta_dato", ["quien_es"])
+    assert hecho["como_lo_nombro"] == "el proveedor"
+    assert hecho["pregunta"] == "quien_es_esa_persona"
+    assert len(_destraban(conn)) == 1
+    assert cuantas(conn, "dicho_de_quien_destraba") == 0
+    assert avisos_guardados(conn, CADENA) == [] and avisos_guardados(conn, LO_QUE_DIJO) == []
+    assert _su_pregunta(conn, mundo, "Ariel")["tipo"] == "quien_es_esa_persona"
+    # Lo que dijo no se pierde: vuelve con la respuesta.
+    r = equipo.dice("Ariel", Jugada("decir_quien_es", {"de_afuera": True}),
+                    texto="no es del equipo")
+    assert uno(conn, "select lo_que_dice from dicho_de_quien_destraba")["lo_que_dice"] == \
+        "no es mio"
+
+
+def test_un_apodo_que_no_conoce_en_no_me_toca_se_confirma_y_sigue_con_esa_persona(conn, mundo,
+                                                                                 equipo):
+    _le_pregunto_a_ariel(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el tano"}))
+    equipo.dice("Ariel", Jugada("decir_quien_es", {"quien_es": "mariano"}), texto="mariano")
+
+    r = equipo.dice("Ariel", Jugada("confirmar", {}), texto="si")
+
+    [hecho] = r.hechos
+    assert hecho["aprendio_como_le_dicen_a"] == MARIANO
+    assert _destraban(conn)[-1]["destraba"] == _membresia(mundo, "Mariano")
+    _primera, pregunta = avisos_guardados(conn, PREGUNTA_A_QUIEN_DESTRABA)
+    assert str(pregunta["destinatario_membership_id"]) == _membresia(mundo, "Mariano")
 
 
 # --- "Ni idea": antes de asentarlo, a la persona trabada (decisión 49) ---------------------------
@@ -564,7 +614,7 @@ def test_nunca_va_a_alguien_de_la_cadena(conn, mundo, equipo):
     _referente(conn, mundo["area"], _membresia(mundo, "Mariano"))
     _le_pregunto_a_juan(conn, mundo, equipo)
 
-    r = equipo.dice("Juan", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    r = _de_afuera(equipo, "Juan", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
 
     [cadena] = avisos_guardados(conn, CADENA)
     assert str(cadena["destinatario_membership_id"]) == _membresia(mundo, "Ismael")
@@ -583,7 +633,7 @@ def test_si_quien_aprueba_tambien_es_de_la_cadena_queda_asentado_sin_a_quien(con
     conn.commit()
     _le_pregunto_a_juan(conn, mundo, equipo)
 
-    r = equipo.dice("Juan", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    r = _de_afuera(equipo, "Juan", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
 
     assert avisos_guardados(conn, CADENA) == []
     assert r.hechos[0]["aviso_de_la_cadena"] == {"llega": "no_le_va_a_llegar",
@@ -598,7 +648,7 @@ def test_si_el_referente_es_quien_esta_trabado_va_a_quien_aprueba_su_trabajo(con
     _referente(conn, mundo["area"], _membresia(mundo, "Marcos"))
     _le_pregunto_a_ariel(conn, mundo, equipo)
 
-    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
 
     [cadena] = avisos_guardados(conn, CADENA)
     assert str(cadena["destinatario_membership_id"]) == _membresia(mundo, "Ismael")
@@ -613,7 +663,7 @@ def test_sin_referente_no_promete_que_se_informa(conn, mundo, equipo):
     conn.commit()
     _le_pregunto_a_ariel(conn, mundo, equipo)
 
-    r = equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    r = _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
 
     assert avisos_guardados(conn, CADENA) == []
     [hecho] = r.hechos
@@ -635,7 +685,7 @@ def test_sin_referente_la_cadena_queda_asentada_igual(conn, mundo, equipo):
     conn.commit()
     _le_pregunto_a_ariel(conn, mundo, equipo)
 
-    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
 
     [fila] = todos(conn, """select sujeto_tipo, detalle from audit_log
                              where accion = 'asentar_la_cadena_del_bloqueo'""")
@@ -656,7 +706,7 @@ def test_sin_referente_la_cadena_queda_asentada_igual(conn, mundo, equipo):
 
 def test_el_aviso_al_referente_no_sale_si_ya_se_destrabo(conn, mundo, equipo):
     _le_pregunto_a_ariel(conn, mundo, equipo)
-    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
     equipo.dice("Marcos", Jugada("destrabar", {"tarea": "T1"}))
 
     _salir(conn, mundo, AHORA + timedelta(minutes=90))
@@ -750,7 +800,7 @@ def test_si_al_segundo_no_se_le_puede_escribir_la_cadena_va_al_referente(conn, m
 
 def test_el_aviso_al_referente_sale_como_informacion(conn, mundo, equipo):
     _le_pregunto_a_ariel(conn, mundo, equipo)
-    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
 
     ia = _salir(conn, mundo, AHORA + timedelta(minutes=45))
 
@@ -822,7 +872,7 @@ def test_si_nombra_a_alguien_de_afuera_la_cadena_queda_asentada(conn, mundo, equ
     `fichas.py:895-898`)."""
     _ariel_no_sabe_y_se_lo_pregunto_a_marcos(conn, mundo, equipo)
 
-    r = equipo.dice("Marcos", Jugada("anotar_quien_destraba", {"quien": "el proveedor"}))
+    r = _de_afuera(equipo, "Marcos", Jugada("anotar_quien_destraba", {"quien": "el proveedor"}))
 
     [cadena] = avisos_guardados(conn, CADENA)
     assert str(cadena["destinatario_membership_id"]) == _membresia(mundo, "Ismael")
@@ -841,7 +891,7 @@ def test_quien_recibio_la_cadena_la_ve_en_su_lista(conn, mundo, equipo):
     `persecucion.py:509-516`) la ve como una tarea que se le informó que sigue trabada; no como
     una que espera que la destrabe."""
     _le_pregunto_a_ariel(conn, mundo, equipo)
-    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
     _salir(conn, mundo, AHORA + timedelta(minutes=45))
 
     equipo.dice("Ismael", at=AHORA + timedelta(hours=2))
@@ -854,7 +904,7 @@ def test_quien_recibio_la_cadena_la_ve_en_su_lista(conn, mundo, equipo):
 
 def test_la_cadena_que_todavia_no_salio_no_la_pone_en_su_lista(conn, mundo, equipo):
     _le_pregunto_a_ariel(conn, mundo, equipo)
-    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
 
     equipo.dice("Ismael")
 
@@ -863,7 +913,7 @@ def test_la_cadena_que_todavia_no_salio_no_la_pone_en_su_lista(conn, mundo, equi
 
 def test_la_cadena_no_pone_la_tarea_en_la_lista_de_otra_persona(conn, mundo, equipo):
     _le_pregunto_a_ariel(conn, mundo, equipo)
-    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
     _salir(conn, mundo, AHORA + timedelta(minutes=45))
 
     equipo.dice("Pedro", at=AHORA + timedelta(hours=2))
@@ -873,7 +923,7 @@ def test_la_cadena_no_pone_la_tarea_en_la_lista_de_otra_persona(conn, mundo, equ
 
 def test_destrabada_la_tarea_sale_de_la_lista_de_quien_recibio_la_cadena(conn, mundo, equipo):
     _le_pregunto_a_ariel(conn, mundo, equipo)
-    equipo.dice("Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
+    _de_afuera(equipo, "Ariel", Jugada("decir_que_no_le_toca", {"quien": "el proveedor"}))
     _salir(conn, mundo, AHORA + timedelta(minutes=45))
     equipo.dice("Marcos", Jugada("destrabar", {"tarea": "T1"}), at=AHORA + timedelta(hours=1))
 

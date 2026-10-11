@@ -195,6 +195,11 @@ def test_destrabar_cierra_las_salidas(conn, mundo, equipo):
 
 def test_a_alguien_de_afuera_del_equipo_no_le_escribe(conn, mundo, equipo):
     r = _trabada(equipo, quien="el proveedor de cables")
+    # No es nadie del equipo: Leda pregunta quién es, y Marcos contesta que no es del equipo
+    # (decisión 65 del usuario, 2026-10-11).
+    assert r.pregunta["tipo"] == "quien_es_esa_persona"
+    r = equipo.dice("Marcos", Jugada("decir_quien_es", {"de_afuera": True}),
+                    texto="no es del equipo")
 
     assert avisos_guardados(conn, PREGUNTA_A_QUIEN_DESTRABA) == []
     [hecho] = r.hechos
