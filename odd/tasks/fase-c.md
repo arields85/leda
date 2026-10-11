@@ -3740,8 +3740,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         - **De la IA, aceptado por Leda:** "el motor ya lo arranqué" leído como avance y no como
           inicio (la 40, 2 de 5); "no le escribas" a la tarea equivocada (la 32, 2 de 5); `a: "yo"`
           en un pase (la 39, una vez).
-        - **De las pruebas:** el comparador cuenta como garantía una fila que difiere en un dato
-          (`comprobar.py:553`) y las filas correctas después de una cascada; el corredor sigue el
+        - **De las pruebas:** ~~el comparador cuenta como garantía una fila que difiere en un dato
+          (`comprobar.py:553`)~~ (arreglado en `090016a`: una fila que coincide en lo que la
+          identifica y difiere en un dato es ese dato; la falla nombra las palabras que la persona
+          no dijo, la pregunta 6; revisión `review-eca1ccfc9b1dd387`, aprobada; advertencia: esas
+          palabras se listan aunque la jugada falle por otra cosa, `comprobar.py:470-472`), las
+          filas correctas después de una cascada; el corredor sigue el
           guion después de que el estado se separó (la 34 y la 44, 25 y 50 fallas); no marca como
           `[servicio]` un turno en el que la IA no respondió (sólo los avisos); YAML más estrictos
           que la ficha (36 paso 20 `ya_esta`, 35 paso 4, 39 paso 20).
@@ -3868,8 +3872,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
             culpaba a la persona: ahora tiene el suyo. Revisión `review-1831155009989b77`,
             aprobada; advertencia: las piezas de una entrega se agrupan por `xmin` (la misma
             transacción); después de restaurar la base, todas las de una tarea comparten `xmin`
-            y la fecha saldría la de la primera entrega. `PENDIENTE`: guardar a qué entrega
-            pertenece cada pieza (una columna, con migración).
+            y la fecha saldría la de la primera entrega. Resuelto en `a839c1e` (abajo).
+          - `a839c1e`: cada pieza guarda a qué entrega pertenece (`evidence.de_la_entrega`,
+            migración `0056` con su rollback, escrita por la cocina en la misma transacción);
+            `_piezas` ya no usa `xmin`, y el dato viaja con un respaldo. Rojo: dos entregas en una
+            transacción daban `2026-10-05` en vez de `2026-10-06`. Revisión
+            `review-73a7cbeb541e172a`, aprobada; advertencia: en las filas anteriores a la `0056`,
+            las piezas que no son la primera de su entrega toman la hora de la fila (sólo datos
+            de prueba).
         - `ca02a63`: la 49. Revisión `review-538db78b22524dab`, aprobada, dos sugerencias.
         - Verificación final (`65086af`): `tests/motor` 1257, `tests/garantias` 472,
           `tests/conversaciones` 180 passed; en seco, 47 de 47.

@@ -57,14 +57,17 @@ aprobado. Detalle y evidencia en el plan.
 1. **Los apodos (ADR 0020):** hechas y revisadas dos de tres porciones (`bbe40de`, `1c9f8fe`: la
    tabla `apodo` y "¿quién es?" en el pase y la aprobación). La tercera (quién destraba) y la
    conversación 47 esperan la pregunta 3; están en un parche sin aplicar (plan, "Los apodos").
-2. **Preguntas para el usuario** (en el plan, "Preguntas para el usuario", 1 a 4): "se lo pido yo"
+2. **Preguntas para el usuario** (en el plan, "Preguntas para el usuario", 1 a 6): "se lo pido yo"
    con la pregunta del día ya enviada; corregir un apodo que ya tiene dueño; quién destraba con un
-   nombre que no es nadie del equipo; un archivo para una tarea que espera cambios (la 23, paso 12).
+   nombre que no es nadie del equipo; un archivo para una tarea que espera cambios (la 23, paso 12);
+   "pedíselo igual" sin encargado (la 48, paso 10); el motivo con el verbo en otra persona (la 38,
+   paso 23).
 3. **La prueba de cupo:** hecha (`bb862e4`, `python -m leda chatgpt cupo`; el corredor la mira antes
    de cada ronda por la suscripción). 50 llamadas gastan el 4 % de la ventana de 5 horas.
 4. **Cierre de la Fase C:** suite completa (hecha: 2350 passed, `e4d4f3a`), `docs/capacidades.md` (hecho, `7d20bb2`),
-   y los arreglos del corredor (fila con un dato distinto
-   contada como garantía, `comprobar.py:553`; YAML estrictos: la 39 paso 20, la 36 paso 20, la 35 paso 4).
+   el arreglo del corredor (hecho: `090016a`, una fila con un dato distinto ya no cuenta como
+   garantía), la fecha de un retiro que sobrevive a un respaldo (hecha: `a839c1e`, migración `0056`),
+   ambos revisados y aprobados; faltan los YAML estrictos (la 39 paso 20, la 36 paso 20, la 35 paso 4).
 5. **La tanda de pruebas:** las conversaciones de los dos avisos están hechas (la 48 y la 49, con la IA
    real; la 49 encontró y arregló dos defectos de honestidad); falta la prueba por Telegram con `leda_motor` al día hasta la
    última migración (respaldo previo; autorizado). Necesita al usuario.
@@ -87,7 +90,7 @@ guion es `docs/product/guion-telegram-fase-c-parte-1.md`):
 - **Ojo:** nunca el escuchador y una ronda del corredor a la vez, ni una ronda real mientras se edita `src/`.
 
 **`leda_motor`:** recreada el 2026-10-08 (D6) con las tareas de la prueba (vencen el viernes 16/10);
-respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`. Le faltan de la `0039` a la `0054`. El usuario autorizó
+respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`. Le faltan de la `0039` a la `0056`. El usuario autorizó
 ponerla al día o recrearla cuando haga falta, con respaldo previo; nunca `leda` ni `leda_flujo`.
 
 **Acuerdos de trabajo** (detalle en la memoria del agente):
