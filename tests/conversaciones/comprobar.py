@@ -501,10 +501,34 @@ def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any],
     return True
 
 
+def jugadas_coinciden(esperadas: list[dict], reales: list[dict], mensaje: str | None = None, *,
+                      motor: Motor | None = None) -> bool:
+    """Si las jugadas de un mensaje son las esperadas, sin importar el orden en que la IA las
+    nombra: la cocina juzga las de un mensaje con lo que deja el mensaje entero
+    (`fichas.en_orden`; la 35, paso 4, ronda `fase-c-formato`). Las mismas cuántas, y cada real
+    con una esperada distinta que cumple (`jugada_coincide`)."""
+    if len(esperadas) != len(reales):
+        return False
+    faltan, sobran = _emparejar(esperadas, reales,
+                                lambda e, r: jugada_coincide(e, r, mensaje, motor=motor))
+    return not faltan and not sobran
+
+
+def hechos_coinciden(esperados: Any, reales: Any) -> bool:
+    """Los hechos de un paso contra los reales. Siguen el orden de las jugadas de la IA, así que
+    una lista se compara como ellas, sin importar el orden (cada real con un esperado distinto
+    que `coincide`); lo demás, con `coincide`."""
+    if not (isinstance(esperados, list) and isinstance(reales, list)):
+        return coincide(esperados, reales)
+    if len(esperados) != len(reales):
+        return False
+    faltan, sobran = _emparejar(esperados, reales)
+    return not faltan and not sobran
+
+
 def comprobar_jugadas(c: Comprobacion, esperadas: list[dict], reales: list[dict],
                       mensaje: str | None = None, *, motor: Motor | None = None) -> bool:
-    ok = len(esperadas) == len(reales) and all(
-        jugada_coincide(e, r, mensaje, motor=motor) for e, r in zip(esperadas, reales))
+    ok = jugadas_coinciden(esperadas, reales, mensaje, motor=motor)
     if not ok:
         no_dichas = palabras_no_dichas(esperadas, reales, mensaje, motor=motor)
         c.falla(COMPRENSION, f"jugadas (palabras que la persona no dijo: {no_dichas})"
@@ -516,13 +540,15 @@ def palabras_no_dichas(esperadas: list[dict], reales: list[dict], mensaje: str |
                        motor: Motor | None = None) -> str:
     """Por qué una jugada no coincide cuando lo esperado y lo real se ven iguales: las palabras
     de un dato libre que la persona no escribió, comparadas por su raíz como en
-    `jugada_coincide`. Vacío si no hay ninguna."""
+    `jugada_coincide`. Vacío si no hay ninguna. Mira cada jugada real que tiene una esperada con
+    su nombre, en el orden que sea (como `jugadas_coinciden`)."""
     if not mensaje:
         return ""
     palabras = (motor or cargar_motor()).palabras
+    nombres = {e.get("nombre") for e in esperadas}
     partes = []
-    for e, r in zip(esperadas, reales):
-        if e.get("nombre") != r.get("nombre"):
+    for r in reales:
+        if r.get("nombre") not in nombres:
             continue
         for k in sorted(DATOS_LIBRES & set(r)):
             if isinstance(r[k], str) and r[k]:
@@ -561,8 +587,7 @@ def elegir_lectura(paso: dict[str, Any], reales: list[dict], *,
     mensaje = paso.get("escribe", "")
 
     def coinciden(esperadas: list[dict]) -> bool:
-        return len(esperadas) == len(reales) and all(
-            jugada_coincide(e, r, mensaje, motor=motor) for e, r in zip(esperadas, reales))
+        return jugadas_coinciden(esperadas, reales, mensaje, motor=motor)
 
     if coinciden(paso.get("jugadas") or []) or not coinciden(otra.get("jugadas") or []):
         return paso, []

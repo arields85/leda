@@ -684,7 +684,7 @@ class _Corredor:
             c.fallas += [cp.Falla(cp.MOTOR, f.que, f.esperado, f.real)
                          if f.clase == cp.COMPRENSION else f
                          for f in de_la_administracion.fallas]
-            if "hechos" in paso and not cp.coincide(paso["hechos"], r.hechos):
+            if "hechos" in paso and not cp.hechos_coinciden(paso["hechos"], r.hechos):
                 c.falla(cp.MOTOR, "hechos", paso["hechos"], r.hechos)
         elif "escribe" in paso or "toca" in paso or "manda" in paso:
             jugadas_bien = cp.comprobar_jugadas(c, paso.get("jugadas") or [], r.jugadas,
@@ -712,7 +712,8 @@ class _Corredor:
                 if (e is None) != (r.pregunta is None) or (
                         e is not None and not cp.coincide(e, r.pregunta)):
                     c.falla(clase, "la pregunta de la respuesta", e, r.pregunta)
-            if "hechos" in paso and not cp.coincide(paso["hechos"], r.hechos):
+            # Los hechos siguen el orden de las jugadas de la IA: se comparan sin mirarlo.
+            if "hechos" in paso and not cp.hechos_coinciden(paso["hechos"], r.hechos):
                 c.falla(clase, "hechos", paso["hechos"], r.hechos)
             if paso.get("repetir_toque") and not getattr(self, "_repetido", False):
                 c.falla(cp.GARANTIA, "un toque repetido no repite el efecto", "repetido",

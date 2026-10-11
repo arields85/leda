@@ -338,12 +338,16 @@ def test_la_23_por_la_otra_lectura_del_archivo_ofrece_la_misma_entrega(conn):
     assert next(p for p in corrida.pasos if p.paso == 12).lectura == cp.O_BIEN
 
 
-def _por_la_otra_lectura(conn, numero: str, paso: int, sin: tuple[str, ...] = ()):
+def _por_la_otra_lectura(conn, numero: str, paso: int, sin: tuple[str, ...] = (),
+                         orden: tuple[int, ...] | None = None):
     """La conversación entera con la IA guionada que lee ese paso como su otra lectura (`o_bien`)
-    y los demás como el YAML. `sin`: los datos de `puede_traer` que la IA no trae."""
+    y los demás como el YAML. `sin`: los datos de `puede_traer` que la IA no trae; `orden`: en qué
+    orden nombra la IA las jugadas de la otra lectura (sus posiciones en el YAML)."""
     [conv] = elegir([numero])
     otra = [{k: v for k, v in j.items() if k not in sin}
             for j in next(p for p in conv["pasos"] if p["paso"] == paso)["o_bien"]["jugadas"]]
+    if orden is not None:
+        otra = [otra[i] for i in orden]
     ia = _perfecta(conv)
     guion = copy.deepcopy(conv)
     next(p for p in guion["pasos"] if p["paso"] == paso)["jugadas"] = otra
@@ -368,6 +372,19 @@ def test_la_35_por_la_otra_lectura_le_manda_a_marcos_un_solo_mensaje(conn, sin):
     [a_marcos] = [s for s in next(p for p in corrida.pasos if p.paso == 5).salidas
                   if s.a == "Marcos"]
     assert a_marcos.tipos == ["lo_que_dijo_quien_destraba", "novedad_de_lo_que_espera"]
+
+
+def test_la_35_por_la_otra_lectura_con_las_jugadas_en_otro_orden_pasa_igual(conn):
+    """La ronda real `fase-c-formato` (la 35, vez 5, paso 4): la IA nombró las jugadas de la otra
+    lectura en otro orden (el bloqueo, lo que dice del PLC y quién destraba). Leda hizo lo mismo,
+    y el corredor no mira el orden: ni las jugadas ni sus hechos."""
+    corrida = _por_la_otra_lectura(conn, "35", 4, orden=(1, 0, 2))
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    paso_4 = next(p for p in corrida.pasos if p.paso == 4)
+    assert paso_4.lectura == cp.O_BIEN
+    assert [j["nombre"] for j in paso_4.jugadas] == [
+        "anotar_bloqueo", "decir_cuando_destraba", "anotar_quien_destraba"]
 
 
 @pytest.mark.parametrize(("numero", "paso"), [("36", 20), ("39", 20), ("48", 10)])

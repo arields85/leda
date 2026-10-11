@@ -679,6 +679,92 @@ def test_otra_lectura_mal_escrita_es_un_error_del_yaml():
         cp.elegir_lectura(un_toque, [])
 
 
+# --- El orden en que la IA nombra las jugadas de un mensaje no importa (la 35, paso 4) ---------
+
+# Las jugadas que eligió la IA en la ronda real `fase-c-formato` (la 35, vez 5, paso 4): las de la
+# otra lectura, en otro orden. La cocina las juzga igual en cualquier orden (`fichas.en_orden`).
+_REALES_35_VEZ_5 = [
+    {"nombre": "anotar_bloqueo", "tarea": "SRV", "causa": "falta el switch nuevo"},
+    {"nombre": "decir_cuando_destraba", "tarea": "PLC",
+     "lo_que_dice": "todavia no la tengo, estoy parado con el servidor xq falta el switch nuevo",
+     "su_tarea_trabada": "SRV"},
+    {"nombre": "anotar_quien_destraba", "tarea": "SRV", "quien": "lucas"}]
+
+
+def _paso_4_de_la_35() -> dict:
+    from tests.conversaciones.corredor import elegir
+
+    [conv] = elegir(["35"])
+    return next(p for p in conv["pasos"] if p["paso"] == 4)
+
+
+def test_las_jugadas_de_un_mensaje_coinciden_en_cualquier_orden():
+    paso = _paso_4_de_la_35()
+    esperadas, mensaje = paso["o_bien"]["jugadas"], paso["escribe"]
+
+    assert cp.jugadas_coinciden(esperadas, _REALES_35_VEZ_5, mensaje)
+    assert cp.comprobar_jugadas(cp.Comprobacion(), esperadas, _REALES_35_VEZ_5, mensaje)
+    assert cp.jugadas_coinciden(esperadas, list(reversed(_REALES_35_VEZ_5)), mensaje)
+
+
+def test_una_jugada_distinta_de_menos_o_de_mas_sigue_sin_coincidir_en_cualquier_orden():
+    paso = _paso_4_de_la_35()
+    esperadas, mensaje = paso["o_bien"]["jugadas"], paso["escribe"]
+    bloqueo, decir, quien = _REALES_35_VEZ_5
+
+    distinta = [bloqueo, {**decir, "tarea": "SRV"}, quien]
+    assert not cp.jugadas_coinciden(esperadas, distinta, mensaje)
+    assert not cp.jugadas_coinciden(esperadas, [quien, bloqueo], mensaje)
+    assert not cp.jugadas_coinciden(esperadas, [*_REALES_35_VEZ_5, bloqueo], mensaje)
+    # Dos iguales no cubren dos esperadas distintas: cada real va con una sola esperada.
+    assert not cp.jugadas_coinciden(esperadas, [bloqueo, bloqueo, quien], mensaje)
+    c = cp.Comprobacion()
+    assert not cp.comprobar_jugadas(c, esperadas, [quien, bloqueo], mensaje)
+    assert [(f.clase, f.que) for f in c.fallas] == [(cp.COMPRENSION, "jugadas")]
+
+
+def test_la_otra_lectura_se_elige_con_sus_jugadas_en_otro_orden():
+    """La 35, vez 5, paso 4: la IA nombró las tres jugadas de la otra lectura en otro orden, y lo
+    que hizo Leda fue lo de esa lectura; el corredor la elige igual, y no la principal."""
+    paso = _paso_4_de_la_35()
+
+    esperado, luego = cp.elegir_lectura(paso, _REALES_35_VEZ_5)
+
+    assert esperado.get("lectura") == cp.O_BIEN and luego == []
+    assert esperado["jugadas"] == paso["o_bien"]["jugadas"]
+
+
+def test_las_palabras_no_dichas_se_buscan_aunque_las_jugadas_vengan_en_otro_orden():
+    mensaje = "no, esa hacela vos nahuel que la conoces mejor"
+    esperadas = [{"nombre": "anotar_inicio", "tarea": "PLC"},
+                 {"nombre": "contestar_el_pase", "tarea": "SEN", "acepta": False,
+                  "puede_traer": ["por_que"]}]
+    reales = [{"nombre": "contestar_el_pase", "tarea": "SEN", "acepta": False,
+               "por_que": "nahuel la sabe mejor"},
+              {"nombre": "anotar_inicio", "tarea": "PLC"}]
+
+    assert cp.palabras_no_dichas(esperadas, reales, mensaje) == "por_que: sabe"
+
+
+def test_los_hechos_de_un_mensaje_coinciden_en_cualquier_orden():
+    """Los hechos de un paso siguen el orden de las jugadas de la IA: se comparan como ellas."""
+    bloqueo = {"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "SRV"}
+    decir = {"jugada": "decir_cuando_destraba", "resultado": "anotado", "tarea": "PLC"}
+    quien = {"jugada": "anotar_quien_destraba", "resultado": "anotado"}
+    reales = [{**bloqueo, "causa": "falta el switch nuevo"}, {**decir, "lo_que_dice": "x"},
+              {**quien, "tarea": "SRV"}]
+
+    assert cp.hechos_coinciden([decir, bloqueo, quien], reales)
+    assert cp.hechos_coinciden([bloqueo, decir, quien], reales)
+    assert not cp.hechos_coinciden([{**decir, "tarea": "SRV"}, bloqueo, quien], reales)
+    assert not cp.hechos_coinciden([decir, bloqueo], reales)
+    assert not cp.hechos_coinciden([decir, bloqueo, quien, quien], reales)
+    # Lo que no es una lista se compara como siempre.
+    assert cp.hechos_coinciden("presente", reales)
+    assert cp.hechos_coinciden({"resultado": "anotado"}, {"resultado": "anotado", "tarea": "SRV"})
+    assert not cp.hechos_coinciden([decir], {"jugada": "decir_cuando_destraba"})
+
+
 # --- Una fila con un dato distinto no es un efecto de más (`fase-c.md`, "De las pruebas") ------
 
 def test_una_fila_que_es_la_esperada_con_un_dato_distinto_no_es_de_garantia():

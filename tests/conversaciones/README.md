@@ -467,8 +467,11 @@ hasta volver al mismo estado que la principal. Lo elige el corredor por las juga
 siempre; con las de la otra, se compara con lo que el paso hace (quién, cuándo y qué escribe) más lo
 que declara la otra, sin heredar nada de la principal: un efecto, un aviso o un botón que la otra no
 declara es de más, así que ninguna garantía se afloja. Sólo en un paso escrito o con archivos (un
-toque no compara jugadas), y la otra no cambia lo que la persona escribe ni quién. La IA guionada sigue
-siempre la principal, así la corrida en seco no cambia; el informe muestra los pasos de `luego` cuando
+toque no compara jugadas), y la otra no cambia lo que la persona escribe ni quién. Las jugadas de un
+mensaje y sus `hechos` se comparan sin importar el orden en que la IA las nombra, para elegir la
+lectura y en cualquier paso, porque la cocina las juzga con lo que deja el mensaje entero
+(`comprobar.jugadas_coinciden` y `hechos_coinciden`; la 35, paso 4, ronda `fase-c-formato`).
+La IA guionada sigue siempre la principal, así la corrida en seco no cambia; el informe muestra los pasos de `luego` cuando
 corrieron, y la estimación de llamadas cuenta sólo la principal.
 
 Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
