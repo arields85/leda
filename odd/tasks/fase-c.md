@@ -497,6 +497,15 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     "¿Sabés quién se encarga?"; si contesta que no, se cierra como "no sabe". Es una pregunta de
     más a cambio de no perder el nombre cuando la persona lo sabía. La prueba acepta los dos
     caminos (la IA lee "no sabe" de entrada, o Leda pregunta y la persona contesta que no).
+64. **"Se lo pido yo" no anula el día que ya dio quien destraba** (usuario, 2026-10-10, de noche;
+    eligió B después de discutir la A). Si Ariel, que destraba, ya dijo "el jueves" y después
+    Nahuel, el trabado, dice "se lo pido yo y te cuento", el jueves Leda igual le pregunta a Ariel
+    si pudo, y además le pregunta a Nahuel cómo le fue. Por qué: el día de Ariel es un compromiso
+    registrado de quien de verdad destraba; la palabra de otro no lo anula, y si Nahuel no cumple o
+    no contesta, el seguimiento no puede quedar colgado de alguien que no destraba. Distinto de la
+    decisión 37: si Ariel todavía no se comprometió a nada, "se lo pido yo" sí hace que Leda deje de
+    escribirle. Es lo que el código ya hace (`vigencia_del_dia_que_dijo` no mira
+    `se_lo_pide_quien_esta_trabado`); falta una prueba que lo fije.
 
 ## Chequeo de rumbo (2026-10-07)
 
