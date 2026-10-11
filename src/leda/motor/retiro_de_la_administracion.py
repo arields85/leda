@@ -209,16 +209,18 @@ def _piezas(cur, ids: Sequence[str], zona: ZoneInfo, pol) -> list[dict[str, Any]
     quien la revisa, que guardó el turno que la confirmó. La fila de la evidencia la fecha la
     base (`clock_timestamp()`), porque su orden frente a las decisiones sobre la tarea lo exige
     (T6j); en una corrida con el reloj movido, esa fecha no es la de Leda. El aviso se ata a la
-    primera pieza del acto (`herramientas._entregar_tarea`, `entrega`), y las piezas de un mismo
-    acto se escriben en una sola transacción, la misma `xmin` (una evidencia no se modifica).
-    Sin ese aviso (nadie la revisa, o la entregó quien la revisa), el de la fila."""
+    primera pieza del acto (`herramientas._entregar_tarea`, `entrega`), y cada pieza guarda cuál
+    es (`de_la_entrega`, migración 0056): un dato de la fila, que sobrevive a una restauración
+    (la transacción que la escribió, no: después de restaurar, todas comparten una). Una pieza
+    de antes de la 0056, sin ese dato, cuenta como su propio acto. Sin ese aviso (nadie la
+    revisa, o la entregó quien la revisa), el de la fila."""
     cur.execute("""select e.clase, e.cubre, e.at, e.es_ejemplo_aceptado,
                           a.clase as clase_del_archivo,
                           (select min(n.creado_en)
-                             from evidence f
-                             join scheduled_notice n
-                               on n.dedupe_key = %s || f.id::text
-                            where f.task_id = e.task_id and f.xmin = e.xmin) as en_el_reloj
+                             from scheduled_notice n
+                            where n.workspace_id = e.workspace_id
+                              and n.dedupe_key = %s || coalesce(e.de_la_entrega, e.id)::text
+                          ) as en_el_reloj
                      from evidence e
                      left join archivo a on a.workspace_id = e.workspace_id
                                         and a.id = e.archivo_id

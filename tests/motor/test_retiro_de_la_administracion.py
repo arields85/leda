@@ -515,6 +515,70 @@ def test_el_dia_de_la_pieza_retirada_es_el_de_la_entrega_en_el_reloj_de_leda(con
     assert [p["la_entrego_el"] for p in de_la_tarea["piezas_retiradas"]] == ["2026-10-05"]
 
 
+def test_el_dia_de_cada_pieza_es_el_de_su_entrega_aunque_compartan_la_transaccion(conn, mundo,
+                                                                                ada):
+    """Revisión `review-1831155009989b77`: las piezas de una entrega se agrupaban por la
+    transacción que las escribió (`xmin`). Después de restaurar un respaldo, todas las filas de
+    una tarea comparten la misma, y la pieza de la segunda entrega salía con el día de la
+    primera. Cada pieza guarda a qué entrega pertenece (`evidence.de_la_entrega`, migración
+    0056), un dato que viaja con el respaldo. Dos entregas escritas en una sola transacción
+    reproducen lo que deja una restauración."""
+    from leda import herramientas
+
+    marcos = mundo["personas"]["Marcos"]
+    with admin(conn) as cur:
+        cur.execute("""insert into task_evidence_policy (workspace_id, area_id,
+                                                         evidencia_requerida, tipos)
+                       values (%s, %s, %s, %s)
+                       on conflict (workspace_id, area_id) do nothing""",
+                    (mundo["id"], mundo["area"], ["explicacion", "foto"], json.dumps(TIPOS)))
+        cur.execute(
+            """insert into task (workspace_id, objective_id, titulo, area_id,
+                                 responsable_membership_id, estado, fecha_objetivo,
+                                 evidencia_requerida)
+               values (%s, %s, 'Armar el tablero', %s, %s, 'en_curso', %s, %s) returning id""",
+            (mundo["id"], mundo["objetivo"], mundo["area"], marcos["membership_id"],
+             VIERNES_16, ["explicacion", "foto"]))
+        tarea = str(cur.fetchone()["id"])
+        primera_foto = _archivo(cur, mundo, JPEG)
+        segunda_foto = _archivo(cur, mundo, JPEG + b"segunda")
+    conn.commit()
+
+    entregas = []
+    with espacio(conn, mundo["id"]) as cur:
+        quien = identificar_en_espacio(cur, marcos["telegram"], mundo["id"])
+        for dia, piezas in ((AHORA, [{"texto": "quedó armado", "cubre": ["explicacion"]},
+                                     {"archivo_id": primera_foto, "cubre": ["foto"]}]),
+                            (AHORA + timedelta(days=1),
+                             [{"archivo_id": segunda_foto, "cubre": ["foto"]}])):
+            r = herramientas.ejecutar(cur, quien, "entregar_tarea",
+                                      {"tarea_id": tarea, "piezas": piezas}, ya_confirmada=True)
+            entregas.append(r)
+            # El aviso de cada entrega a quien la revisa, atado al acto, con el reloj de Leda.
+            cur.execute(
+                """insert into scheduled_notice (workspace_id, tipo, task_id,
+                                                 destinatario_membership_id, hechos,
+                                                 programado_para, estado, dedupe_key, creado_en,
+                                                 resuelto_en)
+                   values (%s, 'entrega_para_aprobar', %s, %s, '{}', %s, 'enviado', %s, %s, %s)""",
+                (mundo["id"], tarea, mundo["personas"]["Ismael"]["membership_id"], dia,
+                 f"motor:entrega_para_aprobar:{r['entrega']}", dia, dia))
+    conn.commit()
+    [nueva] = entregas[1]["evidencias"]
+    # Las dos entregas comparten la transacción, como después de una restauración.
+    assert len({f["x"] for f in todos(conn, "select xmin::text x from evidence where task_id = %s",
+                                      tarea)}) == 1
+
+    with admin(conn) as cur:
+        pagina_de_tarea.retirar_contenido(cur, mundo["id"], nueva, ada, MOTIVO,
+                                          ahora=AHORA + timedelta(days=2))
+    conn.commit()
+    [aviso] = [a for a in avisos_guardados(conn, A_QUIEN_LA_ENTREGO)
+               if nueva in a["dedupe_key"]]
+    [de_la_tarea] = aviso["hechos"][EN_CADA_TAREA]
+    assert [p["la_entrego_el"] for p in de_la_tarea["piezas_retiradas"]] == ["2026-10-06"]
+
+
 # --- Lo retirado no vuelve -------------------------------------------------------------------
 
 def test_la_misma_foto_mandada_otra_vez_no_se_guarda(conn, mundo, ada):

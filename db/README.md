@@ -53,6 +53,11 @@ algo que la base puede verificar.
 `objective_state_event`, `dependency`, `blocker`, `evidence`, `approval`,
 `pending_reply`.
 
+Cada pieza de `evidence` guarda a qué entrega pertenece (`de_la_entrega`, migración 0056): el
+id de la primera pieza del acto, ella misma si es la primera o la única, de la misma tarea. Es
+un dato de la fila y sobrevive a una restauración; la transacción que la escribió (`xmin`), no.
+Las filas de antes de la 0056 quedan nulas y cuentan como su propio acto.
+
 `leda_app` puede insertar borradores, pero no tareas. Una tarea nueva se crea
 únicamente mediante `confirmar_borrador_tarea`, que revalida la vista previa y
 deja `task.source_draft_id`. `leda_admin` conserva escritura directa para

@@ -578,7 +578,15 @@ create table evidence (
   -- criterio y la persona aceptó tal cual: vale como lo que describe, pero no lo escribió ella.
   -- Sólo un texto; las filas de antes de la 0039, `false`.
   es_ejemplo_aceptado boolean not null default false,
+  -- Migración 0056: la entrega a la que pertenece la pieza, por el id de la primera pieza del
+  -- acto (ella misma, si es la primera o la única), de la misma tarea. Un dato de la fila, que
+  -- viaja con un respaldo (la transacción que la escribió, no). Las filas de antes, nulas.
+  de_la_entrega  uuid,
   constraint evidence_workspace_id_unique unique (workspace_id, id),
+  constraint evidence_tarea_id_unique unique (workspace_id, task_id, id),
+  constraint evidence_de_la_entrega
+    foreign key (workspace_id, task_id, de_la_entrega)
+    references evidence(workspace_id, task_id, id),
   constraint evidence_task_workspace
     foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
   constraint evidence_clase check (clase in ('texto', 'imagen', 'archivo', 'enlace')),
@@ -600,6 +608,8 @@ comment on column evidence.cubre is
   'ADR 0019, decisión 5: los tipos de la política que cubre esta pieza, como los vio la persona en la vista previa de la entrega. Un texto puede cubrir varios.';
 comment on column evidence.tipo is
   'Legado: en las filas nuevas es igual a la clase. Los tipos de la política que cubre una pieza están en cubre.';
+comment on column evidence.de_la_entrega is
+  'Migración 0056: la entrega a la que pertenece esta pieza, por el id de la primera pieza del acto (ella misma, si es la primera o la única), de la misma tarea. La escribe la cocina al entregar; viaja con un respaldo, a diferencia de la transacción que la escribió. Nula en las filas de antes de la 0056: la pieza cuenta como su propio acto.';
 
 create table approval (
   id                     uuid primary key default gen_random_uuid(),

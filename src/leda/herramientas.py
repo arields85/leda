@@ -1059,23 +1059,30 @@ def _tipos_que_faltan(cur, tarea_id, piezas: list[dict] | None = None) -> list[s
     return list(cur.fetchone()["t"] or [])
 
 
-def _insertar_evidencia(cur, quien: Solicitante, tarea_id, pieza: dict) -> str:
+def _insertar_evidencia(cur, quien: Solicitante, tarea_id, pieza: dict,
+                        entrega: str | None = None) -> str:
     """Una fila de `evidence` para una pieza ya resuelta (`clase`, `cubre` y su
     contenido: `texto`, `uri` o `archivo_id`; un texto, también los puntos del criterio
     de aceptación que describe, `describe`, y si es un ejemplo que la persona aceptó,
-    `ejemplo_aceptado`). `tipo` es igual a la clase."""
+    `ejemplo_aceptado`). `tipo` es igual a la clase.
+
+    `entrega` es la primera pieza del acto al que pertenece ésta (migración 0056); sin
+    ella, la pieza es la primera o la única de su acto, y su entrega es ella misma. Se
+    guarda en la fila (`de_la_entrega`) porque la transacción que la escribió no
+    sobrevive a una restauración (revisión de `65086af`)."""
+    pieza_id = str(uuid.uuid4())
     # T6f (seguimiento del orquestador): `at` explícito con `clock_timestamp()` --
     # ver el comentario de `_bloquear_tarea`.
     cur.execute(
-        """insert into evidence (workspace_id, task_id, tipo, clase, texto, uri,
+        """insert into evidence (id, workspace_id, task_id, tipo, clase, texto, uri,
                                  archivo_id, cubre, describe_del_criterio,
-                                 es_ejemplo_aceptado, entregado_por, at)
-           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, clock_timestamp())
+                                 es_ejemplo_aceptado, entregado_por, de_la_entrega, at)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, clock_timestamp())
            returning id""",
-        (quien.workspace_id, tarea_id, pieza["clase"], pieza["clase"],
+        (pieza_id, quien.workspace_id, tarea_id, pieza["clase"], pieza["clase"],
          pieza.get("texto"), pieza.get("uri"), pieza.get("archivo_id"),
          list(pieza["cubre"]), list(pieza.get("describe") or []),
-         bool(pieza.get("ejemplo_aceptado")), quien.membership_id))
+         bool(pieza.get("ejemplo_aceptado")), quien.membership_id, entrega or pieza_id))
     return str(cur.fetchone()["id"])
 
 
@@ -1861,7 +1868,11 @@ def _entregar_tarea(cur, quien: Solicitante, tarea_id, piezas):
                values (%s, 'asignada', 'en_curso', 'persona', %s,
                        'arrancó al entregarla', clock_timestamp())""",
             (tarea_id, quien.app_user_id))
-    ids = [_insertar_evidencia(cur, quien, tarea_id, p) for p in resueltas]
+    # Cada pieza guarda su acto: la primera (migración 0056), la identidad de la entrega.
+    ids: list[str] = []
+    for p in resueltas:
+        ids.append(_insertar_evidencia(cur, quien, tarea_id, p,
+                                       entrega=ids[0] if ids else None))
     if completa:
         if not ids:
             return {"en_revision": True, "estado": "en_revision",

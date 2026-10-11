@@ -706,3 +706,89 @@ def test_completar_una_entrega_en_revision_suma_las_piezas_sin_moverla(corework,
     with admin(conn) as cur:
         assert _cuantas(cur, "evidence", "task_id = %s", tarea) == 2
         assert _cuantas(cur, "task_state_event", "task_id = %s", tarea) == eventos
+
+
+# --- A qué entrega pertenece cada pieza (migración 0056) -------------------------------------
+#
+# Revisión de `65086af` (`review-1831155009989b77`): las piezas de un acto se agrupaban por la
+# transacción que las escribió (`xmin`), que no sobrevive a una restauración. Cada pieza guarda
+# su entrega: el id de la primera pieza del acto, ella misma si es la primera o la única.
+
+def test_cada_pieza_de_una_entrega_guarda_la_primera_del_acto(corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws)
+        mariano = _membresia(cur, ws, "Mariano Naim")
+        primera = _archivo(cur, ws, mariano)
+        segunda = _archivo(cur, ws, mariano, JPEG + b"segunda")
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, ws, "Mariano Naim")
+        r1 = H.ejecutar(cur, quien, "entregar_tarea", {"tarea_id": tarea, "piezas": [
+            {"texto": "Quedó cerrado y probado", "cubre": ["explicacion"]},
+            {"archivo_id": primera, "cubre": ["foto"]}]}, ya_confirmada=True)
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        r2 = H.ejecutar(cur, _quien(cur, ws, "Mariano Naim"), "entregar_tarea", {
+            "tarea_id": tarea, "piezas": [{"archivo_id": segunda, "cubre": ["foto"]}]},
+            ya_confirmada=True)
+        suelta = H.ejecutar(cur, _quien(cur, ws, "Mariano Naim"), "adjuntar_evidencia", {
+            "tarea_id": tarea, "tipo": "explicacion", "descripcion": "Y el rótulo"},
+            ya_confirmada=True)
+    conn.commit()
+    with admin(conn) as cur:
+        cur.execute("select id::text, de_la_entrega::text d from evidence where task_id = %s",
+                    (tarea,))
+        de = {f["id"]: f["d"] for f in cur.fetchall()}
+    assert {de[i] for i in r1["evidencias"]} == {r1["entrega"]} == {r1["evidencias"][0]}
+    assert [de[i] for i in r2["evidencias"]] == [r2["entrega"]]
+    # Una pieza que llega sola es su propio acto.
+    assert de[suelta["evidencia_id"]] == suelta["evidencia_id"]
+
+
+def test_la_entrega_de_una_pieza_es_de_la_misma_tarea_y_del_mismo_espacio(corework, conn,
+                                                                          intake_world):
+    ws = corework.workspace_id
+    otro = intake_world["north-lab"]
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws)
+        otra_tarea = _tarea(cur, ws)
+        de_otra_tarea = _pieza(cur, ws, otra_tarea)
+        cur.execute("""insert into task (workspace_id, objective_id, titulo, area_id,
+                                         responsable_membership_id)
+                       values (%s, %s, 'Ajena', %s, %s) returning id""",
+                    (otro["id"], otro["objectives"][0], otro["areas"]["field"],
+                     otro["people"]["Sam North"]["membership_id"]))
+        ajena = _pieza(cur, otro["id"], str(cur.fetchone()["id"]))
+        for entrega in (de_otra_tarea, ajena, "00000000-0000-0000-0000-000000000000"):
+            with pytest.raises(psycopg.errors.ForeignKeyViolation), conn.transaction():
+                cur.execute("""insert into evidence (workspace_id, task_id, tipo, clase, texto,
+                                                     de_la_entrega)
+                               values (%s, %s, 'texto', 'texto', 'otra', %s)""",
+                            (ws, tarea, entrega))
+        # Una vez escrita, la entrega de una pieza no cambia, ni con la administración.
+        propia = _pieza(cur, ws, tarea)
+        with pytest.raises(psycopg.errors.RaiseException, match="no se modifica"), \
+                conn.transaction():
+            cur.execute("update evidence set de_la_entrega = id where id = %s", (propia,))
+    conn.rollback()
+
+
+def test_el_rollback_de_la_0056_se_niega_si_una_pieza_dice_su_entrega(corework, conn):
+    """Deshacerla borraría a qué acto pertenece cada pieza, que una restauración no recupera."""
+    script = (Path(__file__).resolve().parents[2] / "db" / "rollbacks"
+              / "0056_la_entrega_de_cada_pieza.sql").read_text("utf-8")
+    guarda = re.findall(r"do \$\$.*?end \$\$;", script, re.S)[-1]
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea = _tarea(cur, ws)
+        pieza = _pieza(cur, ws, tarea)
+        cur.execute("""insert into evidence (workspace_id, task_id, tipo, clase, texto, cubre,
+                                             de_la_entrega)
+                       values (%s, %s, 'texto', 'texto', 'Y el rótulo', '{explicacion}', %s)""",
+                    (ws, tarea, pieza))
+        with pytest.raises(psycopg.errors.RaiseException, match="0056 rollback refused"), \
+                conn.transaction():
+            cur.execute("set local search_path = leda, public")
+            cur.execute(guarda)
+        assert _cuantas(cur, "evidence") == 2
