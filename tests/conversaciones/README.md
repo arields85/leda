@@ -136,6 +136,12 @@ La página de la tarea (ADR 0019, decisión 7):
     que desde entonces puede pedir como cualquiera que la ve; con otra tarea, Martín dice que no y
     Nahuel se entera. Dos tareas que coinciden: Leda las nombra y Nahuel contesta (decisión 33 del
     usuario, 2026-10-09).
+48. [`48-el-sector-se-queda-sin-encargado.md`](48-el-sector-se-queda-sin-encargado.md): dos
+    pedidos del detalle esperan a Martín y la plataforma deja a Infraestructura IT sin encargado.
+    Los dos terminan sin compartir nada; a Martín, a quien le llegó la pregunta del switch, le
+    llega una vez que ya no hace falta que conteste, y de la del servidor, que nunca le llegó,
+    nada; a Nahuel, lo mismo que si el sector no hubiera tenido encargado al pedirlo; su botón
+    viejo no comparte nada (decisiones 33, 35 y 39; constitución §8).
 
 La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, decisiones 4 a 7):
 
@@ -425,6 +431,18 @@ después puede decir quién tiene cada tarea (`responsables`), también para mir
 **El detalle de una tarea** (decisión 33; la 45): los efectos suman las tareas compartidas con
 alguien que no las veía (`compartidas`, por la clave de la tarea, con quién y por quién): una de más es
 de garantía, porque nada se comparte sin la decisión del encargado del sector de la tarea.
+
+**Lo que hace la administración** (la 48): un paso puede ser una operación de la
+administración en el medio de la conversación (`administracion`, con `hace` y sus datos, y
+`quien: Administracion`), de una lista cerrada (`corredor.OPERACIONES_DE_LA_ADMINISTRACION`),
+corrida como la corre la consola o la plataforma, con el reloj del paso: `cambiar_el_encargado`
+(`area`, por su slug, y `a`, una persona o nulo: el sector sin encargado) y `retirar_contenido`
+(`tarea`, `clase` de la pieza, que tiene que ser una sola, y `motivo`; por el administrador de
+plataforma de la corrida, como `python -m leda retirar-contenido`; su conversación, la 49, está
+`PENDIENTE`). Sus efectos se comparan como
+los de un turno (`efectos`): uno de más es de garantía y uno que falta es del motor, nunca de
+comprensión, porque nadie eligió jugadas; `hechos` compara lo que hizo. No lleva la casilla del
+próximo paso: no es un mensaje de Leda. Lo que Leda manda después va en un paso con `relojes`.
 
 **Otra lectura válida de un mensaje** (`o_bien`; decisión 63, la 34, paso 7): cuando lo que una
 persona escribe admite dos lecturas que llevan al mismo lugar ("ni idea yo eso no lo manejo": la IA

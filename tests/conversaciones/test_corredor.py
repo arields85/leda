@@ -47,7 +47,7 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_cuarenta_y_cinco_conversaciones_y_cada_una_nombra_su_fuente():
+def test_hay_cuarenta_y_seis_conversaciones_y_cada_una_nombra_su_fuente():
     # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega), la 23 desde la 3b (la
     # aprobación), la 24 desde la 3c (quien aprueba no contesta), la 27 desde la D3 de la C-3d
     # (la entrega frente al criterio), la 28 y la 29 desde la D4 (las entregas en listas y si
@@ -63,9 +63,11 @@ def test_hay_cuarenta_y_cinco_conversaciones_y_cada_una_nombra_su_fuente():
     # la decisión 25 (el informe al grupo), y la 42 desde la C-5b (a quien destraba y no
     # contesta, Leda nunca lo abandona), y la 43 desde la C-5c (cerrar el tema para todos), y la
     # 44 desde la C-5e (seguir la cadena hasta quien puede destrabarla), y la 45 desde la
-    # decisión 33 (el resumen para cualquiera, el detalle a pedido).
+    # decisión 33 (el resumen para cualquiera, el detalle a pedido), y la 48 desde el aviso al
+    # encargado anterior (el sector que se queda sin encargado). La 47 (los apodos) todavía no
+    # tiene su YAML.
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 46)]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 46)] + ["48"]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]
@@ -611,3 +613,88 @@ def test_la_direccion_de_prueba_vale_mientras_corra_alguna_corrida():
     finally:
         b.__exit__(None, None, None)
     assert config_mod.config.base_url == antes
+
+
+# --- Lo que hace la administración (`administracion`; la 48) ---------------------------------
+
+def _la_27_hasta_el_aviso_a_ismael_y(paso_de_la_administracion) -> dict:
+    """La 27 hasta que el aviso de la entrega del PLC, con su foto, le llega a Ismael (paso 6), y
+    después un paso de la administración."""
+    [conv] = elegir(["27"])
+    otra = copy.deepcopy(conv)
+    otra["pasos"] = [p for p in otra["pasos"] if p["paso"] <= 6] + [
+        {"paso": 7, "quien": "Administracion", "a_las": "2026-10-22 16:00",
+         **paso_de_la_administracion}]
+    return otra
+
+
+_RETIRAR_LA_FOTO = {"hace": "retirar_contenido", "tarea": "PLC", "clase": "imagen",
+                    "motivo": "en la foto se ve la clave del PLC"}
+_LOS_DOS_AVISOS = [
+    {"tipo": "contenido_retirado_por_la_administracion", "tarea": "PLC", "a": "Marcos",
+     "estado": "guardado"},
+    {"tipo": "la_entrega_espera_otra_pieza", "tarea": "PLC", "a": "Ismael", "estado": "guardado"}]
+
+
+def test_la_administracion_retira_el_contenido_como_la_consola_y_sus_efectos_se_comparan(conn):
+    """El retiro corre la función de la consola (`pagina_de_tarea.retirar_contenido`), por el
+    administrador de plataforma de la corrida y con el reloj del paso: la pieza queda retirada,
+    no borrada, y se guardan los avisos a quien la entregó y a quien la revisa (decisión 58)."""
+    conv = _la_27_hasta_el_aviso_a_ismael_y({
+        "administracion": _RETIRAR_LA_FOTO,
+        "efectos": {"retiradas": [{"tarea": "PLC", "clase": "imagen"}],
+                    "avisos_guardados": _LOS_DOS_AVISOS},
+        "hechos": [{"hace": "retirar_contenido", "tarea": "PLC", "piezas_retiradas": 1}]})
+
+    corrida = correr_conversacion(conn, conv, _perfecta(conv))
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    paso = corrida.pasos[-1]
+    assert paso.quien == "Administracion" and paso.texto.startswith("[administración]")
+    assert paso.salidas == [] and paso.jugadas == []
+    # No es un mensaje de Leda: no lleva la casilla del próximo paso.
+    assert paso.dice == []
+    with admin(conn) as cur:
+        cur.execute("""select count(*) n from evidence e join evidencia_retirada w
+                         on w.evidence_id = e.id where w.retirada_por_app_user_id is not null""")
+        assert cur.fetchone()["n"] == 1
+        cur.execute("""select count(*) n from audit_log
+                        where accion = 'retirar_contenido_de_evidencia'""")
+        assert cur.fetchone()["n"] == 1
+    conn.commit()
+
+
+def test_lo_que_hace_la_administracion_sin_esperarlo_es_de_garantia_y_lo_que_falta_del_motor(
+        conn):
+    """Nadie eligió jugadas: un efecto que no se esperaba es de garantía, como en un turno, y uno
+    esperado que no pasó es del código, nunca de comprensión."""
+    de_mas = _la_27_hasta_el_aviso_a_ismael_y({
+        "administracion": _RETIRAR_LA_FOTO,
+        "efectos": {"retiradas": [{"tarea": "PLC", "clase": "imagen"}]}})
+    corrida = correr_conversacion(conn, de_mas, _perfecta(de_mas))
+    assert corrida.error is None
+    assert [(f.clase, f.que) for _, f in corrida.fallas()] == [
+        (cp.GARANTIA, "efecto de más: aviso guardado")]
+
+    _limpiar(conn)
+    falta = _la_27_hasta_el_aviso_a_ismael_y({
+        "administracion": _RETIRAR_LA_FOTO,
+        "efectos": {"retiradas": [{"tarea": "PLC", "clase": "imagen"}],
+                    "avisos_guardados": _LOS_DOS_AVISOS + [
+                        {"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos"}]}})
+    corrida = correr_conversacion(conn, falta, _perfecta(falta))
+    assert corrida.error is None
+    assert [(f.clase, f.que) for _, f in corrida.fallas()] == [
+        (cp.MOTOR, "falta un efecto: aviso guardado")]
+
+
+def test_una_operacion_que_la_administracion_no_hace_es_un_error_del_yaml(conn):
+    [conv] = elegir(["01"])
+    otra = copy.deepcopy(conv)
+    otra["pasos"] = otra["pasos"][:1] + [
+        {"paso": 2, "quien": "Administracion", "a_las": "2026-10-20 11:00",
+         "administracion": {"hace": "borrar_la_tarea", "tarea": "PLC"}}]
+
+    corrida = correr_conversacion(conn, otra, _perfecta(otra))
+
+    assert corrida.error is not None and "borrar_la_tarea" in corrida.error

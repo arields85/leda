@@ -27,6 +27,11 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
    - **la plataforma cambia quién aprueba** el trabajo de una persona (`cambia_quien_aprueba`,
      con `de` y `a`; C-3d, D4): se escribe como la escribiría la plataforma, en el momento del
      paso, antes de sus relojes;
+   - **la administración hace algo** en el medio de la conversación (`administracion`, con
+     `hace` y sus datos; la conversación 48): una operación de una lista cerrada
+     (`OPERACIONES_DE_LA_ADMINISTRACION`), corrida como la corre la administración (la consola
+     o la plataforma), con el reloj del paso; sus efectos se comparan como los de un turno, y
+     lo que falta es del código, porque nadie eligió jugadas;
    - **otra lectura válida** del mensaje (`o_bien`; decisión 63): si la IA eligió sus jugadas, el
      paso se compara con lo que ella espera y corren sus pasos (`luego`) antes de seguir
      (`comprobar.elegir_lectura`);
@@ -82,6 +87,15 @@ DIRECCION_DE_PRUEBA = "https://leda.invalid"
 # El botón que muestra la entrega de una tarea (`avisos.boton_para_ver`): en el YAML, "Ver <clave>".
 VER = "Ver "
 ENLACE_DE_PRUEBA = re.compile(r"\n" + re.escape(DIRECCION_DE_PRUEBA) + r"/tarea/[A-Za-z0-9_-]+$")
+# Lo que la administración puede hacer en el medio de una conversación (`administracion`, con
+# `hace`): una lista cerrada, cada una con el método del corredor que la corre como la corre la
+# administración (la consola o la plataforma).
+OPERACIONES_DE_LA_ADMINISTRACION = {
+    # El encargado de un sector (el referente de su área) cambia, o el sector queda sin él (la 48).
+    "cambiar_el_encargado": "_cambiar_el_encargado",
+    # El retiro del contenido de una pieza de una entrega, por la consola.
+    "retirar_contenido": "_retirar_contenido",
+}
 
 
 # La definición del usuario (2026-10-06; ADR 0018, decisión 9, tercera vuelta): todo mensaje de
@@ -283,7 +297,13 @@ class _Corredor:
         if "cambia_quien_aprueba" in paso:
             self.reloj.momento = momento(paso["a_las"])
             self._cambiar_quien_aprueba(paso["cambia_quien_aprueba"])
-        if "escribe" in paso or "toca" in paso or "manda" in paso:
+        if "administracion" in paso:
+            self.reloj.momento = momento(paso["a_las"])
+            r.cuando = paso["a_las"]
+            r.texto = f"[administración] {_lo_que_hace(paso['administracion'])}"
+            r.hechos = [cp.normalizar(self._administrar(paso["administracion"]),
+                                      self.mundo.titulos)]
+        elif "escribe" in paso or "toca" in paso or "manda" in paso:
             self.reloj.momento = momento(paso["a_las"])
             r.cuando = paso["a_las"]
             ia = self.ia
@@ -328,7 +348,8 @@ class _Corredor:
             r.hechos = cp.normalizar(resultado.hechos, self.mundo.titulos)
             r.pregunta = cp.normalizar(resultado.pregunta, self.mundo.titulos)
             r.ya_no_sale = list(resultado.ya_no_sale)
-        if not preludio and (r.texto or r.salidas) and not any(
+        # Un paso de la administración no es un mensaje de Leda: no lleva la casilla.
+        if not preludio and "administracion" not in paso and (r.texto or r.salidas) and not any(
                 "próximo paso" in d for d in r.dice):
             r.dice.append(PROXIMO_PASO)
         if not preludio:
@@ -412,6 +433,57 @@ class _Corredor:
                         (self.mundo.personas[cambio["a"]]["membership_id"],
                          self.mundo.personas[cambio["de"]]["membership_id"]))
         self.conn.commit()
+
+    def _administrar(self, que: dict[str, Any]) -> dict[str, Any]:
+        """Lo que hace la administración en el paso (`administracion`): una operación de la lista
+        cerrada, con el reloj del paso. Devuelve lo que hizo, en hechos para el informe y para
+        compararlos (`hechos` del paso). Una que no está en la lista es un error del YAML."""
+        hace = que.get("hace")
+        if hace not in OPERACIONES_DE_LA_ADMINISTRACION:
+            raise ValueError(f"La administración no hace {hace!r} en el corredor: las que hace "
+                             f"son {', '.join(sorted(OPERACIONES_DE_LA_ADMINISTRACION))}.")
+        hecho = getattr(self, OPERACIONES_DE_LA_ADMINISTRACION[hace])(que)
+        self.conn.commit()
+        return {"hace": hace, **hecho}
+
+    def _cambiar_el_encargado(self, que: dict[str, Any]) -> dict[str, Any]:
+        """Lo que hace la plataforma: el encargado del sector `area` (el referente de su área,
+        por su slug) pasa a ser `a`, o nadie si `a` es nulo (la 48)."""
+        from leda.db import admin
+
+        a = que.get("a")
+        with admin(self.conn) as cur:
+            cur.execute("update area set referente_membership_id = %s where id = %s",
+                        (self.mundo.personas[a]["membership_id"] if a else None,
+                         self.mundo.areas[que["area"]]))
+        return {"area": que["area"], "encargado": a}
+
+    def _retirar_contenido(self, que: dict[str, Any]) -> dict[str, Any]:
+        """Lo que hace la administración por la consola (`python -m leda retirar-contenido`): el
+        retiro del contenido de una pieza de la entrega de `tarea`, la de la clase `clase` (una
+        sola, para que no dependa del orden), con su `motivo`, por el administrador de
+        plataforma de la corrida y con el reloj de Leda, como la consola."""
+        from leda import pagina_de_tarea
+        from leda.db import admin
+
+        from .carga import TELEGRAM_ADMIN
+
+        with admin(self.conn) as cur:
+            cur.execute("""select e.id from evidence e
+                            where e.task_id = %s and e.clase = %s
+                              and not exists (select 1 from evidencia_retirada w
+                                               where w.evidence_id = e.id)""",
+                        (self.mundo.tareas[que["tarea"]], que["clase"]))
+            piezas = [str(f["id"]) for f in cur.fetchall()]
+            if len(piezas) != 1:
+                raise ValueError(f"La pieza de {que['clase']} de {que['tarea']} que se retira "
+                                 f"tiene que ser una sola, y son {len(piezas)}.")
+            cur.execute("select id from app_user where telegram_user_id = %s", (TELEGRAM_ADMIN,))
+            administrador = str(cur.fetchone()["id"])
+            retiradas = pagina_de_tarea.retirar_contenido(
+                cur, self.mundo.workspace_id, piezas[0], administrador, que["motivo"],
+                ahora=self.reloj.ahora())
+        return {"tarea": que["tarea"], "clase": que["clase"], "piezas_retiradas": len(retiradas)}
 
     def _etiqueta(self, etiqueta: str) -> str:
         """Un botón por su clave en el YAML: una tarea, por la suya; el que muestra la entrega de
@@ -590,7 +662,19 @@ class _Corredor:
         hubo = cp.efectos(antes, despues)
         titulos = self.mundo.titulos
         quien = paso.get("quien", self.persona)
-        if "escribe" in paso or "toca" in paso or "manda" in paso:
+        if "administracion" in paso:
+            # Nadie eligió jugadas: un efecto de más sigue siendo de garantía, y uno que falta
+            # es del código, nunca de comprensión.
+            clase = cp.MOTOR
+            de_la_administracion = cp.Comprobacion()
+            cp.comprobar_efectos(de_la_administracion, paso.get("efectos") or {}, hubo, titulos,
+                                 jugadas_bien=True)
+            c.fallas += [cp.Falla(cp.MOTOR, f.que, f.esperado, f.real)
+                         if f.clase == cp.COMPRENSION else f
+                         for f in de_la_administracion.fallas]
+            if "hechos" in paso and not cp.coincide(paso["hechos"], r.hechos):
+                c.falla(cp.MOTOR, "hechos", paso["hechos"], r.hechos)
+        elif "escribe" in paso or "toca" in paso or "manda" in paso:
             jugadas_bien = cp.comprobar_jugadas(c, paso.get("jugadas") or [], r.jugadas,
                                                 paso.get("escribe", ""), motor=self.motor) \
                 if "toca" not in paso else True
@@ -770,6 +854,12 @@ def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -
                   and ("tarea" not in e or a["tarea"] == e["tarea"])
                   and (foco is None or a["tarea"] is None or a["tarea"] in foco)]
     return any(cp.coincide(e["hechos"], a["hechos"]) for a in candidatos)
+
+
+def _lo_que_hace(que: dict[str, Any]) -> str:
+    """Lo que hace la administración en un paso, en una línea para la transcripción."""
+    datos = ", ".join(f"{k}: {v}" for k, v in que.items() if k != "hace")
+    return f"{que.get('hace')} ({datos})" if datos else str(que.get("hace"))
 
 
 def _resumen(s: Salida) -> dict[str, Any]:

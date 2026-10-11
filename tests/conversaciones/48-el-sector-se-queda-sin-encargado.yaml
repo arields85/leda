@@ -1,0 +1,224 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/48-el-sector-se-queda-sin-encargado.md
+numero: "48"
+titulo: "El sector se queda sin encargado mientras se espera su decisión"
+mide: garantias
+persona: Nahuel
+inicio: "2026-10-26 09:00"
+
+tareas:
+  SW:
+    titulo: Configurar el switch de la planta
+    criterio: "El switch de la planta da red a las doce máquinas de la línea y responde al monitoreo"
+    responsable: Lucas
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  SRV:
+    titulo: Instalar el servidor de la planta
+    criterio: "El servidor queda en el rack de la planta, con su respaldo diario funcionando y probado una vez"
+    responsable: Lucas
+    vence: "2026-11-06"
+    estado: en_curso
+    desde: "2026-10-19"
+
+pasos:
+  # Como en la 45: el resumen, sin enlace, y la oferta de pedirle el detalle a Martín.
+  - paso: 1
+    quien: Nahuel
+    a_las: "2026-10-26 10:00"
+    escribe: "pasame el link de la tarea del switch"
+    jugadas:
+      - {nombre: pedir_enlace, como_la_nombra: "switch"}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_enlace, resultado: solo_el_resumen, tarea: SW, responsable: Lucas Natuche,
+         estado: en_curso, vence: "2026-10-30", el_detalle_lo_ve: Infraestructura IT,
+         se_lo_puede_pedir_a: Martín Forte, pregunta: propuesta,
+         lleva_el_enlace_a_la_pagina_de_la_tarea: ausente}
+    pregunta: {tipo: propuesta, tarea: SW}
+    botones: []
+    enlace: false
+    estado_despues:
+      pregunta_abierta: {tipo: propuesta, tarea: SW}
+    dice:
+      - "el resumen: la del switch, de Lucas, en curso, vence el vie 30/10"
+      - que el detalle lo ve Infraestructura IT y que, si lo necesita, le pregunta a Martín
+    no_dice:
+      - que no la puede ver
+
+  - paso: 2
+    quien: Nahuel
+    a_las: "2026-10-26 10:02"
+    escribe: "si dale"
+    jugadas:
+      - {nombre: pedir_el_detalle}
+    efectos:
+      avisos_guardados:
+        - {tipo: pedido_del_detalle, tarea: SW, a: Martin, estado: guardado,
+           hechos: {necesita_respuesta: true, pregunta: compartir_el_detalle,
+                    pide_ver_el_detalle: Nahuel Gimenez, la_tiene: Lucas Natuche}}
+    hechos:
+      - {jugada: pedir_el_detalle, resultado: detalle_pedido, tarea: SW,
+         le_pregunta_a: {a: Martín Forte, llega: "~2026-10-26T10:12"}}
+    pregunta: null
+    botones: []
+    enlace: false
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que le pregunta a Martín y le avisa cuando conteste
+
+  # La pregunta le llega a Martín: desde acá, hay un tema abierto con él.
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-26 10:12"]
+    salen:
+      - a: Martin
+        tipo: pedido_del_detalle
+        tarea: SW
+        hechos: {necesita_respuesta: true, pregunta: compartir_el_detalle,
+                 pide_ver_el_detalle: Nahuel Gimenez, la_tiene: Lucas Natuche}
+        botones: [Compartirla, No compartirla]
+    dice:
+      - que Nahuel pide ver el detalle de la del switch, de Lucas
+      - "la pregunta: si se la comparte"
+
+  - paso: 4
+    quien: Nahuel
+    a_las: "2026-10-26 10:20"
+    escribe: "y el del servidor de lucas?"
+    jugadas:
+      - {nombre: pedir_enlace, como_la_nombra: "servidor de lucas"}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_enlace, resultado: solo_el_resumen, tarea: SRV, responsable: Lucas Natuche,
+         estado: en_curso, vence: "2026-11-06", el_detalle_lo_ve: Infraestructura IT,
+         se_lo_puede_pedir_a: Martín Forte, pregunta: propuesta,
+         lleva_el_enlace_a_la_pagina_de_la_tarea: ausente}
+    pregunta: {tipo: propuesta, tarea: SRV}
+    botones: []
+    enlace: false
+    dice:
+      - "el resumen del servidor: de Lucas, en curso, vence el vie 6/11"
+      - que el detalle lo ve Infraestructura IT y que, si lo necesita, le pregunta a Martín
+    no_dice:
+      - que no la puede ver
+
+  # La pregunta del servidor queda guardada para dentro de diez minutos: todavía no le llegó a
+  # Martín.
+  - paso: 5
+    quien: Nahuel
+    a_las: "2026-10-26 10:21"
+    escribe: "si porfa"
+    jugadas:
+      - {nombre: pedir_el_detalle}
+    efectos:
+      avisos_guardados:
+        - {tipo: pedido_del_detalle, tarea: SRV, a: Martin, estado: guardado,
+           hechos: {necesita_respuesta: true, pide_ver_el_detalle: Nahuel Gimenez}}
+    hechos:
+      - {jugada: pedir_el_detalle, resultado: detalle_pedido, tarea: SRV,
+         le_pregunta_a: {a: Martín Forte, llega: "~2026-10-26T10:31"}}
+    pregunta: null
+    botones: []
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que le pregunta a Martín por la del servidor y le avisa cuando conteste
+
+  # La plataforma deja a Infraestructura IT sin encargado (Martín deja de ser su referente y
+  # sigue en el equipo). Nada cambia en ese momento: lo nota el seguimiento.
+  - paso: 6
+    quien: Administracion
+    a_las: "2026-10-26 10:25"
+    administracion: {hace: cambiar_el_encargado, area: it, a: null}
+    efectos: {}
+    hechos:
+      - {hace: cambiar_el_encargado, area: it, encargado: null}
+
+  # Nadie puede decidir los dos pedidos: terminan. A Martín, a quien le llegó la pregunta del
+  # switch, que ya no hace falta que conteste, una vez; de la del servidor no le llega nada,
+  # porque nunca se la preguntaron. El administrador se entera por su canal, una vez por sector
+  # y por día. Nahuel escribió a las 10:21: lo suyo espera a no interrumpirlo (las 10:51).
+  - paso: 7
+    quien: Leda
+    relojes: ["2026-10-26 10:30"]
+    salen:
+      - a: Martin
+        tipo: como_termino_el_pedido_del_detalle
+        tarea: SW
+        hechos: {necesita_respuesta: false, la_compartio: false, ya_no_espera_su_respuesta: true,
+                 pidio: Nahuel Gimenez, sin_encargado_del_sector: ausente,
+                 el_detalle_lo_ve: ausente, sin_respuesta: ausente}
+        # Martín sigue revisando el trabajo de Lucas: la ve, y el aviso lleva su enlace.
+        enlace: true
+    incidentes: [motor_sector_sin_encargado]
+    dice:
+      - a Martín, que el pedido de Nahuel para ver el detalle de la del switch terminó y que ya no hace falta que conteste
+      - que no hace falta contestar, en el último renglón
+    no_dice:
+      - que Martín dejó de ser el encargado, o algo de la administración o de la plataforma
+      - la tarea del servidor
+
+  - paso: 8
+    quien: Leda
+    relojes: ["2026-10-26 10:51"]
+    salen:
+      - a: Nahuel
+        tipo: como_termino_el_pedido_del_detalle
+        tarea: SW
+        hechos: {necesita_respuesta: false, la_compartio: false, sin_encargado_del_sector: true,
+                 el_detalle_lo_ve: Infraestructura IT, no_contesto: ausente}
+        enlace: false
+      - a: Nahuel
+        tipo: como_termino_el_pedido_del_detalle
+        tarea: SRV
+        hechos: {necesita_respuesta: false, la_compartio: false, sin_encargado_del_sector: true,
+                 el_detalle_lo_ve: Infraestructura IT, no_contesto: ausente}
+        enlace: false
+    dice:
+      - a Nahuel, que el detalle de la del switch y el de la del servidor no se compartieron porque Infraestructura IT no tiene a quién pedírselo por ahora
+    no_dice:
+      - el nombre de Martín
+      - el enlace
+
+  # El botón viejo de Martín no hace nada y lo dice: nada se comparte sin la decisión del
+  # encargado de ahora, y ya no hay ninguno.
+  - paso: 9
+    quien: Martin
+    a_las: "2026-10-26 11:00"
+    toca: Compartirla
+    efectos: {}
+    hechos:
+      - {jugada: elegir, resultado: sin_efecto, motivo: pregunta_cerrada,
+         eligio: {etiqueta: Compartirla, tarea: SW},
+         cerrada_con: {cierre: sin_efecto, tarea: SW}}
+    pregunta: null
+    botones: []
+    dice:
+      - que ese pedido ya no espera su respuesta
+    no_dice:
+      - que se la compartió
+
+  # Nahuel insiste: Leda le dice lo mismo que si el sector no hubiera tenido encargado al
+  # pedirlo. No le pregunta a Martín, que ya no es el encargado, ni se anota otro pedido; el
+  # administrador ya se enteró hoy.
+  - paso: 10
+    quien: Nahuel
+    a_las: "2026-10-26 11:30"
+    escribe: "y lo del switch no se lo podes pedir igual a martin?"
+    jugadas:
+      - {nombre: pedir_el_detalle, como_la_nombra: "switch"}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_el_detalle, resultado: no_se_puede, motivo: sin_encargado_del_sector,
+         tarea: SW}
+    pregunta: null
+    botones: []
+    enlace: false
+    dice:
+      - que el detalle de la del switch lo ve Infraestructura IT y que por ahora no tiene a quién pedírselo
+    no_dice:
+      - que le pregunta a Martín
+      - que Martín dejó de ser el encargado, o algo de la administración o de la plataforma
