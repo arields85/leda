@@ -3648,8 +3648,15 @@ Vigente; lo de abajo ("cierre del 2026-10-10") es el registro de lo anterior.
 - [ ] **La prueba por Telegram** con `leda_motor` al día hasta la `0056` (respaldo previo;
       autorizado; guion `docs/product/guion-telegram-fase-c-parte-1.md`). Necesita al usuario.
 - [ ] **La plataforma web:** su ADR, con el usuario.
-- [ ] **Formato:** unas 87 fallas en 35 corridas (renglones de más de 140 caracteres, dos
-      preguntas al cierre); la instrucción de la redacción dice sólo "renglones cortos".
+- [ ] **Formato:** 87 fallas en 35 corridas (`fase-c-decisiones-66-73.md`): 63 renglones de más
+      de 140 caracteres, 20 el cierre sin su renglón aparte, 4 otras. Chequeo de rumbo (2026-10-11):
+      la misma clase en todas las rondas desde el formato (punto 4: se revisa el mecanismo, no el
+      caso); las instrucciones ya describen el formato entero (`instrucciones.py:157-172`), así que
+      otra vuelta de instrucciones no la haría innecesaria. Es presentación, no comprensión: la
+      cocina puede darle forma sin cambiar una palabra (partir un renglón largo entre oraciones,
+      separar el cierre) y deja de depender de la IA; no es corregir lo que el mozo escuchó. Lo
+      demuestra una ronda real de las mismas siete conversaciones, comparada con estas 87.
+      Escritor delegado (2+ archivos).
 - [ ] **Una lectura de la IA:** la 35 paso 18 (1 de 5): "sigo parado con el tablero" queda como
       texto y no como su tarea trabada, y a Nahuel no le llega la novedad posterior.
 - [ ] **Advertencias de las revisiones de hoy** (casos de borde y pruebas que faltan), anotadas
