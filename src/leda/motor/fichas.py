@@ -1853,7 +1853,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "la nueva, y con sólo a la nueva deja de usar el de la otra, auditado",
           manejar=_decir_quien_es, se_ofrece=False,
           contesta=(preguntas.QUIEN_ES, preguntas.CONFIRMAR_QUIEN_ES,
-                    preguntas.CUAL_DE_ESAS_PERSONAS),
+                    preguntas.CUAL_DE_ESAS_PERSONAS, preguntas.A_QUIENES),
           es="La persona contesta la pregunta de Leda de quién es alguien que nombró y Leda no "
              "reconoce como del equipo (como_lo_nombro, en la pregunta abierta): quien_es es el "
              "nombre de esa persona, como lo dice; de_afuera, si dice que no es del equipo. "

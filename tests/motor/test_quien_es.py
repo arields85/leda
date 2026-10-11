@@ -582,3 +582,76 @@ def test_con_la_pregunta_de_quien_es_abierta_el_apodo_la_contesta(conn, turnos):
 
     assert r.hechos[0]["resultado"] == "quien_es_para_confirmar"
     assert r.pregunta["tipo"] == CONFIRMAR
+
+
+# --- Revisión de `e932186` (decisión 67) ---------------------------------------------------------
+
+def test_la_ficha_declara_que_contesta_a_quienes_les_dicen_asi():
+    from leda.motor import fichas, preguntas
+
+    assert preguntas.A_QUIENES in fichas.FICHAS["decir_quien_es"].contesta
+
+
+def test_escribir_solo_a_la_nueva_persona_con_el_apodo_la_contesta(conn, turnos):
+    """La IA puede repetir el apodo al leer "solo a nahuel": con la pregunta de a quiénes
+    abierta, es la respuesta, no otra corrección."""
+    _el_tano_es_mariano(conn, turnos)
+    _el_tano_es_nahuel(turnos)
+
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"apodo": "el tano",
+                                                        "quien_es": "nahuel"}),
+                    texto="solo a nahuel")
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["dejo_de_reconocer_asi_a"] == [MARIANO]
+    assert _vigentes_del_tano(conn) == [NAHUEL]
+    assert _pregunta(conn, turnos, "Marcos") is None
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+
+def _vigentes_del_flaco(conn) -> list[str]:
+    return [f["nombre"] for f in todos(
+        conn, """select u.nombre from apodo a
+                   join membership m on m.id = a.membership_id
+                   join app_user u on u.id = m.app_user_id
+                  where a.apodo = 'el flaco' and a.borrado_en is null order by u.nombre""")]
+
+
+def test_con_mas_de_un_dueno_anterior_el_boton_dice_a_todos(conn, turnos):
+    """"El flaco" es de Martín y de Marcos (la plataforma): decir que es de Nahuel pregunta con
+    "A todos", y tocarlo se lo enseña a Nahuel sin quitárselo a ninguno."""
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"apodo": "el flaco",
+                                                        "quien_es": "nahuel"}),
+                    texto="el flaco es nahuel")
+
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["falta"]) == ("falta_dato", [A_QUIENES])
+    assert hecho["ya_le_dicen_asi_a"] == [MARCOS, MARTIN]
+    assert [o["etiqueta"] for o in r.pregunta["opciones"]] == ["A todos", f"Sólo a {NAHUEL}"]
+
+    r = turnos.toca("Marcos", _boton(conn, turnos, "Marcos", "A todos"))
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "anotado"
+    assert hecho["sigue_reconociendo_asi_a"] == [MARCOS, MARTIN]
+    assert _vigentes_del_flaco(conn) == [MARCOS, MARTIN, NAHUEL]
+    assert hechos.sin_significado(turnos.redaccion) == set()
+
+
+def test_un_nombre_que_coincide_con_varias_personas_no_elige_ni_cambia_nada(conn, turnos):
+    """"El tano es el flaco": "el flaco" es de dos personas. Leda no elige: dice con quiénes
+    coincide, no abre ninguna pregunta de a quiénes y no cambia ningún apodo."""
+    _el_tano_es_mariano(conn, turnos)
+
+    r = turnos.dice("Marcos", Jugada("decir_quien_es", {"apodo": "el tano",
+                                                        "quien_es": "el flaco"}),
+                    texto="no, el tano es el flaco")
+
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["falta"]) == ("falta_dato", ["quien_es"])
+    assert sorted(hecho["coinciden"]) == [MARCOS, MARTIN]
+    assert r.pregunta is None
+    assert _vigentes_del_tano(conn) == [MARIANO]
+    assert _vigentes_del_flaco(conn) == [MARCOS, MARTIN]
+    assert hechos.sin_significado(turnos.redaccion) == set()
