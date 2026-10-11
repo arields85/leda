@@ -3966,9 +3966,16 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         - Verificación del escritor (en serie): `tests/motor` 1237, `tests/garantias` 472,
           `tests/conversaciones` 166 passed; en seco, 45 de 45. Correr las suites en paralelo las
           rompe entre sí.
-        - **Retenida, sin aplicar** (`porcion3-quien-destraba.patch`, en el scratchpad de la
-          sesión del 2026-10-11): "¿quién es?" en quién destraba y en "no me toca, es de X", la
-          47 en YAML (pasa en seco) y su `.md`. Espera la pregunta 3. Cambios del diseño de la 47
+        - **Aplicada: `ce0cf04`** (escritor delegado, con la decisión 65): "¿quién es?" en quién
+          destraba y en "no me toca, es de X", la 47 en YAML y su `.md`, y un paso nuevo en la 25
+          (6b) y la 30 (9b), donde Marcos contesta que no es del equipo. El escritor cerró un hueco
+          del parche: "no es del equipo" cuenta sólo como respuesta a una pregunta que la persona
+          vio en un mensaje anterior (`apodos.decir`). 23 pruebas de `tests/motor` que anotaban
+          a alguien de afuera sin preguntar suman la respuesta. Verificación (en serie):
+          `tests/motor` 1265, `tests/garantias` 475, `tests/conversaciones` 185 passed; en seco,
+          48 de 48. Revisión `review-e33f1effc4134c71`, aprobada; advertencia: la guarda mira sólo
+          las preguntas abiertas en el mismo turno (`apodos.py:236-241`). Antes, retenida
+          (`porcion3-quien-destraba.patch`) a la espera de la pregunta 3. Cambios del diseño de la 47
           a contarle al usuario: el paso 1 anota el bloqueo con su causa y deja pendiente sólo
           quién destraba; los botones del paso 11 salen por orden alfabético.
 - [ ] La plataforma: su ADR, con el usuario.
