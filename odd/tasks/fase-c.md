@@ -491,6 +491,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     respuesta a esa oferta; si no contesta, Leda no insiste y la pregunta vence sola. Sólo si la
     persona no tiene otra pregunta abierta: una pregunta que hace falta contestar nunca queda
     tapada por una opcional; en ese caso la respuesta se lee como hoy.
+63. **"Ni idea" sin decir quién: Leda pregunta una vez quién se encarga, como en la 51** (de las
+    rondas de control, conversación 34, paso 7; usuario, 2026-10-10, la que recomendó el agente).
+    Si quien no destraba no nombra a nadie y la IA no lee que no sabe, Leda le pregunta una vez
+    "¿Sabés quién se encarga?"; si contesta que no, se cierra como "no sabe". Es una pregunta de
+    más a cambio de no perder el nombre cuando la persona lo sabía. La prueba acepta los dos
+    caminos (la IA lee "no sabe" de entrada, o Leda pregunta y la persona contesta que no).
 
 ## Chequeo de rumbo (2026-10-07)
 
