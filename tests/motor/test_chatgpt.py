@@ -704,3 +704,175 @@ def test_un_modelo_lite_pide_el_razonamiento_de_todos_los_turnos(tmp_path):
 
     assert codex.pedidos[0]["cuerpo"]["reasoning"] == {"context": "all_turns"}
     assert codex.pedidos[1]["cuerpo"]["reasoning"] == {"context": "all_turns", "effort": "low"}
+
+
+# --- El cupo de la suscripción ----------------------------------------------------------
+#
+# El servicio informa el cupo en las cabeceras de cada respuesta (observado el 2026-10-10 y
+# el 2026-10-11): la ventana corta (`primary`, de 5 horas) y la larga (`secondary`, semanal).
+
+ART = timezone(timedelta(hours=-3))
+CABECERAS_DEL_CUPO = {
+    "x-codex-primary-used-percent": "17", "x-codex-secondary-used-percent": "3",
+    "x-codex-primary-window-minutes": "300", "x-codex-secondary-window-minutes": "10080",
+    "x-codex-primary-reset-after-seconds": "9585",
+    "x-codex-secondary-reset-after-seconds": "596385",
+    "x-codex-primary-reset-at": str(int(AHORA.timestamp()) + 9585),
+    "x-codex-secondary-reset-at": str(int(AHORA.timestamp()) + 596385)}
+
+
+def test_el_cupo_se_lee_de_las_cabeceras_completas():
+    cupo = chatgpt.cupo_de_cabeceras(httpx.Headers(CABECERAS_DEL_CUPO), AHORA)
+
+    assert cupo.corta.usado == 17 and cupo.larga.usado == 3
+    assert cupo.corta.minutos == 300 and cupo.larga.minutos == 10080
+    assert cupo.corta.renueva == AHORA + timedelta(seconds=9585)
+    assert cupo.larga.renueva == AHORA + timedelta(seconds=596385)
+    assert cupo.visto == AHORA and not cupo.agotado
+
+
+def test_el_cupo_acepta_un_porcentaje_con_decimales_y_mayusculas_en_el_nombre():
+    cupo = chatgpt.cupo_de_cabeceras({"X-Codex-Primary-Used-Percent": "99.5",
+                                      "x-codex-secondary-used-percent": "100.0"}, AHORA)
+    assert cupo.corta.usado == 99.5 and cupo.larga.usado == 100.0
+    assert cupo.agotado                    # una de las dos ventanas llena alcanza
+
+
+def test_sin_las_cabeceras_del_cupo_no_hay_cupo():
+    assert chatgpt.cupo_de_cabeceras({"content-type": "text/event-stream"}, AHORA) is None
+    assert chatgpt.cupo_de_cabeceras({}, AHORA) is None
+
+
+def test_un_valor_ilegible_del_cupo_queda_vacio_sin_romper():
+    cupo = chatgpt.cupo_de_cabeceras({
+        "x-codex-primary-used-percent": "mucho", "x-codex-secondary-used-percent": "nan",
+        "x-codex-primary-window-minutes": "", "x-codex-secondary-window-minutes": "-5",
+        "x-codex-primary-reset-at": "99999999999999999999",
+        "x-codex-secondary-reset-after-seconds": "pronto"}, AHORA)
+
+    assert cupo.corta == chatgpt.Ventana(None, None, None)
+    assert cupo.larga == chatgpt.Ventana(None, None, None)
+    assert not cupo.agotado                # lo que no se sabe no es un cupo lleno
+
+
+def test_sin_el_momento_de_renovar_vale_lo_que_falta():
+    cupo = chatgpt.cupo_de_cabeceras({"x-codex-primary-used-percent": "40",
+                                      "x-codex-primary-reset-after-seconds": "60"}, AHORA)
+    assert cupo.corta.renueva == AHORA + timedelta(seconds=60)
+    assert cupo.larga == chatgpt.Ventana(None, None, None)
+
+
+def test_las_lineas_del_cupo_dicen_el_uso_y_la_hora_local_de_renovar():
+    cupo = chatgpt.cupo_de_cabeceras(CABECERAS_DEL_CUPO, AHORA)
+    corta, larga = chatgpt.lineas_del_cupo(cupo, AHORA.astimezone(ART))
+
+    assert "de 5 horas" in corta and "17 % usado" in corta
+    assert "07/10 a las 11:39" in corta and "2 h 40 min" in corta
+    assert "de 7 días" in larga and "3 % usado" in larga and "14/10 a las 06:39" in larga
+
+
+def test_las_lineas_de_un_cupo_a_medias_dicen_lo_que_no_se_sabe():
+    cupo = chatgpt.cupo_de_cabeceras({"x-codex-primary-used-percent": "12.5"}, AHORA)
+    corta, larga = chatgpt.lineas_del_cupo(cupo, AHORA)
+    assert "12.5 % usado" in corta and "no dijo cuándo se renueva" in corta
+    assert "no se sabe" in larga
+
+
+def test_cada_respuesta_real_deja_el_ultimo_cupo_visto(tmp_path, monkeypatch):
+    monkeypatch.setattr(chatgpt, "_ultimo_cupo", None)
+    codex = Codex([httpx.Response(200, content=sse(completada([mensaje("Listo.")])),
+                                  headers={"content-type": "text/event-stream",
+                                           **CABECERAS_DEL_CUPO}),
+                   httpx.Response(429, json={"error": {"type": "usage_limit_reached"}},
+                                  headers={"x-codex-primary-used-percent": "100",
+                                           "x-codex-secondary-used-percent": "4"})])
+    ia = ia_por_suscripcion(tmp_path, codex)
+
+    assert chatgpt.ultimo_cupo() is None
+    ia.redactar({"hoy": "2026-10-20"})
+    assert chatgpt.ultimo_cupo().corta.usado == 17
+    with pytest.raises(httpx.HTTPStatusError):        # el 429 del límite de uso
+        ia.redactar({"hoy": "2026-10-20"})
+    assert chatgpt.ultimo_cupo().corta.usado == 100 and chatgpt.ultimo_cupo().agotado
+
+
+def test_un_cupo_mas_viejo_no_pisa_al_mas_nuevo(monkeypatch):
+    monkeypatch.setattr(chatgpt, "_ultimo_cupo", None)
+    nuevo = chatgpt.cupo_de_cabeceras({"x-codex-primary-used-percent": "30"}, AHORA)
+    viejo = chatgpt.cupo_de_cabeceras({"x-codex-primary-used-percent": "20"},
+                                      AHORA - timedelta(seconds=5))
+    chatgpt.recordar_cupo(nuevo)
+    chatgpt.recordar_cupo(viejo)
+    chatgpt.recordar_cupo(None)
+    assert chatgpt.ultimo_cupo() is nuevo
+
+
+def test_la_consulta_del_cupo_hace_un_pedido_minimo_y_lee_las_cabeceras(tmp_path, monkeypatch):
+    monkeypatch.setattr(chatgpt, "_ultimo_cupo", None)
+    codex = Codex([httpx.Response(200, content=sse(completada([mensaje("ok")])),
+                                  headers={"content-type": "text/event-stream",
+                                           **CABECERAS_DEL_CUPO})])
+    sesion = sesion_guardada(tmp_path / "s.json")
+
+    consulta = chatgpt.consultar_cupo(sesion, transporte=httpx.MockTransport(codex),
+                                      reloj=lambda: AHORA)
+
+    assert consulta.cupo.corta.usado == 17 and not consulta.sin_cuota
+    [pedido] = codex.pedidos
+    assert pedido["url"] == f"{chatgpt.BASE_URL}/responses"
+    assert pedido["cuerpo"]["input"][-1]["content"][0]["text"] == "ok"
+    assert chatgpt.ultimo_cupo() is consulta.cupo
+
+
+def test_la_consulta_del_cupo_reconoce_el_limite_de_uso(tmp_path):
+    codex = Codex([httpx.Response(429, json={"error": {"type": "usage_limit_reached"}})])
+    consulta = chatgpt.consultar_cupo(sesion_guardada(tmp_path / "s.json"),
+                                      transporte=httpx.MockTransport(codex),
+                                      reloj=lambda: AHORA)
+    assert consulta.sin_cuota and consulta.cupo is None and consulta.http == 429
+
+
+def test_la_consulta_del_cupo_sin_red_no_rompe(tmp_path):
+    def sin_red(pedido):
+        raise httpx.ConnectError("sin red", request=pedido)
+
+    consulta = chatgpt.consultar_cupo(sesion_guardada(tmp_path / "s.json"),
+                                      transporte=httpx.MockTransport(sin_red),
+                                      reloj=lambda: AHORA)
+    assert consulta.cupo is None and consulta.http is None and not consulta.sin_cuota
+    assert "ConnectError" in consulta.falla
+
+
+def test_el_comando_del_cupo_imprime_las_dos_ventanas_sin_secretos(tmp_path, capsys):
+    ruta = tmp_path / "s.json"
+    assert chatgpt.cupo(ruta, reloj=lambda: AHORA) == 1
+    assert "python -m leda chatgpt login" in capsys.readouterr().out
+
+    sesion_guardada(ruta)
+    codex = Codex([httpx.Response(200, content=sse(completada([mensaje("ok")])),
+                                  headers={"content-type": "text/event-stream",
+                                           **CABECERAS_DEL_CUPO})])
+    assert chatgpt.cupo(ruta, transporte=httpx.MockTransport(codex),
+                        reloj=lambda: AHORA.astimezone(ART)) == 0
+    salida = capsys.readouterr().out
+    assert "17 % usado" in salida and "3 % usado" in salida and "11:39" in salida
+    tokens = chatgpt.cargar(ruta)
+    assert tokens.access_token not in salida and tokens.refresh_token not in salida
+    assert CORREO not in salida
+
+
+def test_el_comando_del_cupo_dice_cuando_el_servicio_no_lo_informa(tmp_path, capsys):
+    ruta = tmp_path / "s.json"
+    sesion_guardada(ruta)
+    codex = Codex([httpx.Response(429, json={"error": {"type": "usage_limit_reached"}})])
+    assert chatgpt.cupo(ruta, transporte=httpx.MockTransport(codex),
+                        reloj=lambda: AHORA) == 1
+    assert "límite de uso" in capsys.readouterr().out
+
+
+def test_la_cli_tiene_el_comando_del_cupo(tmp_path, monkeypatch, capsys):
+    from leda import cli
+
+    monkeypatch.setenv(chatgpt.VARIABLE_RUTA, str(tmp_path / "s.json"))
+    assert cli.main(["chatgpt", "cupo"]) == 1          # sin sesión: no llama a nadie
+    assert "No hay sesión" in capsys.readouterr().out

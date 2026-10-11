@@ -85,6 +85,7 @@ vez con la cuenta de ChatGPT, como el Codex CLI.
 ```bash
 python -m leda chatgpt login        # abre el navegador; con --manual, se pega la dirección de vuelta
 python -m leda chatgpt estado       # cuenta enmascarada y cuándo vence el acceso
+python -m leda chatgpt cupo         # cuánto se usó de cada ventana (5 horas y semana) y cuándo se renueva
 python -m leda modelo gpt-6-sol --proveedor chatgpt
 python -m leda chatgpt salir        # borra la sesión guardada
 ```

@@ -356,7 +356,10 @@ usuario); avisa desde el 80 %. Con un proveedor que no informa el costo (`nan`),
 ni cuenta para el techo, y la libreta anota los tokens con el precio desconocido. **El crédito:** en una
 ronda por OpenRouter, antes de empezar se le pregunta cuánto le queda a la cuenta y, si no alcanza, no
 corre (sale con 3); un HTTP 402 a mitad de ronda la corta (sale con 3) y las corridas que lo tuvieron
-quedan inválidas, aparte en el informe. La cuenta queda en
+quedan inválidas, aparte en el informe. **El cupo:** con la suscripción de ChatGPT, antes de empezar se
+pide el cupo (`python -m leda chatgpt cupo`) y, con una ventana al 100 % o el límite de uso, no corre (sale
+con 4); al terminar se imprime el último cupo visto, y el informe anota el de antes y el de después.
+La cuenta queda en
 `resultados/gasto.json` y el informe de la ronda, con sus transcripciones, en `resultados/` (las
 grabaciones crudas, en `grabaciones/`, no se versionan). La comprensión automática del informe es
 provisional: la que vale es la lectura del usuario.

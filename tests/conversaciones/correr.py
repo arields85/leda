@@ -56,6 +56,11 @@
   `usage_limit_reached` (`gasto.SinCuota`) corta la ronda igual que un 402: no empieza ninguna
   corrida más, las que lo tuvieron son inválidas, el informe dice el motivo y cuándo se renueva
   la cuota, y sale con 4 (`SALIDA_SIN_CUOTA`). Un 429 con otro código no corta.
+- **El cupo de la suscripción** (2026-10-11): con `chatgpt`, antes de empezar se pide el cupo
+  con un pedido mínimo (`python -m leda chatgpt cupo`) y se imprime; con una ventana al 100 % o
+  el límite de uso, la ronda no empieza (sale con 4). Al terminar se imprime el último cupo
+  visto en las respuestas de la ronda, sin otra llamada, y el informe anota el de antes y el de
+  después. La corrida en seco nunca lo pide.
 - El informe de la ronda queda en `resultados/` (`informe.py`), con el motor y la IA.
 """
 
@@ -310,6 +315,24 @@ def _credito_restante() -> float | None:
     return credito_restante(clave, BASE_URLS["openrouter"])
 
 
+def _consultar_cupo():
+    """El cupo de la suscripción de ChatGPT, con un pedido mínimo al servicio
+    (`chatgpt.consultar_cupo`). Sin sesión, la ronda no corre."""
+    from leda.motor.chatgpt import SesionChatGPT, consultar_cupo
+    try:
+        return consultar_cupo(SesionChatGPT.abrir())
+    except (LookupError, ValueError) as e:
+        raise SystemExit(str(e)) from None
+
+
+def _cupo_en_palabras(cupo) -> str:
+    """El cupo en un renglón, en hora local, para la consola y la cabecera del informe."""
+    from leda.motor.chatgpt import lineas_del_cupo
+    if cupo is None:
+        return "no se sabe (el servicio no lo informó)"
+    return " ".join(lineas_del_cupo(cupo, datetime.now().astimezone()))
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m tests.conversaciones.correr",
                                 description="Corre las conversaciones de prueba del Motor.")
@@ -421,6 +444,24 @@ def main(argv: list[str] | None = None) -> int:
             if restante < total:
                 print("No alcanza: la ronda no empieza.")
                 return SALIDA_SIN_CREDITO
+
+    # El cupo de la suscripción (2026-10-11): se mira antes de empezar, con un pedido mínimo.
+    # Con una ventana llena o el límite de uso, la ronda no empieza (sale como el corte por
+    # cuota a mitad de ronda). Al terminar se dice el último visto, sin otra llamada.
+    con_cupo = real and proveedor in PROVEEDORES_CON_SESION
+    cupo_antes = None
+    if con_cupo:
+        consulta = _consultar_cupo()
+        cupo_antes = consulta.cupo
+        if cupo_antes is not None:
+            print(f"Cupo de la suscripción: {_cupo_en_palabras(cupo_antes)}")
+        if consulta.sin_cuota or (cupo_antes is not None and cupo_antes.agotado):
+            print("La suscripción llegó a su límite de uso: la ronda no empieza.")
+            return SALIDA_SIN_CUOTA
+        if cupo_antes is None:
+            print(f"Aviso: no se pudo saber el cupo de la suscripción"
+                  f"{' (' + consulta.falla + ')' if consulta.falla else ''}; la ronda sigue sin "
+                  f"esa comprobación.")
 
     # El servidor de las bases, recién ahora: decidir el techo no lo necesita.
     os.environ["LEDA_TEST_DB_URL"] = _url_de_mantenimiento()
@@ -573,6 +614,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Ronda cortada: {corte_del_proveedor['motivo']}.")
     if cortes:
         print(f"Ronda cortada: {len(cortes)} corrida(s) no corrieron o no terminaron.")
+    cupo_despues = None
+    if con_cupo:
+        from leda.motor.chatgpt import ultimo_cupo
+        cupo_despues = ultimo_cupo()
+        print(f"Cupo de la suscripción al terminar: {_cupo_en_palabras(cupo_despues)}")
     if not a.sin_informe and (corridas or cortes or invalidas):
         cabecera = {"Fecha": f"{datetime.now():%Y-%m-%d %H:%M}", "Commit": _commit(),
                     "Motor": motor.nombre,
@@ -587,6 +633,9 @@ def main(argv: list[str] | None = None) -> int:
                 if parametros else "ninguno (los de omisión)")
         if real and proveedor == "nan":
             cabecera["Caché del proveedor"] = NOTA_DE_CACHE
+        if con_cupo:
+            cabecera["Cupo de la suscripción antes"] = _cupo_en_palabras(cupo_antes)
+            cabecera["Cupo de la suscripción después"] = _cupo_en_palabras(cupo_despues)
         resumen, _ = informe.escribir(
             corridas, ronda=ronda, cabecera=cabecera, cortes=cortes, invalidas=invalidas,
             motivo_del_corte=corte_del_proveedor.get("motivo"),

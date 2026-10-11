@@ -40,6 +40,9 @@ Cómo funciona (fuentes, leídas el 2026-10-07; el cliente oficial manda cuando 
   cortada (`finish_reason: length`).
 - **Las fallas** llegan como HTTP (429 con `usage_limit_reached`, 401) o como un evento
   `response.failed` o `error` con su código (`codex-api/src/sse/responses_error.rs`).
+- **El cupo** viaja en las cabeceras `x-codex-primary-*` y `x-codex-secondary-*` de cada
+  respuesta (observado, no documentado): se guarda el último visto (`ultimo_cupo`) y
+  `python -m leda chatgpt cupo` lo pide con un pedido mínimo.
 
 La sesión se guarda fuera del repositorio (`~/.leda/chatgpt.json`, o la ruta de
 `LEDA_CHATGPT_AUTH`), nunca se imprime y nunca entra a un mensaje de error. Lo que se muestra
@@ -54,6 +57,7 @@ import base64
 import hashlib
 import http.server
 import json
+import math
 import os
 import secrets
 import threading
@@ -635,6 +639,9 @@ class ClienteChatGPT(ClienteCompatible):
             with self.http.stream("POST", f"{self.base_url}/responses",
                                   json={**extra, **pedido},
                                   headers=cabeceras(acceso, cuenta, lite=lite)) as r:
+                # El cupo viaja en cada respuesta, también en la del límite de uso: queda el
+                # último visto, sin otra llamada (`ultimo_cupo`).
+                recordar_cupo(cupo_de_cabeceras(r.headers))
                 if r.status_code == 401:
                     self.sesion.forzar_renovacion(acceso)
                 if r.status_code >= 400:
@@ -658,7 +665,198 @@ class ClienteChatGPT(ClienteCompatible):
         return llamar_con_plazo(pedir, plazo)
 
 
-# --- Los comandos: entrar, ver el estado, salir ------------------------------------------
+# --- El cupo de la suscripción -------------------------------------------------------------
+#
+# Cada respuesta de `{BASE_URL}/responses` trae el cupo en sus cabeceras (observado el
+# 2026-10-10 y el 2026-10-11): `x-codex-primary-*` es la ventana corta (300 minutos) y
+# `x-codex-secondary-*` la larga (10080, la semana), cada una con `used-percent`,
+# `window-minutes`, `reset-at` (segundos desde 1970) y `reset-after-seconds`. No es una API
+# documentada: lo que falta o no se lee queda vacío, nunca rompe una respuesta.
+
+PREFIJO_DEL_CUPO = "x-codex-"
+LIMITE_DE_USO = "usage_limit_reached"
+
+
+@dataclass(frozen=True)
+class Ventana:
+    """Una ventana del cupo: el porcentaje usado, cuántos minutos dura y cuándo se renueva
+    (UTC). Lo que el servicio no dijo, o dijo de una forma que no se lee, es `None`."""
+
+    usado: float | None
+    minutos: int | None
+    renueva: datetime | None
+
+
+@dataclass(frozen=True)
+class Cupo:
+    corta: Ventana
+    larga: Ventana
+    visto: datetime
+
+    @property
+    def agotado(self) -> bool:
+        """Si alguna ventana está llena: con una sola alcanza para que el servicio no responda.
+        Lo que no se sabe no cuenta como lleno."""
+        return any(v.usado is not None and v.usado >= 100 for v in (self.corta, self.larga))
+
+
+def _numero(texto: str | None) -> float | None:
+    try:
+        valor = float(str(texto).strip())
+    except (TypeError, ValueError):
+        return None
+    return valor if math.isfinite(valor) else None
+
+
+def _ventana(cabeceras: dict[str, str], cual: str, ahora: datetime) -> Ventana:
+    def leer(nombre: str) -> float | None:
+        return _numero(cabeceras.get(f"{PREFIJO_DEL_CUPO}{cual}-{nombre}"))
+
+    usado = leer("used-percent")
+    usado = usado if usado is not None and usado >= 0 else None
+    minutos = leer("window-minutes")
+    minutos = int(minutos) if minutos is not None and minutos > 0 else None
+    renueva = None
+    if (momento := leer("reset-at")) is not None:
+        try:
+            renueva = datetime.fromtimestamp(momento, timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            renueva = None
+    if renueva is None and (falta := leer("reset-after-seconds")) is not None and falta >= 0:
+        try:
+            renueva = ahora + timedelta(seconds=falta)
+        except OverflowError:
+            renueva = None
+    return Ventana(usado, minutos, renueva)
+
+
+def cupo_de_cabeceras(cabeceras: Any, ahora: datetime | None = None) -> Cupo | None:
+    """El cupo de las cabeceras de una respuesta del servicio, o `None` si no trae ninguna del
+    cupo. Nunca levanta una excepción: un valor que no se lee queda en `None`."""
+    try:
+        minusculas = {str(k).lower(): str(v) for k, v in cabeceras.items()}
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if not any(k.startswith((f"{PREFIJO_DEL_CUPO}primary-", f"{PREFIJO_DEL_CUPO}secondary-"))
+               for k in minusculas):
+        return None
+    ahora = ahora or _ahora()
+    return Cupo(_ventana(minusculas, "primary", ahora), _ventana(minusculas, "secondary", ahora),
+                ahora)
+
+
+_ultimo_cupo: Cupo | None = None
+_candado_del_cupo = threading.Lock()
+
+
+def recordar_cupo(cupo: Cupo | None) -> None:
+    """Guarda el cupo de una respuesta real, si es el más nuevo visto en este proceso (con
+    varias llamadas a la vez, las respuestas no llegan en orden)."""
+    global _ultimo_cupo
+    if cupo is None:
+        return
+    with _candado_del_cupo:
+        if _ultimo_cupo is None or cupo.visto >= _ultimo_cupo.visto:
+            _ultimo_cupo = cupo
+
+
+def ultimo_cupo() -> Cupo | None:
+    """El último cupo que trajo una respuesta real del servicio en este proceso, sin llamarlo."""
+    return _ultimo_cupo
+
+
+def _duracion(segundos: float) -> str:
+    minutos = max(0, round(segundos / 60))
+    dias, minutos = divmod(minutos, 24 * 60)
+    horas, minutos = divmod(minutos, 60)
+    partes = ([f"{dias} d"] if dias else []) + ([f"{horas} h"] if horas else [])
+    return " ".join(partes + [f"{minutos} min"])
+
+
+def _largo(minutos: int | None) -> str:
+    if minutos is None:
+        return ""
+    if minutos % (24 * 60) == 0:
+        dias = minutos // (24 * 60)
+        return f" (de {dias} día{'s' if dias != 1 else ''})"
+    if minutos % 60 == 0:
+        horas = minutos // 60
+        return f" (de {horas} hora{'s' if horas != 1 else ''})"
+    return f" (de {minutos} minutos)"
+
+
+def lineas_del_cupo(cupo: Cupo, ahora: datetime) -> list[str]:
+    """Las dos ventanas en palabras: cuánto se usó y cuándo se renueva, en la zona de `ahora`
+    (la hora local, para el comando)."""
+    lineas = []
+    for nombre, ventana in (("La ventana corta", cupo.corta), ("La ventana larga", cupo.larga)):
+        titulo = f"{nombre}{_largo(ventana.minutos)}"
+        if ventana.usado is None and ventana.renueva is None:
+            lineas.append(f"{titulo}: no se sabe (el servicio no lo dijo).")
+            continue
+        usado = (f"{ventana.usado:g} % usado" if ventana.usado is not None
+                 else "no dijo cuánto se usó")
+        if ventana.renueva is None:
+            renueva = "no dijo cuándo se renueva"
+        else:
+            momento = ventana.renueva.astimezone(ahora.tzinfo)
+            renueva = (f"se renueva el {momento:%d/%m} a las {momento:%H:%M} (en "
+                       f"{_duracion((ventana.renueva - ahora).total_seconds())})")
+        lineas.append(f"{titulo}: {usado}; {renueva}.")
+    return lineas
+
+
+@dataclass(frozen=True)
+class ConsultaDeCupo:
+    """Lo que dejó una consulta del cupo: el cupo (si el servicio lo dijo), el HTTP de la
+    respuesta (`None` si no la hubo), el código de error del servicio y, si falló, por qué."""
+
+    cupo: Cupo | None
+    http: int | None
+    codigo: str = ""
+    falla: str = ""
+
+    @property
+    def sin_cuota(self) -> bool:
+        """El servicio contestó con el límite de uso (HTTP 429 `usage_limit_reached`)."""
+        return self.http == 429 and self.codigo == LIMITE_DE_USO
+
+
+MODELO_DE_LA_CONSULTA = "gpt-6-sol"
+
+
+def consultar_cupo(sesion: SesionChatGPT, *, transporte: httpx.BaseTransport | None = None,
+                   reloj: Callable[[], datetime] | None = None,
+                   plazo_s: float = PLAZO_DEL_EMISOR_S,
+                   modelo: str = MODELO_DE_LA_CONSULTA) -> ConsultaDeCupo:
+    """Un pedido mínimo al servicio ("ok"), sólo para leer el cupo de sus cabeceras: gasta una
+    llamada chica. Sin red o sin respuesta legible no levanta nada: lo dice `falla`. Sin
+    sesión o sin poder renovarla, sí: el `LookupError` de la sesión."""
+    pedido, lite = pedido_de_respuestas(modelo, {"messages": [{"role": "user",
+                                                               "content": "ok"}]})
+    acceso, cuenta = sesion.credenciales()
+    reloj = reloj or _ahora
+    try:
+        with httpx.Client(transport=transporte, timeout=plazo_s) as http, \
+                http.stream("POST", f"{BASE_URL}/responses", json=pedido,
+                            headers=cabeceras(acceso, cuenta, lite=lite)) as r:
+            cupo = cupo_de_cabeceras(r.headers, reloj())
+            recordar_cupo(cupo)
+            if r.status_code == 401:
+                sesion.forzar_renovacion(acceso)
+            if r.status_code >= 400:
+                r.read()
+                codigo = _codigo_de_error(r)
+                return ConsultaDeCupo(cupo, r.status_code, codigo,
+                                      f"HTTP {r.status_code}{', ' + codigo if codigo else ''}")
+            for _ in r.iter_lines():        # se lee entera: el servicio cierra el pedido
+                pass
+            return ConsultaDeCupo(cupo, r.status_code)
+    except httpx.HTTPError as e:
+        return ConsultaDeCupo(None, None, falla=f"sin respuesta del servicio: {type(e).__name__}")
+
+
+# --- Los comandos: entrar, ver el estado, ver el cupo, salir -----------------------------
 
 class _Retorno(http.server.BaseHTTPRequestHandler):
     estado = ""
@@ -802,6 +1000,31 @@ def estado(ruta: Path | None = None, *, reloj: Callable[[], datetime] | None = N
         vence = (f"el acceso vence el {tokens.expira:%Y-%m-%d %H:%M} UTC y se renueva solo "
                  f"antes")
     print(f"Sesión de ChatGPT iniciada para la cuenta {enmascarar(tokens)}: {vence}.")
+    return 0
+
+
+def cupo(ruta: Path | None = None, *, transporte: httpx.BaseTransport | None = None,
+         reloj: Callable[[], datetime] | None = None) -> int:
+    """`python -m leda chatgpt cupo`: cuánto se usó de cada ventana del cupo y cuándo se
+    renueva, en hora local, con un pedido mínimo al servicio. Nunca un token ni la cuenta. 0 si
+    el servicio dijo el cupo, 1 si no."""
+    reloj = reloj or (lambda: datetime.now().astimezone())
+    try:
+        sesion = SesionChatGPT.abrir(ruta, transporte=transporte)
+        consulta = consultar_cupo(sesion, transporte=transporte, reloj=reloj)
+    except (LookupError, ValueError) as e:
+        print(e)
+        return 1
+    if consulta.sin_cuota:
+        print("La suscripción llegó a su límite de uso (HTTP 429 usage_limit_reached).")
+    elif consulta.falla:
+        print(f"El servicio no respondió bien ({consulta.falla}).")
+    if consulta.cupo is None:
+        print("El servicio no informó el cupo en esta respuesta.")
+        return 1
+    print("Cupo de la suscripción de ChatGPT:")
+    for linea in lineas_del_cupo(consulta.cupo, reloj()):
+        print(f"  {linea}")
     return 0
 
 

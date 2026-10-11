@@ -10,6 +10,7 @@
     python -m leda servir                   webhook + tablero + el ciclo del motor
     python -m leda webhooks                 registra el webhook de cada bot
     python -m leda chatgpt login|estado|salir   la sesión de la suscripción de ChatGPT
+    python -m leda chatgpt cupo             cuánto se usó del cupo y cuándo se renueva
     python -m leda modelo gpt-6-sol --proveedor chatgpt
     python -m leda revocar-enlaces corework --persona "Marcos"   (o --tarea, o --administrador)
     python -m leda retirar-contenido corework --tarea "tablero"   (lista lo entregado; con
@@ -421,7 +422,7 @@ def main(argv: list[str] | None = None) -> int:
     # La suscripción de ChatGPT (`leda.motor.chatgpt`): la sesión se guarda fuera del
     # repositorio y nunca se imprime.
     gpt = sub.add_parser("chatgpt", help="la sesión de la suscripción de ChatGPT")
-    gpt.add_argument("accion", choices=("login", "estado", "salir"))
+    gpt.add_argument("accion", choices=("login", "estado", "cupo", "salir"))
     gpt.add_argument("--manual", action="store_true",
                      help="sin servidor local: pegar la dirección a la que vuelve el navegador")
     sub.add_parser("estado").add_argument("slug")
@@ -543,6 +544,8 @@ def main(argv: list[str] | None = None) -> int:
             return chatgpt.iniciar(manual=a.manual)
         if a.accion == "estado":
             return chatgpt.estado()
+        if a.accion == "cupo":
+            return chatgpt.cupo()
         return chatgpt.salir()
 
     if a.cmd == "modelos" and a.proveedor in PROVEEDORES_CON_SESION:
