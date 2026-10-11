@@ -33,50 +33,40 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-10, madrugada, cierre con el usuario)
+## Punto exacto para retomar (2026-10-11, madrugada; el agente sigue solo, el usuario duerme)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
-Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 55, el registro de
-cada unidad y la lista de tareas en "Próximo paso".
+Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 64, el registro de
+cada unidad (al final de "La tanda de pruebas") y la lista de tareas en "Próximo paso".
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si está caído, levantarlo con
 `levantar-postgres.bat` (o `pg_ctl ... start`, fuera del sandbox). Si `pg_ctl` dice que otro servidor puede
 estar en ejecución, cerrar los procesos `postgres` colgados y reintentar. Comprobar que no quede un escuchador
 viejo corriendo.
 
-**Lo hecho el 2026-10-09 (de 10:22 a 00:30, con el usuario):** las decisiones 24 a 55, con test primero y
-revisadas por tramos: C-7 (26 a 28 y 53), D5b (29 y 50), C-6 (31, 32, 44 y 46), el informe al grupo (25, 54
-y 55; el grupo es "CoreWork IA", ya en el pack), la C-5 de la a a la f (24, 34 a 42, 47 a 49 y 51), el
-enlace (33, `0050`), una corrección acumulada (`0051`), la escalera en fin de semana (probada, sin cambios) y
-la porción 5 de la C-3 (el acceso del administrador, `0052`). Las reglas generales del usuario pasaron a la
-constitución 1.1 (§8, principios 13 y 14), con su porqué en el ADR 0021. Suite `tests/motor`,
-`tests/garantias`, `tests/conversaciones` y `test_administrador_plataforma.py` sobre `c06fa6d`: 1740 passed;
-en seco, 45 de 45.
-
-**La revisión de la C-5c quedó sin sello:** su único CRÍTICO es un falso positivo verificado (en el plan).
-Dos revisiones quedaron trabadas en las carpetas temporales `_rdd-c7` y `_rdd-c5c`, y una tercera en
-`_rdd-adm` (la porción 5: pidió corregir una aserción confusa de `test_cli_enlaces_de_tarea.py`, que
-pasaba; corregida en la rama); liberarlas pide la autorización del mantenedor (el usuario). No traban la rama; las demás carpetas `_rdd-*` se pueden borrar.
+**Lo hecho el 2026-10-10 y la madrugada del 11:** la primera ronda con la IA real de las 30 a 45 y sus
+arreglos (el motivo cierto al cerrar el tema, el enlace, el nombre que no se encontró, las decisiones 61
+y 62), dos rondas de control (garantías sin ningún defecto de Leda), el rediseño de las dos lecturas que
+la IA repetía mal ("la hago yo" → `se_la_queda`; "ni idea" → la decisión 63 y las dos lecturas válidas
+del corredor, `o_bien`), la decisión 64 (el día de quien destraba sigue en pie tras "se lo pido yo", y la
+pregunta lo menciona), el ADR 0020 de los apodos (aceptado) con su conversación 47 diseñada, y la
+limpieza de `apscheduler` y la fila de delegar del roadmap. Cada commit de código, revisado por RDD y
+aprobado. Detalle y evidencia en el plan.
 
 **Lo que sigue:**
-1. **Hecho (2026-10-10):** una tarea que vence sábado o domingo; el usuario eligió C (decisión 56): la
-   plataforma no la deja cargar. Sin código hasta la plataforma.
-2. **De la porción 5:** las tres preguntas, decididas el 2026-10-10 (decisiones 57 a 59: se borra de
-   verdad, deja de contar y Leda avisa, la página muestra el motivo) y la 60 (a quien revisa, sólo si ya le
-   llegó la entrega): construidas en la porción 5b (`0053`), revisadas y selladas. Falta la IA real sobre
-   los dos avisos nuevos y `leda_motor` hasta la `0054`.
-3. **Hecho (2026-10-10):** la corrección chica y la respuesta del bot de administración por la cola
-   (`0054`), revisadas y selladas por commit. Quedan sus advertencias de casos de borde (en el plan),
-   con el pedido del detalle cuyo sector se queda sin encargado mientras espera (decisión 33).
-4. **Los apodos:** el ADR 0020 (reemplaza la parte de apodos del ADR 0005), que el usuario lo acepte, la
-   conversación de prueba y la construcción.
-5. **Hecho (2026-10-10):** los avisos que a veces no salían a su hora eran del corredor (no corría los reintentos tras una falla del servicio de la IA); corregido en `507b21e` y revisado.
-6. **La prueba de cupo antes de una ronda:** `leda chatgpt estado` mira sólo la sesión, no el cupo.
-7. **Cierre de la Fase C:** suite completa (`pytest -q`), `docs/capacidades.md` y limpieza (`apscheduler`,
-   `mostrado_para_confirmar`, la fila "Delegar por chat" del roadmap).
-8. **La tanda de pruebas:** una ronda con la IA real sobre las conversaciones nuevas y cambiadas, y la
-   prueba por Telegram con `leda_motor` al día hasta la `0054` (respaldo previo; autorizado).
-9. **La plataforma:** su ADR, con el usuario.
+1. **Los apodos (ADR 0020):** un escritor los construye (migración `0055`, la pregunta "¿quién es?", la
+   conversación 47, pasos 1 a 11); después, su revisión y una ronda con la IA real sobre la 47.
+2. **Preguntas para el usuario** (en el plan, "Preguntas para el usuario"): "se lo pido yo" con la
+   pregunta del día ya enviada, y corregir un apodo que ya tiene dueño.
+3. **La prueba de cupo antes de una ronda:** `leda chatgpt estado` mira sólo la sesión; el servicio
+   informa el cupo en las cabeceras (`x-codex-primary-used-percent` y `secondary`).
+4. **Cierre de la Fase C:** suite completa (`pytest -q`), `docs/capacidades.md`,
+   `mostrado_para_confirmar` (decidir o borrar), y los arreglos del corredor (fila con un dato distinto
+   contada como garantía, `comprobar.py:553`; YAML estrictos: la 39 paso 20, la 36 paso 20, la 35 paso 4).
+5. **La tanda de pruebas:** conversaciones para los dos avisos sin conversación (retiro de contenido del
+   administrador y aviso al encargado anterior) y la prueba por Telegram con `leda_motor` al día hasta la
+   última migración (respaldo previo; autorizado). Necesita al usuario.
+6. **La plataforma:** su ADR, con el usuario.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
