@@ -3794,6 +3794,15 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           `tests/conversaciones` 166 passed; en seco, 45 de 45.
         - **ADR 0020 (los apodos), aceptado** (`8b2b82d`): por construir, con su conversación de
           prueba primero.
+        - **Ronda de control** (`resultados/fase-c-dos-lecturas.md`, 34 y 39, 5 veces, `af3263f`;
+          revisión de `af3263f`: `review-85ae106af1b92a0c`, aprobada, dos sugerencias en
+          `pase.py:167-171`): garantías 9 de 10. La 39, paso 21 ("la hago yo"), bien 5 de 5 (antes
+          1, 1 y 3 de 5 mal); sólo falla el paso 20, el YAML estricto conocido. La 34: 4 de 5 sin
+          fallas fuera del formato. En la vez 2 la IA tomó la otra lectura y, a la pregunta
+          "¿Sabés quién se encarga?", Mariano contestó "no" y la IA no eligió ninguna jugada: la
+          pregunta abierta es `cuando_se_destraba` (con `falta: quien_se_encarga` en sus datos), y un
+          "no" suelto no le contesta un "para cuándo". Una sola vez; se mira en la próxima ronda
+          antes de tocar nada (si se repite: un tipo de pregunta propio para "quién se encarga").
 - [ ] La plataforma: su ADR, con el usuario.
 
 **Preguntas juntadas para el usuario: contestadas todas** (2026-10-09, a la mañana, de a una y
