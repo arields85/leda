@@ -521,6 +521,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     Mariano contesta que no es del equipo queda anotado como alguien de afuera. La IA nunca
     decide sola que alguien es de afuera (ADR 0020 al pie de la letra).
 
+66. **"Se lo pido yo" después de que la pregunta del día ya le llegó a quien destraba: vale la
+    64** (pregunta 1; usuario, 2026-10-11, "64", la que recomendó el agente; reemplaza a la 37
+    en este caso). Si el martes Leda ya le preguntó a Ariel "¿pudiste pasársela?" y, antes de que
+    conteste, Nahuel dice "se lo pido yo", el compromiso de Ariel sigue en pie: la pregunta queda
+    abierta y, si Ariel no contesta, Leda le vuelve a preguntar contándole que Nahuel le iba a
+    pedir la lista directamente (como la 64). Por construir, con su prueba, cuando termine el
+    escritor de los apodos.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3825,7 +3833,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         menciona a Marcos en las tres corridas en que salió; una dijo "Marcos te dijo" (se lo dijo a
         Leda): el significado del hecho lo aclara ahora.
   - [ ] **Preguntas para el usuario (juntadas la noche del 2026-10-10 al 11):**
-        1. **"Se lo pido yo" después de que la pregunta del día ya le llegó a quien destraba**, sin
+        1. **Contestada: decisión 66, como la 64.** **"Se lo pido yo" después de que la pregunta del día ya le llegó a quien destraba**, sin
            contestar todavía: hoy cuenta como que Leda le sigue preguntando y "se lo pido yo" le
            cierra el tema (decisión 37). ¿Vale lo mismo que la 64 (su compromiso sigue y Leda le
            sigue preguntando) o la 37?
