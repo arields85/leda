@@ -3807,7 +3807,12 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
         sale igual y lleva `dijo_que_se_lo_pedia` (quién dijo que se lo pedía, sólo si lo dijo
         después de que quien destraba dio el día; nada de si confirmó o no). La conversación 42
         suma el paso 13b. Verificación: `tests/motor` 1213, `tests/garantias` 466,
-        `tests/conversaciones` 166 passed; en seco, 45 de 45.
+        `tests/conversaciones` 166 passed; en seco, 45 de 45. Revisión `review-88e89d4c5bf3830e`,
+        aprobada; su advertencia (`persecucion.py:2264-2269`, no filtra un "cómo te fue" omitido) no
+        aplica: `pedirselo_y_contar` no tiene `deshacer`. Ronda real
+        (`resultados/fase-c-decision-64.md`, la 42, 5 veces): garantías 5 de 5; la pregunta del día
+        menciona a Marcos en las tres corridas en que salió; una dijo "Marcos te dijo" (se lo dijo a
+        Leda): el significado del hecho lo aclara ahora.
   - [ ] **Preguntas para el usuario (juntadas la noche del 2026-10-10 al 11):**
         1. **"Se lo pido yo" después de que la pregunta del día ya le llegó a quien destraba**, sin
            contestar todavía: hoy cuenta como que Leda le sigue preguntando y "se lo pido yo" le
