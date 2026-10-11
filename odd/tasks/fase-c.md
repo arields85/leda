@@ -556,6 +556,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     palabra que la persona no dijo sigue fallando. Por hacer en `comprobar.py`, con su prueba,
     cuando termine el escritor de los apodos.
 
+71. **"Ya está, llega mañana" y "si dale" a un pase cerrado: las dos lecturas valen** (la 36
+    paso 20 y la 39 paso 20; usuario, 2026-10-11, "Si, aceptamos", la que recomendó el agente;
+    como la 63 y la 69). En la 36, que la IA anote o no `ya_esta` junto con la fecha está bien:
+    Leda guarda la fecha, le avisa a Marcos y no da la tarea por destrabada. En la 39, si Martín
+    acepta un pase que ya terminó, que la IA intente `contestar_el_pase` o no elija ninguna
+    jugada está bien: Leda le dice que ya no tiene nada que contestar y nada cambia. Por hacer:
+    los `o_bien` de los dos pasos, cuando termine el escritor de los apodos.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3790,7 +3798,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           filas correctas después de una cascada; el corredor sigue el
           guion después de que el estado se separó (la 34 y la 44, 25 y 50 fallas); no marca como
           `[servicio]` un turno en el que la IA no respondió (sólo los avisos); YAML más estrictos
-          que la ficha (36 paso 20 `ya_esta`, 35 paso 4, 39 paso 20).
+          que la ficha (36 paso 20 `ya_esta` y 39 paso 20: decisión 71, las dos lecturas valen; 35 paso 4).
         - **Formato:** unas 6 de cada 10 fallas (renglones de más de 140 caracteres y dos
           preguntas al cierre); la instrucción de la redacción dice sólo "renglones cortos".
         - **El cupo:** la primera parte gastó la ventana entera de 5 horas en unas 9 conversaciones
