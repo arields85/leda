@@ -549,6 +549,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     respuesta, y la nota de pedido fuera de la lista al administrador es cierta. Por hacer: el
     `o_bien` del paso 10 de la 48, cuando termine el escritor de los apodos.
 
+70. **Un dato libre puede llevar el verbo de la persona en otra persona** (pregunta 6, la 38 paso
+    23; usuario, 2026-10-11, "aceptarlo", la que recomendó el agente). Si Marcos escribe "que la
+    conoces mejor" y la IA anota `por_que: "nahuel la conoce mejor"`, la prueba lo da por bien: el
+    corredor compara la raíz de cada palabra contra las de la persona, no la forma exacta. Una
+    palabra que la persona no dijo sigue fallando. Por hacer en `comprobar.py`, con su prueba,
+    cuando termine el escritor de los apodos.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
@@ -3879,7 +3886,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
            eso le deja un aviso al administrador (el de los pedidos fuera de la lista). ¿Se acepta
            como la otra lectura válida (como la decisión 63), o un pedido así no tiene que avisarle
            al administrador?
-        6. **El motivo con otras palabras** (la 38, paso 23; encontrado en `090016a`): Marcos
+        6. **Contestada: decisión 70, aceptarlo.** **El motivo con otras palabras** (la 38, paso 23; encontrado en `090016a`): Marcos
            escribe "no, esa hacela vos nahuel que la conoces mejor" y la IA anota el motivo
            "nahuel la conoce mejor". La prueba exige que un dato libre use sólo palabras de la
            persona, y "conoce" no lo es ("conoces" sí), así que lo cuenta como mala comprensión.
