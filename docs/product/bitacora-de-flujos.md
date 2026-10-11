@@ -398,7 +398,16 @@ una pregunta de diseño (qué hace Leda con un archivo para una tarea que espera
 5, con los dos arreglos de honestidad que encontró en seco (quién retiró la pieza y la fecha de la
 entrega). La 48 (el sector se queda sin encargado): pasos 1 a 9 bien; en el paso 10, "pediselo
 igual a martin", 4 de 5 leídos como un pedido fuera de la lista, que avisa al administrador (una
-pregunta para el usuario).
+pregunta para el usuario; decisión 69: las dos lecturas valen).
+
+**Los apodos y "¿quién es?" en quién destraba** (`resultados/fase-c-apodos-quien-destraba.md`,
+código de `ce0cf04`, 2026-10-11; decisión 65: Leda pregunta siempre). La 47 (los apodos), por
+primera vez con la IA real: garantías 5 de 5, comprensión 3 de 5; las dos fallas son "Mariano"
+con mayúscula donde la prueba esperaba "mariano" (de la prueba, no de la IA). Los pasos nuevos de
+la 25 (6b) y la 30 (9b), donde Marcos contesta que no es del equipo, bien en las 10 corridas. La
+30: garantías y comprensión 5 de 5. La 25: 0 de 5, por los pasos 2 y 3, la falla ya conocida del
+mensaje sin puntuación (la fecha en la tarea del PLC, que Marcos corrige dentro del margen; a
+Ismael nunca le llega el aviso equivocado). Cupo: 23 % de la ventana corta.
 
 ## Los arreglos de las 30 a 45, controlados con la IA real (Fase C, 2026-10-10, de noche)
 
