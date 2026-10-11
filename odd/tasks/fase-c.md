@@ -564,7 +564,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     lea como `pedir_el_detalle` o como `fuera_de_la_lista` está bien: Nahuel recibe la misma
     respuesta, y la nota de pedido fuera de la lista al administrador es cierta. Hecha en `fcb8c17`
     (el `o_bien` del paso 10 de la 48; la lectura sin ninguna jugada, vista en la primera ronda,
-    no está cubierta). Revisión `review-c8af6bc8d375ef19` del corredor (`fcb8c17`), aprobada.
+    cubierta después por la decisión 75). Revisión `review-c8af6bc8d375ef19` del corredor (`fcb8c17`), aprobada.
 
 70. **Un dato libre puede llevar el verbo de la persona en otra persona** (pregunta 6, la 38 paso
     23; usuario, 2026-10-11, "aceptarlo", la que recomendó el agente). Si Marcos escribe "que la
@@ -630,7 +630,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     IA puede no elegir jugada y contestar por el contexto: "No puedo pedírselo a Martín:
     Infraestructura IT se quedó sin encargado". Es cierto y no queda nada sin hacer (con la jugada
     esperada tampoco se podía pedir), como en la 71 (la 39, paso 20). Es la tercera lectura del
-    paso, con la 69: el corredor admite más de una otra lectura por paso.
+    paso, con la 69: el corredor admite más de una otra lectura por paso. Hecha en `ca5c38f3`
+    (`o_bien` puede ser una lista; `comprobar.otras_lecturas`), revisión
+    `review-282ea7ac37a964a8`, aprobada.
 
 ## Chequeo de rumbo (2026-10-07)
 
