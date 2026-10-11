@@ -338,6 +338,31 @@ def test_la_23_por_la_otra_lectura_del_archivo_ofrece_la_misma_entrega(conn):
     assert next(p for p in corrida.pasos if p.paso == 12).lectura == cp.O_BIEN
 
 
+def _por_la_otra_lectura(conn, numero: str, paso: int):
+    """La conversación entera con la IA guionada que lee ese paso como su otra lectura (`o_bien`)
+    y los demás como el YAML."""
+    [conv] = elegir([numero])
+    otra = next(p for p in conv["pasos"] if p["paso"] == paso)["o_bien"]["jugadas"]
+    ia = _perfecta(conv)
+    guion = copy.deepcopy(conv)
+    next(p for p in guion["pasos"] if p["paso"] == paso)["jugadas"] = otra
+    ia.ia.preparar = lambda p: setattr(ia.ia, "paso", next(
+        (q for q in guion["pasos"] if q.get("paso") == p.get("paso")), p))
+    return correr_conversacion(conn, conv, ia)
+
+
+def test_la_35_por_la_otra_lectura_le_manda_a_marcos_un_solo_mensaje(conn):
+    """Decisión 72: si la IA también anota lo que dice Ariel del PLC (paso 4), lo que dijo y que
+    se trabó le llegan a Marcos en un mensaje (paso 5), y la conversación sigue igual."""
+    corrida = _por_la_otra_lectura(conn, "35", 4)
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    assert next(p for p in corrida.pasos if p.paso == 4).lectura == cp.O_BIEN
+    [a_marcos] = [s for s in next(p for p in corrida.pasos if p.paso == 5).salidas
+                  if s.a == "Marcos"]
+    assert a_marcos.tipos == ["lo_que_dijo_quien_destraba", "novedad_de_lo_que_espera"]
+
+
 def test_una_grabacion_repite_la_corrida(conn):
     [conv] = elegir(["01"])
     grabada = correr_conversacion(conn, conv, _perfecta(conv))

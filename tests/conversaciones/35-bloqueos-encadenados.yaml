@@ -128,6 +128,51 @@ pasos:
       - que Marcos se va a enterar
     no_dice:
       - una pregunta por la tarea del PLC
+    # La otra lectura válida (decisión 72; 5 de 5 en la primera ronda real): la IA también anota
+    # lo que dice Ariel de la tarea del PLC ("todavia no la tengo"). Queda anotado y se guarda
+    # para Marcos, que lo recibe junto con que Ariel se trabó, en un solo mensaje: los avisos de
+    # un mismo mensaje a la misma persona sobre la misma tarea trabada van en uno. El paso 5 vale
+    # para las dos.
+    o_bien:
+      jugadas:
+        - {nombre: decir_cuando_destraba, tarea: PLC, lo_que_dice: "todavia no la tengo"}
+        - {nombre: anotar_bloqueo, tarea: SRV, causa: "falta el switch nuevo"}
+        - {nombre: anotar_quien_destraba, quien: "lucas", puede_traer: [tarea]}
+      efectos:
+        estados: {SRV: bloqueada}
+        bloqueos: [{tarea: SRV, causa: presente}]
+        destraban: [{tarea: SRV, integrante: Lucas, alguien: true, no_sabe: false, de: Ariel}]
+        dicen_quien_destraba: [{tarea: PLC, de: Ariel, para_cuando: null, ya_esta: false}]
+        avisos_guardados:
+          - {tipo: pregunta_a_quien_destraba, tarea: SRV, a: Lucas, estado: guardado,
+             hechos: {necesita_respuesta: true, pregunta: cuando_se_destraba,
+                      responsable: Ariel De Simone, causa: presente}}
+          - {tipo: novedad_de_lo_que_espera, tarea: PLC, a: Marcos, estado: guardado,
+             hechos: {necesita_respuesta: false, causa: presente,
+                      esperando_a: [{de: Ariel De Simone, tarea: SRV}],
+                      novedad: {de: Ariel De Simone, tarea: SRV, se_trabo: {causa: presente}}}}
+          - {tipo: lo_que_dijo_quien_destraba, tarea: PLC, a: Marcos, estado: guardado,
+             hechos: {necesita_respuesta: false, quien_destraba: Ariel De Simone,
+                      dice_quien_destraba: {lo_que_dice: presente}}}
+      hechos:
+        - {jugada: decir_cuando_destraba, resultado: anotado, tarea: PLC,
+           aviso_a_quien_esta_trabado: {a: Marcos Tarquini, llega: "~2026-10-20T11:10"}}
+        - {jugada: anotar_bloqueo, resultado: anotado, tarea: SRV,
+           avisos_a_quienes_esperan: [{aviso_a_quien_espera: {a: Marcos Tarquini, tarea: PLC,
+                                                              llega: "~2026-10-20T11:10"}}]}
+        - {jugada: anotar_quien_destraba, resultado: anotado,
+           se_le_pregunta_a: {a: Lucas Natuche, llega: "~2026-10-20T11:10"}}
+      pregunta: null
+      estado_despues:
+        de: Ariel
+        pregunta_abierta: null
+        esperas_abiertas: []
+      dice:
+        - que quedó anotado que está trabado con el servidor y que lo destraba Lucas
+        - que Leda le pregunta a Lucas
+        - que Marcos se va a enterar
+      no_dice:
+        - una pregunta por la tarea del PLC
 
   - paso: 5
     quien: Leda

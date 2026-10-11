@@ -88,6 +88,10 @@ Cómo se leyó lo que la regla no dice (`PENDIENTE` del usuario, en `odd/tasks/f
      pregunta a Lucas; que Marcos se va a enterar.
    - La respuesta no dice: una pregunta por la tarea del PLC.
    - Estado después (Ariel): sin tema abierto.
+   - **O bien** (decisión 72, la otra lectura válida): la IA también anota lo que dice Ariel de la
+     tarea del PLC ("todavia no la tengo"). Queda anotado, y a Marcos le llega junto con que Ariel
+     se trabó: los avisos de un mismo mensaje a la misma persona sobre la misma tarea trabada van
+     en uno. El paso 5 es el mismo.
 
 5. **Leda**, por su cuenta (martes 20, 11:10):
    →

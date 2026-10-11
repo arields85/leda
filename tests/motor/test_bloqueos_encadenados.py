@@ -394,3 +394,70 @@ def test_trabado_y_destrabado_dentro_del_margen_no_le_llega_nada(conn, mundo, se
     assert todos(conn, """select 1 from message_outbox
                            where chat_id = %s and not es_respuesta""",
                  mundo["personas"]["Marcos"]["telegram"]) == []
+
+
+# --- Los avisos de un mismo mensaje a la misma persona sobre la misma tarea van en uno ----------
+#
+# Decisión 72 del usuario (2026-10-11; la 35, paso 4): Ariel contesta en un solo mensaje que
+# todavía no tiene lo de Marcos, que está trabado con el servidor y que lo destraba Lucas. A
+# Marcos no le llegan dos mensajes (lo que dijo Ariel y que Ariel se trabó) sino uno con los dos
+# hechos. Cada aviso conserva su vigencia; lo que se junta es el envío.
+
+def _ariel_contesta_todo_junto(t: Turnos):
+    return t.dice("Ariel",
+                  Jugada("decir_cuando_destraba", {"tarea": "T2",
+                                                   "lo_que_dice": "todavia no la tengo"}),
+                  Jugada("anotar_bloqueo", {"tarea": "T1", "causa": SWITCH}),
+                  Jugada("anotar_quien_destraba", {"tarea": "T1", "quien": "lucas"}),
+                  texto="todavia no la tengo, estoy parado con el servidor xq falta el switch "
+                        "nuevo, lo pone lucas")
+
+
+def _a_marcos(conn, mundo) -> list[dict]:
+    return todos(conn, """select * from message_outbox
+                           where chat_id = %s and not es_respuesta order by id""",
+                 mundo["personas"]["Marcos"]["telegram"])
+
+
+def test_lo_de_un_mismo_mensaje_sobre_su_tarea_trabada_le_llega_en_uno(conn, mundo, servidor,
+                                                                       equipo):
+    _marcos_espera_a_ariel(conn, mundo, equipo)
+    _ariel_contesta_todo_junto(equipo)
+
+    ia = _salir(conn, mundo, AHORA + timedelta(minutes=70))
+
+    [mensaje] = _a_marcos(conn, mundo)
+    a_marcos = [a for a in avisos_guardados(conn)
+                if str(a["destinatario_membership_id"]) == _membresia(mundo, "Marcos")]
+    assert sorted(a["tipo"] for a in a_marcos) == [LO_QUE_DIJO, NOVEDAD]
+    assert {(a["estado"], str(a["outbox_id"])) for a in a_marcos} == {
+        ("enviado", str(mensaje["id"]))}
+    [pedido] = [p for p in ia.pedidos_de_redaccion if p["persona"] == "Marcos"]
+    assert sorted(h["aviso"] for h in pedido["hechos"]) == [LO_QUE_DIJO, NOVEDAD]
+
+
+def test_lo_de_mensajes_distintos_sale_como_siempre(conn, mundo, servidor, equipo):
+    """Sólo se junta lo que causó un mismo mensaje: dos mensajes de Ariel, dos avisos aparte."""
+    _marcos_espera_a_ariel(conn, mundo, equipo)
+    equipo.dice("Ariel", Jugada("decir_cuando_destraba", {"tarea": "T2",
+                                                          "lo_que_dice": "todavia no la tengo"}),
+                texto="todavia no la tengo")
+    _ariel_se_traba(equipo)
+
+    _salir(conn, mundo, AHORA + timedelta(minutes=70))
+
+    assert len(_a_marcos(conn, mundo)) == 2
+
+
+def test_si_uno_ya_no_corresponde_sale_solo_el_otro(conn, mundo, servidor, equipo):
+    """Cada aviso del envío se mira al salir con su propia regla: si Ariel se destraba dentro
+    del margen, que se trabó ya no sale, y lo que dijo sale solo."""
+    _marcos_espera_a_ariel(conn, mundo, equipo)
+    _ariel_contesta_todo_junto(equipo)
+    equipo.dice("Ariel", Jugada("destrabar", {"tarea": "T1"}), texto="ah no, ya llego")
+
+    _salir(conn, mundo, AHORA + timedelta(minutes=70))
+
+    [_mensaje] = _a_marcos(conn, mundo)
+    [lo_que_dijo] = avisos_guardados(conn, LO_QUE_DIJO)
+    assert lo_que_dijo["estado"] == "enviado"

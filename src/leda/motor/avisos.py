@@ -110,6 +110,16 @@ quedan abiertas a la vez: cuando una se cierra, la otra vuelve en su propio mens
 Por el mismo camino vuelve la pregunta que quedó por un cambio de tema (decisión 50): un mensaje,
 un tema.
 
+**Lo que causó un mismo mensaje, en un mensaje** (decisión 72 del usuario, 2026-10-11; la 35, paso
+4): los avisos informativos de coordinación que guardó un mismo turno para la misma persona sobre
+la misma tarea salen juntos, en un envío con los hechos de todos (`_se_junta`, `_envios`). Ariel
+contesta en un mensaje que todavía no tiene lo de Marcos, que se trabó y quién lo destraba: a
+Marcos le llega un mensaje, no dos. Cada aviso conserva su fila, su hora y su vigencia (el que ya
+no corresponde al salir no va); lo que se junta es el envío. Sólo los que salen solos por ser de
+coordinación y no llevan nada propio de un aviso suelto (una pregunta que abren, botones,
+adjuntos, el enlace, una oferta): lo demás sale como siempre, y el tope y las reglas de la
+coordinación (mecánica §10) no cambian.
+
 **La persecución del bloqueo** (C-5, porción 1; decisión 4 del usuario, 2026-10-08; conversación
 32; `persecucion.py`): cuando la persona trabada nombra a quien destraba su tarea, Leda le escribe
 a esa persona, como Leda (`pregunta_a_quien_destraba`), terminado el margen para corregir. Al
@@ -371,7 +381,7 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
             resumen["en_espera"] += esperan
         if omitidos:
             resumen["omitido"] += omitidos
-        for envio in _envios(listos):
+        for envio in _envios(m, listos):
             for resultado in _enviar(m, envio, ia):
                 resumen[resultado] += 1
         if tipos is None:
@@ -555,13 +565,22 @@ def _es_la_misma(tipo: str, abierta: str) -> bool:
     return a is not None and b is not None and a.espera is not None and a.espera == b.espera
 
 
-def _envios(listos: list[_Listo]) -> list[list[_Listo]]:
+def _envios(m: Momento, listos: list[_Listo]) -> list[list[_Listo]]:
     """Los envíos: uno por persona con sus avisos automáticos, en el orden en que se guardaron,
     y uno por cada aviso de coordinación (mecánica §10) y por la pregunta abierta repetida
-    (`_Listo.solo`)."""
+    (`_Listo.solo`). Los informativos de coordinación que causó un mismo mensaje, a la misma
+    persona y sobre la misma tarea, van en uno (`_se_junta`; decisión 72)."""
     envios: list[list[_Listo]] = []
-    de_la_persona: dict[tuple[str, str | None], list[_Listo]] = {}
+    de_la_persona: dict[tuple[str, ...], list[_Listo]] = {}
     for listo in listos:
+        if _se_junta(m, listo):
+            clave = (str(listo.destinatario["membership_id"]), "del_mismo_mensaje",
+                     str(listo.aviso["turno_id"]), str(listo.aviso["task_id"]))
+            if clave not in de_la_persona:
+                de_la_persona[clave] = []
+                envios.append(de_la_persona[clave])
+            de_la_persona[clave].append(listo)
+            continue
         if listo.solo or (listo.tipo.es_coordinacion and not listo.tipo.se_agrupa):
             envios.append([listo])
             continue
@@ -574,6 +593,23 @@ def _envios(listos: list[_Listo]) -> list[list[_Listo]]:
             envios.append(de_la_persona[clave])
         de_la_persona[clave].append(listo)
     return envios
+
+
+def _se_junta(m: Momento, listo: _Listo) -> bool:
+    """Si el aviso sale junto con los otros que causó el mismo mensaje para la misma persona
+    sobre la misma tarea (decisión 72): un informativo de coordinación, guardado por un turno,
+    sobre una tarea, que no lleva nada propio de un aviso que sale solo (la pregunta que abre,
+    botones, adjuntos, el enlace, ni la oferta que deja al salir)."""
+    tipo, aviso = listo.tipo, listo.aviso
+    if (listo.solo or not tipo.es_coordinacion or tipo.se_agrupa
+            or tipo.tipo_de_mensaje != "informativo"
+            or aviso.get("turno_id") is None or aviso.get("task_id") is None
+            or tipo.adjuntos is not None or tipo.enlace is not None or tipo.ofrece
+            or tipo.opciones is not None or tipo.abre is not None or tipo.recuerda
+            or tipo.ofrece_ver):
+        return False
+    return (tipo.deja_una_oferta is None
+            or tipo.deja_una_oferta(m, {**aviso, "hechos": listo.hechos}) is None)
 
 
 def _en_la_lista(envio: list[_Listo]) -> bool:
