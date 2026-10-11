@@ -1,0 +1,122 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/49-la-administracion-retira-una-pieza.md
+numero: "49"
+titulo: "La administración retira una pieza de una entrega"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-22 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: en_curso
+    desde: "2026-10-19"
+
+evidencia:
+  ot: [explicacion, captura]
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-22 10:00"
+    escribe: "termine el plc, la comprimidora arranco desde el plc y completo los 20 ciclos sin fallas"
+    manda: [{que: foto}]
+    jugadas:
+      - {nombre: entregar, tarea: PLC, el_texto_cubre: [explicacion], lo_descrito_cubre: [C1]}
+    efectos: {}
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
+    botones: [Confirmar]
+    dice:
+      - "la vista previa de la entrega: lo que escribió y la foto"
+      - "la pregunta: si la confirma"
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-22 10:01"
+    escribe: "dale"
+    jugadas:
+      - {nombre: confirmar, tarea: PLC, puede_traer: [tarea]}
+    efectos:
+      estados: {PLC: en_revision}
+      evidencias:
+        - {tarea: PLC, clase: texto, cubre: [explicacion]}
+        - {tarea: PLC, clase: imagen, cubre: [captura]}
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: PLC, a: Ismael, estado: guardado}
+    pregunta: null
+    dice:
+      - que la entregó y que Ismael la revisa
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-22 10:11"]
+    salen:
+      - a: Ismael
+        tipo: entrega_para_aprobar
+        tarea: PLC
+        fotos: 1
+        botones: [Aprobar, Pedir cambios]
+    dice:
+      - a Ismael, que Marcos entregó la tarea del PLC, con lo que escribió y la foto
+
+  # La administración retira la foto por la consola: la pieza queda retirada (la fila sigue) y su
+  # contenido se borra de verdad (decisión 57). Se guardan los dos avisos de la decisión 58.
+  - paso: 4
+    quien: Administracion
+    a_las: "2026-10-22 10:45"
+    administracion: {hace: retirar_contenido, tarea: PLC, clase: imagen,
+                     motivo: "en la foto se ve la clave del PLC"}
+    efectos:
+      retiradas: [{tarea: PLC, clase: imagen}]
+      avisos_guardados:
+        - {tipo: contenido_retirado_por_la_administracion, tarea: PLC, a: Marcos,
+           estado: guardado}
+        - {tipo: la_entrega_espera_otra_pieza, tarea: PLC, a: Ismael, estado: guardado}
+    hechos:
+      - {hace: retirar_contenido, tarea: PLC, clase: imagen, piezas_retiradas: 1,
+         contenidos_borrados: 1, piezas_que_siguen: 1}
+
+  # Marcos escribió por última vez a las 10:01 y Ismael no escribió: los dos avisos salen enseguida.
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-22 10:45"]
+    salen:
+      - a: Marcos
+        tipo: contenido_retirado_por_la_administracion
+        tarea: PLC
+        hechos: {necesita_respuesta: false,
+                 motivo_del_retiro: "en la foto se ve la clave del PLC"}
+      - a: Ismael
+        tipo: la_entrega_espera_otra_pieza
+        tarea: PLC
+        hechos: {necesita_respuesta: false, motivo_del_retiro: ausente}
+    dice:
+      - a Marcos, que la administración retiró la foto de la entrega del PLC, con el motivo, y que hace falta otra para que la revisen
+      - a Ismael, que la entrega del PLC espera una pieza nueva de Marcos y que le avisa cuando esté completa
+      - que no hace falta contestar, en el último renglón
+    no_dice:
+      - quién de la administración retiró la foto
+      - a Ismael, el motivo del retiro
+
+  # Ismael toca Aprobar en el aviso del paso 3: no cambia nada, y la cocina le pasa a la IA que
+  # la pieza que falta la retiró la administración, no Marcos.
+  - paso: 6
+    quien: Ismael
+    a_las: "2026-10-22 11:00"
+    toca: Aprobar
+    de_la_tarea: PLC
+    efectos: {}
+    hechos:
+      - {jugada: aprobar, resultado: no_se_puede,
+         motivo: la_entrega_espera_lo_que_retiro_la_administracion, tarea: PLC,
+         se_le_avisa_cuando_este_completa: true}
+    dice:
+      - que la entrega del PLC espera una pieza nueva, porque la administración retiró una
+      - que le avisa cuando esté completa
+    no_dice:
+      - que la aprobó o que quedó terminada
+      - que Marcos sacó algo de la entrega
+      - quién de la administración retiró la pieza, o el motivo

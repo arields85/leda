@@ -142,6 +142,12 @@ La página de la tarea (ADR 0019, decisión 7):
     llega una vez que ya no hace falta que conteste, y de la del servidor, que nunca le llegó,
     nada; a Nahuel, lo mismo que si el sector no hubiera tenido encargado al pedirlo; su botón
     viejo no comparte nada (decisiones 33, 35 y 39; constitución §8).
+49. [`49-la-administracion-retira-una-pieza.md`](49-la-administracion-retira-una-pieza.md): la
+    administración retira por la consola la foto de una entrega que ya le llegó a Ismael. La pieza
+    queda retirada y su contenido se borra, sin borrar la fila; a Marcos le llega el retiro con el
+    motivo y a Ismael, sin él, que la entrega espera una pieza nueva. Si Ismael toca Aprobar, nada
+    cambia y la cocina le pasa a la IA que la pieza la retiró la administración, no Marcos; nadie
+    nombra a quien la retiró (decisiones 57 a 60; constitución §4).
 
 La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, decisiones 4 a 7):
 
@@ -438,8 +444,9 @@ administración en el medio de la conversación (`administracion`, con `hace` y 
 corrida como la corre la consola o la plataforma, con el reloj del paso: `cambiar_el_encargado`
 (`area`, por su slug, y `a`, una persona o nulo: el sector sin encargado) y `retirar_contenido`
 (`tarea`, `clase` de la pieza, que tiene que ser una sola, y `motivo`; por el administrador de
-plataforma de la corrida, como `python -m leda retirar-contenido`; su conversación, la 49, está
-`PENDIENTE`). Sus efectos se comparan como
+plataforma de la corrida, como `python -m leda retirar-contenido`; sus `hechos` dicen también
+cuántas piezas siguen, `piezas_que_siguen`, y a cuántas se les borró el contenido,
+`contenidos_borrados`: la 49). Sus efectos se comparan como
 los de un turno (`efectos`): uno de más es de garantía y uno que falta es del motor, nunca de
 comprensión, porque nadie eligió jugadas; `hechos` compara lo que hizo. No lleva la casilla del
 próximo paso: no es un mensaje de Leda. Lo que Leda manda después va en un paso con `relojes`.

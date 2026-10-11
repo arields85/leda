@@ -47,7 +47,7 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_cuarenta_y_seis_conversaciones_y_cada_una_nombra_su_fuente():
+def test_hay_cuarenta_y_siete_conversaciones_y_cada_una_nombra_su_fuente():
     # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega), la 23 desde la 3b (la
     # aprobación), la 24 desde la 3c (quien aprueba no contesta), la 27 desde la D3 de la C-3d
     # (la entrega frente al criterio), la 28 y la 29 desde la D4 (las entregas en listas y si
@@ -64,10 +64,10 @@ def test_hay_cuarenta_y_seis_conversaciones_y_cada_una_nombra_su_fuente():
     # contesta, Leda nunca lo abandona), y la 43 desde la C-5c (cerrar el tema para todos), y la
     # 44 desde la C-5e (seguir la cadena hasta quien puede destrabarla), y la 45 desde la
     # decisión 33 (el resumen para cualquiera, el detalle a pedido), y la 48 desde el aviso al
-    # encargado anterior (el sector que se queda sin encargado). La 47 (los apodos) todavía no
-    # tiene su YAML.
+    # encargado anterior (el sector que se queda sin encargado), y la 49 desde las decisiones 57
+    # a 60 (la administración retira una pieza). La 47 (los apodos) todavía no tiene su YAML.
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 46)] + ["48"]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 46)] + ["48", "49"]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]
@@ -644,7 +644,8 @@ def test_la_administracion_retira_el_contenido_como_la_consola_y_sus_efectos_se_
         "administracion": _RETIRAR_LA_FOTO,
         "efectos": {"retiradas": [{"tarea": "PLC", "clase": "imagen"}],
                     "avisos_guardados": _LOS_DOS_AVISOS},
-        "hechos": [{"hace": "retirar_contenido", "tarea": "PLC", "piezas_retiradas": 1}]})
+        "hechos": [{"hace": "retirar_contenido", "tarea": "PLC", "piezas_retiradas": 1,
+                    "piezas_que_siguen": 1, "contenidos_borrados": 1}]})
 
     corrida = correr_conversacion(conn, conv, _perfecta(conv))
 

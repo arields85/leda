@@ -483,7 +483,19 @@ class _Corredor:
             retiradas = pagina_de_tarea.retirar_contenido(
                 cur, self.mundo.workspace_id, piezas[0], administrador, que["motivo"],
                 ahora=self.reloj.ahora())
-        return {"tarea": que["tarea"], "clase": que["clase"], "piezas_retiradas": len(retiradas)}
+            # Lo que queda (decisión 57): la pieza sigue, con su huella, y el contenido de su
+            # archivo se borró de verdad.
+            cur.execute("""select count(*) as siguen,
+                                  count(*) filter (where a.contenido is null
+                                                     and a.contenido_retirado_en is not null)
+                                      as borrados
+                             from evidence e
+                             left join archivo a on a.workspace_id = e.workspace_id
+                                                and a.id = e.archivo_id
+                            where e.id = any(%s::uuid[])""", (list(retiradas),))
+            queda = cur.fetchone()
+        return {"tarea": que["tarea"], "clase": que["clase"], "piezas_retiradas": len(retiradas),
+                "piezas_que_siguen": queda["siguen"], "contenidos_borrados": queda["borrados"]}
 
     def _etiqueta(self, etiqueta: str) -> str:
         """Un botón por su clave en el YAML: una tarea, por la suya; el que muestra la entrega de
