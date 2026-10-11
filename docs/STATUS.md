@@ -244,7 +244,6 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
   aviso previo cruza fines de semana y feriados, la comprimida no saltea pasos). Un vencimiento
   sábado o domingo: la plataforma no lo dejará cargar (decisión 56, 2026-10-10); el que entre por
   otro lado cuenta como si venciera el viernes anterior.
-- **`apscheduler`** sigue en `pyproject.toml` y ya no lo usa nadie.
 - **Contexto de la IA:** comparar el contexto amplio con variantes reducidas; requiere ADR antes de operar en
   internet.
 - **Alta de un segundo cliente:** el proceso no está definido.
