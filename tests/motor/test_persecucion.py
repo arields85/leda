@@ -1205,6 +1205,74 @@ def test_corregir_que_ya_le_llego_si_contesto_despues_no_se_le_vuelve_a_escribir
     assert _la_que_se_lo_corrige(conn, mundo) == []
 
 
+def test_corregir_no_le_escribas_que_fallo_vuelve_a_preguntarle_como_antes(conn, mundo, equipo):
+    """El aviso de que ya no hace falta falló (nunca le llegó a Ariel): es como si no hubiera
+    salido. Su pregunta y su espera vuelven como estaban y Leda no le escribe nada; el aviso
+    queda como estaba, fallido (nada se borra), y deja de contar como el cierre del tema."""
+    _le_pregunto(conn, mundo, equipo)
+    _trabada_tambien(conn, mundo, equipo)
+    equipo.dice("Marcos", Jugada("no_escribirle", {"tarea": "T1", "quien": "ariel"}))
+    with admin(conn) as cur:
+        cur.execute("update scheduled_notice set estado = 'fallido', intentos = 5, "
+                    "resuelto_en = %s where tipo = %s",
+                    (AHORA + timedelta(minutes=34), YA_NO_HACE_FALTA))
+    conn.commit()
+
+    r = _corregir_a_t2(equipo)
+
+    [hecho] = r.hechos
+    assert hecho["resultado"] == "corregido"
+    [avisado] = hecho["ya_no_hace_falta_que_destraben"]
+    assert avisado["aviso_a_quien_destrababa"] == {"a": ARIEL, "llega": "no_le_llego"}
+    assert hecho["se_le_pregunta_a"] == {"a": ARIEL, "llega": "ya_le_llego", "el": "2026-10-05"}
+    assert SIGUE not in hecho
+    assert _la_que_se_lo_corrige(conn, mundo) == []
+    assert _abiertas(conn, mundo, "Ariel", "cuando_se_destraba") == 1
+    assert _esperas(conn, mundo, "Ariel") == 1
+    assert _su_pregunta(conn, mundo)["tarea"] == mundo["tarea"]
+    [fallido] = avisos_guardados(conn, YA_NO_HACE_FALTA)
+    assert fallido["estado"] == "fallido"
+
+    # El tema vuelve a estar abierto para Ariel: si se destraba, se entera (decisión 39).
+    equipo.dice("Marcos", Jugada("destrabar", {"tarea": "T1"}))
+    ultimo = avisos_guardados(conn, YA_NO_HACE_FALTA)[-1]
+    assert ultimo["id"] != fallido["id"]
+    assert (ultimo["estado"], ultimo["hechos"]["como_se_cerro"]) == ("guardado",
+                                                                     "ya_se_destrabo")
+
+
+def test_la_repeticion_que_no_salio_porque_se_cerro_no_corta_la_que_se_reabre(
+        conn, espacio_con_escalera, equipo):
+    """La repetición del martes 6 esperaba salir cuando "no le escribas" le cerró la pregunta a
+    Ariel: no sale (ya no esperaba nada). La corrección se la reabre, y desde ahí la escalera la
+    sigue repitiendo como a cualquier pregunta sin contestar (decisión 38): nunca se la abandona."""
+    mundo = espacio_con_escalera
+    _le_pregunto(conn, mundo, equipo)
+    _trabada_tambien(conn, mundo, equipo)
+    correr_escalera(conn, mundo["id"], RelojFijo(octubre(6, 10)))
+    conn.commit()
+    equipo.dice("Marcos", Jugada("no_escribirle", {"tarea": "T1", "quien": "ariel"}),
+                at=octubre(6, 10, 5))
+    _salir(conn, mundo, octubre(6, 10, 6))
+    [no_salio] = [a for a in avisos_guardados(conn, "repregunta")
+                  if str(a["task_id"]) == mundo["tarea"]]
+    assert (no_salio["estado"], no_salio["motivo_omision"]) == ("omitido", "ya_respondio")
+    equipo.minuto = int((octubre(6, 10, 6) - AHORA).total_seconds() // 60)
+    _corregir_a_t2(equipo)              # a las 10:07 del martes 6
+    assert _abiertas(conn, mundo, "Ariel", "cuando_se_destraba") >= 1
+
+    _los_dias(conn, mundo, (7, 8, 9))
+
+    de_t1 = [a for a in avisos_guardados(conn, "repregunta")
+             if str(a["task_id"]) == mundo["tarea"]]
+    assert len(de_t1) >= 2
+    otra = de_t1[1]
+    assert otra["estado"] == "enviado"
+    assert str(otra["destinatario_membership_id"]) == _membresia(mundo, "Ariel")
+    # La que no salió no se cuenta como un pedido que no le llegó: Leda la retiró.
+    assert "pedidos_anteriores_que_no_le_llegaron" not in otra["hechos"]
+
+
 def test_lo_de_antes_era_por_otra_tarea_tiene_su_significado():
     for codigo in (SIGUE, ERA_POR_OTRA):
         assert hechos_mod.significado(codigo), codigo

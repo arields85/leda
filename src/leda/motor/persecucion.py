@@ -227,11 +227,15 @@ CORRIGE = "n"
 LO_DE_ANTES_ERA_POR_OTRA_TAREA = "lo_de_antes_era_por_otra_tarea"
 AVISO_DE_QUE_SIGUE_HACIENDO_FALTA = "aviso_de_que_sigue_haciendo_falta"
 # Un aviso de que ya no hace falta deja de contar como el cierre del tema si se le corrigió a quien
-# lo recibió, mientras la corrección siga en pie (`a` es el aviso de que ya no hace falta).
-_SIN_CORREGIR = """not exists (select 1 from scheduled_notice c
+# lo recibió, mientras la corrección siga en pie, o si la corrección lo retiró porque nunca le
+# llegó (uno que falló: su clave termina en `:c<id>`, `_volver_a_preguntarle`). `a` es el aviso
+# de que ya no hace falta.
+_RETIRADO_POR_LA_CORRECCION = "a.dedupe_key like ('%%:c' || a.id::text)"
+_SIN_CORREGIR = f"""not exists (select 1 from scheduled_notice c
                                 where c.tipo = %s and c.task_id = a.task_id
                                   and c.estado <> 'omitido'
-                                  and split_part(c.dedupe_key, ':', 5) = %s || a.id::text)"""
+                                  and split_part(c.dedupe_key, ':', 5) = %s || a.id::text)
+                    and not {_RETIRADO_POR_LA_CORRECCION}"""
 # La pregunta que cerró un aviso de que ya no hace falta (`_ya_no_le_pregunta`), en el momento en
 # que se guardó.
 _CERRADA_PORQUE_YA_NO_HACE_FALTA = """membership_id = %s and task_id = %s and tipo = %s
@@ -1686,11 +1690,12 @@ def deshacer_no_escribirle(ctx: Contexto, tarea: dict[str, Any]) -> dict[str, An
         (PREGUNTA_A_QUIEN_DESTRABA, task_id, PIDIO_QUE_NO_LE_ESCRIBA))
     retirado = cur.fetchone()
     cur.execute(
-        """select a.*, i.nombre as a_nombre from scheduled_notice a
-             join integrante i on i.membership_id = a.destinatario_membership_id
-            where a.tipo = %s and a.task_id = %s and a.estado <> 'omitido'
-              and split_part(a.dedupe_key, ':', 5) = %s
-            order by a.creado_en desc, a.id desc limit 1""",
+        f"""select a.*, i.nombre as a_nombre from scheduled_notice a
+              join integrante i on i.membership_id = a.destinatario_membership_id
+             where a.tipo = %s and a.task_id = %s and a.estado <> 'omitido'
+               and split_part(a.dedupe_key, ':', 5) = %s
+               and not {_RETIRADO_POR_LA_CORRECCION}
+             order by a.creado_en desc, a.id desc limit 1""",
         (YA_NO_HACE_FALTA, task_id, DIJO_QUE_YA_LO_HABLARON))
     cerrado = cur.fetchone()
     if retirado is not None and (cerrado is None
@@ -1727,8 +1732,9 @@ def _devolver_el_mensaje(ctx: Contexto, retirado: dict[str, Any]) -> dict[str, A
 
 def _volver_a_preguntarle(ctx: Contexto, cerrado: dict[str, Any]) -> dict[str, Any]:
     """El aviso de que ya no hace falta: si no salió, se retira y lo que Leda le preguntaba a
-    esa persona vuelve como estaba (lo que se cerró con él, en el mismo momento); si salió, los
-    hechos dicen que ya le llegó y Leda se lo corrige (decisión 61)."""
+    esa persona vuelve como estaba (lo que se cerró con él, en el mismo momento); si falló, nunca
+    le llegó, y es lo mismo; si salió, los hechos dicen que ya le llegó y Leda se lo corrige
+    (decisión 61)."""
     cur, cal = ctx.cur, ctx.calendario
     if cerrado["estado"] == "enviado":
         hecho: dict[str, Any] = {YA_NO_HACE_FALTA_QUE_DESTRABEN: [{AVISO_A_QUIEN_DESTRABABA: {
@@ -1736,20 +1742,30 @@ def _volver_a_preguntarle(ctx: Contexto, cerrado: dict[str, Any]) -> dict[str, A
             "el": cerrado["resuelto_en"].astimezone(cal.zona).date().isoformat()}}]}
         _juntar(hecho, _decirle_que_sigue_haciendo_falta(ctx, cerrado))
         return hecho
-    if cerrado["estado"] != "guardado":
+    if cerrado["estado"] == "fallido":
+        # Falló y nunca le llegó: como si no hubiera salido. Queda fallido (nada se borra) y
+        # libera su clave, que lo marca corregido: deja de contar como el cierre del tema
+        # (`_SIN_CORREGIR`).
+        cur.execute("""update scheduled_notice set dedupe_key = dedupe_key || ':c' || id::text
+                        where id = %s and estado = 'fallido'""", (cerrado["id"],))
+        avisado: dict[str, Any] = {AVISO_A_QUIEN_DESTRABABA: {"a": cerrado["a_nombre"],
+                                                              LLEGA: NO_LE_LLEGO}}
+    elif cerrado["estado"] == "guardado":
+        # Retirado, libera su clave: lo mismo por esta tarea se puede volver a guardar.
+        cur.execute("""update scheduled_notice
+                          set estado = 'omitido',
+                              motivo_omision = 'se_anoto_en_la_tarea_equivocada',
+                              resuelto_en = %s, proximo_intento_en = null,
+                              dedupe_key = dedupe_key || ':c' || id::text
+                        where id = %s and estado = 'guardado'""", (ctx.ahora, cerrado["id"]))
+        avisado = {AVISO_A_QUIEN_DESTRABABA: {"a": cerrado["a_nombre"],
+                                              LLEGA: NO_LE_VA_A_LLEGAR}}
+        nombrar_efecto(avisado, AVISO_A_QUIEN_DESTRABABA, AVISO, cerrado["id"])
+    else:
         return {YA_NO_HACE_FALTA_QUE_DESTRABEN: [{AVISO_A_QUIEN_DESTRABABA: {
             "a": cerrado["a_nombre"], LLEGA: NO_LE_LLEGO}}]}
-    # Retirado, libera su clave: lo mismo por esta tarea se puede volver a guardar.
-    cur.execute("""update scheduled_notice
-                      set estado = 'omitido', motivo_omision = 'se_anoto_en_la_tarea_equivocada',
-                          resuelto_en = %s, proximo_intento_en = null,
-                          dedupe_key = dedupe_key || ':c' || id::text
-                    where id = %s and estado = 'guardado'""", (ctx.ahora, cerrado["id"]))
     persona, task_id = str(cerrado["destinatario_membership_id"]), str(cerrado["task_id"])
     _seguir_preguntandole(ctx, persona, task_id, cerrado["creado_en"])
-    avisado: dict[str, Any] = {AVISO_A_QUIEN_DESTRABABA: {"a": cerrado["a_nombre"],
-                                                          LLEGA: NO_LE_VA_A_LLEGAR}}
-    nombrar_efecto(avisado, AVISO_A_QUIEN_DESTRABABA, AVISO, cerrado["id"])
     hecho: dict[str, Any] = {YA_NO_HACE_FALTA_QUE_DESTRABEN: [avisado]}
     cur.execute("""select resuelto_en from scheduled_notice
                     where tipo = %s and task_id = %s and destinatario_membership_id = %s

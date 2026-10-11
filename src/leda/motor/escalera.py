@@ -359,9 +359,10 @@ def _ultimo_avance(escalon: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 def _no_llegaron(pedidos: list[dict[str, Any]]) -> int:
     """Los pedidos que no le llegaron a la persona. Uno que no salió porque ya había contado cómo
-    venía la tarea (`YA_LO_CONTO`) no cuenta: lo contestó."""
-    return sum(a["estado"] != "enviado" and a["motivo_omision"] != YA_LO_CONTO
-               for a in pedidos)
+    venía la tarea (`YA_LO_CONTO`) no cuenta: lo contestó; ni uno que no salió porque su pregunta
+    estaba cerrada (`ya_respondio`): Leda no se lo iba a mandar."""
+    return sum(a["estado"] != "enviado"
+               and a["motivo_omision"] not in (YA_LO_CONTO, "ya_respondio") for a in pedidos)
 
 
 def _dar_por_contado(m: Momento, tarea, hasta: Anclaje, ronda: list[str],
@@ -573,8 +574,10 @@ def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
         return None                     # el paso anterior todavía no salió
     if any(a["tipo"] == ESCALAMIENTO_DE_UNA_PREGUNTA for a in escalon):
         return None                     # terminó al escalar
-    if any(a["estado"] == "omitido" and a["motivo_omision"] in DETIENEN for a in escalon):
-        return None                     # contestó antes de que saliera
+    # Si contestó, la pregunta está cerrada y no se llega acá. Un paso que no salió porque la
+    # pregunta se había cerrado (`ya_respondio`) no la detiene si se volvió a abrir (una
+    # corrección la reabrió, decisión 61): sigue sin contestar y se la repite como a cualquiera,
+    # contando ese paso como dado, sin decir que no le llegó (`_no_llegaron`).
     dados = sorted(escalon, key=lambda a: a["resuelto_en"])
     siguiente = 1 + len(dados)          # el pedido 0 es la pregunta misma
     # Una que no escala, pasados sus tres días, se repite cada 2 días hábiles desde la anterior
