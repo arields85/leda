@@ -6,6 +6,7 @@ clasifica cada diferencia (garantía, comprensión o motor).
 
 from __future__ import annotations
 
+from leda import salida
 from tests.conversaciones import comprobar as cp
 
 
@@ -425,6 +426,33 @@ def test_cada_regla_del_formato_se_reconoce_con_su_renglon():
         cp.FECHA_CORTA}
 
 
+def test_el_tope_del_renglon_es_el_de_la_cocina():
+    """Uno solo: el corredor mide con el mismo número con el que la cocina parte los renglones."""
+    assert cp.RENGLON_MAXIMO is salida.RENGLON_MAXIMO
+
+
+# Mensajes de la ronda real de las decisiones 66 a 73 (`fase-c-decisiones-66-73.md`) que el
+# corredor marcó por un renglón largo o por el cierre pegado a lo anterior.
+REALES_CON_LA_FORMA_DE_LA_IA = [
+    (f"📋 {COM}\n⚠️ Sigue frenada porque falta el switch nuevo.\n\n"
+     "Cuando puedas seguir, avisame. No hace falta responder ahora."),
+    (f"📋 {PLC}\n✏️ Quedó pedido el pase a Martín.\n"
+     "Marcos y Martín serán avisados hoy a las 12:10. No hace falta que respondas."),
+    ("Marcos dijo que le toca a Ariel. Ariel primero dijo que la tendría para el jue 22/10; "
+     "después avisó que se le complicó con otra cosa y que la tendría ayer. No hay confirmación "
+     "de que ya esté."),
+    (f"📋 {COM}\n✏️ Quedó asentado que seguís trabado porque te falta la IP del servidor de "
+     "Corelabs. Van 10 días hábiles desde que lo contaste, el mar 20/10.\n\n"
+     "¿Seguís esperando la IP?"),
+]
+
+
+def test_lo_que_la_cocina_le_da_forma_ya_no_falla_por_el_renglon_ni_por_el_cierre():
+    for texto in REALES_CON_LA_FORMA_DE_LA_IA:
+        assert _reglas(texto) & {cp.RENGLON_CORTO, cp.CIERRE_APARTE}, texto
+        assert not _reglas(salida.dar_forma(texto)) & {cp.RENGLON_CORTO, cp.CIERRE_APARTE}, texto
+
+
 # --- Tercera vuelta (usuario, 2026-10-07, después de la segunda prueba por Telegram) ------------
 
 def test_la_marca_de_una_tarea_con_su_vencimiento_es_el_calendario_de_espiral():
@@ -767,6 +795,7 @@ def test_la_raiz_saca_solo_la_terminacion_y_deja_las_palabras_cortas():
     assert cp.raiz("la") == "la" and cp.raiz("los") == "los"
     assert cp.raiz("mejor") == "mejor"
     assert cp.raiz("sabe") != cp.raiz("conoce")
+
 
 
 def test_un_nombre_se_compara_sin_mayusculas_ni_acentos():

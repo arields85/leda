@@ -2,7 +2,8 @@
 `odd/tasks/motor-definitivo.md`, "El formato de los mensajes").
 
 La IA escribe un formato mínimo: `**negrita**`, párrafos separados por un renglón en blanco y
-viñetas con "• ". El outbox guarda el texto tal como lo escribió. Al enviar, la cocina lo
+viñetas con "• ". El outbox guarda el texto con sus marcas, con la forma que le da la cocina
+(`test_forma_del_mensaje.py`: sólo dónde van los saltos de renglón). Al enviar, la cocina lo
 convierte en texto plano más entidades `bold` de Telegram, nunca con `parse_mode`: no hay nada
 que escapar, y una marca mal cerrada sale como texto. Las posiciones se cuentan en unidades
 UTF-16 sobre el texto que de verdad sale (con el saludo del día, si lo hubo) y conviven con la
@@ -231,8 +232,8 @@ def test_pasado_el_maximo_con_bloque_se_quitan_las_negritas_y_queda_el_bloque():
 # ------------------------------------------------------------- de punta a punta
 
 def test_el_outbox_guarda_las_marcas_y_el_saludo_corre_las_posiciones(corework, conn):
-    """El outbox guarda lo que escribió la IA, así la IA ve su formato en el historial; las
-    posiciones se calculan sobre lo que sale, con el saludo del día adelante."""
+    """El outbox guarda las marcas que escribió la IA, así la IA ve su formato en el historial;
+    las posiciones se calculan sobre lo que sale, con el saludo del día adelante."""
     ws = corework.workspace_id
     texto = "Anoté el inicio de **Programar PLC**.\n\n• **Revisar comunicaciones**"
     with admin(conn) as cur:

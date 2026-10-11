@@ -424,9 +424,10 @@ def entidad_de_bloque(texto: str, bloque: str) -> dict:
 
 
 # El formato de los mensajes (pedido del usuario, 2026-10-07): la IA escribe `**negrita**`,
-# párrafos separados por un renglón en blanco y viñetas con "• ". El outbox lo guarda así, y
-# al enviar se convierte en texto plano más entidades `bold`, nunca con `parse_mode`: no hay
-# nada que escapar, y una marca mal cerrada sale como texto.
+# párrafos separados por un renglón en blanco y viñetas con "• ". El outbox guarda las marcas
+# (con la forma de `dar_forma`, que sólo mueve saltos de renglón), y al enviar se convierte en
+# texto plano más entidades `bold`, nunca con `parse_mode`: no hay nada que escapar, y una marca
+# mal cerrada sale como texto.
 #
 # Una negrita abre y cierra en el mismo renglón, con algo adentro que no empieza ni termina
 # con un espacio o un asterisco; la búsqueda va de izquierda a derecha y toma el cierre más
@@ -437,6 +438,106 @@ _VINETA = re.compile(r"(?m)^[ \t]*[-•][ \t]+")
 # Telegram toma hasta 100 entidades por mensaje e ignora el formato de las que siguen
 # (`MAX_MESSAGE_ENTITIES` de python-telegram-bot, sacado de la Bot API).
 MAX_ENTIDADES_TELEGRAM = 100
+
+# La forma del mensaje (chequeo de rumbo del formato, 2026-10-11; `odd/tasks/fase-c.md`,
+# "Formato"). La IA sabe el formato entero (`motor/instrucciones.py`) y aun así, ronda tras
+# ronda, escribe renglones largos y deja el cierre pegado a lo anterior. Es presentación, no
+# comprensión: la cocina le da la forma a lo que se escribió, sin cambiar, agregar ni quitar una
+# palabra, donde entra a su cola (`enqueue_outbox`, `despachador.encolar_respuesta_admin`),
+# antes de las entidades de Telegram. La cola guarda el texto ya con su forma.
+#
+# El tope del renglón: 140 caracteres son tres o cuatro renglones en la pantalla de un teléfono,
+# lo que ocupa una idea con el nombre completo de una tarea y su fecha; los párrafos de la
+# primera vuelta del formato pasaban de 200. Se cuenta en caracteres, sin los espacios de los
+# costados. El corredor de las conversaciones mide con este mismo número
+# (`tests/conversaciones/comprobar.py`).
+RENGLON_MAXIMO = 140
+# Los renglones de una tarea (📋 sola, 🗓️ con su vencimiento y la marca vieja 📅): nunca se
+# tocan. Las marcas se reconocen sin el selector de emoji (U+FE0F) que puede seguirlas.
+_MARCAS_DE_TAREA = ("📋", "\U0001F5D3", "📅")
+# Lo que abre un renglón y dice qué es: lo anotado (✏️), lo que pide atención (⚠️) y una viñeta.
+_MARCAS_DE_RENGLON = ("✏", "⚠", "•", "- ")
+# El final de una oración: un punto, un signo que cierra una pregunta o una exclamación o unos
+# puntos suspensivos, con las comillas, el paréntesis o la negrita que los cierren, y los
+# espacios que siguen (el grupo 1). La oración siguiente tiene que empezar con una mayúscula o
+# con un signo que abre (`_ABRE`): una minúscula no empieza otra ("etc. y"), y un número
+# tampoco ("aprox. 3").
+_FIN_DE_ORACION = re.compile(r"[.!?…][»”\"')\]*]*([ \t]+)(?=\S)")
+_ABRE = "¿¡«“\"("
+
+
+def _cortes(renglon: str) -> list[tuple[int, int]]:
+    """Dónde se parte un renglón entre dos oraciones: el tramo de espacios entre una y la
+    siguiente. Nunca dentro de una negrita, que abre y cierra en el mismo renglón
+    (`formatear`): partirla dejaría los asteriscos a la vista."""
+    cortes = []
+    for fin in _FIN_DE_ORACION.finditer(renglon):
+        desde, hasta = fin.span(1)
+        sigue = renglon[hasta]
+        if (sigue.isupper() or sigue in _ABRE) and renglon[:desde].count("**") % 2 == 0:
+            cortes.append((desde, hasta))
+    return cortes
+
+
+def _de_una_tarea(renglon: str) -> bool:
+    return renglon.lstrip().startswith(_MARCAS_DE_TAREA)
+
+
+def _en_oraciones(renglon: str) -> list[str]:
+    """El renglón partido en sus oraciones, en orden; la primera conserva lo que abre el renglón
+    (su marca o su viñeta) y las demás van sin marca."""
+    pedazos, desde = [], 0
+    for a, b in _cortes(renglon):
+        pedazos.append(renglon[desde:a])
+        desde = b
+    return [*pedazos, renglon[desde:]]
+
+
+def dar_forma(texto: str, *, con_cierre: bool = True) -> str:
+    """El texto con la forma del formato de los mensajes, con las mismas palabras en el mismo
+    orden: sólo cambia dónde van los saltos de renglón. Dos veces da lo mismo que una.
+
+    - Un renglón de más de `RENGLON_MAXIMO` caracteres se parte entre oraciones, una por
+      renglón, en el mismo bloque. Una oración sola más larga queda como está. La marca o la
+      viñeta queda en el primer pedazo y los que siguen van sin marca, debajo: la marca dice qué
+      es ese renglón y lo que sigue en el bloque es su continuación (una marca repetida diría
+      que es otra cosa anotada u otra viñeta). Un renglón de una tarea (📋 o 🗓️) nunca se toca.
+    - Con `con_cierre`, el cierre va solo en su renglón con un renglón en blanco antes
+      (`_separar_el_cierre`)."""
+    renglones: list[str] = []
+    for renglon in texto.split("\n"):
+        if len(renglon.strip()) > RENGLON_MAXIMO and not _de_una_tarea(renglon):
+            renglones += _en_oraciones(renglon)
+        else:
+            renglones.append(renglon)
+    if con_cierre:
+        _separar_el_cierre(renglones)
+    return "\n".join(renglones)
+
+
+def _separar_el_cierre(renglones: list[str]) -> None:
+    """El cierre es la última oración del mensaje, diga lo que diga: todo mensaje termina con
+    su próximo paso (la pregunta, que no hace falta responder o lo que sigue). Si comparte el
+    último renglón con otras oraciones, va aparte; si es el último renglón pero sigue a otro
+    del mismo bloque, se le pone un renglón en blanco antes. Un mensaje de un solo renglón
+    (corto: uno largo ya se partió) queda como está: se lee de una vez y no tiene de qué
+    separarse; así quedan también los textos fijos de la cocina, como el aviso neutro de un
+    incidente. Un último renglón de una sola oración que abre con una marca o una viñeta es de
+    su bloque (una lista, lo anotado, lo que pide atención): no se separa. Un último renglón de
+    una tarea tampoco."""
+    llenos = [i for i, r in enumerate(renglones) if r.strip()]
+    if len(llenos) < 2:
+        return
+    u = llenos[-1]
+    ultimo = renglones[u]
+    if _de_una_tarea(ultimo):
+        return
+    cortes = _cortes(ultimo)
+    if cortes:
+        a, b = cortes[-1]
+        renglones[u:u + 1] = [ultimo[:a], "", ultimo[b:]]
+    elif renglones[u - 1].strip() and not ultimo.lstrip().startswith(_MARCAS_DE_RENGLON):
+        renglones.insert(u, "")
 
 
 def formatear(texto: str) -> tuple[str, list[dict]]:
@@ -579,6 +680,17 @@ def margen_saludo(*, personal: bool) -> int:
     return MARGEN_SALUDO
 
 
+def _con_su_forma(text: Any, bloque_copiable: str | None) -> str:
+    """El texto de una fila de la salida con su forma (`dar_forma`). El bloque copiable es lo
+    que la persona escribió, al final: queda literal, y lo de antes se parte si es largo pero no
+    separa su cierre, porque su última oración presenta al bloque."""
+    normalizado = normalize_visible_text(text)
+    if bloque_copiable is None:
+        return dar_forma(normalizado)
+    antes = normalizado[:len(normalizado) - len(bloque_copiable)]
+    return dar_forma(antes, con_cierre=False) + bloque_copiable
+
+
 def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    text: Any, dedupe_key: str,
                    recipient_membership_id: str | None = None,
@@ -638,6 +750,7 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                 "El bloque copiable tiene que ser el final de un mensaje que "
                 "no se parte.")
         entidad_de_bloque(normalize_visible_text(text), bloque_copiable)
+    text = _con_su_forma(text, bloque_copiable)
     has_buttons = (pending_action_id is not None
                    or (bloque_copiable is not None
                        and cabe_en_boton_de_copiar(bloque_copiable)))

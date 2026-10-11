@@ -30,8 +30,8 @@ from .calendario import Calendario
 from .incidentes import (ETAPA_ENTREGA_AVISO_ADMIN, ETAPA_ENTREGA_MENSAJE,
                          ETAPA_ENTREGA_REINTENTO, ETAPA_RESPUESTA_ADMIN, REFERENCIA_ADMIN_NOTICE,
                          redactar_secreto_telegram, registrar_incidente)
-from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, formatear, prepare_buttons,
-                     prepare_payload, texto_y_entidades)
+from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, dar_forma, formatear,
+                     prepare_buttons, prepare_payload, texto_y_entidades)
 
 
 class ErrorTelegram(RuntimeError):
@@ -1481,13 +1481,15 @@ def encolar_respuesta_admin(cur, admin_app_user_id: str, chat_id: int, texto: st
     (`admin_notice`, `es_respuesta`; migración 0054), bajo la conexión administrativa. Sin el
     enlace: si lo lleva (`enlace_de`: el espacio y la tarea), queda su marca
     (`admin_notice_enlace`) y `despachar_avisos_admin` lo emite al mandarla, así la base nunca
-    guarda el token. `clave` la deduplica (el mensaje del pedido): ya encolada, `None`."""
+    guarda el token. `clave` la deduplica (el mensaje del pedido): ya encolada, `None`. La cola
+    guarda el texto con su forma (`salida.dar_forma`), como la de los mensajes del equipo."""
     cur.execute(
         """insert into admin_notice (es_respuesta, workspace_id, destinatario_app_user_id,
                                      chat_id, cuerpo, dedupe_key)
            values (true, %s, %s, %s, %s, %s)
            on conflict (dedupe_key) do nothing returning id""",
-        (enlace_de[0] if enlace_de else None, str(admin_app_user_id), chat_id, texto, clave))
+        (enlace_de[0] if enlace_de else None, str(admin_app_user_id), chat_id, dar_forma(texto),
+         clave))
     fila = cur.fetchone()
     if fila is None:
         return None

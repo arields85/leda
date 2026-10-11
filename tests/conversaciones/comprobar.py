@@ -41,6 +41,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
+from leda import salida
 from leda.db import admin
 from leda.motor.avisos import ETAPA_AVISO_REINTENTO
 
@@ -856,14 +857,16 @@ def comprobar_avisos_en_estado(c: Comprobacion, esperados: list[dict], f: dict[s
 # nunca con Leda como quien le avisa (desde el 2026-10-08, decisión 11, sobre lo que se informa
 # cuando no se nombra a quien aprueba el trabajo de la persona). Se
 # mide solo, en cada mensaje de una corrida, para no depender de leer las transcripciones. Se
-# comprueba sobre el texto que escribió la IA, sin el saludo del día que agrega el sistema. Lo
-# que no se puede medir sin juzgar el texto (que el primer renglón diga lo que pasó, que una idea
-# no se parta) lo sigue leyendo una persona.
+# comprueba sobre el texto que de verdad sale, como quedó en la cola, sin el saludo del día que
+# agrega el sistema: desde el 2026-10-11 la cocina le da la forma a lo que escribió la IA
+# (`salida.dar_forma`: parte un renglón largo entre oraciones y separa el cierre) y esto mide
+# lo que queda después. Lo que no se puede medir sin juzgar el texto (que el primer renglón diga
+# lo que pasó, que una idea no se parta) lo sigue leyendo una persona.
 #
-# El tope del renglón: 140 caracteres son tres o cuatro renglones en la pantalla de un teléfono,
-# lo que ocupa una idea con el nombre completo de una tarea y su fecha; los párrafos de la
-# primera vuelta pasaban de 200.
-RENGLON_MAXIMO = 140
+# El tope del renglón es uno solo, el de la cocina (`salida.RENGLON_MAXIMO`, con su porqué): 140
+# caracteres son tres o cuatro renglones en la pantalla de un teléfono, lo que ocupa una idea con
+# el nombre completo de una tarea y su fecha; los párrafos de la primera vuelta pasaban de 200.
+RENGLON_MAXIMO = salida.RENGLON_MAXIMO
 # Las marcas se reconocen sin el selector de emoji (U+FE0F) que puede seguirlas: 🗓️ y 🗓 son la
 # misma marca.
 MARCA_DE_LA_TAREA_SOLA = "📋"
