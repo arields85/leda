@@ -63,10 +63,10 @@ aprobado. Detalle y evidencia en el plan.
 3. **La prueba de cupo:** hecha (`bb862e4`, `python -m leda chatgpt cupo`; el corredor la mira antes
    de cada ronda por la suscripción). 50 llamadas gastan el 4 % de la ventana de 5 horas.
 4. **Cierre de la Fase C:** suite completa (`pytest -q`), `docs/capacidades.md` (hecho, `7d20bb2`),
-   `mostrado_para_confirmar` (decidir o borrar), y los arreglos del corredor (fila con un dato distinto
+   y los arreglos del corredor (fila con un dato distinto
    contada como garantía, `comprobar.py:553`; YAML estrictos: la 39 paso 20, la 36 paso 20, la 35 paso 4).
-5. **La tanda de pruebas:** conversaciones para los dos avisos sin conversación (retiro de contenido del
-   administrador y aviso al encargado anterior) y la prueba por Telegram con `leda_motor` al día hasta la
+5. **La tanda de pruebas:** las conversaciones de los dos avisos están hechas (la 48 y la 49, con la IA
+   real; la 49 encontró y arregló dos defectos de honestidad); falta la prueba por Telegram con `leda_motor` al día hasta la
    última migración (respaldo previo; autorizado). Necesita al usuario.
 6. **La plataforma:** su ADR, con el usuario.
 
@@ -253,8 +253,6 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
 - **Tope de contacto por espacio y no por persona** (`docs/capacidades.md`, "Trampas conocidas").
 - **Avisos que a veces no salen a su hora** (1 o 2 de cada 95 corridas, dos rondas): causa desconocida; desde
   `2b4afbf` cada intento fallido deja un incidente y el informe de la ronda lo muestra.
-- **`conversation_state.mostrado_para_confirmar`** no lo lee nadie: por eso `test_capacidades` exime las
-  tablas del motor (`TABLAS_DEL_MOTOR`). Decidir para qué es o borrarla.
 - **Una prueba intermitente** en `tests/motor tests/conversaciones` (una falla sin nombre en una corrida, dos
   repeticiones en verde, 2026-10-07); quizás la del indicador de escritura.
 - **Advertencias de RDD sin arreglar** (2026-10-07 y 08), casos de borde: el borrador del streaming puede
