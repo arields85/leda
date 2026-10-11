@@ -506,6 +506,13 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     decisión 37: si Ariel todavía no se comprometió a nada, "se lo pido yo" sí hace que Leda deje de
     escribirle. Es lo que el código ya hace (`vigencia_del_dia_que_dijo` no mira
     `se_lo_pide_quien_esta_trabado`); falta una prueba que lo fije.
+    **Ajuste del usuario:** la pregunta del día a Ariel menciona que Nahuel dijo que se lo pedía él
+    directamente, para que Ariel entienda por qué le pregunta Leda ("Nahuel me comentó que te iba a
+    pedir la lista él directamente. Como hoy era el día que me dijiste, te pregunto: ¿pudiste
+    pasársela?"). Sin decir que Nahuel no le confirmó a Leda si habló con él: sería exponerlo
+    delante de un compañero (constitución §8). La cocina le pasa el hecho al aviso de
+    `EL_DIA_QUE_DIJO` (quién dijo que se lo pedía, por la fila que nombra `COMO_LE_FUE`) y la IA
+    lo cuenta con sus palabras; por construir, con su prueba.
 
 ## Chequeo de rumbo (2026-10-07)
 
