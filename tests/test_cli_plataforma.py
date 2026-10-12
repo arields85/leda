@@ -52,7 +52,7 @@ def test_el_enlace_de_una_persona_abre_su_sesion(conn, mundo, correr, web):
     codigo, salida = correr("enlace-web", "north-lab", "--persona", "Sam North")
     assert codigo == 0 and "Sam North 1" in salida
     navegador = web()
-    assert navegador.get(f"/app/entrar/{_token(salida)}").status_code == 303
+    assert navegador.post(f"/app/entrar/{_token(salida)}").status_code == 303
     assert navegador.get("/app/api/yo").json()["persona"] == "Sam North 1"
     emitidos = _auditadas(conn, "emitir_enlace_de_entrada")
     assert len(emitidos) == 1 and emitidos[0]["nucleo_hash"]
@@ -61,8 +61,8 @@ def test_el_enlace_de_una_persona_abre_su_sesion(conn, mundo, correr, web):
 def test_otro_enlace_anula_el_anterior(conn, mundo, correr, web):
     _, primera = correr("enlace-web", "north-lab", "--persona", "Sam North")
     _, segunda = correr("enlace-web", "north-lab", "--persona", "Sam North")
-    assert web().get(f"/app/entrar/{_token(primera)}").status_code == 404
-    assert web().get(f"/app/entrar/{_token(segunda)}").status_code == 303
+    assert web().post(f"/app/entrar/{_token(primera)}").status_code == 404
+    assert web().post(f"/app/entrar/{_token(segunda)}").status_code == 303
 
 
 def test_sin_la_direccion_publica_no_emite_nada(conn, mundo, correr, monkeypatch):
@@ -84,15 +84,15 @@ def test_cortar_las_sesiones_de_una_persona(conn, mundo, correr, web):
     _, de_sam = correr("enlace-web", "north-lab", "--persona", "Sam North")
     _, de_taylor = correr("enlace-web", "north-lab", "--persona", "Taylor Quinn")
     sam, taylor = web(), web()
-    sam.get(f"/app/entrar/{_token(de_sam)}")
-    taylor.get(f"/app/entrar/{_token(de_taylor)}")
+    sam.post(f"/app/entrar/{_token(de_sam)}")
+    taylor.post(f"/app/entrar/{_token(de_taylor)}")
     _, sin_usar = correr("enlace-web", "north-lab", "--persona", "Sam North")
     codigo, salida = correr("cortar-sesiones-web", "north-lab", "--persona", "Sam North")
     assert codigo == 0 and "1 sesión" in salida and "Sam North 1" in salida
     assert sam.get("/app/api/yo").status_code == 401
     assert taylor.get("/app/api/yo").status_code == 200
     # El enlace que no había usado tampoco sirve: si perdió el celular, perdió el mensaje.
-    assert web().get(f"/app/entrar/{_token(sin_usar)}").status_code == 404
+    assert web().post(f"/app/entrar/{_token(sin_usar)}").status_code == 404
     cortes = _auditadas(conn, "cortar_sesion_web")
     assert [c["detalle"]["motivo"] for c in cortes] == ["administrador"]
     codigo, salida = correr("cortar-sesiones-web", "north-lab", "--persona", "Sam North")
@@ -102,6 +102,6 @@ def test_cortar_las_sesiones_de_una_persona(conn, mundo, correr, web):
 def test_cortar_en_un_espacio_no_toca_el_otro(conn, mundo, correr, web):
     _, oeste = correr("enlace-web", "west-studio", "--persona", "Sam North")
     navegador = web()
-    navegador.get(f"/app/entrar/{_token(oeste)}")
+    navegador.post(f"/app/entrar/{_token(oeste)}")
     correr("cortar-sesiones-web", "north-lab", "--persona", "Sam North")
     assert navegador.get("/app/api/yo").json()["espacio"] == "West Studio"
