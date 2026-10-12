@@ -485,3 +485,32 @@ lleva a `/app/`. Para probar los cortes: "salir" en la página, o
 **En el celular** (`PENDIENTE`, con el usuario): la cookie de la sesión es `Secure`, y fuera de
 `localhost` el navegador sólo la guarda con HTTPS. Hace falta un túnel o HTTPS hasta la PC, con
 `LEDA_BASE_URL` apuntando a esa dirección.
+
+### La puerta de administración (porción 2)
+
+La de un administrador de plataforma, que abarca todos los espacios (tarea P2-1 de
+`odd/tasks/plataforma-p2.md`). Necesita la migración `0061` y el mismo servidor del paso 2, en el
+puerto 8001. Sus pantallas llegan con la P2-3: por ahora se prueba la entrada y
+`/app/admin/api/yo`.
+
+**1. Quien entra tiene que ser administrador de plataforma** (una vez; `python -m leda
+administrador <espacio> <nombre>`, sección 8). Sin el rol vigente, la consola no emite el enlace.
+
+**2. Emitir su enlace** (terminal 2; sirve una vez y el anterior sin usar queda anulado):
+
+```powershell
+$env:PYTHONPATH = "src"
+$env:LEDA_BASE_URL = "http://localhost:8001"
+..\motor-de-conversacion\.venv\Scripts\python.exe -m leda enlace-admin Ariel
+```
+
+**3. Abrir el enlace** en el navegador de la misma PC y apretar "Entrar": la sesión queda en su
+propia cookie y lleva a `/app/admin/`. `http://localhost:8001/app/admin/api/yo` muestra el nombre y
+los espacios. La sesión del equipo, si está abierta en el mismo navegador, sigue aparte. Para
+cortar todas sus sesiones y su enlace sin usar:
+
+```powershell
+..\motor-de-conversacion\.venv\Scripts\python.exe -m leda cortar-sesiones-admin Ariel
+```
+
+Quitarle el rol de administrador corta su sesión en el pedido siguiente.

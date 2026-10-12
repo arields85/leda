@@ -49,7 +49,7 @@ El ADR pide probar cada porción en el celular antes de la siguiente. El usuario
 
 Ruta: un escritor delegado por tarea (dos o más archivos no triviales cada una).
 
-- [ ] **P2-1 · La puerta de administración:** tablas del enlace y de la sesión del administrador
+- [x] **P2-1 · La puerta de administración:** tablas del enlace y de la sesión del administrador
       (sin espacio: un administrador abarca todos), canje con el botón "Entrar", cookie propia, corte
       de sesiones, comando `enlace-admin` y `/app/admin/api/yo`. Garantías: un integrante sin rol de
       plataforma no abre la puerta; un rol revocado corta la sesión en el pedido siguiente; la cookie del
@@ -85,4 +85,45 @@ responsable.
 
 ## Progreso y evidencia
 
-(Se completa por tarea.)
+### P2-1 · La puerta de administración (2026-10-12)
+
+**Ruta:** delegated (2+ non-trivial files): migración, esquema, `web_app.py`, `cli.py` y sus pruebas.
+
+**Qué quedó:**
+- Migración `0061_la_puerta_de_administracion.sql` (con su rollback y `db/esquema.sql` al día):
+  `enlace_de_administracion` y `sesion_de_administracion`, de un `app_user` y sin `workspace_id`
+  (un administrador abarca todos los espacios), sin política por espacio y sin ningún privilegio
+  para `leda_app`. Funciones `security definer` de `leda_owner`: `emitir_enlace_de_administracion`
+  y `cortar_sesiones_de_administrador` sólo para `leda_admin` (la consola);
+  `canjear_enlace_de_administracion`, `sesion_de_administracion_vigente` y
+  `cerrar_sesion_de_administracion` (la sesión propia, por el hash de su token) sólo para
+  `leda_app`. El rol `administrador` de `platform_role` se comprueba al emitir, al canjear y en
+  cada pedido; revocado, la sesión queda cortada (`dejo_de_ser_administrador`). Auditoría sin
+  espacio, aunque quien llama tenga uno fijado (`auditar_acceso_de_administracion`).
+- `web_app.py`: `GET` y `POST /app/admin/entrar/{token}` (el mismo botón y las mismas cabeceras
+  que la porción 1), cookie `leda_admin` (`HttpOnly`, `Secure`, `SameSite=Strict`,
+  `Path=/app/admin`, 400 días), `GET /app/admin/api/yo` (nombre y espacios) y
+  `POST /app/admin/salir`. Las páginas de `/app/admin/` son las de la web; su API, su enlace y
+  salir nunca caen en el índice.
+- `cli.py`: `python -m leda enlace-admin <nombre>` y `cortar-sesiones-admin <nombre>`; a quien no
+  tiene el rol vigente, no.
+- Pruebas: `tests/garantias/test_puerta_de_administracion.py` (nueva), más
+  `test_web_servida.py`, `test_capacidades.py` (`TABLAS_POR_FUNCION`), `test_migraciones.py`
+  (`TABLAS_DE_LA_ADMINISTRACION`) y `tests/test_cli_plataforma.py`.
+
+**Evidencia:**
+- RED, antes del código: `pytest -q tests/garantias/test_puerta_de_administracion.py
+  tests/garantias/test_web_servida.py tests/test_cli_plataforma.py` → 34 failed, 27 passed.
+- GREEN, lo mismo → 61 passed.
+- `pytest -q tests/garantias/test_puerta_de_administracion.py tests/garantias/test_enlace_y_sesion.py
+  tests/garantias/test_api_de_la_plataforma.py tests/garantias/test_web_servida.py
+  tests/garantias/test_capacidades.py tests/garantias/test_frontera.py
+  tests/garantias/test_aislamiento.py tests/garantias/test_migraciones.py
+  tests/test_cli_plataforma.py` (con `LEDA_TEST_DB_URL` al servidor local de pruebas) →
+  155 passed (16 min 30 s), con el ensayo de paridad y de rollback de la `0061`.
+- Commit de código y pruebas: `16f630ca`. La suite `tests/garantias` completa y la revisión RDD:
+  `PENDIENTE` (las corre el coordinador).
+
+**Para confirmar con el usuario** (anotado en `docs/product/plataforma-pendientes.md`): el enlace
+de la administración no vence por tiempo, como el del equipo; el rol `operador` no abre la
+puerta; `/app/admin/api/yo` lista todos los espacios, también los importados sin activar.

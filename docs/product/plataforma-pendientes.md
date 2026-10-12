@@ -155,6 +155,21 @@ plataforma web"); plan y evidencia en
     una nueva previsión de la persona (el motor sí); los días que quedan cuando vence el mismo día; el
     candado global atiende la web de a un pedido; el chequeo de `Origin` detrás de un proxy.
 
+## La puerta de administración, porción 2 (2026-10-12)
+
+Construida en la rama `feat/plataforma` (tarea P2-1 de
+[`../../odd/tasks/plataforma-p2.md`](../../odd/tasks/plataforma-p2.md); [`../capacidades.md`](../capacidades.md)).
+
+**Valores fijados a mano en esta tarea:**
+
+| Qué | Hoy | Notas |
+|---|---|---|
+| Nombre, camino y duración de la cookie de la administración | `leda_admin`, sólo para `/app/admin`, `Max-Age` de 400 días, renovada al pedir `/app/admin/api/yo`; `web_app.py` (`COOKIE_DE_ADMINISTRACION`, `CAMINO_DE_ADMINISTRACION`) | La sesión de la base no vence, pero el rol se revalida en cada pedido (decisión 12) |
+| Vencimiento del enlace de la administración | Ninguno por tiempo, como el del equipo (migración `0061`): deja de servir al canjearse, al emitirse otro o al cortarse las sesiones | El ADR 0022 no fija un plazo. Es una credencial de más alcance que la del equipo: `PENDIENTE` con el usuario si vence |
+| Quién abre la puerta | Sólo el rol `administrador` de `platform_role`; el `operador`, no | `PENDIENTE` con el usuario si el operador entra, y a qué |
+| Quién emite el enlace | Sólo la consola (`python -m leda enlace-admin <nombre>`), con `leda_admin` | Que lo ofrezca el bot de administración toca el Motor: después de juntar las ramas |
+| Qué espacios lista `/app/admin/api/yo` | Todos los que existen, también los importados sin activar | |
+
 ## Decisiones abiertas que la plataforma va a necesitar
 
 - Cómo se autentica quien opera Leda.

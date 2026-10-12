@@ -80,7 +80,7 @@ porción 1 construida en la rama `feat/plataforma` ("Lo que agregó la plataform
 |---|---|---|
 | **Motor de conversación (flujo D)** | [`ADR 0018`](decisions/0018-motor-de-conversacion.md), aceptado el 2026-10-06, después de la prueba chica (M2) | Sin código. La IA elige jugadas de una lista cerrada y el código las comprueba y ejecuta; estado por persona y registro de turnos; circuitos declarados con fichas y ocho situaciones generales. La prueba chica de la Etapa 2 vive fuera de `src/leda`; el motor definitivo, en la Etapa 3 |
 | **Lo que le falta al seguimiento** | [`ADR 0017`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisiones 4 y 6 | No hay enlace entre una respuesta y su recordatorio; `pending_reply` existe y nada la escribe; los textos de recordatorios y cadencias están fijos en `escalera.py` y `reloj.py`; no existe la operación de pedir más tiempo. Relevamiento del 2026-10-04 ([`STATUS.md`](STATUS.md), "Estado comprobado") |
-| **Plataforma web de tareas** | [`ADR 0022`](decisions/0022-plataforma-web-de-tareas.md), aceptado el 2026-10-12 | La porción 1 (la puerta del equipo, de sólo lectura) está construida en `feat/plataforma` (abajo). Sin construir: la carga de tareas, el cambio de fecha, el alta y la baja de integrantes y la puerta de administración. Para cargar tareas sólo existe `sembrar`, un cargador de datos ficticios que no cumple las condiciones de la carga (ADR 0017, decisión 2) |
+| **Plataforma web de tareas** | [`ADR 0022`](decisions/0022-plataforma-web-de-tareas.md), aceptado el 2026-10-12 | La porción 1 (la puerta del equipo, de sólo lectura) y la puerta de administración de la porción 2 están construidas en `feat/plataforma` (abajo). Sin construir: la carga de tareas, el cambio de fecha y el alta y la baja de integrantes. Para cargar tareas sólo existe `sembrar`, un cargador de datos ficticios que no cumple las condiciones de la carga (ADR 0017, decisión 2) |
 | **Entrevista de alta de espacios** | [`nucleo/alta-de-equipo.md`](../nucleo/alta-de-equipo.md), 195 líneas | Sin una sola línea. Sólo existe el importador, que consume un paquete ya escrito. Sin esto, cada cliente nuevo exige que alguien lo escriba a mano. No aplica en esta etapa (ADR 0017, decisión 7) |
 | **Panel de plataforma** | [`ADR 0004`](decisions/0004-dos-superficies-separadas.md) | Decidido: contraseña + TOTP. Sin construir |
 | **Integración de calendario** | Especificación §17.3, constitución §7 | Consultar disponibilidad, proponer, crear, modificar, asistentes. `calendario.py` es el calendario **laboral**, no externo |
@@ -240,13 +240,26 @@ piezas de la web y datos ficticios; nadie la abrió todavía en un celular.
 | La web, con el aspecto de la "9 · Terminal" (decisión 18): React, TypeScript, Vite, Tailwind y Lucide en `web/`, compilada a `web/dist` (que no se versiona) y servida por la misma aplicación en `/app/`. Cabezal, panel de estados, tira de la semana, tarjetas con el estado entre corchetes (color sólo en vencida, trabada, en curso y entregada; "[TRABADA] [VENCIDA]" juntas) y la previsión ("prevé 28.10"), barra de días hábiles, árbol de esperas, las terminadas, el botón "> consultar a leda" y "salir". Sin compilar, la persona ve un mensaje humano | `web/src/`, `web_app.py` (`la_web`), `tests/garantias/test_web_servida.py`, pruebas de las piezas con `vitest` |
 | Emitir el enlace de una persona (lo imprime; necesita `LEDA_BASE_URL`) y cortar todas sus sesiones, por la consola, para probar sin el chat | `python -m leda enlace-web <espacio> --persona <nombre>`, `python -m leda cortar-sesiones-web <espacio> --persona <nombre>`, `tests/test_cli_plataforma.py` |
 
+**Porción 2, la puerta de administración** (tarea P2-1, [`odd/tasks/plataforma-p2.md`](../odd/tasks/plataforma-p2.md);
+ADR 0022, decisiones 10, 11 y 12). Probada con `TestClient`; todavía no tiene pantallas (la P2-3).
+
+| Capacidad | Dónde |
+|---|---|
+| El enlace y la sesión de un administrador de plataforma, que abarca todos los espacios: tablas propias, sin espacio, a las que `leda_app` no llega (sólo por funciones `security definer` de `leda_owner`); sólo los hashes; el enlace sirve una vez, sin vencimiento por tiempo, y uno nuevo anula el que estaba sin usar. Abrirlo muestra el mismo botón "Entrar"; un pedido de otro sitio no canjea. La sesión queda en su propia cookie `leda_admin` (`HttpOnly`, `Secure`, `SameSite=Strict`, sólo para `/app/admin`, 400 días) | migración `0061`, `web_app.py` (`GET` y `POST /app/admin/entrar/{token}`) |
+| El rol se comprueba en la base: sin el rol `administrador` vigente no se emite el enlace ni se canjea, y un rol revocado corta la sesión en el pedido siguiente (`dejo_de_ser_administrador`), auditado. El rol `operador` no abre la puerta | migración `0061` (`sesion_de_administracion_vigente`) |
+| `/app/admin/api/yo`: el nombre del administrador y los espacios que existen (id, slug, nombre); 401 sin una sesión de administración que entre. `POST /app/admin/salir` corta la sesión propia (por el hash de su token) y borra la cookie, con la misma protección contra pedidos de otro sitio que `/app/salir`. Las páginas de `/app/admin/` son las de la web | `web_app.py` |
+| Dos puertas separadas (constitución §2): la cookie del equipo no abre la administración ni la de la administración la API del equipo; un administrador que además es integrante tiene las dos sesiones por separado, y salir de una no cierra la otra | `tests/garantias/test_puerta_de_administracion.py` |
+| Emitir, canjear y cortar quedan en `audit_log` sin espacio (hechos de alcance global), con la versión del núcleo y sin el token, aunque quien llama tenga un espacio fijado | migración `0061` (`auditar_acceso_de_administracion`) |
+| Emitir el enlace de un administrador (lo imprime; necesita `LEDA_BASE_URL`) y cortar todas sus sesiones y su enlace sin usar, sólo por la consola (`leda_admin`); a quien no tiene el rol vigente, no | `python -m leda enlace-admin <nombre>`, `python -m leda cortar-sesiones-admin <nombre>`, `tests/test_cli_plataforma.py` |
+
 **Sin construir todavía** (`PENDIENTE`, después de la prueba por Telegram de la Fase C):
 
 - que Leda ofrezca el acceso por chat, y el corte de las sesiones por "perdí el celular" por chat
   (tocan el motor de conversación: primero su conversación de prueba);
 - la prueba en el celular (una cookie `Secure` necesita HTTPS fuera de `localhost`);
-- las piezas de administración de la plataforma: cargar tareas, cambiar fechas, alta y baja de
-  integrantes, y la puerta de administración (porción 2);
+- las piezas de administración de la plataforma: cargar tareas (porción 2, P2-2 y P2-3), cambiar
+  fechas y el alta y la baja de integrantes; que el bot de administración ofrezca el enlace de la
+  puerta de administración (toca el Motor: después de juntar las ramas);
 - el usuario del bot de CoreWork en el pack (`telegram.bot_usuario`): sin él, el botón "> consultar
   a leda" no se muestra;
 - la tarjeta no abre la página de la tarea, aunque la API dice si la persona la puede ver
