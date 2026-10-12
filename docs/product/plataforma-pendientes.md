@@ -18,6 +18,13 @@ es su inventario.
 plataforma" o se fija a mano (pack, SQL, consola) porque la plataforma no existe, se
 agrega acá con dónde vive hoy.
 
+**Primera versión y segunda** ([ADR 0022](../decisions/0022-plataforma-web-de-tareas.md), aceptado el
+2026-10-12). La primera versión hace cuatro cosas: la lista de tareas por puesto, el formulario de
+carga con sus controles, el cambio de fecha con el pedido de más tiempo y el alta y la baja de
+integrantes; también muestra los apodos (ADR 0020). Todo lo demás de este inventario (horarios,
+feriados, cadencias, tono, márgenes, modelos de IA y el resto de la configuración) sigue en el
+paquete del espacio y la consola hasta la segunda versión.
+
 ## Reglas que la plataforma no puede saltear
 
 - **Dos firmas para ampliar autoridad** ([constitución](../../nucleo/constitucion.md) §2):

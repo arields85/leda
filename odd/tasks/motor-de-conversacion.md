@@ -42,5 +42,7 @@ misma clase de falla y el usuario frenó el parcheo (análisis en `docs/research
 
 ## Próximo paso
 
-Las tres etapas terminaron. Sigue la **Fase C** (lo que a Leda le falta por chat), con su plan en
-[`fase-c.md`](fase-c.md), y después la plataforma web. El punto exacto para retomar está en `docs/STATUS.md`.
+Las tres etapas terminaron. La **Fase C** (lo que a Leda le falta por chat, plan en [`fase-c.md`](fase-c.md))
+está prácticamente cerrada: le falta la prueba por Telegram del usuario. La **plataforma web** tiene su ADR
+aceptado ([0022](../../docs/decisions/0022-plataforma-web-de-tareas.md), 2026-10-12) y sigue su porción 1.
+El punto exacto para retomar está en `docs/STATUS.md`.

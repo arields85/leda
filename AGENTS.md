@@ -51,7 +51,7 @@ trabajo; por la web, su estructura.* El porqué está en
 - Tratar una suite en verde o la auditoría de otro agente como prueba de que la conversación funciona.
 - Adoptar Rasa, Engram u otro marco de terceros como componente.
 - Construir la creación de tareas u objetivos por chat (ADR 0017, decisiones 1 y 2).
-- Escribir código de la plataforma web antes de su propio ADR (ADR 0017, decisión 5).
+- Escribir código de la plataforma web fuera de su ADR (el 0022) o de su porción en curso.
 
 **Sobre `nucleo/`.** Es el comportamiento obligatorio de Leda: el ideal que tiene que alcanzar, que no se edita.
 Su autoridad está por encima de cualquier documento de `docs/`. Los pasajes que necesitan capacidades fuera de
@@ -138,7 +138,8 @@ calendarios externos, aprendizaje persistente, motor genérico de workflows y mi
 - El motor de conversación no es un motor genérico de workflows: sus circuitos son un conjunto cerrado declarado
   en el código, nunca configuración de un cliente (ADR 0018, decisión 4).
 - La plataforma web de tareas (cargar tareas, ver su estado, cambiar fechas por retrasos, gestionar integrantes)
-  está dentro del alcance de esta etapa y se diseña en su propio ADR antes del código (ADR 0017, decisión 5).
+  está dentro del alcance de esta etapa; su diseño es el ADR 0022, aceptado. Su web es React y TypeScript, la
+  misma base que la HMI (decisión 17); el servidor sigue siendo el monolito.
 - La memoria por integrante es aprendizaje persistente: tiene su lugar reservado y no se construye sin su propio
   ADR (ADR 0018, decisión 3). Leda puede aprender sola formas nuevas de decir algo que ya es una jugada; una
   jugada nueva la decide una persona, y el aprendizaje nunca cambia lo que Leda tiene permitido (decisión 1).

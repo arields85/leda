@@ -32,39 +32,42 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-11, tarde)
+## Punto exacto para retomar (2026-10-12)
 
-**Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
-Plan: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md): las decisiones del usuario 1 a 73, el registro de
-cada unidad (al final de "La tanda de pruebas") y la lista de tareas en "Próximo paso".
+**Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`,
+subida a `origin` en `912eb413`. Plan de la Fase C: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (las
+decisiones del usuario 1 a 76 y la lista de tareas en "Próximo paso"); la plataforma, en el
+[ADR 0022](decisions/0022-plataforma-web-de-tareas.md).
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si está caído, levantarlo con
 `levantar-postgres.bat` (o `pg_ctl ... start`, fuera del sandbox). Si `pg_ctl` dice que otro servidor puede
 estar en ejecución, cerrar los procesos `postgres` colgados y reintentar. Comprobar que no quede un escuchador
 viejo corriendo.
 
-**Lo hecho el 2026-10-11:** las preguntas 1 a 6 del plan y tres más, contestadas (decisiones 65 a 73) y
-construidas: quién destraba con un nombre de afuera (65, la tercera porción de los apodos), "se lo pido
-yo" con la pregunta del día ya enviada (66), corregir un apodo con dueño (67), el archivo para una
-tarea que espera cambios y su oferta que no se repite (68 y 73), las lecturas válidas de la 36, 39 y
-48 (69 y 71), el verbo en otra persona (70) y un solo aviso por persona y tarea trabada por mensaje
-(72). Los apodos (ADR 0020) quedaron completos. La ronda con la IA real de las siete conversaciones
-tocadas dio garantías 35 de 35 y encontró un defecto de honestidad ("esa tarea no está trabada"),
-arreglado en `f0d18e6` (el orden de las jugadas de un mensaje) y controlado con la 35: 5 de 5. Cada
-commit de código, revisado por RDD y aprobado. Detalle y evidencia en el plan y la bitácora.
+**Lo hecho el 2026-10-11 y el 2026-10-12:**
+- Decisiones 65 a 73, construidas; los apodos (ADR 0020), completos; el orden de las jugadas de un
+  mensaje (`f0d18e6`).
+- **El formato lo da la cocina** (decisión 74, `c304b23`): de 87 fallas en 35 corridas a 15; las que
+  quedan son contenido de la IA.
+- El corredor compara las jugadas y los hechos sin mirar el orden (`1079b18`) y un paso admite varias
+  lecturas (`ca5c38f3`).
+- Decisiones 75 (la 48 paso 10 sin jugada vale) y 76 (repetir el nombre contesta la pregunta del
+  apodo).
+- Cada commit de código, revisado por RDD y aprobado. Detalle en el plan y la bitácora.
+- **El ADR 0022 de la plataforma web, aceptado** (`912eb413`): producto (1 a 10), técnica (11 a 16),
+  la misma tecnología que la HMI (17) y el aspecto (18), elegido en el lienzo de diseño
+  https://claude.ai/artifact/VwC3sCvufFZ7DUkv3yJt7f: la "9 · Terminal", sobria, oscura y de letra de
+  máquina, con color sólo en los estados que tienen algo.
 
 **Lo que sigue:**
-1. **Cierre de la Fase C:** suite completa, `docs/capacidades.md`, el corredor, la fecha de un retiro
-   y los YAML estrictos, hechos. Queda una lectura de la IA sin arreglar (la 35 paso 18, 1 de 5: lo
-   que dice Mariano queda como texto y a Nahuel no le llega la novedad posterior) y la 48 paso 10
-   sin ninguna jugada (2 de 5). El formato lo da la cocina (`c304b23`, decisión 74): de 87 fallas
-   en 35 corridas a 15.
-2. **La tanda de pruebas:** la prueba por Telegram con `leda_motor` al día hasta la última migración
-   (respaldo previo; autorizado). Necesita al usuario.
-3. **La plataforma:** el ADR 0022, aceptado el 2026-10-12 (producto, tecnología igual a la de la HMI y
-   el aspecto elegido en el lienzo de diseño). Sigue la porción 1: la puerta del equipo, de sólo
-   lectura, con su prueba en el celular del usuario.
-4. **El ADR 0018, 9m.1:** precisado (`8e64719`), con el acuerdo del usuario.
+1. **La prueba por Telegram** con `leda_motor` al día hasta la `0056` (respaldo previo; autorizado;
+   guion `docs/product/guion-telegram-fase-c-parte-1.md`). Necesita al usuario, cuando tenga tiempo.
+2. **La plataforma, porción 1** (ADR 0022, decisión 16): la puerta del equipo, de sólo lectura
+   (sesiones, "Tus tareas", "Tu sector" y "El equipo", y Leda ofreciendo el acceso), con su prueba en
+   el celular del usuario. Antes del código: el documento de la unidad, la estructura de la web
+   (React, TypeScript, Vite y Tailwind, decisión 17) y sus tokens desde el lienzo.
+3. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11; no volvió a pasar en las rondas del
+   formato).
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
@@ -103,8 +106,8 @@ ponerla al día o recrearla cuando haga falta, con respaldo previo; nunca `leda`
 `odd/tasks/motor-definitivo.md`. Sus cierres están hechos (2026-10-07): las palabras de todos los días, el
 formato de los mensajes (aprobado por el usuario), `prueba_chica/` borrada y `main` con el motor.
 
-**Después:** la Fase C y la plataforma web (decisiones del usuario: van después de M3). No hay equipo real
-hasta que el usuario lo diga.
+**Después:** la Fase C, prácticamente cerrada (falta la prueba por Telegram), y la plataforma web, con su
+ADR 0022 aceptado. No hay equipo real hasta que el usuario lo diga.
 
 ## Qué quedó congelado o superado
 

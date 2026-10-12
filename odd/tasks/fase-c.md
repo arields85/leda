@@ -3653,7 +3653,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
           una tarea (Leda no le puede preguntar si la toma), ni a alguien de Electricidad, que
           decide Mariano. ¿Está bien, o se puede decidir por la plataforma?
 
-## Próximo paso (2026-10-11, tarde)
+## Próximo paso (2026-10-11, tarde; actualizado el 2026-10-12)
 
 Vigente; lo de abajo ("cierre del 2026-10-10") es el registro de lo anterior.
 
@@ -3669,7 +3669,8 @@ Vigente; lo de abajo ("cierre del 2026-10-10") es el registro de lo anterior.
 **Lo que queda:**
 - [ ] **La prueba por Telegram** con `leda_motor` al día hasta la `0056` (respaldo previo;
       autorizado; guion `docs/product/guion-telegram-fase-c-parte-1.md`). Necesita al usuario.
-- [ ] **La plataforma web:** su ADR, con el usuario.
+- [x] **La plataforma web:** su ADR, con el usuario. **Hecho:** ADR 0022, aceptado el 2026-10-12
+      (`912eb413`); sigue su porción 1, fuera de este plan.
 - [x] **Formato:** 87 fallas en 35 corridas (`fase-c-decisiones-66-73.md`): 63 renglones de más
       de 140 caracteres, 20 el cierre sin su renglón aparte, 4 otras. Chequeo de rumbo (2026-10-11):
       la misma clase en todas las rondas desde el formato (punto 4: se revisa el mecanismo, no el
@@ -3690,7 +3691,8 @@ Vigente; lo de abajo ("cierre del 2026-10-10") es el registro de lo anterior.
       lo del switch no se lo podes pedir igual a martin?" sin jugada; Leda contesta lo cierto por
       el contexto. Pregunta al usuario.
 - [ ] **Una lectura de la IA:** la 35 paso 18 (1 de 5): "sigo parado con el tablero" queda como
-      texto y no como su tarea trabada, y a Nahuel no le llega la novedad posterior.
+      texto y no como su tarea trabada, y a Nahuel no le llega la novedad posterior. En
+      observación: no volvió a pasar en las rondas del formato.
 - [x] **Advertencias de las revisiones de hoy** (casos de borde y pruebas que faltan), anotadas
       en cada decisión (66 a 73) y en la 72 (el orden de las jugadas).
       Cubiertas en `0749a26` (sólo pruebas; ninguna encontró un defecto de Leda), revisión
