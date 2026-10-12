@@ -830,7 +830,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # cuyas claves también apuntan ahí (el detalle de una tarea, decisión 33), y antes
             # de ella la 0051, que suma otra (quién decidió el pedido). Antes de todas, la 0055,
             # cuya persona del apodo también apunta ahí (ADR 0020), y antes aún la 0057, cuyos
-            # enlaces y sesiones de la web también (ADR 0022).
+            # enlaces y sesiones de la web también (ADR 0022); y antes de ella la 0058, cuyas
+            # funciones de las listas leen la sesión.
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0058_quien_ve_que_en_las_listas.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0057_el_enlace_y_la_sesion_de_la_web.sql"))
             db.execute(_sql_script(ROOT / "db" / "rollbacks" / "0055_los_apodos.sql"))
