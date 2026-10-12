@@ -122,7 +122,7 @@ responsable.
   tests/test_cli_plataforma.py` (con `LEDA_TEST_DB_URL` al servidor local de pruebas) →
   155 passed (16 min 30 s), con el ensayo de paridad y de rollback de la `0061`.
 - Commit de código y pruebas: `16f630ca`. La suite `tests/garantias` completa y la revisión RDD:
-  `PENDIENTE` (las corre el coordinador).
+  hechas: ver "Cierre del coordinador".
 
 **Para confirmar con el usuario** (anotado en `docs/product/plataforma-pendientes.md`): el enlace
 de la administración no vence por tiempo, como el del equipo; el rol `operador` no abre la
@@ -170,7 +170,7 @@ puerta; `/app/admin/api/yo` lista todos los espacios, también los importados si
   tests/garantias/test_migraciones.py` (con `LEDA_TEST_DB_URL` al servidor local de pruebas) →
   116 passed (15 min 11 s), con el ensayo de paridad y de rollback de la `0062`.
 - Commit de código y pruebas: `f6a40067`. La suite `tests/garantias` completa y la revisión RDD:
-  `PENDIENTE` (las corre el coordinador).
+  hechas: ver "Cierre del coordinador".
 
 ### Arreglo de la revisión de la P2-1: la sesión es del rol vigente (2026-10-12)
 
@@ -192,7 +192,7 @@ restricción); un enlace emitido antes del otorgamiento vigente no se canjea y q
 - GREEN: `pytest -q tests/garantias/test_puerta_de_administracion.py` → 32 passed (46 s);
   `pytest -q tests/garantias/test_migraciones.py` → 16 passed (3 min 48 s), con el ensayo de
   paridad y de rollback de la `0063`.
-- Commit: `072972aa`. La revisión RDD: `PENDIENTE` (la corre el coordinador).
+- Commit: `072972aa`. La revisión RDD: hecha: ver "Cierre del coordinador".
 
 ### P2-3 · El formulario (2026-10-12)
 
@@ -235,7 +235,7 @@ restricción); un enlace emitido antes del otorgamiento vigente no se canjea y q
   de 390 px, `scrollWidth` 390 = ancho 390 en el formulario vacío, lleno y en "revisar"; a 1280 px
   (ventana), `scrollWidth` 1254 = ancho 1254 (sin desborde). Capturas miradas: a 390, una columna;
   a 1280, dos columnas.
-- Commit: `37ac3bcc`. La revisión RDD: `PENDIENTE` (la corre el coordinador).
+- Commit: `37ac3bcc`. La revisión RDD: hecha: ver "Cierre del coordinador".
 
 **Decisiones del escritor, para confirmar** (anotadas en `docs/product/plataforma-pendientes.md`):
 el espacio elegido no se recuerda entre visitas; cambiar de persona vuelve a marcar la evidencia de
@@ -261,13 +261,13 @@ un cuerpo mal formado (422).
 - RED, antes del código: `pytest -q tests/garantias/test_carga_de_tareas.py -k "cerro_la_jornada
   or anidado"` → 3 failed (hoy aceptado a las 18:00, hoy ofrecido, y el cuerpo anidado).
 - GREEN: `pytest -q tests/garantias/test_carga_de_tareas.py` → 35 passed (39 s).
-- La verificación entera, abajo. Commit: `8e18463d`. La revisión RDD: `PENDIENTE`.
+- La verificación entera, abajo. Commit: `8e18463d`. La revisión RDD: hecha, ver "Cierre del coordinador".
 
 ### Verificación de las tres unidades (2026-10-12)
 
 `pytest -q tests/garantias/test_puerta_de_administracion.py tests/garantias/test_migraciones.py
 tests/garantias/test_web_servida.py tests/garantias/test_carga_de_tareas.py` (con
-`LEDA_TEST_DB_URL` al servidor local de pruebas) → 105 passed (5 min 2 s), sobre los tres commits (`072972aa`, `37ac3bcc`, `8e18463d`), con el ensayo de paridad y de rollback de la `0063` y la `0064`. La suite `tests/garantias` completa: `PENDIENTE` (la corre el coordinador).
+`LEDA_TEST_DB_URL` al servidor local de pruebas) → 105 passed (5 min 2 s), sobre los tres commits (`072972aa`, `37ac3bcc`, `8e18463d`), con el ensayo de paridad y de rollback de la `0063` y la `0064`. La suite `tests/garantias` completa: hecha: ver "Cierre del coordinador".
 
 ### Arreglo de la revisión de la P2-3 (2026-10-12)
 
@@ -307,3 +307,9 @@ passed, `npx vite build` bien.
   que el bot de administración ofrezca el enlace (después de juntar las ramas); que Leda proponga un
   criterio comprobable (IA real, con permiso); las tres preguntas de "Para decidir" y si el enlace de
   entrada vence (recomendación: 24 horas).
+- **Falta del usuario:** el nombre del bot del equipo de CoreWork (`bot_usuario` en
+  `espacios/corework.yaml`; sin él, el botón "> consultar a leda" no aparece).
+- **Próximo paso (al cerrar la sesión del 2026-10-12):** el usuario hace primero la prueba por Telegram
+  de la Fase C; después, con su visto bueno: respaldo de `leda_motor`, migraciones hasta la `0064`,
+  juntar las ramas y la prueba de las porciones 1 y 2 en el celular y la computadora (túnel o HTTPS,
+  sólo con su permiso). Las preguntas de "Para decidir", de a una, cuando vuelva.
