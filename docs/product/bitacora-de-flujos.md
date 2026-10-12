@@ -365,6 +365,39 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   - **Conclusión vigente:** la regla del motivo funciona con la IA real; la inestabilidad del servicio no
     oficial de ChatGPT (riesgo 5) pesa en las rondas, aunque la cocina la maneja sin silencio.
 
+## Prueba por Telegram real de la Fase C (2026-10-12)
+
+El usuario operó las tres cuentas (Ariel, Ismael, Marcos) con el guion
+`docs/product/guion-telegram-fase-c-parte-1.md`, pasos 1 a 48, sobre `leda_motor` recreada esa
+madrugada, código `74ab5e1`, sol por la suscripción. Reloj de Leda del martes 13/10 10:00 al
+miércoles 14/10 15:35 (el lunes 12 era feriado).
+
+- **Garantías: bien.** Estados, entregas, pedido de cambios, aprobaciones, bloqueo con quien lo
+  destraba, pase, pedido del detalle e informe al grupo, comprobados en la base; ningún incidente;
+  ningún aviso trabado. La espera de 30 minutos para no interrumpir funcionó (el pedido de cambios
+  esperó a Marcos; la pregunta a Ariel, a Ariel). "El colo" se entendió como Ariel, también con
+  el error "arirl"; Mariano sin Telegram se manejó como pide la 39. El informe al grupo salió el
+  miércoles con lo terminado y quién lo hizo, la trabada y lo que falta, sin comparar ni pedir
+  respuesta. El bot está en el grupo "CoreWork IA" y puede escribir (comprobado con `getChat` y
+  `getChatMember`).
+- **Lo que el usuario marcó:**
+  - las horas exactas y los nombres de a quién le llega un aviso, en ocho mensajes
+    ("Recibirá mi pregunta hoy a las 12:15", "Marcos será informado hoy de lo que dijiste"):
+    robótico y acusatorio; la cocina se los pasa a la IA (decisión 77);
+  - "preguntar" suena a interrogatorio (decisión 78);
+  - un ícono por estado en las listas (decisión 79);
+  - los enlaces no se pueden tocar: apuntan a `localhost`, que Telegram no convierte en enlace y
+    que en el celular no existe; se resuelve con la dirección pública (túnel o HTTPS) y la página
+    de la tarea dentro de la plataforma, previstas después de esta prueba.
+- **Lo que encontró el agente** (lista en `odd/tasks/fase-c.md`, después de la decisión 79): el
+  comentario de una aprobación que contesta "¿cuál de las dos?" llegó como la frase que lo nombra
+  («pasale lo de los colores»); "dejalo pendiente, después lo hago" no se leyó como salir del tema
+  a la primera, y "Anoté" dicho de un borrador confunde; la entrega nueva del PLC se contradijo
+  un poco; una tarea terminada "vence pasado mañana"; la hora de cuatro turnos en el registro.
+- **Conclusión:** la capa de garantías y la cadena del seguimiento funcionan con la IA real y
+  personas de verdad del otro lado; lo que falla es cómo habla Leda de lo que hace la cocina
+  (horas, nombres, palabras), y la causa vuelve a estar en los hechos que la cocina le pasa.
+
 ## Los apodos sin romper el pase ni la aprobación, con la IA real (Fase C, 2026-10-11, de madrugada)
 
 Sol por la suscripción, 5 veces, código de `bb862e4` (los apodos en el pase y la aprobación, y la

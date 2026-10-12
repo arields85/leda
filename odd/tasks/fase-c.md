@@ -640,6 +640,54 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
     Tarquini": el de Mariano se deja de usar, con quién y cuándo. Una respuesta que no la contesta
     la deja abierta y no cambia nada. Ya era así (`apodos.py`); probado en `0749a26`.
 
+77. **Un aviso a otra persona se cuenta sin su nombre ni su hora** (usuario, 2026-10-12, en la
+    prueba por Telegram: "Recibirá mi pregunta hoy a las 12:15" no aporta; "Marcos será
+    informado hoy de lo que dijiste" es acusatorio; "es muy robótico"). Ocho mensajes de la
+    prueba dijeron a quién y a qué hora le llegaba un aviso. La causa es de la cocina: cada
+    hecho de un aviso a otra persona le pasa a la IA el destinatario y la hora exacta (`a`,
+    `llega`), y la IA los cuenta. Ya lo pedían la constitución §8 ("dice que algo quedó
+    asentado, no a quién se lo contó") y la decisión 35. Regla: Leda dice que quedó asentado y,
+    si sirve, cuándo vuelve a escribirle a la persona, en palabras de todos los días ("mañana",
+    "más tarde"); nunca la hora del reloj. A quién y cuándo, sólo si la persona lo pregunta
+    (como el paso 7). Lo que le dice a la persona sobre lo que va a hacer ("te aviso cuando sepa
+    algo") vale más que el horario. El tono, más cálido y menos seco ("Genial, mañana te vuelvo
+    a consultar si le pudiste pasar la IP a Marcos, así lo dejo asentado"), es la medida para
+    juzgar el resultado, no un texto para la IA (regla del mozo).
+
+78. **"Consultar", no "preguntar"** (usuario, 2026-10-12: "preguntar" suena a interrogatorio).
+    Como con "previsión" (`9b7c6f4`): la IA toma la palabra de los nombres de los datos
+    (`le_vuelve_a_preguntar`, `pregunta`, `se_le_pregunta_a`), así que se cambian en la frontera
+    de la redacción (`hechos.para_redactar`), sin enseñarle frases.
+
+79. **Un ícono por estado en las listas de tareas** (usuario, 2026-10-12, "muy bueno, me
+    gusta"): con un solo ícono para todas hay que leer para saber cómo va; con uno por estado,
+    "todo verde" ya es la buena noticia (constitución §8, informar también las buenas). El verde
+    sólo dice lo que Leda sabe (§4):
+    - 🏁 terminada;
+    - 🟢 en curso y al día;
+    - ⚪ sin empezar, o sin novedades porque la persona no contó cómo viene;
+    - 🔵 entregada, esperando la revisión;
+    - 🟠 atrasada (en el informe al grupo, sólo la ya hablada en privado, como hoy);
+    - 🔴 trabada.
+    Los pone la cocina, que ya da la forma de los mensajes (decisión 74), en el informe al grupo
+    y en las demás listas de tareas. El 📋 de un mensaje sobre una sola tarea no cambia.
+
+**Otros hallazgos de la prueba por Telegram del 2026-10-12** (detalle en la bitácora; cada
+uno va primero a una conversación de prueba):
+- El comentario que acompaña una aprobación, cuando contesta "¿cuál de las dos?", llegó como
+  la frase que la nombra («pasale lo de los colores») y no como lo que pedía («cambiale los
+  colores al gráfico», de su mensaje anterior).
+- "No, mejor dejalo pendiente, después lo hago" en medio de una entrega no se leyó como salir
+  del tema: Leda preguntó si sacaba lo anotado y repitió el ejemplo; recién al tercer mensaje
+  quedó sin nada. "Anoté que terminaste", dicho de un borrador, suena a algo ya asentado.
+- La entrega nueva del PLC dijo "Dejé la foto para cuando vuelvas a entregarla" y enseguida
+  "¿Confirmás la entrega así?", y contó que la descripción decía "arranca desde el PLC", que
+  esta vez Marcos no escribió.
+- Leda dijo de una tarea terminada que "vence pasado mañana".
+- El registro de turnos muestra los pasos 22 a 25 a las 10:02 del martes, cuando pasaron cerca
+  de las 11:50 (los avisos salieron a su hora). `PENDIENTE`: ver si la hora del turno quedó mal
+  guardada.
+
 ## Chequeo de rumbo (2026-10-07)
 
 - **Clase:** circuitos nuevos sobre el motor que ya funciona; no es un hallazgo de conversación.
