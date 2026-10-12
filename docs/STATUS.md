@@ -71,7 +71,10 @@ viejo corriendo.
    (`0058`), la cadena de esperas (`0059`), la API interna, la web con el aspecto "9 · Terminal" y los
    comandos de consola. Cada commit de código, revisado por RDD y aprobado; garantías en verde. Plan,
    evidencia y **ocho preguntas para el usuario** ("Para decidir", con ejemplos) en
-   `odd/tasks/plataforma-p1.md` de esa rama. Después de la prueba, con el usuario: las ocho preguntas,
+   `odd/tasks/plataforma-p1.md` de esa rama. El 2026-10-12, de día: las ocho preguntas, contestadas y
+   construidas (P1-6), y la **porción 2** (la puerta de administración y la carga de tareas, con
+   vista de escritorio; `odd/tasks/plataforma-p2.md`), adelantada sin la prueba de la porción 1 en el
+   celular por decisión del usuario; rama subida en `54889f99`. Después de la prueba, con el usuario:
    juntar las ramas, poner `leda_motor` al día hasta la `0059` (con respaldo), que Leda ofrezca el
    acceso por chat y la prueba en el celular (necesita HTTPS o un túnel).
 3. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11; no volvió a pasar en las rondas del
