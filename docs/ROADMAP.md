@@ -99,6 +99,7 @@ reales. Las unidades de abajo que no son el seguimiento ni la plataforma tambié
 | Quien decide las tareas las acepta dentro de Leda, en el formulario web; nunca por chat | ADR 0017, decisión 2 |
 | Leda le pregunta al referente si acepta una fecha nueva y, si confirma, la cambia ella misma | ADR 0017, decisión 4 (pedido explícito del usuario) |
 | Servidor propio de la API de bots de Telegram, para recibir archivos de hasta 60 MB (hoy, 20 MB) | ADR 0019, decisión 2 (usuario, 2026-10-07: se instala cuando Leda vaya a un equipo real) |
+| Un chat con Leda dentro de la plataforma web, sin depender de Telegram | Usuario, 2026-10-12. Necesita antes despegar la salida de Telegram (riesgo 1 de `STATUS.md`; ADR 0017, decisión 5) y notificaciones del celular para los avisos que Leda manda por su cuenta |
 
 Delegar por chat salió de esta lista: se construyó en la Fase C (C-7, con la enmienda a la
 decisión 2 del ADR 0017 y las decisiones 9, 26 a 28, 39 y 53 de `odd/tasks/fase-c.md`; conversaciones
