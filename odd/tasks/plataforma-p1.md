@@ -82,11 +82,11 @@ aspecto de la "9 · Terminal" y un comando de consola para emitir y cortar un en
 Ruta: escritor delegado en cada una (dos o más archivos no triviales); el coordinador revisa, corre una
 comprobación y hace la revisión RDD. Estimación total: más de 400 líneas; cada tarea es su commit.
 
-- [ ] **P1-0 · El guion de la prueba de mañana** (rama del Motor, sólo documentos): comprobar que
+- [x] **P1-0 · El guion de la prueba de mañana** (rama del Motor, sólo documentos): comprobar que
       `docs/product/guion-telegram-fase-c-parte-1.md` cubre lo construido después del 2026-10-08 (trabas
       y quién destraba, delegar, apodos, el formato de la cocina, la lista del detalle); si no, sumar los
       pasos que falten, como hilo numerado (quién, texto exacto, lo esperado).
-- [ ] **P1-1 · El enlace y la sesión** (migración `0057`): tablas del enlace de un solo uso y de la sesión
+- [x] **P1-1 · El enlace y la sesión** (migración `0057`): tablas del enlace de un solo uso y de la sesión
       (sólo hashes; membresía; creada, último uso, cortada y motivo), funciones `security definer` para
       emitir el enlace, canjearlo por una sesión (una sola vez), leer la sesión vigente (revalida la
       membresía y anota el último uso) y cortarla; auditoría de emitir, canjear y cortar. Pruebas de
@@ -123,3 +123,20 @@ Lo prueba primero `TestClient` y después el usuario en su celular.
 
 - 2026-10-12: rama y carpeta creadas desde `093eb33c`; las pruebas corren desde la carpeta (30 passed).
   `leda_motor` al día hasta la `0056` para la prueba de mañana (en la rama del Motor, `6fc7449f`).
+- 2026-10-12, noche. **P1-0** (rama del Motor, `6faafce6`): el guion suma la segunda parte, pasos 22 a
+  48 (apodos, quién destraba, la pregunta sin contestar, pasar una tarea, enlace y detalle ajeno, la
+  lista, el informe al grupo); lo no comprobable, marcado "(a observar)". La prueba del 2026-10-08 había
+  dejado "Programar PLC" entregada y "Dashboard" terminada: `leda_motor` se recreó con respaldo
+  (`18828013`, detalle en `docs/STATUS.md`).
+- **P1-1** (`db782e71`, escritor delegado: dos archivos no triviales): migración `0057`,
+  `enlace_de_entrada` y `sesion_web` (sólo hashes, RLS forzado, sin privilegios para `leda_app`), cinco
+  funciones `security definer` (emitir, canjear, sesión vigente, cortar una, cortar las de una persona),
+  auditoría sin el token. El enlace no vence por tiempo (como la `0036`): deja de servir al canjearse, al
+  emitirse otro o al cortarse las sesiones. RED: 25 fallas (`UndefinedFunction`); GREEN: 26 passed.
+  `pytest tests/garantias/test_capacidades.py tests/garantias/test_frontera.py`: 7 passed (la de la
+  frontera corre todas las garantías en otro proceso). RDD `review-ce739a56c466ff4c`, aprobada.
+  Advertencias sin arreglar: dos emisiones simultáneas para la misma persona hacen fallar la segunda con
+  un error en vez de reemplazar; un enlace sin canjear de alguien que dejó el equipo vuelve a servir si lo
+  reincorporan; la prueba de la carrera no prueba contención real. Las funciones sólo las ejecuta
+  `leda_app`: el comando de consola (P1-3) las llama dentro de `espacio()`; `sesion_vigente` mira la
+  membresía activa, no el espacio.
