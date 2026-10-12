@@ -83,7 +83,9 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     # compartido.
                     "pedido_de_detalle", "tarea_compartida",
                     # Los apodos (migración 0055; ADR 0020).
-                    "apodo")
+                    "apodo",
+                    # El enlace de entrada y la sesión de la web (migración 0057; ADR 0022).
+                    "enlace_de_entrada", "sesion_web")
 
 # La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
 # política. `model_config` admite espacio nulo para el modelo global.
@@ -97,8 +99,10 @@ TABLAS_DE_LA_ADMINISTRACION = ("admin_notice", "admin_notice_enlace")
 
 # Las políticas de más de una tabla, además de la de aislamiento: `acceso_tarea` (migración
 # 0036) se encuentra por el hash del token antes de saber su espacio, sólo desde las funciones
-# de `leda_owner`.
-POLITICAS_DE_MAS = {"acceso_tarea": ["resolver_por_token"]}
+# de `leda_owner`; el enlace de entrada y la sesión de la web (migración 0057), igual.
+POLITICAS_DE_MAS = {"acceso_tarea": ["resolver_por_token"],
+                    "enlace_de_entrada": ["resolver_por_token"],
+                    "sesion_web": ["resolver_por_token"]}
 
 
 def _retrato_de_aislamiento(url, tablas):
@@ -825,7 +829,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # 0046, que deja la tarea y el pase como los espera aquélla. Antes de todas, la 0050,
             # cuyas claves también apuntan ahí (el detalle de una tarea, decisión 33), y antes
             # de ella la 0051, que suma otra (quién decidió el pedido). Antes de todas, la 0055,
-            # cuya persona del apodo también apunta ahí (ADR 0020).
+            # cuya persona del apodo también apunta ahí (ADR 0020), y antes aún la 0057, cuyos
+            # enlaces y sesiones de la web también (ADR 0022).
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0057_el_enlace_y_la_sesion_de_la_web.sql"))
             db.execute(_sql_script(ROOT / "db" / "rollbacks" / "0055_los_apodos.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0051_las_revisiones_de_la_c5d_y_del_detalle.sql"))
