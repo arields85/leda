@@ -509,7 +509,7 @@ excepción queda vigente sin la aprobación que corresponde.
 **Nota (2026-10-04):** esta unidad nació del alta por chat, que quedó fuera del alcance por
 ahora, y dependía de la rama de flujo, que quedó congelada. Espera (ADR 0017, decisión 5). Si la
 regla de fondo sobre la fecha de una tarea y la de su objetivo se aplica a las tareas que se
-cargan en la plataforma está `PENDIENTE` en el ADR de la plataforma.
+cargan en la plataforma lo resolvió el ADR 0022, decisión 9: se avisa y no se bloquea.
 
 ### Respuesta que se va escribiendo
 

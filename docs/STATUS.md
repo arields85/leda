@@ -3,8 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-11, tarde: las decisiones 65 a 73 construidas y revisadas,
-los apodos completos y el orden de las jugadas de un mensaje.
+**Última actualización documental:** 2026-10-12: el ADR 0022 de la plataforma web, aceptado.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -62,7 +61,9 @@ commit de código, revisado por RDD y aprobado. Detalle y evidencia en el plan y
    en 35 corridas a 15.
 2. **La tanda de pruebas:** la prueba por Telegram con `leda_motor` al día hasta la última migración
    (respaldo previo; autorizado). Necesita al usuario.
-3. **La plataforma:** su ADR, con el usuario.
+3. **La plataforma:** el ADR 0022, aceptado el 2026-10-12 (producto, tecnología igual a la de la HMI y
+   el aspecto elegido en el lienzo de diseño). Sigue la porción 1: la puerta del equipo, de sólo
+   lectura, con su prueba en el celular del usuario.
 4. **El ADR 0018, 9m.1:** precisado (`8e64719`), con el acuerdo del usuario.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
@@ -122,7 +123,6 @@ validador de invariantes. Destino de cada uno:
   proyecto suman unos 138.700 de 150.000 (`LC_ALL=C.UTF-8 wc -m`, 2026-10-09, con el documento del Motor
   reducido).
 - **`PENDIENTE` dentro de los ADR y del plan:**
-  - si Leda avisa que se cargaron tareas (ADR 0017, decisión 2);
   - qué pasa si quien destraba dice que no le corresponde (3a);
   - preguntarle al referente sin dejar de ser Leda la PM;
   - cómo llega el tono de cada cliente a la IA;
