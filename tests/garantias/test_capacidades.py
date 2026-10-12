@@ -83,7 +83,13 @@ TABLAS_MUERTAS = ("conversation_access_log", "learning")
 # `acceso_tablero` se toca únicamente desde sus dos funciones `security
 # definer`, por diseño: `leda_app` no tiene ningún privilegio sobre ella.
 # Que sus columnas no aparezcan en `src/` es la señal de que eso se respeta.
-TABLAS_POR_FUNCION = ("acceso_tablero", "acceso_tarea", "vista_de_tarea")
+TABLAS_POR_FUNCION = ("acceso_tablero", "acceso_tarea", "vista_de_tarea",
+                      "enlace_de_entrada", "sesion_web",
+                      # La puerta de administración (migración 0061).
+                      "enlace_de_administracion", "sesion_de_administracion",
+                      # La clave de cada carga desde la web (migración 0062): la toca sólo
+                      # `cargar_tarea`.
+                      "carga_de_tarea")
 
 # Las tablas del motor de conversación (migraciones 0030 y 0031) estuvieron
 # exentas mientras `conversation_state.mostrado_para_confirmar` no la leía nadie.

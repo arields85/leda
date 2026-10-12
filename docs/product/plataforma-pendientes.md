@@ -118,6 +118,88 @@ de `workspace_setting` (se cambia por SQL).
 | Revisión periódica del pack (cada N meses) | No existe | `nucleo/alta-de-equipo.md`, "Revisión periódica" |
 | Quién deja de compartir el detalle de una tarea y desde dónde, y si lo compartido vence solo (por ejemplo, cuando la tarea se cierra) | No hay jugada por chat ni comando: sólo la operación de la cocina `dejar_de_compartir_tarea`, que puede usar el encargado del sector de la tarea o quien la compartió (auditada; corta también el enlace ya emitido). Lo compartido no vence: vale hasta que alguien lo revoca | Decisión 33 del usuario (2026-10-09; `odd/tasks/fase-c.md`, "El resumen para cualquiera, el detalle a pedido"). `PENDIENTE` con el usuario: si se revoca desde la plataforma, por chat o también por quien lo recibió, y si vence al cerrarse la tarea |
 
+## La puerta del equipo, porción 1 (2026-10-12)
+
+Construida en la rama `feat/plataforma` ([`../capacidades.md`](../capacidades.md), "Lo que agregó la
+plataforma web"); plan y evidencia en
+[`../../odd/tasks/plataforma-p1.md`](../../odd/tasks/plataforma-p1.md).
+
+**Valores fijados a mano en esta porción:**
+
+| Qué | Hoy | Notas |
+|---|---|---|
+| Nombre y duración de la cookie de la sesión | `leda_sesion`, `Max-Age` de 400 días (lo más que aceptan los navegadores), renovada cada vez que la web pregunta quién es la persona; `web_app.py` (`COOKIE`, `DURACION_DE_LA_COOKIE_S`) | La sesión de la base no vence (decisión 4); la cookie sólo la transporta. Cada puerta tendrá su cookie (decisión 12) |
+| Vencimiento del enlace de entrada | Ninguno por tiempo, como el de la página de la tarea (migración `0057`): deja de servir al canjearse, al emitirse otro o al cortarse las sesiones | El ADR 0022 no fija un plazo |
+| Profundidad de la cadena de esperas | Hasta 10 niveles, sin repetir (migración `0059`) | |
+| Qué estado muestra una tarjeta cuando tiene más de uno | Trabada y vencida juntas ("[TRABADA] [VENCIDA]"); entregada o en curso, sólo sin ninguna de ellas (`web_app._marcas`). El panel cuenta una tarea trabada y vencida en los dos números | Decisión 5 del usuario (2026-10-12) |
+| Cuánto atrás muestra las terminadas | 30 días corridos desde el reloj de Leda, por el evento que terminó la tarea (migración `0060`, `terminadas_que_ve`) | Decisión 3 del usuario (2026-10-12): "las tareas suelen ser largas; una semana se queda corta" |
+| Usuario público del bot del equipo, para el botón "> consultar a leda" | Pack, `telegram.bot_usuario` (sin "@"; opcional), que el importador guarda en `workspace_setting` (`bot_usuario`; la base exige un usuario de Telegram válido). CoreWork: `PENDIENTE` del usuario (en `espacios/corework.yaml`, comentado); sin él, la web no muestra el botón | Decisión 8 del usuario (2026-10-12). No es un secreto (el token sí, y sigue en `.env`). Hoy la consola lo obtiene de Telegram con el token (`getMe`, en `leda enlaces`) |
+| Colores, letras y medidas del aspecto | En el tema de Tailwind (`web/src/index.css`): los cuatro colores de estado, los grises, JetBrains Mono, tamaños, bordes y sombras | Decisión 18. Las dos páginas sin la web (el botón "Entrar" y la de un enlace que no sirve) repiten los colores a mano en `web_app.py` |
+
+**Abierto:**
+
+- **Las ocho preguntas de la noche, decididas por el usuario el 2026-10-12** y construidas en la
+  P1-6 (`odd/tasks/plataforma-p1.md`, "Decidido por el usuario"): de una tarea ajena, lo mismo que
+  el informe al grupo (trabada, su cadena, y vencida recién con el atraso hablado, con la
+  previsión); las terminadas de 30 días; el botón "> consultar a leda" con el bot del equipo. Falta
+  que el usuario declare el usuario del bot de CoreWork en el pack.
+- **Técnico:**
+  - dos toques seguidos en "Entrar" pueden terminar en "Este enlace ya no sirve" aunque el primero
+    haya abierto la sesión;
+  - la tarjeta de una tarea entregada no dice quién la revisa;
+  - la tarjeta no abre la página de la tarea, aunque la API dice si la persona la puede ver;
+  - las advertencias de las revisiones listadas en `odd/tasks/plataforma-p1.md` ("Progreso y
+    evidencia"): dos emisiones simultáneas del enlace de una persona hacen fallar la segunda; un enlace
+    sin canjear de alguien que dejó el equipo vuelve a servir si lo reincorporan; una espera por el
+    bloqueo de quien destraba sigue contando aunque ese bloqueo ya se haya resuelto; `vencida` no mira
+    una nueva previsión de la persona (el motor sí); los días que quedan cuando vence el mismo día; el
+    candado global atiende la web de a un pedido; el chequeo de `Origin` detrás de un proxy.
+
+## La puerta de administración, porción 2 (2026-10-12)
+
+Construida en la rama `feat/plataforma` (tarea P2-1 de
+[`../../odd/tasks/plataforma-p2.md`](../../odd/tasks/plataforma-p2.md); [`../capacidades.md`](../capacidades.md)).
+
+**Valores fijados a mano en esta tarea:**
+
+| Qué | Hoy | Notas |
+|---|---|---|
+| Nombre, camino y duración de la cookie de la administración | `leda_admin`, sólo para `/app/admin`, `Max-Age` de 400 días, renovada al pedir `/app/admin/api/yo`; `web_app.py` (`COOKIE_DE_ADMINISTRACION`, `CAMINO_DE_ADMINISTRACION`) | La sesión de la base no vence, pero el rol se revalida en cada pedido (decisión 12) |
+| Vencimiento del enlace de la administración | Ninguno por tiempo, como el del equipo (migración `0061`): deja de servir al canjearse, al emitirse otro o al cortarse las sesiones | El ADR 0022 no fija un plazo. Es una credencial de más alcance que la del equipo: `PENDIENTE` con el usuario si vence |
+| Quién abre la puerta | Sólo el rol `administrador` de `platform_role`; el `operador`, no | `PENDIENTE` con el usuario si el operador entra, y a qué |
+| Quién emite el enlace | Sólo la consola (`python -m leda enlace-admin <nombre>`), con `leda_admin` | Que lo ofrezca el bot de administración toca el Motor: después de juntar las ramas |
+| Qué espacios lista `/app/admin/api/yo` | Todos los que existen, también los importados sin activar | |
+
+## La carga de tareas, porción 2 (2026-10-12)
+
+Construida en la rama `feat/plataforma` (tarea P2-2 de
+[`../../odd/tasks/plataforma-p2.md`](../../odd/tasks/plataforma-p2.md); migración `0062`).
+
+**Valores fijados a mano en esta tarea:**
+
+| Qué | Hoy | Notas |
+|---|---|---|
+| A qué hora vence la fecha elegida | Al cierre de la jornada del espacio (`work_calendar.hora_fin`), en su zona, como las tareas de las conversaciones de prueba (`sembrar` usa las 00:00) | La escalera y las vistas miran el día local, que es el elegido |
+| Topes de los textos | Título 200, descripción 800 y criterio 500 caracteres, los del borrador de una tarea | Se cuentan en caracteres, no en unidades de Telegram (riesgo 2 de `docs/STATUS.md`) |
+| Quién revisa | La regla única de la base (`quien_revisa_la_tarea`): quien aprueba el trabajo del responsable, activo. Sin él no se carga; la autoridad final sin aprobador tampoco (se revisaría a sí misma) | El motor no tiene otra regla: no se cae a la autoridad final como hacía el borrador por chat |
+| Qué evidencia se acepta | Sólo tipos que la política del área conoce (su lista o sus `tipos`); vacía, sólo si el área no pide evidencia | Un tipo desconocido no lo cubriría ninguna pieza y la tarea no cerraría nunca. `PENDIENTE` con el usuario si el formulario puede pedir otra evidencia |
+| La clave de un solo uso | 16 a 128 caracteres (`A-Z a-z 0-9 _ -`), una por espacio, sin vencimiento | La genera el formulario (P2-3): `crypto.randomUUID`, o 32 dígitos hexadecimales sin HTTPS |
+| "Conectado" | Tiene un Telegram vinculado (`app_user.telegram_user_id`), como `persecucion.alcanzable` del motor | |
+| Días hábiles que ofrecen las opciones | Desde hoy (desde mañana si la jornada del espacio ya cerró, migración `0064`) hasta seis meses después | Hoy después del cierre tampoco se carga: la tarea nacería vencida |
+| Espacios donde se carga | Cualquiera que exista, también uno importado sin activar | Como `/app/admin/api/yo` |
+
+**Para más adelante:** la versión de cada fila (decisión 15) es para editar, en la porción 3; los
+avisos de la decisión 7 y el de "sin conectar" al referente son del motor.
+
+**El formulario (P2-3), valores fijados a mano:**
+
+| Qué | Hoy | Notas |
+|---|---|---|
+| Desde qué ancho va en dos columnas | 1024 px (`lg`), hasta 72rem; la puerta del equipo sigue en 32rem | |
+| El espacio elegido | El primero de la lista al entrar; no se recuerda entre visitas ni va en la dirección | Cambiar de espacio vacía el formulario |
+| La evidencia marcada al elegir a la persona | La que pide la política de su área; se pueden sumar los demás tipos que el área conoce | Cambiar de persona vuelve a marcar la de su área |
+| Los meses del calendario | Del mes de hoy al del último día hábil que ofrecen las opciones (seis meses) | |
+
 ## Decisiones abiertas que la plataforma va a necesitar
 
 - Cómo se autentica quien opera Leda.

@@ -15,6 +15,10 @@
     python -m leda revocar-enlaces corework --persona "Marcos"   (o --tarea, o --administrador)
     python -m leda retirar-contenido corework --tarea "tablero"   (lista lo entregado; con
         --pieza N --administrador NOMBRE --motivo TEXTO, retira el contenido de esa pieza)
+    python -m leda enlace-web corework --persona "Marcos"     el enlace de un solo uso a la web
+    python -m leda cortar-sesiones-web corework --persona "Marcos"   corta sus sesiones de la web
+    python -m leda enlace-admin "Ariel"     el enlace de un solo uso a la administración de la web
+    python -m leda cortar-sesiones-admin "Ariel"   corta sus sesiones de administración
 """
 
 from __future__ import annotations
@@ -207,6 +211,112 @@ def _revocar_enlaces(conn, ws: str, a) -> int:
         print(f"Revocados {cantidad} enlaces de {de}: ya no abren.")
     else:
         print(f"No había enlaces vigentes de {de}.")
+    return 0
+
+
+def _integrante_del_espacio(conn, ws: str, slug: str, nombre: str) -> dict | None:
+    """El único integrante activo del espacio que nombra `nombre` (como `_uno_por_nombre`), leído
+    como `leda_app` dentro del espacio; o `None` diciendo por qué."""
+    with espacio(conn, ws) as cur:
+        cur.execute("""select membership_id::text id, nombre from integrante
+                        where activo order by nombre""")
+        filas = cur.fetchall()
+    conn.commit()
+    return _uno_por_nombre(filas, nombre, f"integrante activo en '{slug}'")
+
+
+def _enlace_web(conn, ws: str, a) -> int:
+    """Emite el enlace de un solo uso a la puerta del equipo de la web (ADR 0022, decisión 4) de
+    una persona y lo imprime, para mandárselo por privado o para probar sin el chat. El anterior
+    sin usar queda anulado. Corre como `leda_app` en el espacio: la función sólo la ejecuta él."""
+    from . import web_app
+
+    if not config.base_url:
+        print("Falta LEDA_BASE_URL en el entorno: sin la dirección pública no hay enlace.")
+        return 1
+    persona = _integrante_del_espacio(conn, ws, a.slug, a.persona)
+    if persona is None:
+        return 1
+    with espacio(conn, ws) as cur:
+        token = web_app.emitir_enlace(cur, persona["id"])
+    conn.commit()
+    if token is None:
+        print(f"{persona['nombre']} ya no es integrante activo de '{a.slug}'.")
+        return 1
+    print(f"Enlace de {persona['nombre']} a la web (sirve una sola vez; mandáselo por privado):")
+    print(f"  {web_app.enlace(config.base_url, token)}")
+    return 0
+
+
+def _cortar_sesiones_web(conn, ws: str, a) -> int:
+    """Corta todas las sesiones de la web de una persona, y su enlace sin usar, por un
+    administrador (ADR 0022, decisiones 4 y 12). Auditado."""
+    from . import web_app
+
+    persona = _integrante_del_espacio(conn, ws, a.slug, a.persona)
+    if persona is None:
+        return 1
+    with espacio(conn, ws) as cur:
+        cortadas = web_app.cortar_sesiones(cur, persona["id"])
+    conn.commit()
+    if cortadas:
+        print(f"Cortada{'s' if cortadas > 1 else ''} {cortadas} "
+              f"sesi{'ones' if cortadas > 1 else 'ón'} de {persona['nombre']} en la web.")
+    else:
+        print(f"{persona['nombre']} no tenía sesiones abiertas en la web.")
+    return 0
+
+
+def _administrador_vigente(conn, nombre: str) -> dict | None:
+    """El único administrador de plataforma con el rol vigente que nombra `nombre`, o `None`
+    diciendo por qué: a quien no lo es, la consola no le abre la puerta de administración."""
+    with admin(conn) as cur:
+        filas = _administradores(cur)
+    conn.commit()
+    return _uno_por_nombre(filas, nombre, "administrador de plataforma")
+
+
+def _enlace_admin(conn, a) -> int:
+    """Emite el enlace de un solo uso de un administrador de plataforma a la puerta de
+    administración de la web (ADR 0022, decisiones 10 y 12; porción 2) y lo imprime. El anterior
+    sin usar queda anulado. Corre como `leda_admin`: la función sólo la ejecuta la consola, y
+    vuelve a comprobar el rol."""
+    from . import web_app
+
+    if not config.base_url:
+        print("Falta LEDA_BASE_URL en el entorno: sin la dirección pública no hay enlace.")
+        return 1
+    quien = _administrador_vigente(conn, a.nombre)
+    if quien is None:
+        return 1
+    with admin(conn) as cur:
+        token = web_app.emitir_enlace_de_administracion(cur, quien["id"])
+    conn.commit()
+    if token is None:
+        print(f"{quien['nombre']} ya no es administrador de plataforma.")
+        return 1
+    print(f"Enlace de {quien['nombre']} a la administración de la web (sirve una sola vez; "
+          "no lo reenvíes):")
+    print(f"  {web_app.enlace_de_administracion(config.base_url, token)}")
+    return 0
+
+
+def _cortar_sesiones_admin(conn, a) -> int:
+    """Corta todas las sesiones de administración de un administrador de plataforma, y su enlace
+    sin usar (ADR 0022, decisiones 10 y 12). Auditado."""
+    from . import web_app
+
+    quien = _administrador_vigente(conn, a.nombre)
+    if quien is None:
+        return 1
+    with admin(conn) as cur:
+        cortadas = web_app.cortar_sesiones_de_administrador(cur, quien["id"])
+    conn.commit()
+    if cortadas:
+        print(f"Cortada{'s' if cortadas > 1 else ''} {cortadas} "
+              f"sesi{'ones' if cortadas > 1 else 'ón'} de administración de {quien['nombre']}.")
+    else:
+        print(f"{quien['nombre']} no tenía sesiones abiertas en la administración.")
     return 0
 
 
@@ -404,6 +514,27 @@ def main(argv: list[str] | None = None) -> int:
     ret.add_argument("--pieza", type=int, help="el número de la pieza, de la lista")
     ret.add_argument("--administrador", help="quién la retira: un administrador de plataforma")
     ret.add_argument("--motivo", help="por qué se retira")
+
+    # La puerta del equipo de la web (ADR 0022, decisiones 4 y 12; porción 1): el enlace de un
+    # solo uso de una persona, para probar sin el chat, y cortar sus sesiones.
+    ew = sub.add_parser("enlace-web",
+                        help="emite el enlace de un solo uso de una persona a la web")
+    ew.add_argument("slug")
+    ew.add_argument("--persona", required=True, help="el integrante, por su nombre")
+    cw = sub.add_parser("cortar-sesiones-web",
+                        help="corta todas las sesiones de una persona en la web")
+    cw.add_argument("slug")
+    cw.add_argument("--persona", required=True, help="el integrante, por su nombre")
+
+    # La puerta de administración de la web (ADR 0022, decisiones 10 y 12; porción 2): sin
+    # espacio, porque un administrador de plataforma abarca todos.
+    ea = sub.add_parser("enlace-admin",
+                        help="emite el enlace de un solo uso de un administrador a la "
+                             "administración de la web")
+    ea.add_argument("nombre", help="el administrador de plataforma, por su nombre")
+    ca = sub.add_parser("cortar-sesiones-admin",
+                        help="corta todas las sesiones de administración de un administrador")
+    ca.add_argument("nombre", help="el administrador de plataforma, por su nombre")
 
     sub.add_parser("presentar").add_argument("slug")
 
@@ -682,6 +813,12 @@ def main(argv: list[str] | None = None) -> int:
                   ", ".join(r.pendientes[:6]))
         return 0
 
+    if a.cmd == "enlace-admin":
+        return _enlace_admin(conn, a)
+
+    if a.cmd == "cortar-sesiones-admin":
+        return _cortar_sesiones_admin(conn, a)
+
     ws = _id_de(conn, a.slug)
 
     if a.cmd == "enlaces":
@@ -759,6 +896,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "retirar-contenido":
         return _retirar_contenido(conn, ws, a)
+
+    if a.cmd == "enlace-web":
+        return _enlace_web(conn, ws, a)
+
+    if a.cmd == "cortar-sesiones-web":
+        return _cortar_sesiones_web(conn, ws, a)
 
     if a.cmd == "estado":
         return _estado(conn, ws, a.slug)

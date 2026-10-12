@@ -426,3 +426,105 @@ curl "https://api.telegram.org/bot<token>/deleteWebhook"
 
 y el listener lo detecta solo, dentro de un minuto aproximadamente, sin
 reiniciar nada.
+
+---
+
+## La plataforma web (porción 1)
+
+La puerta del equipo, de sólo lectura ([ADR 0022](docs/decisions/0022-plataforma-web-de-tareas.md);
+qué hace, en [`docs/capacidades.md`](docs/capacidades.md)). Hoy está en la rama `feat/plataforma`:
+estos comandos corren desde `D:\Proyectos\Leda-PM-worktrees\plataforma`, en PowerShell, cada uno
+entero en un renglón. Después de juntar las ramas, desde la carpeta del Motor, con su `.venv` y sin
+`PYTHONPATH`.
+
+**Antes:**
+
+- La carpeta de la plataforma no tiene `.venv` ni `.env`. Se usa el Python del Motor con
+  `PYTHONPATH=src`: sin eso corre el código del Motor, que no tiene la plataforma. La base se da con
+  `LEDA_DB_URL` en las dos terminales de abajo, sin copiarla a ningún documento.
+- La base necesita las migraciones hasta la `0059`. `leda_motor` está en la `0056` y es de la
+  prueba por Telegram: `PENDIENTE` qué base se usa (por ejemplo, `leda_motor` puesta al día después
+  de la prueba, con respaldo previo).
+- El puerto 8000 es de la página de la prueba por Telegram: la plataforma usa el 8001.
+
+**1. Compilar la web, una vez** (y cada vez que cambie `web/`; hace falta Node, no para correrla):
+
+```powershell
+cd web
+npm ci
+npm run build
+cd ..
+```
+
+Queda en `web/dist`, que no se versiona. Sin compilar, `/app/` muestra "La página todavía no está
+lista."
+
+**2. Levantar el servidor de la página** (terminal 1; Ctrl+C para cortar):
+
+```powershell
+$env:PYTHONPATH = "src"
+..\motor-de-conversacion\.venv\Scripts\python.exe -m uvicorn leda.entrada:app --host 127.0.0.1 --port 8001 --no-access-log
+```
+
+**3. Emitir el enlace de una persona** (terminal 2; el enlace sirve una vez y el anterior sin usar
+queda anulado):
+
+```powershell
+$env:PYTHONPATH = "src"
+$env:LEDA_BASE_URL = "http://localhost:8001"
+..\motor-de-conversacion\.venv\Scripts\python.exe -m leda enlace-web corework --persona Marcos
+```
+
+**4. Abrir el enlace** en el navegador de la misma PC y apretar "Entrar": la sesión queda abierta y
+lleva a `/app/`. Para probar los cortes: "salir" en la página, o
+
+```powershell
+..\motor-de-conversacion\.venv\Scripts\python.exe -m leda cortar-sesiones-web corework --persona Marcos
+```
+
+**En el celular** (`PENDIENTE`, con el usuario): la cookie de la sesión es `Secure`, y fuera de
+`localhost` el navegador sólo la guarda con HTTPS. Hace falta un túnel o HTTPS hasta la PC, con
+`LEDA_BASE_URL` apuntando a esa dirección.
+
+### La puerta de administración (porción 2)
+
+La de un administrador de plataforma, que abarca todos los espacios, con el formulario para cargar
+una tarea (tareas P2-1 a P2-3 de `odd/tasks/plataforma-p2.md`). Necesita las migraciones `0061` a
+`0064`, la web compilada (paso 1) y el mismo servidor del paso 2, en el puerto 8001.
+
+**1. Quien entra tiene que ser administrador de plataforma** (una vez; `python -m leda
+administrador <espacio> <nombre>`, sección 8). Sin el rol vigente, la consola no emite el enlace.
+
+**2. Emitir su enlace** (terminal 2; sirve una vez y el anterior sin usar queda anulado):
+
+```powershell
+$env:PYTHONPATH = "src"
+$env:LEDA_BASE_URL = "http://localhost:8001"
+..\motor-de-conversacion\.venv\Scripts\python.exe -m leda enlace-admin Ariel
+```
+
+**3. Abrir el enlace** en el navegador de la misma PC y apretar "Entrar": la sesión queda en su
+propia cookie y lleva a `/app/admin/`. `http://localhost:8001/app/admin/api/yo` muestra el nombre y
+los espacios. La sesión del equipo, si está abierta en el mismo navegador, sigue aparte. Para
+cortar todas sus sesiones y su enlace sin usar:
+
+```powershell
+..\motor-de-conversacion\.venv\Scripts\python.exe -m leda cortar-sesiones-admin Ariel
+```
+
+Quitarle el rol de administrador corta su sesión en el pedido siguiente, y volver a dárselo no la
+revive: hace falta un enlace nuevo (migración `0063`).
+
+**4. Cargar una tarea** en `http://localhost:8001/app/admin/`: si hay más de un espacio, elegirlo
+arriba; después el objetivo (sólo los que ya existen), el título, quién la hace (con su área, quién
+la revisa y "[SIN CONECTAR]" si todavía no tiene Leda), la fecha (el calendario ofrece sólo los días
+hábiles del espacio desde hoy; hoy, sólo antes del cierre de la jornada), el criterio, la evidencia
+(viene marcada la que pide el área) y quién la decidió. "revisar" muestra la tarea como la va a ver
+el equipo y quién la carga, la decidió y la revisa; "confirmar" la carga y "volver" deja corregir.
+En una computadora, el formulario va a la izquierda y la vista previa a la derecha; en el celular,
+uno debajo del otro. La tarea aparece en "Tus tareas" de su responsable (puerta del equipo).
+
+Lo que no se carga vuelve marcado en su campo, en palabras. Si se corta la red al confirmar, los
+datos quedan y "probar de nuevo" manda la misma clave: nunca se cargan dos tareas. Quién la cargó y
+quién la decidió quedan en la auditoría (`psql`, `select detalle from leda.audit_log where accion =
+'cargar_tarea' order by at desc limit 1;`).

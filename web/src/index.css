@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+
+/*
+ * Leda's design tokens (ADR 0022, decision 18, the "9 · Terminal" look): dark, grays, one
+ * monospace family, almost square corners, marked borders and a hard offset shadow. Color
+ * belongs only to the four task states, and only when a state has something in it.
+ *
+ * Tailwind's default palette is cleared so no stray color can slip into a page.
+ */
+@theme {
+  --color-*: initial;
+
+  /* Surfaces and lines. */
+  --color-page: #0f1010;
+  --color-card: #161717;
+  --color-line: #3a3c40;
+  --color-line-soft: #26282a;
+  --color-line-strong: #4a4c50;
+  --color-line-dashed: #2f3134;
+  --color-track: #2a2c2f;
+
+  /* Text, from strongest to dimmest. */
+  --color-ink: #e6e6e3;
+  --color-ink-soft: #b0b2b6;
+  --color-ink-dim: #6f7277;
+
+  /* The four states. */
+  --color-vencida: #ffc14d;
+  --color-trabada: #ff7a6b;
+  --color-en-curso: #9be39b;
+  --color-entregada: #8fd0ff;
+
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  --text-tiny: 9px;
+  --text-mini: 10px;
+  --text-meta: 11px;
+  --text-small: 12px;
+  --text-body: 13px;
+  --text-button: 14px;
+  --text-day: 16px;
+  --text-count: 20px;
+  --text-title: 24px;
+
+  --radius-card: 6px;
+
+  --shadow-hard: 3px 3px 0 #26282a;
+  --shadow-hard-ink: 3px 3px 0 #e6e6e3;
+}
+
+/* The 1.5px borders of the cards, the panel and the days. */
+@utility border-hard {
+  border-width: 1.5px;
+}
+
+@utility border-r-hard {
+  border-right-width: 1.5px;
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    background-color: var(--color-page);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  button {
+    font: inherit;
+  }
+}

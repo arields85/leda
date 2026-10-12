@@ -73,14 +73,14 @@ que se reutiliza".
 
 ## Diseñado y sin construir
 
-Cada uno tiene diseño escrito y cero código, salvo la plataforma web de tareas, que todavía
-no tiene su diseño.
+Cada uno tiene diseño escrito y cero código, salvo la plataforma web de tareas, que tiene su
+porción 1 construida en la rama `feat/plataforma` ("Lo que agregó la plataforma web", abajo).
 
 | Área | Lo manda | Estado |
 |---|---|---|
 | **Motor de conversación (flujo D)** | [`ADR 0018`](decisions/0018-motor-de-conversacion.md), aceptado el 2026-10-06, después de la prueba chica (M2) | Sin código. La IA elige jugadas de una lista cerrada y el código las comprueba y ejecuta; estado por persona y registro de turnos; circuitos declarados con fichas y ocho situaciones generales. La prueba chica de la Etapa 2 vive fuera de `src/leda`; el motor definitivo, en la Etapa 3 |
 | **Lo que le falta al seguimiento** | [`ADR 0017`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisiones 4 y 6 | No hay enlace entre una respuesta y su recordatorio; `pending_reply` existe y nada la escribe; los textos de recordatorios y cadencias están fijos en `escalera.py` y `reloj.py`; no existe la operación de pedir más tiempo. Relevamiento del 2026-10-04 ([`STATUS.md`](STATUS.md), "Estado comprobado") |
-| **Plataforma web de tareas** | [`ADR 0017`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisión 5 | Sin diseño propio todavía: lleva su ADR antes del código. Para cargar tareas sólo existe `sembrar`, un cargador de datos ficticios que no cumple las condiciones de la carga (decisión 2) |
+| **Plataforma web de tareas** | [`ADR 0022`](decisions/0022-plataforma-web-de-tareas.md), aceptado el 2026-10-12 | La porción 1 (la puerta del equipo, de sólo lectura) y la porción 2 (la puerta de administración, la carga de tareas en la base con su API y el formulario de carga) están construidas en `feat/plataforma` (abajo). Sin construir: el cambio de fecha y el alta y la baja de integrantes. `sembrar` queda sólo para pruebas y semillas |
 | **Entrevista de alta de espacios** | [`nucleo/alta-de-equipo.md`](../nucleo/alta-de-equipo.md), 195 líneas | Sin una sola línea. Sólo existe el importador, que consume un paquete ya escrito. Sin esto, cada cliente nuevo exige que alguien lo escriba a mano. No aplica en esta etapa (ADR 0017, decisión 7) |
 | **Panel de plataforma** | [`ADR 0004`](decisions/0004-dos-superficies-separadas.md) | Decidido: contraseña + TOTP. Sin construir |
 | **Integración de calendario** | Especificación §17.3, constitución §7 | Consultar disponibilidad, proponer, crear, modificar, asistentes. `calendario.py` es el calendario **laboral**, no externo |
@@ -221,9 +221,81 @@ filas están `PENDIENTE` (la tanda de pruebas del plan).
 | El corredor de conversaciones acepta una segunda lectura válida de un paso (63) y separa como `[servicio]` un aviso que la IA no pudo redactar y salió en su reintento | `tests/conversaciones/corredor.py`, `comprobar.py` (`o_bien`, `SERVICIO`) |
 | La forma del mensaje la da la cocina (chequeo de rumbo del formato, 2026-10-11): todo mensaje que entra a la salida, también los avisos, el informe al grupo y la respuesta del bot de administración, sale con un renglón de más de 140 caracteres partido entre oraciones (una por renglón, en el mismo bloque; la marca o la viñeta queda en el primer pedazo; un renglón de una tarea con 📋 o 🗓️ nunca se toca; una oración sola más larga queda como está) y con el cierre, la última oración, solo en su renglón y con un renglón en blanco antes. Nunca cambia, agrega ni quita una palabra; la cola guarda el texto con su forma, que es lo que mide el corredor, con el mismo tope. Que la IA real deje de fallar por esto está `PENDIENTE` de una ronda | `salida.py` (`dar_forma`, `RENGLON_MAXIMO`, `enqueue_outbox`), `despachador.py` (`encolar_respuesta_admin`), `tests/garantias/test_forma_del_mensaje.py` |
 
+## Lo que agregó la plataforma web, porción 1 (2026-10-12)
+
+Rama `feat/plataforma`, todavía sin juntar con la del Motor. Plan, evidencia y advertencias de cada
+revisión en [`odd/tasks/plataforma-p1.md`](../odd/tasks/plataforma-p1.md); diseño en el
+[ADR 0022](decisions/0022-plataforma-web-de-tareas.md). Lo probado es con `TestClient`, pruebas de las
+piezas de la web y datos ficticios; nadie la abrió todavía en un celular.
+
+| Capacidad | Dónde |
+|---|---|
+| El enlace de entrada: de un solo uso, sólo su hash en la base, sin vencimiento por tiempo; deja de servir al canjearse, al emitirse otro para la misma persona o al cortarse sus sesiones. Abrirlo no lo gasta: muestra un botón "Entrar" (Telegram abre los enlaces para armar la vista previa) y el canje es al tocarlo; un pedido que dice venir de otro sitio no canjea. Un enlace que no sirve muestra siempre la misma página humana, sin detalles | migración `0057`, `web_app.py` (`GET` y `POST /app/entrar/{token}`) |
+| La sesión: queda abierta sin vencimiento en una cookie `HttpOnly`, `Secure`, `SameSite=Strict`, sólo para `/app`; la base la revalida en cada pedido (membresía activa) y anota su último uso. Se corta por un administrador, porque la persona cierra la sesión ("salir", con una confirmación) o porque deja el equipo; una sesión cortada no vuelve. Emitir, canjear y cortar quedan auditados, sin el token | migración `0057`, `web_app.py` (`POST /app/salir`) |
+| Quién ve qué (decisión 3), una sola regla en la base: el integrante, "Tus tareas" (las suyas, las que espera de otros y las que otros esperan de él); de una ajena ve lo mismo que el informe al grupo: su estado, su fecha y si está trabada, y vencida recién cuando el atraso ya se habló en privado (una previsión vigente posterior al vencimiento, que también ve, o el escalamiento de ese vencimiento ya salido); la web no lo calcula. El referente del sector, además "Tu sector", con fechas, atrasos y bloqueos; la autoridad final, además "El equipo", sin rankings. Trabada y vencida pueden ir juntas. Esperar una tarea no abre su página. La persona y el espacio salen de la sesión, nunca del pedido | migraciones `0058` (`tareas_que_ve`, `vistas_de`, `tareas_de_la_sesion`, `vistas_de_la_sesion`) y `0060` (decisiones del usuario del 2026-10-12, 1, 2, 5 y 7) |
+| La cadena de esperas de una tarea trabada, en árbol, hasta 10 niveles y sin repetir, también la de una tarea ajena de la lista | migraciones `0059` (`esperas_de_la_sesion`) y `0060` |
+| Las terminadas de los últimos 30 días, aparte y después de las abiertas, cada vista en su alcance ("Tus tareas": las suyas; "Tu sector": las del área; "El equipo": todas), con quién las hizo; las canceladas, no | migración `0060` (`terminadas_de_la_sesion`), `web_app.py`, `web/src/components/FinishedList.tsx` |
+| El botón "> consultar a leda": abre el chat de Telegram con el bot del equipo, si el pack declara su usuario público (`telegram.bot_usuario`, guardado en `workspace_setting` con un formato que la base exige); si no, no se muestra | `importador.py`, migración `0060`, `/app/api/yo` (`chat_con_leda`), `web/src/components/TalkButton.tsx` |
+| La API interna, de sólo lectura: `/app/api/yo` (quién es, de qué espacio, qué vistas tiene) y `/app/api/tareas?vista=tus\|sector\|equipo` (un número por estado, la semana del calendario del espacio con los días en que vence algo, cada tarea con su estado, sus marcas, su fecha, la previsión de un atraso ya hablado, los días hábiles que quedan, la barra de días hábiles si está en curso y las esperas si está trabada, y las terminadas de los últimos 30 días); cabeceras como las de la página de la tarea (`no-store`, `noindex`, sin marcos) y una política de contenido sólo del mismo origen. Si la base falla, un 503 sin detalles | `web_app.py` |
+| La web, con el aspecto de la "9 · Terminal" (decisión 18): React, TypeScript, Vite, Tailwind y Lucide en `web/`, compilada a `web/dist` (que no se versiona) y servida por la misma aplicación en `/app/`. Cabezal, panel de estados, tira de la semana, tarjetas con el estado entre corchetes (color sólo en vencida, trabada, en curso y entregada; "[TRABADA] [VENCIDA]" juntas) y la previsión ("prevé 28.10"), barra de días hábiles, árbol de esperas, las terminadas, el botón "> consultar a leda" y "salir". Sin compilar, la persona ve un mensaje humano | `web/src/`, `web_app.py` (`la_web`), `tests/garantias/test_web_servida.py`, pruebas de las piezas con `vitest` |
+| Emitir el enlace de una persona (lo imprime; necesita `LEDA_BASE_URL`) y cortar todas sus sesiones, por la consola, para probar sin el chat | `python -m leda enlace-web <espacio> --persona <nombre>`, `python -m leda cortar-sesiones-web <espacio> --persona <nombre>`, `tests/test_cli_plataforma.py` |
+
+**Porción 2, la puerta de administración** (tarea P2-1, [`odd/tasks/plataforma-p2.md`](../odd/tasks/plataforma-p2.md);
+ADR 0022, decisiones 10, 11 y 12). Probada con `TestClient`; sus pantallas, abajo (P2-3).
+
+| Capacidad | Dónde |
+|---|---|
+| El enlace y la sesión de un administrador de plataforma, que abarca todos los espacios: tablas propias, sin espacio, a las que `leda_app` no llega (sólo por funciones `security definer` de `leda_owner`); sólo los hashes; el enlace sirve una vez, sin vencimiento por tiempo, y uno nuevo anula el que estaba sin usar. Abrirlo muestra el mismo botón "Entrar"; un pedido de otro sitio no canjea. La sesión queda en su propia cookie `leda_admin` (`HttpOnly`, `Secure`, `SameSite=Strict`, sólo para `/app/admin`, 400 días) | migración `0061`, `web_app.py` (`GET` y `POST /app/admin/entrar/{token}`) |
+| El rol se comprueba en la base: sin el rol `administrador` vigente no se emite el enlace ni se canjea, y un rol revocado corta la sesión en el pedido siguiente (`dejo_de_ser_administrador`), auditado. El rol `operador` no abre la puerta Una sesión abierta o un enlace emitido antes del otorgamiento vigente del rol (revocado y vuelto a otorgar) tampoco entra: la sesión queda cortada y el enlace anulado (migración `0063`, revisión RDD de la `0061`) | migración `0061` (`sesion_de_administracion_vigente`), `0063` |
+| `/app/admin/api/yo`: el nombre del administrador y los espacios que existen (id, slug, nombre); 401 sin una sesión de administración que entre. `POST /app/admin/salir` corta la sesión propia (por el hash de su token) y borra la cookie, con la misma protección contra pedidos de otro sitio que `/app/salir`. Las páginas de `/app/admin/` son las de la web | `web_app.py` |
+| Dos puertas separadas (constitución §2): la cookie del equipo no abre la administración ni la de la administración la API del equipo; un administrador que además es integrante tiene las dos sesiones por separado, y salir de una no cierra la otra | `tests/garantias/test_puerta_de_administracion.py` |
+| Emitir, canjear y cortar quedan en `audit_log` sin espacio (hechos de alcance global), con la versión del núcleo y sin el token, aunque quien llama tenga un espacio fijado | migración `0061` (`auditar_acceso_de_administracion`) |
+| Emitir el enlace de un administrador (lo imprime; necesita `LEDA_BASE_URL`) y cortar todas sus sesiones y su enlace sin usar, sólo por la consola (`leda_admin`); a quien no tiene el rol vigente, no | `python -m leda enlace-admin <nombre>`, `python -m leda cortar-sesiones-admin <nombre>`, `tests/test_cli_plataforma.py` |
+
+**Porción 2, la carga de tareas en la base y su API** (tarea P2-2; ADR 0022, decisiones 9 y 11;
+ADR 0017, decisión 2). Probada con la base real y `TestClient`; el formulario, abajo (P2-3).
+
+| Capacidad | Dónde |
+|---|---|
+| El día hábil de un espacio en SQL, el mismo que `Calendario.es_habil`: un día de su calendario que no es feriado; sin calendario, ninguno | migración `0062` (`es_dia_habil`), `tests/garantias/test_carga_de_tareas.py` |
+| Cargar una tarea comprometida por la puerta de administración: una función de la base (`security definer` de `leda_owner`, sólo para `leda_app`) que comprueba la sesión de administración (el rol vigente) en cada llamada y que el espacio exista, y fija ella misma ese espacio: la RLS no le deja encontrar un objetivo, una persona ni una clave de otro. Escribe la tarea (el área sale de su responsable; la fecha, al cierre de la jornada del espacio), su evento `asignada` (actor: la persona del administrador) y una fila de auditoría `cargar_tarea` en el espacio de la tarea con quién la cargó, quién la decidió (declarado al cargar, nunca una aprobación hecha en Leda), quién la revisa y las versiones del paquete y del núcleo. Aparece en "Tus tareas" de su responsable | migración `0062` (`cargar_tarea`) |
+| Lo que no se carga (decisión 9), devuelto todo junto como datos (`campo`, `motivo`): sin objetivo, título, responsable, fecha, criterio, evidencia o quién la decidió; un objetivo de otro espacio o que no está abierto; un día no hábil o pasado (hoy vale si es hábil y la jornada del espacio no cerró: después del cierre, la tarea nacería vencida; migración `0064`); un responsable que no es integrante activo; nadie activo que revise su trabajo, o la autoridad final sin aprobador, que se revisaría a sí misma; quien decidió, si no es integrante activo; un tipo de evidencia que la política del área no conoce (nadie podría entregarlo); un área sin política de evidencia; textos más largos que los del borrador (200, 800 y 500 caracteres). Lo que se avisa y no bloquea: una fecha posterior a la de su objetivo y un responsable sin Leda conectada | migración `0062` (`cargar_tarea`) |
+| Una sola vez por clave: la misma clave con los mismos datos devuelve la misma tarea (`repetida`), con otros datos se rechaza; cada espacio, sus claves (`carga_de_tarea`, con RLS forzada y sin ningún privilegio para `leda_app`) | migración `0062` |
+| Lo que el formulario necesita de un espacio: los objetivos abiertos, los integrantes activos con su área, quién revisaría sus tareas y si tienen Leda conectada (un Telegram vinculado), la política de evidencia de cada área (tipos y versión) y los días hábiles (desde hoy, o desde mañana si la jornada ya cerró) y feriados de los próximos seis meses | migraciones `0062` y `0064` (`opciones_de_la_carga`) |
+| `GET /app/admin/api/espacios/{id}/opciones` y `POST /app/admin/api/espacios/{id}/tareas` (JSON), con la cookie `leda_admin`: 201 con la tarea y sus avisos en palabras, 200 si la clave ya la cargó, 422 con todo lo que hay que corregir en palabras, 401 sin sesión de administración (la cookie del equipo no sirve), 404 si el espacio no existe. La carga se niega a un pedido de otro sitio (como salir) y a uno que no es JSON. Un cuerpo anidado hasta el fondo es un pedido mal formado más (422), nunca un 500 | `web_app.py` |
+
+**Porción 2, el formulario de carga** (tarea P2-3; ADR 0022, decisiones 6, 9, 10 y 18). Probado
+con `vitest` y Testing Library sobre un servidor de mentira, y a 390 y 1280 px con la web compilada.
+
+| Capacidad | Dónde |
+|---|---|
+| La puerta de administración en `/app/admin/`: la misma web, elegida por el camino; arriba, el nombre del administrador y "salir"; un selector de espacio si hay más de uno | `web/src/door.ts`, `web/src/admin/AdminApp.tsx` |
+| El formulario, con lo que ofrece la base: objetivo (sólo los que existen), título, descripción, quién la hace (con su área, quién la revisa y "[SIN CONECTAR]"), la fecha en un calendario que sólo deja elegir los días hábiles que ofrece el espacio (con teclado: flechas entre días, Enter para elegir), el criterio, la evidencia del área (marcada la que pide) y quién la decidió; contadores con los topes del servidor (200, 800 y 500) | `web/src/admin/LoadForm.tsx`, `web/src/admin/DatePicker.tsx` |
+| "revisar" muestra la tarea como la ve el equipo (la misma tarjeta) y quién la carga, la decidió y la revisa, y si la fecha pasa la del objetivo; "confirmar" la carga y "volver" deja corregir (decisión 6) | `web/src/admin/TaskPreview.tsx` |
+| Una clave de un solo uso por intento: la misma en cada reintento con los mismos datos, una nueva al cambiar un dato o después de cargar; sin `crypto.randomUUID` (HTTP en la red local), 32 dígitos hexadecimales al azar | `web/src/admin/LoadForm.tsx`, `web/src/admin/draft.ts` |
+| Resultados: "Tarea cargada." con los avisos (fecha posterior a la del objetivo, "no va a recibir avisos ni seguimiento hasta que la conecte") y "cargar otra"; cada rechazo en su campo y los demás en un resumen; sin sesión, "entrá con un enlace nuevo"; sin red, los datos quedan y se reintenta | `web/src/admin/LoadForm.tsx`, `web/src/admin/AdminApp.tsx` |
+| En una computadora (desde 1024 px), formulario a la izquierda y vista previa a la derecha, hasta 72rem de ancho; en el celular, todo en una columna, sin desborde a 390 px | `web/src/admin/LoadForm.tsx` |
+
+**Sin construir todavía** (`PENDIENTE`, después de la prueba por Telegram de la Fase C):
+
+- que Leda ofrezca el acceso por chat, y el corte de las sesiones por "perdí el celular" por chat
+  (tocan el motor de conversación: primero su conversación de prueba);
+- la prueba en el celular (una cookie `Secure` necesita HTTPS fuera de `localhost`);
+- las piezas de administración de la plataforma: el formulario de carga (porción 2, P2-3), cambiar
+  fechas y el alta y la baja de integrantes; que el bot de administración ofrezca el enlace de la
+  puerta de administración (toca el Motor: después de juntar las ramas);
+- los avisos de una tarea cargada al responsable y a quien la revisa (decisión 7) y el de "sin
+  conectar" a su referente: son avisos del motor, después de juntar las ramas;
+- el usuario del bot de CoreWork en el pack (`telegram.bot_usuario`): sin él, el botón "> consultar
+  a leda" no se muestra;
+- la tarjeta no abre la página de la tarea, aunque la API dice si la persona la puede ver
+  (`ve_la_pagina`);
+- las tareas canceladas no aparecen en ninguna vista (decisión del usuario, 2026-10-12).
+
 ## Vigencia
 
 Levantado el 2026-09-22 auditando `nucleo/`, la especificación funcional y el
 código completo; notas del 2026-10-04 con los ADR 0017 y 0018. Puesto al día el 2026-10-11 con lo
-que construyó la Fase C, contrastado contra `src/leda/` y el plan. Todo lo de arriba es
+que construyó la Fase C, contrastado contra `src/leda/` y el plan, y el 2026-10-12 con la porción 1
+de la plataforma web, contrastada contra su código y sus pruebas. Todo lo de arriba es
 una foto y envejece; la única parte que se mantiene sola es la prueba.

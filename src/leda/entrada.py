@@ -1,7 +1,8 @@
 """La entrada HTTP de Leda (E3-2, enredos 3 y 4 de `odd/tasks/motor-definitivo.md`; E3-7).
 
 La contraparte de `salida.py`: lo que llega de afuera. La aplicación (`app`), sus rutas
-(`POST /telegram/{slug}`, `GET /tablero/{token}`, `GET /tarea/{token}`, `GET /salud`), el registro
+(`POST /telegram/{slug}`, `GET /tablero/{token}`, `GET /tarea/{token}`, `GET /salud` y, bajo
+`/app`, la API interna de la plataforma web, `web_app.py`), el registro
 de los webhooks
 (`registrar_webhooks`, `python -m leda webhooks`) y lo que la recuperación de un mensaje sin
 respuesta comparte con el barrido de huérfanos (`huerfanos.py`): la ventana del turno en curso,
@@ -46,6 +47,7 @@ from fastapi.responses import HTMLResponse, Response
 
 from .config import config
 from .db import admin, conectar, espacio
+from .web_app import router as router_de_la_web
 
 app = FastAPI(title="Leda", docs_url=None, redoc_url=None)
 router = APIRouter()
@@ -433,6 +435,8 @@ def salud():
 
 
 app.include_router(router)
+# La plataforma web (ADR 0022): su API interna, del mismo origen que la página de la tarea.
+app.include_router(router_de_la_web)
 
 
 def registrar_webhooks(cliente=None) -> dict[str, bool]:

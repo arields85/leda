@@ -325,6 +325,15 @@ create table workspace_setting (
       when jsonb_typeof(valor) <> 'number' then false
       else (valor #>> '{}')::numeric between 1 and 60
            and (valor #>> '{}')::numeric % 1 = 0
+    end),
+  -- Decisión 8 del usuario, 2026-10-12 (migración 0060): el usuario público del bot del equipo
+  -- (`telegram.bot_usuario` del pack, sin "@"), con el que la web abre el chat con Leda. Va en
+  -- una dirección: sólo un usuario de Telegram válido.
+  constraint workspace_setting_bot_usuario check (
+    case
+      when clave <> 'bot_usuario' then true
+      when jsonb_typeof(valor) <> 'string' then false
+      else (valor #>> '{}') ~ '^[A-Za-z][A-Za-z0-9_]{4,31}$'
     end)
 );
 
@@ -2247,6 +2256,1151 @@ begin
   end if;
 end $$;
 
+-- El enlace de un solo uso y la sesión de la puerta del equipo de la plataforma web (migración
+-- 0057; ADR 0022, decisiones 4, 11 y 12). `enlace_de_entrada` es el enlace que manda Leda: sólo el
+-- hash, sirve una vez y no vence por tiempo (como `acceso_tarea`); uno sin usar por persona.
+-- `sesion_web` es la sesión que abre el canje: sólo el hash del token de la cookie, sin
+-- vencimiento, revalidada en cada pedido y cortada sólo por un administrador, por la persona o al
+-- dejar el equipo. Como `acceso_tarea`: la política de aislamiento de siempre y una de lectura
+-- sólo para `leda_owner` por el hash (`resolver_por_token`), y `leda_app` sin ningún privilegio
+-- sobre las tablas, sólo `execute` sobre las funciones. El espacio sale de la sesión o de la
+-- membresía, nunca de quien llama; emitir, canjear y cortar quedan en `audit_log`.
+create table enlace_de_entrada (
+  id             uuid primary key default gen_random_uuid(),
+  workspace_id   uuid not null references workspace(id) on delete cascade,
+  membership_id  uuid not null,
+  token_hash     text not null,
+  emitido_en     timestamptz not null default now(),
+  canjeado_en    timestamptz,
+  anulado_en     timestamptz,
+  constraint enlace_de_entrada_workspace_id_unique unique (workspace_id, id),
+  constraint enlace_de_entrada_token_unico unique (token_hash),
+  constraint enlace_de_entrada_hash check (token_hash ~ '^[0-9a-f]{64}$'),
+  constraint enlace_de_entrada_canjeado_o_anulado
+    check (canjeado_en is null or anulado_en is null),
+  constraint enlace_de_entrada_membership
+    foreign key (workspace_id, membership_id) references membership(workspace_id, id)
+    on delete cascade
+);
+
+-- Uno sin usar por persona: emitir otro anula el anterior.
+create unique index enlace_de_entrada_sin_usar on enlace_de_entrada (membership_id)
+  where canjeado_en is null and anulado_en is null;
+
+comment on table enlace_de_entrada is
+  'ADR 0022, decisiones 4 y 12: el enlace de un solo uso para entrar a la web. Sólo el hash del token. Sirve una vez (canjeado_en); sin vencimiento por tiempo; queda anulado si se emite otro para la misma persona o se cortan sus sesiones. leda_app no tiene privilegios: sólo execute sobre sus funciones.';
+
+create table sesion_web (
+  id               uuid primary key default gen_random_uuid(),
+  workspace_id     uuid not null references workspace(id) on delete cascade,
+  membership_id    uuid not null,
+  enlace_id        uuid not null,
+  token_hash       text not null,
+  creada_en        timestamptz not null default now(),
+  ultimo_uso_en    timestamptz not null default now(),
+  cortada_en       timestamptz,
+  motivo_de_corte  text,
+  constraint sesion_web_token_unico unique (token_hash),
+  constraint sesion_web_hash check (token_hash ~ '^[0-9a-f]{64}$'),
+  constraint sesion_web_un_canje unique (enlace_id),
+  constraint sesion_web_corte check ((cortada_en is null) = (motivo_de_corte is null)),
+  constraint sesion_web_motivo check (motivo_de_corte in (
+    'administrador', 'perdio_el_celular', 'cerro_la_sesion', 'dejo_el_equipo')),
+  constraint sesion_web_membership
+    foreign key (workspace_id, membership_id) references membership(workspace_id, id)
+    on delete cascade,
+  constraint sesion_web_enlace
+    foreign key (workspace_id, enlace_id) references enlace_de_entrada(workspace_id, id)
+    on delete cascade
+);
+
+create index sesion_web_abierta on sesion_web (membership_id) where cortada_en is null;
+
+comment on table sesion_web is
+  'ADR 0022, decisiones 4 y 12: la sesión de la puerta del equipo que abre el canje de un enlace. Sólo el hash del token de la cookie. Sin vencimiento: se revalida en cada pedido (membresía activa) y anota su último uso; se corta (cortada_en, motivo_de_corte) y no vuelve. leda_app no tiene privilegios: sólo execute sobre sus funciones.';
+
+create or replace function auditar_acceso_web(
+    p_workspace_id uuid, p_actor_app_user_id uuid, p_actor_kind tipo_actor, p_accion text,
+    p_sujeto_tipo text, p_sujeto_id uuid, p_detalle jsonb)
+returns void
+language plpgsql set search_path = leda, public, pg_temp as $$
+begin
+  insert into audit_log (workspace_id, actor_app_user_id, actor_kind, accion, sujeto_tipo,
+                         sujeto_id, detalle, pack_hash, nucleo_hash)
+  values (p_workspace_id, p_actor_app_user_id, p_actor_kind, p_accion, p_sujeto_tipo,
+          p_sujeto_id, p_detalle,
+          (select v.pack_hash from workspace_version v
+            where v.workspace_id = p_workspace_id order by v.version desc limit 1),
+          nullif(current_setting('leda.nucleo_hash', true), ''));
+end $$;
+
+create or replace function emitir_enlace_de_entrada(
+    p_membership_id uuid, p_token_hash text, p_actor_app_user_id uuid)
+returns uuid
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare espacio uuid;
+        nuevo uuid;
+begin
+  -- El espacio sale de la membresía, que la RLS acota al espacio de quien llama: una membresía
+  -- de otro espacio no se encuentra, igual que una que no existe o que dejó el equipo.
+  select m.workspace_id into espacio from membership m
+   where m.id = p_membership_id and m.activo;
+  if espacio is null then
+    return null;
+  end if;
+  update enlace_de_entrada set anulado_en = now()
+   where membership_id = p_membership_id and canjeado_en is null and anulado_en is null;
+  insert into enlace_de_entrada (workspace_id, membership_id, token_hash)
+       values (espacio, p_membership_id, p_token_hash)
+    returning id into nuevo;
+  perform auditar_acceso_web(
+    espacio, p_actor_app_user_id,
+    case when p_actor_app_user_id is null then 'leda' else 'persona' end::tipo_actor,
+    'emitir_enlace_de_entrada', 'membership', p_membership_id,
+    jsonb_build_object('enlace_id', nuevo));
+  return nuevo;
+end $$;
+
+create or replace function canjear_enlace_de_entrada(
+    p_token_hash text, p_sesion_token_hash text)
+returns uuid
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        enlace enlace_de_entrada%rowtype;
+        persona uuid;
+        nueva uuid;
+begin
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$'
+     or p_sesion_token_hash is null or p_sesion_token_hash !~ '^[0-9a-f]{64}$' then
+    return null;
+  end if;
+  perform set_config('leda.token_de_entrada', p_token_hash, true);
+  select * into enlace from enlace_de_entrada e where e.token_hash = p_token_hash;
+  perform set_config('leda.token_de_entrada', '', true);
+  if enlace.id is null then
+    return null;
+  end if;
+  perform set_config('leda.workspace_id', enlace.workspace_id::text, true);
+  select m.app_user_id into persona from membership m
+   where m.id = enlace.membership_id and m.activo;
+  if persona is not null then
+    -- Una sola vez: si llegan dos canjes a la vez, el segundo espera el candado de la fila y ya
+    -- no la encuentra sin canjear.
+    update enlace_de_entrada set canjeado_en = now()
+     where id = enlace.id and canjeado_en is null and anulado_en is null;
+    if found then
+      insert into sesion_web (workspace_id, membership_id, enlace_id, token_hash)
+           values (enlace.workspace_id, enlace.membership_id, enlace.id, p_sesion_token_hash)
+        returning id into nueva;
+      perform auditar_acceso_web(
+        enlace.workspace_id, persona, 'persona', 'canjear_enlace_de_entrada', 'sesion_web',
+        nueva, jsonb_build_object('enlace_id', enlace.id,
+                                  'membership_id', enlace.membership_id));
+    end if;
+  end if;
+  perform set_config('leda.workspace_id', previo, true);
+  return nueva;
+end $$;
+
+create or replace function sesion_vigente(p_token_hash text)
+returns table (sesion_id uuid, workspace_id uuid, membership_id uuid)
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        sesion sesion_web%rowtype;
+begin
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then
+    return;
+  end if;
+  perform set_config('leda.token_de_sesion', p_token_hash, true);
+  select * into sesion from sesion_web s
+   where s.token_hash = p_token_hash and s.cortada_en is null;
+  perform set_config('leda.token_de_sesion', '', true);
+  if sesion.id is null then
+    return;
+  end if;
+  perform set_config('leda.workspace_id', sesion.workspace_id::text, true);
+  -- Quien dejó el equipo ya no entra, y su sesión queda cortada: si vuelve, pide un enlace nuevo.
+  if not exists (select 1 from membership m
+                  where m.id = sesion.membership_id and m.activo) then
+    update sesion_web s set cortada_en = now(), motivo_de_corte = 'dejo_el_equipo'
+     where s.id = sesion.id and s.cortada_en is null;
+    if found then
+      perform auditar_acceso_web(
+        sesion.workspace_id, null, 'sistema', 'cortar_sesion_web', 'sesion_web', sesion.id,
+        jsonb_build_object('motivo', 'dejo_el_equipo', 'membership_id', sesion.membership_id));
+    end if;
+    perform set_config('leda.workspace_id', previo, true);
+    return;
+  end if;
+  -- Cortada mientras tanto: no entra.
+  update sesion_web s set ultimo_uso_en = now()
+   where s.id = sesion.id and s.cortada_en is null;
+  if not found then
+    perform set_config('leda.workspace_id', previo, true);
+    return;
+  end if;
+  return query select sesion.id, sesion.workspace_id, sesion.membership_id;
+end $$;
+
+create or replace function cortar_sesion(
+    p_sesion_id uuid, p_motivo text, p_actor_app_user_id uuid)
+returns boolean
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare cortada sesion_web%rowtype;
+begin
+  if p_motivo is null or p_motivo not in (
+       'administrador', 'perdio_el_celular', 'cerro_la_sesion', 'dejo_el_equipo') then
+    raise exception 'cortar_sesion: motivo desconocido';
+  end if;
+  -- La RLS acota la búsqueda al espacio de quien llama: una sesión de otro espacio no se
+  -- encuentra, igual que una que no existe o que ya estaba cortada.
+  update sesion_web s set cortada_en = now(), motivo_de_corte = p_motivo
+   where s.id = p_sesion_id and s.cortada_en is null
+  returning * into cortada;
+  if cortada.id is null then
+    return false;
+  end if;
+  perform auditar_acceso_web(
+    cortada.workspace_id, p_actor_app_user_id,
+    case when p_actor_app_user_id is null then 'leda' else 'persona' end::tipo_actor,
+    'cortar_sesion_web', 'sesion_web', cortada.id,
+    jsonb_build_object('motivo', p_motivo, 'membership_id', cortada.membership_id));
+  return true;
+end $$;
+
+create or replace function cortar_sesiones_de_membresia(
+    p_membership_id uuid, p_motivo text, p_actor_app_user_id uuid)
+returns integer
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare cortada record;
+        cortadas integer := 0;
+begin
+  if p_motivo is null or p_motivo not in (
+       'administrador', 'perdio_el_celular', 'cerro_la_sesion', 'dejo_el_equipo') then
+    raise exception 'cortar_sesiones_de_membresia: motivo desconocido';
+  end if;
+  -- Con las sesiones, el enlace que estaba sin usar: si se perdió el celular, el mensaje con el
+  -- enlace también.
+  update enlace_de_entrada e set anulado_en = now()
+   where e.membership_id = p_membership_id and e.canjeado_en is null and e.anulado_en is null;
+  for cortada in
+    update sesion_web s set cortada_en = now(), motivo_de_corte = p_motivo
+     where s.membership_id = p_membership_id and s.cortada_en is null
+    returning s.id, s.workspace_id, s.membership_id
+  loop
+    perform auditar_acceso_web(
+      cortada.workspace_id, p_actor_app_user_id,
+      case when p_actor_app_user_id is null then 'leda' else 'persona' end::tipo_actor,
+      'cortar_sesion_web', 'sesion_web', cortada.id,
+      jsonb_build_object('motivo', p_motivo, 'membership_id', cortada.membership_id));
+    cortadas := cortadas + 1;
+  end loop;
+  return cortadas;
+end $$;
+
+-- Quién ve qué en las listas de la puerta del equipo (ADR 0022, decisiones 3, 5, 11 y 13;
+-- migraciones 0058 y 0060). `tareas_que_ve` es la regla, una sola y en SQL, que extiende
+-- `puede_ver_tarea` de una tarea a la lista de cada vista ("tus", "sector", "equipo"). De una
+-- tarea ajena, quien no ve sus atrasos (no es su responsable, el referente de su área ni la
+-- autoridad final) ve lo mismo que el informe al grupo: si está trabada, y vencida sólo cuando
+-- el atraso ya se habló en privado (una previsión vigente posterior al vencimiento, que también
+-- ve, o el escalamiento de ese vencimiento ya salido; decisiones del usuario del 2026-10-12).
+-- `vistas_de` dice qué vistas tiene
+-- cada persona. Las dos corren con la RLS de quien llama y `leda_app` no las ejecuta: la web
+-- llama a `tareas_de_la_sesion` y `vistas_de_la_sesion`, que sacan a la persona del hash del
+-- token de la sesión (`sesion_vigente`), nunca de un dato del pedido.
+create or replace function tareas_que_ve(
+    p_membership_id uuid, p_vista text, p_ahora timestamptz)
+returns table (task_id uuid, titulo text, estado text, fecha_objetivo timestamptz,
+               asignada_en timestamptz, responsable text, area text, papel text,
+               vencida boolean, bloqueo_abierto boolean, ve_la_pagina boolean,
+               prevision date)
+language sql stable set search_path = leda, public, pg_temp as $$
+  with yo as (
+    select m.id, m.workspace_id, r.autoridad_final
+      from membership m
+      join rol r on r.id = m.rol_id
+     where m.id = p_membership_id and m.activo
+  ),
+  abiertas as (
+    select t.id, t.workspace_id, t.titulo, t.estado, t.fecha_objetivo, t.creado_en,
+           t.area_id, t.responsable_membership_id
+      from task t
+      join yo on yo.workspace_id = t.workspace_id
+     where t.estado not in ('terminada', 'cancelada')
+  ),
+  -- Quién destraba hoy cada bloqueo abierto: lo último que se dijo.
+  destraba as (
+    select b.id as blocker_id, b.task_id, u.destraba_membership_id
+      from blocker b
+      join lateral (select x.destraba_membership_id from blocker_unblocker x
+                     where x.blocker_id = b.id
+                     order by x.at desc, x.id desc limit 1) u on true
+     where b.resuelto_en is null
+  ),
+  -- Una tarea que espera otra: una dependencia bloqueante, o el bloqueo con el que dijo estar
+  -- trabado quien destraba (`dicho_de_quien_destraba.espera_su_bloqueo_id`, 0044).
+  esperas as (
+    select d.destino_task_id as espera, d.origen_task_id as esperada
+      from dependency d
+     where d.tipo = 'bloqueante'
+    union
+    select b.task_id, y.task_id
+      from destraba b
+      join blocker_unblocker x on x.blocker_id = b.blocker_id
+      join dicho_de_quien_destraba dd on dd.blocker_unblocker_id = x.id
+      join blocker y on y.id = dd.espera_su_bloqueo_id
+      join task o on o.id = y.task_id
+     where b.destraba_membership_id = o.responsable_membership_id
+       and dd.dicho_por_membership_id = o.responsable_membership_id
+  ),
+  filas as (
+    select t.*, a.nombre as area_nombre, a.referente_membership_id,
+           case
+             when t.responsable_membership_id = yo.id then 'mia'
+             when exists (select 1 from destraba b
+                           where b.task_id = t.id and b.destraba_membership_id = yo.id)
+                  or exists (select 1 from esperas e
+                               join abiertas o on o.id = e.esperada
+                              where e.espera = t.id and o.responsable_membership_id = yo.id)
+                  or (t.estado = 'en_revision' and quien_revisa_la_tarea(t.id) = yo.id)
+               then 'me_esperan'
+             when exists (select 1 from esperas e
+                            join abiertas w on w.id = e.espera
+                           where e.esperada = t.id and w.responsable_membership_id = yo.id)
+               then 'espero'
+           end as papel,
+           coalesce(t.responsable_membership_id = yo.id
+                    or a.referente_membership_id = yo.id
+                    or yo.autoridad_final, false) as ve_atrasos,
+           t.estado in ('asignada', 'en_curso', 'bloqueada') as sigue,
+           yo.autoridad_final as es_autoridad,
+           yo.id as yo_id
+      from abiertas t
+      cross join yo
+      join area a on a.id = t.area_id
+  )
+  select f.id, f.titulo, f.estado::text, f.fecha_objetivo,
+         coalesce((select min(e.at) from task_state_event e
+                    where e.task_id = f.id and e.estado_nuevo = 'asignada'), f.creado_en),
+         u.nombre, f.area_nombre, f.papel,
+         -- Ya pasó su fecha y, para quien no ve los atrasos de la tarea, el atraso ya se habló
+         -- (la regla a o la b del informe al grupo).
+         coalesce(f.sigue and d.hoy > d.vence
+                  and (f.ve_atrasos
+                       or p.fecha_prevista > d.vence
+                       or exists (select 1 from scheduled_notice n
+                                   where n.task_id = f.id and n.tipo = 'escalamiento'
+                                     and n.estado = 'enviado'
+                                     and n.hechos ->> 'vence' = to_char(d.vence, 'YYYY-MM-DD'))),
+                  false),
+         exists (select 1 from blocker b where b.task_id = f.id and b.resuelto_en is null),
+         puede_ver_tarea(f.yo_id, f.id),
+         case when f.sigue and p.fecha_prevista > d.vence then p.fecha_prevista end
+    from filas f
+    join workspace w on w.id = f.workspace_id
+    cross join lateral (
+      select (f.fecha_objetivo at time zone w.zona_horaria)::date as vence,
+             (coalesce(p_ahora, now()) at time zone w.zona_horaria)::date as hoy) d
+    -- La previsión vigente: la última que ninguna otra reemplaza.
+    left join lateral (
+      select x.fecha_prevista from task_forecast x
+       where x.task_id = f.id
+         and not exists (select 1 from task_forecast y where y.reemplaza_id = x.id)
+       order by x.at desc limit 1) p on true
+    left join membership rm on rm.id = f.responsable_membership_id
+    left join app_user u on u.id = rm.app_user_id
+   where case p_vista
+           when 'tus' then f.papel is not null
+           when 'sector' then f.referente_membership_id = f.yo_id
+           when 'equipo' then f.es_autoridad
+           else false
+         end
+   order by f.fecha_objetivo nulls last, f.titulo, f.id;
+$$;
+
+create or replace function vistas_de(p_membership_id uuid)
+returns text[]
+language sql stable set search_path = leda, public, pg_temp as $$
+  select array['tus']
+         || case when exists (select 1 from area a where a.referente_membership_id = m.id)
+                 then array['sector'] else array[]::text[] end
+         || case when r.autoridad_final then array['equipo'] else array[]::text[] end
+    from membership m
+    join rol r on r.id = m.rol_id
+   where m.id = p_membership_id and m.activo;
+$$;
+
+create or replace function tareas_de_la_sesion(
+    p_token_hash text, p_vista text, p_ahora timestamptz)
+returns table (task_id uuid, titulo text, estado text, fecha_objetivo timestamptz,
+               asignada_en timestamptz, responsable text, area text, papel text,
+               vencida boolean, bloqueo_abierto boolean, ve_la_pagina boolean,
+               prevision date)
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare persona uuid;
+begin
+  if p_vista is null or p_vista not in ('tus', 'sector', 'equipo') then
+    raise exception 'tareas_de_la_sesion: vista desconocida';
+  end if;
+  -- La persona sale de la sesión, que deja fijado su espacio; si no entra, nada.
+  select s.membership_id into persona from sesion_vigente(p_token_hash) s;
+  if persona is null then
+    return;
+  end if;
+  return query select q.* from tareas_que_ve(persona, p_vista, p_ahora) q;
+end $$;
+
+-- Las terminadas de los últimos 30 días de cada vista, con quién las hizo (decisión 3 del
+-- usuario, 2026-10-12; migración 0060): `terminadas_que_ve` corre con la RLS de quien llama
+-- y `leda_app` no la ejecuta; la web llama a `terminadas_de_la_sesion`, con la persona de la
+-- sesión.
+create or replace function terminadas_que_ve(
+    p_membership_id uuid, p_vista text, p_ahora timestamptz)
+returns table (task_id uuid, titulo text, responsable text, area text,
+               terminada_en timestamptz)
+language sql stable set search_path = leda, public, pg_temp as $$
+  with yo as (
+    select m.id, m.workspace_id, r.autoridad_final
+      from membership m
+      join rol r on r.id = m.rol_id
+     where m.id = p_membership_id and m.activo
+  ),
+  terminadas as (
+    select t.id, t.titulo, t.area_id, t.responsable_membership_id,
+           coalesce((select max(e.at) from task_state_event e
+                      where e.task_id = t.id and e.estado_nuevo = 'terminada'),
+                    t.actualizado_en) as terminada_en
+      from task t
+      join yo on yo.workspace_id = t.workspace_id
+     where t.estado = 'terminada'
+  )
+  select x.id, x.titulo, u.nombre, a.nombre, x.terminada_en
+    from terminadas x
+    cross join yo
+    join area a on a.id = x.area_id
+    left join membership rm on rm.id = x.responsable_membership_id
+    left join app_user u on u.id = rm.app_user_id
+   where x.terminada_en >= coalesce(p_ahora, now()) - interval '30 days'
+     and case p_vista
+           when 'tus' then x.responsable_membership_id = yo.id
+           when 'sector' then a.referente_membership_id = yo.id
+           when 'equipo' then yo.autoridad_final
+           else false
+         end
+   order by x.terminada_en desc, x.titulo, x.id;
+$$;
+
+create or replace function terminadas_de_la_sesion(
+    p_token_hash text, p_vista text, p_ahora timestamptz)
+returns table (task_id uuid, titulo text, responsable text, area text,
+               terminada_en timestamptz)
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare persona uuid;
+begin
+  if p_vista is null or p_vista not in ('tus', 'sector', 'equipo') then
+    raise exception 'terminadas_de_la_sesion: vista desconocida';
+  end if;
+  -- La persona sale de la sesión, que deja fijado su espacio; si no entra, nada.
+  select s.membership_id into persona from sesion_vigente(p_token_hash) s;
+  if persona is null then
+    return;
+  end if;
+  return query select q.* from terminadas_que_ve(persona, p_vista, p_ahora) q;
+end $$;
+
+create or replace function vistas_de_la_sesion(p_token_hash text)
+returns table (membership_id uuid, vistas text[])
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare persona uuid;
+begin
+  select s.membership_id into persona from sesion_vigente(p_token_hash) s;
+  if persona is null then
+    return;
+  end if;
+  return query select persona, vistas_de(persona);
+end $$;
+
+-- La cadena de esperas de una tarea trabada (ADR 0022, decisiones 3, 13 y 18; migración 0059).
+-- `esperas_que_ve` arma, para cada tarea de la vista cuyo bloqueo abierto ve la persona
+-- (`tareas_que_ve`), el árbol de lo que espera hacia abajo: otra tarea abierta (una dependencia
+-- bloqueante, o el bloqueo con el que dijo estar trabado quien destraba), con su título y quién la
+-- tiene, o un bloqueo que no lleva a ninguna, con su causa y quién lo destraba. Corre con la RLS de
+-- quien llama y `leda_app` no la ejecuta: la web llama a `esperas_de_la_sesion`, que saca a la
+-- persona del hash del token de la sesión (`sesion_vigente`).
+create or replace function esperas_que_ve(
+    p_membership_id uuid, p_vista text, p_ahora timestamptz)
+returns table (raiz uuid, ruta text, padre text, nivel integer, que text, quien text)
+language sql stable set search_path = leda, public, pg_temp as $$
+  with recursive
+  raices as (
+    select q.task_id from tareas_que_ve(p_membership_id, p_vista, p_ahora) q
+     where q.bloqueo_abierto
+  ),
+  abiertas as (
+    select t.id, t.titulo, t.responsable_membership_id
+      from task t
+     where t.estado not in ('terminada', 'cancelada')
+  ),
+  -- Quién destraba hoy cada bloqueo abierto: lo último que se dijo.
+  bloqueos as (
+    select b.id, b.task_id, b.causa, u.destraba_membership_id, u.destraba_externo
+      from blocker b
+      left join lateral (select x.destraba_membership_id, x.destraba_externo
+                           from blocker_unblocker x
+                          where x.blocker_id = b.id
+                          order by x.at desc, x.id desc limit 1) u on true
+     where b.resuelto_en is null
+  ),
+  -- El bloqueo con el que dijo estar trabado quien destraba (como `esperas` en la 0058).
+  por_lo_dicho as (
+    select b.id as blocker_id, b.task_id, y.task_id as esperada
+      from bloqueos b
+      join blocker_unblocker x on x.blocker_id = b.id
+      join dicho_de_quien_destraba dd on dd.blocker_unblocker_id = x.id
+      join blocker y on y.id = dd.espera_su_bloqueo_id
+      join abiertas o on o.id = y.task_id
+     where b.destraba_membership_id = o.responsable_membership_id
+       and dd.dicho_por_membership_id = o.responsable_membership_id
+  ),
+  -- Lo que espera directamente cada tarea: otra tarea abierta, o un bloqueo que no lleva a
+  -- ninguna.
+  pasos as (
+    select d.destino_task_id as tarea, 't' || d.origen_task_id::text as clave,
+           d.origen_task_id as siguiente, o.titulo as que, u.nombre as quien
+      from dependency d
+      join abiertas o on o.id = d.origen_task_id
+      left join membership m on m.id = o.responsable_membership_id
+      left join app_user u on u.id = m.app_user_id
+     where d.tipo = 'bloqueante'
+    union
+    select p.task_id, 't' || p.esperada::text, p.esperada, o.titulo, u.nombre
+      from por_lo_dicho p
+      join abiertas o on o.id = p.esperada
+      left join membership m on m.id = o.responsable_membership_id
+      left join app_user u on u.id = m.app_user_id
+    union
+    select b.task_id, 'b' || b.id::text, null::uuid, b.causa,
+           coalesce(u.nombre, b.destraba_externo)
+      from bloqueos b
+      left join membership m on m.id = b.destraba_membership_id
+      left join app_user u on u.id = m.app_user_id
+     where not exists (select 1 from por_lo_dicho p where p.blocker_id = b.id)
+  ),
+  arbol (raiz, ruta, padre, nivel, siguiente, camino, que, quien) as (
+    select r.task_id, '/' || p.clave, null::text, 1, p.siguiente, array[r.task_id],
+           p.que, p.quien
+      from raices r
+      join pasos p on p.tarea = r.task_id
+    union all
+    select a.raiz, a.ruta || '/' || p.clave, a.ruta, a.nivel + 1, p.siguiente,
+           a.camino || a.siguiente, p.que, p.quien
+      from arbol a
+      join pasos p on p.tarea = a.siguiente
+     where a.nivel < 10 and not (a.siguiente = any (a.camino))
+  )
+  select a.raiz, a.ruta, a.padre, a.nivel, a.que, a.quien
+    from arbol a
+   order by a.raiz, a.ruta;
+$$;
+
+create or replace function esperas_de_la_sesion(
+    p_token_hash text, p_vista text, p_ahora timestamptz)
+returns table (raiz uuid, ruta text, padre text, nivel integer, que text, quien text)
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare persona uuid;
+begin
+  if p_vista is null or p_vista not in ('tus', 'sector', 'equipo') then
+    raise exception 'esperas_de_la_sesion: vista desconocida';
+  end if;
+  -- La persona sale de la sesión, que deja fijado su espacio; si no entra, nada.
+  select s.membership_id into persona from sesion_vigente(p_token_hash) s;
+  if persona is null then
+    return;
+  end if;
+  return query select q.* from esperas_que_ve(persona, p_vista, p_ahora) q;
+end $$;
+
+-- La puerta de administración de la plataforma web (migración 0061; ADR 0022, decisiones 10, 11
+-- y 12). Un administrador de plataforma abarca todos los espacios: su enlace de un solo uso y su
+-- sesión son de un `app_user`, sin `workspace_id` ni política por espacio, y `leda_app` no tiene
+-- ningún privilegio sobre las tablas (como `acceso_tablero`). Sólo los hashes; el enlace sirve una
+-- vez y uno nuevo anula el que estaba sin usar; la sesión no vence, pero el rol `administrador`
+-- se revalida en cada pedido y sin él queda cortada (`dejo_de_ser_administrador`). Emitir y cortar
+-- todas las sesiones de un administrador, sólo la consola (`leda_admin`); canjear, la sesión
+-- vigente y cerrar la propia, sólo la web (`leda_app`). Emitir, canjear y cortar quedan en
+-- `audit_log` sin espacio.
+create table enlace_de_administracion (
+  id            uuid primary key default gen_random_uuid(),
+  app_user_id   uuid not null references app_user(id) on delete cascade,
+  token_hash    text not null,
+  emitido_en    timestamptz not null default now(),
+  canjeado_en   timestamptz,
+  anulado_en    timestamptz,
+  constraint enlace_de_administracion_token_unico unique (token_hash),
+  constraint enlace_de_administracion_hash check (token_hash ~ '^[0-9a-f]{64}$'),
+  constraint enlace_de_administracion_canjeado_o_anulado
+    check (canjeado_en is null or anulado_en is null)
+);
+
+-- Uno sin usar por persona: emitir otro anula el anterior.
+create unique index enlace_de_administracion_sin_usar on enlace_de_administracion (app_user_id)
+  where canjeado_en is null and anulado_en is null;
+
+comment on table enlace_de_administracion is
+  'ADR 0022, decisiones 10 y 12: el enlace de un solo uso a la puerta de administración, de un administrador de plataforma (sin espacio: abarca todos). Sólo el hash del token. Sirve una vez; sin vencimiento por tiempo; queda anulado si se emite otro o se cortan sus sesiones. leda_app no tiene privilegios: sólo execute sobre las funciones de la web.';
+
+create table sesion_de_administracion (
+  id               uuid primary key default gen_random_uuid(),
+  app_user_id      uuid not null references app_user(id) on delete cascade,
+  enlace_id        uuid not null references enlace_de_administracion(id) on delete cascade,
+  token_hash       text not null,
+  creada_en        timestamptz not null default now(),
+  ultimo_uso_en    timestamptz not null default now(),
+  cortada_en       timestamptz,
+  motivo_de_corte  text,
+  constraint sesion_de_administracion_token_unico unique (token_hash),
+  constraint sesion_de_administracion_hash check (token_hash ~ '^[0-9a-f]{64}$'),
+  constraint sesion_de_administracion_un_canje unique (enlace_id),
+  constraint sesion_de_administracion_corte
+    check ((cortada_en is null) = (motivo_de_corte is null)),
+  constraint sesion_de_administracion_motivo check (motivo_de_corte in (
+    'administrador', 'perdio_el_celular', 'cerro_la_sesion', 'dejo_de_ser_administrador'))
+);
+
+create index sesion_de_administracion_abierta on sesion_de_administracion (app_user_id)
+  where cortada_en is null;
+
+comment on table sesion_de_administracion is
+  'ADR 0022, decisiones 10 y 12: la sesión de la puerta de administración que abre el canje de un enlace. Sólo el hash del token de la cookie. Sin vencimiento, pero el rol de plataforma se revalida en cada pedido: sin él queda cortada (dejo_de_ser_administrador). Una sesión cortada no vuelve. leda_app no tiene privilegios: sólo execute sobre las funciones de la web.';
+
+-- La auditoría de la puerta, sin espacio aunque quien llama tenga uno fijado. De uso interno: no
+-- la ejecuta nadie más que su dueño.
+create or replace function auditar_acceso_de_administracion(
+    p_actor_app_user_id uuid, p_actor_kind tipo_actor, p_accion text, p_sujeto_tipo text,
+    p_sujeto_id uuid, p_detalle jsonb)
+returns void
+language plpgsql set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+begin
+  perform set_config('leda.workspace_id', '', true);
+  perform auditar_acceso_web(null, p_actor_app_user_id, p_actor_kind, p_accion, p_sujeto_tipo,
+                             p_sujeto_id, p_detalle);
+  perform set_config('leda.workspace_id', previo, true);
+end $$;
+
+create or replace function es_administrador_de_plataforma(p_app_user_id uuid)
+returns boolean
+language sql stable set search_path = leda, public, pg_temp as $$
+  select exists (select 1 from platform_role p
+                  where p.app_user_id = p_app_user_id and p.rol = 'administrador');
+$$;
+
+create or replace function emitir_enlace_de_administracion(
+    p_app_user_id uuid, p_token_hash text, p_actor_app_user_id uuid)
+returns uuid
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare nuevo uuid;
+begin
+  -- Sólo a quien tiene hoy el rol de administrador de plataforma.
+  if p_app_user_id is null or not es_administrador_de_plataforma(p_app_user_id) then
+    return null;
+  end if;
+  update enlace_de_administracion set anulado_en = now()
+   where app_user_id = p_app_user_id and canjeado_en is null and anulado_en is null;
+  insert into enlace_de_administracion (app_user_id, token_hash)
+       values (p_app_user_id, p_token_hash)
+    returning id into nuevo;
+  perform auditar_acceso_de_administracion(
+    p_actor_app_user_id,
+    case when p_actor_app_user_id is null then 'leda' else 'persona' end::tipo_actor,
+    'emitir_enlace_de_administracion', 'app_user', p_app_user_id,
+    jsonb_build_object('enlace_id', nuevo));
+  return nuevo;
+end $$;
+
+create or replace function canjear_enlace_de_administracion(
+    p_token_hash text, p_sesion_token_hash text)
+returns uuid
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare enlace enlace_de_administracion%rowtype;
+        otorgado timestamptz;
+        nueva uuid;
+begin
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$'
+     or p_sesion_token_hash is null or p_sesion_token_hash !~ '^[0-9a-f]{64}$' then
+    return null;
+  end if;
+  select * into enlace from enlace_de_administracion e where e.token_hash = p_token_hash;
+  if enlace.id is null then
+    return null;
+  end if;
+  select p.otorgado_en into otorgado from platform_role p
+   where p.app_user_id = enlace.app_user_id and p.rol = 'administrador';
+  if otorgado is null then
+    return null;
+  end if;
+  -- Emitido antes del otorgamiento vigente (el rol se revocó y se volvió a otorgar): no se
+  -- canjea, y queda anulado.
+  if enlace.emitido_en < otorgado then
+    update enlace_de_administracion set anulado_en = now()
+     where id = enlace.id and canjeado_en is null and anulado_en is null;
+    return null;
+  end if;
+  -- Una sola vez: si llegan dos canjes a la vez, el segundo espera el candado de la fila y ya no
+  -- la encuentra sin canjear.
+  update enlace_de_administracion set canjeado_en = now()
+   where id = enlace.id and canjeado_en is null and anulado_en is null;
+  if not found then
+    return null;
+  end if;
+  insert into sesion_de_administracion (app_user_id, enlace_id, token_hash)
+       values (enlace.app_user_id, enlace.id, p_sesion_token_hash)
+    returning id into nueva;
+  perform auditar_acceso_de_administracion(
+    enlace.app_user_id, 'persona', 'canjear_enlace_de_administracion',
+    'sesion_de_administracion', nueva, jsonb_build_object('enlace_id', enlace.id));
+  return nueva;
+end $$;
+
+create or replace function sesion_de_administracion_vigente(p_token_hash text)
+returns table (sesion_id uuid, app_user_id uuid, nombre text)
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare sesion sesion_de_administracion%rowtype;
+        otorgado timestamptz;
+begin
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then
+    return;
+  end if;
+  select * into sesion from sesion_de_administracion s
+   where s.token_hash = p_token_hash and s.cortada_en is null;
+  if sesion.id is null then
+    return;
+  end if;
+  -- El rol se revalida en cada pedido: quien dejó de ser administrador ya no entra, y su sesión
+  -- queda cortada. Si vuelve a serlo, pide un enlace nuevo. La sesión es del otorgamiento en que
+  -- se abrió: una anterior al vigente (el rol se revocó y se volvió a otorgar sin que la sesión
+  -- pidiera nada en el medio) también queda cortada.
+  select p.otorgado_en into otorgado from platform_role p
+   where p.app_user_id = sesion.app_user_id and p.rol = 'administrador';
+  if otorgado is null or sesion.creada_en < otorgado then
+    update sesion_de_administracion s
+       set cortada_en = now(), motivo_de_corte = 'dejo_de_ser_administrador'
+     where s.id = sesion.id and s.cortada_en is null;
+    if found then
+      perform auditar_acceso_de_administracion(
+        null, 'sistema', 'cortar_sesion_de_administracion', 'sesion_de_administracion',
+        sesion.id, jsonb_build_object('motivo', 'dejo_de_ser_administrador',
+                                      'app_user_id', sesion.app_user_id));
+    end if;
+    return;
+  end if;
+  -- Cortada mientras tanto: no entra.
+  update sesion_de_administracion s set ultimo_uso_en = now()
+   where s.id = sesion.id and s.cortada_en is null;
+  if not found then
+    return;
+  end if;
+  return query select sesion.id, sesion.app_user_id, u.nombre
+                 from app_user u where u.id = sesion.app_user_id;
+end $$;
+
+create or replace function cerrar_sesion_de_administracion(p_token_hash text)
+returns boolean
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare cortada sesion_de_administracion%rowtype;
+begin
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then
+    return false;
+  end if;
+  -- Sólo la sesión de ese token: la web corta la propia, nunca una por su id.
+  update sesion_de_administracion s set cortada_en = now(), motivo_de_corte = 'cerro_la_sesion'
+   where s.token_hash = p_token_hash and s.cortada_en is null
+  returning * into cortada;
+  if cortada.id is null then
+    return false;
+  end if;
+  perform auditar_acceso_de_administracion(
+    cortada.app_user_id, 'persona', 'cortar_sesion_de_administracion',
+    'sesion_de_administracion', cortada.id,
+    jsonb_build_object('motivo', 'cerro_la_sesion', 'app_user_id', cortada.app_user_id));
+  return true;
+end $$;
+
+create or replace function cortar_sesiones_de_administrador(
+    p_app_user_id uuid, p_motivo text, p_actor_app_user_id uuid)
+returns integer
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare cortada record;
+        cortadas integer := 0;
+begin
+  if p_motivo is null or p_motivo not in (
+       'administrador', 'perdio_el_celular', 'cerro_la_sesion', 'dejo_de_ser_administrador') then
+    raise exception 'cortar_sesiones_de_administrador: motivo desconocido';
+  end if;
+  -- Con las sesiones, el enlace que estaba sin usar: si se perdió el celular, el mensaje con el
+  -- enlace también.
+  update enlace_de_administracion e set anulado_en = now()
+   where e.app_user_id = p_app_user_id and e.canjeado_en is null and e.anulado_en is null;
+  for cortada in
+    update sesion_de_administracion s set cortada_en = now(), motivo_de_corte = p_motivo
+     where s.app_user_id = p_app_user_id and s.cortada_en is null
+    returning s.id, s.app_user_id
+  loop
+    perform auditar_acceso_de_administracion(
+      p_actor_app_user_id,
+      case when p_actor_app_user_id is null then 'leda' else 'persona' end::tipo_actor,
+      'cortar_sesion_de_administracion', 'sesion_de_administracion', cortada.id,
+      jsonb_build_object('motivo', p_motivo, 'app_user_id', cortada.app_user_id));
+    cortadas := cortadas + 1;
+  end loop;
+  return cortadas;
+end $$;
+
+-- La carga de una tarea desde la puerta de administración (migración 0062; ADR 0022, decisiones
+-- 9, 11 y 12; ADR 0017, decisión 2). `es_dia_habil` es el día hábil del espacio en SQL, el mismo
+-- que `Calendario.es_habil`: sin calendario, ningún día es hábil. `opciones_de_la_carga` y
+-- `cargar_tarea` comprueban la sesión de administración (el rol de plataforma vigente) en cada
+-- llamada y que el espacio exista, y fijan ellas mismas ese espacio: la RLS no les deja encontrar
+-- un objetivo, una persona ni una clave de otro. Lo que no se carga (decisión 9) vuelve todo junto,
+-- como datos; lo que se avisa y no bloquea, en `avisos`. La carga escribe la tarea, su evento
+-- `asignada` y su auditoría en el espacio de la tarea, con quién la cargó y quién la decidió
+-- (declarado por quien la carga, nunca una aprobación hecha en Leda). Quién la revisa es la regla
+-- única (`quien_revisa_la_tarea`): sin nadie activo que la revise, no se carga. La fecha elegida
+-- se guarda al cierre de la jornada del espacio, en su zona. `carga_de_tarea` es la clave de un
+-- solo uso de cada carga, con RLS forzada y sin ningún privilegio para `leda_app`.
+create table carga_de_tarea (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  clave         text not null,
+  huella        text not null,
+  task_id       uuid not null,
+  avisos        jsonb not null default '[]'::jsonb,
+  cargada_en    timestamptz not null default now(),
+  constraint carga_de_tarea_clave_unica unique (workspace_id, clave),
+  constraint carga_de_tarea_clave check (clave ~ '^[A-Za-z0-9_-]{16,128}$'),
+  constraint carga_de_tarea_huella check (huella ~ '^[0-9a-f]{64}$'),
+  constraint carga_de_tarea_avisos check (jsonb_typeof(avisos) = 'array'),
+  constraint carga_de_tarea_tarea
+    foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade
+);
+
+comment on table carga_de_tarea is
+  'ADR 0022, decisiones 9 y 11: la clave de un solo uso de cada carga de una tarea desde la web, con la huella de lo cargado y sus avisos. La misma clave con los mismos datos devuelve la misma tarea; con otros, se rechaza. leda_app no tiene privilegios: sólo execute sobre cargar_tarea.';
+
+create or replace function es_dia_habil(p_workspace_id uuid, p_fecha date)
+returns boolean
+language sql stable set search_path = leda, public, pg_temp as $$
+  select coalesce((
+    select (array['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'])
+             [extract(isodow from p_fecha)::int] = any (c.dias)
+           and not exists (select 1 from holiday h
+                            where h.workspace_id = c.workspace_id and h.fecha = p_fecha)
+      from work_calendar c
+     where c.workspace_id = p_workspace_id), false);
+$$;
+
+create or replace function opciones_de_la_carga(
+    p_token_hash text, p_workspace_id uuid, p_ahora timestamptz)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_administrador uuid;
+        v_espacio workspace%rowtype;
+        v_hoy date;
+        v_desde date;
+        v_hora_fin time;
+        v_hasta date;
+        v_resultado jsonb;
+begin
+  select s.app_user_id into v_administrador from sesion_de_administracion_vigente(p_token_hash) s;
+  if v_administrador is null then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+  end if;
+  select * into v_espacio from workspace w where w.id = p_workspace_id;
+  if v_espacio.id is null then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'espacio', 'motivo', 'no_existe')));
+  end if;
+  -- Desde acá, la RLS acota todo a ese espacio.
+  perform set_config('leda.workspace_id', v_espacio.id::text, true);
+  v_hoy := (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::date;
+  v_hasta := (v_hoy + interval '6 months')::date;
+  -- Hoy se ofrece sólo si la jornada del espacio no cerró: la tarea vence a esa hora, y cargada
+  -- después nacería vencida (migración 0064).
+  select c.hora_fin into v_hora_fin from work_calendar c where c.workspace_id = v_espacio.id;
+  v_desde := case when v_hora_fin is not null
+                       and (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::time
+                           >= v_hora_fin
+                  then v_hoy + 1 else v_hoy end;
+  v_resultado := jsonb_build_object(
+    'ok', true,
+    'espacio', jsonb_build_object('id', v_espacio.id, 'nombre', v_espacio.nombre,
+                                  'zona_horaria', v_espacio.zona_horaria),
+    'hoy', v_hoy,
+    'objetivos', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', o.id, 'titulo', o.titulo, 'tipo', o.tipo, 'estado', o.estado,
+               'fecha_objetivo', o.fecha_objetivo) order by o.titulo, o.id)
+        from objective o where o.estado in ('activo', 'propuesto')), '[]'::jsonb),
+    'integrantes', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'membership_id', m.id, 'nombre', u.nombre, 'area_id', a.id, 'area', a.nombre,
+               'autoridad_final', r.autoridad_final,
+               'conectado', u.telegram_user_id is not null,
+               'revisa', case when ap.id is null then null
+                              else jsonb_build_object('membership_id', ap.id,
+                                                      'nombre', apu.nombre) end)
+             order by u.nombre, m.id)
+        from membership m
+        join app_user u on u.id = m.app_user_id
+        join area a on a.id = m.area_id
+        join rol r on r.id = m.rol_id
+        left join membership ap on ap.id = m.aprobador_membership_id and ap.activo
+        left join app_user apu on apu.id = ap.app_user_id
+       where m.activo), '[]'::jsonb),
+    'politicas', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'area_id', p.area_id, 'area', a.nombre,
+               'evidencia_requerida', to_jsonb(p.evidencia_requerida),
+               'version', p.version, 'tipos', p.tipos) order by a.nombre, a.id)
+        from task_evidence_policy p join area a on a.id = p.area_id), '[]'::jsonb),
+    'calendario', jsonb_build_object(
+      'dias', coalesce((select to_jsonb(c.dias) from work_calendar c
+                         where c.workspace_id = v_espacio.id), '[]'::jsonb),
+      'hasta', v_hasta,
+      'feriados', coalesce((
+        select jsonb_agg(jsonb_build_object('fecha', h.fecha, 'nombre', h.nombre)
+                         order by h.fecha)
+          from holiday h where h.fecha between v_hoy and v_hasta), '[]'::jsonb),
+      'dias_habiles', coalesce((
+        select jsonb_agg(d.dia order by d.dia)
+          from (select g::date as dia
+                  from generate_series(v_desde, v_hasta, interval '1 day') g) d
+         where es_dia_habil(v_espacio.id, d.dia)), '[]'::jsonb)));
+  perform set_config('leda.workspace_id', previo, true);
+  return v_resultado;
+end $$;
+
+create or replace function cargar_tarea(
+    p_token_hash text, p_workspace_id uuid, p_objective_id uuid, p_titulo text,
+    p_descripcion text, p_responsable_membership_id uuid, p_fecha date, p_criterio text,
+    p_evidencia text[], p_decidio_membership_id uuid, p_clave text, p_ahora timestamptz)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_sesion uuid;
+        v_administrador uuid;
+        v_espacio workspace%rowtype;
+        v_objetivo objective%rowtype;
+        v_responsable membership%rowtype;
+        v_revisa membership%rowtype;
+        v_politica task_evidence_policy%rowtype;
+        v_previa carga_de_tarea%rowtype;
+        v_es_autoridad boolean;
+        v_conectado boolean;
+        v_hoy date;
+        v_hora_fin time;
+        v_huella text;
+        v_tarea uuid;
+        v_errores jsonb := '[]'::jsonb;
+        v_avisos jsonb := '[]'::jsonb;
+        v_resultado jsonb;
+begin
+  -- La sesión, en cada llamada: sin el rol de plataforma vigente, nada.
+  select s.sesion_id, s.app_user_id into v_sesion, v_administrador
+    from sesion_de_administracion_vigente(p_token_hash) s;
+  if v_administrador is null then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+  end if;
+  select * into v_espacio from workspace w where w.id = p_workspace_id;
+  if v_espacio.id is null then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'espacio', 'motivo', 'no_existe')));
+  end if;
+  -- Desde acá, la RLS acota todo a ese espacio: un id de otro no se encuentra.
+  perform set_config('leda.workspace_id', v_espacio.id::text, true);
+
+  <<carga>>
+  begin
+    -- La clave de un solo uso: la misma carga dos veces devuelve la misma tarea.
+    if nullif(btrim(p_clave), '') is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'clave', 'motivo', 'falta');
+    elsif p_clave !~ '^[A-Za-z0-9_-]{16,128}$' then
+      v_errores := v_errores || jsonb_build_object('campo', 'clave', 'motivo', 'mal_formada');
+    else
+      perform pg_advisory_xact_lock(hashtextextended(v_espacio.id::text || ':' || p_clave, 0));
+      v_huella := encode(sha256(convert_to(jsonb_build_object(
+        'administrador', v_administrador, 'objetivo', p_objective_id, 'titulo', p_titulo,
+        'descripcion', p_descripcion, 'responsable', p_responsable_membership_id,
+        'fecha', p_fecha, 'criterio', p_criterio, 'evidencia', to_jsonb(p_evidencia),
+        'decidio', p_decidio_membership_id)::text, 'UTF8')), 'hex');
+      select * into v_previa from carga_de_tarea c where c.clave = p_clave;
+      if v_previa.id is not null then
+        if v_previa.huella = v_huella then
+          v_resultado := jsonb_build_object('ok', true, 'task_id', v_previa.task_id,
+                                            'avisos', v_previa.avisos, 'repetida', true);
+        else
+          v_resultado := jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+            jsonb_build_object('campo', 'clave', 'motivo', 'usada_con_otros_datos')));
+        end if;
+        exit carga;
+      end if;
+    end if;
+
+    -- El objetivo: de este espacio y abierto.
+    if p_objective_id is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'objetivo', 'motivo', 'falta');
+    else
+      select * into v_objetivo from objective o where o.id = p_objective_id for share;
+      if v_objetivo.id is null then
+        v_errores := v_errores || jsonb_build_object('campo', 'objetivo', 'motivo', 'no_existe');
+      elsif v_objetivo.estado not in ('activo', 'propuesto') then
+        v_errores := v_errores
+                     || jsonb_build_object('campo', 'objetivo', 'motivo', 'no_esta_abierto');
+      end if;
+    end if;
+
+    -- Los textos (los mismos topes que el borrador de una tarea).
+    if nullif(btrim(p_titulo), '') is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'titulo', 'motivo', 'falta');
+    elsif char_length(btrim(p_titulo)) > 200 then
+      v_errores := v_errores || jsonb_build_object('campo', 'titulo', 'motivo', 'demasiado_largo');
+    end if;
+    if char_length(btrim(coalesce(p_descripcion, ''))) > 800 then
+      v_errores := v_errores
+                   || jsonb_build_object('campo', 'descripcion', 'motivo', 'demasiado_largo');
+    end if;
+
+    -- El responsable: integrante activo de este espacio, con alguien activo que no sea él para
+    -- revisar su trabajo (la regla única: quien aprueba el trabajo del responsable).
+    if p_responsable_membership_id is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'responsable', 'motivo', 'falta');
+    else
+      select * into v_responsable from membership m
+       where m.id = p_responsable_membership_id and m.activo for share;
+      if v_responsable.id is null then
+        v_errores := v_errores || jsonb_build_object('campo', 'responsable',
+                                                     'motivo', 'no_es_integrante_activo');
+      else
+        select * into v_revisa from membership m
+         where m.id = v_responsable.aprobador_membership_id and m.activo;
+        select r.autoridad_final into v_es_autoridad from rol r where r.id = v_responsable.rol_id;
+        if v_revisa.id = v_responsable.id
+           or (v_revisa.id is null and v_responsable.aprobador_membership_id is null
+               and coalesce(v_es_autoridad, false)) then
+          v_errores := v_errores || jsonb_build_object('campo', 'responsable',
+                                                       'motivo', 'la_hace_y_la_revisa');
+        elsif v_revisa.id is null then
+          v_errores := v_errores || jsonb_build_object('campo', 'responsable',
+                                                       'motivo', 'sin_quien_la_revise');
+        end if;
+        select u.telegram_user_id is not null into v_conectado
+          from app_user u where u.id = v_responsable.app_user_id;
+        if not coalesce(v_conectado, false) then
+          v_avisos := v_avisos || jsonb_build_object('campo', 'responsable',
+                                                     'motivo', 'sin_conectar');
+        end if;
+      end if;
+    end if;
+
+    -- La fecha: un día hábil del espacio, hoy o después (hoy, en su zona). Hoy, sólo si la
+    -- jornada no cerró: la tarea vence al cierre y nacería vencida (migración 0064).
+    v_hoy := (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::date;
+    select c.hora_fin into v_hora_fin from work_calendar c where c.workspace_id = v_espacio.id;
+    if p_fecha is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'falta');
+    elsif p_fecha < v_hoy then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'en_el_pasado');
+    elsif not es_dia_habil(v_espacio.id, p_fecha) then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'no_es_dia_habil');
+    elsif p_fecha = v_hoy and v_hora_fin is not null
+          and (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::time >= v_hora_fin then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'ya_cerro_el_dia');
+    elsif v_objetivo.fecha_objetivo is not null and p_fecha > v_objetivo.fecha_objetivo then
+      v_avisos := v_avisos || jsonb_build_object('campo', 'fecha',
+                                                 'motivo', 'despues_del_objetivo');
+    end if;
+
+    if nullif(btrim(p_criterio), '') is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'criterio', 'motivo', 'falta');
+    elsif char_length(btrim(p_criterio)) > 500 then
+      v_errores := v_errores
+                   || jsonb_build_object('campo', 'criterio', 'motivo', 'demasiado_largo');
+    end if;
+
+    -- La evidencia: la política del área del responsable tiene que conocer cada tipo (uno que no
+    -- conoce no lo cubre ninguna pieza: la tarea no se cerraría nunca). Vacía, sólo si el área
+    -- decidió no pedir evidencia.
+    if p_evidencia is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'evidencia', 'motivo', 'falta');
+    elsif v_responsable.id is not null then
+      select * into v_politica from task_evidence_policy p
+       where p.area_id = v_responsable.area_id for share;
+      if v_politica.area_id is null then
+        v_errores := v_errores || jsonb_build_object('campo', 'evidencia',
+                                                     'motivo', 'sin_politica_del_area');
+      elsif cardinality(p_evidencia) = 0 and cardinality(v_politica.evidencia_requerida) > 0 then
+        v_errores := v_errores || jsonb_build_object('campo', 'evidencia', 'motivo', 'falta');
+      elsif exists (select 1 from unnest(p_evidencia) e(tipo)
+                     where not (e.tipo = any (v_politica.evidencia_requerida)
+                                or v_politica.tipos ? e.tipo)) then
+        v_errores := v_errores || jsonb_build_object('campo', 'evidencia',
+                                                     'motivo', 'tipo_no_es_de_la_politica');
+      end if;
+    end if;
+
+    -- Quién la decidió (ADR 0017, decisión 2): un integrante activo de este espacio.
+    if p_decidio_membership_id is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'decidio', 'motivo', 'falta');
+    elsif not exists (select 1 from membership m
+                       where m.id = p_decidio_membership_id and m.activo) then
+      v_errores := v_errores || jsonb_build_object('campo', 'decidio',
+                                                   'motivo', 'no_es_integrante_activo');
+    end if;
+
+    if jsonb_array_length(v_errores) > 0 then
+      v_resultado := jsonb_build_object('ok', false, 'errores', v_errores);
+      exit carga;
+    end if;
+
+    -- Todo en orden: la tarea, su evento, su auditoría y su clave.
+    insert into task (workspace_id, objective_id, titulo, descripcion, area_id,
+                      responsable_membership_id, fecha_objetivo, criterio_aceptacion,
+                      evidencia_requerida, evidencia_policy_version)
+    values (v_espacio.id, v_objetivo.id, btrim(p_titulo), nullif(btrim(p_descripcion), ''),
+            v_responsable.area_id, v_responsable.id,
+            (p_fecha + v_hora_fin) at time zone v_espacio.zona_horaria, btrim(p_criterio),
+            p_evidencia, v_politica.version)
+    returning id into v_tarea;
+    insert into task_state_event (task_id, estado_nuevo, actor_kind, actor_app_user_id, motivo)
+    values (v_tarea, 'asignada', 'persona', v_administrador,
+            'cargada desde la web por un administrador de plataforma');
+    perform auditar_acceso_web(
+      v_espacio.id, v_administrador, 'persona', 'cargar_tarea', 'task', v_tarea,
+      jsonb_build_object(
+        'origen', 'web',
+        'cargada_por_app_user_id', v_administrador,
+        'decidida_por_membership_id', p_decidio_membership_id,
+        'decision_declarada_al_cargar', true,
+        'responsable_membership_id', v_responsable.id,
+        'revisa_membership_id', v_revisa.id,
+        'objective_id', v_objetivo.id,
+        'evidencia_policy_version', v_politica.version,
+        'sesion_de_administracion_id', v_sesion,
+        'avisos', v_avisos));
+    insert into carga_de_tarea (workspace_id, clave, huella, task_id, avisos)
+    values (v_espacio.id, p_clave, v_huella, v_tarea, v_avisos);
+    v_resultado := jsonb_build_object('ok', true, 'task_id', v_tarea, 'avisos', v_avisos,
+                                      'repetida', false);
+  end carga;
+
+  perform set_config('leda.workspace_id', previo, true);
+  return v_resultado;
+end $$;
+
 -- =========================================================================
 -- Sistema
 -- =========================================================================
@@ -3588,7 +4742,8 @@ begin
     'archivo','archivo_de_mensaje','evidencia_retirada','archivo_de_tarea',
     'message_outbox_adjunto','acceso_tarea','vista_de_tarea','message_outbox_enlace',
     'dicho_de_quien_destraba','pase_de_tarea','cambio_de_responsable',
-    'pedido_de_detalle','tarea_compartida','apodo']
+    'pedido_de_detalle','tarea_compartida','apodo',
+    'enlace_de_entrada','sesion_web','carga_de_tarea']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -3650,6 +4805,16 @@ revoke update, delete on message_outbox_enlace from leda_app;
 -- sólo para leer y sólo la fila de ese hash.
 create policy resolver_por_token on acceso_tarea for select to leda_owner
   using (token_hash = nullif(current_setting('leda.token_de_tarea', true), ''));
+-- El enlace de entrada y la sesión de la web (migración 0057): lo mismo. `leda_app` no tiene nada
+-- sobre las tablas; el canje y `sesion_vigente` encuentran el token antes de saber su espacio.
+revoke all on enlace_de_entrada, sesion_web from public, leda_app;
+create policy resolver_por_token on enlace_de_entrada for select to leda_owner
+  using (token_hash = nullif(current_setting('leda.token_de_entrada', true), ''));
+create policy resolver_por_token on sesion_web for select to leda_owner
+  using (token_hash = nullif(current_setting('leda.token_de_sesion', true), ''));
+-- La clave de cada carga desde la web (migración 0062): `leda_app` no tiene nada sobre ella, sólo
+-- `execute` sobre `cargar_tarea`.
+revoke all on carga_de_tarea from public, leda_app;
 
 -- Registros auxiliares. Quedan fuera del bucle de arriba porque `audit_log` e
 -- `incident` admiten espacio nulo para los hechos de alcance global, que sólo
@@ -3759,6 +4924,13 @@ grant select, insert on acceso_tablero to leda_owner;
 revoke all on acceso_tarea, vista_de_tarea from leda_owner;
 grant select, insert on acceso_tarea, vista_de_tarea to leda_owner;
 
+-- El enlace de entrada y la sesión de la web (migración 0057): lo que necesitan sus funciones; de
+-- las columnas, sólo las que cambian.
+revoke all on enlace_de_entrada, sesion_web from leda_owner;
+grant select, insert on enlace_de_entrada, sesion_web to leda_owner;
+grant update (canjeado_en, anulado_en) on enlace_de_entrada to leda_owner;
+grant update (ultimo_uso_en, cortada_en, motivo_de_corte) on sesion_web to leda_owner;
+
 alter function puede_ver_tarea(uuid, uuid) owner to leda_owner;
 alter function emitir_acceso_tarea(uuid, uuid, text) owner to leda_owner;
 alter function acceso_tarea_vigente(text) owner to leda_owner;
@@ -3774,6 +4946,105 @@ grant execute on function puede_ver_tarea(uuid, uuid) to leda_app;
 grant execute on function emitir_acceso_tarea(uuid, uuid, text) to leda_app;
 grant execute on function leer_pagina_de_tarea(text) to leda_app;
 grant execute on function leer_archivo_de_tarea(text, uuid) to leda_app;
+
+alter function auditar_acceso_web(uuid, uuid, tipo_actor, text, text, uuid, jsonb)
+  owner to leda_owner;
+alter function emitir_enlace_de_entrada(uuid, text, uuid) owner to leda_owner;
+alter function canjear_enlace_de_entrada(text, text) owner to leda_owner;
+alter function sesion_vigente(text) owner to leda_owner;
+alter function cortar_sesion(uuid, text, uuid) owner to leda_owner;
+alter function cortar_sesiones_de_membresia(uuid, text, uuid) owner to leda_owner;
+
+revoke execute on function auditar_acceso_web(uuid, uuid, tipo_actor, text, text, uuid, jsonb)
+  from public;
+revoke execute on function emitir_enlace_de_entrada(uuid, text, uuid) from public;
+revoke execute on function canjear_enlace_de_entrada(text, text) from public;
+revoke execute on function sesion_vigente(text) from public;
+revoke execute on function cortar_sesion(uuid, text, uuid) from public;
+revoke execute on function cortar_sesiones_de_membresia(uuid, text, uuid) from public;
+grant execute on function emitir_enlace_de_entrada(uuid, text, uuid) to leda_app;
+grant execute on function canjear_enlace_de_entrada(text, text) to leda_app;
+grant execute on function sesion_vigente(text) to leda_app;
+grant execute on function cortar_sesion(uuid, text, uuid) to leda_app;
+grant execute on function cortar_sesiones_de_membresia(uuid, text, uuid) to leda_app;
+
+alter function tareas_que_ve(uuid, text, timestamptz) owner to leda_owner;
+alter function vistas_de(uuid) owner to leda_owner;
+alter function tareas_de_la_sesion(text, text, timestamptz) owner to leda_owner;
+alter function vistas_de_la_sesion(text) owner to leda_owner;
+
+revoke execute on function tareas_que_ve(uuid, text, timestamptz) from public;
+revoke execute on function vistas_de(uuid) from public;
+revoke execute on function tareas_de_la_sesion(text, text, timestamptz) from public;
+revoke execute on function vistas_de_la_sesion(text) from public;
+grant execute on function tareas_de_la_sesion(text, text, timestamptz) to leda_app;
+grant execute on function vistas_de_la_sesion(text) to leda_app;
+
+alter function terminadas_que_ve(uuid, text, timestamptz) owner to leda_owner;
+alter function terminadas_de_la_sesion(text, text, timestamptz) owner to leda_owner;
+
+revoke execute on function terminadas_que_ve(uuid, text, timestamptz) from public;
+revoke execute on function terminadas_de_la_sesion(text, text, timestamptz) from public;
+grant execute on function terminadas_de_la_sesion(text, text, timestamptz) to leda_app;
+
+alter function esperas_que_ve(uuid, text, timestamptz) owner to leda_owner;
+alter function esperas_de_la_sesion(text, text, timestamptz) owner to leda_owner;
+
+revoke execute on function esperas_que_ve(uuid, text, timestamptz) from public;
+revoke execute on function esperas_de_la_sesion(text, text, timestamptz) from public;
+grant execute on function esperas_de_la_sesion(text, text, timestamptz) to leda_app;
+
+-- La puerta de administración (migración 0061): lo que necesitan sus funciones; de las columnas,
+-- sólo las que cambian. `leda_app`, nada sobre las tablas.
+revoke all on enlace_de_administracion, sesion_de_administracion from leda_owner;
+grant select, insert on enlace_de_administracion, sesion_de_administracion to leda_owner;
+grant update (canjeado_en, anulado_en) on enlace_de_administracion to leda_owner;
+grant update (ultimo_uso_en, cortada_en, motivo_de_corte) on sesion_de_administracion
+  to leda_owner;
+
+alter function auditar_acceso_de_administracion(uuid, tipo_actor, text, text, uuid, jsonb)
+  owner to leda_owner;
+alter function es_administrador_de_plataforma(uuid) owner to leda_owner;
+alter function emitir_enlace_de_administracion(uuid, text, uuid) owner to leda_owner;
+alter function canjear_enlace_de_administracion(text, text) owner to leda_owner;
+alter function sesion_de_administracion_vigente(text) owner to leda_owner;
+alter function cerrar_sesion_de_administracion(text) owner to leda_owner;
+alter function cortar_sesiones_de_administrador(uuid, text, uuid) owner to leda_owner;
+
+revoke execute on function auditar_acceso_de_administracion(uuid, tipo_actor, text, text, uuid,
+                                                            jsonb) from public;
+revoke execute on function es_administrador_de_plataforma(uuid) from public;
+revoke execute on function emitir_enlace_de_administracion(uuid, text, uuid) from public;
+revoke execute on function canjear_enlace_de_administracion(text, text) from public;
+revoke execute on function sesion_de_administracion_vigente(text) from public;
+revoke execute on function cerrar_sesion_de_administracion(text) from public;
+revoke execute on function cortar_sesiones_de_administrador(uuid, text, uuid) from public;
+-- La consola (`leda_admin`): emitir y cortar todas. La web (`leda_app`): canjear, la sesión
+-- vigente y cerrar la propia.
+grant execute on function emitir_enlace_de_administracion(uuid, text, uuid) to leda_admin;
+grant execute on function cortar_sesiones_de_administrador(uuid, text, uuid) to leda_admin;
+grant execute on function canjear_enlace_de_administracion(text, text) to leda_app;
+grant execute on function sesion_de_administracion_vigente(text) to leda_app;
+grant execute on function cerrar_sesion_de_administracion(text) to leda_app;
+
+-- La carga de una tarea desde la web (migración 0062): de la clave, `leda_owner` sólo busca y
+-- agrega. La consola (`leda_admin`): el día hábil. La web (`leda_app`): las opciones y la carga.
+revoke all on carga_de_tarea from leda_owner;
+grant select, insert on carga_de_tarea to leda_owner;
+
+alter function es_dia_habil(uuid, date) owner to leda_owner;
+alter function opciones_de_la_carga(text, uuid, timestamptz) owner to leda_owner;
+alter function cargar_tarea(text, uuid, uuid, text, text, uuid, date, text, text[], uuid, text,
+                            timestamptz) owner to leda_owner;
+
+revoke execute on function es_dia_habil(uuid, date) from public;
+revoke execute on function opciones_de_la_carga(text, uuid, timestamptz) from public;
+revoke execute on function cargar_tarea(text, uuid, uuid, text, text, uuid, date, text, text[],
+                                        uuid, text, timestamptz) from public;
+grant execute on function es_dia_habil(uuid, date) to leda_admin;
+grant execute on function opciones_de_la_carga(text, uuid, timestamptz) to leda_app;
+grant execute on function cargar_tarea(text, uuid, uuid, text, text, uuid, date, text, text[],
+                                       uuid, text, timestamptz) to leda_app;
 
 alter function emitir_acceso_tablero(uuid, text, timestamptz)
   owner to leda_owner;
