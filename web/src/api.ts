@@ -13,6 +13,8 @@ export interface Me {
   persona: string;
   espacio: string;
   vistas: ViewRef[];
+  // The Telegram chat with the team bot ("> consultar a leda"), when the space declares it.
+  chat_con_leda: string | null;
 }
 
 export interface Wait {
@@ -30,13 +32,19 @@ export interface Task {
   id: string;
   titulo: string;
   estado: string;
+  // The first mark gives the card its frame; the card shows them all (blocked and late can
+  // come together).
   marca: Marca | null;
+  marcas: Marca[];
   fecha_objetivo: string | null;
+  // The day the person gave, later than the due date: a delay already talked about.
+  prevision: string | null;
   asignada_el: string | null;
   responsable: string | null;
   area: string | null;
   papel: 'mia' | 'espero' | 'me_esperan' | null;
-  // Null means this person is not shown the delay or the block: never guess it.
+  // The server decides both: a waited task is late here only once the delay was talked about,
+  // like in the group report. Never guess them.
   vencida: boolean | null;
   bloqueo_abierto: boolean | null;
   dias_de_atraso: number | null;
@@ -44,6 +52,15 @@ export interface Task {
   quedan_dias_habiles: number | null;
   barra: Segment[] | null;
   esperas: Wait[] | null;
+}
+
+/** A task finished in the last 30 days, with who did it. */
+export interface Finished {
+  id: string;
+  titulo: string;
+  responsable: string | null;
+  area: string | null;
+  terminada_el: string | null;
 }
 
 export interface Day {
@@ -63,6 +80,7 @@ export interface ViewData {
   activas: number;
   semana: Day[];
   tareas: Task[];
+  terminadas: Finished[];
 }
 
 /** The session is gone (cut, expired cookie, or the person left the team). */

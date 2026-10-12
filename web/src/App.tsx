@@ -8,6 +8,7 @@ import {
   type ViewData,
   type ViewId,
 } from './api';
+import { FinishedList } from './components/FinishedList';
 import { Header } from './components/Header';
 import { Notice } from './components/Notice';
 import { SignOut } from './components/SignOut';
@@ -149,6 +150,7 @@ export function App() {
                 ))}
               </div>
             )}
+            <FinishedList items={ready.terminadas ?? []} view={ready.vista} />
           </>
         )}
       </>
@@ -169,7 +171,7 @@ export function App() {
       <main className="flex flex-col gap-3.5 pt-3.5">{body}</main>
       {open && (
         <footer className="mt-auto flex flex-col gap-3 pb-[22px] pt-5">
-          <TalkButton />
+          <TalkButton href={person?.chat_con_leda ?? null} />
           <div className="flex justify-end">
             <SignOut onDone={() => setSignedOut(true)} />
           </div>

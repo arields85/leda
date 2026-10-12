@@ -43,22 +43,31 @@ export const STATE_TEXT: Record<Marca, string> = {
   entregada: 'text-entregada',
 };
 
-// A task without a colored state shows its plain state in gray. A blocked task whose block
-// this person is not shown reads "abierta": the page never tells what the server withheld.
+// A task without a colored state shows its plain state in gray.
 const PLAIN_STATES: Record<string, string> = {
   propuesta: 'PROPUESTA',
   pendiente_aprobacion: 'POR APROBAR',
   asignada: 'ASIGNADA',
 };
 
-/** The bracketed label of a task card: "[VENCIDA +2d]", "[TRABADA]", "[ASIGNADA]"… */
-export function stateLabel(task: Task): string {
-  if (task.marca === 'vencida') {
+export interface StateLabel {
+  text: string;
+  marca: Marca | null;
+}
+
+function markLabel(task: Task, marca: Marca): string {
+  if (marca === 'vencida') {
     const late = task.dias_de_atraso;
     return late !== null && late > 0 ? `[VENCIDA +${late}d]` : '[VENCIDA]';
   }
-  if (task.marca !== null) {
-    return `[${STATES.find((s) => s.marca === task.marca)?.label ?? 'ABIERTA'}]`;
+  return `[${STATES.find((s) => s.marca === marca)?.label ?? 'ABIERTA'}]`;
+}
+
+/** The bracketed labels of a task card, one per mark the server gave: "[TRABADA]" and
+ * "[VENCIDA +2d]" together, or "[EN CURSO]"; without a mark, its plain state in gray. */
+export function stateLabels(task: Task): StateLabel[] {
+  if (task.marcas.length > 0) {
+    return task.marcas.map((marca) => ({ text: markLabel(task, marca), marca }));
   }
-  return `[${PLAIN_STATES[task.estado] ?? 'ABIERTA'}]`;
+  return [{ text: `[${PLAIN_STATES[task.estado] ?? 'ABIERTA'}]`, marca: null }];
 }

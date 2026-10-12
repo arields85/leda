@@ -10,6 +10,7 @@ describe('TaskCard', () => {
         view="tus"
         task={task({
           marca: 'vencida',
+          marcas: ['vencida'],
           vencida: true,
           dias_de_atraso: 2,
           fecha_objetivo: '2026-10-22',
@@ -22,20 +23,49 @@ describe('TaskCard', () => {
   });
 
   it('shows [VENCIDA] alone when the delay cannot be counted', () => {
-    render(<TaskCard view="tus" task={task({ marca: 'vencida', vencida: true, dias_de_atraso: null })} />);
+    render(
+      <TaskCard
+        view="tus"
+        task={task({ marca: 'vencida', marcas: ['vencida'], vencida: true, dias_de_atraso: null })}
+      />,
+    );
     expect(screen.getByText('[VENCIDA]')).toBeInTheDocument();
   });
 
-  it('never shows a delay or a block the server did not give (null fields)', () => {
-    const { container } = render(
+  it('a blocked and late task shows both marks, each in its color', () => {
+    render(
       <TaskCard
         view="tus"
         task={task({
           papel: 'espero',
           responsable: 'Ariel',
           estado: 'bloqueada',
-          vencida: null,
-          bloqueo_abierto: null,
+          marca: 'trabada',
+          marcas: ['trabada', 'vencida'],
+          vencida: true,
+          bloqueo_abierto: true,
+          dias_de_atraso: 3,
+          fecha_objetivo: '2026-10-19',
+          quedan_dias_habiles: null,
+          esperas: [{ que: 'falta el cable', quien: 'Lucas', esperas: [] }],
+        })}
+      />,
+    );
+    expect(screen.getByText('[TRABADA]')).toHaveClass('text-trabada');
+    expect(screen.getByText('[VENCIDA +3d]')).toHaveClass('text-vencida');
+    expect(screen.getByText('└─ espera: falta el cable (Lucas)')).toBeInTheDocument();
+  });
+
+  it('a waited task the server does not mark late shows only its state and its date', () => {
+    const { container } = render(
+      <TaskCard
+        view="tus"
+        task={task({
+          papel: 'espero',
+          responsable: 'Ariel',
+          estado: 'asignada',
+          vencida: false,
+          bloqueo_abierto: false,
           dias_de_atraso: null,
           esperas: null,
           fecha_objetivo: '2026-10-19',
@@ -43,10 +73,31 @@ describe('TaskCard', () => {
         })}
       />,
     );
-    expect(container.textContent).not.toMatch(/VENCIDA|TRABADA|espera:/);
+    expect(container.textContent).not.toMatch(/VENCIDA|TRABADA|espera:|prevé/);
     expect(container.innerHTML).not.toMatch(/text-(vencida|trabada)/);
-    expect(screen.getByText('[ABIERTA]')).toHaveClass('text-ink-dim');
+    expect(screen.getByText('[ASIGNADA]')).toHaveClass('text-ink-dim');
+    expect(screen.getByText('19.10')).toBeInTheDocument();
     expect(screen.getByText('└─ de Ariel · la esperás')).toBeInTheDocument();
+  });
+
+  it('shows the day the person gave when a delay was already talked about', () => {
+    render(
+      <TaskCard
+        view="tus"
+        task={task({
+          papel: 'espero',
+          responsable: 'Ariel',
+          marca: 'vencida',
+          marcas: ['vencida'],
+          vencida: true,
+          dias_de_atraso: 3,
+          fecha_objetivo: '2026-10-19',
+          prevision: '2026-10-28',
+          quedan_dias_habiles: null,
+        })}
+      />,
+    );
+    expect(screen.getByText('19.10 · prevé 28.10')).toBeInTheDocument();
   });
 
   it('a task in progress shows the days left on top and its bar', () => {
@@ -55,6 +106,7 @@ describe('TaskCard', () => {
         view="tus"
         task={task({
           marca: 'en_curso',
+          marcas: ['en_curso'],
           estado: 'en_curso',
           quedan_dias_habiles: 7,
           barra: [
@@ -72,7 +124,10 @@ describe('TaskCard', () => {
 
   it('a delivered task is dashed and dimmer, without the shadow', () => {
     const { container } = render(
-      <TaskCard view="tus" task={task({ marca: 'entregada', estado: 'en_revision' })} />,
+      <TaskCard
+        view="tus"
+        task={task({ marca: 'entregada', marcas: ['entregada'], estado: 'en_revision' })}
+      />,
     );
     const card = container.querySelector('article') as HTMLElement;
     expect(card).toHaveClass('border-dashed');
@@ -87,6 +142,7 @@ describe('TaskCard', () => {
         view="tus"
         task={task({
           marca: 'trabada',
+          marcas: ['trabada'],
           bloqueo_abierto: true,
           esperas: [{ que: 'servidor de la planta', quien: 'Ariel', esperas: [] }],
         })}

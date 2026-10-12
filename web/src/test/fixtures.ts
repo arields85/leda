@@ -1,4 +1,4 @@
-import type { Me, Task, ViewData } from '../api';
+import type { Finished, Me, Task, ViewData } from '../api';
 
 export function task(overrides: Partial<Task> = {}): Task {
   return {
@@ -6,7 +6,9 @@ export function task(overrides: Partial<Task> = {}): Task {
     titulo: 'Configurar alarmas del SCADA',
     estado: 'asignada',
     marca: null,
+    marcas: [],
     fecha_objetivo: '2026-10-30',
+    prevision: null,
     asignada_el: '2026-10-19',
     responsable: 'Marcos',
     area: 'Automatización',
@@ -18,6 +20,17 @@ export function task(overrides: Partial<Task> = {}): Task {
     quedan_dias_habiles: 4,
     barra: null,
     esperas: null,
+    ...overrides,
+  };
+}
+
+export function finished(overrides: Partial<Finished> = {}): Finished {
+  return {
+    id: 'f1',
+    titulo: 'Relevar tableros de la línea 2',
+    responsable: 'Marcos',
+    area: 'Automatización',
+    terminada_el: '2026-10-20',
     ...overrides,
   };
 }
@@ -38,6 +51,7 @@ export function view(overrides: Partial<ViewData> = {}): ViewData {
       { fecha: '2026-10-30', dia: 'vie', hoy: false, habil: true, vence_algo: true },
     ],
     tareas: [task()],
+    terminadas: [],
     ...overrides,
   };
 }
@@ -47,6 +61,7 @@ export function me(overrides: Partial<Me> = {}): Me {
     persona: 'Marcos',
     espacio: 'CoreWork',
     vistas: [{ vista: 'tus', titulo: 'Tus tareas' }],
+    chat_con_leda: null,
     ...overrides,
   };
 }

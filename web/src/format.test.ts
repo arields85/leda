@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { activeCount, daysLeft, weekLine } from './format';
+import { activeCount, daysLeft, stateLabels, weekLine } from './format';
+import { task } from './test/fixtures';
 
 describe('format', () => {
   it('writes the header line like the design', () => {
@@ -13,5 +14,15 @@ describe('format', () => {
     expect(daysLeft(7)).toBe('quedan 7 días');
     expect(daysLeft(1)).toBe('queda 1 día');
     expect(daysLeft(0)).toBe('vence hoy');
+  });
+
+  it('labels every mark the server gave, blocked first', () => {
+    expect(stateLabels(task({ marcas: ['trabada', 'vencida'], dias_de_atraso: 2 }))).toEqual([
+      { text: '[TRABADA]', marca: 'trabada' },
+      { text: '[VENCIDA +2d]', marca: 'vencida' },
+    ]);
+    expect(stateLabels(task({ marcas: [], estado: 'asignada' }))).toEqual([
+      { text: '[ASIGNADA]', marca: null },
+    ]);
   });
 });

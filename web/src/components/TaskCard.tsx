@@ -1,5 +1,5 @@
 import type { Task, ViewId } from '../api';
-import { daysLeft, shortDate, STATE_TEXT, stateLabel } from '../format';
+import { daysLeft, shortDate, STATE_TEXT, stateLabels } from '../format';
 import { WaitTree } from './WaitTree';
 import { WorkdayBar } from './WorkdayBar';
 
@@ -12,25 +12,28 @@ function ownerLine(task: Task, view: ViewId): string | null {
   return null;
 }
 
-/** Top right: the working days left on a task in progress, the due date on the others. */
+/** Top right: the working days left on a task in progress, the due date on the others, and
+ * the day the person gave when a delay was already talked about ("19.10 · prevé 28.10"). */
 function corner(task: Task): string | null {
-  if (task.marca === 'en_curso' && task.quedan_dias_habiles !== null) {
+  if (task.marcas.includes('en_curso') && task.quedan_dias_habiles !== null) {
     return daysLeft(task.quedan_dias_habiles);
   }
-  return task.fecha_objetivo ? shortDate(task.fecha_objetivo) : null;
+  const due = task.fecha_objetivo ? shortDate(task.fecha_objetivo) : null;
+  const forecast = task.prevision ? `prevé ${shortDate(task.prevision)}` : null;
+  return [due, forecast].filter(Boolean).join(' · ') || null;
 }
 
-/** A task: its state in brackets (in color only for the four states), its date, its title,
- * and, when there is one, the chain of waits or the bar of working days. */
+/** A task: its states in brackets (in color only for the four states; blocked and late can come
+ * together), its date, its title, and, when there is one, the chain of waits or the bar of
+ * working days. */
 export function TaskCard({ task, view }: { task: Task; view: ViewId }) {
-  const delivered = task.marca === 'entregada';
+  const delivered = task.marcas.includes('entregada');
   const frame = delivered
     ? 'border-dashed border-line-dashed'
     : 'border-line bg-card shadow-hard';
-  const labelColor = task.marca ? STATE_TEXT[task.marca] : 'text-ink-dim';
   const owner = ownerLine(task, view);
   const top = corner(task);
-  const waits = task.marca === 'trabada' && task.esperas ? task.esperas : [];
+  const waits = task.marcas.includes('trabada') && task.esperas ? task.esperas : [];
   const bar = task.barra ?? [];
   return (
     <article
@@ -38,7 +41,13 @@ export function TaskCard({ task, view }: { task: Task; view: ViewId }) {
       className={`flex min-w-0 flex-col rounded-card border-hard px-3 py-2.5 ${bar.length ? 'gap-[5px]' : 'gap-1'} ${frame}`}
     >
       <div className="flex justify-between gap-2">
-        <span className={`font-bold ${labelColor}`}>{stateLabel(task)}</span>
+        <span className="flex min-w-0 flex-wrap gap-x-1.5">
+          {stateLabels(task).map(({ text, marca }) => (
+            <span key={text} className={`font-bold ${marca ? STATE_TEXT[marca] : 'text-ink-dim'}`}>
+              {text}
+            </span>
+          ))}
+        </span>
         {top && <span className="shrink-0 text-ink-dim">{top}</span>}
       </div>
       <span className={`wrap-break-word font-medium ${delivered ? 'text-ink-soft' : ''}`}>

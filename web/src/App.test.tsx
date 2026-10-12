@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Me, ViewData } from './api';
 import { App } from './App';
-import { me, task, view } from './test/fixtures';
+import { finished, me, task, view } from './test/fixtures';
 
 type Route = { status: number; body?: unknown };
 
@@ -37,7 +37,7 @@ afterEach(() => {
 describe('App', () => {
   it('shows a member only her view, with no switch', async () => {
     serve({
-      'GET /app/api/yo': ok(me()),
+      'GET /app/api/yo': ok(me({ chat_con_leda: 'https://t.me/LedaCoreWorkBot' })),
       'GET /app/api/tareas?vista=tus': ok(view()),
     });
     render(<App />);
@@ -46,7 +46,33 @@ describe('App', () => {
     expect(screen.getByText('LEDA · COREWORK')).toBeInTheDocument();
     expect(screen.getByText('SEM 44 · LUN 26.10')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Vistas' })).toBeNull();
-    expect(screen.getByText('> contarle algo a leda')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '> consultar a leda' })).toHaveAttribute(
+      'href',
+      'https://t.me/LedaCoreWorkBot',
+    );
+  });
+
+  it('without the bot address there is no button to consult Leda', async () => {
+    serve({
+      'GET /app/api/yo': ok(me()),
+      'GET /app/api/tareas?vista=tus': ok(view()),
+    });
+    render(<App />);
+    await screen.findByText('Configurar alarmas del SCADA');
+    expect(screen.queryByText('> consultar a leda')).toBeNull();
+  });
+
+  it('shows the finished tasks apart, after the open ones', async () => {
+    serve({
+      'GET /app/api/yo': ok(me()),
+      'GET /app/api/tareas?vista=tus': ok(view({ terminadas: [finished()] })),
+    });
+    const { container } = render(<App />);
+    const done = await screen.findByText('Relevar tableros de la línea 2');
+    const open = screen.getByText('Configurar alarmas del SCADA');
+    expect(open.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Terminadas en los últimos 30 días' })).toBeInTheDocument();
+    expect(container.querySelectorAll('article[data-task]')).toHaveLength(1);
   });
 
   it('switches only between the views the server gave', async () => {
@@ -93,7 +119,7 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByText('La sesión está cerrada.')).toBeInTheDocument();
     expect(screen.getByText(/pedile a Leda un enlace nuevo/)).toBeInTheDocument();
-    expect(screen.queryByText('> contarle algo a leda')).toBeNull();
+    expect(screen.queryByText('> consultar a leda')).toBeNull();
   });
 
   it('a failure shows plain words, never technical details', async () => {
@@ -111,11 +137,17 @@ describe('App', () => {
     serve({
       'GET /app/api/yo': ok(me()),
       'GET /app/api/tareas?vista=tus': ok(
-        view({ tareas: [], activas: 0, panel: { vencida: 0, trabada: 0, en_curso: 0, entregada: 0 } }),
+        view({
+          tareas: [],
+          activas: 0,
+          panel: { vencida: 0, trabada: 0, en_curso: 0, entregada: 0 },
+          terminadas: [finished()],
+        }),
       ),
     });
     render(<App />);
     expect(await screen.findByText('No tenés tareas abiertas.')).toBeInTheDocument();
+    expect(screen.getByText('Relevar tableros de la línea 2')).toBeInTheDocument();
     expect(screen.getByText(/0 activas/)).toBeInTheDocument();
   });
 
@@ -144,6 +176,7 @@ describe('App', () => {
             task({
               id: 'b',
               marca: 'en_curso',
+              marcas: ['en_curso'],
               estado: 'en_curso',
               quedan_dias_habiles: 20,
               barra: Array.from({ length: 30 }, (_, i) => ({
