@@ -101,12 +101,12 @@ comprobación y hace la revisión RDD. Estimación total: más de 400 líneas; c
       fecha, sus días hábiles para la barra y la cadena de esperas); cabeceras como las de la página de
       la tarea; `TestClient` con `https`. Comando de consola para emitir el enlace de una persona y para
       cortar sus sesiones.
-- [ ] **P1-4 · La web:** `web/` con Vite, React, TypeScript, Tailwind y Lucide; los tokens del aspecto;
+- [x] **P1-4 · La web:** `web/` con Vite, React, TypeScript, Tailwind y Lucide; los tokens del aspecto;
       las piezas (cabezal, panel de estados, tira de la semana, tarjeta, barra de días, árbol de esperas,
       botón); "Tus tareas", "Tu sector" y "El equipo"; compilada a `web/dist` y servida en `/app`.
       Comprobaciones: tipos, pruebas de las piezas (vitest), compilación, y una prueba de Python que la
       sirve; control del ancho de un teléfono (390 px).
-- [ ] **P1-5 · Documentos:** `docs/capacidades.md`, `docs/product/plataforma-pendientes.md`, cómo
+- [x] **P1-5 · Documentos:** `docs/capacidades.md`, `docs/product/plataforma-pendientes.md`, cómo
       levantarla para probar (`PRUEBA-LOCAL.md`) y este documento con la evidencia.
 
 **Después de la prueba por Telegram** (con el usuario): juntar las ramas; Leda ofrece el acceso por chat
@@ -163,6 +163,33 @@ Lo prueba primero `TestClient` y después el usuario en su celular.
   proxy. **Hallazgo del escritor, decidido por el coordinador (técnico):** Telegram abre el enlace para
   armar la vista previa y gastaría el enlace de un solo uso; desde la P1-4, abrir el enlace muestra un
   botón "Entrar" y el canje es al tocarlo.
+- **P1-4** (escritor delegado). `5e3d74b3`: abrir el enlace (GET) muestra la misma página con el botón
+  "Entrar" para cualquier token y no lo gasta; tocarlo (POST, mismo origen) lo canjea una vez (RED 27
+  fallas, GREEN 31 passed); la página del botón manda `Referrer-Policy: same-origin` porque con
+  `no-referrer` el navegador manda `Origin: null` y el chequeo lo rechazaría. `3dd40792`: la web en
+  `web/` (React 19.1.0, Vite 6.3.5, TypeScript 5.8.3, Tailwind 4.1.11, lucide-react 0.525.0, JetBrains
+  Mono local; versiones exactas y `package-lock.json`; `web/dist` y `node_modules` fuera de Git), con
+  los tokens de la "9 · Terminal" y las piezas (cabezal, panel, semana, tarjeta, barra de días, árbol de
+  esperas, botón inerte, selector de vista, salir); el servidor la sirve en `/app/` con su CSP, sin tapar
+  la API. La API suma `dias_de_atraso` para "[VENCIDA +Nd]", sólo cuando la base ya muestra el atraso.
+  `b83aae48` y `2731f214`: un comentario que la garantía de capacidades leía como el campo de prioridad,
+  y las pruebas de consola que entran con el botón. 390 px: la web servida con datos de mentira en el
+  puerto 5179 dentro de un marco de 390 px, sin desbordes (servidor cortado). Comprobado por el
+  coordinador: `npm run typecheck` sin errores, `npx vitest run` 27 passed, `npm run build` bien;
+  `pytest tests/test_cli_plataforma.py tests/garantias/test_api_de_la_plataforma.py
+  tests/garantias/test_web_servida.py`: 56 passed; `pytest tests/garantias` (por el escritor, con
+  `test_frontera`, que corre todas en otro proceso, después del arreglo): en verde; nada escuchando en
+  8000, 8001, 5173 ni 5179; `_archivo_de_la_web` devuelve `None` ante `../`, `..\`, rutas absolutas y
+  `%2e%2e`. RDD por tramos (el `package-lock.json` es generado y no entra en el presupuesto de una
+  revisión entera): `review-67a124eeb603558a` (parte A) y `review-c660bc80e653c6df` (la web), aprobadas.
+  Advertencias: una doble pulsación rápida en "Entrar" puede caer en "ya no sirve"; una compilación nueva
+  mientras alguien navega puede servir un índice que apunta a archivos que ya no están; sugerencias de
+  pruebas (401 en tareas, vistas vacías, la semana).
+- **P1-5** (`ab3fae1d`): `docs/capacidades.md`, `docs/product/plataforma-pendientes.md` y
+  `PRUEBA-LOCAL.md` ("La plataforma web (porción 1)", en el puerto 8001). `PENDIENTE`: la tarjeta no abre
+  la página de la tarea (la de hoy entra con un enlace propio, no con la sesión); no hay base para probarla
+  de punta a punta todavía: `leda_motor` está en la `0056` y reservada para la prueba por Telegram; al
+  juntar las ramas, se pone al día hasta la `0059` (con respaldo) y se prueba ahí.
 
 ## Para decidir (el usuario, después de la prueba por Telegram)
 
@@ -185,3 +212,9 @@ Mientras no se decida, la plataforma hace lo más restrictivo; abrirlo después 
 6. **Hasta dónde ve la cadena un integrante.** Marcos ve "└─ espera: switch nuevo (Lucas)", que es el
    bloqueo de la tarea de Ariel, como en el ejemplo del ADR. ¿Está bien que un integrante vea esa
    profundidad, o sólo el primer escalón ("espera: servidor de la planta (Ariel)")?
+7. **Una tarea trabada de otro.** Marcos espera "Integrar datos de la comprimidora", que está trabada; como
+   el servidor no le muestra el bloqueo de otro, su tarjeta dice "[ABIERTA]" en gris. ¿Tiene que ver que
+   está trabada (va de la mano con la 1)?
+8. **El botón "> contarle algo a leda"** está pero no hace nada: la web todavía no sabe la dirección del
+   bot del equipo. ¿Lo dejamos visible hasta que la tenga, o lo ocultamos? (Recomendación: que abra el
+   chat con el bot del espacio, cuya dirección sale del pack.)
