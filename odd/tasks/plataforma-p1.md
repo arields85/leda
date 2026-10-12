@@ -95,7 +95,7 @@ comprobación y hace la revisión RDD. Estimación total: más de 400 líneas; c
 - [x] **P1-2 · Quién ve qué en listas** (migración `0058`): la función de lista por vista ("tus":
       mías, espero, me esperan; "sector"; "equipo") que extiende `puede_ver_tarea`, sin atrasos ajenos
       para el integrante; qué vistas tiene cada persona. Pruebas por puesto.
-- [ ] **P1-3 · La API interna:** canje del enlace (`/app/entrar/{token}` → cookie y redirección a la
+- [x] **P1-3 · La API interna:** canje del enlace (`/app/entrar/{token}` → cookie y redirección a la
       web), `/app/api/yo` (quién es y qué vistas tiene) y `/app/api/tareas?vista=…` (panel por estado,
       semana del calendario del espacio con los días en que vence algo, y cada tarea con su estado, su
       fecha, sus días hábiles para la barra y la cadena de esperas); cabeceras como las de la página de
@@ -151,6 +151,18 @@ Lo prueba primero `TestClient` y después el usuario en su celular.
   ya se haya resuelto (mientras la tarea siga abierta); sugerencias: probar los negativos de la cadena y
   el borde de `vencida`. Para la P1-3: la cadena de esperas de una tarea trabada necesita su función, y
   `vencida` no mira una nueva previsión de la persona (el motor sí).
+- **P1-3** (`b7fd66fb`: migración `0059`, la cadena de esperas de una tarea trabada, hasta 10 niveles y
+  sin repetir; `19e922ec`: la API en `src/leda/web_app.py`, enchufada en `entrada.py`): `/app/entrar/{token}`
+  (cookie `leda_sesion` `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/app`, `Max-Age` de 400 días que se
+  renueva), `/app/api/yo`, `/app/api/tareas?vista=` (panel, semana, tareas con barra, días que quedan y
+  esperas; los vacíos de la base no se completan), `POST /app/salir`; comandos `leda enlace-web` y
+  `leda cortar-sesiones-web`. Sus pruebas: 33 passed; `pytest tests/garantias`: 585 passed (el escritor
+  escribió el código antes que las pruebas y mostró el RED quitándolo). RDD `review-62fbe1aba719db0b`,
+  aprobada. Advertencias: los días que quedan cuando vence el mismo día; `/app/` todavía no se servía (lo
+  resuelve la P1-4); sugerencias: el candado global serializa la web, el chequeo de `Origin` detrás de un
+  proxy. **Hallazgo del escritor, decidido por el coordinador (técnico):** Telegram abre el enlace para
+  armar la vista previa y gastaría el enlace de un solo uso; desde la P1-4, abrir el enlace muestra un
+  botón "Entrar" y el canje es al tocarlo.
 
 ## Para decidir (el usuario, después de la prueba por Telegram)
 
@@ -168,3 +180,8 @@ Mientras no se decida, la plataforma hace lo más restrictivo; abrirlo después 
    noticias). ¿Se muestran las terminadas en los últimos días?
 4. **Lo que tengo para revisar.** A Ismael le aparece en "Tus tareas" la entrega de Marcos que espera su
    revisión, aunque sea de otra área ("otros me esperan"). ¿Queda así?
+5. **Vencida y trabada a la vez.** "Programar PLC" está trabada y además pasó su fecha: ¿la tarjeta dice
+   [TRABADA] (como hoy) o [VENCIDA]?
+6. **Hasta dónde ve la cadena un integrante.** Marcos ve "└─ espera: switch nuevo (Lucas)", que es el
+   bloqueo de la tarea de Ariel, como en el ejemplo del ADR. ¿Está bien que un integrante vea esa
+   profundidad, o sólo el primer escalón ("espera: servidor de la planta (Ariel)")?
