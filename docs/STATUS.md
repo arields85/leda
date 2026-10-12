@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-12, noche: la porción 1 de la plataforma, construida en su rama; `leda_motor`, lista para la prueba por Telegram.
+**Última actualización documental:** 2026-10-12, cierre: las porciones 1 y 2 de la plataforma, construidas en su rama; `leda_motor`, lista para la prueba por Telegram.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -35,7 +35,7 @@ chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Te
 ## Punto exacto para retomar (2026-10-12)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`,
-subida a `origin` en `912eb413`. Plan de la Fase C: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (las
+subida a `origin` al cierre del 2026-10-12. Plan de la Fase C: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (las
 decisiones del usuario 1 a 76 y la lista de tareas en "Próximo paso"); la plataforma, en el
 [ADR 0022](decisions/0022-plataforma-web-de-tareas.md).
 
@@ -74,9 +74,13 @@ viejo corriendo.
    `odd/tasks/plataforma-p1.md` de esa rama. El 2026-10-12, de día: las ocho preguntas, contestadas y
    construidas (P1-6), y la **porción 2** (la puerta de administración y la carga de tareas, con
    vista de escritorio; `odd/tasks/plataforma-p2.md`), adelantada sin la prueba de la porción 1 en el
-   celular por decisión del usuario; rama subida en `54889f99`. Después de la prueba, con el usuario:
-   juntar las ramas, poner `leda_motor` al día hasta la `0059` (con respaldo), que Leda ofrezca el
-   acceso por chat y la prueba en el celular (necesita HTTPS o un túnel).
+   celular por decisión del usuario; rama subida en `c52269a`. **Punto exacto:** el usuario hace
+   primero la prueba por Telegram; cuando avise, y con su visto bueno: respaldo de `leda_motor`,
+   migraciones hasta la `0064`, juntar las ramas, que Leda ofrezca el acceso por chat y la prueba de las
+   dos porciones en el celular y la computadora (túnel o HTTPS, sólo con su permiso). Faltan del
+   usuario: el nombre del bot del equipo (`bot_usuario` en el pack) y, de a una, las preguntas de
+   "Para decidir" de `odd/tasks/plataforma-p2.md` (quién crea los objetivos, si las esperas van en el
+   formulario, quién "decidió" la tarea) y si el enlace de entrada vence (recomendado: 24 horas).
 3. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11; no volvió a pasar en las rondas del
    formato).
 
