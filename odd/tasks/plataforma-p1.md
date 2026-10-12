@@ -222,8 +222,12 @@ Lo prueba primero `TestClient` y después el usuario en su celular.
   quién las hizo en el sector y el equipo; "> consultar a leda" es un enlace a `https://t.me/<bot>`
   (sólo una dirección de Telegram; sin ella, no se muestra). RED: 9 fallas en 5 archivos; GREEN:
   `npx tsc --noEmit` sin errores, `npx vitest run` 38 passed, `npx vite build` bien.
-  `PENDIENTE`: el usuario del bot de CoreWork; la suite entera de garantías (la corre el
-  coordinador); la revisión RDD de los dos commits.
+  `PENDIENTE`: el usuario del bot de CoreWork.
+  Coordinador, 2026-10-12: `pytest -q tests/garantias` sobre `6a3ade84`, en una carpeta aparte:
+  626 passed (22 min). RDD por tramos, aprobadas: `a5e23f73` (`review-79811cd70ca3be69`) y
+  `0a2a6fa9` (`review-fbed673bc87e2f0a`). Advertencias sin arreglar: la prueba de la cancelada puede
+  pasar sin probar nada (`test_quien_ve_que.py:596-602`); `marcas` sin guarda si falta
+  (`web/src/format.ts:69`); sugerencias de pruebas y del formato de la fecha.
 
 ## Decidido por el usuario (2026-10-12)
 
