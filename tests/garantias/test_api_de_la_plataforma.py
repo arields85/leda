@@ -2,7 +2,9 @@
 12, 13 y 18; porción 1, tarea P1-3; migraciones 0057 a 0059): la entrada HTTP sobre las
 funciones de la base, con `TestClient` sobre `https` (la cookie es `Secure`) y sin red.
 
-- **El enlace sirve una vez:** canjearlo deja la cookie de la sesión (`HttpOnly`, `Secure`,
+- **El enlace sirve una vez:** abrirlo no lo gasta (la vista previa de Telegram o de un correo lo
+  abre antes que la persona): muestra una página con el botón "Entrar", igual para cualquier
+  enlace. El botón lo canjea: deja la cookie de la sesión (`HttpOnly`, `Secure`,
   `SameSite=Strict`, sólo `/app`) y lleva a la web; usado, inventado o anulado, muestra siempre la
   misma página humana, sin detalles técnicos (constitución §10).
 - **Quién ve qué** sale de la base y de la sesión, nunca del pedido (decisiones 11 y 13): cada
@@ -71,7 +73,7 @@ def _enlace(conn, mundo: dict, nombre: str, slug: str = "north-lab") -> str:
 def _entrar(web, conn, mundo: dict, nombre: str, slug: str = "north-lab"):
     """Un navegador con la sesión de esa persona abierta."""
     navegador = web()
-    r = navegador.get(f"/app/entrar/{_enlace(conn, mundo, nombre, slug)}")
+    r = navegador.post(f"/app/entrar/{_enlace(conn, mundo, nombre, slug)}")
     assert r.status_code == 303, r.text
     return navegador
 
@@ -146,9 +148,48 @@ def test_la_cadena_no_entra_sin_sesion_ni_con_una_vista_desconocida(conn, mundo)
 
 # --- Entrar -----------------------------------------------------------------------------------
 
-def test_el_enlace_abre_la_sesion_con_la_cookie_y_lleva_a_la_web(web, conn, mundo):
+def _sesiones(conn) -> int:
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from sesion_web")
+        n = cur.fetchone()["n"]
+    conn.commit()
+    return n
+
+
+def test_abrir_el_enlace_no_lo_gasta_y_muestra_el_boton_entrar(web, conn, mundo):
+    """La vista previa de Telegram (o el revisor de un correo) abre el enlace antes que la
+    persona: abrirlo, las veces que sea, no canjea nada."""
     token = _enlace(conn, mundo, "Sam North")
-    r = web().get(f"/app/entrar/{token}")
+    for _ in range(2):
+        r = web().get(f"/app/entrar/{token}")
+        assert r.status_code == 200
+        assert "set-cookie" not in r.headers
+        assert 'method="post"' in r.text and ">Entrar<" in r.text and "Leda" in r.text
+        assert token not in r.text
+        politica = r.headers["content-security-policy"]
+        assert "form-action 'self'" in politica and "script-src" not in politica
+        assert "frame-ancestors 'none'" in politica
+        assert r.headers["cache-control"] == "no-store"
+        assert r.headers["x-frame-options"] == "DENY"
+        # El botón manda el origen del sitio (con `no-referrer` el navegador mandaría "null"),
+        # y la dirección con el token no sale nunca hacia otro sitio.
+        assert r.headers["referrer-policy"] == "same-origin"
+    assert _sesiones(conn) == 0
+    assert _auditadas(conn, "canjear_enlace_de_entrada") == []
+    assert web().post(f"/app/entrar/{token}").status_code == 303
+
+
+@pytest.mark.parametrize("camino", ["/app/entrar/inventado", "/app/entrar/" + "x" * 300])
+def test_abrir_cualquier_enlace_muestra_la_misma_pagina(web, conn, mundo, camino):
+    """La página del botón no dice si el enlace sirve."""
+    de_verdad = web().get(f"/app/entrar/{_enlace(conn, mundo, 'Sam North')}")
+    r = web().get(camino)
+    assert r.status_code == 200 and r.text == de_verdad.text
+
+
+def test_el_boton_abre_la_sesion_con_la_cookie_y_lleva_a_la_web(web, conn, mundo):
+    token = _enlace(conn, mundo, "Sam North")
+    r = web().post(f"/app/entrar/{token}", headers={"origin": BASE})
     assert r.status_code == 303 and r.headers["location"] == "/app/"
     _tiene_las_cabeceras(r)
     cookie = r.headers["set-cookie"]
@@ -159,33 +200,45 @@ def test_el_enlace_abre_la_sesion_con_la_cookie_y_lleva_a_la_web(web, conn, mund
     assert partes["path"] == "Path=/app"
     assert token not in cookie and _hash(token) not in cookie
     assert _auditadas(conn, "canjear_enlace_de_entrada")[0]["nucleo_hash"]
+    assert _sesiones(conn) == 1
 
 
 def test_el_enlace_sirve_una_sola_vez(web, conn, mundo):
     token = _enlace(conn, mundo, "Sam North")
-    assert web().get(f"/app/entrar/{token}").status_code == 303
-    r = web().get(f"/app/entrar/{token}")
+    assert web().post(f"/app/entrar/{token}").status_code == 303
+    r = web().post(f"/app/entrar/{token}")
     assert r.status_code == 404
     assert "ya no sirve" in r.text and "Leda" in r.text
     assert "set-cookie" not in r.headers
     _tiene_las_cabeceras(r)
     assert "script-src" not in r.headers["content-security-policy"]
     assert token not in r.text
+    assert _sesiones(conn) == 1
 
 
 @pytest.mark.parametrize("camino", ["/app/entrar/inventado", "/app/entrar/" + "x" * 300])
 def test_un_enlace_inventado_muestra_la_misma_pagina(web, mundo, camino):
-    r = web().get(camino)
+    r = web().post(camino)
     assert r.status_code == 404 and "ya no sirve" in r.text
     for de_la_cocina in ("traceback", "psycopg", "sesion_web", "enlace_de_entrada", "error"):
         assert de_la_cocina not in r.text.lower()
 
 
+def test_el_boton_desde_otro_sitio_no_canjea_nada(web, conn, mundo):
+    token = _enlace(conn, mundo, "Sam North")
+    for origen in ("https://otro.example", "null"):
+        r = web().post(f"/app/entrar/{token}", headers={"origin": origen})
+        assert r.status_code == 403 and "set-cookie" not in r.headers
+        _tiene_las_cabeceras(r)
+    assert _sesiones(conn) == 0
+    assert web().post(f"/app/entrar/{token}").status_code == 303
+
+
 def test_un_enlace_anulado_por_otro_no_entra(web, conn, mundo):
     viejo = _enlace(conn, mundo, "Sam North")
     nuevo = _enlace(conn, mundo, "Sam North")
-    assert web().get(f"/app/entrar/{viejo}").status_code == 404
-    assert web().get(f"/app/entrar/{nuevo}").status_code == 303
+    assert web().post(f"/app/entrar/{viejo}").status_code == 404
+    assert web().post(f"/app/entrar/{nuevo}").status_code == 303
 
 
 # --- Quién es ---------------------------------------------------------------------------------
@@ -469,18 +522,18 @@ def test_ningun_token_en_las_respuestas_ni_en_la_consola_ni_en_la_auditoria(
         web, conn, mundo, capsys):
     enlace = _enlace(conn, mundo, "Taylor Quinn")
     navegador = web()
-    respuestas = [navegador.get(f"/app/entrar/{enlace}")]
+    respuestas = [navegador.get(f"/app/entrar/{enlace}"), navegador.post(f"/app/entrar/{enlace}")]
     sesion = navegador.cookies.get("leda_sesion")
     assert sesion
     respuestas += [navegador.get("/app/api/yo"), navegador.get("/app/api/tareas?vista=sector"),
-                   navegador.get(f"/app/entrar/{enlace}"), navegador.post("/app/salir")]
+                   navegador.post(f"/app/entrar/{enlace}"), navegador.post("/app/salir")]
     salida = capsys.readouterr()
     for secreto in (enlace, _hash(enlace), _hash(sesion)):
         for r in respuestas:
             assert secreto not in r.text
             assert secreto not in str(r.headers)
         assert secreto not in salida.out + salida.err
-    for r in respuestas[1:]:
+    for r in respuestas[2:]:
         assert sesion not in r.text
     with admin(conn) as cur:
         cur.execute("select detalle::text d from audit_log")

@@ -5,10 +5,14 @@ decisiones 3, 4, 5, 11, 12, 13, 16.1, 17 y 18; porción 1, tarea P1-3 de
 Rutas, todas bajo `/app` y servidas por la misma aplicación que la página de la tarea
 (`entrada.py`), así la cookie es del mismo origen:
 
-- `GET /app/entrar/{token}`: canjea el enlace de un solo uso que manda Leda por una sesión y la
-  deja en una cookie `HttpOnly`, `Secure` y `SameSite=Strict`, sólo para `/app`; después lleva a
-  la web (303 a `/app/`). Un enlace usado, anulado, inventado o de alguien que dejó el equipo
-  muestra siempre la misma página humana, sin detalles técnicos (constitución §10).
+- `GET /app/entrar/{token}`: una página con el botón "Entrar", y nada más. Abrir el enlace no lo
+  gasta: Telegram y los revisores de correo lo abren para armar la vista previa antes que la
+  persona, y lo gastarían. La página es la misma para cualquier enlace: no dice si sirve.
+- `POST /app/entrar/{token}` (el botón): canjea el enlace de un solo uso que manda Leda por una
+  sesión y la deja en una cookie `HttpOnly`, `Secure` y `SameSite=Strict`, sólo para `/app`;
+  después lleva a la web (303 a `/app/`). Un enlace usado, anulado, inventado o de alguien que
+  dejó el equipo muestra siempre la misma página humana, sin detalles técnicos (constitución
+  §10). Un pedido que dice venir de otro sitio no canjea nada.
 - `GET /app/api/yo`: quién es la persona de la sesión, de qué espacio y qué vistas tiene.
 - `GET /app/api/tareas?vista=tus|sector|equipo`: lo que muestra cada vista (decisión 18): el panel
   con un número por estado, la semana del calendario del espacio, y cada tarea con su estado, su
@@ -79,6 +83,16 @@ CABECERAS_DE_UNA_PAGINA = {
     **CABECERAS_DE_LA_WEB,
     "Content-Security-Policy": ("default-src 'none'; style-src 'unsafe-inline'; "
                                 "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"),
+}
+# La página del botón "Entrar": tampoco ejecuta nada, y su formulario sólo va a este sitio. Con
+# `no-referrer`, el navegador manda `Origin: null` al apretar el botón y el pedido no se podría
+# distinguir de uno de otro sitio; con `same-origin` manda el origen del sitio, y la dirección
+# con el token sólo viaja hacia este mismo servidor (la página no carga nada de otro lado).
+CABECERAS_DEL_BOTON = {
+    **CABECERAS_DE_LA_WEB,
+    "Referrer-Policy": "same-origin",
+    "Content-Security-Policy": ("default-src 'none'; style-src 'unsafe-inline'; "
+                                "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"),
 }
 
 VISTAS = {"tus": "Tus tareas", "sector": "Tu sector", "equipo": "El equipo"}
@@ -182,31 +196,74 @@ def _sesion(cur, token: str) -> dict[str, Any] | None:
 
 # --- Entrar -----------------------------------------------------------------------------------
 
-def pagina_de_enlace_que_no_sirve() -> str:
-    """La página de un enlace que ya no sirve: humana y sin detalles (constitución §10)."""
-    return """<!doctype html>
+# El aspecto de las dos páginas sin la web (decisión 18): los mismos colores, bordes y sombra.
+_ESTILO_DE_UNA_PAGINA = """
+body{margin:0;background:#0F1010;color:#E6E6E3;
+font:14px/1.5 'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace}
+main{max-width:26rem;margin:0 auto;padding:18px 20px 32px}
+.marca{font-size:11px;color:#6F7277;margin:0}
+h1{font-size:24px;font-weight:800;letter-spacing:-0.02em;margin:10px 0 16px}
+p{margin:0 0 12px;color:#B0B2B6}
+button{display:flex;align-items:center;width:100%;height:48px;margin-top:20px;padding:0 14px;
+font:inherit;font-size:14px;font-weight:700;color:#E6E6E3;background:#161717;
+border:1.5px solid #E6E6E3;border-radius:6px;box-shadow:3px 3px 0 #E6E6E3}
+"""
+
+
+def _pagina(titulo: str, cuerpo: str) -> str:
+    return f"""<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Leda</title>
-<style>
-body{margin:0;background:#111;color:#ddd;font:16px/1.5 ui-monospace,Menlo,Consolas,monospace}
-main{max-width:32rem;margin:0 auto;padding:3rem 1rem}
-h1{font-size:1.25rem;color:#fff;margin:0 0 1rem}
-</style></head>
+<style>{_ESTILO_DE_UNA_PAGINA}</style></head>
 <body><main>
-<h1>Este enlace ya no sirve.</h1>
-<p>Cada enlace abre la página una sola vez, en un solo teléfono o computadora.</p>
-<p>Pedile a Leda uno nuevo por Telegram.</p>
+<p class="marca">LEDA</p>
+<h1>{titulo}</h1>
+{cuerpo}
 </main></body></html>
 """
 
 
+def pagina_de_enlace_que_no_sirve() -> str:
+    """La página de un enlace que ya no sirve: humana y sin detalles (constitución §10)."""
+    return _pagina("Este enlace ya no sirve.", """<p>Cada enlace abre la página una sola vez, en un solo teléfono o computadora.</p>
+<p>Pedile a Leda uno nuevo por Telegram.</p>""")
+
+
+def pagina_del_boton() -> str:
+    """La página que muestra un enlace al abrirlo, igual para cualquier enlace: el botón manda
+    el formulario a la misma dirección, así el token no aparece en la página."""
+    return _pagina("Acá podés ver tus tareas.", """<p>Este enlace abre la sesión en este teléfono o computadora, una sola vez.</p>
+<form method="post"><button type="submit">Entrar</button></form>""")
+
+
+def _de_otro_sitio(request: Request) -> bool:
+    """Además de `SameSite=Strict`: un pedido que dice venir de otro sitio (o de ninguno, con
+    `Origin: null`) no cambia nada. Sin la cabecera, decide la cookie."""
+    origen = request.headers.get("origin")
+    return origen is not None and urlsplit(origen).netloc != request.headers.get("host", "")
+
+
+def _no_sirve() -> HTMLResponse:
+    return HTMLResponse(pagina_de_enlace_que_no_sirve(), status_code=404,
+                        headers=CABECERAS_DE_UNA_PAGINA)
+
+
 @router.get("/entrar/{token}")
-def entrar(token: str):
-    """Canjea el enlace por una sesión, una sola vez, y lleva a la web con la cookie puesta."""
-    if not 0 < len(token) <= LARGO_MAXIMO_DEL_TOKEN:
-        return HTMLResponse(pagina_de_enlace_que_no_sirve(), status_code=404,
+def ver_el_boton(token: str):
+    """Abrir el enlace no lo canjea: muestra el botón "Entrar", sin mirar el token."""
+    return HTMLResponse(pagina_del_boton(), headers=CABECERAS_DEL_BOTON)
+
+
+@router.post("/entrar/{token}")
+def entrar(token: str, request: Request):
+    """El botón: canjea el enlace por una sesión, una sola vez, y lleva a la web con la cookie
+    puesta."""
+    if _de_otro_sitio(request):
+        return HTMLResponse(_pagina("No se pudo entrar desde acá.", """<p>Abrí el enlace que te mandó Leda y apretá "Entrar".</p>"""), status_code=403,
                             headers=CABECERAS_DE_UNA_PAGINA)
+    if not 0 < len(token) <= LARGO_MAXIMO_DEL_TOKEN:
+        return _no_sirve()
     sesion = secrets.token_urlsafe(32)
 
     def canjear(conn) -> Response:
@@ -216,8 +273,7 @@ def entrar(token: str):
                         (_hash(token), _hash(sesion)))
             fila = cur.fetchone()
         if fila is None or fila["id"] is None:
-            return HTMLResponse(pagina_de_enlace_que_no_sirve(), status_code=404,
-                                headers=CABECERAS_DE_UNA_PAGINA)
+            return _no_sirve()
         respuesta = RedirectResponse("/app/", status_code=303, headers=CABECERAS_DE_LA_WEB)
         _poner_la_cookie(respuesta, sesion)
         return respuesta
@@ -424,9 +480,7 @@ def _ordenar(pasos: list[dict[str, Any]]) -> None:
 @router.post("/salir")
 def salir(request: Request):
     """Corta la sesión de esta cookie (la persona cerró la sesión) y la borra."""
-    # Además de `SameSite=Strict`: un pedido que dice venir de otro sitio no corta nada.
-    origen = request.headers.get("origin")
-    if origen is not None and urlsplit(origen).netloc != request.headers.get("host", ""):
+    if _de_otro_sitio(request):
         return _json({"error": "origen_no_verificado"}, 403)
     token = _token_de_la_cookie(request)
     if token is None:
