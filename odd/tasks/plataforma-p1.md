@@ -51,7 +51,7 @@ aspecto de la "9 · Terminal" y un comando de consola para emitir y cortar un en
 - **El aspecto** (decisión 18): oscuro, grises, JetBrains Mono; color sólo en los estados que tienen algo
   (vencida `#FFC14D`, trabada `#FF7A6B`, en curso `#9BE39B`, entregada `#8FD0FF`; en 0, gris); cabezal de
   la "11 · Plano"; barra "C" por días hábiles con "hoy" bajo el segmento blanco y la fecha de entrega bajo
-  el último; "quedan N días" arriba de la tarjeta en curso; botón "> contarle algo a leda" blanco, con el
+  el último; "quedan N días" arriba de la tarjeta en curso; botón "> contarle algo a leda" (desde la P1-6, "> consultar a leda") blanco, con el
   marco de las tarjetas y sin cursor. Referencia: el lienzo https://claude.ai/artifact/VwC3sCvufFZ7DUkv3yJt7f
   (tableros "9 · Terminal", "9b" y "Barras de progreso"; se leen con la herramienta Artifact, `read`).
 - Textos de la interfaz en castellano (como Leda); identificadores como el resto del código.
@@ -109,7 +109,7 @@ comprobación y hace la revisión RDD. Estimación total: más de 400 líneas; c
 - [x] **P1-5 · Documentos:** `docs/capacidades.md`, `docs/product/plataforma-pendientes.md`, cómo
       levantarla para probar (`PRUEBA-LOCAL.md`) y este documento con la evidencia.
 
-- [ ] **P1-6 · Las decisiones del usuario** (2026-10-12, "Decidido por el usuario", abajo): la fecha,
+- [x] **P1-6 · Las decisiones del usuario** (2026-10-12, "Decidido por el usuario", abajo): la fecha,
       el estado, la trabada y la vencida ya hablada de lo que espero (1, 5, 7); las terminadas de 30 días
       (3); la cadena entera (6); el botón "> consultar a leda" con la dirección del bot (8). Lo que cambia
       quién ve qué va en una migración nueva con sus pruebas de garantías.
@@ -195,6 +195,35 @@ Lo prueba primero `TestClient` y después el usuario en su celular.
   la página de la tarea (la de hoy entra con un enlace propio, no con la sesión); no hay base para probarla
   de punta a punta todavía: `leda_motor` está en la `0056` y reservada para la prueba por Telegram; al
   juntar las ramas, se pone al día hasta la `0059` (con respaldo) y se prueba ahí.
+
+- **P1-6** (escritor delegado; dos commits de código). `a5e23f73` (P1-6a): migración `0060` con
+  su rollback y plegada en `db/esquema.sql`. `tareas_que_ve` da `bloqueo_abierto` para toda tarea
+  de la lista (decisión 7; con eso la cadena de la `0059` también cuelga de las ajenas, decisión 6,
+  que ya bajaba hasta 10 niveles) y, para quien no ve los atrasos de la tarea, `vencida` recién con
+  el atraso hablado, como `informe_al_grupo._sin_entregar`, sólo para una tarea que sigue y ya
+  pasada su fecha: (a) su previsión vigente (la última que ninguna otra reemplaza, como
+  `ancla.prevision_vigente`) posterior al vencimiento, o (b) el escalamiento de ese vencimiento ya
+  salido (`_quedo_asentado_el_atraso`); columna nueva `prevision` (la vigente, si es posterior al
+  vencimiento). Lo propio, el sector y el equipo, como antes. `terminadas_que_ve` y
+  `terminadas_de_la_sesion`: las terminadas de 30 días por el evento que las terminó, cada vista en
+  su alcance; las canceladas, no. `workspace_setting.bot_usuario` con una restricción de formato;
+  el pack declara `telegram.bot_usuario` (opcional; `importador.py` lo guarda, avisa si está mal
+  escrito y lo borra si se saca) y `/app/api/yo` da `chat_con_leda`. La API devuelve `marcas`
+  (trabada y vencida juntas; el panel cuenta las dos), `prevision` y `terminadas`. Archivos del
+  pack: `src/leda/importador.py` y `espacios/corework.yaml` (sólo un comentario: el usuario del bot
+  de CoreWork queda `PENDIENTE` del usuario; el agente no lo conoce ni lee `.env`). RED: 27 fallas
+  (`UndefinedFunction`, columnas que no estaban, nulos); GREEN: `pytest tests/garantias/test_quien_ve_que.py
+  tests/garantias/test_api_de_la_plataforma.py`: 65 passed; `pytest tests/garantias/test_migraciones.py
+  tests/garantias/test_aislamiento.py tests/test_esqueleto.py`: 36 passed (rollback y paridad);
+  `pytest` de la verificación (las dos anteriores, `test_web_servida`, `test_enlace_y_sesion`,
+  `test_capacidades`, `test_frontera`, `tests/test_cli_plataforma.py`): 122 passed (9 min 31 s).
+  `0a2a6fa9` (P1-6b): la tarjeta muestra todas las marcas ("[TRABADA] [VENCIDA +3d]") y la previsión
+  ("19.10 · prevé 28.10"); "Terminadas en los últimos 30 días" aparte, después de las abiertas, con
+  quién las hizo en el sector y el equipo; "> consultar a leda" es un enlace a `https://t.me/<bot>`
+  (sólo una dirección de Telegram; sin ella, no se muestra). RED: 9 fallas en 5 archivos; GREEN:
+  `npx tsc --noEmit` sin errores, `npx vitest run` 38 passed, `npx vite build` bien.
+  `PENDIENTE`: el usuario del bot de CoreWork; la suite entera de garantías (la corre el
+  coordinador); la revisión RDD de los dos commits.
 
 ## Decidido por el usuario (2026-10-12)
 

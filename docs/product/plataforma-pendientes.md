@@ -131,19 +131,18 @@ plataforma web"); plan y evidencia en
 | Nombre y duración de la cookie de la sesión | `leda_sesion`, `Max-Age` de 400 días (lo más que aceptan los navegadores), renovada cada vez que la web pregunta quién es la persona; `web_app.py` (`COOKIE`, `DURACION_DE_LA_COOKIE_S`) | La sesión de la base no vence (decisión 4); la cookie sólo la transporta. Cada puerta tendrá su cookie (decisión 12) |
 | Vencimiento del enlace de entrada | Ninguno por tiempo, como el de la página de la tarea (migración `0057`): deja de servir al canjearse, al emitirse otro o al cortarse las sesiones | El ADR 0022 no fija un plazo |
 | Profundidad de la cadena de esperas | Hasta 10 niveles, sin repetir (migración `0059`) | |
-| Qué estado muestra una tarjeta cuando tiene más de uno | Trabada antes que vencida, vencida antes que entregada, entregada antes que en curso (`web_app._marca`) | Ver abajo, "Para decidir", pregunta 5 |
+| Qué estado muestra una tarjeta cuando tiene más de uno | Trabada y vencida juntas ("[TRABADA] [VENCIDA]"); entregada o en curso, sólo sin ninguna de ellas (`web_app._marcas`). El panel cuenta una tarea trabada y vencida en los dos números | Decisión 5 del usuario (2026-10-12) |
+| Cuánto atrás muestra las terminadas | 30 días corridos desde el reloj de Leda, por el evento que terminó la tarea (migración `0060`, `terminadas_que_ve`) | Decisión 3 del usuario (2026-10-12): "las tareas suelen ser largas; una semana se queda corta" |
+| Usuario público del bot del equipo, para el botón "> consultar a leda" | Pack, `telegram.bot_usuario` (sin "@"; opcional), que el importador guarda en `workspace_setting` (`bot_usuario`; la base exige un usuario de Telegram válido). CoreWork: `PENDIENTE` del usuario (en `espacios/corework.yaml`, comentado); sin él, la web no muestra el botón | Decisión 8 del usuario (2026-10-12). No es un secreto (el token sí, y sigue en `.env`). Hoy la consola lo obtiene de Telegram con el token (`getMe`, en `leda enlaces`) |
 | Colores, letras y medidas del aspecto | En el tema de Tailwind (`web/src/index.css`): los cuatro colores de estado, los grises, JetBrains Mono, tamaños, bordes y sombras | Decisión 18. Las dos páginas sin la web (el botón "Entrar" y la de un enlace que no sirve) repiten los colores a mano en `web_app.py` |
 
 **Abierto:**
 
-- **Para decidir, con el usuario después de la prueba por Telegram:** las seis preguntas de
-  `odd/tasks/plataforma-p1.md`, "Para decidir" (la fecha y el estado de una tarea que espero, abrir su
-  página, lo terminado, lo que tengo para revisar de otra área, vencida y trabada a la vez, hasta
-  dónde ve la cadena un integrante). Mientras tanto, la plataforma hace lo más restrictivo. Y dos más:
-  - **Qué ve un integrante de la tarea trabada de otro.** Hoy no se le dice que está trabada: la
-    tarjeta dice "[ABIERTA]" en gris, porque la base no le muestra ese bloqueo.
-  - **El botón "> contarle algo a leda".** Está dibujado y no hace nada: el servidor todavía no da la
-    dirección del bot del espacio.
+- **Las ocho preguntas de la noche, decididas por el usuario el 2026-10-12** y construidas en la
+  P1-6 (`odd/tasks/plataforma-p1.md`, "Decidido por el usuario"): de una tarea ajena, lo mismo que
+  el informe al grupo (trabada, su cadena, y vencida recién con el atraso hablado, con la
+  previsión); las terminadas de 30 días; el botón "> consultar a leda" con el bot del equipo. Falta
+  que el usuario declare el usuario del bot de CoreWork en el pack.
 - **Técnico:**
   - dos toques seguidos en "Entrar" pueden terminar en "Este enlace ya no sirve" aunque el primero
     haya abierto la sesión;
