@@ -2924,6 +2924,7 @@ create or replace function canjear_enlace_de_administracion(
 returns uuid
 language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare enlace enlace_de_administracion%rowtype;
+        otorgado timestamptz;
         nueva uuid;
 begin
   if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$'
@@ -2931,7 +2932,19 @@ begin
     return null;
   end if;
   select * into enlace from enlace_de_administracion e where e.token_hash = p_token_hash;
-  if enlace.id is null or not es_administrador_de_plataforma(enlace.app_user_id) then
+  if enlace.id is null then
+    return null;
+  end if;
+  select p.otorgado_en into otorgado from platform_role p
+   where p.app_user_id = enlace.app_user_id and p.rol = 'administrador';
+  if otorgado is null then
+    return null;
+  end if;
+  -- Emitido antes del otorgamiento vigente (el rol se revocó y se volvió a otorgar): no se
+  -- canjea, y queda anulado.
+  if enlace.emitido_en < otorgado then
+    update enlace_de_administracion set anulado_en = now()
+     where id = enlace.id and canjeado_en is null and anulado_en is null;
     return null;
   end if;
   -- Una sola vez: si llegan dos canjes a la vez, el segundo espera el candado de la fila y ya no
@@ -2954,6 +2967,7 @@ create or replace function sesion_de_administracion_vigente(p_token_hash text)
 returns table (sesion_id uuid, app_user_id uuid, nombre text)
 language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare sesion sesion_de_administracion%rowtype;
+        otorgado timestamptz;
 begin
   if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then
     return;
@@ -2964,8 +2978,12 @@ begin
     return;
   end if;
   -- El rol se revalida en cada pedido: quien dejó de ser administrador ya no entra, y su sesión
-  -- queda cortada. Si vuelve a serlo, pide un enlace nuevo.
-  if not es_administrador_de_plataforma(sesion.app_user_id) then
+  -- queda cortada. Si vuelve a serlo, pide un enlace nuevo. La sesión es del otorgamiento en que
+  -- se abrió: una anterior al vigente (el rol se revocó y se volvió a otorgar sin que la sesión
+  -- pidiera nada en el medio) también queda cortada.
+  select p.otorgado_en into otorgado from platform_role p
+   where p.app_user_id = sesion.app_user_id and p.rol = 'administrador';
+  if otorgado is null or sesion.creada_en < otorgado then
     update sesion_de_administracion s
        set cortada_en = now(), motivo_de_corte = 'dejo_de_ser_administrador'
      where s.id = sesion.id and s.cortada_en is null;

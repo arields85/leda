@@ -240,6 +240,42 @@ def test_un_rol_revocado_corta_la_sesion_en_el_pedido_siguiente(conn, administra
     assert _vigente(conn, sesion) is None
 
 
+def test_una_sesion_anterior_al_rol_vigente_no_vive_aunque_nadie_pidiera_en_el_medio(
+        conn, administradora):
+    """Revisión RDD de la 0061 (migración 0063): si el rol se revoca y se vuelve a otorgar antes
+    del pedido siguiente, la sesión vieja no puede seguir abierta sólo porque hoy el rol está. La
+    sesión es del otorgamiento en que se abrió: una anterior al vigente queda cortada."""
+    vieja_id, vieja = _entrar(conn, administradora)
+    _revocar(conn, administradora)
+    _otorgar(conn, administradora)
+    assert _vigente(conn, vieja) is None
+    fila = _sesion(conn, vieja_id)
+    assert fila["cortada_en"] is not None
+    assert fila["motivo_de_corte"] == "dejo_de_ser_administrador"
+    cortes = _auditoria(conn, "cortar_sesion_de_administracion")
+    assert len(cortes) == 1 and cortes[0]["actor_kind"] == "sistema"
+    assert cortes[0]["sujeto_id"] == fila["id"]
+    assert cortes[0]["detalle"]["motivo"] == "dejo_de_ser_administrador"
+    # Una sesión abierta después del otorgamiento vigente sí entra, y sigue entrando.
+    nueva_id, nueva = _entrar(conn, administradora)
+    assert str(_vigente(conn, nueva)["sesion_id"]) == nueva_id
+    assert _vigente(conn, nueva) is not None
+    assert _vigente(conn, vieja) is None
+
+
+def test_un_enlace_anterior_al_rol_vigente_no_se_canjea(conn, administradora):
+    """Igual con el enlace sin usar: emitido antes de revocar y volver a otorgar el rol, ya no
+    abre nada y queda anulado; uno emitido con el rol vigente, sí."""
+    viejo = _emitir(conn, administradora)
+    _revocar(conn, administradora)
+    _otorgar(conn, administradora)
+    assert _canjear(conn, viejo)[0] is None
+    assert _contar(conn, "sesion_de_administracion") == 0
+    assert _contar(conn, "enlace_de_administracion",
+                   "canjeado_en is null and anulado_en is null") == 0
+    assert _canjear(conn, _emitir(conn, administradora))[0] is not None
+
+
 # --- La credencial y el enlace de un solo uso ----------------------------------------------
 
 def test_solo_se_guarda_el_hash_de_cada_token(conn, administradora):
@@ -568,6 +604,16 @@ def test_un_rol_revocado_cierra_la_puerta_en_el_pedido_siguiente(web, conn, admi
     _revocar(conn, administradora)
     assert navegador.get("/app/admin/api/yo").status_code == 401
     assert _contar(conn, "sesion_de_administracion", "cortada_en is null") == 0
+
+
+def test_revocar_y_volver_a_otorgar_el_rol_tambien_cierra_la_puerta(web, conn, administradora):
+    vieja = _navegador_de_administracion(web, conn, administradora)
+    assert vieja.get("/app/admin/api/yo").status_code == 200
+    _revocar(conn, administradora)
+    _otorgar(conn, administradora)
+    assert vieja.get("/app/admin/api/yo").status_code == 401
+    nueva = _navegador_de_administracion(web, conn, administradora)
+    assert nueva.get("/app/admin/api/yo").status_code == 200
 
 
 def test_la_cookie_del_equipo_no_abre_la_administracion(web, conn, intake_world, administradora):
