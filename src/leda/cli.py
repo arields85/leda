@@ -17,6 +17,8 @@
         --pieza N --administrador NOMBRE --motivo TEXTO, retira el contenido de esa pieza)
     python -m leda enlace-web corework --persona "Marcos"     el enlace de un solo uso a la web
     python -m leda cortar-sesiones-web corework --persona "Marcos"   corta sus sesiones de la web
+    python -m leda enlace-admin "Ariel"     el enlace de un solo uso a la administración de la web
+    python -m leda cortar-sesiones-admin "Ariel"   corta sus sesiones de administración
 """
 
 from __future__ import annotations
@@ -265,6 +267,59 @@ def _cortar_sesiones_web(conn, ws: str, a) -> int:
     return 0
 
 
+def _administrador_vigente(conn, nombre: str) -> dict | None:
+    """El único administrador de plataforma con el rol vigente que nombra `nombre`, o `None`
+    diciendo por qué: a quien no lo es, la consola no le abre la puerta de administración."""
+    with admin(conn) as cur:
+        filas = _administradores(cur)
+    conn.commit()
+    return _uno_por_nombre(filas, nombre, "administrador de plataforma")
+
+
+def _enlace_admin(conn, a) -> int:
+    """Emite el enlace de un solo uso de un administrador de plataforma a la puerta de
+    administración de la web (ADR 0022, decisiones 10 y 12; porción 2) y lo imprime. El anterior
+    sin usar queda anulado. Corre como `leda_admin`: la función sólo la ejecuta la consola, y
+    vuelve a comprobar el rol."""
+    from . import web_app
+
+    if not config.base_url:
+        print("Falta LEDA_BASE_URL en el entorno: sin la dirección pública no hay enlace.")
+        return 1
+    quien = _administrador_vigente(conn, a.nombre)
+    if quien is None:
+        return 1
+    with admin(conn) as cur:
+        token = web_app.emitir_enlace_de_administracion(cur, quien["id"])
+    conn.commit()
+    if token is None:
+        print(f"{quien['nombre']} ya no es administrador de plataforma.")
+        return 1
+    print(f"Enlace de {quien['nombre']} a la administración de la web (sirve una sola vez; "
+          "no lo reenvíes):")
+    print(f"  {web_app.enlace_de_administracion(config.base_url, token)}")
+    return 0
+
+
+def _cortar_sesiones_admin(conn, a) -> int:
+    """Corta todas las sesiones de administración de un administrador de plataforma, y su enlace
+    sin usar (ADR 0022, decisiones 10 y 12). Auditado."""
+    from . import web_app
+
+    quien = _administrador_vigente(conn, a.nombre)
+    if quien is None:
+        return 1
+    with admin(conn) as cur:
+        cortadas = web_app.cortar_sesiones_de_administrador(cur, quien["id"])
+    conn.commit()
+    if cortadas:
+        print(f"Cortada{'s' if cortadas > 1 else ''} {cortadas} "
+              f"sesi{'ones' if cortadas > 1 else 'ón'} de administración de {quien['nombre']}.")
+    else:
+        print(f"{quien['nombre']} no tenía sesiones abiertas en la administración.")
+    return 0
+
+
 def _retirar_contenido(conn, ws: str, a) -> int:
     """Sin `--pieza`, lista lo que se entregó en la tarea, numerado. Con `--pieza`, retira su
     contenido por la administración (ADR 0019, decisión 3; decisiones 57 a 59): la pieza no se
@@ -470,6 +525,16 @@ def main(argv: list[str] | None = None) -> int:
                         help="corta todas las sesiones de una persona en la web")
     cw.add_argument("slug")
     cw.add_argument("--persona", required=True, help="el integrante, por su nombre")
+
+    # La puerta de administración de la web (ADR 0022, decisiones 10 y 12; porción 2): sin
+    # espacio, porque un administrador de plataforma abarca todos.
+    ea = sub.add_parser("enlace-admin",
+                        help="emite el enlace de un solo uso de un administrador a la "
+                             "administración de la web")
+    ea.add_argument("nombre", help="el administrador de plataforma, por su nombre")
+    ca = sub.add_parser("cortar-sesiones-admin",
+                        help="corta todas las sesiones de administración de un administrador")
+    ca.add_argument("nombre", help="el administrador de plataforma, por su nombre")
 
     sub.add_parser("presentar").add_argument("slug")
 
@@ -747,6 +812,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {len(r.pendientes)} valores sin definir:",
                   ", ".join(r.pendientes[:6]))
         return 0
+
+    if a.cmd == "enlace-admin":
+        return _enlace_admin(conn, a)
+
+    if a.cmd == "cortar-sesiones-admin":
+        return _cortar_sesiones_admin(conn, a)
 
     ws = _id_de(conn, a.slug)
 

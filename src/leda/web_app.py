@@ -23,6 +23,12 @@ Rutas, todas bajo `/app` y servidas por la misma aplicación que la página de l
   trabada, la cadena de esperas en árbol; y aparte, las terminadas de los últimos 30 días con
   quién las hizo (decisiones del usuario del 2026-10-12, 1, 3, 5, 6 y 7).
 - `POST /app/salir`: corta la sesión (`cerro_la_sesion`) y borra la cookie.
+- La puerta de administración (decisiones 10 y 12; porción 2, tarea P2-1, migración 0061), la de
+  un administrador de plataforma, que abarca todos los espacios: `GET` y `POST
+  /app/admin/entrar/{token}` (el mismo botón), con su propia cookie `leda_admin`, sólo para
+  `/app/admin`; `GET /app/admin/api/yo` (quién es y los espacios que existen) y `POST
+  /app/admin/salir`. El rol de plataforma se revalida en la base en cada pedido; las dos puertas
+  no se abren con la cookie de la otra (constitución §2).
 - `GET /app/` y las demás páginas bajo `/app` (tarea P1-4): la web compilada de `web/dist`
   (React, decisión 17), del mismo origen que la API. `index.html` no se guarda; los archivos con
   huella de `assets/` se guardan un año. Sin compilar, la persona ve un mensaje humano.
@@ -573,6 +579,143 @@ def salir(request: Request):
     return _con_la_base(cortar)
 
 
+# --- La puerta de administración --------------------------------------------------------------
+#
+# La de un administrador de plataforma (decisiones 10 y 12; porción 2, tarea P2-1, migración
+# 0061): abarca todos los espacios, con su propio enlace, su propia sesión y su propia cookie,
+# sólo para `/app/admin`. Las dos puertas no se mezclan (constitución §2: el canal define el
+# sombrero): la cookie del equipo no abre esta puerta ni la de esta abre la API del equipo, y un
+# administrador que además es integrante de un equipo tiene las dos sesiones por separado. El rol
+# se revalida en la base en cada pedido: revocado, la sesión queda cortada en el siguiente.
+
+COOKIE_DE_ADMINISTRACION = "leda_admin"
+CAMINO_DE_ADMINISTRACION = "/app/admin"
+
+
+def _sin_sesion_de_administracion() -> JSONResponse:
+    """Sin una sesión de administración que entre: 401, y se borra sólo la cookie de esta
+    puerta (la del equipo, si la hay, sigue)."""
+    respuesta = _json({"error": "sin_sesion"}, 401)
+    _borrar_la_cookie_de_administracion(respuesta)
+    return respuesta
+
+
+def _borrar_la_cookie_de_administracion(respuesta: Response) -> None:
+    respuesta.delete_cookie(COOKIE_DE_ADMINISTRACION, path=CAMINO_DE_ADMINISTRACION, secure=True,
+                            httponly=True, samesite="strict")
+
+
+def _poner_la_cookie_de_administracion(respuesta: Response, token: str) -> None:
+    respuesta.set_cookie(COOKIE_DE_ADMINISTRACION, token, max_age=DURACION_DE_LA_COOKIE_S,
+                         path=CAMINO_DE_ADMINISTRACION, secure=True, httponly=True,
+                         samesite="strict")
+
+
+def _token_de_administracion(request: Request) -> str | None:
+    token = request.cookies.get(COOKIE_DE_ADMINISTRACION) or ""
+    return token if 0 < len(token) <= LARGO_MAXIMO_DEL_TOKEN else None
+
+
+def _sesion_de_administracion(cur, token: str) -> dict[str, Any] | None:
+    """La sesión de administración vigente del token (que revalida el rol de plataforma), o
+    `None`."""
+    _con_la_version_del_nucleo(cur)
+    cur.execute("select * from sesion_de_administracion_vigente(%s)", (_hash(token),))
+    return cur.fetchone()
+
+
+def pagina_del_boton_de_administracion() -> str:
+    """La página que muestra el enlace de la administración al abrirlo, igual para cualquier
+    enlace."""
+    return _pagina("Acá entrás a la administración.", """<p>Este enlace abre la sesión de administración en este teléfono o computadora, una sola vez.</p>
+<form method="post"><button type="submit">Entrar</button></form>""")
+
+
+def _enlace_de_administracion_que_no_sirve() -> HTMLResponse:
+    return HTMLResponse(_pagina("Este enlace ya no sirve.", """<p>Cada enlace abre la administración una sola vez, en un solo teléfono o computadora.</p>
+<p>Pedí uno nuevo.</p>"""), status_code=404, headers=CABECERAS_DE_UNA_PAGINA)
+
+
+@router.get("/admin/entrar/{token}")
+def ver_el_boton_de_administracion(token: str):
+    """Abrir el enlace no lo canjea: muestra el botón "Entrar", sin mirar el token."""
+    return HTMLResponse(pagina_del_boton_de_administracion(), headers=CABECERAS_DEL_BOTON)
+
+
+@router.post("/admin/entrar/{token}")
+def entrar_a_la_administracion(token: str, request: Request):
+    """El botón: canjea el enlace por una sesión de administración, una sola vez, y lleva a la
+    administración con su cookie puesta."""
+    if _de_otro_sitio(request):
+        return HTMLResponse(_pagina("No se pudo entrar desde acá.", """<p>Abrí el enlace de la administración y apretá "Entrar".</p>"""), status_code=403,
+                            headers=CABECERAS_DE_UNA_PAGINA)
+    if not 0 < len(token) <= LARGO_MAXIMO_DEL_TOKEN:
+        return _enlace_de_administracion_que_no_sirve()
+    sesion = secrets.token_urlsafe(32)
+
+    def canjear(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            _con_la_version_del_nucleo(cur)
+            cur.execute("select canjear_enlace_de_administracion(%s, %s) as id",
+                        (_hash(token), _hash(sesion)))
+            fila = cur.fetchone()
+        if fila is None or fila["id"] is None:
+            return _enlace_de_administracion_que_no_sirve()
+        respuesta = RedirectResponse(f"{CAMINO_DE_ADMINISTRACION}/", status_code=303,
+                                     headers=CABECERAS_DE_LA_WEB)
+        _poner_la_cookie_de_administracion(respuesta, sesion)
+        return respuesta
+
+    return _con_la_base(canjear)
+
+
+@router.get("/admin/api/yo")
+def yo_en_la_administracion(request: Request):
+    """Quién es el administrador de la sesión y los espacios que existen (todos: la puerta de
+    administración no es de un espacio)."""
+    token = _token_de_administracion(request)
+    if token is None:
+        return _sin_sesion_de_administracion()
+
+    def leer(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            sesion = _sesion_de_administracion(cur, token)
+            if sesion is None:
+                return _sin_sesion_de_administracion()
+            cur.execute("select id, slug, nombre from workspace order by nombre, slug")
+            espacios = cur.fetchall()
+        respuesta = _json({
+            "administrador": sesion["nombre"],
+            "espacios": [{"id": str(e["id"]), "slug": e["slug"], "nombre": e["nombre"]}
+                         for e in espacios]})
+        _poner_la_cookie_de_administracion(respuesta, token)
+        return respuesta
+
+    return _con_la_base(leer)
+
+
+@router.post("/admin/salir")
+def salir_de_la_administracion(request: Request):
+    """Corta la sesión de administración de esta cookie (cerró la sesión) y la borra. La del
+    equipo, si la hay, sigue."""
+    if _de_otro_sitio(request):
+        return _json({"error": "origen_no_verificado"}, 403)
+    token = _token_de_administracion(request)
+    if token is None:
+        return _sin_sesion_de_administracion()
+
+    def cortar(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            if _sesion_de_administracion(cur, token) is None:
+                return _sin_sesion_de_administracion()
+            cur.execute("select cerrar_sesion_de_administracion(%s) as cerrada", (_hash(token),))
+        respuesta = Response(status_code=204, headers=CABECERAS_DE_LA_WEB)
+        _borrar_la_cookie_de_administracion(respuesta)
+        return respuesta
+
+    return _con_la_base(cortar)
+
+
 # --- La web -----------------------------------------------------------------------------------
 
 def _no_existe() -> HTMLResponse:
@@ -601,7 +744,10 @@ def a_la_web():
 @router.get("/{ruta:path}", include_in_schema=False)
 def la_web(ruta: str):
     """La web compilada: un archivo de `assets/`, o `index.html` para cualquier página."""
-    primera = ruta.split("/", 1)[0]
+    partes = ruta.split("/")
+    # Las páginas de `/app/admin/` son de la web (la administración, porción 2); su API, su
+    # enlace y salir, igual que los del equipo, nunca caen en el índice.
+    primera = partes[1] if partes[0] == "admin" and len(partes) > 1 else partes[0]
     if primera == "api":
         return _json({"error": "no_existe"}, 404)
     if primera in ("entrar", "salir"):
@@ -650,3 +796,30 @@ def cortar_sesiones(cur, membership_id: str) -> int:
 def enlace(base_url: str, token: str) -> str:
     """La dirección del enlace de entrada, sobre la dirección pública configurada."""
     return f"{base_url.rstrip('/')}/app/entrar/{token}"
+
+
+def emitir_enlace_de_administracion(cur, app_user_id: str) -> str | None:
+    """Emite el enlace de un solo uso de un administrador de plataforma a la puerta de
+    administración (corre como `leda_admin`, dentro de `admin()`: la función sólo la ejecuta la
+    consola) y devuelve el token en claro, o `None` si no tiene hoy el rol. El anterior sin usar
+    queda anulado."""
+    token = secrets.token_urlsafe(32)
+    _con_la_version_del_nucleo(cur)
+    cur.execute("select emitir_enlace_de_administracion(%s, %s, null) as id",
+                (str(app_user_id), _hash(token)))
+    fila = cur.fetchone()
+    return token if fila and fila["id"] is not None else None
+
+
+def cortar_sesiones_de_administrador(cur, app_user_id: str) -> int:
+    """Corta todas las sesiones de administración abiertas de un administrador, y su enlace sin
+    usar, por la consola (`leda_admin`). Devuelve cuántas sesiones cortó."""
+    _con_la_version_del_nucleo(cur)
+    cur.execute("select cortar_sesiones_de_administrador(%s, %s, null) as cortadas",
+                (str(app_user_id), POR_UN_ADMINISTRADOR))
+    return int(cur.fetchone()["cortadas"])
+
+
+def enlace_de_administracion(base_url: str, token: str) -> str:
+    """La dirección del enlace de la puerta de administración, sobre la dirección pública."""
+    return f"{base_url.rstrip('/')}{CAMINO_DE_ADMINISTRACION}/entrar/{token}"

@@ -50,7 +50,8 @@ def _politica(r) -> dict[str, str]:
     return {p.split()[0]: " ".join(p.split()[1:]) for p in partes}
 
 
-@pytest.mark.parametrize("camino", ["/app/", "/app/tareas", "/app/una/pagina/de/la/web"])
+@pytest.mark.parametrize("camino", ["/app/", "/app/tareas", "/app/una/pagina/de/la/web",
+                                    "/app/admin/", "/app/admin", "/app/admin/espacios"])
 def test_la_web_y_sus_paginas_devuelven_el_indice_sin_guardarlo(dist, web, camino):
     r = web.get(camino)
     assert r.status_code == 200
@@ -117,6 +118,21 @@ def test_el_enlace_de_entrada_no_queda_tapado_por_la_web(dist, web):
     r = web.get("/app/entrar/un-token")
     assert r.status_code == 200 and ">Entrar<" in r.text and r.text != INDICE
     assert web.get("/app/entrar/").status_code == 404
+
+
+def test_la_puerta_de_administracion_no_queda_tapada_por_la_web(dist, web):
+    """Las páginas de `/app/admin/` son de la web; su API, su enlace y salir, no."""
+    r = web.get("/app/admin/api/yo")
+    assert r.status_code == 401 and r.json() == {"error": "sin_sesion"}
+    for camino in ("/app/admin/api/no-existe", "/app/admin/api"):
+        r = web.get(camino)
+        assert r.status_code == 404 and r.text != INDICE, camino
+        assert r.headers["content-type"].startswith("application/json"), camino
+    r = web.get("/app/admin/entrar/un-token")
+    assert r.status_code == 200 and ">Entrar<" in r.text and r.text != INDICE
+    assert web.get("/app/admin/entrar/").status_code == 404
+    assert web.post("/app/admin/salir").status_code == 401
+    assert web.get("/app/admin/salir").status_code == 404
 
 
 def test_lo_que_no_es_de_la_web_sigue_igual(dist, web):

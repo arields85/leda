@@ -105,3 +105,69 @@ def test_cortar_en_un_espacio_no_toca_el_otro(conn, mundo, correr, web):
     navegador.post(f"/app/entrar/{_token(oeste)}")
     correr("cortar-sesiones-web", "north-lab", "--persona", "Sam North")
     assert navegador.get("/app/api/yo").json()["espacio"] == "West Studio"
+
+
+# --- La puerta de administración (porción 2, tarea P2-1; migración 0061) ------------------------
+
+def _otorgar(conn, mundo: dict, nombre: str = "Morgan Hale", slug: str = "north-lab") -> str:
+    quien = mundo[slug]["people"][nombre]["app_user_id"]
+    with admin(conn) as cur:
+        cur.execute("insert into platform_role (app_user_id, rol) values (%s, 'administrador')",
+                    (quien,))
+    conn.commit()
+    return quien
+
+
+def _token_de_administracion(salida: str) -> str:
+    hallado = re.search(re.escape(DIRECCION) + r"/app/admin/entrar/([A-Za-z0-9_-]+)", salida)
+    assert hallado, salida
+    return hallado.group(1)
+
+
+def test_el_enlace_de_un_administrador_abre_la_administracion(conn, mundo, correr, web):
+    _otorgar(conn, mundo)
+    codigo, salida = correr("enlace-admin", "Morgan Hale 1")
+    assert codigo == 0 and "Morgan Hale 1" in salida
+    navegador = web()
+    assert navegador.post(f"/app/admin/entrar/{_token_de_administracion(salida)}"
+                          ).status_code == 303
+    assert navegador.get("/app/admin/api/yo").json()["administrador"] == "Morgan Hale 1"
+    # El enlace de la administración no abre la puerta del equipo.
+    assert web().post(f"/app/entrar/{_token_de_administracion(salida)}").status_code == 404
+    emitidos = _auditadas(conn, "emitir_enlace_de_administracion")
+    assert len(emitidos) == 1 and emitidos[0]["nucleo_hash"]
+
+
+def test_a_quien_no_es_administrador_no_se_le_emite_el_enlace(conn, mundo, correr):
+    codigo, salida = correr("enlace-admin", "Sam North 1")
+    assert codigo == 1 and "administrador de plataforma" in salida
+    assert "/app/admin/entrar/" not in salida
+    codigo, salida = correr("cortar-sesiones-admin", "Sam North 1")
+    assert codigo == 1 and "administrador de plataforma" in salida
+    assert _auditadas(conn, "emitir_enlace_de_administracion") == []
+
+
+def test_el_enlace_de_administracion_necesita_la_direccion_publica(conn, mundo, correr,
+                                                                  monkeypatch):
+    _otorgar(conn, mundo)
+    monkeypatch.setattr(cli, "config", dataclasses.replace(cli.config, base_url=""))
+    codigo, salida = correr("enlace-admin", "Morgan Hale 1")
+    assert codigo == 1 and "LEDA_BASE_URL" in salida
+    assert _auditadas(conn, "emitir_enlace_de_administracion") == []
+
+
+def test_cortar_las_sesiones_de_un_administrador(conn, mundo, correr, web):
+    _otorgar(conn, mundo)
+    _, primera = correr("enlace-admin", "Morgan Hale 1")
+    navegador = web()
+    navegador.post(f"/app/admin/entrar/{_token_de_administracion(primera)}")
+    _, sin_usar = correr("enlace-admin", "Morgan Hale 1")
+    codigo, salida = correr("cortar-sesiones-admin", "Morgan Hale 1")
+    assert codigo == 0 and "1 sesión" in salida and "Morgan Hale 1" in salida
+    assert navegador.get("/app/admin/api/yo").status_code == 401
+    assert web().post(f"/app/admin/entrar/{_token_de_administracion(sin_usar)}"
+                      ).status_code == 404
+    cortes = _auditadas(conn, "cortar_sesion_de_administracion")
+    assert [c["detalle"]["motivo"] for c in cortes] == ["administrador"]
+    codigo, salida = correr("cortar-sesiones-admin", "Morgan Hale 1")
+    assert codigo == 0 and "no tenía sesiones abiertas" in salida

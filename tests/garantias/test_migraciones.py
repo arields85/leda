@@ -94,8 +94,11 @@ TABLAS_DE_CONFIGURACION = ("work_calendar", "holiday", "persona_config",
 
 # La cola del bot de administración y la marca del enlace de una respuesta (migración 0054): sin
 # política por espacio (excepciones de `test_aislamiento.py`), pero sus columnas, restricciones y
-# privilegios tienen que converger y volver atrás como las demás.
-TABLAS_DE_LA_ADMINISTRACION = ("admin_notice", "admin_notice_enlace")
+# privilegios tienen que converger y volver atrás como las demás. El enlace y la sesión de la
+# puerta de administración (migración 0061), igual: no tienen espacio (un administrador abarca
+# todos) ni política.
+TABLAS_DE_LA_ADMINISTRACION = ("admin_notice", "admin_notice_enlace",
+                               "enlace_de_administracion", "sesion_de_administracion")
 
 # Las políticas de más de una tabla, además de la de aislamiento: `acceso_tarea` (migración
 # 0036) se encuentra por el hash del token antes de saber su espacio, sólo desde las funciones
