@@ -73,14 +73,14 @@ que se reutiliza".
 
 ## Diseñado y sin construir
 
-Cada uno tiene diseño escrito y cero código, salvo la plataforma web de tareas, que todavía
-no tiene su diseño.
+Cada uno tiene diseño escrito y cero código, salvo la plataforma web de tareas, que tiene su
+porción 1 construida en la rama `feat/plataforma` ("Lo que agregó la plataforma web", abajo).
 
 | Área | Lo manda | Estado |
 |---|---|---|
 | **Motor de conversación (flujo D)** | [`ADR 0018`](decisions/0018-motor-de-conversacion.md), aceptado el 2026-10-06, después de la prueba chica (M2) | Sin código. La IA elige jugadas de una lista cerrada y el código las comprueba y ejecuta; estado por persona y registro de turnos; circuitos declarados con fichas y ocho situaciones generales. La prueba chica de la Etapa 2 vive fuera de `src/leda`; el motor definitivo, en la Etapa 3 |
 | **Lo que le falta al seguimiento** | [`ADR 0017`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisiones 4 y 6 | No hay enlace entre una respuesta y su recordatorio; `pending_reply` existe y nada la escribe; los textos de recordatorios y cadencias están fijos en `escalera.py` y `reloj.py`; no existe la operación de pedir más tiempo. Relevamiento del 2026-10-04 ([`STATUS.md`](STATUS.md), "Estado comprobado") |
-| **Plataforma web de tareas** | [`ADR 0017`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisión 5 | Sin diseño propio todavía: lleva su ADR antes del código. Para cargar tareas sólo existe `sembrar`, un cargador de datos ficticios que no cumple las condiciones de la carga (decisión 2) |
+| **Plataforma web de tareas** | [`ADR 0022`](decisions/0022-plataforma-web-de-tareas.md), aceptado el 2026-10-12 | La porción 1 (la puerta del equipo, de sólo lectura) está construida en `feat/plataforma` (abajo). Sin construir: la carga de tareas, el cambio de fecha, el alta y la baja de integrantes y la puerta de administración. Para cargar tareas sólo existe `sembrar`, un cargador de datos ficticios que no cumple las condiciones de la carga (ADR 0017, decisión 2) |
 | **Entrevista de alta de espacios** | [`nucleo/alta-de-equipo.md`](../nucleo/alta-de-equipo.md), 195 líneas | Sin una sola línea. Sólo existe el importador, que consume un paquete ya escrito. Sin esto, cada cliente nuevo exige que alguien lo escriba a mano. No aplica en esta etapa (ADR 0017, decisión 7) |
 | **Panel de plataforma** | [`ADR 0004`](decisions/0004-dos-superficies-separadas.md) | Decidido: contraseña + TOTP. Sin construir |
 | **Integración de calendario** | Especificación §17.3, constitución §7 | Consultar disponibilidad, proponer, crear, modificar, asistentes. `calendario.py` es el calendario **laboral**, no externo |
@@ -221,9 +221,40 @@ filas están `PENDIENTE` (la tanda de pruebas del plan).
 | El corredor de conversaciones acepta una segunda lectura válida de un paso (63) y separa como `[servicio]` un aviso que la IA no pudo redactar y salió en su reintento | `tests/conversaciones/corredor.py`, `comprobar.py` (`o_bien`, `SERVICIO`) |
 | La forma del mensaje la da la cocina (chequeo de rumbo del formato, 2026-10-11): todo mensaje que entra a la salida, también los avisos, el informe al grupo y la respuesta del bot de administración, sale con un renglón de más de 140 caracteres partido entre oraciones (una por renglón, en el mismo bloque; la marca o la viñeta queda en el primer pedazo; un renglón de una tarea con 📋 o 🗓️ nunca se toca; una oración sola más larga queda como está) y con el cierre, la última oración, solo en su renglón y con un renglón en blanco antes. Nunca cambia, agrega ni quita una palabra; la cola guarda el texto con su forma, que es lo que mide el corredor, con el mismo tope. Que la IA real deje de fallar por esto está `PENDIENTE` de una ronda | `salida.py` (`dar_forma`, `RENGLON_MAXIMO`, `enqueue_outbox`), `despachador.py` (`encolar_respuesta_admin`), `tests/garantias/test_forma_del_mensaje.py` |
 
+## Lo que agregó la plataforma web, porción 1 (2026-10-12)
+
+Rama `feat/plataforma`, todavía sin juntar con la del Motor. Plan, evidencia y advertencias de cada
+revisión en [`odd/tasks/plataforma-p1.md`](../odd/tasks/plataforma-p1.md); diseño en el
+[ADR 0022](decisions/0022-plataforma-web-de-tareas.md). Lo probado es con `TestClient`, pruebas de las
+piezas de la web y datos ficticios; nadie la abrió todavía en un celular.
+
+| Capacidad | Dónde |
+|---|---|
+| El enlace de entrada: de un solo uso, sólo su hash en la base, sin vencimiento por tiempo; deja de servir al canjearse, al emitirse otro para la misma persona o al cortarse sus sesiones. Abrirlo no lo gasta: muestra un botón "Entrar" (Telegram abre los enlaces para armar la vista previa) y el canje es al tocarlo; un pedido que dice venir de otro sitio no canjea. Un enlace que no sirve muestra siempre la misma página humana, sin detalles | migración `0057`, `web_app.py` (`GET` y `POST /app/entrar/{token}`) |
+| La sesión: queda abierta sin vencimiento en una cookie `HttpOnly`, `Secure`, `SameSite=Strict`, sólo para `/app`; la base la revalida en cada pedido (membresía activa) y anota su último uso. Se corta por un administrador, porque la persona cierra la sesión ("salir", con una confirmación) o porque deja el equipo; una sesión cortada no vuelve. Emitir, canjear y cortar quedan auditados, sin el token | migración `0057`, `web_app.py` (`POST /app/salir`) |
+| Quién ve qué (decisión 3), una sola regla en la base: el integrante, "Tus tareas" (las suyas, las que espera de otros y las que otros esperan de él), sin los atrasos ni los bloqueos ajenos, que llegan vacíos y la web no calcula; el referente del sector, además "Tu sector", con fechas, atrasos y bloqueos; la autoridad final, además "El equipo", sin rankings. Sólo tareas abiertas. La persona y el espacio salen de la sesión, nunca del pedido | migración `0058` (`tareas_que_ve`, `vistas_de`, `tareas_de_la_sesion`, `vistas_de_la_sesion`) |
+| La cadena de esperas de una tarea trabada, en árbol, hasta 10 niveles y sin repetir, sólo para quien ve ese bloqueo | migración `0059` (`esperas_de_la_sesion`) |
+| La API interna, de sólo lectura: `/app/api/yo` (quién es, de qué espacio, qué vistas tiene) y `/app/api/tareas?vista=tus\|sector\|equipo` (un número por estado, la semana del calendario del espacio con los días en que vence algo, y cada tarea con su estado, su fecha, los días hábiles que quedan, la barra de días hábiles si está en curso y las esperas si está trabada); cabeceras como las de la página de la tarea (`no-store`, `noindex`, sin marcos) y una política de contenido sólo del mismo origen. Si la base falla, un 503 sin detalles | `web_app.py` |
+| La web, con el aspecto de la "9 · Terminal" (decisión 18): React, TypeScript, Vite, Tailwind y Lucide en `web/`, compilada a `web/dist` (que no se versiona) y servida por la misma aplicación en `/app/`. Cabezal, panel de estados, tira de la semana, tarjetas con el estado entre corchetes (color sólo en vencida, trabada, en curso y entregada), barra de días hábiles, árbol de esperas y "salir". Sin compilar, la persona ve un mensaje humano | `web/src/`, `web_app.py` (`la_web`), `tests/garantias/test_web_servida.py`, pruebas de las piezas con `vitest` |
+| Emitir el enlace de una persona (lo imprime; necesita `LEDA_BASE_URL`) y cortar todas sus sesiones, por la consola, para probar sin el chat | `python -m leda enlace-web <espacio> --persona <nombre>`, `python -m leda cortar-sesiones-web <espacio> --persona <nombre>`, `tests/test_cli_plataforma.py` |
+
+**Sin construir todavía** (`PENDIENTE`, después de la prueba por Telegram de la Fase C):
+
+- que Leda ofrezca el acceso por chat, y el corte de las sesiones por "perdí el celular" por chat
+  (tocan el motor de conversación: primero su conversación de prueba);
+- la prueba en el celular (una cookie `Secure` necesita HTTPS fuera de `localhost`);
+- las piezas de administración de la plataforma: cargar tareas, cambiar fechas, alta y baja de
+  integrantes, y la puerta de administración (porción 2);
+- el botón "> contarle algo a leda" está dibujado y no hace nada: el servidor todavía no da la
+  dirección del chat;
+- la tarjeta no abre la página de la tarea, aunque la API dice si la persona la puede ver
+  (`ve_la_pagina`);
+- las tareas terminadas y canceladas no aparecen en ninguna vista.
+
 ## Vigencia
 
 Levantado el 2026-09-22 auditando `nucleo/`, la especificación funcional y el
 código completo; notas del 2026-10-04 con los ADR 0017 y 0018. Puesto al día el 2026-10-11 con lo
-que construyó la Fase C, contrastado contra `src/leda/` y el plan. Todo lo de arriba es
+que construyó la Fase C, contrastado contra `src/leda/` y el plan, y el 2026-10-12 con la porción 1
+de la plataforma web, contrastada contra su código y sus pruebas. Todo lo de arriba es
 una foto y envejece; la única parte que se mantiene sola es la prueba.

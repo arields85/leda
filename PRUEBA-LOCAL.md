@@ -426,3 +426,62 @@ curl "https://api.telegram.org/bot<token>/deleteWebhook"
 
 y el listener lo detecta solo, dentro de un minuto aproximadamente, sin
 reiniciar nada.
+
+---
+
+## La plataforma web (porción 1)
+
+La puerta del equipo, de sólo lectura ([ADR 0022](docs/decisions/0022-plataforma-web-de-tareas.md);
+qué hace, en [`docs/capacidades.md`](docs/capacidades.md)). Hoy está en la rama `feat/plataforma`:
+estos comandos corren desde `D:\Proyectos\Leda-PM-worktrees\plataforma`, en PowerShell, cada uno
+entero en un renglón. Después de juntar las ramas, desde la carpeta del Motor, con su `.venv` y sin
+`PYTHONPATH`.
+
+**Antes:**
+
+- La carpeta de la plataforma no tiene `.venv` ni `.env`. Se usa el Python del Motor con
+  `PYTHONPATH=src`: sin eso corre el código del Motor, que no tiene la plataforma. La base se da con
+  `LEDA_DB_URL` en las dos terminales de abajo, sin copiarla a ningún documento.
+- La base necesita las migraciones hasta la `0059`. `leda_motor` está en la `0056` y es de la
+  prueba por Telegram: `PENDIENTE` qué base se usa (por ejemplo, `leda_motor` puesta al día después
+  de la prueba, con respaldo previo).
+- El puerto 8000 es de la página de la prueba por Telegram: la plataforma usa el 8001.
+
+**1. Compilar la web, una vez** (y cada vez que cambie `web/`; hace falta Node, no para correrla):
+
+```powershell
+cd web
+npm ci
+npm run build
+cd ..
+```
+
+Queda en `web/dist`, que no se versiona. Sin compilar, `/app/` muestra "La página todavía no está
+lista."
+
+**2. Levantar el servidor de la página** (terminal 1; Ctrl+C para cortar):
+
+```powershell
+$env:PYTHONPATH = "src"
+..\motor-de-conversacion\.venv\Scripts\python.exe -m uvicorn leda.entrada:app --host 127.0.0.1 --port 8001 --no-access-log
+```
+
+**3. Emitir el enlace de una persona** (terminal 2; el enlace sirve una vez y el anterior sin usar
+queda anulado):
+
+```powershell
+$env:PYTHONPATH = "src"
+$env:LEDA_BASE_URL = "http://localhost:8001"
+..\motor-de-conversacion\.venv\Scripts\python.exe -m leda enlace-web corework --persona Marcos
+```
+
+**4. Abrir el enlace** en el navegador de la misma PC y apretar "Entrar": la sesión queda abierta y
+lleva a `/app/`. Para probar los cortes: "salir" en la página, o
+
+```powershell
+..\motor-de-conversacion\.venv\Scripts\python.exe -m leda cortar-sesiones-web corework --persona Marcos
+```
+
+**En el celular** (`PENDIENTE`, con el usuario): la cookie de la sesión es `Secure`, y fuera de
+`localhost` el navegador sólo la guarda con HTTPS. Hace falta un túnel o HTTPS hasta la PC, con
+`LEDA_BASE_URL` apuntando a esa dirección.

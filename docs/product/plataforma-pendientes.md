@@ -118,6 +118,44 @@ de `workspace_setting` (se cambia por SQL).
 | Revisión periódica del pack (cada N meses) | No existe | `nucleo/alta-de-equipo.md`, "Revisión periódica" |
 | Quién deja de compartir el detalle de una tarea y desde dónde, y si lo compartido vence solo (por ejemplo, cuando la tarea se cierra) | No hay jugada por chat ni comando: sólo la operación de la cocina `dejar_de_compartir_tarea`, que puede usar el encargado del sector de la tarea o quien la compartió (auditada; corta también el enlace ya emitido). Lo compartido no vence: vale hasta que alguien lo revoca | Decisión 33 del usuario (2026-10-09; `odd/tasks/fase-c.md`, "El resumen para cualquiera, el detalle a pedido"). `PENDIENTE` con el usuario: si se revoca desde la plataforma, por chat o también por quien lo recibió, y si vence al cerrarse la tarea |
 
+## La puerta del equipo, porción 1 (2026-10-12)
+
+Construida en la rama `feat/plataforma` ([`../capacidades.md`](../capacidades.md), "Lo que agregó la
+plataforma web"); plan y evidencia en
+[`../../odd/tasks/plataforma-p1.md`](../../odd/tasks/plataforma-p1.md).
+
+**Valores fijados a mano en esta porción:**
+
+| Qué | Hoy | Notas |
+|---|---|---|
+| Nombre y duración de la cookie de la sesión | `leda_sesion`, `Max-Age` de 400 días (lo más que aceptan los navegadores), renovada cada vez que la web pregunta quién es la persona; `web_app.py` (`COOKIE`, `DURACION_DE_LA_COOKIE_S`) | La sesión de la base no vence (decisión 4); la cookie sólo la transporta. Cada puerta tendrá su cookie (decisión 12) |
+| Vencimiento del enlace de entrada | Ninguno por tiempo, como el de la página de la tarea (migración `0057`): deja de servir al canjearse, al emitirse otro o al cortarse las sesiones | El ADR 0022 no fija un plazo |
+| Profundidad de la cadena de esperas | Hasta 10 niveles, sin repetir (migración `0059`) | |
+| Qué estado muestra una tarjeta cuando tiene más de uno | Trabada antes que vencida, vencida antes que entregada, entregada antes que en curso (`web_app._marca`) | Ver abajo, "Para decidir", pregunta 5 |
+| Colores, letras y medidas del aspecto | En el tema de Tailwind (`web/src/index.css`): los cuatro colores de estado, los grises, JetBrains Mono, tamaños, bordes y sombras | Decisión 18. Las dos páginas sin la web (el botón "Entrar" y la de un enlace que no sirve) repiten los colores a mano en `web_app.py` |
+
+**Abierto:**
+
+- **Para decidir, con el usuario después de la prueba por Telegram:** las seis preguntas de
+  `odd/tasks/plataforma-p1.md`, "Para decidir" (la fecha y el estado de una tarea que espero, abrir su
+  página, lo terminado, lo que tengo para revisar de otra área, vencida y trabada a la vez, hasta
+  dónde ve la cadena un integrante). Mientras tanto, la plataforma hace lo más restrictivo. Y dos más:
+  - **Qué ve un integrante de la tarea trabada de otro.** Hoy no se le dice que está trabada: la
+    tarjeta dice "[ABIERTA]" en gris, porque la base no le muestra ese bloqueo.
+  - **El botón "> contarle algo a leda".** Está dibujado y no hace nada: el servidor todavía no da la
+    dirección del bot del espacio.
+- **Técnico:**
+  - dos toques seguidos en "Entrar" pueden terminar en "Este enlace ya no sirve" aunque el primero
+    haya abierto la sesión;
+  - la tarjeta de una tarea entregada no dice quién la revisa;
+  - la tarjeta no abre la página de la tarea, aunque la API dice si la persona la puede ver;
+  - las advertencias de las revisiones listadas en `odd/tasks/plataforma-p1.md` ("Progreso y
+    evidencia"): dos emisiones simultáneas del enlace de una persona hacen fallar la segunda; un enlace
+    sin canjear de alguien que dejó el equipo vuelve a servir si lo reincorporan; una espera por el
+    bloqueo de quien destraba sigue contando aunque ese bloqueo ya se haya resuelto; `vencida` no mira
+    una nueva previsión de la persona (el motor sí); los días que quedan cuando vence el mismo día; el
+    candado global atiende la web de a un pedido; el chequeo de `Origin` detrás de un proxy.
+
 ## Decisiones abiertas que la plataforma va a necesitar
 
 - Cómo se autentica quien opera Leda.
