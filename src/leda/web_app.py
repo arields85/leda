@@ -29,6 +29,12 @@ Rutas, todas bajo `/app` y servidas por la misma aplicación que la página de l
   `/app/admin`; `GET /app/admin/api/yo` (quién es y los espacios que existen) y `POST
   /app/admin/salir`. El rol de plataforma se revalida en la base en cada pedido; las dos puertas
   no se abren con la cookie de la otra (constitución §2).
+- La carga de una tarea por la puerta de administración (decisiones 9 y 11; porción 2, tarea
+  P2-2, migración 0062): `GET /app/admin/api/espacios/{id}/opciones` (lo que el formulario
+  necesita) y `POST /app/admin/api/espacios/{id}/tareas` (JSON, con la misma protección contra
+  pedidos de otro sitio que salir). Valida y escribe la base (`opciones_de_la_carga` y
+  `cargar_tarea`), que comprueba la sesión y el espacio en cada llamada: este módulo sólo revisa
+  la forma de los datos y pone en palabras lo que la base rechaza (422) o avisa.
 - `GET /app/` y las demás páginas bajo `/app` (tarea P1-4): la web compilada de `web/dist`
   (React, decisión 17), del mismo origen que la API. `index.html` no se guarda; los archivos con
   huella de `assets/` se guardan un año. Sin compilar, la persona ve un mensaje humano.
@@ -50,8 +56,10 @@ el equipo.
 from __future__ import annotations
 
 import hashlib
+import json
 import secrets
 import threading
+import uuid
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -61,6 +69,7 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, Request
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, RedirectResponse,
                                Response)
+from starlette.concurrency import run_in_threadpool
 
 from .calendario import Calendario
 from .db import conectar, sin_espacio
@@ -714,6 +723,234 @@ def salir_de_la_administracion(request: Request):
         return respuesta
 
     return _con_la_base(cortar)
+
+
+# --- La carga de una tarea --------------------------------------------------------------------
+#
+# Porción 2, tarea P2-2 (decisiones 9 y 11; migración 0062). Lo decide la base: la sesión y el
+# espacio se comprueban en cada llamada, y lo que no se carga vuelve todo junto como datos
+# (`campo` y `motivo`). Acá sólo se revisa la forma de lo que llegó y se pone en palabras.
+
+# Lo más grande que se acepta leer de una carga: un formulario de una tarea entra de sobra.
+TAMANO_MAXIMO_DE_LA_CARGA = 64 * 1024
+
+# Qué se dice de cada rechazo (422) y de cada aviso que no bloquea (constitución §10: nada técnico).
+TEXTOS_DE_LA_CARGA = {
+    ("objetivo", "falta"): "Elegí el objetivo al que contribuye la tarea.",
+    ("objetivo", "no_existe"): "Ese objetivo no está en este espacio.",
+    ("objetivo", "no_esta_abierto"): "Ese objetivo ya no está abierto.",
+    ("titulo", "falta"): "Falta el título.",
+    ("titulo", "demasiado_largo"): "El título es demasiado largo: hasta 200 caracteres.",
+    ("descripcion", "demasiado_largo"):
+        "La descripción es demasiado larga: hasta 800 caracteres.",
+    ("responsable", "falta"): "Elegí quién la va a hacer.",
+    ("responsable", "no_es_integrante_activo"):
+        "Esa persona no es integrante activo de este espacio.",
+    ("responsable", "la_hace_y_la_revisa"):
+        "Nadie aprueba el trabajo de esa persona: la revisaría ella misma.",
+    ("responsable", "sin_quien_la_revise"):
+        "Nadie activo revisa el trabajo de esa persona: nadie podría aprobar la tarea.",
+    ("responsable", "sin_conectar"):
+        "Esa persona todavía no tiene Leda conectada: no va a recibir avisos ni seguimiento "
+        "hasta que la conecte.",
+    ("fecha", "falta"): "Elegí la fecha.",
+    ("fecha", "en_el_pasado"): "Esa fecha ya pasó.",
+    ("fecha", "no_es_dia_habil"): "Ese día no es hábil en este espacio.",
+    ("fecha", "despues_del_objetivo"): "La fecha es posterior a la del objetivo.",
+    ("criterio", "falta"):
+        "Falta el criterio de aceptación: qué tiene que pasar para darla por terminada.",
+    ("criterio", "demasiado_largo"): "El criterio es demasiado largo: hasta 500 caracteres.",
+    ("evidencia", "falta"): "Elegí la evidencia que se pide para darla por terminada.",
+    ("evidencia", "sin_politica_del_area"):
+        "El área de esa persona todavía no tiene definida qué evidencia se pide.",
+    ("evidencia", "tipo_no_es_de_la_politica"):
+        "Hay una evidencia que el área no conoce: nadie podría entregarla.",
+    ("decidio", "falta"): "Elegí quién decidió la tarea.",
+    ("decidio", "no_es_integrante_activo"):
+        "Quien la decidió tiene que ser integrante activo de este espacio.",
+    ("clave", "falta"): "No se pudo identificar este envío. Recargá la página y probá de nuevo.",
+    ("clave", "usada_con_otros_datos"):
+        "Este envío ya cargó otra tarea. Recargá la página para cargar una nueva.",
+}
+TEXTO_DE_UN_DATO_MAL_FORMADO = "Este dato no es válido."
+
+# Cómo se llama cada dato en el cuerpo del pedido, y el `campo` con que lo nombra la base.
+_CAMPOS_ID = {"objetivo": "objetivo_id", "responsable": "responsable_id",
+              "decidio": "decidio_id"}
+_CAMPOS_TEXTO = {"titulo": "titulo", "descripcion": "descripcion", "criterio": "criterio",
+                 "clave": "clave"}
+_FEMENINOS = {"descripcion", "fecha", "evidencia", "clave"}
+
+
+def _con_texto(fila: dict[str, Any]) -> dict[str, str]:
+    campo, motivo = str(fila.get("campo", "")), str(fila.get("motivo", ""))
+    texto = TEXTOS_DE_LA_CARGA.get((campo, motivo))
+    if texto is None:
+        texto = (TEXTO_DE_UN_DATO_MAL_FORMADO if motivo.startswith("mal_formad")
+                 else TEXTOS_DE_LA_CARGA.get(("clave", "falta")))
+    return {"campo": campo, "motivo": motivo, "texto": texto}
+
+
+def _mal_formado(campo: str) -> dict[str, str]:
+    return {"campo": campo,
+            "motivo": "mal_formada" if campo in _FEMENINOS else "mal_formado"}
+
+
+def leer_la_carga(cuerpo: Any) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Los datos de una carga como los recibe `cargar_tarea`, y los que llegaron con una forma
+    que no sirve (`mal_formado`). Lo que falta lo dice la base, todo junto."""
+    cuerpo = cuerpo if isinstance(cuerpo, dict) else {}
+    datos: dict[str, Any] = {}
+    errores: list[dict[str, str]] = []
+    for campo, clave in _CAMPOS_ID.items():
+        valor = cuerpo.get(clave)
+        datos[campo] = None
+        if valor in (None, ""):
+            continue
+        try:
+            datos[campo] = str(uuid.UUID(valor)) if isinstance(valor, str) else None
+        except ValueError:
+            pass
+        if datos[campo] is None:
+            errores.append(_mal_formado(campo))
+    for campo, clave in _CAMPOS_TEXTO.items():
+        valor = cuerpo.get(clave)
+        datos[campo] = valor if isinstance(valor, str) else None
+        if valor is not None and not isinstance(valor, str):
+            errores.append(_mal_formado(campo))
+    fecha = cuerpo.get("fecha")
+    datos["fecha"] = None
+    if fecha not in (None, ""):
+        try:
+            datos["fecha"] = date.fromisoformat(fecha) if isinstance(fecha, str) else None
+        except ValueError:
+            pass
+        if datos["fecha"] is None:
+            errores.append(_mal_formado("fecha"))
+    evidencia = cuerpo.get("evidencia")
+    datos["evidencia"] = None
+    if isinstance(evidencia, list) and all(isinstance(e, str) for e in evidencia):
+        datos["evidencia"] = evidencia
+    elif evidencia is not None:
+        errores.append(_mal_formado("evidencia"))
+    return datos, errores
+
+
+def _espacio_de(espacio_id: str) -> str | None:
+    try:
+        return str(uuid.UUID(espacio_id))
+    except ValueError:
+        return None
+
+
+def _espacio_que_no_existe() -> JSONResponse:
+    return _json({"error": "espacio_no_existe"}, 404)
+
+
+def _sin_lo_que_rechaza_la_base(resultado: dict[str, Any]) -> Response | None:
+    """Sin sesión (401, se corta la cookie) o sin espacio (404): la base lo dice así."""
+    campos = {e.get("campo") for e in resultado.get("errores") or []}
+    if "sesion" in campos:
+        return _sin_sesion_de_administracion()
+    if "espacio" in campos:
+        return _espacio_que_no_existe()
+    return None
+
+
+@router.get("/admin/api/espacios/{espacio_id}/opciones")
+def opciones_de_la_carga(espacio_id: str, request: Request):
+    """Lo que el formulario necesita para cargar una tarea en un espacio: los objetivos abiertos,
+    los integrantes activos (con quién revisaría sus tareas y si tienen Leda conectada), la
+    evidencia de cada área y los días hábiles."""
+    token = _token_de_administracion(request)
+    if token is None:
+        return _sin_sesion_de_administracion()
+    espacio = _espacio_de(espacio_id)
+
+    def leer(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            if _sesion_de_administracion(cur, token) is None:
+                return _sin_sesion_de_administracion()
+        if espacio is None:
+            return _espacio_que_no_existe()
+        ahora = _ahora(conn, espacio)
+        with sin_espacio(conn) as cur:
+            _con_la_version_del_nucleo(cur)
+            cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
+                        (_hash(token), espacio, ahora))
+            resultado = cur.fetchone()["r"]
+        rechazo = _sin_lo_que_rechaza_la_base(resultado)
+        if rechazo is not None:
+            return rechazo
+        return _json({k: v for k, v in resultado.items() if k != "ok"})
+
+    return _con_la_base(leer)
+
+
+@router.post("/admin/api/espacios/{espacio_id}/tareas")
+async def cargar_una_tarea(espacio_id: str, request: Request):
+    """Carga una tarea comprometida en un espacio (decisión 9): 201 con su id y los avisos; la
+    misma clave con los mismos datos, 200 con la misma tarea; lo que no se carga, 422 con todo
+    lo que hay que corregir."""
+    if _de_otro_sitio(request):
+        return _json({"error": "origen_no_verificado"}, 403)
+    tipo = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if tipo != "application/json":
+        return _json({"error": "se_espera_json"}, 415)
+    token = _token_de_administracion(request)
+    if token is None:
+        return _sin_sesion_de_administracion()
+    crudo = await request.body()
+    if len(crudo) > TAMANO_MAXIMO_DE_LA_CARGA:
+        return _json({"error": "demasiado_grande"}, 413)
+    try:
+        cuerpo = json.loads(crudo or b"null")
+    except ValueError:
+        cuerpo = None
+    datos, mal_formados = leer_la_carga(cuerpo)
+    espacio = _espacio_de(espacio_id)
+    return await run_in_threadpool(_con_la_base, lambda conn: _cargar(
+        conn, token, espacio, datos, mal_formados))
+
+
+def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
+            mal_formados: list[dict[str, str]]) -> Response:
+    with sin_espacio(conn) as cur:
+        if _sesion_de_administracion(cur, token) is None:
+            return _sin_sesion_de_administracion()
+    if espacio is None:
+        return _espacio_que_no_existe()
+    ahora = _ahora(conn, espacio)
+    # Con un dato mal formado no se carga nada: la base igual dice todo lo demás, y sin la clave
+    # nunca escribe (la falta de la clave es un rechazo más).
+    clave = None if mal_formados else datos["clave"]
+    with sin_espacio(conn) as cur:
+        _con_la_version_del_nucleo(cur)
+        cur.execute(
+            """select cargar_tarea(%s, %s, %s, %s, %s, %s, %s, %s, %s::text[], %s, %s, %s)
+                      as r""",
+            (_hash(token), espacio, datos["objetivo"], datos["titulo"], datos["descripcion"],
+             datos["responsable"], datos["fecha"], datos["criterio"], datos["evidencia"],
+             datos["decidio"], clave, ahora))
+        resultado = cur.fetchone()["r"]
+    rechazo = _sin_lo_que_rechaza_la_base(resultado)
+    if rechazo is not None:
+        return rechazo
+    if resultado.get("ok") and not mal_formados:
+        return _json({"task_id": str(resultado["task_id"]),
+                      "avisos": [_con_texto(a) for a in resultado.get("avisos") or []],
+                      "repetida": bool(resultado.get("repetida"))},
+                     200 if resultado.get("repetida") else 201)
+    ya_dichos = {e["campo"] for e in mal_formados}
+    errores = list(mal_formados)
+    for error in resultado.get("errores") or []:
+        if error.get("campo") in ya_dichos:
+            continue
+        if (mal_formados and (error.get("campo"), error.get("motivo")) == ("clave", "falta")
+                and datos["clave"] is not None):
+            continue
+        errores.append(error)
+    return _json({"errores": [_con_texto(e) for e in errores]}, 422)
 
 
 # --- La web -----------------------------------------------------------------------------------

@@ -85,7 +85,9 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     # Los apodos (migración 0055; ADR 0020).
                     "apodo",
                     # El enlace de entrada y la sesión de la web (migración 0057; ADR 0022).
-                    "enlace_de_entrada", "sesion_web")
+                    "enlace_de_entrada", "sesion_web",
+                    # La clave de cada carga de una tarea desde la web (migración 0062).
+                    "carga_de_tarea")
 
 # La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
 # política. `model_config` admite espacio nulo para el modelo global.
