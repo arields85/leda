@@ -63,7 +63,7 @@ Ruta: un escritor delegado por tarea (dos o más archivos no triviales cada una)
 - [x] **P2-3 · El formulario:** elegir espacio, objetivo, responsable (con "sin conectar" a la vista),
       fecha (sólo días hábiles), criterio y evidencia (la de la política del área como punto de
       partida); vista previa y confirmación; la vista ancha de escritorio.
-- [ ] **P2-4 · Documentos:** `docs/capacidades.md`, `docs/product/plataforma-pendientes.md`,
+- [x] **P2-4 · Documentos:** `docs/capacidades.md`, `docs/product/plataforma-pendientes.md`,
       `PRUEBA-LOCAL.md` y este documento con la evidencia.
 
 ## Para decidir (el usuario)
@@ -287,3 +287,23 @@ Evidencia: las tres pruebas nuevas que lo cubren fallan con el código anterior 
 passed) y pasan con el nuevo; en `web/`, `npx tsc --noEmit` sin errores, `npx vitest run` → 57
 passed, `npx vite build` bien.
 
+### Cierre del coordinador (2026-10-12)
+
+- **Suite entera de garantías**, cada vez en una carpeta aparte (`pytest -q tests/garantias
+  tests/test_cli_plataforma.py`): sobre `0c70ea11` (P2-1) 669 passed (22 min); sobre `00432275` (P2-2)
+  701 passed (25 min); sobre `f428389e` (P2-3 y los arreglos A y C) 707 passed (20 min).
+- **RDD por tramos, todas aprobadas:** `16f630ca` (`review-2bb3704b62fcce34`), `f6a40067`
+  (`review-40c4b218bf40f1fa`), `072972aa` (`review-c30e9e7ac000fa0e`), `37ac3bcc`
+  (`review-7b6e2e7b8d956d75`), `8e18463d` (`review-c88ebea1b3807c0f`) y `f30665e0`
+  (`review-5af4428ea31f40d2`). Las advertencias de peso se arreglaron con su commit (la sesión vieja de
+  administración, `072972aa`; hoy después del cierre y el cuerpo anidado, `8e18463d`; el ciclo ante un
+  404 y la clave tras un resultado incierto, `f30665e0`).
+- **Advertencias sin arreglar:** una sesión creada en el mismo instante que el otorgamiento
+  (`0063`, 107-109); el enlace anulado sin auditoría propia (`0063`, 68-71); si desaparece el único
+  espacio, la pantalla queda sin salida (`AdminApp.tsx`, 138-143); la rama del campo mal formado sin
+  prueba (`LoadForm.tsx`, 151-153); sugerencias de pruebas.
+- **Repaso del coordinador:** `npx vitest run` en `web/`: 57 passed.
+- `PENDIENTE`: la prueba del usuario en el celular y en la computadora; los avisos de la decisión 7 y
+  que el bot de administración ofrezca el enlace (después de juntar las ramas); que Leda proponga un
+  criterio comprobable (IA real, con permiso); las tres preguntas de "Para decidir" y si el enlace de
+  entrada vence (recomendación: 24 horas).
