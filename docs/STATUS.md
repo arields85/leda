@@ -60,7 +60,7 @@ viejo corriendo.
   máquina, con color sólo en los estados que tienen algo.
 
 **Lo que sigue:**
-1. **La prueba por Telegram** con `leda_motor` al día hasta la `0056` (respaldo previo; autorizado;
+1. **La prueba por Telegram** con `leda_motor` ya al día hasta la `0056` (respaldo previo hecho;
    guion `docs/product/guion-telegram-fase-c-parte-1.md`), el 2026-10-12 con el usuario. Si pasa, la
    rama del Motor pasa a `main` por avance rápido (usuario, 2026-10-12).
 2. **La plataforma, porción 1** (ADR 0022, decisión 16): la puerta del equipo, de sólo lectura
@@ -90,7 +90,9 @@ guion es `docs/product/guion-telegram-fase-c-parte-1.md`):
 - **Ojo:** nunca el escuchador y una ronda del corredor a la vez, ni una ronda real mientras se edita `src/`.
 
 **`leda_motor`:** recreada el 2026-10-08 (D6) con las tareas de la prueba (vencen el viernes 16/10);
-respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`. Le faltan de la `0039` a la `0056`. El usuario autorizó
+respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`. Al día hasta la `0056` desde el 2026-10-12 (respaldo
+previo `db/respaldos/leda_motor-antes-0039-a-0056-20261012.dump`, `pg_restore --list` sin error; las 18 migraciones
+con `psql -f` como el superusuario local, todas sin error; 12 tareas, vencen el vie 16/10). El usuario autorizó
 ponerla al día o recrearla cuando haga falta, con respaldo previo; nunca `leda` ni `leda_flujo`.
 
 **Acuerdos de trabajo** (detalle en la memoria del agente):
