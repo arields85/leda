@@ -552,7 +552,7 @@ def a_la_web():
     return RedirectResponse("/app/", status_code=308, headers=CABECERAS_DE_LA_WEB)
 
 
-# Va última: las rutas de arriba (la API, entrar y salir) tienen prioridad.
+# Va última: las rutas de arriba (la API, entrar y salir) se miran antes.
 @router.get("/{ruta:path}", include_in_schema=False)
 def la_web(ruta: str):
     """La web compilada: un archivo de `assets/`, o `index.html` para cualquier página."""
