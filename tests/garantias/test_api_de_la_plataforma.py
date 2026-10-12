@@ -475,6 +475,17 @@ def test_la_semana_los_dias_que_quedan_y_la_barra(web, conn, mundo):
     assert tareas["Montar la línea"]["barra"] is None   # no está en curso
 
 
+def test_los_dias_de_atraso_solo_para_quien_ve_el_atraso(web, conn, mundo):
+    """El "[VENCIDA +3d]" de la tarjeta: días hábiles desde la fecha, sólo si la base mostró el
+    atraso a esta persona."""
+    tareas = _por_titulo(_vista(_entrar(web, conn, mundo, "Sam North")))
+    assert tareas["Pintar el galpón"]["dias_de_atraso"] == 3     # el lunes 19; hoy, jueves 22
+    assert tareas["Calibrar la balanza"]["dias_de_atraso"] is None   # ajena: su atraso no se ve
+    assert tareas["Montar la línea"]["dias_de_atraso"] is None       # no venció
+    sector = _por_titulo(_vista(_entrar(web, conn, mundo, "Taylor Quinn"), "sector"))
+    assert sector["Pintar el galpón"]["dias_de_atraso"] == 3
+
+
 def test_un_feriado_no_es_un_segmento_de_la_barra(web, conn, mundo):
     with admin(conn) as cur:
         cur.execute("insert into holiday (workspace_id, fecha, nombre) values (%s, %s, 'Feriado')",

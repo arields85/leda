@@ -36,3 +36,6 @@ tools/_mediciones/
 .leda/
 chatgpt.json
 chatgpt.json.tmp
+# La web de la plataforma (ADR 0022): sus dependencias y lo compilado no se versionan.
+web/node_modules/
+web/dist/

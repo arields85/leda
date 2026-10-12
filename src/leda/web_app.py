@@ -19,6 +19,9 @@ Rutas, todas bajo `/app` y servidas por la misma aplicación que la página de l
   fecha, los días hábiles que quedan, la barra de días hábiles de una tarea en curso y, si es una
   tarea trabada cuyo bloqueo ve la persona, la cadena de esperas en árbol.
 - `POST /app/salir`: corta la sesión (`cerro_la_sesion`) y borra la cookie.
+- `GET /app/` y las demás páginas bajo `/app` (tarea P1-4): la web compilada de `web/dist`
+  (React, decisión 17), del mismo origen que la API. `index.html` no se guarda; los archivos con
+  huella de `assets/` se guardan un año. Sin compilar, la persona ve un mensaje humano.
 
 **Nada del pedido elige a la persona ni al espacio** (decisión 11): salen del hash del token de la
 cookie, por las funciones de la base (`sesion_vigente`, `vistas_de_la_sesion`,
@@ -40,11 +43,13 @@ import secrets
 import threading
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, RedirectResponse,
+                               Response)
 
 from .calendario import Calendario
 from .db import conectar, sin_espacio
@@ -93,6 +98,20 @@ CABECERAS_DEL_BOTON = {
     "Referrer-Policy": "same-origin",
     "Content-Security-Policy": ("default-src 'none'; style-src 'unsafe-inline'; "
                                 "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"),
+}
+
+# La web compilada (`npm run build` en `web/`): la sirve esta misma aplicación, así la cookie
+# sigue siendo del mismo origen (decisión 17). Node hace falta para compilar, no para correr.
+CARPETA_DE_LA_WEB = Path(__file__).resolve().parents[2] / "web" / "dist"
+# Los archivos de `assets/` llevan una huella en el nombre: cambian de nombre si cambian.
+GUARDAR_UN_ANIO = "public, max-age=31536000, immutable"
+# El tipo de cada archivo de la web, explícito: con `nosniff`, un script con otro tipo no corre,
+# y el registro de Windows no siempre sabe el de `.js`.
+TIPOS_DE_LA_WEB = {
+    ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css",
+    ".woff2": "font/woff2", ".woff": "font/woff", ".svg": "image/svg+xml",
+    ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json",
+    ".webmanifest": "application/manifest+json", ".txt": "text/plain", ".html": "text/html",
 }
 
 VISTAS = {"tus": "Tus tareas", "sector": "Tu sector", "equipo": "El equipo"}
@@ -204,6 +223,7 @@ main{max-width:26rem;margin:0 auto;padding:18px 20px 32px}
 .marca{font-size:11px;color:#6F7277;margin:0}
 h1{font-size:24px;font-weight:800;letter-spacing:-0.02em;margin:10px 0 16px}
 p{margin:0 0 12px;color:#B0B2B6}
+a{color:#E6E6E3}
 button{display:flex;align-items:center;width:100%;height:48px;margin-top:20px;padding:0 14px;
 font:inherit;font-size:14px;font-weight:700;color:#E6E6E3;background:#161717;
 border:1.5px solid #E6E6E3;border-radius:6px;box-shadow:3px 3px 0 #E6E6E3}
@@ -410,6 +430,10 @@ def _tarea(fila: dict[str, Any], arboles: dict[str, list[dict[str, Any]]], calen
         "area": fila["area"],
         "papel": fila["papel"],
         "vencida": fila["vencida"],
+        # El "+3d" de "[VENCIDA +3d]": días hábiles desde la fecha, sólo para quien la base le
+        # mostró el atraso.
+        "dias_de_atraso": (calendario.habiles_entre(fila["fecha_objetivo"], ahora)
+                           if fila["vencida"] is True and fila["fecha_objetivo"] else None),
         "bloqueo_abierto": bloqueo,
         "ve_la_pagina": fila["ve_la_pagina"],
         # Los días que quedan, sólo mientras la fecha no pasó: contar los de atraso le diría el
@@ -502,6 +526,57 @@ def salir(request: Request):
         return respuesta
 
     return _con_la_base(cortar)
+
+
+# --- La web -----------------------------------------------------------------------------------
+
+def _no_existe() -> HTMLResponse:
+    return HTMLResponse(_pagina("Esta página no existe.", """<p><a href="/app/">Volver a tus tareas</a>.</p>"""), status_code=404,
+                        headers=CABECERAS_DE_UNA_PAGINA)
+
+
+def _archivo_de_la_web(carpeta: Path, ruta: str) -> Path | None:
+    """El archivo de la web compilada en esa ruta, o `None`: nunca uno fuera de la carpeta."""
+    try:
+        base = carpeta.resolve()
+        destino = (base / ruta).resolve()
+    except (OSError, ValueError):
+        return None
+    if base not in destino.parents or not destino.is_file():
+        return None
+    return destino
+
+
+@router.get("", include_in_schema=False)
+def a_la_web():
+    return RedirectResponse("/app/", status_code=308, headers=CABECERAS_DE_LA_WEB)
+
+
+# Va última: las rutas de arriba (la API, entrar y salir) tienen prioridad.
+@router.get("/{ruta:path}", include_in_schema=False)
+def la_web(ruta: str):
+    """La web compilada: un archivo de `assets/`, o `index.html` para cualquier página."""
+    primera = ruta.split("/", 1)[0]
+    if primera == "api":
+        return _json({"error": "no_existe"}, 404)
+    if primera in ("entrar", "salir"):
+        return _no_existe()
+    indice = CARPETA_DE_LA_WEB / "index.html"
+    if not indice.is_file():
+        _imprimir("  ! falta compilar la web de la plataforma (npm run build, en web/).")
+        return HTMLResponse(_pagina("La página todavía no está lista.", """<p>Probá de nuevo más tarde.</p>"""), status_code=503, headers=CABECERAS_DE_UNA_PAGINA)
+    if ruta:
+        archivo = _archivo_de_la_web(CARPETA_DE_LA_WEB, ruta)
+        if archivo is not None and archivo.name != "index.html":
+            cabeceras = dict(CABECERAS_DE_LA_WEB)
+            if ruta.startswith("assets/"):
+                cabeceras["Cache-Control"] = GUARDAR_UN_ANIO
+            return FileResponse(archivo, headers=cabeceras, media_type=TIPOS_DE_LA_WEB.get(
+                archivo.suffix.lower(), "application/octet-stream"))
+        # Lo que parece un archivo y no está no es una página: nunca el índice en su lugar.
+        if "." in ruta.rsplit("/", 1)[-1] or ruta.startswith("assets/"):
+            return _no_existe()
+    return HTMLResponse(indice.read_text(encoding="utf-8"), headers=CABECERAS_DE_LA_WEB)
 
 
 # --- La consola -------------------------------------------------------------------------------
