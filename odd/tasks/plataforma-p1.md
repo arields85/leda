@@ -109,6 +109,11 @@ comprobación y hace la revisión RDD. Estimación total: más de 400 líneas; c
 - [x] **P1-5 · Documentos:** `docs/capacidades.md`, `docs/product/plataforma-pendientes.md`, cómo
       levantarla para probar (`PRUEBA-LOCAL.md`) y este documento con la evidencia.
 
+- [ ] **P1-6 · Las decisiones del usuario** (2026-10-12, "Decidido por el usuario", abajo): la fecha,
+      el estado, la trabada y la vencida ya hablada de lo que espero (1, 5, 7); las terminadas de 30 días
+      (3); la cadena entera (6); el botón "> consultar a leda" con la dirección del bot (8). Lo que cambia
+      quién ve qué va en una migración nueva con sus pruebas de garantías.
+
 **Después de la prueba por Telegram** (con el usuario): juntar las ramas; Leda ofrece el acceso por chat
 y el corte por "perdí el celular" (conversación de prueba, ronda con la IA real con permiso); la prueba en
 el celular del usuario (cierre de la porción).
@@ -191,30 +196,22 @@ Lo prueba primero `TestClient` y después el usuario en su celular.
   de punta a punta todavía: `leda_motor` está en la `0056` y reservada para la prueba por Telegram; al
   juntar las ramas, se pone al día hasta la `0059` (con respaldo) y se prueba ahí.
 
-## Para decidir (el usuario, después de la prueba por Telegram)
+## Decidido por el usuario (2026-10-12)
 
-Mientras no se decida, la plataforma hace lo más restrictivo; abrirlo después no rehace nada.
+Las ocho preguntas de la noche, contestadas antes de la prueba por Telegram. Criterio común del usuario:
+la web informa lo mismo que el informe al grupo; informar antes que el silencio.
 
-1. **La fecha y el estado de una tarea que espero.** Marcos espera "Integrar datos de la comprimidora"
-   (de Ariel). En "Tus tareas" la ve con su fecha y su estado, pero sin la marca de vencida; con la fecha
-   a la vista, igual se da cuenta de que está atrasada. ¿Marcos tiene que ver la fecha y el estado de lo
-   que espera, o sólo el título y de quién es?
-2. **Abrir la página de una tarea que espero.** Marcos ve esa tarea en su lista pero no puede abrir su
-   página (hoy la página la ven el responsable, quien aprueba, el referente y la autoridad). ¿Esperar una
-   tarea habilita a abrir su página?
-3. **Lo terminado.** Las tareas terminadas y canceladas no aparecen en ninguna vista, así que la web no
-   muestra "lo que se terminó esta semana y quién lo hizo" (constitución §8, informar también las buenas
-   noticias). ¿Se muestran las terminadas en los últimos días?
-4. **Lo que tengo para revisar.** A Ismael le aparece en "Tus tareas" la entrega de Marcos que espera su
-   revisión, aunque sea de otra área ("otros me esperan"). ¿Queda así?
-5. **Vencida y trabada a la vez.** "Programar PLC" está trabada y además pasó su fecha: ¿la tarjeta dice
-   [TRABADA] (como hoy) o [VENCIDA]?
-6. **Hasta dónde ve la cadena un integrante.** Marcos ve "└─ espera: switch nuevo (Lucas)", que es el
-   bloqueo de la tarea de Ariel, como en el ejemplo del ADR. ¿Está bien que un integrante vea esa
-   profundidad, o sólo el primer escalón ("espera: servidor de la planta (Ariel)")?
-7. **Una tarea trabada de otro.** Marcos espera "Integrar datos de la comprimidora", que está trabada; como
-   el servidor no le muestra el bloqueo de otro, su tarjeta dice "[ABIERTA]" en gris. ¿Tiene que ver que
-   está trabada (va de la mano con la 1)?
-8. **El botón "> contarle algo a leda"** está pero no hace nada: la web todavía no sabe la dirección del
-   bot del equipo. ¿Lo dejamos visible hasta que la tenga, o lo ocultamos? (Recomendación: que abra el
-   chat con el bot del espacio, cuya dirección sale del pack.)
+1. **Lo que espero, como en el informe al grupo.** Marcos ve la fecha y el estado de la tarea de Ariel que
+   espera. La marca **[VENCIDA]**, con la previsión nueva si la hay, aparece recién cuando el atraso ya se
+   habló en privado con Ariel, igual que en el informe al grupo (`informe_al_grupo._sin_entregar`,
+   constitución §8); antes, la fecha sola.
+2. **No:** esperar una tarea no habilita a abrir su página.
+3. **Sí, las terminadas de los últimos 30 días**, con quién las hizo (las tareas suelen ser largas; una
+   semana se queda corta).
+4. **Sí:** lo que espera mi revisión queda en "Tus tareas", aunque sea de otra área.
+5. **Las dos marcas:** trabada y vencida a la vez lleva **[TRABADA] [VENCIDA]**; trabada en fecha, sólo
+   [TRABADA]. La vencida sigue la regla de la 1.
+6. **La cadena entera**, todos los escalones: así se ve si se va destrabando.
+7. **Sí:** Marcos ve que la tarea de otro que espera está trabada.
+8. **El botón dice "> consultar a leda"** y abre el chat de Telegram con el bot del espacio (la dirección
+   sale del pack). Un chat propio dentro de la web va a "Anotado para más adelante" del ROADMAP.
