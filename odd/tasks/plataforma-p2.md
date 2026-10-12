@@ -268,3 +268,22 @@ un cuerpo mal formado (422).
 `pytest -q tests/garantias/test_puerta_de_administracion.py tests/garantias/test_migraciones.py
 tests/garantias/test_web_servida.py tests/garantias/test_carga_de_tareas.py` (con
 `LEDA_TEST_DB_URL` al servidor local de pruebas) → 105 passed (5 min 2 s), sobre los tres commits (`072972aa`, `37ac3bcc`, `8e18463d`), con el ensayo de paridad y de rollback de la `0063` y la `0064`. La suite `tests/garantias` completa: `PENDIENTE` (la corre el coordinador).
+
+### Arreglo de la revisión de la P2-3 (2026-10-12)
+
+**Ruta:** delegated (2+ non-trivial files): `AdminApp.tsx`, `LoadForm.tsx` y sus pruebas.
+
+La revisión RDD `review-7b6e2e7b8d956d75` de `37ac3bcc` advirtió: (1) un 404 de `/opciones`
+volvía a pedir `/yo` y, si el espacio seguía en la lista, otra vez las opciones, sin fin; (2)
+cambiar un dato renovaba la clave aunque el envío anterior no hubiera tenido respuesta, y si ese
+envío sí había cargado la tarea, el reenvío cargaba otra. Ahora: ante el 404 se relee la lista de
+espacios una sola vez y se dice "Ese espacio ya no está disponible." (con "probar de nuevo" si
+sigue en la lista, o "Elegí otro espacio arriba." si ya no está); y mientras el resultado del
+último envío es desconocido (sin red, un 5xx) la clave sigue aunque cambien los datos. Un 422 o
+una carga lo resuelven; si el servidor contesta que la clave ya se usó con otros datos (422,
+`clave`, `usada_con_otros_datos`), el formulario dice "Puede que ya se haya cargado: fijate en "El
+equipo" antes de cargarla de nuevo." con "no está cargada: empezar de nuevo" (clave nueva).
+Evidencia: las tres pruebas nuevas que lo cubren fallan con el código anterior (3 failed, 15
+passed) y pasan con el nuevo; en `web/`, `npx tsc --noEmit` sin errores, `npx vitest run` → 57
+passed, `npx vite build` bien.
+

@@ -12,6 +12,9 @@ type Load<T> =
   | { kind: 'closed' }
   | { kind: 'failed' };
 
+// The options of a space can also be gone: the server no longer finds that space.
+type OptionsLoad = Load<Options> | { kind: 'gone' };
+
 function failure(error: unknown): { kind: 'closed' } | { kind: 'failed' } {
   return error instanceof SessionClosedError ? { kind: 'closed' } : { kind: 'failed' };
 }
@@ -24,17 +27,23 @@ function SessionClosed({ byPerson = false }: { byPerson?: boolean }) {
   );
 }
 
+function RetryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-fit rounded-card border-hard border-line bg-card px-3 py-2 text-small text-ink shadow-hard"
+    >
+      probar de nuevo
+    </button>
+  );
+}
+
 function Failed({ onRetry }: { onRetry: () => void }) {
   return (
     <Notice title="No se pudo cargar la página.">
       <p className="m-0">Probá de nuevo en un rato.</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="w-fit rounded-card border-hard border-line bg-card px-3 py-2 text-small text-ink shadow-hard"
-      >
-        probar de nuevo
-      </button>
+      <RetryButton onClick={onRetry} />
     </Notice>
   );
 }
@@ -45,7 +54,7 @@ export function AdminApp() {
   const [attempt, setAttempt] = useState(0);
   const [me, setMe] = useState<Load<AdminMe>>({ kind: 'loading' });
   const [spaceId, setSpaceId] = useState<string | null>(null);
-  const [options, setOptions] = useState<Load<Options>>({ kind: 'loading' });
+  const [options, setOptions] = useState<OptionsLoad>({ kind: 'loading' });
   const [closed, setClosed] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
 
@@ -71,11 +80,23 @@ export function AdminApp() {
     setOptions({ kind: 'loading' });
     fetchOptions(spaceId, request.signal)
       .then((data) => setOptions({ kind: 'ready', data }))
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         if (request.signal.aborted) return;
-        // 404: the space is gone; read the spaces again.
-        if (error instanceof RequestError && error.status === 404) setAttempt((n) => n + 1);
-        else setOptions(failure(error));
+        if (!(error instanceof RequestError && error.status === 404)) {
+          setOptions(failure(error));
+          return;
+        }
+        // 404: the space is gone. Read the spaces once more, so the selector stops offering it,
+        // and say so; never fetch again on its own (only "probar de nuevo" does).
+        try {
+          const fresh = await fetchAdminMe(request.signal);
+          if (request.signal.aborted) return;
+          setMe({ kind: 'ready', data: fresh });
+          if (!fresh.espacios.some((s) => s.id === spaceId)) setSpaceId(null);
+          setOptions({ kind: 'gone' });
+        } catch (again: unknown) {
+          if (!request.signal.aborted) setOptions(failure(again));
+        }
       });
     return () => request.abort();
   }, [spaceId, attempt]);
@@ -93,14 +114,15 @@ export function AdminApp() {
   else {
     body = (
       <>
-        {admin.espacios.length > 1 && (
+        {(admin.espacios.length > 1 || spaceId === null) && (
           <label className="flex max-w-[24rem] flex-col gap-1.5 text-meta text-ink-dim">
             <span className="uppercase tracking-[0.04em]">espacio</span>
             <select
               className="w-full rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none focus:border-ink"
               value={spaceId ?? ''}
-              onChange={(e) => setSpaceId(e.target.value)}
+              onChange={(e) => setSpaceId(e.target.value || null)}
             >
+              {spaceId === null && <option value="">elegí un espacio</option>}
               {admin.espacios.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.nombre}
@@ -111,6 +133,16 @@ export function AdminApp() {
         )}
         {options.kind === 'loading' && <Notice title="Cargando…" />}
         {options.kind === 'failed' && <Failed onRetry={retry} />}
+        {options.kind === 'gone' && (
+          <Notice title="Ese espacio ya no está disponible.">
+            <p className="m-0">
+              {spaceId === null && admin.espacios.length > 0
+                ? 'Elegí otro espacio arriba.'
+                : 'Probá de nuevo en un rato.'}
+            </p>
+            {spaceId !== null && <RetryButton onClick={retry} />}
+          </Notice>
+        )}
         {options.kind === 'ready' && spaceId && (
           <LoadForm
             key={spaceId}

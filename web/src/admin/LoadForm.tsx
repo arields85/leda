@@ -93,6 +93,10 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const [step, setStep] = useState<Step>({ kind: 'edit' });
   const [problems, setProblems] = useState<Problem[]>([]);
   const key = useRef<string | null>(null);
+  // The last send got no definite answer (no network, a server failure): it may have loaded the
+  // task. Until something settles it, the key stays even if the data changes, so the server can
+  // tell (a different task with that key is refused, never loaded twice).
+  const unknown = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -107,7 +111,8 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   function change(patch: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...patch }));
     // Other data, another attempt: a new key, so it never collides with the one already sent.
-    key.current = null;
+    // Not while the last send's outcome is unknown: that one may have loaded the task.
+    if (!unknown.current) key.current = null;
     const touched = new Set(Object.keys(patch));
     setProblems((current) => current.filter((p) => !touched.has(PROBLEM_FIELD[p.campo] ?? '')));
   }
@@ -136,16 +141,34 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       const result = await loadTask(spaceId, { ...draft, clave: key.current });
       if (result.kind === 'loaded') {
         key.current = null;
+        unknown.current = false;
         setProblems([]);
         setStep({ kind: 'done', warnings: result.warnings, repeated: result.repeated });
       } else {
+        // A rejection writes nothing, and the server looked the key up first: nothing was loaded
+        // with it, unless the key was used with other data (the conflict below) or some data came
+        // malformed (then the server never looks the key up).
+        if (!result.errors.some((e) => e.campo === 'clave' || e.motivo.startsWith('mal_formad'))) {
+          unknown.current = false;
+        }
         setProblems(result.errors);
         setStep({ kind: 'edit' });
       }
     } catch (error) {
-      if (error instanceof SessionClosedError) onClosed();
-      else setStep({ kind: 'review', sending: false, failed: true });
+      if (error instanceof SessionClosedError) {
+        onClosed();
+      } else {
+        unknown.current = true;
+        setStep({ kind: 'review', sending: false, failed: true });
+      }
     }
+  }
+
+  /** After a key conflict: the administrator checked the team's tasks and starts over. */
+  function newAttempt() {
+    key.current = null;
+    unknown.current = false;
+    setProblems((current) => current.filter((p) => p.campo !== 'clave'));
   }
 
   function another() {
@@ -210,14 +233,30 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   }
 
   const on = (field: Field) => problems.filter((p) => PROBLEM_FIELD[p.campo] === field);
-  const general = problems.filter((p) => !(p.campo in PROBLEM_FIELD));
+  const conflict = problems.some((p) => p.campo === 'clave' && p.motivo === 'usada_con_otros_datos');
+  const general = problems.filter(
+    (p) => !(p.campo in PROBLEM_FIELD) && !(p.campo === 'clave' && p.motivo === 'usada_con_otros_datos'),
+  );
   const invalid = (field: Field) => (on(field).length ? true : undefined);
   const described = (id: string, field: Field) => (on(field).length ? `${id}-error` : undefined);
 
   return (
     <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10">
       <form noValidate onSubmit={review} aria-label="Cargar tarea" className="flex min-w-0 flex-col gap-4">
-        {problems.length > 0 && (
+        {conflict && (
+          <div role="alert" className="flex flex-col gap-2 rounded-card border-hard border-line px-3 py-2.5 text-body">
+            <p className="m-0 font-bold">
+              Puede que ya se haya cargado: fijate en "El equipo" antes de cargarla de nuevo.
+            </p>
+            <p className="m-0 text-ink-soft">
+              El envío anterior no tuvo respuesta y esta vez cambiaron los datos.
+            </p>
+            <button type="button" className={`${SECONDARY} w-fit`} onClick={newAttempt}>
+              no está cargada: empezar de nuevo
+            </button>
+          </div>
+        )}
+        {problems.length > 0 && !(conflict && problems.length === 1) && (
           <div role="alert" className="flex flex-col gap-1 rounded-card border-hard border-line px-3 py-2.5 text-body">
             <p className="m-0 font-bold">No se cargó: hay que corregir lo marcado.</p>
             {general.map((p) => (

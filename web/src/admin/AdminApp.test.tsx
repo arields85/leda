@@ -212,9 +212,17 @@ describe('AdminApp', () => {
     expect(sent).toEqual(['22222222-2222-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222']);
   });
 
-  it('editing the data after a failed attempt renews the key', async () => {
+  it('after a send with no answer, editing keeps the key so the server can tell', async () => {
     keys('44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555');
-    const calls = await openForm({ [TASKS]: ['network', loaded()] });
+    const conflict = {
+      status: 422,
+      body: {
+        errores: [
+          { campo: 'clave', motivo: 'usada_con_otros_datos', texto: 'Este envío ya cargó otra tarea. Recargá la página para cargar una nueva.' },
+        ],
+      },
+    };
+    const calls = await openForm({ [TASKS]: ['network', conflict, loaded()] });
     fillTask();
     review();
     confirm();
@@ -223,9 +231,45 @@ describe('AdminApp', () => {
     fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar las alarmas' } });
     review();
     confirm();
+    // The first send may have loaded it: the server refused the same key with other data.
+    expect(await screen.findByText(/Puede que ya se haya cargado: fijate en "El equipo"/)).toBeInTheDocument();
+    expect(screen.queryByText(/Recargá la página/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'no está cargada: empezar de nuevo' }));
+    expect(screen.queryByText(/Puede que ya se haya cargado/)).toBeNull();
+    review();
+    confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
-    expect(sent).toEqual(['44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555']);
+    expect(sent).toEqual([
+      '44444444-4444-4444-8444-444444444444',
+      '44444444-4444-4444-8444-444444444444',
+      '55555555-5555-4555-8555-555555555555',
+    ]);
+  });
+
+  it('after a rejection nothing was loaded, so editing renews the key', async () => {
+    keys('66666666-6666-4666-8666-666666666666', '77777777-7777-4777-8777-777777777777');
+    const rejected = {
+      status: 422,
+      body: { errores: [{ campo: 'criterio', motivo: 'falta', texto: 'Falta el criterio de aceptación.' }] },
+    };
+    const calls = await openForm({ [TASKS]: ['network', rejected, loaded()] });
+    fillTask();
+    review();
+    confirm();
+    await screen.findByRole('alert');
+    confirm();
+    await screen.findByText('No se cargó: hay que corregir lo marcado.');
+    fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Suenan las 12' } });
+    review();
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
+    expect(sent).toEqual([
+      '66666666-6666-4666-8666-666666666666',
+      '66666666-6666-4666-8666-666666666666',
+      '77777777-7777-4777-8777-777777777777',
+    ]);
   });
 
   it('each rejection lands on its field, and the rest in the summary', async () => {
@@ -236,7 +280,7 @@ describe('AdminApp', () => {
           errores: [
             { campo: 'fecha', motivo: 'no_es_dia_habil', texto: 'Ese día no es hábil en este espacio.' },
             { campo: 'responsable', motivo: 'sin_quien_la_revise', texto: 'Nadie activo revisa el trabajo de esa persona: nadie podría aprobar la tarea.' },
-            { campo: 'clave', motivo: 'usada_con_otros_datos', texto: 'Este envío ya cargó otra tarea. Recargá la página para cargar una nueva.' },
+            { campo: 'clave', motivo: 'mal_formada', texto: 'Este dato no es válido.' },
           ],
         },
       },
@@ -246,7 +290,7 @@ describe('AdminApp', () => {
     confirm();
     const summary = await screen.findByRole('alert');
     expect(summary).toHaveTextContent('No se cargó: hay que corregir lo marcado.');
-    expect(summary).toHaveTextContent('Este envío ya cargó otra tarea.');
+    expect(summary).toHaveTextContent('Este dato no es válido.');
     expect(screen.getByLabelText('quién la hace')).toHaveAttribute('aria-invalid', 'true');
     expect(document.getElementById('f-responsable-error')).toHaveTextContent('Nadie activo revisa');
     expect(document.getElementById('f-fecha-error')).toHaveTextContent('Ese día no es hábil');
@@ -275,6 +319,49 @@ describe('AdminApp', () => {
     render(<AdminApp />);
     expect(await screen.findByText('La sesión está cerrada.')).toBeInTheDocument();
     expect(screen.queryByText('salir')).toBeNull();
+  });
+
+  it('a space the server no longer finds re-reads the spaces once and never loops', async () => {
+    const calls = serve({
+      'GET /app/admin/api/yo': ok(adminMe()),
+      [OPTIONS]: { status: 404, body: { error: 'espacio_no_existe' } },
+    });
+    render(<AdminApp />);
+    expect(await screen.findByText('Ese espacio ya no está disponible.')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const count = (key: string) => calls.filter((c) => c.key === key).length;
+    expect(count('GET /app/admin/api/yo')).toBe(2);
+    expect(count(OPTIONS)).toBe(1);
+    // Only the person asks again.
+    fireEvent.click(screen.getByRole('button', { name: 'probar de nuevo' }));
+    await waitFor(() => expect(count(OPTIONS)).toBe(2));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(count('GET /app/admin/api/yo')).toBe(4);
+    expect(count(OPTIONS)).toBe(2);
+  });
+
+  it('a space that disappeared leaves the others to choose', async () => {
+    const both = adminMe({
+      espacios: [
+        { id: SPACE, slug: 'corework', nombre: 'CoreWork' },
+        { id: OTHER_SPACE, slug: 'north', nombre: 'North Lab' },
+      ],
+    });
+    const onlyOther = adminMe({ espacios: [{ id: OTHER_SPACE, slug: 'north', nombre: 'North Lab' }] });
+    serve({
+      'GET /app/admin/api/yo': [ok(both), ok(onlyOther)],
+      [OPTIONS]: { status: 404, body: { error: 'espacio_no_existe' } },
+      [`GET /app/admin/api/espacios/${OTHER_SPACE}/opciones`]: ok(
+        options({ espacio: { id: OTHER_SPACE, nombre: 'North Lab', zona_horaria: 'UTC' } }),
+      ),
+    });
+    render(<AdminApp />);
+    expect(await screen.findByText('Ese espacio ya no está disponible.')).toBeInTheDocument();
+    expect(screen.getByText('Elegí otro espacio arriba.')).toBeInTheDocument();
+    const selector = screen.getByLabelText('espacio');
+    expect(within(selector).queryByRole('option', { name: 'CoreWork' })).toBeNull();
+    pick('espacio', OTHER_SPACE);
+    expect(await screen.findByRole('form', { name: 'Cargar tarea' })).toBeInTheDocument();
   });
 
   it('with more than one space, the form follows the chosen one', async () => {
