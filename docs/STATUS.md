@@ -89,11 +89,16 @@ guion es `docs/product/guion-telegram-fase-c-parte-1.md`):
   esperar 2 minutos reales entre saltos. Registro de turnos: `.venv\Scripts\python.exe -m leda.motor.leer corework --completo`.
 - **Ojo:** nunca el escuchador y una ronda del corredor a la vez, ni una ronda real mientras se edita `src/`.
 
-**`leda_motor`:** recreada el 2026-10-08 (D6) con las tareas de la prueba (vencen el viernes 16/10);
-respaldo `db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`. Al día hasta la `0056` desde el 2026-10-12 (respaldo
-previo `db/respaldos/leda_motor-antes-0039-a-0056-20261012.dump`, `pg_restore --list` sin error; las 18 migraciones
-con `psql -f` como el superusuario local, todas sin error; 12 tareas, vencen el vie 16/10). El usuario autorizó
-ponerla al día o recrearla cuando haga falta, con respaldo previo; nunca `leda` ni `leda_flujo`.
+**`leda_motor`:** recreada de nuevo el 2026-10-12 a la madrugada para la prueba por Telegram, porque la
+prueba anterior había dejado "Programar PLC" entregada y "Dashboard de lotes" terminada. Respaldo previo
+`db/respaldos/leda_motor-antes-recrear-prueba-telegram-20261012.dump` (`pg_restore --list` sin error).
+Pasos de la D6 (`esquema --recrear`, `importar corework --activar`, `feriados`, `modelo gpt-6-sol
+--proveedor chatgpt`, `sembrar` con una semilla temporal fuera del repositorio con los criterios concretos,
+`administrador corework`, aviso previo de 3 días hábiles) y `reloj corework volver`. Quedan 12 tareas
+(6 asignadas, 6 en curso) que vencen el vie 16/10, las cuatro del guion como él las describe, sin apodos.
+Los chats de Telegram vienen del pack: no se pierden; igual conviene el `/start` y el "hola" del guion.
+El usuario autorizó ponerla al día o recrearla cuando haga falta, con respaldo previo; nunca `leda` ni
+`leda_flujo`.
 
 **Acuerdos de trabajo** (detalle en la memoria del agente):
 - **Autonomía:** el agente encadena el trabajo técnico y sólo para ante decisiones de producto, que explica
