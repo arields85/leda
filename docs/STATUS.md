@@ -58,19 +58,32 @@ viejo corriendo.
 - **Decidido:** el enlace de entrada que nadie usó vence a las 24 horas y Leda lo dice al mandarlo
   (precisión de la decisión 4 del ADR 0022).
 
-**Lo que sigue** (la lista de tareas de la sesión, en este orden):
-1. **El acceso por chat:** primero su diseño y su conversación de prueba (ADR 0022, decisión 4: Leda
-   ofrece el enlace a cada integrante activo una vez, al conectarse y cuando lo pide; "perdí el celular"
-   corta las sesiones), con las preguntas que deje, de a una; después construirlo, con la migración
-   `0065` del vencimiento de 24 horas, una ronda con la IA real (con permiso) y su revisión.
-2. **El túnel o HTTPS** para que los enlaces se puedan tocar y abran en el celular (Telegram no convierte
-   `localhost` en enlace), sólo con permiso del usuario; y la **prueba de la plataforma** en el celular y
-   la computadora.
-3. **Las correcciones de la prueba por Telegram:** las decisiones 77 a 79 y los hallazgos que les siguen,
-   cada uno primero como conversación de prueba.
-4. **Del usuario, de a una:** confirmar `@Leda_Motor_bot` como `bot_usuario` del pack (lo dice Telegram,
+**Lo hecho el 2026-10-12, noche:**
+- **El acceso por chat, diseñado y en pausa** (el usuario prefiere hacerlo con él presente):
+  [`../odd/tasks/acceso-por-chat.md`](../odd/tasks/acceso-por-chat.md), con sus decisiones (el
+  ofrecimiento al final de la próxima respuesta; "perdí el celular" corta enseguida y recuerda cerrar
+  Telegram desde Ajustes → Dispositivos; "lo recuerda cuando viene al caso", más adelante) y el hilo de la
+  conversación de prueba 50, **que espera la aceptación del usuario** antes del código.
+- **La rama `auxiliar/alta-y-google`, analizada:** no se retoma (su alta es verificar el correo por chat
+  para Calendar; depende de los flujos borrados y choca con la `0054`); se rescatan ideas para la carga de
+  integrantes (`odd/tasks/plataforma-p2.md`). **Correo verificado y Google, pendiente sin fecha** en
+  `docs/ROADMAP.md` ("Anotado para más adelante"; el momento lo decide el usuario).
+- Carpetas borradas: `Leda-PM-worktrees\plataforma` (su rama ya está en la del Motor; queda en
+  `origin/feat/plataforma`) y `_rdd-ca5c38f3` (vacía).
+
+**Lo que sigue:**
+1. **En curso, de forma autónoma: las correcciones de la prueba por Telegram**
+   ([`../odd/tasks/correcciones-prueba-telegram.md`](../odd/tasks/correcciones-prueba-telegram.md), T1 a
+   T10): íconos por estado (79), "consultar" (78), sin nombre ni hora en los avisos a otros (77) y los
+   hallazgos; la hora de los turnos quedó mal guardada (T6, con evidencia). **El usuario autorizó una
+   ronda con la IA real, al final, de las conversaciones tocadas.** Si un hallazgo pide cambiar el
+   diseño, se deja la propuesta sin código.
+2. **La plataforma, cuando el usuario esté:** aceptar la conversación 50 y construir el acceso por chat
+   (con la `0065` de las 24 horas); el túnel o HTTPS, con su permiso; la prueba en el celular y la
+   computadora; después, la plataforma a `main`.
+3. **Del usuario, de a una:** confirmar `@Leda_Motor_bot` como `bot_usuario` del pack (lo dice Telegram,
    `getMe`) y las tres preguntas de "Para decidir" de `odd/tasks/plataforma-p2.md`.
-5. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11).
+4. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11).
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
@@ -165,7 +178,7 @@ validador de invariantes. Destino de cada uno:
 - **`prueba_chica/`** se borró el 2026-10-07 (`c43e3e5`); el lector de turnos es `leda.motor.leer`.
 
 **Git:**
-- Repositorio `arields85/leda` (público). `origin/main` está en `270a38a` (2026-10-12): la rama del Motor
+- Repositorio `arields85/leda` (público). `origin/main` está en `80d6945` (2026-10-12): la rama del Motor
   llegó por avance rápido el 2026-10-07 (221 commits) y el 2026-10-12 (396 commits, con la Fase C),
   sin atribuciones ni secretos.
 - La rama del Motor se sube al cerrar cada tramo.
@@ -173,7 +186,8 @@ validador de invariantes. Destino de cada uno:
   `archivo-c4-medicion`, `archivo-flujo-c6`, `archivo-prueba-0-35` y `respaldo-antes-de-partir-limpieza`
   (todas locales salvo las del 2026-10-04).
 - Ramas congeladas: `feat/flujo-de-un-mensaje` y `auxiliar/alta-y-google`, con sus carpetas en
-  `Leda-PM-worktrees`. Las carpetas `c4-medicion`, `flujo-c6` y `prueba-0-35` se borraron el 2026-10-07; sus
+  `Leda-PM-worktrees`. `feat/plataforma` ya está en la del Motor; su carpeta y su rama local se borraron el
+  2026-10-12 (queda en `origin`). Las carpetas `c4-medicion`, `flujo-c6` y `prueba-0-35` se borraron el 2026-10-07; sus
   `.env`, sin leer, quedaron en `Leda-PM-worktrees\_archivo-env-de-carpetas-borradas`.
 
 ## Línea base de pruebas

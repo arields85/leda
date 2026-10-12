@@ -48,7 +48,14 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
       (llegó «pasale lo de los colores»).
 - [ ] **T5 · Una tarea terminada no "vence".**
 - [ ] **T6 · La hora de los turnos en el registro** (los pasos 22 a 25 figuran a las 10:02): investigar y,
-      si quedó mal guardada, corregirla.
+      si quedó mal guardada, corregirla. **Evidencia (coordinador, 2026-10-12, `leda_motor`):** quedó mal
+      guardada. `conversation_turn.at` sale de `reloj.ahora()` (`turno.py:232`). Turnos de Marcos
+      (`inbound_message.at` real → `conversation_turn.at`): n.º 6 15:47:05 → mar 10:02:17; n.º 18
+      15:54:38 → 10:31:32; n.º 26 16:22:36 → **10:02:18**; n.º 28 16:23:06 → 10:02:42; n.º 34
+      16:27:13 → 10:06:50; n.º 37 16:40:03 → mié 10:03:25. A las 16:22 el reloj de Leda estaba cerca
+      de las 11:58 del martes (la pregunta a Ariel se programó a las 12:15:15, 30 minutos después del
+      último mensaje de Ariel, a las 11:45:15). El adelanto implícito del n.º 26 (17:39:42) es menor que
+      el del n.º 18 (18:36:54): el reloj pareció ir para atrás en esos turnos.
 - [ ] **T7 · "Dejalo pendiente, después lo hago"** en medio de una entrega, y "Anoté" dicho de un
       borrador: conversación de prueba; si pide cambiar el diseño, propuesta al usuario.
 - [ ] **T8 · La entrega nueva que se contradice** ("dejé la foto para cuando vuelvas a entregarla" y

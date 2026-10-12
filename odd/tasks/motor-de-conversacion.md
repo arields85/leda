@@ -46,5 +46,7 @@ Las tres etapas terminaron. La **Fase C** (lo que a Leda le falta por chat, plan
 cerró con la prueba por Telegram del usuario (2026-10-12, pasó; quedan sus correcciones, decisiones 77 a
 79), y la rama del Motor pasó a `main`. La **plataforma web** ([ADR 0022](../../docs/decisions/0022-plataforma-web-de-tareas.md))
 tiene sus porciones 1 y 2 construidas ([`plataforma-p1.md`](plataforma-p1.md),
-[`plataforma-p2.md`](plataforma-p2.md)) y juntas en esta rama; sigue el acceso por chat.
+[`plataforma-p2.md`](plataforma-p2.md)) y juntas en esta rama; el acceso por chat está diseñado
+([`acceso-por-chat.md`](acceso-por-chat.md)) y en pausa hasta que el usuario esté. Mientras tanto, las
+correcciones de la prueba ([`correcciones-prueba-telegram.md`](correcciones-prueba-telegram.md)).
 El punto exacto para retomar está en `docs/STATUS.md`.
