@@ -54,7 +54,7 @@ viejo corriendo.
   `origin/main` en `80d6945`).
 - **La plataforma, junta con el Motor** (`7f752d5`; las porciones 1 y 2, construidas y revisadas por RDD
   en `feat/plataforma`; sin archivos en común). `leda_motor`, hasta la `0064` (ver abajo). Web: `npm
-  test` 57 passed y `npm run build` bien.
+  test` 57 passed y `npm run build` bien; `pytest tests/garantias tests/motor`, 2026 passed.
 - **Decidido:** el enlace de entrada que nadie usó vence a las 24 horas y Leda lo dice al mandarlo
   (precisión de la decisión 4 del ADR 0022).
 
@@ -197,6 +197,8 @@ validador de invariantes. Destino de cada uno:
 | Rama del Motor, ídem | `pytest -q tests/garantias` | 2026-10-11 | 475 passed |
 | Rama del Motor, ídem | `pytest -q tests/conversaciones` | 2026-10-11 | 194 passed |
 | Rama del Motor, ídem | `correr --ia guionada --veces 1` (en seco) | 2026-10-11 | 48 de 48 bien |
+| Rama del Motor, con la plataforma junta y `leda_motor` en la `0064` (`7f752d5`) | `pytest -q tests/garantias tests/motor` | 2026-10-12 | 2026 passed (37 min) |
+| Rama del Motor, ídem | `npm test` en `web/` | 2026-10-12 | 57 passed |
 
 **Conversaciones con la IA real** (bitácora de flujos):
 - La ronda 3 de la prueba chica dio 85 de 85.
