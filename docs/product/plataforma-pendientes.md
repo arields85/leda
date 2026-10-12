@@ -170,6 +170,27 @@ Construida en la rama `feat/plataforma` (tarea P2-1 de
 | Quién emite el enlace | Sólo la consola (`python -m leda enlace-admin <nombre>`), con `leda_admin` | Que lo ofrezca el bot de administración toca el Motor: después de juntar las ramas |
 | Qué espacios lista `/app/admin/api/yo` | Todos los que existen, también los importados sin activar | |
 
+## La carga de tareas, porción 2 (2026-10-12)
+
+Construida en la rama `feat/plataforma` (tarea P2-2 de
+[`../../odd/tasks/plataforma-p2.md`](../../odd/tasks/plataforma-p2.md); migración `0062`).
+
+**Valores fijados a mano en esta tarea:**
+
+| Qué | Hoy | Notas |
+|---|---|---|
+| A qué hora vence la fecha elegida | Al cierre de la jornada del espacio (`work_calendar.hora_fin`), en su zona, como las tareas de las conversaciones de prueba (`sembrar` usa las 00:00) | La escalera y las vistas miran el día local, que es el elegido |
+| Topes de los textos | Título 200, descripción 800 y criterio 500 caracteres, los del borrador de una tarea | Se cuentan en caracteres, no en unidades de Telegram (riesgo 2 de `docs/STATUS.md`) |
+| Quién revisa | La regla única de la base (`quien_revisa_la_tarea`): quien aprueba el trabajo del responsable, activo. Sin él no se carga; la autoridad final sin aprobador tampoco (se revisaría a sí misma) | El motor no tiene otra regla: no se cae a la autoridad final como hacía el borrador por chat |
+| Qué evidencia se acepta | Sólo tipos que la política del área conoce (su lista o sus `tipos`); vacía, sólo si el área no pide evidencia | Un tipo desconocido no lo cubriría ninguna pieza y la tarea no cerraría nunca. `PENDIENTE` con el usuario si el formulario puede pedir otra evidencia |
+| La clave de un solo uso | 16 a 128 caracteres (`A-Z a-z 0-9 _ -`), una por espacio, sin vencimiento | La genera el formulario (P2-3) |
+| "Conectado" | Tiene un Telegram vinculado (`app_user.telegram_user_id`), como `persecucion.alcanzable` del motor | |
+| Días hábiles que ofrecen las opciones | Desde hoy hasta seis meses después | |
+| Espacios donde se carga | Cualquiera que exista, también uno importado sin activar | Como `/app/admin/api/yo` |
+
+**Para más adelante:** la versión de cada fila (decisión 15) es para editar, en la porción 3; los
+avisos de la decisión 7 y el de "sin conectar" al referente son del motor.
+
 ## Decisiones abiertas que la plataforma va a necesitar
 
 - Cómo se autentica quien opera Leda.

@@ -54,7 +54,7 @@ Ruta: un escritor delegado por tarea (dos o más archivos no triviales cada una)
       de sesiones, comando `enlace-admin` y `/app/admin/api/yo`. Garantías: un integrante sin rol de
       plataforma no abre la puerta; un rol revocado corta la sesión en el pedido siguiente; la cookie del
       equipo no abre la de administración ni al revés.
-- [ ] **P2-2 · La carga en la base:** el día hábil del espacio en SQL (`work_calendar` y `holiday`, como
+- [x] **P2-2 · La carga en la base:** el día hábil del espacio en SQL (`work_calendar` y `holiday`, como
       `calendario.es_habil`); la función de carga con los controles de la decisión 9 (objetivo,
       responsable, fecha, criterio y evidencia; fecha hábil y no pasada; integrante activo; quien la
       hace no la revisa, incluido el caso de la autoridad final sin aprobador); el evento `asignada`; la
@@ -127,3 +127,47 @@ responsable.
 **Para confirmar con el usuario** (anotado en `docs/product/plataforma-pendientes.md`): el enlace
 de la administración no vence por tiempo, como el del equipo; el rol `operador` no abre la
 puerta; `/app/admin/api/yo` lista todos los espacios, también los importados sin activar.
+
+### P2-2 · La carga en la base (2026-10-12)
+
+**Ruta:** delegated (2+ non-trivial files): migración, esquema, `web_app.py` y sus pruebas.
+
+**Qué quedó:**
+- Migración `0062_la_carga_de_tareas_desde_la_web.sql` (con su rollback y `db/esquema.sql` al
+  día). `es_dia_habil(espacio, fecha)`: el día hábil en SQL, igual que `Calendario.es_habil`
+  (sin calendario, ninguno). `opciones_de_la_carga` y `cargar_tarea`, `security definer` de
+  `leda_owner` y sólo para `leda_app`: comprueban la sesión de administración en cada llamada y
+  que el espacio exista, y fijan ellas mismas ese espacio (la RLS no deja encontrar un id de
+  otro). La carga devuelve los rechazos de la decisión 9 todos juntos como datos (`campo`,
+  `motivo`) y los avisos que no bloquean; escribe la tarea (área del responsable, fecha al
+  cierre de la jornada del espacio), su evento `asignada` (actor `persona`: el administrador) y
+  la auditoría `cargar_tarea` en el espacio de la tarea, con quién la cargó, quién la decidió
+  (`decision_declarada_al_cargar`), quién la revisa y las versiones. `carga_de_tarea`: la clave
+  de un solo uso, con espacio, RLS forzada y sin privilegios para `leda_app`.
+- `web_app.py`: `GET /app/admin/api/espacios/{id}/opciones` y `POST
+  /app/admin/api/espacios/{id}/tareas` (JSON; 201, 200 si la clave ya cargó, 422 con los
+  rechazos en palabras, 401, 404; 403 desde otro sitio y 415 si no es JSON).
+- Pruebas: `tests/garantias/test_carga_de_tareas.py` (nueva), más `test_capacidades.py`
+  (`TABLAS_POR_FUNCION`) y `test_migraciones.py` (`TABLAS_DEL_MOTOR`).
+- La versión de cada fila (decisión 15) es para editar (porción 3): crear no pisa nada, así
+  que no se agregó.
+
+**Decisiones del escritor, para confirmar** (anotadas en `docs/product/plataforma-pendientes.md`):
+- Quién revisa es la regla única de la base (`quien_revisa_la_tarea`, sin caer a la autoridad
+  final, porque el motor no lo hace): sin un aprobador activo no se carga
+  (`sin_quien_la_revise`); la autoridad final sin aprobador, `la_hace_y_la_revisa`.
+- Sólo tipos de evidencia que la política del área conoce: uno desconocido no lo cubriría
+  ninguna pieza y la tarea no se cerraría nunca.
+- La fecha vence al cierre de la jornada del espacio; los topes de texto son los del borrador,
+  en caracteres.
+
+**Evidencia:**
+- RED, antes del código: `pytest -q tests/garantias/test_carga_de_tareas.py` → 32 failed.
+- GREEN, lo mismo → 32 passed (54 s).
+- `pytest -q tests/garantias/test_carga_de_tareas.py tests/garantias/test_puerta_de_administracion.py
+  tests/garantias/test_quien_ve_que.py tests/garantias/test_capacidades.py
+  tests/garantias/test_frontera.py tests/garantias/test_aislamiento.py
+  tests/garantias/test_migraciones.py` (con `LEDA_TEST_DB_URL` al servidor local de pruebas) →
+  116 passed (15 min 11 s), con el ensayo de paridad y de rollback de la `0062`.
+- Commit de código y pruebas: `f6a40067`. La suite `tests/garantias` completa y la revisión RDD:
+  `PENDIENTE` (las corre el coordinador).

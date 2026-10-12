@@ -80,7 +80,7 @@ porción 1 construida en la rama `feat/plataforma` ("Lo que agregó la plataform
 |---|---|---|
 | **Motor de conversación (flujo D)** | [`ADR 0018`](decisions/0018-motor-de-conversacion.md), aceptado el 2026-10-06, después de la prueba chica (M2) | Sin código. La IA elige jugadas de una lista cerrada y el código las comprueba y ejecuta; estado por persona y registro de turnos; circuitos declarados con fichas y ocho situaciones generales. La prueba chica de la Etapa 2 vive fuera de `src/leda`; el motor definitivo, en la Etapa 3 |
 | **Lo que le falta al seguimiento** | [`ADR 0017`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisiones 4 y 6 | No hay enlace entre una respuesta y su recordatorio; `pending_reply` existe y nada la escribe; los textos de recordatorios y cadencias están fijos en `escalera.py` y `reloj.py`; no existe la operación de pedir más tiempo. Relevamiento del 2026-10-04 ([`STATUS.md`](STATUS.md), "Estado comprobado") |
-| **Plataforma web de tareas** | [`ADR 0022`](decisions/0022-plataforma-web-de-tareas.md), aceptado el 2026-10-12 | La porción 1 (la puerta del equipo, de sólo lectura) y la puerta de administración de la porción 2 están construidas en `feat/plataforma` (abajo). Sin construir: la carga de tareas, el cambio de fecha y el alta y la baja de integrantes. Para cargar tareas sólo existe `sembrar`, un cargador de datos ficticios que no cumple las condiciones de la carga (ADR 0017, decisión 2) |
+| **Plataforma web de tareas** | [`ADR 0022`](decisions/0022-plataforma-web-de-tareas.md), aceptado el 2026-10-12 | La porción 1 (la puerta del equipo, de sólo lectura), la puerta de administración y la carga de tareas en la base con su API (porción 2) están construidas en `feat/plataforma` (abajo). Sin construir: el formulario de carga, el cambio de fecha y el alta y la baja de integrantes. `sembrar` queda sólo para pruebas y semillas |
 | **Entrevista de alta de espacios** | [`nucleo/alta-de-equipo.md`](../nucleo/alta-de-equipo.md), 195 líneas | Sin una sola línea. Sólo existe el importador, que consume un paquete ya escrito. Sin esto, cada cliente nuevo exige que alguien lo escriba a mano. No aplica en esta etapa (ADR 0017, decisión 7) |
 | **Panel de plataforma** | [`ADR 0004`](decisions/0004-dos-superficies-separadas.md) | Decidido: contraseña + TOTP. Sin construir |
 | **Integración de calendario** | Especificación §17.3, constitución §7 | Consultar disponibilidad, proponer, crear, modificar, asistentes. `calendario.py` es el calendario **laboral**, no externo |
@@ -252,14 +252,28 @@ ADR 0022, decisiones 10, 11 y 12). Probada con `TestClient`; todavía no tiene p
 | Emitir, canjear y cortar quedan en `audit_log` sin espacio (hechos de alcance global), con la versión del núcleo y sin el token, aunque quien llama tenga un espacio fijado | migración `0061` (`auditar_acceso_de_administracion`) |
 | Emitir el enlace de un administrador (lo imprime; necesita `LEDA_BASE_URL`) y cortar todas sus sesiones y su enlace sin usar, sólo por la consola (`leda_admin`); a quien no tiene el rol vigente, no | `python -m leda enlace-admin <nombre>`, `python -m leda cortar-sesiones-admin <nombre>`, `tests/test_cli_plataforma.py` |
 
+**Porción 2, la carga de tareas en la base y su API** (tarea P2-2; ADR 0022, decisiones 9 y 11;
+ADR 0017, decisión 2). Probada con la base real y `TestClient`; el formulario es la P2-3.
+
+| Capacidad | Dónde |
+|---|---|
+| El día hábil de un espacio en SQL, el mismo que `Calendario.es_habil`: un día de su calendario que no es feriado; sin calendario, ninguno | migración `0062` (`es_dia_habil`), `tests/garantias/test_carga_de_tareas.py` |
+| Cargar una tarea comprometida por la puerta de administración: una función de la base (`security definer` de `leda_owner`, sólo para `leda_app`) que comprueba la sesión de administración (el rol vigente) en cada llamada y que el espacio exista, y fija ella misma ese espacio: la RLS no le deja encontrar un objetivo, una persona ni una clave de otro. Escribe la tarea (el área sale de su responsable; la fecha, al cierre de la jornada del espacio), su evento `asignada` (actor: la persona del administrador) y una fila de auditoría `cargar_tarea` en el espacio de la tarea con quién la cargó, quién la decidió (declarado al cargar, nunca una aprobación hecha en Leda), quién la revisa y las versiones del paquete y del núcleo. Aparece en "Tus tareas" de su responsable | migración `0062` (`cargar_tarea`) |
+| Lo que no se carga (decisión 9), devuelto todo junto como datos (`campo`, `motivo`): sin objetivo, título, responsable, fecha, criterio, evidencia o quién la decidió; un objetivo de otro espacio o que no está abierto; un día no hábil o pasado (hoy vale si es hábil); un responsable que no es integrante activo; nadie activo que revise su trabajo, o la autoridad final sin aprobador, que se revisaría a sí misma; quien decidió, si no es integrante activo; un tipo de evidencia que la política del área no conoce (nadie podría entregarlo); un área sin política de evidencia; textos más largos que los del borrador (200, 800 y 500 caracteres). Lo que se avisa y no bloquea: una fecha posterior a la de su objetivo y un responsable sin Leda conectada | migración `0062` (`cargar_tarea`) |
+| Una sola vez por clave: la misma clave con los mismos datos devuelve la misma tarea (`repetida`), con otros datos se rechaza; cada espacio, sus claves (`carga_de_tarea`, con RLS forzada y sin ningún privilegio para `leda_app`) | migración `0062` |
+| Lo que el formulario necesita de un espacio: los objetivos abiertos, los integrantes activos con su área, quién revisaría sus tareas y si tienen Leda conectada (un Telegram vinculado), la política de evidencia de cada área (tipos y versión) y los días hábiles y feriados de los próximos seis meses | migración `0062` (`opciones_de_la_carga`) |
+| `GET /app/admin/api/espacios/{id}/opciones` y `POST /app/admin/api/espacios/{id}/tareas` (JSON), con la cookie `leda_admin`: 201 con la tarea y sus avisos en palabras, 200 si la clave ya la cargó, 422 con todo lo que hay que corregir en palabras, 401 sin sesión de administración (la cookie del equipo no sirve), 404 si el espacio no existe. La carga se niega a un pedido de otro sitio (como salir) y a uno que no es JSON | `web_app.py` |
+
 **Sin construir todavía** (`PENDIENTE`, después de la prueba por Telegram de la Fase C):
 
 - que Leda ofrezca el acceso por chat, y el corte de las sesiones por "perdí el celular" por chat
   (tocan el motor de conversación: primero su conversación de prueba);
 - la prueba en el celular (una cookie `Secure` necesita HTTPS fuera de `localhost`);
-- las piezas de administración de la plataforma: cargar tareas (porción 2, P2-2 y P2-3), cambiar
+- las piezas de administración de la plataforma: el formulario de carga (porción 2, P2-3), cambiar
   fechas y el alta y la baja de integrantes; que el bot de administración ofrezca el enlace de la
   puerta de administración (toca el Motor: después de juntar las ramas);
+- los avisos de una tarea cargada al responsable y a quien la revisa (decisión 7) y el de "sin
+  conectar" a su referente: son avisos del motor, después de juntar las ramas;
 - el usuario del bot de CoreWork en el pack (`telegram.bot_usuario`): sin él, el botón "> consultar
   a leda" no se muestra;
 - la tarjeta no abre la página de la tarea, aunque la API dice si la persona la puede ver
