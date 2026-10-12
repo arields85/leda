@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-12, cierre: las porciones 1 y 2 de la plataforma, construidas en su rama; `leda_motor`, lista para la prueba por Telegram.
+**Última actualización documental:** 2026-10-12, tarde: la prueba por Telegram de la Fase C pasó y la rama del Motor está en `main`.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -60,11 +60,11 @@ viejo corriendo.
   máquina, con color sólo en los estados que tienen algo.
 
 **Lo que sigue:**
-1. **La prueba por Telegram**, el 2026-10-12 con el usuario: guion
-   `docs/product/guion-telegram-fase-c-parte-1.md`, ahora con una segunda parte (pasos 22 a 48, lo
-   construido desde el 2026-10-09; `6faafce6`); `leda_motor` recreada esa madrugada con las tareas como
-   las pide el guion (ver "`leda_motor`" abajo). Si pasa, la rama del Motor pasa a `main` por avance
-   rápido (usuario, 2026-10-12).
+1. **La prueba por Telegram: pasó** (2026-10-12, pasos 1 a 48; usuario: "paso super bien, las
+   correcciones son menores"). Resultado en la bitácora; sus hallazgos, en las decisiones 77 a 79
+   de `odd/tasks/fase-c.md` (sin nombre ni hora en los avisos a otros, "consultar", un ícono por
+   estado) y la lista que les sigue, cada uno primero como conversación de prueba. La rama del
+   Motor pasó a `main` por avance rápido (`270a38a`, subido).
 2. **La plataforma, porción 1: construida la noche del 2026-10-12** en la rama `feat/plataforma`
    (carpeta `D:\Proyectos\Leda-PM-worktrees\plataforma`, subida a `origin` en `b1e500b2`), sin tocar la
    conversación: enlace de un solo uso con botón "Entrar" y sesión abierta (`0057`), quién ve qué
@@ -128,7 +128,7 @@ El usuario autorizó ponerla al día o recrearla cuando haga falta, con respaldo
 `odd/tasks/motor-definitivo.md`. Sus cierres están hechos (2026-10-07): las palabras de todos los días, el
 formato de los mensajes (aprobado por el usuario), `prueba_chica/` borrada y `main` con el motor.
 
-**Después:** la Fase C, prácticamente cerrada (falta la prueba por Telegram), y la plataforma web, con su
+**Después:** la Fase C, cerrada con la prueba por Telegram del 2026-10-12 (quedan sus correcciones), y la plataforma web, con su
 ADR 0022 aceptado. No hay equipo real hasta que el usuario lo diga.
 
 ## Qué quedó congelado o superado
@@ -178,10 +178,10 @@ validador de invariantes. Destino de cada uno:
 - **`prueba_chica/`** se borró el 2026-10-07 (`c43e3e5`); el lector de turnos es `leda.motor.leer`.
 
 **Git:**
-- Repositorio `arields85/leda` (público). `origin/main` está en `6ee287a` (2026-10-08); el motor llegó a `main` por avance
-  rápido el 2026-10-07 (221 commits, sin atribuciones ni secretos).
-- La rama del Motor se sube al cerrar cada tramo. Lo posterior a `6ee287a` llega a `main` después de la
-  prueba por Telegram de la Fase C, si pasa (usuario, 2026-10-12), por avance rápido.
+- Repositorio `arields85/leda` (público). `origin/main` está en `270a38a` (2026-10-12): la rama del Motor
+  llegó por avance rápido el 2026-10-07 (221 commits) y el 2026-10-12 (396 commits, con la Fase C),
+  sin atribuciones ni secretos.
+- La rama del Motor se sube al cerrar cada tramo.
 - Etiquetas: `respaldo-flujos-antes-de-d`, `respaldo-main-antes-de-d`, `respaldo-0-36-en-pausa`,
   `archivo-c4-medicion`, `archivo-flujo-c6`, `archivo-prueba-0-35` y `respaldo-antes-de-partir-limpieza`
   (todas locales salvo las del 2026-10-04).
