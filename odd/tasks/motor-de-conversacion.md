@@ -43,7 +43,8 @@ misma clase de falla y el usuario frenó el parcheo (análisis en `docs/research
 ## Próximo paso
 
 Las tres etapas terminaron. La **Fase C** (lo que a Leda le falta por chat, plan en [`fase-c.md`](fase-c.md))
-está prácticamente cerrada: le falta la prueba por Telegram del usuario. La **plataforma web** tiene su ADR
-aceptado ([0022](../../docs/decisions/0022-plataforma-web-de-tareas.md), 2026-10-12) y sigue su porción 1
-([`plataforma-p1.md`](plataforma-p1.md), en la rama `feat/plataforma`).
+cerró con la prueba por Telegram del usuario (2026-10-12, pasó; quedan sus correcciones, decisiones 77 a
+79), y la rama del Motor pasó a `main`. La **plataforma web** ([ADR 0022](../../docs/decisions/0022-plataforma-web-de-tareas.md))
+tiene sus porciones 1 y 2 construidas ([`plataforma-p1.md`](plataforma-p1.md),
+[`plataforma-p2.md`](plataforma-p2.md)) y juntas en esta rama; sigue el acceso por chat.
 El punto exacto para retomar está en `docs/STATUS.md`.

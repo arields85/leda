@@ -3705,6 +3705,11 @@ uno va primero a una conversación de prueba):
 
 Vigente; lo de abajo ("cierre del 2026-10-10") es el registro de lo anterior.
 
+**2026-10-12, tarde:** la prueba por Telegram del usuario **pasó** (pasos 1 a 48; bitácora) y la rama del
+Motor pasó a `main` (`80d6945`). Lo que queda de la Fase C son sus correcciones: las decisiones 77 a 79
+y los hallazgos que les siguen, cada uno primero como conversación de prueba. Van después del acceso por
+chat de la plataforma (orden en `docs/STATUS.md`, "Lo que sigue").
+
 **Hecho el 2026-10-11** (cada commit de código, revisado por RDD y aprobado):
 - [x] Decisiones 65 a 73 del usuario, construidas: 65 y la tercera porción de los apodos
       (`ce0cf04`); 66 (`9d28a4c`); 67 (`e932186`, `7d0cbcd`); 68 y 73 (`6789e4c`, `4bec127`); 69 a

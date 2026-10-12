@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-12, tarde: la prueba por Telegram de la Fase C pasó y la rama del Motor está en `main`.
+**Última actualización documental:** 2026-10-12, tarde: la prueba por Telegram pasó, el Motor está en `main` y la plataforma, junta en la rama del Motor.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -32,57 +32,45 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-12)
+## Punto exacto para retomar (2026-10-12, tarde)
 
-**Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`,
-subida a `origin` al cierre del 2026-10-12. Plan de la Fase C: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (las
-decisiones del usuario 1 a 76 y la lista de tareas en "Próximo paso"); la plataforma, en el
-[ADR 0022](decisions/0022-plataforma-web-de-tareas.md).
+**Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
+Plan de la Fase C: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (decisiones del usuario 1 a 79 y,
+después de la 79, los hallazgos de la prueba por Telegram); la plataforma, en el
+[ADR 0022](decisions/0022-plataforma-web-de-tareas.md) y en `odd/tasks/plataforma-p1.md` y
+`odd/tasks/plataforma-p2.md` (ya en esta rama).
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si está caído, levantarlo con
 `levantar-postgres.bat` (o `pg_ctl ... start`, fuera del sandbox). Si `pg_ctl` dice que otro servidor puede
 estar en ejecución, cerrar los procesos `postgres` colgados y reintentar. Comprobar que no quede un escuchador
 viejo corriendo.
 
-**Lo hecho el 2026-10-11 y el 2026-10-12:**
-- Decisiones 65 a 73, construidas; los apodos (ADR 0020), completos; el orden de las jugadas de un
-  mensaje (`f0d18e6`).
-- **El formato lo da la cocina** (decisión 74, `c304b23`): de 87 fallas en 35 corridas a 15; las que
-  quedan son contenido de la IA.
-- El corredor compara las jugadas y los hechos sin mirar el orden (`1079b18`) y un paso admite varias
-  lecturas (`ca5c38f3`).
-- Decisiones 75 (la 48 paso 10 sin jugada vale) y 76 (repetir el nombre contesta la pregunta del
-  apodo).
-- Cada commit de código, revisado por RDD y aprobado. Detalle en el plan y la bitácora.
-- **El ADR 0022 de la plataforma web, aceptado** (`912eb413`): producto (1 a 10), técnica (11 a 16),
-  la misma tecnología que la HMI (17) y el aspecto (18), elegido en el lienzo de diseño
-  https://claude.ai/artifact/VwC3sCvufFZ7DUkv3yJt7f: la "9 · Terminal", sobria, oscura y de letra de
-  máquina, con color sólo en los estados que tienen algo.
+**Lo hecho el 2026-10-12:**
+- **La prueba por Telegram de la Fase C pasó** (pasos 1 a 48 del guion; usuario: "paso super bien, las
+  correcciones son menores"). Resultado en la bitácora; los hallazgos, en las decisiones 77 (un aviso a
+  otra persona se cuenta sin su nombre ni su hora), 78 ("consultar", no "preguntar") y 79 (un ícono
+  por estado en las listas: 🏁 🟢 ⚪ 🔵 🟠 🔴) y en la lista que les sigue en `odd/tasks/fase-c.md`.
+- **La rama del Motor está en `main`** por avance rápido (396 commits, sin atribuciones ni `.env`;
+  `origin/main` en `80d6945`).
+- **La plataforma, junta con el Motor** (`7f752d5`; las porciones 1 y 2, construidas y revisadas por RDD
+  en `feat/plataforma`; sin archivos en común). `leda_motor`, hasta la `0064` (ver abajo). Web: `npm
+  test` 57 passed y `npm run build` bien.
+- **Decidido:** el enlace de entrada que nadie usó vence a las 24 horas y Leda lo dice al mandarlo
+  (precisión de la decisión 4 del ADR 0022).
 
-**Lo que sigue:**
-1. **La prueba por Telegram: pasó** (2026-10-12, pasos 1 a 48; usuario: "paso super bien, las
-   correcciones son menores"). Resultado en la bitácora; sus hallazgos, en las decisiones 77 a 79
-   de `odd/tasks/fase-c.md` (sin nombre ni hora en los avisos a otros, "consultar", un ícono por
-   estado) y la lista que les sigue, cada uno primero como conversación de prueba. La rama del
-   Motor pasó a `main` por avance rápido (`270a38a`, subido).
-2. **La plataforma, porción 1: construida la noche del 2026-10-12** en la rama `feat/plataforma`
-   (carpeta `D:\Proyectos\Leda-PM-worktrees\plataforma`, subida a `origin` en `b1e500b2`), sin tocar la
-   conversación: enlace de un solo uso con botón "Entrar" y sesión abierta (`0057`), quién ve qué
-   (`0058`), la cadena de esperas (`0059`), la API interna, la web con el aspecto "9 · Terminal" y los
-   comandos de consola. Cada commit de código, revisado por RDD y aprobado; garantías en verde. Plan,
-   evidencia y **ocho preguntas para el usuario** ("Para decidir", con ejemplos) en
-   `odd/tasks/plataforma-p1.md` de esa rama. El 2026-10-12, de día: las ocho preguntas, contestadas y
-   construidas (P1-6), y la **porción 2** (la puerta de administración y la carga de tareas, con
-   vista de escritorio; `odd/tasks/plataforma-p2.md`), adelantada sin la prueba de la porción 1 en el
-   celular por decisión del usuario; rama subida en `c52269a`. **Punto exacto:** el usuario hace
-   primero la prueba por Telegram; cuando avise, y con su visto bueno: respaldo de `leda_motor`,
-   migraciones hasta la `0064`, juntar las ramas, que Leda ofrezca el acceso por chat y la prueba de las
-   dos porciones en el celular y la computadora (túnel o HTTPS, sólo con su permiso). Faltan del
-   usuario: el nombre del bot del equipo (`bot_usuario` en el pack) y, de a una, las preguntas de
-   "Para decidir" de `odd/tasks/plataforma-p2.md` (quién crea los objetivos, si las esperas van en el
-   formulario, quién "decidió" la tarea) y si el enlace de entrada vence (recomendado: 24 horas).
-3. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11; no volvió a pasar en las rondas del
-   formato).
+**Lo que sigue** (la lista de tareas de la sesión, en este orden):
+1. **El acceso por chat:** primero su diseño y su conversación de prueba (ADR 0022, decisión 4: Leda
+   ofrece el enlace a cada integrante activo una vez, al conectarse y cuando lo pide; "perdí el celular"
+   corta las sesiones), con las preguntas que deje, de a una; después construirlo, con la migración
+   `0065` del vencimiento de 24 horas, una ronda con la IA real (con permiso) y su revisión.
+2. **El túnel o HTTPS** para que los enlaces se puedan tocar y abran en el celular (Telegram no convierte
+   `localhost` en enlace), sólo con permiso del usuario; y la **prueba de la plataforma** en el celular y
+   la computadora.
+3. **Las correcciones de la prueba por Telegram:** las decisiones 77 a 79 y los hallazgos que les siguen,
+   cada uno primero como conversación de prueba.
+4. **Del usuario, de a una:** confirmar `@Leda_Motor_bot` como `bot_usuario` del pack (lo dice Telegram,
+   `getMe`) y las tres preguntas de "Para decidir" de `odd/tasks/plataforma-p2.md`.
+5. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11).
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
@@ -100,16 +88,15 @@ guion es `docs/product/guion-telegram-fase-c-parte-1.md`):
   esperar 2 minutos reales entre saltos. Registro de turnos: `.venv\Scripts\python.exe -m leda.motor.leer corework --completo`.
 - **Ojo:** nunca el escuchador y una ronda del corredor a la vez, ni una ronda real mientras se edita `src/`.
 
-**`leda_motor`:** recreada de nuevo el 2026-10-12 a la madrugada para la prueba por Telegram, porque la
-prueba anterior había dejado "Programar PLC" entregada y "Dashboard de lotes" terminada. Respaldo previo
-`db/respaldos/leda_motor-antes-recrear-prueba-telegram-20261012.dump` (`pg_restore --list` sin error).
-Pasos de la D6 (`esquema --recrear`, `importar corework --activar`, `feriados`, `modelo gpt-6-sol
---proveedor chatgpt`, `sembrar` con una semilla temporal fuera del repositorio con los criterios concretos,
-`administrador corework`, aviso previo de 3 días hábiles) y `reloj corework volver`. Quedan 12 tareas
-(6 asignadas, 6 en curso) que vencen el vie 16/10, las cuatro del guion como él las describe, sin apodos.
-Los chats de Telegram vienen del pack: no se pierden; igual conviene el `/start` y el "hola" del guion.
-El usuario autorizó ponerla al día o recrearla cuando haga falta, con respaldo previo; nunca `leda` ni
-`leda_flujo`.
+**`leda_motor`:** recreada el 2026-10-12 a la madrugada para la prueba por Telegram (respaldo previo
+`db/respaldos/leda_motor-antes-recrear-prueba-telegram-20261012.dump`) y, después de la prueba, llevada
+hasta la `0064`: respaldo `db/respaldos/leda_motor-antes-0057-a-0064-20261012.dump` (`pg_restore --list`
+sin error), las ocho migraciones ensayadas en una copia descartable restaurada del respaldo y aplicadas
+con `psql -v ON_ERROR_STOP=1 -f` como `postgres` (`host=localhost user=postgres dbname=leda_motor`),
+sin error. Quedó con lo conversado en la prueba (PLC y dashboard terminados; comunicaciones trabada por
+Mariano; integrar, de Marcos) y el reloj de Leda adelantado al miércoles 14/10; para volver a probar
+desde cero, recrearla con los pasos de la D6. El usuario autorizó ponerla al día o recrearla cuando haga
+falta, con respaldo previo; nunca `leda` ni `leda_flujo`.
 
 **Acuerdos de trabajo** (detalle en la memoria del agente):
 - **Autonomía:** el agente encadena el trabajo técnico y sólo para ante decisiones de producto, que explica
@@ -164,7 +151,7 @@ validador de invariantes. Destino de cada uno:
   `deteccion_pregunta`, `jev` y `local`) y la escalera, el reloj y el ciclo viejos.
 - **La auditoría vuelve a la cocina:** cada `herramientas.ejecutar` y cada efecto propio del motor deja su fila
   en `audit_log`, con `pack_hash` y `nucleo_hash`.
-- **Migraciones:** hasta `0025` en `main`, más `0030` a `0056` en la rama. La `0032` borra las tablas del alta.
+- **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0064` (la plataforma) en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   `PENDIENTE`: un ensayo de propiedad sobre un clúster limpio.

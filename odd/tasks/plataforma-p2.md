@@ -305,11 +305,21 @@ passed, `npx vite build` bien.
 - **Repaso del coordinador:** `npx vitest run` en `web/`: 57 passed.
 - `PENDIENTE`: la prueba del usuario en el celular y en la computadora; los avisos de la decisión 7 y
   que el bot de administración ofrezca el enlace (después de juntar las ramas); que Leda proponga un
-  criterio comprobable (IA real, con permiso); las tres preguntas de "Para decidir" y si el enlace de
-  entrada vence (recomendación: 24 horas).
-- **Falta del usuario:** el nombre del bot del equipo de CoreWork (`bot_usuario` en
-  `espacios/corework.yaml`; sin él, el botón "> consultar a leda" no aparece).
-- **Próximo paso (al cerrar la sesión del 2026-10-12):** el usuario hace primero la prueba por Telegram
-  de la Fase C; después, con su visto bueno: respaldo de `leda_motor`, migraciones hasta la `0064`,
-  juntar las ramas y la prueba de las porciones 1 y 2 en el celular y la computadora (túnel o HTTPS,
-  sólo con su permiso). Las preguntas de "Para decidir", de a una, cuando vuelva.
+  criterio comprobable (IA real, con permiso); las tres preguntas de "Para decidir".
+- **Decidido (usuario, 2026-10-12, tarde): el enlace de entrada que nadie usó vence a las 24 horas,
+  y Leda lo dice al mandarlo** ("así la persona sabe que si no lo toca va a tener que pedir uno
+  nuevo"). Precisa la decisión 4 del ADR 0022 (la sesión sigue sin vencer). Hoy el enlace no vence:
+  hace falta una migración nueva (`0065`) con sus pruebas de garantías.
+- **El bot del equipo de CoreWork es `@Leda_Motor_bot`** (Telegram `getMe`, 2026-10-12). Falta que
+  el usuario confirme ponerlo en `bot_usuario` de `espacios/corework.yaml`; sin él, el botón
+  "> consultar a leda" no aparece.
+- **Hecho el 2026-10-12, tarde** (después de la prueba por Telegram, que pasó): respaldo
+  `db/respaldos/leda_motor-antes-0057-a-0064-20261012.dump` (`pg_restore --list` sin error); las ramas
+  juntas en la del Motor (`7f752d5`, sin archivos en común); las migraciones `0057` a `0064`
+  ensayadas en una copia descartable restaurada del respaldo y aplicadas en `leda_motor` como
+  `postgres`, todas sin error; `npm test` en `web/`: 57 passed; `npm run build`, bien.
+- **Próximo paso:** el diseño de que Leda ofrezca el acceso por chat, con su conversación de prueba
+  (ADR 0022, decisión 4: a cada integrante activo una vez, al conectarse, cuando lo pida y "perdí el
+  celular"), y las preguntas que deje, de a una; después construirlo con el vencimiento de 24 horas,
+  una ronda con la IA real con permiso, el túnel o HTTPS con permiso, y la prueba en el celular y la
+  computadora.

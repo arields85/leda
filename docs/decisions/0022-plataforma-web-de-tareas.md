@@ -71,6 +71,9 @@ real, y el método del Motor pide lo contrario (`AGENTS.md`, punto 5).
    - La sesión queda abierta sin vencimiento. Se corta sólo si la persona deja el equipo (se revisa
      en cada ingreso), si un administrador la corta o si la persona le avisa a Leda que perdió el
      celular. Con un teléfono nuevo, pide un enlace nuevo.
+   - **Precisión (usuario, 2026-10-12):** el enlace que nadie usó vence a las 24 horas, y Leda lo
+     dice al mandarlo, para que la persona sepa que si no lo toca tiene que pedir uno nuevo. Lo
+     que no vence es la sesión abierta.
 
 5. **Sin "tablero" ni nombre de producto.** El ícono dice "Leda". Adentro, el título dice lo que
    muestra: "Tus tareas" (integrante), "Tu sector" (referente o encargado), "El equipo" (autoridad
