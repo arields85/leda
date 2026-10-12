@@ -384,6 +384,10 @@ telegram:
   # El identificador del grupo es un número negativo. Si no lo sabés:
   #   python -m leda grupo corework
   grupo_gestion_id: -1004442696731        # CoreWork IA
+  # El usuario público del bot del equipo, sin "@" (opcional; no es un secreto): con él, el
+  # botón "> consultar a leda" de la plataforma web abre el chat con Leda (https://t.me/...).
+  # Sin él, la web no muestra el botón. Es el que aparece en el perfil del bot en Telegram.
+  # bot_usuario: PENDIENTE
   entrega_de_enlaces: uno_a_uno    # nunca publicados en el grupo
   uso_del_grupo:
     - resumenes_semanales

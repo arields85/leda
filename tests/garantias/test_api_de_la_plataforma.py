@@ -8,11 +8,16 @@ funciones de la base, con `TestClient` sobre `https` (la cookie es `Secure`) y s
   `SameSite=Strict`, sólo `/app`) y lleva a la web; usado, inventado o anulado, muestra siempre la
   misma página humana, sin detalles técnicos (constitución §10).
 - **Quién ve qué** sale de la base y de la sesión, nunca del pedido (decisiones 11 y 13): cada
-  puesto ve su vista; un integrante recibe nulos el atraso y el bloqueo de las tareas ajenas y no
-  ve su cadena de esperas; una vista que la persona no tiene se niega.
+  puesto ve su vista; de una tarea ajena, un integrante ve lo que cuenta el informe al grupo
+  (decisiones del usuario del 2026-10-12, 1, 5, 6 y 7; migración 0060): trabada con su cadena,
+  y vencida recién cuando el atraso ya se habló, con la previsión si la hay; una vista que la
+  persona no tiene se niega.
 - **Lo que muestra cada vista** (decisión 18): el panel por estado, la semana del calendario del
-  espacio, la barra de días hábiles de una tarea en curso, los días que quedan y la cadena de
-  esperas de una tarea trabada, en árbol (la función de la 0059).
+  espacio, la barra de días hábiles de una tarea en curso, los días que quedan, la cadena de
+  esperas de una tarea trabada, en árbol (la función de la 0059), las dos marcas de una tarea
+  trabada y vencida, y las terminadas de los últimos 30 días (decisión 3 del usuario).
+- **El chat con Leda** (decisión 8 del usuario): `/app/api/yo` da la dirección del bot del
+  equipo si el pack la declara (`telegram.bot_usuario`); si no, nada.
 - **Una sesión que no entra** (sin cookie, inventada, cortada, de alguien que dejó el equipo)
   recibe 401; salir corta la sesión.
 - **Aislamiento entre espacios, tokens que no aparecen** en respuestas ni en la consola, y las
@@ -23,15 +28,16 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import psycopg
 import pytest
 
 from leda.db import admin, espacio
 
-from tests.garantias.test_quien_ve_que import (AHORA, DESPUES, _bloqueo,  # noqa: F401
-                                               _persona, _tarea, mundo)
+from tests.garantias.test_quien_ve_que import (AHORA, ANTES, DESPUES,  # noqa: F401
+                                               _bloqueo, _escalamiento, _persona, _prevision,
+                                               _tarea, _terminada, _trabada_y_vencida, mundo)
 
 BASE = "https://testserver"
 CABECERAS = {"cache-control": "no-store", "referrer-policy": "no-referrer",
@@ -295,7 +301,7 @@ def test_una_sesion_cortada_o_de_quien_dejo_el_equipo_no_entra(web, conn, mundo)
 
 # --- Las vistas -------------------------------------------------------------------------------
 
-def test_el_integrante_ve_lo_suyo_y_lo_ajeno_sin_atrasos_ni_bloqueos(web, conn, mundo):
+def test_el_integrante_ve_lo_suyo_y_lo_ajeno_sin_un_atraso_que_no_se_hablo(web, conn, mundo):
     datos = _vista(_entrar(web, conn, mundo, "Sam North"))
     assert datos["vista"] == "tus" and datos["titulo"] == "Tus tareas"
     tareas = _por_titulo(datos)
@@ -303,13 +309,16 @@ def test_el_integrante_ve_lo_suyo_y_lo_ajeno_sin_atrasos_ni_bloqueos(web, conn, 
         "Pintar el galpón": "mia", "Medir el ruido": "mia", "Montar la línea": "mia",
         "Calibrar la balanza": "espero"}
     ajena = tareas["Calibrar la balanza"]
-    assert ajena["vencida"] is None and ajena["bloqueo_abierto"] is None
+    # Venció el lunes, pero nadie lo habló con Sam Noble: su estado y su fecha, sin la marca.
+    assert ajena["vencida"] is False and ajena["bloqueo_abierto"] is False
     assert ajena["esperas"] is None and ajena["responsable"] == "Sam Noble 1"
-    assert ajena["marca"] == "en_curso"   # su estado, no su atraso
+    assert ajena["marca"] == "en_curso" and ajena["marcas"] == ["en_curso"]
+    assert ajena["fecha_objetivo"] == "2026-10-19" and ajena["prevision"] is None
     assert tareas["Pintar el galpón"]["vencida"] is True
-    assert tareas["Pintar el galpón"]["marca"] == "vencida"
-    assert tareas["Medir el ruido"]["marca"] == "trabada"
+    assert tareas["Pintar el galpón"]["marcas"] == ["vencida"]
+    assert tareas["Medir el ruido"]["marcas"] == ["trabada"]
     assert tareas["Montar la línea"]["marca"] is None
+    assert tareas["Montar la línea"]["marcas"] == []
     assert datos["panel"] == {"vencida": 1, "trabada": 1, "en_curso": 1, "entregada": 0}
     assert datos["activas"] == 4
 
@@ -321,12 +330,45 @@ def test_la_cadena_de_una_tarea_trabada_propia(web, conn, mundo):
                                  "esperas": []}]
 
 
-def test_quien_destraba_ve_la_tarea_que_lo_espera_sin_su_bloqueo(web, conn, mundo):
+def test_quien_destraba_ve_la_tarea_que_lo_espera_trabada_con_su_cadena(web, conn, mundo):
     tareas = _por_titulo(_vista(_entrar(web, conn, mundo, "Sam Noble")))
     medir = tareas["Medir el ruido"]
     assert medir["papel"] == "me_esperan"
-    assert medir["bloqueo_abierto"] is None and medir["vencida"] is None
-    assert medir["esperas"] is None and medir["marca"] is None
+    assert medir["bloqueo_abierto"] is True and medir["vencida"] is False
+    assert medir["marcas"] == ["trabada"]
+    assert medir["esperas"] == [{"que": "falta una pieza", "quien": "Sam Noble 1",
+                                 "esperas": []}]
+
+
+def test_lo_que_espero_vencido_y_hablado_lleva_la_marca_y_la_prevision(web, conn, mundo):
+    """Regla a del informe al grupo: Sam Noble dio un día posterior al vencimiento."""
+    with admin(conn) as cur:
+        _prevision(cur, mundo["north-lab"], mundo["t"]["calibrar"], "Sam Noble",
+                   date(2026, 10, 28), ANTES)
+    conn.commit()
+    datos = _vista(_entrar(web, conn, mundo, "Sam North"))
+    calibrar = _por_titulo(datos)["Calibrar la balanza"]
+    assert calibrar["vencida"] is True and calibrar["marcas"] == ["vencida"]
+    assert calibrar["prevision"] == "2026-10-28"
+    assert calibrar["dias_de_atraso"] == 3
+    assert datos["panel"]["vencida"] == 2
+
+
+def test_trabada_y_vencida_lleva_las_dos_marcas(web, conn, mundo):
+    """Decisión 5: las dos marcas en la tarjeta, y el panel la cuenta en las dos."""
+    afinar = _trabada_y_vencida(conn, mundo)
+    with admin(conn) as cur:
+        _escalamiento(cur, mundo["north-lab"], afinar, "2026-10-19")
+    conn.commit()
+    datos = _vista(_entrar(web, conn, mundo, "Sam Noble"))
+    fila = _por_titulo(datos)["Afinar el motor"]
+    assert fila["marcas"] == ["trabada", "vencida"] and fila["marca"] == "trabada"
+    assert fila["dias_de_atraso"] == 3
+    # Trabadas: "Medir el ruido" y "Afinar el motor", las dos de Sam North que destraba.
+    # Vencidas: las dos suyas ("Calibrar la balanza", "Auditar proveedores") y "Afinar".
+    assert datos["panel"]["trabada"] == 2 and datos["panel"]["vencida"] == 3
+    propia = _por_titulo(_vista(_entrar(web, conn, mundo, "Sam North")))["Afinar el motor"]
+    assert propia["marcas"] == ["trabada", "vencida"]
 
 
 def test_la_cadena_sigue_en_arbol_hasta_quien_puede_destrabar(web, conn, mundo):
@@ -352,9 +394,12 @@ def test_la_cadena_sigue_en_arbol_hasta_quien_puede_destrabar(web, conn, mundo):
     assert equipo["Medir el ruido"]["esperas"] == cadena
     assert equipo["Calibrar la balanza"]["esperas"] == [
         {"que": "falta el patrón", "quien": "Taylor Quinn 1", "esperas": []}]
-    # Para Sam North, el bloqueo de Sam Noble sigue sin verse en su propia tarjeta.
+    # Sam North, que espera "Calibrar la balanza", ve que está trabada y su cadena (decisiones
+    # 6 y 7 del usuario, 2026-10-12).
     calibrar = _por_titulo(_vista(_entrar(web, conn, mundo, "Sam North")))["Calibrar la balanza"]
-    assert calibrar["bloqueo_abierto"] is None and calibrar["esperas"] is None
+    assert calibrar["bloqueo_abierto"] is True
+    assert calibrar["esperas"] == [{"que": "falta el patrón", "quien": "Taylor Quinn 1",
+                                    "esperas": []}]
 
 
 def test_una_cadena_que_da_vueltas_se_corta(web, conn, mundo):
@@ -480,7 +525,8 @@ def test_los_dias_de_atraso_solo_para_quien_ve_el_atraso(web, conn, mundo):
     atraso a esta persona."""
     tareas = _por_titulo(_vista(_entrar(web, conn, mundo, "Sam North")))
     assert tareas["Pintar el galpón"]["dias_de_atraso"] == 3     # el lunes 19; hoy, jueves 22
-    assert tareas["Calibrar la balanza"]["dias_de_atraso"] is None   # ajena: su atraso no se ve
+    # Ajena y sin hablar: su atraso no se ve.
+    assert tareas["Calibrar la balanza"]["dias_de_atraso"] is None
     assert tareas["Montar la línea"]["dias_de_atraso"] is None       # no venció
     sector = _por_titulo(_vista(_entrar(web, conn, mundo, "Taylor Quinn"), "sector"))
     assert sector["Pintar el galpón"]["dias_de_atraso"] == 3
@@ -499,6 +545,101 @@ def test_un_feriado_no_es_un_segmento_de_la_barra(web, conn, mundo):
     cablear = _por_titulo(datos)["Cablear el tablero"]
     assert "2026-10-23" not in [s["fecha"] for s in cablear["barra"]]
     assert cablear["quedan_dias_habiles"] == 2
+
+
+# --- Las terminadas de los últimos 30 días ----------------------------------------------------
+
+def test_las_terminadas_van_aparte_con_quien_las_hizo(web, conn, mundo):
+    with admin(conn) as cur:
+        _terminada(cur, mundo["north-lab"], "Cerrar el tablero", "Sam North", "field",
+                   AHORA - timedelta(days=2))
+        _terminada(cur, mundo["north-lab"], "Pesar la carga", "Sam Noble", "quality",
+                   AHORA - timedelta(days=31))
+    conn.commit()
+    datos = _vista(_entrar(web, conn, mundo, "Sam North"))
+    assert datos["terminadas"] == [{"id": datos["terminadas"][0]["id"],
+                                    "titulo": "Cerrar el tablero", "responsable": "Sam North 1",
+                                    "area": "Field Services", "terminada_el": "2026-10-20"}]
+    # Las abiertas, el panel y la cuenta de activas siguen siendo sólo las abiertas.
+    assert "Cerrar el tablero" not in _por_titulo(datos) and datos["activas"] == 4
+    equipo = _vista(_entrar(web, conn, mundo, "Morgan Hale"), "equipo")
+    assert [t["titulo"] for t in equipo["terminadas"]] == ["Cerrar el tablero"]
+    oeste = _vista(_entrar(web, conn, mundo, "Morgan Hale", "west-studio"), "equipo")
+    assert oeste["terminadas"] == []
+
+
+# --- El chat con Leda -------------------------------------------------------------------------
+
+def _bot(conn, mundo: dict, valor: str | None, slug: str = "north-lab") -> None:
+    with admin(conn) as cur:
+        cur.execute("delete from workspace_setting where workspace_id = %s and clave = %s",
+                    (mundo[slug]["id"], "bot_usuario"))
+        if valor is not None:
+            cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                           values (%s, 'bot_usuario', to_jsonb(%s::text))""",
+                        (mundo[slug]["id"], valor))
+    conn.commit()
+
+
+def test_yo_da_el_chat_del_bot_del_equipo_si_el_espacio_lo_tiene(web, conn, mundo):
+    _bot(conn, mundo, "LedaNorteBot")
+    yo = _entrar(web, conn, mundo, "Sam North").get("/app/api/yo").json()
+    assert yo["chat_con_leda"] == "https://t.me/LedaNorteBot"
+    # Cada espacio, el suyo: el oeste no declaró ninguno.
+    oeste = _entrar(web, conn, mundo, "Sam North", "west-studio").get("/app/api/yo").json()
+    assert oeste["chat_con_leda"] is None
+
+
+def test_un_usuario_de_bot_que_no_es_valido_no_entra_en_la_base(conn, mundo):
+    for malo in ("no vale", "a/../b", "x", "https://t.me/otro", "ab_c"):
+        with pytest.raises(psycopg.errors.CheckViolation):
+            _bot(conn, mundo, malo)
+        conn.rollback()
+    with pytest.raises(psycopg.errors.CheckViolation):
+        with admin(conn) as cur:
+            cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                           values (%s, 'bot_usuario', '42'::jsonb)""",
+                        (mundo["north-lab"]["id"],))
+    conn.rollback()
+
+
+def _importar_corework(conn, tmp_path, monkeypatch, bot):
+    """Importa CoreWork con `telegram.bot_usuario` (o sin él, con `None`) y devuelve el
+    resultado y lo guardado."""
+    import yaml
+
+    from leda.importador import importar
+    from tests.conftest import RAIZ
+
+    monkeypatch.setenv("LEDA_BOT_TOKEN_COREWORK", "prueba:token")
+    pack = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
+    pack["telegram"]["grupo_gestion_id"] = -1001
+    pack["telegram"].pop("bot_usuario", None)
+    if bot is not None:
+        pack["telegram"]["bot_usuario"] = bot
+    ruta = tmp_path / "corework.yaml"
+    ruta.write_text(yaml.safe_dump(pack, allow_unicode=True), "utf-8")
+    r = importar(conn, ruta)
+    with admin(conn) as cur:
+        cur.execute("""select valor #>> '{}' v from workspace_setting
+                        where workspace_id = %s and clave = 'bot_usuario'""", (r.workspace_id,))
+        fila = cur.fetchone()
+    conn.commit()
+    return r, (fila["v"] if fila else None)
+
+
+def test_el_pack_declara_el_usuario_del_bot_y_se_puede_sacar(conn, tmp_path, monkeypatch):
+    _, guardado = _importar_corework(conn, tmp_path, monkeypatch, "@CoreWorkLedaBot")
+    assert guardado == "CoreWorkLedaBot"
+    _, guardado = _importar_corework(conn, tmp_path, monkeypatch, None)
+    assert guardado is None
+
+
+def test_un_usuario_del_bot_mal_escrito_en_el_pack_avisa_y_no_se_guarda(
+        conn, tmp_path, monkeypatch):
+    r, guardado = _importar_corework(conn, tmp_path, monkeypatch, "t.me/CoreWorkLedaBot")
+    assert guardado is None
+    assert any("usuario del bot" in a for a in r.advertencias)
 
 
 # --- Salir ------------------------------------------------------------------------------------

@@ -325,6 +325,15 @@ create table workspace_setting (
       when jsonb_typeof(valor) <> 'number' then false
       else (valor #>> '{}')::numeric between 1 and 60
            and (valor #>> '{}')::numeric % 1 = 0
+    end),
+  -- Decisión 8 del usuario, 2026-10-12 (migración 0060): el usuario público del bot del equipo
+  -- (`telegram.bot_usuario` del pack, sin "@"), con el que la web abre el chat con Leda. Va en
+  -- una dirección: sólo un usuario de Telegram válido.
+  constraint workspace_setting_bot_usuario check (
+    case
+      when clave <> 'bot_usuario' then true
+      when jsonb_typeof(valor) <> 'string' then false
+      else (valor #>> '{}') ~ '^[A-Za-z][A-Za-z0-9_]{4,31}$'
     end)
 );
 
@@ -2490,10 +2499,13 @@ begin
 end $$;
 
 -- Quién ve qué en las listas de la puerta del equipo (ADR 0022, decisiones 3, 5, 11 y 13;
--- migración 0058). `tareas_que_ve` es la regla, una sola y en SQL, que extiende
--- `puede_ver_tarea` de una tarea a la lista de cada vista ("tus", "sector", "equipo"); el
--- atraso y el bloqueo abierto sólo los ve quien puede ver los atrasos de esa tarea (su
--- responsable, el referente de su área, la autoridad final). `vistas_de` dice qué vistas tiene
+-- migraciones 0058 y 0060). `tareas_que_ve` es la regla, una sola y en SQL, que extiende
+-- `puede_ver_tarea` de una tarea a la lista de cada vista ("tus", "sector", "equipo"). De una
+-- tarea ajena, quien no ve sus atrasos (no es su responsable, el referente de su área ni la
+-- autoridad final) ve lo mismo que el informe al grupo: si está trabada, y vencida sólo cuando
+-- el atraso ya se habló en privado (una previsión vigente posterior al vencimiento, que también
+-- ve, o el escalamiento de ese vencimiento ya salido; decisiones del usuario del 2026-10-12).
+-- `vistas_de` dice qué vistas tiene
 -- cada persona. Las dos corren con la RLS de quien llama y `leda_app` no las ejecuta: la web
 -- llama a `tareas_de_la_sesion` y `vistas_de_la_sesion`, que sacan a la persona del hash del
 -- token de la sesión (`sesion_vigente`), nunca de un dato del pedido.
@@ -2501,7 +2513,8 @@ create or replace function tareas_que_ve(
     p_membership_id uuid, p_vista text, p_ahora timestamptz)
 returns table (task_id uuid, titulo text, estado text, fecha_objetivo timestamptz,
                asignada_en timestamptz, responsable text, area text, papel text,
-               vencida boolean, bloqueo_abierto boolean, ve_la_pagina boolean)
+               vencida boolean, bloqueo_abierto boolean, ve_la_pagina boolean,
+               prevision date)
 language sql stable set search_path = leda, public, pg_temp as $$
   with yo as (
     select m.id, m.workspace_id, r.autoridad_final
@@ -2560,6 +2573,7 @@ language sql stable set search_path = leda, public, pg_temp as $$
            coalesce(t.responsable_membership_id = yo.id
                     or a.referente_membership_id = yo.id
                     or yo.autoridad_final, false) as ve_atrasos,
+           t.estado in ('asignada', 'en_curso', 'bloqueada') as sigue,
            yo.autoridad_final as es_autoridad,
            yo.id as yo_id
       from abiertas t
@@ -2570,18 +2584,30 @@ language sql stable set search_path = leda, public, pg_temp as $$
          coalesce((select min(e.at) from task_state_event e
                     where e.task_id = f.id and e.estado_nuevo = 'asignada'), f.creado_en),
          u.nombre, f.area_nombre, f.papel,
-         case when f.ve_atrasos then
-           coalesce(f.estado in ('asignada', 'en_curso', 'bloqueada')
-                    and (f.fecha_objetivo at time zone w.zona_horaria)::date
-                        < (coalesce(p_ahora, now()) at time zone w.zona_horaria)::date,
-                    false)
-         end,
-         case when f.ve_atrasos then
-           exists (select 1 from blocker b where b.task_id = f.id and b.resuelto_en is null)
-         end,
-         puede_ver_tarea(f.yo_id, f.id)
+         -- Ya pasó su fecha y, para quien no ve los atrasos de la tarea, el atraso ya se habló
+         -- (la regla a o la b del informe al grupo).
+         coalesce(f.sigue and d.hoy > d.vence
+                  and (f.ve_atrasos
+                       or p.fecha_prevista > d.vence
+                       or exists (select 1 from scheduled_notice n
+                                   where n.task_id = f.id and n.tipo = 'escalamiento'
+                                     and n.estado = 'enviado'
+                                     and n.hechos ->> 'vence' = to_char(d.vence, 'YYYY-MM-DD'))),
+                  false),
+         exists (select 1 from blocker b where b.task_id = f.id and b.resuelto_en is null),
+         puede_ver_tarea(f.yo_id, f.id),
+         case when f.sigue and p.fecha_prevista > d.vence then p.fecha_prevista end
     from filas f
     join workspace w on w.id = f.workspace_id
+    cross join lateral (
+      select (f.fecha_objetivo at time zone w.zona_horaria)::date as vence,
+             (coalesce(p_ahora, now()) at time zone w.zona_horaria)::date as hoy) d
+    -- La previsión vigente: la última que ninguna otra reemplaza.
+    left join lateral (
+      select x.fecha_prevista from task_forecast x
+       where x.task_id = f.id
+         and not exists (select 1 from task_forecast y where y.reemplaza_id = x.id)
+       order by x.at desc limit 1) p on true
     left join membership rm on rm.id = f.responsable_membership_id
     left join app_user u on u.id = rm.app_user_id
    where case p_vista
@@ -2609,7 +2635,8 @@ create or replace function tareas_de_la_sesion(
     p_token_hash text, p_vista text, p_ahora timestamptz)
 returns table (task_id uuid, titulo text, estado text, fecha_objetivo timestamptz,
                asignada_en timestamptz, responsable text, area text, papel text,
-               vencida boolean, bloqueo_abierto boolean, ve_la_pagina boolean)
+               vencida boolean, bloqueo_abierto boolean, ve_la_pagina boolean,
+               prevision date)
 language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare persona uuid;
 begin
@@ -2622,6 +2649,64 @@ begin
     return;
   end if;
   return query select q.* from tareas_que_ve(persona, p_vista, p_ahora) q;
+end $$;
+
+-- Las terminadas de los últimos 30 días de cada vista, con quién las hizo (decisión 3 del
+-- usuario, 2026-10-12; migración 0060): `terminadas_que_ve` corre con la RLS de quien llama
+-- y `leda_app` no la ejecuta; la web llama a `terminadas_de_la_sesion`, con la persona de la
+-- sesión.
+create or replace function terminadas_que_ve(
+    p_membership_id uuid, p_vista text, p_ahora timestamptz)
+returns table (task_id uuid, titulo text, responsable text, area text,
+               terminada_en timestamptz)
+language sql stable set search_path = leda, public, pg_temp as $$
+  with yo as (
+    select m.id, m.workspace_id, r.autoridad_final
+      from membership m
+      join rol r on r.id = m.rol_id
+     where m.id = p_membership_id and m.activo
+  ),
+  terminadas as (
+    select t.id, t.titulo, t.area_id, t.responsable_membership_id,
+           coalesce((select max(e.at) from task_state_event e
+                      where e.task_id = t.id and e.estado_nuevo = 'terminada'),
+                    t.actualizado_en) as terminada_en
+      from task t
+      join yo on yo.workspace_id = t.workspace_id
+     where t.estado = 'terminada'
+  )
+  select x.id, x.titulo, u.nombre, a.nombre, x.terminada_en
+    from terminadas x
+    cross join yo
+    join area a on a.id = x.area_id
+    left join membership rm on rm.id = x.responsable_membership_id
+    left join app_user u on u.id = rm.app_user_id
+   where x.terminada_en >= coalesce(p_ahora, now()) - interval '30 days'
+     and case p_vista
+           when 'tus' then x.responsable_membership_id = yo.id
+           when 'sector' then a.referente_membership_id = yo.id
+           when 'equipo' then yo.autoridad_final
+           else false
+         end
+   order by x.terminada_en desc, x.titulo, x.id;
+$$;
+
+create or replace function terminadas_de_la_sesion(
+    p_token_hash text, p_vista text, p_ahora timestamptz)
+returns table (task_id uuid, titulo text, responsable text, area text,
+               terminada_en timestamptz)
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare persona uuid;
+begin
+  if p_vista is null or p_vista not in ('tus', 'sector', 'equipo') then
+    raise exception 'terminadas_de_la_sesion: vista desconocida';
+  end if;
+  -- La persona sale de la sesión, que deja fijado su espacio; si no entra, nada.
+  select s.membership_id into persona from sesion_vigente(p_token_hash) s;
+  if persona is null then
+    return;
+  end if;
+  return query select q.* from terminadas_que_ve(persona, p_vista, p_ahora) q;
 end $$;
 
 create or replace function vistas_de_la_sesion(p_token_hash text)
@@ -4311,6 +4396,13 @@ revoke execute on function tareas_de_la_sesion(text, text, timestamptz) from pub
 revoke execute on function vistas_de_la_sesion(text) from public;
 grant execute on function tareas_de_la_sesion(text, text, timestamptz) to leda_app;
 grant execute on function vistas_de_la_sesion(text) to leda_app;
+
+alter function terminadas_que_ve(uuid, text, timestamptz) owner to leda_owner;
+alter function terminadas_de_la_sesion(text, text, timestamptz) owner to leda_owner;
+
+revoke execute on function terminadas_que_ve(uuid, text, timestamptz) from public;
+revoke execute on function terminadas_de_la_sesion(text, text, timestamptz) from public;
+grant execute on function terminadas_de_la_sesion(text, text, timestamptz) to leda_app;
 
 alter function esperas_que_ve(uuid, text, timestamptz) owner to leda_owner;
 alter function esperas_de_la_sesion(text, text, timestamptz) owner to leda_owner;

@@ -832,7 +832,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # cuya persona del apodo también apunta ahí (ADR 0020), y antes aún la 0057, cuyos
             # enlaces y sesiones de la web también (ADR 0022); y antes de ella la 0058, cuyas
             # funciones de las listas leen la sesión, y antes aún la 0059, cuya cadena de esperas
-            # lee esas listas.
+            # lee esas listas; antes de todas, la 0060, que deja esas listas como las dejó la
+            # 0058.
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0060_lo_ajeno_como_el_informe_al_grupo.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0059_la_cadena_de_esperas.sql"))
             db.execute(_sql_script(

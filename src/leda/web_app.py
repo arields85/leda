@@ -13,11 +13,15 @@ Rutas, todas bajo `/app` y servidas por la misma aplicación que la página de l
   después lleva a la web (303 a `/app/`). Un enlace usado, anulado, inventado o de alguien que
   dejó el equipo muestra siempre la misma página humana, sin detalles técnicos (constitución
   §10). Un pedido que dice venir de otro sitio no canjea nada.
-- `GET /app/api/yo`: quién es la persona de la sesión, de qué espacio y qué vistas tiene.
+- `GET /app/api/yo`: quién es la persona de la sesión, de qué espacio, qué vistas tiene y, si el
+  pack del espacio declara el bot del equipo, la dirección de su chat (`chat_con_leda`, para el
+  botón "> consultar a leda"; decisión 8 del usuario, 2026-10-12).
 - `GET /app/api/tareas?vista=tus|sector|equipo`: lo que muestra cada vista (decisión 18): el panel
-  con un número por estado, la semana del calendario del espacio, y cada tarea con su estado, su
-  fecha, los días hábiles que quedan, la barra de días hábiles de una tarea en curso y, si es una
-  tarea trabada cuyo bloqueo ve la persona, la cadena de esperas en árbol.
+  con un número por estado, la semana del calendario del espacio, cada tarea abierta con su
+  estado, sus marcas (trabada y vencida pueden ir juntas), su fecha, la previsión de un atraso ya
+  hablado, los días hábiles que quedan, la barra de días hábiles de una tarea en curso y, si está
+  trabada, la cadena de esperas en árbol; y aparte, las terminadas de los últimos 30 días con
+  quién las hizo (decisiones del usuario del 2026-10-12, 1, 3, 5, 6 y 7).
 - `POST /app/salir`: corta la sesión (`cerro_la_sesion`) y borra la cookie.
 - `GET /app/` y las demás páginas bajo `/app` (tarea P1-4): la web compilada de `web/dist`
   (React, decisión 17), del mismo origen que la API. `index.html` no se guarda; los archivos con
@@ -25,9 +29,10 @@ Rutas, todas bajo `/app` y servidas por la misma aplicación que la página de l
 
 **Nada del pedido elige a la persona ni al espacio** (decisión 11): salen del hash del token de la
 cookie, por las funciones de la base (`sesion_vigente`, `vistas_de_la_sesion`,
-`tareas_de_la_sesion` y `esperas_de_la_sesion`, migraciones 0057 a 0059), que revalidan la
-membresía en cada pedido y deciden quién ve qué (decisión 13). El atraso y el bloqueo de una tarea
-llegan nulos para quien no puede verlos y quedan nulos: este módulo nunca los calcula.
+`tareas_de_la_sesion`, `esperas_de_la_sesion` y `terminadas_de_la_sesion`, migraciones 0057 a
+0060), que revalidan la membresía en cada pedido y deciden quién ve qué (decisión 13). Si una
+tarea está vencida o trabada lo decide la base (de una tarea ajena, lo mismo que el informe al
+grupo: el atraso, recién cuando ya se habló en privado): este módulo nunca lo calcula.
 
 **Los tokens** (el del enlace y el de la sesión) nunca se guardan en claro, nunca se imprimen y
 nunca vuelven en una respuesta, salvo el de la sesión en su propia cookie. La sesión no vence
@@ -53,6 +58,7 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, Redirec
 
 from .calendario import Calendario
 from .db import conectar, sin_espacio
+from .importador import BOT_USUARIO, USUARIO_DEL_BOT
 
 router = APIRouter(prefix="/app")
 
@@ -117,7 +123,8 @@ TIPOS_DE_LA_WEB = {
 VISTAS = {"tus": "Tus tareas", "sector": "Tu sector", "equipo": "El equipo"}
 DIAS_CORTOS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
 
-# Los cuatro estados con color de la decisión 18, en el orden en que una tarea toma uno solo.
+# Los cuatro estados con color de la decisión 18. Trabada y vencida pueden ir juntas (decisión 5
+# del usuario, 2026-10-12); entregada y en curso, sólo sin ninguna de ellas.
 TRABADA, VENCIDA, ENTREGADA, EN_CURSO = "trabada", "vencida", "entregada", "en_curso"
 MARCAS = (VENCIDA, TRABADA, EN_CURSO, ENTREGADA)
 
@@ -322,17 +329,30 @@ def yo(request: Request):
             persona = cur.fetchone()
             cur.execute("select nombre from workspace where id = %s", (sesion["workspace_id"],))
             espacio = cur.fetchone()
+            cur.execute("""select valor #>> '{}' as usuario from workspace_setting
+                            where workspace_id = %s and clave = %s""",
+                        (sesion["workspace_id"], BOT_USUARIO))
+            bot = cur.fetchone()
         if vistas is None:
             return _sin_sesion()
         respuesta = _json({
             "persona": persona["nombre"] if persona else "",
             "espacio": espacio["nombre"] if espacio else "",
             "vistas": [{"vista": v, "titulo": VISTAS[v]} for v in vistas["vistas"]
-                       if v in VISTAS]})
+                       if v in VISTAS],
+            "chat_con_leda": _chat_con_leda(bot["usuario"] if bot else None)})
         _poner_la_cookie(respuesta, token)
         return respuesta
 
     return _con_la_base(leer)
+
+
+def _chat_con_leda(usuario: str | None) -> str | None:
+    """La dirección del chat con el bot del equipo, o `None`: sin un usuario válido no hay
+    botón (la base ya lo exige; acá, otra vez, porque va en un enlace)."""
+    if not usuario or not USUARIO_DEL_BOT.fullmatch(usuario):
+        return None
+    return f"https://t.me/{usuario}"
 
 
 # --- Las tareas de una vista ------------------------------------------------------------------
@@ -369,23 +389,28 @@ def tareas(request: Request, vista: str = "tus"):
             cur.execute("select * from esperas_de_la_sesion(%s, %s, %s)",
                         (_hash(token), vista, ahora))
             esperas = cur.fetchall()
+            cur.execute("select * from terminadas_de_la_sesion(%s, %s, %s)",
+                        (_hash(token), vista, ahora))
+            terminadas = cur.fetchall()
             calendario = Calendario.desde_base(cur, ws)
-        return _json(armar_vista(vista, filas, esperas, calendario, ahora))
+        return _json(armar_vista(vista, filas, esperas, calendario, ahora, terminadas))
 
     return _con_la_base(leer)
 
 
 def armar_vista(vista: str, filas: list[dict[str, Any]], esperas: list[dict[str, Any]],
-                calendario, ahora: datetime) -> dict[str, Any]:
+                calendario, ahora: datetime,
+                terminadas: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """La respuesta de una vista con lo que devolvió la base: nada de lo que se arma acá decide
-    quién ve qué; el atraso y el bloqueo nulos siguen nulos."""
+    quién ve qué ni si una tarea está vencida o trabada."""
     hoy = ahora.astimezone(calendario.zona).date()
     arboles = _arboles(esperas)
     tareas_ = [_tarea(f, arboles, calendario, ahora, hoy) for f in filas]
+    # Una tarea trabada y vencida cuenta en los dos números: lleva las dos marcas.
     panel = {marca: 0 for marca in MARCAS}
     for t in tareas_:
-        if t["marca"] is not None:
-            panel[t["marca"]] += 1
+        for marca in t["marcas"]:
+            panel[marca] += 1
     vencen = {t["fecha_objetivo"] for t in tareas_ if t["fecha_objetivo"]}
     return {
         "vista": vista, "titulo": VISTAS[vista],
@@ -393,6 +418,7 @@ def armar_vista(vista: str, filas: list[dict[str, Any]], esperas: list[dict[str,
         "panel": panel, "activas": len(tareas_),
         "semana": _semana(calendario, hoy, vencen),
         "tareas": tareas_,
+        "terminadas": [_terminada(f, calendario) for f in terminadas or []],
     }
 
 
@@ -400,18 +426,19 @@ def _local(momento: datetime | None, calendario) -> date | None:
     return None if momento is None else momento.astimezone(calendario.zona).date()
 
 
-def _marca(fila: dict[str, Any]) -> str | None:
-    """El estado con color de la tarjeta, uno solo: trabada, vencida, entregada o en curso; las
-    demás, ninguno (gris). Trabada y vencida sólo si la base las mostró a esta persona."""
-    if fila["bloqueo_abierto"] is True:
-        return TRABADA
-    if fila["vencida"] is True:
-        return VENCIDA
+def _marcas(fila: dict[str, Any]) -> list[str]:
+    """Los estados con color de la tarjeta: trabada y vencida, juntas si son las dos (decisión 5
+    del usuario), tal como las dio la base; sin ninguna de ellas, entregada o en curso; las
+    demás, ninguno (gris)."""
+    marcas = [marca for marca, columna in ((TRABADA, "bloqueo_abierto"), (VENCIDA, "vencida"))
+              if fila[columna] is True]
+    if marcas:
+        return marcas
     if fila["estado"] == "en_revision":
-        return ENTREGADA
+        return [ENTREGADA]
     if fila["estado"] == "en_curso":
-        return EN_CURSO
-    return None
+        return [EN_CURSO]
+    return []
 
 
 def _tarea(fila: dict[str, Any], arboles: dict[str, list[dict[str, Any]]], calendario,
@@ -419,12 +446,18 @@ def _tarea(fila: dict[str, Any], arboles: dict[str, list[dict[str, Any]]], calen
     vence = _local(fila["fecha_objetivo"], calendario)
     asignada = _local(fila["asignada_en"], calendario)
     bloqueo = fila["bloqueo_abierto"]
+    marcas = _marcas(fila)
+    prevision = fila.get("prevision")
     return {
         "id": str(fila["task_id"]),
         "titulo": fila["titulo"],
         "estado": fila["estado"],
-        "marca": _marca(fila),
+        # La primera marca da el color del marco; la web muestra todas.
+        "marca": marcas[0] if marcas else None,
+        "marcas": marcas,
         "fecha_objetivo": vence.isoformat() if vence else None,
+        # El día que dio la persona, posterior al vencimiento (un atraso ya hablado).
+        "prevision": prevision.isoformat() if prevision else None,
         "asignada_el": asignada.isoformat() if asignada else None,
         "responsable": fila["responsable"],
         "area": fila["area"],
@@ -443,6 +476,18 @@ def _tarea(fila: dict[str, Any], arboles: dict[str, list[dict[str, Any]]], calen
         "barra": (_barra(calendario, asignada, vence, hoy)
                   if fila["estado"] == "en_curso" and asignada and vence else None),
         "esperas": arboles.get(str(fila["task_id"]), []) if bloqueo is True else None,
+    }
+
+
+def _terminada(fila: dict[str, Any], calendario) -> dict[str, Any]:
+    """Una terminada de los últimos 30 días: qué, quién la hizo y cuándo se terminó."""
+    terminada = _local(fila["terminada_en"], calendario)
+    return {
+        "id": str(fila["task_id"]),
+        "titulo": fila["titulo"],
+        "responsable": fila["responsable"],
+        "area": fila["area"],
+        "terminada_el": terminada.isoformat() if terminada else None,
     }
 
 

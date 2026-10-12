@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -65,6 +66,24 @@ def _pendientes(nodo: Any, ruta: str = "") -> list[str]:
 def _definido(valor: Any) -> bool:
     """PENDIENTE es un marcador de ausencia, no un valor."""
     return valor is not None and str(valor).strip() != "PENDIENTE"
+
+
+# El usuario público del bot del equipo (`telegram.bot_usuario`, opcional): la web abre con él el
+# chat con Leda (`https://t.me/<usuario>`; decisión 8 del usuario, 2026-10-12). Un usuario de
+# Telegram: de 5 a 32 letras, números o "_", empezando con una letra (la base lo vuelve a exigir,
+# migración 0060). No es un secreto; el token del bot, sí, y no va en el pack.
+USUARIO_DEL_BOT = re.compile(r"[A-Za-z][A-Za-z0-9_]{4,31}")
+BOT_USUARIO = "bot_usuario"
+
+
+def usuario_del_bot(pack: dict[str, Any]) -> str | None:
+    """El usuario del bot del equipo que declara el pack, sin "@", o `None` si no declara uno
+    válido."""
+    valor = (pack.get("telegram") or {}).get(BOT_USUARIO)
+    if not _definido(valor):
+        return None
+    usuario = str(valor).strip().removeprefix("@")
+    return usuario if USUARIO_DEL_BOT.fullmatch(usuario) else None
 
 
 CLAVES_PROHIBIDAS = {
@@ -206,6 +225,10 @@ def validar(pack: dict[str, Any]) -> tuple[list[str], list[str]]:
             f"en .env, nunca en el pack.")
     if not _definido(tg.get("grupo_gestion_id")):
         bloqueantes.append("Falta el identificador del grupo de gestión.")
+    if _definido(tg.get(BOT_USUARIO)) and usuario_del_bot(pack) is None:
+        advertencias.append(
+            "El usuario del bot (telegram.bot_usuario) no es un usuario de Telegram: se "
+            "ignora y la web no muestra el botón para consultar a Leda.")
     if not pack.get("calendario"):
         bloqueantes.append(
             "Falta el calendario laboral. Toda la escalera de recordatorios "
@@ -667,6 +690,14 @@ def _importar_ajustes(cur, ws, pack) -> None:
     urgencia = pack.get("urgencia")
     if urgencia:
         ajustes["urgencia"] = urgencia
+
+    bot = usuario_del_bot(pack)
+    if bot:
+        ajustes[BOT_USUARIO] = bot
+    else:
+        # Sacarlo del pack (o declararlo mal) lo saca de la web.
+        cur.execute("delete from workspace_setting where workspace_id = %s and clave = %s",
+                    (ws, BOT_USUARIO))
 
     for clave, valor in ajustes.items():
         cur.execute(
