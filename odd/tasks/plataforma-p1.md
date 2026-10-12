@@ -63,6 +63,14 @@ aspecto de la "9 · Terminal" y un comando de consola para emitir y cortar un en
   una regla impide copiar):
   `LEDA_TEST_DB_URL="postgresql://postgres@localhost:5432/postgres" ../motor-de-conversacion/.venv/Scripts/python.exe -m pytest -q <pruebas>`
   (comprobado el 2026-10-12: `tests/garantias/test_pagina_de_la_tarea.py`, 30 passed).
+- **Qué código corre** (comprobado el 2026-10-12): el `.venv` del Motor tiene `leda` instalado apuntando a
+  `motor-de-conversacion/src`. `pytest` antepone el `src/` de esta carpeta y prueba el código de la
+  plataforma; un comando suelto (`python -m leda …`, `python -c …`) corre el del Motor salvo con
+  `PYTHONPATH=src`.
+- **Nada toca las bases de verdad:** cada corrida crea `leda_test_<azar>` y la borra. Los roles `leda_*`
+  son del servidor entero (compartidos con `leda_motor`): ninguna migración crea, altera ni borra roles.
+- **El puerto 8000 es de la prueba por Telegram:** ningún servidor (uvicorn, vite) queda corriendo; para
+  mirar algo, otro puerto, y se cierra.
 - **Node 24 y npm 11** instalados; no hay `package.json` todavía.
 - **Commits** en `feat/plataforma`, uno por tarea, sin líneas de atribución. **RDD** por commit de código:
   `tools/rdd_ciclo.py <carpeta temporal> <base>` en una carpeta `../_rdd-<nombre>` desprendida, que se
