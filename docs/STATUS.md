@@ -61,11 +61,15 @@ viejo corriendo.
 
 **Lo que sigue:**
 1. **La prueba por Telegram** con `leda_motor` al día hasta la `0056` (respaldo previo; autorizado;
-   guion `docs/product/guion-telegram-fase-c-parte-1.md`). Necesita al usuario, cuando tenga tiempo.
+   guion `docs/product/guion-telegram-fase-c-parte-1.md`), el 2026-10-12 con el usuario. Si pasa, la
+   rama del Motor pasa a `main` por avance rápido (usuario, 2026-10-12).
 2. **La plataforma, porción 1** (ADR 0022, decisión 16): la puerta del equipo, de sólo lectura
    (sesiones, "Tus tareas", "Tu sector" y "El equipo", y Leda ofreciendo el acceso), con su prueba en
    el celular del usuario. Antes del código: el documento de la unidad, la estructura de la web
-   (React, TypeScript, Vite y Tailwind, decisión 17) y sus tokens desde el lienzo.
+   (React, TypeScript, Vite y Tailwind, decisión 17) y sus tokens desde el lienzo. Se trabaja en la
+   rama `feat/plataforma` (carpeta `D:\Proyectos\Leda-PM-worktrees\plataforma`), nacida de la del
+   Motor, para que la prueba por Telegram pruebe la Fase C tal como está; después de la prueba se
+   suma a la rama del Motor.
 3. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11; no volvió a pasar en las rondas del
    formato).
 
@@ -158,8 +162,8 @@ validador de invariantes. Destino de cada uno:
 **Git:**
 - Repositorio `arields85/leda` (público). `origin/main` está en `6ee287a` (2026-10-08); el motor llegó a `main` por avance
   rápido el 2026-10-07 (221 commits, sin atribuciones ni secretos).
-- La rama del Motor se sube al cerrar cada tramo; lo posterior a `6ee287a` llega a `main` cuando la
-  entrega y la aprobación pasen con la IA real.
+- La rama del Motor se sube al cerrar cada tramo. Lo posterior a `6ee287a` llega a `main` después de la
+  prueba por Telegram de la Fase C, si pasa (usuario, 2026-10-12), por avance rápido.
 - Etiquetas: `respaldo-flujos-antes-de-d`, `respaldo-main-antes-de-d`, `respaldo-0-36-en-pausa`,
   `archivo-c4-medicion`, `archivo-flujo-c6`, `archivo-prueba-0-35` y `respaldo-antes-de-partir-limpieza`
   (todas locales salvo las del 2026-10-04).
