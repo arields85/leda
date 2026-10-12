@@ -2,9 +2,12 @@
 
 Para el usuario, que opera las tres cuentas de prueba: Ariel, Ismael y Marcos. Mide con la IA real lo
 que la regresión automática no ve: la entrega contra el criterio, la lista de lo que hay para
-revisar, la decisión, la espera de 30 minutos y el enlace a la página de la tarea. Datos ficticios,
-base `leda_motor` (recreada el 2026-10-08 para esta prueba; respaldo previo en
-`db/respaldos/leda_motor-antes-fase-c-d6-20261008.dump`).
+revisar, la decisión, la espera de 30 minutos y el enlace a la página de la tarea (pasos 1 a 21) y,
+en la segunda parte, lo construido desde el 2026-10-09: quién destraba un bloqueo, los apodos, la
+pregunta sin contestar, pasar una tarea, el enlace y el detalle de una tarea ajena, la lista de
+tareas, el informe al grupo y la forma de los mensajes (pasos 22 a 48). Datos ficticios, base
+`leda_motor` (recreada el 2026-10-08 para esta prueba y puesta al día hasta la migración `0056` el
+2026-10-12; respaldos previos en `db/respaldos/`).
 
 **Las tareas de la prueba** (vencen el viernes 16/10):
 
@@ -16,8 +19,15 @@ base `leda_motor` (recreada el 2026-10-08 para esta prueba; respaldo previo en
   captura.
 - Ariel: "Integrar datos de la comprimidora en CoreLabs", todavía sin arrancar.
 - Las dos de Marcos y las dos de Ariel las revisa Ismael.
+- Marcos es el encargado de OT y Ariel, el de Software e interfaz HMI (el sector de sus dos
+  tareas). Mariano, Nahuel, Lucas y Martín no tienen Leda conectada. Leda no conoce ningún apodo.
 
 ## Antes de empezar
+
+- **El estado de las tareas:** la prueba del 2026-10-08 pudo dejarlas entregadas o aprobadas. Antes
+  de empezar, el agente comprueba que estén como dice arriba; si no, recrea `leda_motor` (con
+  respaldo previo; ya está autorizado) y después se corre una vez, en una terminal cualquiera,
+  `.venv\Scripts\python.exe -m leda.motor.reloj corework volver`.
 
 Tres terminales de PowerShell. En cada una, primero pegá esto y Enter:
 
@@ -63,8 +73,10 @@ Cada bloque de abajo es **un renglón entero**: copialo completo y Enter. No esc
 
 ## El hilo
 
-1. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework adelantar` → Leda pasa al
-   viernes 09/10 a las 10:00. Esperar 2 minutos.
+1. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework adelantar` → Leda pasa al día
+   hábil siguiente a las 10:00 (el martes 13/10 si la prueba es el lunes 12). Anotar qué día quedó:
+   la segunda parte depende de él. Esperar 2 minutos. (A observar: ese día puede llegar también el
+   aviso previo de las tareas que vencen el viernes 16.)
 2. **Marcos:** "qué tengo pendiente?" → sus dos tareas, con su estado y el vencimiento del viernes
    16. Sin nombres del sistema ("en_curso", "asignada").
 3. **Marcos:** "termine el plc, ya arranca desde el plc" → Leda recibe la entrega aunque la tarea
@@ -127,6 +139,94 @@ Cada bloque de abajo es **un renglón entero**: copialo completo y Enter. No esc
     → Leda la recibe igual y pide sólo lo que falta del criterio (los datos actualizados cada minuto
     durante un turno completo), con un ejemplo. Ariel puede escribir "dejalo, despues la entrego" →
     no queda nada entregado.
+
+## El hilo, segunda parte: lo construido desde el 2026-10-09
+
+Sigue el mismo día, sin cortar. **En todos los mensajes de Leda** (también los de arriba): la última
+oración va sola en su renglón, con un renglón en blanco antes, aunque no sea una pregunta; ningún
+renglón largo junta dos ideas; un mensaje de un solo renglón queda como está. Leda nunca usa un
+apodo para nombrar a alguien. Si un mensaje esperado no llega a las 17:00, sale al día hábil
+siguiente: anotarlo, no es una falla.
+
+**Un bloqueo, un apodo y la pregunta sin contestar**
+
+22. **Marcos:** "con comunicaciones estoy parado, me falta la ip del servidor de corelabs y me la
+    tiene que pasar el colo" → Leda anota que la de comunicaciones está trabada por eso y, como no
+    tiene a nadie como "el Colo" en el equipo, pregunta quién es. No le escribe a nadie todavía.
+23. **Marcos:** "ariel" → "¿«El Colo» es Ariel De Simone?", con Confirmar.
+24. **Marcos:** toca Confirmar → quedó anotado que lo destraba Ariel; Leda le pregunta a Ariel para
+    cuándo y le avisa a Marcos apenas sepa algo. No dice que ya le escribió ni nombra a Ismael.
+25. **Marcos:** "pasame el link de la de comunicaciones" → el enlace a la página de esa tarea, al
+    final del mensaje (es suya: no pregunta nada).
+26. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework hora 12:30`. Esperar 2 minutos
+    → a Ariel le llega, de parte de Leda y no en nombre de Marcos: que Marcos está trabado con
+    comunicaciones, que le falta la IP del servidor de CoreLabs, y para cuándo se la puede pasar.
+    Sin reproche y sin "el Colo".
+27. **Ariel:** no contesta. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework hora
+    16:35`. Esperar 2 minutos → a Ariel le llega la misma pregunta otra vez, una sola vez (se repite
+    a las 4 horas). A Marcos no le llega nada.
+28. **Ariel:** "uh me olvide, mañana a la mañana se la paso" → quedó anotado y Marcos se va a enterar.
+    No dice que el bloqueo se cerró.
+29. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework hora 16:50`. Esperar 2 minutos
+    → a Marcos le llega que Ariel dice que mañana a la mañana le pasa la IP, que cuando pueda seguir
+    lo diga y que no hace falta responder. No dice que se destrabó.
+
+**El día siguiente: destrabar, pasar una tarea y pedir el detalle**
+
+30. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework adelantar`. Esperar 2 minutos →
+    Leda pasa al día hábil siguiente a las 10:00 (anotar cuál). A Ariel le llega si pudo pasarle la
+    IP a Marcos (era el día que dio). A Ismael, un recordatorio de lo que espera su revisión (el PLC
+    de Marcos), con un botón para verla. (A observar: otros avisos del día.)
+31. **Ismael:** toca el botón y después Aprobar → queda aprobada y ya no le queda nada por revisar. A
+    Marcos le llega que el PLC quedó aprobado, con el enlace.
+32. **Marcos:** "el colo ya me paso la ip, sigo con comunicaciones" → Leda entiende que es Ariel sin
+    preguntar quién es, y anota que pudo seguir: la tarea deja de estar trabada.
+33. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework hora 10:20`. Esperar 2 minutos
+    → a Ariel le llega que lo de Marcos ya se resolvió y que no hace falta que haga nada. Leda no le
+    vuelve a preguntar.
+34. **Ariel:** "la de integrar la comprimidora en corelabs pasasela a marcos, el conoce mejor el plc"
+    → la vista previa: la tarea pasa de Ariel a Marcos, y antes Leda le pregunta a Marcos si la toma;
+    con Confirmar. No nombra a Ismael.
+35. **Ariel:** toca Confirmar → Leda le pregunta a Marcos y le avisa a Ariel cuando conteste;
+    mientras tanto la tarea sigue con Ariel.
+36. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework hora 10:50`. Esperar 2 minutos
+    → a Marcos le llega que Ariel le quiere pasar "Integrar datos de la comprimidora en CoreLabs" y si
+    la toma, con los botones "La tomo" y "No la tomo". A Ismael no le llega nada.
+37. **Marcos:** toca "La tomo" → la tarea pasa a ser suya.
+38. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework hora 11:10`. Esperar 2 minutos
+    → a Ariel le llega que Marcos tomó la tarea. A Ismael, nada.
+39. **Marcos:** "con comunicaciones otra vez estoy parado, falta que mariano termine el cableado del
+    tablero" → quedó anotado; a Mariano todavía no le puede escribir; ya se lo avisó al administrador
+    para que lo conecte; y una sola pregunta: si hay otra persona que pueda destrabarlo, o si se lo
+    pide Marcos y le cuenta. No promete escribirle a Mariano. **Ariel, en el bot de
+    administración:** le llega el aviso de que hay que conectar a Mariano (a observar el texto y la
+    hora).
+40. **Marcos:** "se lo pido yo y te cuento" → Leda lo anota y no le escribe a nadie (a observar qué
+    dice que hace después).
+41. **Marcos:** "pasame el link del dashboard de lotes" → no es suya: Leda le da el resumen (de
+    Ariel, aprobada) y le ofrece pedirle a Ariel el detalle con las fotos. Ningún enlace, y nunca "no
+    la podés ver".
+42. **Marcos:** "si dale" → Leda le pregunta a Ariel y le avisa cuando conteste.
+43. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework hora 11:30`. Esperar 2 minutos
+    → a Ariel le llega que Marcos pide ver el detalle del dashboard de lotes y si se lo comparte, con
+    los botones "Compartirla" y "No compartirla".
+44. **Ariel:** toca "Compartirla" → que se lo comparte y que Marcos se va a enterar.
+45. **Reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework hora 11:55`. Esperar 2 minutos
+    → a Marcos le llega que Ariel le compartió el dashboard, con el enlace al final. Si Leda está en
+    miércoles, aparte le llega también la lista de sus tareas (salía 11:30 y esperó 30 minutos desde
+    su último mensaje): comunicaciones, trabada esperando el cableado de Mariano; la de integrar,
+    que vence el viernes 16; y una sola pregunta, por la que se puede mover. El PLC ya no está.
+46. **Marcos, en la PC:** abre el enlace del dashboard → la página de la tarea de Ariel, aprobada,
+    con la foto. Nada se puede editar.
+47. **Marcos** (si le llegó la lista): "la de integrar recien la agarro, el viernes la tengo" → queda
+    anotado, sin otra pregunta (a observar las palabras).
+48. **Reloj:** si Leda está en miércoles, `.venv\Scripts\python.exe -m leda.motor.reloj corework hora
+    15:35`; si está en viernes, `hora 16:20`; otro día no hay informe (anotarlo). Esperar 2 minutos →
+    en el grupo del equipo, el informe: lo terminado con el nombre de quien lo hizo (el dashboard,
+    de Ariel; el PLC, de Marcos), la de comunicaciones trabada con lo que falta, y la de integrar, de
+    Marcos, con su vencimiento. Cada renglón con nombre, sin comparar personas, sin "todo en orden"
+    (hay una trabada) y sin pedir respuesta. Si no llega nada, anotarlo: puede ser que el bot del
+    equipo del Motor no esté en el grupo.
 
 ## Para volver a empezar
 
