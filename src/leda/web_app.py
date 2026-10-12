@@ -756,6 +756,8 @@ TEXTOS_DE_LA_CARGA = {
     ("fecha", "falta"): "Elegí la fecha.",
     ("fecha", "en_el_pasado"): "Esa fecha ya pasó.",
     ("fecha", "no_es_dia_habil"): "Ese día no es hábil en este espacio.",
+    ("fecha", "ya_cerro_el_dia"):
+        "La jornada de hoy ya terminó en este espacio: elegí otro día.",
     ("fecha", "despues_del_objetivo"): "La fecha es posterior a la del objetivo.",
     ("criterio", "falta"):
         "Falta el criterio de aceptación: qué tiene que pasar para darla por terminada.",
@@ -905,7 +907,9 @@ async def cargar_una_tarea(espacio_id: str, request: Request):
         return _json({"error": "demasiado_grande"}, 413)
     try:
         cuerpo = json.loads(crudo or b"null")
-    except ValueError:
+    except (ValueError, RecursionError):
+        # Un cuerpo anidado hasta el fondo no tira `ValueError` sino `RecursionError`: es un
+        # pedido mal formado más, nunca un 500 (revisión RDD `review-40c4b218bf40f1fa`).
         cuerpo = None
     datos, mal_formados = leer_la_carga(cuerpo)
     espacio = _espacio_de(espacio_id)

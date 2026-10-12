@@ -320,6 +320,28 @@ def test_hoy_vale_si_es_un_dia_habil(conn, intake_world, sesion):
     assert _cargar(conn, sesion, intake_world, fecha=HOY)["ok"] is True
 
 
+def test_hoy_ya_no_vale_cuando_cerro_la_jornada_del_espacio(conn, intake_world, sesion):
+    """Revisión RDD `review-40c4b218bf40f1fa` (migración 0064): la tarea vence al cierre de la
+    jornada (18:00 en North Lab); cargarla para hoy después de esa hora la dejaría vencida al
+    nacer."""
+    al_cierre = datetime(2026, 10, 14, 18, 0, tzinfo=ZoneInfo("America/Argentina/Buenos_Aires"))
+    assert _errores(_cargar(conn, sesion, intake_world, fecha=HOY, ahora=al_cierre)) == {
+        ("fecha", "ya_cerro_el_dia")}
+    _nada_cargado(conn)
+    assert _cargar(conn, sesion, intake_world, fecha=VIERNES, ahora=al_cierre)["ok"] is True
+    antes = al_cierre - timedelta(minutes=1)
+    assert _cargar(conn, sesion, intake_world, fecha=HOY, ahora=antes)["ok"] is True
+
+
+def test_las_opciones_no_ofrecen_hoy_cuando_cerro_la_jornada(conn, intake_world, sesion):
+    norte = _norte(intake_world)
+    al_cierre = datetime(2026, 10, 14, 18, 0, tzinfo=ZoneInfo("America/Argentina/Buenos_Aires"))
+    habiles = _opciones(conn, sesion, norte["id"], al_cierre)["calendario"]["dias_habiles"]
+    assert habiles[0] == (HOY + timedelta(days=1)).isoformat()
+    antes = _opciones(conn, sesion, norte["id"], al_cierre - timedelta(minutes=1))
+    assert antes["calendario"]["dias_habiles"][0] == HOY.isoformat()
+
+
 # --- Lo que no se carga ---------------------------------------------------------------------
 
 def test_sin_los_datos_obligatorios_se_rechaza_todo_junto(conn, intake_world, sesion):
@@ -572,10 +594,10 @@ def test_ningun_dato_de_otro_espacio_entra_en_una_carga(conn, intake_world, sesi
 
 # --- Las opciones del formulario ------------------------------------------------------------
 
-def _opciones(conn, sesion: str, espacio_id: str) -> dict:
+def _opciones(conn, sesion: str, espacio_id: str, ahora: datetime = AHORA) -> dict:
     with sin_espacio(conn) as cur:
         cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
-                    (_hash(sesion), espacio_id, AHORA))
+                    (_hash(sesion), espacio_id, ahora))
         r = cur.fetchone()["r"]
     conn.commit()
     return r
@@ -768,6 +790,21 @@ def test_cargar_por_la_api_devuelve_todo_lo_que_falta_y_los_avisos(web, conn, in
     (aviso,) = r.json()["avisos"]
     assert (aviso["campo"], aviso["motivo"]) == ("responsable", "sin_conectar")
     assert "no va a recibir avisos ni seguimiento" in aviso["texto"]
+
+
+def test_un_cuerpo_anidado_hasta_el_fondo_es_un_pedido_mal_formado_y_no_un_error(
+        web, conn, intake_world, administradora):
+    """Revisión RDD `review-40c4b218bf40f1fa`: `json.loads` de un cuerpo muy anidado (por debajo
+    del tope de tamaño) no tira `ValueError` sino `RecursionError`; antes daba 500."""
+    norte = _norte(intake_world)
+    camino = f"/app/admin/api/espacios/{norte['id']}/tareas"
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    for cuerpo in ("[" * 30000 + "]" * 30000, '{"a":' * 5000 + "1" + "}" * 5000):
+        assert len(cuerpo.encode()) < 64 * 1024
+        r = navegador.post(camino, content=cuerpo, headers={"content-type": "application/json"})
+        assert r.status_code == 422, r.text
+        assert ("clave", "falta") in {(e["campo"], e["motivo"]) for e in r.json()["errores"]}
+    assert _contar(conn, "task") == 0
 
 
 def test_cargar_por_la_api_se_protege_de_otros_sitios_y_de_la_cookie_del_equipo(

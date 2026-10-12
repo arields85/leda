@@ -3108,6 +3108,8 @@ declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
         v_administrador uuid;
         v_espacio workspace%rowtype;
         v_hoy date;
+        v_desde date;
+        v_hora_fin time;
         v_hasta date;
         v_resultado jsonb;
 begin
@@ -3125,6 +3127,13 @@ begin
   perform set_config('leda.workspace_id', v_espacio.id::text, true);
   v_hoy := (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::date;
   v_hasta := (v_hoy + interval '6 months')::date;
+  -- Hoy se ofrece sólo si la jornada del espacio no cerró: la tarea vence a esa hora, y cargada
+  -- después nacería vencida (migración 0064).
+  select c.hora_fin into v_hora_fin from work_calendar c where c.workspace_id = v_espacio.id;
+  v_desde := case when v_hora_fin is not null
+                       and (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::time
+                           >= v_hora_fin
+                  then v_hoy + 1 else v_hoy end;
   v_resultado := jsonb_build_object(
     'ok', true,
     'espacio', jsonb_build_object('id', v_espacio.id, 'nombre', v_espacio.nombre,
@@ -3168,7 +3177,7 @@ begin
       'dias_habiles', coalesce((
         select jsonb_agg(d.dia order by d.dia)
           from (select g::date as dia
-                  from generate_series(v_hoy, v_hasta, interval '1 day') g) d
+                  from generate_series(v_desde, v_hasta, interval '1 day') g) d
          where es_dia_habil(v_espacio.id, d.dia)), '[]'::jsonb)));
   perform set_config('leda.workspace_id', previo, true);
   return v_resultado;
@@ -3297,14 +3306,19 @@ begin
       end if;
     end if;
 
-    -- La fecha: un día hábil del espacio, hoy o después (hoy, en su zona).
+    -- La fecha: un día hábil del espacio, hoy o después (hoy, en su zona). Hoy, sólo si la
+    -- jornada no cerró: la tarea vence al cierre y nacería vencida (migración 0064).
     v_hoy := (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::date;
+    select c.hora_fin into v_hora_fin from work_calendar c where c.workspace_id = v_espacio.id;
     if p_fecha is null then
       v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'falta');
     elsif p_fecha < v_hoy then
       v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'en_el_pasado');
     elsif not es_dia_habil(v_espacio.id, p_fecha) then
       v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'no_es_dia_habil');
+    elsif p_fecha = v_hoy and v_hora_fin is not null
+          and (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::time >= v_hora_fin then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'ya_cerro_el_dia');
     elsif v_objetivo.fecha_objetivo is not null and p_fecha > v_objetivo.fecha_objetivo then
       v_avisos := v_avisos || jsonb_build_object('campo', 'fecha',
                                                  'motivo', 'despues_del_objetivo');
@@ -3353,7 +3367,6 @@ begin
     end if;
 
     -- Todo en orden: la tarea, su evento, su auditoría y su clave.
-    select c.hora_fin into v_hora_fin from work_calendar c where c.workspace_id = v_espacio.id;
     insert into task (workspace_id, objective_id, titulo, descripcion, area_id,
                       responsable_membership_id, fecha_objetivo, criterio_aceptacion,
                       evidencia_requerida, evidencia_policy_version)
