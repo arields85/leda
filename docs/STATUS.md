@@ -63,13 +63,13 @@ viejo corriendo.
 1. **La prueba por Telegram** con `leda_motor` ya al día hasta la `0056` (respaldo previo hecho;
    guion `docs/product/guion-telegram-fase-c-parte-1.md`), el 2026-10-12 con el usuario. Si pasa, la
    rama del Motor pasa a `main` por avance rápido (usuario, 2026-10-12).
-2. **La plataforma, porción 1** (ADR 0022, decisión 16): la puerta del equipo, de sólo lectura
-   (sesiones, "Tus tareas", "Tu sector" y "El equipo", y Leda ofreciendo el acceso), con su prueba en
-   el celular del usuario. Antes del código: el documento de la unidad, la estructura de la web
-   (React, TypeScript, Vite y Tailwind, decisión 17) y sus tokens desde el lienzo. Se trabaja en la
-   rama `feat/plataforma` (carpeta `D:\Proyectos\Leda-PM-worktrees\plataforma`), nacida de la del
-   Motor, para que la prueba por Telegram pruebe la Fase C tal como está; después de la prueba se
-   suma a la rama del Motor.
+2. **La plataforma, porción 1, esta noche (2026-10-12) por cuenta del agente:** el plan es
+   [`../odd/tasks/plataforma-p1.md`](../odd/tasks/plataforma-p1.md) (tareas P1-0 a P1-5, restricciones,
+   cómo correr las pruebas en la otra carpeta). Se trabaja en la rama `feat/plataforma`, carpeta
+   `D:\Proyectos\Leda-PM-worktrees\plataforma`, nacida de la del Motor, para que la prueba por Telegram
+   pruebe la Fase C tal como está. Esta noche, sin tocar la conversación: el guion de mañana (P1-0, en
+   esta rama), la base, la API, la web y la consola. Después de la prueba, con el usuario: juntar las
+   ramas, que Leda ofrezca el acceso por chat y la prueba en el celular.
 3. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11; no volvió a pasar en las rondas del
    formato).
 
