@@ -488,10 +488,9 @@ lleva a `/app/`. Para probar los cortes: "salir" en la página, o
 
 ### La puerta de administración (porción 2)
 
-La de un administrador de plataforma, que abarca todos los espacios (tarea P2-1 de
-`odd/tasks/plataforma-p2.md`). Necesita la migración `0061` y el mismo servidor del paso 2, en el
-puerto 8001. Sus pantallas llegan con la P2-3: por ahora se prueba la entrada y
-`/app/admin/api/yo`.
+La de un administrador de plataforma, que abarca todos los espacios, con el formulario para cargar
+una tarea (tareas P2-1 a P2-3 de `odd/tasks/plataforma-p2.md`). Necesita las migraciones `0061` a
+`0064`, la web compilada (paso 1) y el mismo servidor del paso 2, en el puerto 8001.
 
 **1. Quien entra tiene que ser administrador de plataforma** (una vez; `python -m leda
 administrador <espacio> <nombre>`, sección 8). Sin el rol vigente, la consola no emite el enlace.
@@ -513,4 +512,19 @@ cortar todas sus sesiones y su enlace sin usar:
 ..\motor-de-conversacion\.venv\Scripts\python.exe -m leda cortar-sesiones-admin Ariel
 ```
 
-Quitarle el rol de administrador corta su sesión en el pedido siguiente.
+Quitarle el rol de administrador corta su sesión en el pedido siguiente, y volver a dárselo no la
+revive: hace falta un enlace nuevo (migración `0063`).
+
+**4. Cargar una tarea** en `http://localhost:8001/app/admin/`: si hay más de un espacio, elegirlo
+arriba; después el objetivo (sólo los que ya existen), el título, quién la hace (con su área, quién
+la revisa y "[SIN CONECTAR]" si todavía no tiene Leda), la fecha (el calendario ofrece sólo los días
+hábiles del espacio desde hoy; hoy, sólo antes del cierre de la jornada), el criterio, la evidencia
+(viene marcada la que pide el área) y quién la decidió. "revisar" muestra la tarea como la va a ver
+el equipo y quién la carga, la decidió y la revisa; "confirmar" la carga y "volver" deja corregir.
+En una computadora, el formulario va a la izquierda y la vista previa a la derecha; en el celular,
+uno debajo del otro. La tarea aparece en "Tus tareas" de su responsable (puerta del equipo).
+
+Lo que no se carga vuelve marcado en su campo, en palabras. Si se corta la red al confirmar, los
+datos quedan y "probar de nuevo" manda la misma clave: nunca se cargan dos tareas. Quién la cargó y
+quién la decidió quedan en la auditoría (`psql`, `select detalle from leda.audit_log where accion =
+'cargar_tarea' order by at desc limit 1;`).

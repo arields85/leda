@@ -183,13 +183,22 @@ Construida en la rama `feat/plataforma` (tarea P2-2 de
 | Topes de los textos | Título 200, descripción 800 y criterio 500 caracteres, los del borrador de una tarea | Se cuentan en caracteres, no en unidades de Telegram (riesgo 2 de `docs/STATUS.md`) |
 | Quién revisa | La regla única de la base (`quien_revisa_la_tarea`): quien aprueba el trabajo del responsable, activo. Sin él no se carga; la autoridad final sin aprobador tampoco (se revisaría a sí misma) | El motor no tiene otra regla: no se cae a la autoridad final como hacía el borrador por chat |
 | Qué evidencia se acepta | Sólo tipos que la política del área conoce (su lista o sus `tipos`); vacía, sólo si el área no pide evidencia | Un tipo desconocido no lo cubriría ninguna pieza y la tarea no cerraría nunca. `PENDIENTE` con el usuario si el formulario puede pedir otra evidencia |
-| La clave de un solo uso | 16 a 128 caracteres (`A-Z a-z 0-9 _ -`), una por espacio, sin vencimiento | La genera el formulario (P2-3) |
+| La clave de un solo uso | 16 a 128 caracteres (`A-Z a-z 0-9 _ -`), una por espacio, sin vencimiento | La genera el formulario (P2-3): `crypto.randomUUID`, o 32 dígitos hexadecimales sin HTTPS |
 | "Conectado" | Tiene un Telegram vinculado (`app_user.telegram_user_id`), como `persecucion.alcanzable` del motor | |
-| Días hábiles que ofrecen las opciones | Desde hoy hasta seis meses después | |
+| Días hábiles que ofrecen las opciones | Desde hoy (desde mañana si la jornada del espacio ya cerró, migración `0064`) hasta seis meses después | Hoy después del cierre tampoco se carga: la tarea nacería vencida |
 | Espacios donde se carga | Cualquiera que exista, también uno importado sin activar | Como `/app/admin/api/yo` |
 
 **Para más adelante:** la versión de cada fila (decisión 15) es para editar, en la porción 3; los
 avisos de la decisión 7 y el de "sin conectar" al referente son del motor.
+
+**El formulario (P2-3), valores fijados a mano:**
+
+| Qué | Hoy | Notas |
+|---|---|---|
+| Desde qué ancho va en dos columnas | 1024 px (`lg`), hasta 72rem; la puerta del equipo sigue en 32rem | |
+| El espacio elegido | El primero de la lista al entrar; no se recuerda entre visitas ni va en la dirección | Cambiar de espacio vacía el formulario |
+| La evidencia marcada al elegir a la persona | La que pide la política de su área; se pueden sumar los demás tipos que el área conoce | Cambiar de persona vuelve a marcar la de su área |
+| Los meses del calendario | Del mes de hoy al del último día hábil que ofrecen las opciones (seis meses) | |
 
 ## Decisiones abiertas que la plataforma va a necesitar
 

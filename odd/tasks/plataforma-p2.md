@@ -60,7 +60,7 @@ Ruta: un escritor delegado por tarea (dos o más archivos no triviales cada una)
       hace no la revisa, incluido el caso de la autoridad final sin aprobador); el evento `asignada`; la
       auditoría con quién la cargó y quién la decidió; la clave de un solo uso. La API de escritura con
       protección contra pedidos cruzados.
-- [ ] **P2-3 · El formulario:** elegir espacio, objetivo, responsable (con "sin conectar" a la vista),
+- [x] **P2-3 · El formulario:** elegir espacio, objetivo, responsable (con "sin conectar" a la vista),
       fecha (sólo días hábiles), criterio y evidencia (la de la política del área como punto de
       partida); vista previa y confirmación; la vista ancha de escritorio.
 - [ ] **P2-4 · Documentos:** `docs/capacidades.md`, `docs/product/plataforma-pendientes.md`,
@@ -171,3 +171,100 @@ puerta; `/app/admin/api/yo` lista todos los espacios, también los importados si
   116 passed (15 min 11 s), con el ensayo de paridad y de rollback de la `0062`.
 - Commit de código y pruebas: `f6a40067`. La suite `tests/garantias` completa y la revisión RDD:
   `PENDIENTE` (las corre el coordinador).
+
+### Arreglo de la revisión de la P2-1: la sesión es del rol vigente (2026-10-12)
+
+**Ruta:** delegated (2+ non-trivial files): migración, rollback, esquema y sus pruebas.
+
+La revisión RDD `review-2bb3704b62fcce34` de la `0061` advirtió: si a un administrador le revocan el
+rol y se lo vuelven a otorgar antes del pedido siguiente de su sesión, la sesión vieja seguía
+entrando (`sesion_de_administracion_vigente` sólo miraba que el rol estuviera vigente ahora).
+
+**Qué quedó:** migración `0063_la_sesion_es_del_rol_vigente.sql` (con su rollback y
+`db/esquema.sql` al día): una sesión creada antes del `otorgado_en` del rol vigente queda cortada
+con el mismo motivo y la misma auditoría que la de un rol revocado (`dejo_de_ser_administrador`:
+entre su apertura y hoy la persona dejó de serlo, así que no hizo falta un motivo nuevo ni tocar la
+restricción); un enlace emitido antes del otorgamiento vigente no se canjea y queda anulado.
+
+**Evidencia:**
+- RED, antes del código: `pytest -q tests/garantias/test_puerta_de_administracion.py -k
+  "anterior_al_rol or volver_a_otorgar"` → 3 failed.
+- GREEN: `pytest -q tests/garantias/test_puerta_de_administracion.py` → 32 passed (46 s);
+  `pytest -q tests/garantias/test_migraciones.py` → 16 passed (3 min 48 s), con el ensayo de
+  paridad y de rollback de la `0063`.
+- Commit: `072972aa`. La revisión RDD: `PENDIENTE` (la corre el coordinador).
+
+### P2-3 · El formulario (2026-10-12)
+
+**Ruta:** delegated (2+ non-trivial files): la web (`web/src/admin/`, `door.ts`, `main.tsx`,
+`SignOut.tsx`) y sus pruebas.
+
+**Qué quedó:**
+- La misma web elige la puerta por el camino (`/app/admin/`), sin dependencias nuevas (ni React
+  Router): `web/src/door.ts`. El servidor ya servía esas páginas (`test_web_servida.py`, sin
+  cambios).
+- `AdminApp`: el cabezal ("LEDA · ADMINISTRACIÓN · COREWORK", "Cargar tarea", el nombre del
+  administrador), "salir" (el mismo componente del equipo, con la acción de esta puerta), un
+  selector de espacio si hay más de uno y los estados de sesión cerrada ("entrá con un enlace
+  nuevo") y de falla.
+- `LoadForm`: los campos alimentados por `/opciones`, con contadores de los topes del servidor;
+  quién la hace con su área, "la revisa: …" (o "nadie") y "[SIN CONECTAR]"; la evidencia de la
+  política del área, marcada la que pide; "revisar" → la vista previa (`TaskPreview`, con la
+  tarjeta del equipo y quién la carga, la decidió y la revisa) → "confirmar" o "volver". Una clave
+  por intento (`newKey`: `crypto.randomUUID`, o 32 dígitos hexadecimales sin HTTPS), la misma en
+  cada reintento, nueva al cambiar un dato o después de cargar. 201/200: "Tarea cargada." con los
+  avisos y "cargar otra"; 422: cada rechazo en su campo (con `aria-invalid`) y los demás en un
+  resumen; 401: sesión cerrada; sin red: los datos quedan y "probar de nuevo".
+- `DatePicker`: un mes por vez, lunes primero, sólo los días hábiles que ofrecen las opciones son
+  botones (los demás, en gris y fuera del orden de tabulación); flechas entre días hábiles (arriba y
+  abajo, una semana), Enter o espacio para elegir.
+- La vista ancha: desde 1024 px, el formulario a la izquierda y la vista previa a la derecha
+  (pegada arriba), hasta 72rem; la puerta del equipo sigue en su columna de 32rem.
+
+**Evidencia:**
+- Las pruebas se escribieron junto con el código (no hubo un RED observado antes): 15 en
+  `web/src/admin/AdminApp.test.tsx` (formulario con las opciones de mentira, sólo días hábiles,
+  flechas, evidencia marcada, contadores, vista previa y "volver", cuerpo y clave al confirmar,
+  aviso de fecha posterior, reintento con la misma clave, clave nueva al editar, errores en sus
+  campos, 401 al confirmar y al entrar, varios espacios, la clave sin HTTPS) y 1 en
+  `web/src/door.test.ts`.
+- En `web/`: `npx tsc --noEmit` sin errores; `npx vitest run` → 54 passed (11 archivos);
+  `npx vite build` bien.
+- Ancho: la web compilada, servida con datos de mentira por un servidor de Node de prueba en el
+  puerto 5179 (fuera del repositorio, cortado después), con Chrome sin ventana: dentro de un marco
+  de 390 px, `scrollWidth` 390 = ancho 390 en el formulario vacío, lleno y en "revisar"; a 1280 px
+  (ventana), `scrollWidth` 1254 = ancho 1254 (sin desborde). Capturas miradas: a 390, una columna;
+  a 1280, dos columnas.
+- Commit: `37ac3bcc`. La revisión RDD: `PENDIENTE` (la corre el coordinador).
+
+**Decisiones del escritor, para confirmar** (anotadas en `docs/product/plataforma-pendientes.md`):
+el espacio elegido no se recuerda entre visitas; cambiar de persona vuelve a marcar la evidencia de
+su área; el cliente no valida antes de "revisar" (lo decide la base y vuelve en cada campo).
+
+### Arreglo de la revisión de la P2-2: hoy, no después del cierre (2026-10-12)
+
+**Ruta:** delegated (2+ non-trivial files): migración, rollback, esquema, `web_app.py` y sus
+pruebas.
+
+La revisión RDD `review-40c4b218bf40f1fa` de la `0062` advirtió dos cosas: (1) hoy se aceptaba
+como fecha aunque ya hubiera cerrado la jornada del espacio, y la tarea nacía vencida; (2)
+`json.loads` de un cuerpo muy anidado tira `RecursionError`, no `ValueError`, y daba 500.
+
+**Qué quedó:** migración `0064_hoy_no_despues_del_cierre.sql` (con su rollback y `db/esquema.sql`
+al día): `cargar_tarea` rechaza hoy a la hora del cierre (`hora_fin`, en la zona del espacio) o
+después (`fecha`, `ya_cerro_el_dia`, "La jornada de hoy ya terminó en este espacio: elegí otro
+día."), y `opciones_de_la_carga` ofrece los días hábiles desde mañana en ese caso, así el
+calendario del formulario coincide sin cambiar la web. `web_app.py` trata el `RecursionError` como
+un cuerpo mal formado (422).
+
+**Evidencia:**
+- RED, antes del código: `pytest -q tests/garantias/test_carga_de_tareas.py -k "cerro_la_jornada
+  or anidado"` → 3 failed (hoy aceptado a las 18:00, hoy ofrecido, y el cuerpo anidado).
+- GREEN: `pytest -q tests/garantias/test_carga_de_tareas.py` → 35 passed (39 s).
+- La verificación entera, abajo. Commit: `8e18463d`. La revisión RDD: `PENDIENTE`.
+
+### Verificación de las tres unidades (2026-10-12)
+
+`pytest -q tests/garantias/test_puerta_de_administracion.py tests/garantias/test_migraciones.py
+tests/garantias/test_web_servida.py tests/garantias/test_carga_de_tareas.py` (con
+`LEDA_TEST_DB_URL` al servidor local de pruebas) → 105 passed (5 min 2 s), sobre los tres commits (`072972aa`, `37ac3bcc`, `8e18463d`), con el ensayo de paridad y de rollback de la `0063` y la `0064`. La suite `tests/garantias` completa: `PENDIENTE` (la corre el coordinador).
