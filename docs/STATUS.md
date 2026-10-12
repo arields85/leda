@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-12: el ADR 0022 de la plataforma web, aceptado.
+**Última actualización documental:** 2026-10-12, noche: la porción 1 de la plataforma, construida en su rama; `leda_motor`, lista para la prueba por Telegram.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -60,16 +60,20 @@ viejo corriendo.
   máquina, con color sólo en los estados que tienen algo.
 
 **Lo que sigue:**
-1. **La prueba por Telegram** con `leda_motor` ya al día hasta la `0056` (respaldo previo hecho;
-   guion `docs/product/guion-telegram-fase-c-parte-1.md`), el 2026-10-12 con el usuario. Si pasa, la
-   rama del Motor pasa a `main` por avance rápido (usuario, 2026-10-12).
-2. **La plataforma, porción 1, esta noche (2026-10-12) por cuenta del agente:** el plan es
-   [`../odd/tasks/plataforma-p1.md`](../odd/tasks/plataforma-p1.md) (tareas P1-0 a P1-5, restricciones,
-   cómo correr las pruebas en la otra carpeta). Se trabaja en la rama `feat/plataforma`, carpeta
-   `D:\Proyectos\Leda-PM-worktrees\plataforma`, nacida de la del Motor, para que la prueba por Telegram
-   pruebe la Fase C tal como está. Esta noche, sin tocar la conversación: el guion de mañana (P1-0, en
-   esta rama), la base, la API, la web y la consola. Después de la prueba, con el usuario: juntar las
-   ramas, que Leda ofrezca el acceso por chat y la prueba en el celular.
+1. **La prueba por Telegram**, el 2026-10-12 con el usuario: guion
+   `docs/product/guion-telegram-fase-c-parte-1.md`, ahora con una segunda parte (pasos 22 a 48, lo
+   construido desde el 2026-10-09; `6faafce6`); `leda_motor` recreada esa madrugada con las tareas como
+   las pide el guion (ver "`leda_motor`" abajo). Si pasa, la rama del Motor pasa a `main` por avance
+   rápido (usuario, 2026-10-12).
+2. **La plataforma, porción 1: construida la noche del 2026-10-12** en la rama `feat/plataforma`
+   (carpeta `D:\Proyectos\Leda-PM-worktrees\plataforma`, subida a `origin` en `b1e500b2`), sin tocar la
+   conversación: enlace de un solo uso con botón "Entrar" y sesión abierta (`0057`), quién ve qué
+   (`0058`), la cadena de esperas (`0059`), la API interna, la web con el aspecto "9 · Terminal" y los
+   comandos de consola. Cada commit de código, revisado por RDD y aprobado; garantías en verde. Plan,
+   evidencia y **ocho preguntas para el usuario** ("Para decidir", con ejemplos) en
+   `odd/tasks/plataforma-p1.md` de esa rama. Después de la prueba, con el usuario: las ocho preguntas,
+   juntar las ramas, poner `leda_motor` al día hasta la `0059` (con respaldo), que Leda ofrezca el
+   acceso por chat y la prueba en el celular (necesita HTTPS o un túnel).
 3. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11; no volvió a pasar en las rondas del
    formato).
 
