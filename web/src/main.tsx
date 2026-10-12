@@ -6,13 +6,15 @@ import './index.css';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { AdminApp } from './admin/AdminApp';
 import { App } from './App';
+import { isAdminDoor } from './door';
 
 const root = document.getElementById('root');
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <App />
+      {isAdminDoor(window.location.pathname) ? <AdminApp /> : <App />}
     </StrictMode>,
   );
 }

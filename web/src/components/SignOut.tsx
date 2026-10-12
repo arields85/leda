@@ -3,14 +3,20 @@ import { useState } from 'react';
 import { signOut } from '../api';
 
 /** "salir": closes the session on this phone, after one confirmation, because coming back
- * needs a new link from Leda. */
-export function SignOut({ onDone }: { onDone: () => void }) {
+ * needs a new link from Leda. The administration door passes its own `action`. */
+export function SignOut({
+  onDone,
+  action = signOut,
+}: {
+  onDone: () => void;
+  action?: () => Promise<void>;
+}) {
   const [step, setStep] = useState<'idle' | 'confirm' | 'busy' | 'failed'>('idle');
 
   async function confirm() {
     setStep('busy');
     try {
-      await signOut();
+      await action();
       onDone();
     } catch {
       setStep('failed');
