@@ -92,7 +92,7 @@ comprobación y hace la revisión RDD. Estimación total: más de 400 líneas; c
       membresía y anota el último uso) y cortarla; auditoría de emitir, canjear y cortar. Pruebas de
       garantías: el enlace no sirve dos veces, una sesión cortada o de alguien que dejó el equipo no
       entra, aislamiento entre espacios, catálogo de dueños y RLS, rollback y paridad.
-- [ ] **P1-2 · Quién ve qué en listas** (migración `0058`): la función de lista por vista ("tus":
+- [x] **P1-2 · Quién ve qué en listas** (migración `0058`): la función de lista por vista ("tus":
       mías, espero, me esperan; "sector"; "equipo") que extiende `puede_ver_tarea`, sin atrasos ajenos
       para el integrante; qué vistas tiene cada persona. Pruebas por puesto.
 - [ ] **P1-3 · La API interna:** canje del enlace (`/app/entrar/{token}` → cookie y redirección a la
@@ -140,3 +140,31 @@ Lo prueba primero `TestClient` y después el usuario en su celular.
   reincorporan; la prueba de la carrera no prueba contención real. Las funciones sólo las ejecuta
   `leda_app`: el comando de consola (P1-3) las llama dentro de `espacio()`; `sesion_vigente` mira la
   membresía activa, no el espacio.
+- **P1-2** (`bb5c868c`, escritor delegado): migración `0058`. `tareas_que_ve(persona, vista, ahora)`
+  (sólo tareas abiertas; "tus" con `papel` mía / me esperan / espero, leyendo las esperas como el motor;
+  "sector" para el referente; "equipo" para la autoridad final) y `vistas_de(persona)`, sin ejecución
+  para `leda_app`; la web llama `tareas_de_la_sesion(hash, vista, ahora)` y `vistas_de_la_sesion(hash)`:
+  la persona sale de la sesión, nunca del pedido. `vencida` y `bloqueo_abierto` vienen vacíos para quien
+  no es el responsable, su referente ni la autoridad. `puede_ver_tarea` no cambió. RED: 15 fallas;
+  GREEN: 15 passed. `pytest tests/garantias`: 558 passed. RDD `review-58736fd6bdbafbc8`, aprobada.
+  Advertencia sin arreglar: una espera por el bloqueo de quien destraba sigue contando aunque ese bloqueo
+  ya se haya resuelto (mientras la tarea siga abierta); sugerencias: probar los negativos de la cadena y
+  el borde de `vencida`. Para la P1-3: la cadena de esperas de una tarea trabada necesita su función, y
+  `vencida` no mira una nueva previsión de la persona (el motor sí).
+
+## Para decidir (el usuario, después de la prueba por Telegram)
+
+Mientras no se decida, la plataforma hace lo más restrictivo; abrirlo después no rehace nada.
+
+1. **La fecha y el estado de una tarea que espero.** Marcos espera "Integrar datos de la comprimidora"
+   (de Ariel). En "Tus tareas" la ve con su fecha y su estado, pero sin la marca de vencida; con la fecha
+   a la vista, igual se da cuenta de que está atrasada. ¿Marcos tiene que ver la fecha y el estado de lo
+   que espera, o sólo el título y de quién es?
+2. **Abrir la página de una tarea que espero.** Marcos ve esa tarea en su lista pero no puede abrir su
+   página (hoy la página la ven el responsable, quien aprueba, el referente y la autoridad). ¿Esperar una
+   tarea habilita a abrir su página?
+3. **Lo terminado.** Las tareas terminadas y canceladas no aparecen en ninguna vista, así que la web no
+   muestra "lo que se terminó esta semana y quién lo hizo" (constitución §8, informar también las buenas
+   noticias). ¿Se muestran las terminadas en los últimos días?
+4. **Lo que tengo para revisar.** A Ismael le aparece en "Tus tareas" la entrega de Marcos que espera su
+   revisión, aunque sea de otra área ("otros me esperan"). ¿Queda así?
