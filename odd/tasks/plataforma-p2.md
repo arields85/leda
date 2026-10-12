@@ -318,6 +318,27 @@ passed, `npx vite build` bien.
   juntas en la del Motor (`7f752d5`, sin archivos en común); las migraciones `0057` a `0064`
   ensayadas en una copia descartable restaurada del respaldo y aplicadas en `leda_motor` como
   `postgres`, todas sin error; `npm test` en `web/`: 57 passed; `npm run build`, bien.
+- **Decidido para el acceso por chat (usuario, 2026-10-12, noche):**
+  - **Al salir la primera versión**, Leda le ofrece el acceso a cada integrante activo la próxima vez
+    que le escribe, al final de su respuesta, con el aviso de que el enlace vence en 24 horas (opción
+    A: llega cuando la persona está mirando el chat y no suma un mensaje a su día).
+  - **"Perdí el celular" corta el acceso a la web enseguida, sin confirmación** (opción A: la persona
+    escribe desde otro dispositivo, con apuro, y equivocarse cuesta sólo pedir un enlace nuevo). Leda
+    le recuerda cerrar la sesión de Telegram de ese celular desde Ajustes → Dispositivos en otro
+    dispositivo (quien tiene el celular con Telegram abierto también tiene el chat con Leda) y que pida
+    un enlace nuevo cuando tenga otro. Sin ningún dispositivo, lo corta el administrador desde la consola.
+  - **"Lo recuerda cuando viene al caso"** (ADR 0022, decisión 4) queda para una porción posterior.
+- **La rama `auxiliar/alta-y-google`, analizada (2026-10-12, noche; agente de sólo lectura, una
+  afirmación comprobada por el coordinador):** su "alta" es la verificación del correo por chat encima
+  del enlace de activación, para mandar invitaciones de Calendar; no carga integrantes ni tiene web.
+  El envío de correo nunca se construyó (`obtener_emisor_configurado` devuelve siempre `None`), ni se
+  probó por Telegram real. Depende de `gateway`, `ciclo` y `local`, borrados; usa todavía `prisma`; su
+  `0100` choca con la `0054` del Motor (`admin_notice`); 33 commits sobre `a667170`, 1023 detrás del
+  Motor. No se retoma: lo del acceso ya existe en el Motor (`onboarding.py`, `0057`). Se rescatan como
+  ideas, para la carga de integrantes: los textos aprobados, los avisos al administrador que persisten,
+  los límites contados desde los eventos y que un nombre no puede quedar vacío. Google (cifrado,
+  credencial y OAuth) es independiente y queda pendiente en `docs/ROADMAP.md` (usuario: "dejalo
+  anotado como pendiente"; sin fecha).
 - **Próximo paso:** el diseño de que Leda ofrezca el acceso por chat, con su conversación de prueba
   (ADR 0022, decisión 4: a cada integrante activo una vez, al conectarse, cuando lo pida y "perdí el
   celular"), y las preguntas que deje, de a una; después construirlo con el vencimiento de 24 horas,

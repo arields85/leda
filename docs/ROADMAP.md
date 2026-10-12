@@ -100,6 +100,7 @@ reales. Las unidades de abajo que no son el seguimiento ni la plataforma tambié
 | Leda le pregunta al referente si acepta una fecha nueva y, si confirma, la cambia ella misma | ADR 0017, decisión 4 (pedido explícito del usuario) |
 | Servidor propio de la API de bots de Telegram, para recibir archivos de hasta 60 MB (hoy, 20 MB) | ADR 0019, decisión 2 (usuario, 2026-10-07: se instala cuando Leda vaya a un equipo real) |
 | Un chat con Leda dentro de la plataforma web, sin depender de Telegram | Usuario, 2026-10-12. Necesita antes despegar la salida de Telegram (riesgo 1 de `STATUS.md`; ADR 0017, decisión 5) y notificaciones del celular para los avisos que Leda manda por su cuenta |
+| Correo verificado de cada integrante y Google: enviar correos y que Leda organice reuniones en Calendar | Usuario, 2026-10-12 (pendiente, sin fecha: el momento lo decide el usuario). Orden: aceptar el ADR 0010 adaptado al Motor (hoy "propuesta"; los calendarios externos siguen fuera del producto hasta entonces, `AGENTS.md`), traer de `auxiliar/alta-y-google` el cifrado, la credencial y el OAuth (G2a a G2c), construir el envío por Gmail (G2d), la verificación del correo desde la plataforma (no por chat) y Calendar. La verificación de Google para los permisos sensibles lleva semanas: empezarla temprano. Análisis de la rama en `odd/tasks/plataforma-p2.md` |
 
 Delegar por chat salió de esta lista: se construyó en la Fase C (C-7, con la enmienda a la
 decisión 2 del ADR 0017 y las decisiones 9, 26 a 28, 39 y 53 de `odd/tasks/fase-c.md`; conversaciones
@@ -143,6 +144,8 @@ renombre a Leda. Desde ahí se continúa en `main`, no en una rama aparte. Es un
 pendiente: su construcción espera bajo el criterio vigente (ADR 0017, decisión 5), y el momento
 lo decide el usuario. **Desde el 2026-10-04 no se retoma** antes del paso M3 del Motor, salvo decisión del
 usuario.
+**Precisión (2026-10-12, después de M3):** la rama no se integra como está (depende de los flujos
+borrados y su `0100` choca con la `0054`); va como pendiente en "Anotado para más adelante", con su orden.
 
 **Idea anotada, congelada (decisión del usuario, 2026-10-04): reemplazar una tarea por otra
 más urgente.** Cuando quien confirma toca "Rechazar y cancelar" sobre el borrador de otra
