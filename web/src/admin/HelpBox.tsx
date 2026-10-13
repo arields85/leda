@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Candidate, Problem } from './api';
 import { length } from './draft';
 import { heard, micProblem, type Recognizer, speechRecognition } from './speech';
+import { CONTROL, FIELD_HINT, FIELD_TITLE } from './typography';
 
 /** The server's own limit for the free text (src/leda/ayuda_al_cargar.py, LARGO_DEL_TEXTO). */
 export const STORY_LIMIT = 1000;
@@ -20,8 +21,8 @@ export const NOTHING_TO_COMPLETE = 'Leda no encontró nada para completar con lo
  * what the form had when she asked, so it fills nothing (review review-03b5c3a74d3719b7). */
 export const STALE_ANSWER = 'Cambiaste lo escrito mientras Leda completaba; tocá completar de nuevo.';
 
-const BOX =
-  'block w-full min-w-0 max-w-full min-h-24 resize-y rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none pointer-coarse:text-[16px] focus:border-ink';
+// The shared box of every control (`typography.ts`), taller for a story.
+const BOX = `${CONTROL} min-h-24 resize-y`;
 const BUTTON =
   'inline-flex h-11 items-center rounded-card border-hard border-ink bg-card px-3.5 text-button font-bold text-ink shadow-hard-ink disabled:opacity-50';
 const QUIET =
@@ -91,8 +92,8 @@ export function HelpBox({ story, onStory, help, onAsk, onChoose }: HelpBoxProps)
   const over = length(story) > STORY_LIMIT;
   return (
     <div data-field className="flex min-w-0 max-w-full flex-col gap-2 rounded-card border-hard border-line-soft px-3 py-2.5">
-      <div className="flex min-w-0 items-baseline justify-between gap-2 text-meta text-ink-dim">
-        <label htmlFor="f-contame" className="min-w-0 text-body text-ink">
+      <div className={`flex min-w-0 items-baseline justify-between gap-2 ${FIELD_HINT}`}>
+        <label htmlFor="f-contame" className={`min-w-0 ${FIELD_TITLE}`}>
           Contame qué querés hacer y te ayudo
         </label>
         <span aria-live="polite" className={`shrink-0 ${over ? 'font-bold text-falta' : ''}`}>
@@ -106,7 +107,7 @@ export function HelpBox({ story, onStory, help, onAsk, onChoose }: HelpBoxProps)
         onChange={(e) => onStory(e.target.value)}
         aria-describedby="f-contame-ayuda"
       />
-      <p id="f-contame-ayuda" className="m-0 text-small text-ink-dim">
+      <p id="f-contame-ayuda" className={`m-0 ${FIELD_HINT}`}>
         Como lo dirías. Leda completa lo que está vacío y lo marca; vos lo corregís y confirmás.
       </p>
       <div className="flex flex-wrap gap-3">

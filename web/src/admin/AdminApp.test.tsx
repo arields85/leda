@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminMe, options, OTHER_SPACE, SPACE } from '../test/adminFixtures';
 import { AdminApp } from './AdminApp';
 import { newKey } from './draft';
+import { CONTROL, FIELD_HINT, FIELD_TITLE, FIELD_VALUE } from './typography';
 
 type Reply = { status: number; body?: unknown } | 'network';
 type Call = { key: string; body: unknown };
@@ -351,6 +352,46 @@ describe('AdminApp', () => {
     expect(form).toHaveClass('min-w-0');
     expect(preview()).toHaveClass('min-w-0');
     // jsdom has no layout: the real width is only confirmed on the phone.
+  });
+
+  it('every control has the same box and text, so a list looks like a text field (J2-10)', async () => {
+    await openForm();
+    const form = screen.getByRole('form', { name: 'Cargar tarea' });
+    const controls = form.querySelectorAll('select, input:not([type="checkbox"]), textarea');
+    for (const control of controls) expect(control).toHaveClass(...CONTROL.split(' '));
+    // A list to choose from drops the phone's own look, which made it bigger than a text field.
+    const lists = form.querySelectorAll('select');
+    expect(lists.length).toBeGreaterThan(0);
+    for (const list of lists) expect(list).toHaveClass('appearance-none');
+    // The calendar's days are written in the same main size as the controls.
+    const day = screen.getByRole('button', { name: 'vie 16.10' });
+    expect(day.parentElement).toHaveClass('text-body', 'pointer-coarse:text-[16px]');
+    expect(day).toHaveClass('text-ink-soft');
+    // jsdom has no layout: whether they look the same size is only confirmed on the phone.
+  });
+
+  it('titles, values and help texts share one style in the form and in the preview (J2-10)', async () => {
+    await openForm();
+    fillTask();
+    const styled = (element: Element | null, style: string) => expect(element).toHaveClass(...style.split(' '));
+    // The form: the title of a field, what the person types or chooses, and the help under it.
+    styled(document.getElementById('f-criterio-label'), FIELD_TITLE);
+    styled(screen.getByText('Contame qué querés hacer y te ayudo'), FIELD_TITLE);
+    styled(screen.getByText('evidencia que se pide'), FIELD_TITLE);
+    styled(screen.getByLabelText('criterio de aceptación'), FIELD_VALUE);
+    styled(screen.getByLabelText('quién la hace'), FIELD_VALUE);
+    styled(screen.getByText('Qué tiene que pasar para darla por terminada.'), FIELD_HINT);
+    // The preview: each data name is a title and its value is a value.
+    const name = within(preview()).getByText('criterio de aceptación');
+    expect(name.tagName).toBe('DT');
+    styled(name, FIELD_TITLE);
+    styled(name.nextElementSibling, FIELD_VALUE);
+    expect(name.nextElementSibling).toHaveTextContent('Las 12 alarmas suenan en la sala de control');
+    // Titles and values are the same size; the help is smaller.
+    expect(FIELD_TITLE).toContain('pointer-coarse:text-[16px]');
+    expect(FIELD_VALUE).toContain('pointer-coarse:text-[16px]');
+    expect(FIELD_HINT).not.toContain('pointer-coarse:text-[16px]');
+    expect(FIELD_TITLE).not.toContain('font-bold');
   });
 
   it('confirm sends the data with one key and shows the warnings', async () => {

@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { shortDate, weekdayOf } from '../format';
+import { FIELD_HINT } from './typography';
 
 const MONTHS = [
   'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -72,7 +73,7 @@ export function DatePicker({ id, days, value, onChange, labelledBy, describedBy,
   }, [focusDay, month]);
 
   if (!first || !last) {
-    return <p className="m-0 text-small text-ink-dim">No hay días hábiles para elegir.</p>;
+    return <p className={`m-0 ${FIELD_HINT}`}>No hay días hábiles para elegir.</p>;
   }
 
   const shown = cells(month);
@@ -110,7 +111,7 @@ export function DatePicker({ id, days, value, onChange, labelledBy, describedBy,
       aria-describedby={describedBy}
       className={`flex w-full min-w-0 max-w-full flex-col gap-2 sm:max-w-[19rem] rounded-card border-hard ${invalid ? 'border-falta' : 'border-line'} bg-card p-2.5 shadow-hard`}
     >
-      <div className="flex items-center justify-between gap-2 text-small">
+      <div className="flex items-center justify-between gap-2 text-body pointer-coarse:text-[16px]">
         <button
           type="button"
           className={arrow}
@@ -139,9 +140,9 @@ export function DatePicker({ id, days, value, onChange, labelledBy, describedBy,
           <ChevronRight aria-hidden="true" size={14} strokeWidth={2} />
         </button>
       </div>
-      <div ref={grid} className="grid min-w-0 grid-cols-7 gap-1 text-center text-small">
+      <div ref={grid} className="grid min-w-0 grid-cols-7 gap-1 text-center text-body pointer-coarse:text-[16px]">
         {WEEK.map((d, i) => (
-          <span key={i} aria-hidden="true" className="text-mini text-ink-dim">
+          <span key={i} aria-hidden="true" className={FIELD_HINT}>
             {d}
           </span>
         ))}
@@ -167,7 +168,7 @@ export function DatePicker({ id, days, value, onChange, labelledBy, describedBy,
               aria-label={dayLabel(day)}
               onClick={() => onChange(day)}
               onKeyDown={(event) => onKey(event, day)}
-              className={`min-w-0 rounded-card border-hard py-1 ${selected ? 'border-ink bg-ink font-bold text-page' : 'border-line-soft bg-transparent text-ink hover:border-line-strong'}`}
+              className={`min-w-0 rounded-card border-hard py-1 ${selected ? 'border-ink bg-ink font-bold text-page' : 'border-line-soft bg-transparent text-ink-soft hover:border-line-strong'}`}
             >
               {number}
             </button>

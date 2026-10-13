@@ -4,12 +4,13 @@ import { TaskCard } from '../components/TaskCard';
 import type { Options } from './api';
 import { dayLabel } from './DatePicker';
 import { type Draft, evidenceWords, memberOf, policyOf, previewTask, waitOf } from './draft';
+import { FIELD_HINT, FIELD_TITLE, FIELD_VALUE } from './typography';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <dt className="text-meta text-ink-dim">{label}</dt>
-      <dd className="m-0 wrap-break-word whitespace-pre-line text-body text-ink">{children}</dd>
+      <dt className={FIELD_TITLE}>{label}</dt>
+      <dd className={`m-0 wrap-break-word whitespace-pre-line ${FIELD_VALUE}`}>{children}</dd>
     </div>
   );
 }
@@ -38,7 +39,7 @@ export function TaskPreview({ draft, options, admin }: { draft: Draft; options: 
         <Row label="fecha">
           {draft.fecha ? dayLabel(draft.fecha) : MISSING}
           {late && (
-            <span className="block text-small text-ink-soft">
+            <span className={`block ${FIELD_HINT}`}>
               Es posterior a la del objetivo ({shortDate(late)}): se avisa, no se bloquea.
             </span>
           )}
@@ -46,7 +47,7 @@ export function TaskPreview({ draft, options, admin }: { draft: Draft; options: 
         {wait && (
           <Row label="espera a">
             {[wait.titulo, wait.responsable].filter(Boolean).join(' · ')}
-            <span className="block text-small text-ink-soft">
+            <span className={`block ${FIELD_HINT}`}>
               No puede empezar hasta que esa esté terminada.
             </span>
           </Row>
@@ -63,7 +64,7 @@ export function TaskPreview({ draft, options, admin }: { draft: Draft; options: 
         <Row label="la hace">
           {member ? `${member.nombre} · ${member.area}` : MISSING}
           {member && !member.conectado && (
-            <span className="block text-small text-ink-soft">
+            <span className={`block ${FIELD_HINT}`}>
               [SIN CONECTAR] no va a recibir avisos ni seguimiento hasta que conecte Leda.
             </span>
           )}
