@@ -26,24 +26,26 @@ acá: la persona ve cada dato marcado, lo corrige o lo acepta, y confirma como s
     ("del 10 al 12") no es una fecha;
   - título, descripción y criterio, con los topes del formulario y sin un número ni un nombre que
     no estén en lo que escribió la persona o en los datos de esta tarea
-    (`entrega.problema_del_ejemplo`, punto por punto); el criterio, además, con la parte que dice
-    cómo se comprueba copiada tal cual dentro de él (la idea del alta congelada,
-    `MOTIVO_CRITERIO_SIN_COMPROBACION`, comprobada por el código y no por la IA), y que agrega
-    algo que el resto del criterio y el título no dicen (`lo_que_agrega`, J2-9).
+    (`entrega.problema_del_ejemplo`, punto por punto);
+  - el criterio lo arma el código (J2-13): el resultado que propone la IA y, después, cómo se
+    comprueba. Si la persona lo dijo, su manera, sólo si el juicio de la IA por el sentido
+    (`juzgar_la_propuesta`, una llamada más, fuera del candado) dice que es concreta; si no, la
+    evidencia que pide el área de quien la hace (o la del área del objetivo), en palabras de todos
+    los días; sin evidencia, no se propone y el campo pide "Contame cómo se sabe que está
+    terminada.".
 - **La evidencia** no la propone la IA: elegir quién la hace marca la que pide su área, en la web.
 
-**El criterio escrito, al cargar** (J2-9; mecánica §13: "¿el resultado esperado es concreto y
-verificable?"). Con o sin la ayuda, la carga juzga el criterio antes de guardarlo
-(`juzgar_el_criterio`): si no agrega nada al título no hace falta preguntarle a nadie ("No se");
-si no, la IA del espacio copia la parte que dice cómo se comprueba (como la entrega del motor: la
-IA lee, el código decide) y vale la misma regla de lo que agrega. Si la IA no juzga, no se finge:
-`sin_revisar`, y la web carga con un aviso y un incidente.
+**El criterio escrito, al cargar** (J2-9 y J2-13; mecánica §13: "¿el resultado esperado es
+concreto y verificable?"). Con o sin la ayuda, la carga juzga el criterio antes de guardarlo
+(`juzgar_el_criterio`): vacío o igual al título, no, sin la IA; si no, la IA del espacio dice por
+su sentido si dice una manera concreta de comprobarlo y copia la parte que lo dice (como la
+entrega del motor, `lo_descrito_cubre`: la IA lee, el código decide). Si la IA no juzga, no se
+finge: `sin_revisar`, y la web carga con un aviso y un incidente.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
 import unicodedata
 from collections.abc import Callable, Mapping, Sequence
@@ -85,7 +87,8 @@ TEXTOS = {
         "No pude proponer la descripción con lo que escribiste; si hace falta, escribila vos.",
     ("criterio", "sin_proponer"):
         "No pude proponer el criterio con lo que escribiste; contame cómo se comprueba.",
-    ("responsable", "no_encontrado"): "No encontré a {quien} en el equipo.",
+    ("responsable", "no_encontrado"): "No encontré a «{quien}» en el equipo; elegí quién la hace.",
+    ("criterio", "sin_como"): "Contame cómo se sabe que está terminada.",
     ("responsable", "varios"):
         "Encontré a más de una persona para {quien}: elegí quién la hace.",
     ("fecha", "no_es_habil"):
@@ -110,9 +113,11 @@ contó con sus palabras qué quiere hacer (texto) y te pide que completes los da
 todavía están vacíos (pide). Lo que devolvés es una propuesta: la persona ve cada dato marcado y lo \
 acepta, lo corrige o lo borra.
 
-El título, la descripción y el criterio los proponés vos, con lo que contó la persona. Quién la \
-hace, la tarea que espera y la fecha van sólo si la persona los dijo. El objetivo, si se entiende \
-de lo que contó.
+El título, la descripción y el resultado que tiene que lograr la tarea los proponés vos, con lo \
+que contó la persona. Cómo se comprueba que está hecha, sólo si la persona lo dijo o si recibiste \
+la evidencia que pide el área de quien la hace; no inventás una manera. Quién la hace, la tarea \
+que espera y la fecha van sólo si la persona los dijo. El objetivo, si se entiende de lo que \
+contó.
 
 Usás sólo lo que recibiste: ningún número, nombre, fecha ni dato que no esté ahí. Lo que no podés \
 saber con lo que recibiste va vacío; la persona lo completa."""
@@ -121,15 +126,12 @@ _DATOS = {
     "titulo": "Una línea que dice qué hay que hacer, en imperativo.",
     "descripcion": "Lo que contó la persona sobre la tarea, ordenado y bien escrito, sin agregar "
                    "nada.",
-    "criterio": "El criterio de aceptación: qué tiene que pasar para darla por terminada y cómo "
-                "lo comprueba quien la revise. Si la persona no dijo cómo se comprueba, proponé "
-                "una manera concreta (qué se mira, se prueba o se entrega) con lo que contó, la "
-                "tarea, el objetivo o la evidencia que pide el área, sin repetir el resultado con "
-                "otras palabras.",
-    "como_se_comprueba": "La parte del criterio que dice cómo se comprueba que la tarea está "
-                         "hecha (qué se mira, se prueba o se entrega), copiada tal cual del "
-                         "criterio; tiene que decir algo que el resultado no dice, sin repetir el "
-                         "resultado con otras palabras.",
+    "resultado": "Lo que tiene que pasar para darla por terminada: el resultado de la tarea, en "
+                 "una oración, sin decir cómo se comprueba.",
+    "como_se_comprueba": "Cómo comprueba quien la revise que la tarea está hecha: la manera que "
+                         "dijo la persona, si la dijo; si no, la evidencia que pide el área de "
+                         "quien la hace, si la recibiste, aplicada a lo que hay que hacer. Si la "
+                         "persona no lo dijo y no recibiste esa evidencia, va vacío.",
     "responsable": "Las palabras con que la persona nombró a quien va a hacer la tarea, tal cual "
                    "las escribió.",
     "espera": "El código (T1, T2...) de la tarea abierta que tiene que terminar antes de que "
@@ -142,9 +144,10 @@ _DATOS = {
                           "copiadas tal cual de su texto y enteras, también las que dicen si es "
                           "antes de ese día.",
 }
-# Los datos que van sólo con otro: la parte del criterio que dice cómo se comprueba, con el
-# criterio, y las palabras de la fecha, con la fecha.
-_ACOMPANAN = {"como_se_comprueba": "criterio", "como_dijo_la_fecha": "fecha"}
+# Los datos que van sólo con otro: el resultado y cómo se comprueba, con el criterio (el código los
+# junta, J2-13), y las palabras de la fecha, con la fecha.
+_ACOMPANAN = {"resultado": "criterio", "como_se_comprueba": "criterio",
+              "como_dijo_la_fecha": "fecha"}
 
 # Las palabras de una fecha (`fecha_dicha`).
 _MESES = {m: i for i, m in enumerate(
@@ -294,8 +297,8 @@ def entrada_de_la_ia(texto: str, escrito: Mapping[str, Any],
 # --- La llamada -------------------------------------------------------------------------------
 
 def herramienta(pide: Sequence[str]) -> dict[str, Any]:
-    """La herramienta de la respuesta, con sólo los datos que se piden (y, con el criterio, la
-    parte que dice cómo se comprueba; con la fecha, las palabras con que se dijo)."""
+    """La herramienta de la respuesta, con sólo los datos que se piden (el criterio, como su
+    resultado y cómo se comprueba; con la fecha, las palabras con que se dijo)."""
     datos = [d for d in _DATOS if d in pide or _ACOMPANAN.get(d) in pide]
     return {"type": "function", "function": {
         "name": NOMBRE_HERRAMIENTA,
@@ -665,10 +668,10 @@ def _problema_del_texto(texto: str, permitidos: Sequence[str], largo: int) -> st
 
 def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
             opciones: Mapping[str, Any], coinciden: Callable[[str], list[dict[str, Any]]],
-            objetivo_de: Callable[[str], str | None]) -> Resultado:
+            objetivo_de: Callable[[str], str | None], juicio: Juicio | None = None) -> Resultado:
     """Lo que vale de la propuesta de la IA. `coinciden(dicho)`: los integrantes del espacio que
     coinciden con lo dicho (con los apodos); `objetivo_de(task_id)`: el objetivo de una tarea del
-    espacio."""
+    espacio; `juicio`: el de la manera de comprobarla que dio la IA (`juzgar_la_propuesta`)."""
     r = Resultado()
     pide = set(lo_que_se_pide(escrito, opciones))
     objetivos, tareas = _con_codigos(opciones)
@@ -737,10 +740,11 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
         permitidos += [tarea["titulo"], str(tarea.get("responsable") or "")]
     integrante = _integrante(opciones, responsable)
     if integrante is not None:
-        permitidos += [integrante["nombre"], integrante["area"],
-                       *_evidencia_en_palabras(_politica(opciones, integrante))]
+        permitidos += [integrante["nombre"], integrante["area"]]
+    evidencia = _evidencia_de_la_tarea(opciones, integrante, objetivo)
+    permitidos += evidencia
 
-    for campo in ("titulo", "descripcion", "criterio"):
+    for campo in ("titulo", "descripcion"):
         if campo not in pide:
             continue
         valor = _cadena(crudo.get(campo))
@@ -750,97 +754,90 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
             r.descartar(campo, "vacio", "sin_proponer")
             continue
         problema = _problema_del_texto(valor, permitidos, LARGOS[campo])
-        if problema is None and campo == "criterio":
-            titulos = [str(escrito.get("titulo") or ""), str(crudo.get("titulo") or "")]
-            if not _dice_como_se_comprueba(valor, _cadena(crudo.get("como_se_comprueba")),
-                                           titulos):
-                problema = "sin_comprobacion"
         if problema is not None:
             r.descartar(campo, problema, "sin_proponer")
         else:
             r.propuesta[campo] = valor
+    if "criterio" in pide:
+        _revisar_el_criterio(r, crudo, juicio, evidencia, permitidos)
     return r
 
 
-# --- Un criterio que diga cómo se comprueba (J2-9) ----------------------------------------------
+# --- El criterio: desde la evidencia y juzgado por su sentido (J2-13) ---------------------------
 #
-# Lo que encontró el usuario en el celular (2026-10-13): un criterio propuesto cuya parte de cómo
-# se comprueba sólo repetía el resultado ("…quedan listos… Se comprueba revisando que… estén
-# listos…"), y una tarea cargada con el criterio "No se". La regla es una sola y general, nunca
-# una lista de respuestas malas: la parte que dice cómo se comprueba tiene que traer una palabra
-# con contenido que no esté en el resto del criterio ni en el título.
-#
-# No cuentan como contenido las palabras de función del castellano (artículos, preposiciones,
-# conjunciones, pronombres y los verbos que sólo unen: ser, estar, haber, quedar) ni el
-# vocabulario del acto mismo de comprobar o de estar terminada: es el marco de cualquier
-# comprobación y nunca dice qué se mira, se prueba o se entrega.
+# Mecánica §13: "¿el resultado esperado es concreto y verificable?". J2-9 juzgaba con palabras (la
+# parte de cómo se comprueba tenía que traer una palabra que el resultado no dijera, sin una lista
+# de palabras del marco), y en la prueba del usuario en el celular (2026-10-13) Leda propuso un
+# criterio circular con sinónimos ("…está cambiado; se comprueba verificando… que fue
+# reemplazado"): una regla de palabras no ve el sentido. La decisión del usuario (2026-10-13):
+# - si la persona no dijo cómo se comprueba, la comprobación sale de la evidencia que pide el área
+#   (`_con_la_evidencia`, la misma política que marca las casillas, en palabras de todos los días):
+#   una manera real, no inventada;
+# - si un criterio dice cómo se comprueba lo juzga la IA por su sentido, como la entrega del motor
+#   (`entrega`, `lo_descrito_cubre`): la IA dice si lo dice y copia la parte que lo dice; el código
+#   decide con su juicio y con que esa parte esté dentro del criterio.
+# La única guarda sin la IA no es una lista de palabras: un criterio vacío o igual al título.
 
-_DE_FUNCION = frozenset("""
-a al ante bajo con contra de del desde durante en entre hacia hasta mediante para por segun sin
-so sobre tras el la los las lo un una unos unas y e ni o u pero sino que porque pues si como
-cuando donde mientras cual cuales quien quienes cuyo cuya me te se nos le les mi mis tu tus su
-sus este esta estos estas ese esa esos esas aquel aquella aquellos aquellas esto eso aquello ya
-no tambien muy mas menos tan todo toda todos todas cada otro otra otros otras mismo misma mismos
-mismas ser es son sea sean era eran fue fueron sera seran sido estar esta estan este esten
-estaba estaban estado estada estados estadas estuvo haber ha han hay haya hayan habia habra
-quedar queda quedan quede queden quedo quedaron quedara quedaran quedado quedada quedados
-quedadas
-""".split())
-_DEL_MARCO = ("comprobar", "comprueba", "comprobado", "verificar", "revisar", "controlar",
-              "chequear", "constatar", "confirmar", "probar", "prueba", "probado", "asegurar",
-              "listo", "lista", "terminar", "terminado", "hecho", "hecha", "completar",
-              "completo", "completa", "finalizar", "finalizado", "acabar", "acabado")
-# Dos palabras son la misma si comparten al menos estas letras del principio ("integre" e
-# "integración", "colgado" y "colgar").
-_RAIZ_COMUN = 5
+def _oracion(texto: str) -> str:
+    """El texto como una oración: con mayúscula al principio y su punto al final."""
+    texto = " ".join(texto.split()).rstrip(" ;,")
+    if not texto:
+        return ""
+    texto = texto[0].upper() + texto[1:]
+    return texto if texto[-1] in ".!?" else f"{texto}."
 
 
-def _raiz(palabra: str) -> str:
-    """La palabra sin la s o la n final y sin la vocal final, si es larga: "listos", "lista" y
-    "listo" son "list"; "quedan", "qued"."""
-    if len(palabra) > 4 and palabra[-1] in "sn":
-        palabra = palabra[:-1]
-    if len(palabra) > 4 and palabra[-1] in "aeo":
-        palabra = palabra[:-1]
-    return palabra
+def criterio_propuesto(resultado: str, como: str) -> str:
+    """El criterio que propone Leda: el resultado y, después, cómo se comprueba."""
+    return f"{_oracion(resultado)} {_oracion(como)}"
 
 
-def _misma(a: str, b: str) -> bool:
-    return a == b or len(os.path.commonprefix([a, b])) >= _RAIZ_COMUN
+def _con_la_evidencia(resultado: str, evidencia: Sequence[str]) -> str:
+    """El criterio con la comprobación armada con la evidencia que pide el área, cada una en
+    palabras de todos los días."""
+    return f"{_oracion(resultado)} Se comprueba con lo que pide el área: {'; '.join(evidencia)}."
 
 
-_MARCO = tuple(_raiz(p) for p in _DEL_MARCO)
+def _evidencia_de_la_tarea(opciones, integrante, objetivo) -> list[str]:
+    """La evidencia que pide el área de quien la hace; sin ella, la del área del objetivo si la
+    tiene (hoy la base no les da un área a los objetivos); si no, ninguna."""
+    politica = _politica(opciones, integrante)
+    if politica is None and objetivo is not None and objetivo.get("area_id"):
+        politica = _por_id(opciones.get("politicas") or [], "area_id", objetivo["area_id"])
+    return _evidencia_en_palabras(politica)
 
 
-def _con_contenido(texto: str) -> list[str]:
-    """Las palabras con contenido del texto (sus raíces), sin mayúsculas ni acentos."""
-    raices = (_raiz(p) for p in _normal(texto).split() if p not in _DE_FUNCION)
-    return [r for r in raices if not any(_misma(r, m) for m in _MARCO)]
-
-
-def lo_que_agrega(como: str, dicho: Sequence[str]) -> list[str]:
-    """Las palabras con contenido de `como` (la parte que dice cómo se comprueba) que no están en
-    `dicho` (el resto del criterio y el título): vacío si sólo repite lo dicho o no dice nada."""
-    ya = [r for t in dicho for r in _con_contenido(t or "")]
-    agrega: list[str] = []
-    for r in _con_contenido(como or ""):
-        if not any(_misma(r, d) for d in ya) and r not in agrega:
-            agrega.append(r)
-    return agrega
-
-
-def _el_resto(criterio: str, como: str) -> str:
-    """El criterio sin la parte que dice cómo se comprueba (los dos, sin mayúsculas ni
-    acentos)."""
-    return f" {_normal(criterio)} ".replace(f" {_normal(como)} ", " ", 1)
-
-
-def _dice_como_se_comprueba(criterio: str, como: str | None, titulos: Sequence[str]) -> bool:
-    """Si `como` está dentro del criterio y agrega algo que el resto del criterio y los títulos
-    no dicen."""
-    if como is None or not _normal(como) or not _contiene(_normal(criterio), _normal(como)):
-        return False
-    return bool(lo_que_agrega(como, [_el_resto(criterio, como), *titulos]))
+def _revisar_el_criterio(r: Resultado, crudo: Mapping[str, Any], juicio: Juicio | None,
+                         evidencia: Sequence[str], permitidos: Sequence[str]) -> None:
+    """El criterio que se propone: el resultado de la IA con la manera de comprobarlo que dijo la
+    persona, si el juicio por el sentido la aceptó; si no, con la evidencia del área; sin
+    evidencia, no se propone y el campo pide cómo se sabe."""
+    resultado = _cadena(crudo.get("resultado"))
+    if resultado is None:
+        r.descartar("criterio", "vacio", "sin_proponer")
+        return
+    problema = _problema_del_texto(resultado, permitidos, LARGOS["criterio"])
+    if problema is not None:
+        r.descartar("criterio", problema, "sin_proponer")
+        return
+    candidatos = []
+    como = _cadena(crudo.get("como_se_comprueba"))
+    if como is not None:
+        if juicio is not None and juicio.motivo is None:
+            candidatos.append(criterio_propuesto(resultado, como))
+        else:
+            r.descartar("criterio", juicio.motivo if juicio is not None else "sin_revisar")
+    if evidencia:
+        candidatos.append(_con_la_evidencia(resultado, evidencia))
+    for candidato in candidatos:
+        problema = _problema_del_texto(candidato, permitidos, LARGOS["criterio"])
+        if problema is None:
+            r.propuesta["criterio"] = candidato
+            return
+    if candidatos:
+        r.descartar("criterio", problema, "sin_proponer")
+    else:
+        r.descartar("criterio", "sin_como_se_comprueba", "sin_como")
 
 
 NOMBRE_DEL_JUICIO = "revisar_el_criterio"
@@ -848,10 +845,11 @@ NOMBRE_DEL_JUICIO = "revisar_el_criterio"
 INSTRUCCIONES_DEL_JUICIO = """\
 Sos Leda, la project manager del equipo. Alguien está cargando una tarea en la plataforma y \
 escribió su criterio de aceptación: lo que tiene que pasar para darla por terminada. Quien la \
-revise tiene que poder comprobarlo. Tu trabajo es leer el criterio y copiar, tal cual, la parte \
-que dice cómo se comprueba que la tarea está hecha: qué se mira, se prueba, se mide o se \
-entrega. Si el criterio no lo dice, o sólo repite el resultado o el título con otras palabras, \
-va vacío. No corregís ni completás el criterio: sólo decís qué parte es esa."""
+revise tiene que poder comprobarlo. Tu trabajo es leer el criterio y decir, por lo que significa \
+y no por las palabras que usa, si dice una manera concreta de comprobar que la tarea está hecha: \
+qué se mira, se prueba, se mide o se entrega, distinto del resultado mismo. Si sólo vuelve a \
+decir el resultado o el título, aunque sea con otras palabras, no lo dice. Si lo dice, copiás tal \
+cual la parte del criterio que lo dice. No corregís ni completás el criterio."""
 
 
 def entrada_del_juicio(titulo: str, descripcion: str, criterio: str) -> dict[str, str]:
@@ -862,23 +860,28 @@ def entrada_del_juicio(titulo: str, descripcion: str, criterio: str) -> dict[str
 def herramienta_del_juicio() -> dict[str, Any]:
     return {"type": "function", "function": {
         "name": NOMBRE_DEL_JUICIO,
-        "description": "La parte del criterio de aceptación que dice cómo se comprueba que la "
-                       "tarea está hecha.",
+        "description": "Si el criterio de aceptación dice una manera concreta de comprobar que la "
+                       "tarea está hecha, y la parte que lo dice.",
         "parameters": {
             "type": "object",
-            "properties": {"como_se_comprueba": {
-                "type": "string",
-                "description": "La parte del criterio que dice cómo se comprueba que la tarea "
-                               "está hecha (qué se mira, se prueba, se mide o se entrega), "
-                               "copiada tal cual del criterio; vacío si no lo dice o sólo "
-                               "repite el resultado con otras palabras."}},
-            "required": ["como_se_comprueba"],
+            "properties": {
+                "dice_como_se_comprueba": {
+                    "type": "boolean",
+                    "description": "Si el criterio dice una manera concreta de comprobar que la "
+                                   "tarea está hecha (qué se mira, se prueba, se mide o se "
+                                   "entrega), distinta del resultado; no, si sólo vuelve a decir "
+                                   "el resultado o el título, aunque sea con otras palabras."},
+                "como_se_comprueba": {
+                    "type": "string",
+                    "description": "La parte del criterio que dice cómo se comprueba, copiada tal "
+                                   "cual del criterio; vacío si no lo dice."}},
+            "required": ["dice_como_se_comprueba", "como_se_comprueba"],
             "additionalProperties": False}}}
 
 
 @dataclass(frozen=True)
 class Juicio:
-    """Lo que se decidió del criterio escrito: `motivo` `None` si dice cómo se comprueba,
+    """Lo que se decidió de un criterio: `motivo` `None` si dice cómo se comprueba,
     `sin_comprobacion` si no, y `sin_revisar` si la IA no lo juzgó (con `falla`, para el
     incidente)."""
 
@@ -886,35 +889,59 @@ class Juicio:
     falla: BaseException | None = None
 
 
-def no_agrega_nada(titulo: str, criterio: str) -> bool:
-    """Si el criterio no agrega nada al título ("No se", "listo"): no hace falta la IA."""
-    return not lo_que_agrega(criterio, [titulo])
+def sin_nada_que_juzgar(titulo: str, criterio: str) -> bool:
+    """Si el criterio está vacío (sin una letra ni un número) o es el título mismo: no hace falta
+    la IA para saber que no dice cómo se comprueba. No es una lista de palabras."""
+    normal = _normal(criterio or "")
+    return not normal or normal == _normal(titulo or "")
 
 
 def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str) -> Juicio:
-    """El criterio que escribió la persona, al cargar: si no agrega nada al título, sin la IA;
-    si no, una sola llamada a la IA del espacio (sin reintento), que copia la parte que dice
-    cómo se comprueba, y la regla de lo que agrega. Una IA que no responde, que no juzgó o que
-    copió algo que no está en el criterio: `sin_revisar`, nunca un rechazo ni un visto bueno."""
+    """Si el criterio dice cómo se comprueba: vacío o igual al título, no, sin la IA; si no, una
+    sola llamada a la IA del espacio (sin reintento), que lo juzga por su sentido y copia la parte
+    que lo dice. El código decide: sí, sólo si la IA dijo que sí y esa parte está dentro del
+    criterio. Una IA que no responde, que no juzgó o cuyo juicio no cierra: `sin_revisar`, nunca
+    un rechazo ni un visto bueno."""
     titulo, descripcion, criterio = (" ".join((t or "").split())
                                      for t in (titulo, descripcion, criterio))
-    if no_agrega_nada(titulo, criterio):
+    if sin_nada_que_juzgar(titulo, criterio):
         return Juicio("sin_comprobacion")
     try:
         crudo = _pedir_el_juicio(ia, entrada_del_juicio(titulo, descripcion, criterio))
     except Exception as falla:  # noqa: BLE001 -- cualquier falla de la IA es que no juzgó
         return Juicio("sin_revisar", falla)
-    como = crudo.get("como_se_comprueba")
-    if not isinstance(como, str):
-        return Juicio("sin_revisar", RespuestaInvalida("La IA no dijo cómo se comprueba."))
-    if not _normal(como):
+    dice, como = crudo.get("dice_como_se_comprueba"), crudo.get("como_se_comprueba")
+    if not isinstance(dice, bool):
+        return Juicio("sin_revisar", RespuestaInvalida("La IA no dijo si se comprueba."))
+    if not dice:
         return Juicio("sin_comprobacion")
+    if not isinstance(como, str) or not _normal(como):
+        return Juicio("sin_revisar", RespuestaInvalida("La IA no copió cómo se comprueba."))
     if not _contiene(_normal(criterio), _normal(como)):
         return Juicio("sin_revisar", RespuestaInvalida(
             "La parte que copió la IA no está en el criterio."))
-    if not lo_que_agrega(como, [_el_resto(criterio, como), titulo]):
-        return Juicio("sin_comprobacion")
     return Juicio(None)
+
+
+def juzgar_la_propuesta(ia, crudo: Mapping[str, Any] | None,
+                        escrito: Mapping[str, Any]) -> Juicio | None:
+    """El juicio de la manera de comprobarla que dio la IA al proponer (la que dijo la persona),
+    con el mismo `juzgar_el_criterio` de la carga; `None` si no hay nada que juzgar (el criterio
+    ya está escrito, o la IA no dio el resultado o la manera). Se llama fuera del candado de la
+    web, entre la propuesta y lo que decide el código (`revisar`)."""
+    crudo = crudo or {}
+    if not _vacio(escrito.get("criterio")):
+        return None
+    resultado, como = _cadena(crudo.get("resultado")), _cadena(crudo.get("como_se_comprueba"))
+    if resultado is None or como is None:
+        return None
+    titulo = (str(escrito.get("titulo") or "").strip() if not _vacio(escrito.get("titulo"))
+              else _cadena(crudo.get("titulo")) or "")
+    descripcion = (str(escrito.get("descripcion") or "").strip()
+                   if not _vacio(escrito.get("descripcion"))
+                   else _cadena(crudo.get("descripcion")) or "")
+    return juzgar_el_criterio(ia, titulo=titulo, descripcion=descripcion,
+                              criterio=criterio_propuesto(resultado, como))
 
 
 def _pedir_el_juicio(ia, entrada: Mapping[str, Any]) -> dict[str, Any]:

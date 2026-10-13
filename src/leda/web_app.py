@@ -769,7 +769,7 @@ TEXTOS_DE_LA_CARGA = {
     ("criterio", "falta"):
         "Falta el criterio de aceptación: qué tiene que pasar para darla por terminada.",
     ("criterio", "demasiado_largo"): "El criterio es demasiado largo: hasta 500 caracteres.",
-    # Un criterio que diga cómo se comprueba (J2-9; `ayuda_al_cargar.juzgar_el_criterio`).
+    # Un criterio que diga cómo se comprueba (J2-9 y J2-13; `ayuda_al_cargar.juzgar_el_criterio`).
     ("criterio", "sin_comprobacion"): "Contame cómo se sabe que está terminada.",
     ("criterio", "sin_revisar"):
         "No pude revisar el criterio ahora: la tarea quedó cargada con el criterio como lo "
@@ -940,12 +940,13 @@ async def cargar_una_tarea(espacio_id: str, request: Request):
         conn, token, espacio, datos, mal_formados, juicio))
 
 
-# --- Un criterio que diga cómo se comprueba (J2-9) ----------------------------------------------
+# --- Un criterio que diga cómo se comprueba (J2-9 y J2-13) -------------------------------------
 #
 # Mecánica §13: "¿el resultado esperado es concreto y verificable?". Antes de `cargar_tarea`, el
-# criterio escrito (con o sin la ayuda) se juzga (`ayuda_al_cargar.juzgar_el_criterio`): si no
-# agrega nada al título, sin la IA; si no, la IA del espacio dice qué parte dice cómo se
-# comprueba y el código decide. Como en la ayuda, el candado de la web nunca espera a la IA: la
+# criterio escrito (con o sin la ayuda) se juzga (`ayuda_al_cargar.juzgar_el_criterio`): vacío o
+# igual al título, sin la IA; si no, la IA del espacio dice por su sentido si dice una manera
+# concreta de comprobarlo y copia la parte que lo dice, y el código decide (J2-13: sin una lista de
+# palabras). Como en la ayuda, el candado de la web nunca espera a la IA: la
 # sesión y la IA con el candado, la llamada sin él y la carga con el candado otra vez (que
 # revalida la sesión). Sin la IA no se traba ni se finge: se carga con un aviso y un incidente.
 
@@ -983,7 +984,7 @@ async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, 
     if (mal_formados or espacio is None or not isinstance(criterio, str) or not criterio.strip()
             or len(criterio.strip()) > ayuda_al_cargar.LARGOS["criterio"]):
         return None
-    if ayuda_al_cargar.no_agrega_nada(titulo, criterio):
+    if ayuda_al_cargar.sin_nada_que_juzgar(titulo, criterio):
         return ayuda_al_cargar.Juicio("sin_comprobacion")
     ia = await run_in_threadpool(_con_la_base, lambda conn: _la_ia_si_hay_sesion(
         conn, token, espacio))
@@ -1074,8 +1075,9 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
 # Porción J2 de `odd/tasks/plataforma-jerarquias.md` (ADR 0023, punto 4; `ayuda_al_cargar.py`): la
 # persona cuenta qué quiere hacer y Leda propone lo que el formulario tiene vacío. Nada se carga:
 # la propuesta vuelve al formulario, que la muestra marcada. Tres pasos, para que el candado de la
-# web nunca espere a la IA: las opciones con el candado, la llamada sin él y los controles con la
-# auditoría (o el incidente) con el candado otra vez, en el espacio y con la sesión revalidada.
+# web nunca espere a la IA: las opciones con el candado; sin él, la llamada y, si la IA dio una
+# manera de comprobarla, su juicio por el sentido (J2-13); y los controles con la auditoría (o el
+# incidente) con el candado otra vez, en el espacio y con la sesión revalidada.
 
 TAMANO_MAXIMO_DE_LA_AYUDA = 16 * 1024
 TEXTO_SI_LA_IA_FALLA = ("Leda no pudo completar ahora. Lo que escribiste sigue acá: completalo "
@@ -1176,14 +1178,18 @@ async def ayudar_a_cargar(espacio_id: str, request: Request):
         conn, token, espacio, cuerpo))
     if isinstance(preparada, Response):
         return preparada
-    crudo_de_la_ia, falla = None, None
+    crudo_de_la_ia, falla, juicio = None, None, None
     try:
         crudo_de_la_ia = await run_in_threadpool(ayuda_al_cargar.pedir, preparada["ia"],
                                                  preparada["entrada"])
     except Exception as e:  # noqa: BLE001 -- cualquier falla de la IA es que no respondió
         falla = e
+    if falla is None:
+        # Nunca levanta: una IA que no juzga es `sin_revisar`.
+        juicio = await run_in_threadpool(ayuda_al_cargar.juzgar_la_propuesta, preparada["ia"],
+                                         crudo_de_la_ia, preparada["escrito"])
     return await run_in_threadpool(_con_la_base, lambda conn: _cerrar_la_ayuda(
-        conn, token, preparada, crudo_de_la_ia, falla))
+        conn, token, preparada, crudo_de_la_ia, falla, juicio))
 
 
 def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, Any]):
@@ -1221,9 +1227,11 @@ def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, 
 
 
 def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[str, Any] | None,
-                     falla: BaseException | None) -> Response:
+                     falla: BaseException | None, juicio=None) -> Response:
     """Con el candado otra vez y en el espacio: la sesión revalidada (cortada mientras respondía
-    la IA, nada), los controles del código, la auditoría y, si la IA no respondió, el incidente."""
+    la IA, nada), los controles del código, la auditoría y, si la IA no respondió, el incidente
+    (también si no juzgó la manera de comprobarla: la propuesta sigue, con la evidencia del área o
+    pidiendo cómo se sabe, nunca como si se hubiera juzgado)."""
     from . import ayuda_al_cargar, versiones
     from .db import espacio as en_el_espacio, registrar_auditoria
     from .incidentes import ETAPA_AYUDA_AL_CARGAR, registrar_incidente
@@ -1250,9 +1258,20 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[st
                 crudo or {}, texto=preparada["texto"], escrito=escrito,
                 opciones=preparada["opciones"],
                 coinciden=lambda dicho: integrantes_que_coinciden(cur, dicho),
-                objetivo_de=objetivo_de)
+                objetivo_de=objetivo_de, juicio=juicio)
             propuesta = resultado.propuesta
+            if juicio is not None and juicio.motivo == "sin_revisar":
+                registrar_incidente(
+                    cur, ws,
+                    "La IA del espacio no juzgó la manera de comprobar el criterio que propuso al "
+                    "completar una carga en la plataforma: no se propuso esa manera.",
+                    severidad="baja",
+                    referencia_cruda=(f"{type(juicio.falla).__name__}: {juicio.falla}"
+                                      if juicio.falla else None),
+                    etapa=ETAPA_AYUDA_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
             detalle.update({
+                "juicio_del_criterio": (None if juicio is None
+                                        else juicio.motivo or "dice_como_se_comprueba"),
                 "propuestos": sorted(propuesta),
                 "descartados": resultado.descartados,
                 "para_elegir": [e["membership_id"] for e in resultado.elegir],

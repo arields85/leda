@@ -1,20 +1,23 @@
 """La medición de la ayuda de la IA al cargar (porción J2 de `odd/tasks/plataforma-jerarquias.md`):
 pedidos escritos como en un chat real, la misma función que usa la web y los mismos controles del
 código, contra la IA que se elija. **No se corre sin permiso del usuario**: con una IA real gasta
-una llamada por pedido y vuelta (16 pedidos, 15 llamadas: 12 propuestas y 4 criterios escritos
-para juzgar al cargar, J2-9, de los que "No se" se rechaza sin la IA).
+unas 20 llamadas por vuelta (20 pedidos: 13 propuestas, cada una con una llamada más cuando la IA
+da una manera de comprobarla, que se juzga por su sentido, J2-13; y 7 criterios escritos para
+juzgar al cargar, de los que el igual al título se rechaza sin la IA).
 
     $env:PYTHONPATH = "src"
     .venv\\Scripts\\python.exe tools\\medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3
 
 `--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira con un guion para el
-ejemplo del usuario, el sábado, "antes del jueves", el criterio del PLC y los criterios escritos
-(lo que tendría que contestar una IA que entendió), y nada para los demás; así la corrida en seco
-prueba los controles y la comparación: da 8 de 16 (sale con 1).
+ejemplo del usuario, el sábado, "antes del jueves", el PLC, el UPS de la prueba del usuario (con
+la comprobación circular que dio la IA real) y los juicios de los criterios (lo que tendría que
+contestar una IA que entendió), y nada para los demás; así la corrida en seco prueba los controles
+y la comparación: da 12 de 20 (sale con 1).
 `--ia PROVEEDOR/MODELO` (o `sol-suscripcion`, la suscripción de ChatGPT del usuario) usa la IA
 real. Sin base de datos: el equipo, los objetivos, las tareas y los días son fijos (hoy, el
 miércoles 14 de octubre de 2026), y quién la hace se busca con la misma función que el servidor,
-`fichas.integrantes_que_coinciden`, sobre el equipo fijo (`EquipoFijo`). Cada pedido dice qué
+`fichas.integrantes_que_coinciden`, sobre el equipo fijo (`EquipoFijo`; un pedido puede traer sus
+apodos, como el del UPS, donde "el tano" no es nadie, como en `leda_motor`). Cada pedido dice qué
 tiene que proponer Leda y qué no; el informe dice, por pedido y por vuelta, qué propuso, qué no
 pasó los controles y por qué, cuántos segundos tardó la IA, y separa lo que es de la IA (no
 respondió) de un error del programa.
@@ -102,7 +105,11 @@ OBJETIVO_DE = {"t-tablero": "o-modem", "t-plc": "o-linea"}
 APODOS = {"m-marcos": ["el tano"]}
 
 # Cada pedido: lo que escribió la persona, como en un chat real; lo que Leda tiene que proponer
-# (con su valor, o `True` para un texto que sólo tiene que pasar los controles) y lo que no.
+# (con su valor, o `True` para un texto que sólo tiene que pasar los controles), lo que no y lo que
+# tiene que descartar con su motivo (`descarta`). J2-13: sin quién la hace (o sin evidencia de su
+# área) y sin que la persona diga cómo se comprueba, el criterio no se propone: el campo pide cómo
+# se sabe (`sin_como_se_comprueba`).
+SIN_COMO = ["criterio", "sin_como_se_comprueba"]
 PEDIDOS: list[dict[str, Any]] = [
     {"nombre": "el ejemplo del usuario",
      "texto": "hay que colgar el estante del modem en la sala que lo haga lucas necesita 12 "
@@ -113,8 +120,8 @@ PEDIDOS: list[dict[str, Any]] = [
                  "objetivo_id": "o-modem", "fecha": "2026-10-16"}},
     {"nombre": "los tornillos, sin quién ni cuándo",
      "texto": "faltan los tornillos para colgar el estante, necesito 12 de 8 mm",
-     "propone": {"titulo": True, "criterio": True},
-     "no_propone": ["responsable_id", "fecha", "espera_id"]},
+     "propone": {"titulo": True},
+     "no_propone": ["responsable_id", "fecha", "espera_id", "criterio"], "descarta": [SIN_COMO]},
     {"nombre": "un apodo y un día de la semana",
      "texto": "hay q cambiar el ups de la sala de servidores que lo vea el tano antes del "
               "jueves porq se corta todo",
@@ -129,8 +136,8 @@ PEDIDOS: list[dict[str, Any]] = [
                  "fecha": "2026-10-15"}},
     {"nombre": "sin apuro",
      "texto": "pedir presupuesto de cables para el tablero 4 sin apuro",
-     "propone": {"titulo": True, "criterio": True},
-     "no_propone": ["responsable_id", "fecha", "espera_id"]},
+     "propone": {"titulo": True},
+     "no_propone": ["responsable_id", "fecha", "espera_id", "criterio"], "descarta": [SIN_COMO]},
     {"nombre": "un sábado no es hábil",
      "texto": "lucas tiene que pintar el cartel de la entrada el sabado",
      "propone": {"titulo": True, "responsable_id": "m-lucas"},
@@ -155,14 +162,23 @@ PEDIDOS: list[dict[str, Any]] = [
               "bateria q pidio ismael",
      "propone": {"titulo": True, "responsable_id": "m-lucas"},
      "no_propone": ["espera_id"]},
-    # J2-9: la persona no dijo cómo se comprueba; el criterio propuesto tiene que traer una manera
-    # concreta (la prueba del usuario en el celular dio uno circular).
-    {"nombre": "un criterio que diga cómo se comprueba",
+    # J2-9 y J2-13: la persona no dijo cómo se comprueba ni quién la hace: Leda no inventa una
+    # manera (en el celular dio una circular), el campo pide cómo se sabe.
+    {"nombre": "el PLC, sin quién ni cómo se comprueba",
      "texto": "hay que dejar el plc de la comprimidora fette 2000 y sus variables listos para "
               "que ariel la integre a la interfaz",
-     "propone": {"titulo": True, "criterio": True}},
-    # J2-9: el criterio que escribió la persona, juzgado al cargar (`juicio`: lo que tiene que
-    # decidir el código; `None` es que dice cómo se comprueba).
+     "propone": {"titulo": True}, "no_propone": ["criterio"], "descarta": [SIN_COMO]},
+    # J2-13: el pedido de la prueba del usuario, tal cual (2026-10-13). En `leda_motor` "el tano"
+    # no es el apodo de nadie, así que no hay quién la hace ni evidencia de su área: la
+    # comprobación circular que dio la IA real se rechaza por su sentido y no se inventa otra.
+    {"nombre": "el UPS de la prueba del usuario",
+     "texto": "hay que cambiar el ups de la sala de servidores que lo vea el tano antes del "
+              "jueves se corta todo",
+     "apodos": {},
+     "propone": {"titulo": True, "fecha": "2026-10-14"},
+     "no_propone": ["responsable_id", "criterio"], "descarta": [SIN_COMO]},
+    # J2-9 y J2-13: el criterio que escribió la persona, juzgado al cargar por su sentido
+    # (`juicio`: lo que tiene que decidir el código; `None` es que dice cómo se comprueba).
     {"nombre": "el criterio circular del usuario", "titulo": "Integrar el PLC de la Fette 2000",
      "criterio_escrito": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para "
                          "que Ariel la integre a la interfaz. Se comprueba revisando que el PLC "
@@ -178,12 +194,26 @@ PEDIDOS: list[dict[str, Any]] = [
      "criterio_escrito": "Hacerlo con cuidado y prolijidad", "juicio": "sin_comprobacion"},
     {"nombre": "no se", "titulo": "Colocar el estante", "criterio_escrito": "No se",
      "juicio": "sin_comprobacion"},
+    {"nombre": "el UPS circular, escrito", "titulo": "Cambiar el UPS de la sala de servidores",
+     "criterio_escrito": "El UPS de la sala de servidores está cambiado. Se comprueba verificando "
+                         "en la sala de servidores que el UPS fue reemplazado.",
+     "juicio": "sin_comprobacion"},
+    # Sin la lista de palabras de la J2-9: "revisa" y "queda" no deciden nada.
+    {"nombre": "un criterio concreto con palabras de revisar",
+     "titulo": "Cambiar la batería del UPS",
+     "criterio_escrito": "Se revisa que el UPS quede encendido con la batería nueva y aguante 10 "
+                         "minutos sin luz.",
+     "juicio": None},
+    # La única guarda sin la IA: un criterio igual al título.
+    {"nombre": "igual al título", "titulo": "Colocar el estante",
+     "criterio_escrito": "Colocar el estante.", "juicio": "sin_comprobacion"},
 ]
 
 VACIO = {c: "" for c in ayuda_al_cargar.CAMPOS}
 
 # Lo que propone la IA en seco: lo que propondría una IA que entendió el ejemplo del usuario, un
-# sábado (que los controles no dejan poner) y "antes del jueves" (el miércoles). Los demás
+# sábado (que los controles no dejan poner), "antes del jueves" (el miércoles) y el PLC; y, en el
+# UPS de la prueba del usuario, lo que propuso la IA real (una comprobación circular). Los demás
 # pedidos, sin guion: no propone nada.
 GUION: dict[str, dict[str, str]] = {
     "el ejemplo del usuario": {
@@ -191,9 +221,8 @@ GUION: dict[str, dict[str, str]] = {
         "descripcion": "Colgar el estante del módem en la sala. Hacen falta 12 tornillos de 8 mm. "
                        "No se puede empezar hasta que terminen de cablear el tablero de la "
                        "máquina 3.",
-        "criterio": "El estante del módem está colgado en la sala con los 12 tornillos de 8 mm; "
-                    "se comprueba con una foto del estante colgado.",
-        "como_se_comprueba": "se comprueba con una foto del estante colgado",
+        "resultado": "El estante del módem está colgado en la sala con los 12 tornillos de 8 mm",
+        "como_se_comprueba": "",
         "responsable": "lucas", "espera": "T1", "objetivo": "O1",
         "fecha": "2026-10-16", "como_dijo_la_fecha": "para el viernes"},
     "un sábado no es hábil": {
@@ -201,40 +230,57 @@ GUION: dict[str, dict[str, str]] = {
         "fecha": "2026-10-17", "como_dijo_la_fecha": "el sabado"},
     "un apodo y un día de la semana": {
         "titulo": "Cambiar el UPS de la sala de servidores",
-        "criterio": "El UPS de la sala de servidores está cambiado y no se corta todo.",
-        "como_se_comprueba": "no se corta todo", "responsable": "el tano",
-        "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves"},
-    "un criterio que diga cómo se comprueba": {
+        "resultado": "El UPS de la sala de servidores está cambiado", "como_se_comprueba": "",
+        "responsable": "el tano", "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves"},
+    "el PLC, sin quién ni cómo se comprueba": {
         "titulo": "Dejar listo el PLC de la comprimidora Fette 2000",
-        "criterio": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que "
-                    "Ariel la integre a la interfaz. Las variables del PLC se leen bien desde la "
-                    "interfaz.",
-        "como_se_comprueba": "Las variables del PLC se leen bien desde la interfaz"},
+        "resultado": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que "
+                     "Ariel la integre a la interfaz",
+        "como_se_comprueba": ""},
+    "el UPS de la prueba del usuario": {
+        "titulo": "Cambiar el UPS de la sala de servidores",
+        "resultado": "El UPS de la sala de servidores está cambiado",
+        "como_se_comprueba": "se comprueba verificando en la sala de servidores que el UPS fue "
+                             "reemplazado",
+        "responsable": "el tano", "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves"},
 }
-# Lo que contesta en seco el juicio de un criterio escrito: la parte que dice cómo se comprueba.
-GUION_DEL_JUICIO: dict[str, str] = {
-    "el criterio circular del usuario":
-        "Se comprueba revisando que el PLC y sus variables estén listos para esa integración",
-    "un criterio con una comprobación concreta":
-        "Las variables del PLC se leen bien desde la interfaz",
-    "un criterio con palabras y sin comprobación": "",
+# Lo que contesta en seco el juicio de un criterio (escrito o propuesto), por su texto: lo que
+# diría una IA que lo juzga por su sentido.
+NO_LO_DICE = {"dice_como_se_comprueba": False, "como_se_comprueba": ""}
+GUION_DEL_JUICIO: dict[str, dict[str, Any]] = {
+    "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que Ariel la integre "
+    "a la interfaz. Se comprueba revisando que el PLC y sus variables estén listos para esa "
+    "integración.": NO_LO_DICE,
+    "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que Ariel la integre "
+    "a la interfaz. Las variables del PLC se leen bien desde la interfaz.":
+        {"dice_como_se_comprueba": True,
+         "como_se_comprueba": "Las variables del PLC se leen bien desde la interfaz"},
+    "Hacerlo con cuidado y prolijidad": NO_LO_DICE,
+    "No se": NO_LO_DICE,
+    "El UPS de la sala de servidores está cambiado. Se comprueba verificando en la sala de "
+    "servidores que el UPS fue reemplazado.": NO_LO_DICE,
+    "Se revisa que el UPS quede encendido con la batería nueva y aguante 10 minutos sin luz.":
+        {"dice_como_se_comprueba": True,
+         "como_se_comprueba": "Se revisa que el UPS quede encendido con la batería nueva y "
+                              "aguante 10 minutos sin luz"},
 }
 
 
 class EquipoFijo:
     """Un cursor sobre el equipo fijo, para buscar quién la hace con la función del servidor tal
     cual (`fichas.integrantes_que_coinciden`), sin base: contesta sus dos lecturas, los apodos
-    vigentes (`apodos.vigentes`) y los integrantes activos. Otra consulta es un error del
-    programa, no una respuesta vacía."""
+    vigentes (`apodos.vigentes`, los de `APODOS` o los del pedido) y los integrantes activos. Otra
+    consulta es un error del programa, no una respuesta vacía."""
 
-    def __init__(self) -> None:
+    def __init__(self, apodos: dict[str, list[str]] | None = None) -> None:
         self._filas: list[dict[str, Any]] = []
+        self._apodos = APODOS if apodos is None else apodos
 
     def execute(self, sql: str, parametros: Any = None) -> None:
         consulta = " ".join(sql.split())
         if "from apodo" in consulta:
             self._filas = [{"membership_id": m, "apodo": a}
-                           for m, apodos in APODOS.items() for a in apodos]
+                           for m, apodos in self._apodos.items() for a in apodos]
         elif "from integrante" in consulta:
             self._filas = sorted(({"membership_id": i["membership_id"], "nombre": i["nombre"]}
                                   for i in OPCIONES["integrantes"]), key=lambda f: f["nombre"])
@@ -245,9 +291,9 @@ class EquipoFijo:
         return self._filas
 
 
-def coinciden(dicho: str) -> list[dict[str, Any]]:
+def coinciden(dicho: str, apodos: dict[str, list[str]] | None = None) -> list[dict[str, Any]]:
     """Los integrantes del equipo fijo que coinciden con lo dicho, con la función del servidor."""
-    return fichas.integrantes_que_coinciden(EquipoFijo(), dicho)
+    return fichas.integrantes_que_coinciden(EquipoFijo(apodos), dicho)
 
 
 class IAEnSeco:
@@ -261,16 +307,13 @@ class IAEnSeco:
         self.parametros: dict[str, Any] = {}
         self._por_texto = {p["texto"]: GUION.get(p["nombre"], {}) for p in PEDIDOS
                            if "texto" in p}
-        self._por_criterio = {p["criterio_escrito"]: GUION_DEL_JUICIO.get(p["nombre"], "")
-                              for p in PEDIDOS if "criterio_escrito" in p}
 
     def completar(self, cuerpo: dict[str, Any], al_avanzar=None) -> dict[str, Any]:
         entrada = json.loads(next(m["content"] for m in cuerpo["messages"]
                                   if m["role"] == "user"))
         nombre = cuerpo["tools"][0]["function"]["name"]
         if nombre == ayuda_al_cargar.NOMBRE_DEL_JUICIO:
-            datos: dict[str, Any] = {
-                "como_se_comprueba": self._por_criterio.get(entrada["criterio"], "")}
+            datos: dict[str, Any] = GUION_DEL_JUICIO.get(entrada["criterio"], {})
         else:
             datos = self._por_texto.get(entrada["texto"], {})
         return {"choices": [{"finish_reason": "tool_calls", "message": {"tool_calls": [
@@ -387,8 +430,18 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     except Exception as falla:
         return False, {**_de_la_ia(falla), "segundos": round(time.monotonic() - desde, 2)}
     segundos = round(time.monotonic() - desde, 2)
+    # Como la web: la manera de comprobarla que dio la IA se juzga por su sentido (J2-13). Si el
+    # juicio no responde, la propuesta sigue como en la web (con la evidencia del área), salvo sin
+    # cupo o con un error del programa.
+    desde = time.monotonic()
+    juicio = ayuda_al_cargar.juzgar_la_propuesta(ia, crudo, VACIO)
+    del_juicio = round(time.monotonic() - desde, 2) if juicio is not None else None
+    if juicio is not None and juicio.motivo == "sin_revisar":
+        _de_la_ia(juicio.falla or RespuestaInvalida("sin juicio"))
+    apodos = pedido.get("apodos")
     r = ayuda_al_cargar.revisar(crudo, texto=pedido["texto"], escrito=VACIO, opciones=OPCIONES,
-                                coinciden=coinciden, objetivo_de=OBJETIVO_DE.get)
+                                coinciden=lambda dicho: coinciden(dicho, apodos),
+                                objetivo_de=OBJETIVO_DE.get, juicio=juicio)
     fallas = []
     for campo, esperado in pedido.get("propone", {}).items():
         valor = r.propuesta.get(campo)
@@ -398,10 +451,15 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     for campo in pedido.get("no_propone", []):
         if campo in r.propuesta:
             fallas.append(f"{campo}: no tenía que proponerlo y propuso {r.propuesta[campo]!r}")
+    for campo, motivo in pedido.get("descarta", []):
+        if {"campo": campo, "motivo": motivo} not in r.descartados:
+            fallas.append(f"{campo}: esperaba descartarlo por {motivo}")
     return not fallas, {"falla": None, "propuesta": r.propuesta,
                         "avisos": [a["texto"] for a in r.avisos],
                         "descartados": r.descartados, "elegir": r.elegir,
-                        "segundos": segundos, "fallas": fallas}
+                        "juicio": None if juicio is None else (juicio.motivo or "lo_dice"),
+                        "segundos": segundos, "segundos_del_juicio": del_juicio,
+                        "fallas": fallas}
 
 
 def _al_menos_una(valor: str) -> int:

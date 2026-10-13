@@ -10,6 +10,10 @@ de mentira (nunca la real).
 - **Sólo lo vacío:** Leda propone lo que el formulario no tiene; lo escrito no se pide ni vuelve.
 - **Nunca en silencio:** si la IA no responde, 503 con un texto humano y un incidente
   (`ayuda_al_cargar`), y nada cambia.
+- **El criterio** (J2-13): la manera de comprobarla que da la IA se juzga por su sentido, fuera
+  del candado; si no vale, o la persona no la dijo, la de la evidencia que pide el área de quien la
+  hace; sin evidencia, no se propone y el campo pide cómo se sabe. Si el juicio no responde, un
+  incidente y nunca esa manera.
 - **La auditoría** (`proponer_al_cargar`): quién pidió, qué se pidió, qué se propuso y qué no, con
   la huella de cada texto propuesto y nunca el texto.
 - **El candado de la web no espera a la IA:** la llamada se hace fuera de él.
@@ -28,7 +32,9 @@ from leda.db import admin
 from tests.garantias.test_carga_de_tareas import (  # noqa: F401
     _cargar, _contar, _fila, _navegador_de_administracion, _navegador_del_equipo, _norte,
     _persona, administradora, sesion, web)
-from tests.test_ayuda_al_cargar import CRITERIO_DEL_EJEMPLO, EJEMPLO, IADeLaCarga
+from tests.test_ayuda_al_cargar import (COMO_DEL_EJEMPLO, COMO_UPS_CIRCULAR, CRITERIO_DEL_EJEMPLO,
+                                        EJEMPLO, RESULTADO_DEL_EJEMPLO, RESULTADO_UPS, TITULO_UPS,
+                                        UPS, IADeLaCarga, juez, juzga_que_si)
 
 TEXTO_SI_LA_IA_FALLA = ("Leda no pudo completar ahora. Lo que escribiste sigue acá: completalo "
                         "vos o probá de nuevo en un rato.")
@@ -50,8 +56,8 @@ def _respuesta(**cambios) -> dict:
     respuesta = {
         "titulo": "Colgar el estante del módem en la sala",
         "descripcion": "Colgar el estante del módem en la sala. Hacen falta 12 tornillos de 8 mm.",
-        "criterio": CRITERIO_DEL_EJEMPLO,
-        "como_se_comprueba": "se comprueba con una foto del estante colgado",
+        "resultado": RESULTADO_DEL_EJEMPLO,
+        "como_se_comprueba": COMO_DEL_EJEMPLO,
         "responsable": "lucas",
         "espera": "T1",
         "objetivo": "O3",
@@ -64,10 +70,11 @@ def _respuesta(**cambios) -> dict:
 
 @pytest.fixture
 def ia(monkeypatch):
-    """La IA de mentira del espacio: cada prueba le carga sus respuestas."""
+    """La IA de mentira del espacio: cada prueba le carga sus respuestas; el juicio de la manera
+    de comprobarla dice que sí, salvo que la prueba lo cambie."""
     from leda import web_app
 
-    falsa = IADeLaCarga()
+    falsa = IADeLaCarga(juzga=juzga_que_si)
     monkeypatch.setattr(web_app, "_ia_de_la_ayuda", lambda conn, espacio: falsa)
     return falsa
 
@@ -169,7 +176,8 @@ def test_alguien_de_otro_espacio_no_se_encuentra(web, conn, intake_world, admini
                texto=EJEMPLO.replace("lucas", "north 2"))
     assert "responsable_id" not in r.json()["propuesta"]
     assert {"campo": "responsable", "motivo": "no_encontrado",
-            "texto": "No encontré a north 2 en el equipo."} in r.json()["avisos"]
+            "texto": "No encontré a «north 2» en el equipo; elegí quién la hace."} \
+        in r.json()["avisos"]
 
 
 def test_una_fecha_que_nadie_dijo_no_se_propone(web, conn, intake_world, administradora, ia):
@@ -357,7 +365,8 @@ def test_la_web_no_espera_a_la_ia_con_su_candado(web, conn, intake_world, admini
     ia.al_llamar = lambda: candado.append(web_app._WEB.locked())
     ia.respuestas.append(_respuesta(espera=None))
     assert _pedir(navegador, _norte(intake_world)["id"]).status_code == 200
-    assert candado == [False]
+    # La propuesta y el juicio de la manera de comprobarla, los dos sin el candado.
+    assert candado == [False, False]
 
 
 # --- La auditoría -----------------------------------------------------------------------------
@@ -392,3 +401,62 @@ def test_la_auditoria_guarda_lo_propuesto_con_su_huella_y_sin_el_texto(
     plano = json.dumps(detalle, ensure_ascii=False)
     for texto in (criterio, EJEMPLO, "Colgar el estante"):
         assert texto not in plano
+
+
+# --- El criterio: desde la evidencia y juzgado por su sentido (J2-13) ------------------------------
+
+def _auditoria(conn) -> dict:
+    return _fila(conn, """select detalle from audit_log where accion = 'proponer_al_cargar'
+                           order by at desc limit 1""")["detalle"]
+
+
+def test_el_ups_circular_del_usuario_no_se_propone_por_la_puerta(web, conn, intake_world,
+                                                               administradora, ia):
+    """La prueba del usuario: "el tano" no es nadie del espacio, la IA inventó una comprobación
+    circular con sinónimos y el juicio por el sentido la rechaza; sin evidencia de un área, el
+    campo pide cómo se sabe."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.juzga = juez(f"{RESULTADO_UPS}. Se comprueba verificando en la sala de servidores que el "
+                    "UPS fue reemplazado.")
+    ia.respuestas.append({"titulo": TITULO_UPS, "resultado": RESULTADO_UPS,
+                          "como_se_comprueba": COMO_UPS_CIRCULAR, "responsable": "el tano"})
+    r = _pedir(navegador, _norte(intake_world)["id"], texto=UPS)
+    assert r.status_code == 200, r.text
+    assert "criterio" not in r.json()["propuesta"]
+    avisos = {a["campo"]: a["texto"] for a in r.json()["avisos"]}
+    assert avisos["criterio"] == "Contame cómo se sabe que está terminada."
+    assert avisos["responsable"] == "No encontré a «el tano» en el equipo; elegí quién la hace."
+    assert len(ia.pedidos) == 2
+    assert _auditoria(conn)["juicio_del_criterio"] == "sin_comprobacion"
+    assert _contar(conn, "incident", "etapa = 'ayuda_al_cargar'") == 0
+
+
+def test_sin_decir_como_se_comprueba_vale_la_evidencia_del_area(web, conn, intake_world,
+                                                                 administradora, con_lucas, ia):
+    """Sam North ("lucas") es de Field Services, cuya política pide "test record": la
+    comprobación sale de ahí, sin preguntarle a la IA si es concreta."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(_respuesta(espera=None, como_se_comprueba=""))
+    r = _pedir(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 200, r.text
+    assert r.json()["propuesta"]["criterio"] == (
+        f"{RESULTADO_DEL_EJEMPLO}. Se comprueba con lo que pide el área: test record.")
+    assert len(ia.pedidos) == 1
+    assert _auditoria(conn)["juicio_del_criterio"] is None
+
+
+def test_si_el_juicio_no_responde_al_proponer_queda_un_incidente(web, conn, intake_world,
+                                                                  administradora, con_lucas, ia):
+    from leda.motor.ia_real import PlazoAgotado
+
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.juzga = lambda entrada: PlazoAgotado(40)
+    ia.respuestas.append(_respuesta(espera=None))
+    r = _pedir(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 200, r.text
+    # La manera de la IA no se propone sin juzgar: vale la evidencia del área.
+    assert r.json()["propuesta"]["criterio"] == (
+        f"{RESULTADO_DEL_EJEMPLO}. Se comprueba con lo que pide el área: test record.")
+    incidente = _fila(conn, "select * from incident where etapa = 'ayuda_al_cargar'")
+    assert incidente is not None and "PlazoAgotado" in incidente["referencia_cruda"]
+    assert _auditoria(conn)["juicio_del_criterio"] == "sin_revisar"
