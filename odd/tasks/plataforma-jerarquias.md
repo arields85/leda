@@ -125,7 +125,7 @@ Ruta: cada porción, delegada (un escritor), porque toca base, servidor, web y p
       dentro del mismo toque: el navegador hacía su propio desplazamiento para mostrarlo (y en el iPhone
       además abre el teclado), y ese desplazamiento nativo es lo que puede mover la vista de costado. Es
       la causa más probable, no comprobada: Chrome no reproduce lo del iPhone.
-      **Qué cambió:** (a) llevar a un campo es ahora un desplazamiento sólo vertical
+      **Qué cambió** (`b7fb4ea7`): (a) llevar a un campo es ahora un desplazamiento sólo vertical
       (`window.scrollTo({ top })`, suave salvo con movimiento reducido, con el bloque entero del campo y
       su mensaje en el medio) y después `focus({ preventScroll: true })`; (b) la red de seguridad:
       `overflow-x: clip` en `html`, `body` y `#root` (`clip` y no `hidden`, para que la vista previa fija
@@ -252,4 +252,4 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
   `cc9cc41d` (escritor delegado); J1-5 se repite con el usuario.
 - 2026-10-13: la segunda prueba encontró cuatro más (J1-7): al confirmar con un campo vacío la página
   se corría de costado, los mensajes blancos no se distinguían, lo que faltaba no estaba a la vista y
-  "confirmar" no se veía apagado. Arregladas por un escritor delegado; J1-5 se repite con el usuario.
+  "confirmar" no se veía apagado. Arregladas en `b7fb4ea7` (escritor delegado); J1-5 se repite con el usuario.
