@@ -79,8 +79,16 @@ Mientras no se decida, lo más restrictivo; abrirlo después no rehace nada.
    cargan en el mismo formulario"). Propuesta: un campo opcional "espera a", entre las tareas abiertas
    del mismo espacio, siempre bloqueante; la base ya tiene `dependency` y rechaza los ciclos
    (`evitar_ciclo_dependencia`). `PENDIENTE` de construcción, junto con los objetivos.
-3. **Quién "decidió" la tarea.** La auditoría guarda quién la decidió (ADR 0017, decisión 2). Mientras
-   tanto, el formulario pide elegir a un integrante activo del espacio, sin restringir su rol.
+3. **Quién "decidió" la tarea. Reemplazada (usuario, 2026-10-13) por las jerarquías:** "quién la
+   decidió" deja de ser un campo y sale de quién la crea y quién la aprueba. Dirección crea objetivos y
+   las tareas que considera necesarias; el referente de un área crea tareas para su área (también las
+   que faltaban para un objetivo de Dirección); un integrante crea tareas para sí mismo, que quedan
+   `propuesta` hasta que las aprueba su referente (ejemplo del usuario: el módem en la pared → el
+   estante → los tornillos; si hay un atraso, se sabe que faltaban los tornillos). Las jerarquías
+   (áreas, roles, referentes) se crean también desde la plataforma. Contradice el ADR 0022 ("la puerta
+   de administración es la única que carga tareas"): **enmienda al ADR antes del código**, `PENDIENTE`.
+   Canal: **sólo la web por ahora**; por chat, más adelante (`docs/ROADMAP.md`). Mientras tanto, el
+   formulario sigue como está.
 
 ## Criterio de aceptación
 

@@ -97,6 +97,7 @@ reales. Las unidades de abajo que no son el seguimiento ni la plataforma tambié
 |---|---|
 | Leda le pasa el pedido de una tarea nueva a quien la carga, con confirmación de quien pide | ADR 0017, decisión 1 (se reevalúa si una prueba real muestra que los pedidos se pierden) |
 | Quien decide las tareas las acepta dentro de Leda, en el formulario web; nunca por chat | ADR 0017, decisión 2 |
+| Un integrante propone una tarea que le falta (por ejemplo, comprar los tornillos) por chat, no sólo por la web; ya existía en un flujo congelado (los borradores de tarea) y hay que adaptarlo al motor | Usuario, 2026-10-13 (las jerarquías de la plataforma: "web ahora, chat más adelante") |
 | Leda le pregunta al referente si acepta una fecha nueva y, si confirma, la cambia ella misma | ADR 0017, decisión 4 (pedido explícito del usuario) |
 | Servidor propio de la API de bots de Telegram, para recibir archivos de hasta 60 MB (hoy, 20 MB) | ADR 0019, decisión 2 (usuario, 2026-10-07: se instala cuando Leda vaya a un equipo real) |
 | Un chat con Leda dentro de la plataforma web, sin depender de Telegram | Usuario, 2026-10-12. Necesita antes despegar la salida de Telegram (riesgo 1 de `STATUS.md`; ADR 0017, decisión 5) y notificaciones del celular para los avisos que Leda manda por su cuenta |
