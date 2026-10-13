@@ -6,14 +6,19 @@ una llamada por pedido y vuelta (11 pedidos).
     $env:PYTHONPATH = "src"
     .venv\\Scripts\\python.exe tools\\medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3
 
-`--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira que no propone nada, para
-probar la herramienta. `--ia PROVEEDOR/MODELO` (o `sol-suscripcion`, la suscripción de ChatGPT del
-usuario) usa la IA real. Sin base de datos: el equipo, los objetivos, las tareas y los días son
-fijos (hoy, el miércoles 14 de octubre de 2026), y quién la hace se busca con las mismas reglas que
-`fichas.integrantes_que_coinciden` (nombre y apodos). Cada pedido dice qué tiene que proponer Leda
-y qué no; el informe dice, por pedido y por vuelta, qué propuso, qué no pasó los controles y por
-qué. Sale con 0 si todo dio lo esperado, 1 si algo no, y 4 si la IA se quedó sin cupo (como el
-corredor de las conversaciones).
+`--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira con un guion para el
+ejemplo del usuario y para el sábado (lo que tendría que proponer una IA que entendió), y nada para
+los demás; así la corrida en seco prueba los controles y la comparación: da 2 de 11 (sale con 1).
+`--ia PROVEEDOR/MODELO` (o `sol-suscripcion`, la suscripción de ChatGPT del usuario) usa la IA
+real. Sin base de datos: el equipo, los objetivos, las tareas y los días son fijos (hoy, el
+miércoles 14 de octubre de 2026), y quién la hace se busca con la misma función que el servidor,
+`fichas.integrantes_que_coinciden`, sobre el equipo fijo (`EquipoFijo`). Cada pedido dice qué
+tiene que proponer Leda y qué no; el informe dice, por pedido y por vuelta, qué propuso, qué no
+pasó los controles y por qué, y separa lo que es de la IA (no respondió) de un error del programa.
+
+Sale con 0 si todo dio lo esperado, 1 si algo no, 3 si el programa falló (corta en ese pedido,
+para no gastar más llamadas) y 4 si la IA se quedó sin cupo (como el corredor de las
+conversaciones). Con `--salida`, el informe se escribe siempre, también al cortar.
 """
 
 from __future__ import annotations
@@ -21,14 +26,19 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import traceback
 from datetime import date, timedelta
 from typing import Any
 
+import httpx
+
 from leda import ayuda_al_cargar
-from leda.motor.fichas import palabras
+from leda.motor import fichas
+from leda.motor.ia_real import RespuestaInvalida
 
 ALIAS = {"sol": "openrouter/openai/gpt-6-sol", "sol-suscripcion": "chatgpt/gpt-6-sol"}
 GUIONADA = "guionada"
+ERROR_DEL_PROGRAMA = 3
 SIN_CUPO = 4
 
 HOY = date(2026, 10, 14)        # miércoles
@@ -140,30 +150,71 @@ PEDIDOS: list[dict[str, Any]] = [
 
 VACIO = {c: "" for c in ayuda_al_cargar.CAMPOS}
 
+# Lo que propone la IA en seco: lo que propondría una IA que entendió el ejemplo del usuario, y
+# un sábado (que los controles no dejan poner). Los demás pedidos, sin guion: no propone nada.
+GUION: dict[str, dict[str, str]] = {
+    "el ejemplo del usuario": {
+        "titulo": "Colgar el estante del módem en la sala",
+        "descripcion": "Colgar el estante del módem en la sala. Hacen falta 12 tornillos de 8 mm. "
+                       "No se puede empezar hasta que terminen de cablear el tablero de la "
+                       "máquina 3.",
+        "criterio": "El estante del módem está colgado en la sala con los 12 tornillos de 8 mm.",
+        "como_se_comprueba": "está colgado en la sala",
+        "responsable": "lucas", "espera": "T1", "objetivo": "O1",
+        "fecha": "2026-10-16", "como_dijo_la_fecha": "para el viernes"},
+    "un sábado no es hábil": {
+        "titulo": "Pintar el cartel de la entrada", "responsable": "lucas",
+        "fecha": "2026-10-17", "como_dijo_la_fecha": "el sabado"},
+}
+
+
+class EquipoFijo:
+    """Un cursor sobre el equipo fijo, para buscar quién la hace con la función del servidor tal
+    cual (`fichas.integrantes_que_coinciden`), sin base: contesta sus dos lecturas, los apodos
+    vigentes (`apodos.vigentes`) y los integrantes activos. Otra consulta es un error del
+    programa, no una respuesta vacía."""
+
+    def __init__(self) -> None:
+        self._filas: list[dict[str, Any]] = []
+
+    def execute(self, sql: str, parametros: Any = None) -> None:
+        consulta = " ".join(sql.split())
+        if "from apodo" in consulta:
+            self._filas = [{"membership_id": m, "apodo": a}
+                           for m, apodos in APODOS.items() for a in apodos]
+        elif "from integrante" in consulta:
+            self._filas = sorted(({"membership_id": i["membership_id"], "nombre": i["nombre"]}
+                                  for i in OPCIONES["integrantes"]), key=lambda f: f["nombre"])
+        else:
+            raise RuntimeError(f"Consulta que el equipo fijo no sabe contestar: {consulta[:80]}")
+
+    def fetchall(self) -> list[dict[str, Any]]:
+        return self._filas
+
 
 def coinciden(dicho: str) -> list[dict[str, Any]]:
-    """Como `fichas.integrantes_que_coinciden`, sobre el equipo fijo."""
-    buscadas = set(palabras(dicho))
-    if not buscadas:
-        return []
-    return [{"membership_id": m["membership_id"], "nombre": m["nombre"]}
-            for m in OPCIONES["integrantes"]
-            if buscadas <= set(palabras(m["nombre"]))
-            or any(buscadas <= set(a.split()) for a in APODOS.get(m["membership_id"], []))]
+    """Los integrantes del equipo fijo que coinciden con lo dicho, con la función del servidor."""
+    return fichas.integrantes_que_coinciden(EquipoFijo(), dicho)
 
 
 class IAEnSeco:
-    """Sin red: contesta la herramienta sin proponer nada."""
+    """Sin red: contesta la herramienta con el guion del pedido (por su texto), o sin proponer
+    nada."""
 
     nombre = GUIONADA
 
     def __init__(self) -> None:
         self.cliente = self
         self.parametros: dict[str, Any] = {}
+        self._por_texto = {p["texto"]: GUION.get(p["nombre"], {}) for p in PEDIDOS}
 
     def completar(self, cuerpo: dict[str, Any], al_avanzar=None) -> dict[str, Any]:
+        entrada = json.loads(next(m["content"] for m in cuerpo["messages"]
+                                  if m["role"] == "user"))
+        argumentos = json.dumps(self._por_texto.get(entrada["texto"], {}), ensure_ascii=False)
         return {"choices": [{"finish_reason": "tool_calls", "message": {"tool_calls": [
-            {"function": {"name": ayuda_al_cargar.NOMBRE_HERRAMIENTA, "arguments": "{}"}}]}}]}
+            {"function": {"name": ayuda_al_cargar.NOMBRE_HERRAMIENTA,
+                          "arguments": argumentos}}]}}]}
 
 
 def la_ia(texto: str):
@@ -201,10 +252,36 @@ def _sin_cupo(falla: BaseException) -> bool:
     return getattr(respuesta, "status_code", None) in (402, 429)
 
 
+def _fallas_de_la_ia() -> tuple[type[BaseException], ...]:
+    """Lo que dice que la IA no respondió, como lo trata la web (`ayuda_al_cargar.pedir`): sin
+    configurar o sin sesión, una respuesta ilegible o cortada, el plazo, la red, el HTTP y un
+    error del servicio de ChatGPT. Cualquier otra excepción es un error del programa."""
+    fallas: tuple[type[BaseException], ...] = (RespuestaInvalida, LookupError, TimeoutError,
+                                               OSError, httpx.HTTPError)
+    try:
+        from leda.motor.chatgpt import ErrorDeChatGPT
+    except ImportError:
+        return fallas
+    return (*fallas, ErrorDeChatGPT)
+
+
+class SinCupo(Exception):
+    """La IA se quedó sin cupo: la medición se corta."""
+
+
 def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
-    """Un pedido, una vez: si dio lo esperado y lo que pasó."""
+    """Un pedido, una vez: si dio lo esperado y lo que pasó. Una falla de la IA vuelve como un
+    resultado (`falla: ia`); sin cupo, `SinCupo`; un error del programa se levanta tal cual."""
     entrada = ayuda_al_cargar.entrada_de_la_ia(pedido["texto"], VACIO, OPCIONES)
-    crudo = ayuda_al_cargar.pedir(ia, entrada)
+    try:
+        crudo = ayuda_al_cargar.pedir(ia, entrada)
+    except Exception as falla:
+        if _sin_cupo(falla):
+            raise SinCupo() from falla
+        if isinstance(falla, _fallas_de_la_ia()):
+            return False, {"falla": "ia",
+                           "fallas": [f"la IA no respondió ({type(falla).__name__})"]}
+        raise
     r = ayuda_al_cargar.revisar(crudo, texto=pedido["texto"], escrito=VACIO, opciones=OPCIONES,
                                 coinciden=coinciden, objetivo_de=OBJETIVO_DE.get)
     fallas = []
@@ -216,14 +293,22 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     for campo in pedido.get("no_propone", []):
         if campo in r.propuesta:
             fallas.append(f"{campo}: no tenía que proponerlo y propuso {r.propuesta[campo]!r}")
-    return not fallas, {"propuesta": r.propuesta, "avisos": [a["texto"] for a in r.avisos],
+    return not fallas, {"falla": None, "propuesta": r.propuesta,
+                        "avisos": [a["texto"] for a in r.avisos],
                         "descartados": r.descartados, "elegir": r.elegir, "fallas": fallas}
+
+
+def _al_menos_una(valor: str) -> int:
+    veces = int(valor)
+    if veces < 1:
+        raise argparse.ArgumentTypeError("tiene que ser 1 o más")
+    return veces
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--ia", default=GUIONADA)
-    p.add_argument("--veces", type=int, default=1)
+    p.add_argument("--veces", type=_al_menos_una, default=1)
     p.add_argument("--salida", help="un archivo para el informe en JSON")
     args = p.parse_args(argv)
     try:
@@ -231,27 +316,46 @@ def main(argv: list[str] | None = None) -> int:
     except (AttributeError, ValueError):
         pass
     ia = la_ia(args.ia)
-    informe: list[dict[str, Any]] = []
+    nombre = getattr(ia, "nombre", args.ia)
+    resultados: list[dict[str, Any]] = []
     bien = total = 0
+    cortada: str | None = None
     for vuelta in range(1, args.veces + 1):
         for pedido in PEDIDOS:
-            total += 1
             try:
                 ok, detalle = medir(ia, pedido)
+            except SinCupo:
+                print("La IA se quedó sin cupo: la medición se corta acá.")
+                cortada = "sin_cupo"
+                break
             except Exception as falla:  # noqa: BLE001 -- se informa, nunca se esconde
-                if _sin_cupo(falla):
-                    print("La IA se quedó sin cupo: la medición se corta acá.")
-                    return SIN_CUPO
-                ok, detalle = False, {"fallas": [f"la IA no respondió ({type(falla).__name__})"]}
+                traceback.print_exc()
+                print("Error del programa (no de la IA): la medición se corta acá.")
+                ok, detalle = False, {"falla": "programa", "fallas": [
+                    f"error del programa ({type(falla).__name__}: {str(falla)[:200]})"]}
+                cortada = "error_del_programa"
+            total += 1
             bien += ok
-            informe.append({"vuelta": vuelta, "pedido": pedido["nombre"], "bien": ok, **detalle})
+            resultados.append({"vuelta": vuelta, "pedido": pedido["nombre"], "bien": ok,
+                               **detalle})
             print(f"[{vuelta}] {'bien' if ok else 'MAL '} · {pedido['nombre']}")
             for f in detalle.get("fallas", []):
                 print(f"        {f}")
-    print(f"\n{bien} de {total} bien (IA: {getattr(ia, 'nombre', args.ia)}).")
+            if cortada:
+                break
+        if cortada:
+            break
+    print(f"\n{bien} de {total} bien (IA: {nombre})"
+          f"{'; cortada: ' + cortada.replace('_', ' ') if cortada else ''}.")
     if args.salida:
         with open(args.salida, "w", encoding="utf-8") as archivo:
-            json.dump(informe, archivo, ensure_ascii=False, indent=2)
+            json.dump({"ia": nombre, "veces": args.veces, "cortada": cortada, "bien": bien,
+                       "total": total, "resultados": resultados},
+                      archivo, ensure_ascii=False, indent=2)
+    if cortada == "sin_cupo":
+        return SIN_CUPO
+    if cortada == "error_del_programa":
+        return ERROR_DEL_PROGRAMA
     return 0 if bien == total else 1
 
 

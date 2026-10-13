@@ -532,3 +532,105 @@ def test_datos_con_otra_forma_se_ignoran(ayuda):
     resultado, _ = _proponer(ayuda, {"titulo": 3, "responsable": ["lucas"], "fecha": None,
                                      "espera": {"x": 1}})
     assert resultado.propuesta == {}
+
+
+# --- La herramienta de medición (`tools/medir_ayuda_al_cargar.py`) ----------------------------
+#
+# La revisión `review-5457837d11cb0618`: con el cupo agotado el informe se perdía, `--veces 0`
+# corría sin medir nada, toda excepción se contaba como de la IA, los nombres se buscaban con una
+# copia de la función del servidor y la corrida en seco daba 0 de 11 sin probar nada.
+
+@pytest.fixture
+def medir():
+    import importlib.util
+    from pathlib import Path
+
+    ruta = Path(__file__).resolve().parents[1] / "tools" / "medir_ayuda_al_cargar.py"
+    spec = importlib.util.spec_from_file_location("medir_ayuda_al_cargar", ruta)
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+class _SinCupo(Exception):
+    def __init__(self) -> None:
+        super().__init__("cupo")
+        self.response = type("R", (), {"status_code": 429})()
+
+
+def test_la_medicion_rechaza_menos_de_una_vuelta(medir):
+    for veces in ("0", "-1"):
+        with pytest.raises(SystemExit) as salida:
+            medir.main(["--veces", veces])
+        assert salida.value.code == 2
+
+
+def test_sin_cupo_la_medicion_guarda_lo_medido_antes_de_salir(medir, monkeypatch, tmp_path):
+    ia = IADeLaCarga({}, _SinCupo())
+    monkeypatch.setattr(medir, "la_ia", lambda texto: ia)
+    salida = tmp_path / "informe.json"
+    assert medir.main(["--ia", "x", "--salida", str(salida)]) == medir.SIN_CUPO
+    informe = json.loads(salida.read_text(encoding="utf-8"))
+    assert informe["cortada"] == "sin_cupo"
+    assert [r["pedido"] for r in informe["resultados"]] == [medir.PEDIDOS[0]["nombre"]]
+
+
+def test_una_falla_de_la_ia_no_es_un_error_del_programa(medir, monkeypatch, tmp_path):
+    from leda.motor.ia_real import PlazoAgotado, RespuestaInvalida
+
+    ia = IADeLaCarga(RespuestaInvalida("x"), PlazoAgotado(40),
+                     *([{}] * (len(medir.PEDIDOS) - 2)))
+    monkeypatch.setattr(medir, "la_ia", lambda texto: ia)
+    salida = tmp_path / "informe.json"
+    assert medir.main(["--ia", "x", "--salida", str(salida)]) == 1
+    informe = json.loads(salida.read_text(encoding="utf-8"))
+    assert informe["cortada"] is None
+    assert [r["falla"] for r in informe["resultados"][:2]] == ["ia", "ia"]
+    assert informe["resultados"][0]["fallas"] == ["la IA no respondió (RespuestaInvalida)"]
+
+
+def test_un_error_del_programa_corta_y_se_informa_como_tal(medir, monkeypatch, tmp_path):
+    ia = IADeLaCarga(*([{}] * len(medir.PEDIDOS)))
+    monkeypatch.setattr(medir, "la_ia", lambda texto: ia)
+
+    def revisar_roto(*a, **k):
+        raise KeyError("dato")
+    monkeypatch.setattr(medir.ayuda_al_cargar, "revisar", revisar_roto)
+    salida = tmp_path / "informe.json"
+    assert medir.main(["--ia", "x", "--salida", str(salida)]) == medir.ERROR_DEL_PROGRAMA
+    informe = json.loads(salida.read_text(encoding="utf-8"))
+    assert informe["cortada"] == "error_del_programa"
+    (resultado,) = informe["resultados"]
+    assert resultado["falla"] == "programa"
+    assert "KeyError" in resultado["fallas"][0]
+    # Cortó en el primero: no gasta más llamadas.
+    assert len(ia.pedidos) == 1
+
+
+def test_la_medicion_busca_los_nombres_con_la_funcion_del_servidor(medir, monkeypatch):
+    from leda.motor import fichas
+
+    llamadas = []
+    original = fichas.integrantes_que_coinciden
+
+    def espia(cur, dicho):
+        llamadas.append(dicho)
+        return original(cur, dicho)
+    monkeypatch.setattr(fichas, "integrantes_que_coinciden", espia)
+    assert [f["membership_id"] for f in medir.coinciden("lucas")] == ["m-lucas"]
+    assert [f["membership_id"] for f in medir.coinciden("el tano")] == ["m-marcos"]
+    assert medir.coinciden("pepe") == []
+    assert llamadas == ["lucas", "el tano", "pepe"]
+
+
+def test_en_seco_la_medicion_prueba_algo(medir, tmp_path, capsys):
+    """La IA en seco propone lo esperado para el ejemplo del usuario y un sábado: el ejemplo
+    pasa entero y el sábado no pone la fecha; los demás, sin guion, no proponen nada."""
+    salida = tmp_path / "informe.json"
+    assert medir.main(["--salida", str(salida)]) == 1
+    informe = json.loads(salida.read_text(encoding="utf-8"))
+    bien = {r["pedido"] for r in informe["resultados"] if r["bien"]}
+    assert bien == {"el ejemplo del usuario", "un sábado no es hábil"}
+    (sabado,) = [r for r in informe["resultados"] if r["pedido"] == "un sábado no es hábil"]
+    assert {"campo": "fecha", "motivo": "no_es_habil"} in sabado["descartados"]
+    assert f"2 de {len(medir.PEDIDOS)} bien" in capsys.readouterr().out
