@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Candidate, Problem } from './api';
 import { length } from './draft';
 import { heard, micProblem, type Recognizer, speechRecognition } from './speech';
-import { CONTROL, FIELD_HINT, FIELD_TITLE } from './typography';
+import { CONTROL, FIELD_HINT, FIELD_TITLE, TEXT_SIZE } from './typography';
 
 /** The server's own limit for the free text (src/leda/ayuda_al_cargar.py, LARGO_DEL_TEXTO). */
 export const STORY_LIMIT = 1000;
@@ -23,10 +23,8 @@ export const STALE_ANSWER = 'Cambiaste lo escrito mientras Leda completaba; toc√
 
 // The shared box of every control (`typography.ts`), taller for a story.
 const BOX = `${CONTROL} min-h-24 resize-y`;
-const BUTTON =
-  'inline-flex h-11 items-center rounded-card border-hard border-ink bg-card px-3.5 text-button font-bold text-ink shadow-hard-ink disabled:opacity-50';
-const QUIET =
-  'inline-flex h-11 items-center rounded-card border-hard border-line-soft bg-transparent px-3.5 text-button text-ink-soft disabled:opacity-50';
+const BUTTON = `inline-flex h-11 items-center rounded-card border-hard border-ink bg-card px-3.5 ${TEXT_SIZE} font-bold text-ink shadow-hard-ink disabled:opacity-50`;
+const QUIET = `inline-flex h-11 items-center rounded-card border-hard border-line-soft bg-transparent px-3.5 ${TEXT_SIZE} text-ink-soft disabled:opacity-50`;
 
 function Line({ children, warn }: { children: string; warn?: boolean }) {
   return (

@@ -1,24 +1,32 @@
 /**
- * The three kinds of text of a field, the same in the load form and in its preview, in one place
- * so the phone test can tweak them here (J2-10; the user, on the iPhone, 2026-10-13: "hay que
- * probar").
+ * The kinds of text of a field, the same in the load form and in its preview, in one place so the
+ * phone test can tweak them here (J2-10; the user, on the iPhone, 2026-10-13: "hay que probar").
  *
- * The main size is the body size, and 16px on a touch screen: under 16px the iPhone zooms the
- * page in when a control gets the focus (J1-6). Titles and values share it, so they differ only
- * in color; titles and help share the smaller size and differ in color.
+ * One size for every text of the form: titles, help, what the person types or chooses, the
+ * calendar and the buttons (user, on the iPhone, 2026-10-13: "que no quede ningún tamaño de letra
+ * grande, incluido los que son campos para completar o seleccionar"). The kinds differ only in
+ * color. The controls used to be 16px on a touch screen so the iPhone would not zoom in on focus
+ * (J1-6); that zoom is now stopped by the iOS-only viewport rule (`viewport.ts`).
  */
-const MAIN_SIZE = 'text-body pointer-coarse:text-[16px]';
+export const TEXT_SIZE = 'text-small pointer-coarse:text-body';
 
-/** A field's title: the form's labels and the preview's data names. In normal case and the help's
- * size (user, on the iPhone, 2026-10-13: the uppercase titles at the main size "quedó muy pesado";
- * the help's size "es el tamaño correcto"), told apart from the help by its off-white color. */
-export const FIELD_TITLE = 'text-small pointer-coarse:text-body font-normal text-ink';
+/** A field's title: the form's labels, the "Vista previa" heading and the preview's data names,
+ * all in sentence case ("Criterio de aceptación"), in normal weight (user, on the iPhone,
+ * 2026-10-13: the uppercase titles at a bigger size "quedó muy pesado"; this size "es el tamaño
+ * correcto"), told apart from the help by its off-white color. */
+export const FIELD_TITLE = `${TEXT_SIZE} font-normal text-ink`;
 
-/** What the person types or chooses: the text of every control and the preview's values. */
-export const FIELD_VALUE = `${MAIN_SIZE} text-ink-soft`;
+/** What the person types or chooses: the text of every control (the preview's values use
+ * `PREVIEW_VALUE`). */
+export const FIELD_VALUE = `${TEXT_SIZE} text-ink-soft`;
 
-/** The help under a field: smaller than the main size, in the dimmest gray. */
-export const FIELD_HINT = 'text-small pointer-coarse:text-body text-ink-dim';
+/** The help under a field, in the dimmest gray. */
+export const FIELD_HINT = `${TEXT_SIZE} text-ink-dim`;
+
+/** A value in the preview (and its "—" when empty): the help's size and color, so the preview
+ * reads even, with its sentence-case names standing out (user, on the iPhone, 2026-10-13). Its own
+ * name so it can be tuned here without touching the help. */
+export const PREVIEW_VALUE = FIELD_HINT;
 
 /** The box of every control (text field, text area, list to choose from and the help box): the
  * same frame, padding, line height and text, so none looks bigger than another. Full width and

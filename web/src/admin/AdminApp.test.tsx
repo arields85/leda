@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminMe, options, OTHER_SPACE, SPACE } from '../test/adminFixtures';
 import { AdminApp } from './AdminApp';
 import { newKey } from './draft';
-import { CONTROL, FIELD_HINT, FIELD_TITLE, FIELD_VALUE } from './typography';
+import { CONTROL, FIELD_HINT, FIELD_TITLE, FIELD_VALUE, PREVIEW_VALUE, TEXT_SIZE } from './typography';
 
 type Reply = { status: number; body?: unknown } | 'network';
 type Call = { key: string; body: unknown };
@@ -59,14 +59,14 @@ function pick(label: string | RegExp, value: string) {
 }
 
 function fillTask() {
-  pick('objetivo', 'o1');
-  fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar alarmas del SCADA' } });
-  pick('quién la hace', 'm-marcos');
+  pick('Objetivo', 'o1');
+  fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
+  pick('Quién la hace', 'm-marcos');
   fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
-  fireEvent.change(screen.getByLabelText('criterio de aceptación'), {
+  fireEvent.change(screen.getByLabelText('Criterio de aceptación'), {
     target: { value: 'Las 12 alarmas suenan en la sala de control' },
   });
-  pick('quién la decidió', 'm-ismael');
+  pick('Quién la decidió', 'm-ismael');
 }
 
 const confirm = () => fireEvent.click(screen.getByRole('button', { name: /confirmar|probar de nuevo/ }));
@@ -89,20 +89,20 @@ describe('AdminApp', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Cargar tarea');
     // One space: no selector.
     expect(screen.queryByLabelText('espacio')).toBeNull();
-    const objective = screen.getByLabelText('objetivo');
+    const objective = screen.getByLabelText('Objetivo');
     expect(within(objective).getByRole('option', { name: 'Puesta en marcha de la línea 3 · hasta 30.10' })).toBeInTheDocument();
-    const responsible = screen.getByLabelText('quién la hace');
+    const responsible = screen.getByLabelText('Quién la hace');
     expect(within(responsible).getByRole('option', { name: 'Lucas · Infraestructura · sin conectar' })).toBeInTheDocument();
-    pick('quién la hace', 'm-lucas');
+    pick('Quién la hace', 'm-lucas');
     expect(screen.getByText('· la revisa: Ismael')).toBeInTheDocument();
     expect(screen.getByText('[SIN CONECTAR]')).toBeInTheDocument();
-    pick('quién la hace', 'm-ismael');
+    pick('Quién la hace', 'm-ismael');
     expect(screen.getByText('· la revisa: nadie')).toBeInTheDocument();
   });
 
   it('offers only the working days from today on', async () => {
     await openForm();
-    const calendar = screen.getByRole('group', { name: 'fecha' });
+    const calendar = screen.getByRole('group', { name: 'Fecha' });
     const offered = within(calendar)
       .getAllByRole('button', { pressed: false })
       .map((b) => b.getAttribute('data-day'));
@@ -129,17 +129,17 @@ describe('AdminApp', () => {
 
   it('pre-checks the evidence the area asks for', async () => {
     await openForm();
-    pick('quién la hace', 'm-marcos');
+    pick('Quién la hace', 'm-marcos');
     expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /un informe/ })).not.toBeChecked();
-    pick('quién la hace', 'm-lucas');
+    pick('Quién la hace', 'm-lucas');
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.getByText('El área no pide evidencia.')).toBeInTheDocument();
   });
 
   it('counts characters against the server limits', async () => {
     await openForm();
-    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'x'.repeat(205) } });
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'x'.repeat(205) } });
     expect(screen.getByText('205/200 · sobran 5')).toBeInTheDocument();
   });
 
@@ -155,9 +155,9 @@ describe('AdminApp', () => {
     expect(card).toHaveTextContent('└─ de Marcos');
     expect(aside).toHaveTextContent('Puesta en marcha de la línea 3');
     expect(aside).toHaveTextContent('una captura de pantalla');
-    expect(aside).toHaveTextContent('la revisaIsmael');
-    expect(aside).toHaveTextContent('la decidióIsmael');
-    expect(aside).toHaveTextContent('la cargaAriel');
+    expect(aside).toHaveTextContent('La revisaIsmael');
+    expect(aside).toHaveTextContent('La decidióIsmael');
+    expect(aside).toHaveTextContent('La cargaAriel');
     const button = within(aside).getByRole('button', { name: '> confirmar' });
     // The confirm button comes after what it confirms.
     expect(card.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -168,29 +168,29 @@ describe('AdminApp', () => {
 
   it('confirm with missing fields says what is missing next to it, focuses the first and sends nothing', async () => {
     const calls = await openForm();
-    pick('objetivo', 'o1');
-    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar alarmas del SCADA' } });
-    pick('quién la hace', 'm-marcos');
+    pick('Objetivo', 'o1');
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
+    pick('Quién la hace', 'm-marcos');
     fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
     fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
     confirm();
     const summary = within(preview()).getByRole('alert');
     expect(summary).toHaveTextContent('Falta completar: criterio de aceptación, evidencia, quién la decidió.');
-    expect(screen.getByLabelText('criterio de aceptación')).toHaveFocus();
-    expect(screen.getByLabelText('criterio de aceptación')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Criterio de aceptación')).toHaveFocus();
+    expect(screen.getByLabelText('Criterio de aceptación')).toHaveAttribute('aria-invalid', 'true');
     expect(document.getElementById('f-criterio-error')).toHaveTextContent('Falta el criterio de aceptación');
-    expect(screen.getByLabelText('quién la decidió')).toHaveAttribute('aria-describedby', 'f-decidio-error');
+    expect(screen.getByLabelText('Quién la decidió')).toHaveAttribute('aria-describedby', 'f-decidio-error');
     expect(calls.some((c) => c.key === TASKS)).toBe(false);
     // Each name takes you to its field.
     fireEvent.click(within(summary).getByRole('button', { name: 'quién la decidió' }));
-    expect(screen.getByLabelText('quién la decidió')).toHaveFocus();
+    expect(screen.getByLabelText('Quién la decidió')).toHaveFocus();
     fireEvent.click(within(summary).getByRole('button', { name: 'evidencia' }));
     expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toHaveFocus();
     // Fixing a field takes it off the summary; with nothing missing, the summary goes away.
-    pick('quién la decidió', 'm-ismael');
+    pick('Quién la decidió', 'm-ismael');
     expect(summary).toHaveTextContent('Falta completar: criterio de aceptación, evidencia.');
     fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
-    fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Suenan las 12' } });
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), { target: { value: 'Suenan las 12' } });
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
@@ -200,7 +200,7 @@ describe('AdminApp', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Falta completar: objetivo, título, quién la hace, fecha, criterio de aceptación, quién la decidió.',
     );
-    expect(screen.getByLabelText('objetivo')).toHaveFocus();
+    expect(screen.getByLabelText('Objetivo')).toHaveFocus();
   });
 
   it('a 422 from the server shows the same summary, with its own texts on the fields', async () => {
@@ -221,7 +221,7 @@ describe('AdminApp', () => {
     confirm();
     const summary = await within(preview()).findByRole('alert');
     expect(summary).toHaveTextContent('Falta completar: criterio de aceptación, evidencia, quién la decidió.');
-    await waitFor(() => expect(screen.getByLabelText('criterio de aceptación')).toHaveFocus());
+    await waitFor(() => expect(screen.getByLabelText('Criterio de aceptación')).toHaveFocus());
     expect(scroll).toHaveBeenCalled();
     expect(document.getElementById('f-decidio-error')).toHaveClass('text-falta');
     expect(document.getElementById('f-decidio-error')).toHaveTextContent('Elegí quién decidió la tarea.');
@@ -244,10 +244,10 @@ describe('AdminApp', () => {
     expect(button).toHaveAttribute('aria-describedby', 'lo-que-falta');
     expect(button).toBeEnabled();
     // Nothing is marked on the fields before confirm is tapped: the line is enough.
-    expect(screen.getByLabelText('título')).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByLabelText('Título')).not.toHaveAttribute('aria-invalid');
     expect(screen.queryByRole('alert')).toBeNull();
-    pick('objetivo', 'o1');
-    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar alarmas del SCADA' } });
+    pick('Objetivo', 'o1');
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
     expect(line).toHaveTextContent('Falta completar: quién la hace, fecha, criterio de aceptación, quién la decidió.');
     fillTask();
     expect(document.getElementById('lo-que-falta')).toBeNull();
@@ -261,14 +261,14 @@ describe('AdminApp', () => {
     const focus = vi.spyOn(HTMLElement.prototype, 'focus');
     try {
       const calls = await openForm();
-      pick('objetivo', 'o1');
-      fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar alarmas del SCADA' } });
-      pick('quién la hace', 'm-marcos');
+      pick('Objetivo', 'o1');
+      fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
+      pick('Quién la hace', 'm-marcos');
       fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
       fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
-      const criterio = screen.getByLabelText('criterio de aceptación');
+      const criterio = screen.getByLabelText('Criterio de aceptación');
       const evidence = screen.getByRole('checkbox', { name: /una captura de pantalla/ });
-      const decided = screen.getByLabelText('quién la decidió');
+      const decided = screen.getByLabelText('Quién la decidió');
       confirm();
       expect(criterio).toHaveFocus();
       // The field's message is there, in the warning color, and its border too.
@@ -345,10 +345,11 @@ describe('AdminApp', () => {
     expect(controls.length).toBeGreaterThan(0);
     for (const control of controls) {
       expect(control).toHaveClass('w-full', 'min-w-0', 'max-w-full');
-      // 16px on a touch screen, so the phone does not zoom in when the field is touched.
-      expect(control).toHaveClass('pointer-coarse:text-[16px]');
+      // The size of the titles, never 16px: the zoom on focus is stopped on iOS by the viewport.
+      expect(control).toHaveClass(...TEXT_SIZE.split(' '));
+      expect(control.className).not.toContain('16px');
     }
-    expect(screen.getByRole('group', { name: 'fecha' })).toHaveClass('w-full', 'min-w-0', 'max-w-full');
+    expect(screen.getByRole('group', { name: 'Fecha' })).toHaveClass('w-full', 'min-w-0', 'max-w-full');
     expect(form).toHaveClass('min-w-0');
     expect(preview()).toHaveClass('min-w-0');
     // jsdom has no layout: the real width is only confirmed on the phone.
@@ -363,37 +364,64 @@ describe('AdminApp', () => {
     const lists = form.querySelectorAll('select');
     expect(lists.length).toBeGreaterThan(0);
     for (const list of lists) expect(list).toHaveClass('appearance-none');
-    // The calendar's days are written in the same main size as the controls.
+    // The calendar's days are written in the same size as the controls.
     const day = screen.getByRole('button', { name: 'vie 16.10' });
-    expect(day.parentElement).toHaveClass('text-body', 'pointer-coarse:text-[16px]');
+    expect(day.parentElement).toHaveClass(...TEXT_SIZE.split(' '));
     expect(day).toHaveClass('text-ink-soft');
     // jsdom has no layout: whether they look the same size is only confirmed on the phone.
   });
 
   it('titles, values and help texts share one style in the form and in the preview (J2-10)', async () => {
     await openForm();
-    fillTask();
     const styled = (element: Element | null, style: string) => expect(element).toHaveClass(...style.split(' '));
+    // An empty value in the preview is a dash in the same style as any value there.
+    const empty = within(preview()).getByText('Objetivo').nextElementSibling;
+    expect(empty).toHaveTextContent('—');
+    styled(empty, PREVIEW_VALUE);
+    styled(empty?.firstElementChild ?? null, PREVIEW_VALUE);
+    fillTask();
     // The form: the title of a field, what the person types or chooses, and the help under it.
     styled(document.getElementById('f-criterio-label'), FIELD_TITLE);
     styled(screen.getByText('Contame qué querés hacer y te ayudo'), FIELD_TITLE);
-    styled(screen.getByText('evidencia que se pide'), FIELD_TITLE);
-    styled(screen.getByLabelText('criterio de aceptación'), FIELD_VALUE);
-    styled(screen.getByLabelText('quién la hace'), FIELD_VALUE);
+    styled(screen.getByText('Evidencia que se pide'), FIELD_TITLE);
+    styled(screen.getByLabelText('Criterio de aceptación'), FIELD_VALUE);
+    styled(screen.getByLabelText('Quién la hace'), FIELD_VALUE);
     styled(screen.getByText('Qué tiene que pasar para darla por terminada.'), FIELD_HINT);
-    // The preview: each data name is a title and its value is a value.
-    const name = within(preview()).getByText('criterio de aceptación');
+    // The preview's heading is one more field title (user, on the iPhone, 2026-10-13).
+    const heading = within(preview()).getByRole('heading', { name: 'Vista previa' });
+    styled(heading, FIELD_TITLE);
+    expect(heading).not.toHaveClass('uppercase');
+    expect(heading.className).not.toContain('tracking-');
+    // The preview: each data name is a title, in sentence case, and its value looks like a help text.
+    const name = within(preview()).getByText('Criterio de aceptación');
     expect(name.tagName).toBe('DT');
     styled(name, FIELD_TITLE);
-    styled(name.nextElementSibling, FIELD_VALUE);
+    styled(name.nextElementSibling, PREVIEW_VALUE);
+    expect(name.nextElementSibling).not.toHaveClass('text-ink-soft');
     expect(name.nextElementSibling).toHaveTextContent('Las 12 alarmas suenan en la sala de control');
-    // Titles take the help's size, in normal case, and differ from it by color; values stay 16px.
-    expect(FIELD_TITLE).not.toContain('pointer-coarse:text-[16px]');
+    expect(PREVIEW_VALUE).toBe(FIELD_HINT);
+    // One size for titles, values and help, in normal case; they differ only by color.
+    for (const style of [FIELD_TITLE, FIELD_VALUE, FIELD_HINT, CONTROL]) {
+      expect(style).toContain(TEXT_SIZE);
+      expect(style).not.toContain('16px');
+    }
     expect(FIELD_TITLE).not.toContain('uppercase');
     expect(FIELD_TITLE).toContain('text-ink');
-    expect(FIELD_VALUE).toContain('pointer-coarse:text-[16px]');
-    expect(FIELD_HINT).not.toContain('pointer-coarse:text-[16px]');
     expect(FIELD_TITLE).not.toContain('font-bold');
+  });
+
+  it('no text on the load page is bigger than the form, but the page title (J2-10)', async () => {
+    await openForm();
+    fillTask();
+    // Every element below the page title, the form and its preview included: none takes a size
+    // above the body size nor the 16px the controls used to have.
+    const main = document.querySelector('main') as HTMLElement;
+    const big = /(^|s)(pointer-coarse:)?text-(button|day|count|title|[d+px])(s|$)/;
+    const offenders = [...main.querySelectorAll('*')].filter((element) => big.test(element.getAttribute('class') ?? ''));
+    expect(offenders.map((element) => element.outerHTML.slice(0, 80))).toEqual([]);
+    for (const button of screen.getAllByRole('button', { name: /completar con Leda|confirmar/ })) {
+      expect(button).toHaveClass(...TEXT_SIZE.split(' '));
+    }
   });
 
   it('confirm sends the data with one key and shows the warnings', async () => {
@@ -422,7 +450,7 @@ describe('AdminApp', () => {
       clave: '11111111-1111-4111-8111-111111111111',
     });
     fireEvent.click(screen.getByRole('button', { name: '> cargar otra' }));
-    expect(screen.getByLabelText('título')).toHaveValue('');
+    expect(screen.getByLabelText('Título')).toHaveValue('');
   });
 
   it('offers the open tasks to wait for, shows the wait and sends it', async () => {
@@ -444,17 +472,17 @@ describe('AdminApp', () => {
       ),
       [TASKS]: loaded(),
     });
-    const wait = screen.getByLabelText('espera a (opcional)');
+    const wait = screen.getByLabelText('Espera a (opcional)');
     expect(wait).toHaveValue('');
     expect(
       within(wait).getByRole('option', { name: 'Colocar el estante · Lucas · Mantenimiento anual' }),
     ).toBeInTheDocument();
     fillTask();
-    pick('espera a (opcional)', 't-estante');
+    pick('Espera a (opcional)', 't-estante');
     const form = screen.getByRole('form', { name: 'Cargar tarea' });
     expect(within(form).getByText('No puede empezar hasta que esa esté terminada.')).toBeInTheDocument();
     expect(preview()).toHaveTextContent(
-      'espera aColocar el estante · Lucas',
+      'Espera aColocar el estante · Lucas',
     );
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
@@ -493,18 +521,18 @@ describe('AdminApp', () => {
       },
     });
     fillTask();
-    pick('espera a (opcional)', 't-estante');
+    pick('Espera a (opcional)', 't-estante');
     confirm();
     await screen.findByRole('alert');
-    expect(screen.getByLabelText('espera a (opcional)')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Espera a (opcional)')).toHaveAttribute('aria-invalid', 'true');
     expect(document.getElementById('f-espera-error')).toHaveTextContent('ya está cerrada');
-    pick('espera a (opcional)', '');
+    pick('Espera a (opcional)', '');
     expect(document.getElementById('f-espera-error')).toBeNull();
   });
 
   it('warns when the date is after the objective, without blocking', async () => {
     await openForm();
-    pick('objetivo', 'o1');
+    pick('Objetivo', 'o1');
     fireEvent.click(screen.getByRole('button', { name: 'mes siguiente' }));
     fireEvent.click(screen.getByRole('button', { name: 'lun 02.11' }));
     expect(screen.getAllByText(/Es posterior a la del objetivo \(30\.10\)/).length).toBeGreaterThan(0);
@@ -517,11 +545,11 @@ describe('AdminApp', () => {
     fillTask();
     confirm();
     // While it is sending, what is shown is what goes: the form is locked.
-    expect(screen.getByLabelText('título')).toBeDisabled();
+    expect(screen.getByLabelText('Título')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'cargando…' })).toBeDisabled();
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar');
-    expect(screen.getByLabelText('título')).toHaveValue('Configurar alarmas del SCADA');
-    expect(screen.getByLabelText('título')).toBeEnabled();
+    expect(screen.getByLabelText('Título')).toHaveValue('Configurar alarmas del SCADA');
+    expect(screen.getByLabelText('Título')).toBeEnabled();
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
@@ -542,7 +570,7 @@ describe('AdminApp', () => {
     fillTask();
     confirm();
     await screen.findByRole('alert');
-    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar las alarmas' } });
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar las alarmas' } });
     confirm();
     // The first send may have loaded it: the server refused the same key with other data.
     expect(await screen.findByText(/Puede que ya se haya cargado: fijate en "El equipo"/)).toBeInTheDocument();
@@ -571,7 +599,7 @@ describe('AdminApp', () => {
     await screen.findByRole('alert');
     confirm();
     await screen.findByText('No se cargó: hay que corregir lo marcado.');
-    fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Suenan las 12' } });
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), { target: { value: 'Suenan las 12' } });
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
@@ -595,16 +623,16 @@ describe('AdminApp', () => {
     const scroll = vi.spyOn(window, 'scrollTo');
     fillTask();
     confirm();
-    await waitFor(() => expect(screen.getByLabelText('criterio de aceptación')).toHaveFocus());
+    await waitFor(() => expect(screen.getByLabelText('Criterio de aceptación')).toHaveFocus());
     expect(scroll).toHaveBeenCalled();
     const message = document.getElementById('f-criterio-error');
     expect(message).toHaveTextContent('Contame cómo se sabe que está terminada.');
     expect(message).toHaveClass('text-falta');
-    expect(screen.getByLabelText('criterio de aceptación')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Criterio de aceptación')).toHaveAttribute('aria-invalid', 'true');
     expect(within(preview()).getByRole('alert')).toHaveTextContent('Hay que corregir: criterio de aceptación.');
     expect(calls.filter((c) => c.key === TASKS)).toHaveLength(1);
     // Rewriting it clears the mark.
-    fireEvent.change(screen.getByLabelText('criterio de aceptación'), {
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), {
       target: { value: 'Las 12 alarmas suenan en la sala de control; se prueba disparando cada una' },
     });
     expect(document.getElementById('f-criterio-error')).toBeNull();
@@ -618,7 +646,7 @@ describe('AdminApp', () => {
     await screen.findByRole('alert');
     confirm();
     expect(await screen.findByText('Contame cómo se sabe que está terminada.')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('criterio de aceptación'), {
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), {
       target: { value: 'Las 12 alarmas suenan en la sala de control; se prueba disparando cada una' },
     });
     confirm();
@@ -666,12 +694,12 @@ describe('AdminApp', () => {
     expect(summary).toHaveTextContent('No se cargó: hay que corregir lo marcado.');
     expect(summary).toHaveTextContent('Hay que corregir: quién la hace, fecha.');
     expect(summary).toHaveTextContent('Este dato no es válido.');
-    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveFocus());
-    expect(screen.getByLabelText('quién la hace')).toHaveAttribute('aria-invalid', 'true');
+    await waitFor(() => expect(screen.getByLabelText('Quién la hace')).toHaveFocus());
+    expect(screen.getByLabelText('Quién la hace')).toHaveAttribute('aria-invalid', 'true');
     expect(document.getElementById('f-responsable-error')).toHaveTextContent('Nadie activo revisa');
     expect(document.getElementById('f-fecha-error')).toHaveTextContent('Ese día no es hábil');
     // Fixing a field clears its message.
-    pick('quién la hace', 'm-lucas');
+    pick('Quién la hace', 'm-lucas');
     expect(document.getElementById('f-responsable-error')).toBeNull();
   });
 
@@ -815,10 +843,10 @@ class FakeRecognition {
 describe('Leda completes the load from the free box', () => {
   it('fills only the empty fields, marks each one, and ticks the evidence of whoever does it', async () => {
     const calls = await openForm({ [HELP]: proposed(FULL) });
-    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Mi título' } });
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Mi título' } });
     tell();
     askLeda();
-    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveValue('m-marcos'));
+    await waitFor(() => expect(screen.getByLabelText('Quién la hace')).toHaveValue('m-marcos'));
     expect(calls.find((c) => c.key === HELP)?.body).toEqual({
       texto: STORY,
       objetivo_id: '',
@@ -830,17 +858,17 @@ describe('Leda completes the load from the free box', () => {
       criterio: '',
     });
     // What the person typed stays, without a mark; the rest is proposed and marked.
-    expect(screen.getByLabelText('título')).toHaveValue('Mi título');
-    expect(markOf('título')).toBeNull();
-    expect(screen.getByLabelText('objetivo')).toHaveValue('o1');
-    expect(screen.getByLabelText('descripción (opcional)')).toHaveValue(FULL.propuesta.descripcion);
-    expect(screen.getByLabelText('criterio de aceptación')).toHaveValue(FULL.propuesta.criterio);
-    for (const label of ['objetivo', 'descripción (opcional)', 'quién la hace', 'fecha', 'criterio de aceptación']) {
+    expect(screen.getByLabelText('Título')).toHaveValue('Mi título');
+    expect(markOf('Título')).toBeNull();
+    expect(screen.getByLabelText('Objetivo')).toHaveValue('o1');
+    expect(screen.getByLabelText('Descripción (opcional)')).toHaveValue(FULL.propuesta.descripcion);
+    expect(screen.getByLabelText('Criterio de aceptación')).toHaveValue(FULL.propuesta.criterio);
+    for (const label of ['Objetivo', 'Descripción (opcional)', 'Quién la hace', 'Fecha', 'Criterio de aceptación']) {
       expect(markOf(label)).toBeInTheDocument();
     }
     expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
     expect(
-      within(screen.getByRole('group', { name: 'fecha' })).getByRole('button', { name: 'vie 16.10' }),
+      within(screen.getByRole('group', { name: 'Fecha' })).getByRole('button', { name: 'vie 16.10' }),
     ).toHaveAttribute('aria-pressed', 'true');
     // The free text stays in its box, and the preview shows what was proposed.
     expect(screen.getByLabelText(BOX)).toHaveValue(STORY);
@@ -851,10 +879,10 @@ describe('Leda completes the load from the free box', () => {
     await openForm({ [HELP]: proposed(FULL) });
     tell();
     askLeda();
-    await waitFor(() => expect(markOf('criterio de aceptación')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Suenan las 12' } });
-    expect(markOf('criterio de aceptación')).toBeNull();
-    expect(markOf('descripción (opcional)')).toBeInTheDocument();
+    await waitFor(() => expect(markOf('Criterio de aceptación')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), { target: { value: 'Suenan las 12' } });
+    expect(markOf('Criterio de aceptación')).toBeNull();
+    expect(markOf('Descripción (opcional)')).toBeInTheDocument();
   });
 
   /** Holds Leda's answer until the test releases it, as a slow AI would. */
@@ -878,14 +906,14 @@ describe('Leda completes the load from the free box', () => {
     tell();
     askLeda();
     expect(screen.getByRole('button', { name: 'completando…' })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Lo mío' } });
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), { target: { value: 'Lo mío' } });
     release(FULL);
     expect(await screen.findByText(STALE_ANSWER)).toBeInTheDocument();
-    expect(screen.getByLabelText('criterio de aceptación')).toHaveValue('Lo mío');
-    expect(screen.getByLabelText('quién la hace')).toHaveValue('');
-    expect(screen.getByLabelText('título')).toHaveValue('');
-    expect(markOf('criterio de aceptación')).toBeNull();
-    expect(markOf('título')).toBeNull();
+    expect(screen.getByLabelText('Criterio de aceptación')).toHaveValue('Lo mío');
+    expect(screen.getByLabelText('Quién la hace')).toHaveValue('');
+    expect(screen.getByLabelText('Título')).toHaveValue('');
+    expect(markOf('Criterio de aceptación')).toBeNull();
+    expect(markOf('Título')).toBeNull();
     expect(screen.getByRole('button', { name: '> completar con Leda' })).toBeEnabled();
   });
 
@@ -896,8 +924,8 @@ describe('Leda completes the load from the free box', () => {
     tell(`${STORY} y que lo revise ismael`);
     release(FULL);
     expect(await screen.findByText(STALE_ANSWER)).toBeInTheDocument();
-    expect(screen.getByLabelText('título')).toHaveValue('');
-    expect(screen.getByLabelText('quién la hace')).toHaveValue('');
+    expect(screen.getByLabelText('Título')).toHaveValue('');
+    expect(screen.getByLabelText('Quién la hace')).toHaveValue('');
     expect(screen.getByLabelText(BOX)).toHaveValue(`${STORY} y que lo revise ismael`);
   });
 
@@ -906,7 +934,7 @@ describe('Leda completes the load from the free box', () => {
     tell();
     askLeda();
     release(FULL);
-    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveValue('m-marcos'));
+    await waitFor(() => expect(screen.getByLabelText('Quién la hace')).toHaveValue('m-marcos'));
     expect(screen.queryByText(STALE_ANSWER)).toBeNull();
   });
 
@@ -930,7 +958,7 @@ describe('Leda completes the load from the free box', () => {
     expect(
       await screen.findByText('No queda nada para completar: el formulario ya tiene todo lo que Leda puede proponer.'),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('título')).toHaveValue('');
+    expect(screen.getByLabelText('Título')).toHaveValue('');
     expect(screen.getByRole('button', { name: '> completar con Leda' })).toBeEnabled();
   });
 
@@ -974,18 +1002,18 @@ describe('Leda completes the load from the free box', () => {
       await screen.findByText('No pude proponer el criterio con lo que escribiste; contame cómo se comprueba.'),
     ).toBeInTheDocument();
     expect(screen.getByText(/No puse la fecha/)).toBeInTheDocument();
-    expect(screen.getByLabelText('quién la hace')).toHaveValue('');
+    expect(screen.getByLabelText('Quién la hace')).toHaveValue('');
     const pickOne = screen.getByRole('group', { name: 'elegí quién la hace' });
     fireEvent.click(within(pickOne).getByRole('button', { name: 'Lucas · Infraestructura' }));
-    expect(screen.getByLabelText('quién la hace')).toHaveValue('m-lucas');
+    expect(screen.getByLabelText('Quién la hace')).toHaveValue('m-lucas');
     // Her choice, not a proposal: no mark, and the choices go.
-    expect(markOf('quién la hace')).toBeNull();
+    expect(markOf('Quién la hace')).toBeNull();
     expect(screen.queryByRole('group', { name: 'elegí quién la hace' })).toBeNull();
   });
 
   it('when Leda cannot answer it says so plainly and nothing changes', async () => {
     await openForm({ [HELP]: { status: 503, body: { error: 'sin_ayuda', texto: 'x' } } });
-    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Mi título' } });
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Mi título' } });
     tell();
     askLeda();
     expect(
@@ -993,8 +1021,8 @@ describe('Leda completes the load from the free box', () => {
         'Leda no pudo completar ahora. Lo que escribiste sigue acá: completalo vos o probá de nuevo en un rato.',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('título')).toHaveValue('Mi título');
-    expect(screen.getByLabelText('criterio de aceptación')).toHaveValue('');
+    expect(screen.getByLabelText('Título')).toHaveValue('Mi título');
+    expect(screen.getByLabelText('Criterio de aceptación')).toHaveValue('');
     expect(screen.getByLabelText(BOX)).toHaveValue(STORY);
     expect(screen.getByRole('button', { name: '> completar con Leda' })).toBeEnabled();
   });
@@ -1016,10 +1044,10 @@ describe('Leda completes the load from the free box', () => {
     });
     tell();
     askLeda();
-    await waitFor(() => expect(screen.getByLabelText('título')).toHaveValue('Configurar'));
-    expect(screen.getByLabelText('quién la hace')).toHaveValue('');
-    expect(screen.getByLabelText('objetivo')).toHaveValue('');
-    expect(markOf('fecha')).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText('Título')).toHaveValue('Configurar'));
+    expect(screen.getByLabelText('Quién la hace')).toHaveValue('');
+    expect(screen.getByLabelText('Objetivo')).toHaveValue('');
+    expect(markOf('Fecha')).toBeNull();
   });
 
   it('confirm after the proposals loads once, with what the preview shows', async () => {
@@ -1027,8 +1055,8 @@ describe('Leda completes the load from the free box', () => {
     const calls = await openForm({ [HELP]: proposed(FULL), [TASKS]: loaded() });
     tell();
     askLeda();
-    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveValue('m-marcos'));
-    pick('quién la decidió', 'm-ismael');
+    await waitFor(() => expect(screen.getByLabelText('Quién la hace')).toHaveValue('m-marcos'));
+    pick('Quién la decidió', 'm-ismael');
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS);

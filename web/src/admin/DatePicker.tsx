@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { shortDate, weekdayOf } from '../format';
-import { FIELD_HINT } from './typography';
+import { FIELD_HINT, TEXT_SIZE } from './typography';
 
 const MONTHS = [
   'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -111,7 +111,7 @@ export function DatePicker({ id, days, value, onChange, labelledBy, describedBy,
       aria-describedby={describedBy}
       className={`flex w-full min-w-0 max-w-full flex-col gap-2 sm:max-w-[19rem] rounded-card border-hard ${invalid ? 'border-falta' : 'border-line'} bg-card p-2.5 shadow-hard`}
     >
-      <div className="flex items-center justify-between gap-2 text-body pointer-coarse:text-[16px]">
+      <div className={`flex items-center justify-between gap-2 ${TEXT_SIZE}`}>
         <button
           type="button"
           className={arrow}
@@ -140,7 +140,7 @@ export function DatePicker({ id, days, value, onChange, labelledBy, describedBy,
           <ChevronRight aria-hidden="true" size={14} strokeWidth={2} />
         </button>
       </div>
-      <div ref={grid} className="grid min-w-0 grid-cols-7 gap-1 text-center text-body pointer-coarse:text-[16px]">
+      <div ref={grid} className={`grid min-w-0 grid-cols-7 gap-1 text-center ${TEXT_SIZE}`}>
         {WEEK.map((d, i) => (
           <span key={i} aria-hidden="true" className={FIELD_HINT}>
             {d}

@@ -8,7 +8,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AdminApp } from './admin/AdminApp';
 import { App } from './App';
+import { stopFocusZoomOnIOS } from './admin/viewport';
 import { isAdminDoor } from './door';
+
+// Before the first render, so no control is ever focused with the zoom still on (J2-10).
+stopFocusZoomOnIOS();
 
 const root = document.getElementById('root');
 if (root) {

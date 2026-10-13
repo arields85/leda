@@ -5,6 +5,7 @@ import { Notice } from '../components/Notice';
 import { SignOut } from '../components/SignOut';
 import { adminSignOut, fetchAdminMe, fetchOptions, type AdminMe, type Options } from './api';
 import { LoadForm } from './LoadForm';
+import { TEXT_SIZE } from './typography';
 
 type Load<T> =
   | { kind: 'loading' }
@@ -118,7 +119,7 @@ export function AdminApp() {
           <label className="flex w-full min-w-0 max-w-[24rem] flex-col gap-1.5 text-meta text-ink-dim">
             <span className="uppercase tracking-[0.04em]">espacio</span>
             <select
-              className="block w-full min-w-0 max-w-full rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none pointer-coarse:text-[16px] focus:border-ink"
+              className={`block w-full min-w-0 max-w-full rounded-card border-hard border-line bg-card px-3 py-2 text-ink outline-none focus:border-ink ${TEXT_SIZE}`}
               value={spaceId ?? ''}
               onChange={(e) => setSpaceId(e.target.value || null)}
             >

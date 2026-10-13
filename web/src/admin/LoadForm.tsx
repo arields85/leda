@@ -27,7 +27,7 @@ import {
   waitLabel,
 } from './draft';
 import { TaskPreview } from './TaskPreview';
-import { CONTROL, FIELD_HINT, FIELD_TITLE, FIELD_VALUE } from './typography';
+import { CONTROL, FIELD_HINT, FIELD_TITLE, FIELD_VALUE, TEXT_SIZE } from './typography';
 
 // The server's words when the free box is empty (src/leda/web_app.py, TEXTOS_DE_LA_AYUDA).
 const STORY_MISSING = 'Contame primero qué querés hacer; con eso Leda completa lo que pueda.';
@@ -46,10 +46,8 @@ const INPUT = `${CONTROL} aria-[invalid=true]:border-falta`;
 const SELECT = `${INPUT} appearance-none pr-9`;
 // Dimmed while something required is missing, but never `disabled`: a tap still says what is
 // missing and takes the person there.
-const PRIMARY =
-  'inline-flex h-11 items-center gap-2 rounded-card border-hard border-ink bg-card px-3.5 text-button font-bold text-ink shadow-hard-ink disabled:opacity-50 aria-disabled:opacity-50 aria-disabled:shadow-none';
-const SECONDARY =
-  'inline-flex h-11 items-center rounded-card border-hard border-line-soft bg-transparent px-3.5 text-button text-ink-soft disabled:opacity-50';
+const PRIMARY = `inline-flex h-11 items-center gap-2 rounded-card border-hard border-ink bg-card px-3.5 ${TEXT_SIZE} font-bold text-ink shadow-hard-ink disabled:opacity-50 aria-disabled:opacity-50 aria-disabled:shadow-none`;
+const SECONDARY = `inline-flex h-11 items-center rounded-card border-hard border-line-soft bg-transparent px-3.5 ${TEXT_SIZE} text-ink-soft disabled:opacity-50`;
 // Takes the color of the line it is in.
 const FIELD_LINK =
   'cursor-pointer border-0 bg-transparent p-0 text-left font-bold underline decoration-dotted underline-offset-2';
@@ -481,7 +479,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         <fieldset disabled={sending} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
           <HelpBox story={story} onStory={setStory} help={help} onAsk={ask} onChoose={choose} />
 
-          <FieldBlock id="f-objetivo" label="objetivo" errors={on('objetivo_id')} proposed={proposed.has('objetivo_id')}
+          <FieldBlock id="f-objetivo" label="Objetivo" errors={on('objetivo_id')} proposed={proposed.has('objetivo_id')}
             hint={options.objetivos.length === 0 ? 'No hay objetivos abiertos en este espacio.' : undefined}>
             <Select
               id="f-objetivo"
@@ -500,7 +498,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             </Select>
           </FieldBlock>
 
-          <FieldBlock id="f-titulo" label="título" errors={on('titulo')} proposed={proposed.has('titulo')}
+          <FieldBlock id="f-titulo" label="Título" errors={on('titulo')} proposed={proposed.has('titulo')}
             extra={<Counter value={draft.titulo} limit={LIMITS.titulo} />}>
             <input
               id="f-titulo"
@@ -513,7 +511,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             />
           </FieldBlock>
 
-          <FieldBlock id="f-descripcion" label="descripción (opcional)" errors={on('descripcion')}
+          <FieldBlock id="f-descripcion" label="Descripción (opcional)" errors={on('descripcion')}
             proposed={proposed.has('descripcion')}
             extra={<Counter value={draft.descripcion} limit={LIMITS.descripcion} />}>
             <textarea
@@ -528,7 +526,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
           <FieldBlock
             id="f-responsable"
-            label="quién la hace"
+            label="Quién la hace"
             errors={on('responsable_id')}
             proposed={proposed.has('responsable_id')}
             hint={
@@ -560,7 +558,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
           <FieldBlock
             id="f-fecha"
-            label="fecha"
+            label="Fecha"
             errors={on('fecha')}
             proposed={proposed.has('fecha')}
             extra={draft.fecha ? <span className={`shrink-0 ${FIELD_VALUE}`}>{dayLabel(draft.fecha)}</span> : undefined}
@@ -583,7 +581,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
           <FieldBlock
             id="f-espera"
-            label="espera a (opcional)"
+            label="Espera a (opcional)"
             errors={on('espera_id')}
             proposed={proposed.has('espera_id')}
             hint={
@@ -610,7 +608,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             </Select>
           </FieldBlock>
 
-          <FieldBlock id="f-criterio" label="criterio de aceptación" errors={on('criterio')}
+          <FieldBlock id="f-criterio" label="Criterio de aceptación" errors={on('criterio')}
             proposed={proposed.has('criterio')}
             extra={<Counter value={draft.criterio} limit={LIMITS.criterio} />}
             hint="Qué tiene que pasar para darla por terminada.">
@@ -631,7 +629,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             className="m-0 flex min-w-0 flex-col gap-1.5 border-0 p-0 outline-none"
             aria-describedby={described('f-evidencia', 'evidencia')}
           >
-            <legend className={`mb-1.5 p-0 ${FIELD_TITLE}`}>evidencia que se pide</legend>
+            <legend className={`mb-1.5 p-0 ${FIELD_TITLE}`}>Evidencia que se pide</legend>
             {!member && <p className={`m-0 ${FIELD_HINT}`}>Elegí primero quién la hace.</p>}
             {member && !policy && (
               <p className={`m-0 ${FIELD_HINT}`}>El área de esa persona todavía no tiene definida qué evidencia se pide.</p>
@@ -667,7 +665,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             )}
           </fieldset>
 
-          <FieldBlock id="f-decidio" label="quién la decidió" errors={on('decidio_id')}>
+          <FieldBlock id="f-decidio" label="Quién la decidió" errors={on('decidio_id')}>
             <Select
               id="f-decidio"
               value={draft.decidio_id}
@@ -690,7 +688,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         aria-labelledby="vista-previa"
         className="flex min-w-0 max-w-full flex-col gap-2 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto"
       >
-        <h2 id="vista-previa" className="m-0 text-meta font-normal uppercase tracking-[0.04em] text-ink-dim">
+        <h2 id="vista-previa" className={`m-0 ${FIELD_TITLE}`}>
           Vista previa
         </h2>
         <TaskPreview draft={draft} options={options} admin={admin} />
