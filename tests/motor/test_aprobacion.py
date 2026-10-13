@@ -728,6 +728,48 @@ def test_una_pregunta_de_cual_de_las_dos_que_quedo_para_despues_no_pisa_lo_escri
     assert _decisiones(conn, tarea) == [(decision, propio)]
 
 
+@pytest.mark.parametrize("mezcla", ["las_dos_jugadas", "un_comentario_que_pide_algo"])
+def test_una_pregunta_de_cual_de_las_dos_que_quedo_para_despues_no_se_reusa_con_otro_mensaje(
+        conn, mundo, turnos, mezcla):
+    """T4c (límite de la T4b): la pregunta de cuál de las dos se hace una sola vez a lo que la
+    persona está contestando, la abierta que vio en un mensaje anterior. Una que quedó para
+    después, porque otro tema la tapó, no es el contexto de un mensaje nuevo que vuelve a
+    admitir dos lecturas: no se cierra ofreciendo sus botones viejos, con el comentario viejo.
+    La reemplaza la del mensaje nuevo (situación general 7), con el comentario nuevo en sus
+    opciones, y nada se decide hasta que elija."""
+    _dos_entregadas(conn, mundo, turnos)
+    tarea = str(uno(conn, "select id from task where titulo = %s", ENTREGADA)["id"])
+    viejo, nuevo = "que revise los colores", "que cambie la etiqueta del tablero"
+    turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1", "comentario": viejo}),
+                Jugada("pedir_cambios", {"tarea": "T1", "comentario": viejo}),
+                texto=f"aprobado, pero {viejo}")
+    vieja = uno(conn, "select * from conversation_question where tipo = %s",
+                preguntas.CUAL_DE_LAS_DOS)
+    r = turnos.dice("Ismael", Jugada("pedir_cambios", {"tarea": "T2"}),
+                    texto="a la del cableado le pido cambios")
+    assert r.pregunta["tipo"] == preguntas.QUE_CAMBIOS_PIDE
+    jugadas = [Jugada("aprobar", {"tarea": "T1", "comentario": nuevo})]
+    if mezcla == "las_dos_jugadas":
+        jugadas.append(Jugada("pedir_cambios", {"tarea": "T1", "comentario": nuevo}))
+    r = turnos.dice("Ismael", *jugadas, texto=f"el tablero aprobado, pero {nuevo}")
+    assert _hecho(r, "aprobar")["resultado"] == "dos_lecturas"
+    assert r.pregunta["tipo"] == preguntas.CUAL_DE_LAS_DOS
+    [abierta] = todos(conn, """select * from conversation_question
+                                where tipo = %s and cerrada_en is null""",
+                      preguntas.CUAL_DE_LAS_DOS)
+    assert str(abierta["id"]) != str(vieja["id"])
+    comentarios = [(o["valor"]["datos"] or {}).get("comentario") for o in todos(
+        conn, "select valor from conversation_option where question_id = %s order by orden",
+        abierta["id"])]
+    assert comentarios == [nuevo, nuevo]
+    vieja = uno(conn, "select * from conversation_question where id = %s", vieja["id"])
+    assert vieja["cierre"] == "sin_efecto" and vieja["cierre_detalle"]["reemplazada"] is True
+    assert _decisiones(conn, tarea) == []
+    r = turnos.toca("Ismael", _token(conn, "Aprobar", tarea))
+    assert _hecho(r, "aprobar")["resultado"] == "anotado"
+    assert _decisiones(conn, tarea) == [("aprobado", nuevo)]
+
+
 def test_aprobar_con_un_comentario_que_no_pide_nada_va_directo(conn, mundo, turnos):
     """Precisión del usuario a la decisión 22 (2026-10-08, D7c): un elogio o una observación que
     no le pide nada a nadie aprueba directo, como antes de la D7b, y el comentario le llega al

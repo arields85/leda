@@ -229,13 +229,9 @@ def _la_pregunta_de_cual(ctx, tarea: dict) -> dict | None:
     mismo mensaje todavía no se contestó). Es la misma guarda de lo último que vio que usan las
     confirmaciones escritas (`entrega`, `pase`, `apodos`). Una que quedó para después, porque
     otro tema la tapó, no es el contexto de lo que se escribe ahora: lo escrito sobre la tarea
-    vale por sí mismo (T4b, revisión de la T4)."""
-    abierta = preguntas.actual(ctx.cur, ctx.quien.membership_id)
-    if (abierta is None or abierta["tipo"] != preguntas.CUAL_DE_LAS_DOS
-            or str(abierta["task_id"]) != str(tarea["id"])
-            or str(abierta["id"]) in ctx.preguntas_del_turno):
-        return None
-    return abierta
+    vale por sí mismo (T4b, revisión de la T4; `preguntas.la_que_vio`, la misma que usa
+    `fichas.dos_lecturas`)."""
+    return preguntas.la_que_vio(ctx, preguntas.CUAL_DE_LAS_DOS, tarea["id"])
 
 
 def _la_lectura_elegida(ctx, nombre: str, datos: dict, tarea: dict) -> dict:

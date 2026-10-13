@@ -1989,19 +1989,22 @@ def dos_lecturas(ctx: Contexto, a: Jugada, b: Jugada) -> dict[str, Any]:
     mensaje anterior, volver a mezclar las dos tampoco elige, y no se repite: Leda no decide, y
     la entrega sigue esperando con sus opciones como botones (`situaciones.no_eligio`). La
     pregunta guarda la huella de lo entregado: lo que se elija decide sobre lo que valía al
-    preguntar (ADR 0018, decisión 2)."""
+    preguntar (ADR 0018, decisión 2).
+
+    "Ya se hizo" es la que la persona está contestando: la abierta que vio en un mensaje
+    anterior (`preguntas.la_que_vio`, la guarda de lo último que vio). Una que quedó para
+    después, porque otro tema la tapó, no es el contexto de este mensaje (T4c): la reemplaza la
+    pregunta nueva, con lo que dice este mensaje en sus opciones (situación general 7), y un
+    toque viejo a sus botones dice que dejó de valer."""
     tarea = ctx.tarea(str(a.datos["tarea"]))
     if tarea is None:
         return correr(FICHAS[a.nombre], ctx, a)
-    ctx.cur.execute("""select * from conversation_question
-                        where membership_id = %s and tipo = %s and task_id = %s
-                          and cerrada_en is null and not (id = any(%s::uuid[]))
-                        order by abierta_en limit 1""",
-                    (ctx.quien.membership_id, preguntas.CUAL_DE_LAS_DOS, tarea["id"],
-                     list(ctx.preguntas_del_turno)))
-    hecha = ctx.cur.fetchone()
+    hecha = preguntas.la_que_vio(ctx, preguntas.CUAL_DE_LAS_DOS, tarea["id"])
     if hecha is not None:
         return {"jugada": a.nombre, **situaciones.no_eligio(ctx, hecha)}
+    preguntas.cerrar_de_tipo(ctx, preguntas.CUAL_DE_LAS_DOS, tarea["id"], "sin_efecto",
+                             {"reemplazada": True, "tarea": tarea["id"]},
+                             salvo=ctx.preguntas_del_turno)
     from . import entrega        # entrega importa fichas
     opciones = []
     for una, otra in ((a, b), (b, a)):

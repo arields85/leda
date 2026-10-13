@@ -250,6 +250,19 @@ def actual(cur, membership_id: str) -> dict[str, Any] | None:
     return cur.fetchone()
 
 
+def la_que_vio(ctx, tipo: str, task_id) -> dict[str, Any] | None:
+    """La pregunta de ese tipo sobre esa tarea que la persona está contestando: la abierta (un
+    tema a la vez), que vio en un mensaje anterior (la de este mismo mensaje todavía no se
+    contestó). Es la guarda de lo último que vio. Una que quedó para después, porque otro tema
+    la tapó, no es el contexto de lo que se escribe ahora (T4b y T4c)."""
+    abierta = actual(ctx.cur, ctx.quien.membership_id)
+    if (abierta is None or abierta["tipo"] != tipo
+            or str(abierta["task_id"]) != str(task_id)
+            or str(abierta["id"]) in ctx.preguntas_del_turno):
+        return None
+    return abierta
+
+
 def para_despues(cur, membership_id: str) -> list[dict[str, Any]]:
     cur.execute("""select * from conversation_question
                     where membership_id = %s and cerrada_en is null
@@ -586,11 +599,14 @@ def cerrar(ctx, pregunta_id: str, cierre: str, detalle: dict[str, Any]) -> None:
         (ctx.ahora, ctx.quien.membership_id, pregunta_id))
 
 
-def cerrar_de_tipo(ctx, tipo: str, task_id: str, cierre: str, detalle: dict[str, Any]) -> None:
+def cerrar_de_tipo(ctx, tipo: str, task_id: str, cierre: str, detalle: dict[str, Any], *,
+                   salvo: Sequence[str] = ()) -> None:
+    """Las preguntas sin cerrar de la persona, de ese tipo sobre esa tarea, salvo las de `salvo`
+    (las de este mismo mensaje, cuando lo nuevo no las reemplaza)."""
     ctx.cur.execute("""select id from conversation_question
                         where membership_id = %s and tipo = %s and task_id = %s
-                          and cerrada_en is null""",
-                    (ctx.quien.membership_id, tipo, task_id))
+                          and cerrada_en is null and not (id = any(%s::uuid[]))""",
+                    (ctx.quien.membership_id, tipo, task_id, list(salvo)))
     for fila in ctx.cur.fetchall():
         cerrar(ctx, str(fila["id"]), cierre, detalle)
 
