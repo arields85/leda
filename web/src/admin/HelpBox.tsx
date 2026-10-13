@@ -10,11 +10,15 @@ export const STORY_LIMIT = 1000;
 export type HelpState =
   | { kind: 'idle' }
   | { kind: 'asking' }
+  | { kind: 'stale' }
   | { kind: 'done'; notes: Problem[]; choices: Candidate[]; nothing: boolean }
   | { kind: 'rejected'; errors: Problem[] }
   | { kind: 'failed'; text: string };
 
 export const NOTHING_TO_COMPLETE = 'Leda no encontró nada para completar con lo que escribiste.';
+/** The person changed the free text or a field while Leda was answering: the answer was made for
+ * what the form had when she asked, so it fills nothing (review review-03b5c3a74d3719b7). */
+export const STALE_ANSWER = 'Cambiaste lo escrito mientras Leda completaba; tocá completar de nuevo.';
 
 const BOX =
   'block w-full min-w-0 max-w-full min-h-24 resize-y rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none pointer-coarse:text-[16px] focus:border-ink';
@@ -121,6 +125,7 @@ export function HelpBox({ story, onStory, help, onAsk, onChoose }: HelpBoxProps)
         {help.kind === 'rejected' && help.errors.map((e) => (
           <Line key={`${e.campo}-${e.motivo}`} warn>{e.texto}</Line>
         ))}
+        {help.kind === 'stale' && <Line>{STALE_ANSWER}</Line>}
         {help.kind === 'done' && help.nothing && <Line>{NOTHING_TO_COMPLETE}</Line>}
         {help.kind === 'done' && help.notes.map((n) => (
           <Line key={`${n.campo}-${n.motivo}`}>{n.texto}</Line>

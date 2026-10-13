@@ -661,6 +661,7 @@ describe('AdminApp', () => {
 
 const HELP = `POST /app/admin/api/espacios/${SPACE}/ayuda`;
 const BOX = 'Contame qué querés hacer y te ayudo';
+const STALE_ANSWER = 'Cambiaste lo escrito mientras Leda completaba; tocá completar de nuevo.';
 const STORY =
   'hay que configurar las alarmas del scada que lo haga marcos para el viernes tienen que sonar las 12 en la sala de control';
 
@@ -748,7 +749,8 @@ describe('Leda completes the load from the free box', () => {
     expect(markOf('descripción (opcional)')).toBeInTheDocument();
   });
 
-  it('never overwrites what the person typed while Leda was answering', async () => {
+  /** Holds Leda's answer until the test releases it, as a slow AI would. */
+  async function holdTheAnswer() {
     await openForm();
     let answer: (r: Response) => void = () => {};
     const real = globalThis.fetch;
@@ -758,14 +760,81 @@ describe('Leda completes the load from the free box', () => {
         url.endsWith('/ayuda') ? new Promise<Response>((resolve) => (answer = resolve)) : real(url, init),
       ),
     );
+    return (body: unknown) =>
+      answer(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  }
+
+  it('a field changed while Leda was answering: the old answer fills nothing, and it says so quietly', async () => {
+    // Review review-03b5c3a74d3719b7: the answer was made for what the form had when it was asked.
+    const release = await holdTheAnswer();
     tell();
     askLeda();
     expect(screen.getByRole('button', { name: 'completando…' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Lo mío' } });
-    answer(new Response(JSON.stringify(FULL), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveValue('m-marcos'));
+    release(FULL);
+    expect(await screen.findByText(STALE_ANSWER)).toBeInTheDocument();
     expect(screen.getByLabelText('criterio de aceptación')).toHaveValue('Lo mío');
+    expect(screen.getByLabelText('quién la hace')).toHaveValue('');
+    expect(screen.getByLabelText('título')).toHaveValue('');
     expect(markOf('criterio de aceptación')).toBeNull();
+    expect(markOf('título')).toBeNull();
+    expect(screen.getByRole('button', { name: '> completar con Leda' })).toBeEnabled();
+  });
+
+  it('the free text changed while Leda was answering: the old answer fills nothing', async () => {
+    const release = await holdTheAnswer();
+    tell();
+    askLeda();
+    tell(`${STORY} y que lo revise ismael`);
+    release(FULL);
+    expect(await screen.findByText(STALE_ANSWER)).toBeInTheDocument();
+    expect(screen.getByLabelText('título')).toHaveValue('');
+    expect(screen.getByLabelText('quién la hace')).toHaveValue('');
+    expect(screen.getByLabelText(BOX)).toHaveValue(`${STORY} y que lo revise ismael`);
+  });
+
+  it('nothing changed while Leda was answering: the answer fills the empty fields', async () => {
+    const release = await holdTheAnswer();
+    tell();
+    askLeda();
+    release(FULL);
+    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveValue('m-marcos'));
+    expect(screen.queryByText(STALE_ANSWER)).toBeNull();
+  });
+
+  it('a 422 says why Leda could not complete, and nothing changes', async () => {
+    await openForm({
+      [HELP]: {
+        status: 422,
+        body: {
+          errores: [
+            {
+              campo: 'ayuda',
+              motivo: 'nada_que_completar',
+              texto: 'No queda nada para completar: el formulario ya tiene todo lo que Leda puede proponer.',
+            },
+          ],
+        },
+      },
+    });
+    tell();
+    askLeda();
+    expect(
+      await screen.findByText('No queda nada para completar: el formulario ya tiene todo lo que Leda puede proponer.'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('título')).toHaveValue('');
+    expect(screen.getByRole('button', { name: '> completar con Leda' })).toBeEnabled();
+  });
+
+  it('a 422 without its reasons is never silent: it reads as "could not complete"', async () => {
+    await openForm({ [HELP]: { status: 422, body: {} } });
+    tell();
+    askLeda();
+    expect(
+      await screen.findByText(
+        'Leda no pudo completar ahora. Lo que escribiste sigue acá: completalo vos o probá de nuevo en un rato.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('says what it could not propose, and shows the people to pick without choosing', async () => {

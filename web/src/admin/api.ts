@@ -209,7 +209,9 @@ export async function askLeda(spaceId: string, input: HelpInput): Promise<HelpRe
   }
   if (response.status === 422) {
     const body = (await response.json()) as { errores?: Problem[] };
-    return { kind: 'rejected', errors: body.errores ?? [] };
+    // A rejection always says why; one without its reasons is never shown as silence.
+    const errors = Array.isArray(body?.errores) ? body.errores : [];
+    return errors.length > 0 ? { kind: 'rejected', errors } : { kind: 'failed', text: HELP_FAILED };
   }
   return { kind: 'failed', text: HELP_FAILED };
 }

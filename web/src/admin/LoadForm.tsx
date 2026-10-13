@@ -212,6 +212,8 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const [proposed, setProposed] = useState<ReadonlySet<Field>>(new Set());
   const latest = useRef(draft);
   latest.current = draft;
+  const latestStory = useRef(story);
+  latestStory.current = story;
 
   useEffect(() => {
     if (step.kind === 'done') heading.current?.focus();
@@ -287,18 +289,19 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     }
     setHelp({ kind: 'asking' });
     const { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio } = latest.current;
+    const asked = { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio };
     try {
-      const result = await askLeda(spaceId, {
-        texto,
-        objetivo_id,
-        titulo,
-        descripcion,
-        responsable_id,
-        fecha,
-        espera_id,
-        criterio,
-      });
-      if (result.kind === 'proposed') {
+      const result = await askLeda(spaceId, { texto, ...asked });
+      // The answer is for what the form had when she asked. If she changed the free text or a
+      // field meanwhile, it may no longer fit (another person, another wait, other words): it
+      // fills nothing, and the box says so quietly (review review-03b5c3a74d3719b7).
+      const now = latest.current;
+      const changed =
+        latestStory.current.trim() !== texto ||
+        (Object.keys(asked) as (keyof typeof asked)[]).some((field) => now[field] !== asked[field]);
+      if (changed && result.kind !== 'failed') {
+        setHelp({ kind: 'stale' });
+      } else if (result.kind === 'proposed') {
         const filled = apply(result.proposal);
         const choices = latest.current.responsable_id
           ? []
