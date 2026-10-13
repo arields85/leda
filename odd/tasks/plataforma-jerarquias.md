@@ -194,12 +194,64 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       propuesta de título y criterio del alta del flujo congelado (`alta_turno.py` en la etiqueta
       `respaldo-flujos-antes-de-d`: `CAMPOS_PROPONIBLES`, el criterio que dice cómo se comprueba), como
       referencia para adaptar, no para copiar el flujo.
+      Ruta: delegada (un escritor; servidor, web, pruebas y la herramienta de medición).
+  - [ ] **J2-1 · Diseño corto** (abajo, "Diseño corto (J2-1)"); la entrada, cambiada por el usuario el
+        2026-10-13: un solo recuadro libre.
+  - [ ] **J2-2 · Las garantías, primero en rojo**, con una IA de mentira.
+  - [ ] **J2-3 · El servidor y la web.**
+  - [ ] **J2-4 · La herramienta de medición** para una ronda real (no se corre sin permiso).
+  - [ ] **J2-5 · Prueba real en el celular** (con el usuario).
+  - [ ] **J2-6 · La ronda con la IA real** (la lanza el coordinador, con permiso).
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
+
+**Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
+libre, "Contame qué querés hacer y te ayudo" (escrito o dictado), y el botón "> completar con Leda". Es
+opcional: cargar a mano sigue igual. El micrófono aparece sólo si el navegador reconoce la voz
+(`SpeechRecognition` o `webkitSpeechRecognition`); sin permiso dice "No tengo permiso para el micrófono;
+escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo al tocar el botón.
+- **El pedido:** `POST /app/admin/api/espacios/{id}/ayuda` (los controles de la carga: otro sitio, JSON,
+  tamaño, la sesión de administración), con el texto libre (hasta 1000 caracteres) y lo que ya tiene el
+  formulario. Leda propone sólo lo que está vacío; sin texto o sin nada vacío, 422 con su motivo.
+- **Tres pasos, para que el candado de la web nunca espere a la IA:** (1) con el candado, la sesión, las
+  opciones de ese espacio (`opciones_de_la_carga`, las mismas del formulario) y la IA del espacio
+  (`entrada._ia_de`); (2) sin el candado, una sola llamada, sin reintento (la persona puede volver a tocar);
+  (3) con el candado, dentro del espacio, la sesión otra vez, los controles y la auditoría.
+- **Qué recibe la IA**, sólo de ese espacio: el texto, lo que ya está escrito, hoy y los días que vienen con
+  su día de la semana (`hechos.dia`), los objetivos abiertos (O1, O2…), las tareas abiertas para esperar
+  (T1, T2…, con su responsable y su objetivo) y, si ya se eligió quién la hace, su área y la evidencia que
+  pide. Los nombres de los integrantes no van: la IA devuelve las palabras con que se nombró a la persona.
+- **Qué devuelve:** título, descripción (lo contado, ordenado, sin agregar nada), criterio con la parte que
+  dice cómo se comprueba copiada tal cual (`como_se_comprueba`), las palabras de quién la hace, el código de
+  la espera, el del objetivo y la fecha (AAAA-MM-DD). Las instrucciones describen el trabajo, sin casos.
+- **Lo que decide el código** (cada dato que no pasa queda vacío y se dice por qué):
+  - **quién la hace**, sólo si sus palabras están en el texto: `fichas.integrantes_que_coinciden` (con los
+    apodos) en una transacción del espacio, después de la sesión. Nadie: "No encontré a X en el equipo.";
+    dos o más: se muestran para elegir, Leda no elige (ADR 0020, decisión 3). Elegirla marca la evidencia
+    del área, como hoy (la evidencia la pone el código, nunca la IA);
+  - **la espera**, un código de la lista; **el objetivo**, el de la tarea que espera si la hay y está
+    abierto; si no, un código de la lista;
+  - **la fecha**, sólo si es un día hábil de las opciones y el texto tiene el número del día, el nombre de
+    ese día de la semana o una palabra que lo dice ("hoy", "mañana", "pasado mañana", "la semana que viene",
+    "el mes que viene"…); si no, "No puse la fecha: …" (constitución §4: nunca una fecha que nadie dijo);
+  - **título, descripción y criterio:** el tope del formulario (200, 800 y 500); ningún número ni nombre que
+    no esté en lo que escribió la persona o en los datos de esta tarea (objetivo, espera, quién la hace y su
+    área, la evidencia), con `entrega.problema_del_ejemplo`, el criterio punto por punto
+    (`puntos_del_criterio`); y el criterio, con `como_se_comprueba` dentro de él. Si no pasa: "No pude
+    proponer el criterio con lo que escribiste; contame cómo se comprueba." (y lo mismo para los otros).
+- **Si la IA no responde** (sin configurar, sin sesión, plazo, cupo, respuesta ilegible): 503, en pantalla
+  "Leda no pudo completar ahora…", nada cambia y queda un incidente (`ayuda_al_cargar`), sin el error.
+- **La auditoría** (`proponer_al_cargar`, en el espacio, quien pidió como actor): qué se pidió, qué se
+  propuso y qué no (con su motivo), la IA, la sesión y la huella (sha256) de cada texto propuesto, no el
+  texto; con la sesión, que ya guarda la carga, se ve si lo cargado fue lo propuesto. **Sin migración:**
+  `leda_app` ya escribe `audit_log` e `incident` dentro de un espacio.
+- **En la web:** cada dato propuesto se completa sólo si sigue vacío al llegar la respuesta (nunca pisa lo
+  escrito), con la marca "propuesto por Leda" hasta que la persona lo cambia; el texto libre queda en su
+  recuadro. La vista previa y "confirmar" no cambian: se carga lo que la persona ve y confirma.
 
 ## De qué se parte en cada porción (explorador de sólo lectura, 2026-10-13)
 

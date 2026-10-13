@@ -108,6 +108,9 @@ ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 # T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
 ETAPA_MENSAJE_HUERFANO_FALLO = "mensaje_huerfano_fallo_al_avisar"
+# La ayuda de la IA al cargar una tarea en la plataforma (porción J2, `ayuda_al_cargar.py`): la IA
+# del espacio no respondió (sin configurar, sin sesión, el plazo, el cupo o una respuesta ilegible).
+ETAPA_AYUDA_AL_CARGAR = "ayuda_al_cargar"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -431,6 +434,16 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "bot se configure."),
         que_hacer=("Configurá el token del bot del espacio en el entorno del servidor y "
                    "reinicialo, o desactivá el espacio si no se usa.")),
+    ETAPA_AYUDA_AL_CARGAR: ExplicacionDeEtapa(
+        titulo="Leda no pudo completar una carga en la plataforma",
+        que_paso=("{nombre} tocó \"completar con Leda\" al cargar una tarea en la plataforma y "
+                  "la IA del espacio no respondió (sin configurar, sin la sesión de la "
+                  "suscripción, sin cupo, el plazo o una respuesta que no se pudo leer)."),
+        que_vio=("Que Leda no pudo completar ahora, con lo que escribió intacto; nada se "
+                 "cargó ni cambió."),
+        que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica) y revisá la IA "
+                   "del espacio (`python -m leda modelo`, `leda chatgpt estado`). No hace falta "
+                   "avisarle a {nombre}: puede volver a tocar el botón o cargarla a mano.")),
 }
 
 _EXPLICACION_GENERICA = ExplicacionDeEtapa(

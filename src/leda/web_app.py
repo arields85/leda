@@ -972,6 +972,219 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
     return _json({"errores": [_con_texto(e) for e in errores]}, 422)
 
 
+# --- La ayuda de la IA al cargar --------------------------------------------------------------
+#
+# Porción J2 de `odd/tasks/plataforma-jerarquias.md` (ADR 0023, punto 4; `ayuda_al_cargar.py`): la
+# persona cuenta qué quiere hacer y Leda propone lo que el formulario tiene vacío. Nada se carga:
+# la propuesta vuelve al formulario, que la muestra marcada. Tres pasos, para que el candado de la
+# web nunca espere a la IA: las opciones con el candado, la llamada sin él y los controles con la
+# auditoría (o el incidente) con el candado otra vez, en el espacio y con la sesión revalidada.
+
+TAMANO_MAXIMO_DE_LA_AYUDA = 16 * 1024
+TEXTO_SI_LA_IA_FALLA = ("Leda no pudo completar ahora. Lo que escribiste sigue acá: completalo "
+                        "vos o probá de nuevo en un rato.")
+TEXTOS_DE_LA_AYUDA = {
+    ("texto", "falta"): "Contame primero qué querés hacer; con eso Leda completa lo que pueda.",
+    ("texto", "demasiado_largo"): "Es demasiado largo para completar: hasta 1000 caracteres.",
+    ("ayuda", "nada_que_completar"):
+        "No queda nada para completar: el formulario ya tiene todo lo que Leda puede proponer.",
+}
+
+
+def _ia_de_la_ayuda(conn, espacio: str):
+    """La IA del espacio, la misma que conversa (`entrada._ia_de`); sin una configurada, la que
+    no responde."""
+    from .entrada import _ia_de
+
+    return _ia_de(conn, espacio)
+
+
+def _con_texto_de_la_ayuda(fila: dict[str, Any]) -> dict[str, str]:
+    texto = TEXTOS_DE_LA_AYUDA.get((fila["campo"], fila["motivo"]))
+    return ({"campo": fila["campo"], "motivo": fila["motivo"], "texto": texto} if texto
+            else _con_texto(fila))
+
+
+def _lo_escrito(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
+        dict[str, str], list[dict[str, str]]]:
+    """Lo que ya tiene el formulario, revisado contra las opciones del espacio: un id que no
+    está ahí (de otro espacio, cerrado o inventado) se rechaza como en la carga."""
+    escrito: dict[str, str] = {}
+    errores: list[dict[str, str]] = []
+    listas = {"objetivo": ("objetivos", "id", "no_existe"),
+              "responsable": ("integrantes", "membership_id", "no_es_integrante_activo"),
+              "espera": ("tareas", "id", "no_existe")}
+    for campo, clave in _CAMPOS_ID.items():
+        if campo == "decidio":
+            continue
+        valor = cuerpo.get(clave)
+        escrito[clave] = ""
+        if valor in (None, ""):
+            continue
+        try:
+            valor = str(uuid.UUID(valor)) if isinstance(valor, str) else None
+        except ValueError:
+            valor = None
+        lista, id_, motivo = listas[campo]
+        if valor is None:
+            errores.append(_mal_formado(campo))
+        elif not any(str(x.get(id_)) == valor for x in opciones.get(lista) or []):
+            errores.append({"campo": campo, "motivo": motivo})
+        else:
+            escrito[clave] = valor
+    for campo in ("titulo", "descripcion", "criterio"):
+        valor = cuerpo.get(campo)
+        if valor is not None and not isinstance(valor, str):
+            errores.append(_mal_formado(campo))
+        escrito[campo] = valor if isinstance(valor, str) else ""
+    fecha = cuerpo.get("fecha")
+    escrito["fecha"] = ""
+    if fecha not in (None, ""):
+        try:
+            escrito["fecha"] = date.fromisoformat(fecha).isoformat() if isinstance(fecha, str) \
+                else ""
+        except ValueError:
+            pass
+        if not escrito["fecha"]:
+            errores.append(_mal_formado("fecha"))
+    return escrito, errores
+
+
+@router.post("/admin/api/espacios/{espacio_id}/ayuda")
+async def ayudar_a_cargar(espacio_id: str, request: Request):
+    """Lo que Leda propone para completar una carga a partir de lo que contó la persona: 200 con
+    la propuesta (sólo lo vacío), las personas para elegir y lo que no pudo proponer; 422 sin
+    texto, con nada para completar o con un dato que no es del espacio; 503 con un texto humano si
+    la IA no respondió (y un incidente)."""
+    from . import ayuda_al_cargar
+
+    if _de_otro_sitio(request):
+        return _json({"error": "origen_no_verificado"}, 403)
+    tipo = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if tipo != "application/json":
+        return _json({"error": "se_espera_json"}, 415)
+    token = _token_de_administracion(request)
+    if token is None:
+        return _sin_sesion_de_administracion()
+    crudo = await request.body()
+    if len(crudo) > TAMANO_MAXIMO_DE_LA_AYUDA:
+        return _json({"error": "demasiado_grande"}, 413)
+    try:
+        cuerpo = json.loads(crudo or b"null")
+    except (ValueError, RecursionError):
+        cuerpo = None
+    cuerpo = cuerpo if isinstance(cuerpo, dict) else {}
+    espacio = _espacio_de(espacio_id)
+    preparada = await run_in_threadpool(_con_la_base, lambda conn: _preparar_la_ayuda(
+        conn, token, espacio, cuerpo))
+    if isinstance(preparada, Response):
+        return preparada
+    crudo_de_la_ia, falla = None, None
+    try:
+        crudo_de_la_ia = await run_in_threadpool(ayuda_al_cargar.pedir, preparada["ia"],
+                                                 preparada["entrada"])
+    except Exception as e:  # noqa: BLE001 -- cualquier falla de la IA es que no respondió
+        falla = e
+    return await run_in_threadpool(_con_la_base, lambda conn: _cerrar_la_ayuda(
+        conn, token, preparada, crudo_de_la_ia, falla))
+
+
+def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, Any]):
+    """Con el candado: la sesión, las opciones del espacio, lo escrito y la IA del espacio."""
+    from . import ayuda_al_cargar
+
+    with sin_espacio(conn) as cur:
+        if _sesion_de_administracion(cur, token) is None:
+            return _sin_sesion_de_administracion()
+    if espacio is None:
+        return _espacio_que_no_existe()
+    ahora = _ahora(conn, espacio)
+    with sin_espacio(conn) as cur:
+        _con_la_version_del_nucleo(cur)
+        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
+                    (_hash(token), espacio, ahora))
+        opciones = cur.fetchone()["r"]
+    rechazo = _sin_lo_que_rechaza_la_base(opciones)
+    if rechazo is not None:
+        return rechazo
+    texto = cuerpo.get("texto")
+    texto = " ".join(texto.split()) if isinstance(texto, str) else ""
+    escrito, errores = _lo_escrito(cuerpo, opciones)
+    if not texto:
+        errores.insert(0, {"campo": "texto", "motivo": "falta"})
+    elif len(texto) > ayuda_al_cargar.LARGO_DEL_TEXTO:
+        errores.insert(0, {"campo": "texto", "motivo": "demasiado_largo"})
+    elif not errores and not ayuda_al_cargar.lo_que_se_pide(escrito, opciones):
+        errores.append({"campo": "ayuda", "motivo": "nada_que_completar"})
+    if errores:
+        return _json({"errores": [_con_texto_de_la_ayuda(e) for e in errores]}, 422)
+    return {"espacio": espacio, "texto": texto, "escrito": escrito, "opciones": opciones,
+            "ia": _ia_de_la_ayuda(conn, espacio),
+            "entrada": ayuda_al_cargar.entrada_de_la_ia(texto, escrito, opciones)}
+
+
+def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[str, Any] | None,
+                     falla: BaseException | None) -> Response:
+    """Con el candado otra vez y en el espacio: la sesión revalidada (cortada mientras respondía
+    la IA, nada), los controles del código, la auditoría y, si la IA no respondió, el incidente."""
+    from . import ayuda_al_cargar, versiones
+    from .db import espacio as en_el_espacio, registrar_auditoria
+    from .incidentes import ETAPA_AYUDA_AL_CARGAR, registrar_incidente
+    from .motor.fichas import integrantes_que_coinciden
+
+    with sin_espacio(conn) as cur:
+        sesion = _sesion_de_administracion(cur, token)
+    if sesion is None:
+        return _sin_sesion_de_administracion()
+    ws, escrito = preparada["espacio"], preparada["escrito"]
+    pide = ayuda_al_cargar.lo_que_se_pide(escrito, preparada["opciones"])
+    with en_el_espacio(conn, ws) as cur:
+        detalle: dict[str, Any] = {
+            "origen": "web", "sesion_de_administracion_id": str(sesion["sesion_id"]),
+            "ia": getattr(preparada["ia"], "nombre", None), "pide": pide,
+            "respondio": falla is None}
+        if falla is None:
+            def objetivo_de(task_id: str) -> str | None:
+                cur.execute("select objective_id from task where id = %s", (task_id,))
+                fila = cur.fetchone()
+                return str(fila["objective_id"]) if fila else None
+
+            resultado = ayuda_al_cargar.revisar(
+                crudo or {}, texto=preparada["texto"], escrito=escrito,
+                opciones=preparada["opciones"],
+                coinciden=lambda dicho: integrantes_que_coinciden(cur, dicho),
+                objetivo_de=objetivo_de)
+            propuesta = resultado.propuesta
+            detalle.update({
+                "propuestos": sorted(propuesta),
+                "descartados": resultado.descartados,
+                "para_elegir": [e["membership_id"] for e in resultado.elegir],
+                "huellas": {c: hashlib.sha256(propuesta[c].encode("utf-8")).hexdigest()
+                            for c in ("titulo", "descripcion", "criterio") if c in propuesta},
+                "responsable_membership_id": propuesta.get("responsable_id"),
+                "espera_task_id": propuesta.get("espera_id"),
+                "objective_id": propuesta.get("objetivo_id"),
+                "fecha": propuesta.get("fecha")})
+        else:
+            registrar_incidente(
+                cur, ws,
+                "La IA del espacio no respondió cuando un administrador pidió completar una "
+                "carga en la plataforma: no se propuso ni se cargó nada y la persona vio un "
+                "aviso.",
+                severidad="baja", referencia_cruda=f"{type(falla).__name__}: {falla}",
+                etapa=ETAPA_AYUDA_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
+        registrar_auditoria(
+            cur, accion="proponer_al_cargar", workspace_id=ws,
+            actor_app_user_id=str(sesion["app_user_id"]), actor_kind="persona",
+            sujeto_tipo="workspace", sujeto_id=ws, detalle=detalle,
+            pack_hash=versiones.pack_hash(cur, ws), nucleo_hash=versiones.nucleo_hash())
+    if falla is not None:
+        _imprimir(f"  ! la IA no respondió a una ayuda para cargar ({type(falla).__name__}).")
+        return _json({"error": "sin_ayuda", "texto": TEXTO_SI_LA_IA_FALLA}, 503)
+    return _json({"propuesta": resultado.propuesta, "elegir": resultado.elegir,
+                  "avisos": resultado.avisos})
+
+
 # --- La web -----------------------------------------------------------------------------------
 
 def _no_existe() -> HTMLResponse:
