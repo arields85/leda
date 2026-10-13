@@ -130,13 +130,17 @@ def _no_antes_del_piso(conn: psycopg.Connection, workspace_id: str, objetivo: da
 def adelantar(conn: psycopg.Connection, workspace_id: str, real: Reloj, *,
               base: str = BASE_DEL_MOTOR) -> EstadoDelReloj:
     """Lleva el reloj de Leda al día hábil siguiente, a la hora de salida (en horario). Nunca
-    antes de lo ya registrado (`HoraAtrasada`)."""
+    antes de lo ya registrado (`HoraAtrasada`): si el reloj de Leda quedó detrás de lo
+    registrado (un `volver --forzar` o un respaldo restaurado), el día siguiente se cuenta desde
+    lo registrado, para que `adelantar` siempre tenga salida (revisión de la T6)."""
     _comprobar(conn, base)
     adelanto = leer_adelanto(conn, workspace_id, base=base)
     ahora = real.ahora()
+    piso = ultimo_registrado(conn, workspace_id)
+    desde = max(ahora + adelanto, piso) if piso is not None else ahora + adelanto
     with admin(conn) as cur:
         cal = Calendario.desde_base(cur, workspace_id)
-        dia = (ahora + adelanto).astimezone(cal.zona).date() + timedelta(days=1)
+        dia = desde.astimezone(cal.zona).date() + timedelta(days=1)
         while not cal.es_habil(dia):
             dia += timedelta(days=1)
         objetivo = sale_el(cal, dia)

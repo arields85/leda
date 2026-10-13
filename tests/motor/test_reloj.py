@@ -166,24 +166,31 @@ def _aviso_creado(conn, mundo, momento: datetime) -> None:
 
 
 def test_adelantar_no_deja_a_leda_antes_de_un_turno_ya_registrado(conn, mundo):
-    from leda.motor.reloj import HoraAtrasada
-
+    """Con el reloj de Leda detrás de lo registrado, el día siguiente se cuenta desde lo
+    registrado: el martes 10:00 quedaría antes del martes 11:45, y va al miércoles."""
     base = conn.info.dbname
     _turno_de_leda(conn, mundo, octubre(13, 11, 45))       # martes 11:45 de Leda
     real = RelojFijo(LUNES_REAL)                           # sin adelanto: el martes 10:00 queda antes
 
-    with pytest.raises(HoraAtrasada, match="13/10 11:45"):
-        adelantar(conn, mundo["id"], real, base=base)
-    assert cuantas(conn, "workspace_setting", f"clave = '{CLAVE_ADELANTO}'") == 0
+    assert adelantar(conn, mundo["id"], real, base=base).leda == octubre(14, 10)
 
 
 def test_adelantar_no_deja_a_leda_antes_de_un_aviso_ya_guardado(conn, mundo):
-    from leda.motor.reloj import HoraAtrasada
-
     base = conn.info.dbname
     _aviso_creado(conn, mundo, octubre(13, 11, 45))
-    with pytest.raises(HoraAtrasada):
-        adelantar(conn, mundo["id"], RelojFijo(LUNES_REAL), base=base)
+    assert adelantar(conn, mundo["id"], RelojFijo(LUNES_REAL), base=base).leda == octubre(14, 10)
+
+
+def test_adelantar_siempre_tiene_salida_aunque_el_reloj_quedo_muy_atras(conn, mundo):
+    """Un `volver --forzar` con dos días ya registrados: `adelantar` sale del día siguiente
+    al de lo registrado, no del de Leda (revisión de la T6: sin salida, se negaba siempre)."""
+    base = conn.info.dbname
+    _turno_de_leda(conn, mundo, octubre(14, 11, 0))        # miércoles 11:00 de Leda
+    real = RelojFijo(LUNES_REAL)
+
+    estado_ = adelantar(conn, mundo["id"], real, base=base)
+    assert estado_.leda == octubre(15, 10)
+    assert cuantas(conn, "workspace_setting", f"clave = '{CLAVE_ADELANTO}'") == 1
 
 
 def test_a_la_hora_no_deja_a_leda_antes_de_lo_registrado(conn, mundo):
