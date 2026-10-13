@@ -244,20 +244,24 @@ def test_el_ejemplo_del_usuario_completa_todo_lo_que_dijo(ayuda):
     assert ia.pedidos[0]["tools"][0]["function"]["name"] == "proponer_la_carga"
 
 
-def test_la_ia_recibe_lo_del_espacio_con_codigos_y_sin_los_nombres_del_equipo(ayuda):
+def test_la_ia_recibe_lo_del_espacio_con_codigos_y_sin_ids(ayuda):
+    """J2-18: el equipo también, como hechos con un código (para proponer quién la hace); antes,
+    la IA no recibía sus nombres."""
     _, ia = _proponer(ayuda, _respuesta_del_ejemplo())
     entrada = ia.entrada()
     assert entrada["texto"] == EJEMPLO
     assert set(entrada["pide"]) == {"titulo", "descripcion", "criterio", "responsable", "espera",
-                                    "objetivo", "fecha"}
+                                    "objetivo", "fecha", "evidencia"}
+    assert [m["nombre"] for m in entrada["equipo"]] == ["Lucas Pérez", "Lucía Benítez",
+                                                        "Marcos Díaz"]
     assert [o["codigo"] for o in entrada["objetivos"]] == ["O1", "O2"]
     assert entrada["tareas_abiertas"][0]["codigo"] == "T1"
     assert entrada["tareas_abiertas"][0]["titulo"] == "Cablear el tablero de la máquina 3"
     assert any(d.startswith(f"{VIERNES}: viernes 16 de octubre") for d in entrada["dias"])
     assert entrada["dias"][0].startswith(f"{HOY.isoformat()}: miércoles 14 de octubre, hoy")
     plano = json.dumps(entrada, ensure_ascii=False)
-    # Ningún id ni el nombre de un integrante que nadie eligió: la IA devuelve las palabras.
-    for dato in ("m-lucas", "o-modem", "t-tablero", "Lucas Pérez", "Lucía Benítez", "ws-1"):
+    # Ningún id: la IA devuelve las palabras o los códigos, y el código los busca.
+    for dato in ("m-lucas", "o-modem", "t-tablero", "a-infra", "ws-1"):
         assert dato not in plano
     # Las instrucciones describen el trabajo, sin frases de ejemplo.
     for frase in ("tornillos", "estante", "lucas"):
@@ -1191,8 +1195,21 @@ def test_en_seco_la_medicion_prueba_algo(medir, tmp_path, capsys):
                     "igual al título", "el UPS del celular", "ordenado y limpio",
                     "el UPS del celular, sin evidencia del área",
                     "ortografía: el árbol y CoreLabs", "ortografía: bien escrito no se toca",
-                    "ortografía: como en un chat"}
+                    "ortografía: como en un chat",
+                    # J2-18: Leda propone quién la hace y la evidencia; a "pepe" no lo reemplaza.
+                    "los tornillos, sin quién ni cuándo", "alguien que no es del equipo"}
     assert len(medir.PEDIDOS) == 27
+    (tornillos,) = [r for r in informe["resultados"]
+                    if r["pedido"] == "los tornillos, sin quién ni cuándo"]
+    assert tornillos["propuesta"]["responsable_id"] == "m-lucas"
+    assert tornillos["responsable_de"] == "leda"
+    assert tornillos["propuesta"]["evidencia"] == ["foto"]
+    assert tornillos["sin_naturalidad"] == {}
+    (pepe,) = [r for r in informe["resultados"] if r["pedido"] == "alguien que no es del equipo"]
+    assert "responsable_id" not in pepe["propuesta"] and pepe["responsable_de"] is None
+    (chat,) = [r for r in informe["resultados"] if r["pedido"] == "ortografía: como en un chat"]
+    assert chat["corregidos"]["titulo"]["texto"] == "Cambiar la batería del UPS q no anda"
+    assert chat["palabras_rechazadas"] == [{"campo": "titulo", "cantidad": 1}]
     assert all(isinstance(r["segundos"], float) for r in informe["resultados"])
     (sabado,) = [r for r in informe["resultados"] if r["pedido"] == "un sábado no es hábil"]
     assert {"campo": "fecha", "motivo": "no_es_habil"} in sabado["descartados"]
@@ -1211,7 +1228,7 @@ def test_en_seco_la_medicion_prueba_algo(medir, tmp_path, capsys):
     (arbol,) = [r for r in informe["resultados"]
                 if r["pedido"] == "ortografía: el árbol y CoreLabs"]
     assert arbol["corregidos"]["titulo"]["texto"] == "Plantar el árbol de la entrada"
-    assert f"19 de {len(medir.PEDIDOS)} bien" in capsys.readouterr().out
+    assert f"21 de {len(medir.PEDIDOS)} bien" in capsys.readouterr().out
 
 
 def test_la_medicion_marca_lo_escrito_sin_naturalidad(medir):
@@ -1224,16 +1241,30 @@ def test_la_medicion_marca_lo_escrito_sin_naturalidad(medir):
     assert medir.sin_naturalidad("Queda colgado y se ve en una foto.", etiquetas) == []
     plantilla = "El UPS queda cambiado. Se comprueba con lo que pide el área: una foto."
     assert medir.sin_naturalidad(plantilla, etiquetas) == ["la frase de la plantilla"]
+    # J2-18: una etiqueta pegada como un fragmento cuenta; un solo ";" une dos oraciones.
     copiada = "El UPS queda cambiado; cómo se probó y qué dio la prueba."
     assert medir.sin_naturalidad(copiada, etiquetas) == [
-        "la etiqueta «cómo se probó y qué dio la prueba» tal cual", "una lista con ; o ·"]
+        "la etiqueta «cómo se probó y qué dio la prueba» pegada como un fragmento"]
+    # J2-18: lo que marcaba de más la ronda de la J2-17, dicho dentro de una oración natural.
+    for natural in ("El estante queda colocado y se puede ver en una foto del trabajo terminado.",
+                    "La batería queda cambiada; se prueba que el UPS aguanta sin luz.",
+                    "Queda andando, y cómo se probó y qué dio la prueba lo cuenta quien lo hizo."):
+        assert medir.sin_naturalidad(natural, etiquetas) == [], natural
+    # Una lista sí: un "·", o dos ";" en una oración.
+    assert medir.sin_naturalidad("Queda cambiado · se prueba.", etiquetas) == [
+        "una lista con ; o ·"]
+    assert medir.sin_naturalidad("Queda cambiado; se prueba; se mide.", etiquetas) == [
+        "una lista con ; o ·"]
+    assert medir.sin_naturalidad("Una foto del trabajo terminado.", etiquetas) == [
+        "la etiqueta «una foto del trabajo terminado» pegada como un fragmento"]
     # Un rechazo cuyo criterio propuesto es la plantilla (el de reserva) sale mal.
     (no_se,) = [p for p in medir.PEDIDOS if p["nombre"] == "no se"]
     ok, detalle = medir.medir(IADeLaCarga({"dice_un_resultado": False,
                                            "resultado": "El estante queda colocado"}), no_se)
     assert ok is False and detalle["de_reserva"] is True
     assert detalle["sin_naturalidad"] == [
-        "la frase de la plantilla", "la etiqueta «una foto del trabajo terminado» tal cual"]
+        "la frase de la plantilla",
+        "la etiqueta «una foto del trabajo terminado» pegada como un fragmento"]
 
 
 def test_la_medicion_juzga_los_criterios_escritos_y_cuenta_la_falla_de_la_ia(medir):
@@ -1509,9 +1540,9 @@ NOMBRES = ["Lucas Pérez", "Marcos Díaz", "Ismael Soschinski", "Integrar el PLC
     ("Todo bien escrito.", "Todo bien escrito.", []),
 ])
 def test_j2_17_una_correccion_de_ortografia_se_acepta(ayuda, original, corregido, cambios):
-    texto, hechos = ayuda.solo_ortografia(original, corregido, NOMBRES)
+    texto, hechos, rechazadas = ayuda.palabra_por_palabra(original, corregido, NOMBRES)
     assert [(c["antes"], c["despues"]) for c in hechos] == cambios
-    assert texto == corregido
+    assert texto == corregido and rechazadas == 0
 
 
 @pytest.mark.parametrize("original, corregido", [
@@ -1523,12 +1554,19 @@ def test_j2_17_una_correccion_de_ortografia_se_acepta(ayuda, original, corregido
     ("el estante queda colgado", "queda colgado el estante"),  # otro orden
 ])
 def test_j2_17_lo_que_no_es_ortografia_se_rechaza(ayuda, original, corregido):
-    assert ayuda.solo_ortografia(original, corregido, NOMBRES) is None
+    """J2-18: con otra cantidad de palabras no se puede comparar; con la misma, cada palabra que
+    no es la misma mal escrita queda como la escribió la persona, y se cuenta."""
+    hecho = ayuda.palabra_por_palabra(original, corregido, NOMBRES)
+    if len(original.split()) != len(corregido.split()):
+        assert hecho is None
+    else:
+        texto, cambios, rechazadas = hecho
+        assert (texto, cambios) == (original, []) and rechazadas >= 1
 
 
 def test_j2_17_la_correccion_respeta_los_renglones_de_la_persona(ayuda):
-    texto, _ = ayuda.solo_ortografia("primero el arvol\nluego la sanja",
-                                     "Primero el árbol. Luego la zanja.", NOMBRES)
+    texto, _, _ = ayuda.palabra_por_palabra("primero el arvol\nluego la sanja",
+                                            "Primero el árbol. Luego la zanja.", NOMBRES)
     assert texto == "Primero el árbol\nLuego la zanja"
 
 
@@ -1544,8 +1582,9 @@ def test_j2_17_revisar_la_ortografia_separa_lo_corregido_de_lo_rechazado(ayuda):
         "cambios": [{"antes": "integrar", "despues": "Integrar"},
                     {"antes": "plc", "despues": "PLC"},
                     {"antes": "cirelabs", "despues": "CoreLabs"}]}}
-    assert r.rechazados == [{"campo": "descripcion", "motivo": "no_es_ortografia"},
-                            {"campo": "criterio", "motivo": "sin_respuesta"}]
+    # J2-18: "instalar" no es "colgar" mal escrito: queda como lo escribió la persona, y se cuenta.
+    assert r.rechazados == [{"campo": "criterio", "motivo": "sin_respuesta"}]
+    assert r.palabras_rechazadas == [{"campo": "descripcion", "cantidad": 1}]
 
 
 def test_j2_17_la_ia_de_la_ortografia_recibe_los_nombres_del_equipo(ayuda):
@@ -1558,3 +1597,278 @@ def test_j2_17_la_ia_de_la_ortografia_recibe_los_nombres_del_equipo(ayuda):
     assert set(herramienta["function"]["parameters"]["properties"]) == {"titulo"}
     for frase in ("cirelabs", "arvol", "corelabs"):
         assert frase not in ayuda.INSTRUCCIONES_DE_LA_ORTOGRAFIA.lower()
+
+
+# --- J2-18: Leda completa todo lo que puede ---------------------------------------------------
+#
+# La ronda de la J2-17 (66 de 81): sin quién la hace, la IA inventaba una comprobación floja, porque
+# proponía sin los datos de los que sale la comprobación. El usuario: "Leda debería en lo posible
+# completar todos los campos; yo reviso y corrijo lo que quiera o lo dejo tal cual". Leda propone
+# quién la hace por el trabajo y las áreas del equipo (aunque no se dijo), la evidencia que sirve
+# para esta tarea además del mínimo del área, y el criterio dice cómo se comprueba con ella. Si la
+# persona nombró a alguien que no es del equipo, se dice y no se reemplaza por otro.
+
+PRUEBA_DE_LA_BATERIA = ("hay que cambiar la bateria del ups de la sala de servidores para el "
+                        "viernes")
+
+
+def _opciones_del_pack() -> dict[str, Any]:
+    """Las opciones con la evidencia como en el pack: cada área pide un mínimo y conoce los tipos
+    del pack (en `espacios/corework.yaml`, cinco; acá, cuatro)."""
+    opciones = json.loads(json.dumps(OPCIONES))
+    tipos = {"captura": {"clases": ["imagen"],
+                         "en_palabras": "una foto o una captura de la pantalla"},
+             "explicacion": {"clases": ["texto"],
+                             "en_palabras": "cómo quedó el trabajo, descrito por quien lo hizo"},
+             "foto": {"clases": ["imagen"], "en_palabras": "una foto"},
+             "resultado_de_prueba": {"clases": ["texto"], "en_palabras": PRUEBA}}
+    opciones["politicas"] = [
+        {"area_id": "a-infra", "area": "Infraestructura", "evidencia_requerida": ["foto"],
+         "version": 1, "tipos": tipos},
+        {"area_id": "a-auto", "area": "Automatización", "evidencia_requerida": ["explicacion"],
+         "version": 1, "tipos": {k: tipos[k] for k in ("captura", "explicacion")}},
+    ]
+    return opciones
+
+
+def _de_la_bateria(**cambios) -> dict[str, Any]:
+    respuesta = {"titulo": "Cambiar la batería del UPS de la sala de servidores",
+                 "criterio": ("La batería del UPS de la sala de servidores queda cambiada, y la "
+                              "prueba muestra que aguanta sin luz."),
+                 "resultado": "La batería del UPS de la sala de servidores queda cambiada",
+                 "quien_la_hace": "P1", "evidencia": "E4",
+                 "fecha": VIERNES, "como_dijo_la_fecha": "para el viernes"}
+    respuesta.update(cambios)
+    return {k: v for k, v in respuesta.items() if v is not None}
+
+
+def test_j2_18_la_ia_recibe_el_equipo_las_areas_y_la_evidencia_como_hechos(ayuda):
+    _, ia = _proponer(ayuda, _de_la_bateria(), texto=PRUEBA_DE_LA_BATERIA,
+                      opciones=_opciones_del_pack())
+    entrada = ia.entrada()
+    # Sólo quien puede hacerla: alguien a quien otro revisa (Ismael no tiene quién lo revise).
+    assert entrada["equipo"] == [
+        {"codigo": "P1", "nombre": "Lucas Pérez", "area": "Infraestructura"},
+        {"codigo": "P2", "nombre": "Lucía Benítez", "area": "Automatización"},
+        {"codigo": "P3", "nombre": "Marcos Díaz", "area": "Automatización"}]
+    assert entrada["areas"] == [
+        {"area": "Infraestructura", "evidencia_que_pide": ["una foto"]},
+        {"area": "Automatización",
+         "evidencia_que_pide": ["cómo quedó el trabajo, descrito por quien lo hizo"]}]
+    assert entrada["tipos_de_evidencia"] == [
+        {"codigo": "E1", "en_palabras": "una foto o una captura de la pantalla"},
+        {"codigo": "E2", "en_palabras": "cómo quedó el trabajo, descrito por quien lo hizo"},
+        {"codigo": "E3", "en_palabras": "una foto"},
+        {"codigo": "E4", "en_palabras": PRUEBA}]
+    assert "evidencia" in entrada["pide"]
+    datos = ia.pedidos[0]["tools"][0]["function"]["parameters"]["properties"]
+    assert {"responsable", "quien_la_hace", "evidencia"} <= set(datos)
+    # Ningún id: la IA devuelve códigos y el código los busca.
+    plano = json.dumps(entrada, ensure_ascii=False)
+    for dato in ("m-lucas", "a-infra", "resultado_de_prueba", "ws-1"):
+        assert dato not in plano
+
+
+def test_j2_18_leda_propone_quien_la_hace_aunque_no_se_dijo(ayuda):
+    resultado, ia = _proponer(ayuda, _de_la_bateria(), texto=PRUEBA_DE_LA_BATERIA,
+                              opciones=_opciones_del_pack())
+    assert resultado.propuesta["responsable_id"] == "m-lucas"
+    assert resultado.responsable_de == "leda"
+    assert "responsable" not in _avisos(resultado)
+    # La evidencia que propone Leda, sumada al mínimo del área de quien propone.
+    assert resultado.propuesta["evidencia"] == ["resultado_de_prueba"]
+    (juicio,) = _juicios(ia)
+    assert juicio["evidencia_que_pide_el_area"] == ["una foto", PRUEBA]
+    assert resultado.propuesta["criterio"].startswith("La batería del UPS")
+
+
+def test_j2_18_quien_se_nombro_gana_sobre_la_propuesta(ayuda):
+    resultado, _ = _proponer(ayuda, _de_la_bateria(responsable="el tano"),
+                             texto=f"{PRUEBA_DE_LA_BATERIA} que lo haga el tano",
+                             opciones=_opciones_del_pack())
+    assert resultado.propuesta["responsable_id"] == "m-marcos"
+    assert resultado.responsable_de == "dicho"
+    # La evidencia de Leda tiene que ser del área de Marcos: la prueba no la conoce.
+    assert "evidencia" not in resultado.propuesta
+    assert {"campo": "evidencia", "motivo": "no_es_del_area"} in resultado.descartados
+
+
+def test_j2_18_alguien_que_no_es_del_equipo_no_se_reemplaza_por_otro(ayuda):
+    """El usuario: si nombró a alguien que no está en el equipo, se dice en su campo y Leda no
+    pone a otro."""
+    resultado, ia = _proponer(ayuda, _de_la_bateria(responsable="pepe"),
+                              texto=f"{PRUEBA_DE_LA_BATERIA} que lo haga pepe",
+                              opciones=_opciones_del_pack())
+    assert "responsable_id" not in resultado.propuesta
+    assert _avisos(resultado)["responsable"] == (
+        "No encontré a «pepe» en el equipo; elegí quién la hace.")
+    assert resultado.responsable_de is None
+    # Sin quién la hace no hay área de dónde salga la evidencia.
+    assert "evidencia" not in resultado.propuesta
+    assert "evidencia_que_pide_el_area" not in _juicios(ia)[0]
+
+
+def test_j2_18_entre_dos_nombrados_leda_no_elige_ni_propone_otro(ayuda):
+    def por_nombre(dicho):
+        return _coinciden("lucas pérez") + _coinciden("lucía benítez")
+    resultado, _ = _proponer(ayuda, _de_la_bateria(responsable="lucas"),
+                             texto=f"{PRUEBA_DE_LA_BATERIA} lucas", coinciden=por_nombre,
+                             opciones=_opciones_del_pack())
+    assert "responsable_id" not in resultado.propuesta
+    assert [e["membership_id"] for e in resultado.elegir] == ["m-lucas", "m-lucas-b"]
+
+
+@pytest.mark.parametrize("codigo", ["P9", "P0", "Lucas", "m-lucas"])
+def test_j2_18_un_codigo_que_no_es_del_equipo_no_se_propone(ayuda, codigo):
+    resultado, _ = _proponer(ayuda, _de_la_bateria(quien_la_hace=codigo),
+                             texto=PRUEBA_DE_LA_BATERIA, opciones=_opciones_del_pack())
+    assert "responsable_id" not in resultado.propuesta
+    assert {"campo": "responsable", "motivo": "no_existe"} in resultado.descartados
+
+
+def test_j2_18_quien_ya_se_eligio_no_se_pide(ayuda):
+    resultado, ia = _proponer(ayuda, _de_la_bateria(), texto=PRUEBA_DE_LA_BATERIA,
+                              escrito=_vacio(responsable_id="m-lucas"),
+                              opciones=_opciones_del_pack())
+    assert "responsable_id" not in resultado.propuesta
+    assert "quien_la_hace" not in ia.pedidos[0]["tools"][0]["function"]["parameters"][
+        "properties"]
+    assert resultado.propuesta["evidencia"] == ["resultado_de_prueba"]
+
+
+@pytest.mark.parametrize("evidencia, propuesta, descartado", [
+    ("E4", ["resultado_de_prueba"], None),
+    ("E1, E4", ["captura", "resultado_de_prueba"], None),
+    ("E3", None, None),                               # el mínimo del área ya está
+    ("E9", None, "no_existe"),
+    ("una foto", None, "no_existe"),
+    ("", None, None),
+])
+def test_j2_18_la_evidencia_que_propone_leda_es_de_los_tipos_del_area(ayuda, evidencia,
+                                                                     propuesta, descartado):
+    resultado, _ = _proponer(ayuda, _de_la_bateria(evidencia=evidencia),
+                             texto=PRUEBA_DE_LA_BATERIA, opciones=_opciones_del_pack())
+    assert resultado.propuesta.get("evidencia") == propuesta
+    if descartado:
+        assert {"campo": "evidencia", "motivo": descartado} in resultado.descartados
+
+
+def test_j2_18_si_la_persona_ya_tildo_otra_evidencia_no_se_propone(ayuda):
+    """Lo que la persona eligió es suyo: la IA lo recibe como dato y no propone otra."""
+    escrito = {**_vacio(responsable_id="m-lucas"), "evidencia": ["foto", "captura"]}
+    resultado, ia = _proponer(ayuda, _de_la_bateria(), texto=PRUEBA_DE_LA_BATERIA,
+                              escrito=escrito, opciones=_opciones_del_pack())
+    assert "evidencia" not in ia.entrada()["pide"]
+    assert ia.entrada()["ya_escrito"]["evidencia_elegida"] == [
+        "una foto", "una foto o una captura de la pantalla"]
+    assert "evidencia" not in resultado.propuesta
+    assert _juicios(ia)[0]["evidencia_que_pide_el_area"] == [
+        "una foto", "una foto o una captura de la pantalla"]
+
+
+def test_j2_18_sin_el_criterio_por_pedir_no_se_propone_evidencia(ayuda):
+    resultado, ia = _proponer(ayuda, _de_la_bateria(), texto=PRUEBA_DE_LA_BATERIA,
+                              escrito=_vacio(criterio="La batería queda cambiada."),
+                              opciones=_opciones_del_pack())
+    assert "evidencia" not in ia.entrada()["pide"]
+    assert "evidencia" not in resultado.propuesta
+
+
+def test_j2_18_sin_quien_la_hace_el_criterio_no_inventa_como_se_comprueba(ayuda):
+    """Si Leda no puede saber quién la hace, el criterio dice qué tiene que quedar hecho y cómo se
+    comprueba sólo si la persona lo dijo: el juicio, sin la evidencia de un área, escribe el suyo
+    con esa misma regla (cómo se comprueba lo va a decir la evidencia de quien la haga)."""
+    resultado, ia = _proponer(ayuda, _respuesta_del_ups(), texto=UPS, coinciden=_nadie,
+                              juzga=juez(CIRCULAR_UPS, propone=RESULTADO_UPS + "."))
+    assert resultado.propuesta["criterio"] == RESULTADO_UPS + "."
+    assert ia.instrucciones(1) == ayuda.INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN
+    assert ia.instrucciones(1) != ayuda.INSTRUCCIONES_DEL_JUICIO
+    # Al cargar, sin evidencia del área, sigue la regla de siempre.
+    juicio_ia = IADeLaCarga(NO_LO_DICE)
+    ayuda.juzgar_el_criterio(juicio_ia, titulo=TITULO_UPS, descripcion="", criterio="No se")
+    assert juicio_ia.instrucciones() == ayuda.INSTRUCCIONES_DEL_JUICIO
+    assert "lo que la tarea misma deja ver" not in ayuda.INSTRUCCIONES
+
+
+def test_j2_18_un_nombre_de_los_datos_mal_escrito_se_propone_como_esta_en_los_datos(ayuda):
+    """"cirelabs" es CoreLabs: la IA lo escribe como está en los datos, y el código lo deja pasar
+    porque es la misma palabra mal escrita, no un nombre inventado."""
+    opciones = json.loads(json.dumps(OPCIONES))
+    opciones["objetivos"].append({"id": "o-core", "titulo": "Integrar el PLC con CoreLabs",
+                                  "tipo": "operativo", "estado": "activo",
+                                  "fecha_objetivo": None})
+    texto = "hay q integrar el plc de la fette con cirelabs"
+    resultado, _ = _proponer(ayuda, {"titulo": "Integrar el PLC de la Fette con CoreLabs",
+                                     "descripcion": "Integrar el PLC de la Fette con CoreLabs.",
+                                     "criterio": ("El PLC de la Fette queda integrado con "
+                                                  "CoreLabs.")},
+                             texto=texto, opciones=opciones)
+    assert resultado.propuesta["titulo"] == "Integrar el PLC de la Fette con CoreLabs"
+    assert resultado.propuesta["descripcion"] == "Integrar el PLC de la Fette con CoreLabs."
+    # Un nombre que no se parece a nada de lo que escribió la persona sigue sin pasar.
+    resultado, _ = _proponer(ayuda, {"titulo": "Integrar el PLC con Siemens"}, texto=texto,
+                             opciones=opciones)
+    assert "titulo" not in resultado.propuesta
+
+
+def test_j2_18_las_instrucciones_describen_el_trabajo_sin_frases_ni_casos(ayuda):
+    _, ia = _proponer(ayuda, _de_la_bateria(), texto=PRUEBA_DE_LA_BATERIA,
+                      opciones=_opciones_del_pack())
+    textos = " ".join([ia.instrucciones(0),
+                       json.dumps(ia.pedidos[0]["tools"], ensure_ascii=False),
+                       ayuda.INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN]).lower()
+    assert "equipo" in textos and "evidencia" in textos and "ortografía" in textos
+    for frase in ("batería", "ups", "lucas", "foto", "captura", "cirelabs", "corelabs", "pepe"):
+        assert frase not in textos, frase
+
+
+# --- La ortografía palabra por palabra (J2-18) ------------------------------------------------
+#
+# La ronda de la J2-17: con "q" (una abreviatura de chat) la corrección del campo entero se
+# rechazaba y "bateria" quedaba sin tilde. Ahora cada palabra que pasa el control se corrige y la
+# que no queda como la escribió la persona; el incidente cuenta sólo las rechazadas.
+
+def test_j2_18_la_ortografia_se_acepta_palabra_por_palabra(ayuda):
+    texto, cambios, rechazadas = ayuda.palabra_por_palabra(
+        "cambiar la bateria del ups q no anda", "Cambiar la batería del UPS que no anda", NOMBRES)
+    assert texto == "Cambiar la batería del UPS q no anda"
+    assert [(c["antes"], c["despues"]) for c in cambios] == [
+        ("cambiar", "Cambiar"), ("bateria", "batería"), ("ups", "UPS")]
+    assert rechazadas == 1
+
+
+def test_j2_18_con_otra_cantidad_de_palabras_no_se_puede_comparar(ayuda):
+    assert ayuda.palabra_por_palabra("colgar el estante", "colgar el estante nuevo",
+                                     NOMBRES) is None
+
+
+def test_j2_18_revisar_la_ortografia_corrige_lo_que_pasa_y_cuenta_lo_que_no(ayuda):
+    r = ayuda.revisar_la_ortografia({"titulo": "Cambiar la batería del UPS que no anda",
+                                     "descripcion": "instalar el estante"},
+                                    {"titulo": "cambiar la bateria del ups q no anda",
+                                     "descripcion": "colgar el estante"}, OPCIONES)
+    assert r.corregidos["titulo"]["texto"] == "Cambiar la batería del UPS q no anda"
+    assert "descripcion" not in r.corregidos
+    assert r.rechazados == []
+    assert r.palabras_rechazadas == [{"campo": "titulo", "cantidad": 1},
+                                     {"campo": "descripcion", "cantidad": 1}]
+
+
+@pytest.mark.parametrize("antes, despues", [
+    ("arvol", "árbol"), ("limpiesa", "limpieza"), ("aser", "hacer"),       # suenan igual
+    ("tablreo", "tablero"), ("trabjo", "trabajo"), ("tsblero", "tablero"),  # un dedo
+    ("bateria", "batería"), ("ups", "UPS"),
+    ("cirelabs", "CoreLabs"),                                              # un nombre de los datos
+])
+def test_j2_18_la_misma_palabra_mal_escrita_se_corrige(ayuda, antes, despues):
+    assert ayuda._misma_palabra(antes, despues, {"corelabs"})
+
+
+@pytest.mark.parametrize("antes, despues", [
+    ("mesa", "masa"), ("cosa", "casa"), ("pelo", "peso"), ("pase", "pose"),  # otra palabra
+    ("a", "ha"), ("e", "he"), ("o", "ho"),                                   # otra palabra corta
+    ("q", "que"), ("xq", "porque"),                                          # abreviaturas
+    ("12", "13"),
+])
+def test_j2_18_otra_palabra_no_es_una_falta(ayuda, antes, despues):
+    assert not ayuda._misma_palabra(antes, despues, {"corelabs"})

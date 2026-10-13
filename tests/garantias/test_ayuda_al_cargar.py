@@ -131,8 +131,10 @@ def test_el_ejemplo_del_usuario_propone_cada_dato_de_su_espacio(web, conn, intak
     assert _contar(conn, "task") == 1
 
 
-def test_la_ia_no_recibe_nada_de_otro_espacio_ni_los_nombres_del_equipo(
-        web, conn, intake_world, administradora, sesion, con_lucas, ia):
+def test_la_ia_no_recibe_nada_de_otro_espacio(web, conn, intake_world, administradora, sesion,
+                                             con_lucas, ia):
+    """J2-18: la IA recibe el equipo de este espacio (para proponer quién la hace), y nada de
+    otro: ni sus tareas, ni sus objetivos, ni su gente."""
     oeste = intake_world["west-studio"]
     _cargar(conn, sesion, intake_world, espacio=oeste["id"], objetivo=oeste["objectives"][0],
             responsable=_persona(intake_world, "Sam North", "west-studio"),
@@ -143,8 +145,11 @@ def test_la_ia_no_recibe_nada_de_otro_espacio_ni_los_nombres_del_equipo(
     assert _pedir(navegador, _norte(intake_world)["id"]).status_code == 200
     plano = json.dumps(ia.pedidos[0], ensure_ascii=False)
     assert "Tarea secreta del oeste" not in plano
-    for nombre in ("Morgan Hale", "Taylor Quinn", "Sam Noble", "Sam North 2"):
-        assert nombre not in plano
+    for persona in oeste["people"].values():
+        assert persona["name"] not in plano
+    # Sólo quien puede hacerla: Morgan Hale no tiene quién la revise.
+    assert [m["nombre"] for m in ia.entrada()["equipo"]] == [
+        "Sam Noble 1", "Sam North 1", "Taylor Quinn 1"]
     for objetivo in oeste["objectives"]:
         assert objetivo not in plano
     entrada = ia.entrada()
@@ -246,7 +251,9 @@ def test_lo_escrito_no_se_pide_ni_vuelve(web, conn, intake_world, administradora
     assert r.status_code == 200, r.text
     assert "titulo" not in r.json()["propuesta"]
     assert "responsable_id" not in r.json()["propuesta"]
-    assert set(ia.entrada()["pide"]) == {"descripcion", "criterio", "espera", "objetivo", "fecha"}
+    # J2-18: con el criterio por pedir, también la evidencia que Leda suma al mínimo del área.
+    assert set(ia.entrada()["pide"]) == {"descripcion", "criterio", "espera", "objetivo", "fecha",
+                                         "evidencia"}
 
 
 def test_sin_texto_o_sin_nada_vacio_no_se_llama_a_la_ia(web, conn, intake_world, administradora,
@@ -484,3 +491,85 @@ def test_una_sesion_cortada_antes_del_juicio_no_recibe_nada(web, conn, intake_wo
     assert _pedir(navegador, _norte(intake_world)["id"]).status_code == 401
     assert len(llamadas) == 1
     assert _contar(conn, "audit_log", "accion = 'proponer_al_cargar'") == 0
+
+
+# --- J2-18: Leda completa todo lo que puede ---------------------------------------------------------
+
+def _con_fotos(conn, intake_world) -> None:
+    """El área de Sam North (field) conoce también una foto, además de lo que pide."""
+    with admin(conn) as cur:
+        cur.execute("""update task_evidence_policy
+                          set tipos = '{"foto": {"clases": ["imagen"], "en_palabras": "una foto"}}'
+                        where area_id = %s""", (_norte(intake_world)["areas"]["field"],))
+    conn.commit()
+
+
+def test_leda_propone_quien_la_hace_y_la_evidencia_aunque_no_se_dijo(web, conn, intake_world,
+                                                                    administradora, ia):
+    _con_fotos(conn, intake_world)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(_respuesta(responsable=None, espera=None, quien_la_hace="P2",
+                                    evidencia="E1"))
+    r = _pedir(navegador, _norte(intake_world)["id"],
+               texto=EJEMPLO.replace("que lo haga lucas ", ""))
+    assert r.status_code == 200, r.text
+    propuesta = r.json()["propuesta"]
+    assert propuesta["responsable_id"] == _persona(intake_world, "Sam North")
+    assert propuesta["evidencia"] == ["foto"]
+    juicio = json.loads(next(m["content"] for m in ia.pedidos[1]["messages"]
+                             if m["role"] == "user"))
+    assert juicio["evidencia_que_pide_el_area"] == ["test record", "una foto"]
+    detalle = _auditoria(conn)
+    assert detalle["responsable_de"] == "leda"
+    assert detalle["evidencia_propuesta"] == ["foto"]
+    assert detalle["responsable_membership_id"] == _persona(intake_world, "Sam North")
+
+
+def test_quien_no_es_del_equipo_no_se_reemplaza_por_otro(web, conn, intake_world,
+                                                         administradora, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(_respuesta(responsable="pepe", espera=None, quien_la_hace="P2"))
+    r = _pedir(navegador, _norte(intake_world)["id"],
+               texto=EJEMPLO.replace("lucas", "pepe"))
+    assert r.status_code == 200, r.text
+    assert "responsable_id" not in r.json()["propuesta"]
+    avisos = {a["campo"]: a["texto"] for a in r.json()["avisos"]}
+    assert avisos["responsable"] == "No encontré a «pepe» en el equipo; elegí quién la hace."
+
+
+def test_la_evidencia_que_ya_tildo_la_persona_no_se_vuelve_a_proponer(
+        web, conn, intake_world, administradora, ia):
+    _con_fotos(conn, intake_world)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(_respuesta(responsable=None, espera=None, evidencia="E1"))
+    r = _pedir(navegador, _norte(intake_world)["id"],
+               responsable_id=_persona(intake_world, "Sam North"),
+               evidencia=["test record", "foto"])
+    assert r.status_code == 200, r.text
+    assert "evidencia" not in r.json()["propuesta"]
+    assert "evidencia" not in ia.entrada()["pide"]
+    assert ia.entrada()["ya_escrito"]["evidencia_elegida"] == ["test record", "una foto"]
+
+
+def test_una_evidencia_mal_formada_se_rechaza_sin_llamar_a_la_ia(web, conn, intake_world,
+                                                                administradora, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _pedir(navegador, _norte(intake_world)["id"], evidencia="foto")
+    assert r.status_code == 422
+    assert ("evidencia", "mal_formada") in {(e["campo"], e["motivo"])
+                                            for e in r.json()["errores"]}
+    assert ia.pedidos == []
+
+
+def test_una_ia_de_la_ayuda_que_no_se_puede_preparar_deja_un_incidente(
+        web, conn, intake_world, administradora, monkeypatch):
+    from leda import web_app
+
+    def rota(conn, espacio):
+        raise RuntimeError("la configuración de la IA no se puede leer")
+    monkeypatch.setattr(web_app, "_ia_de_la_ayuda", rota)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _pedir(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 503 and r.json()["texto"] == TEXTO_SI_LA_IA_FALLA
+    incidente = _fila(conn, "select * from incident where etapa = 'ayuda_al_cargar'")
+    assert incidente is not None and "RuntimeError" in incidente["referencia_cruda"]

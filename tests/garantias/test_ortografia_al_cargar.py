@@ -179,3 +179,63 @@ def test_la_web_no_espera_a_la_ia_con_su_candado(web, conn, intake_world, admini
     assert _pedir(navegador, _norte(intake_world)["id"],
                   titulo="colgar el arvol").status_code == 200
     assert candado == [False]
+
+
+# --- J2-18 y los avisos de RDD de la J2-17 -----------------------------------------------------------
+
+def test_cada_palabra_que_pasa_se_corrige_y_la_que_no_queda_como_se_escribio(
+        web, conn, intake_world, administradora, ia):
+    """La ronda de la J2-17: "q" anulaba la corrección del campo entero. Ahora "q" queda como se
+    escribió, lo demás se corrige, y el incidente cuenta la palabra rechazada sin decir cuál."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({"titulo": "Cambiar la batería del UPS que no anda"})
+    r = _pedir(navegador, _norte(intake_world)["id"],
+               titulo="cambiar la bateria del ups q no anda")
+    assert r.status_code == 200, r.text
+    assert r.json() == {"corregidos": {"titulo": {
+        "texto": "Cambiar la batería del UPS q no anda",
+        "cambios": [{"antes": "cambiar", "despues": "Cambiar"},
+                    {"antes": "bateria", "despues": "batería"},
+                    {"antes": "ups", "despues": "UPS"}]}}, "sin_revisar": []}
+    incidente = _fila(conn, "select * from incident where etapa = 'ortografia_al_cargar'")
+    assert incidente is not None
+    assert incidente["referencia_cruda"] == "titulo: 1 palabra no aceptada"
+    plano = json.dumps(incidente, default=str, ensure_ascii=False)
+    for palabra in ("bateria", "batería", "que no anda"):
+        assert palabra not in plano
+    detalle = _fila(conn, "select detalle from audit_log where accion = 'corregir_al_cargar'")[
+        "detalle"]
+    assert detalle["palabras_rechazadas"] == [{"campo": "titulo", "cantidad": 1}]
+
+
+def test_una_ia_que_no_se_puede_preparar_no_bloquea_y_deja_un_incidente(
+        web, conn, intake_world, administradora, monkeypatch):
+    """Advertencia de RDD de la J2-17: preparar la IA no tenía guarda y una falla era un 503 sin
+    rastro. Ahora es una IA que no responde: queda como se escribió, con el aviso y el
+    incidente."""
+    from leda import web_app
+
+    def rota(conn, espacio):
+        raise RuntimeError("la configuración de la IA no se puede leer")
+    monkeypatch.setattr(web_app, "_ia_de_la_ortografia", rota)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _pedir(navegador, _norte(intake_world)["id"], titulo="colgar el arvol")
+    assert r.status_code == 200, r.text
+    assert r.json() == {"corregidos": {}, "sin_revisar": ["titulo"], "aviso": TEXTO_SIN_REVISAR}
+    incidente = _fila(conn, "select * from incident where etapa = 'ortografia_al_cargar'")
+    assert incidente is not None and "RuntimeError" in incidente["referencia_cruda"]
+
+
+def test_una_sesion_cortada_mientras_responde_la_ia_no_recibe_nada(web, conn, intake_world,
+                                                                  administradora, ia):
+    """Advertencia de RDD de la J2-17: el caso de la sesión cortada mientras la IA corregía."""
+    from tests.garantias.test_carga_de_tareas import _revocar
+
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({"titulo": "Colgar el árbol"})
+    ia.al_llamar = lambda: _revocar(conn, administradora)
+    r = _pedir(navegador, _norte(intake_world)["id"], titulo="colgar el arvol")
+    assert r.status_code == 401
+    assert "corregidos" not in r.text
+    assert _contar(conn, "audit_log", "accion = 'corregir_al_cargar'") == 0
+    assert _contar(conn, "incident", "etapa = 'ortografia_al_cargar'") == 0

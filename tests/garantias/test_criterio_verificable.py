@@ -438,3 +438,26 @@ def test_la_web_no_espera_a_la_ia_con_su_candado(web, conn, intake_world, admini
     r = _cargar(navegador, intake_world, criterio=CONCRETO)
     assert r.status_code == 201 and r.json()["avisos"] == []
     assert candado == [False]
+
+
+# --- Advertencia de RDD de la J2-17: una IA que no se puede preparar ------------------------------
+
+@pytest.mark.parametrize("criterio", [TITULO_PLC, f"  {TITULO_PLC.lower()}. "])
+def test_una_ia_que_no_se_puede_preparar_igual_rechaza_lo_igual_al_titulo(
+        web, conn, intake_world, administradora, monkeypatch, criterio):
+    """Sin la IA, lo igual al título se rechaza igual (`sin_resultado`, sin propuesta: sin la IA
+    no hay un resultado escrito para armar el de reserva) y nunca se carga sin revisar."""
+    from leda import web_app
+
+    def rota(conn, espacio):
+        raise RuntimeError("la configuración de la IA no se puede leer")
+    monkeypatch.setattr(web_app, "_ia_del_criterio", rota)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _cargar(navegador, intake_world, criterio=criterio)
+    assert r.status_code == 422, r.text
+    assert r.json()["errores"] == [{"campo": "criterio", "motivo": "sin_resultado",
+                                    "texto": TEXTO_SIN_RESULTADO}]
+    assert _contar(conn, "task") == 0
+    incidente = _fila(conn, "select * from incident where etapa = 'propuesta_del_criterio'")
+    assert incidente is not None and "RuntimeError" in incidente["referencia_cruda"]
+    assert _contar(conn, "incident", "etapa = 'criterio_al_cargar'") == 0
