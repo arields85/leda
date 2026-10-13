@@ -115,15 +115,18 @@ viejo corriendo.
 3. ~~El usuario del bot~~: el usuario creó bots nuevos (2026-10-13), `@Leda_PM_bot` y `@Leda_Admin_bot`;
    `bot_usuario: Leda_PM_bot` en el pack, importado en `leda_motor` (versión 2; respaldo
    `db/respaldos/leda_motor-antes-bot-nuevo-20261013.dump`). Los tokens nuevos los pone el usuario en el `.env`.
-4. **Las tres preguntas de "Para decidir"** de `../odd/tasks/plataforma-p2.md`.
-5. **La 22, comprensión 0 de 3** en la ronda de la T9 (la misma clase que en la D6, `PENDIENTE`).
-6. **Subir la rama y `main`:** `origin/feat/motor-de-conversacion` está en `b2e84a2b`; lo de esta
-   noche no se subió. `main`, cuando lo decidas. **En observación:** la 35 paso 18.
+4. ~~Las tres preguntas de "Para decidir"~~: decididas (2026-10-13; `../odd/tasks/plataforma-p2.md`):
+   los objetivos los crea Dirección desde la web, las esperas van en el mismo formulario y crear tareas
+   sigue la jerarquía (Dirección, el referente para su área, el integrante para sí mismo con aprobación
+   del referente); las jerarquías las maneja Dirección. Contradice el ADR 0022: **enmienda antes del
+   código**, que escribe el agente y acepta el usuario.
+5. **La 22, comprensión 0 de 3** en la ronda de la T9 (la misma clase que en la D6, `PENDIENTE`): la
+   investiga el agente.
+6. ~~Subir la rama~~: subida el 2026-10-13 (`df191141`). `main`, cuando lo decida el usuario. **En
+   observación:** la 35 paso 18.
 
-**Punto exacto para seguir:** todo lo del plan de la noche está hecho (T4b a T10 y A-1 a A-6). Lo que
-sigue espera las respuestas de arriba; sin ellas, las advertencias anotadas en
-`../odd/tasks/acceso-por-chat.md` y `../odd/tasks/correcciones-prueba-telegram.md` son casos de borde, sin
-urgencia.
+**Punto exacto para seguir:** escribir la enmienda al ADR 0022 con las decisiones de
+`../odd/tasks/plataforma-p2.md` ("Para decidir") y pasársela al usuario; después, la 22.
 
 **El plan de la noche** (las correcciones, después el acceso por chat; frenar antes del túnel, del
 celular, de toda decisión de producto nueva y de `main`) se cumplió entero; su texto, en la historia de
