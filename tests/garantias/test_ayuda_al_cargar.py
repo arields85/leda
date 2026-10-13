@@ -10,10 +10,10 @@ de mentira (nunca la real).
 - **Sólo lo vacío:** Leda propone lo que el formulario no tiene; lo escrito no se pide ni vuelve.
 - **Nunca en silencio:** si la IA no responde, 503 con un texto humano y un incidente
   (`ayuda_al_cargar`), y nada cambia.
-- **El criterio** (J2-13): la manera de comprobarla que da la IA se juzga por su sentido, fuera
-  del candado; si no vale, o la persona no la dijo, la de la evidencia que pide el área de quien la
-  hace; sin evidencia, no se propone y el campo pide cómo se sabe. Si el juicio no responde, un
-  incidente y nunca esa manera.
+- **El criterio** (J2-13 y J2-17): lo escribe la IA entero, con sus palabras, y se juzga por su
+  sentido fuera del candado, ya con la evidencia del área de quien la hace; llega tal cual, sin
+  que el código le agregue nada. Si no vale, el que escribe el juicio; si el juicio no responde,
+  el de reserva (con la evidencia del área) y un incidente, nunca el de la IA sin juzgar.
 - **La auditoría** (`proponer_al_cargar`): quién pidió, qué se pidió, qué se propuso y qué no, con
   la huella de cada texto propuesto y nunca el texto.
 - **El candado de la web no espera a la IA:** la llamada se hace fuera de él.
@@ -32,9 +32,9 @@ from leda.db import admin
 from tests.garantias.test_carga_de_tareas import (  # noqa: F401
     _cargar, _contar, _fila, _navegador_de_administracion, _navegador_del_equipo, _norte,
     _persona, administradora, sesion, web)
-from tests.test_ayuda_al_cargar import (COMO_DEL_EJEMPLO, COMO_UPS_CIRCULAR, CRITERIO_DEL_EJEMPLO,
-                                        EJEMPLO, RESULTADO_DEL_EJEMPLO, RESULTADO_UPS, TITULO_UPS,
-                                        UPS, IADeLaCarga, juez, juzga_que_si)
+from tests.test_ayuda_al_cargar import (CIRCULAR_UPS, CRITERIO_DEL_EJEMPLO, DEL_JUICIO, EJEMPLO,
+                                        RESULTADO_DEL_EJEMPLO, RESULTADO_UPS, TITULO_UPS, UPS,
+                                        IADeLaCarga, juez, juzga_que_si)
 
 TEXTO_SI_LA_IA_FALLA = ("Leda no pudo completar ahora. Lo que escribiste sigue acá: completalo "
                         "vos o probá de nuevo en un rato.")
@@ -56,8 +56,8 @@ def _respuesta(**cambios) -> dict:
     respuesta = {
         "titulo": "Colgar el estante del módem en la sala",
         "descripcion": "Colgar el estante del módem en la sala. Hacen falta 12 tornillos de 8 mm.",
+        "criterio": CRITERIO_DEL_EJEMPLO,
         "resultado": RESULTADO_DEL_EJEMPLO,
-        "como_se_comprueba": COMO_DEL_EJEMPLO,
         "responsable": "lucas",
         "espera": "T1",
         "objetivo": "O3",
@@ -403,46 +403,50 @@ def test_la_auditoria_guarda_lo_propuesto_con_su_huella_y_sin_el_texto(
         assert texto not in plano
 
 
-# --- El criterio: desde la evidencia y juzgado por su sentido (J2-13) ------------------------------
+# --- El criterio: con las palabras de Leda y juzgado por su sentido (J2-13 y J2-17) --------------
 
 def _auditoria(conn) -> dict:
     return _fila(conn, """select detalle from audit_log where accion = 'proponer_al_cargar'
                            order by at desc limit 1""")["detalle"]
 
 
-def test_el_ups_circular_del_usuario_no_se_propone_por_la_puerta(web, conn, intake_world,
-                                                               administradora, ia):
-    """La prueba del usuario: "el tano" no es nadie del espacio, la IA inventó una comprobación
-    circular con sinónimos y el juicio por el sentido la rechaza; sin evidencia de un área, el
-    campo pide cómo se sabe."""
+def test_el_criterio_de_la_ia_llega_tal_cual_sin_plantilla(web, conn, intake_world,
+                                                          administradora, con_lucas, ia):
+    """J2-17: la IA escribe el criterio entero y el juicio, con la evidencia del área de Sam North
+    ("lucas", Field Services, que pide "test record"), dice que sirve: llega tal cual, sin que el
+    código le pegue nada."""
     navegador = _navegador_de_administracion(web, conn, administradora)
-    ia.juzga = juez(f"{RESULTADO_UPS}. Se comprueba verificando en la sala de servidores que el "
-                    "UPS fue reemplazado.")
-    ia.respuestas.append({"titulo": TITULO_UPS, "resultado": RESULTADO_UPS,
-                          "como_se_comprueba": COMO_UPS_CIRCULAR, "responsable": "el tano"})
+    ia.respuestas.append(_respuesta(espera=None))
+    r = _pedir(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 200, r.text
+    criterio = r.json()["propuesta"]["criterio"]
+    assert criterio == CRITERIO_DEL_EJEMPLO
+    assert "Se comprueba con lo que pide el área" not in criterio
+    juicio = json.loads(next(m["content"] for m in ia.pedidos[1]["messages"]
+                             if m["role"] == "user"))
+    assert juicio["evidencia_que_pide_el_area"] == ["test record"]
+    assert _auditoria(conn)["criterio_de"] == "ia"
+
+
+def test_el_ups_circular_del_usuario_se_reemplaza_por_el_del_juicio(web, conn, intake_world,
+                                                                    administradora, ia):
+    """La prueba del usuario: "el tano" no es nadie del espacio, la IA inventó una comprobación
+    circular con sinónimos y el juicio por el sentido la rechaza; sin evidencia de un área, Leda
+    igual propone el criterio que escribió el juicio (J2-17)."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.juzga = juez(CIRCULAR_UPS, propone=DEL_JUICIO)
+    ia.respuestas.append({"titulo": TITULO_UPS, "criterio": CIRCULAR_UPS,
+                          "resultado": RESULTADO_UPS, "responsable": "el tano"})
     r = _pedir(navegador, _norte(intake_world)["id"], texto=UPS)
     assert r.status_code == 200, r.text
-    assert "criterio" not in r.json()["propuesta"]
+    assert r.json()["propuesta"]["criterio"] == DEL_JUICIO
     avisos = {a["campo"]: a["texto"] for a in r.json()["avisos"]}
-    assert avisos["criterio"] == "Contame cómo se sabe que está terminada."
+    assert "criterio" not in avisos
     assert avisos["responsable"] == "No encontré a «el tano» en el equipo; elegí quién la hace."
     assert len(ia.pedidos) == 2
     assert _auditoria(conn)["juicio_del_criterio"] == "sin_comprobacion"
+    assert _auditoria(conn)["criterio_de"] == "juicio"
     assert _contar(conn, "incident", "etapa = 'ayuda_al_cargar'") == 0
-
-
-def test_sin_decir_como_se_comprueba_vale_la_evidencia_del_area(web, conn, intake_world,
-                                                                 administradora, con_lucas, ia):
-    """Sam North ("lucas") es de Field Services, cuya política pide "test record": la
-    comprobación sale de ahí, sin preguntarle a la IA si es concreta."""
-    navegador = _navegador_de_administracion(web, conn, administradora)
-    ia.respuestas.append(_respuesta(espera=None, como_se_comprueba=""))
-    r = _pedir(navegador, _norte(intake_world)["id"])
-    assert r.status_code == 200, r.text
-    assert r.json()["propuesta"]["criterio"] == (
-        f"{RESULTADO_DEL_EJEMPLO}. Se comprueba con lo que pide el área: test record.")
-    assert len(ia.pedidos) == 1
-    assert _auditoria(conn)["juicio_del_criterio"] is None
 
 
 def test_si_el_juicio_no_responde_al_proponer_queda_un_incidente(web, conn, intake_world,
@@ -454,9 +458,29 @@ def test_si_el_juicio_no_responde_al_proponer_queda_un_incidente(web, conn, inta
     ia.respuestas.append(_respuesta(espera=None))
     r = _pedir(navegador, _norte(intake_world)["id"])
     assert r.status_code == 200, r.text
-    # La manera de la IA no se propone sin juzgar: vale la evidencia del área.
+    # El criterio de la IA no se propone sin juzgar: vale el de reserva, con la evidencia del área.
     assert r.json()["propuesta"]["criterio"] == (
         f"{RESULTADO_DEL_EJEMPLO}. Se comprueba con lo que pide el área: test record.")
     incidente = _fila(conn, "select * from incident where etapa = 'ayuda_al_cargar'")
     assert incidente is not None and "PlazoAgotado" in incidente["referencia_cruda"]
     assert _auditoria(conn)["juicio_del_criterio"] == "sin_revisar"
+    assert _auditoria(conn)["criterio_de"] == "reserva"
+
+
+def test_una_sesion_cortada_antes_del_juicio_no_recibe_nada(web, conn, intake_world,
+                                                            administradora, con_lucas, ia):
+    """Entre la propuesta y el juicio, el código revisa con el candado y la sesión otra vez."""
+    from tests.garantias.test_carga_de_tareas import _revocar
+
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(_respuesta(espera=None))
+    llamadas = []
+
+    def al_llamar():
+        llamadas.append(1)
+        if len(llamadas) == 1:
+            _revocar(conn, administradora)
+    ia.al_llamar = al_llamar
+    assert _pedir(navegador, _norte(intake_world)["id"]).status_code == 401
+    assert len(llamadas) == 1
+    assert _contar(conn, "audit_log", "accion = 'proponer_al_cargar'") == 0

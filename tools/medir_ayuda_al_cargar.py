@@ -1,19 +1,27 @@
 """La medición de la ayuda de la IA al cargar (porción J2 de `odd/tasks/plataforma-jerarquias.md`):
 pedidos escritos como en un chat real, la misma función que usa la web y los mismos controles del
 código, contra la IA que se elija. **No se corre sin permiso del usuario**: con una IA real gasta
-unas 25 llamadas por vuelta (23 pedidos: 13 propuestas, cada una con una llamada más cuando la IA
-da una manera de comprobarla, que se juzga por su sentido, J2-13; y 10 criterios escritos para
-juzgar al cargar, una llamada cada uno: J2-14, con la evidencia que pide el área basta un
-resultado, y un rechazo trae un criterio propuesto, también el igual al título).
+unas 41 llamadas por vuelta (27 pedidos: 14 propuestas, cada una con dos llamadas, la propuesta y
+el juicio por el sentido del criterio que escribió la IA, J2-13 y J2-17; 10 criterios escritos
+para juzgar al cargar, una llamada cada uno: J2-14, con la evidencia que pide el área basta un
+resultado, y todo rechazo trae un criterio propuesto; y 3 correcciones de la ortografía, J2-17,
+una llamada cada una).
 
     $env:PYTHONPATH = "src"
     .venv\\Scripts\\python.exe tools\\medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3
 
+J2-17 (el usuario: la propuesta "parece sacada del código… muy estructurada"): cada texto que
+propone Leda (título, descripción, criterio, y el criterio que trae un rechazo) se mira también
+desde la medición, nunca en el código de Leda, por si no está escrito con naturalidad
+(`sin_naturalidad`): si trae tal cual una etiqueta de la evidencia de un área, la frase de la
+plantilla de reserva o una lista armada con ";" o "·". Así la ronda con la IA real muestra si la
+IA escribe como una persona del equipo.
+
 `--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira con un guion para el
 ejemplo del usuario, el sábado, "antes del jueves", el PLC, el UPS de la prueba del usuario (con
-la comprobación circular que dio la IA real) y los juicios de los criterios (lo que tendría que
-contestar una IA que entendió), y nada para los demás; así la corrida en seco prueba los controles
-y la comparación: da 15 de 23 (sale con 1).
+la comprobación circular que dio la IA real), "cirelabs", los juicios de los criterios y las
+correcciones de la ortografía (lo que tendría que contestar una IA que entendió), y nada para los
+demás; así la corrida en seco prueba los controles y la comparación: da 19 de 27 (sale con 1).
 `--ia PROVEEDOR/MODELO` (o `sol-suscripcion`, la suscripción de ChatGPT del usuario) usa la IA
 real. Sin base de datos: el equipo, los objetivos, las tareas y los días son fijos (hoy, el
 miércoles 14 de octubre de 2026), y quién la hace se busca con la misma función que el servidor,
@@ -78,6 +86,9 @@ OPCIONES: dict[str, Any] = {
          "estado": "activo", "fecha_objetivo": "2026-11-20"},
         {"id": "o-anual", "titulo": "Mantenimiento anual", "tipo": "operativo",
          "estado": "activo", "fecha_objetivo": None},
+        # J2-17: el nombre que la persona escribió mal en la prueba del celular ("cirelabs").
+        {"id": "o-corelabs", "titulo": "Integrar el PLC con CoreLabs", "tipo": "operativo",
+         "estado": "activo", "fecha_objetivo": "2026-11-27"},
     ],
     "tareas": [
         {"id": "t-tablero", "titulo": "Cablear el tablero de la máquina 3", "estado": "en_curso",
@@ -92,12 +103,22 @@ OPCIONES: dict[str, Any] = {
         _integrante("m-marcos", "Marcos Díaz", "a-auto", "Automatización"),
         _integrante("m-ismael", "Ismael Soschinski", "a-dir", "Dirección"),
     ],
+    # Las etiquetas de la evidencia, las de `espacios/corework.yaml` (las que vio el usuario).
     "politicas": [
-        {"area_id": "a-infra", "area": "Infraestructura", "evidencia_requerida": ["foto"],
-         "version": 1, "tipos": {"foto": {"clases": ["imagen"], "en_palabras": "una foto"}}},
-        {"area_id": "a-auto", "area": "Automatización", "evidencia_requerida": ["captura"],
-         "version": 1, "tipos": {"captura": {"clases": ["imagen"],
-                                             "en_palabras": "una captura de pantalla"}}},
+        {"area_id": "a-infra", "area": "Infraestructura",
+         "evidencia_requerida": ["explicacion", "resultado_de_prueba"], "version": 1,
+         "tipos": {"explicacion": {"clases": ["texto"],
+                                   "en_palabras": "cómo quedó el trabajo, descrito por quien lo "
+                                                  "hizo"},
+                   "resultado_de_prueba": {"clases": ["texto"],
+                                           "en_palabras": "cómo se probó y qué dio la prueba"}}},
+        {"area_id": "a-auto", "area": "Automatización",
+         "evidencia_requerida": ["explicacion", "captura"], "version": 1,
+         "tipos": {"explicacion": {"clases": ["texto"],
+                                   "en_palabras": "cómo quedó el trabajo, descrito por quien lo "
+                                                  "hizo"},
+                   "captura": {"clases": ["imagen"],
+                               "en_palabras": "una foto o una captura de la pantalla"}}},
     ],
     "calendario": {"dias": ["lunes", "martes", "miercoles", "jueves", "viernes"],
                    "hasta": "2027-04-14", "feriados": [], "dias_habiles": _habiles(HOY)},
@@ -106,11 +127,11 @@ OBJETIVO_DE = {"t-tablero": "o-modem", "t-plc": "o-linea"}
 APODOS = {"m-marcos": ["el tano"]}
 
 # Cada pedido: lo que escribió la persona, como en un chat real; lo que Leda tiene que proponer
-# (con su valor, o `True` para un texto que sólo tiene que pasar los controles), lo que no y lo que
-# tiene que descartar con su motivo (`descarta`). J2-13: sin quién la hace (o sin evidencia de su
-# área) y sin que la persona diga cómo se comprueba, el criterio no se propone: el campo pide cómo
-# se sabe (`sin_como_se_comprueba`).
-SIN_COMO = ["criterio", "sin_como_se_comprueba"]
+# (con su valor, o `True` para un texto que sólo tiene que pasar los controles), lo que no, lo que
+# tiene que descartar con su motivo (`descarta`) y, para la ortografía (J2-17), las palabras que
+# tienen que aparecer bien escritas en lo que propone (`bien_escrito`) y las que no (`mal_escrito`).
+# J2-17: Leda propone siempre un criterio, también sin quién la hace ni evidencia de su área ("no
+# sé" es un pedido de ayuda).
 PEDIDOS: list[dict[str, Any]] = [
     {"nombre": "el ejemplo del usuario",
      "texto": "hay que colgar el estante del modem en la sala que lo haga lucas necesita 12 "
@@ -121,8 +142,8 @@ PEDIDOS: list[dict[str, Any]] = [
                  "objetivo_id": "o-modem", "fecha": "2026-10-16"}},
     {"nombre": "los tornillos, sin quién ni cuándo",
      "texto": "faltan los tornillos para colgar el estante, necesito 12 de 8 mm",
-     "propone": {"titulo": True},
-     "no_propone": ["responsable_id", "fecha", "espera_id", "criterio"], "descarta": [SIN_COMO]},
+     "propone": {"titulo": True, "criterio": True},
+     "no_propone": ["responsable_id", "fecha", "espera_id"]},
     {"nombre": "un apodo y un día de la semana",
      "texto": "hay q cambiar el ups de la sala de servidores que lo vea el tano antes del "
               "jueves porq se corta todo",
@@ -137,8 +158,8 @@ PEDIDOS: list[dict[str, Any]] = [
                  "fecha": "2026-10-15"}},
     {"nombre": "sin apuro",
      "texto": "pedir presupuesto de cables para el tablero 4 sin apuro",
-     "propone": {"titulo": True},
-     "no_propone": ["responsable_id", "fecha", "espera_id", "criterio"], "descarta": [SIN_COMO]},
+     "propone": {"titulo": True, "criterio": True},
+     "no_propone": ["responsable_id", "fecha", "espera_id"]},
     {"nombre": "un sábado no es hábil",
      "texto": "lucas tiene que pintar el cartel de la entrada el sabado",
      "propone": {"titulo": True, "responsable_id": "m-lucas"},
@@ -162,58 +183,69 @@ PEDIDOS: list[dict[str, Any]] = [
      "texto": "cmabiar la bateria del ups lucas el lunes q biene no se puede antes xq falta la "
               "bateria q pidio ismael",
      "propone": {"titulo": True, "responsable_id": "m-lucas"},
-     "no_propone": ["espera_id"]},
-    # J2-9 y J2-13: la persona no dijo cómo se comprueba ni quién la hace: Leda no inventa una
-    # manera (en el celular dio una circular), el campo pide cómo se sabe.
+     "no_propone": ["espera_id"], "bien_escrito": ["batería"], "mal_escrito": ["cmabiar"]},
+    # J2-9, J2-13 y J2-17: la persona no dijo cómo se comprueba ni quién la hace: Leda igual
+    # propone un criterio, con sus palabras, sin inventar una manera.
     {"nombre": "el PLC, sin quién ni cómo se comprueba",
      "texto": "hay que dejar el plc de la comprimidora fette 2000 y sus variables listos para "
               "que ariel la integre a la interfaz",
-     "propone": {"titulo": True}, "no_propone": ["criterio"], "descarta": [SIN_COMO]},
+     "propone": {"titulo": True, "criterio": True}},
     # J2-13: el pedido de la prueba del usuario, tal cual (2026-10-13). En `leda_motor` "el tano"
     # no es el apodo de nadie, así que no hay quién la hace ni evidencia de su área: la
-    # comprobación circular que dio la IA real se rechaza por su sentido y no se inventa otra.
+    # comprobación circular que dio la IA real se rechaza por su sentido y Leda propone otro
+    # criterio (J2-17).
     {"nombre": "el UPS de la prueba del usuario",
      "texto": "hay que cambiar el ups de la sala de servidores que lo vea el tano antes del "
               "jueves se corta todo",
      "apodos": {},
-     "propone": {"titulo": True, "fecha": "2026-10-14"},
-     "no_propone": ["responsable_id", "criterio"], "descarta": [SIN_COMO]},
+     "propone": {"titulo": True, "fecha": "2026-10-14", "criterio": True},
+     "no_propone": ["responsable_id"], "descarta": [["criterio", "sin_comprobacion"]]},
+    # J2-17: el nombre mal escrito de la segunda prueba del usuario en el celular: la IA eligió
+    # bien el objetivo ("Integrar el PLC con CoreLabs") pero escribió "cirelabs".
+    {"nombre": "cirelabs",
+     "texto": "hay q integrar el plc de la fette con cirelabs para q ariel lo vea en la "
+              "interfaz",
+     "propone": {"titulo": True, "criterio": True, "objetivo_id": "o-corelabs"},
+     "bien_escrito": ["CoreLabs"], "mal_escrito": ["cirelabs"]},
     # J2-9, J2-13 y J2-14: el criterio que escribió la persona, juzgado al cargar por su sentido
     # (`juicio`: lo que tiene que decidir el código; `None` es que sirve), con la evidencia que se
     # eligió en el formulario, en palabras de todos los días (`evidencia`). J2-14: con evidencia
     # basta un resultado (cómo se comprueba sale de ella), y lo que no dice ninguno se rechaza
-    # (`sin_resultado`) con un criterio propuesto, que el pedido exige; sin evidencia, el criterio
-    # tiene que decir cómo se comprueba (`sin_comprobacion`).
+    # (`sin_resultado`); sin evidencia, el criterio tiene que decir cómo se comprueba
+    # (`sin_comprobacion`). J2-17: todo rechazo trae un criterio propuesto, que el pedido exige.
     {"nombre": "el criterio circular del usuario", "titulo": "Integrar el PLC de la Fette 2000",
-     "evidencia": ["una captura de pantalla"],
+     "evidencia": ["una foto o una captura de la pantalla"],
      "criterio_escrito": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para "
                          "que Ariel la integre a la interfaz. Se comprueba revisando que el PLC "
                          "y sus variables estén listos para esa integración.",
      "juicio": None},
     {"nombre": "un criterio con una comprobación concreta",
-     "titulo": "Integrar el PLC de la Fette 2000", "evidencia": ["una captura de pantalla"],
+     "titulo": "Integrar el PLC de la Fette 2000",
+     "evidencia": ["una foto o una captura de la pantalla"],
      "criterio_escrito": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para "
                          "que Ariel la integre a la interfaz. Las variables del PLC se leen bien "
                          "desde la interfaz.",
      "juicio": None},
     {"nombre": "un criterio con palabras y sin resultado", "titulo": "Colocar el estante",
-     "evidencia": ["una foto"], "criterio_escrito": "Hacerlo con cuidado y prolijidad",
+     "evidencia": ["una foto del trabajo terminado"],
+     "criterio_escrito": "Hacerlo con cuidado y prolijidad", "juicio": "sin_resultado"},
+    {"nombre": "no se", "titulo": "Colocar el estante",
+     "evidencia": ["una foto del trabajo terminado"], "criterio_escrito": "No se",
      "juicio": "sin_resultado"},
-    {"nombre": "no se", "titulo": "Colocar el estante", "evidencia": ["una foto"],
-     "criterio_escrito": "No se", "juicio": "sin_resultado"},
     {"nombre": "el UPS circular, escrito", "titulo": "Cambiar el UPS de la sala de servidores",
-     "evidencia": ["una foto"],
+     "evidencia": ["una foto del trabajo terminado"],
      "criterio_escrito": "El UPS de la sala de servidores está cambiado. Se comprueba verificando "
                          "en la sala de servidores que el UPS fue reemplazado.",
      "juicio": None},
     # Sin la lista de palabras de la J2-9: "revisa" y "queda" no deciden nada.
     {"nombre": "un criterio concreto con palabras de revisar",
-     "titulo": "Cambiar la batería del UPS", "evidencia": ["una foto"],
+     "titulo": "Cambiar la batería del UPS", "evidencia": ["una foto del trabajo terminado"],
      "criterio_escrito": "Se revisa que el UPS quede encendido con la batería nueva y aguante 10 "
                          "minutos sin luz.",
      "juicio": None},
     # Lo igual al título lo rechaza el código, diga lo que diga la IA; la IA sólo propone.
-    {"nombre": "igual al título", "titulo": "Colocar el estante", "evidencia": ["una foto"],
+    {"nombre": "igual al título", "titulo": "Colocar el estante",
+     "evidencia": ["una foto del trabajo terminado"],
      "criterio_escrito": "Colocar el estante.", "juicio": "sin_resultado"},
     # J2-14: los dos criterios de la segunda prueba del usuario en el celular (2026-10-13), con la
     # evidencia que mostraba el formulario: dicen un resultado y se cargan.
@@ -223,87 +255,179 @@ PEDIDOS: list[dict[str, Any]] = [
     {"nombre": "ordenado y limpio", "titulo": "Ordenar el depósito",
      "evidencia": ["una foto del trabajo terminado"],
      "criterio_escrito": "Quedó ordenado y limpio", "juicio": None},
-    # Sin evidencia del área, el mismo criterio no dice cómo se comprueba (J2-13).
+    # Sin evidencia del área, el mismo criterio no dice cómo se comprueba (J2-13), y el rechazo
+    # trae uno propuesto (J2-17).
     {"nombre": "el UPS del celular, sin evidencia del área",
      "titulo": "Cambiar el UPS de la sala de servidores", "evidencia": [],
      "criterio_escrito": "El ups queda cambiado y funcionando", "juicio": "sin_comprobacion"},
+    # J2-17: la ortografía de lo que la persona escribió a mano en los campos de texto, antes de
+    # la vista previa (`ortografia`: los textos). `corrige`: las palabras que tienen que quedar
+    # bien escritas (y que el código acepte la corrección); `igual`: los campos que no se tocan.
+    {"nombre": "ortografía: el árbol y CoreLabs",
+     "ortografia": {"titulo": "plantar el arvol de la entrada",
+                    "descripcion": "coordinar con cirelabs la entrega del plc"},
+     "corrige": {"titulo": ["árbol"], "descripcion": ["CoreLabs"]}},
+    {"nombre": "ortografía: bien escrito no se toca",
+     "ortografia": {"titulo": "Revisar el tablero de la línea 3",
+                    "criterio": "El tablero queda revisado y Marcos lo ve funcionando."},
+     "igual": ["titulo", "criterio"]},
+    # Lo que se escribe como en un chat ("q") no es una falta para corregir con otra palabra: si la
+    # IA lo cambia, el código rechaza la corrección entera y el pedido sale mal.
+    {"nombre": "ortografía: como en un chat",
+     "ortografia": {"titulo": "cambiar la bateria del ups q no anda"},
+     "corrige": {"titulo": ["batería"]}},
 ]
 
 VACIO = {c: "" for c in ayuda_al_cargar.CAMPOS}
 
 # Lo que propone la IA en seco: lo que propondría una IA que entendió el ejemplo del usuario, un
-# sábado (que los controles no dejan poner), "antes del jueves" (el miércoles) y el PLC; y, en el
-# UPS de la prueba del usuario, lo que propuso la IA real (una comprobación circular). Los demás
-# pedidos, sin guion: no propone nada.
+# sábado (que los controles no dejan poner), "antes del jueves" (el miércoles), el PLC y
+# "cirelabs"; y, en el UPS de la prueba del usuario, lo que propuso la IA real (una comprobación
+# circular). Los demás pedidos, sin guion: no propone nada.
 GUION: dict[str, dict[str, str]] = {
     "el ejemplo del usuario": {
         "titulo": "Colgar el estante del módem en la sala",
         "descripcion": "Colgar el estante del módem en la sala. Hacen falta 12 tornillos de 8 mm. "
                        "No se puede empezar hasta que terminen de cablear el tablero de la "
                        "máquina 3.",
+        "criterio": "El estante del módem queda colgado en la sala con los 12 tornillos de 8 mm, "
+                    "firme y derecho.",
         "resultado": "El estante del módem está colgado en la sala con los 12 tornillos de 8 mm",
-        "como_se_comprueba": "",
         "responsable": "lucas", "espera": "T1", "objetivo": "O1",
         "fecha": "2026-10-16", "como_dijo_la_fecha": "para el viernes"},
     "un sábado no es hábil": {
         "titulo": "Pintar el cartel de la entrada", "responsable": "lucas",
+        "criterio": "El cartel de la entrada queda pintado y se ve terminado.",
         "fecha": "2026-10-17", "como_dijo_la_fecha": "el sabado"},
     "un apodo y un día de la semana": {
         "titulo": "Cambiar el UPS de la sala de servidores",
-        "resultado": "El UPS de la sala de servidores está cambiado", "como_se_comprueba": "",
+        "criterio": "El UPS de la sala de servidores queda cambiado y funcionando.",
+        "resultado": "El UPS de la sala de servidores está cambiado",
         "responsable": "el tano", "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves"},
     "el PLC, sin quién ni cómo se comprueba": {
         "titulo": "Dejar listo el PLC de la comprimidora Fette 2000",
-        "resultado": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que "
-                     "Ariel la integre a la interfaz",
-        "como_se_comprueba": ""},
+        "criterio": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos, y Ariel "
+                    "los ve desde la interfaz."},
     "el UPS de la prueba del usuario": {
         "titulo": "Cambiar el UPS de la sala de servidores",
+        "criterio": "El UPS de la sala de servidores está cambiado. Se comprueba verificando en la "
+                    "sala de servidores que el UPS fue reemplazado.",
         "resultado": "El UPS de la sala de servidores está cambiado",
-        "como_se_comprueba": "se comprueba verificando en la sala de servidores que el UPS fue "
-                             "reemplazado",
         "responsable": "el tano", "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves"},
+    "cirelabs": {
+        "titulo": "Integrar el PLC de la Fette con CoreLabs",
+        "criterio": "El PLC de la Fette queda integrado con CoreLabs y Ariel lo ve en la "
+                    "interfaz.",
+        "objetivo": "O4"},
 }
 # Lo que contesta en seco el juicio de un criterio (escrito o propuesto), por su texto: lo que
-# diría una IA que lo juzga por su sentido. Sin evidencia del área, si dice cómo se comprueba
-# (`GUION_DEL_JUICIO`); con ella (J2-14), si dice un resultado y el resultado de la tarea
-# (`GUION_DEL_RESULTADO`).
-NO_LO_DICE = {"dice_como_se_comprueba": False, "como_se_comprueba": ""}
+# diría una IA que lo juzga por su sentido y que, si no sirve, escribe el suyo con sus palabras
+# (J2-17). Sin evidencia del área, si dice cómo se comprueba (`GUION_DEL_JUICIO`); con ella
+# (J2-14), si dice un resultado (`GUION_DEL_RESULTADO`).
+_UPS_DE_LEDA = ("El UPS de la sala de servidores queda cambiado y funcionando, y se lo ve encendido "
+                "en la sala.")
 GUION_DEL_JUICIO: dict[str, dict[str, Any]] = {
     "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que Ariel la integre "
     "a la interfaz. Se comprueba revisando que el PLC y sus variables estén listos para esa "
-    "integración.": NO_LO_DICE,
+    "integración.": {"dice_como_se_comprueba": False, "como_se_comprueba": "", "criterio": ""},
     "El UPS de la sala de servidores está cambiado. Se comprueba verificando en la sala de "
-    "servidores que el UPS fue reemplazado.": NO_LO_DICE,
-    "El ups queda cambiado y funcionando": NO_LO_DICE,
+    "servidores que el UPS fue reemplazado.":
+        {"dice_como_se_comprueba": False, "como_se_comprueba": "", "criterio": _UPS_DE_LEDA},
+    "El ups queda cambiado y funcionando":
+        {"dice_como_se_comprueba": False, "como_se_comprueba": "", "criterio": _UPS_DE_LEDA},
+    "El PLC de la comprimidora Fette 2000 y sus variables quedan listos, y Ariel los ve desde la "
+    "interfaz.":
+        {"dice_como_se_comprueba": True, "como_se_comprueba": "Ariel los ve desde la interfaz",
+         "criterio": ""},
+    "El PLC de la Fette queda integrado con CoreLabs y Ariel lo ve en la interfaz.":
+        {"dice_como_se_comprueba": True, "como_se_comprueba": "Ariel lo ve en la interfaz",
+         "criterio": ""},
 }
 _ESTANTE = "El estante queda colocado"
+_ESTANTE_DE_LEDA = "El estante queda colocado, firme y derecho, y quien lo revisa lo ve terminado."
 GUION_DEL_RESULTADO: dict[str, dict[str, Any]] = {
     "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que Ariel la integre "
     "a la interfaz. Se comprueba revisando que el PLC y sus variables estén listos para esa "
     "integración.":
         {"dice_un_resultado": True,
          "resultado": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para "
-                      "que Ariel la integre a la interfaz"},
+                      "que Ariel la integre a la interfaz", "criterio": ""},
     "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que Ariel la integre "
     "a la interfaz. Las variables del PLC se leen bien desde la interfaz.":
         {"dice_un_resultado": True,
          "resultado": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para "
-                      "que Ariel la integre a la interfaz"},
-    "Hacerlo con cuidado y prolijidad": {"dice_un_resultado": False, "resultado": _ESTANTE},
-    "No se": {"dice_un_resultado": False, "resultado": _ESTANTE},
-    "Colocar el estante.": {"dice_un_resultado": False, "resultado": _ESTANTE},
+                      "que Ariel la integre a la interfaz", "criterio": ""},
+    "Hacerlo con cuidado y prolijidad":
+        {"dice_un_resultado": False, "resultado": _ESTANTE, "criterio": _ESTANTE_DE_LEDA},
+    "No se": {"dice_un_resultado": False, "resultado": _ESTANTE, "criterio": _ESTANTE_DE_LEDA},
+    "Colocar el estante.":
+        {"dice_un_resultado": False, "resultado": _ESTANTE, "criterio": _ESTANTE_DE_LEDA},
     "El UPS de la sala de servidores está cambiado. Se comprueba verificando en la sala de "
     "servidores que el UPS fue reemplazado.":
-        {"dice_un_resultado": True, "resultado": "El UPS de la sala de servidores está cambiado"},
+        {"dice_un_resultado": True, "resultado": "El UPS de la sala de servidores está cambiado",
+         "criterio": ""},
     "Se revisa que el UPS quede encendido con la batería nueva y aguante 10 minutos sin luz.":
         {"dice_un_resultado": True,
-         "resultado": "El UPS queda encendido con la batería nueva y aguanta 10 minutos sin luz"},
+         "resultado": "El UPS queda encendido con la batería nueva y aguanta 10 minutos sin luz",
+         "criterio": ""},
     "El ups queda cambiado y funcionando":
-        {"dice_un_resultado": True, "resultado": "El UPS queda cambiado y funcionando"},
+        {"dice_un_resultado": True, "resultado": "El UPS queda cambiado y funcionando",
+         "criterio": ""},
     "Quedó ordenado y limpio":
-        {"dice_un_resultado": True, "resultado": "El depósito queda ordenado y limpio"},
+        {"dice_un_resultado": True, "resultado": "El depósito queda ordenado y limpio",
+         "criterio": ""},
+    # Los criterios que propone la IA en seco, ya con la evidencia del área de quien la hace.
+    "El estante del módem queda colgado en la sala con los 12 tornillos de 8 mm, firme y derecho.":
+        {"dice_un_resultado": True, "resultado": "", "criterio": ""},
+    "El UPS de la sala de servidores queda cambiado y funcionando.":
+        {"dice_un_resultado": True, "resultado": "", "criterio": ""},
+    "El cartel de la entrada queda pintado y se ve terminado.":
+        {"dice_un_resultado": True, "resultado": "", "criterio": ""},
 }
+# Lo que corrige en seco la IA de la ortografía, por el primer texto del pedido: lo que haría una
+# IA que entendió (sólo la ortografía, con los nombres de los datos).
+GUION_DE_LA_ORTOGRAFIA: dict[str, dict[str, str]] = {
+    "plantar el arvol de la entrada": {
+        "titulo": "Plantar el árbol de la entrada",
+        "descripcion": "Coordinar con CoreLabs la entrega del PLC"},
+    "Revisar el tablero de la línea 3": {
+        "titulo": "Revisar el tablero de la línea 3",
+        "criterio": "El tablero queda revisado y Marcos lo ve funcionando."},
+    "cambiar la bateria del ups q no anda": {"titulo": "Cambiar la batería del UPS q no anda"},
+}
+
+# J2-17, sólo en la medición: lo que delata un texto escrito con forma de código (el usuario: "muy
+# estructurado… parece sacado del código"). La frase de la plantilla de reserva y una etiqueta de
+# la evidencia copiada tal cual (las de cuatro palabras o más: las cortas, como "una foto", se
+# dicen naturalmente).
+_DE_LA_PLANTILLA = "se comprueba con lo que pide el area"
+_LISTAS = (";", "·")
+
+
+def _etiquetas(pedido: dict[str, Any]) -> list[str]:
+    tipos = [t for p in OPCIONES["politicas"] for t in p["tipos"].values()]
+    return [*{t["en_palabras"] for t in tipos}, *(pedido.get("evidencia") or [])]
+
+
+def _plano(texto: str) -> str:
+    return " ".join(ayuda_al_cargar._normal(texto).split())
+
+
+def sin_naturalidad(texto: str, etiquetas: list[str]) -> list[str]:
+    """Por qué un texto propuesto parece armado por el código y no escrito por una persona: la
+    frase de la plantilla, una etiqueta de la evidencia de cuatro palabras o más copiada tal cual,
+    o una lista con ";" o "·". Vacío si se lee natural."""
+    plano = f" {_plano(texto)} "
+    motivos = []
+    if f" {_DE_LA_PLANTILLA} " in plano:
+        motivos.append("la frase de la plantilla")
+    for etiqueta in etiquetas:
+        if len(_plano(etiqueta).split()) >= 4 and f" {_plano(etiqueta)} " in plano:
+            motivos.append(f"la etiqueta «{etiqueta}» tal cual")
+    if any(signo in texto for signo in _LISTAS):
+        motivos.append("una lista con ; o ·")
+    return motivos
+
 
 class EquipoFijo:
     """Un cursor sobre el equipo fijo, para buscar quién la hace con la función del servidor tal
@@ -355,6 +479,9 @@ class IAEnSeco:
             guion = (GUION_DEL_RESULTADO if "evidencia_que_pide_el_area" in entrada
                      else GUION_DEL_JUICIO)
             datos: dict[str, Any] = guion.get(entrada["criterio"], {})
+        elif nombre == ayuda_al_cargar.NOMBRE_DE_LA_ORTOGRAFIA:
+            primero = next(iter(entrada["textos"].values()), "")
+            datos = GUION_DE_LA_ORTOGRAFIA.get(primero, {})
         else:
             datos = self._por_texto.get(entrada["texto"], {})
         return {"choices": [{"finish_reason": "tool_calls", "message": {"tool_calls": [
@@ -444,15 +571,16 @@ def _de_la_ia(falla: BaseException) -> dict[str, Any]:
 
 def medir_el_juicio(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     """Un criterio escrito, juzgado como al cargar (`juzgar_el_criterio`, con la evidencia del
-    pedido): si el código decidió lo esperado y, si lo rechazó por no decir un resultado, si trajo
-    un criterio propuesto (J2-14). Que la IA no lo juzgara (`sin_revisar`), o un rechazo sin
-    propuesta, es una falla de la IA o, si su causa no es de la IA, un error del programa."""
+    pedido): si el código decidió lo esperado y, si lo rechazó, si trajo un criterio propuesto
+    (J2-14 y J2-17) escrito con naturalidad. Que la IA no lo juzgara (`sin_revisar`), o un rechazo
+    sin propuesta, es una falla de la IA o, si su causa no es de la IA, un error del programa."""
     desde = time.monotonic()
     juicio = ayuda_al_cargar.juzgar_el_criterio(ia, titulo=pedido["titulo"], descripcion="",
                                                 criterio=pedido["criterio_escrito"],
                                                 evidencia=pedido.get("evidencia") or [])
     segundos = round(time.monotonic() - desde, 2)
-    sin_propuesta = juicio.motivo == "sin_resultado" and juicio.propuesta is None
+    sin_propuesta = (juicio.motivo in ("sin_resultado", "sin_comprobacion")
+                     and juicio.propuesta is None)
     if juicio.motivo == "sin_revisar" or sin_propuesta:
         de_la_ia = _de_la_ia(juicio.falla or RespuestaInvalida("sin juicio"))
         if sin_propuesta:
@@ -460,7 +588,39 @@ def medir_el_juicio(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
         return False, {**de_la_ia, "juicio": juicio.motivo, "segundos": segundos}
     fallas = [] if juicio.motivo == pedido["juicio"] else [
         f"juicio: esperaba {pedido['juicio']!r}, vino {juicio.motivo!r}"]
+    naturalidad = (sin_naturalidad(juicio.propuesta, _etiquetas(pedido))
+                   if juicio.propuesta else [])
+    fallas += [f"propuesta sin naturalidad: {m}" for m in naturalidad]
     return not fallas, {"falla": None, "juicio": juicio.motivo, "propuesta": juicio.propuesta,
+                        "de_reserva": juicio.de_reserva, "sin_naturalidad": naturalidad,
+                        "segundos": segundos, "fallas": fallas}
+
+
+def medir_la_ortografia(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+    """Los textos escritos a mano, corregidos como antes de la vista previa (J2-17): la misma
+    llamada y el mismo control del código (`revisar_la_ortografia`). Sale mal si una palabra que
+    se esperaba bien escrita no quedó así, si el código rechazó una corrección (cambió algo más
+    que la ortografía) o si cambió un texto que estaba bien."""
+    textos = pedido["ortografia"]
+    entrada = ayuda_al_cargar.entrada_de_la_ortografia(textos, OPCIONES)
+    desde = time.monotonic()
+    try:
+        crudo = ayuda_al_cargar.pedir_la_ortografia(ia, entrada)
+    except Exception as falla:
+        return False, {**_de_la_ia(falla), "segundos": round(time.monotonic() - desde, 2)}
+    segundos = round(time.monotonic() - desde, 2)
+    r = ayuda_al_cargar.revisar_la_ortografia(crudo, textos, OPCIONES)
+    fallas = [f"{x['campo']}: el código no aceptó la corrección ({x['motivo']})"
+              for x in r.rechazados]
+    for campo, palabras in (pedido.get("corrige") or {}).items():
+        texto = (r.corregidos.get(campo) or {}).get("texto") or textos[campo]
+        for palabra in palabras:
+            if palabra not in texto:
+                fallas.append(f"{campo}: esperaba «{palabra}», quedó {texto!r}")
+    for campo in pedido.get("igual") or []:
+        if campo in r.corregidos:
+            fallas.append(f"{campo}: estaba bien y lo cambió: {r.corregidos[campo]['texto']!r}")
+    return not fallas, {"falla": None, "corregidos": r.corregidos, "rechazados": r.rechazados,
                         "segundos": segundos, "fallas": fallas}
 
 
@@ -469,6 +629,8 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     resultado (`falla: ia`); sin cupo, `SinCupo`; un error del programa se levanta tal cual."""
     if "criterio_escrito" in pedido:
         return medir_el_juicio(ia, pedido)
+    if "ortografia" in pedido:
+        return medir_la_ortografia(ia, pedido)
     entrada = ayuda_al_cargar.entrada_de_la_ia(pedido["texto"], VACIO, OPCIONES)
     desde = time.monotonic()
     try:
@@ -476,20 +638,22 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     except Exception as falla:
         return False, {**_de_la_ia(falla), "segundos": round(time.monotonic() - desde, 2)}
     segundos = round(time.monotonic() - desde, 2)
-    # Como la web: la manera de comprobarla que dio la IA se juzga por su sentido (J2-13). Si el
-    # juicio no responde, la propuesta sigue como en la web (con la evidencia del área), salvo sin
-    # cupo o con un error del programa; y, como en `medir_el_juicio`, es una falla de la IA: el
-    # pedido sale mal y el informe lo dice (revisión `review-bfa79042ca12447b`).
-    desde = time.monotonic()
-    juicio = ayuda_al_cargar.juzgar_la_propuesta(ia, crudo, VACIO)
-    del_juicio = round(time.monotonic() - desde, 2) if juicio is not None else None
-    falla_del_juicio = None
-    if juicio is not None and juicio.motivo == "sin_revisar":
-        (falla_del_juicio,) = _de_la_ia(juicio.falla or RespuestaInvalida("sin juicio"))["fallas"]
     apodos = pedido.get("apodos")
     r = ayuda_al_cargar.revisar(crudo, texto=pedido["texto"], escrito=VACIO, opciones=OPCIONES,
                                 coinciden=lambda dicho: coinciden(dicho, apodos),
-                                objetivo_de=OBJETIVO_DE.get, juicio=juicio)
+                                objetivo_de=OBJETIVO_DE.get)
+    # Como la web: el criterio que escribió la IA se juzga por su sentido, ya con la evidencia del
+    # área de quien la hace (J2-13 y J2-17). Si el juicio no responde o no deja un criterio, la
+    # propuesta sigue como en la web (con el de reserva, si hay evidencia), salvo sin cupo o con un
+    # error del programa; y, como en `medir_el_juicio`, es una falla de la IA: el pedido sale mal y
+    # el informe lo dice (revisión `review-bfa79042ca12447b`).
+    desde = time.monotonic()
+    juicio = ayuda_al_cargar.juzgar_la_propuesta(ia, r)
+    del_juicio = round(time.monotonic() - desde, 2) if juicio is not None else None
+    ayuda_al_cargar.cerrar_el_criterio(r, juicio)
+    falla_del_juicio = None
+    if juicio is not None and juicio.falla is not None:
+        (falla_del_juicio,) = _de_la_ia(juicio.falla)["fallas"]
     fallas = [] if falla_del_juicio is None else [f"juicio: {falla_del_juicio}"]
     for campo, esperado in pedido.get("propone", {}).items():
         valor = r.propuesta.get(campo)
@@ -502,8 +666,20 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     for campo, motivo in pedido.get("descarta", []):
         if {"campo": campo, "motivo": motivo} not in r.descartados:
             fallas.append(f"{campo}: esperaba descartarlo por {motivo}")
+    # J2-17: lo que escribe Leda, con naturalidad y bien escrito.
+    textos = {c: r.propuesta[c] for c in ayuda_al_cargar.CAMPOS_DE_TEXTO if c in r.propuesta}
+    naturalidad = {c: m for c, t in textos.items() if (m := sin_naturalidad(t, _etiquetas(pedido)))}
+    fallas += [f"{c}: sin naturalidad: {', '.join(m)}" for c, m in naturalidad.items()]
+    todo = " ".join(textos.values())
+    for palabra in pedido.get("bien_escrito", []):
+        if palabra not in todo:
+            fallas.append(f"ortografía: esperaba «{palabra}» en lo que propuso")
+    for palabra in pedido.get("mal_escrito", []):
+        if palabra.casefold() in todo.casefold():
+            fallas.append(f"ortografía: propuso «{palabra}» tal cual")
     return not fallas, {"falla": None if falla_del_juicio is None else "ia",
                         "falla_del_juicio": falla_del_juicio, "propuesta": r.propuesta,
+                        "criterio_de": r.criterio_de, "sin_naturalidad": naturalidad,
                         "avisos": [a["texto"] for a in r.avisos],
                         "descartados": r.descartados, "elegir": r.elegir,
                         "juicio": None if juicio is None else (juicio.motivo or "lo_dice"),

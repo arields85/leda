@@ -12,11 +12,13 @@ comprueba, y sin proponer nada (J2-14).
   de la evidencia que se elige en el formulario. Se carga lo que dice un resultado (lo juzga la
   IA por su sentido) y se guarda tal cual; se rechaza lo que no dice ninguno (422 `criterio` /
   `sin_resultado`) y lo igual al título (lo decide el código, diga lo que diga la IA), con un
-  criterio propuesto por Leda (`propuesta`: el resultado más la evidencia del área). Sin
-  propuesta (la IA caída o un resultado que no pasa los controles), el rechazo igual dice qué
-  falta y queda un incidente (`propuesta_del_criterio`).
+  criterio propuesto por Leda (`propuesta`: J2-17, el que escribe la IA con sus palabras; el de
+  reserva, el resultado más la evidencia del área, sólo si el suyo no pasa los controles). Sin
+  propuesta (la IA caída o nada que pase los controles), el rechazo igual dice qué falta y queda
+  un incidente (`propuesta_del_criterio`).
 - **Sin evidencia del área (J2-13):** el criterio tiene que decir cómo se comprueba; la IA lo
-  juzga por el sentido y copia la parte que lo dice; si no, 422 `sin_comprobacion`.
+  juzga por el sentido y copia la parte que lo dice; si no, 422 `sin_comprobacion`, también con
+  un criterio propuesto (J2-17: "no sé" es un pedido de ayuda).
 - **Si la IA no juzga, ni se traba ni se finge:** se carga con un aviso que no bloquea y un
   incidente (`criterio_al_cargar`); una carga repetida no suma otro.
 - **Sin las opciones de la carga** (no se sabe qué evidencia pide el área), el criterio no se
@@ -37,7 +39,10 @@ from tests.garantias.test_carga_de_tareas import (  # noqa: F401
 from tests.test_ayuda_al_cargar import (CIRCULAR, COMO_CONCRETO, CONCRETO, ORDENADO, TITULO_PLC,
                                         TITULO_UPS, UPS_DEL_CELULAR, IADeLaCarga)
 
-TEXTO_SIN_COMPROBACION = "Contame cómo se sabe que está terminada."
+TEXTO_SIN_COMPROBACION = "No dice cómo se sabe que está terminada."
+# El criterio que escribe la IA con sus palabras al rechazar uno (J2-17).
+DE_LEDA_PLC = ("El PLC de la comprimidora Fette 2000 queda listo para integrarlo y se ven sus "
+               "variables desde la interfaz.")
 TEXTO_SIN_RESULTADO = "No dice qué tiene que quedar hecho para darla por terminada."
 TEXTO_SIN_REVISAR = ("No pude revisar el criterio ahora: la tarea quedó cargada con el criterio "
                      "como lo escribiste.")
@@ -189,13 +194,28 @@ def test_sin_evidencia_un_criterio_sin_comprobacion_no_se_carga(web, conn, intak
                                                                 administradora, ia):
     sin_evidencia = _sin_evidencia(conn, intake_world)
     navegador = _navegador_de_administracion(web, conn, administradora)
-    ia.respuestas.append(NO_LO_DICE)
+    ia.respuestas.append({**NO_LO_DICE, "criterio": DE_LEDA_PLC})
     r = _cargar(navegador, intake_world, criterio=UPS_DEL_CELULAR, **sin_evidencia)
     assert r.status_code == 422, r.text
+    # J2-17: el rechazo sin evidencia también trae el criterio que escribe la IA, tal cual.
     assert r.json()["errores"] == [{"campo": "criterio", "motivo": "sin_comprobacion",
-                                    "texto": TEXTO_SIN_COMPROBACION}]
+                                    "texto": TEXTO_SIN_COMPROBACION, "propuesta": DE_LEDA_PLC}]
     assert ia.entrada() == {"titulo": TITULO_PLC, "descripcion": "", "criterio": UPS_DEL_CELULAR}
     assert _contar(conn, "task") == 0
+    assert _contar(conn, "incident", "etapa = 'propuesta_del_criterio'") == 0
+
+
+def test_el_rechazo_trae_el_criterio_de_la_ia_y_no_la_plantilla(web, conn, intake_world,
+                                                               administradora, ia):
+    """J2-17: con la evidencia del área, el criterio propuesto es el que escribió la IA; la
+    plantilla queda sólo de reserva."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({**SIN_RESULTADO, "criterio": DE_LEDA_PLC})
+    r = _cargar(navegador, intake_world, criterio="No se")
+    assert r.status_code == 422, r.text
+    (error,) = r.json()["errores"]
+    assert error["propuesta"] == DE_LEDA_PLC
+    assert "Se comprueba con lo que pide el área" not in error["propuesta"]
 
 
 def test_sin_evidencia_un_criterio_con_una_comprobacion_concreta_se_carga(
@@ -209,14 +229,32 @@ def test_sin_evidencia_un_criterio_con_una_comprobacion_concreta_se_carga(
     assert _contar(conn, "incident", "etapa = 'criterio_al_cargar'") == 0
 
 
-def test_sin_evidencia_igual_al_titulo_no_llama_a_la_ia(web, conn, intake_world, administradora,
-                                                        ia):
+def test_sin_evidencia_igual_al_titulo_se_rechaza_con_un_criterio_propuesto(
+        web, conn, intake_world, administradora, ia):
+    """Lo decide el código, diga lo que diga la IA; J2-17: la IA se llama igual, para escribir el
+    criterio que Leda propone ("no sé" es un pedido de ayuda)."""
     sin_evidencia = _sin_evidencia(conn, intake_world)
     navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({**LO_DICE, "criterio": DE_LEDA_PLC})
     r = _cargar(navegador, intake_world, criterio=f"{TITULO_PLC.lower()}.", **sin_evidencia)
     assert r.status_code == 422, r.text
     assert _errores(r) == {("criterio", "sin_comprobacion")}
-    assert ia.pedidos == []
+    assert r.json()["errores"][0]["propuesta"] == DE_LEDA_PLC
+    assert len(ia.pedidos) == 1
+
+
+def test_sin_evidencia_y_la_ia_caida_vacio_se_rechaza_con_un_incidente(
+        web, conn, intake_world, administradora, ia):
+    from leda.motor.ia_real import PlazoAgotado
+
+    sin_evidencia = _sin_evidencia(conn, intake_world)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(PlazoAgotado(40))
+    r = _cargar(navegador, intake_world, criterio=f"{TITULO_PLC}", **sin_evidencia)
+    assert r.status_code == 422, r.text
+    assert r.json()["errores"] == [{"campo": "criterio", "motivo": "sin_comprobacion",
+                                    "texto": TEXTO_SIN_COMPROBACION}]
+    assert _contar(conn, "incident", "etapa = 'propuesta_del_criterio'") == 1
 
 
 def test_sin_evidencia_la_ia_que_dice_que_si_con_una_parte_que_no_esta_no_vale(
