@@ -334,7 +334,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         el 12", "del 10" de "del 10 al 12", "el martes" de "el lunes o el martes", "de mañana",
         "jueves" de "antes del jueves" y "dos días antes del jueves") daban un día: 11 de 11 en
         rojo. `tests/garantias/test_ayuda_al_cargar.py` contra el código de antes (`-o
-        pythonpath=` con una copia de `src` de `a9d99d0e`): las dos nuevas, por la puerta, en rojo
+        pythonpath=` con una copia de `src` de `6be0fcdf`, el mismo que `a9d99d0e`): las dos nuevas, por la puerta, en rojo
         (el rango y "antes del viernes de la semana que viene" con `es_dia_habil` de la base).
         Después: `.venv\Scripts\python.exe -m pytest -q tests/test_ayuda_al_cargar.py
         tests/garantias/test_ayuda_al_cargar.py`, 146 passed. La herramienta en seco
