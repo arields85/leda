@@ -255,8 +255,11 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
    trabada: la web dice que tiene una propuesta esperando aprobación. Aprobada, figura esperando a
    "Comprar los tornillos" y un atraso se explica por eso. Rechazada, la espera desaparece con ella y la
    tarea sigue normal. Una propuesta sin aprobar nunca traba una tarea comprometida.
-10. **Cambiar quién es la autoridad final.** Ejemplo: Ismael quiere que Martín sea Dirección en su
-    lugar; ¿lo hace él solo desde la web, o pasa por administración?
+10. ~~**Cambiar quién es la autoridad final.**~~ **Decidido (usuario, 2026-10-13: "si").** Lo hace
+    Dirección sola desde su web, con dos cuidados: quien la recibe tiene que aceptar (el cambio vale
+    recién entonces, y el espacio nunca queda sin autoridad final: Ismael sigue hasta que Martín
+    acepta), y al administrador de plataforma le llega un aviso sólo informativo. Así una sesión
+    abierta en un celular perdido no entrega el equipo sin que la otra persona acepte.
 11. **El tipo del objetivo.** La base pide que cada objetivo sea estratégico, hito u operativo.
     Ejemplo: "Poner el módem colgando en la pared"; ¿lo elige Dirección o se deduce de dónde cuelga?
     Se puede resolver en el diseño corto de la porción.
