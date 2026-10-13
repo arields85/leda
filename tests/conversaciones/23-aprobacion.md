@@ -25,8 +25,10 @@ lugar de esperar a que pasen 30 minutos desde su mensaje. Desde la
 D4 de la C-3d: los cuatro avisos del viernes salen de a uno, cada uno al terminar su margen para
 corregir (los que salen juntos irían en una lista, la conversación 28), y después de cada decisión
 (pasos 2, 4 y 6) la respuesta dice lo que le queda por revisar a Ismael, con un botón por tarea para
-verla (decisión 17 del usuario, 2026-10-08). En el paso 9, "pasale lo de los colores" es lo que la
-decisión 12 llama el comentario: va con la aprobación, no como un pedido de cambios.
+verla (decisión 17 del usuario, 2026-10-08). En el paso 9, "aprobala nomas y pasale lo de los
+colores" elige la primera lectura (decisión 12): el comentario va con la aprobación, no como un
+pedido de cambios, y es el del paso 8, porque la respuesta sólo elige entre las lecturas del mensaje
+que abrió la pregunta (prueba por Telegram del 2026-10-12: le llegó «pasale lo de los colores»).
 
 ## Estado inicial
 
@@ -155,7 +157,8 @@ decisión 12 llama el comentario: va con la aprobación, no como un pedido de ca
 9. **Ismael** escribe (10:46), sin tocar los botones: "aprobala nomas y pasale lo de los colores"
    →
    - Jugadas: `elegir`, la primera lectura: `aprobar`, con el comentario "que revise los colores del
-     gráfico de lotes". Escrito vale igual que el botón (situación general 6).
+     gráfico de lotes" del paso 8, aunque la respuesta traiga el suyo: sólo elige. Escrito vale igual
+     que el botón (situación general 6).
    - Efecto: la aprobación con el comentario; la tarea pasa a `terminada`; el aviso a Ariel sale
      enseguida, con el comentario como algo para mirar, no como un cambio pendiente.
    - La respuesta dice: que la tarea de Ariel quedó terminada y que Ariel se va a enterar ahora, con el

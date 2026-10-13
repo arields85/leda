@@ -29,7 +29,11 @@ el comentario pide algo (`el_comentario_pide_algo`); si no lo dijo, pregunta igu
 cerrar por error es peor que un toque más. Un comentario que no pide nada (un elogio) aprueba
 directo. No pregunta cuando es la elección: una opción de una pregunta, o la respuesta escrita a
 la de cuál de las dos (decisión 12: "aprobala nomás y pasale lo de los colores" aprueba y pasa
-el comentario).
+el comentario). **La respuesta sólo elige** (prueba por Telegram del 2026-10-12): elige una de
+las lecturas del mensaje que abrió la pregunta, así que lo que se decide, su comentario, es el
+de ese mensaje, guardado con la opción de esa lectura (`_la_lectura_elegida`), como cuando se
+toca el botón; el de la respuesta ("pasale lo de los colores") no le dice nada a la persona
+responsable.
 
 **El aviso de una entrega ofrece los botones** "Aprobar" y "Pedir cambios" como atajos
 (`avisos`, `entrega_para_aprobar`, `preguntas.DECISION_DE_LA_ENTREGA`); escribir vale igual. El
@@ -170,6 +174,7 @@ def aprobar(ctx, datos: dict, tarea: dict | None) -> dict:
         return {"resultado": "no_se_puede", "motivo": YA_LA_APROBO, "tarea": _tarea(tarea),
                 "ya_la_aprobo_el": aprobada_el(cur, vigente, ctx.calendario.zona),
                 **_frena(cur, tarea["id"])}
+    datos = _la_lectura_elegida(ctx, "aprobar", datos, tarea)
     comentario = _comentario(datos)
     if (comentario is not None and datos.get("el_comentario_pide_algo") is not False
             and _antes_pregunta_cual(ctx, datos, tarea)):
@@ -214,12 +219,39 @@ def _antes_pregunta_cual(ctx, datos: dict, tarea: dict) -> bool:
     sobre esta tarea, que la persona vio en un mensaje anterior (decisión 12)."""
     if datos.get("de_la_pregunta"):
         return False
-    ctx.cur.execute("""select 1 from conversation_question
+    return _la_pregunta_de_cual(ctx, tarea) is None
+
+
+def _la_pregunta_de_cual(ctx, tarea: dict) -> dict | None:
+    """La pregunta de cuál de las dos sobre esta tarea, sin cerrar, que la persona vio en un
+    mensaje anterior (la de este mismo mensaje todavía no se contestó)."""
+    ctx.cur.execute("""select * from conversation_question
                         where membership_id = %s and tipo = %s and task_id = %s
-                          and cerrada_en is null and not (id = any(%s::uuid[]))""",
+                          and cerrada_en is null and not (id = any(%s::uuid[]))
+                        order by abierta_en limit 1""",
                     (ctx.quien.membership_id, preguntas.CUAL_DE_LAS_DOS, tarea["id"],
                      list(ctx.preguntas_del_turno)))
-    return ctx.cur.fetchone() is None
+    return ctx.cur.fetchone()
+
+
+def _la_lectura_elegida(ctx, nombre: str, datos: dict, tarea: dict) -> dict:
+    """Lo escrito que contesta la pregunta de cuál de las dos sobre esta tarea sólo elige una de
+    las lecturas del mensaje que la abrió (prueba por Telegram del 2026-10-12): el comentario de
+    la decisión es el de ese mensaje, guardado con la opción de la lectura elegida
+    (`fichas.dos_lecturas`), igual que si tocara su botón. Si ese mensaje no traía comentario,
+    no hay nada que elegir de él y vale el de la respuesta. Una opción tocada ya trae los datos
+    de su lectura (`de_la_pregunta`), y sin la pregunta abierta, lo del mensaje es lo que vale."""
+    if datos.get("de_la_pregunta"):
+        return datos
+    pregunta = _la_pregunta_de_cual(ctx, tarea)
+    if pregunta is None:
+        return datos
+    lectura = next((o["valor"] for o in preguntas.opciones(ctx.cur, str(pregunta["id"]))
+                    if (o["valor"] or {}).get("jugada") == nombre), None)
+    original = ((lectura or {}).get("datos") or {}).get("comentario")
+    if fichas.vacio(original):
+        return datos
+    return {**datos, "comentario": original}
 
 
 def _cual_de_las_dos(ctx, datos: dict, tarea: dict, comentario: str) -> dict:
@@ -240,6 +272,7 @@ def pedir_cambios(ctx, datos: dict, tarea: dict | None) -> dict:
     no = _la_guarda(ctx, datos, tarea)
     if no is not None:
         return no
+    datos = _la_lectura_elegida(ctx, "pedir_cambios", datos, tarea)
     comentario = _comentario(datos)
     if comentario is None:
         hecho = {"resultado": "falta_dato", "falta": ["comentario"], "tarea": _tarea(tarea)}

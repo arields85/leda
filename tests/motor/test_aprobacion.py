@@ -613,8 +613,10 @@ def test_la_pregunta_de_un_comentario_tambien_deja_pedir_el_cambio(conn, mundo, 
 def test_aprobar_con_un_comentario_que_contesta_cual_de_las_dos_aprueba_directo(
         conn, mundo, turnos, dos_jugadas):
     """Decisión 12: "aprobala nomás y pasale lo de los colores", escrito como `aprobar` con su
-    comentario, es la respuesta a la pregunta abierta: aprueba y pasa el comentario, sin otra
-    pregunta. Igual si la pregunta la abrieron las dos jugadas o una aprobación con comentario."""
+    comentario, es la respuesta a la pregunta abierta: aprueba, sin otra pregunta. Igual si la
+    pregunta la abrieron las dos jugadas o una aprobación con comentario. La respuesta sólo
+    elige: el comentario es el del mensaje que abrió la pregunta (prueba por Telegram del
+    2026-10-12: a la persona responsable le llegó «pasale lo de los colores»)."""
     tarea = _entregada(conn, mundo, turnos)
     jugadas = [Jugada("aprobar", {"tarea": "T1", "comentario": "que revise los colores"})]
     if dos_jugadas:
@@ -627,11 +629,72 @@ def test_aprobar_con_un_comentario_que_contesta_cual_de_las_dos_aprueba_directo(
                     texto="aprobala nomas y pasale lo de los colores")
     hecho = _hecho(r, "aprobar")
     assert hecho["resultado"] == "anotado" and hecho["quedo_terminada"] is True
+    assert hecho["comentario"] == "que revise los colores"
     assert r.pregunta is None
     assert estado_de(conn, tarea) == "terminada"
-    assert _decisiones(conn, tarea) == [("aprobado", "pasale lo de los colores")]
+    assert _decisiones(conn, tarea) == [("aprobado", "que revise los colores")]
+    [aviso] = avisos_guardados(conn, "tarea_aprobada")
+    assert aviso["hechos"]["comentario"] == "que revise los colores"
     assert cuantas(conn, "conversation_question",
                    "tipo = %s and cerrada_en is null", preguntas.CUAL_DE_LAS_DOS) == 0
+
+
+def test_la_respuesta_escrita_a_cual_de_las_dos_solo_elige_la_prueba_por_telegram(
+        conn, mundo, turnos):
+    """La prueba por Telegram del 2026-10-12, tal cual: "esta bien pero cambiale los colores al
+    grafico" abrió la pregunta; "aprobala nomás y pasale lo de los colores" la contestó con
+    `aprobar` y su propio comentario, y a la persona responsable le llegó «pasale lo de los
+    colores», que no le dice nada. Una respuesta a cuál de las dos elige entre las lecturas del
+    mensaje que la abrió: lo que se decide sale de ese mensaje."""
+    tarea = _entregada(conn, mundo, turnos)
+    original = "cambiale los colores al grafico"
+    r = turnos.dice("Ismael",
+                    Jugada("aprobar", {"tarea": "T1", "comentario": original,
+                                       "el_comentario_pide_algo": True}),
+                    Jugada("pedir_cambios", {"tarea": "T1", "comentario": original}),
+                    texto="esta bien pero cambiale los colores al grafico")
+    assert r.pregunta["tipo"] == preguntas.CUAL_DE_LAS_DOS
+    turnos.dice("Ismael", Jugada("aprobar", {"tarea": "T1",
+                                             "comentario": "pasale lo de los colores",
+                                             "el_comentario_pide_algo": True}),
+                texto="aprobala nomás y pasale lo de los colores")
+    assert estado_de(conn, tarea) == "terminada"
+    assert _decisiones(conn, tarea) == [("aprobado", original)]
+    [aviso] = avisos_guardados(conn, "tarea_aprobada")
+    assert aviso["hechos"]["comentario"] == original
+
+
+@pytest.mark.parametrize("comentario_de_la_respuesta", ["pedile el cambio", None])
+def test_pedir_cambios_escrito_que_contesta_cual_de_las_dos_lleva_el_comentario_original(
+        conn, mundo, turnos, comentario_de_la_respuesta):
+    """La otra lectura, igual: pedir cambios escrito como respuesta a cuál de las dos elige esa
+    lectura, y el pedido lleva el comentario del mensaje que abrió la pregunta, también si la
+    respuesta no trae ninguno (no se pregunta qué cambios pide: ya lo dijo)."""
+    original = "que revise los colores"
+    tarea = _cual_de_las_dos(conn, mundo, turnos, original)
+    datos = {"tarea": "T1"}
+    if comentario_de_la_respuesta is not None:
+        datos["comentario"] = comentario_de_la_respuesta
+    r = turnos.dice("Ismael", Jugada("pedir_cambios", datos), texto="pedile el cambio")
+    hecho = _hecho(r, "pedir_cambios")
+    assert hecho["resultado"] == "anotado" and hecho["comentario"] == original
+    assert _decisiones(conn, tarea) == [("rechazado", original)]
+    [aviso] = avisos_guardados(conn, "pedido_de_cambios")
+    assert aviso["hechos"]["comentario"] == original
+    assert avisos_guardados(conn, "tarea_aprobada") == []
+    assert cuantas(conn, "conversation_question",
+                   "tipo = %s and cerrada_en is null", preguntas.CUAL_DE_LAS_DOS) == 0
+
+
+def test_sin_la_pregunta_de_cual_de_las_dos_el_comentario_es_el_del_mensaje(conn, mundo,
+                                                                          turnos):
+    """Sin una pregunta abierta de cuál de las dos sobre la tarea, lo que se decide es lo del
+    mensaje mismo: la regla no toca un pedido de cambios claro."""
+    tarea = _entregada(conn, mundo, turnos)
+    turnos.dice("Ismael", Jugada("pedir_cambios", {"tarea": "T1",
+                                                   "comentario": "falta el diagrama"}),
+                texto="le falta el diagrama")
+    assert _decisiones(conn, tarea) == [("rechazado", "falta el diagrama")]
 
 
 def test_aprobar_con_un_comentario_que_no_pide_nada_va_directo(conn, mundo, turnos):
