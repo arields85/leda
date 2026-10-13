@@ -57,7 +57,10 @@ Ruta: cada porción, delegada (un escritor), porque toca base, servidor, web y p
 - [x] **J1-4 · Verificación** (2026-10-13, sobre `fb87d121`): `pytest -q tests/garantias` 738 passed (13 min);
       `pytest -q tests/test_dependencias.py` 25 passed; `pytest -q tests/garantias/test_migraciones.py` 16
       passed (la paridad y el rollback, con la 0067); en `web/`, `npm test` 60 passed y `npm run build` bien.
-      La revisión RDD de los dos commits la corre el coordinador.
+      **RDD:** `review-9a7a5167ab61833e` (`980a8f2a`) y `review-b2b971d7afdbe9bc` (`fb87d121`), aprobadas.
+      Advertencias: el texto del ciclo depende del mensaje del disparador (`db/esquema.sql:3522`); la lista de
+      tareas para elegir no tiene tope (`0067:88`). Sugerencia: una espera elegida que dejó de estar abierta
+      se manda sin que se vea (`draft.ts:40-43`).
 - [ ] **J1-5 · Prueba real en el celular** (con el usuario).
 
 **Diseño corto (J1-1, 2026-10-13).** Hoy el formulario (`LoadForm.tsx`) pide a
@@ -151,5 +154,7 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
 
 - 2026-10-13: el usuario aceptó el ADR 0023 y este orden; documento creado.
 - 2026-10-13: J1-1 a J1-4 hechas (escritor delegado; ruta delegada: base, servidor, web y pruebas). La
-  `0067` todavía no está aplicada en `leda_motor` (la aplica el coordinador, con respaldo previo); sin ella,
-  la carga desde la web falla porque el servidor ya manda la espera. Falta J1-5, la prueba en el celular.
+  `0067` aplicada en `leda_motor` (respaldo `db/respaldos/leda_motor-antes-0067-20261013.dump`, `pg_restore
+  --list` sin error; ensayo en una copia restaurada, borrada después; `cargar_tarea` con 13 argumentos, de
+  `leda_owner` y `security definer`; aplicada con `psql -v ON_ERROR_STOP=1 -f` como `postgres`, sin error).
+  Falta J1-5, la prueba en el celular.
