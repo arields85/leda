@@ -64,7 +64,8 @@ Cada bloque de abajo es **un renglón entero**: copialo completo y Enter. No esc
   ```
 
   Después de cada salto del reloj, **esperar 2 minutos reales**: los avisos se revisan una vez por
-  minuto.
+  minuto. El reloj nunca deja a Leda antes de lo que ya registró: si un salto cayera antes, se niega
+  (`STOP`) y dice hasta cuándo registró; no cambia nada.
 - **Los enlaces** se abren con Telegram Desktop o Telegram Web en la PC. Si el enlace no se puede
   tocar, copiarlo al navegador.
 - **Ariel, Ismael y Marcos:** `/start` al bot del equipo del Motor. Ariel: "hola" al bot de
@@ -232,6 +233,9 @@ siguiente: anotarlo, no es una falla.
 
 - **El reloj:** `.venv\Scripts\python.exe -m leda.motor.reloj corework volver`. El reloj nunca va
   para atrás de lo ya registrado: lo guardado para "mañana" de Leda sale cuando llegue esa hora real.
+  Si Leda ya registró algo más tarde que la hora real, `volver` se niega (`STOP`) y el reloj queda
+  donde estaba; para seguir, `adelantar` u `hora`, que tampoco van antes de lo registrado.
+  `volver --forzar` es sólo para empezar de cero con `leda_motor` recreada.
 - **Las tareas y lo conversado** no se borran: para repetir la prueba desde cero, pedirle al agente
   que recree `leda_motor` (lo hace con respaldo previo; ya está autorizado).
 - **Al terminar:** cortar las terminales 1 y 2 con Ctrl+C.

@@ -133,3 +133,118 @@ def test_a_la_hora_lleva_el_reloj_a_esa_hora_del_mismo_dia_y_nunca_para_atras(
     assert not noche.en_horario
     with pytest.raises(HoraAtrasada):
         a_la_hora(conn, mundo["id"], real, time(9, 0), base=base)
+
+
+# --- El piso: nunca antes de lo que Leda ya registró (T6, prueba por Telegram 2026-10-12) -----
+#
+# En la prueba, `volver` y después `adelantar` llevaron a Leda del miércoles al martes 10:00 del
+# lunes real: los turnos ya fechados el martes a las 11:45 quedaron en su futuro y la regla de no
+# interrumpir anunció "hoy a las 12:15". El reloj de prueba no deja a Leda antes de lo registrado.
+
+LUNES_REAL = octubre(12, 16, 20)
+
+
+def _turno_de_leda(conn, mundo, momento: datetime) -> None:
+    """Un turno fechado con el reloj de Leda (`registro.registrar_salida`)."""
+    from leda.motor.registro import registrar_salida
+
+    with admin(conn) as cur:
+        registrar_salida(cur, mundo["id"], mundo["personas"]["Marcos"]["membership_id"], None,
+                         "prueba", momento)
+    conn.commit()
+
+
+def _aviso_creado(conn, mundo, momento: datetime) -> None:
+    """Un aviso guardado con el reloj de Leda (`avisos.guardar`, `creado_en`)."""
+    from leda.motor.avisos import guardar
+
+    with admin(conn) as cur:
+        guardar(cur, mundo["id"], "prueba", task_id=None,
+                destinatario=mundo["personas"]["Marcos"]["membership_id"], hechos={},
+                programado_para=momento + timedelta(days=3), clave="prueba:piso", ahora=momento)
+    conn.commit()
+
+
+def test_adelantar_no_deja_a_leda_antes_de_un_turno_ya_registrado(conn, mundo):
+    from leda.motor.reloj import HoraAtrasada
+
+    base = conn.info.dbname
+    _turno_de_leda(conn, mundo, octubre(13, 11, 45))       # martes 11:45 de Leda
+    real = RelojFijo(LUNES_REAL)                           # sin adelanto: el martes 10:00 queda antes
+
+    with pytest.raises(HoraAtrasada, match="13/10 11:45"):
+        adelantar(conn, mundo["id"], real, base=base)
+    assert cuantas(conn, "workspace_setting", f"clave = '{CLAVE_ADELANTO}'") == 0
+
+
+def test_adelantar_no_deja_a_leda_antes_de_un_aviso_ya_guardado(conn, mundo):
+    from leda.motor.reloj import HoraAtrasada
+
+    base = conn.info.dbname
+    _aviso_creado(conn, mundo, octubre(13, 11, 45))
+    with pytest.raises(HoraAtrasada):
+        adelantar(conn, mundo["id"], RelojFijo(LUNES_REAL), base=base)
+
+
+def test_a_la_hora_no_deja_a_leda_antes_de_lo_registrado(conn, mundo):
+    from datetime import time
+
+    from leda.motor.reloj import HoraAtrasada, a_la_hora
+
+    base = conn.info.dbname
+    _turno_de_leda(conn, mundo, octubre(12, 20, 0))        # lunes 20:00 de Leda
+    real = RelojFijo(LUNES_REAL)
+
+    with pytest.raises(HoraAtrasada, match="12/10 20:00"):
+        a_la_hora(conn, mundo["id"], real, time(19, 0), base=base)
+    assert cuantas(conn, "workspace_setting", f"clave = '{CLAVE_ADELANTO}'") == 0
+
+    assert a_la_hora(conn, mundo["id"], real, time(20, 30), base=base).leda \
+        == octubre(12, 20, 30)
+
+
+def test_volver_se_niega_si_dejaria_a_leda_antes_de_lo_registrado_salvo_forzado(conn, mundo):
+    from leda.motor.reloj import HoraAtrasada
+
+    base = conn.info.dbname
+    real = RelojFijo(LUNES_REAL)
+    adelantar(conn, mundo["id"], real, base=base)          # martes 13, 10:00
+    _turno_de_leda(conn, mundo, octubre(13, 11, 45))
+
+    with pytest.raises(HoraAtrasada, match="forzar"):
+        volver(conn, mundo["id"], real, base=base)
+    assert cuantas(conn, "workspace_setting", f"clave = '{CLAVE_ADELANTO}'") == 1
+
+    vuelto = volver(conn, mundo["id"], real, base=base, forzar=True)
+    assert vuelto.adelanto == timedelta(0) and vuelto.leda == LUNES_REAL
+    assert cuantas(conn, "workspace_setting", f"clave = '{CLAVE_ADELANTO}'") == 0
+
+
+def test_con_lo_registrado_antes_los_comandos_siguen_andando(conn, mundo):
+    from datetime import time
+
+    from leda.motor.reloj import a_la_hora
+
+    base = conn.info.dbname
+    real = RelojFijo(LUNES_REAL)
+    _turno_de_leda(conn, mundo, octubre(12, 16, 0))        # antes de todo lo que sigue
+    _aviso_creado(conn, mundo, octubre(12, 16, 0))
+
+    assert adelantar(conn, mundo["id"], real, base=base).leda == octubre(13, 10)
+    assert a_la_hora(conn, mundo["id"], real, time(11, 0), base=base).leda == octubre(13, 11)
+    _turno_de_leda(conn, mundo, octubre(13, 11, 0))        # justo en el piso: no es "antes"
+    assert adelantar(conn, mundo["id"], real, base=base).leda == octubre(14, 10)
+    vuelto = volver(conn, mundo["id"], RelojFijo(octubre(15, 9)), base=base)
+    assert vuelto.adelanto == timedelta(0)
+
+
+def test_forzar_va_solo_con_volver(monkeypatch, capsys):
+    from leda import db
+    from leda.motor.reloj import main
+
+    def no_conectar():
+        raise AssertionError("no tiene que conectarse")
+
+    monkeypatch.setattr(db, "conectar", no_conectar)
+    assert main(["corework", "adelantar", "--forzar"]) == 1
+    assert "volver" in capsys.readouterr().out

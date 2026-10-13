@@ -3,7 +3,8 @@ probado en la Etapa 2, E2-6).
 
     python -m leda.motor.reloj corework adelantar
     python -m leda.motor.reloj corework estado
-    python -m leda.motor.reloj corework volver
+    python -m leda.motor.reloj corework hora 22:30
+    python -m leda.motor.reloj corework volver [--forzar]
 
 `odd/tasks/prueba-chica-del-motor.md`, sección 10, decisión 2 del usuario: en la prueba por
 Telegram, los días pasan con un comando que adelanta el reloj de Leda, sólo en `leda_motor` y
@@ -23,8 +24,16 @@ salgan como en un equipo real.
   por su cuenta (`tiempo.HORA_DE_SALIDA`, 10:00; o al empezar la jornada, si a esa hora no se
   trabaja), con el calendario y los feriados del espacio: lo que se le dijo a la persona que
   sale a esa hora, sale. Correrlo otra vez adelanta otro día.
+- **`hora HH:MM`:** lleva el reloj de Leda a esa hora del día en que está, sólo hacia adelante.
 - **`volver`:** borra el adelanto. Lo escrito con el reloj adelantado queda con su hora: lo
   guardado para "mañana" de Leda sale cuando llegue esa hora real.
+- **Nunca antes de lo registrado** (T6, prueba por Telegram del 2026-10-12): `volver` y después
+  `adelantar` llevaron a Leda del miércoles al martes del lunes real, con turnos ya fechados el
+  martes más tarde; lo registrado quedó en su futuro y las reglas que lo leen se confundieron
+  (la de no interrumpir anunció "hoy a las 12:15"). El piso (`ultimo_registrado`) es lo último
+  que Leda fechó con su reloj en el espacio: `adelantar` y `hora` no llevan el reloj antes de él
+  (`HoraAtrasada`), y `volver` se niega si la hora real queda antes, salvo con `--forzar`, que es
+  sólo para empezar de cero con la base recreada.
 - **Sólo en `leda_motor`:** los tres comandos se niegan en otra base, y el reloj del
   escuchador no aplica un adelanto fuera de ella. Nunca imprime la conexión.
 """
@@ -95,9 +104,33 @@ def leer_adelanto(conn: psycopg.Connection, workspace_id: str, *,
     return timedelta(seconds=int(fila["valor"])) if fila else timedelta(0)
 
 
+def ultimo_registrado(conn: psycopg.Connection, workspace_id: str) -> datetime | None:
+    """El piso del reloj: lo último que Leda fechó con su propio reloj en el espacio, o `None`
+    si todavía no fechó nada. Sólo cuentan las columnas que se escriben siempre con
+    `reloj.ahora()` del motor: `conversation_turn.at` (`registro.py`) y
+    `scheduled_notice.creado_en` (`avisos.guardar` y `fichas.py`). Quedan afuera
+    `programado_para`, que mira al futuro a propósito, y `message_outbox.enviado_en`, que el
+    despacho de la consola (`cli.py despachar`) fecha con el reloj real. Con la RLS del espacio,
+    como `leer_adelanto`."""
+    with espacio(conn, workspace_id) as cur:
+        cur.execute("""select greatest((select max(at) from conversation_turn),
+                                        (select max(creado_en) from scheduled_notice)) as piso""")
+        fila = cur.fetchone()
+    return fila["piso"] if fila else None
+
+
+def _no_antes_del_piso(conn: psycopg.Connection, workspace_id: str, objetivo: datetime,
+                       zona, *, porque: str = "el reloj no va antes de eso.") -> None:
+    piso = ultimo_registrado(conn, workspace_id)
+    if piso is not None and objetivo < piso:
+        raise HoraAtrasada(
+            f"Leda ya registró hasta el {piso.astimezone(zona):%a %d/%m %H:%M}; {porque}")
+
+
 def adelantar(conn: psycopg.Connection, workspace_id: str, real: Reloj, *,
               base: str = BASE_DEL_MOTOR) -> EstadoDelReloj:
-    """Lleva el reloj de Leda al día hábil siguiente, a la hora de salida (en horario)."""
+    """Lleva el reloj de Leda al día hábil siguiente, a la hora de salida (en horario). Nunca
+    antes de lo ya registrado (`HoraAtrasada`)."""
     _comprobar(conn, base)
     adelanto = leer_adelanto(conn, workspace_id, base=base)
     ahora = real.ahora()
@@ -107,6 +140,9 @@ def adelantar(conn: psycopg.Connection, workspace_id: str, real: Reloj, *,
         while not cal.es_habil(dia):
             dia += timedelta(days=1)
         objetivo = sale_el(cal, dia)
+    conn.commit()
+    _no_antes_del_piso(conn, workspace_id, objetivo, cal.zona)
+    with admin(conn) as cur:
         cur.execute(
             """insert into workspace_setting (workspace_id, clave, valor)
                values (%s, %s, %s)
@@ -119,16 +155,20 @@ def adelantar(conn: psycopg.Connection, workspace_id: str, real: Reloj, *,
 def a_la_hora(conn: psycopg.Connection, workspace_id: str, real: Reloj, hora: time, *,
               base: str = BASE_DEL_MOTOR) -> EstadoDelReloj:
     """Lleva el reloj de Leda a `hora` del día en que está, para probar de noche sin esperar
-    (usuario, 2026-10-07). Sólo hacia adelante (`HoraAtrasada`)."""
+    (usuario, 2026-10-07). Sólo hacia adelante y nunca antes de lo ya registrado
+    (`HoraAtrasada`)."""
     _comprobar(conn, base)
     adelanto = leer_adelanto(conn, workspace_id, base=base)
     ahora = real.ahora()
     with admin(conn) as cur:
         cal = Calendario.desde_base(cur, workspace_id)
-        leda = (ahora + adelanto).astimezone(cal.zona)
-        objetivo = datetime.combine(leda.date(), hora, cal.zona)
-        if objetivo <= leda:
-            raise HoraAtrasada(f"El reloj de Leda ya está en {leda:%H:%M}; sólo va hacia adelante.")
+    conn.commit()
+    leda = (ahora + adelanto).astimezone(cal.zona)
+    objetivo = datetime.combine(leda.date(), hora, cal.zona)
+    if objetivo <= leda:
+        raise HoraAtrasada(f"El reloj de Leda ya está en {leda:%H:%M}; sólo va hacia adelante.")
+    _no_antes_del_piso(conn, workspace_id, objetivo, cal.zona)
+    with admin(conn) as cur:
         cur.execute(
             """insert into workspace_setting (workspace_id, clave, valor)
                values (%s, %s, %s)
@@ -139,9 +179,18 @@ def a_la_hora(conn: psycopg.Connection, workspace_id: str, real: Reloj, hora: ti
 
 
 def volver(conn: psycopg.Connection, workspace_id: str, real: Reloj, *,
-           base: str = BASE_DEL_MOTOR) -> EstadoDelReloj:
-    """El reloj de Leda vuelve al tiempo real."""
+           base: str = BASE_DEL_MOTOR, forzar: bool = False) -> EstadoDelReloj:
+    """El reloj de Leda vuelve al tiempo real. Se niega si la hora real queda antes de lo ya
+    registrado (`HoraAtrasada`), salvo con `forzar`, sólo para empezar de cero con la base
+    recreada."""
     _comprobar(conn, base)
+    if not forzar:
+        with espacio(conn, workspace_id) as cur:
+            zona = Calendario.desde_base(cur, workspace_id).zona
+        conn.commit()
+        _no_antes_del_piso(conn, workspace_id, real.ahora(), zona,
+                           porque="volver al tiempo real la dejaría antes. Sólo con --forzar, "
+                                  "para empezar de cero con la base recreada.")
     with admin(conn) as cur:
         cur.execute("delete from workspace_setting where workspace_id = %s and clave = %s",
                     (workspace_id, CLAVE_ADELANTO))
@@ -192,7 +241,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("slug")
     p.add_argument("accion", choices=("adelantar", "estado", "volver", "hora"))
     p.add_argument("hhmm", nargs="?", help='con "hora": la hora del mismo día, por ejemplo 22:30')
+    p.add_argument("--forzar", action="store_true",
+                   help="con volver: aunque Leda quede antes de lo ya registrado (sólo para "
+                        "empezar de cero con la base recreada)")
     a = p.parse_args(argv)
+    if a.forzar and a.accion != "volver":
+        print("--forzar va sólo con volver.")
+        return 1
     if a.accion == "hora":
         try:
             hora = datetime.strptime(a.hhmm or "", "%H:%M").time()
@@ -213,15 +268,18 @@ def main(argv: list[str] | None = None) -> int:
     if fila is None:
         print(f"No hay un espacio activo '{a.slug}'.")
         return 1
-    if a.accion == "hora":
-        try:
-            resultado = a_la_hora(conn, str(fila["id"]), RelojDelSistema(), hora)
-        except HoraAtrasada as e:
-            print(f"STOP: {e}")
-            return 1
-    else:
-        comando = {"adelantar": adelantar, "estado": estado, "volver": volver}[a.accion]
-        resultado = comando(conn, str(fila["id"]), RelojDelSistema())
+    ws = str(fila["id"])
+    try:
+        if a.accion == "hora":
+            resultado = a_la_hora(conn, ws, RelojDelSistema(), hora)
+        elif a.accion == "volver":
+            resultado = volver(conn, ws, RelojDelSistema(), forzar=a.forzar)
+        else:
+            resultado = {"adelantar": adelantar, "estado": estado}[a.accion](
+                conn, ws, RelojDelSistema())
+    except HoraAtrasada as e:
+        print(f"STOP: {e}")
+        return 1
     print(f"base: {conn.info.dbname} · espacio: {a.slug}")
     print(_mostrar(resultado))
     if not resultado.restriccion_prendida:
