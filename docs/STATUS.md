@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-12, cierre de la noche: correcciones T1 a T5 hechas; plan autónomo de la noche escrito en "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-13, madrugada (modo autónomo): correcciones T4b a T9 hechas; el acceso por chat, en marcha. Ver "Lo hecho la noche del 12 al 13" y "Para la mañana".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -79,6 +79,23 @@ viejo corriendo.
   `tests/conversaciones` 215 passed, en seco 48 de 48 (sobre `64796ac`).
 - **El usuario aceptó la conversación 50** del acceso por chat tal como está, y **autorizó dos rondas con
   la IA real**: la de las conversaciones tocadas por las correcciones (T9) y la de la 50 (A-6).
+
+**Lo hecho la noche del 12 al 13 (modo autónomo; detalle y evidencia en
+`../odd/tasks/correcciones-prueba-telegram.md`):**
+- **T4b y T4c** (`01b3aef`, `66a1f51`): una "¿cuál de las dos?" que quedó para después no pisa ni se
+  reusa con lo escrito después (`preguntas.la_que_vio`, la guarda de lo último que vio).
+- **T6** (`ee9df64`, `7e13768`): no hubo hora mal guardada; el reloj de prueba fue para atrás por
+  `volver` + `adelantar`. Ahora el reloj nunca deja a Leda antes de lo registrado: `hora` se niega,
+  `volver` se niega salvo `--forzar` (sólo con la base recreada) y `adelantar` cuenta desde lo registrado.
+- **T7** (`5b52481`, `0ef7888`, conversación 51): "dejalo pendiente" en medio de una entrega cancela sin
+  insistir, y un borrador dice que todavía no quedó anotado (`todavia_no_quedo_anotado`).
+- **T8** (`bc40805`): la entrega nueva muestra el archivo una sola vez y lo que sigue contando de la
+  entrega anterior aparte.
+- **T9, la ronda real** (bitácora): garantías 18 de 18; comprensión bien en 23, 27, 40, 41 y 44; la 51,
+  sólo una expectativa del YAML en su paso 1; la 22, 0 de 3 (la misma clase que en la D6, `PENDIENTE`).
+  Cupo: la ventana de 5 horas, 48 %; la semanal, 49 %.
+- Cada commit de código, revisado por RDD y aprobado. `pytest tests/motor` 1402 passed y
+  `tests/conversaciones` 217 passed (sobre `bc40805`); `tests/garantias` 697 passed; en seco 49 de 49.
 
 **Plan de la noche, en este orden (modo autónomo; el usuario descansa y vuelve a la mañana):**
 1. **Terminar las correcciones** (`../odd/tasks/correcciones-prueba-telegram.md`), una por una, con un

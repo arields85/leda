@@ -78,7 +78,7 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
 - [x] **T8 · La entrega nueva que se contradice** ("dejé la foto para cuando vuelvas a entregarla" y
       "¿confirmás la entrega así?"; contó lo que esta vez no se escribió).
 - [x] **T9 · Ronda con la IA real** de las conversaciones tocadas (autorizada), bitácora.
-- [ ] **T10 · Cierre:** suites, `docs/STATUS.md`, este documento y las memorias.
+- [x] **T10 · Cierre:** suites, `docs/STATUS.md`, este documento y las memorias.
 
 ## Criterio de aceptación
 
@@ -252,4 +252,9 @@ nombres de otros en los mensajes.
   3/3, 23 3/3, 22 0/3 (la clase de la D6), 40, 41 y 44 2/2; formato, la deuda conocida. Ningún mensaje
   con hora o nombre de otro; ningún "Anoté" de un borrador. Detalle en la bitácora ("Las correcciones de
   la prueba por Telegram, con la IA real"). `PENDIENTE`: la comprensión de la 22.
+- **T10, hecha** (2026-10-13, madrugada): `pytest -q tests/garantias` 697 passed (11 min, sobre
+  `30b6a08`, el mismo código que `bc40805`); `tests/motor` 1402 y `tests/conversaciones` 217 (los de la
+  T8); en seco 49 de 49. STATUS, este documento, Engram y la memoria, al día. **Próximo paso:** el acceso
+  por chat (`acceso-por-chat.md`, A-1 a A-6). Pendientes que quedan de estas correcciones: la
+  comprensión de la 22 y las advertencias anotadas en cada tarea.
 
