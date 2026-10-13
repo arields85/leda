@@ -1101,6 +1101,29 @@ def test_la_medicion_juzga_los_criterios_escritos_y_cuenta_la_falla_de_la_ia(med
     assert medir.medir(ia, no_se)[0] is True and len(ia.pedidos) == 1
 
 
+def test_si_el_juicio_de_la_propuesta_no_responde_la_medicion_lo_cuenta(medir):
+    """La revisión `review-bfa79042ca12447b`: que la IA no juzgara la manera de comprobarla que
+    propuso se descartaba y el pedido podía salir bien. Como en `medir_el_juicio`, es una falla de
+    la IA: el pedido sale mal y el informe lo dice, con lo que la propuesta dio igual."""
+    from leda.motor.ia_real import PlazoAgotado
+
+    (ups,) = [p for p in medir.PEDIDOS if p["nombre"] == "el UPS de la prueba del usuario"]
+    ia = IADeLaCarga(medir.GUION[ups["nombre"]], PlazoAgotado(40))
+    ok, detalle = medir.medir(ia, ups)
+    assert len(ia.pedidos) == 2
+    assert ok is False and detalle["falla"] == "ia"
+    assert detalle["falla_del_juicio"] == "la IA no respondió (PlazoAgotado)"
+    assert "juicio: la IA no respondió (PlazoAgotado)" in detalle["fallas"]
+    assert detalle["juicio"] == "sin_revisar"
+    assert detalle["propuesta"]["titulo"] == medir.GUION[ups["nombre"]]["titulo"]
+
+
+def test_sin_cupo_en_el_juicio_de_la_propuesta_la_medicion_se_corta(medir):
+    (ups,) = [p for p in medir.PEDIDOS if p["nombre"] == "el UPS de la prueba del usuario"]
+    with pytest.raises(medir.SinCupo):
+        medir.medir(IADeLaCarga(medir.GUION[ups["nombre"]], _SinCupo()), ups)
+
+
 def test_la_medicion_trae_el_ups_de_la_prueba_del_usuario(medir):
     (ups,) = [p for p in medir.PEDIDOS if p["nombre"] == "el UPS de la prueba del usuario"]
     assert ups["texto"] == ("hay que cambiar el ups de la sala de servidores que lo vea el tano "

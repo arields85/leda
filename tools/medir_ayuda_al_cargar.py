@@ -432,17 +432,19 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     segundos = round(time.monotonic() - desde, 2)
     # Como la web: la manera de comprobarla que dio la IA se juzga por su sentido (J2-13). Si el
     # juicio no responde, la propuesta sigue como en la web (con la evidencia del área), salvo sin
-    # cupo o con un error del programa.
+    # cupo o con un error del programa; y, como en `medir_el_juicio`, es una falla de la IA: el
+    # pedido sale mal y el informe lo dice (revisión `review-bfa79042ca12447b`).
     desde = time.monotonic()
     juicio = ayuda_al_cargar.juzgar_la_propuesta(ia, crudo, VACIO)
     del_juicio = round(time.monotonic() - desde, 2) if juicio is not None else None
+    falla_del_juicio = None
     if juicio is not None and juicio.motivo == "sin_revisar":
-        _de_la_ia(juicio.falla or RespuestaInvalida("sin juicio"))
+        (falla_del_juicio,) = _de_la_ia(juicio.falla or RespuestaInvalida("sin juicio"))["fallas"]
     apodos = pedido.get("apodos")
     r = ayuda_al_cargar.revisar(crudo, texto=pedido["texto"], escrito=VACIO, opciones=OPCIONES,
                                 coinciden=lambda dicho: coinciden(dicho, apodos),
                                 objetivo_de=OBJETIVO_DE.get, juicio=juicio)
-    fallas = []
+    fallas = [] if falla_del_juicio is None else [f"juicio: {falla_del_juicio}"]
     for campo, esperado in pedido.get("propone", {}).items():
         valor = r.propuesta.get(campo)
         if valor is None or (esperado is not True and valor != esperado):
@@ -454,7 +456,8 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     for campo, motivo in pedido.get("descarta", []):
         if {"campo": campo, "motivo": motivo} not in r.descartados:
             fallas.append(f"{campo}: esperaba descartarlo por {motivo}")
-    return not fallas, {"falla": None, "propuesta": r.propuesta,
+    return not fallas, {"falla": None if falla_del_juicio is None else "ia",
+                        "falla_del_juicio": falla_del_juicio, "propuesta": r.propuesta,
                         "avisos": [a["texto"] for a in r.avisos],
                         "descartados": r.descartados, "elegir": r.elegir,
                         "juicio": None if juicio is None else (juicio.motivo or "lo_dice"),
