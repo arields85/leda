@@ -90,7 +90,8 @@ Mientras no se decida, lo más restrictivo; abrirlo después no rehace nada.
    Canal: **sólo la web por ahora**; por chat, más adelante (`docs/ROADMAP.md`). Mientras tanto, el
    formulario sigue como está.
    **La tarea que crea un referente para su área entra directo** (usuario, 2026-10-13: "directo"), sin
-   aprobación de Dirección, con un aviso sólo informativo a Dirección; el umbral de re-aprobación de
+   aprobación de Dirección y sin aviso (usuario: "sin aviso"; la decisión 7 del ADR 0022: Dirección
+   la ve en la web y en el resumen semanal); el umbral de re-aprobación de
    la mecánica (§7) queda para cuando haga falta.
    **Las jerarquías las maneja Dirección desde la web del equipo** (usuario, 2026-10-13: "tiene que
    poder hacerlo direccion, no depender del administrador de la plataforma. es su equipo de trabajo y

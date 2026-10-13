@@ -8,7 +8,7 @@
   referentes), desde qué puerta de la plataforma y con qué garantías.
 - **Enmienda, al aceptarse:**
   - el [ADR 0022](0022-plataforma-web-de-tareas.md), decisiones 3, 6, 9, 10 y 16, y toca la 7 (ver
-    `PENDIENTE` 1); el texto que cambia está citado abajo, en "Qué texto reemplaza a cuál";
+    `PENDIENTE` 1, resuelto: no cambia); el texto que cambia está citado abajo, en "Qué texto reemplaza a cuál";
   - el [ADR 0017](0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisión 2 (las tareas las
     crea a mano el administrador; la declaración de quién decidió) y decisión 7, punto 1 (la
     aceptación del referente ocurre fuera de Leda).
@@ -68,7 +68,8 @@ Reemplaza el campo libre "quién la decidió" del formulario.
 - **Dirección** crea objetivos y las tareas que considera necesarias, en cualquier área de su equipo.
 - **El referente de un área** crea tareas para su área, también las que faltaban para un objetivo de
   Dirección ("Comprar el estante"). **Entran directo**, comprometidas, sin aprobación de Dirección
-  (usuario: "directo"), con un aviso sólo informativo a Dirección. El umbral de re-aprobación de la
+  (usuario: "directo"), **sin aviso a Dirección** (usuario: "sin aviso"; respeta la decisión 7 del
+  ADR 0022): Dirección las ve en la web, con quién las creó, y en el resumen semanal. El umbral de re-aprobación de la
   mecánica §7 (una tarea fuera del plan que consume más esfuerzo del umbral) queda para cuando haga
   falta.
 - **Un integrante** crea tareas para sí mismo ("Comprar los tornillos"). Quedan en `propuesta`
@@ -134,8 +135,8 @@ propuesta; al aceptarse este ADR, esa línea pasa a decir que la enmienda rige.
 - Decisión 6, "**Para más adelante:** con clientes, alguien de cada empresa querrá cargar sus
   tareas. Será un rol del espacio, con acceso sólo a su empresa". Se adelanta: ese rol es Dirección,
   con su equipo y sólo su equipo, por la puerta del equipo.
-- Decisión 7, "La autoridad final no recibe un mensaje por tarea". Choca con el aviso informativo a
-  Dirección de la decisión 3 de este ADR: ver `PENDIENTE` 1.
+- Decisión 7, "La autoridad final no recibe un mensaje por tarea". Sigue valiendo: una tarea que
+  crea un referente no le manda un aviso a Dirección (`PENDIENTE` 1, resuelto).
 - Decisión 9, el formulario: el campo "quién la decidió" deja de existir en la puerta del equipo
   (sale de quién crea y quién aprueba). Se suma el campo opcional "espera a" (decisión 2). Los demás
   controles siguen igual, para las tareas que entran comprometidas y para las propuestas al
@@ -196,9 +197,9 @@ Las invariantes vigentes (`AGENTS.md`) rigen igual:
 
 No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a uno.
 
-1. **Cómo se entera Dirección de una tarea que crea un referente.** El ADR 0022 (decisión 7) dice que
-   la autoridad final no recibe un mensaje por tarea. Ejemplo: Marcos crea "Comprar el estante"; ¿a
-   Ismael le llega un mensaje de Leda, o lo ve en "El equipo" y en el informe al grupo?
+1. ~~**Cómo se entera Dirección de una tarea que crea un referente.**~~ **Decidido (usuario,
+   2026-10-13): "sin aviso".** Ismael la ve en la web, con quién la creó, y en el resumen semanal; la
+   decisión 7 del ADR 0022 sigue valiendo.
 2. **La carga por administración en nombre de otro.** Ejemplo: Ariel, desde la puerta de
    administración, carga una tarea que Ismael le pidió por teléfono; ¿se guarda "decidió Ismael"
    como declaración, como hoy, o la decidió Ariel?
