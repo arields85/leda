@@ -111,8 +111,7 @@ viejo corriendo.
 
 **Para la mañana (lo que necesita al usuario, de a una):**
 1. ~~Un toque no lleva el ofrecimiento de la web~~: confirmado por el usuario (2026-10-13).
-2. **El túnel o HTTPS y la prueba en el celular** del acceso por chat (el enlace tiene que abrir desde
-   Telegram en el teléfono).
+2. ~~La prueba en el celular~~: pasada (2026-10-13, con un túnel rápido de Cloudflare; bitácora).
 3. ~~El usuario del bot~~: el usuario creó bots nuevos (2026-10-13), `@Leda_PM_bot` y `@Leda_Admin_bot`;
    `bot_usuario: Leda_PM_bot` en el pack, importado en `leda_motor` (versión 2; respaldo
    `db/respaldos/leda_motor-antes-bot-nuevo-20261013.dump`). Los tokens nuevos los pone el usuario en el `.env`.
