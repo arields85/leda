@@ -177,6 +177,9 @@ la sesión de administración, fija el espacio y devuelve todos los rechazos jun
 
 Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda de la IA donde sirva.
 
+      **RDD:** `review-71dd3cfc8a337a10` (`b7fb4ea7`), aprobada. Advertencias, de las pruebas: la del CSS depende
+      de la carpeta desde donde se corre (`AdminApp.test.tsx:307`) y la de "los completados salen de la ronda"
+      no lo prueba del todo (`:291-297`); sugerencia: restaurar los espías (`:258-259`).
 - [ ] **J2 · La ayuda de la IA al cargar, para todos.** Se describe como se habla y Leda completa título,
       criterio, fecha y evidencia; la persona corrige y confirma (ADR 0023, punto 4). Para todos los que
       cargan: la puerta de administración primero, y después Dirección, referentes e integrantes en sus
