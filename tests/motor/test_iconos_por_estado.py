@@ -373,3 +373,49 @@ def test_un_aviso_previo_de_dos_tareas_sale_con_el_estado_de_cada_una(conn, mund
     [fila] = todos(conn, "select cuerpo from message_outbox where chat_id = %s",
                    mundo["personas"]["Marcos"]["telegram"])
     assert fila["cuerpo"].split("\n")[1:3] == [f"⚪ {T1}", f"🟢 {T2}"]
+
+
+# --- Si poner los íconos falla, el mensaje sale igual (revisión `review-fd5b12f57ba236dc`) ------
+#
+# Los íconos se ponen después de que redacta la IA: una falla ahí no puede frenar la respuesta ni
+# el aviso. Sale el texto tal como lo redactó la IA, sin los íconos, y queda un incidente de
+# severidad baja (nunca fallar en silencio).
+
+def _que_falle(monkeypatch) -> None:
+    def falla(pedido):
+        raise RuntimeError("falla de prueba al poner los íconos")
+    monkeypatch.setattr(hechos_mod, "iconos_de_las_listas", falla)
+
+
+def _incidentes_de_los_iconos(conn) -> list[dict]:
+    return todos(conn, "select severidad, resumen_sanitizado, referencia_cruda from incident "
+                       "where etapa = %s", hechos_mod.ETAPA_ICONOS_POR_ESTADO)
+
+
+def test_si_poner_los_iconos_falla_la_respuesta_sale_como_la_redacto_la_ia(conn, mundo, escribe,
+                                                                         monkeypatch):
+    nueva_tarea(conn, mundo, T2, estado="en_curso", fecha=octubre(30, 17))
+    _que_falle(monkeypatch)
+
+    resultado = _pendientes(conn, escribe, octubre(13, 10))
+
+    assert resultado.texto.split("\n")[1:3] == [f"🗓️ {T1}, vie 9/10", f"🗓️ {T2}, vie 30/10"]
+    [fila] = todos(conn, "select cuerpo from message_outbox where es_respuesta")
+    assert fila["cuerpo"] == resultado.texto
+    [incidente] = _incidentes_de_los_iconos(conn)
+    assert incidente["severidad"] == "baja"
+    assert "RuntimeError" in incidente["referencia_cruda"]
+
+
+def test_si_poner_los_iconos_falla_el_aviso_sale_igual(conn, mundo, dias, monkeypatch):
+    nueva_tarea(conn, mundo, T2, estado="en_curso", fecha=octubre(9, 17))
+    dias.ia = IAQueNombra((T1, T2))
+    _que_falle(monkeypatch)
+
+    dias.ciclo(octubre(6, 10))
+
+    [fila] = todos(conn, "select cuerpo from message_outbox where chat_id = %s",
+                   mundo["personas"]["Marcos"]["telegram"])
+    assert fila["cuerpo"].split("\n")[1:3] == [f"🗓️ {T1}", f"🗓️ {T2}"]
+    [incidente] = _incidentes_de_los_iconos(conn)
+    assert incidente["severidad"] == "baja"

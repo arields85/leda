@@ -45,6 +45,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from .. import salida
+from ..incidentes import registrar_incidente
 from .fichas import FICHAS
 
 # Un código: minúsculas y cifras, con al menos un guion bajo (un texto libre lleva espacios).
@@ -1779,6 +1780,28 @@ def iconos_de_las_listas(pedido: Mapping[str, Any]) -> dict[str, str]:
     return iconos if len(iconos) > 1 else {}
 
 
-def con_los_iconos(texto: str, pedido: Mapping[str, Any]) -> str:
-    """Lo que redactó la IA, con el ícono del estado de cada tarea de sus listas."""
-    return salida.iconos_por_estado(texto, iconos_de_las_listas(pedido))
+# Poner los íconos es lo último, después de que redacta la IA: si falla, el mensaje sale igual,
+# tal como lo redactó la IA, y queda un incidente de severidad baja (nunca fallar en silencio;
+# revisión RDD `review-fd5b12f57ba236dc`). Uno por espacio y por día: una falla del código se
+# repetiría en cada mensaje.
+ETAPA_ICONOS_POR_ESTADO = "motor_iconos_por_estado"
+
+
+def con_los_iconos(texto: str, pedido: Mapping[str, Any], cur, workspace_id: str) -> str:
+    """Lo que redactó la IA, con el ícono del estado de cada tarea de sus listas; si ponerlos
+    falla, lo que redactó la IA, tal cual, con su incidente."""
+    try:
+        return salida.iconos_por_estado(texto, iconos_de_las_listas(pedido))
+    except Exception as falla:  # noqa: BLE001 -- los íconos nunca frenan un mensaje
+        try:
+            with cur.connection.transaction():
+                registrar_incidente(
+                    cur, workspace_id,
+                    "No se pudo poner el ícono del estado de cada tarea en un mensaje: salió "
+                    "como lo redactó la IA, sin los íconos.",
+                    severidad="baja", referencia_cruda=f"{type(falla).__name__}: {falla}",
+                    etapa=ETAPA_ICONOS_POR_ESTADO,
+                    clave=f"{ETAPA_ICONOS_POR_ESTADO}:{pedido.get('hoy')}")
+        except Exception:  # noqa: BLE001 -- sin incidente, el mensaje igual sale
+            pass
+        return texto

@@ -751,7 +751,7 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     except Exception as falla:     # la IA es un servicio externo: cualquier falla es no redactar
         return _si_la_ia_no_redacta(m, envio, falla)
     # El ícono del estado de cada tarea de una lista lo pone la cocina (decisión 79).
-    texto = con_los_iconos(texto, pedido)
+    texto = con_los_iconos(texto, pedido, cur, m.workspace_id)
 
     primero = str(envio[0].aviso["id"])
     clave = f"motor:aviso:{primero}"

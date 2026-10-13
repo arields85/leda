@@ -220,7 +220,7 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
                       **llegaron}
             texto = pedir_a_la_ia(lambda: no_vacio(_redactar(ia, pedido, al_avanzar)))
             # El ícono del estado de cada tarea de una lista lo pone la cocina (decisión 79).
-            texto = con_los_iconos(texto, pedido)
+            texto = con_los_iconos(texto, pedido, cur, ctx.quien.workspace_id)
             listo_en = time.monotonic()
     except IANoRespondio as falla:
         return _si_la_ia_falla(cur, ctx, ia, reloj, inicio, elegidas, falla, clave_respuesta,

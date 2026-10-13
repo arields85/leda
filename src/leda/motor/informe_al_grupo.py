@@ -192,7 +192,7 @@ def _uno(m: Momento, aviso: dict[str, Any], ia) -> str:
         return _si_no_sale(m, aviso, falla, hechos)
     # El ícono del estado de cada tarea lo pone la cocina, con lo que decidió el informe (decisión
     # 79): un atraso, sólo el ya hablado en privado.
-    texto = con_los_iconos(texto, pedido)
+    texto = con_los_iconos(texto, pedido, cur, m.workspace_id)
     clave_salida = f"motor:aviso:{aviso_id}"
     try:
         enqueue_outbox(cur, workspace_id=m.workspace_id, chat_id=fila["grupo_chat_id"],
