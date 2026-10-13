@@ -25,6 +25,8 @@ estante → los tornillos) y que el equipo se organice solo.
   previo (autorizado).
 - Por chat no se crea nada (ADR 0017; anotado para más adelante en `docs/ROADMAP.md`).
 - No tocar `nucleo/`. Las garantías de la mecánica las exige el código.
+- **Antes de cada porción, partir de lo hecho:** el escritor lee "De qué se parte en cada porción" (abajo) y
+  reusa esas piezas; lo que agregue nuevo lo justifica en el diseño corto.
 
 ## Orden de las porciones (acordado con el usuario, 2026-10-13: "si")
 
@@ -58,8 +60,6 @@ Ruta: cada porción, delegada (un escritor), porque toca base, servidor, web y p
       La revisión RDD de los dos commits la corre el coordinador.
 - [ ] **J1-5 · Prueba real en el celular** (con el usuario).
 
-### J2 a J6
-
 **Diseño corto (J1-1, 2026-10-13).** Hoy el formulario (`LoadForm.tsx`) pide a
 `GET /admin/api/espacios/{id}/opciones` (función `opciones_de_la_carga`) lo que se puede elegir y manda la carga
 a `POST …/tareas` (`cargar_una_tarea` → función `cargar_tarea`, `security definer` de `leda_owner`, que comprueba
@@ -86,13 +86,53 @@ la sesión de administración, fija el espacio y devuelve todos los rechazos jun
 - `PENDIENTE` (con los avisos de la decisión 7 del ADR 0022, que todavía no existen): el aviso de §4 a los dos
   referentes cuando la espera cruza áreas.
 
+### J2 a J6
+
 Se detallan al llegar a cada una, con su diseño corto.
 
 - [ ] **J2 · Los objetivos desde la web.**
 - [ ] **J3 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J4 · El pedido de más tiempo y el cambio de fecha.**
-- [ ] **J5 · La propuesta del integrante con la IA.**
+- [ ] **J5 · La propuesta del integrante con la IA.** Se aprovecha lo que ya existe (usuario, 2026-10-13: "no hay que inventar
+      nada"): el cliente de la IA del motor (`motor/ia_real.py`, `desde_base`), los chequeos de la entrega
+      (`entrega.puntos_del_criterio`, `problema_del_ejemplo`: nada de números ni nombres que nadie dijo) y
+      la propuesta de título y criterio del alta del flujo congelado (`alta_turno.py` en la etiqueta
+      `respaldo-flujos-antes-de-d`: `CAMPOS_PROPONIBLES`, el criterio que dice cómo se comprueba), como
+      referencia para adaptar, no para copiar el flujo.
 - [ ] **J6 · Las jerarquías y los integrantes desde la web de Dirección.**
+
+## De qué se parte en cada porción (explorador de sólo lectura, 2026-10-13)
+
+Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de base para no arrancar de cero".
+
+- **J2, los objetivos:** `herramientas._preparar_crear_objetivo` y `_crear_objetivo` (las comprobaciones, la
+  vista previa y el evento de estado), la convención de tipos de la importación (`importador._importar_objetivo_inicial`:
+  la raíz estratégica, cada frente operativo), la tabla `objective` (ya tiene `referente_membership_id`, sin
+  usar), `opciones_de_la_carga` (ya trae los objetivos y los integrantes para elegir) y `cargar_tarea` como
+  patrón de función de la base (sesión, clave de un solo uso, errores y avisos, auditoría); en la web,
+  `FieldBlock`, `Counter`, `DatePicker` y la vista previa. Falta: la regla de qué tipo cuelga de cuál, una
+  función `crear_objetivo` para la web, poner el referente y que sólo Dirección cree.
+- **J3, la carga del equipo:** `cargar_tarea` entera (sólo cambia la puerta: la sesión del equipo en vez de la
+  de administración), `tareas_que_ve` y `vistas_de` (ya distinguen Dirección y referentes), la regla de quién
+  revisa (`quien_revisa_la_tarea`) y el pase de tareas del motor (`motor/pase.py`, `autoridad.regla_del_pase`)
+  como antecedente de "una tarea para otra persona". Falta: guardar quién revisa una tarea en particular (el
+  préstamo), la versión de `cargar_tarea` para la puerta del equipo y **los avisos de la decisión 7 del
+  ADR 0022** (al responsable y a quien revisa), que quedaron pendientes en la porción 2
+  (`plataforma-p2.md`): se construyen en la J3, junto con el aviso del préstamo.
+- **J4, más tiempo y cambio de fecha:** la previsión del chat (`task_forecast`, la jugada `anotar_prevision`,
+  los avisos `nueva_prevision`), `ancla.prevision_vigente`, la previsión que ya muestra la web, y el umbral
+  de re-aprobación del pack (`corrimiento_de_fecha_dias: 3`), que se guarda y nadie lee. Falta: **la base no
+  deja cambiar la fecha de una tarea** (`bloquear_estado_directo`), así que hace falta una función propia,
+  auditada y con quién lo decidió; el pedido con su estado (pendiente, aceptado o rechazado); el bloque del
+  referente en la web.
+- **J6, las jerarquías y los integrantes:** las validaciones de la importación (`importador.validar`: una sola
+  autoridad final, áreas y roles existentes, quién aprueba a quién sin ciclos ni a sí mismo), la importación
+  de personas y áreas, los enlaces de activación (`onboarding.generar_enlaces`, `activar`,
+  `pendientes_de_activar`), "conectado" que ya trae `opciones_de_la_carga`, el corte de sesiones con
+  `dejo_el_equipo` al dar de baja, y las ideas rescatadas de la rama auxiliar (`plataforma-p2.md`). Falta: las
+  funciones de la base para altas, bajas y cambios de área, rol, referente y quién aprueba, y las preferencias
+  de avisos de Dirección.
+- **La etiqueta congelada** sólo aporta el mismo `crear_objetivo` de hoy; nada de más tiempo ni de integrantes.
 
 ## Criterio de aceptación
 
