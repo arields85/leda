@@ -216,22 +216,26 @@ def _antes_pregunta_cual(ctx, datos: dict, tarea: dict) -> bool:
     """Si una aprobación cuyo comentario pide algo tiene que preguntar antes cuál de las dos
     (decisión 22 del usuario, 2026-10-08): sí, salvo que sea la elección. Elige una opción tocada o escrita
     (la de una pregunta: `de_la_pregunta`) o la respuesta escrita a la pregunta de cuál de las dos
-    sobre esta tarea, que la persona vio en un mensaje anterior (decisión 12)."""
+    sobre esta tarea, la abierta que la persona vio en un mensaje anterior (decisión 12;
+    `_la_pregunta_de_cual`)."""
     if datos.get("de_la_pregunta"):
         return False
     return _la_pregunta_de_cual(ctx, tarea) is None
 
 
 def _la_pregunta_de_cual(ctx, tarea: dict) -> dict | None:
-    """La pregunta de cuál de las dos sobre esta tarea, sin cerrar, que la persona vio en un
-    mensaje anterior (la de este mismo mensaje todavía no se contestó)."""
-    ctx.cur.execute("""select * from conversation_question
-                        where membership_id = %s and tipo = %s and task_id = %s
-                          and cerrada_en is null and not (id = any(%s::uuid[]))
-                        order by abierta_en limit 1""",
-                    (ctx.quien.membership_id, preguntas.CUAL_DE_LAS_DOS, tarea["id"],
-                     list(ctx.preguntas_del_turno)))
-    return ctx.cur.fetchone()
+    """La pregunta de cuál de las dos sobre esta tarea que la persona está contestando: la
+    abierta (`preguntas.actual`; un tema a la vez), que vio en un mensaje anterior (la de este
+    mismo mensaje todavía no se contestó). Es la misma guarda de lo último que vio que usan las
+    confirmaciones escritas (`entrega`, `pase`, `apodos`). Una que quedó para después, porque
+    otro tema la tapó, no es el contexto de lo que se escribe ahora: lo escrito sobre la tarea
+    vale por sí mismo (T4b, revisión de la T4)."""
+    abierta = preguntas.actual(ctx.cur, ctx.quien.membership_id)
+    if (abierta is None or abierta["tipo"] != preguntas.CUAL_DE_LAS_DOS
+            or str(abierta["task_id"]) != str(tarea["id"])
+            or str(abierta["id"]) in ctx.preguntas_del_turno):
+        return None
+    return abierta
 
 
 def _la_lectura_elegida(ctx, nombre: str, datos: dict, tarea: dict) -> dict:

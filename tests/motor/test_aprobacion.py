@@ -697,6 +697,37 @@ def test_sin_la_pregunta_de_cual_de_las_dos_el_comentario_es_el_del_mensaje(conn
     assert _decisiones(conn, tarea) == [("rechazado", "falta el diagrama")]
 
 
+@pytest.mark.parametrize("jugada, decision, propio", [
+    ("aprobar", "aprobado", "buen trabajo con el tablero"),
+    ("pedir_cambios", "rechazado", "falta la foto del tablero cerrado")])
+def test_una_pregunta_de_cual_de_las_dos_que_quedo_para_despues_no_pisa_lo_escrito_despues(
+        conn, mundo, turnos, jugada, decision, propio):
+    """T4b (revisión de la T4): la respuesta a cuál de las dos es lo escrito cuando esa pregunta
+    es la abierta, la que la persona vio en un mensaje anterior (un tema a la vez; la misma
+    guarda de lo último que vio). Si otro tema la dejó para después, lo que la persona escribe
+    sobre esa tarea no la está contestando: se decide con su propio comentario, no con el del
+    mensaje que la abrió."""
+    _dos_entregadas(conn, mundo, turnos)
+    tarea = str(uno(conn, "select id from task where titulo = %s", ENTREGADA)["id"])
+    r = turnos.dice("Ismael",
+                    Jugada("aprobar", {"tarea": "T1", "comentario": "que revise los colores"}),
+                    Jugada("pedir_cambios", {"tarea": "T1",
+                                             "comentario": "que revise los colores"}),
+                    texto="aprobado, pero que revise los colores")
+    assert r.pregunta["tipo"] == preguntas.CUAL_DE_LAS_DOS
+    # Otro tema, sobre la otra entrega: Leda sigue a la persona y la de antes queda para después.
+    r = turnos.dice("Ismael", Jugada("pedir_cambios", {"tarea": "T2"}),
+                    texto="a la del cableado le pido cambios")
+    assert r.pregunta["tipo"] == preguntas.QUE_CAMBIOS_PIDE
+    cual = uno(conn, "select * from conversation_question where tipo = %s",
+               preguntas.CUAL_DE_LAS_DOS)
+    assert cual["cerrada_en"] is None and cual["para_despues_en"] is not None
+    turnos.dice("Ismael", Jugada(jugada, {"tarea": "T1", "comentario": propio,
+                                          "el_comentario_pide_algo": False}),
+                texto=f"el tablero: {propio}")
+    assert _decisiones(conn, tarea) == [(decision, propio)]
+
+
 def test_aprobar_con_un_comentario_que_no_pide_nada_va_directo(conn, mundo, turnos):
     """Precisión del usuario a la decisión 22 (2026-10-08, D7c): un elogio o una observación que
     no le pide nada a nadie aprueba directo, como antes de la D7b, y el comentario le llega al
