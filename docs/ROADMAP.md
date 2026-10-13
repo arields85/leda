@@ -99,6 +99,12 @@ Etapas y criterios de paso a `main` (M1 a M3): [`STATUS.md`](STATUS.md), "Próxi
    registradas"); los riesgos de arquitectura (la salida atada a Telegram, un límite de Telegram que
    decide un dato de negocio: "Qué se corrige", arriba); la IA de cada cliente con su propio proveedor;
    cómo se da de alta un segundo cliente; y la primera prueba con un equipo de verdad.
+   **La web como Mini App de Telegram** (usuario, 2026-10-13: "si"): se abre desde un botón del bot,
+   a pantalla completa y sin las barras del navegador, y Telegram identifica a la persona (con su firma,
+   verificable), así que desde el celular no hace falta el enlace de un solo uso; para la puerta del
+   equipo y la de administración. Va con la VPS, porque pide una dirección HTTPS fija, y lleva una
+   enmienda al ADR 0022 (decisión 4, cómo se entra). Se descartó "agregar a la pantalla de inicio": hay
+   que instalarla desde Safari y en el iPhone no comparte la sesión.
 3. **La API de lectura y el dashboard** (ADR 0017, decisión 5): otros programas que leen el estado de un
    espacio y un panel con números del equipo. Esperan sus precondiciones (el cierre del aislamiento y
    el desacople del transporte, que van en el punto 2) y que el seguimiento ande bien en pruebas reales;
