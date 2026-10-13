@@ -452,6 +452,43 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         (`socket.gaierror` al no encontrar el servidor, `ssl.SSLError`, "red inalcanzable") se
         contaría como error del programa; y dos sugerencias: el año de dos cifras con guion
         (`ayuda_al_cargar.py:156`, "22-10-26" no se lee) y una prueba de garantía negativa floja.
+  - [x] **J2-10 · La jerarquía visual del formulario** (2026-10-13; ruta delegada, un escritor, sólo
+        `web/` y este documento).
+        **Lo que vio el usuario en el iPhone:** (1) en la vista previa, los nombres de los datos
+        (objetivo, fecha, criterio de aceptación, evidencia, la hace, la revisa…) iban en minúscula y
+        más chicos que el valor, y se perdían; (2) en el formulario, el título del campo (ESPERA A,
+        CRITERIO DE ACEPTACIÓN…) y su ayuda ("Si no puede empezar hasta que otra tarea esté
+        terminada.") se veían casi iguales; (3) las listas para elegir (personas, "espera a",
+        objetivo) se veían más grandes que los campos de texto.
+        **Lo que decidió** (2026-10-13, "hay que probar"): los **títulos** de los campos y los
+        nombres de la vista previa, en mayúsculas, con un poco de espacio entre letras, sin negrita,
+        del mismo tamaño que los valores y en `ink` (#e6e6e3, el blanco roto); **lo que la persona
+        escribe o elige** (el texto de los campos y los valores de la vista previa), en `ink-soft`
+        (#b0b2b6, gris claro), en el tamaño principal; las **ayudas**, más chicas, en `ink-dim`
+        (#6f7277). Los mensajes de lo que falta siguen en su ámbar. Para (3), no se achican las
+        listas (los 16 px en pantallas táctiles evitan que el iPhone agrande la página, J1-6): todos
+        los campos quedan iguales.
+        **Qué cambió** (`ee1c0aff`): un solo lugar para los estilos, `web/src/admin/typography.ts`,
+        que usan el formulario, la ayuda, el calendario y la vista previa: `FIELD_TITLE`,
+        `FIELD_VALUE` y `FIELD_HINT` (el tamaño principal es 13 px, y 16 px en pantallas táctiles,
+        el mismo para títulos y valores; la ayuda, 12 px y 13 px en el celular), y `CONTROL`, la caja
+        de todos los campos (texto, área de texto, lista y la caja de la ayuda: el mismo marco,
+        relleno, alto de renglón y texto). Las listas dejan el aspecto propio del teléfono
+        (`appearance-none`), que las hacía más grandes, y llevan una flecha propia (`Select`, en
+        `LoadForm.tsx`; el id, la etiqueta y el foco siguen en la lista). En el calendario, el mes y
+        los días van en el tamaño principal y los días en `ink-soft`; las letras de la semana, como
+        ayuda. Las notas dentro de un valor de la vista previa ("Es posterior a la del objetivo…",
+        "[SIN CONECTAR]…") pasan a ser ayudas, para no confundirse con el valor. La tarjeta de la
+        tarea de la puerta del equipo (`TaskCard.tsx`) no tiene pares de nombre y valor, así que las
+        páginas del equipo no cambian.
+        **Evidencia (2026-10-13):** dos pruebas nuevas en `AdminApp.test.tsx`, en rojo contra el
+        código de antes (2 failed): todos los campos con la misma caja y las listas sin el aspecto
+        del teléfono, y los tres estilos en un título, un valor y una ayuda del formulario y en un
+        nombre y su valor de la vista previa. Después, en `web/`: `npm test` 88 passed; `npm run
+        build` bien (en el CSS compilado están `appearance:none`, `pointer-coarse:text-[16px]` y
+        `pointer-coarse:text-body`). Son pruebas de estructura: **cómo se ve sólo lo confirma la
+        prueba en el celular** (si los títulos de 16 px en mayúsculas pesan demasiado, o la caja
+        "Contame qué querés hacer y te ayudo", que ahora también va en mayúsculas como título).
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
