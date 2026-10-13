@@ -496,6 +496,81 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       primer paso fue antes de esos arreglos): "antes del jueves" propone el miércoles; un criterio "No sé" escrito a
       mano no se carga y pide "Contame cómo se sabe que está terminada"; cuánto tarda la ayuda y si se nota que Leda
       está trabajando. RDD de J2-11: `review-23dc736a9afe1fb0` (`080049cd`; WARNING: el agrandado con dos dedos en el navegador de las apps, confirmado; WARNING: una prueba de tamaños que no discrimina, `AdminApp.test.tsx:419-421`; sugerencia en `viewport.test.ts`).
+- [x] **J2-13 · El criterio, desde la evidencia y juzgado por su sentido** (2026-10-13; ruta delegada, un
+      escritor: servidor, herramienta, web y pruebas).
+      **La prueba del usuario en el celular** (2026-10-13, después de J2-9 y J2-10), con "hay que cambiar el ups
+      de la sala de servidores que lo vea el tano antes del jueves se corta todo": Leda propuso "El UPS de la
+      sala de servidores está cambiado; se comprueba verificando en la sala de servidores que el UPS fue
+      reemplazado.": circular otra vez, con sinónimos ("cambiado" y "reemplazado"), que la regla de palabras de la
+      J2-9 (`lo_que_agrega`: una palabra nueva con contenido, sin una lista fija de palabras de comprobar y de
+      estar terminada) no puede ver. Lo demás estuvo bien: la fecha 21.10 era la correcta, porque el reloj de
+      prueba de Leda dice que hoy es el jueves 15; y "el tano" no es un apodo de Marcos en `leda_motor`, así que
+      "responsable no encontrado" era correcto, pero **la pantalla no lo dijo** donde ella miraba.
+      **Disparador** (`AGENTS.md`, punto 4): la misma clase de hallazgo después de un arreglo del mecanismo; no se
+      propone otro arreglo de palabras, se cambia el diseño.
+      **Lo que decidió el usuario** (2026-10-13, "si"):
+      1. Si la persona no dijo cómo se comprueba, Leda arma la comprobación con la evidencia que pide el área, que
+         es una manera concreta y real, no inventada.
+      2. Si un criterio dice cómo se comprueba lo juzga la IA por su sentido, como la entrega del motor
+         (`lo_descrito_cubre`); se quita la lista de palabras y la regla de lo que agrega.
+      3. Las instrucciones de la IA describen su trabajo, sin frases de ejemplo ni casos.
+      Y, de la misma prueba: que todo lo que la ayuda no pudo completar se vea en su campo, y que los tres puntos de
+      "completando…" se animen, **siempre** (usuario: "quiero que se animen siempre").
+      **Diseño.**
+      - **Al proponer** (`ayuda_al_cargar.revisar`): la IA ya no devuelve el criterio entero sino el resultado
+        (`resultado`) y, aparte, cómo se comprueba (`como_se_comprueba`): la manera que dijo la persona o, si
+        recibió la evidencia del área de quien la hace (cuando ya está elegida), esa evidencia aplicada a lo que
+        hay que hacer; si no, vacío. El código arma el criterio, en este orden: (1) el resultado con esa manera,
+        sólo si el juicio por el sentido (`juzgar_la_propuesta`, el mismo `juzgar_el_criterio` de la carga, una
+        llamada más y fuera del candado) dice que es concreta; (2) si no, el resultado con la evidencia que pide
+        el área de quien la hace, en palabras de todos los días (la misma política que marca las casillas): "Se
+        comprueba con lo que pide el área: una foto del trabajo terminado; cómo se probó y qué dio la prueba.";
+        sin quién la hace, la del área del objetivo, si la tuviera (**hoy la base no les da un área a los
+        objetivos**: `objective` no tiene `area_id` y `opciones_de_la_carga` no la manda, así que este paso queda
+        listo para cuando la tengan; agregarla es una migración, fuera de esta tarea); (3) sin evidencia, el
+        criterio no se propone y el campo dice "Contame cómo se sabe que está terminada.". El control de números
+        y nombres que nadie dijo (`problema_del_ejemplo`) sigue igual, sobre el resultado y sobre cada criterio
+        armado. Si el juicio no responde, esa manera no se propone (vale la evidencia) y queda un incidente
+        `ayuda_al_cargar`; la auditoría guarda `juicio_del_criterio`.
+      - **Al cargar** (`juzgar_el_criterio`): la IA dice si el criterio dice una manera concreta de comprobar el
+        resultado, distinta del resultado mismo (`dice_como_se_comprueba`, sí o no), y copia la parte que lo dice;
+        el código decide: sí, sólo si la IA dijo que sí y la parte está dentro del criterio; no, si dijo que no; y
+        cualquier otra cosa (sin juicio, otra forma, una parte vacía o que no está) es `sin_revisar`, nunca un
+        visto bueno. La única guarda sin la IA, que no es una lista de palabras: un criterio vacío o igual al
+        título (`sin_nada_que_juzgar`). **Cambia una garantía de la J2-9:** "No se" ya no se rechaza sin la IA;
+        lo rechaza el juicio, y con la IA caída se carga con el aviso "No pude revisar el criterio ahora…" y un
+        incidente, como cualquier otro criterio (lo que se acordó: nunca fingir que se revisó).
+      - **Quitado:** `lo_que_agrega`, `no_agrega_nada`, `_DE_FUNCION`, `_DEL_MARCO`, `_raiz`, `_misma` y la
+        "raíz común" (la advertencia de `review-f4fa0b6aca5a841e` desaparece con ella).
+      - **La web** (pedido del coordinador, de la misma prueba). **Por qué no se vio "No encontré a…":** el
+        servidor sí lo mandaba (`avisos`, con `responsable` / `no_encontrado`), pero la web lo mostraba sólo como
+        un renglón gris (`text-ink-soft`) dentro del recuadro de la ayuda, arriba, fuera de la vista en el
+        celular, y nunca en el campo. Ahora cada dato que la ayuda no pudo completar dice su texto en su campo, en
+        el color de lo que falta y con su marca (como los mensajes de la carga, y en el `aria-describedby` del
+        campo), hasta que la persona lo completa o vuelve a pedir; junto al recuadro, "No pude completar: quién la
+        hace, criterio de aceptación." en el mismo color. El texto del servidor: "No encontré a «el tano» en el
+        equipo; elegí quién la hace.". **Los tres puntos** de "completando…" se encienden y se apagan uno después
+        del otro (`--animate-puntos`, 1,2 s, con 0, 200 y 400 ms de diferencia), **siempre**, también con
+        movimiento reducido: por eso sólo cambia la opacidad, sin moverse, agrandarse ni rebotar. El botón se
+        sigue llamando "completando…" para un lector de pantalla.
+      - **La marca "propuesto por Leda"** en un verde agua suave, pedido del usuario: `be4c2830`
+        (`--color-propuesto: #8ccfc0`).
+      **Evidencia (2026-10-13):** con las pruebas nuevas contra el código de antes, `pytest -q
+      tests/test_ayuda_al_cargar.py` 56 en rojo y 109 en verde (el UPS circular, la comprobación desde la
+      evidencia, sin quién ni área, la lista de palabras que ya no existe, el juicio por el sentido y la
+      herramienta); `tests/garantias/test_ayuda_al_cargar.py` y `tests/garantias/test_criterio_verificable.py`,
+      20 en rojo y 16 en verde. En la web, `AdminApp.test.tsx` 2 en rojo y 49 en verde (el mensaje en el campo del
+      responsable descartado y los puntos). Después: `pytest -q tests/test_ayuda_al_cargar.py
+      tests/garantias/test_ayuda_al_cargar.py tests/garantias/test_criterio_verificable.py
+      tests/garantias/test_carga_de_tareas.py` 237 passed; `pytest -q tests/garantias` completa, 774 passed (13 min 36 s); en `web/`, `npm test` 97 passed y
+      `npm run build` bien (en el CSS, `@keyframes puntos{0%,60%,to{opacity:.25}30%{opacity:1}}` y los tres
+      `animation-delay`); la herramienta en seco (`$env:PYTHONPATH="src"; .venv\Scripts\python.exe
+      tools\medir_ayuda_al_cargar.py --ia guionada --veces 1`): 12 de 20 bien, sale con 1. La herramienta suma el
+      pedido del usuario tal cual ("el UPS de la prueba del usuario", con los apodos de `leda_motor`: "el tano" no
+      es nadie), el UPS circular escrito, un criterio concreto con "revisa" y "quede", y uno igual al título (20
+      pedidos; unas 20 llamadas por vuelta con la IA real). Commits: `a4428fd9` (servidor, herramienta, pruebas y `docs/capacidades.md`) y `73a32f9e` (la web).
+      **Falta:** una ronda con la IA real (con permiso: mide si la IA deja vacía la manera cuando la persona no la
+      dijo, y el juicio por el sentido) y la prueba del usuario en el celular (J2-12).
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
@@ -623,3 +698,8 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
   circular; una tarea se había cargado con "No se". J2-9 hecha (escritor delegado, `3d4ab5fa` y
   `c0a0b206`): el criterio tiene que decir cómo se comprueba, al proponerlo y al cargarlo. Siguen
   la ronda real y repetir la J2-5.
+- 2026-10-13: la repetición en el celular dio otro criterio circular, con sinónimos (el UPS): se
+  disparó el punto 4 y el usuario cambió el diseño. J2-13 hecha (escritor delegado, `a4428fd9` y
+  `73a32f9e`): la comprobación sale de la evidencia del área y el criterio lo juzga la IA por su
+  sentido (sin la lista de palabras de la J2-9); lo que la ayuda no completa se ve en su campo, y
+  los puntos de "completando…" se animan. Siguen una ronda real (con permiso) y la J2-12.
