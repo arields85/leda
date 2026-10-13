@@ -376,6 +376,8 @@ La J2 de `odd/tasks/plataforma-jerarquias.md`: la persona escribe o dicta "Conta
 
 **Conclusión:** la ayuda completa bien lo que la persona dijo y no inventa; cuando no está segura, deja el campo vacío y lo marca. Falta la prueba del usuario en el celular.
 
+**Segunda ronda, con "antes del" y la revisión del criterio** (J2-8 y J2-9, sobre `ee1c0aff`; autorizada por el usuario): la misma herramienta con 16 casos, entre ellos el criterio circular del usuario y "no se", `--veces 3`, informe `tests/conversaciones/resultados/ayuda-al-cargar-2.json`. **48 de 48 bien.** Tiempo por llamada: la ayuda, mediana 6,3 s (máximo 15,8 s); la revisión del criterio al confirmar, mediana 1,9 s (máximo 7,8 s). Cupo antes: 2 % y 2 %.
+
 ## El acceso a la web por chat, en el celular (2026-10-13, a la mañana): pasa
 
 El usuario, con la cuenta de Ariel en su celular, contra `leda_motor` y los bots nuevos (`@Leda_PM_bot`), con la web detrás de un túnel rápido de Cloudflare (sólo para la prueba; autorizado por el usuario: "es para probar. cuando tengamos todo en una vps se hace de manera correcta"). Guion de 9 pasos: el ofrecimiento al final de "que tengo pendiente?", el enlace abre el botón "Entrar" y la web, "> consultar a leda" abre el bot, el mismo enlace ya no sirve, "dale gracias" sin repetir el ofrecimiento, otro enlace a pedido, "perdi el celular" corta enseguida, la web ya no entra y el enlace pedido ya no sirve. Usuario: "salio perfecto". En la base: el ofrecimiento reservado y dado por hecho una vez; el primer enlace canjeado y el segundo anulado por el corte; la sesión cortada con `perdio_el_celular`; una fila `cortar_acceso_web` (1 sesión, enlace anulado); los dos mensajes con enlace enviados; ningún incidente. Túnel apagado al terminar.

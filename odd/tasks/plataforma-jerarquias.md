@@ -489,6 +489,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         `pointer-coarse:text-body`). Son pruebas de estructura: **cómo se ve sólo lo confirma la
         prueba en el celular** (si los títulos de 16 px en mayúsculas pesan demasiado, o la caja
         "Contame qué querés hacer y te ayudo", que ahora también va en mayúsculas como título).
+- **Segunda ronda con la IA real** (2026-10-13, autorizada; sobre `ee1c0aff`): `tools/medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3`, 16 casos, **48 de 48 bien** (`ayuda-al-cargar-2.json`). La ayuda tarda una mediana de 6,3 s (máx. 15,8 s); la revisión del criterio al confirmar, 1,9 s (máx. 7,8 s). RDD de J2-9: `review-f4fa0b6aca5a841e` (`3d4ab5fa`, WARNING: la raíz común puede rechazar un criterio bien, `ayuda_al_cargar.py:789-810`; sugerencia: la carga espera a la IA) y `review-47eb28dd67f113be` (`c0a0b206`, sin observaciones); de J2-10: `review-298d3d9895306faf` (una sugerencia en las pruebas). Ajuste del usuario en el celular: títulos sin mayúsculas, del tamaño de las ayudas (`cc7f9893`).
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
