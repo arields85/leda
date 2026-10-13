@@ -229,8 +229,12 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
    por chat con el motivo, de coordinación (mecánica §10: "le rechazaron uno" llega siempre y no cuenta
    para el tope); la propuesta queda `cancelada`, con quién y por qué, en la auditoría y visible en la
    web. Si la idea sirve pero no así, quien aprueba la corrige y la aprueba (punto 4).
-6. **Cómo se entera el referente de una propuesta.** Ejemplo: Nahuel propone a las 10; ¿Marcos recibe
-   un aviso de Leda por chat o la encuentra arriba en "Tu sector", como el pedido de más tiempo?
+6. ~~**Cómo se entera quien aprueba de una propuesta.**~~ **Decidido (usuario, 2026-10-13: "si").**
+   Un aviso de Leda por chat, de coordinación (mecánica §10: "le llegó un borrador para confirmar"),
+   con el enlace a la propuesta en la web y sin botón de aprobar: se aprueba en la web, donde se ve
+   completa y se puede corregir (ADR 0017: "en el formulario web; nunca por chat"). En la web, arriba
+   de todo en "Tu sector" hasta que la decida; varias del mismo día, juntas en un mensaje, como las
+   entregas para revisar.
 7. **Dirección crea una tarea en un área.** Ejemplo: Ismael crea "Revisar el tablero" para Nahuel,
    de OT; ¿se entera Marcos, el referente de OT, además del aviso al responsable y a quien revisa?
 8. **Un referente crea una tarea para sí mismo.** Ejemplo: Marcos crea "Pedir presupuesto" para él;
