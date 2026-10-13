@@ -9,6 +9,9 @@ inicio: "2026-10-19 09:00"
 # Ariel ya entró a la web antes de la conversación: su enlace, emitido y canjeado por una sesión
 # abierta (`corredor._abrir_sesiones_web`). Marcos nunca entró.
 sesion_web_abierta: [Ariel]
+# El corredor da por ofrecida la web a todas las personas (así el ofrecimiento no aparece en las
+# demás conversaciones), salvo a éstas: a Marcos se le ofrece; a Ariel no, porque ya entró.
+sin_ofrecer_la_web: [Marcos, Ariel]
 
 tareas:
   PLC:

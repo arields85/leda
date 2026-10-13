@@ -1053,6 +1053,72 @@ def entro_alguna_vez(cur, membership_id: str) -> bool:
     return bool(cur.fetchone()["si"])
 
 
+def entro_alguna_vez_como_administracion(cur, membership_id: str) -> bool:
+    """Lo mismo que `entro_alguna_vez` (la definición de `entro_a_la_web`, 0066), con la conexión
+    administrativa (`admin()`, `leda_admin`, que lee las dos tablas y no ejecuta la función): la
+    bienvenida se escribe desde ahí (`motor.recibir._activar`)."""
+    cur.execute("""select exists (select 1 from enlace_de_entrada e
+                                   where e.membership_id = %(m)s and e.canjeado_en is not null)
+                       or exists (select 1 from sesion_web s where s.membership_id = %(m)s)
+                       as si""", {"m": str(membership_id)})
+    return bool(cur.fetchone()["si"])
+
+
+# --- El ofrecimiento, una sola vez (decisión 2 del usuario, 2026-10-12; `ofrecimiento_web`) -----
+#
+# Se reserva al armar la respuesta que lo lleva (decisión técnica 1: así no salen dos antes de que
+# salga el primero), queda ofrecido al mandar y se libera si el envío falla sin reintento.
+
+def tiene_un_enlace_por_salir(cur, membership_id: str) -> bool:
+    """Si un mensaje a la persona con su enlace de entrada todavía no salió (esperando su turno o
+    su reintento): mientras tanto no se le ofrece otro, que lo anularía."""
+    cur.execute("""select exists (select 1 from message_outbox_entrada_web w
+                                    join message_outbox o on o.id = w.outbox_id
+                                   where w.membership_id = %s
+                                     and o.estado in ('pendiente', 'esperando_confirmacion',
+                                                      'listo')) as si""",
+                (str(membership_id),))
+    return bool(cur.fetchone()["si"])
+
+
+def ya_se_le_ofrecio(cur, membership_id: str) -> bool:
+    """Si a la persona ya se le ofreció la web, o está reservado para un mensaje que va a salir."""
+    cur.execute("select exists (select 1 from ofrecimiento_web where membership_id = %s) as si",
+                (str(membership_id),))
+    return bool(cur.fetchone()["si"])
+
+
+def reservar_el_ofrecimiento(cur, membership_id: str) -> bool:
+    """Reserva el ofrecimiento de la web para la persona; `True` sólo si lo reservó esta llamada
+    (nunca se le había ofrecido ni estaba reservado). En la transacción que encola el mensaje que
+    lo lleva: si se deshace, la reserva también."""
+    cur.execute("""insert into ofrecimiento_web (workspace_id, membership_id)
+                   select m.workspace_id, m.id from membership m where m.id = %s
+                   on conflict (membership_id) do nothing
+                   returning true as si""", (str(membership_id),))
+    return cur.fetchone() is not None
+
+
+def quedo_ofrecido(cur, membership_id: str, ahora) -> None:
+    """La persona recibió su enlace de entrada (el ofrecimiento, o uno que pidió): ya no se le
+    ofrece. Dentro del punto de retorno del envío: si el envío falla, no cuenta."""
+    cur.execute("""insert into ofrecimiento_web (workspace_id, membership_id, reservado_en,
+                                                 ofrecido_en)
+                   select m.workspace_id, m.id, %(ahora)s, %(ahora)s
+                     from membership m where m.id = %(m)s
+                   on conflict (membership_id) do update
+                     set ofrecido_en = coalesce(ofrecimiento_web.ofrecido_en,
+                                                excluded.ofrecido_en)""",
+                {"m": str(membership_id), "ahora": ahora})
+
+
+def liberar_el_ofrecimiento(cur, membership_id: str) -> None:
+    """El ofrecimiento reservado que no salió (el envío falló sin reintento, o el corte lo
+    anuló) se libera: se le vuelve a ofrecer más adelante. Uno que ya salió no se toca."""
+    cur.execute("""delete from ofrecimiento_web
+                    where membership_id = %s and ofrecido_en is null""", (str(membership_id),))
+
+
 def tiene_un_enlace_sin_usar(cur, membership_id: str) -> bool:
     """Si la persona tiene un enlace de entrada emitido que nadie usó ni se anuló (vencido o no):
     el que un enlace nuevo deja sin servir (0066)."""

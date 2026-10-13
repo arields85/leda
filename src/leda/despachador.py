@@ -1190,6 +1190,22 @@ def _enlace_de_entrada_web(cur, workspace_id: str, m) -> str | None:
     return web_app.enlace(config.base_url, token)
 
 
+def _el_ofrecimiento_al_salir(cur, m, entrada_web: str | None, ahora: datetime) -> None:
+    """Lo que deja en `ofrecimiento_web` un mensaje con el enlace de entrada que salió (decisión
+    2 del usuario, 2026-10-12): si llevó el enlace, ya no se le ofrece a la persona, sea el
+    ofrecimiento o uno que pidió (otro ofrecimiento anularía ése). Si era el ofrecimiento y salió
+    sin el enlace (sin la dirección pública: ya quedó su incidente), la reserva se libera."""
+    from . import web_app
+
+    persona = m.get("entrada_web_persona")
+    if not persona:
+        return
+    if entrada_web:
+        web_app.quedo_ofrecido(cur, persona, ahora)
+    elif m.get("entrada_web_ofrecimiento"):
+        web_app.liberar_el_ofrecimiento(cur, persona)
+
+
 def _marcar_enviado(cur: psycopg.Cursor, ahora: datetime, outbox_id) -> None:
     """El cambio de estado durable: se llama ANTES de intentar el envío
     (ver `_intentar_envio`), no después."""
@@ -1276,7 +1292,8 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
             # en la salida ni en el registro de turnos (ADR 0019, decisión 6).
             enlace = _enlace_de_la_tarea(cur, workspace_id, m)
             # O el de entrada a la web (0066): uno solo por mensaje, la salida lo garantiza.
-            enlace = enlace or _enlace_de_entrada_web(cur, workspace_id, m)
+            entrada_web = None if enlace else _enlace_de_entrada_web(cur, workspace_id, m)
+            enlace = enlace or entrada_web
             cuerpo = f"{m['cuerpo']}\n{enlace}" if enlace else m["cuerpo"]
             texto, falla_saludo = saludo.reclamar_y_anteponer(
                 cur, workspace_id=workspace_id,
@@ -1291,6 +1308,9 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
                                           sin_vista_previa=True)
             else:
                 tg_id = transporte.enviar(m["chat_id"], texto, botones)
+            # Salió: el ofrecimiento de la web queda hecho, dentro de este punto de retorno (si
+            # el envío hubiera fallado, no contaba).
+            _el_ofrecimiento_al_salir(cur, m, entrada_web, ahora)
             try:
                 with cur.connection.transaction():
                     _guardar_id_telegram(cur, tg_id, m["id"])
@@ -1616,6 +1636,11 @@ def _fallo(cur, workspace_id: str, m, error: Exception, cal: Calendario,
             cur, workspace_id,
             f"Un mensaje no se pudo entregar tras {MAX_INTENTOS} intentos.",
             severidad="alta", etapa=ETAPA_ENTREGA_MENSAJE)
+        if m.get("entrada_web_ofrecimiento") and m.get("entrada_web_persona"):
+            # El ofrecimiento de la web que no salió se libera: se le vuelve a ofrecer más
+            # adelante. Uno que se reintenta guarda su reserva.
+            from . import web_app
+            web_app.liberar_el_ofrecimiento(cur, m["entrada_web_persona"])
     else:
         _rastro_del_intento(cur, workspace_id, m, intentos,
                             f"{type(error).__name__}: {ultimo_error}")

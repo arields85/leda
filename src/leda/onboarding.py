@@ -164,6 +164,28 @@ def bienvenida(cur: psycopg.Cursor, workspace_id: str, nombre: str) -> str:
     return texto
 
 
+# El ofrecimiento de la web en la bienvenida (decisión 2 del usuario, 2026-10-12; ADR 0022,
+# decisión 4), texto fijo como la bienvenida: el despachador agrega el enlace al final.
+OFRECIMIENTO_DE_LA_WEB = ("Ahora también podés ver tus tareas en la web: al final de este "
+                          "mensaje va tu enlace para entrar. Sirve una sola vez y vence en 24 "
+                          "horas; si no te anda, pedime otro.")
+
+
+def ofrecer_la_web_en_la_bienvenida(cur: psycopg.Cursor, membership_id: str) -> bool:
+    """Si la bienvenida lleva el ofrecimiento de la web, y entonces lo reserva (`ofrecimiento_
+    web`, en la misma transacción que la encola): a quien nunca entró ni se le ofreció, con la
+    dirección pública configurada y sin otro mensaje con su enlace por salir. Corre con la
+    conexión administrativa (`admin()`), como la bienvenida."""
+    from . import web_app
+    from .config import config
+
+    return bool(config.base_url) and not (
+        web_app.ya_se_le_ofrecio(cur, membership_id)
+        or web_app.entro_alguna_vez_como_administracion(cur, membership_id)
+        or web_app.tiene_un_enlace_por_salir(cur, membership_id)
+    ) and web_app.reservar_el_ofrecimiento(cur, membership_id)
+
+
 def presentacion(cur: psycopg.Cursor, workspace_id: str) -> str | None:
     cur.execute("select presentacion from persona_config where workspace_id = %s",
                 (workspace_id,))

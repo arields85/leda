@@ -35,6 +35,9 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
    - **una persona ya entró a la web** antes de la conversación (`sesion_web_abierta`, una
      lista de personas; la 50): su enlace de entrada se emite y se canjea al cargar el estado
      inicial, así tiene una sesión abierta;
+   - **a quién todavía no se le ofreció la web** (`sin_ofrecer_la_web`, una lista; la 50): a
+     las demás personas se les da por ofrecida al cargar el estado inicial, así el ofrecimiento
+     de una sola vez no aparece en la primera respuesta de cada conversación;
    - **otra lectura válida** del mensaje (`o_bien`; decisión 63; una lista si hay varias,
      decisión 75): si la IA eligió sus jugadas, el paso se compara con lo que ella espera y
      corren sus pasos (`luego`) antes de seguir (`comprobar.elegir_lectura`);
@@ -298,6 +301,26 @@ class _Corredor:
         self.foco = set(conv.get("foco") or self.mundo.tareas)
         self.enlazadas: set[str] = set()     # filas del outbox ya enlazadas a un entregado
         self._abrir_sesiones_web(conv.get("sesion_web_abierta") or [])
+        self._dar_por_ofrecida_la_web(conv.get("sin_ofrecer_la_web") or [])
+
+    def _dar_por_ofrecida_la_web(self, sin_ofrecer: list[str]) -> None:
+        """A todas las personas ya se les ofreció la web antes de la conversación, salvo a las que
+        nombra `sin_ofrecer_la_web` (la 50): como en el corredor nadie entró nunca a la web, el
+        ofrecimiento de una sola vez (decisión 2 del usuario, 2026-10-12) iría en la primera
+        respuesta a cada persona y cambiaría todas las demás conversaciones. Como lo deja el
+        despachador al mandarlo (`web_app.quedo_ofrecido`), con el reloj de la base."""
+        desconocidas = set(sin_ofrecer) - set(self.mundo.personas)
+        if desconocidas:
+            raise ValueError(f"sin_ofrecer_la_web nombra a quien no está: {sorted(desconocidas)}")
+        sin = {self.mundo.personas[corto]["membership_id"] for corto in sin_ofrecer}
+        with espacio(self.conn, self.mundo.workspace_id) as cur:
+            cur.execute("""insert into ofrecimiento_web (workspace_id, membership_id,
+                                                         reservado_en, ofrecido_en)
+                           select workspace_id, id, now(), now() from membership
+                            where workspace_id = %s and not (id::text = any(%s))
+                           on conflict (membership_id) do nothing""",
+                        (self.mundo.workspace_id, sorted(sin)))
+        self.conn.commit()
 
     def _abrir_sesiones_web(self, personas: list[str]) -> None:
         """Las personas que ya entraron a la web antes de la conversación (`sesion_web_abierta`;

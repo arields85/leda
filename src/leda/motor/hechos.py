@@ -950,6 +950,13 @@ SIGNIFICADOS: Mapping[str, str] = {
                                "nuevo para volver a entrar a la web.",
     "ya_lleva_otro_enlace": "Este mensaje ya lleva el enlace a la página de una tarea, y lleva "
                             "uno solo: el de entrada a la web se puede pedir aparte.",
+    # El ofrecimiento de la web, una sola vez (decisión 2 del usuario, 2026-10-12): lo suma la
+    # cocina al final del turno, no es una jugada (`turno._ofrecer_la_web`).
+    "ofrecimiento": "Algo que Leda le ofrece a la persona al final de este mensaje, además de "
+                    "lo que contesta, sin que lo haya pedido: se dice después de lo demás.",
+    "acceso_a_la_web": "Ahora la persona también puede ver sus tareas en la web de Leda: al "
+                       "final del mensaje va su enlace personal para entrar. Se le ofrece una "
+                       "sola vez; si no lo usa a tiempo, le pide otro a Leda.",
     # --- La persecución del bloqueo (C-5, porción 1; `persecucion.py`) -------------------------
     "se_le_pregunta_a": "A quién le consulta Leda, como Leda y no en nombre de nadie, para "
                         "cuándo destraba la tarea (a), y cuándo le llega (llega).",

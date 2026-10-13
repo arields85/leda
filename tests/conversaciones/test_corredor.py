@@ -911,13 +911,13 @@ def test_el_enlace_de_entrada_a_la_web_que_espera_un_paso_se_compara_con_su_resp
 
 
 @pytest.mark.xfail(strict=True,
-                   reason="A-4: el ofrecimiento una sola vez todavía no existe")
+                   reason="la IA guionada nombra el hecho del ofrecimiento con '?' "
+                          "(tests/conversaciones/grabar.py, fuera de la superficie de la A-4)")
 def test_la_50_en_seco_pasa_entera(conn):
-    """El RED de la A-1 (`odd/tasks/acceso-por-chat.md`): con las jugadas esperadas, la 50 falla
-    hasta que la A-4 construya el ofrecimiento una sola vez. Desde la A-3 (`pedir_acceso_web`,
-    `perdi_el_celular` y la marca del enlace de entrada) fallan sólo el paso 1 (el ofrecimiento) y
-    el 4, que espera que el enlace ofrecido en el 1 quede anulado. Estricta: cuando pase, la suite
-    lo dice, y se le saca la marca."""
+    """El RED de la A-1 (`odd/tasks/acceso-por-chat.md`): con las jugadas esperadas, la 50 pasa
+    entera, con el ofrecimiento una sola vez (paso 1), sin repetirlo (2), a quien ya entró no (3),
+    el enlace nuevo a pedido que anula el ofrecido (4), la charla que no corta nada (5), el corte
+    enseguida (6) y el aviso sin ofrecimiento (7). Estricta: cuando pase, se le saca la marca."""
     [conv] = elegir(["50"])
 
     corrida = correr_conversacion(conn, conv, _perfecta(conv))
@@ -925,14 +925,43 @@ def test_la_50_en_seco_pasa_entera(conn):
     assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
 
 
-def test_la_50_en_seco_ya_pasa_salvo_lo_del_ofrecimiento(conn):
-    """Lo que la A-3 dejó andando de la 50 no se pierde mientras falta la A-4: pedir otro enlace,
-    la charla sobre el celular que no corta nada, el corte enseguida y el aviso sin ofrecimiento
-    (pasos 2, 3, 5, 6 y 7). Sólo pueden fallar el 1 (el ofrecimiento) y el 4, que espera anulado
-    el enlace que ofreció el 1."""
+def test_la_50_en_seco_solo_falla_el_formato_del_texto_de_la_guionada(conn):
+    """Desde la A-4, lo único que le falta a la 50 en seco no es de Leda: el texto que escribe la
+    IA guionada nombra cada hecho por su jugada, su aviso o su resultado, y el del ofrecimiento no
+    tiene ninguno de los tres (`grabar.IAPerfecta.redactar` lo nombra "?"), así que el chequeo del
+    formato lee una pregunta que no es el cierre. Fija exactamente esa falla."""
     [conv] = elegir(["50"])
 
     corrida = correr_conversacion(conn, conv, _perfecta(conv))
 
     assert corrida.error is None
-    assert {paso for paso, _ in corrida.fallas()} <= {1, 4}, corrida.fallas()
+    assert [(paso, f.clase, f.esperado) for paso, f in corrida.fallas()] == [
+        (1, cp.FORMATO, cp.CIERRE_APARTE)], corrida.fallas()
+
+
+def test_a_las_demas_personas_la_web_se_les_da_por_ofrecida(conn):
+    """`sin_ofrecer_la_web` (la 50): sin la clave, a todas las personas del mundo ya se les ofreció
+    la web al cargarlo, así su primera respuesta no lleva el ofrecimiento; con ella, a las que
+    nombra no. Un nombre que no es del mundo es un error del YAML."""
+    from leda.db import admin as como_admin
+
+    [conv] = elegir(["01"])
+    otra = copy.deepcopy(conv)
+    otra["pasos"] = otra["pasos"][:1]
+    otra["sin_ofrecer_la_web"] = ["Ismael"]
+
+    corrida = correr_conversacion(conn, otra, _perfecta(otra))
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    with como_admin(conn) as cur:
+        cur.execute("""select u.nombre from membership m join app_user u on u.id = m.app_user_id
+                        where not exists (select 1 from ofrecimiento_web o
+                                           where o.membership_id = m.id)""")
+        sin = [f["nombre"] for f in cur.fetchall()]
+    conn.commit()
+    assert [n.split()[0] for n in sin] == ["Ismael"]
+
+    _limpiar(conn)
+    otra["sin_ofrecer_la_web"] = ["Nadie"]
+    corrida = correr_conversacion(conn, otra, _perfecta(otra))
+    assert corrida.error is not None

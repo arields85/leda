@@ -76,6 +76,17 @@ def contexto(cur, mundo: dict, persona: str = "Marcos", ahora: datetime = AHORA,
                           tareas=list(tareas or []))
 
 
+def ya_ofrecida_la_web(cur, workspace_id: str) -> None:
+    """Da por ofrecida la web a todas las personas del espacio (decisión 2 del usuario,
+    2026-10-12), como el saludo del día ya dado: sin esto, la primera respuesta a cada persona
+    llevaría el ofrecimiento y cada prueba que no es de él cambiaría."""
+    cur.execute("""insert into ofrecimiento_web (workspace_id, membership_id, reservado_en,
+                                                 ofrecido_en)
+                   select workspace_id, id, now(), now() from membership
+                    where workspace_id = %s
+                   on conflict (membership_id) do nothing""", (workspace_id,))
+
+
 def uno(conn, sql: str, *args) -> dict | None:
     with admin(conn) as cur:
         cur.execute(sql, args)

@@ -75,8 +75,8 @@ from ..salida import enqueue_outbox
 from . import (aprobacion, archivos, cambios_de_estado, detalle, entrega, fichas, pase,
                persecucion, pregunta_sin_contestar, preguntas, registro)
 from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
-from .fichas import (JUGADAS, LLEGA, Contexto, Manejador, es_la_entrada_web,
-                     lo_que_puede_hacer)
+from .fichas import (JUGADAS, LLEGA, Contexto, Manejador, es_el_ofrecimiento_web,
+                     es_la_entrada_web, lo_que_puede_hacer)
 from .hechos import con_los_iconos
 from .ia import IA, Jugada
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
@@ -217,6 +217,9 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
             # (9k). También lo que un turno anterior dejó anunciado y ya no va a pasar, y lo
             # que sigue.
             final = al_final_del_turno(ctx, hechos)
+            # El ofrecimiento de la web, una sola vez, al final de lo que contesta (decisión 2
+            # del usuario, 2026-10-12): reservado acá, se deshace con el turno si la IA no redacta.
+            hechos += _ofrecer_la_web(ctx)
             pedido = {**_pedido_de_redaccion(ctx, hechos, pregunta, final.ya_no_sale),
                       **llegaron}
             texto = pedir_a_la_ia(lambda: no_vacio(_redactar(ia, pedido, al_avanzar)))
@@ -389,6 +392,39 @@ def _situacion(ctx: Contexto, jugadas: Mapping[str, Manejador]) -> dict[str, Any
         "ultimos_turnos": list(ctx.ultimos_turnos),
         "jugadas_posibles": sorted(jugadas),
     }
+
+
+# --- El ofrecimiento de la web, una sola vez ---------------------------------------------------
+
+# El código del hecho del ofrecimiento (`hechos.SIGNIFICADOS`).
+ACCESO_A_LA_WEB = "acceso_a_la_web"
+
+
+def _ofrecer_la_web(ctx: Contexto) -> list[dict[str, Any]]:
+    """El ofrecimiento de la entrada a la web (decisión 2 del usuario, 2026-10-12; conversación
+    50): a quien nunca entró ni se le ofreció, al final de la respuesta a lo que ESCRIBIÓ. Un
+    hecho más, después de los demás, y la marca del enlace de entrada en la respuesta
+    (`es_ofrecimiento`), que el despachador emite al mandar. Se reserva acá, en la transacción
+    del turno (decisión técnica 1): si la IA no redacta, se deshace con lo demás.
+
+    No va en un toque (decisión técnica 4: sale en su próximo mensaje escrito), ni si la
+    respuesta ya lleva un enlace (decisión técnica 2: uno por mensaje, espera al turno
+    siguiente), ni en la respuesta a "perdí el celular", ni sin la dirección pública (ningún
+    enlace se promete), ni mientras otro mensaje con su enlace de entrada no salió (lo
+    anularía). Lo que Leda manda por su cuenta no pasa por acá (`avisos.py`)."""
+    from .. import web_app
+    from ..config import config
+
+    yo = ctx.quien.membership_id
+    if (ctx.toque is not None or fichas.PERDI_EL_CELULAR in ctx.elegidas
+            or ctx.enlace_de_la_respuesta or not config.base_url):
+        return []
+    if (web_app.ya_se_le_ofrecio(ctx.cur, yo) or web_app.entro_alguna_vez(ctx.cur, yo)
+            or web_app.tiene_un_enlace_por_salir(ctx.cur, yo)
+            or not web_app.reservar_el_ofrecimiento(ctx.cur, yo)):
+        return []
+    ctx.enlace_de_la_respuesta.append((fichas.OFRECIMIENTO_WEB, yo))
+    return [{"ofrecimiento": ACCESO_A_LA_WEB, **fichas.LLEVA_EL_ENLACE_DE_ENTRADA}]
 
 
 def _pedido_de_redaccion(ctx: Contexto, hechos: list[dict[str, Any]],
@@ -581,7 +617,8 @@ def _responder(cur, ctx: Contexto, texto: str, ahora: datetime, ia_nombre: str |
                    dedupe_key=clave, recipient_membership_id=ctx.quien.membership_id,
                    is_response=True, scheduled_for=ahora,
                    grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace,
-                   enlace_de_entrada_web=entrada_web)
+                   enlace_de_entrada_web=entrada_web,
+                   es_ofrecimiento=entrada_web is not None and es_el_ofrecimiento_web(marca))
     if adjuntos:
         enqueue_outbox(cur, workspace_id=ctx.quien.workspace_id, chat_id=ctx.chat_id,
                        text=f"(adjuntos: {len(adjuntos)})", dedupe_key=f"{clave}:adjuntos",

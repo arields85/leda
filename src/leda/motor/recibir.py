@@ -88,7 +88,8 @@ from ..despachador import (Transporte, despachar, registrar_falla_del_retiro,
 from ..entrada import VENTANA_TURNO_EN_CURSO, clave_de_candado_del_mensaje, sql_respondido
 from ..incidentes import (ETAPA_TURNO_CONVERSACION, REFERENCIA_INBOUND_MESSAGE,
                           registrar_incidente)
-from ..onboarding import ActivacionInvalida, activar, bienvenida
+from ..onboarding import (OFRECIMIENTO_DE_LA_WEB, ActivacionInvalida, activar, bienvenida,
+                          ofrecer_la_web_en_la_bienvenida)
 from ..salida import enqueue_outbox
 
 from . import archivos
@@ -699,11 +700,19 @@ class Recepcion:
                                  join app_user u on u.id = m.app_user_id
                                 where m.id = %s""", (membership_id,))
                 cuerpo = bienvenida(cur, self.ws, cur.fetchone()["nombre"])
+            # A quien nunca entró a la web, la bienvenida también se la ofrece, una sola vez: en
+            # el mismo mensaje, que entonces no se parte (lleva el enlace al final).
+            ofrece = (membership_id is not None
+                      and ofrecer_la_web_en_la_bienvenida(cur, membership_id))
+            if ofrece:
+                cuerpo = f"{cuerpo}\n\n{OFRECIMIENTO_DE_LA_WEB}"
             enqueue_outbox(cur, workspace_id=self.ws, chat_id=chat_id, text=cuerpo,
                            recipient_membership_id=membership_id, message_type="informativo",
                            dedupe_key=f"motor:alta:{self.bot_id}:{chat_id}:{message_id}",
-                           is_response=True, allow_split=True,
+                           is_response=True, allow_split=not ofrece,
                            es_bienvenida=membership_id is not None,
+                           enlace_de_entrada_web=membership_id if ofrece else None,
+                           es_ofrecimiento=ofrece,
                            scheduled_for=self.reloj.ahora())
         self.imprimir("  ← /start")
 

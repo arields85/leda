@@ -18,7 +18,8 @@ import pytest
 
 from leda.motor.ia import Jugada
 
-from tests.motor.ayudantes import AHORA, Charla, Dias, nueva_tarea, todos
+from tests.motor.ayudantes import (AHORA, Charla, Dias, nueva_tarea, todos,
+                                   ya_ofrecida_la_web)
 
 
 @pytest.fixture
@@ -72,6 +73,10 @@ def mundo(conn) -> dict:
         cur.execute("""insert into greeting_state (membership_id, workspace_id, ultima_fecha_local)
                        select id, workspace_id, date '9999-12-31' from membership
                         where workspace_id = %s""", (ws,))
+        # Lo mismo con el ofrecimiento de la web (decisión 2 del usuario, 2026-10-12): sin esto
+        # la primera respuesta a cada persona lo llevaría. Las pruebas del ofrecimiento borran la
+        # fila de quien lo recibe (`test_ofrecimiento_web.py`).
+        ya_ofrecida_la_web(cur, ws)
     conn.commit()
     return {"id": ws, "personas": personas, "tarea": tarea, "objetivo": objetivo,
             "area": area}

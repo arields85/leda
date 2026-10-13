@@ -59,7 +59,8 @@ PERMITIDOS: dict[str, set[str] | None] = {
                    "REFERENCIA_INBOUND_MESSAGE"},
     "llm": None,
     "config": None,
-    "onboarding": {"activar", "bienvenida", "ActivacionInvalida"},
+    "onboarding": {"activar", "bienvenida", "ActivacionInvalida", "OFRECIMIENTO_DE_LA_WEB",
+                   "ofrecer_la_web_en_la_bienvenida"},
     "versiones": None,
     "huerfanos": {"barrer"},
     # La ventana del turno en curso: los álbumes que esperan su turno más que eso quedan para

@@ -12,7 +12,9 @@ El usuario aceptó este hilo tal como está (2026-10-12, noche).
 
 **Corre desde la A-1 de `odd/tasks/acceso-por-chat.md`**, entera, con su YAML. Hasta que la A-3 y
 la A-4 construyan las dos jugadas, la marca del enlace y el ofrecimiento, la corrida en seco falla:
-es su RED.
+es su RED. Desde la A-4 pasa entera. En el corredor, a las demás conversaciones la web ya se les
+dio por ofrecida; en ésta, ni a Marcos ni a Ariel (`sin_ofrecer_la_web`): a Ariel no se le ofrece
+porque ya entró.
 
 ## La regla
 

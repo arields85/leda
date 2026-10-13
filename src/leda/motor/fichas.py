@@ -117,7 +117,8 @@ class Contexto:
     # Lo que la respuesta lleva además de su texto cuando muestra una entrega (`aprobacion.
     # ver_entrega`; decisión 17): las fotos, en un álbum después del texto, y el enlace a la
     # página de la tarea, uno solo por mensaje: `(tarea, persona)`. O, en su lugar, el de
-    # entrada a la web de la persona (`pedir_acceso_web`): `(ENTRADA_WEB, persona)`.
+    # entrada a la web de la persona (`pedir_acceso_web`): `(ENTRADA_WEB, persona)`; o ése como
+    # el ofrecimiento de una sola vez (`turno._ofrecer_la_web`): `(OFRECIMIENTO_WEB, persona)`.
     adjuntos_de_la_respuesta: list[str] = field(default_factory=list)
     enlace_de_la_respuesta: list[tuple[str, str]] = field(default_factory=list)
     # Los nombres de las jugadas que la IA eligió para este mensaje, también las que quedan fuera
@@ -1270,6 +1271,7 @@ def _pedir_enlace(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
 # misma (`auditar_acceso_web`), y por `herramientas.ejecutar` quedaría dos veces.
 ENTRADA_WEB = "entrada_web"
 YA_LLEVA_OTRO_ENLACE = "ya_lleva_otro_enlace"
+PERDI_EL_CELULAR = "perdi_el_celular"
 # Lo que dicen los hechos de un enlace de entrada: que va al final del mensaje, que sirve una
 # sola vez y que vence a las 24 horas si nadie lo usa (decisión 1 del usuario; migración 0065).
 LLEVA_EL_ENLACE_DE_ENTRADA = MappingProxyType({
@@ -1277,9 +1279,20 @@ LLEVA_EL_ENLACE_DE_ENTRADA = MappingProxyType({
     "vence_a_las_24_horas": True})
 
 
+# La misma marca, cuando el enlace de entrada es el ofrecimiento de una sola vez, reservado en
+# el turno (`turno._ofrecer_la_web`), y no uno que la persona pidió.
+OFRECIMIENTO_WEB = "ofrecimiento_web"
+
+
 def es_la_entrada_web(marca: tuple[str, str]) -> bool:
-    """Si la marca del enlace de la respuesta es la del enlace de entrada a la web."""
-    return marca[0] == ENTRADA_WEB
+    """Si la marca del enlace de la respuesta es la del enlace de entrada a la web (pedido u
+    ofrecido)."""
+    return marca[0] in (ENTRADA_WEB, OFRECIMIENTO_WEB)
+
+
+def es_el_ofrecimiento_web(marca: tuple[str, str]) -> bool:
+    """Si la marca es la del enlace de entrada como el ofrecimiento de una sola vez."""
+    return marca[0] == OFRECIMIENTO_WEB
 
 
 def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:

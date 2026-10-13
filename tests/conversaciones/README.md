@@ -478,7 +478,10 @@ próximo paso: no es un mensaje de Leda. Lo que Leda manda después va en un pas
 personas que ya entraron a la web antes de la conversación (`sesion_web_abierta`, una lista): su
 enlace de entrada se emite y se canjea al cargarlo, con las funciones de la web
 (`web_app.emitir_enlace` y `canjear_enlace_de_entrada`), y queda una sesión abierta que ningún
-paso cuenta como efecto. Un paso escrito o tocado, y lo que Leda manda por su cuenta, puede esperar
+paso cuenta como efecto. Como en el corredor nadie entró nunca a la web, a todas las personas se
+les da por ofrecida la web al cargarlo (el ofrecimiento de una sola vez iría si no en la primera
+respuesta de cada conversación), salvo a las que nombra `sin_ofrecer_la_web` (una lista). Un paso
+escrito o tocado, y lo que Leda manda por su cuenta, puede esperar
 el enlace de entrada a la web al final (`enlace_web`), como el de la página de una tarea
 (`enlace`): el despachador lo agrega al mandar (`<dirección>/app/entrar/<token>`), y las mismas
 dos garantías valen para él: sale sin vista previa, y nunca está en lo que escribió la IA. Los
