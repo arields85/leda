@@ -33,6 +33,9 @@
   /* What the load form still needs (user, 2026-10-13: a deeper amber than "vencida"). */
   --color-falta: #ff931f;
 
+  /* What Leda proposed in the load form (user, 2026-10-13: "un verde agua suave, nada exagerado"). */
+  --color-propuesto: #8ccfc0;
+
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
 
   --text-tiny: 9px;

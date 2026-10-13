@@ -123,7 +123,7 @@ function FieldList({ label, fields }: { label: string; fields: Field[] }) {
 /** The small mark of a value Leda proposed, until the person changes it. Outside the label, so
  * the field keeps its name. */
 function Proposed({ on }: { on?: boolean }) {
-  return on ? <span className="shrink-0 text-ink-soft">· propuesto por Leda</span> : null;
+  return on ? <span className="shrink-0 text-propuesto">· propuesto por Leda</span> : null;
 }
 
 /** A list to choose from that looks like the text fields: the same box, and an arrow of its own
