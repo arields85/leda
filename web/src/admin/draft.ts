@@ -1,5 +1,5 @@
 import type { Task } from '../api';
-import type { Member, Options, Policy, Problem, TaskInput, WaitableTask } from './api';
+import type { Member, Options, Policy, Problem, Proposal, TaskInput, WaitableTask } from './api';
 
 /** What the administrator is writing, before the idempotency key is added. `espera_id` is ''
  * while it waits for no task. */
@@ -168,6 +168,28 @@ export function evidenceKinds(policy: Policy | undefined): string[] {
 /** How a kind of evidence is said in everyday words, from the area's policy. */
 export function evidenceWords(policy: Policy | undefined, kind: string): string {
   return policy?.tipos[kind]?.en_palabras ?? kind.replace(/_/g, ' ');
+}
+
+/** What Leda proposed that the options really offer: a person, a task to wait for, an objective
+ * and a working day from the lists, and the texts within the form's limits. The server already
+ * checked it; the form never fills a field with something it could not offer by hand. */
+export function validProposal(proposal: Proposal, options: Options): Proposal {
+  const valid: Proposal = {};
+  const text = (value: unknown, limit: number) =>
+    typeof value === 'string' && length(value) > 0 && length(value) <= limit ? value.trim() : undefined;
+  const titulo = text(proposal.titulo, LIMITS.titulo);
+  const descripcion = text(proposal.descripcion, LIMITS.descripcion);
+  const criterio = text(proposal.criterio, LIMITS.criterio);
+  if (titulo) valid.titulo = titulo;
+  if (descripcion) valid.descripcion = descripcion;
+  if (criterio) valid.criterio = criterio;
+  if (proposal.responsable_id && memberOf(options, proposal.responsable_id)) valid.responsable_id = proposal.responsable_id;
+  if (proposal.espera_id && waitOf(options, proposal.espera_id)) valid.espera_id = proposal.espera_id;
+  if (proposal.objetivo_id && options.objetivos.some((o) => o.id === proposal.objetivo_id)) {
+    valid.objetivo_id = proposal.objetivo_id;
+  }
+  if (proposal.fecha && options.calendario.dias_habiles.includes(proposal.fecha)) valid.fecha = proposal.fecha;
+  return valid;
 }
 
 /** The task as the team cards will show it, for the preview. */

@@ -2,8 +2,9 @@ import { CircleAlert } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { SessionClosedError } from '../api';
 import { shortDate } from '../format';
-import { loadTask, type Options, type Problem } from './api';
+import { askLeda, HELP_FAILED, loadTask, type Options, type Problem, type Proposal } from './api';
 import { DatePicker, dayLabel } from './DatePicker';
+import { HelpBox, type HelpState } from './HelpBox';
 import {
   checkDraft,
   type Draft,
@@ -21,10 +22,14 @@ import {
   policyOf,
   PROBLEM_FIELD,
   toInput,
+  validProposal,
   waitableTasks,
   waitLabel,
 } from './draft';
 import { TaskPreview } from './TaskPreview';
+
+// The server's words when the free box is empty (src/leda/web_app.py, TEXTOS_DE_LA_AYUDA).
+const STORY_MISSING = 'Contame primero qué querés hacer; con eso Leda completa lo que pueda.';
 
 type Step =
   | { kind: 'edit'; sending: boolean; failed: boolean }
@@ -109,12 +114,19 @@ function FieldList({ label, fields }: { label: string; fields: Field[] }) {
   );
 }
 
+/** The small mark of a value Leda proposed, until the person changes it. Outside the label, so
+ * the field keeps its name. */
+function Proposed({ on }: { on?: boolean }) {
+  return on ? <span className="shrink-0 text-ink-soft">· propuesto por Leda</span> : null;
+}
+
 function FieldBlock({
   id,
   label,
   extra,
   errors,
   hint,
+  proposed,
   children,
 }: {
   id: string;
@@ -122,14 +134,18 @@ function FieldBlock({
   extra?: ReactNode;
   errors: Problem[];
   hint?: ReactNode;
+  proposed?: boolean;
   children: ReactNode;
 }) {
   return (
     <div data-field className="flex min-w-0 flex-col gap-1.5">
       <div className="flex min-w-0 items-baseline justify-between gap-2 text-meta text-ink-dim">
-        <label id={`${id}-label`} htmlFor={id} className="min-w-0 uppercase tracking-[0.04em]">
-          {label}
-        </label>
+        <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+          <label id={`${id}-label`} htmlFor={id} className="min-w-0 uppercase tracking-[0.04em]">
+            {label}
+          </label>
+          <Proposed on={proposed} />
+        </span>
         {extra}
       </div>
       {children}
@@ -188,6 +204,14 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const unknown = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const messages = useRef<HTMLDivElement>(null);
+  // The free box (portion J2): what the person told, Leda's answer, and the fields it filled,
+  // marked until the person changes them. `latest` is the draft as it is now, so a proposal that
+  // arrives while the person types never overwrites what was typed in the meantime.
+  const [story, setStory] = useState('');
+  const [help, setHelp] = useState<HelpState>({ kind: 'idle' });
+  const [proposed, setProposed] = useState<ReadonlySet<Field>>(new Set());
+  const latest = useRef(draft);
+  latest.current = draft;
 
   useEffect(() => {
     if (step.kind === 'done') heading.current?.focus();
@@ -214,6 +238,11 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
   function change(patch: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...patch }));
+    // What the person changes is hers: the mark goes.
+    const changed = Object.keys(patch) as Field[];
+    setProposed((marked) =>
+      changed.some((f) => marked.has(f)) ? new Set([...marked].filter((f) => !changed.includes(f))) : marked,
+    );
     // Other data, another attempt: a new key, so it never collides with the one already sent.
     // Not while the last send's outcome is unknown: that one may have loaded the task.
     if (!unknown.current) key.current = null;
@@ -225,6 +254,76 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   function chooseResponsible(id: string) {
     const next = memberOf(options, id);
     change({ responsable_id: id, evidencia: [...(policyOf(options, next)?.evidencia_requerida ?? [])] });
+  }
+
+  /** Fills only what is still empty with what Leda proposed (only what the options offer), and
+   * marks it. Choosing the responsible person ticks the evidence her area asks for, as by hand.
+   * Returns how many fields it filled. */
+  function apply(proposal: Proposal): number {
+    const current = latest.current;
+    const valid = validProposal(proposal, options);
+    const filled = (Object.keys(valid) as (keyof Proposal)[]).filter((field) => !current[field].trim());
+    if (filled.length === 0) return 0;
+    const next: Draft = { ...current };
+    for (const field of filled) next[field] = valid[field] as string;
+    if (filled.includes('responsable_id') && current.evidencia.length === 0) {
+      next.evidencia = [...(policyOf(options, memberOf(options, next.responsable_id))?.evidencia_requerida ?? [])];
+    }
+    latest.current = next;
+    setDraft(next);
+    // Other data, another attempt (as in `change`).
+    if (!unknown.current) key.current = null;
+    setProposed((marked) => new Set([...marked, ...filled]));
+    setProblems((shown) => shown.filter((p) => !(filled as string[]).includes(PROBLEM_FIELD[p.campo] ?? '')));
+    return filled.length;
+  }
+
+  async function ask() {
+    if (help.kind === 'asking') return;
+    const texto = story.trim();
+    if (!texto) {
+      setHelp({ kind: 'rejected', errors: [{ campo: 'texto', motivo: 'falta', texto: STORY_MISSING }] });
+      return;
+    }
+    setHelp({ kind: 'asking' });
+    const { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio } = latest.current;
+    try {
+      const result = await askLeda(spaceId, {
+        texto,
+        objetivo_id,
+        titulo,
+        descripcion,
+        responsable_id,
+        fecha,
+        espera_id,
+        criterio,
+      });
+      if (result.kind === 'proposed') {
+        const filled = apply(result.proposal);
+        const choices = latest.current.responsable_id
+          ? []
+          : result.choices.filter((c) => memberOf(options, c.membership_id));
+        setHelp({
+          kind: 'done',
+          notes: result.notes,
+          choices,
+          nothing: filled === 0 && result.notes.length === 0 && choices.length === 0,
+        });
+      } else if (result.kind === 'rejected') {
+        setHelp({ kind: 'rejected', errors: result.errors });
+      } else {
+        setHelp({ kind: 'failed', text: result.text });
+      }
+    } catch (error) {
+      if (error instanceof SessionClosedError) onClosed();
+      else setHelp({ kind: 'failed', text: HELP_FAILED });
+    }
+  }
+
+  /** The person picked who does it among the ones that fit the name: her choice, not marked. */
+  function choose(id: string) {
+    if (memberOf(options, id)) chooseResponsible(id);
+    setHelp((current) => (current.kind === 'done' ? { ...current, choices: [] } : current));
   }
 
   function toggleEvidence(kind: string, on: boolean) {
@@ -289,6 +388,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   function another() {
     key.current = null;
     visited.current = null;
+    setStory('');
+    setHelp({ kind: 'idle' });
+    setProposed(new Set());
     setDraft(EMPTY_DRAFT);
     setProblems([]);
     setStep({ kind: 'edit', sending: false, failed: false });
@@ -349,7 +451,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         className="flex min-w-0 max-w-full flex-col"
       >
         <fieldset disabled={sending} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
-          <FieldBlock id="f-objetivo" label="objetivo" errors={on('objetivo_id')}
+          <HelpBox story={story} onStory={setStory} help={help} onAsk={ask} onChoose={choose} />
+
+          <FieldBlock id="f-objetivo" label="objetivo" errors={on('objetivo_id')} proposed={proposed.has('objetivo_id')}
             hint={options.objetivos.length === 0 ? 'No hay objetivos abiertos en este espacio.' : undefined}>
             <select
               id="f-objetivo"
@@ -369,7 +473,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             </select>
           </FieldBlock>
 
-          <FieldBlock id="f-titulo" label="título" errors={on('titulo')}
+          <FieldBlock id="f-titulo" label="título" errors={on('titulo')} proposed={proposed.has('titulo')}
             extra={<Counter value={draft.titulo} limit={LIMITS.titulo} />}>
             <input
               id="f-titulo"
@@ -383,6 +487,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           </FieldBlock>
 
           <FieldBlock id="f-descripcion" label="descripción (opcional)" errors={on('descripcion')}
+            proposed={proposed.has('descripcion')}
             extra={<Counter value={draft.descripcion} limit={LIMITS.descripcion} />}>
             <textarea
               id="f-descripcion"
@@ -398,6 +503,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             id="f-responsable"
             label="quién la hace"
             errors={on('responsable_id')}
+            proposed={proposed.has('responsable_id')}
             hint={
               member && (
                 <span className="flex flex-wrap gap-x-2">
@@ -430,6 +536,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             id="f-fecha"
             label="fecha"
             errors={on('fecha')}
+            proposed={proposed.has('fecha')}
             extra={draft.fecha ? <span className="shrink-0 text-ink">{dayLabel(draft.fecha)}</span> : undefined}
             hint={
               objective?.fecha_objetivo && draft.fecha > objective.fecha_objetivo
@@ -452,6 +559,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             id="f-espera"
             label="espera a (opcional)"
             errors={on('espera_id')}
+            proposed={proposed.has('espera_id')}
             hint={
               waitable.length === 0
                 ? 'No hay tareas abiertas para esperar en este espacio.'
@@ -478,6 +586,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           </FieldBlock>
 
           <FieldBlock id="f-criterio" label="criterio de aceptación" errors={on('criterio')}
+            proposed={proposed.has('criterio')}
             extra={<Counter value={draft.criterio} limit={LIMITS.criterio} />}
             hint="Qué tiene que pasar para darla por terminada.">
             <textarea

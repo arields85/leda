@@ -155,6 +155,65 @@ export async function loadTask(spaceId: string, input: TaskInput): Promise<LoadR
   throw new RequestError(response.status);
 }
 
+/** What the form sends to ask Leda to complete it (ADR 0023, point 4; portion J2): what the
+ * person told in the free box and what the form already has. Leda proposes only what is empty. */
+export interface HelpInput {
+  texto: string;
+  objetivo_id: string;
+  titulo: string;
+  descripcion: string;
+  responsable_id: string;
+  fecha: string;
+  espera_id: string;
+  criterio: string;
+}
+
+/** What Leda proposes, with the form's field names. */
+export type Proposal = Partial<
+  Pick<HelpInput, 'objetivo_id' | 'titulo' | 'descripcion' | 'responsable_id' | 'fecha' | 'espera_id' | 'criterio'>
+>;
+
+/** A person to choose from when the name the person used fits more than one: Leda never picks. */
+export interface Candidate {
+  membership_id: string;
+  nombre: string;
+  area: string;
+}
+
+export type HelpResult =
+  | { kind: 'proposed'; proposal: Proposal; choices: Candidate[]; notes: Problem[] }
+  | { kind: 'rejected'; errors: Problem[] }
+  | { kind: 'failed'; text: string };
+
+/** The plain words when Leda could not complete (the server says the same, with an incident). */
+export const HELP_FAILED =
+  'Leda no pudo completar ahora. Lo que escribiste sigue acá: completalo vos o probá de nuevo en un rato.';
+
+/** Asks Leda to complete the empty fields. 200 proposes, 422 says why not, 503 means the AI did
+ * not answer; anything else (no network, a server failure) also reads as "could not complete". */
+export async function askLeda(spaceId: string, input: HelpInput): Promise<HelpResult> {
+  let response: Response;
+  try {
+    response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/ayuda`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  } catch (error) {
+    if (error instanceof SessionClosedError) throw error;
+    return { kind: 'failed', text: HELP_FAILED };
+  }
+  if (response.status === 200) {
+    const body = (await response.json()) as { propuesta?: Proposal; elegir?: Candidate[]; avisos?: Problem[] };
+    return { kind: 'proposed', proposal: body.propuesta ?? {}, choices: body.elegir ?? [], notes: body.avisos ?? [] };
+  }
+  if (response.status === 422) {
+    const body = (await response.json()) as { errores?: Problem[] };
+    return { kind: 'rejected', errors: body.errores ?? [] };
+  }
+  return { kind: 'failed', text: HELP_FAILED };
+}
+
 /** Closes this administration session on the server; the server also clears its cookie. */
 export async function adminSignOut(): Promise<void> {
   const response = await fetch(`${ADMIN}/salir`, { method: 'POST', credentials: 'same-origin' });

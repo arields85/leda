@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminMe, options, OTHER_SPACE, SPACE } from '../test/adminFixtures';
 import { AdminApp } from './AdminApp';
@@ -255,58 +255,75 @@ describe('AdminApp', () => {
   });
 
   it('each tap on the dimmed confirm sends nothing and takes the person to the next missing field', async () => {
-    const scroll = vi.spyOn(window, 'scrollTo');
+    // jsdom has no scrolling: an empty implementation, and both spies restored even on a failure.
+    const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     const focus = vi.spyOn(HTMLElement.prototype, 'focus');
-    const calls = await openForm();
-    pick('objetivo', 'o1');
-    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar alarmas del SCADA' } });
-    pick('quién la hace', 'm-marcos');
-    fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
-    const criterio = screen.getByLabelText('criterio de aceptación');
-    const evidence = screen.getByRole('checkbox', { name: /una captura de pantalla/ });
-    const decided = screen.getByLabelText('quién la decidió');
-    confirm();
-    expect(criterio).toHaveFocus();
-    // The field's message is there, in the warning color, and its border too.
-    expect(document.getElementById('f-criterio-error')).toHaveClass('text-falta');
-    expect(document.getElementById('f-criterio-error')).toHaveTextContent('Falta el criterio de aceptación');
-    expect(document.getElementById('f-criterio-error')?.textContent).not.toContain('!');
-    expect(document.querySelector('#f-criterio-error svg')).toHaveAttribute('aria-hidden', 'true');
-    expect(document.getElementById('f-evidencia-error')).toHaveClass('text-falta');
-    expect(criterio).toHaveClass('aria-[invalid=true]:border-falta');
-    expect(within(preview()).getByRole('alert')).toHaveClass('text-falta');
-    // Focusing never scrolls by itself, and the scroll is only vertical.
-    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
-    expect(scroll).toHaveBeenCalled();
-    for (const [arg] of scroll.mock.calls) {
-      expect(arg).toEqual(expect.objectContaining({ top: expect.any(Number) }));
-      expect(arg).not.toHaveProperty('left');
+    try {
+      const calls = await openForm();
+      pick('objetivo', 'o1');
+      fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar alarmas del SCADA' } });
+      pick('quién la hace', 'm-marcos');
+      fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
+      const criterio = screen.getByLabelText('criterio de aceptación');
+      const evidence = screen.getByRole('checkbox', { name: /una captura de pantalla/ });
+      const decided = screen.getByLabelText('quién la decidió');
+      confirm();
+      expect(criterio).toHaveFocus();
+      // The field's message is there, in the warning color, and its border too.
+      expect(document.getElementById('f-criterio-error')).toHaveClass('text-falta');
+      expect(document.getElementById('f-criterio-error')).toHaveTextContent('Falta el criterio de aceptación');
+      expect(document.getElementById('f-criterio-error')?.textContent).not.toContain('!');
+      expect(document.querySelector('#f-criterio-error svg')).toHaveAttribute('aria-hidden', 'true');
+      expect(document.getElementById('f-evidencia-error')).toHaveClass('text-falta');
+      expect(criterio).toHaveClass('aria-[invalid=true]:border-falta');
+      expect(within(preview()).getByRole('alert')).toHaveClass('text-falta');
+      // Focusing never scrolls by itself, and the scroll is only vertical.
+      expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+      expect(scroll).toHaveBeenCalled();
+      for (const [arg] of scroll.mock.calls) {
+        expect(arg).toEqual(expect.objectContaining({ top: expect.any(Number) }));
+        expect(arg).not.toHaveProperty('left');
+      }
+      confirm();
+      expect(evidence).toHaveFocus();
+      confirm();
+      expect(decided).toHaveFocus();
+      // After the last one, back to the first.
+      confirm();
+      expect(criterio).toHaveFocus();
+      // A field that gets filled drops out of the round: with the focus on the criterion, the
+      // evidence (the next one) gets filled, so the next tap skips it and goes to the decider.
+      fireEvent.click(evidence);
+      confirm();
+      expect(decided).toHaveFocus();
+      // From the last one, back to the first that still lacks something: the criterion.
+      confirm();
+      expect(criterio).toHaveFocus();
+      // Filled too: only the decider is left, and every tap goes there.
+      fireEvent.change(criterio, { target: { value: 'Suenan las 12' } });
+      confirm();
+      expect(decided).toHaveFocus();
+      confirm();
+      expect(decided).toHaveFocus();
+      expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+      expect(calls.some((c) => c.key === TASKS)).toBe(false);
+    } finally {
+      scroll.mockRestore();
+      focus.mockRestore();
     }
-    confirm();
-    expect(evidence).toHaveFocus();
-    confirm();
-    expect(decided).toHaveFocus();
-    // After the last one, back to the first.
-    confirm();
-    expect(criterio).toHaveFocus();
-    // A field that gets filled drops out of the round.
-    fireEvent.change(criterio, { target: { value: 'Suenan las 12' } });
-    confirm();
-    expect(evidence).toHaveFocus();
-    fireEvent.click(evidence);
-    confirm();
-    expect(decided).toHaveFocus();
-    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
-    expect(calls.some((c) => c.key === TASKS)).toBe(false);
   });
 
   it('the page can never pan sideways: the overflow safety net is in place', async () => {
     await openForm();
-    // Vitest runs without CSS (`css: false`), so the stylesheet is read as a file (from web/, where the tests run).
+    // Vitest runs without CSS (`css: false`), so the stylesheet is read as a file, found from this
+    // test file (`import.meta.dirname`) and not from the folder the tests run in. Not with a `URL`:
+    // under jsdom it is jsdom's, which Node's `fs` does not take.
     // @ts-expect-error -- this browser project has no Node types; the tests run on Node.
     const { readFileSync } = await import('node:fs');
-    const css: string = readFileSync('src/index.css', 'utf-8');
+    // @ts-expect-error -- the same: `dirname` is Node's, not in the browser's `ImportMeta`.
+    const here: string = import.meta.dirname;
+    const css: string = readFileSync(`${here}/../index.css`, 'utf-8');
     // html and body clip what goes past the right edge (clip, not hidden, so nothing becomes a
     // scroll container and the sticky preview keeps working).
     expect(css).toMatch(/html,\s*body\s*\{[^}]*overflow-x:\s*clip/);
@@ -637,5 +654,256 @@ describe('AdminApp', () => {
     pick('espacio', OTHER_SPACE);
     expect(await screen.findByRole('option', { name: 'Laboratorio nuevo' })).toBeInTheDocument();
     expect(calls.map((c) => c.key)).toContain(`GET /app/admin/api/espacios/${OTHER_SPACE}/opciones`);
+  });
+});
+
+// --- Leda's help from the free box (ADR 0023, point 4; portion J2) ------------------------------
+
+const HELP = `POST /app/admin/api/espacios/${SPACE}/ayuda`;
+const BOX = 'Contame qué querés hacer y te ayudo';
+const STORY =
+  'hay que configurar las alarmas del scada que lo haga marcos para el viernes tienen que sonar las 12 en la sala de control';
+
+const proposed = (body: unknown) => ({ status: 200, body });
+const FULL = {
+  propuesta: {
+    objetivo_id: 'o1',
+    titulo: 'Configurar las alarmas del SCADA',
+    descripcion: 'Configurar las alarmas del SCADA. Tienen que sonar las 12 en la sala de control.',
+    responsable_id: 'm-marcos',
+    fecha: '2026-10-16',
+    criterio: 'Las 12 alarmas suenan en la sala de control.',
+  },
+  elegir: [],
+  avisos: [],
+};
+
+function tell(text = STORY) {
+  fireEvent.change(screen.getByLabelText(BOX), { target: { value: text } });
+}
+const askLeda = () => fireEvent.click(screen.getByRole('button', { name: '> completar con Leda' }));
+/** The "propuesto por Leda" mark of a field, found from its label. */
+function markOf(label: string) {
+  const row = screen.getByText(label, { selector: 'label' }).parentElement as HTMLElement;
+  return within(row).queryByText('· propuesto por Leda');
+}
+
+class FakeRecognition {
+  static last: FakeRecognition | null = null;
+  lang = '';
+  interimResults = true;
+  continuous = true;
+  onresult: ((e: unknown) => void) | null = null;
+  onerror: ((e: { error: string }) => void) | null = null;
+  onend: (() => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn(() => this.onend?.());
+  constructor() {
+    FakeRecognition.last = this;
+  }
+}
+
+describe('Leda completes the load from the free box', () => {
+  it('fills only the empty fields, marks each one, and ticks the evidence of whoever does it', async () => {
+    const calls = await openForm({ [HELP]: proposed(FULL) });
+    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Mi título' } });
+    tell();
+    askLeda();
+    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveValue('m-marcos'));
+    expect(calls.find((c) => c.key === HELP)?.body).toEqual({
+      texto: STORY,
+      objetivo_id: '',
+      titulo: 'Mi título',
+      descripcion: '',
+      responsable_id: '',
+      fecha: '',
+      espera_id: '',
+      criterio: '',
+    });
+    // What the person typed stays, without a mark; the rest is proposed and marked.
+    expect(screen.getByLabelText('título')).toHaveValue('Mi título');
+    expect(markOf('título')).toBeNull();
+    expect(screen.getByLabelText('objetivo')).toHaveValue('o1');
+    expect(screen.getByLabelText('descripción (opcional)')).toHaveValue(FULL.propuesta.descripcion);
+    expect(screen.getByLabelText('criterio de aceptación')).toHaveValue(FULL.propuesta.criterio);
+    for (const label of ['objetivo', 'descripción (opcional)', 'quién la hace', 'fecha', 'criterio de aceptación']) {
+      expect(markOf(label)).toBeInTheDocument();
+    }
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
+    expect(
+      within(screen.getByRole('group', { name: 'fecha' })).getByRole('button', { name: 'vie 16.10' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    // The free text stays in its box, and the preview shows what was proposed.
+    expect(screen.getByLabelText(BOX)).toHaveValue(STORY);
+    expect(preview()).toHaveTextContent('Las 12 alarmas suenan en la sala de control.');
+  });
+
+  it('a field the person edits loses its mark', async () => {
+    await openForm({ [HELP]: proposed(FULL) });
+    tell();
+    askLeda();
+    await waitFor(() => expect(markOf('criterio de aceptación')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Suenan las 12' } });
+    expect(markOf('criterio de aceptación')).toBeNull();
+    expect(markOf('descripción (opcional)')).toBeInTheDocument();
+  });
+
+  it('never overwrites what the person typed while Leda was answering', async () => {
+    await openForm();
+    let answer: (r: Response) => void = () => {};
+    const real = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) =>
+        url.endsWith('/ayuda') ? new Promise<Response>((resolve) => (answer = resolve)) : real(url, init),
+      ),
+    );
+    tell();
+    askLeda();
+    expect(screen.getByRole('button', { name: 'completando…' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Lo mío' } });
+    answer(new Response(JSON.stringify(FULL), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveValue('m-marcos'));
+    expect(screen.getByLabelText('criterio de aceptación')).toHaveValue('Lo mío');
+    expect(markOf('criterio de aceptación')).toBeNull();
+  });
+
+  it('says what it could not propose, and shows the people to pick without choosing', async () => {
+    await openForm({
+      [HELP]: proposed({
+        propuesta: { titulo: 'Configurar las alarmas del SCADA' },
+        elegir: [
+          { membership_id: 'm-marcos', nombre: 'Marcos', area: 'Automatización' },
+          { membership_id: 'm-lucas', nombre: 'Lucas', area: 'Infraestructura' },
+        ],
+        avisos: [
+          { campo: 'responsable', motivo: 'varios', texto: 'Encontré a más de una persona para el tano: elegí quién la hace.' },
+          {
+            campo: 'criterio',
+            motivo: 'sin_proponer',
+            texto: 'No pude proponer el criterio con lo que escribiste; contame cómo se comprueba.',
+          },
+          {
+            campo: 'fecha',
+            motivo: 'no_dicha',
+            texto: 'No puse la fecha: no encontré en lo que escribiste qué día es; elegila en el calendario.',
+          },
+        ],
+      }),
+    });
+    tell();
+    askLeda();
+    expect(
+      await screen.findByText('No pude proponer el criterio con lo que escribiste; contame cómo se comprueba.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/No puse la fecha/)).toBeInTheDocument();
+    expect(screen.getByLabelText('quién la hace')).toHaveValue('');
+    const pickOne = screen.getByRole('group', { name: 'elegí quién la hace' });
+    fireEvent.click(within(pickOne).getByRole('button', { name: 'Lucas · Infraestructura' }));
+    expect(screen.getByLabelText('quién la hace')).toHaveValue('m-lucas');
+    // Her choice, not a proposal: no mark, and the choices go.
+    expect(markOf('quién la hace')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'elegí quién la hace' })).toBeNull();
+  });
+
+  it('when Leda cannot answer it says so plainly and nothing changes', async () => {
+    await openForm({ [HELP]: { status: 503, body: { error: 'sin_ayuda', texto: 'x' } } });
+    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Mi título' } });
+    tell();
+    askLeda();
+    expect(
+      await screen.findByText(
+        'Leda no pudo completar ahora. Lo que escribiste sigue acá: completalo vos o probá de nuevo en un rato.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('título')).toHaveValue('Mi título');
+    expect(screen.getByLabelText('criterio de aceptación')).toHaveValue('');
+    expect(screen.getByLabelText(BOX)).toHaveValue(STORY);
+    expect(screen.getByRole('button', { name: '> completar con Leda' })).toBeEnabled();
+  });
+
+  it('with the box empty it asks to tell first, without calling Leda', async () => {
+    const calls = await openForm({ [HELP]: proposed(FULL) });
+    askLeda();
+    expect(screen.getByText('Contame primero qué querés hacer; con eso Leda completa lo que pueda.')).toBeInTheDocument();
+    expect(calls.some((c) => c.key === HELP)).toBe(false);
+  });
+
+  it('never fills a field with what the options do not offer', async () => {
+    await openForm({
+      [HELP]: proposed({
+        propuesta: { responsable_id: 'm-de-otro-lado', objetivo_id: 'o-cerrado', fecha: '2026-10-17', titulo: 'Configurar' },
+        elegir: [],
+        avisos: [],
+      }),
+    });
+    tell();
+    askLeda();
+    await waitFor(() => expect(screen.getByLabelText('título')).toHaveValue('Configurar'));
+    expect(screen.getByLabelText('quién la hace')).toHaveValue('');
+    expect(screen.getByLabelText('objetivo')).toHaveValue('');
+    expect(markOf('fecha')).toBeNull();
+  });
+
+  it('confirm after the proposals loads once, with what the preview shows', async () => {
+    keys('33333333-3333-4333-8333-333333333333');
+    const calls = await openForm({ [HELP]: proposed(FULL), [TASKS]: loaded() });
+    tell();
+    askLeda();
+    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveValue('m-marcos'));
+    pick('quién la decidió', 'm-ismael');
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const sent = calls.filter((c) => c.key === TASKS);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].body).toEqual({
+      ...FULL.propuesta,
+      evidencia: ['captura'],
+      decidio_id: 'm-ismael',
+      clave: '33333333-3333-4333-8333-333333333333',
+    });
+    // "cargar otra" starts over, the box too.
+    fireEvent.click(screen.getByRole('button', { name: '> cargar otra' }));
+    expect(screen.getByLabelText(BOX)).toHaveValue('');
+  });
+});
+
+describe('Dictating into the free box', () => {
+  it('without speech recognition there is no microphone, and typing works', async () => {
+    await openForm();
+    expect(screen.queryByRole('button', { name: '> dictar' })).toBeNull();
+    tell('lo escribo');
+    expect(screen.getByLabelText(BOX)).toHaveValue('lo escribo');
+  });
+
+  it('where the browser recognizes speech, what is heard goes into the box', async () => {
+    vi.stubGlobal('webkitSpeechRecognition', FakeRecognition);
+    await openForm();
+    tell('hay que');
+    fireEvent.click(screen.getByRole('button', { name: '> dictar' }));
+    const r = FakeRecognition.last as FakeRecognition;
+    expect(r.start).toHaveBeenCalledTimes(1);
+    expect(r.lang).toBe('es-AR');
+    expect(screen.getByRole('button', { name: '> dejar de dictar' })).toHaveAttribute('aria-pressed', 'true');
+    act(() => r.onresult?.({ resultIndex: 0, results: [[{ transcript: 'colgar el estante' }]] }));
+    expect(screen.getByLabelText(BOX)).toHaveValue('hay que colgar el estante');
+    fireEvent.click(screen.getByRole('button', { name: '> dejar de dictar' }));
+    expect(r.stop).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '> dictar' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('without permission it says so plainly and the box stays', async () => {
+    vi.stubGlobal('SpeechRecognition', FakeRecognition);
+    await openForm();
+    tell('lo que ya escribí');
+    fireEvent.click(screen.getByRole('button', { name: '> dictar' }));
+    const r = FakeRecognition.last as FakeRecognition;
+    act(() => {
+      r.onerror?.({ error: 'not-allowed' });
+      r.onend?.();
+    });
+    expect(screen.getByText('No tengo permiso para el micrófono; escribilo acá.')).toBeInTheDocument();
+    expect(screen.getByLabelText(BOX)).toHaveValue('lo que ya escribí');
+    expect(screen.getByLabelText(BOX)).toBeEnabled();
   });
 });
