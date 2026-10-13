@@ -50,7 +50,7 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
 - [x] **T4b · La advertencia de la revisión de la T4** (`aprobacion.py:246-254`): una pregunta de
       "¿cuál de las dos?" vieja que siga abierta no puede pisar el comentario de una aprobación escrita
       después, que no la contesta. Test primero.
-- [ ] **T4c · `fichas.dos_lecturas` sólo con la pregunta abierta** (límite de la T4b): una "¿cuál de
+- [x] **T4c · `fichas.dos_lecturas` sólo con la pregunta abierta** (límite de la T4b): una "¿cuál de
       las dos?" que quedó para después no se cierra ofreciendo sus botones viejos. Test primero.
 - [x] **T6 · La hora de los turnos en el registro** (los pasos 22 a 25 figuran a las 10:02): investigar y,
       si quedó mal guardada, corregirla. **Evidencia (coordinador, 2026-10-12, `leda_motor`):** quedó mal
@@ -196,4 +196,16 @@ nombres de otros en los mensajes.
   `review-18ef5e4a7c6d0da7`, aprobadas; sugerencias sobre el borde exacto del piso en las pruebas.
   **Ojo con `leda_motor`:** quedó con el reloj en el miércoles 14/10 y lo registrado hasta ahí; `volver`
   ahora se niega (para empezar de cero: recrearla y `volver --forzar`).
+- **T4c, hecha** (escritor delegado; `66a1f51`). `preguntas.la_que_vio(ctx, tipo, task_id)` es ahora la
+  guarda compartida (la pregunta abierta de ese tipo sobre esa tarea que la persona vio en un mensaje
+  anterior): la usan `aprobacion._la_pregunta_de_cual` y `fichas.dos_lecturas`. Se mantiene la decisión
+  12 (la pregunta, una sola vez: si contesta mezclando otra vez, quedan los botones, `no_eligio`) sólo
+  para la pregunta que la persona está contestando. Una "¿cuál de las dos?" que quedó para después se
+  cierra `sin_efecto` con `reemplazada` (el mecanismo de la situación general 7, como `pase`, `entrega`
+  y `apodos`) antes de abrir la nueva, con el comentario nuevo en sus opciones; `cerrar_de_tipo` aceptó
+  `salvo=` para no cerrar una del mismo mensaje. RED: 2 en rojo (`'no_eligio' == 'dos_lecturas'`).
+  `test_aprobacion.py` + `test_fichas.py` 127 passed; `pytest tests/motor` 1388 passed;
+  `tests/conversaciones` 215 passed; en seco 48 de 48. **RDD:** `review-9939d87a9136e3cf`, aprobada; dos
+  sugerencias (`fichas.py:1994-1998`, `preguntas.py:602-603`). El significado de `reemplazada`
+  (`hechos.py:256`) hablaba sólo de la entrega: lo generaliza la T7.
 
