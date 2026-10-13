@@ -110,10 +110,7 @@ viejo corriendo.
   (un renglón largo de la IA). Cupo: la ventana de 5 horas, 7 %; la semanal, 1 %.
 
 **Para la mañana (lo que necesita al usuario, de a una):**
-1. **Confirmar una decisión técnica del acceso por chat:** un toque de botón no lleva el ofrecimiento de
-   la web (sólo una respuesta a algo escrito). Ejemplo: Marcos toca "Aprobar" y la respuesta no ofrece
-   la web; se la ofrece la próxima vez que escriba. Si preferís que también vaya en un toque, es un cambio
-   chico en `turno._ofrecer_la_web`.
+1. ~~Un toque no lleva el ofrecimiento de la web~~: confirmado por el usuario (2026-10-13).
 2. **El túnel o HTTPS y la prueba en el celular** del acceso por chat (el enlace tiene que abrir desde
    Telegram en el teléfono).
 3. **Confirmar `@Leda_Motor_bot` como `bot_usuario`** del pack (lo dice Telegram, `getMe`).
