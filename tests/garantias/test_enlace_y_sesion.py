@@ -8,7 +8,8 @@ Lo que se prueba acá es la base y la credencial, no la API ni la web:
   sólo `execute` sobre las funciones que los emiten, los canjean, los leen y los cortan, que son
   `security definer` con dueño `leda_owner`.
 - **El enlace sirve una sola vez** (decisión 4): el segundo canje no abre nada, tampoco si llegan
-  los dos a la vez. Un enlace nuevo de la misma persona anula el que estaba sin usar.
+  los dos a la vez. Un enlace nuevo de la misma persona anula el que estaba sin usar. El que
+  nadie usó vence a las 24 horas de emitido (migración 0065).
 - **La sesión no vence** (decisiones 4 y 12): se revalida en cada pedido (la membresía sigue
   activa) y anota su último uso. Se corta sólo si la corta un administrador, si la persona avisa
   que perdió el celular o si deja el equipo; una sesión cortada no vuelve.
@@ -254,6 +255,53 @@ def test_un_enlace_nuevo_anula_el_que_estaba_sin_usar(conn, intake_world):
     assert viejo != nuevo
     assert _canjear(conn, viejo)[0] is None, "el enlace reemplazado todavía abre"
     assert _canjear(conn, nuevo)[0] is not None
+
+
+def _emitido_hace(conn, enlace: str, intervalo: str) -> None:
+    """Corre hacia atrás el `emitido_en` de un enlace, con el `now()` real de la base."""
+    with admin(conn) as cur:
+        cur.execute("update enlace_de_entrada set emitido_en = now() - %s::interval"
+                    " where token_hash = %s", (intervalo, _hash(enlace)))
+        assert cur.rowcount == 1
+    conn.commit()
+
+
+def test_el_enlace_que_nadie_uso_vence_a_las_24_horas(conn, intake_world):
+    """Decisión del usuario (acceso por chat, 2026-10-12; migración 0065): el enlace que nadie
+    usó vence a las 24 horas de emitido. Vencido, el canje no abre nada, igual que un enlace ya
+    usado: ni sesión, ni canje, ni fila de auditoría del canje."""
+    enlace = _emitir(conn, intake_world, "Sam Noble")
+    _emitido_hace(conn, enlace, "24 hours 1 minute")
+    sesion_id, sesion = _canjear(conn, enlace)
+    assert sesion_id is None, "un enlace de hace más de 24 horas abrió una sesión"
+    assert _vigente(conn, sesion) is None
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from sesion_web")
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select canjeado_en from enlace_de_entrada")
+        assert cur.fetchone()["canjeado_en"] is None
+    assert _auditoria(conn, "canjear_enlace_de_entrada") == []
+
+
+def test_el_enlace_de_hace_menos_de_24_horas_todavia_abre(conn, intake_world):
+    enlace = _emitir(conn, intake_world, "Sam Noble")
+    _emitido_hace(conn, enlace, "23 hours 59 minutes")
+    assert _canjear(conn, enlace)[0] is not None, "un enlace de menos de 24 horas no abrió"
+
+
+def test_despues_de_un_enlace_vencido_uno_nuevo_abre(conn, intake_world):
+    """El vencido no queda marcado (se deduce de `emitido_en`) y sigue siendo el que estaba sin
+    usar: pedir otro lo anula, como siempre, y el nuevo cuenta sus propias 24 horas."""
+    viejo = _emitir(conn, intake_world, "Sam Noble")
+    _emitido_hace(conn, viejo, "3 days")
+    assert _canjear(conn, viejo)[0] is None
+    nuevo = _emitir(conn, intake_world, "Sam Noble")
+    assert nuevo is not None
+    assert _canjear(conn, nuevo)[0] is not None
+    with admin(conn) as cur:
+        cur.execute("select anulado_en from enlace_de_entrada where token_hash = %s",
+                    (_hash(viejo),))
+        assert cur.fetchone()["anulado_en"] is not None
 
 
 def test_un_token_inventado_no_abre_nada(conn, intake_world):

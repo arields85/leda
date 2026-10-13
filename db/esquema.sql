@@ -2288,7 +2288,7 @@ create unique index enlace_de_entrada_sin_usar on enlace_de_entrada (membership_
   where canjeado_en is null and anulado_en is null;
 
 comment on table enlace_de_entrada is
-  'ADR 0022, decisiones 4 y 12: el enlace de un solo uso para entrar a la web. Sólo el hash del token. Sirve una vez (canjeado_en); sin vencimiento por tiempo; queda anulado si se emite otro para la misma persona o se cortan sus sesiones. leda_app no tiene privilegios: sólo execute sobre sus funciones.';
+  'ADR 0022, decisiones 4 y 12: el enlace de un solo uso para entrar a la web. Sólo el hash del token. Sirve una vez (canjeado_en); el que nadie usó vence a las 24 horas de emitido (0065), sin marcarlo; queda anulado si se emite otro para la misma persona o se cortan sus sesiones. leda_app no tiene privilegios: sólo execute sobre sus funciones.';
 
 create table sesion_web (
   id               uuid primary key default gen_random_uuid(),
@@ -2385,9 +2385,11 @@ begin
    where m.id = enlace.membership_id and m.activo;
   if persona is not null then
     -- Una sola vez: si llegan dos canjes a la vez, el segundo espera el candado de la fila y ya
-    -- no la encuentra sin canjear.
+    -- no la encuentra sin canjear. Y antes de las 24 horas de emitido (0065): vencido, no abre,
+    -- igual que uno ya usado.
     update enlace_de_entrada set canjeado_en = now()
-     where id = enlace.id and canjeado_en is null and anulado_en is null;
+     where id = enlace.id and canjeado_en is null and anulado_en is null
+       and emitido_en > now() - interval '24 hours';
     if found then
       insert into sesion_web (workspace_id, membership_id, enlace_id, token_hash)
            values (enlace.workspace_id, enlace.membership_id, enlace.id, p_sesion_token_hash)
