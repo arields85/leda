@@ -769,10 +769,10 @@ TEXTOS_DE_LA_CARGA = {
     ("criterio", "falta"):
         "Falta el criterio de aceptación: qué tiene que pasar para darla por terminada.",
     ("criterio", "demasiado_largo"): "El criterio es demasiado largo: hasta 500 caracteres.",
-    # Un criterio que se pueda comprobar (J2-9, J2-13 y J2-14; `ayuda_al_cargar.
+    # Un criterio que se pueda comprobar (J2-9, J2-13, J2-14 y J2-17; `ayuda_al_cargar.
     # juzgar_el_criterio`): sin evidencia del área, que diga cómo se comprueba; con ella, que diga
-    # un resultado (el rechazo trae, si se pudo armar, el criterio que propone Leda).
-    ("criterio", "sin_comprobacion"): "Contame cómo se sabe que está terminada.",
+    # un resultado. Todo rechazo trae, si se pudo, el criterio que propone Leda.
+    ("criterio", "sin_comprobacion"): "No dice cómo se sabe que está terminada.",
     ("criterio", "sin_resultado"): "No dice qué tiene que quedar hecho para darla por terminada.",
     ("criterio", "sin_revisar"):
         "No pude revisar el criterio ahora: la tarea quedó cargada con el criterio como lo "
@@ -1011,9 +1011,9 @@ def _lo_que_sabe_la_tarea(conn, token: str, espacio: str,
 def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
     """Con el candado: la evidencia y lo demás de la tarea (`_lo_que_sabe_la_tarea`) y la IA del
     espacio, sólo con una sesión de administración vigente (sin ella, `None`: nadie gasta una
-    llamada sin entrar). Sin evidencia, un criterio igual al título ya está juzgado (`juicio`) y
-    no se prepara la IA. Una IA que no se puede preparar es una que no responde: la carga no se
-    traba por eso."""
+    llamada sin entrar). Sin las opciones, el juicio ya está decidido (`juicio`) y no se prepara
+    la IA. Una IA que no se puede preparar es una que no responde: la carga no se traba por
+    eso."""
     from . import ayuda_al_cargar
     from .motor.recibir import IANoConfigurada
 
@@ -1030,8 +1030,8 @@ def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
         # los dos casos, con el incidente de las opciones (`_cargar`).
         return {"juicio": ayuda_al_cargar.Juicio("sin_resultado" if vacio else "sin_revisar",
                                                  falla)}
-    if not evidencia and vacio:
-        return {"juicio": ayuda_al_cargar.Juicio("sin_comprobacion")}
+    # J2-17: lo vacío o igual al título también va a la IA, sin evidencia del área: se rechaza
+    # igual, y la IA escribe el criterio que Leda propone ("no sé" es un pedido de ayuda).
     try:
         ia = _ia_del_criterio(conn, espacio)
     except Exception as falla:  # noqa: BLE001 -- queda como `sin_revisar`, con su incidente
@@ -1130,8 +1130,8 @@ def _sin_propuesta(conn, espacio: str, sesion: dict[str, Any], falla: BaseExcept
     _dejar_el_incidente(
         conn, espacio, sesion, ETAPA_PROPUESTA_DEL_CRITERIO,
         "Leda rechazó el criterio de una tarea que se cargaba en la plataforma porque no dice qué "
-        "tiene que quedar hecho, y no pudo proponer otro: la persona vio qué falta, sin una "
-        "propuesta.", f"{type(falla).__name__}: {falla}")
+        "tiene que quedar hecho o cómo se sabe, y no pudo proponer otro: la persona vio qué "
+        "falta, sin una propuesta.", f"{type(falla).__name__}: {falla}")
 
 
 # Los rechazos del criterio que decide el juicio antes de la carga (sin la clave, la base nunca
@@ -1187,13 +1187,14 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
             continue
         errores.append(error)
     con_texto = [_con_texto(e) for e in errores]
-    if motivo == "sin_resultado":
-        # J2-14: el rechazo trae el criterio que propone Leda, al lado del campo; sin él, el
-        # aviso igual dice qué falta, y la administración se entera.
+    if motivo in _CRITERIO_RECHAZADO:
+        # J2-14 y J2-17: todo rechazo trae el criterio que propone Leda, escrito por la IA con
+        # sus palabras, al lado del campo; sin él, el aviso igual dice qué falta, y la
+        # administración se entera.
         propuesta = getattr(juicio, "propuesta", None)
         if propuesta:
             for error in con_texto:
-                if (error["campo"], error["motivo"]) == ("criterio", "sin_resultado"):
+                if (error["campo"], error["motivo"]) == ("criterio", motivo):
                     error["propuesta"] = propuesta
         elif getattr(juicio, "falla", None) is not None:
             _sin_propuesta(conn, espacio, sesion, juicio.falla)
@@ -1308,18 +1309,24 @@ async def ayudar_a_cargar(espacio_id: str, request: Request):
         conn, token, espacio, cuerpo))
     if isinstance(preparada, Response):
         return preparada
-    crudo_de_la_ia, falla, juicio = None, None, None
+    crudo_de_la_ia, falla, revisada, juicio = None, None, None, None
     try:
         crudo_de_la_ia = await run_in_threadpool(ayuda_al_cargar.pedir, preparada["ia"],
                                                  preparada["entrada"])
     except Exception as e:  # noqa: BLE001 -- cualquier falla de la IA es que no respondió
         falla = e
     if falla is None:
+        # J2-17: lo que decide el código (quién la hace, con su área y su evidencia) con el
+        # candado; el juicio del criterio que escribió la IA, ya con esa evidencia, sin él.
+        revisada = await run_in_threadpool(_con_la_base, lambda conn: _revisar_la_ayuda(
+            conn, token, preparada, crudo_de_la_ia))
+        if isinstance(revisada, Response):
+            return revisada
         # Nunca levanta: una IA que no juzga es `sin_revisar`.
         juicio = await run_in_threadpool(ayuda_al_cargar.juzgar_la_propuesta, preparada["ia"],
-                                         crudo_de_la_ia, preparada["escrito"])
+                                         revisada)
     return await run_in_threadpool(_con_la_base, lambda conn: _cerrar_la_ayuda(
-        conn, token, preparada, crudo_de_la_ia, falla, juicio))
+        conn, token, preparada, revisada, falla, juicio))
 
 
 def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, Any]):
@@ -1356,16 +1363,41 @@ def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, 
             "entrada": ayuda_al_cargar.entrada_de_la_ia(texto, escrito, opciones)}
 
 
-def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[str, Any] | None,
+def _revisar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[str, Any] | None):
+    """Con el candado y en el espacio, entre la propuesta y el juicio del criterio (J2-17): la
+    sesión revalidada y lo que decide el código de la propuesta (`ayuda_al_cargar.revisar`:
+    quién la hace, con los apodos del espacio, y con eso la evidencia de su área), para que el
+    juicio, fuera del candado, juzgue el criterio con esa evidencia."""
+    from . import ayuda_al_cargar
+    from .db import espacio as en_el_espacio
+    from .motor.fichas import integrantes_que_coinciden
+
+    with sin_espacio(conn) as cur:
+        if _sesion_de_administracion(cur, token) is None:
+            return _sin_sesion_de_administracion()
+    with en_el_espacio(conn, preparada["espacio"]) as cur:
+        def objetivo_de(task_id: str) -> str | None:
+            cur.execute("select objective_id from task where id = %s", (task_id,))
+            fila = cur.fetchone()
+            return str(fila["objective_id"]) if fila else None
+
+        return ayuda_al_cargar.revisar(
+            crudo or {}, texto=preparada["texto"], escrito=preparada["escrito"],
+            opciones=preparada["opciones"],
+            coinciden=lambda dicho: integrantes_que_coinciden(cur, dicho),
+            objetivo_de=objetivo_de)
+
+
+def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
                      falla: BaseException | None, juicio=None) -> Response:
     """Con el candado otra vez y en el espacio: la sesión revalidada (cortada mientras respondía
-    la IA, nada), los controles del código, la auditoría y, si la IA no respondió, el incidente
-    (también si no juzgó la manera de comprobarla: la propuesta sigue, con la evidencia del área o
-    pidiendo cómo se sabe, nunca como si se hubiera juzgado)."""
+    la IA, nada), el criterio que se propone (`cerrar_el_criterio`), la auditoría y, si la IA no
+    respondió, el incidente (también si el juicio del criterio no respondió o no dejó uno: la
+    propuesta sigue, con el criterio de reserva o diciendo que no se pudo, nunca como si se
+    hubiera juzgado)."""
     from . import ayuda_al_cargar, versiones
     from .db import espacio as en_el_espacio, registrar_auditoria
     from .incidentes import ETAPA_AYUDA_AL_CARGAR, registrar_incidente
-    from .motor.fichas import integrantes_que_coinciden
 
     with sin_espacio(conn) as cur:
         sesion = _sesion_de_administracion(cur, token)
@@ -1379,29 +1411,25 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[st
             "ia": getattr(preparada["ia"], "nombre", None), "pide": pide,
             "respondio": falla is None}
         if falla is None:
-            def objetivo_de(task_id: str) -> str | None:
-                cur.execute("select objective_id from task where id = %s", (task_id,))
-                fila = cur.fetchone()
-                return str(fila["objective_id"]) if fila else None
-
-            resultado = ayuda_al_cargar.revisar(
-                crudo or {}, texto=preparada["texto"], escrito=escrito,
-                opciones=preparada["opciones"],
-                coinciden=lambda dicho: integrantes_que_coinciden(cur, dicho),
-                objetivo_de=objetivo_de, juicio=juicio)
+            ayuda_al_cargar.cerrar_el_criterio(resultado, juicio)
             propuesta = resultado.propuesta
-            if juicio is not None and juicio.motivo == "sin_revisar":
+            if juicio is not None and juicio.falla is not None:
                 registrar_incidente(
                     cur, ws,
-                    "La IA del espacio no juzgó la manera de comprobar el criterio que propuso al "
-                    "completar una carga en la plataforma: no se propuso esa manera.",
+                    "La IA del espacio no juzgó o no escribió el criterio de aceptación que "
+                    "propuso al completar una carga en la plataforma: se propuso el criterio de "
+                    "reserva o ninguno, y el campo lo dijo."
+                    if juicio.motivo == "sin_revisar" else
+                    "Leda no pudo escribir un criterio de aceptación al completar una carga en la "
+                    "plataforma (la IA no respondió o lo que escribió no pasó los controles): se "
+                    "propuso el de reserva o ninguno, y el campo lo dijo.",
                     severidad="baja",
-                    referencia_cruda=(f"{type(juicio.falla).__name__}: {juicio.falla}"
-                                      if juicio.falla else None),
+                    referencia_cruda=f"{type(juicio.falla).__name__}: {juicio.falla}",
                     etapa=ETAPA_AYUDA_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
             detalle.update({
                 "juicio_del_criterio": (None if juicio is None
-                                        else juicio.motivo or "dice_como_se_comprueba"),
+                                        else juicio.motivo or "sirve"),
+                "criterio_de": resultado.criterio_de,
                 "propuestos": sorted(propuesta),
                 "descartados": resultado.descartados,
                 "para_elegir": [e["membership_id"] for e in resultado.elegir],
@@ -1429,6 +1457,153 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[st
         return _json({"error": "sin_ayuda", "texto": TEXTO_SI_LA_IA_FALLA}, 503)
     return _json({"propuesta": resultado.propuesta, "elegir": resultado.elegir,
                   "avisos": resultado.avisos})
+
+
+# --- La ortografía, antes de la vista previa (J2-17) --------------------------------------------
+#
+# El usuario (2026-10-13): Leda corrige la ortografía de lo que la persona escribió a mano y pone
+# los nombres como están en los datos del equipo, sin cambiar cómo está redactado; las correcciones
+# se ven en la vista previa (que es la confirmación), marcadas, y lo que se guarda es lo que se vio
+# y se confirmó. La web llama acá al tocar "confirmar", con los textos que todavía no se revisaron
+# tal como están: si algo cambió, la vista previa lo muestra y la persona confirma otra vez; si no,
+# la carga sigue. Los mismos tres pasos que la ayuda, para que el candado nunca espere a la IA. La
+# cocina acepta una corrección sólo si cambió nada más que la ortografía
+# (`ayuda_al_cargar.solo_ortografia`); lo que no, queda como se escribió, con un incidente. Si la IA
+# no responde, nada se bloquea: el texto queda como se escribió, con un aviso y un incidente.
+
+TEXTO_SIN_ORTOGRAFIA = "No pude revisar la ortografía ahora: quedó como lo escribiste."
+
+
+def _ia_de_la_ortografia(conn, espacio: str):
+    """La IA del espacio, la misma que conversa (`entrada._ia_de`)."""
+    from .entrada import _ia_de
+
+    return _ia_de(conn, espacio)
+
+
+@router.post("/admin/api/espacios/{espacio_id}/ortografia")
+async def revisar_la_ortografia(espacio_id: str, request: Request):
+    """La ortografía de los textos de una carga (título, descripción y criterio): 200 con lo que
+    se corrigió (`corregidos`: por campo, el texto y sus cambios) y lo que no se pudo revisar
+    (`sin_revisar`, con un `aviso` humano y un incidente); 422 con un dato que no es un texto."""
+    from . import ayuda_al_cargar
+
+    if _de_otro_sitio(request):
+        return _json({"error": "origen_no_verificado"}, 403)
+    tipo = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if tipo != "application/json":
+        return _json({"error": "se_espera_json"}, 415)
+    token = _token_de_administracion(request)
+    if token is None:
+        return _sin_sesion_de_administracion()
+    crudo = await request.body()
+    if len(crudo) > TAMANO_MAXIMO_DE_LA_AYUDA:
+        return _json({"error": "demasiado_grande"}, 413)
+    try:
+        cuerpo = json.loads(crudo or b"null")
+    except (ValueError, RecursionError):
+        cuerpo = None
+    cuerpo = cuerpo if isinstance(cuerpo, dict) else {}
+    errores = [_mal_formado(c) for c in ayuda_al_cargar.CAMPOS_DE_TEXTO
+               if cuerpo.get(c) is not None and not isinstance(cuerpo.get(c), str)]
+    textos = {c: cuerpo[c] for c in ayuda_al_cargar.CAMPOS_DE_TEXTO
+              if isinstance(cuerpo.get(c), str) and cuerpo[c].strip()}
+    espacio = _espacio_de(espacio_id)
+    preparada = await run_in_threadpool(_con_la_base, lambda conn: _preparar_la_ortografia(
+        conn, token, espacio, textos, errores))
+    if isinstance(preparada, Response):
+        return preparada
+    crudo_de_la_ia, falla = None, None
+    try:
+        crudo_de_la_ia = await run_in_threadpool(ayuda_al_cargar.pedir_la_ortografia,
+                                                 preparada["ia"], preparada["entrada"])
+    except Exception as e:  # noqa: BLE001 -- cualquier falla de la IA es que no respondió
+        falla = e
+    return await run_in_threadpool(_con_la_base, lambda conn: _cerrar_la_ortografia(
+        conn, token, preparada, crudo_de_la_ia, falla))
+
+
+def _preparar_la_ortografia(conn, token: str, espacio: str | None, textos: dict[str, str],
+                            errores: list[dict[str, str]]):
+    """Con el candado: la sesión, las opciones del espacio (de donde salen los nombres del
+    equipo) y la IA del espacio. Sin textos, nada que revisar: no se llama a la IA."""
+    from . import ayuda_al_cargar
+
+    with sin_espacio(conn) as cur:
+        if _sesion_de_administracion(cur, token) is None:
+            return _sin_sesion_de_administracion()
+    if espacio is None:
+        return _espacio_que_no_existe()
+    ahora = _ahora(conn, espacio)
+    with sin_espacio(conn) as cur:
+        _con_la_version_del_nucleo(cur)
+        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
+                    (_hash(token), espacio, ahora))
+        opciones = cur.fetchone()["r"]
+    rechazo = _sin_lo_que_rechaza_la_base(opciones)
+    if rechazo is not None:
+        return rechazo
+    if errores:
+        return _json({"errores": [_con_texto(e) for e in errores]}, 422)
+    if not textos:
+        return _json({"corregidos": {}, "sin_revisar": []})
+    return {"espacio": espacio, "textos": textos, "opciones": opciones,
+            "ia": _ia_de_la_ortografia(conn, espacio),
+            "entrada": ayuda_al_cargar.entrada_de_la_ortografia(textos, opciones)}
+
+
+def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
+                          crudo: dict[str, Any] | None, falla: BaseException | None) -> Response:
+    """Con el candado otra vez y en el espacio: la sesión revalidada, el control del código, la
+    auditoría (con la huella de cada texto corregido, nunca el texto) y, si algo no se pudo
+    revisar, el incidente (sin los textos)."""
+    from . import ayuda_al_cargar, versiones
+    from .db import espacio as en_el_espacio, registrar_auditoria
+    from .incidentes import ETAPA_ORTOGRAFIA_AL_CARGAR, registrar_incidente
+
+    with sin_espacio(conn) as cur:
+        sesion = _sesion_de_administracion(cur, token)
+    if sesion is None:
+        return _sin_sesion_de_administracion()
+    ws, textos = preparada["espacio"], preparada["textos"]
+    if falla is None:
+        revisada = ayuda_al_cargar.revisar_la_ortografia(crudo or {}, textos,
+                                                         preparada["opciones"])
+        corregidos, rechazados = revisada.corregidos, revisada.rechazados
+        sin_revisar = [r["campo"] for r in rechazados]
+        referencia = "; ".join(f"{r['campo']}: {r['motivo']}" for r in rechazados) or None
+    else:
+        corregidos, rechazados = {}, []
+        sin_revisar = list(textos)
+        referencia = f"{type(falla).__name__}: {falla}"
+    with en_el_espacio(conn, ws) as cur:
+        if sin_revisar:
+            registrar_incidente(
+                cur, ws,
+                ("La IA del espacio no respondió al revisar la ortografía de una carga en la "
+                 "plataforma" if falla is not None else
+                 "Leda no aceptó la corrección de ortografía de una carga en la plataforma (no "
+                 "volvió o cambiaba algo más que la ortografía)") +
+                ": los textos quedaron como se escribieron y la persona vio un aviso.",
+                severidad="baja", referencia_cruda=referencia,
+                etapa=ETAPA_ORTOGRAFIA_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
+        registrar_auditoria(
+            cur, accion="corregir_al_cargar", workspace_id=ws,
+            actor_app_user_id=str(sesion["app_user_id"]), actor_kind="persona",
+            sujeto_tipo="workspace", sujeto_id=ws,
+            detalle={"origen": "web", "sesion_de_administracion_id": str(sesion["sesion_id"]),
+                     "ia": getattr(preparada["ia"], "nombre", None), "pide": list(textos),
+                     "respondio": falla is None, "corregidos": list(corregidos),
+                     "rechazados": rechazados, "sin_revisar": sin_revisar,
+                     "huellas": {c: hashlib.sha256(v["texto"].encode("utf-8")).hexdigest()
+                                 for c, v in corregidos.items()}},
+            pack_hash=versiones.pack_hash(cur, ws), nucleo_hash=versiones.nucleo_hash())
+    if sin_revisar:
+        causa = type(falla).__name__ if falla is not None else "corrección rechazada"
+        _imprimir(f"  ! no se pudo revisar la ortografía de una carga ({causa}).")
+        return _json({"corregidos": corregidos, "sin_revisar": sin_revisar,
+                      "aviso": TEXTO_SIN_ORTOGRAFIA})
+    return _json({"corregidos": corregidos, "sin_revisar": []})
 
 
 # --- La web -----------------------------------------------------------------------------------

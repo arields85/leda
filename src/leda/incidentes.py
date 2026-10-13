@@ -114,9 +114,13 @@ ETAPA_AYUDA_AL_CARGAR = "ayuda_al_cargar"
 # El juicio del criterio al cargar una tarea en la plataforma (J2-9, `ayuda_al_cargar.
 # juzgar_el_criterio`): la IA del espacio no lo pudo revisar y la tarea se cargó con un aviso.
 ETAPA_CRITERIO_AL_CARGAR = "criterio_al_cargar"
-# El criterio rechazado al cargar porque no dice ningún resultado, sin el criterio que propone Leda
-# (J2-14): la IA no respondió o su resultado no pasó los controles; la persona vio qué falta.
+# El criterio rechazado al cargar (no dice un resultado o cómo se sabe), sin el criterio que
+# propone Leda (J2-14 y J2-17): la IA no respondió o lo que escribió no pasó los controles; la
+# persona vio qué falta.
 ETAPA_PROPUESTA_DEL_CRITERIO = "propuesta_del_criterio"
+# La ortografía de una carga en la plataforma, antes de la vista previa (J2-17): la IA no respondió
+# o su corrección cambiaba algo más que la ortografía; los textos quedaron como se escribieron.
+ETAPA_ORTOGRAFIA_AL_CARGAR = "ortografia_al_cargar"
 # El criterio que no se revisó al cargar porque las opciones de la carga (de donde sale la evidencia
 # que pide el área) no se pudieron leer: no se lo juzga con la regla de otra (`review-88b227055a98f635`).
 ETAPA_EVIDENCIA_DEL_CRITERIO = "evidencia_del_criterio"
@@ -467,14 +471,28 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
     ETAPA_PROPUESTA_DEL_CRITERIO: ExplicacionDeEtapa(
         titulo="Leda no pudo proponer un criterio al rechazar uno",
         que_paso=("{nombre} quiso cargar una tarea en la plataforma con un criterio de "
-                  "aceptación que no dice qué tiene que quedar hecho, y Leda no pudo proponerle "
-                  "otro (la IA del espacio no respondió o lo que propuso no pasó los controles). "
-                  "La tarea no se cargó."),
-        que_vio=("Que el criterio no dice qué tiene que quedar hecho, sin un criterio propuesto "
-                 "al lado."),
+                  "aceptación que no dice qué tiene que quedar hecho o cómo se sabe, y Leda no "
+                  "pudo proponerle otro (la IA del espacio no respondió o lo que propuso no pasó "
+                  "los controles). La tarea no se cargó."),
+        que_vio=("Que el criterio no dice qué tiene que quedar hecho o cómo se sabe, sin un "
+                 "criterio propuesto al lado."),
         que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica) y revisá la IA "
                    "del espacio (`python -m leda modelo`, `leda chatgpt estado`). {nombre} puede "
                    "escribir el criterio y volver a confirmar.")),
+    ETAPA_ORTOGRAFIA_AL_CARGAR: ExplicacionDeEtapa(
+        titulo="Leda no pudo revisar la ortografía de una carga",
+        que_paso=("{nombre} tocó \"confirmar\" al cargar una tarea en la plataforma y Leda no "
+                  "pudo revisar la ortografía de lo que escribió: la IA del espacio no respondió "
+                  "(sin configurar, sin la sesión de la suscripción, sin cupo, el plazo o una "
+                  "respuesta que no se pudo leer), o su corrección cambiaba algo más que la "
+                  "ortografía y no se aceptó."),
+        que_vio=("Que Leda no pudo revisar la ortografía ahora y que el texto quedó como lo "
+                 "escribió; nada se bloqueó."),
+        que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica: el motivo de "
+                   "cada campo, o el error de la IA) y revisá la IA del espacio (`python -m leda "
+                   "modelo`, `leda chatgpt estado`). Si se repite que la corrección cambiaba algo "
+                   "más que la ortografía, es un hallazgo para la IA: no hace falta avisarle a "
+                   "{nombre}.")),
     ETAPA_EVIDENCIA_DEL_CRITERIO: ExplicacionDeEtapa(
         titulo="Leda no pudo revisar el criterio de una carga sin la evidencia del área",
         que_paso=("{nombre} confirmó una tarea en la plataforma y no se pudo leer qué evidencia "
