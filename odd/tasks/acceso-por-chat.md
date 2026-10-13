@@ -101,7 +101,7 @@ Ruta de cada una: delegada (un escritor), porque toca la base, el motor y el cor
 - [x] **A-1 · La conversación 50** (`.md` y `.yaml`) y la clave nueva del corredor para el enlace de la
       web. RED: el corredor en seco falla.
 - [x] **A-2 · El vencimiento de 24 horas** (`0065`, su rollback y sus garantías).
-- [ ] **A-3 · Las dos jugadas y la marca del enlace** en la respuesta y el despachador.
+- [x] **A-3 · Las dos jugadas y la marca del enlace** en la respuesta y el despachador.
 - [ ] **A-4 · El ofrecimiento una sola vez**, también en la bienvenida.
 - [ ] **A-5 · Verificación:** `correr --ia guionada` en seco, `pytest tests/garantias tests/motor
       tests/conversaciones`, revisión RDD por commit.
@@ -158,5 +158,32 @@ túnel, tarea aparte).
   Para `leda_motor`: `psql -v ON_ERROR_STOP=1 -f db/migrations/0065_el_enlace_vence_a_las_24_horas.sql
   "host=localhost user=postgres dbname=leda_motor"` (con `PGCLIENTENCODING=UTF8`), después del
   respaldo, junto con la `0066`.
-- **A-3, en curso** (escritor delegado): la `0066`, las dos jugadas y la marca del enlace de entrada.
+- **A-3, hecha** (escritor delegado; `38d71f3` la base y `0e3946e` el motor). `0066_la_entrada_a_la_web_por_chat`:
+  `message_outbox_entrada_web` (la marca: espacio, fila del outbox, persona, `es_ofrecimiento`) y
+  `ofrecimiento_web` (`reservado_en`, `ofrecido_en`), las dos con RLS forzado y permisos mínimos;
+  `entro_a_la_web()` y `tiene_un_enlace_sin_usar()`, `security definer` de `leda_owner`, sólo del espacio
+  de quien llama; `cortar_sesiones_de_membresia` deja siempre una fila `cortar_acceso_web` con el motivo,
+  las sesiones cortadas y si anuló un enlace, también con cero sesiones (decisión técnica 3); el
+  rollback se niega si las tablas tienen filas. `web_app.cortar_sesiones` recibe `motivo` y el actor.
+  Motor: `pedir_acceso_web` y `perdi_el_celular` (sin confirmación), con sus hechos y significados; la
+  marca va en la misma lista que el enlace de una tarea (`ctx.enlace_de_la_respuesta`), así "un enlace
+  por mensaje" sale solo (`ya_lleva_otro_enlace`); `enqueue_outbox(enlace_de_entrada_web=…,
+  es_ofrecimiento=…)` reserva el lugar y rechaza partir, adjuntos, bloque copiable o dos enlaces; el
+  despachador emite el token como `leda_app` dentro del punto de guardado del envío, agrega la
+  dirección y manda sin vista previa; si el envío falla, el token vuelve atrás; sin dirección base,
+  sale sin el enlace y queda el incidente `enlace_de_entrada_web`. RED: `test_acceso_web.py` 13 en
+  rojo; `test_entrada_web_por_chat.py` 14 en rojo (las pruebas sólo de la base, escritas después del
+  esquema, no se vieron en rojo). `tests/garantias` 724 passed; `tests/motor` 1417 passed;
+  `tests/conversaciones` 226 passed y 1 xfailed; despachador, salida y afines 130 passed; en seco 49
+  de 50 (la 50 falla en los pasos 1 y 4, que dependen del ofrecimiento). **RDD:**
+  `review-56e6b9278c487733` y `review-d37523bfd05ec550`, aprobadas. Advertencias: "un enlace por
+  mensaje" no lo exige la base (`0066:13-14`); **`perdi_el_celular` no anula una marca de enlace que
+  todavía no salió** (`fichas.py:1306-1317`): el despachador la emitiría después del corte, al
+  Telegram que puede estar en el celular perdido; va en la A-4. Sugerencias: los envoltorios sin
+  prueba propia; `el_anterior_ya_no_sirve` se promete antes de emitir.
+- **`leda_motor` en la `0066`** (2026-10-13, madrugada): respaldo
+  `db/respaldos/leda_motor-antes-0065-0066-20261013.dump` (`pg_restore --list` sin error); ensayo en una
+  copia restaurada con sus dueños (`leda_motor_ensayo`, borrada): las dos migraciones sin error, RLS
+  forzado en las dos tablas, las cuatro funciones de `leda_owner` y `security definer`; aplicadas con
+  `psql -v ON_ERROR_STOP=1 -f` como `postgres`, sin error. Sin escuchador corriendo.
 

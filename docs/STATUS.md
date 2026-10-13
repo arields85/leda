@@ -97,6 +97,12 @@ viejo corriendo.
 - Cada commit de código, revisado por RDD y aprobado. `pytest tests/motor` 1402 passed y
   `tests/conversaciones` 217 passed (sobre `bc40805`); `tests/garantias` 697 passed; en seco 49 de 49.
 
+- **El acceso por chat, A-1 a A-3** (`b6dc364`, `e6b4402`, `38d71f3`, `0e3946e`): la conversación 50, la
+  `0065` (el enlace sin usar vence a las 24 horas), la `0066` (la marca del enlace de entrada, el estado
+  del ofrecimiento, el corte siempre auditado) y las jugadas `pedir_acceso_web` y `perdi_el_celular`.
+  **`leda_motor` está en la `0066`** (respaldo `db/respaldos/leda_motor-antes-0065-0066-20261013.dump`):
+  el despachador ya lee la tabla nueva, así que una base sin la `0066` no sirve para el escuchador.
+
 **Plan de la noche, en este orden (modo autónomo; el usuario descansa y vuelve a la mañana):**
 1. **Terminar las correcciones** (`../odd/tasks/correcciones-prueba-telegram.md`), una por una, con un
    escritor delegado cada una, test primero, en seco, suites y revisión RDD por tramo
