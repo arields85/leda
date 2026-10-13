@@ -2,7 +2,18 @@ import { CircleAlert } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { SessionClosedError } from '../api';
 import { shortDate } from '../format';
-import { askLeda, HELP_FAILED, loadTask, type Options, type Problem, type Proposal } from './api';
+import {
+  askLeda,
+  checkSpelling,
+  HELP_FAILED,
+  loadTask,
+  type Options,
+  type Problem,
+  type Proposal,
+  SPELLING_FAILED,
+  type Spelling,
+  type TextField,
+} from './api';
 import { Completing } from './Completing';
 import { DatePicker, dayLabel } from './DatePicker';
 import { Dropdown } from './Dropdown';
@@ -25,20 +36,26 @@ import {
   PROBLEM_FIELD,
   proposedCriterion,
   REFUSED_CRITERION,
+  TEXT_FIELDS,
+  toCheck,
   toInput,
   validProposal,
   waitableTasks,
   waitLabel,
 } from './draft';
-import { TaskPreview } from './TaskPreview';
+import { type Spelled, TaskPreview } from './TaskPreview';
 import { CONTROL, FIELD_HINT, FIELD_TITLE, FIELD_VALUE, TEXT_SIZE } from './typography';
 
 // The server's words when the free box is empty (src/leda/web_app.py, TEXTOS_DE_LA_AYUDA).
 const STORY_MISSING = 'Contame primero qué querés hacer; con eso Leda completa lo que pueda.';
 
+// What the form says after Leda corrected the spelling (J2-17): the preview is the confirmation,
+// so the person sees the change before confirming again.
+const SPELLING_REVIEW = 'Leda corrigió la ortografía de lo marcado: revisalo en la vista previa y confirmá.';
+
 type Step =
-  | { kind: 'edit'; sending: boolean; failed: boolean }
-  | { kind: 'done'; warnings: Problem[]; repeated: boolean; sent: Draft };
+  | { kind: 'edit'; sending: boolean; failed: boolean; checking?: boolean }
+  | { kind: 'done'; warnings: Problem[]; repeated: boolean; sent: Draft; notice: string | null; spelled: Spelled };
 
 // What is missing or wrong is said in the palette's attention color (the one of an overdue
 // task): the only color on the form, and only while something needs fixing.
@@ -127,6 +144,12 @@ function Proposed({ on }: { on?: boolean }) {
   return on ? <span className="shrink-0 text-propuesto">· propuesto por Leda</span> : null;
 }
 
+/** The small mark of a text whose spelling Leda corrected (J2-17), until the person edits it: gray,
+ * no color, because nothing is wrong. */
+function Corrected({ on }: { on?: boolean }) {
+  return on ? <span className="shrink-0 text-ink-dim">· ortografía corregida</span> : null;
+}
+
 function FieldBlock({
   id,
   label,
@@ -134,6 +157,7 @@ function FieldBlock({
   errors,
   hint,
   proposed,
+  corrected,
   after,
   children,
 }: {
@@ -143,6 +167,7 @@ function FieldBlock({
   errors: Problem[];
   hint?: ReactNode;
   proposed?: boolean;
+  corrected?: boolean;
   // Below the messages: what Leda proposes for this field, if anything.
   after?: ReactNode;
   children: ReactNode;
@@ -155,6 +180,7 @@ function FieldBlock({
             {label}
           </label>
           <Proposed on={proposed} />
+          <Corrected on={corrected} />
         </span>
         {extra}
       </div>
@@ -175,8 +201,8 @@ function FieldBlock({
   );
 }
 
-/** The criterion Leda proposes with a refusal (J2-14): the result and the area's evidence, with a
- * one-tap button to use it. A shortcut: the person can also write her own. */
+/** The criterion Leda proposes with a refusal (J2-14 and J2-17: written by the AI in its own
+ * words), with a one-tap button to use it. A shortcut: the person can also write her own. */
 function CriterionOffer({ text, onUse }: { text: string; onUse: () => void }) {
   return (
     <div className="flex min-w-0 flex-col gap-2 rounded-card border-hard border-line-soft px-3 py-2.5">
@@ -246,6 +272,12 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   latest.current = draft;
   const latestStory = useRef(story);
   latestStory.current = story;
+  // The spelling (J2-17): each text as Leda last checked or corrected it (a text that is still so
+  // is not checked again), the words it corrected (marked until the person edits that text), and
+  // what to say when it could not check.
+  const checked = useRef<Partial<Record<TextField, string>>>({});
+  const [spelled, setSpelled] = useState<Spelled>({});
+  const [spellNote, setSpellNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (step.kind === 'done') heading.current?.focus();
@@ -277,6 +309,11 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     setProposed((marked) =>
       changed.some((f) => marked.has(f)) ? new Set([...marked].filter((f) => !changed.includes(f))) : marked,
     );
+    // An edited text is hers again: its spelling mark goes, and it is checked again on confirm.
+    if (TEXT_FIELDS.some((f) => changed.includes(f))) {
+      setSpelled((marked) => Object.fromEntries(Object.entries(marked).filter(([f]) => !changed.includes(f as Field))));
+      setSpellNote(null);
+    }
     // Other data, another attempt: a new key, so it never collides with the one already sent.
     // Not while the last send's outcome is unknown: that one may have loaded the task.
     if (!unknown.current) key.current = null;
@@ -398,8 +435,49 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       takeTo(fields.find((field) => FIELD_ORDER.indexOf(field) > after) ?? fields[0] ?? null);
       return;
     }
+    let sent = draft;
+    let notice = spellNote;
+    // J2-17: before loading, Leda corrects the spelling of the texts not checked yet as they are.
+    // If it corrected something, nothing loads: the preview shows it, marked, and the person
+    // confirms again (the preview is the confirmation). If it could not check, nothing blocks.
+    const asked = toCheck(sent, checked.current);
+    if (asked.length > 0) {
+      setStep({ kind: 'edit', sending: true, failed: false, checking: true });
+      let spelling: Spelling;
+      try {
+        spelling = await checkSpelling(spaceId, Object.fromEntries(asked.map((f) => [f, sent[f]])));
+      } catch (error) {
+        if (error instanceof SessionClosedError) {
+          onClosed();
+          return;
+        }
+        spelling = { corrected: {}, unchecked: asked, notice: SPELLING_FAILED };
+      }
+      const fixed = asked.filter((f) => {
+        const fix = spelling.corrected[f];
+        return fix !== undefined && fix.text !== sent[f];
+      });
+      const next: Draft = { ...sent };
+      for (const field of fixed) next[field] = spelling.corrected[field]!.text;
+      for (const field of asked) checked.current[field] = next[field];
+      notice = spelling.unchecked.length > 0 ? (spelling.notice ?? SPELLING_FAILED) : null;
+      setSpellNote(notice);
+      if (fixed.length > 0) {
+        latest.current = next;
+        setDraft(next);
+        // Other data, another attempt (as in `change`).
+        if (!unknown.current) key.current = null;
+        setSpelled((marked) => ({
+          ...marked,
+          ...Object.fromEntries(fixed.map((f) => [f, spelling.corrected[f]!.changes])),
+        }));
+        setStep({ kind: 'edit', sending: false, failed: false });
+        takeTo(null);
+        return;
+      }
+      sent = next;
+    }
     key.current ??= newKey();
-    const sent = draft;
     setStep({ kind: 'edit', sending: true, failed: false });
     try {
       const result = await loadTask(spaceId, toInput(sent, key.current));
@@ -408,7 +486,14 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         unknown.current = false;
         visited.current = null;
         setProblems([]);
-        setStep({ kind: 'done', warnings: result.warnings, repeated: result.repeated, sent });
+        setStep({
+          kind: 'done',
+          warnings: result.warnings,
+          repeated: result.repeated,
+          sent,
+          notice,
+          spelled,
+        });
       } else {
         // A rejection writes nothing, and the server looked the key up first: nothing was loaded
         // with it, unless the key was used with other data (the conflict below), some data came
@@ -445,6 +530,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     setHelp({ kind: 'idle' });
     setNotes([]);
     setProposed(new Set());
+    checked.current = {};
+    setSpelled({});
+    setSpellNote(null);
     setDraft(EMPTY_DRAFT);
     setProblems([]);
     setStep({ kind: 'edit', sending: false, failed: false });
@@ -456,7 +544,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         <h2 id="cargada" ref={heading} tabIndex={-1} className="m-0 text-button font-bold outline-none">
           {step.repeated ? 'Esta tarea ya estaba cargada.' : 'Tarea cargada.'}
         </h2>
-        {step.warnings.length > 0 && (
+        {(step.warnings.length > 0 || step.notice) && (
           <ul className="m-0 flex list-none flex-col gap-1 p-0 text-body text-ink-soft">
             {step.warnings.map((w) => (
               <li key={`${w.campo}-${w.motivo}`} className="flex min-w-0 items-start gap-1.5">
@@ -464,9 +552,15 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
                 <span className="min-w-0">{w.texto}</span>
               </li>
             ))}
+            {step.notice && (
+              <li className="flex min-w-0 items-start gap-1.5">
+                <Mark />
+                <span className="min-w-0">{step.notice}</span>
+              </li>
+            )}
           </ul>
         )}
-        <TaskPreview draft={step.sent} options={options} admin={admin} />
+        <TaskPreview draft={step.sent} options={options} admin={admin} spelled={step.spelled} />
         <div>
           <button type="button" className={PRIMARY} onClick={another}>
             &gt; cargar otra
@@ -476,7 +570,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     );
   }
 
-  const { sending, failed } = step;
+  const { sending, failed, checking } = step;
   const on = (field: Field) => problems.filter((p) => PROBLEM_FIELD[p.campo] === field);
   // On a field: its problems and what Leda could not complete there (never the same one twice).
   const said = (field: Field) => [
@@ -535,6 +629,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           </FieldBlock>
 
           <FieldBlock id="f-titulo" label="Título" errors={said('titulo')} proposed={proposed.has('titulo')}
+            corrected={spelled.titulo !== undefined}
             extra={<Counter value={draft.titulo} limit={LIMITS.titulo} />}>
             <input
               id="f-titulo"
@@ -548,7 +643,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           </FieldBlock>
 
           <FieldBlock id="f-descripcion" label="Descripción (opcional)" errors={said('descripcion')}
-            proposed={proposed.has('descripcion')}
+            proposed={proposed.has('descripcion')} corrected={spelled.descripcion !== undefined}
             extra={<Counter value={draft.descripcion} limit={LIMITS.descripcion} />}>
             <textarea
               id="f-descripcion"
@@ -643,7 +738,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           </FieldBlock>
 
           <FieldBlock id="f-criterio" label="Criterio de aceptación" errors={said('criterio')}
-            proposed={proposed.has('criterio')}
+            proposed={proposed.has('criterio')} corrected={spelled.criterio !== undefined}
             extra={<Counter value={draft.criterio} limit={LIMITS.criterio} />}
             hint="Qué tiene que pasar para darla por terminada."
             after={criterionOffer && (
@@ -726,8 +821,12 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         <h2 id="vista-previa" className={`m-0 ${FIELD_TITLE}`}>
           Vista previa
         </h2>
-        <TaskPreview draft={draft} options={options} admin={admin} />
+        <TaskPreview draft={draft} options={options} admin={admin} spelled={spelled} />
         <div ref={messages} tabIndex={-1} className="flex min-w-0 flex-col gap-3 pt-1.5 outline-none">
+          {Object.keys(spelled).length > 0 && !sending && (
+            <p className="m-0 text-body text-ink-soft">{SPELLING_REVIEW}</p>
+          )}
+          {spellNote && <p className="m-0 text-body text-ink-soft">{spellNote}</p>}
           {failed && (
             <p role="alert" className="m-0 text-body text-ink-soft">
               No se pudo cargar: no llegó la respuesta. Los datos siguen acá; probá de nuevo.
@@ -772,9 +871,15 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               disabled={sending}
               aria-disabled={blocked && !sending ? true : undefined}
               aria-describedby={summary ? 'lo-que-falta' : undefined}
-              aria-label={sending ? 'cargando…' : undefined}
+              aria-label={sending ? (checking ? 'revisando…' : 'cargando…') : undefined}
             >
-              {sending ? <Completing word="cargando" /> : failed ? '> probar de nuevo' : '> confirmar'}
+              {sending ? (
+                <Completing word={checking ? 'revisando' : 'cargando'} />
+              ) : failed ? (
+                '> probar de nuevo'
+              ) : (
+                '> confirmar'
+              )}
             </button>
           </div>
         </div>

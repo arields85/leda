@@ -1,5 +1,5 @@
 import type { Task } from '../api';
-import type { Member, Options, Policy, Problem, Proposal, TaskInput, WaitableTask } from './api';
+import type { Member, Options, Policy, Problem, Proposal, TaskInput, TextField, WaitableTask } from './api';
 
 /** What the administrator is writing, before the idempotency key is added. `espera_id` is ''
  * while it waits for no task. */
@@ -18,6 +18,15 @@ export const EMPTY_DRAFT: Draft = {
   decidio_id: '',
   espera_id: '',
 };
+
+/** The free-text fields, in the order of the form: the ones whose spelling Leda checks (J2-17). */
+export const TEXT_FIELDS: TextField[] = ['titulo', 'descripcion', 'criterio'];
+
+/** The text fields that still need a spelling check: written, and not as they were last checked
+ * (or corrected). */
+export function toCheck(draft: Draft, checked: Partial<Record<TextField, string>>): TextField[] {
+  return TEXT_FIELDS.filter((field) => draft[field].trim() && checked[field] !== draft[field]);
+}
 
 /** The server's limits, in characters of the trimmed text (migration 0062). */
 export const LIMITS = { titulo: 200, descripcion: 800, criterio: 500 } as const;
@@ -119,8 +128,8 @@ export function checkDraft(draft: Draft, options: Options): Problem[] {
  * looks the key up for them. */
 export const REFUSED_CRITERION: readonly string[] = ['sin_comprobacion', 'sin_resultado'];
 
-/** A problem as the server may send it: a criterion refused for saying no result brings the one
- * Leda proposes, the result and the area's evidence (J2-14). */
+/** A problem as the server may send it: a refused criterion brings the one Leda proposes, written
+ * by the AI in its own words (J2-14 and J2-17). */
 type ProblemWithProposal = Problem & { propuesta?: unknown };
 
 /** The criterion Leda proposed with a refusal, when it fits the form's limit. */

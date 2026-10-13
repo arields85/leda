@@ -216,6 +216,73 @@ export async function askLeda(spaceId: string, input: HelpInput): Promise<HelpRe
   return { kind: 'failed', text: HELP_FAILED };
 }
 
+/** The form's free-text fields, the ones whose spelling Leda checks before the preview (J2-17). */
+export type TextField = 'titulo' | 'descripcion' | 'criterio';
+
+/** One word Leda corrected: as the person wrote it and as it is now. */
+export interface SpellChange {
+  antes: string;
+  despues: string;
+}
+
+/** What the spelling check said: the corrected texts with their changes (only the ones that
+ * changed), the fields it could not check, and, if any, the plain words to say so. */
+export interface Spelling {
+  corrected: Partial<Record<TextField, { text: string; changes: SpellChange[] }>>;
+  unchecked: TextField[];
+  notice?: string;
+}
+
+/** The plain words when Leda could not check the spelling (the server says the same, with an
+ * incident). Nothing blocks: the text stays as written. */
+export const SPELLING_FAILED = 'No pude revisar la ortografía ahora: quedó como lo escribiste.';
+
+/** Asks Leda to correct the spelling of the texts the person wrote (J2-17), before the preview.
+ * Never blocks the load: anything but an answer (no network, a server failure) reads as "could not
+ * check", with the text as written; only a closed session throws. */
+export async function checkSpelling(
+  spaceId: string,
+  texts: Partial<Record<TextField, string>>,
+): Promise<Spelling> {
+  const asked = Object.keys(texts) as TextField[];
+  const failed: Spelling = { corrected: {}, unchecked: asked, notice: SPELLING_FAILED };
+  let response: Response;
+  try {
+    response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/ortografia`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(texts),
+    });
+  } catch (error) {
+    if (error instanceof SessionClosedError) throw error;
+    return failed;
+  }
+  if (response.status !== 200) return failed;
+  const body = (await response.json()) as {
+    corregidos?: Record<string, { texto?: unknown; cambios?: unknown }>;
+    sin_revisar?: unknown;
+    aviso?: unknown;
+  };
+  const corrected: Spelling['corrected'] = {};
+  for (const field of asked) {
+    const fix = body?.corregidos?.[field];
+    if (fix && typeof fix.texto === 'string' && fix.texto.trim()) {
+      const changes = Array.isArray(fix.cambios)
+        ? (fix.cambios as SpellChange[]).filter((c) => typeof c?.antes === 'string' && typeof c?.despues === 'string')
+        : [];
+      corrected[field] = { text: fix.texto, changes };
+    }
+  }
+  const unchecked = Array.isArray(body?.sin_revisar)
+    ? asked.filter((f) => (body.sin_revisar as unknown[]).includes(f))
+    : [];
+  return {
+    corrected,
+    unchecked,
+    notice: unchecked.length > 0 ? (typeof body.aviso === 'string' ? body.aviso : SPELLING_FAILED) : undefined,
+  };
+}
+
 /** Closes this administration session on the server; the server also clears its cookie. */
 export async function adminSignOut(): Promise<void> {
   const response = await fetch(`${ADMIN}/salir`, { method: 'POST', credentials: 'same-origin' });

@@ -10,6 +10,10 @@ type Call = { key: string; body: unknown };
 
 const TASKS = `POST /app/admin/api/espacios/${SPACE}/tareas`;
 const OPTIONS = `GET /app/admin/api/espacios/${SPACE}/opciones`;
+// J2-17: before loading, Leda checks the spelling of the text fields. By default nothing to
+// correct, so the tests that do not look at it load as before.
+const SPELLING = `POST /app/admin/api/espacios/${SPACE}/ortografia`;
+const NOTHING_TO_CORRECT = { status: 200, body: { corregidos: {}, sin_revisar: [] } };
 
 /** A fake server: each route answers with its replies in order (the last one repeats). */
 function serve(routes: Record<string, Reply | Reply[]>) {
@@ -47,6 +51,7 @@ async function openForm(routes: Record<string, Reply | Reply[]> = {}) {
   const calls = serve({
     'GET /app/admin/api/yo': ok(adminMe()),
     [OPTIONS]: ok(options()),
+    [SPELLING]: NOTHING_TO_CORRECT,
     ...routes,
   });
   render(<AdminApp />);
@@ -561,8 +566,9 @@ describe('AdminApp', () => {
     fillTask();
     confirm();
     // While it is sending, what is shown is what goes: the form is locked.
+    // J2-17: first Leda checks the spelling ("revisando…"), then it loads; locked all along.
     expect(screen.getByLabelText('Título')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'cargando…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'revisando…' })).toBeDisabled();
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar');
     expect(screen.getByLabelText('Título')).toHaveValue('Configurar alarmas del SCADA');
     expect(screen.getByLabelText('Título')).toBeEnabled();
@@ -587,7 +593,8 @@ describe('AdminApp', () => {
     );
     fillTask();
     confirm();
-    const button = screen.getByRole('button', { name: 'cargando…' });
+    // J2-17: the load starts once the spelling check answered.
+    const button = await screen.findByRole('button', { name: 'cargando…' });
     expect(button).toBeDisabled();
     const dots = Array.from(button.querySelectorAll('.animate-puntos'));
     expect(dots).toHaveLength(3);
@@ -1306,5 +1313,105 @@ describe('Dictating into the free box', () => {
     expect(screen.getByText('No tengo permiso para el micrófono; escribilo acá.')).toBeInTheDocument();
     expect(screen.getByLabelText(BOX)).toHaveValue('lo que ya escribí');
     expect(screen.getByLabelText(BOX)).toBeEnabled();
+  });
+});
+
+// J2-17: before the preview is confirmed, Leda corrects the spelling of what the person typed (and
+// writes the team's names as they are in the data), never the wording. The corrected text shows in
+// the preview, marked, and what loads is what the preview showed.
+describe('the spelling before loading', () => {
+  const corrected = (fields: Record<string, { texto: string; cambios: { antes: string; despues: string }[] }>) => ({
+    status: 200,
+    body: { corregidos: fields, sin_revisar: [] },
+  });
+  const TITLE_FIX = {
+    titulo: {
+      texto: 'Configurar las alarmas del SCADA con CoreLabs',
+      cambios: [
+        { antes: 'configurar', despues: 'Configurar' },
+        { antes: 'scada', despues: 'SCADA' },
+        { antes: 'cirelabs', despues: 'CoreLabs' },
+      ],
+    },
+  };
+
+  function typeTitle(value: string) {
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value } });
+  }
+
+  it('shows the corrected text marked in the preview, and loads it only on the next confirm', async () => {
+    const calls = await openForm({ [SPELLING]: corrected(TITLE_FIX), [TASKS]: loaded() });
+    fillTask();
+    typeTitle('configurar las alarmas del scada con cirelabs');
+    confirm();
+    await waitFor(() => expect(screen.getByLabelText('Título')).toHaveValue('Configurar las alarmas del SCADA con CoreLabs'));
+    // Nothing loaded yet: the preview is the confirmation, and it changed.
+    expect(calls.some((c) => c.key === TASKS)).toBe(false);
+    expect(calls.find((c) => c.key === SPELLING)?.body).toEqual({
+      titulo: 'configurar las alarmas del scada con cirelabs',
+      criterio: 'Las 12 alarmas suenan en la sala de control',
+    });
+    expect(preview()).toHaveTextContent(
+      'Título: Leda corrigió la ortografía (configurar → Configurar, scada → SCADA, cirelabs → CoreLabs).',
+    );
+    expect(screen.getByText('Leda corrigió la ortografía de lo marcado: revisalo en la vista previa y confirmá.')).toBeInTheDocument();
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const sent = calls.filter((c) => c.key === TASKS);
+    expect(sent).toHaveLength(1);
+    // What loads is what the preview showed, and the checked texts are not checked again.
+    expect((sent[0].body as { titulo: string }).titulo).toBe('Configurar las alarmas del SCADA con CoreLabs');
+    expect(calls.filter((c) => c.key === SPELLING)).toHaveLength(1);
+  });
+
+  it('the mark is never in the attention color, and goes when the person edits that text', async () => {
+    await openForm({ [SPELLING]: corrected(TITLE_FIX) });
+    fillTask();
+    typeTitle('configurar las alarmas del scada con cirelabs');
+    confirm();
+    await waitFor(() => expect(preview()).toHaveTextContent('Leda corrigió la ortografía'));
+    const mark = preview().querySelector('[data-spelling]') as HTMLElement;
+    expect(mark.className).not.toMatch(/falta|yellow|amber/);
+    expect(screen.getByText('· ortografía corregida')).toBeInTheDocument();
+    typeTitle('Configurar las alarmas del SCADA con CoreLabs ya');
+    expect(preview().querySelector('[data-spelling]')).toBeNull();
+    expect(screen.queryByText('· ortografía corregida')).toBeNull();
+  });
+
+  it('an edited text is checked again before loading', async () => {
+    const calls = await openForm({ [SPELLING]: [corrected(TITLE_FIX), NOTHING_TO_CORRECT], [TASKS]: loaded() });
+    fillTask();
+    typeTitle('configurar las alarmas del scada con cirelabs');
+    confirm();
+    await waitFor(() => expect(preview()).toHaveTextContent('Leda corrigió la ortografía'));
+    typeTitle('Configurar las alarmas del SCADA');
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const checks = calls.filter((c) => c.key === SPELLING);
+    expect(checks).toHaveLength(2);
+    expect(checks[1].body).toEqual({ titulo: 'Configurar las alarmas del SCADA' });
+  });
+
+  it.each([
+    ['the AI does not answer', { status: 200, body: { corregidos: {}, sin_revisar: ['titulo', 'criterio'], aviso: 'No pude revisar la ortografía ahora: quedó como lo escribiste.' } }],
+    ['there is no answer at all', 'network' as const],
+  ])('when %s nothing blocks: the task loads as written, and the person is told', async (_, reply) => {
+    const calls = await openForm({ [SPELLING]: reply, [TASKS]: loaded() });
+    fillTask();
+    typeTitle('configurar las alarmas del scada');
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const sent = calls.filter((c) => c.key === TASKS);
+    expect((sent[0].body as { titulo: string }).titulo).toBe('configurar las alarmas del scada');
+    expect(screen.getByText('No pude revisar la ortografía ahora: quedó como lo escribiste.')).toBeInTheDocument();
+    expect(document.querySelector('[data-spelling]')).toBeNull();
+  });
+
+  it('a closed session while checking goes back to the door', async () => {
+    const calls = await openForm({ [SPELLING]: { status: 401 } });
+    fillTask();
+    confirm();
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'Cargar tarea' })).toBeNull());
+    expect(calls.some((c) => c.key === TASKS)).toBe(false);
   });
 });
