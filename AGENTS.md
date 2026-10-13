@@ -51,7 +51,7 @@ trabajo; por la web, su estructura.* El porqué está en
 - Tratar una suite en verde o la auditoría de otro agente como prueba de que la conversación funciona.
 - Adoptar Rasa, Engram u otro marco de terceros como componente.
 - Construir la creación de tareas u objetivos por chat (ADR 0017, decisiones 1 y 2).
-- Escribir código de la plataforma web que se aparte de su ADR (el 0022).
+- Escribir código de la plataforma web que se aparte de sus ADR.
 
 **Sobre `nucleo/`.** Es el comportamiento obligatorio de Leda: el ideal que tiene que alcanzar, que no se edita.
 Su autoridad está por encima de cualquier documento de `docs/`. Los pasajes que necesitan capacidades fuera de
@@ -123,10 +123,8 @@ es insumo, nunca el patrón contra el cual medir. Una auditoría que no leyó `n
   auditoría.
 - Los mensajes visibles salen por outbox; el ACK técnico de Telegram es la excepción acotada.
 - Una solicitud incompleta es un borrador sin efectos. Una tarea comprometida exige objetivo, responsable, fecha
-  objetivo, criterio de aceptación y política de evidencia; la conversión de borrador a tarea es explícita,
-  confirmada y auditable. Una tarea que carga el administrador entra comprometida por declaración: se valida con
-  los mismos datos, la auditoría separa quién la cargó y quién la decidió, y Leda nunca la presenta como una
-  aprobación hecha en Leda (ADR 0017, decisión 2).
+  objetivo, criterio de aceptación y política de evidencia; pasar de borrador o propuesta a tarea es
+  explícito, confirmado y auditable, y la auditoría separa quién la cargó y quién la decidió.
 - Actualización, evidencia, aprobación y cierre son hechos distintos.
 - No poder consultar datos no equivale a que no existan.
 
