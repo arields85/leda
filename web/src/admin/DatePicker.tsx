@@ -108,7 +108,7 @@ export function DatePicker({ id, days, value, onChange, labelledBy, describedBy,
       role="group"
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
-      className={`flex w-full min-w-0 max-w-full flex-col gap-2 sm:max-w-[19rem] rounded-card border-hard ${invalid ? 'border-vencida' : 'border-line'} bg-card p-2.5 shadow-hard`}
+      className={`flex w-full min-w-0 max-w-full flex-col gap-2 sm:max-w-[19rem] rounded-card border-hard ${invalid ? 'border-falta' : 'border-line'} bg-card p-2.5 shadow-hard`}
     >
       <div className="flex items-center justify-between gap-2 text-small">
         <button

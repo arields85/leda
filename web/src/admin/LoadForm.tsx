@@ -31,11 +31,11 @@ type Step =
 
 // What is missing or wrong is said in the palette's attention color (the one of an overdue
 // task): the only color on the form, and only while something needs fixing.
-const WARN = 'text-vencida';
+const WARN = 'text-falta';
 // Full width and never wider than its column, so a long option never pushes the page sideways on
 // a phone; 16px on a touch screen, so the phone does not zoom in when a field is touched.
 const INPUT =
-  'block w-full min-w-0 max-w-full rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none pointer-coarse:text-[16px] focus:border-ink aria-[invalid=true]:border-vencida';
+  'block w-full min-w-0 max-w-full rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none pointer-coarse:text-[16px] focus:border-ink aria-[invalid=true]:border-falta';
 // Dimmed while something required is missing, but never `disabled`: a tap still says what is
 // missing and takes the person there.
 const PRIMARY =

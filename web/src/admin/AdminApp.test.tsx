@@ -222,7 +222,7 @@ describe('AdminApp', () => {
     expect(summary).toHaveTextContent('Falta completar: criterio de aceptación, evidencia, quién la decidió.');
     await waitFor(() => expect(screen.getByLabelText('criterio de aceptación')).toHaveFocus());
     expect(scroll).toHaveBeenCalled();
-    expect(document.getElementById('f-decidio-error')).toHaveClass('text-vencida');
+    expect(document.getElementById('f-decidio-error')).toHaveClass('text-falta');
     expect(document.getElementById('f-decidio-error')).toHaveTextContent('Elegí quién decidió la tarea.');
     expect(document.getElementById('f-evidencia-error')).toHaveTextContent('Elegí la evidencia que se pide');
     expect(calls.filter((c) => c.key === TASKS)).toHaveLength(1);
@@ -235,7 +235,7 @@ describe('AdminApp', () => {
     expect(line).toHaveTextContent(
       'Falta completar: objetivo, título, quién la hace, fecha, criterio de aceptación, quién la decidió.',
     );
-    expect(line).toHaveClass('text-vencida');
+    expect(line).toHaveClass('text-falta');
     // The line comes right before the button it explains.
     expect(line.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Dimmed, but still tappable: never the HTML disabled attribute.
@@ -269,11 +269,11 @@ describe('AdminApp', () => {
     confirm();
     expect(criterio).toHaveFocus();
     // The field's message is there, in the warning color, and its border too.
-    expect(document.getElementById('f-criterio-error')).toHaveClass('text-vencida');
+    expect(document.getElementById('f-criterio-error')).toHaveClass('text-falta');
     expect(document.getElementById('f-criterio-error')).toHaveTextContent('! Falta el criterio de aceptación');
-    expect(document.getElementById('f-evidencia-error')).toHaveClass('text-vencida');
-    expect(criterio).toHaveClass('aria-[invalid=true]:border-vencida');
-    expect(within(preview()).getByRole('alert')).toHaveClass('text-vencida');
+    expect(document.getElementById('f-evidencia-error')).toHaveClass('text-falta');
+    expect(criterio).toHaveClass('aria-[invalid=true]:border-falta');
+    expect(within(preview()).getByRole('alert')).toHaveClass('text-falta');
     // Focusing never scrolls by itself, and the scroll is only vertical.
     expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
     expect(scroll).toHaveBeenCalled();
