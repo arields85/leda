@@ -38,7 +38,7 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
       (`motor/instrucciones.py`); la cocina reconoce los renglones de una tarea (`salida.py`) y cambia el
       ícono según el estado que dicen los hechos del turno: 🏁 terminada, 🟢 en curso y al día, ⚪ sin
       empezar o sin novedades, 🔵 entregada, 🟠 atrasada, 🔴 trabada. El 📋 de una sola tarea no cambia.
-- [ ] **T2 · "Consultar", no "preguntar" (decisión 78)**, en los nombres que lee la IA
+- [x] **T2 · "Consultar", no "preguntar" (decisión 78)**, en los nombres que lee la IA
       (`hechos.para_redactar`).
 - [ ] **T3 · Sin nombre ni hora en los avisos a otros (decisión 77).** Los hechos de un aviso a otra
       persona no le pasan a la IA el destinatario ni la hora; sí que quedó asentado y, si hace falta,
@@ -85,3 +85,12 @@ nombres de otros en los mensajes.
   (`salida.py:546-555`); el paso de los íconos, después de la IA, no tiene una guarda propia
   (`hechos.py:1731-1747`); sugerencia: títulos repetidos (`hechos.py:1750-1757`). A observar en la ronda
   real: que la IA copie los íconos de mensajes anteriores en un mensaje de una sola tarea.
+- **T2, hecha** (escritor delegado; `b2f4afa`, más `f599ca8` del coordinador). Lo que lee la IA al
+  redactar dice "consulta/consultar" cuando Leda le escribe a alguien para saber algo (doce nombres
+  nuevos en la frontera y otros nueve reescritos; unos 80 significados); "pregunta" queda sólo para la
+  pregunta de este mensaje y para lo que la persona pregunta. Adentro no cambió ningún nombre. El
+  coordinador cambió una palabra de la instrucción de redacción ("un aviso, un recordatorio o una
+  consulta") y su huella (`71b74fdaea8a436d`). RED: 4 de 17 en rojo en
+  `tests/motor/test_palabras_de_la_redaccion.py`. `pytest tests/motor` 1350 passed;
+  `tests/conversaciones` 215 passed; en seco 48 de 48. **RDD:** `review-cdfe60231c85d84d`, aprobada; dos
+  sugerencias sobre las pruebas (sólo el primer párrafo; una expresión sensible a mayúsculas).
