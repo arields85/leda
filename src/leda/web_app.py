@@ -963,26 +963,38 @@ def _ia_del_criterio(conn, espacio: str):
     return _ia_de(conn, espacio)
 
 
+def _opciones_para_el_juicio(conn, token: str, espacio: str) -> dict[str, Any]:
+    """Las opciones de la carga de ese espacio (`opciones_de_la_carga`), de donde salen la
+    evidencia que pide el área y los otros datos de la tarea."""
+    ahora = _ahora(conn, espacio)
+    with sin_espacio(conn) as cur:
+        _con_la_version_del_nucleo(cur)
+        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
+                    (_hash(token), espacio, ahora))
+        return cur.fetchone()["r"] or {}
+
+
+class OpcionesIlegibles(Exception):
+    """Las opciones de la carga no se pudieron leer al juzgar un criterio: no se sabe qué
+    evidencia pide el área (advertencia de `review-88b227055a98f635`)."""
+
+
 def _lo_que_sabe_la_tarea(conn, token: str, espacio: str,
                           datos: dict[str, Any]) -> tuple[list[str], list[str]]:
     """La evidencia que se eligió, en palabras de todos los días (`ayuda_al_cargar.
     evidencia_de_la_carga`), y los otros datos de esta tarea que un criterio propuesto puede
     nombrar (quién la hace y su área, el objetivo, la tarea que espera), de las opciones de la
-    carga de ese espacio. Si no se pueden leer, ninguna: la base rechaza la carga igual."""
+    carga de ese espacio. Si no se pueden leer, `OpcionesIlegibles`: sin ellas no se sabe qué
+    regla le toca al criterio, y no se lo juzga con otra."""
     from . import ayuda_al_cargar
 
     try:
-        ahora = _ahora(conn, espacio)
-        with sin_espacio(conn) as cur:
-            _con_la_version_del_nucleo(cur)
-            cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
-                        (_hash(token), espacio, ahora))
-            opciones = cur.fetchone()["r"] or {}
-    except Exception:  # noqa: BLE001 -- sin espacio o sin la base: la carga lo dice
+        opciones = _opciones_para_el_juicio(conn, token, espacio)
+    except Exception as falla:  # noqa: BLE001 -- cualquier falla es que no se leyeron
         _sin_transaccion(conn)
-        return [], []
+        raise OpcionesIlegibles(f"{type(falla).__name__}: {falla}") from falla
     if not opciones.get("ok", True):
-        return [], []
+        raise OpcionesIlegibles(f"opciones_de_la_carga: {opciones.get('error') or 'ok false'}")
     evidencia = ayuda_al_cargar.evidencia_de_la_carga(opciones, datos.get("responsable"),
                                                        datos.get("evidencia"))
     contexto: list[str] = []
@@ -1008,9 +1020,17 @@ def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
     with sin_espacio(conn) as cur:
         if _sesion_de_administracion(cur, token) is None:
             return None
-    evidencia, contexto = _lo_que_sabe_la_tarea(conn, token, espacio, datos)
-    if not evidencia and ayuda_al_cargar.sin_nada_que_juzgar(datos.get("titulo") or "",
-                                                             datos["criterio"]):
+    vacio = ayuda_al_cargar.sin_nada_que_juzgar(datos.get("titulo") or "", datos["criterio"])
+    try:
+        evidencia, contexto = _lo_que_sabe_la_tarea(conn, token, espacio, datos)
+    except OpcionesIlegibles as falla:
+        # Sin saber qué evidencia pide el área no se juzga con la regla de otra (la J2-13 pediría
+        # decir cómo se comprueba, que quizás ya lo dice el área): lo vacío o igual al título se
+        # rechaza como siempre, sin la IA y sin propuesta; lo demás, sin revisar, con su aviso. En
+        # los dos casos, con el incidente de las opciones (`_cargar`).
+        return {"juicio": ayuda_al_cargar.Juicio("sin_resultado" if vacio else "sin_revisar",
+                                                 falla)}
+    if not evidencia and vacio:
         return {"juicio": ayuda_al_cargar.Juicio("sin_comprobacion")}
     try:
         ia = _ia_del_criterio(conn, espacio)
@@ -1048,46 +1068,70 @@ def _sin_revisar(conn, espacio: str, sesion: dict[str, Any], falla: BaseExceptio
     la vista: la referencia técnica queda para la administración). La tarea ya está cargada: si
     el incidente no se puede guardar, la carga no se deshace ni se contesta como una falla (la
     persona igual ve el aviso) y la consola lo dice."""
-    from .db import espacio as en_el_espacio
-    from .incidentes import ETAPA_CRITERIO_AL_CARGAR, registrar_incidente
+    from .incidentes import ETAPA_CRITERIO_AL_CARGAR
 
+    if isinstance(falla, OpcionesIlegibles):
+        _sin_las_opciones(conn, espacio, sesion, falla, cargada=True)
+        return
     causa = type(falla).__name__ if falla else "sin juicio"
     _imprimir(f"  ! no se pudo revisar el criterio de una carga ({causa}).")
+    _dejar_el_incidente(
+        conn, espacio, sesion, ETAPA_CRITERIO_AL_CARGAR,
+        "La IA del espacio no pudo revisar el criterio de una tarea cargada en la plataforma: la "
+        "tarea se cargó con el criterio como se escribió y la persona vio un aviso.",
+        f"{type(falla).__name__}: {falla}" if falla else None)
+
+
+def _dejar_el_incidente(conn, espacio: str, sesion: dict[str, Any], etapa: str, resumen: str,
+                        referencia: str | None) -> None:
+    """Un incidente de la carga, en el espacio y a nombre de quien cargaba (sin el criterio ni el
+    error a la vista). Si no se puede guardar, lo que se le contestó a la persona sigue igual y la
+    consola lo dice."""
+    from .db import espacio as en_el_espacio
+    from .incidentes import registrar_incidente
+
     try:
         with en_el_espacio(conn, espacio) as cur:
-            registrar_incidente(
-                cur, espacio,
-                "La IA del espacio no pudo revisar el criterio de una tarea cargada en la "
-                "plataforma: la tarea se cargó con el criterio como se escribió y la persona vio "
-                "un aviso.",
-                severidad="baja",
-                referencia_cruda=f"{type(falla).__name__}: {falla}" if falla else None,
-                etapa=ETAPA_CRITERIO_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
-    except Exception as otra:  # noqa: BLE001 -- la tarea ya está cargada
+            registrar_incidente(cur, espacio, resumen, severidad="baja",
+                                referencia_cruda=referencia, etapa=etapa,
+                                app_user_id=str(sesion["app_user_id"]))
+    except Exception as otra:  # noqa: BLE001 -- la respuesta a la persona no cambia
         _sin_transaccion(conn)
         _imprimir(f"  ! tampoco se pudo guardar su incidente ({type(otra).__name__}).")
+
+
+def _sin_las_opciones(conn, espacio: str, sesion: dict[str, Any], falla: OpcionesIlegibles, *,
+                      cargada: bool) -> None:
+    """El incidente de un criterio que no se juzgó porque las opciones de la carga no se pudieron
+    leer (advertencia de `review-88b227055a98f635`): nunca en silencio."""
+    from .incidentes import ETAPA_EVIDENCIA_DEL_CRITERIO
+
+    _imprimir("  ! no se pudo leer la evidencia del área para revisar el criterio de una carga.")
+    que_paso = ("la tarea se cargó con el criterio como se escribió y la persona vio un aviso."
+                if cargada else
+                "el criterio estaba vacío o era el título, así que no se cargó; la persona vio "
+                "qué falta, sin un criterio propuesto.")
+    _dejar_el_incidente(
+        conn, espacio, sesion, ETAPA_EVIDENCIA_DEL_CRITERIO,
+        "No se pudo leer qué evidencia pide el área para revisar el criterio de una tarea que se "
+        f"cargaba en la plataforma, y no se revisó: {que_paso}", str(falla))
 
 
 def _sin_propuesta(conn, espacio: str, sesion: dict[str, Any], falla: BaseException) -> None:
     """El incidente de un criterio rechazado sin un criterio propuesto (J2-14: la IA no respondió
     o su resultado no pasó los controles). La persona igual ve qué falta; si el incidente no se
     puede guardar, el rechazo sigue y la consola lo dice."""
-    from .db import espacio as en_el_espacio
-    from .incidentes import ETAPA_PROPUESTA_DEL_CRITERIO, registrar_incidente
+    from .incidentes import ETAPA_PROPUESTA_DEL_CRITERIO
 
+    if isinstance(falla, OpcionesIlegibles):
+        _sin_las_opciones(conn, espacio, sesion, falla, cargada=False)
+        return
     _imprimir(f"  ! no se pudo proponer un criterio al rechazar uno ({type(falla).__name__}).")
-    try:
-        with en_el_espacio(conn, espacio) as cur:
-            registrar_incidente(
-                cur, espacio,
-                "Leda rechazó el criterio de una tarea que se cargaba en la plataforma porque no "
-                "dice qué tiene que quedar hecho, y no pudo proponer otro: la persona vio qué "
-                "falta, sin una propuesta.",
-                severidad="baja", referencia_cruda=f"{type(falla).__name__}: {falla}",
-                etapa=ETAPA_PROPUESTA_DEL_CRITERIO, app_user_id=str(sesion["app_user_id"]))
-    except Exception as otra:  # noqa: BLE001 -- el rechazo sigue igual
-        _sin_transaccion(conn)
-        _imprimir(f"  ! tampoco se pudo guardar su incidente ({type(otra).__name__}).")
+    _dejar_el_incidente(
+        conn, espacio, sesion, ETAPA_PROPUESTA_DEL_CRITERIO,
+        "Leda rechazó el criterio de una tarea que se cargaba en la plataforma porque no dice qué "
+        "tiene que quedar hecho, y no pudo proponer otro: la persona vio qué falta, sin una "
+        "propuesta.", f"{type(falla).__name__}: {falla}")
 
 
 # Los rechazos del criterio que decide el juicio antes de la carga (sin la clave, la base nunca

@@ -117,6 +117,9 @@ ETAPA_CRITERIO_AL_CARGAR = "criterio_al_cargar"
 # El criterio rechazado al cargar porque no dice ningún resultado, sin el criterio que propone Leda
 # (J2-14): la IA no respondió o su resultado no pasó los controles; la persona vio qué falta.
 ETAPA_PROPUESTA_DEL_CRITERIO = "propuesta_del_criterio"
+# El criterio que no se revisó al cargar porque las opciones de la carga (de donde sale la evidencia
+# que pide el área) no se pudieron leer: no se lo juzga con la regla de otra (`review-88b227055a98f635`).
+ETAPA_EVIDENCIA_DEL_CRITERIO = "evidencia_del_criterio"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -472,6 +475,18 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica) y revisá la IA "
                    "del espacio (`python -m leda modelo`, `leda chatgpt estado`). {nombre} puede "
                    "escribir el criterio y volver a confirmar.")),
+    ETAPA_EVIDENCIA_DEL_CRITERIO: ExplicacionDeEtapa(
+        titulo="Leda no pudo revisar el criterio de una carga sin la evidencia del área",
+        que_paso=("{nombre} confirmó una tarea en la plataforma y no se pudo leer qué evidencia "
+                  "pide el área, de la que depende cómo se revisa el criterio de aceptación; no "
+                  "se lo revisó. Si el criterio decía algo, la tarea se cargó como se escribió; si "
+                  "estaba vacío o era el título, no se cargó."),
+        que_vio=("La tarea cargada, con el aviso de que Leda no pudo revisar el criterio ahora; "
+                 "o, si no se cargó, que el criterio no dice qué tiene que quedar hecho, sin un "
+                 "criterio propuesto al lado."),
+        que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica) y revisá la base "
+                   "y las opciones de la carga del espacio. Si la tarea se cargó, mirá su "
+                   "criterio y, si no dice qué tiene que quedar hecho, hablalo con {nombre}.")),
 }
 
 _EXPLICACION_GENERICA = ExplicacionDeEtapa(

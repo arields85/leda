@@ -19,6 +19,9 @@ comprueba, y sin proponer nada (J2-14).
   juzga por el sentido y copia la parte que lo dice; si no, 422 `sin_comprobacion`.
 - **Si la IA no juzga, ni se traba ni se finge:** se carga con un aviso que no bloquea y un
   incidente (`criterio_al_cargar`); una carga repetida no suma otro.
+- **Sin las opciones de la carga** (no se sabe qué evidencia pide el área), el criterio no se
+  juzga con la regla de otra: se carga con el mismo aviso, o se rechaza sin la IA lo vacío o
+  igual al título, y queda un incidente (`evidencia_del_criterio`).
 - **La IA, sólo con una sesión vigente y fuera del candado de la web;** una sesión cortada
   mientras respondía no carga nada. Un rechazo del criterio no usa la clave.
 """
@@ -302,6 +305,59 @@ def test_con_la_ia_caida_no_se_se_carga_con_el_aviso(web, conn, intake_world, ad
     assert r.json()["avisos"] == [{"campo": "criterio", "motivo": "sin_revisar",
                                    "texto": TEXTO_SIN_REVISAR}]
     assert _contar(conn, "incident", "etapa = 'criterio_al_cargar'") == 1
+
+
+# --- Las opciones de la carga que no se pueden leer (advertencia de `review-88b227055a98f635`) ---
+#
+# Sin las opciones no se sabe qué evidencia pide el área: juzgar el criterio sin ella sería
+# juzgarlo con la regla de la J2-13 (decir cómo se comprueba) cuando el área ya lo dice, en
+# silencio. No se juzga ni se finge: se carga con el aviso de que no se revisó, o se rechaza sin
+# la IA lo que se rechaza sin ella, y en los dos casos queda un incidente (`evidencia_del_criterio`).
+
+def _opciones_que_no_se_leen(monkeypatch, falla):
+    from leda import web_app
+
+    def leer(conn, token, espacio):
+        if isinstance(falla, BaseException):
+            raise falla
+        return falla
+    monkeypatch.setattr(web_app, "_opciones_para_el_juicio", leer)
+
+
+@pytest.mark.parametrize("falla, causa", [(RuntimeError("la base no contestó"), "RuntimeError"),
+                                          ({"ok": False, "error": "sin_permiso"}, "sin_permiso")])
+def test_sin_las_opciones_no_se_juzga_se_carga_con_el_aviso_y_un_incidente(
+        web, conn, intake_world, administradora, ia, monkeypatch, falla, causa):
+    _opciones_que_no_se_leen(monkeypatch, falla)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _cargar(navegador, intake_world, criterio=UPS_DEL_CELULAR)
+    assert r.status_code == 201, r.text
+    assert r.json()["avisos"] == [{"campo": "criterio", "motivo": "sin_revisar",
+                                   "texto": TEXTO_SIN_REVISAR}]
+    assert ia.pedidos == []
+    incidente = _fila(conn, "select * from incident where etapa = 'evidencia_del_criterio'")
+    assert incidente is not None
+    assert str(incidente["workspace_id"]) == _norte(intake_world)["id"]
+    assert causa in incidente["referencia_cruda"]
+    assert UPS_DEL_CELULAR not in (incidente["resumen_sanitizado"] or "")
+    assert _contar(conn, "incident", "etapa = 'criterio_al_cargar'") == 0
+    assert _contar(conn, "task") == 1
+
+
+def test_sin_las_opciones_lo_igual_al_titulo_se_rechaza_igual_con_un_incidente(
+        web, conn, intake_world, administradora, ia, monkeypatch):
+    """Lo que se rechaza sin la IA se rechaza también sin las opciones; sin la evidencia no hay
+    propuesta, y la administración se entera."""
+    _opciones_que_no_se_leen(monkeypatch, RuntimeError("la base no contestó"))
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _cargar(navegador, intake_world, criterio=TITULO_PLC)
+    assert r.status_code == 422, r.text
+    assert r.json()["errores"] == [{"campo": "criterio", "motivo": "sin_resultado",
+                                    "texto": TEXTO_SIN_RESULTADO}]
+    assert ia.pedidos == []
+    assert _contar(conn, "incident", "etapa = 'evidencia_del_criterio'") == 1
+    assert _contar(conn, "incident", "etapa = 'propuesta_del_criterio'") == 0
+    assert _contar(conn, "task") == 0
 
 
 # --- La puerta y el candado -------------------------------------------------------------------
