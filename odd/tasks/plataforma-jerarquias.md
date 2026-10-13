@@ -184,7 +184,10 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
 
       **RDD:** `review-71dd3cfc8a337a10` (`b7fb4ea7`), aprobada. Advertencias, de las pruebas: la del CSS depende
       de la carpeta desde donde se corre (`AdminApp.test.tsx:307`) y la de "los completados salen de la ronda"
-      no lo prueba del todo (`:291-297`); sugerencia: restaurar los espías (`:258-259`).
+      no lo prueba del todo (`:291-297`); sugerencia: restaurar los espías (`:258-259`). Las tres, arregladas
+      en `ddb822e8` (J2-3). La revisión de estilo de los últimos detalles de la J1-5 (el color de lo que
+      falta y el ícono), `review-62463f212ed0f53d`, aprobada con dos sugerencias: la marca del resumen
+      ("Falta completar") y la de los avisos no tienen prueba propia. Sin arreglar todavía.
 - [ ] **J2 · La ayuda de la IA al cargar, para todos.** Se describe como se habla y Leda completa título,
       criterio, fecha y evidencia; la persona corrige y confirma (ADR 0023, punto 4). Para todos los que
       cargan: la puerta de administración primero, y después Dirección, referentes e integrantes en sus
@@ -223,9 +226,64 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         `.venv\Scripts\python.exe tools\medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3
         --salida tests\conversaciones\resultados\ayuda-al-cargar.json` (11 llamadas por vuelta; sale
         con 4 si se acaba el cupo). En seco (`--ia guionada`, sin red) corrió: 0 de 11, como debe,
-        porque la IA de mentira no propone nada.
+        porque la IA de mentira no propone nada (cambiado en la J2-7: ahora tiene guion).
+        **RDD de la J2** (el coordinador): `review-6a44e26466b95395` (`65b2469f`), aprobada con
+        advertencias: el chequeo de "la fecha está dicha" era flojo (`ayuda_al_cargar.py:299-304`: un
+        número cualquiera, un día de la semana o una palabra relativa en cualquier lugar del texto) y
+        la sugerencia del tope de salida (`:249`, el de elegir jugadas para una propuesta más larga);
+        `review-03b5c3a74d3719b7` (`ddb822e8`), aprobada con advertencias: una respuesta vieja podía
+        completar después de un cambio (`LoadForm.tsx:301-302`) y el 422 de `api.ts:210-213` sin
+        prueba; `review-5457837d11cb0618` (`0669ab63`), aprobada con cinco hallazgos de la
+        herramienta: sin cupo se perdía el informe, `--veces` menor que 1 corría, toda excepción se
+        contaba como de la IA, los nombres se buscaban con una copia de la función del servidor y la
+        corrida en seco no probaba nada. Todos, arreglados en la J2-7.
   - [ ] **J2-5 · Prueba real en el celular** (con el usuario).
   - [ ] **J2-6 · La ronda con la IA real** (la lanza el coordinador, con permiso).
+  - [x] **J2-7 · Arreglos de las revisiones** (2026-10-13; ruta delegada, un escritor: servidor, web,
+        herramienta y pruebas).
+        **La fecha** (`dd5bd617`): la IA devuelve, junto a la fecha, las palabras con que la persona la
+        dijo (`como_dijo_la_fecha`). El código (`fecha_dicha`) comprueba que están tal cual en el texto
+        (sin mayúsculas ni acentos) y calcula él mismo el día con hoy, con la frase entera del texto
+        donde están (si la persona escribió "el viernes de la semana que viene" y la IA copió "el
+        viernes", el día es el de la semana que viene). Entiende "hoy", "mañana" (no "por la mañana",
+        "a la mañana" ni "esta mañana", que son una hora), "pasado mañana", el nombre de un día (el
+        próximo, nunca hoy; "el viernes que viene" es el mismo; "de la semana que viene" o "de la
+        próxima semana", el de la semana siguiente), "el 22", "del 22", "el día 22" (de este mes o, si
+        ya pasó, del que viene), "22/10" o "22-10" (de este año o del que viene), "22/10/2026", "el 22
+        de octubre" y "el viernes 23" (tiene que ser viernes). Un número suelto ("12 tornillos", "la
+        máquina 3 10 tornillos") nunca es un día, y "la semana que viene" sola no dice cuál. Vale sólo
+        si el día del código es el de la IA y es hábil; si no, queda vacío con el porqué: "No puse la
+        fecha: dijiste "el sábado", pero el sábado 17 de octubre no es día hábil en este espacio…",
+        "… está fuera del calendario…", "No puse la fecha: no entendí qué día es "12"…" (también
+        cuando la IA calculó otro día) y "no encontré en lo que escribiste qué día es…" (sin las
+        palabras o con unas que no están). El motor no tiene un lector de días en el código (la IA de
+        las jugadas los saca de la lista `dias`, `instrucciones.py:89`), así que no había uno para
+        reusar: se usan sus nombres (`calendario.DIAS`, `hechos.dia`). **El tope de salida:**
+        3000, y nunca menos que `tope_jugadas` ni `tope_redaccion` del espacio (la propuesta lleva
+        hasta 1500 caracteres de texto más el JSON, y un modelo que razona gasta parte antes).
+        **La respuesta vieja** (`b8ebc49c`): si mientras Leda respondía la persona cambió el texto
+        libre o un dato, la respuesta no completa nada y el recuadro dice "Cambiaste lo escrito
+        mientras Leda completaba; tocá completar de nuevo."; un 422 sin sus motivos se lee como "Leda
+        no pudo completar ahora…", nunca en silencio. **La herramienta** (`577d3dd0`): sin cupo
+        escribe el informe hasta donde llegó (`cortada: sin_cupo`) y sale con 4; `--veces` menor que 1
+        se rechaza; sólo una falla de la llamada a la IA cuenta como de la IA (`falla: ia`), y un error
+        del programa corta en ese pedido (`falla: programa`), sale con 3 y no gasta más llamadas;
+        quién la hace se busca con `fichas.integrantes_que_coinciden` del servidor sobre el equipo
+        fijo (`EquipoFijo`, un cursor que contesta sus dos lecturas); en seco tiene un guion para el
+        ejemplo del usuario y para el sábado: da 2 de 11 (el sábado, con la fecha descartada por no
+        ser hábil).
+        **Evidencia (2026-10-13):** `pytest -q tests/test_ayuda_al_cargar.py` con las pruebas nuevas
+        de la fecha y del tope contra el código de antes: 47 en rojo y 30 en verde; después, 77 en
+        verde. `tests/garantias/test_ayuda_al_cargar.py` con la nueva (la fecha que nadie dijo, por la
+        puerta): 1 en rojo y 13 en verde con el código de antes; las dos juntas, 91 en verde. Las de la
+        herramienta: 6 en rojo, después 83 en verde en `tests/test_ayuda_al_cargar.py`. En la web,
+        `AdminApp.test.tsx` 3 en rojo y 40 en verde (la respuesta vieja por un dato y por el texto, el
+        422 sin motivos), 43 en verde después; `npm test` 83 passed y `npm run build` bien. La
+        herramienta en seco (`$env:PYTHONPATH="src"; .venv\Scripts\python.exe
+        tools\medir_ayuda_al_cargar.py --ia guionada --veces 1`): 2 de 11, sale con 1.
+        `pytest -q tests/garantias` completa: 752 passed (12 min 27 s).
+        Quedan sin marcar la J2-5 (el celular) y la J2-6 (la ronda real, que ahora mide también si la
+        IA copia bien las palabras de la fecha).
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
@@ -259,9 +317,10 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
     del área, como hoy (la evidencia la pone el código, nunca la IA);
   - **la espera**, un código de la lista; **el objetivo**, el de la tarea que espera si la hay y está
     abierto; si no, un código de la lista;
-  - **la fecha**, sólo si es un día hábil de las opciones y el texto tiene el número del día, el nombre de
-    ese día de la semana o una palabra que lo dice ("hoy", "mañana", "pasado mañana", "la semana que viene",
-    "el mes que viene"…); si no, "No puse la fecha: …" (constitución §4: nunca una fecha que nadie dijo);
+  - **la fecha** (cambiada en la J2-7): la IA copia las palabras con que la persona la dijo
+    (`como_dijo_la_fecha`); el código comprueba que están en el texto, calcula él mismo el día con la
+    frase entera donde están, y la pone sólo si es el mismo día que dio la IA y es hábil; si no, "No
+    puse la fecha: …" con el porqué (constitución §4: nunca una fecha que nadie dijo);
   - **título, descripción y criterio:** el tope del formulario (200, 800 y 500); ningún número ni nombre que
     no esté en lo que escribió la persona o en los datos de esta tarea (objetivo, espera, quién la hace y su
     área, la evidencia), con `entrega.problema_del_ejemplo`, el criterio punto por punto
@@ -340,3 +399,6 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
 - 2026-10-13: la segunda prueba encontró cuatro más (J1-7): al confirmar con un campo vacío la página
   se corría de costado, los mensajes blancos no se distinguían, lo que faltaba no estaba a la vista y
   "confirmar" no se veía apagado. Arregladas en `b7fb4ea7` (escritor delegado); J1-5 se repite con el usuario.
+- 2026-10-13: J2-7 hecha (escritor delegado): los arreglos de las tres revisiones RDD de la J2 (la
+  fecha la calcula el código con las palabras de la persona; la respuesta vieja no completa nada;
+  la herramienta de medición). Siguen la prueba en el celular (J2-5) y la ronda real (J2-6).
