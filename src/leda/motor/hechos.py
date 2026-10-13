@@ -320,7 +320,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "aviso_al_responsable": "Lo que se le avisa a la persona responsable de la tarea: a quién "
                             "(a) y cuándo se entera (llega).",
     "lecturas": "Las dos cosas que puede querer decir el mensaje sobre la misma tarea: no se "
-                "hizo ninguna y Leda pregunta cuál.",
+                "hizo ninguna y Leda consulta cuál.",
     "aprobada_por": "Quién aprobó la tarea.",
     "aprobada_el": "El día en que quien aprueba dio esa aprobación.",
     "pidio_cambios": "Quién le pidió cambios a la entrega.",
@@ -332,7 +332,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "bloqueos_que_se_cerraron": "Lo que trababa la tarea y ya se resolvió.",
     "dos_lecturas": "El mensaje se puede leer de dos formas sobre la misma tarea (lecturas): "
                     "dice a la vez dos cosas opuestas, o aprueba con un comentario que le pide "
-                    "algo a alguien. No se hizo ninguna y Leda pregunta cuál de las dos.",
+                    "algo a alguien. No se hizo ninguna y Leda consulta cuál de las dos.",
     "el_comentario_pide_algo": "Si el comentario de la aprobación le pide a la persona "
                                "responsable o a otra persona que haga o revise algo.",
     "su_propio_trabajo": "Es trabajo de la persona que escribe: no lo puede aprobar ni devolver "
@@ -403,9 +403,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "cual_de_las_dos": "Pregunta, una sola vez, cuál de las dos cosas quiso decir la persona "
                        "sobre la tarea: su respuesta elige una (una opción, o esa decisión "
                        "escrita), y lo demás que diga es su comentario, no la otra cosa. Si no "
-                       "elige, no se vuelve a preguntar.",
+                       "elige, no se vuelve a consultar.",
     "no_eligio": "La persona contestó sin elegir ninguna opción de una pregunta que Leda hace "
-                 "una sola vez: Leda no decide por ella ni la vuelve a preguntar. Lo que esperaba "
+                 "una sola vez: Leda no decide por ella ni lo vuelve a consultar. Lo que esperaba "
                  "esa decisión sigue esperándola, y las opciones van como botones en este mensaje "
                  "(botones), para cuando quiera; también lo puede escribir.",
     "pregunta_hecha_una_vez": "La pregunta, ya hecha, que no se vuelve a hacer: su tipo.",
@@ -505,17 +505,17 @@ SIGNIFICADOS: Mapping[str, str] = {
                           "(a) y cuándo se entera (llega); vacío si no se le avisa.",
     "sin_aviso": "Por qué no se le avisa a quien aprueba el trabajo de la persona, con su "
                  "código.",
-    "espera_el_motivo": "El aviso espera el porqué que Leda le preguntó a la persona: si lo "
+    "espera_el_motivo": "El aviso espera el porqué que Leda le consultó a la persona: si lo "
                         "da antes, sale otro aviso que lo lleva; si no, sale a la hora de "
                         "llega y dice que todavía no lo dio.",
     "sin_motivo_todavia": "La persona todavía no dio el porqué de ese día: Leda se lo "
-                          "preguntó y espera la respuesta. No hay un porqué que contar.",
+                          "consultó y espera la respuesta. No hay un porqué que contar.",
     "a": "A quién va un aviso.",
     "llega": "Cuándo se entera quien recibe el aviso (a; sin a, la persona a la que Leda le "
              "escribe): una fecha y hora es el momento en que le llega, que todavía no pasó; "
              "si no, su código dice si ya le llegó, si no le va a llegar o si no le llegó.",
     "quien_destraba": "Quién puede destrabar el bloqueo: como dato, lo que dijo la persona; "
-                      "como tipo de pregunta, Leda pregunta quién lo puede destrabar y espera "
+                      "como tipo de pregunta, Leda consulta quién lo puede destrabar y espera "
                       "un nombre, que no sabe, o que le toca a la persona que escribe "
                       "(nunca a Leda).",
     "integrante": "Una persona del equipo.",
@@ -530,12 +530,12 @@ SIGNIFICADOS: Mapping[str, str] = {
     "avance": "Lo que la persona contó de cómo viene la tarea, sin un hecho cierto.",
     "dijo": "Lo que dijo la persona, con sus palabras.",
     "el_pedido_de_estado": "Si Leda sigue esperando saber cómo viene la tarea.",
-    "vuelve_a_pedir_el_estado": "Cuándo Leda le vuelve a preguntar a la persona cómo viene "
+    "vuelve_a_pedir_el_estado": "Cuándo Leda le vuelve a consultar a la persona cómo viene "
                                 "la tarea (llega, todavía no pasó); o que ya no se lo va a "
-                                "preguntar, y motivo dice por qué.",
+                                "consultar, y motivo dice por qué.",
     "veces_sin_algo_cierto": "Cuántas respuestas seguidas sin un hecho cierto tuvo esta "
-                             "pregunta de cómo viene la tarea.",
-    "no_vuelve_a_pedir_el_estado": "Por qué Leda no le vuelve a preguntar cómo viene la tarea.",
+                             "consulta de cómo viene la tarea.",
+    "no_vuelve_a_pedir_el_estado": "Por qué Leda no le vuelve a consultar cómo viene la tarea.",
     "escalado_a": "A quiénes se les avisó que la persona no contestaba, y si les llegó "
                   "(llega).",
     "vencida": "La tarea pasó el día en que vencía y, si la persona había dado un día "
@@ -598,17 +598,17 @@ SIGNIFICADOS: Mapping[str, str] = {
     # --- Lo que dice un aviso que Leda manda por su cuenta ------------------------------------
     "aviso": "Qué aviso es, con su código.",
     "necesita_respuesta": "Si el aviso espera una respuesta de quien lo recibe.",
-    "numero": "Cuántas veces seguidas, contando ésta, Leda le pregunta cómo viene la tarea "
+    "numero": "Cuántas veces seguidas, contando ésta, Leda le consulta cómo viene la tarea "
               "sin que conteste.",
     "responsable": "La persona responsable de la tarea.",
     "prevision_vigente": "El día que la persona dio para terminar la tarea y que vale ahora: "
                          "ese día, el atraso que tendrá si la termina ese día, su porqué y si "
                          "quien aprueba su trabajo ya se enteró o cuándo se entera.",
     "fecha": "Una fecha.",
-    "pide_el_estado_el": "El día en que Leda le va a preguntar cómo viene la tarea: todavía "
+    "pide_el_estado_el": "El día en que Leda le va a consultar cómo viene la tarea: todavía "
                          "no pasó.",
     "si_no_hay_respuesta": "Lo que va a pasar si la persona no contesta: va a quedar asentado "
-                           "que la tarea está atrasada, o que la pregunta quedó sin respuesta "
+                           "que la tarea está atrasada, o que la consulta quedó sin respuesta "
                            "(queda_asentado), y a quiénes les llega (se_avisa_a). Es sólo "
                            "información: nadie toma la tarea ni la destraba por eso. Todavía no "
                            "pasó.",
@@ -618,21 +618,21 @@ SIGNIFICADOS: Mapping[str, str] = {
     "espera_algo_cierto": "Lo que Leda necesita saber de la tarea: un hecho cierto.",
     "seguimiento_por": "Desde qué día Leda sigue la tarea: el día que la persona dio para "
                        "terminarla, si es posterior al día en que vence.",
-    "pedido_desde": "Desde cuándo Leda le pregunta cómo viene la tarea sin respuesta.",
-    "pedidos_de_estado_sin_respuesta": "Cuántas veces Leda le preguntó cómo viene la tarea "
+    "pedido_desde": "Desde cuándo Leda le consulta cómo viene la tarea sin respuesta.",
+    "pedidos_de_estado_sin_respuesta": "Cuántas veces Leda le consultó cómo viene la tarea "
                                        "sin que contestara.",
-    "pedidos_anteriores_que_no_le_llegaron": "Preguntas anteriores de cómo viene la tarea que "
+    "pedidos_anteriores_que_no_le_llegaron": "Consultas anteriores de cómo viene la tarea que "
                                              "no le llegaron a la persona: no se le habla como "
                                              "si las hubiera recibido.",
-    "pedidos_de_estado_que_no_le_llegaron": "Preguntas de cómo viene la tarea que no le "
+    "pedidos_de_estado_que_no_le_llegaron": "Consultas de cómo viene la tarea que no le "
                                             "llegaron a la persona.",
     "avance_sin_algo_cierto": "Lo que la persona contestó antes sin un hecho cierto.",
     "ausencia": "La ausencia de la persona, con desde y hasta.",
     "desde": "Desde cuándo.",
     "hasta": "Hasta cuándo.",
-    "sobre": "Lo anotado sobre lo que se pregunta.",
-    "preguntas_sin_respuesta": "Cuántas veces se hizo la pregunta sin respuesta.",
-    "preguntado_el": "Cuándo se hizo la pregunta por primera vez.",
+    "sobre": "Lo anotado sobre lo que se consulta.",
+    "preguntas_sin_respuesta": "Cuántas veces se hizo la consulta sin respuesta.",
+    "preguntado_el": "Cuándo se hizo la consulta por primera vez.",
     "lo_pendiente": "Lo que tenía el aviso que no salió.",
     "aviso_que_no_salio": "El aviso que no le llegó a quien iba: a quién y qué era.",
     # --- Códigos: cómo terminó una jugada ------------------------------------------------------
@@ -722,7 +722,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "pedirselo_y_contar": "Que la persona trabada se lo pida directamente a quien destraba y le "
                           "cuente a Leda lo que pase (lo que arreglaron, quién lo destraba, o "
                           "que ya puede seguir): Leda no le escribe a quien destraba y al día "
-                          "hábil siguiente le pregunta cómo le fue.",
+                          "hábil siguiente le consulta cómo le fue.",
     "pasarsela_a_otra_persona": "Pasarle la tarea a otra persona del equipo que tenga un chat "
                                 "con Leda.",
     "si_la_termino": "Si la persona terminó la tarea.",
@@ -740,25 +740,25 @@ SIGNIFICADOS: Mapping[str, str] = {
                          "porqué de ese día, con sus palabras.",
     "propuesta": "Leda le propuso algo a la persona: espera que elija una de las propuestas o "
                  "la deje.",
-    "como_vienen_sus_tareas": "Leda le pregunta a la persona cómo viene cada una de sus tareas, "
+    "como_vienen_sus_tareas": "Leda le consulta a la persona cómo viene cada una de sus tareas, "
                               "todas juntas en un solo mensaje, con el ritmo fijo del equipo: "
-                              "espera algo cierto de cada una. Es una sola pregunta, por la "
+                              "espera algo cierto de cada una. Es una sola consulta, por la "
                               "lista entera.",
     "sus_tareas": "Las tareas abiertas de la persona en este mensaje, en una lista: cada una con "
                   "lo que se sabe de ella, también las trabadas y las entregadas, para que vea "
-                  "todo junto y avise si algo cambió. Leda pregunta cómo vienen sólo por las que "
+                  "todo junto y avise si algo cambió. Leda consulta cómo vienen sólo por las que "
                   "no están trabadas ni entregadas.",
-    "sin_respuesta_desde": "Leda le preguntó cómo viene esta tarea en un mensaje anterior, ese "
+    "sin_respuesta_desde": "Leda le consultó cómo viene esta tarea en un mensaje anterior, ese "
                            "día, y la persona todavía no le contó.",
     "solo_lo_que_cambio_o_falta": "Esta lista no es la primera de la semana: trae sólo las "
                                   "tareas que cambiaron o por las que la persona todavía no "
                                   "contó cómo vienen. Las demás siguen como las contó.",
     "sin_novedades_para_la_lista": "No había nada nuevo para la lista: ninguna tarea cambió y "
                                    "la persona ya había contado cómo venían todas.",
-    "antes_le_recuerda_que_vence": "Antes de volver a preguntarle, Leda le recuerda que la "
+    "antes_le_recuerda_que_vence": "Antes de volver a consultarle, Leda le recuerda que la "
                                    "tarea vence pronto, sin pedirle nada (llega, todavía no "
                                    "pasó).",
-    "de_la_lista": "Las tareas de la lista por las que Leda pregunta: las que la persona todavía "
+    "de_la_lista": "Las tareas de la lista por las que Leda consulta: las que la persona todavía "
                    "no contó.",
     "vence_hoy": "La tarea vence hoy.",
     # --- El informe al grupo (C-6, decisión 25; `informe_al_grupo.py`) -------------------------
@@ -776,7 +776,7 @@ SIGNIFICADOS: Mapping[str, str] = {
                 "(para_cuando).",
     "entregadas": "Las tareas entregadas que esperan la revisión.",
     "siguen": "Las tareas que siguen su curso: cada una con su estado y el día en que vence.",
-    "sin_saber_como_vienen": "Las tareas de las que Leda no sabe cómo vienen: le preguntó a "
+    "sin_saber_como_vienen": "Las tareas de las que Leda no sabe cómo vienen: le consultó a "
                              "quien la tiene otro día y todavía no contestó. No están bien ni "
                              "atrasadas: no se sabe.",
     "todo_en_orden": "Lo comprobó el sistema: ninguna tarea atrasada, ninguna trabada y ninguna "
@@ -791,25 +791,25 @@ SIGNIFICADOS: Mapping[str, str] = {
                             "terminada desde el informe anterior.",
     "sin_grupo": "El espacio no tiene un grupo del equipo.",
     "ya_conto_como_viene": "La persona ya había contado cómo viene la tarea y no cambió nada: "
-                           "no hacía falta preguntárselo ese día.",
+                           "no hacía falta consultárselo ese día.",
     "ya_paso_su_momento": "El día de ese mensaje ya pasó: no se manda otro día.",
     "no_es_dia_habil": "Ese día no es de trabajo para el equipo.",
-    "sin_tareas_abiertas": "La persona no tiene tareas por las que preguntarle.",
+    "sin_tareas_abiertas": "La persona no tiene tareas por las que consultarle.",
     # --- Códigos: los avisos que Leda manda por su cuenta --------------------------------------
     "aviso_previo": "Aviso de que la tarea vence pronto; no pide respuesta.",
     "vencimiento_proximo": "La tarea vence pronto; no pide respuesta.",
     "vencimiento_con_prevision": "La tarea vence hoy, pero la persona ya dijo otro día para "
                                  "terminarla: no pide nada.",
-    "pedido_de_estado": "Leda pregunta cómo viene la tarea: espera algo cierto.",
+    "pedido_de_estado": "Leda consulta cómo viene la tarea: espera algo cierto.",
     "reencuadre": "Leda retoma el seguimiento después de una ausencia.",
     "vuelta_de_ausencia": "La persona volvió de una ausencia: Leda retoma el seguimiento.",
     "escalamiento": "Aviso a quien corresponde de que la persona no contesta.",
     "falta_de_respuesta": "La persona no contestó los pedidos: se le avisa a quien "
                           "corresponde.",
-    "repregunta_de_estado": "Leda vuelve a preguntar cómo viene la tarea después de una "
+    "repregunta_de_estado": "Leda vuelve a consultar cómo viene la tarea después de una "
                             "respuesta sin un hecho cierto.",
-    "repregunta": "Leda vuelve a hacer una pregunta que no tuvo respuesta.",
-    "repeticion_del_dia": "Leda vuelve a hacer, una sola vez en el día, una pregunta que la "
+    "repregunta": "Leda vuelve a hacer una consulta que no tuvo respuesta.",
+    "repeticion_del_dia": "Leda vuelve a hacer, una sola vez en el día, una consulta que la "
                           "persona todavía no contestó.",
     "vuelve_la_pregunta": "Leda vuelve, en un mensaje aparte, a una pregunta que había "
                           "quedado sin contestar: la persona contestó la otra que estaba "
@@ -817,7 +817,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "la_misma_pregunta_sale_en_otro_aviso": "La misma pregunta sale en otro mensaje de ese "
                                             "momento: no se repite dos veces.",
     "ya_no_es_el_dia_de_la_repeticion": "La repetición era para otro día: ese día ya pasó.",
-    "escalamiento_de_una_pregunta": "Aviso a quien corresponde de que una pregunta quedó sin "
+    "escalamiento_de_una_pregunta": "Aviso a quien corresponde de que una consulta quedó sin "
                                     "respuesta.",
     "nueva_prevision": "Aviso a quien aprueba el trabajo de la persona responsable: dio un "
                        "día nuevo para terminar su tarea. Es información para él; no pide "
@@ -859,15 +859,15 @@ SIGNIFICADOS: Mapping[str, str] = {
                         "encargado del sector, que todavía no contestó: no se pide otra vez.",
     "ya_lo_pidio": "La persona ya pidió el detalle de esa tarea y todavía no le contestaron.",
     "ya_la_ve": "La persona ya ve el detalle de esa tarea: no hace falta pedirlo.",
-    "detalle_pedido": "Quedó pedido el detalle de la tarea: Leda le pregunta al encargado del "
-                      "sector de la tarea si se la comparte (le_pregunta_a) y le avisa a la "
-                      "persona cuando conteste. Todavía no se la compartió.",
+    "detalle_pedido": "Quedó pedido el detalle de la tarea: Leda le consulta al encargado del "
+                      "sector de la tarea si se la comparte y le avisa a la persona cuando "
+                      "conteste. Todavía no se la compartió.",
     "compartir_el_detalle": "Pregunta al encargado del sector de una tarea si le comparte su "
                             "detalle a quien lo pidió, con dos botones; también se contesta "
                             "escribiendo.",
     "pedido_del_detalle": "Mensaje de Leda, como Leda, al encargado del sector de una tarea: "
                           "quién pide ver su detalle (pide_ver_el_detalle), de quién es la tarea "
-                          "(la_tiene) y cuándo vence; pregunta si se la comparte.",
+                          "(la_tiene) y cuándo vence; consulta si se la comparte.",
     "pide_ver_el_detalle": "Quién pide ver el detalle de la tarea (sus fotos, archivos y "
                            "correcciones).",
     "espera_que_decida_si_la_comparte": "Una tarea de otra persona (la_tiene) cuyo detalle "
@@ -888,7 +888,7 @@ SIGNIFICADOS: Mapping[str, str] = {
                                           "de la tarea se quedó sin encargado mientras "
                                           "esperaba (sin_encargado_del_sector, el_detalle_lo_ve), "
                                           "lo mismo que si no lo hubiera tenido al pedirlo; o, "
-                                          "a quien Leda le preguntaba si lo compartía, que ya "
+                                          "a quien Leda le consultaba si lo compartía, que ya "
                                           "no hace falta que conteste "
                                           "(ya_no_espera_su_respuesta). Es información: no pide "
                                           "respuesta.",
@@ -902,10 +902,10 @@ SIGNIFICADOS: Mapping[str, str] = {
     "ya_lleva_el_enlace_de_otra_tarea": "Este mensaje ya lleva el enlace de otra tarea, y "
                                         "lleva uno solo: el de ésta se puede pedir aparte.",
     # --- La persecución del bloqueo (C-5, porción 1; `persecucion.py`) -------------------------
-    "se_le_pregunta_a": "A quién le pregunta Leda, como Leda y no en nombre de nadie, para "
+    "se_le_pregunta_a": "A quién le consulta Leda, como Leda y no en nombre de nadie, para "
                         "cuándo destraba la tarea (a), y cuándo le llega (llega).",
     "no_se_le_puede_escribir_a": "A quién Leda no le puede escribir por este chat (a), y por "
-                                 "qué (motivo): no se le pregunta nada ni se promete que se "
+                                 "qué (motivo): no se le consulta nada ni se promete que se "
                                  "va a enterar.",
     "se_le_aviso_al_administrador": "El aviso al administrador para que conecte con Leda a esa "
                                     "persona (para_que_conecte), con cuándo le llega (llega), o "
@@ -920,7 +920,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "pregunta_a_quien_destraba": "Mensaje de Leda, como Leda, a quien puede destrabar la tarea "
                                  "de otra persona: quién está trabado (responsable), con qué "
                                  "tarea y qué le falta (causa), como lo dijo esa persona, y la "
-                                 "pregunta de para cuándo lo puede resolver. No es un mensaje "
+                                 "consulta de para cuándo lo puede resolver. No es un mensaje "
                                  "en nombre de nadie.",
     "lo_que_dijo_quien_destraba": "Aviso a la persona trabada con lo que dijo quien puede "
                                   "destrabar su tarea (quien_destraba). Es información: no "
@@ -960,21 +960,21 @@ SIGNIFICADOS: Mapping[str, str] = {
                       "tarea y para cuándo: espera su respuesta.",
     "pregunta_a_quien_esta_trabado": "Mensaje de Leda a la persona trabada: quien puede "
                                      "destrabar su tarea (quien_destraba) dice que ya lo "
-                                     "hablaron, sin decir qué; la pregunta de qué arreglaron y "
+                                     "hablaron, sin decir qué; la consulta de qué arreglaron y "
                                      "para cuándo. Vale lo que conteste primero cualquiera de "
                                      "los dos.",
     "como_le_fue_con_quien_destraba": "Mensaje de Leda a la persona trabada, el día hábil "
                                       "siguiente de que dijo que se lo pedía directamente a "
-                                      "quien destraba su tarea (se_lo_pide_a): la pregunta de "
+                                      "quien destraba su tarea (se_lo_pide_a): la consulta de "
                                       "cómo le fue, qué arreglaron y para cuándo.",
     "lo_que_dijo_quien_esta_trabado": "Aviso a quien puede destrabar (o destrababa) la tarea "
                                       "de otra persona con lo que dijo la persona trabada "
                                       "(quien_esta_trabado) sobre lo que arreglaron, o lo que "
                                       "contestó. Es información: no pide respuesta.",
-    "ya_no_hace_falta_que_destrabe": "Aviso a quien Leda le preguntaba por la tarea trabada de "
+    "ya_no_hace_falta_que_destrabe": "Aviso a quien Leda le consultaba por la tarea trabada de "
                                      "otra persona (responsable): el tema se cerró sin esa "
                                      "persona (como_se_cerro), así que ya no hace falta lo que "
-                                     "se le pedía y Leda no le pregunta más. Es información: no "
+                                     "se le pedía y Leda no le consulta más. Es información: no "
                                      "pide respuesta.",
     "se_lo_pasa_si_contesta": "Lo que llega es lo que dijo la otra persona de lo que "
                               "arreglaron, o lo que contestó: si es así, no hace falta que haga "
@@ -999,19 +999,19 @@ SIGNIFICADOS: Mapping[str, str] = {
     "dijo_que_se_lo_pedia": "La persona trabada que, después de que quien recibe el aviso dio "
                             "su día, le dijo a Leda (no a quien recibe el aviso) que se lo iba "
                             "a pedir directamente. Ese día sigue valiendo, y por eso Leda le "
-                            "pregunta igual.",
+                            "consulta igual.",
     "quedo_sin_efecto": "El bloqueo se había anotado por error y quedó sin efecto.",
-    "ya_no_hace_falta_que_destraben": "A quiénes Leda les preguntaba por la tarea trabada y "
+    "ya_no_hace_falta_que_destraben": "A quiénes Leda les consultaba por la tarea trabada y "
                                       "ahora les avisa que ya no hace falta "
                                       "(aviso_a_quien_destrababa).",
-    "aviso_a_quien_destrababa": "El aviso de que ya no hace falta, a quien Leda le preguntaba "
+    "aviso_a_quien_destrababa": "El aviso de que ya no hace falta, a quien Leda le consultaba "
                                 "por la tarea trabada: a quién (a) y cuándo se entera (llega).",
     # Un "no le escribas" corregido tarde (decisión 61): a quien ya le llegó que no hacía falta.
     "lo_de_antes_era_por_otra_tarea": "Lo que Leda le dijo antes a quien recibe el mensaje, que "
                                       "ya no hacía falta que destrabara esta tarea, era por otra "
                                       "tarea (la nombrada, si se nombra): se había anotado en la "
                                       "equivocada. Para esta tarea sigue haciendo falta. Si el "
-                                      "mensaje no pregunta nada, Leda le pregunta el día que "
+                                      "mensaje no pregunta nada, Leda le consulta el día que "
                                       "había dicho (habia_dicho).",
     "aviso_de_que_sigue_haciendo_falta": "El aviso a quien Leda le había dicho que ya no hacía "
                                          "falta que destrabara la tarea: eso era por otra tarea y "
@@ -1023,7 +1023,7 @@ SIGNIFICADOS: Mapping[str, str] = {
                                "palabras.",
     "aviso_a_quien_destraba": "El aviso con lo que dijo la persona que escribe, a quien destraba "
                               "su tarea: a quién (a) y cuándo se entera (llega).",
-    "le_pregunta_tambien_a": "La misma pregunta, qué arreglaron y para cuándo, también a la "
+    "le_pregunta_tambien_a": "La misma consulta, qué arreglaron y para cuándo, también a la "
                              "persona trabada: a quién (a) y cuándo le llega (llega). Vale lo "
                              "que conteste primero cualquiera de los dos.",
     "ya_se_habia_destrabado": "Lo que dijo quien destrababa la tarea llegó después de que la "
@@ -1033,12 +1033,12 @@ SIGNIFICADOS: Mapping[str, str] = {
                                         "lo que diga de eso le llega a quien la tiene. No es una "
                                         "tarea suya.",
     "se_lo_pide_a": "A quién se lo pide directamente la persona trabada.",
-    "le_pregunta_como_le_fue": "Cuándo le pregunta Leda a la persona trabada cómo le fue "
+    "le_pregunta_como_le_fue": "Cuándo le consulta Leda a la persona trabada cómo le fue "
                                "(llega).",
     "ya_lo_conto_quien_destraba": "Quien puede destrabar la tarea ya contó lo que arreglaron: "
-                                  "la pregunta a la persona trabada ya no hace falta.",
+                                  "la consulta a la persona trabada ya no hace falta.",
     "ya_lo_conto_quien_esta_trabado": "La persona trabada ya contó lo que arreglaron: la "
-                                      "pregunta ya no hace falta.",
+                                      "consulta ya no hace falta.",
     "volvio_a_ser_quien_destraba": "La persona trabada volvió a decir que la destraba esa misma "
                                    "persona.",
     "sin_quien_destraba": "La tarea trabada no tiene a otra persona que la destrabe: no hay con "
@@ -1066,7 +1066,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "quien_mas_puede_destrabar": "Mensaje de Leda a la persona trabada: quien Leda creía que "
                                  "podía destrabar su tarea (quien_destraba) dice que no le "
                                  "corresponde y no sabe de quién es (dice_quien_destraba); la "
-                                 "pregunta de si se le ocurre otra persona que pueda "
+                                 "consulta de si se le ocurre otra persona que pueda "
                                  "destrabarla. Si no se le ocurre nadie, queda asentado.",
     "se_le_informo_que_sigue_trabada": "Una tarea de otra persona, trabada, que Leda le "
                                        "informó a la persona que escribe que sigue trabada: lo "
@@ -1098,7 +1098,7 @@ SIGNIFICADOS: Mapping[str, str] = {
                         "quién la puede destrabar (lo_destraba).",
     # --- Seguir la cadena hasta quien puede destrabarla (C-5e; decisión 42) -------------------
     "ya_esta_trabado": "Quien puede destrabar la tarea (a) ya está trabado con lo que le falta: "
-                       "Leda no le pregunta lo que no puede dar. Lo que espera, hasta quien "
+                       "Leda no le consulta lo que no puede dar. Lo que espera, hasta quien "
                        "puede destrabarlo (esperando_a: cada tarea con quién la tiene, lo que la "
                        "traba, quién la destraba y lo último que dijo esa persona).",
     "se_entera_de_cada_avance": "La persona trabada se va a enterar de cada avance de lo que "
@@ -1107,18 +1107,18 @@ SIGNIFICADOS: Mapping[str, str] = {
                               "está o sus palabras.",
     "lo_esperan": "Las tareas trabadas de otras personas que esperaban lo que la persona que "
                   "escribe acaba de destrabar: ahora puede dar lo que les falta, y Leda le "
-                  "pregunta para cuándo (le_pregunta_para_cuando).",
-    "le_pregunta_para_cuando": "La pregunta a la persona que escribe de para cuándo destraba la "
+                  "consulta para cuándo.",
+    "le_pregunta_para_cuando": "La consulta a la persona que escribe de para cuándo destraba la "
                                "tarea de otra persona (responsable), con lo que le falta (causa) "
                                "y cuándo le llega (llega).",
-    "le_vuelve_a_preguntar": "El día que dijo la persona que escribe, Leda le vuelve a preguntar "
+    "le_vuelve_a_preguntar": "El día que dijo la persona que escribe, Leda le vuelve a consultar "
                              "si ya está (llega).",
     "se_le_cerro_el_tema": "Después de que esa persona dio un día, Leda le avisó que ya no hace "
-                           "falta que destrabe la tarea y que no le va a preguntar más: no se "
-                           "le pregunta.",
+                           "falta que destrabe la tarea y que no le va a consultar más: no se "
+                           "le consulta.",
     "el_dia_que_dijo_quien_destraba": "Mensaje de Leda, como Leda, a quien puede destrabar la "
                                       "tarea de otra persona: hoy es el día que dijo "
-                                      "(habia_dicho); la pregunta de si ya está o para cuándo. "
+                                      "(habia_dicho); la consulta de si ya está o para cuándo. "
                                       "Quién está trabado (responsable) y qué le falta (causa).",
     "su_tarea_no_esta_trabada": "La tarea suya con la que quien escribe dijo estar trabado "
                                 "(su_tarea_trabada) no está trabada, ni después de todo lo que "
@@ -1173,12 +1173,12 @@ SIGNIFICADOS: Mapping[str, str] = {
     "la_tiene": "Quién tiene la tarea ahora: quien la hace y da sus novedades.",
     "pasaria_a": "A quién pasaría la tarea con el pase.",
     "al_confirmar_el_pase": "Lo que pasa cuando la persona confirme el pase: si lo decide otra "
-                            "persona, Leda se lo pregunta primero (lo_decide); después, quien "
+                            "persona, Leda se lo consulta primero (lo_decide); después, quien "
                             "la recibe tiene que decir que la toma (la_tiene_que_tomar). Hasta "
                             "que la tome, la tarea sigue con quien la tiene.",
     "lo_decide": "Quién decide si la tarea pasa: el encargado del sector de quien la recibe. "
-                 "Leda se lo pregunta antes que a quien la recibe.",
-    "la_tiene_que_tomar": "Quién recibe la tarea: Leda le pregunta si la toma, y sólo con su sí "
+                 "Leda se lo consulta antes que a quien la recibe.",
+    "la_tiene_que_tomar": "Quién recibe la tarea: Leda le consulta si la toma, y sólo con su sí "
                           "pasa a ser suya.",
     "decide_y_la_toma": "Quien recibe la tarea es también quien decide: su sí vale como las "
                         "dos cosas.",
@@ -1188,9 +1188,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                             "y Leda le avisa a quien la tenía.",
     "se_la_queda": "La persona que escribe se queda con la tarea de otra persona, para hacerla.",
     "pase_pedido": "El pase quedó pedido: la tarea sigue con quien la tiene hasta que la tomen, "
-                   "y Leda le pregunta a quien sigue (le_pregunta_a).",
-    "le_pregunta_a": "A quién le pregunta Leda por el pase, como Leda y no en nombre de nadie "
-                     "(a), y cuándo le llega (llega).",
+                   "y Leda le consulta a quien sigue.",
+    "le_pregunta_a": "A quién le consulta Leda por el pase o por el detalle, como Leda y no en "
+                     "nombre de nadie (a), y cuándo le llega (llega).",
     "aprobo_el_pase": "Si quien escribe aprobó que la tarea pase a otra persona (verdadero) o "
                       "no (falso).",
     "la_toma": "Si quien escribe toma la tarea que le querían pasar, o la de alguien de su sector "
@@ -1212,12 +1212,12 @@ SIGNIFICADOS: Mapping[str, str] = {
                       "también se contesta escribiendo.",
     "pase_para_decidir": "Mensaje de Leda, como Leda, a quien decide si una tarea de otra "
                          "persona pasa a alguien: quién lo pidió (pidio), quién la tiene "
-                         "(la_tiene), a quién pasaría (pasaria_a) y para cuándo vence; pregunta "
+                         "(la_tiene), a quién pasaría (pasaria_a) y para cuándo vence; consulta "
                          "si lo aprueba.",
     "pase_para_tomar": "Mensaje de Leda, como Leda, a quien le quieren pasar una tarea: quién lo "
                        "pidió (pidio), quién la tiene (la_tiene), para cuándo vence y, si "
                        "corresponde, quién lo aprobó (lo_aprobo) o que lo decide la misma "
-                       "persona (tambien_lo_decide); pregunta si la toma.",
+                       "persona (tambien_lo_decide); consulta si la toma.",
     "como_termino_el_pase": "Aviso de cómo terminó el pase de una tarea: si quien la recibía "
                             "(pasaria_a) la tomó (la_tomo), si quien decidía no lo aprobó "
                             "(no_lo_aprobo, lo_decidio), si nadie contestó (sin_respuesta) o si "
@@ -1251,28 +1251,28 @@ SIGNIFICADOS: Mapping[str, str] = {
     "la_tarea_cambio": "La tarea ya no se puede pasar (se entregó o se cerró): el pase quedó "
                        "sin efecto.",
     "el_pase_ya_no_espera": "El pase ya no espera eso: se decidió, se tomó o terminó.",
-    "cambio_quien_la_tiene": "La tarea pasó a otra persona: lo que se le preguntaba a quien la "
+    "cambio_quien_la_tiene": "La tarea pasó a otra persona: lo que se le consultaba a quien la "
                              "tenía ya no espera nada.",
     # Un pase que nadie contesta (decisión 26), el encargado que pasa una tarea de su gente (27) y
     # la revisión que sigue a quien era la tarea (28).
-    "recordatorio_del_pase": "Mensaje de Leda, como Leda, que vuelve a hacer la pregunta del "
+    "recordatorio_del_pase": "Mensaje de Leda, como Leda, que vuelve a hacer la consulta del "
                              "pase que la persona todavía no contestó (si lo aprueba o si toma "
                              "la tarea), por única vez; se contesta igual que la primera.",
-    "se_lo_pregunto_el": "El día en que Leda le hizo la pregunta por primera vez.",
+    "se_lo_pregunto_el": "El día en que Leda le hizo la consulta por primera vez.",
     "si_sigue_sin_contestar": "Lo que pasa si la persona sigue sin contestar: ese día (fecha) "
                               "el pase termina y la tarea sigue con quien la tiene (sigue_con), "
                               "o el pedido del detalle termina sin compartirla "
                               "(no_se_comparte).",
     "no_se_comparte": "El detalle de la tarea no se comparte: nada cambia.",
-    "sin_respuesta": "Nadie contestó la pregunta del pase o del pedido del detalle (no_contesto "
+    "sin_respuesta": "Nadie contestó la consulta del pase o del pedido del detalle (no_contesto "
                      "dice quién tenía que hacerlo), ni la primera vez ni cuando Leda la "
                      "repitió: terminó sin que nada cambie (la tarea sigue con quien la tenía; "
                      "el detalle no se compartió).",
-    "no_contesto": "Quién tenía que contestar la pregunta del pase o del pedido del detalle y no "
+    "no_contesto": "Quién tenía que contestar la consulta del pase o del pedido del detalle y no "
                    "contestó.",
     "puede_volver_a_pedirlo": "Quien pidió el detalle de la tarea puede volver a pedirlo.",
     "recordatorio_del_pedido_del_detalle": "Mensaje de Leda, como Leda, al encargado del sector "
-                                           "de una tarea, que vuelve a hacer la pregunta del "
+                                           "de una tarea, que vuelve a hacer la consulta del "
                                            "pedido del detalle que todavía no contestó (si se lo "
                                            "comparte a pide_ver_el_detalle), por única vez; se "
                                            "contesta igual que la primera.",
@@ -1282,13 +1282,13 @@ SIGNIFICADOS: Mapping[str, str] = {
                 "sector (pidio), y ahora la tiene otra persona (la_tiene).",
     "aviso_a_quien_la_tenia": "Lo que se le avisa a quien tenía la tarea, que pasó a otra "
                               "persona: a quién (a) y cuándo se entera (llega).",
-    "aviso_a_quien_se_le_preguntaba": "Lo que se le avisa a quien Leda le preguntaba por el pase "
+    "aviso_a_quien_se_le_preguntaba": "Lo que se le avisa a quien Leda le consultaba por el pase "
                                       "y no llegó a contestar, de cómo terminó: a quién (a) y "
                                       "cuándo se entera (llega).",
-    "ya_no_espera_su_respuesta": "Leda le preguntaba a quien recibe este mensaje por el pase "
+    "ya_no_espera_su_respuesta": "Leda le consultaba a quien recibe este mensaje por el pase "
                                  "(si lo aprobaba o si tomaba la tarea) o por el pedido del "
                                  "detalle (si lo compartía), que pidió pidio; terminó y ya no "
-                                 "hace falta que conteste: Leda no le pregunta más.",
+                                 "hace falta que conteste: Leda no le consulta más.",
     "no_es_de_su_sector": "La tarea nombrada es de otra persona (la_tiene) que no es de su "
                           "sector: quien escribe no la puede pasar.",
     "ya_la_tiene": "Quien recibiría la tarea es quien ya la tiene.",
@@ -1315,10 +1315,18 @@ SIGNIFICADOS: Mapping[str, str] = {
 # "contar"), y a una entrega incompleta le falta algo para entregarla, no "evidencia" (C-3d, D7:
 # la IA escribía "Sumé lo que contaste" y "Todavía no se puede entregar"; el modelo que aprobó
 # el usuario dice "Sumé tu descripción" y "Para entregarla falta saber…").
+#
+# Cuando Leda le escribe a alguien para saber algo (después, a otra persona, o lo que ya le
+# escribió antes), lo hace con una consulta, no con una pregunta (decisión 78 del usuario,
+# 2026-10-12: "preguntar" suena a interrogatorio; la IA escribía "Le voy a preguntar a Ariel…" y
+# "Te voy a preguntar cómo te fue"). "Pregunta" queda para la de este mensaje, el dato que nombra
+# la instrucción de redacción, y para lo que pregunta la persona (`solo_si_pregunta`).
 CONCEPTOS_DE_LA_COCINA = ("prevision", "comprometid", "referente", "dependiente", "escal",
                           "aviso_previo", "reencuadre", "repregunta", "de_estado", "el_estado",
                           "esperando_la_aprobacion", "para_aprobar", "aprobacion_trabada",
-                          "aprobacion_destrabada", "lo_que_escribio", "falta_evidencia")
+                          "aprobacion_destrabada", "lo_que_escribio", "falta_evidencia",
+                          "le_pregunta", "a_preguntar", "pregunto", "preguntado",
+                          "preguntas_sin", "pregunta_a_quien")
 
 
 def es_un_concepto_de_la_cocina(nombre: str) -> bool:
@@ -1338,8 +1346,8 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "dependientes": "tareas_que_dependen_de_esta",
     "aviso_al_referente": "aviso_a_quien_aprueba_su_trabajo",
     "el_pedido_de_estado": "sigue_esperando_saber_como_viene",
-    "vuelve_a_pedir_el_estado": "vuelve_a_preguntar_como_viene",
-    "no_vuelve_a_pedir_el_estado": "no_vuelve_a_preguntar_como_viene",
+    "vuelve_a_pedir_el_estado": "vuelve_a_consultar_como_viene",
+    "no_vuelve_a_pedir_el_estado": "no_vuelve_a_consultar_como_viene",
     "escalado_a": "avisados_de_que_no_contestaba",
     "prevision_vencida": "el_dia_que_dio_para_terminarla_tambien_paso",
     "prevision_corregida": "dia_para_terminarla_corregido",
@@ -1349,12 +1357,23 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "prevision_que_no_vale": "dia_para_terminarla_que_ya_no_vale",
     "prevision_vigente": "dia_para_terminarla_que_vale_ahora",
     "queda_esperando_la_aprobacion_de": "queda_esperando_la_revision_de",
-    "pide_el_estado_el": "pregunta_como_viene_el",
-    "pedidos_de_estado_sin_respuesta": "veces_que_pregunto_como_viene_sin_respuesta",
-    "pedidos_de_estado_que_no_le_llegaron": "preguntas_de_como_viene_que_no_le_llegaron",
+    "pide_el_estado_el": "consulta_como_viene_el",
+    "pedidos_de_estado_sin_respuesta": "veces_que_consulto_como_viene_sin_respuesta",
+    "pedidos_de_estado_que_no_le_llegaron": "consultas_de_como_viene_que_no_le_llegaron",
+    # A quién y cuándo le escribe Leda para saber algo (decisión 78).
+    "le_pregunta_a": "le_consulta_a",
+    "le_pregunta_como_le_fue": "le_consulta_como_le_fue",
+    "le_pregunta_para_cuando": "le_consulta_para_cuando",
+    "le_pregunta_tambien_a": "le_consulta_tambien_a",
+    "le_vuelve_a_preguntar": "le_vuelve_a_consultar",
+    "se_le_pregunta_a": "se_le_consulta_a",
+    "se_lo_pregunto_el": "se_lo_consulto_el",
+    "preguntado_el": "consultado_el",
+    "preguntas_sin_respuesta": "consultas_sin_respuesta",
+    "aviso_a_quien_se_le_preguntaba": "aviso_a_quien_se_le_consultaba",
     # --- Códigos: por qué no se hizo, no salió o ya no va a pasar ------------------------------
     "sin_fecha_comprometida": "sin_dia_en_que_vence",
-    "nadie_pidio_el_estado": "no_le_habia_preguntado_como_viene",
+    "nadie_pidio_el_estado": "no_le_habia_consultado_como_viene",
     "ya_se_escalo": "ya_se_aviso_que_no_contestaba",
     "misma_fecha_comprometida": "el_dia_que_dio_es_el_dia_en_que_vence",
     "sin_referente": "nadie_aprueba_su_trabajo",
@@ -1364,12 +1383,14 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     # --- Códigos: los avisos que Leda manda por su cuenta --------------------------------------
     "aviso_previo": "aviso_de_que_vence_pronto",
     "vencimiento_con_prevision": "vence_hoy_pero_dio_otro_dia_para_terminarla",
-    "pedido_de_estado": "pregunta_como_viene_la_tarea",
+    "pedido_de_estado": "consulta_como_viene_la_tarea",
     "reencuadre": "retoma_despues_de_una_ausencia",
     "escalamiento": "aviso_de_que_no_contesta",
-    "repregunta_de_estado": "vuelve_a_preguntar_tras_una_respuesta_sin_algo_cierto",
-    "repregunta": "vuelve_a_hacer_una_pregunta_sin_respuesta",
-    "escalamiento_de_una_pregunta": "aviso_de_una_pregunta_sin_respuesta",
+    "repregunta_de_estado": "vuelve_a_consultar_tras_una_respuesta_sin_algo_cierto",
+    "repregunta": "vuelve_a_consultar_algo_sin_respuesta",
+    "escalamiento_de_una_pregunta": "aviso_de_una_consulta_sin_respuesta",
+    "pregunta_a_quien_destraba": "consulta_a_quien_destraba",
+    "pregunta_a_quien_esta_trabado": "consulta_a_quien_esta_trabado",
     "nueva_prevision": "dio_otro_dia_para_terminar_su_tarea",
     "correccion_de_prevision": "el_dia_para_terminarla_que_recibio_ya_no_vale",
     "entrega_para_aprobar": "entrega_para_revisar",

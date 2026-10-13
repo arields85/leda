@@ -153,7 +153,7 @@ def test_quien_aprueba_el_trabajo_de_la_persona_llega_a_la_redaccion_solo_si_pre
     assert recibido["hechos"][0]["aviso_a_quien_aprueba_su_trabajo"] == {
         "solo_si_pregunta": {"a": "Ismael", "llega": "2026-10-20T15:50:00-03:00"}}
     # Un código de si le llegó o no queda a la vista: no es una hora.
-    assert recibido["hechos"][3]["no_vuelve_a_preguntar_como_viene"][
+    assert recibido["hechos"][3]["no_vuelve_a_consultar_como_viene"][
         "avisados_de_que_no_contestaba"] == [
         {"llega": "ya_le_llego", "solo_si_pregunta": {"a": "Ismael"}}]
     assert recibido["hechos"][4]["si_no_hay_respuesta"] == {
@@ -301,3 +301,103 @@ def test_lo_que_la_persona_entrega_lo_describe():
     """Decisión 10: "describir", no "contar", en lo que la IA lee sobre la entrega."""
     for texto in (hechos.significado("el_texto_cubre"), DATOS["el_texto_cubre"][1]):
         assert "describe" in texto and "cont" not in texto, texto
+
+
+# --- "Consultar", no "preguntar" (decisión 78 del usuario, 2026-10-12) -----------------------
+#
+# En la prueba por Telegram Leda escribía "Le voy a preguntar a Ariel…", "Mañana a las 10 te voy
+# a preguntar si ya se la pasaste" y "Te voy a preguntar cómo te fue": "preguntar" suena a
+# interrogatorio. Como con "previsión", la IA toma la palabra de lo que lee: los nombres de los
+# datos y sus significados. Cuando Leda le escribe a alguien para saber algo (después, a otra
+# persona, o lo que ya le escribió antes), lo que lee la IA dice "consultar".
+#
+# Lo que sigue siendo una pregunta es la de este mensaje, el dato `pregunta` que nombra la
+# instrucción de redacción (abierta, para después, cerrada, sus opciones), y lo que pregunta la
+# persona (`solo_si_pregunta`).
+LA_PREGUNTA_DE_ESTE_MENSAJE = frozenset({
+    "pregunta", "pregunta_abierta", "pregunta_cerrada", "pregunta_hecha_una_vez",
+    "pregunta_para_despues", "pregunta_sigue_abierta", "preguntas_ya_cerradas",
+    "otras_preguntas_para_despues", "contesta_la_pregunta", "la_pregunta_espera_respuesta",
+    "la_misma_pregunta_sale_en_otro_aviso", "sin_pregunta_abierta", "vuelve_la_pregunta",
+    "solo_si_pregunta", "dejar_sin_efecto_la_pregunta", "dejar_la_pregunta_para_mas_tarde"})
+
+# Los datos que son, enteros, Leda escribiéndole a alguien para saber algo: su significado no
+# dice "pregunta" de ninguna forma.
+CONSULTAS_DE_LEDA = (
+    "le_pregunta_a", "le_pregunta_como_le_fue", "le_pregunta_para_cuando",
+    "le_pregunta_tambien_a", "le_vuelve_a_preguntar", "se_le_pregunta_a", "se_lo_pregunto_el",
+    "preguntado_el", "preguntas_sin_respuesta", "pregunta_a_quien_destraba",
+    "pregunta_a_quien_esta_trabado", "aviso_a_quien_se_le_preguntaba",
+    "vuelve_a_pedir_el_estado", "no_vuelve_a_pedir_el_estado", "pide_el_estado_el",
+    "pedidos_de_estado_sin_respuesta", "pedidos_de_estado_que_no_le_llegaron",
+    "pedidos_anteriores_que_no_le_llegaron", "nadie_pidio_el_estado", "pedido_de_estado",
+    "pedido_desde", "numero", "sin_respuesta_desde", "veces_sin_algo_cierto", "repregunta",
+    "repregunta_de_estado", "escalamiento_de_una_pregunta", "repeticion_del_dia",
+    "recordatorio_del_pase", "recordatorio_del_pedido_del_detalle",
+    "como_le_fue_con_quien_destraba", "el_dia_que_dijo_quien_destraba",
+    "quien_mas_puede_destrabar", "pedido_del_detalle", "pase_para_decidir", "pase_para_tomar",
+    "ya_lo_conto_quien_destraba", "ya_lo_conto_quien_esta_trabado", "sin_respuesta",
+    "no_contesto", "ya_no_espera_su_respuesta", "ya_no_hace_falta_que_destrabe",
+    "ya_no_hace_falta_que_destraben", "aviso_a_quien_destrababa", "cambio_quien_la_tiene",
+    "como_termino_el_pedido_del_detalle")
+
+# Leda preguntando, en cualquier forma: Leda o un pronombre antes del verbo, volver o ir a
+# preguntar, "preguntarle" o "preguntárselo", hacer o hacerle la pregunta, y la pregunta de algo.
+LEDA_PREGUNTA = re.compile(
+    r"\b(?:Leda|le|les|se le|se lo|se la)\s+(?:no\s+)?(?:(?:vuelve|va|volvía|iba)\s+a\s+)?"
+    r"pregunt"
+    r"|\b(?:vuelve|volver|va|iba)\s+a\s+pregunt"
+    r"|\bpregunt[aá]r(?:le|les|selo|sela)\b"
+    r"|\b(?:hac\w*|hizo)\s+(?:una|la)\s+pregunta\b"
+    r"|\bpregunta de (?:si|cómo|qué|para)\b")
+
+
+def test_ningun_nombre_para_redactar_dice_preguntar_salvo_la_pregunta_de_este_mensaje():
+    """Decisión 78: el nombre que la IA lee de un dato en que Leda le escribe a alguien dice
+    "consultar"; "pregunta" queda sólo para la de este mensaje."""
+    dicen = {hechos.para_redactar(n) for n in NOMBRES
+             if "pregunt" in hechos.para_redactar(n)}
+    assert dicen <= LA_PREGUNTA_DE_ESTE_MENSAJE, sorted(dicen - LA_PREGUNTA_DE_ESTE_MENSAJE)
+
+
+def test_lo_que_recibe_la_redaccion_dice_consultar():
+    """Lo mismo en lo que recibe de verdad la IA real: los hechos, los últimos turnos y la lista
+    de significados."""
+    recibido, sistema = _lo_que_recibe_la_redaccion(_con_todos_los_nombres())
+
+    nombres = {n for n in hechos._nombres(recibido) if "pregunt" in n}
+    assert nombres <= LA_PREGUNTA_DE_ESTE_MENSAJE, sorted(nombres - LA_PREGUNTA_DE_ESTE_MENSAJE)
+    lista = sistema.split(hechos.ENCABEZADO_DEL_BLOQUE, 1)[1].split("\n\n", 1)[0]
+    assert [m.group(0) for m in LEDA_PREGUNTA.finditer(lista)] == []
+
+
+def test_ningun_significado_dice_que_leda_pregunta():
+    """Decisión 78: Leda consulta. Ningún significado la pone preguntando, y los de los datos en
+    que le escribe a alguien para saber algo no dicen "pregunta" de ninguna forma."""
+    dicen = {n: LEDA_PREGUNTA.search(hechos.significado(n) or "").group(0)
+             for n in NOMBRES if LEDA_PREGUNTA.search(hechos.significado(n) or "")}
+    assert dicen == {}
+    assert set(CONSULTAS_DE_LEDA) <= set(NOMBRES)
+    assert [n for n in CONSULTAS_DE_LEDA if "pregunt" in hechos.significado(n).lower()] == []
+
+
+def test_lo_que_hizo_leda_con_otra_persona_se_lee_como_consulta():
+    """Los avisos de la prueba por Telegram: a quién le escribe Leda por el pase, a quién para
+    saber cuándo destraba, cuándo le vuelve a escribir y cuándo le escribe para saber cómo le
+    fue."""
+    pedido = {"hoy": "2026-10-20", "persona": "Marcos", "mensaje": None, "pregunta": None,
+              "hechos": [{"jugada": "pedir_reasignacion",
+                          "le_pregunta_a": {"a": "Ariel", "llega": "ya_le_llego"}},
+                         {"jugada": "anotar_quien_destraba",
+                          "se_le_pregunta_a": {"a": "Ariel", "llega": "ya_le_llego"}},
+                         {"jugada": "decir_cuando_destraba",
+                          "le_vuelve_a_preguntar": {"llega": "2026-10-21T10:00:00-03:00"}},
+                         {"jugada": "pedirselo_y_contar",
+                          "le_pregunta_como_le_fue": {"llega": "2026-10-21T10:00:00-03:00"}}],
+              "ultimos_turnos": []}
+
+    recibido, _ = _lo_que_recibe_la_redaccion(pedido)
+
+    assert [list(h)[1] for h in recibido["hechos"]] == [
+        "le_consulta_a", "se_le_consulta_a", "le_vuelve_a_consultar", "le_consulta_como_le_fue"]
+    assert pedido["hechos"][0]["le_pregunta_a"] == {"a": "Ariel", "llega": "ya_le_llego"}
