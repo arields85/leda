@@ -49,10 +49,10 @@ Se reevalúa si una prueba real muestra que los pedidos derivados se pierden.
 
 ### 2. En esta etapa, las tareas las crea a mano el administrador (usuario, 2026-10-04)
 
-> **Enmienda propuesta (2026-10-13, a la espera de la aceptación del usuario):** el
+> **Enmendado (2026-10-13, aceptado por el usuario):** el
 > [ADR 0023](0023-quien-crea-en-la-plataforma.md) cambia quién crea las tareas (el equipo, según su
-> jerarquía, por la web), la declaración de quién decidió y la decisión 7, punto 1. Hasta que se
-> acepte, rige lo de acá.
+> jerarquía, por la web), la declaración de quién decidió y la decisión 7, punto 1. Lo de acá rige
+> salvo en lo que el 0023 cambia.
 
 En la primera etapa del Motor ninguna persona del equipo crea tareas. Las crea a mano el
 administrador de plataforma designado, desde la plataforma web (decisión 5). Las personas del equipo las cumplen y Leda hace el

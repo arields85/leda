@@ -12,7 +12,7 @@
   dos puertas en vez de dos aplicaciones, decisión 10) y el ADR 0017, decisión 4 (la fecha la cambia
   el referente, no el administrador, decisión 8). Resuelve el `PENDIENTE` del ADR 0017, decisión 2
   (Leda avisa que se cargó una tarea, decisión 7).
-- **Enmienda propuesta (2026-10-13, a la espera de la aceptación del usuario):** el
+- **Enmendado (2026-10-13, aceptado por el usuario):** el
   [ADR 0023](0023-quien-crea-en-la-plataforma.md) cambia quién crea objetivos, tareas y jerarquías
   (decisiones 3, 6, 7, 9, 10 y 16); el texto que reemplaza a cuál está en su sección "Qué texto
   reemplaza a cuál". Hasta que se acepte, rige lo de acá.

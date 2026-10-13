@@ -1,12 +1,12 @@
 # ADR 0023: Quién crea objetivos, tareas y jerarquías en la plataforma
 
-- **Estado:** Propuesta, a la espera de la aceptación del usuario. Las decisiones 1 a 6 son del
+- **Estado:** Aceptado por el usuario el 2026-10-13 ("acepto"). Las decisiones 1 a 6 son del
   usuario (2026-10-13); su redacción como enmienda, las lecturas marcadas como tales y la división
-  en porciones son del agente. Nada de esto se construye antes de la aceptación (`AGENTS.md`, punto 12).
+  en porciones son del agente. Se construye por porciones, cada una con su prueba real.
 - **Fecha:** 2026-10-13.
 - **Alcance:** quién crea objetivos, tareas y esperas, y quién organiza el equipo (áreas, roles y
   referentes), desde qué puerta de la plataforma y con qué garantías.
-- **Enmienda, al aceptarse:**
+- **Enmienda:**
   - el [ADR 0022](0022-plataforma-web-de-tareas.md), decisiones 3, 6, 9, 10 y 16, y toca la 7 (ver
     `PENDIENTE` 1, resuelto: no cambia); el texto que cambia está citado abajo, en "Qué texto reemplaza a cuál";
   - el [ADR 0017](0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisión 2 (las tareas las
