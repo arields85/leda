@@ -63,6 +63,37 @@ Marcos nunca entró a la web; Ariel ya tiene la sesión abierta.
 Garantías aparte, con pruebas deterministas: un enlace de hace 24 horas y un minuto no abre; el corte deja
 la auditoría con su motivo; el ofrecimiento no se repite aunque se mande dos veces la misma respuesta.
 
+## Mapa del código y decisiones técnicas del coordinador (2026-10-13, madrugada)
+
+Explorador de sólo lectura. Lo que hay: `enlace_de_entrada` con `emitido_en` (`0057`), un solo enlace
+sin usar por persona, `canjear_enlace_de_entrada` (su `update` de canje es donde entra el vencimiento),
+`cortar_sesiones_de_membresia` con el motivo `perdio_el_celular` (audita una fila por sesión cortada,
+no el enlace anulado), los envoltorios en `web_app.py` (`emitir_enlace`, `cortar_sesiones`, que fija
+`administrador`), la marca del enlace de una tarea (`message_outbox_enlace`, `task_id not null`; el
+despachador emite el token dentro del punto de guardado del envío y agrega la dirección sin vista
+previa), el saludo diario como modelo de "reclamar al mandar" (`greeting_state`), y la bienvenida con
+texto fijo (`onboarding.bienvenida`, bajo `admin()`). `leda_app` no lee `enlace_de_entrada` ni
+`sesion_web`: "¿entró alguna vez?" necesita una función `security definer`.
+
+Decisiones técnicas dentro del diseño aceptado (reversibles; ninguna cambia lo que ve la persona salvo
+la 4, que va a la mañana):
+
+1. **"Ya ofrecido" se reserva al armar el turno** (la IA ya escribió la frase) y se libera si el envío
+   falla y no se reintenta; así no salen dos ofrecimientos antes de que salga el primero.
+2. **Un enlace por mensaje:** si la respuesta ya lleva el enlace de una tarea, el ofrecimiento espera al
+   turno siguiente; `pedir_acceso_web` junto con `pedir_enlace` en el mismo mensaje da el código "ya
+   lleva otro enlace", como hoy dos páginas de tarea.
+3. **El corte siempre deja su auditoría**, también si la persona no tenía ninguna sesión abierta (hoy
+   anular sólo el enlace no deja fila): la garantía de la 50 lo pide.
+4. **Un toque no lleva el ofrecimiento** (el diseño dice "a lo que la persona escribió"); sale en su
+   próximo mensaje escrito. **Para confirmar con el usuario a la mañana.**
+5. **Migraciones:** la `0065` el vencimiento; la `0066` la marca del enlace de entrada (tabla nueva,
+   `message_outbox_entrada_web`, con RLS forzado), el estado del ofrecimiento, la función de "entró
+   alguna vez" y la auditoría del corte sin sesiones.
+
+Reparto en commits: (1) la 50 y la clave `enlace_web` del corredor; (2) `0065`; (3) `0066`; (4) las dos
+jugadas y la marca en `enqueue_outbox` y el despachador; (5) el ofrecimiento una vez y la bienvenida.
+
 ## Tareas
 
 Ruta de cada una: delegada (un escritor), porque toca la base, el motor y el corredor.
