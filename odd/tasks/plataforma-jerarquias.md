@@ -571,6 +571,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       pedidos; unas 20 llamadas por vuelta con la IA real). Commits: `a4428fd9` (servidor, herramienta, pruebas y `docs/capacidades.md`) y `73a32f9e` (la web).
       **Falta:** una ronda con la IA real (con permiso: mide si la IA deja vacía la manera cuando la persona no la
       dijo, y el juicio por el sentido) y la prueba del usuario en el celular (J2-12).
+      **RDD de J2-13:** `review-bfa79042ca12447b` (`a4428fd9`, WARNING: la herramienta de medición descarta una falla del juicio, `tools/medir_ayuda_al_cargar.py:437-440`) y `review-97374544422a6d97` (`73a32f9e`, WARNING: el resumen de la caja puede no coincidir con los avisos de cada campo, `HelpBox.tsx:156-157`); las dos aprobadas, sus avisos para arreglar con el cierre de la J2.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**

@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-13, tarde: ADR 0023 aceptado; J1 y J2 hechas y probadas en el celular. Ver "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-13, cierre de la tarde: J1 cerrada; J2 hecha, con su ronda real y su prueba en el celular pendientes de lo último. Ver "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -54,14 +54,29 @@ viejo corriendo.
 - Los bots nuevos del usuario, `@Leda_PM_bot` y `@Leda_Admin_bot` (sus tokens, en el `.env`, los pone el
   usuario); `bot_usuario: Leda_PM_bot` en el pack.
 - Las decisiones de la plataforma por jerarquía: el ADR 0023 y `../odd/tasks/plataforma-p2.md` ("Para decidir").
-- La J1 (las esperas en el formulario) y la J2 (la ayuda de la IA al cargar: "Contame qué querés hacer"),
-  construidas, revisadas por RDD y pasadas en el celular; la J2 con la IA real, 48 de 48.
+- La J1 (las esperas en el formulario), cerrada y pasada en el celular.
+- La J2 (la ayuda de la IA al cargar: "Contame qué querés hacer y te ayudo"), construida, revisada por RDD y
+  probada en el celular; con la IA real, 29 de 33 y después 48 de 48. Tras la segunda prueba del usuario, la
+  J2-13 (`a4428fd9`, `73a32f9e`): el criterio se arma con la evidencia del área y lo juzga la IA por su sentido
+  (salió la lista de palabras, porque un sinónimo dejaba pasar un criterio circular); lo que la ayuda no pudo
+  completar se ve en su campo; los puntos de "completando…" se animan. El aspecto del formulario, ajustado
+  con el usuario hasta "quedó perfecto la parte visual".
 - `leda_motor`, en la `0067` (respaldos en `db/respaldos/`, el último `leda_motor-antes-0067-20261013.dump`).
 
-**Punto exacto para seguir: la J2b** (la voz a texto en el servidor: GPT-4o Transcribe por OpenRouter contra
-Gemini, con unos 10 dictados del usuario; base `research/gemini-voz-del-otro-proyecto.md`), después la J3. El
-túnel para probar: `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000` (la dirección cambia cada vez).
-Lo que sigue a la plataforma, en orden: `ROADMAP.md`.
+**Punto exacto para seguir** (cierre del 2026-10-13, tarde):
+1. **Cerrar la J2:** una ronda con la IA real de lo de la J2-13 (unas 20 llamadas por vuelta; **pedirle
+   permiso al usuario**: `$env:PYTHONPATH="src"; .venv\Scripts\python.exe tools\medir_ayuda_al_cargar.py --ia
+   sol-suscripcion --veces 3 --salida tests\conversaciones\resultados\ayuda-al-cargar-3.json`) y la J2-12, la
+   prueba del usuario en el celular (el guion, en `../odd/tasks/plataforma-jerarquias.md`, J2-12; sumar: el aviso
+   "No encontré a…" en su campo y los puntos animados). En `leda_motor` el reloj de Leda está adelantado (hoy
+   para Leda es jueves 15) y "el tano" no es apodo de nadie.
+2. **La J2b, la voz a texto:** GPT-4o Transcribe por OpenRouter contra Gemini, con unos 10 dictados del usuario;
+   el usuario pone `LEDA_GEMINI_API_KEY` en el `.env`; base `research/gemini-voz-del-otro-proyecto.md`;
+   mantener la pantalla encendida mientras graba.
+3. **Después, la J3** (los objetivos desde la web) y las siguientes, en el orden del documento de la unidad.
+Para probar en el celular, el túnel: `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000` (la
+dirección cambia cada vez), reiniciar la web y emitir el enlace con `leda enlace-admin Ariel`. Lo que sigue a
+la plataforma, en orden: `ROADMAP.md`.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
