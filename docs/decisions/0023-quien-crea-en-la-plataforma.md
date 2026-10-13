@@ -246,8 +246,10 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
    Una propuesta dentro de la tarea prestada la aprueba quien revisa esa tarea (punto 3). **Cambio en
    la base:** hoy quién revisa es un dato de la persona (`aprobado_por`), no de cada tarea; el préstamo
    necesita quién revisa una tarea en particular, `PENDIENTE` de diseño en su porción.
-8. **Un referente crea una tarea para sí mismo.** Ejemplo: Marcos crea "Pedir presupuesto" para él;
-   ¿entra directo como las de su área, y la revisa quien lo aprueba a él (Dirección)?
+8. ~~**Un referente crea una tarea para sí mismo.**~~ **Decidido (usuario, 2026-10-13): "directo".**
+   Entra directo, como las de su área; su entrega la aprueba quien revisa el trabajo del referente
+   (en CoreWork, Dirección: "a los referentes los aprueba Dirección"), así nadie se aprueba a sí mismo;
+   Dirección se entera según lo que eligió en su web (punto 1).
 9. **Una espera sobre una propuesta.** Ejemplo: "Colocar el estante" (comprometida) quiere esperar a
    "Comprar los tornillos" (todavía propuesta); ¿se puede, o sólo entre tareas comprometidas?
 10. **Cambiar quién es la autoridad final.** Ejemplo: Ismael quiere que Martín sea Dirección en su
