@@ -1,7 +1,7 @@
 import { CircleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Candidate, Problem } from './api';
-import { length } from './draft';
+import { FIELD_NAME, FIELD_ORDER, length, PROBLEM_FIELD } from './draft';
 import { heard, micProblem, type Recognizer, speechRecognition } from './speech';
 import { CONTROL, FIELD_HINT, FIELD_TITLE, TEXT_SIZE } from './typography';
 
@@ -33,6 +33,26 @@ function Line({ children, warn }: { children: string; warn?: boolean }) {
       <span className="min-w-0 wrap-break-word">{children}</span>
     </p>
   );
+}
+
+/** "completando" with its three dots fading in and out one after another (J2-13): always, also
+ * with reduced motion, because only their opacity changes (`--animate-puntos`, `index.css`). */
+function Completing() {
+  return (
+    <span aria-hidden="true">
+      completando
+      <span className="animate-puntos [animation-delay:0ms]">.</span>
+      <span className="animate-puntos [animation-delay:200ms]">.</span>
+      <span className="animate-puntos [animation-delay:400ms]">.</span>
+    </span>
+  );
+}
+
+/** "No pude completar: quién la hace, criterio de aceptación." for the notes that belong to a
+ * field (each one also shows its own text on that field), in the order of the form. */
+function missedFields(notes: Problem[]): string | null {
+  const fields = FIELD_ORDER.filter((field) => notes.some((n) => PROBLEM_FIELD[n.campo] === field));
+  return fields.length ? `No pude completar: ${fields.map((f) => FIELD_NAME[f]).join(', ')}.` : null;
 }
 
 interface HelpBoxProps {
@@ -88,6 +108,7 @@ export function HelpBox({ story, onStory, help, onAsk, onChoose }: HelpBoxProps)
 
   const asking = help.kind === 'asking';
   const over = length(story) > STORY_LIMIT;
+  const missed = help.kind === 'done' ? missedFields(help.notes) : null;
   return (
     <div data-field className="flex min-w-0 max-w-full flex-col gap-2 rounded-card border-hard border-line-soft px-3 py-2.5">
       <div className={`flex min-w-0 items-baseline justify-between gap-2 ${FIELD_HINT}`}>
@@ -109,8 +130,14 @@ export function HelpBox({ story, onStory, help, onAsk, onChoose }: HelpBoxProps)
         Como lo dirías. Leda completa lo que está vacío y lo marca; vos lo corregís y confirmás.
       </p>
       <div className="flex flex-wrap gap-3">
-        <button type="button" className={BUTTON} onClick={onAsk} disabled={asking}>
-          {asking ? 'completando…' : '> completar con Leda'}
+        <button
+          type="button"
+          className={BUTTON}
+          onClick={onAsk}
+          disabled={asking}
+          aria-label={asking ? 'completando…' : undefined}
+        >
+          {asking ? <Completing /> : '> completar con Leda'}
         </button>
         {Recognition && (
           <button type="button" className={QUIET} onClick={toggleMic} aria-pressed={listening}>
@@ -126,7 +153,8 @@ export function HelpBox({ story, onStory, help, onAsk, onChoose }: HelpBoxProps)
         ))}
         {help.kind === 'stale' && <Line>{STALE_ANSWER}</Line>}
         {help.kind === 'done' && help.nothing && <Line>{NOTHING_TO_COMPLETE}</Line>}
-        {help.kind === 'done' && help.notes.map((n) => (
+        {missed && <Line warn>{missed}</Line>}
+        {help.kind === 'done' && help.notes.filter((n) => !(n.campo in PROBLEM_FIELD)).map((n) => (
           <Line key={`${n.campo}-${n.motivo}`}>{n.texto}</Line>
         ))}
       </div>

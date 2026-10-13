@@ -232,6 +232,10 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const [story, setStory] = useState('');
   const [help, setHelp] = useState<HelpState>({ kind: 'idle' });
   const [proposed, setProposed] = useState<ReadonlySet<Field>>(new Set());
+  // What Leda could not complete, each one shown on its field in the falta color (J2-13: in the
+  // phone retest "No encontré a … en el equipo" was only a gray line in the box, out of sight),
+  // until the person fills that field or asks again.
+  const [notes, setNotes] = useState<Problem[]>([]);
   const latest = useRef(draft);
   latest.current = draft;
   const latestStory = useRef(story);
@@ -273,6 +277,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     setStep((current) => (current.kind === 'edit' && current.failed ? { ...current, failed: false } : current));
     const touched = new Set(Object.keys(patch));
     setProblems((current) => current.filter((p) => !touched.has(PROBLEM_FIELD[p.campo] ?? '')));
+    setNotes((current) => current.filter((n) => !touched.has(PROBLEM_FIELD[n.campo] ?? '')));
   }
 
   function chooseResponsible(id: string) {
@@ -299,6 +304,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     if (!unknown.current) key.current = null;
     setProposed((marked) => new Set([...marked, ...filled]));
     setProblems((shown) => shown.filter((p) => !(filled as string[]).includes(PROBLEM_FIELD[p.campo] ?? '')));
+    setNotes((shown) => shown.filter((n) => !(filled as string[]).includes(PROBLEM_FIELD[n.campo] ?? '')));
     return filled.length;
   }
 
@@ -310,6 +316,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       return;
     }
     setHelp({ kind: 'asking' });
+    setNotes([]);
     const { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio } = latest.current;
     const asked = { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio };
     try {
@@ -325,6 +332,13 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         setHelp({ kind: 'stale' });
       } else if (result.kind === 'proposed') {
         const filled = apply(result.proposal);
+        // Only on the fields still empty: what the person wrote meanwhile is hers.
+        setNotes(
+          result.notes.filter((n) => {
+            const field = PROBLEM_FIELD[n.campo];
+            return field !== undefined && !String(latest.current[field] ?? '').trim();
+          }),
+        );
         const choices = latest.current.responsable_id
           ? []
           : result.choices.filter((c) => memberOf(options, c.membership_id));
@@ -416,6 +430,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     visited.current = null;
     setStory('');
     setHelp({ kind: 'idle' });
+    setNotes([]);
     setProposed(new Set());
     setDraft(EMPTY_DRAFT);
     setProblems([]);
@@ -450,6 +465,13 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
   const { sending, failed } = step;
   const on = (field: Field) => problems.filter((p) => PROBLEM_FIELD[p.campo] === field);
+  // On a field: its problems and what Leda could not complete there (never the same one twice).
+  const said = (field: Field) => [
+    ...on(field),
+    ...notes.filter(
+      (n) => PROBLEM_FIELD[n.campo] === field && !on(field).some((p) => p.campo === n.campo && p.motivo === n.motivo),
+    ),
+  ];
   const conflict = problems.some((p) => p.campo === 'clave' && p.motivo === 'usada_con_otros_datos');
   const general = problems.filter(
     (p) => !(p.campo in PROBLEM_FIELD) && !(p.campo === 'clave' && p.motivo === 'usada_con_otros_datos'),
@@ -466,7 +488,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   // announced again); before, only a line.
   const alerted = problems.length > 0;
   const invalid = (field: Field) => (on(field).length ? true : undefined);
-  const described = (id: string, field: Field) => (on(field).length ? `${id}-error` : undefined);
+  const described = (id: string, field: Field) => (said(field).length ? `${id}-error` : undefined);
 
   return (
     <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10">
@@ -479,7 +501,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         <fieldset disabled={sending} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
           <HelpBox story={story} onStory={setStory} help={help} onAsk={ask} onChoose={choose} />
 
-          <FieldBlock id="f-objetivo" label="Objetivo" errors={on('objetivo_id')} proposed={proposed.has('objetivo_id')}
+          <FieldBlock id="f-objetivo" label="Objetivo" errors={said('objetivo_id')} proposed={proposed.has('objetivo_id')}
             hint={options.objetivos.length === 0 ? 'No hay objetivos abiertos en este espacio.' : undefined}>
             <Select
               id="f-objetivo"
@@ -498,7 +520,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             </Select>
           </FieldBlock>
 
-          <FieldBlock id="f-titulo" label="Título" errors={on('titulo')} proposed={proposed.has('titulo')}
+          <FieldBlock id="f-titulo" label="Título" errors={said('titulo')} proposed={proposed.has('titulo')}
             extra={<Counter value={draft.titulo} limit={LIMITS.titulo} />}>
             <input
               id="f-titulo"
@@ -511,7 +533,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             />
           </FieldBlock>
 
-          <FieldBlock id="f-descripcion" label="Descripción (opcional)" errors={on('descripcion')}
+          <FieldBlock id="f-descripcion" label="Descripción (opcional)" errors={said('descripcion')}
             proposed={proposed.has('descripcion')}
             extra={<Counter value={draft.descripcion} limit={LIMITS.descripcion} />}>
             <textarea
@@ -527,7 +549,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           <FieldBlock
             id="f-responsable"
             label="Quién la hace"
-            errors={on('responsable_id')}
+            errors={said('responsable_id')}
             proposed={proposed.has('responsable_id')}
             hint={
               member && (
@@ -559,7 +581,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           <FieldBlock
             id="f-fecha"
             label="Fecha"
-            errors={on('fecha')}
+            errors={said('fecha')}
             proposed={proposed.has('fecha')}
             extra={draft.fecha ? <span className={`shrink-0 ${FIELD_VALUE}`}>{dayLabel(draft.fecha)}</span> : undefined}
             hint={
@@ -582,7 +604,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           <FieldBlock
             id="f-espera"
             label="Espera a (opcional)"
-            errors={on('espera_id')}
+            errors={said('espera_id')}
             proposed={proposed.has('espera_id')}
             hint={
               waitable.length === 0
@@ -608,7 +630,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             </Select>
           </FieldBlock>
 
-          <FieldBlock id="f-criterio" label="Criterio de aceptación" errors={on('criterio')}
+          <FieldBlock id="f-criterio" label="Criterio de aceptación" errors={said('criterio')}
             proposed={proposed.has('criterio')}
             extra={<Counter value={draft.criterio} limit={LIMITS.criterio} />}
             hint="Qué tiene que pasar para darla por terminada.">
@@ -665,7 +687,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             )}
           </fieldset>
 
-          <FieldBlock id="f-decidio" label="Quién la decidió" errors={on('decidio_id')}>
+          <FieldBlock id="f-decidio" label="Quién la decidió" errors={said('decidio_id')}>
             <Select
               id="f-decidio"
               value={draft.decidio_id}

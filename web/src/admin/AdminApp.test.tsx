@@ -1011,6 +1011,63 @@ describe('Leda completes the load from the free box', () => {
     expect(screen.queryByRole('group', { name: 'elegí quién la hace' })).toBeNull();
   });
 
+  it('a field Leda could not complete says why on that field, in the falta color, and the box lists it', async () => {
+    // J2-13, the user's phone retest (2026-10-13): "el tano" is nobody in the team and the help
+    // dropped who does it, but the screen said nothing where she was looking.
+    const NOBODY = 'No encontré a «el tano» en el equipo; elegí quién la hace.';
+    await openForm({
+      [HELP]: proposed({
+        propuesta: { titulo: 'Cambiar el UPS de la sala de servidores' },
+        elegir: [],
+        avisos: [
+          { campo: 'responsable', motivo: 'no_encontrado', texto: NOBODY },
+          { campo: 'criterio', motivo: 'sin_como', texto: 'Contame cómo se sabe que está terminada.' },
+        ],
+      }),
+    });
+    tell('hay que cambiar el ups de la sala de servidores que lo vea el tano antes del jueves se corta todo');
+    askLeda();
+    await waitFor(() => expect(screen.getByLabelText('Título')).toHaveValue('Cambiar el UPS de la sala de servidores'));
+    const onField = document.getElementById('f-responsable-error') as HTMLElement;
+    expect(onField).toHaveTextContent(NOBODY);
+    expect(onField).toHaveClass('text-falta');
+    expect(onField.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByLabelText('Quién la hace')).toHaveAttribute('aria-describedby', 'f-responsable-error');
+    expect(document.getElementById('f-criterio-error')).toHaveTextContent('Contame cómo se sabe que está terminada.');
+    // Near the box, what it could not complete, in the order of the form.
+    const listed = screen.getByText('No pude completar: quién la hace, criterio de aceptación.');
+    expect(listed.closest('p')).toHaveClass('text-falta');
+    // Each message goes when the person fills its field.
+    pick('Quién la hace', 'm-marcos');
+    expect(document.getElementById('f-responsable-error')).toBeNull();
+    expect(document.getElementById('f-criterio-error')).toHaveTextContent('Contame cómo se sabe que está terminada.');
+  });
+
+  it('while Leda completes, the three dots fade in and out one after another, always', async () => {
+    // The user (2026-10-13): "quiero que se animen siempre", also with reduced motion; so only the
+    // opacity changes, with no movement, scaling or bouncing.
+    const release = await holdTheAnswer();
+    tell();
+    askLeda();
+    const button = screen.getByRole('button', { name: 'completando…' });
+    const dots = Array.from(button.querySelectorAll('.animate-puntos'));
+    expect(dots).toHaveLength(3);
+    expect(dots.map((d) => d.textContent)).toEqual(['.', '.', '.']);
+    expect(new Set(dots.map((d) => d.className)).size).toBe(3);
+    expect(button.innerHTML).not.toMatch(/motion-reduce|motion-safe/);
+    // @ts-expect-error -- this browser project has no Node types; the tests run on Node.
+    const { readFileSync } = await import('node:fs');
+    // @ts-expect-error -- the same: `dirname` is Node's, not in the browser's `ImportMeta`.
+    const here: string = import.meta.dirname;
+    const css: string = readFileSync(`${here}/../index.css`, 'utf-8');
+    expect(css).toMatch(/--animate-puntos:\s*puntos\s[^;]*infinite/);
+    const keyframes = css.match(/@keyframes puntos\s*\{([\s\S]*?\})\s*\}/)?.[1] ?? '';
+    expect(keyframes).toMatch(/opacity/);
+    expect(keyframes).not.toMatch(/transform|scale|translate|rotate|top|left|margin/);
+    release(FULL);
+    await waitFor(() => expect(screen.getByRole('button', { name: '> completar con Leda' })).toBeEnabled());
+  });
+
   it('when Leda cannot answer it says so plainly and nothing changes', async () => {
     await openForm({ [HELP]: { status: 503, body: { error: 'sin_ayuda', texto: 'x' } } });
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Mi título' } });

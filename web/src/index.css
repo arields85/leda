@@ -52,6 +52,23 @@
 
   --shadow-hard: 3px 3px 0 #26282a;
   --shadow-hard-ink: 3px 3px 0 #e6e6e3;
+
+  /* The three dots of "completando…" while Leda completes the load form (J2-13): each one fades in
+   * and out after the one before, always (user, 2026-10-13: "quiero que se animen siempre"). Only
+   * the opacity changes, never the position or the size, so it stays gentle also for people who
+   * ask the system for reduced motion. */
+  --animate-puntos: puntos 1.2s ease-in-out infinite;
+
+  @keyframes puntos {
+    0%,
+    60%,
+    100% {
+      opacity: 0.25;
+    }
+    30% {
+      opacity: 1;
+    }
+  }
 }
 
 /* The 1.5px borders of the cards, the panel and the days. */
