@@ -28,7 +28,7 @@ from leda.db import admin
 from tests.garantias.test_carga_de_tareas import (  # noqa: F401
     _cargar, _contar, _fila, _navegador_de_administracion, _navegador_del_equipo, _norte,
     _persona, administradora, sesion, web)
-from tests.test_ayuda_al_cargar import EJEMPLO, IADeLaCarga
+from tests.test_ayuda_al_cargar import CRITERIO_DEL_EJEMPLO, EJEMPLO, IADeLaCarga
 
 TEXTO_SI_LA_IA_FALLA = ("Leda no pudo completar ahora. Lo que escribiste sigue acá: completalo "
                         "vos o probá de nuevo en un rato.")
@@ -50,8 +50,8 @@ def _respuesta(**cambios) -> dict:
     respuesta = {
         "titulo": "Colgar el estante del módem en la sala",
         "descripcion": "Colgar el estante del módem en la sala. Hacen falta 12 tornillos de 8 mm.",
-        "criterio": "El estante del módem está colgado en la sala con los 12 tornillos de 8 mm.",
-        "como_se_comprueba": "está colgado en la sala",
+        "criterio": CRITERIO_DEL_EJEMPLO,
+        "como_se_comprueba": "se comprueba con una foto del estante colgado",
         "responsable": "lucas",
         "espera": "T1",
         "objetivo": "O3",
@@ -111,7 +111,7 @@ def test_el_ejemplo_del_usuario_propone_cada_dato_de_su_espacio(web, conn, intak
     assert propuesta == {
         "titulo": "Colgar el estante del módem en la sala",
         "descripcion": "Colgar el estante del módem en la sala. Hacen falta 12 tornillos de 8 mm.",
-        "criterio": "El estante del módem está colgado en la sala con los 12 tornillos de 8 mm.",
+        "criterio": CRITERIO_DEL_EJEMPLO,
         # "lucas" es el apodo de Sam North, buscado en su espacio.
         "responsable_id": _persona(intake_world, "Sam North"),
         "espera_id": con_lucas,

@@ -669,12 +669,17 @@ def test_el_rollback_de_la_0062_se_niega_si_hay_cargas(conn, intake_world, sesio
 
 @pytest.fixture
 def web(conn, monkeypatch):
-    """Un navegador nuevo por llamada, con la conexión de la prueba."""
+    """Un navegador nuevo por llamada, con la conexión de la prueba. El juicio del criterio al
+    cargar (J2-9) usa una IA de mentira que lo da por comprobable: nunca la real (las pruebas
+    del juicio, en `test_criterio_verificable.py`, ponen la suya)."""
     from fastapi.testclient import TestClient
 
     from leda import entrada, web_app
+    from tests.test_ayuda_al_cargar import IAQueCopiaElCriterio
 
     monkeypatch.setattr(web_app, "_conn_de_la_web", lambda: conn)
+    monkeypatch.setattr(web_app, "_ia_del_criterio",
+                        lambda conn, espacio: IAQueCopiaElCriterio())
 
     def nuevo():
         return TestClient(entrada.app, base_url=BASE, follow_redirects=False)

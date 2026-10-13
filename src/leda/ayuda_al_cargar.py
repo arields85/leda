@@ -28,13 +28,22 @@ acá: la persona ve cada dato marcado, lo corrige o lo acepta, y confirma como s
     no estén en lo que escribió la persona o en los datos de esta tarea
     (`entrega.problema_del_ejemplo`, punto por punto); el criterio, además, con la parte que dice
     cómo se comprueba copiada tal cual dentro de él (la idea del alta congelada,
-    `MOTIVO_CRITERIO_SIN_COMPROBACION`, comprobada por el código y no por la IA).
+    `MOTIVO_CRITERIO_SIN_COMPROBACION`, comprobada por el código y no por la IA), y que agrega
+    algo que el resto del criterio y el título no dicen (`lo_que_agrega`, J2-9).
 - **La evidencia** no la propone la IA: elegir quién la hace marca la que pide su área, en la web.
+
+**El criterio escrito, al cargar** (J2-9; mecánica §13: "¿el resultado esperado es concreto y
+verificable?"). Con o sin la ayuda, la carga juzga el criterio antes de guardarlo
+(`juzgar_el_criterio`): si no agrega nada al título no hace falta preguntarle a nadie ("No se");
+si no, la IA del espacio copia la parte que dice cómo se comprueba (como la entrega del motor: la
+IA lee, el código decide) y vale la misma regla de lo que agrega. Si la IA no juzga, no se finge:
+`sin_revisar`, y la web carga con un aviso y un incidente.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import unicodedata
 from collections.abc import Callable, Mapping, Sequence
@@ -112,10 +121,15 @@ _DATOS = {
     "titulo": "Una línea que dice qué hay que hacer, en imperativo.",
     "descripcion": "Lo que contó la persona sobre la tarea, ordenado y bien escrito, sin agregar "
                    "nada.",
-    "criterio": "El criterio de aceptación: qué tiene que pasar para darla por terminada, dicho "
-                "de manera que quien la revise pueda comprobarlo.",
+    "criterio": "El criterio de aceptación: qué tiene que pasar para darla por terminada y cómo "
+                "lo comprueba quien la revise. Si la persona no dijo cómo se comprueba, proponé "
+                "una manera concreta (qué se mira, se prueba o se entrega) con lo que contó, la "
+                "tarea, el objetivo o la evidencia que pide el área, sin repetir el resultado con "
+                "otras palabras.",
     "como_se_comprueba": "La parte del criterio que dice cómo se comprueba que la tarea está "
-                         "hecha, copiada tal cual del criterio.",
+                         "hecha (qué se mira, se prueba o se entrega), copiada tal cual del "
+                         "criterio; tiene que decir algo que el resultado no dice, sin repetir el "
+                         "resultado con otras palabras.",
     "responsable": "Las palabras con que la persona nombró a quien va a hacer la tarea, tal cual "
                    "las escribió.",
     "espera": "El código (T1, T2...) de la tarea abierta que tiene que terminar antes de que "
@@ -293,6 +307,14 @@ def herramienta(pide: Sequence[str]) -> dict[str, Any]:
                        "additionalProperties": False}}}
 
 
+def _tope_de_salida(cliente) -> int:
+    """`TOPE_DE_SALIDA`, y nunca menos que los topes de elegir jugadas y de redactar del
+    espacio."""
+    parametros = getattr(cliente, "parametros", {}) or {}
+    return max(TOPE_DE_SALIDA, *(int(parametros.get(t) or 0)
+                                 for t in ("tope_jugadas", "tope_redaccion")))
+
+
 def pedir(ia, entrada: Mapping[str, Any]) -> dict[str, Any]:
     """Una sola llamada a la IA del espacio (sin reintento: la persona puede volver a tocar), con
     la herramienta de la respuesta. Una IA sin configurar es `LookupError`; una respuesta cortada,
@@ -301,11 +323,9 @@ def pedir(ia, entrada: Mapping[str, Any]) -> dict[str, Any]:
     cliente = getattr(ia, "cliente", None)
     if cliente is None:
         raise LookupError(getattr(ia, "motivo", "La IA del espacio no está configurada."))
-    parametros = getattr(cliente, "parametros", {}) or {}
     respuesta = cliente.completar({
         "temperature": 0,
-        "max_tokens": max(TOPE_DE_SALIDA, *(int(parametros.get(t) or 0)
-                                             for t in ("tope_jugadas", "tope_redaccion"))),
+        "max_tokens": _tope_de_salida(cliente),
         "messages": [{"role": "system", "content": INSTRUCCIONES},
                      {"role": "user",
                       "content": json.dumps(entrada, ensure_ascii=False, default=str)}],
@@ -315,19 +335,19 @@ def pedir(ia, entrada: Mapping[str, Any]) -> dict[str, Any]:
     return leer(respuesta)
 
 
-def leer(respuesta: Any) -> dict[str, Any]:
-    """Los datos de la llamada a la herramienta, o `RespuestaInvalida`."""
+def leer(respuesta: Any, nombre: str = NOMBRE_HERRAMIENTA) -> dict[str, Any]:
+    """Los datos de la llamada a la herramienta `nombre`, o `RespuestaInvalida`."""
     if not isinstance(respuesta, dict):
         raise RespuestaInvalida("Respuesta ilegible.")
     sin_cortar(respuesta)
     try:
         mensaje = respuesta["choices"][0]["message"]
         llamadas = [c["function"] for c in mensaje.get("tool_calls") or []
-                    if c["function"]["name"] == NOMBRE_HERRAMIENTA]
+                    if c["function"]["name"] == nombre]
     except (KeyError, IndexError, TypeError, AttributeError) as e:
         raise RespuestaInvalida(f"Respuesta ilegible ({type(e).__name__}).") from e
     if not llamadas:
-        raise RespuestaInvalida("La IA no llamó a la herramienta de la propuesta.")
+        raise RespuestaInvalida(f"La IA no llamó a la herramienta {nombre}.")
     argumentos = llamadas[0].get("arguments")
     try:
         argumentos = json.loads(argumentos) if isinstance(argumentos, str) else argumentos
@@ -731,11 +751,183 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
             continue
         problema = _problema_del_texto(valor, permitidos, LARGOS[campo])
         if problema is None and campo == "criterio":
-            como = _cadena(crudo.get("como_se_comprueba"))
-            if como is None or _normal(como) == "" or not _contiene(_normal(valor), _normal(como)):
+            titulos = [str(escrito.get("titulo") or ""), str(crudo.get("titulo") or "")]
+            if not _dice_como_se_comprueba(valor, _cadena(crudo.get("como_se_comprueba")),
+                                           titulos):
                 problema = "sin_comprobacion"
         if problema is not None:
             r.descartar(campo, problema, "sin_proponer")
         else:
             r.propuesta[campo] = valor
     return r
+
+
+# --- Un criterio que diga cómo se comprueba (J2-9) ----------------------------------------------
+#
+# Lo que encontró el usuario en el celular (2026-10-13): un criterio propuesto cuya parte de cómo
+# se comprueba sólo repetía el resultado ("…quedan listos… Se comprueba revisando que… estén
+# listos…"), y una tarea cargada con el criterio "No se". La regla es una sola y general, nunca
+# una lista de respuestas malas: la parte que dice cómo se comprueba tiene que traer una palabra
+# con contenido que no esté en el resto del criterio ni en el título.
+#
+# No cuentan como contenido las palabras de función del castellano (artículos, preposiciones,
+# conjunciones, pronombres y los verbos que sólo unen: ser, estar, haber, quedar) ni el
+# vocabulario del acto mismo de comprobar o de estar terminada: es el marco de cualquier
+# comprobación y nunca dice qué se mira, se prueba o se entrega.
+
+_DE_FUNCION = frozenset("""
+a al ante bajo con contra de del desde durante en entre hacia hasta mediante para por segun sin
+so sobre tras el la los las lo un una unos unas y e ni o u pero sino que porque pues si como
+cuando donde mientras cual cuales quien quienes cuyo cuya me te se nos le les mi mis tu tus su
+sus este esta estos estas ese esa esos esas aquel aquella aquellos aquellas esto eso aquello ya
+no tambien muy mas menos tan todo toda todos todas cada otro otra otros otras mismo misma mismos
+mismas ser es son sea sean era eran fue fueron sera seran sido estar esta estan este esten
+estaba estaban estado estada estados estadas estuvo haber ha han hay haya hayan habia habra
+quedar queda quedan quede queden quedo quedaron quedara quedaran quedado quedada quedados
+quedadas
+""".split())
+_DEL_MARCO = ("comprobar", "comprueba", "comprobado", "verificar", "revisar", "controlar",
+              "chequear", "constatar", "confirmar", "probar", "prueba", "probado", "asegurar",
+              "listo", "lista", "terminar", "terminado", "hecho", "hecha", "completar",
+              "completo", "completa", "finalizar", "finalizado", "acabar", "acabado")
+# Dos palabras son la misma si comparten al menos estas letras del principio ("integre" e
+# "integración", "colgado" y "colgar").
+_RAIZ_COMUN = 5
+
+
+def _raiz(palabra: str) -> str:
+    """La palabra sin la s o la n final y sin la vocal final, si es larga: "listos", "lista" y
+    "listo" son "list"; "quedan", "qued"."""
+    if len(palabra) > 4 and palabra[-1] in "sn":
+        palabra = palabra[:-1]
+    if len(palabra) > 4 and palabra[-1] in "aeo":
+        palabra = palabra[:-1]
+    return palabra
+
+
+def _misma(a: str, b: str) -> bool:
+    return a == b or len(os.path.commonprefix([a, b])) >= _RAIZ_COMUN
+
+
+_MARCO = tuple(_raiz(p) for p in _DEL_MARCO)
+
+
+def _con_contenido(texto: str) -> list[str]:
+    """Las palabras con contenido del texto (sus raíces), sin mayúsculas ni acentos."""
+    raices = (_raiz(p) for p in _normal(texto).split() if p not in _DE_FUNCION)
+    return [r for r in raices if not any(_misma(r, m) for m in _MARCO)]
+
+
+def lo_que_agrega(como: str, dicho: Sequence[str]) -> list[str]:
+    """Las palabras con contenido de `como` (la parte que dice cómo se comprueba) que no están en
+    `dicho` (el resto del criterio y el título): vacío si sólo repite lo dicho o no dice nada."""
+    ya = [r for t in dicho for r in _con_contenido(t or "")]
+    agrega: list[str] = []
+    for r in _con_contenido(como or ""):
+        if not any(_misma(r, d) for d in ya) and r not in agrega:
+            agrega.append(r)
+    return agrega
+
+
+def _el_resto(criterio: str, como: str) -> str:
+    """El criterio sin la parte que dice cómo se comprueba (los dos, sin mayúsculas ni
+    acentos)."""
+    return f" {_normal(criterio)} ".replace(f" {_normal(como)} ", " ", 1)
+
+
+def _dice_como_se_comprueba(criterio: str, como: str | None, titulos: Sequence[str]) -> bool:
+    """Si `como` está dentro del criterio y agrega algo que el resto del criterio y los títulos
+    no dicen."""
+    if como is None or not _normal(como) or not _contiene(_normal(criterio), _normal(como)):
+        return False
+    return bool(lo_que_agrega(como, [_el_resto(criterio, como), *titulos]))
+
+
+NOMBRE_DEL_JUICIO = "revisar_el_criterio"
+
+INSTRUCCIONES_DEL_JUICIO = """\
+Sos Leda, la project manager del equipo. Alguien está cargando una tarea en la plataforma y \
+escribió su criterio de aceptación: lo que tiene que pasar para darla por terminada. Quien la \
+revise tiene que poder comprobarlo. Tu trabajo es leer el criterio y copiar, tal cual, la parte \
+que dice cómo se comprueba que la tarea está hecha: qué se mira, se prueba, se mide o se \
+entrega. Si el criterio no lo dice, o sólo repite el resultado o el título con otras palabras, \
+va vacío. No corregís ni completás el criterio: sólo decís qué parte es esa."""
+
+
+def entrada_del_juicio(titulo: str, descripcion: str, criterio: str) -> dict[str, str]:
+    """Lo que recibe la IA para juzgar el criterio: sólo la tarea."""
+    return {"titulo": titulo, "descripcion": descripcion, "criterio": criterio}
+
+
+def herramienta_del_juicio() -> dict[str, Any]:
+    return {"type": "function", "function": {
+        "name": NOMBRE_DEL_JUICIO,
+        "description": "La parte del criterio de aceptación que dice cómo se comprueba que la "
+                       "tarea está hecha.",
+        "parameters": {
+            "type": "object",
+            "properties": {"como_se_comprueba": {
+                "type": "string",
+                "description": "La parte del criterio que dice cómo se comprueba que la tarea "
+                               "está hecha (qué se mira, se prueba, se mide o se entrega), "
+                               "copiada tal cual del criterio; vacío si no lo dice o sólo "
+                               "repite el resultado con otras palabras."}},
+            "required": ["como_se_comprueba"],
+            "additionalProperties": False}}}
+
+
+@dataclass(frozen=True)
+class Juicio:
+    """Lo que se decidió del criterio escrito: `motivo` `None` si dice cómo se comprueba,
+    `sin_comprobacion` si no, y `sin_revisar` si la IA no lo juzgó (con `falla`, para el
+    incidente)."""
+
+    motivo: str | None
+    falla: BaseException | None = None
+
+
+def no_agrega_nada(titulo: str, criterio: str) -> bool:
+    """Si el criterio no agrega nada al título ("No se", "listo"): no hace falta la IA."""
+    return not lo_que_agrega(criterio, [titulo])
+
+
+def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str) -> Juicio:
+    """El criterio que escribió la persona, al cargar: si no agrega nada al título, sin la IA;
+    si no, una sola llamada a la IA del espacio (sin reintento), que copia la parte que dice
+    cómo se comprueba, y la regla de lo que agrega. Una IA que no responde, que no juzgó o que
+    copió algo que no está en el criterio: `sin_revisar`, nunca un rechazo ni un visto bueno."""
+    titulo, descripcion, criterio = (" ".join((t or "").split())
+                                     for t in (titulo, descripcion, criterio))
+    if no_agrega_nada(titulo, criterio):
+        return Juicio("sin_comprobacion")
+    try:
+        crudo = _pedir_el_juicio(ia, entrada_del_juicio(titulo, descripcion, criterio))
+    except Exception as falla:  # noqa: BLE001 -- cualquier falla de la IA es que no juzgó
+        return Juicio("sin_revisar", falla)
+    como = crudo.get("como_se_comprueba")
+    if not isinstance(como, str):
+        return Juicio("sin_revisar", RespuestaInvalida("La IA no dijo cómo se comprueba."))
+    if not _normal(como):
+        return Juicio("sin_comprobacion")
+    if not _contiene(_normal(criterio), _normal(como)):
+        return Juicio("sin_revisar", RespuestaInvalida(
+            "La parte que copió la IA no está en el criterio."))
+    if not lo_que_agrega(como, [_el_resto(criterio, como), titulo]):
+        return Juicio("sin_comprobacion")
+    return Juicio(None)
+
+
+def _pedir_el_juicio(ia, entrada: Mapping[str, Any]) -> dict[str, Any]:
+    """Como `pedir`, con la herramienta del juicio."""
+    cliente = getattr(ia, "cliente", None)
+    if cliente is None:
+        raise LookupError(getattr(ia, "motivo", "La IA del espacio no está configurada."))
+    return leer(cliente.completar({
+        "temperature": 0,
+        "max_tokens": _tope_de_salida(cliente),
+        "messages": [{"role": "system", "content": INSTRUCCIONES_DEL_JUICIO},
+                     {"role": "user",
+                      "content": json.dumps(entrada, ensure_ascii=False, default=str)}],
+        "tools": [herramienta_del_juicio()],
+        "tool_choice": "auto",
+    }), NOMBRE_DEL_JUICIO)

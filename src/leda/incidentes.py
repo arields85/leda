@@ -111,6 +111,9 @@ ETAPA_MENSAJE_HUERFANO_FALLO = "mensaje_huerfano_fallo_al_avisar"
 # La ayuda de la IA al cargar una tarea en la plataforma (porción J2, `ayuda_al_cargar.py`): la IA
 # del espacio no respondió (sin configurar, sin sesión, el plazo, el cupo o una respuesta ilegible).
 ETAPA_AYUDA_AL_CARGAR = "ayuda_al_cargar"
+# El juicio del criterio al cargar una tarea en la plataforma (J2-9, `ayuda_al_cargar.
+# juzgar_el_criterio`): la IA del espacio no lo pudo revisar y la tarea se cargó con un aviso.
+ETAPA_CRITERIO_AL_CARGAR = "criterio_al_cargar"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -444,6 +447,17 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica) y revisá la IA "
                    "del espacio (`python -m leda modelo`, `leda chatgpt estado`). No hace falta "
                    "avisarle a {nombre}: puede volver a tocar el botón o cargarla a mano.")),
+    ETAPA_CRITERIO_AL_CARGAR: ExplicacionDeEtapa(
+        titulo="Leda no pudo revisar el criterio de una tarea cargada",
+        que_paso=("{nombre} cargó una tarea en la plataforma y la IA del espacio no pudo revisar "
+                  "si su criterio de aceptación dice cómo se comprueba (sin configurar, sin la "
+                  "sesión de la suscripción, sin cupo, el plazo o una respuesta que no se pudo "
+                  "leer). La tarea se cargó igual, con el criterio como se escribió."),
+        que_vio=("La tarea cargada, con el aviso de que Leda no pudo revisar el criterio "
+                 "ahora."),
+        que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica), revisá la IA "
+                   "del espacio (`python -m leda modelo`, `leda chatgpt estado`) y mirá el "
+                   "criterio de la tarea: si no dice cómo se comprueba, hablalo con {nombre}.")),
 }
 
 _EXPLICACION_GENERICA = ExplicacionDeEtapa(

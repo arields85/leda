@@ -769,6 +769,11 @@ TEXTOS_DE_LA_CARGA = {
     ("criterio", "falta"):
         "Falta el criterio de aceptación: qué tiene que pasar para darla por terminada.",
     ("criterio", "demasiado_largo"): "El criterio es demasiado largo: hasta 500 caracteres.",
+    # Un criterio que diga cómo se comprueba (J2-9; `ayuda_al_cargar.juzgar_el_criterio`).
+    ("criterio", "sin_comprobacion"): "Contame cómo se sabe que está terminada.",
+    ("criterio", "sin_revisar"):
+        "No pude revisar el criterio ahora: la tarea quedó cargada con el criterio como lo "
+        "escribiste.",
     ("evidencia", "falta"): "Elegí la evidencia que se pide para darla por terminada.",
     ("evidencia", "sin_politica_del_area"):
         "El área de esa persona todavía no tiene definida qué evidencia se pide.",
@@ -928,17 +933,105 @@ async def cargar_una_tarea(espacio_id: str, request: Request):
         cuerpo = None
     datos, mal_formados = leer_la_carga(cuerpo)
     espacio = _espacio_de(espacio_id)
+    juicio = await _juzgar_el_criterio(token, espacio, datos, mal_formados)
+    if isinstance(juicio, Response):
+        return juicio
     return await run_in_threadpool(_con_la_base, lambda conn: _cargar(
-        conn, token, espacio, datos, mal_formados))
+        conn, token, espacio, datos, mal_formados, juicio))
+
+
+# --- Un criterio que diga cómo se comprueba (J2-9) ----------------------------------------------
+#
+# Mecánica §13: "¿el resultado esperado es concreto y verificable?". Antes de `cargar_tarea`, el
+# criterio escrito (con o sin la ayuda) se juzga (`ayuda_al_cargar.juzgar_el_criterio`): si no
+# agrega nada al título, sin la IA; si no, la IA del espacio dice qué parte dice cómo se
+# comprueba y el código decide. Como en la ayuda, el candado de la web nunca espera a la IA: la
+# sesión y la IA con el candado, la llamada sin él y la carga con el candado otra vez (que
+# revalida la sesión). Sin la IA no se traba ni se finge: se carga con un aviso y un incidente.
+
+def _ia_del_criterio(conn, espacio: str):
+    """La IA del espacio para juzgar el criterio, la misma que conversa (`entrada._ia_de`)."""
+    from .entrada import _ia_de
+
+    return _ia_de(conn, espacio)
+
+
+def _la_ia_si_hay_sesion(conn, token: str, espacio: str):
+    """Con el candado: la IA del espacio, sólo con una sesión de administración vigente (sin
+    ella, `None`: nadie gasta una llamada sin entrar). Una IA que no se puede preparar es una
+    que no responde: la carga no se traba por eso."""
+    from .motor.recibir import IANoConfigurada
+
+    with sin_espacio(conn) as cur:
+        if _sesion_de_administracion(cur, token) is None:
+            return None
+    try:
+        return _ia_del_criterio(conn, espacio)
+    except Exception as falla:  # noqa: BLE001 -- queda como `sin_revisar`, con su incidente
+        _sin_transaccion(conn)
+        return IANoConfigurada(f"La IA del espacio no se pudo preparar ({type(falla).__name__}).")
+
+
+async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, Any],
+                              mal_formados: list[dict[str, str]]):
+    """El juicio del criterio de una carga, o `None` si no se juzga: con un dato mal formado, sin
+    espacio, sin sesión o con un criterio que la base ya rechaza (vacío o largo). Un 503 de la
+    base vuelve tal cual."""
+    from . import ayuda_al_cargar
+
+    criterio, titulo = datos.get("criterio"), datos.get("titulo") or ""
+    if (mal_formados or espacio is None or not isinstance(criterio, str) or not criterio.strip()
+            or len(criterio.strip()) > ayuda_al_cargar.LARGOS["criterio"]):
+        return None
+    if ayuda_al_cargar.no_agrega_nada(titulo, criterio):
+        return ayuda_al_cargar.Juicio("sin_comprobacion")
+    ia = await run_in_threadpool(_con_la_base, lambda conn: _la_ia_si_hay_sesion(
+        conn, token, espacio))
+    if ia is None or isinstance(ia, Response):
+        return ia
+    return await run_in_threadpool(
+        ayuda_al_cargar.juzgar_el_criterio, ia, titulo=titulo,
+        descripcion=datos.get("descripcion") or "", criterio=criterio)
+
+
+def _sin_revisar(conn, espacio: str, sesion: dict[str, Any], falla: BaseException | None) -> None:
+    """El incidente de una carga cuyo criterio no se pudo revisar (sin el criterio ni el error a
+    la vista: la referencia técnica queda para la administración). La tarea ya está cargada: si
+    el incidente no se puede guardar, la carga no se deshace ni se contesta como una falla (la
+    persona igual ve el aviso) y la consola lo dice."""
+    from .db import espacio as en_el_espacio
+    from .incidentes import ETAPA_CRITERIO_AL_CARGAR, registrar_incidente
+
+    causa = type(falla).__name__ if falla else "sin juicio"
+    _imprimir(f"  ! no se pudo revisar el criterio de una carga ({causa}).")
+    try:
+        with en_el_espacio(conn, espacio) as cur:
+            registrar_incidente(
+                cur, espacio,
+                "La IA del espacio no pudo revisar el criterio de una tarea cargada en la "
+                "plataforma: la tarea se cargó con el criterio como se escribió y la persona vio "
+                "un aviso.",
+                severidad="baja",
+                referencia_cruda=f"{type(falla).__name__}: {falla}" if falla else None,
+                etapa=ETAPA_CRITERIO_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
+    except Exception as otra:  # noqa: BLE001 -- la tarea ya está cargada
+        _sin_transaccion(conn)
+        _imprimir(f"  ! tampoco se pudo guardar su incidente ({type(otra).__name__}).")
 
 
 def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
-            mal_formados: list[dict[str, str]]) -> Response:
+            mal_formados: list[dict[str, str]], juicio=None) -> Response:
     with sin_espacio(conn) as cur:
-        if _sesion_de_administracion(cur, token) is None:
-            return _sin_sesion_de_administracion()
+        sesion = _sesion_de_administracion(cur, token)
+    if sesion is None:
+        return _sin_sesion_de_administracion()
     if espacio is None:
         return _espacio_que_no_existe()
+    motivo = getattr(juicio, "motivo", None)
+    if motivo == "sin_comprobacion":
+        # Como un dato mal formado: no se carga nada (sin la clave, la base nunca escribe) y la
+        # base igual dice todo lo demás.
+        mal_formados = [*mal_formados, {"campo": "criterio", "motivo": "sin_comprobacion"}]
     ahora = _ahora(conn, espacio)
     # Con un dato mal formado no se carga nada: la base igual dice todo lo demás, y sin la clave
     # nunca escribe (la falta de la clave es un rechazo más).
@@ -956,8 +1049,12 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
     if rechazo is not None:
         return rechazo
     if resultado.get("ok") and not mal_formados:
-        return _json({"task_id": str(resultado["task_id"]),
-                      "avisos": [_con_texto(a) for a in resultado.get("avisos") or []],
+        avisos = [_con_texto(a) for a in resultado.get("avisos") or []]
+        if motivo == "sin_revisar" and not resultado.get("repetida"):
+            # Una carga repetida ya tuvo su aviso y su incidente, la primera vez.
+            _sin_revisar(conn, espacio, sesion, getattr(juicio, "falla", None))
+            avisos.append(_con_texto({"campo": "criterio", "motivo": "sin_revisar"}))
+        return _json({"task_id": str(resultado["task_id"]), "avisos": avisos,
                       "repetida": bool(resultado.get("repetida"))},
                      200 if resultado.get("repetida") else 201)
     ya_dichos = {e["campo"] for e in mal_formados}

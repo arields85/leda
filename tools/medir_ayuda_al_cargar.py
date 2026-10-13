@@ -1,21 +1,23 @@
 """La medición de la ayuda de la IA al cargar (porción J2 de `odd/tasks/plataforma-jerarquias.md`):
 pedidos escritos como en un chat real, la misma función que usa la web y los mismos controles del
 código, contra la IA que se elija. **No se corre sin permiso del usuario**: con una IA real gasta
-una llamada por pedido y vuelta (11 pedidos).
+una llamada por pedido y vuelta (16 pedidos, 15 llamadas: 12 propuestas y 4 criterios escritos
+para juzgar al cargar, J2-9, de los que "No se" se rechaza sin la IA).
 
     $env:PYTHONPATH = "src"
     .venv\\Scripts\\python.exe tools\\medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3
 
 `--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira con un guion para el
-ejemplo del usuario, el sábado y "antes del jueves" (lo que tendría que proponer una IA que
-entendió), y nada para los demás; así la corrida en seco prueba los controles y la comparación: da
-3 de 11 (sale con 1).
+ejemplo del usuario, el sábado, "antes del jueves", el criterio del PLC y los criterios escritos
+(lo que tendría que contestar una IA que entendió), y nada para los demás; así la corrida en seco
+prueba los controles y la comparación: da 8 de 16 (sale con 1).
 `--ia PROVEEDOR/MODELO` (o `sol-suscripcion`, la suscripción de ChatGPT del usuario) usa la IA
 real. Sin base de datos: el equipo, los objetivos, las tareas y los días son fijos (hoy, el
 miércoles 14 de octubre de 2026), y quién la hace se busca con la misma función que el servidor,
 `fichas.integrantes_que_coinciden`, sobre el equipo fijo (`EquipoFijo`). Cada pedido dice qué
 tiene que proponer Leda y qué no; el informe dice, por pedido y por vuelta, qué propuso, qué no
-pasó los controles y por qué, y separa lo que es de la IA (no respondió) de un error del programa.
+pasó los controles y por qué, cuántos segundos tardó la IA, y separa lo que es de la IA (no
+respondió) de un error del programa.
 
 Sale con 0 si todo dio lo esperado, 1 si algo no, 3 si el programa falló (corta en ese pedido,
 para no gastar más llamadas) y 4 si la IA se quedó sin cupo (como el corredor de las
@@ -25,8 +27,12 @@ conversaciones). Con `--salida`, el informe se escribe siempre, también al cort
 from __future__ import annotations
 
 import argparse
+import errno
 import json
+import socket
+import ssl
 import sys
+import time
 import traceback
 from datetime import date, timedelta
 from typing import Any
@@ -149,6 +155,29 @@ PEDIDOS: list[dict[str, Any]] = [
               "bateria q pidio ismael",
      "propone": {"titulo": True, "responsable_id": "m-lucas"},
      "no_propone": ["espera_id"]},
+    # J2-9: la persona no dijo cómo se comprueba; el criterio propuesto tiene que traer una manera
+    # concreta (la prueba del usuario en el celular dio uno circular).
+    {"nombre": "un criterio que diga cómo se comprueba",
+     "texto": "hay que dejar el plc de la comprimidora fette 2000 y sus variables listos para "
+              "que ariel la integre a la interfaz",
+     "propone": {"titulo": True, "criterio": True}},
+    # J2-9: el criterio que escribió la persona, juzgado al cargar (`juicio`: lo que tiene que
+    # decidir el código; `None` es que dice cómo se comprueba).
+    {"nombre": "el criterio circular del usuario", "titulo": "Integrar el PLC de la Fette 2000",
+     "criterio_escrito": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para "
+                         "que Ariel la integre a la interfaz. Se comprueba revisando que el PLC "
+                         "y sus variables estén listos para esa integración.",
+     "juicio": "sin_comprobacion"},
+    {"nombre": "un criterio con una comprobación concreta",
+     "titulo": "Integrar el PLC de la Fette 2000",
+     "criterio_escrito": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para "
+                         "que Ariel la integre a la interfaz. Las variables del PLC se leen bien "
+                         "desde la interfaz.",
+     "juicio": None},
+    {"nombre": "un criterio con palabras y sin comprobación", "titulo": "Colocar el estante",
+     "criterio_escrito": "Hacerlo con cuidado y prolijidad", "juicio": "sin_comprobacion"},
+    {"nombre": "no se", "titulo": "Colocar el estante", "criterio_escrito": "No se",
+     "juicio": "sin_comprobacion"},
 ]
 
 VACIO = {c: "" for c in ayuda_al_cargar.CAMPOS}
@@ -162,8 +191,9 @@ GUION: dict[str, dict[str, str]] = {
         "descripcion": "Colgar el estante del módem en la sala. Hacen falta 12 tornillos de 8 mm. "
                        "No se puede empezar hasta que terminen de cablear el tablero de la "
                        "máquina 3.",
-        "criterio": "El estante del módem está colgado en la sala con los 12 tornillos de 8 mm.",
-        "como_se_comprueba": "está colgado en la sala",
+        "criterio": "El estante del módem está colgado en la sala con los 12 tornillos de 8 mm; "
+                    "se comprueba con una foto del estante colgado.",
+        "como_se_comprueba": "se comprueba con una foto del estante colgado",
         "responsable": "lucas", "espera": "T1", "objetivo": "O1",
         "fecha": "2026-10-16", "como_dijo_la_fecha": "para el viernes"},
     "un sábado no es hábil": {
@@ -174,6 +204,20 @@ GUION: dict[str, dict[str, str]] = {
         "criterio": "El UPS de la sala de servidores está cambiado y no se corta todo.",
         "como_se_comprueba": "no se corta todo", "responsable": "el tano",
         "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves"},
+    "un criterio que diga cómo se comprueba": {
+        "titulo": "Dejar listo el PLC de la comprimidora Fette 2000",
+        "criterio": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que "
+                    "Ariel la integre a la interfaz. Las variables del PLC se leen bien desde la "
+                    "interfaz.",
+        "como_se_comprueba": "Las variables del PLC se leen bien desde la interfaz"},
+}
+# Lo que contesta en seco el juicio de un criterio escrito: la parte que dice cómo se comprueba.
+GUION_DEL_JUICIO: dict[str, str] = {
+    "el criterio circular del usuario":
+        "Se comprueba revisando que el PLC y sus variables estén listos para esa integración",
+    "un criterio con una comprobación concreta":
+        "Las variables del PLC se leen bien desde la interfaz",
+    "un criterio con palabras y sin comprobación": "",
 }
 
 
@@ -215,15 +259,23 @@ class IAEnSeco:
     def __init__(self) -> None:
         self.cliente = self
         self.parametros: dict[str, Any] = {}
-        self._por_texto = {p["texto"]: GUION.get(p["nombre"], {}) for p in PEDIDOS}
+        self._por_texto = {p["texto"]: GUION.get(p["nombre"], {}) for p in PEDIDOS
+                           if "texto" in p}
+        self._por_criterio = {p["criterio_escrito"]: GUION_DEL_JUICIO.get(p["nombre"], "")
+                              for p in PEDIDOS if "criterio_escrito" in p}
 
     def completar(self, cuerpo: dict[str, Any], al_avanzar=None) -> dict[str, Any]:
         entrada = json.loads(next(m["content"] for m in cuerpo["messages"]
                                   if m["role"] == "user"))
-        argumentos = json.dumps(self._por_texto.get(entrada["texto"], {}), ensure_ascii=False)
+        nombre = cuerpo["tools"][0]["function"]["name"]
+        if nombre == ayuda_al_cargar.NOMBRE_DEL_JUICIO:
+            datos: dict[str, Any] = {
+                "como_se_comprueba": self._por_criterio.get(entrada["criterio"], "")}
+        else:
+            datos = self._por_texto.get(entrada["texto"], {})
         return {"choices": [{"finish_reason": "tool_calls", "message": {"tool_calls": [
-            {"function": {"name": ayuda_al_cargar.NOMBRE_HERRAMIENTA,
-                          "arguments": argumentos}}]}}]}
+            {"function": {"name": nombre,
+                          "arguments": json.dumps(datos, ensure_ascii=False)}}]}}]}
 
 
 def la_ia(texto: str):
@@ -276,7 +328,18 @@ def _fallas_de_la_ia() -> tuple[type[BaseException], ...]:
     return (*fallas, ErrorDeChatGPT)
 
 
+# Los errores de la red que no son `ConnectionError` ni `TimeoutError`: no encontrar el servidor,
+# el certificado y una red inalcanzable (revisión `review-ded34de579ff3bc5`). Un archivo que falta
+# sigue siendo un error del programa.
+_DE_LA_RED = (socket.gaierror, socket.herror, ssl.SSLError)
+_ERRNO_DE_LA_RED = frozenset(getattr(errno, n) for n in (
+    "ENETUNREACH", "ENETDOWN", "ENETRESET", "EHOSTUNREACH", "EHOSTDOWN") if hasattr(errno, n))
+
+
 def _es_de_la_ia(falla: BaseException) -> bool:
+    if isinstance(falla, _DE_LA_RED) or (isinstance(falla, OSError)
+                                         and falla.errno in _ERRNO_DE_LA_RED):
+        return True
     return (isinstance(falla, _fallas_de_la_ia())
             and not isinstance(falla, (KeyError, IndexError)))
 
@@ -285,19 +348,45 @@ class SinCupo(Exception):
     """La IA se quedó sin cupo: la medición se corta."""
 
 
+def _de_la_ia(falla: BaseException) -> dict[str, Any]:
+    """Una falla al llamar a la IA: sin cupo, `SinCupo`; de la IA, el resultado que lo dice; un
+    error del programa se levanta tal cual."""
+    if _sin_cupo(falla):
+        raise SinCupo() from falla
+    if _es_de_la_ia(falla):
+        return {"falla": "ia", "fallas": [f"la IA no respondió ({type(falla).__name__})"]}
+    raise falla
+
+
+def medir_el_juicio(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+    """Un criterio escrito, juzgado como al cargar (`juzgar_el_criterio`): si el código decidió
+    lo esperado. Que la IA no lo juzgara (`sin_revisar`) es una falla de la IA o, si su causa no
+    es de la IA, un error del programa."""
+    desde = time.monotonic()
+    juicio = ayuda_al_cargar.juzgar_el_criterio(ia, titulo=pedido["titulo"], descripcion="",
+                                                criterio=pedido["criterio_escrito"])
+    segundos = round(time.monotonic() - desde, 2)
+    if juicio.motivo == "sin_revisar":
+        return False, {**_de_la_ia(juicio.falla or RespuestaInvalida("sin juicio")),
+                       "segundos": segundos}
+    fallas = [] if juicio.motivo == pedido["juicio"] else [
+        f"juicio: esperaba {pedido['juicio']!r}, vino {juicio.motivo!r}"]
+    return not fallas, {"falla": None, "juicio": juicio.motivo, "segundos": segundos,
+                        "fallas": fallas}
+
+
 def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     """Un pedido, una vez: si dio lo esperado y lo que pasó. Una falla de la IA vuelve como un
     resultado (`falla: ia`); sin cupo, `SinCupo`; un error del programa se levanta tal cual."""
+    if "criterio_escrito" in pedido:
+        return medir_el_juicio(ia, pedido)
     entrada = ayuda_al_cargar.entrada_de_la_ia(pedido["texto"], VACIO, OPCIONES)
+    desde = time.monotonic()
     try:
         crudo = ayuda_al_cargar.pedir(ia, entrada)
     except Exception as falla:
-        if _sin_cupo(falla):
-            raise SinCupo() from falla
-        if _es_de_la_ia(falla):
-            return False, {"falla": "ia",
-                           "fallas": [f"la IA no respondió ({type(falla).__name__})"]}
-        raise
+        return False, {**_de_la_ia(falla), "segundos": round(time.monotonic() - desde, 2)}
+    segundos = round(time.monotonic() - desde, 2)
     r = ayuda_al_cargar.revisar(crudo, texto=pedido["texto"], escrito=VACIO, opciones=OPCIONES,
                                 coinciden=coinciden, objetivo_de=OBJETIVO_DE.get)
     fallas = []
@@ -311,7 +400,8 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
             fallas.append(f"{campo}: no tenía que proponerlo y propuso {r.propuesta[campo]!r}")
     return not fallas, {"falla": None, "propuesta": r.propuesta,
                         "avisos": [a["texto"] for a in r.avisos],
-                        "descartados": r.descartados, "elegir": r.elegir, "fallas": fallas}
+                        "descartados": r.descartados, "elegir": r.elegir,
+                        "segundos": segundos, "fallas": fallas}
 
 
 def _al_menos_una(valor: str) -> int:
