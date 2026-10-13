@@ -70,9 +70,11 @@ Ruta: un escritor delegado por tarea (dos o más archivos no triviales cada una)
 
 Mientras no se decida, lo más restrictivo; abrirlo después no rehace nada.
 
-1. **Los objetivos.** Toda tarea cuelga de un objetivo, pero el ADR no dice quién crea los objetivos ni
-   dónde. Hoy los crea sólo el paquete del espacio al importarse (uno por frente). Mientras tanto, el
-   formulario deja elegir sólo entre los objetivos que ya existen.
+1. **Los objetivos. Decidido (usuario, 2026-10-13): los crea el administrador desde la web**, en el
+   mismo lugar donde carga las tareas ("obviamente, los crea el administrador"); el pack sigue trayendo
+   los iniciales. Propuesta de lo mínimo: nombre, de qué objetivo cuelga y su referente. Es una porción
+   nueva de la plataforma, `PENDIENTE` de diseño corto y construcción; hasta entonces, el formulario
+   deja elegir sólo entre los objetivos que ya existen.
 2. **Las esperas.** Si "esta tarea espera a aquella" se carga en el mismo formulario. Mientras tanto, no.
 3. **Quién "decidió" la tarea.** La auditoría guarda quién la decidió (ADR 0017, decisión 2). Mientras
    tanto, el formulario pide elegir a un integrante activo del espacio, sin restringir su rol.
@@ -310,9 +312,9 @@ passed, `npx vite build` bien.
   y Leda lo dice al mandarlo** ("así la persona sabe que si no lo toca va a tener que pedir uno
   nuevo"). Precisa la decisión 4 del ADR 0022 (la sesión sigue sin vencer). Hoy el enlace no vence:
   hace falta una migración nueva (`0065`) con sus pruebas de garantías.
-- **El bot del equipo de CoreWork es `@Leda_Motor_bot`** (Telegram `getMe`, 2026-10-12). Falta que
-  el usuario confirme ponerlo en `bot_usuario` de `espacios/corework.yaml`; sin él, el botón
-  "> consultar a leda" no aparece.
+- **El bot del equipo de CoreWork es `@Leda_PM_bot`** (el usuario creó bots nuevos el 2026-10-13, sin
+  "motor" en el nombre; el de administración, `@Leda_Admin_bot`): `bot_usuario: Leda_PM_bot` en
+  `espacios/corework.yaml` (`28b252d5`).
 - **Hecho el 2026-10-12, tarde** (después de la prueba por Telegram, que pasó): respaldo
   `db/respaldos/leda_motor-antes-0057-a-0064-20261012.dump` (`pg_restore --list` sin error); las ramas
   juntas en la del Motor (`7f752d5`, sin archivos en común); las migraciones `0057` a `0064`
