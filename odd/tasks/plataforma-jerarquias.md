@@ -238,7 +238,12 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         contaba como de la IA, los nombres se buscaban con una copia de la función del servidor y la
         corrida en seco no probaba nada. Todos, arreglados en la J2-7.
   - [ ] **J2-5 · Prueba real en el celular** (con el usuario).
-  - [ ] **J2-6 · La ronda con la IA real** (la lanza el coordinador, con permiso).
+  - [x] **J2-6 · La ronda con la IA real** (la lanzó el coordinador, con permiso; 2026-10-13):
+        `tools/medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3` (chatgpt/gpt-6-sol),
+        **29 de 33 bien** (`tests/conversaciones/resultados/ayuda-al-cargar.json`). Fallas: 3 ×
+        "antes del jueves" con la fecha vacía (el código leía "antes del jueves" como ningún día;
+        lo decidió el usuario y se arregló en la J2-8) y 1 × el criterio sin proponer en "los
+        tornillos, sin quién ni cuándo" (el dato quedó vacío, con su mensaje).
   - [x] **J2-7 · Arreglos de las revisiones** (2026-10-13; ruta delegada, un escritor: servidor, web,
         herramienta y pruebas).
         **La fecha** (`dd5bd617`): la IA devuelve, junto a la fecha, las palabras con que la persona la
@@ -284,6 +289,58 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         `pytest -q tests/garantias` completa: 752 passed (12 min 27 s).
         Quedan sin marcar la J2-5 (el celular) y la J2-6 (la ronda real, que ahora mide también si la
         IA copia bien las palabras de la fecha).
+        **RDD de la J2-7** (el coordinador): `review-6eec478c3a4ddc11` (`dd5bd617`), con una
+        advertencia: "22-10" con guion se leía como día y mes, así que un rango ("del 10-12", "10-12
+        tornillos") daba una fecha (`ayuda_al_cargar.py:139-141`); y una sugerencia: "de mañana"
+        (`:132-133`) se leía como mañana, y suele ser una hora del día. `review-22a7da5ecc0b44dc`
+        (`b8ebc49c`), con dos sugerencias sobre las pruebas de la respuesta vieja.
+        `review-f7886a8a6481af78` (`577d3dd0`), con una advertencia en la herramienta
+        (`tools/medir_ayuda_al_cargar.py:259-260`: `LookupError` y `OSError` también atrapan un
+        `KeyError`, un `IndexError` o un archivo que falta, que son errores del programa). Las dos
+        advertencias y la sugerencia de "de mañana", arregladas en la J2-8; las dos sugerencias de
+        las pruebas de la respuesta vieja quedan anotadas, sin tocar.
+  - [x] **J2-8 · "Antes del" y los rangos** (2026-10-13; ruta inline del escritor delegado: un
+        archivo de código, sus pruebas y la herramienta). La decisión del usuario, después de la
+        ronda real: "si la persona dijo antes del jueves, leda deberia proponer el miercoles, porque
+        la persona dijo 'antes del jueves' no 'el jueves'".
+        **Qué cambió** (`f000059e`): `fecha_dicha` lee "antes de" uno de los días que ya entendía
+        ("antes del jueves", "antes del 22", "antes del día 22", "antes del 22/10", "antes del 22 de
+        octubre", "antes de mañana", "antes de pasado mañana", "antes del viernes de la semana que
+        viene"), calcula ese día con las mismas reglas y propone el día hábil anterior del calendario
+        del espacio (`dias_habiles` de las opciones de la carga, con sus feriados), desde hoy:
+        "antes del jueves" un miércoles es hoy; "antes del lunes", el viernes; con el miércoles
+        feriado, el martes. Si no hay un día hábil desde hoy ("antes de hoy", o "antes de mañana"
+        pasada la hora de cierre) o el día anterior queda fuera del calendario, queda vacío: "No puse
+        la fecha: dijiste "antes de hoy", pero no encontré el día hábil anterior en el calendario de
+        este espacio; elegila en el calendario." (`sin_habil_antes`). Las palabras de la IA tienen
+        que traer el "antes" ("jueves" solo, `no_entendida`) y su fecha tiene que ser la del código
+        (la regla de la J2-7); con una cantidad delante ("dos días antes del jueves") no se entiende.
+        La IA puede dar ese día: la lista de días que recibe marca ", no es día hábil" en los que no
+        lo son, y la herramienta dice, sin frases de ejemplo, que si la persona dijo que tiene que
+        estar antes de un día es el hábil anterior, y que las palabras van enteras, con las que dicen
+        si es antes. **Los rangos:** un par con guion sin el año ("10-12", "22-10", "5-1") queda como
+        una ficha que no es un día y cuyos números no se leen sueltos; con el año ("22-10-2026"), sí
+        es un día. Dos días unidos ("del 10 al 12", "entre el 10 y el 12", "del 10 a 12", "el lunes o
+        el martes") o uno con "entre" delante no son una fecha, tampoco copiando una sola parte.
+        **"De mañana"** es una hora del día, como "por la mañana", salvo en "antes de mañana".
+        **La herramienta:** "un apodo y un día de la semana" espera el miércoles 2026-10-14 (su hoy
+        es el miércoles 14 y es hábil, así que el hábil anterior al jueves 15 es hoy) y tiene guion
+        en seco; `KeyError`, `IndexError` y un `OSError` que no es de la red son errores del
+        programa (sale con 3), y una IA sin configurar, sin red o sin plazo sigue siendo de la IA.
+        **Evidencia (2026-10-13):** con el código de antes, `pytest -q tests/test_ayuda_al_cargar.py`
+        84 en rojo y 46 en verde (la mayoría por la firma nueva de `fecha_dicha`, con el
+        calendario); con la función de antes llamada a mano, los 11 casos nuevos ("antes del jueves",
+        "antes del lunes", "antes del 22", "del 10-12", "10-12 tornillos", "el 12" de "entre el 10 y
+        el 12", "del 10" de "del 10 al 12", "el martes" de "el lunes o el martes", "de mañana",
+        "jueves" de "antes del jueves" y "dos días antes del jueves") daban un día: 11 de 11 en
+        rojo. `tests/garantias/test_ayuda_al_cargar.py` contra el código de antes (`-o
+        pythonpath=` con una copia de `src` de `a9d99d0e`): las dos nuevas, por la puerta, en rojo
+        (el rango y "antes del viernes de la semana que viene" con `es_dia_habil` de la base).
+        Después: `.venv\Scripts\python.exe -m pytest -q tests/test_ayuda_al_cargar.py
+        tests/garantias/test_ayuda_al_cargar.py`, 146 passed. La herramienta en seco
+        (`$env:PYTHONPATH="src"; .venv\Scripts\python.exe tools\medir_ayuda_al_cargar.py --ia
+        guionada --veces 1`): 3 de 11 bien (el ejemplo, el sábado y "antes del jueves"), sale con 1.
+        Sin tocar la ruta: `tests/garantias` completa no se corrió.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
@@ -320,7 +377,8 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
   - **la fecha** (cambiada en la J2-7): la IA copia las palabras con que la persona la dijo
     (`como_dijo_la_fecha`); el código comprueba que están en el texto, calcula él mismo el día con la
     frase entera donde están, y la pone sólo si es el mismo día que dio la IA y es hábil; si no, "No
-    puse la fecha: …" con el porqué (constitución §4: nunca una fecha que nadie dijo);
+    puse la fecha: …" con el porqué (constitución §4: nunca una fecha que nadie dijo). "Antes de" un
+    día es el día hábil anterior del calendario del espacio, y un rango no es una fecha (J2-8);
   - **título, descripción y criterio:** el tope del formulario (200, 800 y 500); ningún número ni nombre que
     no esté en lo que escribió la persona o en los datos de esta tarea (objetivo, espera, quién la hace y su
     área, la evidencia), con `entrega.problema_del_ejemplo`, el criterio punto por punto
@@ -402,3 +460,7 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
 - 2026-10-13: J2-7 hecha (escritor delegado): los arreglos de las tres revisiones RDD de la J2 (la
   fecha la calcula el código con las palabras de la persona; la respuesta vieja no completa nada;
   la herramienta de medición). Siguen la prueba en el celular (J2-5) y la ronda real (J2-6).
+- 2026-10-13: la ronda real de la J2 (J2-6), 29 de 33; el usuario decidió que "antes del jueves" es el
+  miércoles. J2-8 hecha (escritor delegado, `f000059e`): "antes de" un día es el hábil anterior del
+  espacio, los rangos no son fechas, "de mañana" es una hora, y la herramienta separa mejor los
+  errores del programa. Sigue la prueba en el celular (J2-5).
