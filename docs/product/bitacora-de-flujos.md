@@ -365,6 +365,17 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   - **Conclusión vigente:** la regla del motivo funciona con la IA real; la inestabilidad del servicio no
     oficial de ChatGPT (riesgo 5) pesa en las rondas, aunque la cocina la maneja sin silencio.
 
+## La ayuda de la IA al cargar una tarea, con la IA real (2026-10-13, tarde)
+
+La J2 de `odd/tasks/plataforma-jerarquias.md`: la persona escribe o dicta "Contame qué querés hacer" y Leda propone título, descripción, criterio, responsable, espera, objetivo y fecha, cada campo con los chequeos del código (nada que nadie dijo; la fecha sólo si la persona la dijo, calculada por el código). Medición autorizada por el usuario, sobre `577d3dd0`: `tools/medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3` (11 textos escritos como en un chat real, entre ellos el ejemplo del usuario del estante del módem), 33 llamadas; informe `tests/conversaciones/resultados/ayuda-al-cargar.json`.
+
+- **29 de 33 bien.** Siempre bien: el ejemplo del usuario, un apodo ("el tano" → Marcos), "mañana" con el nombre en el medio, un sábado que no es hábil, alguien que no es del equipo, dos personas nombradas, el número del día, una espera nombrada con palabras de todos los días y un texto con faltas.
+- **3 × "antes del jueves":** la fecha quedó vacía (el código no lo leía como un día). Decisión del usuario: "antes del jueves" propone el día hábil anterior, el miércoles (J2-8).
+- **1 × el criterio no propuesto** en "los tornillos, sin quién ni cuándo": el campo quedó vacío con su aviso; las otras dos veces, bien.
+- Cupo: la ventana de 5 horas, 0 %; la semanal, 1 %.
+
+**Conclusión:** la ayuda completa bien lo que la persona dijo y no inventa; cuando no está segura, deja el campo vacío y lo marca. Falta la prueba del usuario en el celular.
+
 ## El acceso a la web por chat, en el celular (2026-10-13, a la mañana): pasa
 
 El usuario, con la cuenta de Ariel en su celular, contra `leda_motor` y los bots nuevos (`@Leda_PM_bot`), con la web detrás de un túnel rápido de Cloudflare (sólo para la prueba; autorizado por el usuario: "es para probar. cuando tengamos todo en una vps se hace de manera correcta"). Guion de 9 pasos: el ofrecimiento al final de "que tengo pendiente?", el enlace abre el botón "Entrar" y la web, "> consultar a leda" abre el bot, el mismo enlace ya no sirve, "dale gracias" sin repetir el ofrecimiento, otro enlace a pedido, "perdi el celular" corta enseguida, la web ya no entra y el enlace pedido ya no sirve. Usuario: "salio perfecto". En la base: el ofrecimiento reservado y dado por hecho una vez; el primer enlace canjeado y el segundo anulado por el corte; la sesión cortada con `perdio_el_celular`; una fila `cortar_acceso_web` (1 sesión, enlace anulado); los dos mensajes con enlace enviados; ningún incidente. Túnel apagado al terminar.
