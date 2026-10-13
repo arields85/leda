@@ -166,12 +166,15 @@ export interface HelpInput {
   fecha: string;
   espera_id: string;
   criterio: string;
+  // The evidence already ticked (J2-18): what the person chose is hers, so Leda proposes none.
+  evidencia: string[];
 }
 
-/** What Leda proposes, with the form's field names. */
+/** What Leda proposes, with the form's field names. `evidencia` (J2-18) is what Leda adds on top
+ * of the minimum the area of whoever does it asks for. */
 export type Proposal = Partial<
   Pick<HelpInput, 'objetivo_id' | 'titulo' | 'descripcion' | 'responsable_id' | 'fecha' | 'espera_id' | 'criterio'>
->;
+> & { evidencia?: string[] };
 
 /** A person to choose from when the name the person used fits more than one: Leda never picks. */
 export interface Candidate {

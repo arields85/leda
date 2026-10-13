@@ -263,6 +263,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const [story, setStory] = useState('');
   const [help, setHelp] = useState<HelpState>({ kind: 'idle' });
   const [proposed, setProposed] = useState<ReadonlySet<Field>>(new Set());
+  // The kinds of evidence Leda ticked on top of the area's minimum (J2-18), marked until the person
+  // changes them; they stay when she picks another person whose area knows them.
+  const [ledaEvidence, setLedaEvidence] = useState<ReadonlySet<string>>(new Set());
   // What Leda could not complete, each one shown on its field in the falta color (J2-13: in the
   // phone retest "No encontré a … en el equipo" was only a gray line in the box, out of sight),
   // until the person fills that field or asks again. The box's summary reads these same notes,
@@ -330,32 +333,51 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     setProposed((marked) => new Set([...marked, 'criterio']));
   }
 
+  /** Choosing who does it ticks the evidence her area asks for, as always; the evidence Leda
+   * proposed stays ticked (and marked) if her area knows it (J2-18). */
   function chooseResponsible(id: string) {
-    const next = memberOf(options, id);
-    change({ responsable_id: id, evidencia: [...(policyOf(options, next)?.evidencia_requerida ?? [])] });
+    const policyNow = policyOf(options, memberOf(options, id));
+    const known = evidenceKinds(policyNow);
+    const kept = [...ledaEvidence].filter((k) => known.includes(k));
+    const wanted = new Set([...(policyNow?.evidencia_requerida ?? []), ...kept]);
+    change({ responsable_id: id, evidencia: known.filter((k) => wanted.has(k)) });
+    setLedaEvidence(new Set(kept.filter((k) => !policyNow?.evidencia_requerida.includes(k))));
   }
 
   /** Fills only what is still empty with what Leda proposed (only what the options offer), and
-   * marks it. Choosing the responsible person ticks the evidence her area asks for, as by hand.
-   * Returns how many fields it filled. */
+   * marks it. Choosing the responsible person ticks the evidence her area asks for, as by hand,
+   * and the evidence Leda proposes on top of it is ticked and marked (J2-18), only kinds that
+   * area knows. Returns how many fields it filled. */
   function apply(proposal: Proposal): number {
     const current = latest.current;
     const valid = validProposal(proposal, options);
-    const filled = (Object.keys(valid) as (keyof Proposal)[]).filter((field) => !current[field].trim());
-    if (filled.length === 0) return 0;
+    const filled = (Object.keys(valid) as Exclude<keyof Proposal, 'evidencia'>[]).filter(
+      (field) => !current[field].trim(),
+    );
     const next: Draft = { ...current };
     for (const field of filled) next[field] = valid[field] as string;
-    if (filled.includes('responsable_id') && current.evidencia.length === 0) {
-      next.evidencia = [...(policyOf(options, memberOf(options, next.responsable_id))?.evidencia_requerida ?? [])];
+    const policyNext = policyOf(options, memberOf(options, next.responsable_id));
+    const minimum = policyNext?.evidencia_requerida ?? [];
+    const base =
+      filled.includes('responsable_id') && current.evidencia.length === 0 ? minimum : current.evidencia;
+    const known = evidenceKinds(policyNext);
+    const added = (Array.isArray(proposal.evidencia) ? proposal.evidencia : []).filter(
+      (k) => typeof k === 'string' && known.includes(k) && !base.includes(k),
+    );
+    if (filled.length === 0 && added.length === 0) return 0;
+    if (base !== current.evidencia || added.length > 0) {
+      next.evidencia = known.filter((k) => base.includes(k) || added.includes(k));
     }
     latest.current = next;
     setDraft(next);
     // Other data, another attempt (as in `change`).
     if (!unknown.current) key.current = null;
     setProposed((marked) => new Set([...marked, ...filled]));
-    setProblems((shown) => shown.filter((p) => !(filled as string[]).includes(PROBLEM_FIELD[p.campo] ?? '')));
-    setNotes((shown) => shown.filter((n) => !(filled as string[]).includes(PROBLEM_FIELD[n.campo] ?? '')));
-    return filled.length;
+    if (added.length > 0) setLedaEvidence((marked) => new Set([...marked, ...added]));
+    const touched: string[] = [...filled, ...(added.length > 0 ? ['evidencia'] : [])];
+    setProblems((shown) => shown.filter((p) => !touched.includes(PROBLEM_FIELD[p.campo] ?? '')));
+    setNotes((shown) => shown.filter((n) => !touched.includes(PROBLEM_FIELD[n.campo] ?? '')));
+    return filled.length + added.length;
   }
 
   async function ask() {
@@ -367,16 +389,18 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     }
     setHelp({ kind: 'asking' });
     setNotes([]);
-    const { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio } = latest.current;
+    const { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio, evidencia } =
+      latest.current;
     const asked = { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio };
     try {
-      const result = await askLeda(spaceId, { texto, ...asked });
+      const result = await askLeda(spaceId, { texto, ...asked, evidencia: [...evidencia] });
       // The answer is for what the form had when she asked. If she changed the free text or a
       // field meanwhile, it may no longer fit (another person, another wait, other words): it
       // fills nothing, and the box says so quietly (review review-03b5c3a74d3719b7).
       const now = latest.current;
       const changed =
         latestStory.current.trim() !== texto ||
+        now.evidencia.join('\n') !== evidencia.join('\n') ||
         (Object.keys(asked) as (keyof typeof asked)[]).some((field) => now[field] !== asked[field]);
       if (changed && result.kind !== 'failed') {
         setHelp({ kind: 'stale' });
@@ -420,6 +444,8 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     if (on) chosen.add(kind);
     else chosen.delete(kind);
     change({ evidencia: kinds.filter((k) => chosen.has(k)) });
+    // What the person changes is hers: Leda's mark on that kind goes.
+    setLedaEvidence((marked) => (marked.has(kind) ? new Set([...marked].filter((k) => k !== kind)) : marked));
   }
 
   async function confirm() {
@@ -459,7 +485,11 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       });
       const next: Draft = { ...sent };
       for (const field of fixed) next[field] = spelling.corrected[field]!.text;
-      for (const field of asked) checked.current[field] = next[field];
+      // Only what was really checked counts as checked: a text the check could not look at (the
+      // AI did not answer, no network) is checked again on the next confirm (RDD warning, J2-17).
+      for (const field of asked) {
+        if (!spelling.unchecked.includes(field)) checked.current[field] = next[field];
+      }
       notice = spelling.unchecked.length > 0 ? (spelling.notice ?? SPELLING_FAILED) : null;
       setSpellNote(notice);
       if (fixed.length > 0) {
@@ -530,6 +560,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     setHelp({ kind: 'idle' });
     setNotes([]);
     setProposed(new Set());
+    setLedaEvidence(new Set());
     checked.current = {};
     setSpelled({});
     setSpellNote(null);
@@ -781,6 +812,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
                   {evidenceWords(policy, kind)}
                   {policy?.evidencia_requerida.includes(kind) && (
                     <span className="text-ink-dim"> · la pide el área</span>
+                  )}
+                  {ledaEvidence.has(kind) && draft.evidencia.includes(kind) && (
+                    <span className="text-propuesto"> · propuesto por Leda</span>
                   )}
                 </span>
               </label>

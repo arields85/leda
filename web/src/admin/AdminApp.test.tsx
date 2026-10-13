@@ -970,6 +970,8 @@ describe('Leda completes the load from the free box', () => {
       fecha: '',
       espera_id: '',
       criterio: '',
+      // J2-18: the evidence already ticked goes too, so Leda never proposes over it.
+      evidencia: [],
     });
     // What the person typed stays, without a mark; the rest is proposed and marked.
     expect(screen.getByLabelText('Título')).toHaveValue('Mi título');
@@ -1413,5 +1415,104 @@ describe('the spelling before loading', () => {
     confirm();
     await waitFor(() => expect(screen.queryByRole('form', { name: 'Cargar tarea' })).toBeNull());
     expect(calls.some((c) => c.key === TASKS)).toBe(false);
+  });
+});
+
+// --- J2-18: Leda completes everything it can --------------------------------------------------------
+//
+// Leda proposes who does it and the evidence that fits this task on top of the area's minimum; the
+// person reviews, corrects or keeps it. The evidence Leda adds is ticked and marked, the area's
+// minimum follows whoever does it, and a text the spelling check could not check is checked again.
+
+describe('Leda completes everything it can (J2-18)', () => {
+  const WITH_EVIDENCE = { ...FULL, propuesta: { ...FULL.propuesta, evidencia: ['informe'] } };
+  /** The "propuesto por Leda" mark of an evidence box, found from its words. */
+  function evidenceMark(words: RegExp) {
+    const row = screen.getByRole('checkbox', { name: words }).closest('label') as HTMLElement;
+    return within(row).queryByText('· propuesto por Leda');
+  }
+
+  it('ticks the evidence Leda proposes on top of what the area asks, and marks only that one', async () => {
+    const calls = await openForm({ [HELP]: proposed(WITH_EVIDENCE) });
+    tell();
+    askLeda();
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /un informe/ })).toBeChecked());
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
+    expect(evidenceMark(/un informe/)).toBeInTheDocument();
+    expect(evidenceMark(/una captura de pantalla/)).toBeNull();
+    // What the form had goes with the question, so Leda never proposes over what was ticked.
+    expect((calls.find((c) => c.key === HELP)?.body as { evidencia: string[] }).evidencia).toEqual([]);
+    expect(preview()).toHaveTextContent('una captura de pantalla · un informe');
+  });
+
+  it('unticking the evidence Leda proposed is the person\'s choice: the mark goes', async () => {
+    await openForm({ [HELP]: proposed(WITH_EVIDENCE) });
+    tell();
+    askLeda();
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /un informe/ })).toBeChecked());
+    fireEvent.click(screen.getByRole('checkbox', { name: /un informe/ }));
+    expect(screen.getByRole('checkbox', { name: /un informe/ })).not.toBeChecked();
+    expect(evidenceMark(/un informe/)).toBeNull();
+  });
+
+  it('another person: the minimum follows her area, and Leda\'s evidence stays if her area knows it', async () => {
+    const both = options({
+      politicas: [
+        options().politicas[0],
+        {
+          area_id: 'a-infra',
+          area: 'Infraestructura',
+          evidencia_requerida: ['foto'],
+          version: 1,
+          tipos: {
+            foto: { clases: ['imagen'], en_palabras: 'una foto' },
+            informe: { clases: ['archivo'], en_palabras: 'un informe' },
+          },
+        },
+      ],
+    });
+    await openForm({ [OPTIONS]: ok(both), [HELP]: proposed(WITH_EVIDENCE) });
+    tell();
+    askLeda();
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /un informe/ })).toBeChecked());
+    pick('Quién la hace', 'm-lucas');
+    expect(screen.getByRole('checkbox', { name: /una foto/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /un informe/ })).toBeChecked();
+    expect(evidenceMark(/un informe/)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /una captura de pantalla/ })).toBeNull();
+  });
+
+  it('never ticks an evidence the area does not know', async () => {
+    await openForm({
+      [HELP]: proposed({ ...FULL, propuesta: { ...FULL.propuesta, evidencia: ['inventada', 'captura'] } }),
+    });
+    tell();
+    askLeda();
+    await waitFor(() => expect(screen.getByLabelText('Quién la hace')).toHaveValue('m-marcos'));
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /un informe/ })).not.toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: /inventada/ })).toBeNull();
+    // The minimum is the area's, not Leda's: no mark on it.
+    expect(evidenceMark(/una captura de pantalla/)).toBeNull();
+  });
+
+  it('a text the spelling check could not check is checked again on the next confirm', async () => {
+    const unchecked = {
+      status: 200,
+      body: { corregidos: {}, sin_revisar: ['titulo', 'criterio'], aviso: 'No pude revisar la ortografía ahora: quedó como lo escribiste.' },
+    };
+    const refused = {
+      status: 422,
+      body: { errores: [{ campo: 'fecha', motivo: 'no_es_dia_habil', texto: 'Ese día no es hábil en este espacio.' }] },
+    };
+    const calls = await openForm({ [SPELLING]: [unchecked, NOTHING_TO_CORRECT], [TASKS]: [refused, loaded()] });
+    fillTask();
+    confirm();
+    expect(await screen.findByText('Ese día no es hábil en este espacio.')).toBeInTheDocument();
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const checks = calls.filter((c) => c.key === SPELLING);
+    expect(checks).toHaveLength(2);
+    expect(checks[1].body).toEqual(checks[0].body);
   });
 });
