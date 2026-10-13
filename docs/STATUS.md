@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-13, cierre de la tarde: J1 cerrada; J2 hecha, con su ronda real y su prueba en el celular pendientes de lo último. Ver "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-13, cierre de la tarde: J1 cerrada; J2 hecha y medida (59 de 60), con su prueba en el celular pendiente. Ver "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -64,12 +64,11 @@ viejo corriendo.
 - `leda_motor`, en la `0067` (respaldos en `db/respaldos/`, el último `leda_motor-antes-0067-20261013.dump`).
 
 **Punto exacto para seguir** (cierre del 2026-10-13, tarde):
-1. **Cerrar la J2:** una ronda con la IA real de lo de la J2-13 (unas 20 llamadas por vuelta; **pedirle
-   permiso al usuario**: `$env:PYTHONPATH="src"; .venv\Scripts\python.exe tools\medir_ayuda_al_cargar.py --ia
-   sol-suscripcion --veces 3 --salida tests\conversaciones\resultados\ayuda-al-cargar-3.json`) y la J2-12, la
-   prueba del usuario en el celular (el guion, en `../odd/tasks/plataforma-jerarquias.md`, J2-12; sumar: el aviso
-   "No encontré a…" en su campo y los puntos animados). En `leda_motor` el reloj de Leda está adelantado (hoy
-   para Leda es jueves 15) y "el tano" no es apodo de nadie.
+1. **Cerrar la J2:** falta sólo la J2-12, la prueba del usuario en el celular (el guion, en
+   `../odd/tasks/plataforma-jerarquias.md`, J2-12; sumar: el aviso "No encontré a…" en su campo, los puntos
+   animados y que el resumen de la caja deje de nombrar un campo al completarlo). La ronda con la IA real de la
+   J2-13 dio 59 de 60 (2026-10-13, bitácora) y los dos avisos de RDD están arreglados (`67ca78df`, `bfa3943e`).
+   En `leda_motor` el reloj de Leda está adelantado (hoy para Leda es jueves 15) y "el tano" no es apodo de nadie.
 2. **La J2b, la voz a texto:** GPT-4o Transcribe por OpenRouter contra Gemini, con unos 10 dictados del usuario;
    el usuario pone `LEDA_GEMINI_API_KEY` en el `.env`; base `research/gemini-voz-del-otro-proyecto.md`;
    mantener la pantalla encendida mientras graba.
