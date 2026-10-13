@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-13, madrugada (modo autónomo): correcciones T4b a T10 y acceso por chat A-1 a A-6 hechos. Ver "Lo hecho la noche del 12 al 13" y "Para la mañana".
+**Última actualización documental:** 2026-10-13, tarde: ADR 0023 aceptado, J1 construida; falta su prueba en el celular. Ver "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -32,106 +32,36 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-13, madrugada, al terminar el plan de la noche)
+## Punto exacto para retomar (2026-10-13, tarde)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
-Plan de la Fase C: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (decisiones del usuario 1 a 79 y,
-después de la 79, los hallazgos de la prueba por Telegram); la plataforma, en el
-[ADR 0022](decisions/0022-plataforma-web-de-tareas.md) y en `odd/tasks/plataforma-p1.md` y
-`odd/tasks/plataforma-p2.md` (ya en esta rama).
+La unidad en curso es [`../odd/tasks/plataforma-jerarquias.md`](../odd/tasks/plataforma-jerarquias.md): el
+[ADR 0023](decisions/0023-quien-crea-en-la-plataforma.md) (quién crea qué según la jerarquía del equipo,
+aceptado el 2026-10-13) en seis porciones, J1 a J6, con "De qué se parte en cada porción". La Fase C, en
+[`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md); la plataforma, en el
+[ADR 0022](decisions/0022-plataforma-web-de-tareas.md) y en `odd/tasks/plataforma-p1.md` y `plataforma-p2.md`.
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si está caído, levantarlo con
 `levantar-postgres.bat` (o `pg_ctl ... start`, fuera del sandbox). Si `pg_ctl` dice que otro servidor puede
 estar en ejecución, cerrar los procesos `postgres` colgados y reintentar. Comprobar que no quede un escuchador
 viejo corriendo.
 
-**Lo hecho el 2026-10-12:**
-- **La prueba por Telegram de la Fase C pasó** (pasos 1 a 48 del guion; usuario: "paso super bien, las
-  correcciones son menores"). Resultado en la bitácora; los hallazgos, en las decisiones 77 (un aviso a
-  otra persona se cuenta sin su nombre ni su hora), 78 ("consultar", no "preguntar") y 79 (un ícono
-  por estado en las listas: 🏁 🟢 ⚪ 🔵 🟠 🔴) y en la lista que les sigue en `odd/tasks/fase-c.md`.
-- **La rama del Motor está en `main`** por avance rápido (396 commits, sin atribuciones ni `.env`;
-  `origin/main` en `80d6945`).
-- **La plataforma, junta con el Motor** (`7f752d5`; las porciones 1 y 2, construidas y revisadas por RDD
-  en `feat/plataforma`; sin archivos en común). `leda_motor`, hasta la `0064` (ver abajo). Web: `npm
-  test` 57 passed y `npm run build` bien; `pytest tests/garantias tests/motor`, 2026 passed.
-- **Decidido:** el enlace de entrada que nadie usó vence a las 24 horas y Leda lo dice al mandarlo
-  (precisión de la decisión 4 del ADR 0022).
+**Lo hecho del 12 al 13 de octubre** (el detalle y la evidencia, en cada documento):
+- La prueba por Telegram de la Fase C pasó y la rama llegó a `main` (`80d6945`, 2026-10-12).
+- Las correcciones de esa prueba, T1 a T10: `../odd/tasks/correcciones-prueba-telegram.md`.
+- El acceso a la web por chat, A-1 a A-6, y la prueba en el celular, pasada ("salio perfecto"):
+  `../odd/tasks/acceso-por-chat.md` y la bitácora de flujos.
+- Los bots nuevos del usuario, `@Leda_PM_bot` y `@Leda_Admin_bot` (sus tokens, en el `.env`, los pone el
+  usuario); `bot_usuario: Leda_PM_bot` en el pack.
+- Las decisiones de la plataforma por jerarquía: el ADR 0023 y `../odd/tasks/plataforma-p2.md` ("Para decidir").
+- La J1, las esperas en el formulario, construida y revisada por RDD (`980a8f2a`, `fb87d121`).
+- `leda_motor`, en la `0067` (respaldos en `db/respaldos/`, el último `leda_motor-antes-0067-20261013.dump`).
 
-**Lo hecho el 2026-10-12, noche:**
-- **El acceso por chat, diseñado y en pausa** (el usuario prefiere hacerlo con él presente):
-  [`../odd/tasks/acceso-por-chat.md`](../odd/tasks/acceso-por-chat.md), con sus decisiones (el
-  ofrecimiento al final de la próxima respuesta; "perdí el celular" corta enseguida y recuerda cerrar
-  Telegram desde Ajustes → Dispositivos; "lo recuerda cuando viene al caso", más adelante) y el hilo de la
-  conversación de prueba 50, **que espera la aceptación del usuario** antes del código.
-- **La rama `auxiliar/alta-y-google`, analizada:** no se retoma (su alta es verificar el correo por chat
-  para Calendar; depende de los flujos borrados y choca con la `0054`); se rescatan ideas para la carga de
-  integrantes (`odd/tasks/plataforma-p2.md`). **Correo verificado y Google, pendiente sin fecha** en
-  `docs/ROADMAP.md` ("Anotado para más adelante"; el momento lo decide el usuario).
-- Carpetas borradas: `Leda-PM-worktrees\plataforma` (su rama ya está en la del Motor; queda en
-  `origin/feat/plataforma`) y `_rdd-ca5c38f3` (vacía).
-
-**Lo hecho después, la misma noche (sesión cerrada con corte limpio a pedido del usuario):**
-- **Las correcciones de la prueba, T1 a T5, hechas, revisadas por RDD y subidas** (rama en `bfd721e`;
-  detalle y evidencia en `../odd/tasks/correcciones-prueba-telegram.md`): íconos por estado (79),
-  "consultar" (78), sin nombre ni hora en los avisos a otros (77), el comentario de una aprobación que
-  contesta "¿cuál de las dos?" y una tarea terminada que no "vence". `pytest tests/motor` 1377 passed,
-  `tests/conversaciones` 215 passed, en seco 48 de 48 (sobre `64796ac`).
-- **El usuario aceptó la conversación 50** del acceso por chat tal como está, y **autorizó dos rondas con
-  la IA real**: la de las conversaciones tocadas por las correcciones (T9) y la de la 50 (A-6).
-
-**Lo hecho la noche del 12 al 13 (modo autónomo; detalle y evidencia en
-`../odd/tasks/correcciones-prueba-telegram.md`):**
-- **T4b y T4c** (`01b3aef`, `66a1f51`): una "¿cuál de las dos?" que quedó para después no pisa ni se
-  reusa con lo escrito después (`preguntas.la_que_vio`, la guarda de lo último que vio).
-- **T6** (`ee9df64`, `7e13768`): no hubo hora mal guardada; el reloj de prueba fue para atrás por
-  `volver` + `adelantar`. Ahora el reloj nunca deja a Leda antes de lo registrado: `hora` se niega,
-  `volver` se niega salvo `--forzar` (sólo con la base recreada) y `adelantar` cuenta desde lo registrado.
-- **T7** (`5b52481`, `0ef7888`, conversación 51): "dejalo pendiente" en medio de una entrega cancela sin
-  insistir, y un borrador dice que todavía no quedó anotado (`todavia_no_quedo_anotado`).
-- **T8** (`bc40805`): la entrega nueva muestra el archivo una sola vez y lo que sigue contando de la
-  entrega anterior aparte.
-- **T9, la ronda real** (bitácora): garantías 18 de 18; comprensión bien en 23, 27, 40, 41 y 44; la 51,
-  sólo una expectativa del YAML en su paso 1; la 22, 0 de 3 (la misma clase que en la D6, `PENDIENTE`).
-  Cupo: la ventana de 5 horas, 48 %; la semanal, 49 %.
-- Cada commit de código, revisado por RDD y aprobado. `pytest tests/motor` 1402 passed y
-  `tests/conversaciones` 217 passed (sobre `bc40805`); `tests/garantias` 697 passed; en seco 49 de 49.
-
-- **El acceso por chat, A-1 a A-3** (`b6dc364`, `e6b4402`, `38d71f3`, `0e3946e`): la conversación 50, la
-  `0065` (el enlace sin usar vence a las 24 horas), la `0066` (la marca del enlace de entrada, el estado
-  del ofrecimiento, el corte siempre auditado) y las jugadas `pedir_acceso_web` y `perdi_el_celular`.
-  **`leda_motor` está en la `0066`** (respaldo `db/respaldos/leda_motor-antes-0065-0066-20261013.dump`):
-  el despachador ya lee la tabla nueva, así que una base sin la `0066` no sirve para el escuchador.
-- **El acceso por chat, A-4 y A-5** (`fb4fc9a2`, `30f4a86f`, `3964a0e8`, `79225200`): el ofrecimiento
-  de la web una sola vez, al final de una respuesta escrita, y en la bienvenida; "perdí el celular"
-  descarta los enlaces que todavía no salieron. En seco 50 de 50; `tests/garantias` 724 passed,
-  `tests/motor` 1440 passed, `tests/conversaciones` 227 passed. Revisado por RDD y aprobado.
-- **A-6, la ronda real de la 50** (bitácora): garantías 5 de 5, comprensión 5 de 5, formato 4 de 5
-  (un renglón largo de la IA). Cupo: la ventana de 5 horas, 7 %; la semanal, 1 %.
-
-**Para la mañana (lo que necesita al usuario, de a una):**
-1. ~~Un toque no lleva el ofrecimiento de la web~~: confirmado por el usuario (2026-10-13).
-2. ~~La prueba en el celular~~: pasada (2026-10-13, con un túnel rápido de Cloudflare; bitácora).
-3. ~~El usuario del bot~~: el usuario creó bots nuevos (2026-10-13), `@Leda_PM_bot` y `@Leda_Admin_bot`;
-   `bot_usuario: Leda_PM_bot` en el pack, importado en `leda_motor` (versión 2; respaldo
-   `db/respaldos/leda_motor-antes-bot-nuevo-20261013.dump`). Los tokens nuevos los pone el usuario en el `.env`.
-4. ~~Las tres preguntas de "Para decidir"~~: decididas (2026-10-13; `../odd/tasks/plataforma-p2.md`):
-   los objetivos los crea Dirección desde la web, las esperas van en el mismo formulario y crear tareas
-   sigue la jerarquía (Dirección, el referente para su área, el integrante para sí mismo con aprobación
-   del referente); las jerarquías las maneja Dirección. Contradice el ADR 0022: **enmienda antes del
-   código**, que escribe el agente y acepta el usuario.
-5. **La 22, comprensión 0 de 3** en la ronda de la T9 (la misma clase que en la D6, `PENDIENTE`): la
-   investiga el agente.
-6. ~~Subir la rama~~: subida el 2026-10-13 (`df191141`). `main`, cuando lo decida el usuario. **En
-   observación:** la 35 paso 18.
-
-**Punto exacto para seguir:** el [ADR 0023](decisions/0023-quien-crea-en-la-plataforma.md) (quién crea qué
-según la jerarquía del equipo), aceptado el 2026-10-13, se construye en seis porciones, en el orden acordado:
-`../odd/tasks/plataforma-jerarquias.md`. En marcha la J1 (las esperas en el formulario). La 22, después.
-
-**El plan de la noche** (las correcciones, después el acceso por chat; frenar antes del túnel, del
-celular, de toda decisión de producto nueva y de `main`) se cumplió entero; su texto, en la historia de
-Git de este archivo (`a9e73268`).
+**Punto exacto para seguir: la J1-5, la prueba del usuario en el celular**, con el guion de
+`../odd/tasks/plataforma-jerarquias.md`. Se prende el túnel (`cloudflared tunnel --no-autoupdate --url
+http://127.0.0.1:8000`; la dirección cambia cada vez, autorizado para probar), se reinicia la web, y el usuario
+emite su enlace con `$env:LEDA_BASE_URL` del túnel y `leda enlace-admin Ariel`. Después, la J2. La
+conversación 22, después de la plataforma. Lo que sigue a la plataforma, en orden: `ROADMAP.md`.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un

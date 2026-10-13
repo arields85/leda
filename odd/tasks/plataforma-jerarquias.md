@@ -62,6 +62,15 @@ Ruta: cada porción, delegada (un escritor), porque toca base, servidor, web y p
       tareas para elegir no tiene tope (`0067:88`). Sugerencia: una espera elegida que dejó de estar abierta
       se manda sin que se vea (`draft.ts:40-43`).
 - [ ] **J1-5 · Prueba real en el celular** (con el usuario).
+      Preparación: el túnel (`cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000`), la web
+      reiniciada (`.venv\Scripts\python.exe -m uvicorn leda.entrada:app --host 127.0.0.1 --port 8000
+      --no-access-log`), y el usuario emite su enlace con `$env:LEDA_BASE_URL = "<dirección del túnel>"` y
+      `.venv\Scripts\python.exe -m leda enlace-admin Ariel`. Guion: (1) abre el enlace en el celular y toca
+      "Entrar" → la puerta de administración; (2) empieza a cargar "Colocar el estante" como siempre; (3) el
+      campo "Espera a" muestra sólo las tareas abiertas del espacio, con su responsable, sin las terminadas;
+      (4) elige una (por ejemplo la de integrar de Marcos) → la vista previa dice "espera a: …" con la tarea y
+      la persona; (5) confirma → cargada; (6) carga otra sin espera → igual que antes. Después, el coordinador
+      revisa en la base la espera (`dependency`) y la fila de auditoría con `espera_task_id`.
 
 **Diseño corto (J1-1, 2026-10-13).** Hoy el formulario (`LoadForm.tsx`) pide a
 `GET /admin/api/espacios/{id}/opciones` (función `opciones_de_la_carga`) lo que se puede elegir y manda la carga
