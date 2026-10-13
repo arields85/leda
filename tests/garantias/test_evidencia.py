@@ -261,7 +261,17 @@ def test_el_pack_de_corework_queda_con_las_clases_de_cada_tipo(corework, conn):
         tipos = {f["slug"]: f["tipos"] for f in cur.fetchall()}
     assert tipos["electricidad"]["foto"]["clases"] == ["imagen"]
     assert tipos["ot"]["archivo"]["clases"] == ["archivo", "imagen", "enlace"]
-    assert set(tipos["ot"]) == {"explicacion", "resultado_de_prueba", "captura", "archivo"}
+    # Cada área conoce todos los tipos del pack; lo que pide es el mínimo, no un límite (J2-18,
+    # usuario, 2026-10-13: "¿infraestructura nunca podría pedir fotos?").
+    todos = {"explicacion", "resultado_de_prueba", "captura", "foto", "archivo"}
+    assert all(set(t) == todos for t in tipos.values())
+    with admin(conn) as cur:
+        cur.execute("""select a.slug, p.evidencia_requerida from task_evidence_policy p
+                         join area a on a.id = p.area_id where p.workspace_id = %s""",
+                    (corework.workspace_id,))
+        pide = {f["slug"]: f["evidencia_requerida"] for f in cur.fetchall()}
+    assert pide["it"] == ["explicacion", "resultado_de_prueba"]
+    assert pide["electricidad"] == ["explicacion", "foto"]
 
 
 def test_la_base_rechaza_unas_clases_que_no_existen(corework, conn):

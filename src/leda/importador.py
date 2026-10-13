@@ -545,10 +545,12 @@ def _validar_tipos_de_evidencia(pack: dict[str, Any]) -> list[str]:
 
 
 def _tipos_del_area(pack: dict[str, Any], evidencia: list[str]) -> dict[str, Any]:
-    """Las clases y las palabras de los tipos que pide la política de un área, del pack."""
+    """Las clases y las palabras de todos los tipos de evidencia del pack: cada área conoce todos;
+    lo que pide su política (`evidencia`) es el mínimo, no un límite (J2-18). Si el pack no
+    describe un tipo que el área pide, no se agrega: lo rechaza `validar`."""
     tipos = (pack.get("evidencia") or {}).get("tipos") or {}
-    return {t: {"clases": list(tipos[t]["clases"]), "en_palabras": tipos[t]["en_palabras"]}
-            for t in evidencia if isinstance(tipos.get(t), dict)}
+    return {t: {"clases": list(d["clases"]), "en_palabras": d["en_palabras"]}
+            for t, d in tipos.items() if isinstance(d, dict)}
 
 
 def _importar_politica_evidencia(cur, ws, pack) -> None:
