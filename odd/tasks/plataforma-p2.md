@@ -89,6 +89,9 @@ Mientras no se decida, lo más restrictivo; abrirlo después no rehace nada.
    de administración es la única que carga tareas"): **enmienda al ADR antes del código**, `PENDIENTE`.
    Canal: **sólo la web por ahora**; por chat, más adelante (`docs/ROADMAP.md`). Mientras tanto, el
    formulario sigue como está.
+   **La tarea que crea un referente para su área entra directo** (usuario, 2026-10-13: "directo"), sin
+   aprobación de Dirección, con un aviso sólo informativo a Dirección; el umbral de re-aprobación de
+   la mecánica (§7) queda para cuando haga falta.
 
 ## Criterio de aceptación
 
