@@ -52,7 +52,7 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
       después, que no la contesta. Test primero.
 - [ ] **T4c · `fichas.dos_lecturas` sólo con la pregunta abierta** (límite de la T4b): una "¿cuál de
       las dos?" que quedó para después no se cierra ofreciendo sus botones viejos. Test primero.
-- [ ] **T6 · La hora de los turnos en el registro** (los pasos 22 a 25 figuran a las 10:02): investigar y,
+- [x] **T6 · La hora de los turnos en el registro** (los pasos 22 a 25 figuran a las 10:02): investigar y,
       si quedó mal guardada, corregirla. **Evidencia (coordinador, 2026-10-12, `leda_motor`):** quedó mal
       guardada. `conversation_turn.at` sale de `reloj.ahora()` (`turno.py:232`). Turnos de Marcos
       (`inbound_message.at` real → `conversation_turn.at`): n.º 6 15:47:05 → mar 10:02:17; n.º 18
@@ -154,4 +154,46 @@ nombres de otros en los mensajes.
   `fichas.dos_lecturas` busca cualquier "¿cuál de las dos?" abierta de la tarea, así que una que quedó
   para después puede cerrarse ofreciendo sus botones viejos (más seguro que antes, pero con el
   comentario viejo en los botones). Va como T4c.
-- **T6, diagnosticada** (ver la tarea): sin hora mal guardada; el arreglo va en la herramienta del reloj.
+- **T7 y T8, analizadas** (explorador de sólo lectura, 2026-10-12, noche; registro de turnos de
+  `leda_motor`). Las tres se arreglan dentro del diseño, en los hechos de la cocina:
+  - **T7a** (fue Ariel, paso 21, no Marcos): ante "dejalo pendiente, después lo hago" la IA eligió
+    `corregir` sin `saca`, porque la ficha de `cancelar` dice que dejar sin efecto algo dicho antes "es
+    corregirlo" (`fichas.py:1921-1930`); pero lo de Ariel nunca quedó anotado, vive sólo en la pregunta
+    abierta. Y `entrega.corregir` sin nada que corregir volvió `falta_dato` (`entrega.py:1191`), otra
+    pregunta. Por la 9d del ADR 0018, "dice que lo deja" es cancelar sin insistir. Arreglo: la ficha
+    describe el trabajo (lo contado para una pregunta que espera confirmación no está anotado; dejarlo
+    todo es cancelar) y `corregir` sin nada que corregir lleva lo mostrado y `no_se_anoto_nada`.
+    Conversación de prueba nueva: la 51, "Dejar una entrega sin terminar".
+  - **T7b:** los hechos de un borrador (`sumo`, `para_entregarla_falta`) no dicen que nada quedó
+    anotado, y ✏️ es "algo que quedó anotado" (`instrucciones.py:164`). Arreglo: un hecho
+    `todavia_no_quedo_anotado` en lo que espera confirmación o un dato, con su significado. Misma clase
+    que las decisiones 77 y 78.
+  - **T8:** la IA leyó la foto como `guardar_para_la_entrega` (la misma lectura que la 23, paso 12, 4 de
+    5) y la cocina pasó dos hechos que se contradicen: `para_cuando_la_entregue` ("no es parte de una
+    entrega todavía") y la oferta con la foto adentro (`_ofrecer_volver_a_entregarla`,
+    `entrega.py:997-1039`). "Arranca desde el PLC" no es un resto viejo: lo cubría la entrega anterior
+    (decisión 23) y `entrega.py:862` lo pone en el `describe` de la pieza nueva, que la IA cuenta como
+    lo escrito ahora. Arreglo: con oferta, el archivo sólo dentro de la oferta; lo que sigue contando de
+    la entrega anterior, con su propia clave al redactar (sin quitarlo de lo guardado: la cobertura
+    cuenta sólo desde el último pedido de cambios, `_ciclo_desde`). Conversación: la 27 se extiende
+    (pedido de cambios y la foto del contador).
+  - **Chequeo de rumbo:** la T8 dispara "la misma clase de hallazgo en dos rondas" (`AGENTS.md`, punto
+    4). Revisado el mecanismo: el diseño de las decisiones 23 y 68 se sostiene; lo que falla son los
+    hechos que la cocina le pasa a la IA (regla del mozo: primero se mira si la cocina le pasó el hecho
+    correcto). No se agregan frases ni casos. Si la ronda real vuelve a mostrar la lectura de
+    `guardar_para_la_entrega`, se para y se lleva al usuario.
+- **T6, hecha** (escritor delegado; `ee9df64`, más `7e13768` del coordinador). Sin hora mal guardada
+  (diagnóstico en la tarea): el arreglo es el piso del reloj de prueba. `reloj.ultimo_registrado` es lo
+  último que Leda fechó con su reloj (`conversation_turn.at` y `scheduled_notice.creado_en`; afuera
+  `programado_para`, que mira al futuro, y `message_outbox.enviado_en`, que `cli.py despachar` fecha con
+  el reloj real). `hora` no va antes del piso, `volver` se niega si dejaría a Leda antes salvo
+  `--forzar` (sólo para empezar de cero con la base recreada), y `adelantar` cuenta el día siguiente
+  desde el más tardío entre el día de Leda y el piso, así que siempre tiene salida (advertencia de la
+  revisión). El guion del reloj lo dice. RED: `test_reloj.py` 5 en rojo antes de `ee9df64`; el de
+  `7e13768` no se observó en rojo (el escritor de la T4c corría la suite), pero la prueba anterior
+  afirmaba la negativa en ese mismo caso. `test_reloj.py` 13 passed; `pytest tests/motor` 1385 passed
+  (sobre `ee9df64`); `tests/garantias -k reloj` 2 passed. **RDD:** `review-61e666a8d017cce0` y
+  `review-18ef5e4a7c6d0da7`, aprobadas; sugerencias sobre el borde exacto del piso en las pruebas.
+  **Ojo con `leda_motor`:** quedó con el reloj en el miércoles 14/10 y lo registrado hasta ahí; `volver`
+  ahora se niega (para empezar de cero: recrearla y `volver --forzar`).
+
