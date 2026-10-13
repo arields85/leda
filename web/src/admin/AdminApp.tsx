@@ -4,8 +4,8 @@ import { Header } from '../components/Header';
 import { Notice } from '../components/Notice';
 import { SignOut } from '../components/SignOut';
 import { adminSignOut, fetchAdminMe, fetchOptions, type AdminMe, type Options } from './api';
+import { Dropdown } from './Dropdown';
 import { LoadForm } from './LoadForm';
-import { TEXT_SIZE } from './typography';
 
 type Load<T> =
   | { kind: 'loading' }
@@ -116,21 +116,21 @@ export function AdminApp() {
     body = (
       <>
         {(admin.espacios.length > 1 || spaceId === null) && (
-          <label className="flex w-full min-w-0 max-w-[24rem] flex-col gap-1.5 text-meta text-ink-dim">
-            <span className="uppercase tracking-[0.04em]">espacio</span>
-            <select
-              className={`block w-full min-w-0 max-w-full rounded-card border-hard border-line bg-card px-3 py-2 text-ink outline-none focus:border-ink ${TEXT_SIZE}`}
+          <div className="flex w-full min-w-0 max-w-[24rem] flex-col gap-1.5 text-meta text-ink-dim">
+            <label id="f-espacio-label" htmlFor="f-espacio" className="uppercase tracking-[0.04em]">
+              espacio
+            </label>
+            <Dropdown
+              id="f-espacio"
+              labelledBy="f-espacio-label"
               value={spaceId ?? ''}
-              onChange={(e) => setSpaceId(e.target.value || null)}
-            >
-              {spaceId === null && <option value="">elegí un espacio</option>}
-              {admin.espacios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={(value) => setSpaceId(value || null)}
+              options={[
+                ...(spaceId === null ? [{ value: '', label: 'elegí un espacio' }] : []),
+                ...admin.espacios.map((s) => ({ value: s.id, label: s.nombre })),
+              ]}
+            />
+          </div>
         )}
         {options.kind === 'loading' && <Notice title="Cargando…" />}
         {options.kind === 'failed' && <Failed onRetry={retry} />}

@@ -54,8 +54,24 @@ async function openForm(routes: Record<string, Reply | Reply[]> = {}) {
   return calls;
 }
 
+/** Picks the option with that value from a field's list, as a person does (J2-16: the lists are
+ * the web's own, not the phone's): a tap on the list, a tap on the option. */
 function pick(label: string | RegExp, value: string) {
-  fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  fireEvent.click(screen.getByLabelText(label));
+  const option = within(screen.getByRole('listbox'))
+    .getAllByRole('option')
+    .find((o) => o.dataset.value === value);
+  if (!option) throw new Error(`"${String(label)}" does not offer "${value}"`);
+  fireEvent.click(option);
+}
+
+/** What a field's list offers: opened, read and closed again with Escape. */
+function offered(label: string): string[] {
+  fireEvent.click(screen.getByLabelText(label));
+  const list = screen.getByRole('listbox');
+  const names = within(list).getAllByRole('option').map((o) => o.textContent ?? '');
+  fireEvent.keyDown(list, { key: 'Escape' });
+  return names;
 }
 
 function fillTask() {
@@ -89,10 +105,8 @@ describe('AdminApp', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Cargar tarea');
     // One space: no selector.
     expect(screen.queryByLabelText('espacio')).toBeNull();
-    const objective = screen.getByLabelText('Objetivo');
-    expect(within(objective).getByRole('option', { name: 'Puesta en marcha de la línea 3 · hasta 30.10' })).toBeInTheDocument();
-    const responsible = screen.getByLabelText('Quién la hace');
-    expect(within(responsible).getByRole('option', { name: 'Lucas · Infraestructura · sin conectar' })).toBeInTheDocument();
+    expect(offered('Objetivo')).toContain('Puesta en marcha de la línea 3 · hasta 30.10');
+    expect(offered('Quién la hace')).toContain('Lucas · Infraestructura · sin conectar');
     pick('Quién la hace', 'm-lucas');
     expect(screen.getByText('· la revisa: Ismael')).toBeInTheDocument();
     expect(screen.getByText('[SIN CONECTAR]')).toBeInTheDocument();
@@ -341,7 +355,7 @@ describe('AdminApp', () => {
   it('every control and the calendar are built to fit the width of a phone', async () => {
     await openForm();
     const form = screen.getByRole('form', { name: 'Cargar tarea' });
-    const controls = form.querySelectorAll('select, input:not([type="checkbox"]), textarea');
+    const controls = form.querySelectorAll('[aria-haspopup="listbox"], input:not([type="checkbox"]), textarea');
     expect(controls.length).toBeGreaterThan(0);
     for (const control of controls) {
       expect(control).toHaveClass('w-full', 'min-w-0', 'max-w-full');
@@ -358,11 +372,13 @@ describe('AdminApp', () => {
   it('every control has the same box and text, so a list looks like a text field (J2-10)', async () => {
     await openForm();
     const form = screen.getByRole('form', { name: 'Cargar tarea' });
-    const controls = form.querySelectorAll('select, input:not([type="checkbox"]), textarea');
+    const controls = form.querySelectorAll('[aria-haspopup="listbox"], input:not([type="checkbox"]), textarea');
     for (const control of controls) expect(control).toHaveClass(...CONTROL.split(' '));
-    // A list to choose from drops the phone's own look, which made it bigger than a text field.
-    const lists = form.querySelectorAll('select');
-    expect(lists.length).toBeGreaterThan(0);
+    // A list to choose from is the web's own (J2-16): the phone's menu cannot take the web's font
+    // and size, so there is no native list left, in the form nor above it.
+    expect(document.querySelectorAll('select')).toHaveLength(0);
+    const lists = form.querySelectorAll('[aria-haspopup="listbox"]');
+    expect(lists).toHaveLength(4);
     for (const list of lists) expect(list).toHaveClass('appearance-none');
     // The calendar's days are written in the same size as the controls.
     const day = screen.getByRole('button', { name: 'vie 16.10' });
@@ -472,11 +488,11 @@ describe('AdminApp', () => {
       ),
       [TASKS]: loaded(),
     });
-    const wait = screen.getByLabelText('Espera a (opcional)');
-    expect(wait).toHaveValue('');
-    expect(
-      within(wait).getByRole('option', { name: 'Colocar el estante · Lucas · Mantenimiento anual' }),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Espera a (opcional)')).toHaveValue('');
+    expect(offered('Espera a (opcional)')).toEqual([
+      'no espera a ninguna',
+      'Colocar el estante · Lucas · Mantenimiento anual',
+    ]);
     fillTask();
     pick('Espera a (opcional)', 't-estante');
     const form = screen.getByRole('form', { name: 'Cargar tarea' });
@@ -554,6 +570,35 @@ describe('AdminApp', () => {
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
     expect(sent).toEqual(['22222222-2222-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222']);
+  });
+
+  it('while it loads, "cargando" has the same three fading dots as "completando", always (J2-15)', async () => {
+    // The user, on the iPhone (J2-12): the dots of "completando…" also on "cargando…".
+    await openForm();
+    let answer: (r: Response) => void = () => {};
+    const real = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) =>
+        init?.method === 'POST' && url.endsWith('/tareas')
+          ? new Promise<Response>((resolve) => (answer = resolve))
+          : real(url, init),
+      ),
+    );
+    fillTask();
+    confirm();
+    const button = screen.getByRole('button', { name: 'cargando…' });
+    expect(button).toBeDisabled();
+    const dots = Array.from(button.querySelectorAll('.animate-puntos'));
+    expect(dots).toHaveLength(3);
+    expect(dots.map((d) => d.textContent)).toEqual(['.', '.', '.']);
+    expect(new Set(dots.map((d) => d.className)).size).toBe(3);
+    expect(button.innerHTML).not.toMatch(/motion-reduce|motion-safe/);
+    answer(new Response(JSON.stringify({ task_id: 't-new', avisos: [], repetida: false }), {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
   });
 
   it('after a send with no answer, editing keeps the key so the server can tell', async () => {
@@ -824,8 +869,7 @@ describe('AdminApp', () => {
     render(<AdminApp />);
     expect(await screen.findByText('Ese espacio ya no está disponible.')).toBeInTheDocument();
     expect(screen.getByText('Elegí otro espacio arriba.')).toBeInTheDocument();
-    const selector = screen.getByLabelText('espacio');
-    expect(within(selector).queryByRole('option', { name: 'CoreWork' })).toBeNull();
+    expect(offered('espacio')).toEqual(['elegí un espacio', 'North Lab']);
     pick('espacio', OTHER_SPACE);
     expect(await screen.findByRole('form', { name: 'Cargar tarea' })).toBeInTheDocument();
   });
@@ -851,8 +895,8 @@ describe('AdminApp', () => {
     render(<AdminApp />);
     await screen.findByRole('form', { name: 'Cargar tarea' });
     pick('espacio', OTHER_SPACE);
-    expect(await screen.findByRole('option', { name: 'Laboratorio nuevo' })).toBeInTheDocument();
-    expect(calls.map((c) => c.key)).toContain(`GET /app/admin/api/espacios/${OTHER_SPACE}/opciones`);
+    await waitFor(() => expect(calls.map((c) => c.key)).toContain(`GET /app/admin/api/espacios/${OTHER_SPACE}/opciones`));
+    await waitFor(() => expect(offered('Objetivo')).toContain('Laboratorio nuevo'));
   });
 });
 

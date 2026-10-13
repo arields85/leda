@@ -1,9 +1,11 @@
-import { ChevronDown, CircleAlert } from 'lucide-react';
-import { type ComponentProps, Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { CircleAlert } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { SessionClosedError } from '../api';
 import { shortDate } from '../format';
 import { askLeda, HELP_FAILED, loadTask, type Options, type Problem, type Proposal } from './api';
+import { Completing } from './Completing';
 import { DatePicker, dayLabel } from './DatePicker';
+import { Dropdown } from './Dropdown';
 import { HelpBox, type HelpState } from './HelpBox';
 import {
   checkDraft,
@@ -43,9 +45,6 @@ type Step =
 const WARN = 'text-falta';
 // The shared box of every control (`typography.ts`), with the attention border while it is wrong.
 const INPUT = `${CONTROL} aria-[invalid=true]:border-falta`;
-// A list to choose from without the phone's own look, which made it bigger than a text field
-// (J2-10): the same box as the others, with room for its arrow.
-const SELECT = `${INPUT} appearance-none pr-9`;
 // Dimmed while something required is missing, but never `disabled`: a tap still says what is
 // missing and takes the person there.
 const PRIMARY = `inline-flex h-11 items-center gap-2 rounded-card border-hard border-ink bg-card px-3.5 ${TEXT_SIZE} font-bold text-ink shadow-hard-ink disabled:opacity-50 aria-disabled:opacity-50 aria-disabled:shadow-none`;
@@ -66,12 +65,12 @@ function bringTo(area: HTMLElement, target: HTMLElement) {
 }
 
 /** Takes the person to a field: its whole block (label, control and message) in view, and the
- * focus on the control itself, the chosen (or first) day of the calendar, or the first evidence
- * box (the group itself when it has none). */
+ * focus on the control itself (a list's button), the chosen (or first) day of the calendar, or the
+ * first evidence box (the group itself when it has none). */
 function focusField(field: Field) {
   const element = document.getElementById(FIELD_ID[field]);
   if (!element) return;
-  const target = element.matches('input, select, textarea')
+  const target = element.matches('input, select, textarea, button')
     ? element
     : (element.querySelector<HTMLElement>('[tabindex="0"], input, select, textarea') ?? element);
   bringTo(element.closest<HTMLElement>('[data-field]') ?? element, target);
@@ -126,22 +125,6 @@ function FieldList({ label, fields }: { label: string; fields: Field[] }) {
  * the field keeps its name. */
 function Proposed({ on }: { on?: boolean }) {
   return on ? <span className="shrink-0 text-propuesto">· propuesto por Leda</span> : null;
-}
-
-/** A list to choose from that looks like the text fields: the same box, and an arrow of its own
- * in place of the phone's. The id, the label and the focus stay on the list itself. */
-function Select({ className, ...props }: ComponentProps<'select'>) {
-  return (
-    <div className="relative min-w-0 max-w-full">
-      <select {...props} className={className ? `${SELECT} ${className}` : SELECT} />
-      <ChevronDown
-        aria-hidden="true"
-        size={16}
-        strokeWidth={2}
-        className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-ink-dim"
-      />
-    </div>
-  );
 }
 
 function FieldBlock({
@@ -534,21 +517,21 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
           <FieldBlock id="f-objetivo" label="Objetivo" errors={said('objetivo_id')} proposed={proposed.has('objetivo_id')}
             hint={options.objetivos.length === 0 ? 'No hay objetivos abiertos en este espacio.' : undefined}>
-            <Select
+            <Dropdown
               id="f-objetivo"
+              labelledBy="f-objetivo-label"
               value={draft.objetivo_id}
-              onChange={(e) => change({ objetivo_id: e.target.value })}
-              aria-invalid={invalid('objetivo_id')}
-              aria-describedby={described('f-objetivo', 'objetivo_id')}
-            >
-              <option value="">elegí un objetivo</option>
-              {options.objetivos.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.titulo}
-                  {o.fecha_objetivo ? ` · hasta ${shortDate(o.fecha_objetivo)}` : ''}
-                </option>
-              ))}
-            </Select>
+              onChange={(value) => change({ objetivo_id: value })}
+              invalid={invalid('objetivo_id')}
+              describedBy={described('f-objetivo', 'objetivo_id')}
+              options={[
+                { value: '', label: 'elegí un objetivo' },
+                ...options.objetivos.map((o) => ({
+                  value: o.id,
+                  label: `${o.titulo}${o.fecha_objetivo ? ` · hasta ${shortDate(o.fecha_objetivo)}` : ''}`,
+                })),
+              ]}
+            />
           </FieldBlock>
 
           <FieldBlock id="f-titulo" label="Título" errors={said('titulo')} proposed={proposed.has('titulo')}
@@ -592,21 +575,21 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               )
             }
           >
-            <Select
+            <Dropdown
               id="f-responsable"
+              labelledBy="f-responsable-label"
               value={draft.responsable_id}
-              onChange={(e) => chooseResponsible(e.target.value)}
-              aria-invalid={invalid('responsable_id')}
-              aria-describedby={described('f-responsable', 'responsable_id')}
-            >
-              <option value="">elegí a una persona</option>
-              {options.integrantes.map((m) => (
-                <option key={m.membership_id} value={m.membership_id}>
-                  {m.nombre} · {m.area}
-                  {m.conectado ? '' : ' · sin conectar'}
-                </option>
-              ))}
-            </Select>
+              onChange={chooseResponsible}
+              invalid={invalid('responsable_id')}
+              describedBy={described('f-responsable', 'responsable_id')}
+              options={[
+                { value: '', label: 'elegí a una persona' },
+                ...options.integrantes.map((m) => ({
+                  value: m.membership_id,
+                  label: `${m.nombre} · ${m.area}${m.conectado ? '' : ' · sin conectar'}`,
+                })),
+              ]}
+            />
           </FieldBlock>
 
           <FieldBlock
@@ -645,20 +628,18 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
                   : 'Si no puede empezar hasta que otra tarea esté terminada.'
             }
           >
-            <Select
+            <Dropdown
               id="f-espera"
+              labelledBy="f-espera-label"
               value={draft.espera_id}
-              onChange={(e) => change({ espera_id: e.target.value })}
-              aria-invalid={invalid('espera_id')}
-              aria-describedby={described('f-espera', 'espera_id')}
-            >
-              <option value="">no espera a ninguna</option>
-              {waitable.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {waitLabel(t)}
-                </option>
-              ))}
-            </Select>
+              onChange={(value) => change({ espera_id: value })}
+              invalid={invalid('espera_id')}
+              describedBy={described('f-espera', 'espera_id')}
+              options={[
+                { value: '', label: 'no espera a ninguna' },
+                ...waitable.map((t) => ({ value: t.id, label: waitLabel(t) })),
+              ]}
+            />
           </FieldBlock>
 
           <FieldBlock id="f-criterio" label="Criterio de aceptación" errors={said('criterio')}
@@ -722,20 +703,18 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           </fieldset>
 
           <FieldBlock id="f-decidio" label="Quién la decidió" errors={said('decidio_id')}>
-            <Select
+            <Dropdown
               id="f-decidio"
+              labelledBy="f-decidio-label"
               value={draft.decidio_id}
-              onChange={(e) => change({ decidio_id: e.target.value })}
-              aria-invalid={invalid('decidio_id')}
-              aria-describedby={described('f-decidio', 'decidio_id')}
-            >
-              <option value="">elegí a una persona</option>
-              {options.integrantes.map((m) => (
-                <option key={m.membership_id} value={m.membership_id}>
-                  {m.nombre} · {m.area}
-                </option>
-              ))}
-            </Select>
+              onChange={(value) => change({ decidio_id: value })}
+              invalid={invalid('decidio_id')}
+              describedBy={described('f-decidio', 'decidio_id')}
+              options={[
+                { value: '', label: 'elegí a una persona' },
+                ...options.integrantes.map((m) => ({ value: m.membership_id, label: `${m.nombre} · ${m.area}` })),
+              ]}
+            />
           </FieldBlock>
         </fieldset>
       </form>
@@ -793,8 +772,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               disabled={sending}
               aria-disabled={blocked && !sending ? true : undefined}
               aria-describedby={summary ? 'lo-que-falta' : undefined}
+              aria-label={sending ? 'cargando…' : undefined}
             >
-              {sending ? 'cargando…' : failed ? '> probar de nuevo' : '> confirmar'}
+              {sending ? <Completing word="cargando" /> : failed ? '> probar de nuevo' : '> confirmar'}
             </button>
           </div>
         </div>

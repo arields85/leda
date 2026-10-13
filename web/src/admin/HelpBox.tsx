@@ -1,6 +1,7 @@
 import { CircleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Candidate, Problem } from './api';
+import { Completing } from './Completing';
 import { FIELD_NAME, FIELD_ORDER, length, PROBLEM_FIELD } from './draft';
 import { heard, micProblem, type Recognizer, speechRecognition } from './speech';
 import { CONTROL, FIELD_HINT, FIELD_TITLE, TEXT_SIZE } from './typography';
@@ -32,19 +33,6 @@ function Line({ children, warn }: { children: string; warn?: boolean }) {
       <CircleAlert aria-hidden="true" strokeWidth={2.25} className="mt-[0.2em] size-[1em] shrink-0" />
       <span className="min-w-0 wrap-break-word">{children}</span>
     </p>
-  );
-}
-
-/** "completando" with its three dots fading in and out one after another (J2-13): always, also
- * with reduced motion, because only their opacity changes (`--animate-puntos`, `index.css`). */
-function Completing() {
-  return (
-    <span aria-hidden="true">
-      completando
-      <span className="animate-puntos [animation-delay:0ms]">.</span>
-      <span className="animate-puntos [animation-delay:200ms]">.</span>
-      <span className="animate-puntos [animation-delay:400ms]">.</span>
-    </span>
   );
 }
 
@@ -141,7 +129,7 @@ export function HelpBox({ story, onStory, help, notes, onAsk, onChoose }: HelpBo
           disabled={asking}
           aria-label={asking ? 'completando…' : undefined}
         >
-          {asking ? <Completing /> : '> completar con Leda'}
+          {asking ? <Completing word="completando" /> : '> completar con Leda'}
         </button>
         {Recognition && (
           <button type="button" className={QUIET} onClick={toggleMic} aria-pressed={listening}>
