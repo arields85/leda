@@ -96,8 +96,15 @@ Mientras no se decida, lo más restrictivo; abrirlo después no rehace nada.
    poder hacerlo direccion, no depender del administrador de la plataforma. es su equipo de trabajo y
    el decide como organizarlo"): áreas, roles y quién es referente de qué. Las garantías de la
    mecánica (toda área con aprobador declarado o que se autoaprueba; el espacio nunca sin autoridad
-   final) las exige el código, no quien carga. Ampliar la autoridad de Leda sigue con las dos firmas
-   de la constitución §2.
+   final) las exige el código, no quien carga.
+   **Quién puede qué** (usuario, 2026-10-13): el administrador de plataforma puede todo, en todos los
+   espacios (también organizar las jerarquías de un equipo si se lo piden); Dirección puede todo lo de
+   su equipo (jerarquías, áreas, personas, cadencias), sólo de su equipo. Dos límites, aceptados por el
+   usuario: el núcleo no lo cambia nadie desde la plataforma (constitución §14), y ampliar la autoridad
+   de Leda lleva las dos firmas (§2). En palabras del usuario: "si son funciones nuevas, obviamente tiene
+   que pedirlas a administración de la plataforma, pero si son funciones disponibles, las puede ajustar
+   como guste". Lectura para la enmienda: el administrador habilita una función para el espacio (la
+   firma de quien aplica) y Dirección la usa y la ajusta (la de quien decide).
 
 ## Criterio de aceptación
 
