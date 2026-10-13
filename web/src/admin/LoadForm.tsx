@@ -234,7 +234,8 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const [proposed, setProposed] = useState<ReadonlySet<Field>>(new Set());
   // What Leda could not complete, each one shown on its field in the falta color (J2-13: in the
   // phone retest "No encontré a … en el equipo" was only a gray line in the box, out of sight),
-  // until the person fills that field or asks again.
+  // until the person fills that field or asks again. The box's summary reads these same notes,
+  // with the ones that belong to no field.
   const [notes, setNotes] = useState<Problem[]>([]);
   const latest = useRef(draft);
   latest.current = draft;
@@ -332,11 +333,12 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         setHelp({ kind: 'stale' });
       } else if (result.kind === 'proposed') {
         const filled = apply(result.proposal);
-        // Only on the fields still empty: what the person wrote meanwhile is hers.
+        // Only on the fields still empty: what the person wrote meanwhile is hers. A note that
+        // belongs to no field stays for the box.
         setNotes(
           result.notes.filter((n) => {
             const field = PROBLEM_FIELD[n.campo];
-            return field !== undefined && !String(latest.current[field] ?? '').trim();
+            return field === undefined || !String(latest.current[field] ?? '').trim();
           }),
         );
         const choices = latest.current.responsable_id
@@ -344,7 +346,6 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           : result.choices.filter((c) => memberOf(options, c.membership_id));
         setHelp({
           kind: 'done',
-          notes: result.notes,
           choices,
           nothing: filled === 0 && result.notes.length === 0 && choices.length === 0,
         });
@@ -499,7 +500,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         className="flex min-w-0 max-w-full flex-col"
       >
         <fieldset disabled={sending} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
-          <HelpBox story={story} onStory={setStory} help={help} onAsk={ask} onChoose={choose} />
+          <HelpBox story={story} onStory={setStory} help={help} notes={notes} onAsk={ask} onChoose={choose} />
 
           <FieldBlock id="f-objetivo" label="Objetivo" errors={said('objetivo_id')} proposed={proposed.has('objetivo_id')}
             hint={options.objetivos.length === 0 ? 'No hay objetivos abiertos en este espacio.' : undefined}>

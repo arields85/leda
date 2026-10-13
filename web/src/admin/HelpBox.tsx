@@ -12,7 +12,7 @@ export type HelpState =
   | { kind: 'idle' }
   | { kind: 'asking' }
   | { kind: 'stale' }
-  | { kind: 'done'; notes: Problem[]; choices: Candidate[]; nothing: boolean }
+  | { kind: 'done'; choices: Candidate[]; nothing: boolean }
   | { kind: 'rejected'; errors: Problem[] }
   | { kind: 'failed'; text: string };
 
@@ -59,6 +59,10 @@ interface HelpBoxProps {
   story: string;
   onStory: (text: string) => void;
   help: HelpState;
+  /** What Leda could not complete, as the form keeps it now (`LoadForm`): a field's notice goes
+   * when the person fills that field, so the summary never names it after it went (review
+   * review-97374544422a6d97). */
+  notes: Problem[];
   onAsk: () => void;
   onChoose: (membershipId: string) => void;
 }
@@ -66,7 +70,7 @@ interface HelpBoxProps {
 /** "Contame qué querés hacer y te ayudo" (ADR 0023, point 4; portion J2): one free box, typed or
  * dictated, and "completar con Leda". Optional: the form below works by hand as always. The
  * microphone shows only where the browser recognizes speech. */
-export function HelpBox({ story, onStory, help, onAsk, onChoose }: HelpBoxProps) {
+export function HelpBox({ story, onStory, help, notes, onAsk, onChoose }: HelpBoxProps) {
   const [Recognition] = useState(() => speechRecognition());
   const [listening, setListening] = useState(false);
   const [micNote, setMicNote] = useState<string | null>(null);
@@ -108,7 +112,7 @@ export function HelpBox({ story, onStory, help, onAsk, onChoose }: HelpBoxProps)
 
   const asking = help.kind === 'asking';
   const over = length(story) > STORY_LIMIT;
-  const missed = help.kind === 'done' ? missedFields(help.notes) : null;
+  const missed = help.kind === 'done' ? missedFields(notes) : null;
   return (
     <div data-field className="flex min-w-0 max-w-full flex-col gap-2 rounded-card border-hard border-line-soft px-3 py-2.5">
       <div className={`flex min-w-0 items-baseline justify-between gap-2 ${FIELD_HINT}`}>
@@ -154,7 +158,7 @@ export function HelpBox({ story, onStory, help, onAsk, onChoose }: HelpBoxProps)
         {help.kind === 'stale' && <Line>{STALE_ANSWER}</Line>}
         {help.kind === 'done' && help.nothing && <Line>{NOTHING_TO_COMPLETE}</Line>}
         {missed && <Line warn>{missed}</Line>}
-        {help.kind === 'done' && help.notes.filter((n) => !(n.campo in PROBLEM_FIELD)).map((n) => (
+        {help.kind === 'done' && notes.filter((n) => !(n.campo in PROBLEM_FIELD)).map((n) => (
           <Line key={`${n.campo}-${n.motivo}`}>{n.texto}</Line>
         ))}
       </div>

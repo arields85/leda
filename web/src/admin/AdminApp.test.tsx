@@ -1043,6 +1043,38 @@ describe('Leda completes the load from the free box', () => {
     expect(document.getElementById('f-criterio-error')).toHaveTextContent('Contame cómo se sabe que está terminada.');
   });
 
+  it('the box names only the fields still missing: filling one takes it out of the summary too', async () => {
+    // Review review-97374544422a6d97: the summary came from the frozen answer, so a field the
+    // person had already filled was still named there after its own notice went.
+    const OTHER = 'Lo demás lo completé con lo que escribiste.';
+    await openForm({
+      [HELP]: proposed({
+        propuesta: { titulo: 'Cambiar el UPS de la sala de servidores' },
+        elegir: [],
+        avisos: [
+          { campo: 'responsable', motivo: 'no_encontrado', texto: 'No encontré a «el tano» en el equipo; elegí quién la hace.' },
+          { campo: 'criterio', motivo: 'sin_como', texto: 'Contame cómo se sabe que está terminada.' },
+          { campo: 'general', motivo: 'nota', texto: OTHER },
+        ],
+      }),
+    });
+    tell('hay que cambiar el ups de la sala de servidores que lo vea el tano antes del jueves se corta todo');
+    askLeda();
+    expect(
+      await screen.findByText('No pude completar: quién la hace, criterio de aceptación.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(OTHER)).toBeInTheDocument();
+    pick('Quién la hace', 'm-marcos');
+    expect(screen.queryByText(/No pude completar: quién la hace/)).toBeNull();
+    expect(screen.getByText('No pude completar: criterio de aceptación.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), {
+      target: { value: 'El UPS nuevo sostiene la sala 10 minutos con la red cortada.' },
+    });
+    expect(screen.queryByText(/No pude completar/)).toBeNull();
+    // A note that belongs to no field stays until she asks again.
+    expect(screen.getByText(OTHER)).toBeInTheDocument();
+  });
+
   it('while Leda completes, the three dots fade in and out one after another, always', async () => {
     // The user (2026-10-13): "quiero que se animen siempre", also with reduced motion; so only the
     // opacity changes, with no movement, scaling or bouncing.
