@@ -44,9 +44,12 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
       persona no le pasan a la IA el destinatario ni la hora; sí que quedó asentado y, si hace falta,
       cuándo vuelve a escribirle a la persona, en palabras de todos los días. El nombre y la hora, sólo si
       la persona los pregunta.
-- [ ] **T4 · El comentario de una aprobación que contesta "¿cuál de las dos?"** sale del mensaje original
+- [x] **T4 · El comentario de una aprobación que contesta "¿cuál de las dos?"** sale del mensaje original
       (llegó «pasale lo de los colores»).
-- [ ] **T5 · Una tarea terminada no "vence".**
+- [x] **T5 · Una tarea terminada no "vence".**
+- [ ] **T4b · La advertencia de la revisión de la T4** (`aprobacion.py:246-254`): una pregunta de
+      "¿cuál de las dos?" vieja que siga abierta no puede pisar el comentario de una aprobación escrita
+      después, que no la contesta. Test primero.
 - [ ] **T6 · La hora de los turnos en el registro** (los pasos 22 a 25 figuran a las 10:02): investigar y,
       si quedó mal guardada, corregirla. **Evidencia (coordinador, 2026-10-12, `leda_motor`):** quedó mal
       guardada. `conversation_turn.at` sale de `reloj.ahora()` (`turno.py:232`). Turnos de Marcos
@@ -112,3 +115,14 @@ nombres de otros en los mensajes.
   aviso sale a esa hora). Sugerencias: la clave del incidente, su falla sin prueba, la unión de
   `solo_si_pregunta`, un significado vacío. A observar en la ronda real: "el administrador" sigue
   nombrado por la clave (sin la hora) y un aviso que no salió se cuenta sin a quién.
+- **T4 y T5, hechas** (escritor delegado; `d9ebbf0` y `64796ac`). T4: una respuesta escrita a "¿cuál de
+  las dos?" sólo elige la lectura; el comentario sale del mensaje que abrió la pregunta, guardado con la
+  opción (`aprobacion._la_lectura_elegida`), como ya pasaba con el botón; la conversación 23 pide ahora
+  el comentario original (`~que revise los colores`). Límite: "aprobala y además decile X" perdería X
+  (sin regla). T5: de una tarea `terminada` o `cancelada`, la IA no recibe `vence` ni `fecha_objetivo`, y
+  ese día sale de `dias` si ningún otro hecho lo nombra (`hechos._sin_vencimiento_si_cerro`, en
+  `para_redactar`); la pregunta al encargado por el detalle lleva ahora el `estado`. RED: 5 de 8
+  (T4) y 6 de 9 (T5). `pytest tests/motor` 1377 passed; `tests/conversaciones` 215 passed; en seco 48 de
+  48. Repaso del coordinador: `test_terminada_no_vence.py` y `test_aprobacion.py`, 62 passed. **RDD:**
+  `review-488b6f52cd3b174d`, aprobada; advertencia: una pregunta vieja abierta puede pisar el comentario
+  (T4b, arriba); sugerencia: la forma del estado (`hechos.py:1510-1514`).
