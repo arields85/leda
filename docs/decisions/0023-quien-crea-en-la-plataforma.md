@@ -210,8 +210,8 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
    tiene autoridad sobre esa tarea según la jerarquía: Dirección o el referente del área.
 3. ~~**Quién es "su referente" para aprobar una propuesta.**~~ **Decidido (usuario, 2026-10-13):
    "quien revisa su trabajo".** La propuesta de un integrante la aprueba quien revisa su trabajo (el
-   `aprobado_por` de la persona en el pack, el mismo que aprueba sus entregas), no el referente del
-   área. Cuando coinciden, que es lo normal, no cambia nada; así proponer, entregar y aprobar pasan
+   `aprobado_por` de la persona en el pack, el mismo que aprueba sus entregas; en una tarea prestada,
+   quien revisa esa tarea: punto 7), no el referente del área. Cuando coinciden, que es lo normal, no cambia nada; así proponer, entregar y aprobar pasan
    por la misma persona.
 4. ~~**Qué le falta a una propuesta.**~~ **Decidido (usuario, 2026-10-13): la persona describe y
    Leda completa.** Ni burocracia para quien propone ni para quien aprueba (el usuario: "le sacamos la
@@ -235,8 +235,17 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
    completa y se puede corregir (ADR 0017: "en el formulario web; nunca por chat"). En la web, arriba
    de todo en "Tu sector" hasta que la decida; varias del mismo día, juntas en un mensaje, como las
    entregas para revisar.
-7. **Dirección crea una tarea en un área.** Ejemplo: Ismael crea "Revisar el tablero" para Nahuel,
-   de OT; ¿se entera Marcos, el referente de OT, además del aviso al responsable y a quien revisa?
+7. ~~**Dirección crea una tarea en un área.**~~ **Decidido (usuario, 2026-10-13), con el préstamo de
+   personas.** Una persona pertenece a un sector (Nahuel, a OT, con Marcos de referente) y eso no
+   cambia; otro referente puede pedirla prestada para una tarea de su sector, y esa tarea la revisa él
+   (Martín, en una de Infraestructura); las demás de Nahuel las sigue revisando Marcos. **Cuando alguien
+   que no es su referente le asigna una tarea** (Dirección o Martín), a Marcos le llega el aviso: le
+   están usando a alguien de su sector. **Lo que pasa dentro de esa tarea** (una propuesta como la de
+   los tornillos, entregas, avances) es entre Nahuel y Martín, y a Marcos no le llega nada (usuario: "no
+   tiene sentido molestarlo a marcos con un aviso que no va a entender de que tornillos se refiere").
+   Una propuesta dentro de la tarea prestada la aprueba quien revisa esa tarea (punto 3). **Cambio en
+   la base:** hoy quién revisa es un dato de la persona (`aprobado_por`), no de cada tarea; el préstamo
+   necesita quién revisa una tarea en particular, `PENDIENTE` de diseño en su porción.
 8. **Un referente crea una tarea para sí mismo.** Ejemplo: Marcos crea "Pedir presupuesto" para él;
    ¿entra directo como las de su área, y la revisa quien lo aprueba a él (Dirección)?
 9. **Una espera sobre una propuesta.** Ejemplo: "Colocar el estante" (comprometida) quiere esperar a
