@@ -116,7 +116,8 @@ class Contexto:
     ofrecidas: list[str] = field(default_factory=list)
     # Lo que la respuesta lleva además de su texto cuando muestra una entrega (`aprobacion.
     # ver_entrega`; decisión 17): las fotos, en un álbum después del texto, y el enlace a la
-    # página de la tarea, uno solo por mensaje: `(tarea, persona)`.
+    # página de la tarea, uno solo por mensaje: `(tarea, persona)`. O, en su lugar, el de
+    # entrada a la web de la persona (`pedir_acceso_web`): `(ENTRADA_WEB, persona)`.
     adjuntos_de_la_respuesta: list[str] = field(default_factory=list)
     enlace_de_la_respuesta: list[tuple[str, str]] = field(default_factory=list)
     # Los nombres de las jugadas que la IA eligió para este mensaje, también las que quedan fuera
@@ -1257,6 +1258,65 @@ def _pedir_enlace(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     return enlace.pedir_enlace(ctx, datos, tarea)
 
 
+# La entrada a la web por chat (ADR 0022, decisión 4; decisiones 1 y 3 del usuario del
+# 2026-10-12; conversación 50; `odd/tasks/acceso-por-chat.md`). El enlace nunca pasa por la IA,
+# como el de la página de una tarea: la respuesta lleva la marca de la persona en
+# `enlace_de_la_respuesta`, la misma lista de "un enlace por mensaje" (decisión técnica 2), con
+# `ENTRADA_WEB` en el lugar de la tarea. Así un enlace de tarea pedido después ve que el mensaje
+# ya lleva otro (`enlace.YA_LLEVA_OTRO`), y éste, si ya va el de una tarea, no se promete
+# (`YA_LLEVA_OTRO_ENLACE`). El despachador lo emite al mandar, dentro del punto de retorno del
+# envío, y la base anula el que la persona tenía sin usar (`despachador._enlace_de_entrada_web`).
+# Las dos jugadas llaman a `web_app` directo, no a la cocina: la base audita emitir y cortar ella
+# misma (`auditar_acceso_web`), y por `herramientas.ejecutar` quedaría dos veces.
+ENTRADA_WEB = "entrada_web"
+YA_LLEVA_OTRO_ENLACE = "ya_lleva_otro_enlace"
+# Lo que dicen los hechos de un enlace de entrada: que va al final del mensaje, que sirve una
+# sola vez y que vence a las 24 horas si nadie lo usa (decisión 1 del usuario; migración 0065).
+LLEVA_EL_ENLACE_DE_ENTRADA = MappingProxyType({
+    "lleva_el_enlace_de_entrada_a_la_web": True, "sirve_una_sola_vez": True,
+    "vence_a_las_24_horas": True})
+
+
+def es_la_entrada_web(marca: tuple[str, str]) -> bool:
+    """Si la marca del enlace de la respuesta es la del enlace de entrada a la web."""
+    return marca[0] == ENTRADA_WEB
+
+
+def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    """Un enlace de entrada nuevo para la persona, al final de la respuesta. Si tenía uno sin
+    usar, ése deja de servir cuando se emite el nuevo (lo dice el hecho, leído ahora de la base).
+    Sin la dirección pública configurada, ninguno se promete. Nada cambia hasta mandar."""
+    from .. import web_app
+    from ..config import config
+    from .enlace import SIN_PAGINA
+
+    yo = ctx.quien.membership_id
+    ya = ctx.enlace_de_la_respuesta
+    if ya and ya[0] != (ENTRADA_WEB, yo):
+        return {"resultado": "no_se_puede", "motivo": YA_LLEVA_OTRO_ENLACE}
+    if not config.base_url:
+        return {"resultado": "no_se_puede", "motivo": SIN_PAGINA}
+    anterior = web_app.tiene_un_enlace_sin_usar(ctx.cur, yo)
+    if not ya:
+        ya.append((ENTRADA_WEB, yo))
+    return {"resultado": "enlace_nuevo", **LLEVA_EL_ENLACE_DE_ENTRADA,
+            "el_anterior_ya_no_sirve": anterior}
+
+
+def _perdi_el_celular(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    """Corta enseguida, sin confirmación (decisión 3 del usuario), todas las sesiones de la web de
+    la persona y su enlace sin usar, con el motivo de que perdió el celular y la persona como
+    actor; la base lo audita, también sin sesiones (0066). Los hechos le dicen a la IA que le
+    recuerde cerrar Telegram en ese celular y que puede pedir otro enlace."""
+    from .. import web_app
+
+    cortadas = web_app.cortar_sesiones(ctx.cur, ctx.quien.membership_id,
+                                       motivo=web_app.PERDIO_EL_CELULAR,
+                                       actor_app_user_id=ctx.quien.app_user_id)
+    return {"resultado": "acceso_cortado", "sesiones_cortadas": cortadas,
+            "recuerda_cerrar_telegram_en_ese_celular": True, "puede_pedir_otro_enlace": True}
+
+
 # La persecución del bloqueo (C-5, porción 1): las jugadas están en `persecucion.py`, que
 # importa este módulo.
 
@@ -1717,6 +1777,31 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "suya, una que espera su revisión o cualquier otra que nombre. Si la tarea no está "
              "en la lista, como_la_nombra dice cómo la nombró. Pedir ver lo entregado de una "
              "tarea que espera su revisión es otra jugada."),
+    Ficha("pedir_acceso_web", "pasar un enlace nuevo para entrar a la web",
+          necesita=(), opcional=(),
+          comprueba="que la página esté disponible y que el mensaje no lleve ya el enlace de una "
+                    "tarea (uno solo por mensaje)",
+          hace="marca la respuesta para que lleve el enlace de entrada de la persona; no cambia "
+               "nada todavía",
+          despues="el código emite el enlace al mandar la respuesta y lo agrega al final: sirve "
+                  "una sola vez, vence a las 24 horas si nadie lo usa, y el que la persona tenía "
+                  "sin usar deja de servir",
+          manejar=_pedir_acceso_web,
+          es="La persona pide entrar a la web de Leda, donde ve sus tareas: necesita un enlace "
+             "de entrada nuevo, porque no tiene uno, no le anda, se le venció o lo perdió. "
+             "Pedir el enlace a la página de una tarea es otra jugada."),
+    Ficha("perdi_el_celular", "cortar el acceso a la web si perdió el celular",
+          necesita=(), opcional=(),
+          comprueba="nada: se corta sin confirmación (decisión 3 del usuario)",
+          hace="corta todas las sesiones de la web de la persona y el enlace que tenía sin usar, "
+               "con el motivo de que perdió el celular (cortar_sesiones_de_membresia); queda en "
+               "la auditoría",
+          despues="nada: para volver a entrar, pide un enlace nuevo",
+          manejar=_perdi_el_celular,
+          es="La persona avisa que perdió el celular o que se lo robaron: ya no lo tiene, y "
+             "quien lo tenga podría entrar a la web con su sesión. Leda corta enseguida su "
+             "acceso a la web. Si habla del celular sin decir que ya no lo tiene, no es esta "
+             "jugada."),
     Ficha("pedir_el_detalle", "pedirle al encargado del sector de una tarea que le comparta su "
                               "detalle",
           necesita=(), opcional=("tarea", "como_la_nombra"),

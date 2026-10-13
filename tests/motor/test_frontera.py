@@ -68,6 +68,10 @@ PERMITIDOS: dict[str, set[str] | None] = {
     # El bot de administración (porción 5 de la C-3, `administracion.py`): el enlace de un
     # administrador de plataforma a la página de una tarea, que emite la conexión administrativa.
     "pagina_de_tarea": {"emitir_para_administrador", "enlace"},
+    # La entrada a la web por chat (`pedir_acceso_web`, `perdi_el_celular`; migración 0066): lo
+    # que la cocina pregunta del acceso de la persona y el corte, por las mismas funciones de la
+    # base que usa la consola, que lo auditan ellas. El enlace lo emite el despachador.
+    "web_app": {"tiene_un_enlace_sin_usar", "cortar_sesiones", "PERDIO_EL_CELULAR"},
 }
 
 # Los módulos de los flujos A y B, borrados en la E3-4, por si volvieran. La escalera, el reloj

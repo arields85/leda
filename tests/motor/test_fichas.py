@@ -26,7 +26,9 @@ from tests.motor.ayudantes import AHORA, a_la_vista
 VIERNES_9 = datetime(2026, 10, 9, 20, 0, tzinfo=timezone.utc)      # 17:00 en Buenos Aires
 OFRECIDAS = ("anotar_inicio", "anotar_prevision", "anotar_bloqueo", "anotar_quien_destraba",
              "destrabar", "consultar_pendientes", "informar_avance", "entregar", "aprobar",
-             "pedir_cambios", "ver_entrega", "pedir_enlace", "pedir_reasignacion")
+             "pedir_cambios", "ver_entrega", "pedir_enlace", "pedir_reasignacion",
+             # La entrada a la web por chat (ADR 0022, decisión 4; la conversación 50).
+             "pedir_acceso_web", "perdi_el_celular")
 
 
 # --- Ayudas ---------------------------------------------------------------------------------

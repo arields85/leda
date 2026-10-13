@@ -920,8 +920,36 @@ SIGNIFICADOS: Mapping[str, str] = {
                                     "persona.",
     "la_pagina_no_esta_disponible": "La página de las tareas no está disponible ahora: no hay "
                                     "enlace para pasar.",
-    "ya_lleva_el_enlace_de_otra_tarea": "Este mensaje ya lleva el enlace de otra tarea, y "
-                                        "lleva uno solo: el de ésta se puede pedir aparte.",
+    "ya_lleva_el_enlace_de_otra_tarea": "Este mensaje ya lleva otro enlace (el de otra tarea o "
+                                        "el de entrada a la web), y lleva uno solo: el de ésta "
+                                        "se puede pedir aparte.",
+    # --- La entrada a la web por chat (`fichas`: `pedir_acceso_web`, `perdi_el_celular`) -------
+    "enlace_nuevo": "Leda le pasa a la persona un enlace nuevo para entrar a la web, donde ve "
+                    "sus tareas.",
+    "lleva_el_enlace_de_entrada_a_la_web":
+        "Al final de este mensaje, el código agrega el enlace personal para entrar a la web, "
+        "donde la persona ve sus tareas. La IA no lo ve ni lo escribe: no hay ninguna dirección "
+        "para escribir.",
+    "sirve_una_sola_vez": "El enlace sirve para entrar una sola vez: al usarlo, la persona queda "
+                          "adentro en ese dispositivo, sin volver a usarlo.",
+    "vence_a_las_24_horas": "Si nadie lo usa, el enlace deja de servir a las 24 horas de "
+                            "mandado; entonces la persona le pide otro a Leda.",
+    "el_anterior_ya_no_sirve": "Si es verdadero, la persona tenía otro enlace de entrada sin "
+                               "usar, y ése deja de servir: vale sólo el nuevo. Si es falso, no "
+                               "tenía ninguno sin usar.",
+    "acceso_cortado": "Leda cortó enseguida el acceso a la web de la persona, en todos sus "
+                      "dispositivos: con ese celular ya no se entra a la web, y el enlace que "
+                      "no había usado tampoco sirve.",
+    "sesiones_cortadas": "Cuántos dispositivos tenían la web abierta y quedaron afuera; con 0 "
+                         "no había ninguno, y el corte vale igual.",
+    "recuerda_cerrar_telegram_en_ese_celular":
+        "Leda le recuerda a la persona que cierre también Telegram en ese celular, desde otro "
+        "dispositivo, en Ajustes → Dispositivos; si no tiene ningún otro, lo corta la "
+        "administración.",
+    "puede_pedir_otro_enlace": "Cuando tenga otro celular, la persona le pide a Leda un enlace "
+                               "nuevo para volver a entrar a la web.",
+    "ya_lleva_otro_enlace": "Este mensaje ya lleva el enlace a la página de una tarea, y lleva "
+                            "uno solo: el de entrada a la web se puede pedir aparte.",
     # --- La persecución del bloqueo (C-5, porción 1; `persecucion.py`) -------------------------
     "se_le_pregunta_a": "A quién le consulta Leda, como Leda y no en nombre de nadie, para "
                         "cuándo destraba la tarea (a), y cuándo le llega (llega).",
@@ -1442,6 +1470,8 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "pedir_cambios": "devolver_la_entrega_con_cambios",
     "ver_entrega": "mostrar_la_entrega_para_revisar",
     "pedir_enlace": "pasar_el_enlace_a_la_pagina_de_una_tarea",
+    "pedir_acceso_web": "pasar_un_enlace_nuevo_para_entrar_a_la_web",
+    "perdi_el_celular": "cortar_el_acceso_a_la_web_por_el_celular_perdido",
     "decir_cuando_destraba": "anotar_para_cuando_destraba_la_tarea_de_otra_persona",
     "no_escribirle": "no_escribirle_a_quien_destraba",
     "decir_que_no_le_toca": "anotar_que_no_le_toca_destrabar_la_tarea_de_otra_persona",

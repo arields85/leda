@@ -703,6 +703,17 @@ def reserva_del_enlace() -> int:
             + pagina_de_tarea.LARGO_DEL_TOKEN)
 
 
+def reserva_del_enlace_de_entrada() -> int:
+    """Lo que ocupa, con su salto de renglón, el enlace de entrada a la web que el despachador
+    agrega al final de un mensaje (`enqueue_outbox`, `enlace_de_entrada_web`): la dirección
+    pública configurada, el camino y el token. Importado adentro, como el de una tarea."""
+    from . import web_app
+    from .config import config
+
+    return (1 + len(config.base_url.rstrip("/")) + len(web_app.CAMINO_DE_ENTRADA)
+            + web_app.LARGO_DEL_TOKEN_DE_ENTRADA)
+
+
 def margen_saludo(*, personal: bool) -> int:
     """Cuánto hay que reservarle al saludo diario en el presupuesto de un
     mensaje -- `saludo.MARGEN_SALUDO` si `personal` (tiene
@@ -748,7 +759,9 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    grupo_respuesta: str | None = None,
                    es_coordinacion: bool = False,
                    adjuntos: Sequence[str] = (),
-                   enlace_de_tarea: tuple[str, str] | None = None) -> int:
+                   enlace_de_tarea: tuple[str, str] | None = None,
+                   enlace_de_entrada_web: str | None = None,
+                   es_ofrecimiento: bool = False) -> int:
     """Encola un mensaje visible. `es_coordinacion` marca el aviso causado
     directamente por el acto de otra persona sobre trabajo compartido (una
     entrega para revisar, cambios pedidos, una aprobación, un borrador para
@@ -774,13 +787,28 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     lleva al final el enlace a la página de esa tarea para esa persona. No se guarda el enlace,
     sólo esa marca (`message_outbox_enlace`): el despachador lo emite al mandar y la base guarda
     sólo su hash. El texto le reserva su lugar. Un mensaje con enlace no se parte, no lleva
-    adjuntos ni bloque copiable: el enlace va al final de su único texto."""
+    adjuntos ni bloque copiable: el enlace va al final de su único texto.
+
+    `enlace_de_entrada_web` (ADR 0022, decisión 4; migración 0066), una persona: la fila lleva al
+    final su enlace de entrada a la web, con las mismas reglas que el de una tarea (sólo la marca,
+    `message_outbox_entrada_web`; el despachador lo emite al mandar). `es_ofrecimiento` dice que
+    es el ofrecimiento de una sola vez y no un pedido de la persona. Un mensaje lleva un solo
+    enlace: el de una tarea y el de entrada juntos se rechazan."""
     adjuntos = [str(a) for a in adjuntos]
     if enlace_de_tarea is not None and (adjuntos or allow_split
                                         or bloque_copiable is not None):
         raise PayloadValidationError(
             "Un mensaje con el enlace de una tarea no se parte, no lleva adjuntos ni bloque "
             "copiable.")
+    if enlace_de_entrada_web is not None and (adjuntos or allow_split
+                                              or bloque_copiable is not None
+                                              or enlace_de_tarea is not None):
+        raise PayloadValidationError(
+            "Un mensaje con el enlace de entrada a la web no se parte, no lleva adjuntos, "
+            "bloque copiable ni otro enlace.")
+    if es_ofrecimiento and enlace_de_entrada_web is None:
+        raise PayloadValidationError(
+            "El ofrecimiento de la web va con el enlace de entrada de la persona.")
     if adjuntos and (len(adjuntos) > MAX_ADJUNTOS or allow_split
                      or pending_action_id is not None or bloque_copiable is not None):
         raise PayloadValidationError(
@@ -804,6 +832,8 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     margen = margen_saludo(personal=recipient_membership_id is not None)
     if enlace_de_tarea is not None:
         margen += reserva_del_enlace()
+    if enlace_de_entrada_web is not None:
+        margen += reserva_del_enlace_de_entrada()
     payloads = prepare_payload(
         text, dedupe_key=dedupe_key, has_buttons=has_buttons,
         allow_split=allow_split, margen=margen,
@@ -851,6 +881,13 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                                                     membership_id)
                    values (%s, %s, %s, %s)""",
                 (workspace_id, outbox_id, str(enlace_de_tarea[0]), str(enlace_de_tarea[1])))
+        if fila is not None and enlace_de_entrada_web is not None:
+            outbox_id = fila["id"] if isinstance(fila, dict) else fila[0]
+            cur.execute(
+                """insert into message_outbox_entrada_web (workspace_id, outbox_id,
+                                                         membership_id, es_ofrecimiento)
+                   values (%s, %s, %s, %s)""",
+                (workspace_id, outbox_id, str(enlace_de_entrada_web), es_ofrecimiento))
         if fila is not None and adjuntos:
             outbox_id = fila["id"] if isinstance(fila, dict) else fila[0]
             for orden, archivo_id in enumerate(adjuntos, 1):

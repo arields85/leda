@@ -911,14 +911,28 @@ def test_el_enlace_de_entrada_a_la_web_que_espera_un_paso_se_compara_con_su_resp
 
 
 @pytest.mark.xfail(strict=True,
-                   reason="A-3/A-4: las jugadas del acceso a la web todavía no existen")
+                   reason="A-4: el ofrecimiento una sola vez todavía no existe")
 def test_la_50_en_seco_pasa_entera(conn):
     """El RED de la A-1 (`odd/tasks/acceso-por-chat.md`): con las jugadas esperadas, la 50 falla
-    hasta que la A-3 construya `pedir_acceso_web`, `perdi_el_celular` y la marca del enlace de
-    entrada, y la A-4 el ofrecimiento una sola vez. Estricta: cuando pase, la suite lo dice, y se
-    le saca la marca."""
+    hasta que la A-4 construya el ofrecimiento una sola vez. Desde la A-3 (`pedir_acceso_web`,
+    `perdi_el_celular` y la marca del enlace de entrada) fallan sólo el paso 1 (el ofrecimiento) y
+    el 4, que espera que el enlace ofrecido en el 1 quede anulado. Estricta: cuando pase, la suite
+    lo dice, y se le saca la marca."""
     [conv] = elegir(["50"])
 
     corrida = correr_conversacion(conn, conv, _perfecta(conv))
 
     assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+
+
+def test_la_50_en_seco_ya_pasa_salvo_lo_del_ofrecimiento(conn):
+    """Lo que la A-3 dejó andando de la 50 no se pierde mientras falta la A-4: pedir otro enlace,
+    la charla sobre el celular que no corta nada, el corte enseguida y el aviso sin ofrecimiento
+    (pasos 2, 3, 5, 6 y 7). Sólo pueden fallar el 1 (el ofrecimiento) y el 4, que espera anulado
+    el enlace que ofreció el 1."""
+    [conv] = elegir(["50"])
+
+    corrida = correr_conversacion(conn, conv, _perfecta(conv))
+
+    assert corrida.error is None
+    assert {paso for paso, _ in corrida.fallas()} <= {1, 4}, corrida.fallas()

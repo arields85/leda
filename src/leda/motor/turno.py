@@ -75,7 +75,8 @@ from ..salida import enqueue_outbox
 from . import (aprobacion, archivos, cambios_de_estado, detalle, entrega, fichas, pase,
                persecucion, pregunta_sin_contestar, preguntas, registro)
 from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
-from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
+from .fichas import (JUGADAS, LLEGA, Contexto, Manejador, es_la_entrada_web,
+                     lo_que_puede_hacer)
 from .hechos import con_los_iconos
 from .ia import IA, Jugada
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
@@ -568,14 +569,19 @@ def _responder(cur, ctx: Contexto, texto: str, ahora: datetime, ia_nombre: str |
     `con_lo_mostrado`, lo que muestra una entrega (decisión 17): el enlace a la página de la
     tarea al final del texto y las fotos en otra fila de la misma respuesta, que el despachador
     manda después del texto (como en el aviso de una entrega). Sin la redacción de la IA (el
-    texto fijo), nada de eso: lo que hicieron las jugadas se deshizo."""
-    enlace = (ctx.enlace_de_la_respuesta[0]
-              if con_lo_mostrado and ctx.enlace_de_la_respuesta else None)
+    texto fijo), nada de eso: lo que hicieron las jugadas se deshizo. La marca del enlace puede
+    ser, en lugar del de una tarea, la del enlace de entrada a la web (`pedir_acceso_web`): uno
+    solo por mensaje."""
+    marca = (ctx.enlace_de_la_respuesta[0]
+             if con_lo_mostrado and ctx.enlace_de_la_respuesta else None)
+    entrada_web = marca[1] if marca is not None and es_la_entrada_web(marca) else None
+    enlace = marca if marca is not None and entrada_web is None else None
     adjuntos = list(ctx.adjuntos_de_la_respuesta) if con_lo_mostrado else []
     enqueue_outbox(cur, workspace_id=ctx.quien.workspace_id, chat_id=ctx.chat_id, text=texto,
                    dedupe_key=clave, recipient_membership_id=ctx.quien.membership_id,
                    is_response=True, scheduled_for=ahora,
-                   grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace)
+                   grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace,
+                   enlace_de_entrada_web=entrada_web)
     if adjuntos:
         enqueue_outbox(cur, workspace_id=ctx.quien.workspace_id, chat_id=ctx.chat_id,
                        text=f"(adjuntos: {len(adjuntos)})", dedupe_key=f"{clave}:adjuntos",

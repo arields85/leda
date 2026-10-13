@@ -1,8 +1,13 @@
 """La entrada a la web por chat (ADR 0022, decisión 4; migración 0066; tarea A-3 de
 `odd/tasks/acceso-por-chat.md`): la capa de garantías.
 
-Lo que se prueba acá es la base, no la conversación:
+Lo que se prueba acá es la base, la salida y el despachador, no la conversación:
 
+- **La marca, no el enlace.** La fila de la salida sólo dice que lleva el enlace de entrada de
+  esta persona (`message_outbox_entrada_web`); el despachador lo emite al mandar, dentro del
+  punto de retorno del envío, y la base guarda sólo su hash. Sale sin vista previa. Sin la
+  dirección pública, o si la base no lo emite, el mensaje sale sin enlace y deja su incidente;
+  un envío que falla no deja ningún enlace emitido. Un mensaje lleva un solo enlace.
 - **Lo que la cocina pregunta sin leer las tablas:** si la persona entró alguna vez a la web
   (`entro_a_la_web`) y si tiene un enlace sin usar (`tiene_un_enlace_sin_usar`), en el espacio de
   quien llama.
@@ -13,19 +18,33 @@ Lo que se prueba acá es la base, no la conversación:
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg
 import pytest
 
+from leda import config as config_mod
 from leda import web_app
+from leda.calendario import Calendario
 from leda.db import admin, espacio, sin_espacio
-from leda.salida import enqueue_outbox
+from leda.despachador import TransporteDePrueba, despachar
+from leda.salida import PayloadValidationError, enqueue_outbox
 
+AHORA = datetime(2026, 10, 22, 15, 0, tzinfo=timezone.utc)      # jueves, 12:00 en Buenos Aires
+BASE = "https://leda.invalid"
+ENLACE = re.compile(r"\n" + re.escape(BASE) + r"/app/entrar/([A-Za-z0-9_-]{43})$")
 TABLAS = ("message_outbox_entrada_web", "ofrecimiento_web")
 FUNCIONES = ("entro_a_la_web", "tiene_un_enlace_sin_usar", "cortar_sesiones_de_membresia")
+
+
+@pytest.fixture
+def direccion(monkeypatch):
+    monkeypatch.setattr(config_mod, "config",
+                        dataclasses.replace(config_mod.config, base_url=BASE + "/"))
 
 
 # --- Ayudas ---------------------------------------------------------------------------------
@@ -78,6 +97,29 @@ def _cortar(conn, mundo: dict, nombre: str = "Sam Noble", slug: str = "north-lab
         cortadas = web_app.cortar_sesiones(cur, _persona(mundo, nombre, slug), **como)
     conn.commit()
     return cortadas
+
+
+def _encolar(conn, mundo: dict, nombre: str = "Taylor Quinn", *, clave: str = "respuesta:1",
+             texto: str = "Ahí va tu enlace.", **mas) -> str:
+    ws = mundo["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        enqueue_outbox(cur, workspace_id=ws,
+                       chat_id=mundo["north-lab"]["people"][nombre]["telegram"], text=texto,
+                       recipient_membership_id=_persona(mundo, nombre), dedupe_key=clave,
+                       is_response=True, scheduled_for=AHORA,
+                       enlace_de_entrada_web=_persona(mundo, nombre), **mas)
+        cur.execute("select id from message_outbox where dedupe_key = %s", (clave,))
+        fila = str(cur.fetchone()["id"])
+    conn.commit()
+    return fila
+
+
+def _despachar(conn, mundo: dict, transporte) -> dict:
+    ws = mundo["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        r = despachar(cur, ws, transporte, Calendario.desde_base(cur, ws), AHORA)
+    conn.commit()
+    return r
 
 
 # --- Las tablas y las funciones -------------------------------------------------------------
@@ -230,6 +272,146 @@ def test_un_motivo_desconocido_no_corta_ni_audita(conn, intake_world):
         _cortar(conn, intake_world, motivo="porque_si")
     conn.rollback()
     assert _auditoria(conn, "cortar_acceso_web") == []
+
+
+# --- La marca en la salida y el despachador -------------------------------------------------
+
+def test_la_salida_guarda_la_marca_y_no_el_enlace(conn, intake_world, direccion):
+    fila = _encolar(conn, intake_world)
+    [marca] = _filas(conn, "select * from message_outbox_entrada_web")
+    assert str(marca["outbox_id"]) == fila
+    assert str(marca["membership_id"]) == _persona(intake_world, "Taylor Quinn")
+    assert marca["es_ofrecimiento"] is False
+    [salida] = _filas(conn, "select cuerpo from message_outbox")
+    assert "/app/entrar/" not in salida["cuerpo"] and BASE not in salida["cuerpo"]
+    assert _filas(conn, "select * from enlace_de_entrada") == []    # se emite al mandar
+
+
+def test_el_ofrecimiento_queda_marcado_como_tal(conn, intake_world, direccion):
+    _encolar(conn, intake_world, es_ofrecimiento=True)
+    [marca] = _filas(conn, "select es_ofrecimiento from message_outbox_entrada_web")
+    assert marca["es_ofrecimiento"] is True
+
+
+def test_el_despachador_emite_el_enlace_al_mandar_y_sale_sin_vista_previa(conn, intake_world,
+                                                                          direccion):
+    _encolar(conn, intake_world)
+    transporte = TransporteDePrueba()
+    assert _despachar(conn, intake_world, transporte)["enviados"] == 1
+    [mensaje] = transporte.enviados
+    encontrado = ENLACE.search(mensaje.texto)
+    assert encontrado, mensaje.texto
+    assert mensaje.texto.startswith("Ahí va tu enlace.")
+    assert mensaje.sin_vista_previa is True
+    token = encontrado.group(1)
+    [enlace] = _filas(conn, "select * from enlace_de_entrada")
+    assert enlace["token_hash"] == web_app._hash(token)
+    assert str(enlace["membership_id"]) == _persona(intake_world, "Taylor Quinn")
+    for tabla in ("enlace_de_entrada", "message_outbox", "message_outbox_entrada_web",
+                  "audit_log", "incident"):
+        for f in _filas(conn, f"select * from {tabla}"):
+            assert token not in str(dict(f)), tabla
+    [emitido] = _auditoria(conn, "emitir_enlace_de_entrada")
+    assert emitido["actor_kind"] == "leda"
+    # Y el enlace abre la web.
+    assert _canjear(conn, token)
+
+
+def test_el_enlace_nuevo_anula_el_que_estaba_sin_usar(conn, intake_world, direccion):
+    anterior = _emitir(conn, intake_world, nombre="Taylor Quinn")
+    _encolar(conn, intake_world)
+    _despachar(conn, intake_world, TransporteDePrueba())
+    assert _canjear(conn, anterior) is None
+
+
+def test_sin_direccion_publica_sale_sin_enlace_y_deja_un_incidente(conn, intake_world,
+                                                                    monkeypatch):
+    _encolar(conn, intake_world)
+    monkeypatch.setattr(config_mod, "config",
+                        dataclasses.replace(config_mod.config, base_url=""))
+    transporte = TransporteDePrueba()
+    assert _despachar(conn, intake_world, transporte)["enviados"] == 1
+    [mensaje] = transporte.enviados
+    assert "/app/entrar/" not in mensaje.texto
+    assert _filas(conn, "select * from enlace_de_entrada") == []
+    [incidente] = _filas(conn, "select etapa from incident")
+    assert incidente["etapa"] == "enlace_de_entrada_web"
+
+
+def test_si_la_base_no_lo_emite_sale_sin_enlace_y_deja_un_incidente(conn, intake_world,
+                                                                     direccion):
+    """Quien dejó el equipo entre el turno y el envío: la base no le emite el enlace."""
+    _encolar(conn, intake_world)
+    with admin(conn) as cur:
+        cur.execute("update membership set activo = false where id = %s",
+                    (_persona(intake_world, "Taylor Quinn"),))
+    conn.commit()
+    transporte = TransporteDePrueba()
+    _despachar(conn, intake_world, transporte)
+    assert all("/app/entrar/" not in m.texto for m in transporte.enviados)
+    assert _filas(conn, "select * from enlace_de_entrada") == []
+    assert [i["etapa"] for i in _filas(conn, "select etapa from incident")] == [
+        "enlace_de_entrada_web"]
+
+
+def test_un_envio_que_falla_no_deja_un_enlace_emitido(conn, intake_world, direccion):
+    anterior = _emitir(conn, intake_world, nombre="Taylor Quinn")
+    _encolar(conn, intake_world)
+    transporte = TransporteDePrueba(falla_en={intake_world["north-lab"]["people"]
+                                              ["Taylor Quinn"]["telegram"]})
+    assert _despachar(conn, intake_world, transporte)["fallidos"] == 1
+    [enlace] = _filas(conn, "select * from enlace_de_entrada")
+    assert enlace["anulado_en"] is None, "el envío que falló anuló el enlace anterior"
+    assert _canjear(conn, anterior)
+
+
+def test_repetir_el_encolado_no_duplica_la_marca(conn, intake_world, direccion):
+    _encolar(conn, intake_world)
+    _encolar(conn, intake_world)
+    assert len(_filas(conn, "select * from message_outbox_entrada_web")) == 1
+
+
+def test_la_marca_no_va_partida_con_adjuntos_ni_con_bloque_ni_con_otro_enlace(
+        conn, intake_world, direccion):
+    ws = intake_world["north-lab"]["id"]
+    persona = _persona(intake_world, "Taylor Quinn")
+    with admin(conn) as cur:
+        cur.execute("""insert into task (workspace_id, objective_id, titulo, area_id,
+                                         responsable_membership_id, criterio_aceptacion,
+                                         evidencia_requerida)
+                       values (%s, %s, 'Una', %s, %s, 'Que ande', '{}') returning id""",
+                    (ws, intake_world["north-lab"]["objectives"][0],
+                     intake_world["north-lab"]["areas"]["field"], persona))
+        tarea = str(cur.fetchone()["id"])
+    conn.commit()
+    for extra in ({"allow_split": True}, {"adjuntos": [str(secrets.token_hex(4))]},
+                  {"bloque_copiable": "x"}, {"enlace_de_tarea": (tarea, persona)}):
+        with espacio(conn, ws) as cur, pytest.raises(PayloadValidationError):
+            enqueue_outbox(cur, workspace_id=ws, chat_id=71001, text="x", dedupe_key="x",
+                           recipient_membership_id=persona, enlace_de_entrada_web=persona,
+                           **extra)
+        conn.rollback()
+    with espacio(conn, ws) as cur, pytest.raises(PayloadValidationError):
+        enqueue_outbox(cur, workspace_id=ws, chat_id=71001, text="x", dedupe_key="x",
+                       recipient_membership_id=persona, es_ofrecimiento=True)
+    conn.rollback()
+
+
+def test_el_texto_le_reserva_el_lugar_al_enlace(conn, intake_world, direccion):
+    """Un texto que entra solo pero no con el enlace no se encola: el enlace siempre entra."""
+    from leda.salida import TELEGRAM_TEXT_LIMIT, margen_saludo
+
+    largo = TELEGRAM_TEXT_LIMIT - margen_saludo(personal=True) - 10
+    ws = intake_world["north-lab"]["id"]
+    persona = _persona(intake_world, "Taylor Quinn")
+    with espacio(conn, ws) as cur:
+        enqueue_outbox(cur, workspace_id=ws, chat_id=71001, text="a" * largo, dedupe_key="solo",
+                       recipient_membership_id=persona)
+        with pytest.raises(PayloadValidationError):
+            enqueue_outbox(cur, workspace_id=ws, chat_id=71001, text="a" * largo,
+                           dedupe_key="con", recipient_membership_id=persona,
+                           enlace_de_entrada_web=persona)
+    conn.rollback()
 
 
 # --- Aislamiento ----------------------------------------------------------------------------

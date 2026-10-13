@@ -941,7 +941,12 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
                     (select e.task_id from message_outbox_enlace e
                       where e.outbox_id = message_outbox.id) as enlace_tarea,
                     (select e.membership_id from message_outbox_enlace e
-                      where e.outbox_id = message_outbox.id) as enlace_persona
+                      where e.outbox_id = message_outbox.id) as enlace_persona,
+                    (select w.membership_id from message_outbox_entrada_web w
+                      where w.outbox_id = message_outbox.id) as entrada_web_persona,
+                    coalesce((select w.es_ofrecimiento from message_outbox_entrada_web w
+                               where w.outbox_id = message_outbox.id), false)
+                      as entrada_web_ofrecimiento
               from message_outbox
              where workspace_id = %(ws)s
                and estado = 'listo'
@@ -1153,6 +1158,38 @@ def _enlace_de_la_tarea(cur, workspace_id: str, m) -> str | None:
     return pagina_de_tarea.enlace(config.base_url, token)
 
 
+ETAPA_ENLACE_DE_ENTRADA_WEB = "enlace_de_entrada_web"
+
+
+def _enlace_de_entrada_web(cur, workspace_id: str, m) -> str | None:
+    """El enlace de entrada a la web que lleva la fila (`message_outbox_entrada_web`; ADR 0022,
+    decisión 4), emitido ahora para esa persona como lo emite la consola (`web_app.
+    emitir_enlace`, con la conexión de la aplicación en el espacio): la base guarda sólo su hash
+    y anula el que la persona tenía sin usar. Se emite dentro del punto de retorno del envío: un
+    envío que falla no deja ningún enlace emitido ni anula el anterior. El mensaje se escribió
+    diciendo que lleva el enlace, así que si no sale (sin la dirección pública configurada, o la
+    persona ya no es del equipo) queda un incidente, sin avisar a la administración: el mensaje
+    salió. Nunca se inventa una dirección (constitución §4)."""
+    if not m.get("entrada_web_persona"):
+        return None
+    from . import web_app
+    from .config import config
+
+    token = (web_app.emitir_enlace(cur, m["entrada_web_persona"])
+             if config.base_url else None)
+    if token is None:
+        registrar_incidente(
+            cur, workspace_id,
+            "Un mensaje salió sin el enlace de entrada a la web que anunciaba: "
+            + ("la dirección pública no está configurada." if not config.base_url
+               else "la base no lo emitió (la persona ya no es del equipo)."),
+            severidad="baja", etapa=ETAPA_ENLACE_DE_ENTRADA_WEB,
+            referencia_tipo="message_outbox", referencia_id=str(m["id"]), avisar_admin=False,
+            sin_avisar_porque="el mensaje salió igual; sólo le falta el enlace")
+        return None
+    return web_app.enlace(config.base_url, token)
+
+
 def _marcar_enviado(cur: psycopg.Cursor, ahora: datetime, outbox_id) -> None:
     """El cambio de estado durable: se llama ANTES de intentar el envío
     (ver `_intentar_envio`), no después."""
@@ -1238,6 +1275,8 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
             # El enlace a la página de la tarea, si la fila lo lleva: al final del texto, nunca
             # en la salida ni en el registro de turnos (ADR 0019, decisión 6).
             enlace = _enlace_de_la_tarea(cur, workspace_id, m)
+            # O el de entrada a la web (0066): uno solo por mensaje, la salida lo garantiza.
+            enlace = enlace or _enlace_de_entrada_web(cur, workspace_id, m)
             cuerpo = f"{m['cuerpo']}\n{enlace}" if enlace else m["cuerpo"]
             texto, falla_saludo = saludo.reclamar_y_anteponer(
                 cur, workspace_id=workspace_id,

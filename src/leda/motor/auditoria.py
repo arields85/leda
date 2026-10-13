@@ -6,7 +6,9 @@ transacción que el efecto: si la jugada se deshace (su punto de guardado), su f
 
 Lo que pasa por la cocina (`herramientas.ejecutar`: un inicio, un bloqueo, destrabar, una
 consulta) ya deja su fila allá, con la misma versión; acá va sólo lo que el motor escribe
-directo. La regla, por escritura (crear, asignar, cambiar de estado, aprobar, enviar,
+directo. El acceso a la web (emitir el enlace de entrada, cortarlo porque la persona perdió el
+celular) lo audita la base, en las funciones que lo hacen (`auditar_acceso_web`, 0057 y 0066):
+las jugadas llaman a `web_app` sin pasar por la cocina ni auditar otra vez. La regla, por escritura (crear, asignar, cambiar de estado, aprobar, enviar,
 configurar):
 
 - **Se audita** lo que agrega un hecho del trabajo o llega a otra persona por cuenta de Leda:
