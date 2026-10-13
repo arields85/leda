@@ -365,6 +365,35 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   - **Conclusión vigente:** la regla del motivo funciona con la IA real; la inestabilidad del servicio no
     oficial de ChatGPT (riesgo 5) pesa en las rondas, aunque la cocina la maneja sin silencio.
 
+## Las correcciones de la prueba por Telegram, con la IA real (2026-10-13, de madrugada)
+
+Sol por la suscripción, sobre `bc40805` (las correcciones T1 a T8 de
+`odd/tasks/correcciones-prueba-telegram.md`). Dos tandas: `resultados/correcciones-t9-a.md` (51, 27, 23
+y 22, 3 veces) y `resultados/correcciones-t9-b.md` (40, 41 y 44, 2 veces). Comando:
+`.venv\Scripts\python.exe -m tests.conversaciones.correr --ia sol-suscripcion --conversacion … --veces
+3 --paralelo 2 --ronda correcciones-t9-a`. Cupo: la ventana de 5 horas pasó de 0 % a 48 %, la semanal de
+41 % a 49 % (281 + unas 100 llamadas). Por eso no fueron 10 conversaciones × 5.
+
+| Conversación | Garantías | Comprensión | Formato | Lo que falló |
+|---|---|---|---|---|
+| 51 | 3/3 | 0/3 | 3/3 | sólo el paso 1: la IA juzga que "termine la integracion…" no cubre la explicación y ofrece el ejemplo (el YAML esperaba `el_texto_cubre: [explicacion]`); el paso 2, "dejalo pendiente", se lee como salir del tema 3 de 3 |
+| 27 | 3/3 | 3/3 | 0/3 | renglones de más de 140; un `PlazoAgotado` del servicio |
+| 23 | 3/3 | 3/3 | 0/3 | formato (el bloque de una tarea, un nombre repetido, un renglón largo) |
+| 22 | 3/3 | 0/3 | 0/3 | los campos de la jugada `entregar` (pasos 5 a 7: `el_texto_cubre`, `ejemplo`), la foto sin entrega leída como `guardar_para_la_entrega` (paso 1, 2 de 3) y, de ahí, el camino de la evidencia (paso 8) |
+| 40 | 2/2 | 2/2 | 1/2 | la pregunta junta varias cosas |
+| 41 | 2/2 | 2/2 | 2/2 | nada |
+| 44 | 2/2 | 2/2 | 2/2 | nada |
+
+- **Lo que se quería ver, bien:** ningún mensaje dice a quién ni a qué hora se avisa (T3); ningún "Anoté"
+  de un borrador (T7b: los dos "Anoté" de la tanda b son de un bloqueo registrado); "dejalo pendiente"
+  sale del tema a la primera (T7a); en la 27 la entrega nueva no se contradice ni cuenta como escrito
+  ahora lo de la entrega anterior (T8); la aprobación con su comentario (T4), 3 de 3.
+- **La 22:** ya daba comprensión 0 de 5 en la D6 (2026-10-08) por la misma clase (el YAML estricto con
+  los campos del ejemplo; se aflojó con `puede_traer`). `PENDIENTE`: separar lo que es del YAML de lo
+  que es de Leda; la lectura de la foto sin entrega es la misma de la 23, paso 12 (decisión 68).
+- **Conclusión:** las correcciones de la prueba por Telegram se sostienen con la IA real: garantías 18 de
+  18. Quedan la comprensión de la 22 (a analizar) y el formato, la deuda conocida.
+
 ## Prueba por Telegram real de la Fase C (2026-10-12)
 
 El usuario operó las tres cuentas (Ariel, Ismael, Marcos) con el guion

@@ -77,7 +77,7 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
       borrador: conversación de prueba; si pide cambiar el diseño, propuesta al usuario.
 - [x] **T8 · La entrega nueva que se contradice** ("dejé la foto para cuando vuelvas a entregarla" y
       "¿confirmás la entrega así?"; contó lo que esta vez no se escribió).
-- [ ] **T9 · Ronda con la IA real** de las conversaciones tocadas (autorizada), bitácora.
+- [x] **T9 · Ronda con la IA real** de las conversaciones tocadas (autorizada), bitácora.
 - [ ] **T10 · Cierre:** suites, `docs/STATUS.md`, este documento y las memorias.
 
 ## Criterio de aceptación
@@ -248,4 +248,8 @@ nombres de otros en los mensajes.
 - **T9, en curso** (2026-10-13, madrugada): ronda con la IA real, sol por la suscripción, sobre
   `bc40805`: 51, 27, 23 y 22, 3 veces; 40, 41 y 44, 2 veces (cupo: la ventana de 5 horas en 0 %, la
   semanal en 41 %; 15 corridas grandes gastaron antes el 52 % de una ventana, por eso no 10 × 5).
+- **T9, hecha:** garantías 18 de 18; comprensión 51 0/3 (sólo el paso 1, una expectativa del YAML), 27
+  3/3, 23 3/3, 22 0/3 (la clase de la D6), 40, 41 y 44 2/2; formato, la deuda conocida. Ningún mensaje
+  con hora o nombre de otro; ningún "Anoté" de un borrador. Detalle en la bitácora ("Las correcciones de
+  la prueba por Telegram, con la IA real"). `PENDIENTE`: la comprensión de la 22.
 
