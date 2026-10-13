@@ -1,3 +1,4 @@
+import { CircleAlert } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { SessionClosedError } from '../api';
 import { shortDate } from '../format';
@@ -81,10 +82,18 @@ function fieldsWith(problems: Problem[]): Field[] {
 }
 
 /** "Falta completar: criterio de aceptación, evidencia." Each name takes the focus to its field. */
+/** The mark in front of what the form still needs: a Lucide icon, not a "!" character (user,
+ * 2026-10-13). Decorative: the text next to it says it all. */
+function Mark() {
+  return <CircleAlert aria-hidden="true" strokeWidth={2.25} className="mt-[0.2em] size-[1em] shrink-0" />;
+}
+
 function FieldList({ label, fields }: { label: string; fields: Field[] }) {
   if (fields.length === 0) return null;
   return (
-    <p className="m-0">
+    <p className="m-0 flex min-w-0 items-start gap-1.5">
+      <Mark />
+      <span className="min-w-0">
       {label}:{' '}
       {fields.map((field, i) => (
         <Fragment key={field}>
@@ -95,6 +104,7 @@ function FieldList({ label, fields }: { label: string; fields: Field[] }) {
         </Fragment>
       ))}
       .
+      </span>
     </p>
   );
 }
@@ -127,7 +137,10 @@ function FieldBlock({
       {errors.length > 0 && (
         <ul id={`${id}-error`} className={`m-0 flex list-none flex-col gap-0.5 p-0 text-small font-bold ${WARN}`}>
           {errors.map((e) => (
-            <li key={`${e.campo}-${e.motivo}`}>! {e.texto}</li>
+            <li key={`${e.campo}-${e.motivo}`} className="flex min-w-0 items-start gap-1.5">
+              <Mark />
+              <span className="min-w-0">{e.texto}</span>
+            </li>
           ))}
         </ul>
       )}
@@ -290,7 +303,10 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         {step.warnings.length > 0 && (
           <ul className="m-0 flex list-none flex-col gap-1 p-0 text-body text-ink-soft">
             {step.warnings.map((w) => (
-              <li key={`${w.campo}-${w.motivo}`}>! {w.texto}</li>
+              <li key={`${w.campo}-${w.motivo}`} className="flex min-w-0 items-start gap-1.5">
+                <Mark />
+                <span className="min-w-0">{w.texto}</span>
+              </li>
             ))}
           </ul>
         )}
@@ -508,7 +524,10 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             {on('evidencia').length > 0 && (
               <ul id="f-evidencia-error" className={`m-0 flex list-none flex-col gap-0.5 p-0 text-small font-bold ${WARN}`}>
                 {on('evidencia').map((e) => (
-                  <li key={`${e.campo}-${e.motivo}`}>! {e.texto}</li>
+                  <li key={`${e.campo}-${e.motivo}`} className="flex min-w-0 items-start gap-1.5">
+              <Mark />
+              <span className="min-w-0">{e.texto}</span>
+            </li>
                 ))}
               </ul>
             )}
@@ -569,11 +588,12 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               className={`flex min-w-0 flex-col gap-1 wrap-break-word text-body ${WARN} ${alerted ? 'rounded-card border-hard border-line px-3 py-2.5' : ''}`}
             >
               {alerted && <p className="m-0 font-bold text-ink">No se cargó: hay que corregir lo marcado.</p>}
-              <FieldList label="! Falta completar" fields={missing} />
-              <FieldList label="! Hay que corregir" fields={wrong} />
+              <FieldList label="Falta completar" fields={missing} />
+              <FieldList label="Hay que corregir" fields={wrong} />
               {general.map((p) => (
-                <p key={`${p.campo}-${p.motivo}`} className="m-0">
-                  ! {p.texto}
+                <p key={`${p.campo}-${p.motivo}`} className="m-0 flex min-w-0 items-start gap-1.5">
+                  <Mark />
+                  <span className="min-w-0">{p.texto}</span>
                 </p>
               ))}
             </div>

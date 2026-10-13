@@ -270,7 +270,9 @@ describe('AdminApp', () => {
     expect(criterio).toHaveFocus();
     // The field's message is there, in the warning color, and its border too.
     expect(document.getElementById('f-criterio-error')).toHaveClass('text-falta');
-    expect(document.getElementById('f-criterio-error')).toHaveTextContent('! Falta el criterio de aceptación');
+    expect(document.getElementById('f-criterio-error')).toHaveTextContent('Falta el criterio de aceptación');
+    expect(document.getElementById('f-criterio-error')?.textContent).not.toContain('!');
+    expect(document.querySelector('#f-criterio-error svg')).toHaveAttribute('aria-hidden', 'true');
     expect(document.getElementById('f-evidencia-error')).toHaveClass('text-falta');
     expect(criterio).toHaveClass('aria-[invalid=true]:border-falta');
     expect(within(preview()).getByRole('alert')).toHaveClass('text-falta');
