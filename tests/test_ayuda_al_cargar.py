@@ -110,6 +110,7 @@ def _respuesta_del_ejemplo(**cambios) -> dict[str, Any]:
         "espera": "T1",
         "objetivo": "O2",
         "fecha": VIERNES,
+        "como_dijo_la_fecha": "para el viernes",
     }
     respuesta.update(cambios)
     return {k: v for k, v in respuesta.items() if v is not None}
@@ -355,12 +356,30 @@ def test_la_espera_elegida_a_mano_da_el_objetivo(ayuda):
 
 
 # --- La fecha ---------------------------------------------------------------------------------
+#
+# Constitución §4: nunca una fecha que nadie dijo. La IA devuelve, con la fecha, las palabras con
+# que la persona la dijo (`como_dijo_la_fecha`); el código comprueba que están tal cual en el texto
+# y calcula él mismo el día con esas palabras: vale sólo si es el mismo que dio la IA y es hábil.
 
 def test_una_fecha_que_no_es_un_dia_habil_no_se_pone(ayuda):
-    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(fecha=SABADO),
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(fecha=SABADO,
+                                                           como_dijo_la_fecha="para el sabado"),
                              texto=EJEMPLO.replace("viernes", "sabado"))
     assert "fecha" not in resultado.propuesta
-    assert _avisos(resultado)["fecha"].startswith("No puse la fecha: ese día no es hábil")
+    assert _avisos(resultado)["fecha"] == (
+        'No puse la fecha: dijiste "para el sabado", pero el sábado 17 de octubre no es día '
+        'hábil en este espacio; elegila en el calendario.')
+    assert {"campo": "fecha", "motivo": "no_es_habil"} in resultado.descartados
+
+
+def test_una_fecha_fuera_del_calendario_no_se_pone(ayuda):
+    texto = EJEMPLO.replace("para el viernes", "para el 3 de mayo")
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(
+        fecha="2027-05-03", como_dijo_la_fecha="para el 3 de mayo"), texto=texto)
+    assert "fecha" not in resultado.propuesta
+    assert _avisos(resultado)["fecha"] == (
+        'No puse la fecha: dijiste "para el 3 de mayo", pero el lunes 3 de mayo está fuera del '
+        'calendario de este espacio; elegila en el calendario.')
 
 
 def test_una_fecha_que_la_persona_no_dijo_no_se_pone(ayuda):
@@ -368,36 +387,122 @@ def test_una_fecha_que_la_persona_no_dijo_no_se_pone(ayuda):
     resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(fecha="2026-10-15"), texto=texto)
     assert "fecha" not in resultado.propuesta
     assert _avisos(resultado)["fecha"].startswith("No puse la fecha: no encontré")
+    assert {"campo": "fecha", "motivo": "no_dicha"} in resultado.descartados
 
 
-def test_el_dia_de_la_semana_tiene_que_ser_el_de_la_fecha(ayuda):
-    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(fecha="2026-10-22"))   # un jueves
+def test_una_fecha_sin_las_palabras_de_la_persona_no_se_pone(ayuda):
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(como_dijo_la_fecha=None))
     assert "fecha" not in resultado.propuesta
+    assert {"campo": "fecha", "motivo": "no_dicha"} in resultado.descartados
 
 
-@pytest.mark.parametrize("dicho, fecha", [
-    ("para el 16", "2026-10-16"),
-    ("para el 16/10", "2026-10-16"),
-    ("para mañana", "2026-10-15"),
-    ("para manana", "2026-10-15"),
-    ("hoy mismo", "2026-10-14"),
-    ("pasado mañana", "2026-10-16"),
-    ("la semana que viene", "2026-10-21"),
-    ("el jueves", "2026-10-15"),
+def test_el_dia_que_calcula_el_codigo_tiene_que_ser_el_de_la_ia(ayuda):
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(fecha="2026-10-23"))  # otro viernes
+    assert "fecha" not in resultado.propuesta
+    assert {"campo": "fecha", "motivo": "no_coincide"} in resultado.descartados
+    assert _avisos(resultado)["fecha"] == (
+        'No puse la fecha: no entendí qué día es "para el viernes"; elegila en el calendario.')
+
+
+def test_el_numero_de_unos_tornillos_no_es_una_fecha(ayuda):
+    """La revisión `review-6a44e26466b95395`: "12 tornillos" dejaba pasar el 12."""
+    texto = EJEMPLO.replace(" para el viernes", "")
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(fecha="2026-11-12",
+                                                           como_dijo_la_fecha="12"), texto=texto)
+    assert "fecha" not in resultado.propuesta
+    assert {"campo": "fecha", "motivo": "no_entendida"} in resultado.descartados
+    assert _avisos(resultado)["fecha"] == (
+        'No puse la fecha: no entendí qué día es "12"; elegila en el calendario.')
+
+
+def test_por_la_manana_es_una_hora_y_no_un_dia(ayuda):
+    texto = "revisar las alarmas del scada por la mañana que lo haga lucas"
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(fecha="2026-10-15",
+                                                           como_dijo_la_fecha="mañana"),
+                             texto=texto)
+    assert "fecha" not in resultado.propuesta
+    assert {"campo": "fecha", "motivo": "no_entendida"} in resultado.descartados
+
+
+@pytest.mark.parametrize("texto, dicho, fecha", [
+    ("colgar el estante para el viernes", "para el viernes", "2026-10-16"),
+    ("colgar el estante para el VIERNES", "Para el viernes", "2026-10-16"),
+    ("colgar el estante el viernes", "viernes", "2026-10-16"),
+    ("colgar el estante para mañana", "mañana", "2026-10-15"),
+    ("colgar el estante para manana", "para mañana", "2026-10-15"),
+    ("colgar el estante mañana a la mañana", "mañana a la mañana", "2026-10-15"),
+    ("hoy mismo", "hoy", "2026-10-14"),
+    ("pasado mañana", "pasado mañana", "2026-10-16"),
+    # Hoy es miércoles: "el miércoles" es el que viene, no hoy.
+    ("el miercoles", "el miércoles", "2026-10-21"),
+    ("antes del jueves", "antes del jueves", "2026-10-15"),
+    ("el viernes que viene", "el viernes que viene", "2026-10-16"),
+    ("el lunes q viene", "el lunes q viene", "2026-10-19"),
+    ("el viernes de la semana que viene", "el viernes de la semana que viene", "2026-10-23"),
+    # Las palabras de la IA eligen la frase del texto, entera: no se pierde "de la semana que viene".
+    ("el viernes de la semana que viene", "el viernes", "2026-10-23"),
+    ("el viernes de la proxima semana", "viernes de la próxima semana", "2026-10-23"),
+    ("para el 22", "para el 22", "2026-10-22"),
+    ("para el 22", "22", "2026-10-22"),
+    ("el dia 20", "el dia 20", "2026-10-20"),
+    # Un día que ya pasó este mes es el del mes que viene.
+    ("para el 10", "el 10", "2026-11-10"),
+    ("el 22/10", "22/10", "2026-10-22"),
+    ("el 22 / 10", "22/10", "2026-10-22"),
+    ("el 5-1", "5-1", "2027-01-05"),
+    ("el 22/10/2026", "22/10/2026", "2026-10-22"),
+    ("el 3 de noviembre", "el 3 de noviembre", "2026-11-03"),
+    ("el viernes 23", "el viernes 23", "2026-10-23"),
 ])
-def test_la_fecha_dicha_de_cualquier_forma(ayuda, dicho, fecha):
-    assert ayuda.la_fecha_esta_dicha(f"colgar el estante {dicho}", date.fromisoformat(fecha))
+def test_el_codigo_calcula_el_dia_de_las_palabras(ayuda, texto, dicho, fecha):
+    assert ayuda.fecha_dicha(texto, dicho, HOY) == (date.fromisoformat(fecha), None)
 
 
-def test_sin_ninguna_forma_la_fecha_no_esta_dicha(ayuda):
-    assert not ayuda.la_fecha_esta_dicha("colgar el estante pronto", date(2026, 10, 16))
-    assert not ayuda.la_fecha_esta_dicha("el miercoles", date(2026, 10, 16))
-    assert not ayuda.la_fecha_esta_dicha("necesito 3 tornillos", date(2026, 10, 16))
+@pytest.mark.parametrize("texto, dicho, motivo", [
+    ("necesita 12 tornillos", "12", "no_entendida"),
+    ("necesita 12 tornillos para el viernes", "12 tornillos", "no_entendida"),
+    ("lo hago por la mañana", "mañana", "no_entendida"),
+    ("lo hago a la mañana", "a la mañana", "no_entendida"),
+    ("esta mañana se cortó", "mañana", "no_entendida"),
+    ("la semana que viene", "la semana que viene", "no_entendida"),
+    ("pronto", "pronto", "no_entendida"),
+    # El 22 es jueves: "viernes 22" no es un día.
+    ("el viernes 22", "el viernes 22", "no_entendida"),
+    ("mañana o el viernes", "mañana o el viernes", "no_entendida"),
+    ("el 31 de febrero", "el 31 de febrero", "no_entendida"),
+    ("la maquina 3 10 tornillos", "3 10", "no_entendida"),
+    ("colgar el estante para el viernes", "para el jueves", "no_dicha"),
+    ("colgar el estante para el viernes", "", "no_dicha"),
+    ("colgar el estante para el viernes", None, "no_dicha"),
+])
+def test_lo_que_no_es_un_dia_no_se_calcula(ayuda, texto, dicho, motivo):
+    assert ayuda.fecha_dicha(texto, dicho, HOY) == (None, motivo)
 
 
 def test_una_fecha_mal_escrita_no_se_pone(ayuda):
     resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(fecha="16/10"))
     assert "fecha" not in resultado.propuesta and "fecha" in _avisos(resultado)
+
+
+def test_la_herramienta_pide_las_palabras_de_la_fecha_solo_con_la_fecha(ayuda):
+    def datos(pide):
+        return set(ayuda.herramienta(pide)["function"]["parameters"]["properties"])
+    assert {"fecha", "como_dijo_la_fecha"} <= datos(["titulo", "fecha"])
+    assert "como_dijo_la_fecha" not in datos(["titulo"])
+
+
+# --- El tope de salida ------------------------------------------------------------------------
+
+def test_el_tope_de_salida_alcanza_para_la_propuesta_entera(ayuda):
+    """La revisión `review-6a44e26466b95395`: la propuesta puede llevar hasta 1500 caracteres de
+    texto más el JSON, y un modelo que razona gasta parte del tope antes de contestar; con el tope
+    de elegir jugadas (1500) se podía cortar. Nunca menos que el de redactar un mensaje."""
+    _, ia = _proponer(ayuda, _respuesta_del_ejemplo())
+    assert ia.pedidos[0]["max_tokens"] >= 3000
+    ia = IADeLaCarga(_respuesta_del_ejemplo())
+    ia.parametros = {"tope_jugadas": 1500, "tope_redaccion": 6000}
+    ayuda.pedir(ia, ayuda.entrada_de_la_ia(EJEMPLO, _vacio(), OPCIONES))
+    assert ia.pedidos[0]["max_tokens"] == 6000
 
 
 # --- La IA que no responde --------------------------------------------------------------------

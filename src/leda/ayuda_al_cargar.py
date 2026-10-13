@@ -18,8 +18,10 @@ acá: la persona ve cada dato marcado, lo corrige o lo acepta, y confirma como s
     elige y las muestra (ADR 0020, decisión 3);
   - la espera y el objetivo, de sus listas; el objetivo es el de la tarea que espera si está
     abierto;
-  - la fecha, sólo si es un día hábil de las opciones y el texto la dice (`la_fecha_esta_dicha`;
-    constitución §4: nunca una fecha que nadie dijo);
+  - la fecha, sólo si la persona la dijo (constitución §4: nunca una fecha que nadie dijo): la IA
+    devuelve también las palabras con que la dijo (`como_dijo_la_fecha`), el código comprueba que
+    están tal cual en el texto y calcula él mismo el día con ellas (`fecha_dicha`, con hoy y la
+    frase entera del texto donde están); vale sólo si es el mismo día que dio la IA y es hábil;
   - título, descripción y criterio, con los topes del formulario y sin un número ni un nombre que
     no estén en lo que escribió la persona o en los datos de esta tarea
     (`entrega.problema_del_ejemplo`, punto por punto); el criterio, además, con la parte que dice
@@ -38,6 +40,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
+from .calendario import DIAS as DIAS_DE_LA_SEMANA
 from .motor import hechos
 from .motor.entrega import problema_del_ejemplo, puntos_del_criterio
 from .motor.ia_real import RespuestaInvalida, sin_cortar
@@ -57,7 +60,12 @@ LARGOS = {"titulo": 200, "descripcion": 800, "criterio": 500}
 LARGO_DEL_TEXTO = 1000
 # Los días que se le dan a la IA para nombrar una fecha: ocho semanas, como al motor.
 DIAS_PROXIMOS = 56
-TOPE_DE_SALIDA = 1500
+# El tope de salida de la llamada. La propuesta puede llevar hasta 1500 caracteres de texto
+# (título, descripción y criterio) más la parte que dice cómo se comprueba y el JSON, y un modelo
+# que razona gasta parte del tope antes de contestar: el de elegir jugadas (1500) la podía cortar
+# (revisión `review-6a44e26466b95395`), y redactar un solo mensaje ya pidió 2000. Una respuesta
+# cortada igual es que la IA no respondió (`sin_cortar`), nunca una propuesta a medias.
+TOPE_DE_SALIDA = 3000
 
 TEXTOS = {
     ("titulo", "sin_proponer"):
@@ -70,8 +78,13 @@ TEXTOS = {
     ("responsable", "varios"):
         "Encontré a más de una persona para {quien}: elegí quién la hace.",
     ("fecha", "no_es_habil"):
-        "No puse la fecha: ese día no es hábil en este espacio o ya no se puede elegir; "
+        'No puse la fecha: dijiste "{dicho}", pero el {dia} no es día hábil en este espacio; '
         "elegila en el calendario.",
+    ("fecha", "fuera_del_calendario"):
+        'No puse la fecha: dijiste "{dicho}", pero el {dia} está fuera del calendario de este '
+        "espacio; elegila en el calendario.",
+    ("fecha", "no_entendida"):
+        'No puse la fecha: no entendí qué día es "{dicho}"; elegila en el calendario.',
     ("fecha", "no_dicha"):
         "No puse la fecha: no encontré en lo que escribiste qué día es; elegila en el "
         "calendario.",
@@ -105,12 +118,27 @@ _DATOS = {
     "objetivo": "El código (O1, O2...) del objetivo al que contribuye la tarea.",
     "fecha": "El día para el que la persona dijo que tiene que estar, como AAAA-MM-DD, de la "
              "lista de días.",
+    "como_dijo_la_fecha": "Las palabras con que la persona dijo para cuándo tiene que estar, "
+                          "copiadas tal cual de su texto.",
 }
+# Los datos que van sólo con otro: la parte del criterio que dice cómo se comprueba, con el
+# criterio, y las palabras de la fecha, con la fecha.
+_ACOMPANAN = {"como_se_comprueba": "criterio", "como_dijo_la_fecha": "fecha"}
 
-_RELATIVAS = ("hoy", "manana", "pasado manana", "semana que viene", "proxima semana",
-              "semana proxima", "mes que viene", "proximo mes", "mes proximo", "fin de mes")
-_DIAS = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
-_NUMERO = re.compile(r"\d+")
+# Las palabras de una fecha (`fecha_dicha`).
+_MESES = {m: i for i, m in enumerate(
+    ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
+     "octubre", "noviembre", "diciembre"), 1)} | {"setiembre": 9}
+# "por la mañana", "a la mañana", "esta mañana": una hora del día, no mañana.
+_LA_MANANA = {"la", "esta"}
+# Lo que antecede al número de un día ("para el 22", "antes del 22", "el día 22").
+_ANTES_DEL_DIA = {"el", "del", "dia", "al"}
+_LA_SEMANA_QUE_VIENE = (("semana", "que", "viene"), ("proxima", "semana"), ("semana", "proxima"))
+# "22/10", "22 / 10", "22-10" o "22/10/2026": una sola ficha, con la barra; un número suelto al
+# lado de otro ("la máquina 3 10 tornillos") no es un día y un mes.
+_CON_BARRAS = re.compile(
+    r"(?<!\d)(\d{1,2})\s*[/-]\s*(\d{1,2})(?:\s*[/-]\s*(\d{4}|\d{2}))?(?!\d)")
+_FICHA = re.compile(r"\d{1,2}/\d{1,2}(?:/\d{2,4})?|[^\W_]+")
 
 
 @dataclass
@@ -223,8 +251,8 @@ def entrada_de_la_ia(texto: str, escrito: Mapping[str, Any],
 
 def herramienta(pide: Sequence[str]) -> dict[str, Any]:
     """La herramienta de la respuesta, con sólo los datos que se piden (y, con el criterio, la
-    parte que dice cómo se comprueba)."""
-    datos = [d for d in _DATOS if d in pide or (d == "como_se_comprueba" and "criterio" in pide)]
+    parte que dice cómo se comprueba; con la fecha, las palabras con que se dijo)."""
+    datos = [d for d in _DATOS if d in pide or _ACOMPANAN.get(d) in pide]
     return {"type": "function", "function": {
         "name": NOMBRE_HERRAMIENTA,
         "description": "Los datos de la tarea que Leda le propone a la persona; vacío lo que no "
@@ -246,7 +274,8 @@ def pedir(ia, entrada: Mapping[str, Any]) -> dict[str, Any]:
     parametros = getattr(cliente, "parametros", {}) or {}
     respuesta = cliente.completar({
         "temperature": 0,
-        "max_tokens": int(parametros.get("tope_jugadas", TOPE_DE_SALIDA)),
+        "max_tokens": max(TOPE_DE_SALIDA, *(int(parametros.get(t) or 0)
+                                             for t in ("tope_jugadas", "tope_redaccion"))),
         "messages": [{"role": "system", "content": INSTRUCCIONES},
                      {"role": "user",
                       "content": json.dumps(entrada, ensure_ascii=False, default=str)}],
@@ -291,17 +320,186 @@ def _contiene(texto: str, frase: str) -> bool:
     return f" {frase} " in f" {texto} "
 
 
-def la_fecha_esta_dicha(texto: str, fecha: date) -> bool:
-    """Si el texto dice esa fecha: su número, el nombre de su día de la semana o una palabra que
-    nombra un día ("hoy", "mañana", "la semana que viene"...). El código no calcula a qué día se
-    refiere la palabra: eso lo hizo la IA con la lista de días; acá sólo se comprueba que la
-    persona dijo algo de cuándo."""
-    normal = _normal(texto)
-    if str(fecha.day) in {n.lstrip("0") for n in _NUMERO.findall(normal)}:
+# --- La fecha que dijo la persona ---------------------------------------------------------------
+#
+# Constitución §4: nunca una fecha que nadie dijo. La IA nombra el día y copia las palabras con que
+# la persona lo dijo; el código no le cree el día: busca esas palabras en el texto y calcula él
+# mismo, con hoy, qué día dice la frase del texto donde están. Lo que entiende, y nada más:
+# - "hoy", "mañana" (no "por la mañana", "a la mañana" ni "esta mañana", que son una hora) y
+#   "pasado mañana";
+# - el nombre de un día: el próximo, nunca hoy ("el viernes", "este viernes", "el viernes que
+#   viene"; hoy miércoles, "el miércoles" es el de la semana que viene), o el de la semana que
+#   viene si lo dice ("el viernes de la semana que viene", "de la próxima semana");
+# - un número de día con lo que lo hace un día: "el 22", "del 22", "el día 22" (de este mes, o del
+#   que viene si ya pasó), "22/10" o "22-10" (de este año, o del que viene si ya pasó), "22/10/2026",
+#   "el 22 de octubre" y "el viernes 23" (que tiene que ser viernes).
+# Un número suelto ("12 tornillos", "la máquina 3") nunca es un día, y "la semana que viene" sola
+# no dice qué día. Si las palabras están en más de una frase con días distintos, no se entiende.
+
+@dataclass(frozen=True)
+class _Frase:
+    """Una frase de fecha del texto: sus fichas (`desde` hasta `hasta`, sin incluir) y su día
+    (`None` si no es un día que exista, como "el 31 de febrero" o "el viernes 22" un jueves)."""
+
+    desde: int
+    hasta: int
+    dia: date | None
+
+
+def _fichas_de_fecha(texto: str) -> list[str]:
+    """Las palabras del texto sin mayúsculas ni acentos, con "22/10" como una sola y "q" como
+    "que"."""
+    sin_marcas = "".join(c for c in unicodedata.normalize("NFD", texto.casefold())
+                         if unicodedata.category(c) != "Mn")
+    con_barras = _CON_BARRAS.sub(lambda m: "/".join(g for g in m.groups() if g), sin_marcas)
+    return ["que" if f == "q" else f for f in _FICHA.findall(con_barras)]
+
+
+def _es_un_dia_del_mes(valor: str) -> bool:
+    return valor.isdigit() and len(valor) <= 2 and 1 <= int(valor) <= 31
+
+
+def _empieza_un_numero_de_dia(fichas: Sequence[str], i: int) -> bool:
+    ficha = fichas[i]
+    if "/" in ficha:
         return True
-    if _contiene(normal, _DIAS[fecha.weekday()]):
-        return True
-    return any(_contiene(normal, r) for r in _RELATIVAS)
+    if not _es_un_dia_del_mes(ficha):
+        return False
+    previa = fichas[i - 1] if i else ""
+    return (previa in _ANTES_DEL_DIA or previa in DIAS_DE_LA_SEMANA
+            or (fichas[i + 1:i + 2] == ["de"] and fichas[i + 2:i + 3] != []
+                and fichas[i + 2] in _MESES))
+
+
+def _el_dia(dia: int, mes: int | None, anio: int | None, hoy: date) -> date | None:
+    """El día con ese número: con el año, ese; con el mes, de este año o del que viene si ya
+    pasó; sólo el número, de este mes o del que viene si ya pasó. `None` si no existe."""
+    if anio is not None:
+        try:
+            return date(anio + 2000 if anio < 100 else anio, mes or 0, dia)
+        except ValueError:
+            return None
+    meses = ([(hoy.year, mes), (hoy.year + 1, mes)] if mes is not None else
+             [(hoy.year + (hoy.month - 1 + k) // 12, (hoy.month - 1 + k) % 12 + 1)
+              for k in (0, 1)])
+    for a, m in meses:
+        try:
+            candidato = date(a, m, dia)
+        except ValueError:
+            continue
+        if candidato >= hoy:
+            return candidato
+    return None
+
+
+def _numero_de_dia(fichas: Sequence[str], i: int, hoy: date) -> tuple[int, date | None]:
+    """Hasta dónde llega la frase de un número de día que empieza en `i`, y su día."""
+    ficha = fichas[i]
+    if "/" in ficha:
+        partes = [int(p) for p in ficha.split("/")]
+        return i + 1, _el_dia(partes[0], partes[1], partes[2] if len(partes) == 3 else None, hoy)
+    dia, mes, anio, hasta = int(ficha), None, None, i + 1
+    if fichas[hasta:hasta + 1] == ["de"] and fichas[hasta + 1:hasta + 2] != [] \
+            and fichas[hasta + 1] in _MESES:
+        mes, hasta = _MESES[fichas[hasta + 1]], hasta + 2
+        if fichas[hasta:hasta + 1] == ["de"] and fichas[hasta + 1:hasta + 2] != [] \
+                and re.fullmatch(r"\d{4}", fichas[hasta + 1]):
+            anio, hasta = int(fichas[hasta + 1]), hasta + 2
+    return hasta, _el_dia(dia, mes, anio, hoy)
+
+
+def _dia_de_la_semana(fichas: Sequence[str], i: int, hoy: date) -> tuple[int, date | None]:
+    """Hasta dónde llega la frase del nombre de un día que está en `i`, y su día."""
+    semana, hasta = DIAS_DE_LA_SEMANA.index(fichas[i]), i + 1
+    if hasta < len(fichas) and _empieza_un_numero_de_dia(fichas, hasta):
+        hasta, dia = _numero_de_dia(fichas, hasta, hoy)
+        return hasta, dia if dia is not None and dia.weekday() == semana else None
+    if fichas[hasta:hasta + 2] == ["que", "viene"]:
+        hasta += 2
+    else:
+        j = hasta + (fichas[hasta:hasta + 1] == ["de"])
+        j += fichas[j:j + 1] == ["la"]
+        for frase in _LA_SEMANA_QUE_VIENE:
+            if tuple(fichas[j:j + len(frase)]) == frase:
+                lunes_que_viene = hoy + timedelta(days=7 - hoy.weekday())
+                return j + len(frase), lunes_que_viene + timedelta(days=semana)
+    return hasta, hoy + timedelta(days=(semana - hoy.weekday()) % 7 or 7)
+
+
+def _frases_de_fecha(fichas: Sequence[str], hoy: date) -> list[_Frase]:
+    frases: list[_Frase] = []
+    i = 0
+    while i < len(fichas):
+        ficha, previa = fichas[i], fichas[i - 1] if i else ""
+        if ficha == "pasado" and fichas[i + 1:i + 2] == ["manana"]:
+            frases.append(_Frase(i, i + 2, hoy + timedelta(days=2)))
+            i += 2
+            continue
+        if ficha == "manana" and previa not in _LA_MANANA:
+            frases.append(_Frase(i, i + 1, hoy + timedelta(days=1)))
+        elif ficha == "hoy":
+            frases.append(_Frase(i, i + 1, hoy))
+        elif ficha in DIAS_DE_LA_SEMANA or _empieza_un_numero_de_dia(fichas, i):
+            hasta, dia = (_dia_de_la_semana if ficha in DIAS_DE_LA_SEMANA
+                          else _numero_de_dia)(fichas, i, hoy)
+            frases.append(_Frase(i, hasta, dia))
+            i = hasta
+            continue
+        i += 1
+    return frases
+
+
+def fecha_dicha(texto: str, dicho: str | None, hoy: date) -> tuple[date | None, str | None]:
+    """El día que dicen las palabras `dicho` en el texto de la persona, calculado por el código:
+    `(día, None)`, o `(None, motivo)`: `no_dicha` si esas palabras no están tal cual en el texto
+    (sin mayúsculas ni acentos); `no_entendida` si no son parte de una frase que nombra un solo
+    día que existe. La frase es la del texto, entera: si la persona escribió "el viernes de la
+    semana que viene" y la IA copió "el viernes", el día es el de la semana que viene."""
+    buscadas = _fichas_de_fecha(dicho or "")
+    if not buscadas:
+        return None, "no_dicha"
+    fichas = _fichas_de_fecha(texto)
+    largo = len(buscadas)
+    lugares = [i for i in range(len(fichas) - largo + 1) if fichas[i:i + largo] == buscadas]
+    if not lugares:
+        return None, "no_dicha"
+    dias = {f.dia for f in _frases_de_fecha(fichas, hoy) for i in lugares
+            if f.desde < i + largo and i < f.hasta}
+    if len(dias) != 1 or None in dias:
+        return None, "no_entendida"
+    return dias.pop(), None
+
+
+def _en_palabras(dia: date) -> str:
+    """"sábado 17 de octubre", como lo nombra el motor (`hechos.dia`)."""
+    return hechos.dia(dia).split(": ", 1)[1]
+
+
+def _revisar_la_fecha(r: Resultado, fecha: Any, dicho: str | None, texto: str,
+                      opciones: Mapping[str, Any]) -> None:
+    try:
+        de_la_ia = date.fromisoformat(fecha) if isinstance(fecha, str) else None
+    except ValueError:
+        de_la_ia = None
+    if de_la_ia is None:
+        r.descartar("fecha", "mal_formada", "no_dicha")
+        return
+    hoy = _hoy(opciones)
+    dia, motivo = fecha_dicha(texto, dicho, hoy)
+    if dia is None:
+        r.descartar("fecha", motivo, motivo, dicho=dicho or "")
+        return
+    calendario = opciones.get("calendario") or {}
+    if dia.isoformat() not in set(calendario.get("dias_habiles") or []):
+        # Lo que se dice es el día de las palabras de la persona, no el de la IA.
+        hasta = calendario.get("hasta")
+        fuera = dia < hoy or (bool(hasta) and dia.isoformat() > str(hasta))
+        motivo = "fuera_del_calendario" if fuera else "no_es_habil"
+        r.descartar("fecha", motivo, motivo, dicho=dicho, dia=_en_palabras(dia))
+    elif dia != de_la_ia:
+        r.descartar("fecha", "no_coincide", "no_entendida", dicho=dicho)
+    else:
+        r.propuesta["fecha"] = dia.isoformat()
 
 
 def _cadena(valor: Any) -> str | None:
@@ -378,22 +576,11 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
         elif codigo is not None:
             r.descartar("objetivo", "no_existe")
 
-    # La fecha: un día hábil que la persona dijo.
+    # La fecha: el día que dicen las palabras de la persona, calculado por el código, si es el
+    # mismo que dio la IA y es hábil.
     fecha = crudo.get("fecha") if "fecha" in pide else None
     if fecha is not None and not (isinstance(fecha, str) and not fecha.strip()):
-        try:
-            dia = date.fromisoformat(fecha) if isinstance(fecha, str) else None
-        except ValueError:
-            dia = None
-        if dia is None:
-            r.descartar("fecha", "mal_formada", "no_dicha")
-        elif dia.isoformat() not in set((opciones.get("calendario") or {}).get(
-                "dias_habiles") or []):
-            r.descartar("fecha", "no_es_habil", "no_es_habil")
-        elif not la_fecha_esta_dicha(texto, dia):
-            r.descartar("fecha", "no_dicha", "no_dicha")
-        else:
-            r.propuesta["fecha"] = dia.isoformat()
+        _revisar_la_fecha(r, fecha, _cadena(crudo.get("como_dijo_la_fecha")), texto, opciones)
 
     # Los textos, con lo que es de esta tarea: lo que escribió la persona y los datos elegidos.
     permitidos = [texto, *(str(escrito.get(c) or "") for c in ("titulo", "descripcion",

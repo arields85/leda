@@ -56,6 +56,7 @@ def _respuesta(**cambios) -> dict:
         "espera": "T1",
         "objetivo": "O3",
         "fecha": _viernes_real(),
+        "como_dijo_la_fecha": "para el viernes",
     }
     respuesta.update(cambios)
     return {k: v for k, v in respuesta.items() if v is not None}
@@ -169,6 +170,22 @@ def test_alguien_de_otro_espacio_no_se_encuentra(web, conn, intake_world, admini
     assert "responsable_id" not in r.json()["propuesta"]
     assert {"campo": "responsable", "motivo": "no_encontrado",
             "texto": "No encontré a north 2 en el equipo."} in r.json()["avisos"]
+
+
+def test_una_fecha_que_nadie_dijo_no_se_propone(web, conn, intake_world, administradora, ia):
+    """Constitución §4 (revisión `review-6a44e26466b95395`): "12 tornillos" no es el 12, y un día
+    que la IA calculó distinto del que dicen las palabras de la persona tampoco vale."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(_respuesta(espera=None, como_dijo_la_fecha="12"))
+    r = _pedir(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 200, r.text
+    assert "fecha" not in r.json()["propuesta"]
+    assert {"campo": "fecha", "motivo": "no_entendida",
+            "texto": 'No puse la fecha: no entendí qué día es "12"; elegila en el calendario.'}         in r.json()["avisos"]
+    ia.respuestas.append(_respuesta(espera=None, como_dijo_la_fecha="para el lunes"))
+    r = _pedir(navegador, _norte(intake_world)["id"])
+    assert "fecha" not in r.json()["propuesta"]
+    assert [a["motivo"] for a in r.json()["avisos"] if a["campo"] == "fecha"] == ["no_dicha"]
 
 
 # --- Sólo lo vacío ----------------------------------------------------------------------------
