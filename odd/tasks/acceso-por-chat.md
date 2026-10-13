@@ -100,7 +100,7 @@ Ruta de cada una: delegada (un escritor), porque toca la base, el motor y el cor
 
 - [x] **A-1 · La conversación 50** (`.md` y `.yaml`) y la clave nueva del corredor para el enlace de la
       web. RED: el corredor en seco falla.
-- [ ] **A-2 · El vencimiento de 24 horas** (`0065`, su rollback y sus garantías).
+- [x] **A-2 · El vencimiento de 24 horas** (`0065`, su rollback y sus garantías).
 - [ ] **A-3 · Las dos jugadas y la marca del enlace** en la respuesta y el despachador.
 - [ ] **A-4 · El ofrecimiento una sola vez**, también en la bienvenida.
 - [ ] **A-5 · Verificación:** `correr --ia guionada` en seco, `pytest tests/garantias tests/motor
@@ -144,4 +144,19 @@ túnel, tarea aparte).
   corredor todos "nunca entraron", así que la A-4 necesita que el corredor dé por ofrecido a todos salvo
   que el YAML diga otra cosa; `emitido_en` usa el `now()` real, así que las 24 horas se prueban en las
   garantías deterministas, no en el corredor.
+- **A-2, hecha** (escritor delegado; `e6b4402`). `0065_el_enlace_vence_a_las_24_horas`: en
+  `canjear_enlace_de_entrada`, el `update` del canje suma `emitido_en > now() - interval '24 hours'`
+  (en el mismo `update` que traba la fila: dos canjes a la vez siguen abriendo una sola sesión); un
+  enlace vencido devuelve `null`, como uno usado o anulado, y la página dice "Pedile a Leda uno nuevo";
+  no se audita el vencimiento (0057 no audita un canje fallido; se deduce de `emitido_en`) y sigue
+  contando como el enlace sin usar de la persona (otro enlace o el corte lo anulan). La puerta de
+  administración no cambió (`canjear_enlace_de_administracion`, otra tabla). Rollback y `esquema.sql`.
+  RED: `test_enlace_y_sesion.py` 2 en rojo (el vencido abría sesión). `test_enlace_y_sesion.py` 29
+  passed; `test_migraciones.py` 16 passed; `tests/garantias` 700 passed. **RDD:**
+  `review-9fc81742ea92beeb`, aprobada; sugerencias: el borde exacto de las 24 horas sin prueba, el
+  rollback sin ejercitar en una prueba propia. `docs/capacidades.md` ya dice que vence a las 24 horas.
+  Para `leda_motor`: `psql -v ON_ERROR_STOP=1 -f db/migrations/0065_el_enlace_vence_a_las_24_horas.sql
+  "host=localhost user=postgres dbname=leda_motor"` (con `PGCLIENTENCODING=UTF8`), después del
+  respaldo, junto con la `0066`.
+- **A-3, en curso** (escritor delegado): la `0066`, las dos jugadas y la marca del enlace de entrada.
 
