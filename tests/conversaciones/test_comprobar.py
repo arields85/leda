@@ -407,6 +407,12 @@ BIEN_LISTA = f"""Tenés dos tareas pendientes.
 Conviene empezar por la del PLC, que vence primero."""
 
 
+def test_el_icono_del_estado_que_pone_la_cocina_tambien_es_marca_de_tarea():
+    # Decisión 79: en una lista, la cocina cambia 🗓️ por el ícono del estado de cada tarea.
+    for icono in salida.ICONOS_DE_ESTADO:
+        assert _reglas(BIEN_LISTA.replace("🗓️", icono)) == set(), icono
+
+
 def test_un_mensaje_con_el_formato_pedido_no_tiene_fallas_de_formato():
     for texto in (BIEN_CON_PREGUNTA, BIEN_SIN_RESPUESTA, BIEN_LISTA, "¿Cuál de las dos?",
                   "Listo, quedó anotado.\n\nNo hace falta que respondas."):

@@ -922,15 +922,17 @@ RENGLON_MAXIMO = salida.RENGLON_MAXIMO
 MARCA_DE_LA_TAREA_SOLA = "📋"
 MARCA_DEL_VENCIMIENTO = "\U0001F5D3"             # 🗓, sin el selector
 MARCA_VIEJA_DEL_VENCIMIENTO = "📅"
-MARCAS_DE_TAREA = (MARCA_DE_LA_TAREA_SOLA, MARCA_DEL_VENCIMIENTO)
+# En una lista, la cocina cambia la marca de cada tarea por el ícono de su estado (decisión 79).
+MARCAS_DE_TAREA = (MARCA_DE_LA_TAREA_SOLA, MARCA_DEL_VENCIMIENTO, *salida.ICONOS_DE_ESTADO)
 MARCA_DE_LO_ANOTADO = "✏"                   # ✏, sin el selector
 MARCA_DE_LA_CONSECUENCIA = "⚠"              # ⚠, sin el selector
 # Todas las marcas, también la vieja: cada una va sólo al principio de su renglón.
 MARCAS = (MARCA_DE_LA_TAREA_SOLA, MARCA_DEL_VENCIMIENTO, MARCA_DE_LO_ANOTADO,
-          MARCA_DE_LA_CONSECUENCIA, MARCA_VIEJA_DEL_VENCIMIENTO)
+          MARCA_DE_LA_CONSECUENCIA, MARCA_VIEJA_DEL_VENCIMIENTO, *salida.ICONOS_DE_ESTADO)
 
 SIN_NEGRITA = "sin negrita (**)"
-TAREA_EN_SU_RENGLON = "el nombre completo de una tarea, en un renglón que empieza con 📋 o 🗓️"
+TAREA_EN_SU_RENGLON = ("el nombre completo de una tarea, en un renglón que empieza con 📋, 🗓️ o el "
+                       "ícono de su estado")
 TAREA_SOLA = "un renglón con 📋 lleva sólo el nombre de la tarea"
 TAREA_UNA_VEZ = "el nombre completo de una tarea, una sola vez por mensaje"
 RENGLON_CORTO = f"ningún renglón de más de {RENGLON_MAXIMO} caracteres"
