@@ -208,10 +208,11 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
    primera".** Como hoy, quien carga por la puerta de administración declara quién la decidió y la
    auditoría guarda las dos cosas (la cargó Ariel, la decidió Ismael); sólo se puede elegir a quien
    tiene autoridad sobre esa tarea según la jerarquía: Dirección o el referente del área.
-3. **Quién es "su referente" para aprobar una propuesta.** La base tiene dos datos: el referente del
-   área y quién aprueba a cada persona (que puede ser de otra área: "Marcos aprueba a Nahuel aunque
-   estén en áreas distintas"). Ejemplo: si no coinciden, ¿quién aprueba "Comprar los tornillos" de
-   Nahuel?
+3. ~~**Quién es "su referente" para aprobar una propuesta.**~~ **Decidido (usuario, 2026-10-13):
+   "quien revisa su trabajo".** La propuesta de un integrante la aprueba quien revisa su trabajo (el
+   `aprobado_por` de la persona en el pack, el mismo que aprueba sus entregas), no el referente del
+   área. Cuando coinciden, que es lo normal, no cambia nada; así proponer, entregar y aprobar pasan
+   por la misma persona.
 4. **Qué le falta a una propuesta.** Ejemplo: Nahuel propone "Comprar los tornillos" sin criterio de
    aceptación; ¿la web no la guarda, o el referente la completa al aprobarla?
 5. **El rechazo de una propuesta.** Ejemplo: Marcos no aprueba "Comprar los tornillos"; ¿cómo se
