@@ -98,7 +98,7 @@ jugadas y la marca en `enqueue_outbox` y el despachador; (5) el ofrecimiento una
 
 Ruta de cada una: delegada (un escritor), porque toca la base, el motor y el corredor.
 
-- [ ] **A-1 · La conversación 50** (`.md` y `.yaml`) y la clave nueva del corredor para el enlace de la
+- [x] **A-1 · La conversación 50** (`.md` y `.yaml`) y la clave nueva del corredor para el enlace de la
       web. RED: el corredor en seco falla.
 - [ ] **A-2 · El vencimiento de 24 horas** (`0065`, su rollback y sus garantías).
 - [ ] **A-3 · Las dos jugadas y la marca del enlace** en la respuesta y el despachador.
@@ -121,3 +121,27 @@ túnel, tarea aparte).
   construye de forma autónoma después de las correcciones de la prueba por Telegram
   (`correcciones-prueba-telegram.md`); frena antes del túnel y de la prueba en el celular, que necesitan
   al usuario.
+- **A-1, hecha** (escritor delegado; `b6dc364`). La 50 (`50-el-acceso-a-la-web.md`/`.yaml`), los 7 pasos
+  aceptados; empieza el lunes 19/10, Ariel con la sesión abierta (clave nueva del mundo
+  `sesion_web_abierta`, que emite y canjea el enlace como el botón "Entrar"). El corredor reconoce
+  `https://leda.invalid/app/entrar/<token>` (`ENLACE_WEB_DE_PRUEBA`), con `Salida.enlace_web`, la clave
+  `enlace_web` en los pasos y en `salen`, y dos garantías nuevas (sin vista previa; la dirección no queda
+  en lo que escribió la IA), en `comprobar_los_enlaces()`; `comprobar.py` ve tres efectos nuevos
+  (`enlaces_de_entrada`, `enlaces_anulados`, `sesiones_cortadas`), y uno no esperado es falla de
+  garantía (así el paso 5 prueba que no se cortó nada). RED: la 50 en seco, 15 fallas (las jugadas
+  `fuera_de_la_lista`, sin significado, sin enlace ni ofrecimiento). `test_la_50_en_seco_pasa_entera`,
+  `xfail(strict=True)` hasta la A-4. `tests/conversaciones` 225 passed y 1 xfailed; en seco 49 de 50
+  (sólo la 50). **RDD:** `review-5bf7c9c04fe0c32f`, aprobada; advertencia: el `xfail` no fija qué falla
+  (`test_corredor.py:913-924`); sugerencias: el motivo del enlace anulado no se mira, una consulta de
+  sesiones sin filtrar por espacio en una prueba.
+  **Lo que la 50 espera de la A-2 a la A-4:** paso 1, un segundo hecho `{ofrecimiento: acceso_a_la_web,
+  lleva_el_enlace_de_entrada_a_la_web, sirve_una_sola_vez, vence_a_las_24_horas}`; paso 4,
+  `{jugada: pedir_acceso_web, resultado: enlace_nuevo, lleva_el_enlace_de_entrada_a_la_web,
+  sirve_una_sola_vez, vence_a_las_24_horas, el_anterior_ya_no_sirve}`, un enlace emitido y uno anulado;
+  paso 6, `{jugada: perdi_el_celular, resultado: acceso_cortado, sesiones_cortadas: 0,
+  recuerda_cerrar_telegram_en_ese_celular, puede_pedir_otro_enlace}`, un enlace anulado; paso 7, sin
+  `ofrecimiento`; cada clave con su significado; el enlace se emite al despachar. **Riesgos:** en el
+  corredor todos "nunca entraron", así que la A-4 necesita que el corredor dé por ofrecido a todos salvo
+  que el YAML diga otra cosa; `emitido_en` usa el `now()` real, así que las 24 horas se prueban en las
+  garantías deterministas, no en el corredor.
+
