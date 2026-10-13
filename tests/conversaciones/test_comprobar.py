@@ -1044,3 +1044,63 @@ def test_un_nombre_se_compara_sin_mayusculas_ni_acentos():
                                    "fecha": "2026-10-30"},
                                   {"nombre": "anotar_prevision", "tarea": "plc",
                                    "fecha": "2026-10-30"}, "la termino el 30")
+
+
+# --- El acceso a la web (la 50; `odd/tasks/acceso-por-chat.md`, A-1) ---------------------------
+
+def _foto_de_la_web(enlaces: dict | None = None, sesiones: dict | None = None) -> dict:
+    """Una foto sin nada más que el acceso a la web: los enlaces de entrada y las sesiones."""
+    return {"estados": {}, "previsiones": {}, "bloqueos": {}, "destraban": {},
+            "dicen_quien_destraba": {}, "avisos": {}, "salidas": {}, "incidentes": {},
+            "avisos_admin": 0, "avances": {}, "evidencias": {}, "archivos_de_tarea": {},
+            "aprobaciones": {}, "confirmadas": {}, "compartidas": {}, "apodos": {},
+            "enlaces_de_entrada": enlaces or {}, "sesiones_web": sesiones or {}}
+
+
+def test_los_efectos_del_acceso_a_la_web_son_lo_emitido_lo_anulado_y_lo_cortado_en_el_paso():
+    antes = _foto_de_la_web(
+        {"e1": {"de": "Marcos", "anulado": False}, "e0": {"de": "Ariel", "anulado": False}},
+        {"s0": {"de": "Ariel", "cortada": False, "motivo": None}})
+    # Un enlace nuevo de Marcos anula el suyo sin usar; el de Ariel, ya canjeado, no cambia.
+    despues = _foto_de_la_web(
+        {"e1": {"de": "Marcos", "anulado": True}, "e0": {"de": "Ariel", "anulado": False},
+         "e2": {"de": "Marcos", "anulado": False}},
+        {"s0": {"de": "Ariel", "cortada": False, "motivo": None}})
+
+    hubo = cp.efectos(antes, despues)
+
+    assert hubo["enlaces_de_entrada"] == [{"de": "Marcos"}]
+    assert hubo["enlaces_anulados"] == [{"de": "Marcos"}]
+    assert hubo["sesiones_cortadas"] == []
+    # Lo que ya estaba anulado o cortado antes del paso no es un efecto del paso.
+    cortada = _foto_de_la_web(despues["enlaces_de_entrada"],
+                              {"s0": {"de": "Ariel", "cortada": True,
+                                      "motivo": "perdio_el_celular"}})
+    hubo = cp.efectos(despues, cortada)
+    assert (hubo["enlaces_de_entrada"], hubo["enlaces_anulados"]) == ([], [])
+    assert hubo["sesiones_cortadas"] == [{"de": "Ariel", "motivo": "perdio_el_celular"}]
+    assert cp.efectos(cortada, cortada)["sesiones_cortadas"] == []
+
+
+def test_un_acceso_a_la_web_de_mas_es_de_garantia_y_uno_que_falta_de_comprension():
+    """Nadie recibe ni pierde el acceso a la web sin haberlo pedido o sin que se le ofrezca: un
+    enlace emitido, uno anulado o una sesión cortada de más son de garantía (la 50, paso 5: "casi
+    pierdo el celular" no corta nada); uno esperado que no pasó, de comprensión."""
+    for nombre, que, fila in (
+            ("enlaces_de_entrada", "enlace de entrada a la web", {"de": "Marcos"}),
+            ("enlaces_anulados", "enlace de entrada a la web anulado", {"de": "Marcos"}),
+            ("sesiones_cortadas", "sesión de la web cortada",
+             {"de": "Marcos", "motivo": "perdio_el_celular"})):
+        sobra = cp.Comprobacion()
+        assert cp.comprobar_efectos(sobra, {}, _hubo(**{nombre: [fila]}), {}) == (True, False)
+        assert [(f.clase, f.que) for f in sobra.fallas] == [(cp.GARANTIA, f"efecto de más: {que}")]
+
+        falta = cp.Comprobacion()
+        assert cp.comprobar_efectos(falta, {nombre: [fila]}, _hubo(), {}) == (False, True)
+        assert [(f.clase, f.que) for f in falta.fallas] == [
+            (cp.COMPRENSION, f"falta un efecto: {que}")]
+
+        bien = cp.Comprobacion()
+        assert cp.comprobar_efectos(bien, {nombre: [fila]}, _hubo(**{nombre: [fila]}),
+                                    {}) == (False, False)
+        assert bien.fallas == []

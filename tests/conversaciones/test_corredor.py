@@ -47,7 +47,7 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_cuarenta_y_siete_conversaciones_y_cada_una_nombra_su_fuente():
+def test_hay_cincuenta_conversaciones_y_cada_una_nombra_su_fuente():
     # La 21 y la 22 corren desde la porción 2 de la C-3 (la entrega), la 23 desde la 3b (la
     # aprobación), la 24 desde la 3c (quien aprueba no contesta), la 27 desde la D3 de la C-3d
     # (la entrega frente al criterio), la 28 y la 29 desde la D4 (las entregas en listas y si
@@ -67,10 +67,10 @@ def test_hay_cuarenta_y_siete_conversaciones_y_cada_una_nombra_su_fuente():
     # encargado anterior (el sector que se queda sin encargado), y la 49 desde las decisiones 57
     # a 60 (la administración retira una pieza), y la 47 desde la tercera porción de los apodos
     # (ADR 0020; decisión 65), y la 51 desde la T7 de las correcciones de la prueba por
-    # Telegram (dejar una entrega sin terminar); la 50 está reservada para el acceso a la web.
+    # Telegram (dejar una entrega sin terminar), y la 50 desde la A-1 del acceso a la web por chat
+    # (`odd/tasks/acceso-por-chat.md`).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 52)
-                                            if n not in (46, 50)]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 52) if n != 46]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]
@@ -805,3 +805,120 @@ def test_una_operacion_que_la_administracion_no_hace_es_un_error_del_yaml(conn):
     corrida = correr_conversacion(conn, otra, _perfecta(otra))
 
     assert corrida.error is not None and "borrar_la_tarea" in corrida.error
+
+
+# --- El acceso a la web (la 50; `odd/tasks/acceso-por-chat.md`, A-1) ---------------------------
+
+_DIRECCION = "https://leda.invalid"
+
+
+def test_los_enlaces_del_final_se_sacan_de_lo_entregado_y_se_dice_cuales_eran():
+    """El despachador agrega al final el enlace de la página de una tarea o el de entrada a la web
+    (`web_app.enlace`: `<base>/app/entrar/<token>`): lo entregado se compara sin ellos."""
+    from tests.conversaciones.corredor import _sin_los_enlaces
+
+    assert _sin_los_enlaces("Hola") == ("Hola", False, False)
+    assert _sin_los_enlaces(f"Hola\n{_DIRECCION}/tarea/abc_D-1") == ("Hola", True, False)
+    assert _sin_los_enlaces(f"Hola\n{_DIRECCION}/app/entrar/abc_D-1") == ("Hola", False, True)
+    # Uno solo por mensaje (decisión 2 del acceso por chat); si llevara los dos, se verían.
+    assert _sin_los_enlaces(f"Hola\n{_DIRECCION}/tarea/a\n{_DIRECCION}/app/entrar/b") == (
+        "Hola", True, True)
+    # Otra dirección, o una en el medio del texto, no es un enlace que agregó el despachador.
+    assert _sin_los_enlaces("Hola\nhttps://otra.invalid/app/entrar/b")[1:] == (False, False)
+    assert _sin_los_enlaces(f"{_DIRECCION}/app/entrar/b\nHola")[1:] == (False, False)
+
+
+def test_el_enlace_de_entrada_a_la_web_sale_sin_vista_previa_y_nunca_en_lo_que_escribio_la_ia():
+    """Las dos garantías del enlace de la página de una tarea valen también para el de entrada a
+    la web: sin vista previa, y la IA nunca escribe su dirección."""
+    from tests.conversaciones.corredor import Salida, comprobar_los_enlaces
+
+    def fallas(**salida) -> list[tuple[str, str]]:
+        c = cp.Comprobacion()
+        comprobar_los_enlaces(c, Salida("Marcos", "Hola", [], True, redactado="Hola", **salida))
+        return [(f.clase, f.que) for f in c.fallas]
+
+    assert fallas(enlace_web=True, sin_vista_previa=True) == []
+    assert fallas(enlace_web=True, sin_vista_previa=False) == [
+        (cp.GARANTIA, "el enlace de entrada a la web sale sin vista previa")]
+    assert fallas(enlace_web=False) == []
+    c = cp.Comprobacion()
+    comprobar_los_enlaces(c, Salida("Marcos", "Hola", [], True,
+                                    redactado=f"Entrá acá: {_DIRECCION}/app/entrar/abc"))
+    assert [(f.clase, f.que) for f in c.fallas] == [
+        (cp.GARANTIA, "el enlace de entrada a la web no queda en la salida")]
+    # La del enlace de la página de una tarea sigue igual.
+    assert fallas(enlace=True, sin_vista_previa=False) == [
+        (cp.GARANTIA, "el enlace a la página sale sin vista previa")]
+
+
+def test_lo_que_leda_manda_por_su_cuenta_puede_esperar_el_enlace_de_entrada_a_la_web():
+    """`enlace_web` en lo que sale (`salen`), como `enlace`: un aviso que Leda manda por su cuenta
+    nunca lleva el ofrecimiento (la 50, paso 7)."""
+    from tests.conversaciones.corredor import Salida, _sale_coincide
+
+    aviso = Salida("Marcos", "Aviso", [], False, tipo="aviso_previo", tareas=["PLC"])
+    assert _sale_coincide({"a": "Marcos", "tipo": "aviso_previo", "enlace_web": False}, aviso)
+    assert not _sale_coincide({"a": "Marcos", "tipo": "aviso_previo", "enlace_web": True}, aviso)
+    aviso.enlace_web = True
+    assert not _sale_coincide({"a": "Marcos", "enlace_web": False}, aviso)
+    # Sin la clave, no se mira.
+    assert _sale_coincide({"a": "Marcos", "tipo": "aviso_previo"}, aviso)
+
+
+def test_una_sesion_de_la_web_abierta_antes_de_la_conversacion_queda_abierta_y_no_es_un_efecto(
+        conn):
+    """`sesion_web_abierta` (la 50): la persona ya entró a la web antes de la conversación. Su
+    enlace se emite y se canjea al cargar el estado inicial, por las funciones de la web, así
+    queda con una sesión abierta que ningún paso cuenta como efecto."""
+    [conv] = elegir(["01"])
+    otra = copy.deepcopy(conv)
+    otra["sesion_web_abierta"] = ["Ariel"]
+
+    corrida = correr_conversacion(conn, otra, _perfecta(otra))
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    with admin(conn) as cur:
+        cur.execute("""select u.nombre, s.cortada_en, e.canjeado_en
+                         from sesion_web s
+                         join enlace_de_entrada e on e.id = s.enlace_id
+                         join membership m on m.id = s.membership_id
+                         join app_user u on u.id = m.app_user_id""")
+        sesiones = cur.fetchall()
+    conn.commit()
+    assert [(s["nombre"], s["cortada_en"] is None, s["canjeado_en"] is not None)
+            for s in sesiones] == [("Ariel De Simone", True, True)]
+
+
+def test_el_enlace_de_entrada_a_la_web_que_espera_un_paso_se_compara_con_su_respuesta(conn):
+    """`enlace_web` en un paso escrito, como `enlace`: la respuesta que no lo lleva y lo tenía que
+    llevar es una diferencia del código, con las jugadas esperadas (la 31, paso 1)."""
+    [conv] = elegir(["31"])
+    otra = copy.deepcopy(conv)
+    otra["pasos"] = otra["pasos"][:1]
+
+    corrida = correr_conversacion(conn, otra, _perfecta(otra))
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    [respuesta] = corrida.pasos[0].salidas
+    assert respuesta.enlace and not respuesta.enlace_web
+
+    _limpiar(conn)
+    otra["pasos"][0]["enlace_web"] = True
+    corrida = correr_conversacion(conn, otra, _perfecta(otra))
+    assert corrida.error is None
+    assert [(f.clase, f.que, f.esperado, f.real) for _, f in corrida.fallas()] == [
+        (cp.MOTOR, "enlace_web de la respuesta", True, False)]
+
+
+@pytest.mark.xfail(strict=True,
+                   reason="A-3/A-4: las jugadas del acceso a la web todavía no existen")
+def test_la_50_en_seco_pasa_entera(conn):
+    """El RED de la A-1 (`odd/tasks/acceso-por-chat.md`): con las jugadas esperadas, la 50 falla
+    hasta que la A-3 construya `pedir_acceso_web`, `perdi_el_celular` y la marca del enlace de
+    entrada, y la A-4 el ofrecimiento una sola vez. Estricta: cuando pase, la suite lo dice, y se
+    le saca la marca."""
+    [conv] = elegir(["50"])
+
+    corrida = correr_conversacion(conn, conv, _perfecta(conv))
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()

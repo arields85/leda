@@ -258,6 +258,19 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                                  "canal": f["canal"], "auditado": f["auditado"],
                                  "vigente": f["borrado_en"] is None}
                   for f in cur.fetchall()}
+        # El acceso a la web (ADR 0022, decisión 4; la 50): cada enlace de entrada, de quién y
+        # si quedó anulado sin usarse, y cada sesión, de quién y si se cortó, con su motivo.
+        cur.execute("""select id, membership_id, anulado_en from enlace_de_entrada
+                        where workspace_id = %s""", (ws,))
+        enlaces_de_entrada = {str(f["id"]): {"de": persona(f["membership_id"]),
+                                             "anulado": f["anulado_en"] is not None}
+                              for f in cur.fetchall()}
+        cur.execute("""select id, membership_id, cortada_en, motivo_de_corte from sesion_web
+                        where workspace_id = %s""", (ws,))
+        sesiones_web = {str(f["id"]): {"de": persona(f["membership_id"]),
+                                       "cortada": f["cortada_en"] is not None,
+                                       "motivo": f["motivo_de_corte"]}
+                        for f in cur.fetchall()}
         cur.execute("""select id, task_id from archivo_de_tarea where workspace_id = %s""",
                     (ws,))
         archivos_de_tarea = {str(f["id"]): {"tarea": tarea(f["task_id"])}
@@ -304,7 +317,8 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
             "esperas": esperas, "preguntas": preguntas, "ultimo_aviso": ultimo_aviso,
             "evidencias": evidencias, "archivos_de_tarea": archivos_de_tarea,
             "aprobaciones": aprobaciones, "confirmadas": confirmadas,
-            "compartidas": compartidas, "apodos": apodos}
+            "compartidas": compartidas, "apodos": apodos,
+            "enlaces_de_entrada": enlaces_de_entrada, "sesiones_web": sesiones_web}
 
 
 def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
@@ -339,6 +353,17 @@ def efectos(antes: dict[str, Any], despues: dict[str, Any]) -> dict[str, Any]:
         "confirmadas": nuevas("confirmadas"),
         "compartidas": nuevas("compartidas"),
         "apodos": nuevas("apodos"),
+        # El acceso a la web (la 50): los enlaces de entrada emitidos, los que quedaron anulados
+        # sin usarse y las sesiones cortadas, con su motivo.
+        "enlaces_de_entrada": [{"de": v["de"]} for v in nuevas("enlaces_de_entrada")],
+        "enlaces_anulados": [{"de": v["de"]}
+                             for k, v in despues.get("enlaces_de_entrada", {}).items()
+                             if v["anulado"] and not antes.get("enlaces_de_entrada", {}).get(
+                                 k, {}).get("anulado")],
+        "sesiones_cortadas": [{"de": v["de"], "motivo": v["motivo"]}
+                              for k, v in despues.get("sesiones_web", {}).items()
+                              if v["cortada"] and not antes.get("sesiones_web", {}).get(
+                                  k, {}).get("cortada")],
     }
 
 
@@ -832,6 +857,13 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
     # Un apodo aprendido (ADR 0020): uno de más es de garantía (Leda no aprende un apodo sin la
     # confirmación de una persona).
     filas("apodos", hubo.get("apodos") or [], "apodo aprendido")
+    # El acceso a la web (ADR 0022, decisión 4; la 50): un enlace de entrada emitido, uno anulado
+    # o una sesión cortada de más son de garantía (nadie recibe ni pierde el acceso sin haberlo
+    # pedido o sin que se le ofrezca).
+    filas("enlaces_de_entrada", hubo.get("enlaces_de_entrada") or [], "enlace de entrada a la web")
+    filas("enlaces_anulados", hubo.get("enlaces_anulados") or [],
+          "enlace de entrada a la web anulado")
+    filas("sesiones_cortadas", hubo.get("sesiones_cortadas") or [], "sesión de la web cortada")
     al_admin_e = esperados.get("avisos_al_administrador", 0)
     fuera = [i for i in hubo["incidentes"] if i["etapa"] == ETAPA_FUERA_DE_LA_LISTA]
     if len(fuera) != al_admin_e:

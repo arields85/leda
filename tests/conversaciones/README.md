@@ -155,6 +155,17 @@ La página de la tarea (ADR 0019, decisión 7):
     cambia y la cocina le pasa a la IA que la pieza la retiró la administración, no Marcos; nadie
     nombra a quien la retiró (decisiones 57 a 60; constitución §4).
 
+El acceso a la web (ADR 0022, decisión 4; `odd/tasks/acceso-por-chat.md`):
+
+50. [`50-el-acceso-a-la-web.md`](50-el-acceso-a-la-web.md): Marcos nunca entró a la web y Ariel
+    ya tiene la sesión abierta. A Marcos, Leda le ofrece el acceso una sola vez, al final de su
+    respuesta, con el enlace y el aviso de que sirve una vez y vence en 24 horas; a Ariel, no. A
+    pedido, un enlace nuevo, y el anterior deja de servir; "casi pierdo el celular" no corta nada
+    y "perdí el celular" corta enseguida, sin botones, y Leda recuerda cerrar Telegram en ese
+    celular desde Ajustes → Dispositivos; un aviso que Leda manda por su cuenta nunca lleva el
+    ofrecimiento (decisiones 1 a 3 del usuario, 2026-10-12). Hasta la A-3 y la A-4, su corrida
+    en seco falla (el RED de la A-1).
+
 La persecución del bloqueo (ADR 0017, decisión 3a; `odd/tasks/fase-c.md`, decisiones 4 a 7):
 
 32. [`32-escribirle-a-quien-destraba.md`](32-escribirle-a-quien-destraba.md): Marcos dice quién
@@ -463,6 +474,19 @@ los de un turno (`efectos`): uno de más es de garantía y uno que falta es del 
 comprensión, porque nadie eligió jugadas; `hechos` compara lo que hizo. No lleva la casilla del
 próximo paso: no es un mensaje de Leda. Lo que Leda manda después va en un paso con `relojes`.
 
+**El acceso a la web** (ADR 0022, decisión 4; la 50): el estado inicial puede nombrar a las
+personas que ya entraron a la web antes de la conversación (`sesion_web_abierta`, una lista): su
+enlace de entrada se emite y se canjea al cargarlo, con las funciones de la web
+(`web_app.emitir_enlace` y `canjear_enlace_de_entrada`), y queda una sesión abierta que ningún
+paso cuenta como efecto. Un paso escrito o tocado, y lo que Leda manda por su cuenta, puede esperar
+el enlace de entrada a la web al final (`enlace_web`), como el de la página de una tarea
+(`enlace`): el despachador lo agrega al mandar (`<dirección>/app/entrar/<token>`), y las mismas
+dos garantías valen para él: sale sin vista previa, y nunca está en lo que escribió la IA. Los
+efectos suman los enlaces de entrada emitidos (`enlaces_de_entrada`, de quién), los que quedaron
+anulados sin usarse (`enlaces_anulados`) y las sesiones cortadas (`sesiones_cortadas`, de quién y
+con qué motivo): uno de más es de garantía, porque nadie recibe ni pierde el acceso sin pedirlo o
+sin que se le ofrezca.
+
 **Otra lectura válida de un mensaje** (`o_bien`; decisión 63, la 34, paso 7): cuando lo que una
 persona escribe admite dos lecturas que llevan al mismo lugar ("ni idea yo eso no lo manejo": la IA
 lee que no sabe, o no lo lee y Leda pregunta una vez quién se encarga), el paso declara la otra con
@@ -629,6 +653,10 @@ importa es el significado:
 - `pedir_enlace`: la persona pide el enlace a la página de una tarea; sale sólo si puede verla
   (conversación 31). Si no puede, Leda le da el resumen y le ofrece pedir el detalle
   (decisión 33; conversación 45).
+- `pedir_acceso_web`: la persona pide su enlace de entrada a la web; sale uno nuevo, que sirve una
+  vez y vence en 24 horas, y el anterior sin usar deja de servir (conversación 50).
+- `perdi_el_celular`: la persona dice que perdió el celular; Leda le corta el acceso a la web
+  enseguida, sin confirmación, y le recuerda cerrar Telegram en ese celular (conversación 50).
 - `pedir_el_detalle`: la persona acepta que Leda le pida el detalle de una tarea que no le toca
   ver al encargado del sector de la tarea, que decide si se la comparte (conversación 45).
 - `contestar_el_pedido_del_detalle`: el encargado dice si le comparte la tarea a quien pidió el

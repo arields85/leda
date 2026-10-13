@@ -1,0 +1,209 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/50-el-acceso-a-la-web.md
+numero: "50"
+titulo: "El acceso a la web"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-19 09:00"
+
+# Ariel ya entró a la web antes de la conversación: su enlace, emitido y canjeado por una sesión
+# abierta (`corredor._abrir_sesiones_web`). Marcos nunca entró.
+sesion_web_abierta: [Ariel]
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-26"
+    estado: asignada
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  INT:
+    titulo: Integrar datos de la comprimidora en CoreLabs
+    criterio: "Los datos de la comprimidora se ven en CoreLabs, con menos de un minuto de demora, durante una jornada de producción"
+    responsable: Ariel
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+
+# El ofrecimiento (decisión 2 del usuario) no es una jugada: es un hecho que la cocina suma al
+# final del turno, con la marca del enlace, si la persona nunca entró ni se le ofreció. El enlace
+# de entrada a la web lo emite el despachador al mandar (`enlaces_de_entrada`) y lo agrega al
+# final, sin vista previa (`enlace_web`); la IA nunca lo ve ni lo escribe.
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-19 10:30"
+    escribe: "que tengo pendiente?"
+    jugadas:
+      - {nombre: consultar_pendientes}
+    efectos:
+      enlaces_de_entrada: [{de: Marcos}]
+    hechos:
+      - jugada: consultar_pendientes
+        resultado: leido
+        tareas:
+          - {titulo: PLC, estado: asignada, vence: "2026-10-26"}
+          - {titulo: COM, estado: en_curso, vence: "2026-10-30"}
+      - {ofrecimiento: acceso_a_la_web, lleva_el_enlace_de_entrada_a_la_web: true,
+         sirve_una_sola_vez: true, vence_a_las_24_horas: true}
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: true
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - "sus dos tareas: la del PLC sin empezar, que vence el lun 26/10; la de comunicaciones en curso, que vence el vie 30/10"
+      - al final, que ahora también puede ver sus tareas en la web, que ahí va el enlace, que sirve una vez y vence en 24 horas, y que si no lo usa le pida otro
+    no_dice:
+      - tareas de otras personas
+      - una dirección o un enlace escrito por la IA
+
+  # Ya se le ofreció: no se vuelve a ofrecer.
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-19 10:35"
+    escribe: "dale gracias"
+    jugadas: []
+    efectos: {}
+    hechos: []
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: false
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - contesta el agradecimiento, breve
+    no_dice:
+      - el acceso a la web otra vez
+
+  # Ariel ya entró a la web: no se le ofrece, y su sesión sigue abierta.
+  - paso: 3
+    quien: Ariel
+    a_las: "2026-10-19 10:40"
+    escribe: "que tengo pendiente?"
+    jugadas:
+      - {nombre: consultar_pendientes}
+    efectos: {}
+    hechos:
+      - jugada: consultar_pendientes
+        resultado: leido
+        tareas:
+          - {titulo: INT, estado: en_curso, vence: "2026-10-30"}
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: false
+    estado_despues:
+      de: Ariel
+      pregunta_abierta: null
+    dice:
+      - "su tarea: la de integrar los datos en CoreLabs, en curso, que vence el vie 30/10"
+    no_dice:
+      - el acceso a la web
+      - tareas de otras personas
+
+  # Un enlace nuevo a pedido: el del paso 1, sin usar, deja de servir (`emitir_enlace_de_entrada`
+  # lo anula al emitir el nuevo).
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-20 10:30"
+    escribe: "no me anda el link de la web, pasame otro"
+    jugadas:
+      - {nombre: pedir_acceso_web}
+    efectos:
+      enlaces_de_entrada: [{de: Marcos}]
+      enlaces_anulados: [{de: Marcos}]
+    hechos:
+      - {jugada: pedir_acceso_web, resultado: enlace_nuevo,
+         lleva_el_enlace_de_entrada_a_la_web: true, sirve_una_sola_vez: true,
+         vence_a_las_24_horas: true, el_anterior_ya_no_sirve: true}
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: true
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que ahí va el enlace nuevo, que sirve una vez y vence en 24 horas
+      - que el anterior ya no sirve
+    no_dice:
+      - que el enlace anterior tenía un problema técnico
+      - cómo funciona el enlace por dentro
+      - una dirección o un enlace escrito por la IA
+
+  # Una charla, no un aviso: no corta nada (el enlace del paso 4 sigue sirviendo).
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-20 10:40"
+    escribe: "casi pierdo el celular en el colectivo jaja"
+    jugadas: []
+    efectos: {}
+    hechos: []
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: false
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - contesta con naturalidad
+    no_dice:
+      - que le cortó el acceso a la web
+      - el acceso a la web otra vez
+
+  # Corta enseguida, sin confirmación (decisión 3 del usuario): no tiene ninguna sesión abierta,
+  # así que se anula su enlace sin usar, el del paso 4. La sesión de Ariel no se toca.
+  - paso: 6
+    quien: Marcos
+    a_las: "2026-10-20 10:50"
+    escribe: "perdi el celular"
+    jugadas:
+      - {nombre: perdi_el_celular}
+    efectos:
+      enlaces_anulados: [{de: Marcos}]
+    hechos:
+      - {jugada: perdi_el_celular, resultado: acceso_cortado, sesiones_cortadas: 0,
+         recuerda_cerrar_telegram_en_ese_celular: true, puede_pedir_otro_enlace: true}
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: false
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que le cortó el acceso a la web
+      - que cierre Telegram en ese celular desde otro dispositivo, en Ajustes → Dispositivos
+      - que pida un enlace nuevo cuando tenga otro celular
+    no_dice:
+      - una confirmación o una pregunta antes de cortar
+      - el motivo con su código
+
+  # Lo que Leda manda por su cuenta nunca lleva el ofrecimiento (decisión 2 del usuario).
+  - paso: 7
+    quien: Leda
+    relojes: ["2026-10-21 10:00"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        enlace: false
+        enlace_web: false
+        hechos: {vence: "2026-10-26", necesita_respuesta: false,
+                 dias_habiles_hasta_el_vencimiento: 3, ofrecimiento: ausente}
+    estado_despues:
+      ultimo_aviso: {Marcos: PLC}
+    dice:
+      - el título de la tarea del PLC
+      - que vence el lunes 26
+      - que no hace falta contestar
+    no_dice:
+      - el acceso a la web

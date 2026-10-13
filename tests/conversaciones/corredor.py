@@ -32,6 +32,9 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
      (`OPERACIONES_DE_LA_ADMINISTRACION`), corrida como la corre la administración (la consola
      o la plataforma), con el reloj del paso; sus efectos se comparan como los de un turno, y
      lo que falta es del código, porque nadie eligió jugadas;
+   - **una persona ya entró a la web** antes de la conversación (`sesion_web_abierta`, una
+     lista de personas; la 50): su enlace de entrada se emite y se canjea al cargar el estado
+     inicial, así tiene una sesión abierta;
    - **otra lectura válida** del mensaje (`o_bien`; decisión 63; una lista si hay varias,
      decisión 75): si la IA eligió sus jugadas, el paso se compara con lo que ella espera y
      corren sus pasos (`luego`) antes de seguir (`comprobar.elegir_lectura`);
@@ -87,6 +90,13 @@ DIRECCION_DE_PRUEBA = "https://leda.invalid"
 # El botón que muestra la entrega de una tarea (`avisos.boton_para_ver`): en el YAML, "Ver <clave>".
 VER = "Ver "
 ENLACE_DE_PRUEBA = re.compile(r"\n" + re.escape(DIRECCION_DE_PRUEBA) + r"/tarea/[A-Za-z0-9_-]+$")
+# El enlace de entrada a la web (ADR 0022, decisión 4; `web_app.enlace`): el despachador lo agrega
+# al final, como el de la página de una tarea, cuando la respuesta lleva su marca (el ofrecimiento
+# o `pedir_acceso_web`; la 50). La IA nunca escribe ninguno de los dos.
+ENLACE_WEB_DE_PRUEBA = re.compile(r"\n" + re.escape(DIRECCION_DE_PRUEBA)
+                                  + r"/app/entrar/[A-Za-z0-9_-]+$")
+# Cómo se reconoce cada enlace en lo que escribió la IA, donde nunca tiene que estar.
+CAMINO_DE_LA_TAREA, CAMINO_DE_LA_WEB = "/tarea/", "/app/entrar/"
 # Lo que la administración puede hacer en el medio de una conversación (`administracion`, con
 # `hace`): una lista cerrada, cada una con el método del corredor que la corre como la corre la
 # administración (la consola o la plataforma).
@@ -193,6 +203,9 @@ class Salida:
     # decisión 6), y si salió sin vista previa. El texto de la salida nunca lo lleva.
     enlace: bool = False
     sin_vista_previa: bool = False
+    # El enlace de entrada a la web (la 50), que el despachador también agrega al final al mandar,
+    # sin vista previa. El texto de la salida tampoco lo lleva.
+    enlace_web: bool = False
 
 
 @dataclass
@@ -284,6 +297,34 @@ class _Corredor:
                                     seguimiento=False, imprimir=callar)
         self.foco = set(conv.get("foco") or self.mundo.tareas)
         self.enlazadas: set[str] = set()     # filas del outbox ya enlazadas a un entregado
+        self._abrir_sesiones_web(conv.get("sesion_web_abierta") or [])
+
+    def _abrir_sesiones_web(self, personas: list[str]) -> None:
+        """Las personas que ya entraron a la web antes de la conversación (`sesion_web_abierta`;
+        la 50): su enlace de entrada, emitido como lo emite la consola (`web_app.emitir_enlace`,
+        en el espacio) y canjeado como lo canjea el botón "Entrar" (`canjear_enlace_de_entrada`,
+        antes de saber el espacio), así cada una queda con una sesión abierta. Con el reloj de
+        la base, no con el de la corrida: es lo de antes, y ningún paso lo compara."""
+        import secrets
+
+        from leda import web_app
+        from leda.db import sin_espacio
+
+        for corto in personas:
+            persona = self.mundo.personas[corto]
+            with espacio(self.conn, self.mundo.workspace_id) as cur:
+                token = web_app.emitir_enlace(cur, persona["membership_id"])
+            self.conn.commit()
+            if token is None:
+                raise ValueError(f"La base no emitió el enlace de entrada de {corto}.")
+            with sin_espacio(self.conn) as cur:
+                web_app._con_la_version_del_nucleo(cur)
+                cur.execute("select canjear_enlace_de_entrada(%s, %s) as id",
+                            (web_app._hash(token), web_app._hash(secrets.token_urlsafe(32))))
+                sesion = cur.fetchone()["id"]
+            self.conn.commit()
+            if sesion is None:
+                raise ValueError(f"La base no canjeó el enlace de entrada de {corto}.")
 
     # -- el paso ---------------------------------------------------------------------------
 
@@ -633,10 +674,9 @@ class _Corredor:
                     salidas.append(Salida(quien, "", [], False, el=cp.dia(self.reloj.ahora()),
                                           fotos=len(e.fotos), album_suelto=True))
                 continue
-            # El enlace a la página de la tarea va al final de lo que se entregó, nunca en la
-            # salida: se compara sin él.
-            enlace = ENLACE_DE_PRUEBA.search(e.texto)
-            entregado = e.texto[:enlace.start()] if enlace else e.texto
+            # El enlace a la página de la tarea y el de entrada a la web van al final de lo que se
+            # entregó, nunca en la salida: se compara sin ellos.
+            entregado, enlace, enlace_web = _sin_los_enlaces(e.texto)
             # El outbox guarda el texto con las marcas de formato de la IA y el transporte
             # entrega el texto plano (`salida.formatear`): se comparan ya convertidos.
             fila_id = next((k for k, s in despues["salidas"].items()
@@ -663,8 +703,8 @@ class _Corredor:
                 tareas=list(dict.fromkeys(a["tarea"] for a in avisos if a["tarea"])),
                 hechos=(hechos[0] if len(hechos) == 1 else hechos) if hechos else None,
                 el=cp.dia(self.reloj.ahora()), tipos=tipos,
-                avisos=avisos, redactado=fila.get("cuerpo"), enlace=enlace is not None,
-                sin_vista_previa=e.sin_vista_previa))
+                avisos=avisos, redactado=fila.get("cuerpo"), enlace=enlace,
+                sin_vista_previa=e.sin_vista_previa, enlace_web=enlace_web))
         return salidas
 
     # -- lo que se comprueba ------------------------------------------------------------------
@@ -702,8 +742,9 @@ class _Corredor:
             if botones != list(paso.get("botones") or []):
                 c.falla(clase, "botones", list(paso.get("botones") or []), botones)
             # Lo que lleva la respuesta además del texto, si el paso lo dice (C-3d, D4): las fotos
-            # del álbum que sigue al texto y el enlace a la página de la tarea.
-            for que in ("fotos", "enlace"):
+            # del álbum que sigue al texto, el enlace a la página de la tarea y el de entrada a la
+            # web (la 50).
+            for que in ("fotos", "enlace", "enlace_web"):
                 if que in paso and respuestas and paso[que] != getattr(respuestas[0], que):
                     c.falla(clase, f"{que} de la respuesta", paso[que],
                             getattr(respuestas[0], que))
@@ -733,12 +774,7 @@ class _Corredor:
                 c.falla(cp.GARANTIA, "el álbum sale después de su texto", "texto y álbum",
                         _resumen(s))
                 continue
-            if s.enlace and not s.sin_vista_previa:
-                c.falla(cp.GARANTIA, "el enlace a la página sale sin vista previa",
-                        "sin vista previa", _resumen(s))
-            if s.redactado is not None and "/tarea/" in s.redactado:
-                c.falla(cp.GARANTIA, "el enlace a la página no queda en la salida",
-                        "sin el enlace", _resumen(s))
+            comprobar_los_enlaces(c, s)
             cp.comprobar_formato(c, s.redactado if s.redactado is not None else s.texto,
                                  titulos.values(), a=s.a)
         return c
@@ -763,6 +799,25 @@ class _Corredor:
                 sobran.pop(i)
         for s in sobran:
             c.falla(cp.MOTOR, "salió algo de más", None, _resumen(s))
+
+
+def comprobar_los_enlaces(c: cp.Comprobacion, s: Salida) -> None:
+    """Las garantías de los enlaces que el despachador agrega al final de un mensaje: el de la
+    página de una tarea (ADR 0019, decisión 6) y el de entrada a la web (ADR 0022, decisión 4; la
+    50). Cada uno sale sin vista previa, y ninguno está en lo que escribió la IA: la IA nunca ve
+    ni escribe una dirección."""
+    if s.enlace and not s.sin_vista_previa:
+        c.falla(cp.GARANTIA, "el enlace a la página sale sin vista previa",
+                "sin vista previa", _resumen(s))
+    if s.redactado is not None and CAMINO_DE_LA_TAREA in s.redactado:
+        c.falla(cp.GARANTIA, "el enlace a la página no queda en la salida",
+                "sin el enlace", _resumen(s))
+    if s.enlace_web and not s.sin_vista_previa:
+        c.falla(cp.GARANTIA, "el enlace de entrada a la web sale sin vista previa",
+                "sin vista previa", _resumen(s))
+    if s.redactado is not None and CAMINO_DE_LA_WEB in s.redactado:
+        c.falla(cp.GARANTIA, "el enlace de entrada a la web no queda en la salida",
+                "sin el enlace", _resumen(s))
 
 
 def _avisos_del_envio(avisos: list[dict[str, Any]], titulos: dict[str, str]
@@ -857,6 +912,8 @@ def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -
         return False
     if "enlace" in e and bool(e["enlace"]) != s.enlace:
         return False
+    if "enlace_web" in e and bool(e["enlace_web"]) != s.enlace_web:
+        return False
     if "hechos" not in e:
         return True
     if not s.avisos:        # un envío sin avisos guardados detrás: sus hechos, como vinieron
@@ -878,7 +935,22 @@ def _lo_que_hace(que: dict[str, Any]) -> str:
 def _resumen(s: Salida) -> dict[str, Any]:
     return {"a": s.a, "tipo": s.tipo or s.tipos, "tareas": s.tareas, "el": s.el,
             "hechos": s.hechos, **({"fotos": s.fotos} if s.fotos else {}),
-            **({"enlace": True} if s.enlace else {})}
+            **({"enlace": True} if s.enlace else {}),
+            **({"enlace_web": True} if s.enlace_web else {})}
+
+
+def _sin_los_enlaces(texto: str) -> tuple[str, bool, bool]:
+    """Lo entregado sin los enlaces que el despachador agrega al final (el de la página de una
+    tarea y el de entrada a la web), y cuáles llevaba. Se sacan desde el final, en cualquier
+    orden: un mensaje lleva uno solo, pero si llevara los dos se verían los dos."""
+    enlace = enlace_web = False
+    while True:
+        if (m := ENLACE_DE_PRUEBA.search(texto)) is not None:
+            enlace, texto = True, texto[:m.start()]
+        elif (m := ENLACE_WEB_DE_PRUEBA.search(texto)) is not None:
+            enlace_web, texto = True, texto[:m.start()]
+        else:
+            return texto, enlace, enlace_web
 
 
 def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1,
