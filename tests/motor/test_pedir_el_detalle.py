@@ -33,7 +33,7 @@ from leda.motor.tiempo import RelojFijo
 
 from tests.conversaciones.carga import cargar
 from tests.motor.ayudantes import (AHORA, IAQueRedacta, administrador, avisos_guardados,
-                                   cuantas, octubre, todos, uno)
+                                   cuantas, octubre, todos, uno, ya_ofrecida_la_web)
 from tests.motor.test_aprobacion import Turnos
 
 DIRECCION = "https://leda.invalid/"
@@ -41,6 +41,14 @@ SWITCH = "Configurar el switch de la planta"
 SERVIDOR = "Instalar el servidor de la planta"
 LUCAS, MARTIN, NAHUEL, MARCOS = "Lucas Natuche", "Martín Forte", "Nahuel Gimenez", "Marcos Tarquini"
 PEDIDO, COMO_TERMINO = "pedido_del_detalle", "como_termino_el_pedido_del_detalle"
+
+
+def _ya_ofrecida_la_web(conn, workspace_id: str) -> None:
+    """La web ya se les ofreció a todos (`ayudantes.ya_ofrecida_la_web`): el mundo de las
+    conversaciones no lo hace, y el ofrecimiento iría en la primera respuesta."""
+    with admin(conn) as cur:
+        ya_ofrecida_la_web(cur, workspace_id)
+    conn.commit()
 
 
 @pytest.fixture
@@ -59,6 +67,7 @@ def equipo(conn, direccion) -> Turnos:
         "SRV": {"titulo": SERVIDOR, "responsable": "Lucas", "vence": "2026-10-23"},
         "PLC": {"titulo": "Programar el PLC", "responsable": "Marcos", "vence": "2026-10-16"},
     }})
+    _ya_ofrecida_la_web(conn, mundo.workspace_id)
     t = Turnos(conn, {"id": mundo.workspace_id, "personas": mundo.personas})
     t.carga = mundo
     return t

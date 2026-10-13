@@ -239,6 +239,12 @@ def _pide_por_chat(conn, mundo, persona: str, como_la_nombra: str) -> dict:
                     (ws, 4242 + len(persona), gente[persona]["telegram"],
                      gente[persona]["app_user_id"], AHORA))
         entrante = str(cur.fetchone()["id"])
+        # La web ya se le ofreció (decisión 2 del usuario, 2026-10-12): el ofrecimiento de una
+        # sola vez no es lo que mira esta prueba.
+        cur.execute("""insert into ofrecimiento_web (workspace_id, membership_id, reservado_en,
+                                                     ofrecido_en)
+                       values (%s, %s, now(), now()) on conflict do nothing""",
+                    (ws, gente[persona]["membership_id"]))
     conn.commit()
     ia = IAGuionada(jugadas=[[Jugada("pedir_enlace", {"como_la_nombra": como_la_nombra})]],
                     redacciones=["Listo."])

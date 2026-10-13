@@ -30,7 +30,7 @@ from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import procesar_toque, procesar_turno
 
 from tests.motor.ayudantes import (AHORA, VIERNES_16, IAQueRedacta, avisos_guardados, cuantas,
-                                   enviar, estado_de, todos, uno)
+                                   enviar, estado_de, todos, uno, ya_ofrecida_la_web)
 
 ENTREGADA = "Armar el tablero"
 DESPUES_DEL_MARGEN = AHORA + timedelta(minutes=20)
@@ -79,6 +79,7 @@ def _nahuel(conn, mundo) -> None:
         cur.execute("""insert into greeting_state (membership_id, workspace_id, ultima_fecha_local)
                        values (%s, %s, date '9999-12-31')""",
                     (mundo["personas"]["Nahuel"]["membership_id"], mundo["id"]))
+        ya_ofrecida_la_web(cur, mundo["id"])
     conn.commit()
 
 

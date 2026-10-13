@@ -28,6 +28,7 @@ from tests.motor.ayudantes import (ProveedorFalso, avisos_guardados, ia_real_fal
                                    respuesta_de_texto)
 from tests.motor.test_aprobacion import Turnos
 from tests.motor.test_pedir_el_detalle import direccion  # noqa: F401 -- el fixture
+from tests.motor.test_pedir_el_detalle import _ya_ofrecida_la_web
 
 HOY = "2026-10-14"
 VENCE = "2026-10-16"
@@ -118,6 +119,7 @@ def equipo(conn, direccion):  # noqa: F811 -- el fixture importado
         "DASH": {"titulo": DASHBOARD, "responsable": "Lucas", "vence": VENCE,
                  "estado": "terminada", "desde": "2026-10-01"},
     }})
+    _ya_ofrecida_la_web(conn, mundo.workspace_id)
     t = Turnos(conn, {"id": mundo.workspace_id, "personas": mundo.personas})
     t.carga = mundo
     return t
