@@ -233,7 +233,8 @@ def _el_pedido(cur, pedido_id: str) -> dict:
     """Un pedido con los nombres de quién lo pidió, quién tiene la tarea y quién lo decidió (o,
     mientras espera, a quién se le preguntó al pedirlo)."""
     cur.execute(
-        """select p.*, t.titulo, t.fecha_objetivo, t.area_id, pide.nombre pidio,
+        """select p.*, t.titulo, t.fecha_objetivo, t.estado::text estado_de_la_tarea, t.area_id,
+                  pide.nombre pidio,
                   tiene.nombre la_tiene,
                   decide.nombre decide
              from pedido_de_detalle p
@@ -251,12 +252,14 @@ def _el_pedido(cur, pedido_id: str) -> dict:
 
 
 def hechos_de_la_pregunta(pedido: dict, zona) -> dict[str, Any]:
-    """Lo que lleva la pregunta al encargado: quién pide ver el detalle, de quién es la tarea y
-    cuándo vence."""
+    """Lo que lleva la pregunta al encargado: quién pide ver el detalle, de quién es la tarea,
+    cómo quedó y cuándo vence (de una tarea cerrada, la redacción no lo recibe:
+    `hechos.para_redactar`)."""
     hechos: dict[str, Any] = {"necesita_respuesta": True,
                               "pregunta": preguntas.COMPARTIR_EL_DETALLE,
                               "pide_ver_el_detalle": pedido["pidio"],
-                              "la_tiene": pedido["la_tiene"]}
+                              "la_tiene": pedido["la_tiene"],
+                              "estado": pedido["estado_de_la_tarea"]}
     if pedido["fecha_objetivo"] is not None:
         hechos["vence"] = pedido["fecha_objetivo"].astimezone(zona).date().isoformat()
     return hechos

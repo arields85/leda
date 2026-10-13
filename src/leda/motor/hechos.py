@@ -1455,8 +1455,10 @@ def para_redactar(valor: Any) -> Any:
     otra persona y cuándo le llega, también (`AVISOS`, decisión 77); cada hora del reloj de un
     hecho, en su día; cada clave y cada código de la cocina que nombra un concepto cambiado por el
     suyo para redactar (`PARA_LA_REDACCION`) y cada día de `dias` en la forma corta con que se
-    escribe (segunda vuelta del formato, 2026-10-07); lo demás, tal cual."""
-    return _traducir(_sin_nombre_ni_hora(_quien_aprueba_solo_si_pregunta(valor)))
+    escribe (segunda vuelta del formato, 2026-10-07); de una tarea cerrada, nada de cuándo
+    vencía (`_sin_vencimiento_si_cerro`); lo demás, tal cual."""
+    return _traducir(_sin_nombre_ni_hora(_quien_aprueba_solo_si_pregunta(
+        _sin_vencimiento_si_cerro(valor))))
 
 
 def _traducir(valor: Any) -> Any:
@@ -1472,6 +1474,56 @@ def _traducir(valor: Any) -> Any:
     if isinstance(valor, str):
         return PARA_LA_REDACCION.get(valor, valor)
     return valor
+
+
+# --- Una tarea cerrada no vence (prueba por Telegram del 2026-10-12) ---------------------------
+#
+# A "pasame el link del dashboard de lotes", una tarea ya terminada, el resumen decía su estado y
+# cuándo vencía, y Leda escribió "La tarea está terminada y aprobada. … vence pasado mañana." Un
+# vencimiento no dice nada de una tarea que ya se cerró. La regla, en el borde de la redacción y
+# para todos los hechos a la vez (los de la cocina no cambian: la base, el registro de turnos, las
+# pruebas y la auditoría los leen): un dato que dice que su tarea está en un estado final no le
+# pasa a la IA cuándo vencía, y `dias` deja de nombrar ese día si ningún otro dato lo trae.
+ESTADOS_FINALES = frozenset({"terminada", "cancelada"})
+CUANDO_VENCE = frozenset({"vence", "fecha_objetivo"})
+
+
+def _sin_vencimiento_si_cerro(valor: Any) -> Any:
+    """Una copia del valor sin cuándo vencía cada tarea que dice estar en un estado final
+    (`ESTADOS_FINALES`) y, si el valor trae `dias`, sin el día de una fecha que ya no nombra
+    ningún otro dato."""
+    quitadas: set[date] = set()
+    copia = _sin_vencimiento(valor, quitadas)
+    if quitadas and isinstance(copia, dict) and isinstance(copia.get("dias"), (list, tuple)):
+        sin_nombrar = quitadas - set(_fechas({k: v for k, v in copia.items() if k != "dias"}))
+        copia["dias"] = [d for d in copia["dias"]
+                         if not (isinstance(d, str) and _fecha_de_la_linea(d) in sin_nombrar)]
+    return copia
+
+
+def _sin_vencimiento(valor: Any, quitadas: set[date]) -> Any:
+    if isinstance(valor, (list, tuple)):
+        return [_sin_vencimiento(v, quitadas) for v in valor]
+    if not isinstance(valor, Mapping):
+        return valor
+    cerro = valor.get("estado") in ESTADOS_FINALES
+    copia: dict[str, Any] = {}
+    for k, v in valor.items():
+        if cerro and k in CUANDO_VENCE:
+            quitadas.update(_fechas(v))
+        elif k in _LO_QUE_ALGUIEN_ESCRIBIO:
+            copia[k] = v
+        else:
+            copia[k] = _sin_vencimiento(v, quitadas)
+    return copia
+
+
+def _fecha_de_la_linea(linea: str) -> date | None:
+    """La fecha de una línea de `dias` ("2026-10-16: viernes 16 de octubre, …")."""
+    try:
+        return date.fromisoformat(linea[:10])
+    except ValueError:
+        return None
 
 
 # --- Quien aprueba el trabajo de la persona, sólo si lo pregunta (usuario, 2026-10-08) -------
