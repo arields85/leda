@@ -28,16 +28,23 @@ estante → los tornillos) y que el equipo se organice solo.
 - **Antes de cada porción, partir de lo hecho:** el escritor lee "De qué se parte en cada porción" (abajo) y
   reusa esas piezas; lo que agregue nuevo lo justifica en el diseño corto.
 
-## Orden de las porciones (acordado con el usuario, 2026-10-13: "si")
+## Orden de las porciones (acordado con el usuario, 2026-10-13; reordenado el mismo día)
 
-1. **Las esperas en el formulario** (0023, decisión 2).
-2. **Los objetivos desde la web** (0023, decisión 1; tipo según dónde cuelga, punto 11).
-3. **La carga por la web del equipo para Dirección y los referentes** (0023, decisión 3, puntos 2, 7 y 8), con
-   el préstamo de personas.
-4. **El pedido de más tiempo y el cambio de fecha** (0022, porción 3, decisión 8).
-5. **La ayuda de la IA al cargar (para todos) y la propuesta del integrante** (0023, decisión 3, puntos 3 a 6 y 9).
-6. **Las jerarquías y los integrantes desde la web de Dirección** (0023, decisiones 4 y 5, puntos 1 y 10; con
-   la porción 4 del 0022).
+**Regla del usuario:** "la IA debe ayudar desde el principio con todo lo que pueda". Por eso la ayuda de la
+IA al cargar va segunda, sobre el formulario que ya existe, y cada porción siguiente la trae desde el primer
+día donde sirva (por ejemplo, proponer el nombre o el tipo de un objetivo a partir de lo que se describe).
+
+1. **J1 · Las esperas en el formulario** (0023, decisión 2).
+2. **J2 · La ayuda de la IA al cargar, para todos** (0023, punto 4): se describe como se habla y Leda completa
+   título, criterio, fecha y evidencia; primero en el formulario de la puerta de administración.
+3. **J3 · Los objetivos desde la web** (0023, decisión 1; tipo según dónde cuelga, punto 11).
+4. **J4 · La carga por la web del equipo para Dirección y los referentes** (0023, decisión 3, puntos 2, 7 y 8),
+   con el préstamo de personas y los avisos de la carga.
+5. **J5 · El pedido de más tiempo y el cambio de fecha** (0022, porción 3, decisión 8).
+6. **J6 · La propuesta del integrante** (0023, decisión 3, puntos 3 a 6 y 9); necesita la puerta del equipo
+   de la J4.
+7. **J7 · Las jerarquías y los integrantes desde la web de Dirección** (0023, decisiones 4 y 5, puntos 1 y 10;
+   con la porción 4 del 0022).
 
 ## Tareas
 
@@ -128,49 +135,51 @@ la sesión de administración, fija el espacio y devuelve todos los rechazos jun
 - `PENDIENTE` (con los avisos de la decisión 7 del ADR 0022, que todavía no existen): el aviso de §4 a los dos
   referentes cuando la espera cruza áreas.
 
-### J2 a J6
+### J2 a J7
 
-Se detallan al llegar a cada una, con su diseño corto.
+Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda de la IA donde sirva.
 
-- [ ] **J2 · Los objetivos desde la web.**
-- [ ] **J3 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
-- [ ] **J4 · El pedido de más tiempo y el cambio de fecha.**
-- [ ] **J5 · La ayuda de la IA al cargar (para todos) y la propuesta del integrante.** La ayuda (describir
-      como se habla y que Leda complete título, criterio, fecha y evidencia) es para todos los que cargan:
-      Dirección, referentes, integrantes y la puerta de administración (ADR 0023, punto 4); la propuesta,
-      sólo del integrante (usuario, 2026-10-13). Se aprovecha lo que ya existe (usuario, 2026-10-13: "no hay que inventar
-      nada"): el cliente de la IA del motor (`motor/ia_real.py`, `desde_base`), los chequeos de la entrega
-      (`entrega.puntos_del_criterio`, `problema_del_ejemplo`: nada de números ni nombres que nadie dijo) y
-      la propuesta de título y criterio del alta del flujo congelado (`alta_turno.py` en la etiqueta
+- [ ] **J2 · La ayuda de la IA al cargar, para todos.** Se describe como se habla y Leda completa título,
+      criterio, fecha y evidencia; la persona corrige y confirma (ADR 0023, punto 4). Para todos los que
+      cargan: la puerta de administración primero, y después Dirección, referentes e integrantes en sus
+      porciones. Se aprovecha lo que ya existe (usuario, 2026-10-13: "no hay que inventar nada"): el
+      cliente de la IA del motor (`motor/ia_real.py`, `desde_base`), los chequeos de la entrega
+      (`entrega.puntos_del_criterio`, `problema_del_ejemplo`: nada de números ni nombres que nadie dijo) y la
+      propuesta de título y criterio del alta del flujo congelado (`alta_turno.py` en la etiqueta
       `respaldo-flujos-antes-de-d`: `CAMPOS_PROPONIBLES`, el criterio que dice cómo se comprueba), como
       referencia para adaptar, no para copiar el flujo.
-- [ ] **J6 · Las jerarquías y los integrantes desde la web de Dirección.**
+- [ ] **J3 · Los objetivos desde la web.**
+- [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
+- [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
+- [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
+      directo).
+- [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 ## De qué se parte en cada porción (explorador de sólo lectura, 2026-10-13)
 
 Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de base para no arrancar de cero".
 
-- **J2, los objetivos:** `herramientas._preparar_crear_objetivo` y `_crear_objetivo` (las comprobaciones, la
+- **J3, los objetivos:** `herramientas._preparar_crear_objetivo` y `_crear_objetivo` (las comprobaciones, la
   vista previa y el evento de estado), la convención de tipos de la importación (`importador._importar_objetivo_inicial`:
   la raíz estratégica, cada frente operativo), la tabla `objective` (ya tiene `referente_membership_id`, sin
   usar), `opciones_de_la_carga` (ya trae los objetivos y los integrantes para elegir) y `cargar_tarea` como
   patrón de función de la base (sesión, clave de un solo uso, errores y avisos, auditoría); en la web,
   `FieldBlock`, `Counter`, `DatePicker` y la vista previa. Falta: la regla de qué tipo cuelga de cuál, una
   función `crear_objetivo` para la web, poner el referente y que sólo Dirección cree.
-- **J3, la carga del equipo:** `cargar_tarea` entera (sólo cambia la puerta: la sesión del equipo en vez de la
+- **J4, la carga del equipo:** `cargar_tarea` entera (sólo cambia la puerta: la sesión del equipo en vez de la
   de administración), `tareas_que_ve` y `vistas_de` (ya distinguen Dirección y referentes), la regla de quién
   revisa (`quien_revisa_la_tarea`) y el pase de tareas del motor (`motor/pase.py`, `autoridad.regla_del_pase`)
   como antecedente de "una tarea para otra persona". Falta: guardar quién revisa una tarea en particular (el
   préstamo), la versión de `cargar_tarea` para la puerta del equipo y **los avisos de la decisión 7 del
   ADR 0022** (al responsable y a quien revisa), que quedaron pendientes en la porción 2
-  (`plataforma-p2.md`): se construyen en la J3, junto con el aviso del préstamo.
-- **J4, más tiempo y cambio de fecha:** la previsión del chat (`task_forecast`, la jugada `anotar_prevision`,
+  (`plataforma-p2.md`): se construyen en la J4, junto con el aviso del préstamo.
+- **J5, más tiempo y cambio de fecha:** la previsión del chat (`task_forecast`, la jugada `anotar_prevision`,
   los avisos `nueva_prevision`), `ancla.prevision_vigente`, la previsión que ya muestra la web, y el umbral
   de re-aprobación del pack (`corrimiento_de_fecha_dias: 3`), que se guarda y nadie lee. Falta: **la base no
   deja cambiar la fecha de una tarea** (`bloquear_estado_directo`), así que hace falta una función propia,
   auditada y con quién lo decidió; el pedido con su estado (pendiente, aceptado o rechazado); el bloque del
   referente en la web.
-- **J6, las jerarquías y los integrantes:** las validaciones de la importación (`importador.validar`: una sola
+- **J7, las jerarquías y los integrantes:** las validaciones de la importación (`importador.validar`: una sola
   autoridad final, áreas y roles existentes, quién aprueba a quién sin ciclos ni a sí mismo), la importación
   de personas y áreas, los enlaces de activación (`onboarding.generar_enlaces`, `activar`,
   `pendientes_de_activar`), "conectado" que ya trae `opciones_de_la_carga`, el corte de sesiones con
