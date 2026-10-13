@@ -195,11 +195,35 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       `respaldo-flujos-antes-de-d`: `CAMPOS_PROPONIBLES`, el criterio que dice cómo se comprueba), como
       referencia para adaptar, no para copiar el flujo.
       Ruta: delegada (un escritor; servidor, web, pruebas y la herramienta de medición).
-  - [ ] **J2-1 · Diseño corto** (abajo, "Diseño corto (J2-1)"); la entrada, cambiada por el usuario el
-        2026-10-13: un solo recuadro libre.
-  - [ ] **J2-2 · Las garantías, primero en rojo**, con una IA de mentira.
-  - [ ] **J2-3 · El servidor y la web.**
-  - [ ] **J2-4 · La herramienta de medición** para una ronda real (no se corre sin permiso).
+  - [x] **J2-1 · Diseño corto** (abajo, "Diseño corto (J2-1)"); la entrada, cambiada por el usuario el
+        2026-10-13: un solo recuadro libre. Sin migración (`leda_app` ya escribe `audit_log` e
+        `incident` en un espacio).
+  - [x] **J2-2 · Las garantías, primero en rojo**, con una IA de mentira (`IADeLaCarga`, en
+        `tests/test_ayuda_al_cargar.py`; nunca la real). Servidor: 41 en rojo en
+        `tests/test_ayuda_al_cargar.py` (sin el módulo) y 13 en `tests/garantias/test_ayuda_al_cargar.py`
+        (sin la ruta), con el ejemplo del usuario en las dos; 54 en verde después. Web: 11 en rojo en
+        `AdminApp.test.tsx` contra el formulario de antes (el recuadro, las marcas, nunca pisar lo
+        escrito, lo que no pudo, elegir entre dos, la falla, el recuadro vacío, lo que no ofrecen las
+        opciones, confirmar una vez, y el micrófono: sin reconocimiento, con él y sin permiso), en
+        verde después.
+  - [x] **J2-3 · El servidor y la web.** `65b2469f` (`ayuda_al_cargar.py`, la ruta
+        `/ayuda` de `web_app.py`, la etapa `ayuda_al_cargar` de `incidentes.py` y sus pruebas) y
+        `ddb822e8` (`HelpBox.tsx`, `speech.ts`, el formulario, y las tres advertencias de la J1-7:
+        el CSS se lee desde la carpeta de la prueba, `import.meta.dirname`, y pasa también corriendo
+        desde `web/src`; la vuelta prueba que un campo completado sale; los espías, restaurados en un
+        `finally`). **Verificación** (2026-10-13): `pytest -q tests/garantias tests/test_ayuda_al_cargar.py`
+        792 passed (13 min); `pytest -q tests/test_aviso_incidente_legible.py
+        tests/motor/test_incidentes_del_motor.py` 18 passed; en `web/`, `npm test` 79 passed y
+        `npm run build` bien.
+  - [x] **J2-4 · La herramienta de medición** para una ronda real (no se corre sin permiso):
+        `tools/medir_ayuda_al_cargar.py`, 11 pedidos escritos como en un chat (el ejemplo del
+        usuario, los tornillos, un apodo, "mañana", un sábado, alguien de afuera, dos nombres, el
+        número del día, una espera por su nombre, faltas de ortografía), con la misma función y los
+        mismos controles. Con la IA real, desde la carpeta del Motor: `$env:PYTHONPATH = "src"` y
+        `.venv\Scripts\python.exe tools\medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3
+        --salida tests\conversaciones\resultados\ayuda-al-cargar.json` (11 llamadas por vuelta; sale
+        con 4 si se acaba el cupo). En seco (`--ia guionada`, sin red) corrió: 0 de 11, como debe,
+        porque la IA de mentira no propone nada.
   - [ ] **J2-5 · Prueba real en el celular** (con el usuario).
   - [ ] **J2-6 · La ronda con la IA real** (la lanza el coordinador, con permiso).
 - [ ] **J3 · Los objetivos desde la web.**
@@ -310,6 +334,9 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
 - 2026-10-13: la primera prueba del usuario en el celular encontró tres cosas (J1-6): no se decía qué
   faltaba, el paso "revisar" sobraba y la página se corría de costado en el iPhone. Arregladas en
   `cc9cc41d` (escritor delegado); J1-5 se repite con el usuario.
+- 2026-10-13: J2-1 a J2-4 hechas (escritor delegado): la entrada es un recuadro libre (usuario), Leda
+  propone lo vacío y el código decide qué vale. Faltan la prueba en el celular (J2-5) y la ronda con
+  la IA real (J2-6), con permiso.
 - 2026-10-13: la segunda prueba encontró cuatro más (J1-7): al confirmar con un campo vacío la página
   se corría de costado, los mensajes blancos no se distinguían, lo que faltaba no estaba a la vista y
   "confirmar" no se veía apagado. Arregladas en `b7fb4ea7` (escritor delegado); J1-5 se repite con el usuario.
