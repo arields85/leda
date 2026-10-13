@@ -29,26 +29,55 @@ type Step =
   | { kind: 'edit'; sending: boolean; failed: boolean }
   | { kind: 'done'; warnings: Problem[]; repeated: boolean; sent: Draft };
 
+// What is missing or wrong is said in the palette's attention color (the one of an overdue
+// task): the only color on the form, and only while something needs fixing.
+const WARN = 'text-vencida';
 // Full width and never wider than its column, so a long option never pushes the page sideways on
 // a phone; 16px on a touch screen, so the phone does not zoom in when a field is touched.
 const INPUT =
-  'block w-full min-w-0 max-w-full rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none pointer-coarse:text-[16px] focus:border-ink aria-[invalid=true]:border-ink-soft';
+  'block w-full min-w-0 max-w-full rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none pointer-coarse:text-[16px] focus:border-ink aria-[invalid=true]:border-vencida';
+// Dimmed while something required is missing, but never `disabled`: a tap still says what is
+// missing and takes the person there.
 const PRIMARY =
-  'inline-flex h-11 items-center gap-2 rounded-card border-hard border-ink bg-card px-3.5 text-button font-bold text-ink shadow-hard-ink disabled:opacity-50';
+  'inline-flex h-11 items-center gap-2 rounded-card border-hard border-ink bg-card px-3.5 text-button font-bold text-ink shadow-hard-ink disabled:opacity-50 aria-disabled:opacity-50 aria-disabled:shadow-none';
 const SECONDARY =
   'inline-flex h-11 items-center rounded-card border-hard border-line-soft bg-transparent px-3.5 text-button text-ink-soft disabled:opacity-50';
+// Takes the color of the line it is in.
 const FIELD_LINK =
-  'cursor-pointer border-0 bg-transparent p-0 text-left font-bold text-ink underline decoration-dotted underline-offset-2';
+  'cursor-pointer border-0 bg-transparent p-0 text-left font-bold underline decoration-dotted underline-offset-2';
 
-/** Puts the focus on a field: the control itself, the chosen (or first) day of the calendar, or
- * the first evidence box (the group itself when it has none). */
+/** Brings `area` to the middle of the screen with a vertical-only scroll, then focuses `target`
+ * without letting the browser scroll on its own: on a phone a focus that scrolls can also move
+ * the page sideways. */
+function bringTo(area: HTMLElement, target: HTMLElement) {
+  const box = area.getBoundingClientRect();
+  const top = window.scrollY + box.top - Math.max(16, (window.innerHeight - box.height) / 2);
+  const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
+  target.focus({ preventScroll: true });
+}
+
+/** Takes the person to a field: its whole block (label, control and message) in view, and the
+ * focus on the control itself, the chosen (or first) day of the calendar, or the first evidence
+ * box (the group itself when it has none). */
 function focusField(field: Field) {
   const element = document.getElementById(FIELD_ID[field]);
   if (!element) return;
   const target = element.matches('input, select, textarea')
     ? element
     : (element.querySelector<HTMLElement>('[tabindex="0"], input, select, textarea') ?? element);
-  target.focus();
+  bringTo(element.closest<HTMLElement>('[data-field]') ?? element, target);
+}
+
+/** The local problems first, then the ones already shown that the local check does not repeat
+ * (what the server said). */
+function merge(found: Problem[], shown: Problem[]): Problem[] {
+  return [...found, ...shown.filter((p) => !found.some((f) => f.campo === p.campo && f.motivo === p.motivo))];
+}
+
+/** The fields with a problem, in the order of the form. */
+function fieldsWith(problems: Problem[]): Field[] {
+  return FIELD_ORDER.filter((field) => problems.some((p) => PROBLEM_FIELD[p.campo] === field));
 }
 
 /** "Falta completar: criterio de aceptación, evidencia." Each name takes the focus to its field. */
@@ -86,7 +115,7 @@ function FieldBlock({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div data-field className="flex min-w-0 flex-col gap-1.5">
       <div className="flex min-w-0 items-baseline justify-between gap-2 text-meta text-ink-dim">
         <label id={`${id}-label`} htmlFor={id} className="min-w-0 uppercase tracking-[0.04em]">
           {label}
@@ -96,7 +125,7 @@ function FieldBlock({
       {children}
       {hint && <div className="wrap-break-word text-small text-ink-dim">{hint}</div>}
       {errors.length > 0 && (
-        <ul id={`${id}-error`} className="m-0 flex list-none flex-col gap-0.5 p-0 text-small font-bold text-ink">
+        <ul id={`${id}-error`} className={`m-0 flex list-none flex-col gap-0.5 p-0 text-small font-bold ${WARN}`}>
           {errors.map((e) => (
             <li key={`${e.campo}-${e.motivo}`}>! {e.texto}</li>
           ))}
@@ -110,7 +139,7 @@ function Counter({ value, limit }: { value: string; limit: number }) {
   const n = length(value);
   const over = n > limit;
   return (
-    <span aria-live="polite" className={`shrink-0 ${over ? 'font-bold text-ink' : ''}`}>
+    <span aria-live="polite" className={`shrink-0 ${over ? `font-bold ${WARN}` : ''}`}>
       {n}/{limit}
       {over && ` · sobran ${n - limit}`}
     </span>
@@ -133,8 +162,12 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [step, setStep] = useState<Step>({ kind: 'edit', sending: false, failed: false });
   const [problems, setProblems] = useState<Problem[]>([]);
-  // Asks for the focus to go to the first field with a problem, after the render that shows it.
-  const [focusAsked, setFocusAsked] = useState(0);
+  // Asks for the person to be taken to a field (null: to the messages), after the render that
+  // shows its message. `n` makes every ask a new one, even for the same field.
+  const [focusAsked, setFocusAsked] = useState<{ field: Field | null; n: number } | null>(null);
+  // The field the last tap took the person to: the next tap goes to the next one that still has
+  // a problem, in the order of the form, and back to the first after the last.
+  const visited = useRef<Field | null>(null);
   const key = useRef<string | null>(null);
   // The last send got no definite answer (no network, a server failure): it may have loaded the
   // task. Until something settles it, the key stays even if the data changes, so the server can
@@ -148,12 +181,17 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   }, [step.kind]);
 
   useEffect(() => {
-    if (focusAsked === 0) return;
-    const first = FIELD_ORDER.find((field) => problems.some((p) => PROBLEM_FIELD[p.campo] === field));
-    if (first) focusField(first);
-    else messages.current?.focus();
+    if (!focusAsked) return;
+    if (focusAsked.field) focusField(focusAsked.field);
+    else if (messages.current) bringTo(messages.current, messages.current);
     // Only when asked: fixing a field must not move the focus.
   }, [focusAsked]);
+
+  /** Takes the person to `field` (or to the messages) and remembers it for the next tap. */
+  function takeTo(field: Field | null) {
+    visited.current = field;
+    setFocusAsked((current) => ({ field, n: (current?.n ?? 0) + 1 }));
+  }
 
   const member = memberOf(options, draft.responsable_id);
   const policy = policyOf(options, member);
@@ -185,14 +223,15 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
   async function confirm() {
     if (step.kind !== 'edit' || step.sending) return;
-    // What the form can already tell is missing goes next to the button, and nothing is sent.
+    // Something required is missing (the button looks disabled): nothing is sent; each field
+    // shows its message and the tap takes the person to the next field with a problem.
     const found = checkDraft(draft, options);
     if (found.length > 0) {
-      setProblems((current) => [
-        ...found,
-        ...current.filter((p) => !found.some((f) => f.campo === p.campo && f.motivo === p.motivo)),
-      ]);
-      setFocusAsked((n) => n + 1);
+      const shown = merge(found, problems);
+      setProblems(shown);
+      const fields = fieldsWith(shown);
+      const after = visited.current ? FIELD_ORDER.indexOf(visited.current) : -1;
+      takeTo(fields.find((field) => FIELD_ORDER.indexOf(field) > after) ?? fields[0] ?? null);
       return;
     }
     key.current ??= newKey();
@@ -203,6 +242,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       if (result.kind === 'loaded') {
         key.current = null;
         unknown.current = false;
+        visited.current = null;
         setProblems([]);
         setStep({ kind: 'done', warnings: result.warnings, repeated: result.repeated, sent });
       } else {
@@ -214,7 +254,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         }
         setProblems(result.errors);
         setStep({ kind: 'edit', sending: false, failed: false });
-        setFocusAsked((n) => n + 1);
+        takeTo(fieldsWith(result.errors)[0] ?? null);
       }
     } catch (error) {
       if (error instanceof SessionClosedError) {
@@ -235,6 +275,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
   function another() {
     key.current = null;
+    visited.current = null;
     setDraft(EMPTY_DRAFT);
     setProblems([]);
     setStep({ kind: 'edit', sending: false, failed: false });
@@ -269,18 +310,27 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const general = problems.filter(
     (p) => !(p.campo in PROBLEM_FIELD) && !(p.campo === 'clave' && p.motivo === 'usada_con_otros_datos'),
   );
-  const missing = FIELD_ORDER.filter((field) => on(field).some((p) => p.motivo === 'falta'));
-  const wrong = FIELD_ORDER.filter((field) => !missing.includes(field) && on(field).length > 0);
+  // What blocks confirm right now, said from the start and updated as the fields are filled; the
+  // fields themselves are marked only after a tap on confirm (or the server's answer).
+  const pending = checkDraft(draft, options);
+  const blocked = pending.length > 0;
+  const listed = merge(pending, problems);
+  const missing = fieldsWith(listed.filter((p) => p.motivo === 'falta'));
+  const wrong = fieldsWith(listed).filter((field) => !missing.includes(field));
+  const summary = missing.length > 0 || wrong.length > 0 || general.length > 0;
+  // After a tap that found problems the summary is an alert (a new one for each ask, so it is
+  // announced again); before, only a line.
+  const alerted = problems.length > 0;
   const invalid = (field: Field) => (on(field).length ? true : undefined);
   const described = (id: string, field: Field) => (on(field).length ? `${id}-error` : undefined);
 
   return (
-    <div className="grid w-full min-w-0 grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10">
+    <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10">
       <form
         noValidate
         onSubmit={(event) => event.preventDefault()}
         aria-label="Cargar tarea"
-        className="flex min-w-0 flex-col"
+        className="flex min-w-0 max-w-full flex-col"
       >
         <fieldset disabled={sending} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
           <FieldBlock id="f-objetivo" label="objetivo" errors={on('objetivo_id')}
@@ -378,6 +428,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               onChange={(day) => change({ fecha: day })}
               labelledBy="f-fecha-label"
               describedBy={described('f-fecha', 'fecha')}
+              invalid={on('fecha').length > 0}
             />
           </FieldBlock>
 
@@ -425,6 +476,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
           <fieldset
             id="f-evidencia"
+            data-field
             tabIndex={-1}
             className="m-0 flex min-w-0 flex-col gap-1.5 border-0 p-0 outline-none"
             aria-describedby={described('f-evidencia', 'evidencia')}
@@ -454,7 +506,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               </label>
             ))}
             {on('evidencia').length > 0 && (
-              <ul id="f-evidencia-error" className="m-0 flex list-none flex-col gap-0.5 p-0 text-small font-bold text-ink">
+              <ul id="f-evidencia-error" className={`m-0 flex list-none flex-col gap-0.5 p-0 text-small font-bold ${WARN}`}>
                 {on('evidencia').map((e) => (
                   <li key={`${e.campo}-${e.motivo}`}>! {e.texto}</li>
                 ))}
@@ -484,7 +536,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
       <aside
         aria-labelledby="vista-previa"
-        className="flex min-w-0 flex-col gap-2 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto"
+        className="flex min-w-0 max-w-full flex-col gap-2 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto"
       >
         <h2 id="vista-previa" className="m-0 text-meta font-normal uppercase tracking-[0.04em] text-ink-dim">
           Vista previa
@@ -509,20 +561,32 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               </button>
             </div>
           )}
-          {problems.length > 0 && !(conflict && problems.length === 1) && (
-            <div role="alert" className="flex flex-col gap-1 rounded-card border-hard border-line px-3 py-2.5 text-body">
-              <p className="m-0 font-bold">No se cargó: hay que corregir lo marcado.</p>
-              <FieldList label="Falta completar" fields={missing} />
-              <FieldList label="Hay que corregir" fields={wrong} />
+          {summary && (
+            <div
+              key={alerted ? `alerta-${focusAsked?.n ?? 0}` : 'en-vivo'}
+              id="lo-que-falta"
+              role={alerted ? 'alert' : undefined}
+              className={`flex min-w-0 flex-col gap-1 wrap-break-word text-body ${WARN} ${alerted ? 'rounded-card border-hard border-line px-3 py-2.5' : ''}`}
+            >
+              {alerted && <p className="m-0 font-bold text-ink">No se cargó: hay que corregir lo marcado.</p>}
+              <FieldList label="! Falta completar" fields={missing} />
+              <FieldList label="! Hay que corregir" fields={wrong} />
               {general.map((p) => (
-                <p key={`${p.campo}-${p.motivo}`} className="m-0 text-ink-soft">
+                <p key={`${p.campo}-${p.motivo}`} className="m-0">
                   ! {p.texto}
                 </p>
               ))}
             </div>
           )}
           <div className="flex flex-wrap gap-3">
-            <button type="button" className={PRIMARY} onClick={confirm} disabled={sending}>
+            <button
+              type="button"
+              className={PRIMARY}
+              onClick={confirm}
+              disabled={sending}
+              aria-disabled={blocked && !sending ? true : undefined}
+              aria-describedby={summary ? 'lo-que-falta' : undefined}
+            >
               {sending ? 'cargando…' : failed ? '> probar de nuevo' : '> confirmar'}
             </button>
           </div>

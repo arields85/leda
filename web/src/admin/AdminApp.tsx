@@ -159,7 +159,7 @@ export function AdminApp() {
   const spaceName =
     admin?.espacios.length === 1 ? admin.espacios[0].nombre : options.kind === 'ready' ? options.data.espacio.nombre : '';
   return (
-    <div className="mx-auto flex min-h-dvh w-full min-w-0 max-w-[72rem] flex-col px-5">
+    <div className="mx-auto flex min-h-dvh w-full min-w-0 overflow-x-clip max-w-[72rem] flex-col px-5">
       <Header
         space={open && spaceName ? `administración · ${spaceName}` : 'administración'}
         title={open ? 'Cargar tarea' : 'Leda'}

@@ -159,7 +159,7 @@ export function App() {
 
   const open = !signedOut && person !== null && me.kind === 'ready' && tasks.kind !== 'closed';
   return (
-    <div className="mx-auto flex min-h-dvh w-full min-w-0 max-w-[32rem] flex-col px-5">
+    <div className="mx-auto flex min-h-dvh w-full min-w-0 overflow-x-clip max-w-[32rem] flex-col px-5">
       <Header
         space={person?.espacio ?? ''}
         title={signedOut || !open ? 'Leda' : title}

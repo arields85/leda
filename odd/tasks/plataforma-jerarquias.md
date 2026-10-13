@@ -111,6 +111,41 @@ Ruta: cada porción, delegada (un escritor), porque toca base, servidor, web y p
       marcos de 360 y 390 px (345 y 375 px de contenido), con textos largos: ningún elemento pasa el
       borde, ni antes ni después del arreglo; Chrome no reproduce lo del iPhone, así que la causa más
       probable es el agrandado al tocar un campo, y sólo la prueba en el celular lo confirma (J1-5).
+- [x] **J1-7 · Segunda ronda de arreglos de la prueba** (2026-10-13; ruta delegada, un escritor, sólo
+      `web/` y documentos). **Lo que vio** el usuario en el iPhone, después de `cc9cc41d`: (1) antes de
+      tocar "> confirmar" la página entraba; al tocarlo con un campo vacío se podía correr de costado (el
+      resumen y la vista previa pasaban el borde derecho); (2) los textos de lo que falta, blancos, no se
+      distinguían; (3) lo que faltaba aparecía recién al confirmar, y había que bajar a buscarlo; (4)
+      "confirmar" se veía igual aunque faltara algo. Y pidió (por el coordinador): con varios campos
+      vacíos, cada toque lleva al próximo.
+      **La causa del corrimiento:** en Chrome con emulación de celular (`mobile: true`, táctil, 360 y 390
+      px, textos largos) ningún elemento pasa el borde, ni antes ni después de confirmar
+      (`scrollWidth` = ancho), y los campos ya tienen 16 px; así que no es un desborde del diseño. Lo único
+      que pasa al confirmar es que aparece el resumen y que el foco salta por programa a un campo lejano,
+      dentro del mismo toque: el navegador hacía su propio desplazamiento para mostrarlo (y en el iPhone
+      además abre el teclado), y ese desplazamiento nativo es lo que puede mover la vista de costado. Es
+      la causa más probable, no comprobada: Chrome no reproduce lo del iPhone.
+      **Qué cambió:** (a) llevar a un campo es ahora un desplazamiento sólo vertical
+      (`window.scrollTo({ top })`, suave salvo con movimiento reducido, con el bloque entero del campo y
+      su mensaje en el medio) y después `focus({ preventScroll: true })`; (b) la red de seguridad:
+      `overflow-x: clip` en `html`, `body` y `#root` (`clip` y no `hidden`, para que la vista previa fija
+      siga funcionando), `overflow-x-clip` en la raíz de cada puerta y `max-w-full` en la grilla, el
+      formulario y la vista previa; (c) los mensajes de cada campo, el resumen y el borde del campo (y
+      del calendario) con un problema van en el color de atención que ya tenía la paleta (`vencida`,
+      ámbar), con el "!"; (d) "! Falta completar: …" está siempre arriba de "confirmar" mientras falte
+      algo, desde el principio y en vivo, y se va cuando está todo; los campos no se marcan antes de
+      tocar confirmar; (e) "confirmar" se ve apagado mientras falta algo (`aria-disabled`, nunca
+      `disabled`); tocarlo no manda, marca los campos y lleva al primero que falta; cada toque siguiente,
+      al próximo en el orden del formulario, y del último vuelve al primero; los que se completan salen
+      de la vuelta. El 422 del servidor sigue yendo a los mismos mensajes y lleva al primero.
+      **Evidencia:** `AdminApp.test.tsx`, 4 en rojo y 24 en verde antes (la línea en vivo, la vuelta
+      por los campos con `scrollTo` sin `left` y `focus` con `preventScroll`, la red de seguridad, el
+      desplazamiento del 422), 28 en verde después; `npm test` 68 passed; `npm run build` bien (en el CSS
+      compilado: `overflow-x:clip`, `#root`, `aria-disabled`, `border-vencida`). Chrome con emulación de
+      celular a 360 y 390 px, antes y después del arreglo: `scrollWidth` igual al ancho antes y después
+      de confirmar. **Sólo el celular confirma** que ya no se corre (J1-5). Sumar al guion: (9) con el
+      formulario vacío, "! Falta completar: …" en ámbar arriba de "confirmar", que se ve apagado; (10)
+      tocarlo tres veces con tres campos vacíos → lleva a cada uno, en orden, sin correrse de costado.
 
 **Diseño corto (J1-1, 2026-10-13).** Hoy el formulario (`LoadForm.tsx`) pide a
 `GET /admin/api/espacios/{id}/opciones` (función `opciones_de_la_carga`) lo que se puede elegir y manda la carga
@@ -215,3 +250,6 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
 - 2026-10-13: la primera prueba del usuario en el celular encontró tres cosas (J1-6): no se decía qué
   faltaba, el paso "revisar" sobraba y la página se corría de costado en el iPhone. Arregladas en
   `cc9cc41d` (escritor delegado); J1-5 se repite con el usuario.
+- 2026-10-13: la segunda prueba encontró cuatro más (J1-7): al confirmar con un campo vacío la página
+  se corría de costado, los mensajes blancos no se distinguían, lo que faltaba no estaba a la vista y
+  "confirmar" no se veía apagado. Arregladas por un escritor delegado; J1-5 se repite con el usuario.

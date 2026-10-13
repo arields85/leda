@@ -215,14 +215,107 @@ describe('AdminApp', () => {
         },
       },
     });
+    const scroll = vi.spyOn(window, 'scrollTo');
     fillTask();
     confirm();
     const summary = await within(preview()).findByRole('alert');
     expect(summary).toHaveTextContent('Falta completar: criterio de aceptación, evidencia, quién la decidió.');
     await waitFor(() => expect(screen.getByLabelText('criterio de aceptación')).toHaveFocus());
+    expect(scroll).toHaveBeenCalled();
+    expect(document.getElementById('f-decidio-error')).toHaveClass('text-vencida');
     expect(document.getElementById('f-decidio-error')).toHaveTextContent('Elegí quién decidió la tarea.');
     expect(document.getElementById('f-evidencia-error')).toHaveTextContent('Elegí la evidencia que se pide');
     expect(calls.filter((c) => c.key === TASKS)).toHaveLength(1);
+  });
+
+  it('says what is still missing above confirm from the start, and the list shrinks as fields are filled', async () => {
+    await openForm();
+    const button = screen.getByRole('button', { name: '> confirmar' });
+    const line = document.getElementById('lo-que-falta') as HTMLElement;
+    expect(line).toHaveTextContent(
+      'Falta completar: objetivo, título, quién la hace, fecha, criterio de aceptación, quién la decidió.',
+    );
+    expect(line).toHaveClass('text-vencida');
+    // The line comes right before the button it explains.
+    expect(line.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Dimmed, but still tappable: never the HTML disabled attribute.
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAttribute('aria-describedby', 'lo-que-falta');
+    expect(button).toBeEnabled();
+    // Nothing is marked on the fields before confirm is tapped: the line is enough.
+    expect(screen.getByLabelText('título')).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByRole('alert')).toBeNull();
+    pick('objetivo', 'o1');
+    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar alarmas del SCADA' } });
+    expect(line).toHaveTextContent('Falta completar: quién la hace, fecha, criterio de aceptación, quién la decidió.');
+    fillTask();
+    expect(document.getElementById('lo-que-falta')).toBeNull();
+    expect(button).not.toHaveAttribute('aria-disabled');
+    expect(button).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('each tap on the dimmed confirm sends nothing and takes the person to the next missing field', async () => {
+    const scroll = vi.spyOn(window, 'scrollTo');
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    const calls = await openForm();
+    pick('objetivo', 'o1');
+    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar alarmas del SCADA' } });
+    pick('quién la hace', 'm-marcos');
+    fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
+    const criterio = screen.getByLabelText('criterio de aceptación');
+    const evidence = screen.getByRole('checkbox', { name: /una captura de pantalla/ });
+    const decided = screen.getByLabelText('quién la decidió');
+    confirm();
+    expect(criterio).toHaveFocus();
+    // The field's message is there, in the warning color, and its border too.
+    expect(document.getElementById('f-criterio-error')).toHaveClass('text-vencida');
+    expect(document.getElementById('f-criterio-error')).toHaveTextContent('! Falta el criterio de aceptación');
+    expect(document.getElementById('f-evidencia-error')).toHaveClass('text-vencida');
+    expect(criterio).toHaveClass('aria-[invalid=true]:border-vencida');
+    expect(within(preview()).getByRole('alert')).toHaveClass('text-vencida');
+    // Focusing never scrolls by itself, and the scroll is only vertical.
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+    expect(scroll).toHaveBeenCalled();
+    for (const [arg] of scroll.mock.calls) {
+      expect(arg).toEqual(expect.objectContaining({ top: expect.any(Number) }));
+      expect(arg).not.toHaveProperty('left');
+    }
+    confirm();
+    expect(evidence).toHaveFocus();
+    confirm();
+    expect(decided).toHaveFocus();
+    // After the last one, back to the first.
+    confirm();
+    expect(criterio).toHaveFocus();
+    // A field that gets filled drops out of the round.
+    fireEvent.change(criterio, { target: { value: 'Suenan las 12' } });
+    confirm();
+    expect(evidence).toHaveFocus();
+    fireEvent.click(evidence);
+    confirm();
+    expect(decided).toHaveFocus();
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+    expect(calls.some((c) => c.key === TASKS)).toBe(false);
+  });
+
+  it('the page can never pan sideways: the overflow safety net is in place', async () => {
+    await openForm();
+    // Vitest runs without CSS (`css: false`), so the stylesheet is read as a file (from web/, where the tests run).
+    // @ts-expect-error -- this browser project has no Node types; the tests run on Node.
+    const { readFileSync } = await import('node:fs');
+    const css: string = readFileSync('src/index.css', 'utf-8');
+    // html and body clip what goes past the right edge (clip, not hidden, so nothing becomes a
+    // scroll container and the sticky preview keeps working).
+    expect(css).toMatch(/html,\s*body\s*\{[^}]*overflow-x:\s*clip/);
+    expect(css).toMatch(/#root\s*\{[^}]*overflow-x:\s*clip/);
+    const form = screen.getByRole('form', { name: 'Cargar tarea' });
+    const layout = form.parentElement as HTMLElement;
+    expect(layout.closest('.overflow-x-clip')).not.toBeNull();
+    expect(layout).toHaveClass('max-w-full', 'min-w-0');
+    expect(form).toHaveClass('max-w-full');
+    expect(preview()).toHaveClass('max-w-full');
+    // jsdom has no layout: whether the page still pans is only confirmed on the phone.
   });
 
   it('every control and the calendar are built to fit the width of a phone', async () => {
@@ -249,6 +342,7 @@ describe('AdminApp', () => {
       ]),
     });
     fillTask();
+    expect(screen.getByRole('button', { name: '> confirmar' })).not.toHaveAttribute('aria-disabled');
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     expect(screen.getByText(/no va a recibir avisos ni seguimiento hasta que la conecte/)).toBeInTheDocument();

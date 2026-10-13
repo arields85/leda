@@ -47,12 +47,14 @@ interface DatePickerProps {
   onChange: (day: string) => void;
   labelledBy: string;
   describedBy?: string;
+  /** The date has a problem: the frame takes the attention color. */
+  invalid?: boolean;
 }
 
 /** A compact month calendar in the Terminal look that only lets you pick the space's working
  * days from today on (decision 9). Keyboard: Tab reaches the month, the arrows move between the
  * days that can be chosen, Enter or Space picks one. */
-export function DatePicker({ id, days, value, onChange, labelledBy, describedBy }: DatePickerProps) {
+export function DatePicker({ id, days, value, onChange, labelledBy, describedBy, invalid }: DatePickerProps) {
   const allowed = useMemo(() => new Set(days), [days]);
   const first = days[0] ?? null;
   const last = days[days.length - 1] ?? null;
@@ -106,7 +108,7 @@ export function DatePicker({ id, days, value, onChange, labelledBy, describedBy 
       role="group"
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
-      className="flex w-full min-w-0 max-w-full flex-col gap-2 sm:max-w-[19rem] rounded-card border-hard border-line bg-card p-2.5 shadow-hard"
+      className={`flex w-full min-w-0 max-w-full flex-col gap-2 sm:max-w-[19rem] rounded-card border-hard ${invalid ? 'border-vencida' : 'border-line'} bg-card p-2.5 shadow-hard`}
     >
       <div className="flex items-center justify-between gap-2 text-small">
         <button

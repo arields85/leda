@@ -65,6 +65,15 @@
     color: var(--color-ink);
     font-family: var(--font-mono);
     -webkit-text-size-adjust: 100%;
+    /* A safety net so a phone can never pan the page sideways: whatever might go past the right
+     * edge is cut there. `clip`, not `hidden`, so nothing becomes a scroll container and the
+     * sticky preview of the load form keeps working. */
+    overflow-x: clip;
+  }
+
+  #root {
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   button {
