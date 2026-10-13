@@ -777,6 +777,13 @@ TEXTOS_DE_LA_CARGA = {
     ("decidio", "falta"): "Elegí quién decidió la tarea.",
     ("decidio", "no_es_integrante_activo"):
         "Quien la decidió tiene que ser integrante activo de este espacio.",
+    # La espera (migración 0067; ADR 0023, decisión 2).
+    ("espera", "no_existe"): "La tarea que espera no está en este espacio.",
+    ("espera", "esta_cerrada"): "La tarea que espera ya está cerrada: no puede trabar a otra.",
+    ("espera", "no_esta_comprometida"):
+        "La tarea que espera todavía no está comprometida: no puede trabar a otra.",
+    ("espera", "haria_un_ciclo"):
+        "Esa espera cerraría un círculo: esa tarea ya espera, directa o indirectamente, a esta.",
     ("clave", "falta"): "No se pudo identificar este envío. Recargá la página y probá de nuevo.",
     ("clave", "usada_con_otros_datos"):
         "Este envío ya cargó otra tarea. Recargá la página para cargar una nueva.",
@@ -785,10 +792,10 @@ TEXTO_DE_UN_DATO_MAL_FORMADO = "Este dato no es válido."
 
 # Cómo se llama cada dato en el cuerpo del pedido, y el `campo` con que lo nombra la base.
 _CAMPOS_ID = {"objetivo": "objetivo_id", "responsable": "responsable_id",
-              "decidio": "decidio_id"}
+              "decidio": "decidio_id", "espera": "espera_id"}
 _CAMPOS_TEXTO = {"titulo": "titulo", "descripcion": "descripcion", "criterio": "criterio",
                  "clave": "clave"}
-_FEMENINOS = {"descripcion", "fecha", "evidencia", "clave"}
+_FEMENINOS = {"descripcion", "fecha", "evidencia", "clave", "espera"}
 
 
 def _con_texto(fila: dict[str, Any]) -> dict[str, str]:
@@ -869,7 +876,8 @@ def _sin_lo_que_rechaza_la_base(resultado: dict[str, Any]) -> Response | None:
 @router.get("/admin/api/espacios/{espacio_id}/opciones")
 def opciones_de_la_carga(espacio_id: str, request: Request):
     """Lo que el formulario necesita para cargar una tarea en un espacio: los objetivos abiertos,
-    los integrantes activos (con quién revisaría sus tareas y si tienen Leda conectada), la
+    las tareas que una nueva puede esperar (las comprometidas y abiertas, migración 0067), los
+    integrantes activos (con quién revisaría sus tareas y si tienen Leda conectada), la
     evidencia de cada área y los días hábiles."""
     token = _token_de_administracion(request)
     if token is None:
@@ -938,11 +946,11 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
     with sin_espacio(conn) as cur:
         _con_la_version_del_nucleo(cur)
         cur.execute(
-            """select cargar_tarea(%s, %s, %s, %s, %s, %s, %s, %s, %s::text[], %s, %s, %s)
-                      as r""",
+            """select cargar_tarea(%s, %s, %s, %s, %s, %s, %s, %s, %s::text[], %s, %s, %s,
+                                   %s::uuid) as r""",
             (_hash(token), espacio, datos["objetivo"], datos["titulo"], datos["descripcion"],
              datos["responsable"], datos["fecha"], datos["criterio"], datos["evidencia"],
-             datos["decidio"], clave, ahora))
+             datos["decidio"], clave, ahora, datos["espera"]))
         resultado = cur.fetchone()["r"]
     rechazo = _sin_lo_que_rechaza_la_base(resultado)
     if rechazo is not None:

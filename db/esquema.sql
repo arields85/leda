@@ -3144,7 +3144,9 @@ end $$;
 -- (declarado por quien la carga, nunca una aprobación hecha en Leda). Quién la revisa es la regla
 -- única (`quien_revisa_la_tarea`): sin nadie activo que la revise, no se carga. La fecha elegida
 -- se guarda al cierre de la jornada del espacio, en su zona. `carga_de_tarea` es la clave de un
--- solo uso de cada carga, con RLS forzada y sin ningún privilegio para `leda_app`.
+-- solo uso de cada carga, con RLS forzada y sin ningún privilegio para `leda_app`. La espera
+-- (migración 0067; ADR 0023, decisión 2): la carga puede esperar a una tarea comprometida y
+-- abierta del espacio, siempre bloqueante; `opciones_de_la_carga` las ofrece en `tareas`.
 create table carga_de_tarea (
   id            uuid primary key default gen_random_uuid(),
   workspace_id  uuid not null references workspace(id) on delete cascade,
@@ -3220,6 +3222,18 @@ begin
                'id', o.id, 'titulo', o.titulo, 'tipo', o.tipo, 'estado', o.estado,
                'fecha_objetivo', o.fecha_objetivo) order by o.titulo, o.id)
         from objective o where o.estado in ('activo', 'propuesto')), '[]'::jsonb),
+    -- Las tareas que una nueva puede esperar (migración 0067; ADR 0023, decisión 2): las
+    -- comprometidas y abiertas; ni una cerrada ni una propuesta sin aprobar (punto 9).
+    'tareas', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', t.id, 'titulo', t.titulo, 'estado', t.estado,
+               'fecha_objetivo', (t.fecha_objetivo at time zone v_espacio.zona_horaria)::date,
+               'responsable', u.nombre, 'objetivo', o.titulo) order by t.titulo, t.id)
+        from task t
+        join objective o on o.id = t.objective_id
+        left join membership m on m.id = t.responsable_membership_id
+        left join app_user u on u.id = m.app_user_id
+       where t.estado in ('asignada', 'en_curso', 'bloqueada', 'en_revision')), '[]'::jsonb),
     'integrantes', coalesce((
       select jsonb_agg(jsonb_build_object(
                'membership_id', m.id, 'nombre', u.nombre, 'area_id', a.id, 'area', a.nombre,
@@ -3262,7 +3276,8 @@ end $$;
 create or replace function cargar_tarea(
     p_token_hash text, p_workspace_id uuid, p_objective_id uuid, p_titulo text,
     p_descripcion text, p_responsable_membership_id uuid, p_fecha date, p_criterio text,
-    p_evidencia text[], p_decidio_membership_id uuid, p_clave text, p_ahora timestamptz)
+    p_evidencia text[], p_decidio_membership_id uuid, p_clave text, p_ahora timestamptz,
+    p_espera_task_id uuid default null)
 returns jsonb
 language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
@@ -3270,6 +3285,7 @@ declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
         v_administrador uuid;
         v_espacio workspace%rowtype;
         v_objetivo objective%rowtype;
+        v_espera task%rowtype;
         v_responsable membership%rowtype;
         v_revisa membership%rowtype;
         v_politica task_evidence_policy%rowtype;
@@ -3308,11 +3324,16 @@ begin
       v_errores := v_errores || jsonb_build_object('campo', 'clave', 'motivo', 'mal_formada');
     else
       perform pg_advisory_xact_lock(hashtextextended(v_espacio.id::text || ':' || p_clave, 0));
-      v_huella := encode(sha256(convert_to(jsonb_build_object(
+      v_huella := encode(sha256(convert_to((jsonb_build_object(
         'administrador', v_administrador, 'objetivo', p_objective_id, 'titulo', p_titulo,
         'descripcion', p_descripcion, 'responsable', p_responsable_membership_id,
         'fecha', p_fecha, 'criterio', p_criterio, 'evidencia', to_jsonb(p_evidencia),
-        'decidio', p_decidio_membership_id)::text, 'UTF8')), 'hex');
+        'decidio', p_decidio_membership_id)
+        -- La espera entra en la huella sólo si la hay: una carga sin espera tiene la huella de
+        -- antes de la 0067.
+        || case when p_espera_task_id is null then '{}'::jsonb
+                else jsonb_build_object('espera', p_espera_task_id) end)::text,
+        'UTF8')), 'hex');
       select * into v_previa from carga_de_tarea c where c.clave = p_clave;
       if v_previa.id is not null then
         if v_previa.huella = v_huella then
@@ -3437,40 +3458,73 @@ begin
                                                    'motivo', 'no_es_integrante_activo');
     end if;
 
+    -- La espera (migración 0067; ADR 0023, decisión 2; mecánica §4): opcional, una sola y
+    -- siempre bloqueante, sobre una tarea comprometida y abierta de este espacio (la RLS no
+    -- encuentra una de otro). Leída `for share`: no se cierra entre esta comprobación y la espera.
+    if p_espera_task_id is not null then
+      select * into v_espera from task t where t.id = p_espera_task_id for share;
+      if v_espera.id is null then
+        v_errores := v_errores || jsonb_build_object('campo', 'espera', 'motivo', 'no_existe');
+      elsif v_espera.estado in ('terminada', 'cancelada') then
+        v_errores := v_errores || jsonb_build_object('campo', 'espera', 'motivo', 'esta_cerrada');
+      elsif v_espera.estado not in ('asignada', 'en_curso', 'bloqueada', 'en_revision') then
+        -- Una propuesta sin aprobar nunca traba una tarea comprometida (ADR 0023, punto 9).
+        v_errores := v_errores
+                     || jsonb_build_object('campo', 'espera', 'motivo', 'no_esta_comprometida');
+      end if;
+    end if;
+
     if jsonb_array_length(v_errores) > 0 then
       v_resultado := jsonb_build_object('ok', false, 'errores', v_errores);
       exit carga;
     end if;
 
-    -- Todo en orden: la tarea, su evento, su auditoría y su clave.
-    insert into task (workspace_id, objective_id, titulo, descripcion, area_id,
-                      responsable_membership_id, fecha_objetivo, criterio_aceptacion,
-                      evidencia_requerida, evidencia_policy_version)
-    values (v_espacio.id, v_objetivo.id, btrim(p_titulo), nullif(btrim(p_descripcion), ''),
-            v_responsable.area_id, v_responsable.id,
-            (p_fecha + v_hora_fin) at time zone v_espacio.zona_horaria, btrim(p_criterio),
-            p_evidencia, v_politica.version)
-    returning id into v_tarea;
-    insert into task_state_event (task_id, estado_nuevo, actor_kind, actor_app_user_id, motivo)
-    values (v_tarea, 'asignada', 'persona', v_administrador,
-            'cargada desde la web por un administrador de plataforma');
-    perform auditar_acceso_web(
-      v_espacio.id, v_administrador, 'persona', 'cargar_tarea', 'task', v_tarea,
-      jsonb_build_object(
-        'origen', 'web',
-        'cargada_por_app_user_id', v_administrador,
-        'decidida_por_membership_id', p_decidio_membership_id,
-        'decision_declarada_al_cargar', true,
-        'responsable_membership_id', v_responsable.id,
-        'revisa_membership_id', v_revisa.id,
-        'objective_id', v_objetivo.id,
-        'evidencia_policy_version', v_politica.version,
-        'sesion_de_administracion_id', v_sesion,
-        'avisos', v_avisos));
-    insert into carga_de_tarea (workspace_id, clave, huella, task_id, avisos)
-    values (v_espacio.id, p_clave, v_huella, v_tarea, v_avisos);
-    v_resultado := jsonb_build_object('ok', true, 'task_id', v_tarea, 'avisos', v_avisos,
-                                      'repetida', false);
+    -- Todo en orden: la tarea, su evento, su espera, su auditoría y su clave. Si la guarda de los
+    -- ciclos salta (al cargar no puede: nadie espera todavía a la tarea nueva), no queda nada y
+    -- vuelve como un rechazo más, nunca como un error crudo.
+    begin
+      insert into task (workspace_id, objective_id, titulo, descripcion, area_id,
+                        responsable_membership_id, fecha_objetivo, criterio_aceptacion,
+                        evidencia_requerida, evidencia_policy_version)
+      values (v_espacio.id, v_objetivo.id, btrim(p_titulo), nullif(btrim(p_descripcion), ''),
+              v_responsable.area_id, v_responsable.id,
+              (p_fecha + v_hora_fin) at time zone v_espacio.zona_horaria, btrim(p_criterio),
+              p_evidencia, v_politica.version)
+      returning id into v_tarea;
+      insert into task_state_event (task_id, estado_nuevo, actor_kind, actor_app_user_id, motivo)
+      values (v_tarea, 'asignada', 'persona', v_administrador,
+              'cargada desde la web por un administrador de plataforma');
+      if v_espera.id is not null then
+        insert into dependency (workspace_id, origen_task_id, destino_task_id, tipo)
+        values (v_espacio.id, v_espera.id, v_tarea, 'bloqueante');
+      end if;
+      perform auditar_acceso_web(
+        v_espacio.id, v_administrador, 'persona', 'cargar_tarea', 'task', v_tarea,
+        jsonb_build_object(
+          'origen', 'web',
+          'cargada_por_app_user_id', v_administrador,
+          'decidida_por_membership_id', p_decidio_membership_id,
+          'decision_declarada_al_cargar', true,
+          'responsable_membership_id', v_responsable.id,
+          'revisa_membership_id', v_revisa.id,
+          'objective_id', v_objetivo.id,
+          'evidencia_policy_version', v_politica.version,
+          'sesion_de_administracion_id', v_sesion,
+          'avisos', v_avisos)
+        || case when v_espera.id is null then '{}'::jsonb
+                else jsonb_build_object('espera_task_id', v_espera.id,
+                                        'espera_tipo', 'bloqueante') end);
+      insert into carga_de_tarea (workspace_id, clave, huella, task_id, avisos)
+      values (v_espacio.id, p_clave, v_huella, v_tarea, v_avisos);
+      v_resultado := jsonb_build_object('ok', true, 'task_id', v_tarea, 'avisos', v_avisos,
+                                        'repetida', false);
+    exception when raise_exception then
+      if sqlerrm is distinct from 'La dependencia crea un ciclo.' then
+        raise;
+      end if;
+      v_resultado := jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'espera', 'motivo', 'haria_un_ciclo')));
+    end;
   end carga;
 
   perform set_config('leda.workspace_id', previo, true);
@@ -5121,16 +5175,16 @@ grant select, insert on carga_de_tarea to leda_owner;
 alter function es_dia_habil(uuid, date) owner to leda_owner;
 alter function opciones_de_la_carga(text, uuid, timestamptz) owner to leda_owner;
 alter function cargar_tarea(text, uuid, uuid, text, text, uuid, date, text, text[], uuid, text,
-                            timestamptz) owner to leda_owner;
+                            timestamptz, uuid) owner to leda_owner;
 
 revoke execute on function es_dia_habil(uuid, date) from public;
 revoke execute on function opciones_de_la_carga(text, uuid, timestamptz) from public;
 revoke execute on function cargar_tarea(text, uuid, uuid, text, text, uuid, date, text, text[],
-                                        uuid, text, timestamptz) from public;
+                                        uuid, text, timestamptz, uuid) from public;
 grant execute on function es_dia_habil(uuid, date) to leda_admin;
 grant execute on function opciones_de_la_carga(text, uuid, timestamptz) to leda_app;
 grant execute on function cargar_tarea(text, uuid, uuid, text, text, uuid, date, text, text[],
-                                       uuid, text, timestamptz) to leda_app;
+                                       uuid, text, timestamptz, uuid) to leda_app;
 
 alter function emitir_acceso_tablero(uuid, text, timestamptz)
   owner to leda_owner;
