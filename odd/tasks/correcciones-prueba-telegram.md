@@ -40,7 +40,7 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
       empezar o sin novedades, 🔵 entregada, 🟠 atrasada, 🔴 trabada. El 📋 de una sola tarea no cambia.
 - [x] **T2 · "Consultar", no "preguntar" (decisión 78)**, en los nombres que lee la IA
       (`hechos.para_redactar`).
-- [ ] **T3 · Sin nombre ni hora en los avisos a otros (decisión 77).** Los hechos de un aviso a otra
+- [x] **T3 · Sin nombre ni hora en los avisos a otros (decisión 77).** Los hechos de un aviso a otra
       persona no le pasan a la IA el destinatario ni la hora; sí que quedó asentado y, si hace falta,
       cuándo vuelve a escribirle a la persona, en palabras de todos los días. El nombre y la hora, sólo si
       la persona los pregunta.
@@ -94,3 +94,21 @@ nombres de otros en los mensajes.
   `tests/motor/test_palabras_de_la_redaccion.py`. `pytest tests/motor` 1350 passed;
   `tests/conversaciones` 215 passed; en seco 48 de 48. **RDD:** `review-cdfe60231c85d84d`, aprobada; dos
   sugerencias sobre las pruebas (sólo el primer párrafo; una expresión sensible a mayúsculas).
+- **T3, hecha** (escritor delegado; `8d49d42` y `9f5ac67`). En la frontera de la redacción
+  (`hechos.para_redactar` → `_sin_nombre_ni_hora`), un aviso a otra persona (un hecho con `llega` o con
+  su clave en `hechos.AVISOS`, unas 30) pasa a la IA sin el destinatario ni la hora, que quedan en
+  `solo_si_pregunta` (el paso 7 del guion sigue: preguntado, dice a quién y cuándo); lo que Leda le va a
+  hacer a la misma persona (`hechos.AVISOS_A_LA_PERSONA`) llega con el día, que la cocina ya dice "hoy",
+  "mañana" o "vie 16/10", nunca la hora; los hechos de la cocina no cambian. Una prueba lee el motor y
+  falla si aparece un aviso nuevo fuera de la regla. Instrucciones de redacción: lo que se entera otra
+  persona "quedó asentado"; huella `1b181215b77350b8`. Además, el arreglo de la advertencia de la T1:
+  si falla el paso de los íconos, el texto sale igual y queda un incidente leve
+  (`motor_iconos_por_estado`). RED: `test_avisos_sin_nombre_ni_hora.py` 10 de 12 en rojo; dos de
+  `test_iconos_por_estado.py`. `pytest tests/motor` 1364 passed; `tests/conversaciones` 215 passed;
+  `test_formato_de_salida.py` 27 passed; en seco 48 de 48. Repaso del coordinador:
+  `test_avisos_sin_nombre_ni_hora.py` 12 passed. **RDD:** `review-7f672eb05058d717`, aprobada.
+  Advertencia sin arreglar: el día sale de recortar el texto de la fecha (`hechos.py:1657`); con una hora
+  en UTC entre las 21 y las 24 locales daría el día siguiente (los hechos van en hora local y ningún
+  aviso sale a esa hora). Sugerencias: la clave del incidente, su falla sin prueba, la unión de
+  `solo_si_pregunta`, un significado vacío. A observar en la ronda real: "el administrador" sigue
+  nombrado por la clave (sin la hora) y un aviso que no salió se cuenta sin a quién.
