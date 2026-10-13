@@ -587,7 +587,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       **RDD de J2-13:** `review-bfa79042ca12447b` (`a4428fd9`, WARNING: la herramienta de medición descarta una falla del juicio, `tools/medir_ayuda_al_cargar.py:437-440`) y `review-97374544422a6d97` (`73a32f9e`, WARNING: el resumen de la caja puede no coincidir con los avisos de cada campo, `HelpBox.tsx:156-157`); las dos aprobadas, sus avisos para arreglar con el cierre de la J2.
       **Ronda con la IA real** (2026-10-13, autorizada; sobre `c258ee37`): `tools/medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3 --salida tests/conversaciones/resultados/ayuda-al-cargar-3.json`, 20 casos, **59 de 60 bien** (sale con 1). La falla, "sin apuro" (vuelta 1): la IA dejó el criterio vacío en vez de proponer uno que el juicio descartara; para la persona, lo mismo. La ayuda, mediana 3,5 s (máx. 7,2 s). Detalle en la bitácora de flujos.
       **Los dos avisos de RDD, arreglados** (2026-10-13; ruta delegada, un escritor: herramienta y web): un juicio que no respondió queda en el resultado (`falla_del_juicio`, `falla: ia`, el caso sale mal como en `medir_el_juicio`), `67ca78df`; el resumen de la caja sale de los mismos avisos vivos que cada campo, `bfa3943e`. RED observado en las dos pruebas nuevas. `npm test`: 98 passed; `npm run typecheck`: sin errores; `pytest -q tests/test_ayuda_al_cargar.py tests/garantias/test_ayuda_al_cargar.py`: 187 passed. RDD: `review-5f52a868a430fd86`, aprobada (una sugerencia, `tools/medir_ayuda_al_cargar.py:442`). **Falta sólo la J2-12** (la prueba del usuario en el celular).
-- [ ] **J2-14 · El criterio escrito a mano se toma como el que propone Leda, y un rechazo trae su propuesta**
+- [x] **J2-14 · El criterio escrito a mano se toma como el que propone Leda, y un rechazo trae su propuesta**
       (decisión del usuario, 2026-10-13, "si", tras la J2-12). **Chequeo de rumbo:** es la tercera vez que se toca el
       criterio; la clase de problema no es de palabras sino de diseño: al proponer, el criterio es el resultado más
       la evidencia del área; al escribirlo a mano, se le exigía al texto solo decir cómo se comprueba, sin mirar la
@@ -611,9 +611,17 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       no se pueden leer, el criterio se juzga con la regla vieja sin dejar incidente (`web_app.py:974-985`).
       **Ronda con la IA real** (autorizada): 65 de 69, los criterios escritos todos bien (bitácora). Falta la prueba
       en el celular.
-- [ ] **J2-15 · Los puntos animados también en "cargando…"** al confirmar (usuario, J2-12). Ruta: delegada, con la J2-16.
+- [x] **J2-15 · Los puntos animados también en "cargando…"** al confirmar (usuario, J2-12). Ruta: delegada, con la J2-16.
+      Hecha: `ec3a3f37` (`Completing.tsx`, compartido por "completando…" y "cargando…").
 - [ ] **J2-16 · Las listas desplegables propias**, con la letra y el tamaño de la web, como el calendario: el
       menú nativo de iOS no se puede estilar (usuario, J2-12).
+      Hecha (escritor delegado, junto con la J2-15 y el aviso de RDD de la J2-14): `Dropdown.tsx` (botón y lista,
+      teclado, Escape, toque afuera), en las cuatro listas de la carga y en la de espacios, sin ningún `<select>`;
+      `ec3a3f37`. El aviso de RDD de la J2-14: si las opciones de la carga no se leen, no se juzga con la regla vieja:
+      se carga con el aviso de "no pude revisar" y un incidente (`evidencia_del_criterio`), `86c790d0`. RDD
+      `review-9ed467d37d43f402`, aprobada; su WARNING (en el iPhone, un toque para cerrar la lista la volvía a
+      abrir) arreglado en `309b6ac4` con su prueba (RED observado). `npm test`: 111 passed; typecheck y build bien;
+      `pytest` del criterio y la ayuda: 240 passed. **Falta la prueba en el celular.**
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**

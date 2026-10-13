@@ -64,7 +64,9 @@ viejo corriendo.
 - `leda_motor`, en la `0067` (respaldos en `db/respaldos/`, el último `leda_motor-antes-0067-20261013.dump`).
 
 **Punto exacto para seguir** (cierre del 2026-10-13, tarde):
-1. **Cerrar la J2:** falta sólo la J2-12, la prueba del usuario en el celular (el guion, en
+1. **Cerrar la J2:** la J2-12 (2026-10-13) dio tres arreglos, hechos: J2-14 (el criterio escrito a mano se toma
+   como el de Leda y un rechazo trae su propuesta; IA real 65 de 69), J2-15 (puntos en "cargando…") y J2-16 (listas
+   desplegables propias). Falta repetir la prueba en el celular con eso (el guion, en
    `../odd/tasks/plataforma-jerarquias.md`, J2-12; sumar: el aviso "No encontré a…" en su campo, los puntos
    animados y que el resumen de la caja deje de nombrar un campo al completarlo). La ronda con la IA real de la
    J2-13 dio 59 de 60 (2026-10-13, bitácora) y los dos avisos de RDD están arreglados (`67ca78df`, `bfa3943e`).
