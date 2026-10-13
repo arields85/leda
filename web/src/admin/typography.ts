@@ -5,13 +5,14 @@
  *
  * The main size is the body size, and 16px on a touch screen: under 16px the iPhone zooms the
  * page in when a control gets the focus (J1-6). Titles and values share it, so they differ only
- * in case and color; the help is smaller and dimmer.
+ * in color; titles and help share the smaller size and differ in color.
  */
 const MAIN_SIZE = 'text-body pointer-coarse:text-[16px]';
 
-/** A field's title: the form's labels and the preview's data names. Uppercase, a little spaced,
- * not bold, in the palette's off-white. */
-export const FIELD_TITLE = `${MAIN_SIZE} font-normal uppercase tracking-[0.04em] text-ink`;
+/** A field's title: the form's labels and the preview's data names. In normal case and the help's
+ * size (user, on the iPhone, 2026-10-13: the uppercase titles at the main size "quedó muy pesado";
+ * the help's size "es el tamaño correcto"), told apart from the help by its off-white color. */
+export const FIELD_TITLE = 'text-small pointer-coarse:text-body font-normal text-ink';
 
 /** What the person types or chooses: the text of every control and the preview's values. */
 export const FIELD_VALUE = `${MAIN_SIZE} text-ink-soft`;

@@ -387,8 +387,10 @@ describe('AdminApp', () => {
     styled(name, FIELD_TITLE);
     styled(name.nextElementSibling, FIELD_VALUE);
     expect(name.nextElementSibling).toHaveTextContent('Las 12 alarmas suenan en la sala de control');
-    // Titles and values are the same size; the help is smaller.
-    expect(FIELD_TITLE).toContain('pointer-coarse:text-[16px]');
+    // Titles take the help's size, in normal case, and differ from it by color; values stay 16px.
+    expect(FIELD_TITLE).not.toContain('pointer-coarse:text-[16px]');
+    expect(FIELD_TITLE).not.toContain('uppercase');
+    expect(FIELD_TITLE).toContain('text-ink');
     expect(FIELD_VALUE).toContain('pointer-coarse:text-[16px]');
     expect(FIELD_HINT).not.toContain('pointer-coarse:text-[16px]');
     expect(FIELD_TITLE).not.toContain('font-bold');
