@@ -68,7 +68,12 @@ Ruta: cada porción, delegada (un escritor), porque toca base, servidor, web y p
       Advertencias: el texto del ciclo depende del mensaje del disparador (`db/esquema.sql:3522`); la lista de
       tareas para elegir no tiene tope (`0067:88`). Sugerencia: una espera elegida que dejó de estar abierta
       se manda sin que se vea (`draft.ts:40-43`).
-- [ ] **J1-5 · Prueba real en el celular** (con el usuario).
+- [x] **J1-5 · Prueba real en el celular** (con el usuario; pasada el 2026-10-13: "ahora si, perfecto").
+      En el celular cargó "Poner tornillo" (de Lucas) que espera a "Cablear tablero de la máquina 3": la espera,
+      bloqueante, y la auditoría de la carga con `espera_task_id`, en `leda_motor`. Tras dos rondas de arreglos
+      (J1-6 y J1-7), los últimos detalles a pedido del usuario: un color propio para lo que falta,
+      `--color-falta: #ff931f` (`27f13459`, `a2976722`; las vencidas siguen con el suyo), y el ícono
+      `CircleAlert` de Lucide en vez del "!" (`b45778eb`).
       Preparación: el túnel (`cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000`), la web
       reiniciada (`.venv\Scripts\python.exe -m uvicorn leda.entrada:app --host 127.0.0.1 --port 8000
       --no-access-log`), y el usuario emite su enlace con `$env:LEDA_BASE_URL = "<dirección del túnel>"` y
