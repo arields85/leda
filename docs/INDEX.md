@@ -63,6 +63,7 @@ se trabaja y qué no se hace".
 | Quién crea objetivos, tareas y jerarquías en la plataforma: Dirección, los referentes y las propuestas de un integrante, según la jerarquía del equipo; enmienda los ADR 0022 y 0017 (aceptado el 2026-10-13) | [`decisions/0023-quien-crea-en-la-plataforma.md`](decisions/0023-quien-crea-en-la-plataforma.md) |
 | Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
 | Relevamiento de NotebookLM y respuestas ancladas en fuentes | [`research/notebooklm-y-grounding.md`](research/notebooklm-y-grounding.md) |
+| Cómo usa Gemini para voz a texto (y texto a voz) el otro proyecto del usuario; base de la J2b | [`research/gemini-voz-del-otro-proyecto.md`](research/gemini-voz-del-otro-proyecto.md) |
 | Aprendizajes del `SOUL.md` y del contexto operativo de Prisma en Hermes (trabajo anterior del usuario) | [`research/soul-y-contexto-de-prisma-en-hermes.md`](research/soul-y-contexto-de-prisma-en-hermes.md) |
 | Copias de documentos anteriores: `STATUS` y `AGENTS` hasta el 2026-09-30, hasta el 2026-10-04 y hasta el paso M1; el documento de la unidad del Motor hasta el paso M1; y el diario de Leda orienta. Son historia, no instrucciones vigentes | [`historial/`](historial/) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
