@@ -75,7 +75,7 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
       atrás (`HoraAtrasada`) y `volver` se niega si dejaría a Leda antes, salvo `--forzar`.
 - [x] **T7 · "Dejalo pendiente, después lo hago"** en medio de una entrega, y "Anoté" dicho de un
       borrador: conversación de prueba; si pide cambiar el diseño, propuesta al usuario.
-- [ ] **T8 · La entrega nueva que se contradice** ("dejé la foto para cuando vuelvas a entregarla" y
+- [x] **T8 · La entrega nueva que se contradice** ("dejé la foto para cuando vuelvas a entregarla" y
       "¿confirmás la entrega así?"; contó lo que esta vez no se escribió).
 - [ ] **T9 · Ronda con la IA real** de las conversaciones tocadas (autorizada), bitácora.
 - [ ] **T10 · Cierre:** suites, `docs/STATUS.md`, este documento y las memorias.
@@ -229,4 +229,23 @@ nombres de otros en los mensajes.
   (`fichas.py:520-521`); a observar en la ronda real. Límite: sacar todas las piezas con `corregir`
   arma un borrador vacío en vez de cancelar (es la otra lectura del paso 2, junto con `cancelar`).
   **Para la ronda real:** 51, 22, 27, 21, 23, 38 y 07.
+- **T8, hecha** (escritor delegado; `bc40805`). En los hechos, sin frases ni casos: (a) con la oferta de
+  volver a entregarla, el archivo aparece sólo dentro de `le_ofrece_entregarla_con_esto`; en vez de
+  `para_cuando_la_entregue` va `si_no_la_entrega_queda_con_la_tarea` (fiel a la decisión 68); (b) al
+  mostrar una entrega nueva (`entrega._con_lo_que_sigue_contando`), los puntos del criterio que ya
+  describió la entrega anterior salen del `describe` de lo escrito ahora y van en
+  `sigue_contando_de_la_entrega_anterior`; lo guardado no cambia (C1 sigue en `describe_del_criterio`,
+  la revisión lo ve cubierto). La huella no cambió. Conversaciones: la 27 suma los pasos 14 a 18 (el
+  pedido de cambios, la foto del contador con sus dos lecturas y "dale"); la 23, paso 12, con los dos
+  "no dice". RED: `test_entrega.py` 4 en rojo sin el arreglo. `test_entrega.py` 85 passed; `pytest
+  tests/motor` 1402 passed; `tests/conversaciones` 217 passed; en seco 49 de 49. **RDD:**
+  `review-7136c6a53e78a211`, aprobada; advertencia: si lo escrito ahora repite un punto ya descrito (o
+  el pedido de cambios era sobre ese punto), igual sale como "sigue contando de antes"
+  (`entrega.py:738-747`). A observar en la ronda: el nombre de la jugada al redactar sigue siendo
+  `dejarlo_para_cuando_la_entregue`; el aviso a quien aprueba todavía describe C1 con lo nuevo; una
+  pregunta repetida pierde la clave nueva (`preguntas.py`); el `pedido_de_estado` de la escalera que
+  llega justo después de un pedido de cambios en una tarea que vence ese día (paso 16 de la 27).
+- **T9, en curso** (2026-10-13, madrugada): ronda con la IA real, sol por la suscripción, sobre
+  `bc40805`: 51, 27, 23 y 22, 3 veces; 40, 41 y 44, 2 veces (cupo: la ventana de 5 horas en 0 %, la
+  semanal en 41 %; 15 corridas grandes gastaron antes el 52 % de una ventana, por eso no 10 × 5).
 
