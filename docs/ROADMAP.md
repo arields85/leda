@@ -113,7 +113,8 @@ Etapas y criterios de paso a `main` (M1 a M3): [`STATUS.md`](STATUS.md), "Próxi
    orden se decide al llegar.
 
 Aparte, sin orden: lo que queda abierto de esta etapa (la conversación 22, el paso a `main`, los casos
-de borde de las revisiones y los `PENDIENTE` de los ADR), en `STATUS.md`.
+de borde de las revisiones, los `PENDIENTE` de los ADR y la auditoría del lenguaje que sale del código, antes
+de la próxima prueba real grande), en `STATUS.md`.
 
 ### Anotado para más adelante
 

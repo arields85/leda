@@ -242,6 +242,13 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
 
 ## Deudas registradas
 
+- **Auditoría del lenguaje que sale del código** (pedido del usuario, 2026-10-13; para antes de la próxima
+  prueba real grande): que Leda hable siempre natural y cálida. Dos frentes: lo que la cocina le pasa a la IA
+  (nombres de datos que escapen a `hechos.para_redactar`, estados internos, fechas técnicas, códigos de
+  motivo: lo que la IA pueda copiar tal cual) y los textos que el código manda directo sin la IA (botones,
+  mensajes fijos, avisos de error, textos de la web). Antecedente: "Las palabras de todos los días" en la
+  bitácora (2026-10-07: "previsión" 85 → 0). Un explorador arma la lista con ejemplos y arreglo propuesto, y
+  se pule con el usuario.
 - **Producción:**
   - Faltan cola de entrada, pool de conexiones, observabilidad, respaldo y restauración.
   - El webhook atiende un mensaje a la vez, bajo un candado global, y el candado de cada mensaje sigue tomado
