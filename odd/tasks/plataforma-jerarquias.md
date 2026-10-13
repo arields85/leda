@@ -650,6 +650,24 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
          comprueba que sólo cambió la ortografía (palabra por palabra) o un nombre de los datos.
       Ruta: delegada, un escritor (servidor, web, herramienta y pruebas). Después, ronda con la IA real (autorizada
       por el usuario) y la prueba en el celular.
+- [ ] **J2-18 · Leda completa todo lo que puede** (decisión del usuario, 2026-10-13, "si"). La ronda de la J2-17
+      (66 de 81, bitácora) mostró que, sin quién la hace, la IA inventaba una comprobación floja ("se comprueba al
+      verlo"), la misma clase que el UPS de la J2-13. El usuario: "Leda debería en lo posible completar todos los
+      campos; yo reviso y corrijo lo que quiera o lo dejo tal cual"; y la evidencia no es cerrada (el formulario
+      ofrece los cinco tipos del pack; el área fija un mínimo, no un límite). **Chequeo de rumbo:** la causa no era
+      la redacción sino que Leda proponía sin los datos de los que sale la comprobación; con la persona y la
+      evidencia propuestas, el criterio dice cómo se comprueba con lo que se ve tildado. Lo decidido:
+      1. Leda propone quién la hace según el trabajo y las áreas del equipo, aunque no se haya dicho (marcado como
+         propuesto); si la persona nombró a alguien que no está en el equipo, se dice en su campo y no se reemplaza
+         por otro.
+      2. Leda propone la evidencia que corresponde a esta tarea, sumada al mínimo del área (que no se puede quitar).
+      3. El criterio dice cómo se comprueba con esa evidencia, con naturalidad.
+      4. El objetivo y la tarea que espera, cuando se entienda.
+      5. La fecha, sólo si la persona la dijo (cualquier otra sería inventada).
+      Con la misma unidad: la ortografía palabra por palabra (una palabra que no pasa el control queda como estaba,
+      sin perder las demás: "q" no anula "batería"), los avisos de RDD de la J2-17 (`review-0f1f6e1e0eacf371`,
+      `review-297cc946aa4740af`, `review-b5e1ca58c61b942f`; entre ellos: sin la IA, un criterio igual al título
+      podía cargarse sin revisar) y el chequeo de naturalidad de la herramienta, que marcaba de más.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
