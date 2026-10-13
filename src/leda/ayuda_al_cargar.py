@@ -9,13 +9,19 @@ acá: la persona ve cada dato marcado, lo corrige o lo acepta, y confirma como s
 
 - **Qué recibe la IA** (`entrada_de_la_ia`), sólo del espacio de la carga: el texto, lo que ya
   está escrito, hoy y los días que vienen con su día de la semana (`hechos.dia`), los objetivos
-  abiertos y las tareas abiertas para esperar con un código cada una (O1…, T1…), y el área y la
-  evidencia de quien la hace si ya se eligió. Nunca los nombres del equipo ni un id: quién la hace
-  vuelve como las palabras con que se la nombró.
+  abiertos y las tareas abiertas para esperar con un código cada una (O1…, T1…), el área y la
+  evidencia de quien la hace si ya se eligió y, como hechos (J2-18), el equipo que puede hacerla
+  (P1…, con su nombre y su área), la evidencia que pide cada área y los tipos de evidencia del pack
+  (E1…, en palabras de todos los días). Nunca un id.
 - **Lo que decide el código** (`revisar`):
-  - quién la hace, sólo si sus palabras están en el texto y son de alguien del equipo
-    (`coinciden`: `fichas.integrantes_que_coinciden`, con los apodos); con dos o más, Leda no
-    elige y las muestra (ADR 0020, decisión 3);
+  - quién la hace: si la persona lo nombró, sólo si sus palabras están en el texto y son de
+    alguien del equipo (`coinciden`: `fichas.integrantes_que_coinciden`, con los apodos); con dos
+    o más, Leda no elige y las muestra (ADR 0020, decisión 3); si no es nadie del equipo, se dice
+    y no se pone a otro. Si no nombró a nadie (J2-18), el que propone Leda por el trabajo y las
+    áreas, sólo si su código es de alguien del equipo que puede hacerla (alguien lo revisa);
+  - la evidencia (J2-18): la que propone Leda para esta tarea, además del mínimo que pide el área
+    de quien la hace (que va siempre), sólo de los tipos que esa área conoce; se propone junto con
+    el criterio y si la persona no eligió ya otra;
   - la espera y el objetivo, de sus listas; el objetivo es el de la tarea que espera si está
     abierto;
   - la fecha, sólo si la persona la dijo (constitución §4: nunca una fecha que nadie dijo): la IA
@@ -26,19 +32,23 @@ acá: la persona ve cada dato marcado, lo corrige o lo acepta, y confirma como s
     ("del 10 al 12") no es una fecha;
   - título, descripción y criterio, con los topes del formulario y sin un número ni un nombre que
     no estén en lo que escribió la persona o en los datos de esta tarea
-    (`entrega.problema_del_ejemplo`, punto por punto);
-  - el criterio (J2-17): lo escribe la IA entero, con sus palabras (la evidencia que pide el
-    área, si la recibió, es un dato para decir cómo se comprueba, no un texto para copiar), y lo
-    juzga por su sentido otra llamada (`juzgar_la_propuesta`, fuera del candado), ya con la
-    evidencia del área de quien la hace (o la del área del objetivo): con evidencia, que diga un
+    (`entrega.problema_del_ejemplo`, punto por punto); un nombre de los datos que la persona
+    escribió mal ("cirelabs" por CoreLabs) vale escrito como está en los datos (J2-18);
+  - el criterio (J2-17): lo escribe la IA entero, con sus palabras (la evidencia de quien la
+    hace, la que pide el área y la que propone Leda, es un dato para decir cómo se comprueba, no
+    un texto para copiar), y lo juzga por su sentido otra llamada (`juzgar_la_propuesta`, fuera
+    del candado), ya con esa evidencia (o la del área del objetivo): con evidencia, que diga un
     resultado; sin ella, que diga cómo se comprueba. Si no pasa, el criterio que escribió el
     juicio; si tampoco, el de reserva (`criterio_con_la_evidencia`, sólo con evidencia). Leda
-    propone siempre: "no sé" es un pedido de ayuda.
-- **La evidencia** no la propone la IA: elegir quién la hace marca la que pide su área, en la web.
-- **La ortografía** (J2-17): antes de la vista previa, la IA corrige la ortografía de lo que se
-  escribió en los campos de texto y pone los nombres como están en los datos del equipo
-  (`revisar_la_ortografia`); el código acepta una corrección sólo si no cambió nada más que la
-  ortografía, palabra por palabra (`solo_ortografia`), y la arma sobre el texto de la persona.
+    propone siempre: "no sé" es un pedido de ayuda. Sin quién la hace (J2-18), ninguna
+    comprobación inventada: el criterio dice qué tiene que quedar hecho y cómo se comprueba sólo
+    si la persona lo dijo (`INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN`): cómo se comprueba lo dirá la
+    evidencia del área de quien la haga, y al cargar con ella basta un resultado (J2-14).
+- **La ortografía** (J2-17 y J2-18): antes de la vista previa, la IA corrige la ortografía de lo
+  que se escribió en los campos de texto y pone los nombres como están en los datos del equipo
+  (`revisar_la_ortografia`); el código acepta cada palabra corregida sólo si es la misma palabra
+  mal escrita (`palabra_por_palabra`), la que no queda como la escribió la persona, y arma el
+  texto sobre el de la persona.
 
 **El criterio escrito, al cargar** (J2-9, J2-13, J2-14 y J2-17; mecánica §13: "¿el resultado
 esperado es concreto y verificable?"). Con o sin la ayuda, la carga juzga el criterio antes de
@@ -116,20 +126,32 @@ TEXTOS = {
 INSTRUCCIONES = """\
 Sos Leda, la project manager del equipo. Una persona está cargando una tarea en la plataforma: te \
 contó con sus palabras qué quiere hacer (texto) y te pide que completes los datos de la tarea que \
-todavía están vacíos (pide). Lo que devolvés es una propuesta: la persona ve cada dato marcado y lo \
-acepta, lo corrige o lo borra.
+todavía están vacíos (pide). Completás todo lo que se pueda saber con lo que recibiste. Lo que \
+devolvés es una propuesta: la persona ve cada dato marcado y lo acepta, lo corrige o lo borra.
+
+Quién la hace: si la persona nombró a alguien, copiás sus palabras tal cual y no proponés a nadie \
+más, aunque no lo encuentres en el equipo. Si no nombró a nadie, proponés a quien del equipo le \
+corresponde hacerla por el trabajo que hay que hacer y por su área.
+
+La evidencia: el área de quien la hace pide un mínimo, que va siempre. Además proponés, de los \
+tipos de evidencia, los que sirven para comprobar esta tarea en particular, si hace falta alguno \
+más.
 
 El título, la descripción y el criterio de aceptación los escribís vos, con lo que contó la \
 persona, como los escribiría alguien del equipo que conoce el trabajo: con naturalidad, en \
-oraciones simples y con buena ortografía. El criterio dice, en una o dos oraciones, qué tiene que \
-quedar hecho y cómo sabe quien la revise que quedó hecho. Para decir cómo se sabe usás lo que dijo \
-la persona y, si la recibiste, la evidencia que pide el área de quien la hace; si no tenés ninguna \
-de las dos, lo decís con lo que la tarea misma deja ver. Los datos que recibís son hechos para \
-entender la tarea, no textos para copiar: los contás con tus palabras, sin repetir sus etiquetas \
-ni armar listas con ellos. Siempre proponés un criterio, aunque la persona no sepa cuál poner.
+oraciones simples y con buena ortografía. Los nombres de personas, áreas, objetivos y tareas los \
+escribís como están en los datos, aunque la persona los haya escrito con otra ortografía. El \
+criterio dice, en una o dos oraciones, qué tiene que quedar hecho y cómo sabe quien la revise que \
+quedó hecho: con lo que dijo la persona y con la evidencia de quien la hace, la que pide su área y \
+la que proponés. Si no sabés quién la hace, el criterio dice qué tiene que quedar hecho, y cómo se \
+sabe sólo si la persona lo dijo: cómo se comprueba lo va a decir la evidencia del área de quien la \
+haga. Los datos que recibís son hechos para entender la tarea, no textos para copiar: los contás \
+con tus palabras, sin repetir sus etiquetas ni armar listas con ellos. Siempre proponés un \
+criterio, aunque la persona no sepa cuál poner.
 
-Quién la hace, la tarea que espera y la fecha van sólo si la persona los dijo. El objetivo, si se \
-entiende de lo que contó.
+La tarea que espera, si la persona dijo que tiene que esperar a otra; el objetivo, si se entiende \
+de lo que contó; los dos también cuando la persona los nombra con otra ortografía. La fecha, sólo \
+si la persona la dijo.
 
 Usás sólo lo que recibiste: ningún número, nombre, fecha ni dato que no esté ahí. Lo que no podés \
 saber con lo que recibiste va vacío; la persona lo completa."""
@@ -142,7 +164,13 @@ _DATOS = {
                 "tiene que quedar hecho y cómo sabe quien la revise que quedó hecho.",
     "resultado": "Lo que tiene que quedar hecho, en una oración, sin decir cómo se comprueba.",
     "responsable": "Las palabras con que la persona nombró a quien va a hacer la tarea, tal cual "
-                   "las escribió.",
+                   "las escribió; vacío si no nombró a nadie.",
+    "quien_la_hace": "Si la persona no nombró a nadie, el código (P1, P2...) de quien del equipo "
+                     "le corresponde hacerla por el trabajo y por su área; vacío si nombró a "
+                     "alguien o si no se puede saber.",
+    "evidencia": "Los códigos (E1, E2...) de los tipos de evidencia que sirven para comprobar "
+                 "esta tarea además de los que pide el área de quien la hace, separados por "
+                 "comas; vacío si no hace falta otro.",
     "espera": "El código (T1, T2...) de la tarea abierta que tiene que terminar antes de que "
               "esta pueda empezar.",
     "objetivo": "El código (O1, O2...) del objetivo al que contribuye la tarea.",
@@ -154,8 +182,9 @@ _DATOS = {
                           "antes de ese día.",
 }
 # Los datos que van sólo con otro: el resultado, con el criterio (para el criterio de reserva,
-# J2-17), y las palabras de la fecha, con la fecha.
-_ACOMPANAN = {"resultado": "criterio", "como_dijo_la_fecha": "fecha"}
+# J2-17), quien propone Leda, con quién la hace (J2-18), y las palabras de la fecha, con la fecha.
+_ACOMPANAN = {"resultado": "criterio", "quien_la_hace": "responsable",
+              "como_dijo_la_fecha": "fecha"}
 
 # Las palabras de una fecha (`fecha_dicha`).
 _MESES = {m: i for i, m in enumerate(
@@ -184,11 +213,13 @@ _FICHA = re.compile(r"\d{1,2}/\d{1,2}(?:/\d{2,4})?|\d{1,2}-\d{1,2}|[^\W_]+")
 
 @dataclass
 class Resultado:
-    """Lo que Leda propone (`propuesta`, con los nombres del formulario), las personas para elegir
-    quién la hace cuando hay más de una (`elegir`), lo que no se propuso y la persona tiene que
-    saber (`avisos`, con su texto) y, para la auditoría, cada dato descartado con su motivo."""
+    """Lo que Leda propone (`propuesta`, con los nombres del formulario; la evidencia, como la
+    lista de los tipos que Leda suma al mínimo del área), las personas para elegir quién la hace
+    cuando hay más de una (`elegir`), lo que no se propuso y la persona tiene que saber (`avisos`,
+    con su texto) y, para la auditoría, cada dato descartado con su motivo y de dónde salió quién
+    la hace (`responsable_de`: `dicho`, si la persona lo nombró; `leda`, si lo propuso Leda)."""
 
-    propuesta: dict[str, str] = field(default_factory=dict)
+    propuesta: dict[str, Any] = field(default_factory=dict)
     elegir: list[dict[str, str]] = field(default_factory=list)
     avisos: list[dict[str, str]] = field(default_factory=list)
     descartados: list[dict[str, str]] = field(default_factory=list)
@@ -197,6 +228,7 @@ class Resultado:
     # escribió el juicio (`juicio`) o el de reserva (`reserva`), para la auditoría.
     por_juzgar: dict[str, Any] | None = None
     criterio_de: str | None = None
+    responsable_de: str | None = None
 
     def descartar(self, campo: str, motivo: str, aviso: str | None = None, **datos: str) -> None:
         self.descartados.append({"campo": campo, "motivo": motivo})
@@ -250,6 +282,57 @@ def _con_codigos(opciones) -> tuple[dict[str, Mapping[str, Any]], dict[str, Mapp
     return objetivos, tareas
 
 
+def _puede_hacerla(integrante: Mapping[str, Any]) -> bool:
+    """Si a alguien se le puede dar una tarea: que la revise otra persona activa (si no, la carga
+    la rechaza: `sin_quien_la_revise` o `la_hace_y_la_revisa`)."""
+    revisa = integrante.get("revisa") or {}
+    return bool(revisa.get("membership_id")) and \
+        revisa.get("membership_id") != integrante.get("membership_id")
+
+
+def _equipo(opciones) -> dict[str, Mapping[str, Any]]:
+    """Quienes pueden hacer una tarea, con un código cada uno (P1…), para que Leda proponga a uno
+    (J2-18)."""
+    return {f"P{i}": m for i, m in enumerate(
+        (m for m in opciones.get("integrantes") or [] if _puede_hacerla(m)), 1)}
+
+
+def _tipos_del_pack(opciones) -> dict[str, tuple[str, str]]:
+    """Los tipos de evidencia que conocen las áreas del espacio (los del pack), con un código cada
+    uno (E1…, por su nombre): el código, el tipo y cómo se dice en palabras de todos los días."""
+    palabras: dict[str, str] = {}
+    for politica in opciones.get("politicas") or []:
+        for tipo in [*(politica.get("evidencia_requerida") or []), *(politica.get("tipos") or {})]:
+            if tipo not in palabras:
+                palabras[tipo] = _evidencia_en_palabras(
+                    {"tipos": politica.get("tipos") or {}, "evidencia_requerida": [tipo]})[0]
+    return {f"E{i}": (t, palabras[t]) for i, t in enumerate(sorted(palabras), 1)}
+
+
+def _lista(valor: Any) -> list[str]:
+    return [v for v in valor if isinstance(v, str)] if isinstance(valor, (list, tuple)) else []
+
+
+def _minimo(politica) -> list[str]:
+    return list((politica or {}).get("evidencia_requerida") or [])
+
+
+def se_propone_la_evidencia(escrito: Mapping[str, Any], opciones: Mapping[str, Any]) -> bool:
+    """Si Leda propone la evidencia (J2-18): junto con el criterio, que dice cómo se comprueba con
+    ella; si quién la hace ya se eligió, sólo si su área tiene una política y la persona no tildó
+    otra además del mínimo (lo que eligió es suyo); si no se eligió, si hay alguna política."""
+    if "criterio" not in lo_que_se_pide(escrito, opciones):
+        return False
+    if not opciones.get("politicas"):
+        return False
+    if _vacio(escrito.get("responsable_id")):
+        return True
+    politica = _politica(opciones, _integrante(opciones, escrito.get("responsable_id")))
+    if politica is None:
+        return False
+    return not set(_lista(escrito.get("evidencia"))) - set(_minimo(politica))
+
+
 def _hoy(opciones) -> date:
     return date.fromisoformat(str(opciones["hoy"]))
 
@@ -270,8 +353,8 @@ def _dias_proximos(hoy: date, opciones) -> list[str]:
 
 def entrada_de_la_ia(texto: str, escrito: Mapping[str, Any],
                      opciones: Mapping[str, Any]) -> dict[str, Any]:
-    """Lo que recibe la IA: sólo del espacio de las opciones, sin ids ni los nombres del
-    equipo."""
+    """Lo que recibe la IA: sólo del espacio de las opciones y sin ids; el equipo, las áreas y la
+    evidencia, como hechos con un código (J2-18)."""
     objetivos, tareas = _con_codigos(opciones)
     hoy = _hoy(opciones)
     ya: dict[str, Any] = {}
@@ -289,14 +372,21 @@ def entrada_de_la_ia(texto: str, escrito: Mapping[str, Any],
         ya["quien_la_hace"] = {"nombre": integrante["nombre"], "area": integrante["area"],
                                "evidencia_que_pide": _evidencia_en_palabras(
                                    _politica(opciones, integrante))}
+        elegida = evidencia_de_la_carga(opciones, integrante["membership_id"],
+                                        _lista(escrito.get("evidencia")))
+        if elegida:
+            ya["evidencia_elegida"] = elegida
     if not _vacio(escrito.get("fecha")):
         try:
             ya["fecha"] = hechos.dia(date.fromisoformat(escrito["fecha"]), hoy)
         except ValueError:
             pass
+    pide = [PARA_LA_IA[c] for c in lo_que_se_pide(escrito, opciones)]
+    if se_propone_la_evidencia(escrito, opciones):
+        pide.append("evidencia")
     return {
         "texto": texto,
-        "pide": [PARA_LA_IA[c] for c in lo_que_se_pide(escrito, opciones)],
+        "pide": pide,
         "ya_escrito": ya,
         "hoy": hechos.dia(hoy, hoy),
         "dias": _dias_proximos(hoy, opciones),
@@ -304,6 +394,12 @@ def entrada_de_la_ia(texto: str, escrito: Mapping[str, Any],
         "tareas_abiertas": [{"codigo": c, "titulo": t["titulo"],
                              "la_hace": t.get("responsable"), "objetivo": t.get("objetivo")}
                             for c, t in tareas.items()],
+        "equipo": [{"codigo": c, "nombre": m["nombre"], "area": m["area"]}
+                   for c, m in _equipo(opciones).items()],
+        "areas": [{"area": p["area"], "evidencia_que_pide": _evidencia_en_palabras(p)}
+                  for p in opciones.get("politicas") or []],
+        "tipos_de_evidencia": [{"codigo": c, "en_palabras": palabras}
+                               for c, (_, palabras) in _tipos_del_pack(opciones).items()],
     }
 
 
@@ -690,28 +786,19 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
     pide = set(lo_que_se_pide(escrito, opciones))
     objetivos, tareas = _con_codigos(opciones)
 
-    # Quién la hace: sólo con palabras del texto, y alguien de este equipo.
+    # Quién la hace: el que nombró la persona (sólo con palabras del texto, y alguien de este
+    # equipo); si no nombró a nadie, el que propone Leda (J2-18). Si nombró a alguien que no es del
+    # equipo, o a varios, Leda no pone a otro.
     responsable = escrito.get("responsable_id") or None
-    dicho = _cadena(crudo.get("responsable")) if "responsable_id" in pide else None
-    if dicho is not None:
-        palabras_del_texto = set(_normal(texto).split())
-        if not set(_normal(dicho).split()) <= palabras_del_texto:
-            r.descartar("responsable", "no_lo_dijo")
-        else:
-            encontrados = []
-            for f in coinciden(dicho):
-                integrante = _integrante(opciones, str(f["membership_id"]))
-                if integrante is not None and integrante not in encontrados:
-                    encontrados.append(integrante)
-            if len(encontrados) == 1:
-                responsable = encontrados[0]["membership_id"]
-                r.propuesta["responsable_id"] = responsable
-            elif encontrados:
-                r.elegir = [{"membership_id": i["membership_id"], "nombre": i["nombre"],
-                             "area": i["area"]} for i in encontrados]
-                r.descartar("responsable", "varios", "varios", quien=dicho)
-            else:
-                r.descartar("responsable", "no_encontrado", "no_encontrado", quien=dicho)
+    if "responsable_id" in pide:
+        responsable = _quien_la_hace(r, crudo, texto, opciones, coinciden)
+
+    # La evidencia que propone Leda, además del mínimo del área de quien la hace (J2-18).
+    integrante = _integrante(opciones, responsable)
+    tipos = _minimo(_politica(opciones, integrante)) + _lista(escrito.get("evidencia"))
+    if se_propone_la_evidencia(escrito, opciones):
+        tipos += _la_evidencia_de_leda(r, crudo.get("evidencia"), opciones, integrante,
+                                       escrito)
 
     # La espera, de la lista.
     espera = escrito.get("espera_id") or None
@@ -742,9 +829,11 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
     if fecha is not None and not (isinstance(fecha, str) and not fecha.strip()):
         _revisar_la_fecha(r, fecha, _cadena(crudo.get("como_dijo_la_fecha")), texto, opciones)
 
-    # Los textos, con lo que es de esta tarea: lo que escribió la persona y los datos elegidos.
+    # Los textos, con lo que es de esta tarea: lo que escribió la persona, los datos elegidos y los
+    # nombres de los datos que la persona escribió mal (J2-18: "cirelabs" es CoreLabs).
     permitidos = [texto, *(str(escrito.get(c) or "") for c in ("titulo", "descripcion",
                                                                "criterio"))]
+    permitidos += nombres_mal_escritos(texto, opciones)
     objetivo = _por_id(opciones.get("objetivos") or [], "id",
                        r.propuesta.get("objetivo_id") or escrito.get("objetivo_id"))
     if objetivo is not None:
@@ -752,10 +841,11 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
     tarea = _por_id(opciones.get("tareas") or [], "id", espera)
     if tarea is not None:
         permitidos += [tarea["titulo"], str(tarea.get("responsable") or "")]
-    integrante = _integrante(opciones, responsable)
     if integrante is not None:
         permitidos += [integrante["nombre"], integrante["area"]]
-    evidencia = _evidencia_de_la_tarea(opciones, integrante, objetivo)
+        evidencia = evidencia_de_la_carga(opciones, responsable, tipos)
+    else:
+        evidencia = _evidencia_de_la_tarea(opciones, None, objetivo)
     permitidos += evidencia
 
     for campo in ("titulo", "descripcion"):
@@ -773,8 +863,83 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
         else:
             r.propuesta[campo] = valor
     if "criterio" in pide:
-        r.por_juzgar = _el_criterio_por_juzgar(r, crudo, escrito, evidencia, permitidos)
+        r.por_juzgar = _el_criterio_por_juzgar(r, crudo, escrito, evidencia, permitidos,
+                                               sin_quien=integrante is None)
     return r
+
+
+def _quien_la_hace(r: Resultado, crudo: Mapping[str, Any], texto: str,
+                   opciones: Mapping[str, Any],
+                   coinciden: Callable[[str], list[dict[str, Any]]]) -> str | None:
+    """Quién la hace, si se pidió: el que nombró la persona, si es uno solo del equipo; con varios,
+    para elegir; con nadie, se dice. Si no nombró a nadie, el que propone Leda, si su código es de
+    alguien del equipo que puede hacerla."""
+    dicho = _cadena(crudo.get("responsable"))
+    if dicho is not None:
+        if not set(_normal(dicho).split()) <= set(_normal(texto).split()):
+            # Las palabras no son de la persona: no nombró a nadie con ellas.
+            r.descartar("responsable", "no_lo_dijo")
+        else:
+            encontrados = []
+            for f in coinciden(dicho):
+                integrante = _integrante(opciones, str(f["membership_id"]))
+                if integrante is not None and integrante not in encontrados:
+                    encontrados.append(integrante)
+            if len(encontrados) == 1:
+                r.propuesta["responsable_id"] = encontrados[0]["membership_id"]
+                r.responsable_de = "dicho"
+                return encontrados[0]["membership_id"]
+            if encontrados:
+                r.elegir = [{"membership_id": i["membership_id"], "nombre": i["nombre"],
+                             "area": i["area"]} for i in encontrados]
+                r.descartar("responsable", "varios", "varios", quien=dicho)
+            else:
+                r.descartar("responsable", "no_encontrado", "no_encontrado", quien=dicho)
+            return None
+    codigo = _cadena(crudo.get("quien_la_hace"))
+    if codigo is None:
+        return None
+    integrante = _equipo(opciones).get(codigo.upper())
+    if integrante is None:
+        r.descartar("responsable", "no_existe")
+        return None
+    r.propuesta["responsable_id"] = integrante["membership_id"]
+    r.responsable_de = "leda"
+    return integrante["membership_id"]
+
+
+def _la_evidencia_de_leda(r: Resultado, crudo: Any, opciones: Mapping[str, Any],
+                          integrante: Mapping[str, Any] | None,
+                          escrito: Mapping[str, Any]) -> list[str]:
+    """Los tipos de evidencia que propone Leda además del mínimo del área de quien la hace (y de
+    lo que ya tildó la persona), en el orden del formulario: sólo los que esa área conoce (uno que
+    no, lo rechazaría la carga). Sin quién la hace, ninguno: no hay área de dónde salgan."""
+    if isinstance(crudo, str):
+        fichas = [f for f in re.split(r"[\s,;]+", crudo) if f]
+    else:
+        fichas = [f.strip() for f in _lista(crudo) if f.strip()]
+    if not fichas:
+        return []
+    politica = _politica(opciones, integrante)
+    if politica is None:
+        r.descartar("evidencia", "sin_quien_la_hace")
+        return []
+    por_codigo = _tipos_del_pack(opciones)
+    conoce = set(_minimo(politica)) | set(politica.get("tipos") or {})
+    ya = set(_minimo(politica)) | set(_lista(escrito.get("evidencia")))
+    elegidos: list[str] = []
+    for ficha in fichas:
+        tipo = por_codigo.get(ficha.upper(), (None,))[0]
+        if tipo is None:
+            r.descartar("evidencia", "no_existe")
+        elif tipo not in conoce:
+            r.descartar("evidencia", "no_es_del_area")
+        elif tipo not in ya and tipo not in elegidos:
+            elegidos.append(tipo)
+    elegidos.sort()
+    if elegidos:
+        r.propuesta["evidencia"] = elegidos
+    return elegidos
 
 
 # --- El criterio: con las palabras de Leda y juzgado por su sentido (J2-13, J2-14 y J2-17) ------
@@ -840,10 +1005,12 @@ def _evidencia_de_la_tarea(opciones, integrante, objetivo) -> list[str]:
 
 
 def _el_criterio_por_juzgar(r: Resultado, crudo: Mapping[str, Any], escrito: Mapping[str, Any],
-                            evidencia: Sequence[str], permitidos: Sequence[str]) -> dict[str, Any]:
+                            evidencia: Sequence[str], permitidos: Sequence[str], *,
+                            sin_quien: bool = False) -> dict[str, Any]:
     """Lo que se juzga del criterio que escribió la IA: el texto entero, si pasa los controles de
     lo inventado (si no, vacío: el juicio igual escribe uno), con el título y la descripción de la
-    tarea (los escritos o los propuestos), la evidencia del área y lo que puede nombrar."""
+    tarea (los escritos o los propuestos), la evidencia de quien la hace, lo que puede nombrar y
+    si se sabe quién la hace (`sin_quien`, J2-18)."""
     criterio = _cadena(crudo.get("criterio"))
     if criterio is None:
         r.descartar("criterio", "vacio")
@@ -860,7 +1027,8 @@ def _el_criterio_por_juzgar(r: Resultado, crudo: Mapping[str, Any], escrito: Map
 
     return {"titulo": de_la_tarea("titulo"), "descripcion": de_la_tarea("descripcion"),
             "criterio": criterio or "", "evidencia": list(evidencia),
-            "contexto": list(permitidos), "resultado": _cadena(crudo.get("resultado"))}
+            "contexto": list(permitidos), "resultado": _cadena(crudo.get("resultado")),
+            "sin_quien": sin_quien}
 
 
 def juzgar_la_propuesta(ia, r: Resultado) -> Juicio | None:
@@ -873,7 +1041,7 @@ def juzgar_la_propuesta(ia, r: Resultado) -> Juicio | None:
     p = r.por_juzgar
     return juzgar_el_criterio(ia, titulo=p["titulo"], descripcion=p["descripcion"],
                               criterio=p["criterio"], evidencia=p["evidencia"],
-                              contexto=p["contexto"])
+                              contexto=p["contexto"], sin_quien=p.get("sin_quien", False))
 
 
 def cerrar_el_criterio(r: Resultado, juicio: Juicio | None) -> None:
@@ -925,7 +1093,7 @@ oraciones y con buena ortografía, que dice qué tiene que quedar hecho y cómo 
 que quedó hecho. {como} Usás sólo lo que dicen el título, la descripción y el criterio: ningún \
 número, nombre ni dato que no esté ahí."""
 
-INSTRUCCIONES_DEL_JUICIO = """\
+_DEL_JUICIO = """\
 Sos Leda, la project manager del equipo. Alguien está cargando una tarea en la plataforma y \
 escribió su criterio de aceptación: lo que tiene que pasar para darla por terminada. Quien la \
 revise tiene que poder comprobarlo. Tu trabajo es leer el criterio y decir, por lo que significa \
@@ -934,7 +1102,19 @@ qué se mira, se prueba, se mide o se entrega, distinto del resultado mismo. Si 
 decir el resultado o el título, aunque sea con otras palabras, no lo dice. Si lo dice, copiás tal \
 cual la parte del criterio que lo dice. No corregís ni completás el criterio.
 
-""" + _EL_DE_LEDA.format(como="Cómo se sabe lo decís con lo que la tarea misma deja ver.")
+"""
+
+INSTRUCCIONES_DEL_JUICIO = _DEL_JUICIO + _EL_DE_LEDA.format(
+    como="Cómo se sabe lo decís con lo que la tarea misma deja ver.")
+
+# J2-18: al proponer sin saber quién la hace no hay evidencia de un área de donde salga cómo se
+# comprueba, y lo que "la tarea misma deja ver" salía flojo o circular (la ronda de la J2-17). El
+# criterio de Leda dice entonces qué tiene que quedar hecho, y cómo se comprueba sólo si lo dice la
+# tarea: lo demás lo dirá la evidencia de quien la haga (al cargar con ella basta un resultado).
+INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN = _DEL_JUICIO + _EL_DE_LEDA.format(
+    como="Todavía no se sabe quién la hace: cómo se sabe lo decís sólo si lo dicen el título, la "
+         "descripción o el criterio; si no lo dicen, decís sólo qué tiene que quedar hecho, "
+         "porque cómo se comprueba lo va a decir la evidencia que pida el área de quien la haga.")
 
 
 # J2-14: con la evidencia que pide el área, el criterio sólo tiene que decir el resultado; la IA
@@ -1040,7 +1220,8 @@ def sin_nada_que_juzgar(titulo: str, criterio: str) -> bool:
 
 
 def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
-                       evidencia: Sequence[str] = (), contexto: Sequence[str] = ()) -> Juicio:
+                       evidencia: Sequence[str] = (), contexto: Sequence[str] = (),
+                       sin_quien: bool = False) -> Juicio:
     """Si el criterio sirve. Una sola llamada a la IA del espacio (sin reintento), que lo juzga
     por su sentido y escribe su propio criterio; el código decide.
 
@@ -1055,7 +1236,10 @@ def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
     controles de lo inventado (`contexto`: los otros datos de esta tarea que puede nombrar); si no,
     el de reserva, con la evidencia. Una IA que no responde, que no juzgó o cuyo juicio no cierra:
     `sin_revisar`, nunca un rechazo ni un visto bueno; salvo lo que se rechaza sin ella, que queda
-    rechazado sin propuesta y con la falla."""
+    rechazado sin propuesta y con la falla.
+
+    `sin_quien` (al proponer sin saber quién la hace, J2-18): el criterio que escribe la IA no
+    inventa cómo se comprueba (`INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN`)."""
     titulo, descripcion, criterio = (" ".join((t or "").split())
                                      for t in (titulo, descripcion, criterio))
     evidencia = [e for e in (" ".join(str(x).split()) for x in evidencia) if e]
@@ -1067,7 +1251,9 @@ def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
                                                             evidencia),
                                      INSTRUCCIONES_DEL_RESULTADO, herramienta_del_resultado())
         else:
-            crudo = _pedir_el_juicio(ia, entrada_del_juicio(titulo, descripcion, criterio))
+            crudo = _pedir_el_juicio(ia, entrada_del_juicio(titulo, descripcion, criterio),
+                                     INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN if sin_quien
+                                     else INSTRUCCIONES_DEL_JUICIO)
     except Exception as falla:  # noqa: BLE001 -- cualquier falla de la IA es que no juzgó
         return Juicio(rechazo, falla) if sin_nada else Juicio("sin_revisar", falla)
     if not sin_nada:
@@ -1148,12 +1334,21 @@ def _pedir_el_juicio(ia, entrada: Mapping[str, Any],
 # El usuario (2026-10-13): "no es cambiar el significado de mis palabras, es corregir la
 # ortografía… me está ayudando". Antes de la vista previa (que es la confirmación), la IA corrige la
 # ortografía de lo que la persona escribió en los campos de texto y pone los nombres como están en
-# los datos del equipo; nunca cambia cómo está redactado. La cocina no le cree: acepta una
-# corrección sólo si tiene las mismas palabras en el mismo orden y cada palabra cambiada es la misma
-# palabra mal escrita (`_misma_palabra`: igual sin tildes ni mayúsculas, que suena igual, o con una
-# diferencia chica para su largo, más holgada si es un nombre de los datos; un número, nunca); y la
-# arma sobre el texto de la persona, cambiando sólo esas palabras (sus renglones y su puntuación
-# quedan). Lo que no pasa queda como lo escribió, con un incidente.
+# los datos del equipo; nunca cambia cómo está redactado. La cocina no le cree: compara sólo una
+# corrección con la misma cantidad de palabras y, palabra por palabra en su lugar (J2-18: "q" no
+# anula "batería"), acepta la que es la misma palabra mal escrita (`_misma_palabra`) y deja como la
+# escribió la persona la que no; arma el texto sobre el de la persona, cambiando sólo esas palabras
+# (sus renglones y su puntuación quedan). Lo que no pasa queda como lo escribió, con un incidente
+# que cuenta las palabras rechazadas (nunca cuáles).
+#
+# `_misma_palabra`, sin un diccionario: igual sin tildes ni mayúsculas; si es una palabra de un
+# nombre de los datos, con pocas letras distintas para su largo; si no, que suene igual (las letras
+# que se confunden al escribir) o con una diferencia chica que pueda ser un dedo: una letra de más,
+# de menos, dos dadas vuelta o una cambiada por otra vecina en el teclado o que suena igual (J2-18:
+# "mesa" por "masa" ya no pasa). Una palabra de una o dos letras sólo cambia de tildes o mayúsculas
+# ("a" y "ha", "q" y "que" son otras palabras), y un número nunca. Lo que no puede ver sin un
+# diccionario (dos palabras que suenan igual, como "casa" y "caza") lo muestra la vista previa,
+# marcado, antes de confirmar.
 
 NOMBRE_DE_LA_ORTOGRAFIA = "corregir_la_ortografia"
 CAMPOS_DE_TEXTO = ("titulo", "descripcion", "criterio")
@@ -1234,13 +1429,39 @@ def _como_suena(palabra: str) -> str:
     return s
 
 
-def _distancia(a: str, b: str) -> int:
-    """Las letras que hay que agregar, sacar, cambiar o dar vuelta para pasar de una a la otra."""
+# El teclado (con la ñ) y las letras que suenan igual: una letra cambiada por una de éstas puede ser
+# un dedo o el oído; por otra, es otra palabra.
+_TECLADO = {c: (fila, col) for fila, letras in enumerate(("qwertyuiop", "asdfghjklñ", "zxcvbnm"))
+            for col, c in enumerate(letras)}
+_SUENAN_IGUAL = {frozenset(p) for p in ("bv", "sz", "sc", "cz", "ck", "qk", "gj", "yi")}
+
+
+def _se_confunden(a: str, b: str) -> bool:
+    """Si una letra escrita en lugar de la otra es una falta: vecinas en el teclado (al lado, o
+    arriba o abajo) o que suenan igual."""
+    if frozenset((a, b)) in _SUENAN_IGUAL:
+        return True
+    if a not in _TECLADO or b not in _TECLADO:
+        return False
+    (fa, ca), (fb, cb) = _TECLADO[a], _TECLADO[b]
+    return ((fa == fb and abs(ca - cb) == 1) or (fb == fa - 1 and cb in (ca, ca + 1))
+            or (fb == fa + 1 and cb in (ca - 1, ca)))
+
+
+_OTRA_LETRA = 99
+
+
+def _distancia(a: str, b: str, se_confunden: Callable[[str, str], bool] | None = None) -> int:
+    """Las letras que hay que agregar, sacar, cambiar o dar vuelta para pasar de una a la otra.
+    Con `se_confunden`, cambiar una letra por otra que no se confunde con ella no es una falta
+    (cuesta más que cualquier tope)."""
     previa, fila = None, list(range(len(b) + 1))
     for i, ca in enumerate(a, 1):
         nueva = [i] + [0] * len(b)
         for j, cb in enumerate(b, 1):
-            nueva[j] = min(fila[j] + 1, nueva[j - 1] + 1, fila[j - 1] + (ca != cb))
+            cambio = 0 if ca == cb else (1 if se_confunden is None or se_confunden(ca, cb)
+                                         else _OTRA_LETRA)
+            nueva[j] = min(fila[j] + 1, nueva[j - 1] + 1, fila[j - 1] + cambio)
             if previa is not None and i > 1 and j > 1 and ca == b[j - 2] and a[i - 2] == cb:
                 nueva[j] = min(nueva[j], previa[j - 2] + 1)
         previa, fila = fila, nueva
@@ -1248,55 +1469,80 @@ def _distancia(a: str, b: str) -> int:
 
 
 def _misma_palabra(antes: str, despues: str, de_los_nombres: set[str]) -> bool:
-    """Si `despues` es `antes` bien escrita: igual sin tildes ni mayúsculas, que suena igual, o con
-    pocas letras distintas para su largo (ninguna hasta 3 letras, una hasta 6, dos desde 7; una más
-    si es una palabra de un nombre de los datos). Una palabra con números no cambia."""
+    """Si `despues` es `antes` bien escrita (la regla, en el comentario de la sección): igual sin
+    tildes ni mayúsculas; una palabra de un nombre de los datos, con pocas letras distintas para su
+    largo (ninguna hasta 3 letras, una hasta 6, dos desde 7, y una más); si no, que suene igual o
+    con esa diferencia, hecha sólo de letras de más, de menos, dadas vuelta o que se confunden. Una
+    palabra de una o dos letras sólo cambia de tildes o mayúsculas; una con números, nunca."""
     a, d = _sin_marcas(antes), _sin_marcas(despues)
     if a == d:
         return True
     if any(c.isdigit() for c in a + d):
         return False
-    if _como_suena(a) == _como_suena(d):
-        return True
     largo = len(a)
     tope = 0 if largo <= 3 else 1 if largo <= 6 else 2
     if d in de_los_nombres:
-        tope += 1
-    return _distancia(a, d) <= tope
+        return _distancia(a, d) <= tope + 1
+    if largo <= 2:
+        return False
+    if _como_suena(a) == _como_suena(d):
+        return True
+    return _distancia(a, d, _se_confunden) <= tope
 
 
-def solo_ortografia(original: str, corregido: str,
-                    nombres: Sequence[str]) -> tuple[str, list[dict[str, str]]] | None:
-    """La corrección de `original`, si sólo cambió la ortografía: el texto de la persona con cada
-    palabra corregida en su lugar (sus renglones y su puntuación quedan) y los cambios
-    (`antes`, `despues`), en su orden; `None` si cambió algo más (otra palabra, una de más o de
-    menos, otro orden, otro número)."""
+def palabra_por_palabra(original: str, corregido: str, nombres: Sequence[str]) -> tuple[
+        str, list[dict[str, str]], int] | None:
+    """La corrección de `original`, palabra por palabra: el texto de la persona con cada palabra
+    corregida que es la misma palabra mal escrita en su lugar (sus renglones y su puntuación
+    quedan), los cambios (`antes`, `despues`) en su orden y cuántas palabras cambiadas no se
+    aceptaron (quedan como las escribió la persona). `None` si la corrección no tiene la misma
+    cantidad de palabras: no se puede saber cuál es cuál."""
     lugares = list(_PALABRA.finditer(original))
     nuevas = _PALABRA.findall(corregido)
     if len(lugares) != len(nuevas):
         return None
     de_los_nombres = {_sin_marcas(p) for n in nombres for p in _PALABRA.findall(n)}
-    partes, desde, cambios = [], 0, []
+    partes, desde, cambios, rechazadas = [], 0, [], 0
     for lugar, nueva in zip(lugares, nuevas):
         antes = lugar.group(0)
         if antes == nueva:
             continue
         if not _misma_palabra(antes, nueva, de_los_nombres):
-            return None
+            rechazadas += 1
+            continue
         partes += [original[desde:lugar.start()], nueva]
         desde = lugar.end()
         cambios.append({"antes": antes, "despues": nueva})
-    return "".join([*partes, original[desde:]]), cambios
+    return "".join([*partes, original[desde:]]), cambios, rechazadas
+
+
+def nombres_mal_escritos(texto: str, opciones: Mapping[str, Any]) -> list[str]:
+    """Las palabras de los nombres de los datos del espacio (personas, áreas, objetivos y tareas)
+    que la persona escribió mal en `texto`, como están en los datos (J2-18: "cirelabs" es
+    CoreLabs): lo que Leda puede escribir bien en lo que propone sin inventar un nombre. Sólo
+    palabras de cuatro letras o más, y la misma palabra mal escrita (`_misma_palabra`)."""
+    escritas = {_sin_marcas(p) for p in _PALABRA.findall(texto) if len(p) >= 4}
+    encontradas: list[str] = []
+    for nombre in _nombres_del_equipo(opciones):
+        for palabra in _PALABRA.findall(nombre):
+            d = _sin_marcas(palabra)
+            if len(d) < 4 or d in escritas or palabra in encontradas:
+                continue
+            if any(_misma_palabra(a, palabra, {d}) for a in escritas):
+                encontradas.append(palabra)
+    return encontradas
 
 
 @dataclass
 class Ortografia:
     """Lo que se corrigió (`corregidos`: por campo, el texto y sus cambios; sólo los que
-    cambiaron) y lo que no se pudo revisar (`rechazados`, con su motivo: `sin_respuesta`,
-    `no_es_ortografia` o `largo`)."""
+    cambiaron), lo que no se pudo revisar (`rechazados`, con su motivo: `sin_respuesta`,
+    `no_es_ortografia` o `largo`) y, de lo revisado, cuántas palabras no se aceptaron en cada
+    campo (`palabras_rechazadas`: quedan como las escribió la persona)."""
 
     corregidos: dict[str, dict[str, Any]] = field(default_factory=dict)
     rechazados: list[dict[str, str]] = field(default_factory=list)
+    palabras_rechazadas: list[dict[str, Any]] = field(default_factory=list)
 
 
 def revisar_la_ortografia(crudo: Mapping[str, Any], textos: Mapping[str, str],
@@ -1311,13 +1557,16 @@ def revisar_la_ortografia(crudo: Mapping[str, Any], textos: Mapping[str, str],
         if not isinstance(corregido, str) or not corregido.strip():
             r.rechazados.append({"campo": campo, "motivo": "sin_respuesta"})
             continue
-        hecho = solo_ortografia(original, corregido, nombres)
+        hecho = palabra_por_palabra(original, corregido, nombres)
         if hecho is None:
             r.rechazados.append({"campo": campo, "motivo": "no_es_ortografia"})
             continue
-        texto, cambios = hecho
+        texto, cambios, rechazadas = hecho
         if len(texto.strip()) > LARGOS[campo]:
             r.rechazados.append({"campo": campo, "motivo": "largo"})
-        elif cambios:
+            continue
+        if cambios:
             r.corregidos[campo] = {"texto": texto, "cambios": cambios}
+        if rechazadas:
+            r.palabras_rechazadas.append({"campo": campo, "cantidad": rechazadas})
     return r

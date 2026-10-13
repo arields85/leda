@@ -1236,10 +1236,10 @@ def _con_texto_de_la_ayuda(fila: dict[str, Any]) -> dict[str, str]:
 
 
 def _lo_escrito(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
-        dict[str, str], list[dict[str, str]]]:
+        dict[str, Any], list[dict[str, str]]]:
     """Lo que ya tiene el formulario, revisado contra las opciones del espacio: un id que no
     está ahí (de otro espacio, cerrado o inventado) se rechaza como en la carga."""
-    escrito: dict[str, str] = {}
+    escrito: dict[str, Any] = {}
     errores: list[dict[str, str]] = []
     listas = {"objetivo": ("objetivos", "id", "no_existe"),
               "responsable": ("integrantes", "membership_id", "no_es_integrante_activo"),
@@ -1277,6 +1277,13 @@ def _lo_escrito(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
             pass
         if not escrito["fecha"]:
             errores.append(_mal_formado("fecha"))
+    # La evidencia ya tildada (J2-18): lo que la persona eligió es suyo, y Leda no propone otra.
+    evidencia = cuerpo.get("evidencia")
+    escrito["evidencia"] = []
+    if isinstance(evidencia, list) and all(isinstance(e, str) for e in evidencia):
+        escrito["evidencia"] = evidencia
+    elif evidencia is not None:
+        errores.append(_mal_formado("evidencia"))
     return escrito, errores
 
 
@@ -1359,8 +1366,22 @@ def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, 
     if errores:
         return _json({"errores": [_con_texto_de_la_ayuda(e) for e in errores]}, 422)
     return {"espacio": espacio, "texto": texto, "escrito": escrito, "opciones": opciones,
-            "ia": _ia_de_la_ayuda(conn, espacio),
+            "ia": _la_ia_o_la_que_no_responde(conn, espacio, _ia_de_la_ayuda),
             "entrada": ayuda_al_cargar.entrada_de_la_ia(texto, escrito, opciones)}
+
+
+def _la_ia_o_la_que_no_responde(conn, espacio: str, preparar: Callable[[Any, str], Any]):
+    """La IA del espacio; si no se puede preparar, una que no responde (`IANoConfigurada`): la
+    llamada falla como cualquier IA que no responde, con su aviso y su incidente, nunca un error
+    de la web sin rastro (advertencia de RDD de la J2-17)."""
+    from .motor.recibir import IANoConfigurada
+
+    try:
+        return preparar(conn, espacio)
+    except Exception as falla:  # noqa: BLE001 -- queda como una IA que no responde
+        _sin_transaccion(conn)
+        return IANoConfigurada(
+            f"La IA del espacio no se pudo preparar ({type(falla).__name__}: {falla}).")
 
 
 def _revisar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[str, Any] | None):
@@ -1436,6 +1457,10 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
                 "huellas": {c: hashlib.sha256(propuesta[c].encode("utf-8")).hexdigest()
                             for c in ("titulo", "descripcion", "criterio") if c in propuesta},
                 "responsable_membership_id": propuesta.get("responsable_id"),
+                # J2-18: si quién la hace lo nombró la persona o lo propuso Leda, y la evidencia
+                # que Leda sumó al mínimo del área.
+                "responsable_de": resultado.responsable_de,
+                "evidencia_propuesta": propuesta.get("evidencia") or [],
                 "espera_task_id": propuesta.get("espera_id"),
                 "objective_id": propuesta.get("objetivo_id"),
                 "fecha": propuesta.get("fecha")})
@@ -1467,9 +1492,10 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
 # y se confirmó. La web llama acá al tocar "confirmar", con los textos que todavía no se revisaron
 # tal como están: si algo cambió, la vista previa lo muestra y la persona confirma otra vez; si no,
 # la carga sigue. Los mismos tres pasos que la ayuda, para que el candado nunca espere a la IA. La
-# cocina acepta una corrección sólo si cambió nada más que la ortografía
-# (`ayuda_al_cargar.solo_ortografia`); lo que no, queda como se escribió, con un incidente. Si la IA
-# no responde, nada se bloquea: el texto queda como se escribió, con un aviso y un incidente.
+# cocina acepta, palabra por palabra, sólo la que es la misma palabra mal escrita
+# (`ayuda_al_cargar.palabra_por_palabra`, J2-18); la que no, queda como se escribió, con un
+# incidente que cuenta cuántas. Si la IA no responde (o no se puede preparar), nada se bloquea: el
+# texto queda como se escribió, con un aviso y un incidente.
 
 TEXTO_SIN_ORTOGRAFIA = "No pude revisar la ortografía ahora: quedó como lo escribiste."
 
@@ -1548,7 +1574,7 @@ def _preparar_la_ortografia(conn, token: str, espacio: str | None, textos: dict[
     if not textos:
         return _json({"corregidos": {}, "sin_revisar": []})
     return {"espacio": espacio, "textos": textos, "opciones": opciones,
-            "ia": _ia_de_la_ortografia(conn, espacio),
+            "ia": _la_ia_o_la_que_no_responde(conn, espacio, _ia_de_la_ortografia),
             "entrada": ayuda_al_cargar.entrada_de_la_ortografia(textos, opciones)}
 
 
@@ -1566,25 +1592,35 @@ def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
     if sesion is None:
         return _sin_sesion_de_administracion()
     ws, textos = preparada["espacio"], preparada["textos"]
+    palabras: list[dict[str, Any]] = []
     if falla is None:
         revisada = ayuda_al_cargar.revisar_la_ortografia(crudo or {}, textos,
                                                          preparada["opciones"])
         corregidos, rechazados = revisada.corregidos, revisada.rechazados
+        palabras = revisada.palabras_rechazadas
         sin_revisar = [r["campo"] for r in rechazados]
-        referencia = "; ".join(f"{r['campo']}: {r['motivo']}" for r in rechazados) or None
+        # Sin los textos ni las palabras: cuántas de cada campo (J2-18).
+        referencia = "; ".join(
+            [*(f"{r['campo']}: {r['motivo']}" for r in rechazados),
+             *(f"{p['campo']}: {p['cantidad']} "
+               f"{'palabra no aceptada' if p['cantidad'] == 1 else 'palabras no aceptadas'}"
+               for p in palabras)]) or None
     else:
         corregidos, rechazados = {}, []
         sin_revisar = list(textos)
         referencia = f"{type(falla).__name__}: {falla}"
     with en_el_espacio(conn, ws) as cur:
-        if sin_revisar:
+        if sin_revisar or palabras:
             registrar_incidente(
                 cur, ws,
                 ("La IA del espacio no respondió al revisar la ortografía de una carga en la "
-                 "plataforma" if falla is not None else
+                 "plataforma: los textos quedaron como se escribieron y la persona vio un aviso."
+                 if falla is not None else
                  "Leda no aceptó la corrección de ortografía de una carga en la plataforma (no "
-                 "volvió o cambiaba algo más que la ortografía)") +
-                ": los textos quedaron como se escribieron y la persona vio un aviso.",
+                 "volvió, cambiaba algo más que la ortografía o cambiaba una palabra por otra): "
+                 "lo que no aceptó quedó como se escribió" +
+                 (" y la persona vio un aviso." if sin_revisar else
+                  "; lo demás se corrigió y la persona lo ve marcado.")),
                 severidad="baja", referencia_cruda=referencia,
                 etapa=ETAPA_ORTOGRAFIA_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
         registrar_auditoria(
@@ -1595,6 +1631,7 @@ def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
                      "ia": getattr(preparada["ia"], "nombre", None), "pide": list(textos),
                      "respondio": falla is None, "corregidos": list(corregidos),
                      "rechazados": rechazados, "sin_revisar": sin_revisar,
+                     "palabras_rechazadas": palabras,
                      "huellas": {c: hashlib.sha256(v["texto"].encode("utf-8")).hexdigest()
                                  for c, v in corregidos.items()}},
             pack_hash=versiones.pack_hash(cur, ws), nucleo_hash=versiones.nucleo_hash())
