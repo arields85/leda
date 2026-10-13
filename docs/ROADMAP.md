@@ -105,6 +105,9 @@ Etapas y criterios de paso a `main` (M1 a M3): [`STATUS.md`](STATUS.md), "Próxi
    equipo y la de administración. Va con la VPS, porque pide una dirección HTTPS fija, y lleva una
    enmienda al ADR 0022 (decisión 4, cómo se entra). Se descartó "agregar a la pantalla de inicio": hay
    que instalarla desde Safari y en el iPhone no comparte la sesión.
+   Al hacerla, revisar el agrandado con dos dedos: hoy, en el navegador de Telegram, la regla que evita que el
+   iPhone agrande la página al tocar un campo también lo bloquea (decisión del usuario, 2026-10-13: se acepta por
+   ahora; queda el Zoom de accesibilidad del sistema).
 3. **La API de lectura y el dashboard** (ADR 0017, decisión 5): otros programas que leen el estado de un
    espacio y un panel con números del equipo. Esperan sus precondiciones (el cierre del aislamiento y
    el desacople del transporte, que van en el punto 2) y que el seguimiento ande bien en pruebas reales;
