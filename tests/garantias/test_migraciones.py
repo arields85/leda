@@ -87,7 +87,10 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     # El enlace de entrada y la sesión de la web (migración 0057; ADR 0022).
                     "enlace_de_entrada", "sesion_web",
                     # La clave de cada carga de una tarea desde la web (migración 0062).
-                    "carga_de_tarea")
+                    "carga_de_tarea",
+                    # La marca del enlace de entrada a la web y el ofrecimiento (migración
+                    # 0066).
+                    "message_outbox_entrada_web", "ofrecimiento_web")
 
 # La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
 # política. `model_config` admite espacio nulo para el modelo global.
@@ -838,7 +841,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # enlaces y sesiones de la web también (ADR 0022); y antes de ella la 0058, cuyas
             # funciones de las listas leen la sesión, y antes aún la 0059, cuya cadena de esperas
             # lee esas listas; antes de todas, la 0060, que deja esas listas como las dejó la
-            # 0058.
+            # 0058. Y antes que nada la 0066, cuya marca del enlace de entrada y cuyo
+            # ofrecimiento de la web también apuntan ahí.
+            db.execute(_sql_script(
+                ROOT / "db" / "rollbacks" / "0066_la_entrada_a_la_web_por_chat.sql"))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0060_lo_ajeno_como_el_informe_al_grupo.sql"))
             db.execute(_sql_script(

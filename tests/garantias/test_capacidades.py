@@ -68,6 +68,17 @@ PROMESAS_SIN_CUMPLIR = {
         "retiró en la E3-3; vuelve con el primer mensaje que necesite confirmarse.",
     "confirmado_en":
         "Cuándo se confirmó ese mensaje (ver `confirmado_por`).",
+    # El ofrecimiento de la web una sola vez (migración 0066): la tabla llega con la marca del
+    # enlace de entrada (tarea A-3) y la usa el ofrecimiento (tarea A-4 de
+    # `odd/tasks/acceso-por-chat.md`), que la saca de esta lista.
+    "reservado_en":
+        "Cuándo se reservó el ofrecimiento de la web a una persona, al armar el turno que lo "
+        "lleva (decisión técnica 1 de la A-4).",
+    "ofrecido_en":
+        "Cuándo salió el ofrecimiento de la web a una persona (ver `reservado_en`).",
+    "es_ofrecimiento":
+        "Si el enlace de entrada que lleva una fila de la salida es el ofrecimiento de una "
+        "sola vez: lo escribe la salida con la marca del enlace (tarea A-3).",
     "resuelta_por":
         "Quién resolvió una acción pendiente. La escribe `resolver_pendiente`, en "
         "la base; el código de `src/leda` que la leía era de los flujos A y B "

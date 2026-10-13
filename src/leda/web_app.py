@@ -85,9 +85,16 @@ DURACION_DE_LA_COOKIE_S = 400 * 24 * 60 * 60
 # Lo más largo que puede ser un token que se acepta mirar (`secrets.token_urlsafe(32)`: 43).
 LARGO_MAXIMO_DEL_TOKEN = 128
 
-# Cómo se corta una sesión desde la web y desde la consola (motivos de la 0057).
+# Cómo se corta una sesión desde la web, desde la consola y por chat (motivos de la 0057): la
+# persona avisa por chat que perdió el celular (`perdi_el_celular`, decisión 3 del usuario).
 CERRO_LA_SESION = "cerro_la_sesion"
 POR_UN_ADMINISTRADOR = "administrador"
+PERDIO_EL_CELULAR = "perdio_el_celular"
+# El camino del enlace de entrada (`enlace`) y lo más largo que es su token
+# (`secrets.token_urlsafe(32)`: 43): la salida le reserva ese lugar al texto que lo lleva
+# (`salida.reserva_del_enlace_de_entrada`).
+CAMINO_DE_ENTRADA = "/app/entrar/"
+LARGO_DEL_TOKEN_DE_ENTRADA = 43
 
 # Lo que lleva toda respuesta de `/app`, como la página de la tarea: que nada la guarde ni la
 # indexe, que no diga de dónde viene quien sigue un enlace, que no se adivine el tipo y que no se
@@ -1025,18 +1032,37 @@ def emitir_enlace(cur, membership_id: str) -> str | None:
     return token if fila and fila["id"] is not None else None
 
 
-def cortar_sesiones(cur, membership_id: str) -> int:
+def cortar_sesiones(cur, membership_id: str, *, motivo: str = POR_UN_ADMINISTRADOR,
+                    actor_app_user_id: str | None = None) -> int:
     """Corta todas las sesiones abiertas de una persona del espacio de la transacción, y su
-    enlace sin usar, por un administrador. Devuelve cuántas sesiones cortó."""
+    enlace sin usar. Devuelve cuántas sesiones cortó. Por omisión, un administrador desde la
+    consola (actor nulo: lo hace Leda por su pedido); por chat, la persona que avisa que perdió
+    el celular (`PERDIO_EL_CELULAR`, con su usuario como actor). El corte queda siempre en la
+    auditoría, también sin sesiones (0066)."""
     _con_la_version_del_nucleo(cur)
-    cur.execute("select cortar_sesiones_de_membresia(%s, %s, null) as cortadas",
-                (str(membership_id), POR_UN_ADMINISTRADOR))
+    cur.execute("select cortar_sesiones_de_membresia(%s, %s, %s) as cortadas",
+                (str(membership_id), motivo,
+                 str(actor_app_user_id) if actor_app_user_id else None))
     return int(cur.fetchone()["cortadas"])
+
+
+def entro_alguna_vez(cur, membership_id: str) -> bool:
+    """Si la persona entró alguna vez a la web (canjeó un enlace), en el espacio de la
+    transacción: `leda_app` no lee los enlaces ni las sesiones (0066)."""
+    cur.execute("select entro_a_la_web(%s) as si", (str(membership_id),))
+    return bool(cur.fetchone()["si"])
+
+
+def tiene_un_enlace_sin_usar(cur, membership_id: str) -> bool:
+    """Si la persona tiene un enlace de entrada emitido que nadie usó ni se anuló (vencido o no):
+    el que un enlace nuevo deja sin servir (0066)."""
+    cur.execute("select tiene_un_enlace_sin_usar(%s) as si", (str(membership_id),))
+    return bool(cur.fetchone()["si"])
 
 
 def enlace(base_url: str, token: str) -> str:
     """La dirección del enlace de entrada, sobre la dirección pública configurada."""
-    return f"{base_url.rstrip('/')}/app/entrar/{token}"
+    return f"{base_url.rstrip('/')}{CAMINO_DE_ENTRADA}{token}"
 
 
 def emitir_enlace_de_administracion(cur, app_user_id: str) -> str | None:

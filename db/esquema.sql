@@ -2319,6 +2319,44 @@ create index sesion_web_abierta on sesion_web (membership_id) where cortada_en i
 comment on table sesion_web is
   'ADR 0022, decisiones 4 y 12: la sesión de la puerta del equipo que abre el canje de un enlace. Sólo el hash del token de la cookie. Sin vencimiento: se revalida en cada pedido (membresía activa) y anota su último uso; se corta (cortada_en, motivo_de_corte) y no vuelve. leda_app no tiene privilegios: sólo execute sobre sus funciones.';
 
+-- La entrada a la web por chat (migración 0066; ADR 0022, decisión 4; decisiones del usuario del
+-- 2026-10-12). `message_outbox_entrada_web` es la marca de la fila de la salida que lleva al final
+-- el enlace de entrada a la web de una persona, como `message_outbox_enlace` el de la página de una
+-- tarea: el despachador lo emite al mandar, y ni la salida ni el registro de turnos lo guardan.
+-- `es_ofrecimiento`, si es el ofrecimiento de una sola vez. Un mensaje lleva un solo enlace.
+-- `ofrecimiento_web` dice si a una persona ya se le ofreció la entrada (una sola vez): se reserva
+-- al armar el turno, queda ofrecida al mandar y se libera si el envío falla sin reintento.
+create table message_outbox_entrada_web (
+  id               uuid primary key default gen_random_uuid(),
+  workspace_id     uuid not null references workspace(id) on delete cascade,
+  outbox_id        uuid not null,
+  membership_id    uuid not null,
+  es_ofrecimiento  boolean not null default false,
+  constraint message_outbox_entrada_web_outbox
+    foreign key (workspace_id, outbox_id) references message_outbox(workspace_id, id)
+    on delete cascade,
+  constraint message_outbox_entrada_web_membership
+    foreign key (workspace_id, membership_id) references membership(workspace_id, id)
+    on delete cascade,
+  constraint message_outbox_entrada_web_uno_por_fila unique (outbox_id)
+);
+
+comment on table message_outbox_entrada_web is
+  'ADR 0022, decisión 4: la fila de la salida lleva al final el enlace de entrada a la web de esta persona (es_ofrecimiento: el ofrecimiento de una sola vez). El despachador lo emite al mandar; la base guarda sólo su hash (enlace_de_entrada). Sólo se agrega.';
+
+create table ofrecimiento_web (
+  workspace_id   uuid not null references workspace(id) on delete cascade,
+  membership_id  uuid primary key,
+  reservado_en   timestamptz not null default now(),
+  ofrecido_en    timestamptz,
+  constraint ofrecimiento_web_membership
+    foreign key (workspace_id, membership_id) references membership(workspace_id, id)
+    on delete cascade
+);
+
+comment on table ofrecimiento_web is
+  'Decisión 2 del usuario (2026-10-12): la entrada a la web se le ofrece a cada persona una sola vez. Se reserva al armar el turno (reservado_en), queda ofrecida al mandar (ofrecido_en) y se libera si el envío falla sin reintento.';
+
 create or replace function auditar_acceso_web(
     p_workspace_id uuid, p_actor_app_user_id uuid, p_actor_kind tipo_actor, p_accion text,
     p_sujeto_tipo text, p_sujeto_id uuid, p_detalle jsonb)
@@ -2476,29 +2514,65 @@ returns integer
 language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare cortada record;
         cortadas integer := 0;
+        espacio uuid;
+        anulados integer;
+        actor tipo_actor := case when p_actor_app_user_id is null then 'leda'
+                                 else 'persona' end::tipo_actor;
 begin
   if p_motivo is null or p_motivo not in (
        'administrador', 'perdio_el_celular', 'cerro_la_sesion', 'dejo_el_equipo') then
     raise exception 'cortar_sesiones_de_membresia: motivo desconocido';
   end if;
+  -- El espacio sale de la membresía, que la RLS acota al espacio de quien llama: una membresía
+  -- de otro espacio no se encuentra, y no se corta ni se audita nada.
+  select m.workspace_id into espacio from membership m where m.id = p_membership_id;
+  if espacio is null then
+    return 0;
+  end if;
   -- Con las sesiones, el enlace que estaba sin usar: si se perdió el celular, el mensaje con el
   -- enlace también.
   update enlace_de_entrada e set anulado_en = now()
    where e.membership_id = p_membership_id and e.canjeado_en is null and e.anulado_en is null;
+  get diagnostics anulados = row_count;
   for cortada in
     update sesion_web s set cortada_en = now(), motivo_de_corte = p_motivo
      where s.membership_id = p_membership_id and s.cortada_en is null
     returning s.id, s.workspace_id, s.membership_id
   loop
     perform auditar_acceso_web(
-      cortada.workspace_id, p_actor_app_user_id,
-      case when p_actor_app_user_id is null then 'leda' else 'persona' end::tipo_actor,
-      'cortar_sesion_web', 'sesion_web', cortada.id,
+      cortada.workspace_id, p_actor_app_user_id, actor, 'cortar_sesion_web', 'sesion_web',
+      cortada.id,
       jsonb_build_object('motivo', p_motivo, 'membership_id', cortada.membership_id));
     cortadas := cortadas + 1;
   end loop;
+  -- El corte mismo, siempre: también si no había ninguna sesión abierta (0066).
+  perform auditar_acceso_web(
+    espacio, p_actor_app_user_id, actor, 'cortar_acceso_web', 'membership', p_membership_id,
+    jsonb_build_object('motivo', p_motivo, 'sesiones_cortadas', cortadas,
+                       'enlace_anulado', anulados > 0));
   return cortadas;
 end $$;
+
+-- Lo que la cocina pregunta del acceso de una persona sin leer las tablas (migración 0066):
+-- si entró alguna vez y si tiene un enlace sin usar. En el espacio de quien llama.
+create or replace function entro_a_la_web(p_membership_id uuid)
+returns boolean
+language sql stable security definer set search_path = leda, public, pg_temp as $$
+  -- La RLS acota las dos lecturas al espacio de quien llama: una membresía de otro espacio da
+  -- `false`, igual que una que no existe.
+  select exists (select 1 from enlace_de_entrada e
+                  where e.membership_id = p_membership_id and e.canjeado_en is not null)
+      or exists (select 1 from sesion_web s where s.membership_id = p_membership_id);
+$$;
+
+create or replace function tiene_un_enlace_sin_usar(p_membership_id uuid)
+returns boolean
+language sql stable security definer set search_path = leda, public, pg_temp as $$
+  -- El que un enlace nuevo deja sin servir: emitido, sin canjear ni anular (vencido o no).
+  select exists (select 1 from enlace_de_entrada e
+                  where e.membership_id = p_membership_id
+                    and e.canjeado_en is null and e.anulado_en is null);
+$$;
 
 -- Quién ve qué en las listas de la puerta del equipo (ADR 0022, decisiones 3, 5, 11 y 13;
 -- migraciones 0058 y 0060). `tareas_que_ve` es la regla, una sola y en SQL, que extiende
@@ -4745,7 +4819,8 @@ begin
     'message_outbox_adjunto','acceso_tarea','vista_de_tarea','message_outbox_enlace',
     'dicho_de_quien_destraba','pase_de_tarea','cambio_de_responsable',
     'pedido_de_detalle','tarea_compartida','apodo',
-    'enlace_de_entrada','sesion_web','carga_de_tarea']
+    'enlace_de_entrada','sesion_web','carga_de_tarea',
+    'message_outbox_entrada_web','ofrecimiento_web']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -4803,6 +4878,8 @@ revoke delete on apodo from leda_app;
 -- vistas, sólo `execute` sobre sus funciones; la marca del enlace en la salida, agregar y leer.
 revoke all on acceso_tarea, vista_de_tarea from public, leda_app;
 revoke update, delete on message_outbox_enlace from leda_app;
+-- La marca del enlace de entrada a la web (migración 0066): agregar y leer.
+revoke update, delete on message_outbox_entrada_web from leda_app;
 -- Encontrar un token antes de saber su espacio: sólo `leda_owner` (las funciones de la página),
 -- sólo para leer y sólo la fila de ese hash.
 create policy resolver_por_token on acceso_tarea for select to leda_owner
@@ -4969,6 +5046,13 @@ grant execute on function canjear_enlace_de_entrada(text, text) to leda_app;
 grant execute on function sesion_vigente(text) to leda_app;
 grant execute on function cortar_sesion(uuid, text, uuid) to leda_app;
 grant execute on function cortar_sesiones_de_membresia(uuid, text, uuid) to leda_app;
+
+alter function entro_a_la_web(uuid) owner to leda_owner;
+alter function tiene_un_enlace_sin_usar(uuid) owner to leda_owner;
+revoke execute on function entro_a_la_web(uuid) from public;
+revoke execute on function tiene_un_enlace_sin_usar(uuid) from public;
+grant execute on function entro_a_la_web(uuid) to leda_app;
+grant execute on function tiene_un_enlace_sin_usar(uuid) to leda_app;
 
 alter function tareas_que_ve(uuid, text, timestamptz) owner to leda_owner;
 alter function vistas_de(uuid) owner to leda_owner;
