@@ -85,3 +85,8 @@ túnel, tarea aparte).
 ## Progreso y evidencia
 
 - 2026-10-12, noche: diseño escrito, a la espera de que el usuario acepte la conversación 50.
+- **2026-10-12, noche: el usuario aceptó la conversación 50 tal como está** ("Sí, acepto la conversación 50
+  tal como está") **y autorizó la ronda con la IA real para medirla** (A-6) cuando esté construida. Se
+  construye de forma autónoma después de las correcciones de la prueba por Telegram
+  (`correcciones-prueba-telegram.md`); frena antes del túnel y de la prueba en el celular, que necesitan
+  al usuario.

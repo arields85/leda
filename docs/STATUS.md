@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-12, tarde: la prueba por Telegram pasó, el Motor está en `main` y la plataforma, junta en la rama del Motor.
+**Última actualización documental:** 2026-10-12, cierre de la noche: correcciones T1 a T5 hechas; plan autónomo de la noche escrito en "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -32,7 +32,7 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-12, tarde)
+## Punto exacto para retomar (2026-10-12, cierre de la noche)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
 Plan de la Fase C: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (decisiones del usuario 1 a 79 y,
@@ -71,19 +71,43 @@ viejo corriendo.
 - Carpetas borradas: `Leda-PM-worktrees\plataforma` (su rama ya está en la del Motor; queda en
   `origin/feat/plataforma`) y `_rdd-ca5c38f3` (vacía).
 
-**Lo que sigue:**
-1. **En curso, de forma autónoma: las correcciones de la prueba por Telegram**
-   ([`../odd/tasks/correcciones-prueba-telegram.md`](../odd/tasks/correcciones-prueba-telegram.md), T1 a
-   T10): íconos por estado (79), "consultar" (78), sin nombre ni hora en los avisos a otros (77) y los
-   hallazgos; la hora de los turnos quedó mal guardada (T6, con evidencia). **El usuario autorizó una
-   ronda con la IA real, al final, de las conversaciones tocadas.** Si un hallazgo pide cambiar el
-   diseño, se deja la propuesta sin código.
-2. **La plataforma, cuando el usuario esté:** aceptar la conversación 50 y construir el acceso por chat
-   (con la `0065` de las 24 horas); el túnel o HTTPS, con su permiso; la prueba en el celular y la
-   computadora; después, la plataforma a `main`.
-3. **Del usuario, de a una:** confirmar `@Leda_Motor_bot` como `bot_usuario` del pack (lo dice Telegram,
-   `getMe`) y las tres preguntas de "Para decidir" de `odd/tasks/plataforma-p2.md`.
-4. **En observación:** la 35 paso 18 (1 de 5 el 2026-10-11).
+**Lo hecho después, la misma noche (sesión cerrada con corte limpio a pedido del usuario):**
+- **Las correcciones de la prueba, T1 a T5, hechas, revisadas por RDD y subidas** (rama en `bfd721e`;
+  detalle y evidencia en `../odd/tasks/correcciones-prueba-telegram.md`): íconos por estado (79),
+  "consultar" (78), sin nombre ni hora en los avisos a otros (77), el comentario de una aprobación que
+  contesta "¿cuál de las dos?" y una tarea terminada que no "vence". `pytest tests/motor` 1377 passed,
+  `tests/conversaciones` 215 passed, en seco 48 de 48 (sobre `64796ac`).
+- **El usuario aceptó la conversación 50** del acceso por chat tal como está, y **autorizó dos rondas con
+  la IA real**: la de las conversaciones tocadas por las correcciones (T9) y la de la 50 (A-6).
+
+**Plan de la noche, en este orden (modo autónomo; el usuario descansa y vuelve a la mañana):**
+1. **Terminar las correcciones** (`../odd/tasks/correcciones-prueba-telegram.md`), una por una, con un
+   escritor delegado cada una, test primero, en seco, suites y revisión RDD por tramo
+   (`tools/rdd_ciclo.py` en una carpeta `_rdd-*` que se borra después):
+   - **T4b:** la advertencia de la revisión de la T4 (una pregunta vieja de "¿cuál de las dos?" abierta
+     no pisa el comentario de una aprobación escrita después);
+   - **T6:** la hora mal guardada de los turnos (la evidencia está en la tarea: `reloj.ahora()` devolvió
+     una hora anterior; el adelanto se guarda en memoria y se relee con `refrescar`);
+   - **T7 y T8:** primero sus conversaciones de prueba; si el arreglo pide cambiar el diseño (las tres
+     salidas de un tema, ADR 0018, decisión 4), **no se toca el código**: se deja la propuesta para la
+     mañana y se sigue;
+   - **T9:** la ronda con la IA real (autorizada) de una selección de las conversaciones tocadas (unas
+     10, 5 veces cada una), lanzada por el coordinador en segundo plano con `salida=$?`, sin ningún
+     escritor editando; a la bitácora. Si se corta por cupo, no se insiste: queda para la mañana;
+   - **T10:** suites completas, este STATUS, el documento y las memorias.
+2. **Después, la plataforma: el acceso por chat** (`../odd/tasks/acceso-por-chat.md`, A-1 a A-6: la
+   conversación 50, la `0065` de las 24 horas con su ensayo y sus garantías, las dos jugadas, la marca
+   del enlace, el ofrecimiento una sola vez, la bienvenida y la ronda real autorizada). `leda_motor` se
+   lleva a la `0065` con respaldo previo (autorizado).
+3. **Frenar antes de:** el túnel o HTTPS y la prueba en el celular (necesitan al usuario); cualquier
+   decisión de producto nueva (queda escrita para la mañana, con ejemplos, de a una); `main` (lo decide
+   el usuario).
+4. **Al terminar o al frenar:** dejar en este STATUS una lista "Para la mañana" con lo que necesite al
+   usuario, y el punto exacto para seguir.
+
+**Pendientes del usuario, para la mañana** (de a una): confirmar `@Leda_Motor_bot` como `bot_usuario`
+del pack (lo dice Telegram, `getMe`); las tres preguntas de "Para decidir" de
+`odd/tasks/plataforma-p2.md`; lo que dejen las T7 y T8 y la ronda real. **En observación:** la 35 paso 18.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
