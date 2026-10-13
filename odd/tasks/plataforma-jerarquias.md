@@ -71,6 +71,36 @@ Ruta: cada porción, delegada (un escritor), porque toca base, servidor, web y p
       (4) elige una (por ejemplo la de integrar de Marcos) → la vista previa dice "espera a: …" con la tarea y
       la persona; (5) confirma → cargada; (6) carga otra sin espera → igual que antes. Después, el coordinador
       revisa en la base la espera (`dependency`) y la fila de auditoría con `espera_task_id`.
+      Se repite con el usuario después de la J1-6. Sumar al guion: (7) tocar "> confirmar" con el criterio,
+      la evidencia y "quién la decidió" vacíos → al lado del botón, "Falta completar: criterio de
+      aceptación, evidencia, quién la decidió.", y el foco en el criterio; (8) tocar cada campo, el
+      calendario y "Espera a" → la página no se agranda ni se corre de costado.
+- [x] **J1-6 · Arreglos de la prueba del usuario** (2026-10-13; ruta delegada, un escritor, sólo `web/`).
+      **Lo que vio:** (1) tocó confirmar con el criterio, la evidencia y "quién la decidió" vacíos; el
+      servidor respondió bien (422 con los tres `errores`), pero nada lo decía cerca de donde miraba, y no
+      supo por qué no se cargó; (2) el paso "> revisar" repetía la vista previa que ya estaba a la vista
+      ("debería tener un título o algo que diga vista previa y abajo directamente los botones de
+      confirmar"); (3) en el navegador de Telegram del iPhone la página se corría de costado: el selector
+      de quién la hace, el calendario y "Espera a" pasaban el borde derecho.
+      **Qué cambió** (`cc9cc41d`): una sola pantalla, con la vista previa en vivo titulada "Vista previa" y
+      "> confirmar" justo debajo (en la computadora, fija al bajar; en el celular, debajo del formulario);
+      sin "revisar" ni "volver"; mientras se manda, el formulario queda trabado (lo que se ve es lo que
+      va); la clave de un solo uso, "no llegó la respuesta, probá de nuevo", el aviso de clave usada con
+      otros datos y "cargar otra" siguen igual. Al lado de confirmar, un resumen (`role="alert"`): "Falta
+      completar: …" y "Hay que corregir: …" con el nombre de cada campo, que lleva a él; el foco va al
+      primero con problema, y cada campo conserva su mensaje (`aria-invalid`, `aria-describedby`). Lo que
+      falta o se pasa del tope se ve antes de mandar (`draft.checkDraft`, con los textos de
+      `TEXTOS_DE_LA_CARGA`); lo demás lo dice el servidor y va al mismo resumen. El ancho: cada campo y
+      el calendario `w-full min-w-0 max-w-full`, y 16 px en pantallas táctiles (`pointer-coarse:`), porque
+      el iPhone agranda la página al tocar un campo de menos de 16 px (los campos tenían 13); en la puerta
+      del equipo, la línea del espacio del cabezal no podía achicarse (`truncate` sin `min-w-0`).
+      **Evidencia:** `AdminApp.test.tsx` 15 en rojo y 10 en verde antes, 25 en verde después (5 pruebas
+      nuevas: una sola pantalla, lo que falta con el foco, el formulario vacío, el 422 del servidor, los
+      anchos); `App.test.tsx` 1 en rojo antes (el cabezal), 11 en verde después; `npm test` 65 passed;
+      `npm run build` bien (la regla de 16 px está en el CSS compilado). Medido con Chrome sin ventana en
+      marcos de 360 y 390 px (345 y 375 px de contenido), con textos largos: ningún elemento pasa el
+      borde, ni antes ni después del arreglo; Chrome no reproduce lo del iPhone, así que la causa más
+      probable es el agrandado al tocar un campo, y sólo la prueba en el celular lo confirma (J1-5).
 
 **Diseño corto (J1-1, 2026-10-13).** Hoy el formulario (`LoadForm.tsx`) pide a
 `GET /admin/api/espacios/{id}/opciones` (función `opciones_de_la_carga`) lo que se puede elegir y manda la carga
@@ -167,3 +197,6 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
   --list` sin error; ensayo en una copia restaurada, borrada después; `cargar_tarea` con 13 argumentos, de
   `leda_owner` y `security definer`; aplicada con `psql -v ON_ERROR_STOP=1 -f` como `postgres`, sin error).
   Falta J1-5, la prueba en el celular.
+- 2026-10-13: la primera prueba del usuario en el celular encontró tres cosas (J1-6): no se decía qué
+  faltaba, el paso "revisar" sobraba y la página se corría de costado en el iPhone. Arregladas en
+  `cc9cc41d` (escritor delegado); J1-5 se repite con el usuario.
