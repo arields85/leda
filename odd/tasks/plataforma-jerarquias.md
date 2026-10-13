@@ -43,17 +43,48 @@ Ruta: cada porción, delegada (un escritor), porque toca base, servidor, web y p
 
 ### J1 · Las esperas en el formulario
 
-- [ ] **J1-1 · Mapa y diseño corto:** cómo carga hoy el formulario (`web/src/admin/LoadForm.tsx`, la API de
-      carga, `dependency` y `evitar_ciclo_dependencia`), y qué cambia; escrito acá.
-- [ ] **J1-2 · Las garantías, primero en rojo:** no se elige una tarea de otro espacio ni una cerrada; un ciclo
+- [x] **J1-1 · Mapa y diseño corto:** cómo carga hoy el formulario (`web/src/admin/LoadForm.tsx`, la API de
+      carga, `dependency` y `evitar_ciclo_dependencia`), y qué cambia; escrito acá (abajo).
+- [x] **J1-2 · Las garantías, primero en rojo:** no se elige una tarea de otro espacio ni una cerrada; un ciclo
       se rechaza con su motivo; la tarea que espera no pasa a en curso mientras la otra no terminó; la
-      auditoría lo guarda.
-- [ ] **J1-3 · El servidor y la web:** el campo opcional "espera a" en el formulario y la carga.
-- [ ] **J1-4 · Verificación:** `pytest tests/garantias`, las pruebas de la carga, `npm test` y `npm run build`
-      en `web/`; revisión RDD por commit.
+      auditoría lo guarda. `tests/garantias/test_espera_al_cargar.py`: 14 en rojo antes de la 0067
+      (sin la carga de 13 datos, sin `tareas` en las opciones, sin los textos), 14 en verde después.
+- [x] **J1-3 · El servidor y la web:** el campo opcional "espera a" en el formulario y la carga. `980a8f2a`
+      (la `0067`, su rollback, `esquema.sql`, `web_app.py` y las garantías) y `fb87d121` (el formulario y la
+      revisión; `AdminApp.test.tsx`: 3 en rojo antes, en verde después).
+- [x] **J1-4 · Verificación** (2026-10-13, sobre `fb87d121`): `pytest -q tests/garantias` 738 passed (13 min);
+      `pytest -q tests/test_dependencias.py` 25 passed; `pytest -q tests/garantias/test_migraciones.py` 16
+      passed (la paridad y el rollback, con la 0067); en `web/`, `npm test` 60 passed y `npm run build` bien.
+      La revisión RDD de los dos commits la corre el coordinador.
 - [ ] **J1-5 · Prueba real en el celular** (con el usuario).
 
 ### J2 a J6
+
+**Diseño corto (J1-1, 2026-10-13).** Hoy el formulario (`LoadForm.tsx`) pide a
+`GET /admin/api/espacios/{id}/opciones` (función `opciones_de_la_carga`) lo que se puede elegir y manda la carga
+a `POST …/tareas` (`cargar_una_tarea` → función `cargar_tarea`, `security definer` de `leda_owner`, que comprueba
+la sesión de administración, fija el espacio y devuelve todos los rechazos juntos). La base ya guarda las esperas
+(`dependency`: `origen_task_id` es la esperada, `destino_task_id` la que espera) y la regla de §4 ya vive en ella:
+`exigir_dependencias_resueltas` no deja pasar a `en_curso` mientras la esperada no esté `terminada` o `cancelada`, y
+`evitar_ciclo_dependencia` rechaza un ciclo. Qué cambia (migración `0067_la_espera_al_cargar`):
+- **Una sola espera por tarea, siempre bloqueante**, opcional (decisión 2: "un campo"); puede ser de otro objetivo
+  del mismo espacio.
+- **Qué se ofrece:** las tareas comprometidas y abiertas del espacio (`asignada`, `en_curso`, `bloqueada`,
+  `en_revision`), con su responsable y su objetivo. Ni una cerrada ni una propuesta sin aprobar (punto 9: una
+  propuesta nunca traba una tarea comprometida).
+- **Qué rechaza `cargar_tarea`**, junto con lo demás: una tarea que no está en el espacio (la RLS no la encuentra:
+  `no_existe`), una cerrada (`esta_cerrada`), una sin comprometer (`no_esta_comprometida`). Lee la esperada `for
+  share`, para que no se cierre entre la comprobación y la espera.
+- **El ciclo:** al cargar, la tarea es nueva y nadie la espera todavía, así que una sola espera no puede cerrar un
+  círculo; el disparador sigue de guarda y, si alguna vez salta, la carga entera se deshace y vuelve como un rechazo
+  más (`haria_un_ciclo`), con su texto, nunca como un error crudo.
+- **La auditoría** de la carga guarda `espera_task_id` y `espera_tipo` (sólo con espera); la huella de la clave
+  suma la espera sólo si la hay, así una carga sin espera queda exactamente como antes, también su idempotencia.
+- **La firma:** `cargar_tarea` suma `p_espera_task_id uuid default null` al final (la de 12 se borra; mismo dueño,
+  `search_path` y permisos). El rollback vuelve a la 0064 y no toca datos: una espera cargada queda como espera.
+- **La web:** "espera a (opcional)", un `select` como los demás, y en la revisión, "espera a: <tarea>".
+- `PENDIENTE` (con los avisos de la decisión 7 del ADR 0022, que todavía no existen): el aviso de §4 a los dos
+  referentes cuando la espera cruza áreas.
 
 Se detallan al llegar a cada una, con su diseño corto.
 
@@ -79,3 +110,6 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
 ## Progreso y evidencia
 
 - 2026-10-13: el usuario aceptó el ADR 0023 y este orden; documento creado.
+- 2026-10-13: J1-1 a J1-4 hechas (escritor delegado; ruta delegada: base, servidor, web y pruebas). La
+  `0067` todavía no está aplicada en `leda_motor` (la aplica el coordinador, con respaldo previo); sin ella,
+  la carga desde la web falla porque el servidor ya manda la espera. Falta J1-5, la prueba en el celular.

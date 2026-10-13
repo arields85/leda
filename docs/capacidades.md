@@ -272,6 +272,7 @@ con `vitest` y Testing Library sobre un servidor de mentira, y a 390 y 1280 px c
 |---|---|
 | La puerta de administración en `/app/admin/`: la misma web, elegida por el camino; arriba, el nombre del administrador y "salir"; un selector de espacio si hay más de uno | `web/src/door.ts`, `web/src/admin/AdminApp.tsx` |
 | El formulario, con lo que ofrece la base: objetivo (sólo los que existen), título, descripción, quién la hace (con su área, quién la revisa y "[SIN CONECTAR]"), la fecha en un calendario que sólo deja elegir los días hábiles que ofrece el espacio (con teclado: flechas entre días, Enter para elegir), el criterio, la evidencia del área (marcada la que pide) y quién la decidió; contadores con los topes del servidor (200, 800 y 500) | `web/src/admin/LoadForm.tsx`, `web/src/admin/DatePicker.tsx` |
+| "espera a (opcional)": una sola tarea comprometida y abierta del mismo espacio que la nueva espera, siempre bloqueante (ADR 0023, decisión 2); la base rechaza una de otro espacio, una cerrada o una sin comprometer, y un ciclo con su motivo; la auditoría de la carga la guarda, y la revisión dice "espera a" | migración `0067`, `cargar_tarea`, `web/src/admin/LoadForm.tsx` |
 | "revisar" muestra la tarea como la ve el equipo (la misma tarjeta) y quién la carga, la decidió y la revisa, y si la fecha pasa la del objetivo; "confirmar" la carga y "volver" deja corregir (decisión 6) | `web/src/admin/TaskPreview.tsx` |
 | Una clave de un solo uso por intento: la misma en cada reintento con los mismos datos, una nueva al cambiar un dato o después de cargar; sin `crypto.randomUUID` (HTTP en la red local), 32 dígitos hexadecimales al azar | `web/src/admin/LoadForm.tsx`, `web/src/admin/draft.ts` |
 | Resultados: "Tarea cargada." con los avisos (fecha posterior a la del objetivo, "no va a recibir avisos ni seguimiento hasta que la conecte") y "cargar otra"; cada rechazo en su campo y los demás en un resumen; sin sesión, "entrá con un enlace nuevo"; sin red, los datos quedan y se reintenta | `web/src/admin/LoadForm.tsx`, `web/src/admin/AdminApp.tsx` |
@@ -286,7 +287,8 @@ con `vitest` y Testing Library sobre un servidor de mentira, y a 390 y 1280 px c
   fechas y el alta y la baja de integrantes; que el bot de administración ofrezca el enlace de la
   puerta de administración (toca el Motor: después de juntar las ramas);
 - los avisos de una tarea cargada al responsable y a quien la revisa (decisión 7) y el de "sin
-  conectar" a su referente: son avisos del motor, después de juntar las ramas;
+  conectar" a su referente: son avisos del motor, después de juntar las ramas; con ellos, el aviso
+  de la mecánica §4 a los dos referentes cuando una espera cargada cruza áreas;
 - el usuario del bot de CoreWork en el pack (`telegram.bot_usuario`): sin él, el botón "> consultar
   a leda" no se muestra;
 - la tarjeta no abre la página de la tarea, aunque la API dice si la persona la puede ver
