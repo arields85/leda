@@ -650,7 +650,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
          comprueba que sólo cambió la ortografía (palabra por palabra) o un nombre de los datos.
       Ruta: delegada, un escritor (servidor, web, herramienta y pruebas). Después, ronda con la IA real (autorizada
       por el usuario) y la prueba en el celular.
-- [ ] **J2-18 · Leda completa todo lo que puede** (decisión del usuario, 2026-10-13, "si"). La ronda de la J2-17
+- [x] **J2-18 · Leda completa todo lo que puede** (decisión del usuario, 2026-10-13, "si"). La ronda de la J2-17
       (66 de 81, bitácora) mostró que, sin quién la hace, la IA inventaba una comprobación floja ("se comprueba al
       verlo"), la misma clase que el UPS de la J2-13. El usuario: "Leda debería en lo posible completar todos los
       campos; yo reviso y corrijo lo que quiera o lo dejo tal cual"; y la evidencia no es cerrada (el formulario
@@ -668,6 +668,16 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       sin perder las demás: "q" no anula "batería"), los avisos de RDD de la J2-17 (`review-0f1f6e1e0eacf371`,
       `review-297cc946aa4740af`, `review-b5e1ca58c61b942f`; entre ellos: sin la IA, un criterio igual al título
       podía cargarse sin revisar) y el chequeo de naturalidad de la herramienta, que marcaba de más.
+      **Hecha** (escritor delegado): `2a760fdc` (servidor), `2ec540e9` (pruebas y herramienta), `bba1efc6` (web);
+      y, inline, el importador: cada área conoce los cinco tipos del pack y lo que pide es el mínimo (`c99791b7`,
+      RED observado; `leda_motor` reimportada con respaldo `db/respaldos/leda_motor-antes-tipos-de-evidencia-20261013.dump`).
+      `pytest` de la ayuda, el criterio y la ortografía: 362 passed; garantías y entrega (`LEDA_BASE_URL=` vacío):
+      888 passed; `npm test`: 122 passed. RDD aprobadas: `review-baa23ace8bea44a1`, `review-fc656fe6eb091158`,
+      `review-756b1bb3b4c0b845`, `review-5eca561410caecb7`; WARNINGs para una tanda: la evidencia escrita sin
+      validar (`web_app.py:1280-1286`), `nombres_mal_escritos` amplio (`ayuda_al_cargar.py:836`), `LoadForm.tsx:403`
+      y los tipos malformados del pack (`importador.py:552-553`). Ronda con la IA real: 76 de 81 (bitácora).
+      **Falta la prueba en el celular.** Nota: `test_el_enganche_de_la_cocina_da_la_marca…` falla si `LEDA_BASE_URL`
+      está en el `.env` (la prueba depende del entorno).
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
