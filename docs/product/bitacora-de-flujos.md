@@ -365,6 +365,16 @@ convierte en texto plano con entidades de Telegram, sin `parse_mode`, y una marc
   - **Conclusión vigente:** la regla del motivo funciona con la IA real; la inestabilidad del servicio no
     oficial de ChatGPT (riesgo 5) pesa en las rondas, aunque la cocina la maneja sin silencio.
 
+## El acceso a la web por chat, con la IA real (2026-10-13, de madrugada)
+
+La conversación 50 (`odd/tasks/acceso-por-chat.md`, A-6, autorizada por el usuario): el ofrecimiento de la web una sola vez al final de una respuesta, sin repetirlo ni ofrecérselo a quien ya entró, el enlace nuevo a pedido que anula el anterior, una charla que no corta nada ("casi pierdo el celular"), el corte enseguida al perder el celular y un aviso sin ofrecimiento. Sobre `a9e73268`. Comando: `.venv\Scripts\python.exe -m tests.conversaciones.correr --ia sol-suscripcion --veces 5 --paralelo 2 --conversacion 50`; informe `resultados/2026-10-13-0326-leda.motor-sol-suscripcion.md`.
+
+- **Garantías 5 de 5 y comprensión 5 de 5:** la IA eligió `pedir_acceso_web` y `perdi_el_celular` donde correspondía y no leyó "casi pierdo el celular" como un corte.
+- **Formato 4 de 5:** en la vez 2, paso 6, un renglón de la respuesta del corte pasó de 140 caracteres (la clase conocida de los renglones largos de la IA; no es del acceso por chat).
+- Cupo: la ventana de 5 horas, de 0 % a 7 %; la semanal, 1 %.
+
+**Conclusión:** el acceso por chat funciona con la IA real en la conversación de prueba. Falta la prueba del usuario en un celular, con el túnel o HTTPS (necesita al usuario).
+
 ## Las correcciones de la prueba por Telegram, con la IA real (2026-10-13, de madrugada)
 
 Sol por la suscripción, sobre `bc40805` (las correcciones T1 a T8 de

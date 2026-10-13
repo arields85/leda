@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-13, madrugada (modo autónomo): correcciones T4b a T9 hechas; el acceso por chat, en marcha. Ver "Lo hecho la noche del 12 al 13" y "Para la mañana".
+**Última actualización documental:** 2026-10-13, madrugada (modo autónomo): correcciones T4b a T10 y acceso por chat A-1 a A-6 hechos. Ver "Lo hecho la noche del 12 al 13" y "Para la mañana".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -32,7 +32,7 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-12, cierre de la noche)
+## Punto exacto para retomar (2026-10-13, madrugada, al terminar el plan de la noche)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
 Plan de la Fase C: [`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md) (decisiones del usuario 1 a 79 y,
@@ -102,35 +102,34 @@ viejo corriendo.
   del ofrecimiento, el corte siempre auditado) y las jugadas `pedir_acceso_web` y `perdi_el_celular`.
   **`leda_motor` está en la `0066`** (respaldo `db/respaldos/leda_motor-antes-0065-0066-20261013.dump`):
   el despachador ya lee la tabla nueva, así que una base sin la `0066` no sirve para el escuchador.
+- **El acceso por chat, A-4 y A-5** (`fb4fc9a2`, `30f4a86f`, `3964a0e8`, `79225200`): el ofrecimiento
+  de la web una sola vez, al final de una respuesta escrita, y en la bienvenida; "perdí el celular"
+  descarta los enlaces que todavía no salieron. En seco 50 de 50; `tests/garantias` 724 passed,
+  `tests/motor` 1440 passed, `tests/conversaciones` 227 passed. Revisado por RDD y aprobado.
+- **A-6, la ronda real de la 50** (bitácora): garantías 5 de 5, comprensión 5 de 5, formato 4 de 5
+  (un renglón largo de la IA). Cupo: la ventana de 5 horas, 7 %; la semanal, 1 %.
 
-**Plan de la noche, en este orden (modo autónomo; el usuario descansa y vuelve a la mañana):**
-1. **Terminar las correcciones** (`../odd/tasks/correcciones-prueba-telegram.md`), una por una, con un
-   escritor delegado cada una, test primero, en seco, suites y revisión RDD por tramo
-   (`tools/rdd_ciclo.py` en una carpeta `_rdd-*` que se borra después):
-   - **T4b:** la advertencia de la revisión de la T4 (una pregunta vieja de "¿cuál de las dos?" abierta
-     no pisa el comentario de una aprobación escrita después);
-   - **T6:** la hora mal guardada de los turnos (la evidencia está en la tarea: `reloj.ahora()` devolvió
-     una hora anterior; el adelanto se guarda en memoria y se relee con `refrescar`);
-   - **T7 y T8:** primero sus conversaciones de prueba; si el arreglo pide cambiar el diseño (las tres
-     salidas de un tema, ADR 0018, decisión 4), **no se toca el código**: se deja la propuesta para la
-     mañana y se sigue;
-   - **T9:** la ronda con la IA real (autorizada) de una selección de las conversaciones tocadas (unas
-     10, 5 veces cada una), lanzada por el coordinador en segundo plano con `salida=$?`, sin ningún
-     escritor editando; a la bitácora. Si se corta por cupo, no se insiste: queda para la mañana;
-   - **T10:** suites completas, este STATUS, el documento y las memorias.
-2. **Después, la plataforma: el acceso por chat** (`../odd/tasks/acceso-por-chat.md`, A-1 a A-6: la
-   conversación 50, la `0065` de las 24 horas con su ensayo y sus garantías, las dos jugadas, la marca
-   del enlace, el ofrecimiento una sola vez, la bienvenida y la ronda real autorizada). `leda_motor` se
-   lleva a la `0065` con respaldo previo (autorizado).
-3. **Frenar antes de:** el túnel o HTTPS y la prueba en el celular (necesitan al usuario); cualquier
-   decisión de producto nueva (queda escrita para la mañana, con ejemplos, de a una); `main` (lo decide
-   el usuario).
-4. **Al terminar o al frenar:** dejar en este STATUS una lista "Para la mañana" con lo que necesite al
-   usuario, y el punto exacto para seguir.
+**Para la mañana (lo que necesita al usuario, de a una):**
+1. **Confirmar una decisión técnica del acceso por chat:** un toque de botón no lleva el ofrecimiento de
+   la web (sólo una respuesta a algo escrito). Ejemplo: Marcos toca "Aprobar" y la respuesta no ofrece
+   la web; se la ofrece la próxima vez que escriba. Si preferís que también vaya en un toque, es un cambio
+   chico en `turno._ofrecer_la_web`.
+2. **El túnel o HTTPS y la prueba en el celular** del acceso por chat (el enlace tiene que abrir desde
+   Telegram en el teléfono).
+3. **Confirmar `@Leda_Motor_bot` como `bot_usuario`** del pack (lo dice Telegram, `getMe`).
+4. **Las tres preguntas de "Para decidir"** de `../odd/tasks/plataforma-p2.md`.
+5. **La 22, comprensión 0 de 3** en la ronda de la T9 (la misma clase que en la D6, `PENDIENTE`).
+6. **Subir la rama y `main`:** `origin/feat/motor-de-conversacion` está en `b2e84a2b`; lo de esta
+   noche no se subió. `main`, cuando lo decidas. **En observación:** la 35 paso 18.
 
-**Pendientes del usuario, para la mañana** (de a una): confirmar `@Leda_Motor_bot` como `bot_usuario`
-del pack (lo dice Telegram, `getMe`); las tres preguntas de "Para decidir" de
-`odd/tasks/plataforma-p2.md`; lo que dejen las T7 y T8 y la ronda real. **En observación:** la 35 paso 18.
+**Punto exacto para seguir:** todo lo del plan de la noche está hecho (T4b a T10 y A-1 a A-6). Lo que
+sigue espera las respuestas de arriba; sin ellas, las advertencias anotadas en
+`../odd/tasks/acceso-por-chat.md` y `../odd/tasks/correcciones-prueba-telegram.md` son casos de borde, sin
+urgencia.
+
+**El plan de la noche** (las correcciones, después el acceso por chat; frenar antes del túnel, del
+celular, de toda decisión de producto nueva y de `main`) se cumplió entero; su texto, en la historia de
+Git de este archivo (`a9e73268`).
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
@@ -155,7 +154,8 @@ sin error), las ocho migraciones ensayadas en una copia descartable restaurada d
 con `psql -v ON_ERROR_STOP=1 -f` como `postgres` (`host=localhost user=postgres dbname=leda_motor`),
 sin error. Quedó con lo conversado en la prueba (PLC y dashboard terminados; comunicaciones trabada por
 Mariano; integrar, de Marcos) y el reloj de Leda adelantado al miércoles 14/10; para volver a probar
-desde cero, recrearla con los pasos de la D6. El usuario autorizó ponerla al día o recrearla cuando haga
+desde cero, recrearla con los pasos de la D6. El 2026-10-13 a la madrugada se llevó a la `0066` (respaldo
+`db/respaldos/leda_motor-antes-0065-0066-20261013.dump`, ensayo en una copia descartable). El usuario autorizó ponerla al día o recrearla cuando haga
 falta, con respaldo previo; nunca `leda` ni `leda_flujo`.
 
 **Acuerdos de trabajo** (detalle en la memoria del agente):
@@ -211,7 +211,7 @@ validador de invariantes. Destino de cada uno:
   `deteccion_pregunta`, `jev` y `local`) y la escalera, el reloj y el ciclo viejos.
 - **La auditoría vuelve a la cocina:** cada `herramientas.ejecutar` y cada efecto propio del motor deja su fila
   en `audit_log`, con `pack_hash` y `nucleo_hash`.
-- **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0064` (la plataforma) en la rama. La `0032` borra las tablas del alta.
+- **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0066` (la plataforma y el acceso por chat) en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   `PENDIENTE`: un ensayo de propiedad sobre un clúster limpio.
