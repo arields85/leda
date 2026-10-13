@@ -129,4 +129,8 @@ def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
 # `solo_si_pregunta`); ⚠️ sólo para lo que pide atención, nunca el estado de una tarea que sigue
 # su curso ("⚠️ Está en revisión"); y una sola pregunta en el cierre. Sin frases de ejemplo.
 # Antes: "9e419fe6bbcc420a".
-HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "420146b697b5124b"}
+# Y otra vez a propósito el 2026-10-12 (decisión 78, prueba por Telegram del usuario: "preguntar"
+# suena a interrogatorio): lo que Leda va a hacer con la persona es "un aviso, un recordatorio o una
+# consulta", la misma palabra que ya leen los hechos (`b2f4afa`). Sin frases de ejemplo.
+# Antes: "420146b697b5124b".
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "71b74fdaea8a436d"}

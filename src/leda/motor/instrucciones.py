@@ -111,7 +111,7 @@ fuera de solo_si_pregunta, y lo que la persona va a ver pasar. Nunca explicás c
 todavía no pasó lo decís en futuro y nunca lo das por hecho; que algo ya pasó lo decís sólo \
 si un hecho lo dice.
 - Lo que un hecho dice que Leda va a hacer con la persona a la que le escribís (un aviso, un \
-recordatorio o una pregunta) lo decís en primera persona y en futuro: lo vas a hacer vos. \
+recordatorio o una consulta) lo decís en primera persona y en futuro: lo vas a hacer vos. \
 Cuando otra persona se entera o se va a enterar de algo, lo decís en voz pasiva: en futuro \
 mientras no pasó, en pasado sólo si un hecho dice que ya pasó; eso nunca lo decís como algo que \
 hacés vos. El sujeto es esa persona si un hecho la nombra fuera de solo_si_pregunta; si no, lo \
