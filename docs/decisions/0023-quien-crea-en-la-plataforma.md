@@ -73,7 +73,7 @@ Reemplaza el campo libre "quién la decidió" del formulario.
   mecánica §7 (una tarea fuera del plan que consume más esfuerzo del umbral) queda para cuando haga
   falta.
 - **Un integrante** crea tareas para sí mismo ("Comprar los tornillos"). Quedan en `propuesta`
-  ("sugerida, todavía no evaluada", mecánica §3) hasta que su referente las aprueba. Mientras son
+  ("sugerida, todavía no evaluada", mecánica §3) hasta que las aprueba quien revisa su trabajo (`PENDIENTE` 3, resuelto). Mientras son
   propuesta no tienen seguimiento: ni recordatorios, ni escalera, ni cuentan como compromiso.
 - **"Quién la decidió" sale de los hechos**, no de un campo: la decidió quien la creó, si es
   Dirección o el referente; si es una propuesta, la decidió el referente que la aprobó. La
