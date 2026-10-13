@@ -213,8 +213,17 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
    `aprobado_por` de la persona en el pack, el mismo que aprueba sus entregas), no el referente del
    área. Cuando coinciden, que es lo normal, no cambia nada; así proponer, entregar y aprobar pasan
    por la misma persona.
-4. **Qué le falta a una propuesta.** Ejemplo: Nahuel propone "Comprar los tornillos" sin criterio de
-   aceptación; ¿la web no la guarda, o el referente la completa al aprobarla?
+4. ~~**Qué le falta a una propuesta.**~~ **Decidido (usuario, 2026-10-13): la persona describe y
+   Leda completa.** Ni burocracia para quien propone ni para quien aprueba (el usuario: "le sacamos la
+   burocracia a nahuel y se la pasamos al que aprueba"). Nahuel elige la tarea que destraba y describe
+   como habla ("faltan los tornillos para colgar el estante, necesito 12 de 8 mm"); con eso la IA
+   propone el título y el criterio, y la web pone el responsable (él), el objetivo (el de la tarea que
+   destraba), una fecha antes de su vencimiento y la evidencia que pide su área. Él corrige y la manda;
+   quien la aprueba lee una propuesta completa. Garantías, las de la entrega por chat: lo que propone la
+   IA cuenta sólo si la persona lo acepta; el código rechaza un criterio con un número o un nombre que
+   nadie dijo; nada se compromete incompleto. La misma ayuda, para Dirección y los referentes al cargar
+   (usuario: "hace la tarea que tiene que hacer leda, que es facilitar y ayudar"). Es la IA dentro de la
+   web, nueva: va en su propia porción, con su prueba.
 5. **El rechazo de una propuesta.** Ejemplo: Marcos no aprueba "Comprar los tornillos"; ¿cómo se
    entera Nahuel (mensaje de Leda o sólo en la web), con motivo o sin él, y la propuesta queda
    `cancelada` (que es terminal y pide razón, mecánica §3)?
