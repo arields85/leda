@@ -622,6 +622,34 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       `review-9ed467d37d43f402`, aprobada; su WARNING (en el iPhone, un toque para cerrar la lista la volvía a
       abrir) arreglado en `309b6ac4` con su prueba (RED observado). `npm test`: 111 passed; typecheck y build bien;
       `pytest` del criterio y la ayuda: 240 passed. **Falta la prueba en el celular.**
+- [ ] **J2-17 · El criterio en palabras de Leda, y lo que Leda escribe, bien escrito** (segunda prueba en el
+      celular de la J2-12, 2026-10-13, 18:42). **Hallazgos del usuario:** (1) la propuesta del criterio "es muy
+      rebuscada… parece sacada del código y no lo que dice la IA… es muy estructurada": es cierto, la arma una
+      plantilla del código (`criterio_con_la_evidencia`: "<resultado> Se comprueba con lo que pide el área: <a>; <b>.");
+      (2) Leda no corrige la ortografía: escribió "cirelabs" aunque eligió bien el objetivo ("…con CoreLabs").
+      **Chequeo de rumbo:** cuarta vez sobre el criterio. La clase de problema: la cocina escribe el texto visible
+      en lugar del mozo (regla del mozo: la cocina da el hecho, la IA lo dice con naturalidad). La evidencia ya se
+      ve en su lista, justo debajo, y se guarda aparte: el criterio no necesita repetirla.
+      **De qué se parte:** el flujo C (`feat/flujo-de-un-mensaje:src/leda/alta_turno.py:1047-1068`, `:1155-1157`,
+      `:1644-1646`): la IA escribía el criterio entero con sus palabras, con la evidencia del área como dato, y "no
+      sé" era un pedido de ayuda (pasó en real, C6, 2026-10-03); su hueco: la propuesta no se revisaba contra datos
+      inventados. El F-B7 (`respaldo-flujos-antes-de-d:src/leda/llm.py:429-440`) proponía sólo con el título.
+      **Lo que decidió el usuario** (2026-10-13, "si, vamos por ahí pero… para todos los otros campos también, así
+      queda natural"; y sobre la ortografía: "no es cambiar el significado de mis palabras, es corregir la
+      ortografía… me está ayudando"):
+      1. La IA escribe con naturalidad todo lo que propone: título, descripción y criterio (el criterio entero, con
+         la evidencia del área como dato para decir cómo se comprueba, no pegada como lista). Ninguna oración
+         armada por el código; `criterio_con_la_evidencia` queda sólo de reserva si la IA no responde.
+      2. Siguen los controles de la cocina sobre cada texto entero: nada inventado (`_problema_del_texto`) y, en el
+         criterio, que diga un resultado (el juicio por su sentido).
+      3. "No sé" es un pedido de ayuda: Leda propone siempre, también sin evidencia del área (con el título y la
+         descripción).
+      4. La ortografía, en todo: Leda corrige lo que propone y lo que la persona escribió a mano, y pone los nombres
+         como están en los datos del equipo (personas, objetivos, tareas: "cirelabs" → "CoreLabs"); nunca cambia
+         cómo está redactado. Las correcciones se ven en la vista previa antes de confirmar, marcadas; el código
+         comprueba que sólo cambió la ortografía (palabra por palabra) o un nombre de los datos.
+      Ruta: delegada, un escritor (servidor, web, herramienta y pruebas). Después, ronda con la IA real (autorizada
+      por el usuario) y la prueba en el celular.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
