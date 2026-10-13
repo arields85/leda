@@ -21,6 +21,8 @@ import {
   newKey,
   policyOf,
   PROBLEM_FIELD,
+  proposedCriterion,
+  REFUSED_CRITERION,
   toInput,
   validProposal,
   waitableTasks,
@@ -76,9 +78,9 @@ function focusField(field: Field) {
 }
 
 /** Whether the server looked the key up before refusing: not with a malformed value, nor with a
- * criterion it refused for not saying how it is checked (J2-9), which it decides before loading. */
+ * criterion it refused (J2-9 and J2-14), which it decides before loading. */
 function lookedUpTheKey(problem: Problem): boolean {
-  return !problem.motivo.startsWith('mal_formad') && problem.motivo !== 'sin_comprobacion';
+  return !problem.motivo.startsWith('mal_formad') && !(problem.campo === 'criterio' && REFUSED_CRITERION.includes(problem.motivo));
 }
 
 /** The local problems first, then the ones already shown that the local check does not repeat
@@ -149,6 +151,7 @@ function FieldBlock({
   errors,
   hint,
   proposed,
+  after,
   children,
 }: {
   id: string;
@@ -157,6 +160,8 @@ function FieldBlock({
   errors: Problem[];
   hint?: ReactNode;
   proposed?: boolean;
+  // Below the messages: what Leda proposes for this field, if anything.
+  after?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -182,6 +187,23 @@ function FieldBlock({
           ))}
         </ul>
       )}
+      {after}
+    </div>
+  );
+}
+
+/** The criterion Leda proposes with a refusal (J2-14): the result and the area's evidence, with a
+ * one-tap button to use it. A shortcut: the person can also write her own. */
+function CriterionOffer({ text, onUse }: { text: string; onUse: () => void }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2 rounded-card border-hard border-line-soft px-3 py-2.5">
+      <p className={`m-0 ${FIELD_HINT}`}>
+        <span className="text-propuesto">Leda propone:</span>
+      </p>
+      <p className={`m-0 wrap-break-word ${FIELD_VALUE}`}>{text}</p>
+      <button type="button" className={`${SECONDARY} w-fit`} onClick={onUse}>
+        &gt; usar este criterio
+      </button>
     </div>
   );
 }
@@ -279,6 +301,13 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     const touched = new Set(Object.keys(patch));
     setProblems((current) => current.filter((p) => !touched.has(PROBLEM_FIELD[p.campo] ?? '')));
     setNotes((current) => current.filter((n) => !touched.has(PROBLEM_FIELD[n.campo] ?? '')));
+  }
+
+  /** Takes the criterion Leda proposed with a refusal: it fills the field (the notice goes, as
+   * with any change) and stays marked as hers until the person edits it. */
+  function takeCriterion(text: string) {
+    change({ criterio: text });
+    setProposed((marked) => new Set([...marked, 'criterio']));
   }
 
   function chooseResponsible(id: string) {
@@ -489,6 +518,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   // announced again); before, only a line.
   const alerted = problems.length > 0;
   const invalid = (field: Field) => (on(field).length ? true : undefined);
+  const criterionOffer = proposedCriterion(on('criterio'));
   const described = (id: string, field: Field) => (said(field).length ? `${id}-error` : undefined);
 
   return (
@@ -634,7 +664,10 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
           <FieldBlock id="f-criterio" label="Criterio de aceptación" errors={said('criterio')}
             proposed={proposed.has('criterio')}
             extra={<Counter value={draft.criterio} limit={LIMITS.criterio} />}
-            hint="Qué tiene que pasar para darla por terminada.">
+            hint="Qué tiene que pasar para darla por terminada."
+            after={criterionOffer && (
+              <CriterionOffer text={criterionOffer} onUse={() => takeCriterion(criterionOffer)} />
+            )}>
             <textarea
               id="f-criterio"
               className={`${INPUT} min-h-20 resize-y`}

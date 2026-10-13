@@ -114,6 +114,9 @@ ETAPA_AYUDA_AL_CARGAR = "ayuda_al_cargar"
 # El juicio del criterio al cargar una tarea en la plataforma (J2-9, `ayuda_al_cargar.
 # juzgar_el_criterio`): la IA del espacio no lo pudo revisar y la tarea se cargó con un aviso.
 ETAPA_CRITERIO_AL_CARGAR = "criterio_al_cargar"
+# El criterio rechazado al cargar porque no dice ningún resultado, sin el criterio que propone Leda
+# (J2-14): la IA no respondió o su resultado no pasó los controles; la persona vio qué falta.
+ETAPA_PROPUESTA_DEL_CRITERIO = "propuesta_del_criterio"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -458,6 +461,17 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica), revisá la IA "
                    "del espacio (`python -m leda modelo`, `leda chatgpt estado`) y mirá el "
                    "criterio de la tarea: si no dice cómo se comprueba, hablalo con {nombre}.")),
+    ETAPA_PROPUESTA_DEL_CRITERIO: ExplicacionDeEtapa(
+        titulo="Leda no pudo proponer un criterio al rechazar uno",
+        que_paso=("{nombre} quiso cargar una tarea en la plataforma con un criterio de "
+                  "aceptación que no dice qué tiene que quedar hecho, y Leda no pudo proponerle "
+                  "otro (la IA del espacio no respondió o lo que propuso no pasó los controles). "
+                  "La tarea no se cargó."),
+        que_vio=("Que el criterio no dice qué tiene que quedar hecho, sin un criterio propuesto "
+                 "al lado."),
+        que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica) y revisá la IA "
+                   "del espacio (`python -m leda modelo`, `leda chatgpt estado`). {nombre} puede "
+                   "escribir el criterio y volver a confirmar.")),
 }
 
 _EXPLICACION_GENERICA = ExplicacionDeEtapa(

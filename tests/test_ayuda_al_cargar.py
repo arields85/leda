@@ -126,8 +126,11 @@ def _respuesta_del_ejemplo(**cambios) -> dict[str, Any]:
 
 
 def juzga_que_si(entrada: dict[str, Any]) -> dict[str, Any]:
-    """El juicio de mentira que dice que el criterio dice cómo se comprueba, con todo el criterio
-    como la parte que lo dice (para las pruebas que no miran el juicio). Nunca la IA real."""
+    """El juicio de mentira que dice que el criterio sirve (para las pruebas que no miran el
+    juicio): sin evidencia del área, que dice cómo se comprueba, con todo el criterio como la
+    parte que lo dice; con ella (J2-14), que dice un resultado. Nunca la IA real."""
+    if "evidencia_que_pide_el_area" in entrada:
+        return {"dice_un_resultado": True, "resultado": entrada.get("criterio", "")}
     return {"dice_como_se_comprueba": True, "como_se_comprueba": entrada.get("criterio", "")}
 
 
@@ -917,6 +920,127 @@ def test_al_cargar_sin_ia_configurada_no_se_revisa(ayuda):
     assert juicio.motivo == "sin_revisar" and isinstance(juicio.falla, LookupError)
 
 
+# --- El criterio escrito, con la evidencia que pide el área (J2-14) ------------------------------
+#
+# La prueba del usuario en el celular (2026-10-13): "El ups queda cambiado y funcionando" se
+# rechazaba con "Contame cómo se sabe que está terminada." aunque el área ya pedía "cómo se probó y
+# qué dio la prueba", y el rechazo no proponía nada. La decisión del usuario: la persona escribe el
+# resultado y cómo se comprueba sale de la evidencia que pide el área, como en la propuesta de
+# Leda; sólo se rechaza lo que no dice ningún resultado, y todo rechazo trae un criterio propuesto
+# (el resultado más la evidencia del área). Sin evidencia del área, sigue el juicio de la J2-13.
+
+PRUEBA = "cómo se probó y qué dio la prueba"
+FOTO = "una foto del trabajo terminado"
+UPS_DEL_CELULAR = "El ups queda cambiado y funcionando"
+ORDENADO = "Quedó ordenado y limpio"
+RESULTADO_PROPUESTO = "El UPS de la sala de servidores queda cambiado y funcionando"
+SIN_RESULTADO = {"dice_un_resultado": False, "resultado": RESULTADO_PROPUESTO}
+
+
+def _con_evidencia(ayuda, ia, criterio, *, titulo=TITULO_UPS, evidencia=(PRUEBA,)):
+    return ayuda.juzgar_el_criterio(ia, titulo=titulo, descripcion="", criterio=criterio,
+                                    evidencia=list(evidencia))
+
+
+@pytest.mark.parametrize("titulo, criterio, evidencia", [
+    (TITULO_UPS, UPS_DEL_CELULAR, (PRUEBA,)),
+    ("Ordenar el depósito", ORDENADO, (FOTO,)),
+])
+def test_con_evidencia_un_resultado_escrito_se_carga_aunque_no_diga_como(ayuda, titulo, criterio,
+                                                                       evidencia):
+    """Los dos casos del celular: dicen un resultado y el área ya dice cómo se comprueba."""
+    ia = IADeLaCarga({"dice_un_resultado": True, "resultado": criterio})
+    juicio = _con_evidencia(ayuda, ia, criterio, titulo=titulo, evidencia=evidencia)
+    assert juicio.motivo is None and juicio.propuesta is None
+    assert ia.entrada() == {"titulo": titulo, "descripcion": "", "criterio": criterio,
+                            "evidencia_que_pide_el_area": list(evidencia)}
+    parametros = ia.pedidos[0]["tools"][0]["function"]["parameters"]
+    assert parametros["required"] == ["dice_un_resultado", "resultado"]
+    assert parametros["properties"]["dice_un_resultado"]["type"] == "boolean"
+    assert ia.pedidos[0]["tools"][0]["function"]["name"] == ayuda.NOMBRE_DEL_JUICIO
+
+
+def test_con_evidencia_lo_que_no_dice_un_resultado_trae_un_criterio_propuesto(ayuda):
+    ia = IADeLaCarga(SIN_RESULTADO)
+    juicio = _con_evidencia(ayuda, ia, "No se")
+    assert juicio.motivo == "sin_resultado" and juicio.falla is None
+    assert juicio.propuesta == (f"{RESULTADO_PROPUESTO}. Se comprueba con lo que pide el área: "
+                                f"{PRUEBA}.")
+    assert juicio.propuesta == ayuda.criterio_con_la_evidencia(RESULTADO_PROPUESTO, [PRUEBA])
+
+
+@pytest.mark.parametrize("dice", [True, False])
+def test_con_evidencia_igual_al_titulo_se_rechaza_igual_y_trae_la_propuesta(ayuda, dice):
+    """El código decide que igual al título no dice un resultado, diga lo que diga la IA; la IA se
+    llama sólo para proponer el resultado."""
+    ia = IADeLaCarga({"dice_un_resultado": dice, "resultado": RESULTADO_PROPUESTO})
+    juicio = _con_evidencia(ayuda, ia, f"{TITULO_UPS}.")
+    assert juicio.motivo == "sin_resultado"
+    assert juicio.propuesta.startswith(f"{RESULTADO_PROPUESTO}. Se comprueba con lo que pide")
+    assert len(ia.pedidos) == 1
+
+
+def test_con_evidencia_y_la_ia_caida_igual_al_titulo_se_rechaza_sin_propuesta(ayuda):
+    """Sin propuesta, el rechazo igual dice qué falta, con la falla para el incidente."""
+    from leda.motor.recibir import IANoConfigurada
+
+    juicio = _con_evidencia(ayuda, IANoConfigurada("No hay modelo configurado."), TITULO_UPS)
+    assert juicio.motivo == "sin_resultado" and juicio.propuesta is None
+    assert isinstance(juicio.falla, LookupError)
+
+
+@pytest.mark.parametrize("respuesta", [
+    TimeoutError("plazo"),
+    {},
+    {"dice_un_resultado": "si", "resultado": RESULTADO_PROPUESTO},
+])
+def test_con_evidencia_si_la_ia_no_juzga_no_se_finge_la_revision(ayuda, respuesta):
+    juicio = _con_evidencia(ayuda, IADeLaCarga(respuesta), UPS_DEL_CELULAR)
+    assert juicio.motivo == "sin_revisar" and juicio.falla is not None
+
+
+@pytest.mark.parametrize("resultado", ["", 3, "El UPS de las 4 salas queda cambiado"])
+def test_un_resultado_propuesto_que_no_sirve_no_se_propone(ayuda, resultado):
+    """Un resultado vacío, con otra forma o con un número que nadie dijo: el rechazo queda, sin
+    propuesta y con la falla (nunca en silencio)."""
+    juicio = _con_evidencia(ayuda, IADeLaCarga({"dice_un_resultado": False,
+                                                "resultado": resultado}), "No se")
+    assert juicio.motivo == "sin_resultado" and juicio.propuesta is None
+    assert juicio.falla is not None
+
+
+def test_sin_evidencia_del_area_sigue_pidiendo_como_se_comprueba(ayuda):
+    """Sin evidencia, el criterio tiene que decir cómo se comprueba (el juicio de la J2-13)."""
+    ia = IADeLaCarga(NO_LO_DICE)
+    juicio = _con_evidencia(ayuda, ia, UPS_DEL_CELULAR, evidencia=())
+    assert juicio.motivo == "sin_comprobacion" and juicio.propuesta is None
+    assert "evidencia_que_pide_el_area" not in ia.entrada()
+    assert ia.pedidos[0]["tools"][0]["function"]["parameters"]["required"] == [
+        "dice_como_se_comprueba", "como_se_comprueba"]
+
+
+def test_la_evidencia_de_la_carga_sale_de_la_politica_en_palabras(ayuda):
+    """La evidencia que se eligió en el formulario, en palabras de todos los días y en el orden
+    del área; un tipo que el área no conoce no cuenta (la base lo rechaza igual)."""
+    opciones = json.loads(json.dumps(OPCIONES))
+    opciones["politicas"][0]["tipos"]["prueba"] = {"clases": ["texto"], "en_palabras": PRUEBA}
+    assert ayuda.evidencia_de_la_carga(opciones, "m-lucas", ["prueba", "foto", "otra"]) == [
+        "una foto", PRUEBA]
+    assert ayuda.evidencia_de_la_carga(opciones, "m-lucas", []) == []
+    assert ayuda.evidencia_de_la_carga(opciones, "m-marcos", ["foto"]) == []
+
+
+def test_las_instrucciones_del_resultado_describen_el_trabajo_sin_frases_de_ejemplo(ayuda):
+    ia = IADeLaCarga(SIN_RESULTADO)
+    _con_evidencia(ayuda, ia, "No se")
+    textos = " ".join([ia.instrucciones(0),
+                       json.dumps(ia.pedidos[0]["tools"], ensure_ascii=False)]).lower()
+    assert "evidencia" in textos and "resultado" in textos
+    for frase in ("ups", "servidores", "foto", "ordenado", "limpio", "no sé", "funcionando",
+                  "cambiado"):
+        assert frase not in textos, frase
+
+
 # --- El tope de salida ------------------------------------------------------------------------
 
 def test_el_tope_de_salida_alcanza_para_la_propuesta_entera(ayuda):
@@ -1054,7 +1178,8 @@ def test_en_seco_la_medicion_prueba_algo(medir, tmp_path, capsys):
     jueves", el PLC y el UPS de la prueba del usuario, y juzga los criterios por su sentido: el
     ejemplo pasa entero (el criterio, con la evidencia del área de Lucas), el sábado no pone la
     fecha, "antes del jueves" pone el miércoles, el UPS circular no se propone (J2-13) y el código
-    decide cada criterio escrito; los demás, sin guion, no proponen nada."""
+    decide cada criterio escrito (J2-14: con la evidencia del área, los que dicen un resultado se
+    cargan y los demás traen un criterio propuesto); los demás, sin guion, no proponen nada."""
     salida = tmp_path / "informe.json"
     assert medir.main(["--salida", str(salida)]) == 1
     informe = json.loads(salida.read_text(encoding="utf-8"))
@@ -1063,10 +1188,11 @@ def test_en_seco_la_medicion_prueba_algo(medir, tmp_path, capsys):
                     "un apodo y un día de la semana", "el PLC, sin quién ni cómo se comprueba",
                     "el UPS de la prueba del usuario",
                     "el criterio circular del usuario", "un criterio con una comprobación concreta",
-                    "un criterio con palabras y sin comprobación", "no se",
+                    "un criterio con palabras y sin resultado", "no se",
                     "el UPS circular, escrito", "un criterio concreto con palabras de revisar",
-                    "igual al título"}
-    assert len(medir.PEDIDOS) == 20
+                    "igual al título", "el UPS del celular", "ordenado y limpio",
+                    "el UPS del celular, sin evidencia del área"}
+    assert len(medir.PEDIDOS) == 23
     assert all(isinstance(r["segundos"], float) for r in informe["resultados"])
     (sabado,) = [r for r in informe["resultados"] if r["pedido"] == "un sábado no es hábil"]
     assert {"campo": "fecha", "motivo": "no_es_habil"} in sabado["descartados"]
@@ -1078,27 +1204,56 @@ def test_en_seco_la_medicion_prueba_algo(medir, tmp_path, capsys):
     (ups,) = [r for r in informe["resultados"] if r["pedido"] == "el UPS de la prueba del usuario"]
     assert ups["juicio"] == "sin_comprobacion" and "criterio" not in ups["propuesta"]
     assert "Contame cómo se sabe que está terminada." in ups["avisos"]
-    assert f"12 de {len(medir.PEDIDOS)} bien" in capsys.readouterr().out
+    (no_se,) = [r for r in informe["resultados"] if r["pedido"] == "no se"]
+    assert no_se["juicio"] == "sin_resultado"
+    assert no_se["propuesta"] == ("El estante queda colocado. Se comprueba con lo que pide el "
+                                  "área: una foto.")
+    assert f"15 de {len(medir.PEDIDOS)} bien" in capsys.readouterr().out
 
 
 def test_la_medicion_juzga_los_criterios_escritos_y_cuenta_la_falla_de_la_ia(medir):
-    """J2-9 y J2-13: un criterio escrito se mide con el mismo juicio que la carga; si la IA no lo
-    juzgó, es una falla de la IA, nunca un juicio."""
+    """J2-9, J2-13 y J2-14: un criterio escrito se mide con el mismo juicio que la carga, con la
+    evidencia del pedido; si la IA no lo juzgó, o lo rechazó sin un criterio propuesto, es una
+    falla de la IA, nunca un juicio."""
     from leda.motor.ia_real import PlazoAgotado
 
     (circular,) = [p for p in medir.PEDIDOS if p["nombre"] == "el criterio circular del usuario"]
     ok, detalle = medir.medir(IADeLaCarga(PlazoAgotado(40)), circular)
     assert ok is False and detalle["falla"] == "ia"
+    # Con la evidencia del área, una respuesta sin el juicio del resultado no se da por juzgada.
     ok, detalle = medir.medir(IADeLaCarga({"dice_como_se_comprueba": True,
                                            "como_se_comprueba": "las variables se leen bien"}),
                               circular)
-    assert ok is False and detalle["falla"] == "ia"     # copió algo que no está en el criterio
+    assert ok is False and detalle["falla"] == "ia"
+    estante = {"dice_un_resultado": False, "resultado": "El estante queda colocado"}
     (igual,) = [p for p in medir.PEDIDOS if p["nombre"] == "igual al título"]
-    ia = IADeLaCarga()
-    assert medir.medir(ia, igual)[0] is True and ia.pedidos == []
+    ia = IADeLaCarga({**estante, "dice_un_resultado": True})
+    assert medir.medir(ia, igual)[0] is True and len(ia.pedidos) == 1
+    # Igual al título se rechaza sin la IA, pero sin ella no hay propuesta: es una falla de la IA.
+    ok, detalle = medir.medir(IADeLaCarga(PlazoAgotado(40)), igual)
+    assert ok is False and detalle["falla"] == "ia"
+    assert detalle["fallas"] == ["propuesta: la IA no respondió (PlazoAgotado)"]
     (no_se,) = [p for p in medir.PEDIDOS if p["nombre"] == "no se"]
-    ia = IADeLaCarga({"dice_como_se_comprueba": False, "como_se_comprueba": ""})
+    ia = IADeLaCarga(estante)
     assert medir.medir(ia, no_se)[0] is True and len(ia.pedidos) == 1
+    # Un resultado que no pasa los controles no da propuesta: el pedido sale mal.
+    ok, detalle = medir.medir(IADeLaCarga({**estante, "resultado": "Los 4 estantes"}), no_se)
+    assert ok is False and detalle["falla"] == "ia"
+
+
+def test_la_medicion_trae_los_criterios_del_celular_con_su_evidencia(medir):
+    """J2-14: los dos criterios de la segunda prueba del usuario, con la evidencia que mostraba
+    el formulario, se tienen que cargar; sin evidencia del área, el mismo no alcanza."""
+    pedidos = {p["nombre"]: p for p in medir.PEDIDOS}
+    ups = pedidos["el UPS del celular"]
+    assert ups["criterio_escrito"] == UPS_DEL_CELULAR
+    assert ups["evidencia"] == [PRUEBA]
+    assert ups["juicio"] is None
+    assert pedidos["ordenado y limpio"]["criterio_escrito"] == "Quedó ordenado y limpio"
+    assert pedidos["ordenado y limpio"]["evidencia"] == ["una foto del trabajo terminado"]
+    assert pedidos["ordenado y limpio"]["juicio"] is None
+    sin = pedidos["el UPS del celular, sin evidencia del área"]
+    assert (sin["evidencia"], sin["juicio"]) == ([], "sin_comprobacion")
 
 
 def test_si_el_juicio_de_la_propuesta_no_responde_la_medicion_lo_cuenta(medir):

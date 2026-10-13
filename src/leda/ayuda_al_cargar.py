@@ -35,12 +35,16 @@ acá: la persona ve cada dato marcado, lo corrige o lo acepta, y confirma como s
     terminada.".
 - **La evidencia** no la propone la IA: elegir quién la hace marca la que pide su área, en la web.
 
-**El criterio escrito, al cargar** (J2-9 y J2-13; mecánica §13: "¿el resultado esperado es
-concreto y verificable?"). Con o sin la ayuda, la carga juzga el criterio antes de guardarlo
-(`juzgar_el_criterio`): vacío o igual al título, no, sin la IA; si no, la IA del espacio dice por
-su sentido si dice una manera concreta de comprobarlo y copia la parte que lo dice (como la
-entrega del motor, `lo_descrito_cubre`: la IA lee, el código decide). Si la IA no juzga, no se
-finge: `sin_revisar`, y la web carga con un aviso y un incidente.
+**El criterio escrito, al cargar** (J2-9, J2-13 y J2-14; mecánica §13: "¿el resultado esperado
+es concreto y verificable?"). Con o sin la ayuda, la carga juzga el criterio antes de guardarlo
+(`juzgar_el_criterio`), por su sentido (la IA lee, el código decide, como la entrega del motor,
+`lo_descrito_cubre`). J2-14: se toma como el que propone Leda. Si el área pide evidencia, cómo se
+comprueba sale de ella y el criterio sólo tiene que decir un resultado: se rechaza el que no dice
+ninguno (y el igual al título, sin importar la IA), siempre con un criterio propuesto (el
+resultado más la evidencia, `criterio_con_la_evidencia`); el que lo dice se guarda tal cual. Si el
+área no pide evidencia, tiene que decir cómo se comprueba: vacío o igual al título, no, sin la IA;
+si no, la IA dice si dice una manera concreta y copia la parte que lo dice. Si la IA no juzga, no
+se finge: `sin_revisar`, y la web carga con un aviso y un incidente.
 """
 
 from __future__ import annotations
@@ -771,12 +775,17 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
 # criterio circular con sinónimos ("…está cambiado; se comprueba verificando… que fue
 # reemplazado"): una regla de palabras no ve el sentido. La decisión del usuario (2026-10-13):
 # - si la persona no dijo cómo se comprueba, la comprobación sale de la evidencia que pide el área
-#   (`_con_la_evidencia`, la misma política que marca las casillas, en palabras de todos los días):
-#   una manera real, no inventada;
+#   (`criterio_con_la_evidencia`, la misma política que marca las casillas, en palabras de todos
+#   los días): una manera real, no inventada;
 # - si un criterio dice cómo se comprueba lo juzga la IA por su sentido, como la entrega del motor
 #   (`entrega`, `lo_descrito_cubre`): la IA dice si lo dice y copia la parte que lo dice; el código
 #   decide con su juicio y con que esa parte esté dentro del criterio.
 # La única guarda sin la IA no es una lista de palabras: un criterio vacío o igual al título.
+#
+# J2-14 (la segunda prueba del usuario en el celular, 2026-10-13): un criterio escrito a mano se
+# juzgaba solo, sin mirar la evidencia que el área ya pedía, y el rechazo no proponía nada. Al
+# cargar, el criterio escrito se toma como el que propone Leda: la persona escribe el resultado y
+# cómo se comprueba sale de la evidencia que se pide (`juzgar_el_criterio` con `evidencia`).
 
 def _oracion(texto: str) -> str:
     """El texto como una oración: con mayúscula al principio y su punto al final."""
@@ -792,10 +801,28 @@ def criterio_propuesto(resultado: str, como: str) -> str:
     return f"{_oracion(resultado)} {_oracion(como)}"
 
 
-def _con_la_evidencia(resultado: str, evidencia: Sequence[str]) -> str:
+def criterio_con_la_evidencia(resultado: str, evidencia: Sequence[str]) -> str:
     """El criterio con la comprobación armada con la evidencia que pide el área, cada una en
-    palabras de todos los días."""
+    palabras de todos los días: el que propone la ayuda y el que trae un rechazo al cargar."""
     return f"{_oracion(resultado)} Se comprueba con lo que pide el área: {'; '.join(evidencia)}."
+
+
+def evidencia_de_la_carga(opciones: Mapping[str, Any], responsable_id: Any,
+                          tipos: Sequence[Any] | None) -> list[str]:
+    """La evidencia que se eligió al cargar (`tipos`), en palabras de todos los días y en el orden
+    del área de quien la hace (`_evidencia_en_palabras`: primero la que pide, después las otras que
+    conoce): sólo los tipos que esa área conoce (uno que no, lo rechaza la base igual). Sin quién
+    la hace o sin la política de su área, ninguna."""
+    politica = _politica(opciones, _integrante(opciones, responsable_id))
+    if politica is None or not tipos:
+        return []
+    conocidos = [*(politica.get("evidencia_requerida") or []),
+                 *sorted(k for k in (politica.get("tipos") or {})
+                         if k not in (politica.get("evidencia_requerida") or []))]
+    elegidos = set(t for t in tipos if isinstance(t, str))
+    return _evidencia_en_palabras({"tipos": politica.get("tipos") or {},
+                                   "evidencia_requerida": [k for k in conocidos
+                                                           if k in elegidos]})
 
 
 def _evidencia_de_la_tarea(opciones, integrante, objetivo) -> list[str]:
@@ -828,7 +855,7 @@ def _revisar_el_criterio(r: Resultado, crudo: Mapping[str, Any], juicio: Juicio 
         else:
             r.descartar("criterio", juicio.motivo if juicio is not None else "sin_revisar")
     if evidencia:
-        candidatos.append(_con_la_evidencia(resultado, evidencia))
+        candidatos.append(criterio_con_la_evidencia(resultado, evidencia))
     for candidato in candidatos:
         problema = _problema_del_texto(candidato, permitidos, LARGOS["criterio"])
         if problema is None:
@@ -852,9 +879,29 @@ decir el resultado o el título, aunque sea con otras palabras, no lo dice. Si l
 cual la parte del criterio que lo dice. No corregís ni completás el criterio."""
 
 
-def entrada_del_juicio(titulo: str, descripcion: str, criterio: str) -> dict[str, str]:
-    """Lo que recibe la IA para juzgar el criterio: sólo la tarea."""
-    return {"titulo": titulo, "descripcion": descripcion, "criterio": criterio}
+# J2-14: con la evidencia que pide el área, el criterio sólo tiene que decir el resultado; la IA
+# dice si lo dice y, en la misma llamada, escribe el resultado de la tarea, que el código usa para
+# proponer un criterio si lo rechaza (el resultado más la evidencia del área).
+INSTRUCCIONES_DEL_RESULTADO = """\
+Sos Leda, la project manager del equipo. Alguien está cargando una tarea en la plataforma y \
+escribió su criterio de aceptación: lo que tiene que pasar para darla por terminada. Cómo se \
+comprueba que pasó lo dice la evidencia que pide el área (evidencia_que_pide_el_area), así que el \
+criterio no necesita decirlo. Tu trabajo es leer el criterio y decir, por lo que significa y no \
+por las palabras que usa, si dice un resultado: algo que tiene que quedar hecho o pasar con la \
+tarea. Si no dice ninguno, no lo dice. Además escribís el resultado de la tarea en una oración, \
+con lo que dicen el título, la descripción y el criterio, sin decir cómo se comprueba y sin \
+agregar ningún dato que no esté ahí: si el criterio no se puede usar, Leda lo propone con la \
+evidencia del área. No corregís el criterio."""
+
+
+def entrada_del_juicio(titulo: str, descripcion: str, criterio: str,
+                       evidencia: Sequence[str] = ()) -> dict[str, Any]:
+    """Lo que recibe la IA para juzgar el criterio: sólo la tarea y, si el área pide evidencia,
+    esa evidencia en palabras de todos los días."""
+    entrada: dict[str, Any] = {"titulo": titulo, "descripcion": descripcion, "criterio": criterio}
+    if evidencia:
+        entrada["evidencia_que_pide_el_area"] = list(evidencia)
+    return entrada
 
 
 def herramienta_del_juicio() -> dict[str, Any]:
@@ -879,14 +926,39 @@ def herramienta_del_juicio() -> dict[str, Any]:
             "additionalProperties": False}}}
 
 
+def herramienta_del_resultado() -> dict[str, Any]:
+    """La herramienta del juicio con la evidencia del área (J2-14): si dice un resultado y el
+    resultado de la tarea."""
+    return {"type": "function", "function": {
+        "name": NOMBRE_DEL_JUICIO,
+        "description": "Si el criterio de aceptación dice un resultado, y el resultado de la "
+                       "tarea en una oración.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "dice_un_resultado": {
+                    "type": "boolean",
+                    "description": "Si el criterio dice algo que tiene que quedar hecho o pasar "
+                                   "con la tarea; no, si no dice ninguno."},
+                "resultado": {
+                    "type": "string",
+                    "description": "El resultado de la tarea en una oración, con lo que dicen el "
+                                   "título, la descripción y el criterio, sin decir cómo se "
+                                   "comprueba y sin agregar ningún dato."}},
+            "required": ["dice_un_resultado", "resultado"],
+            "additionalProperties": False}}}
+
+
 @dataclass(frozen=True)
 class Juicio:
-    """Lo que se decidió de un criterio: `motivo` `None` si dice cómo se comprueba,
-    `sin_comprobacion` si no, y `sin_revisar` si la IA no lo juzgó (con `falla`, para el
-    incidente)."""
+    """Lo que se decidió de un criterio: `motivo` `None` si sirve; sin evidencia del área,
+    `sin_comprobacion` si no dice cómo se comprueba; con ella (J2-14), `sin_resultado` si no dice
+    ningún resultado, con el criterio que propone Leda (`propuesta`) o, si no se pudo armar, la
+    causa (`falla`, para el incidente); y `sin_revisar` si la IA no lo juzgó (con `falla`)."""
 
     motivo: str | None
     falla: BaseException | None = None
+    propuesta: str | None = None
 
 
 def sin_nada_que_juzgar(titulo: str, criterio: str) -> bool:
@@ -896,14 +968,27 @@ def sin_nada_que_juzgar(titulo: str, criterio: str) -> bool:
     return not normal or normal == _normal(titulo or "")
 
 
-def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str) -> Juicio:
-    """Si el criterio dice cómo se comprueba: vacío o igual al título, no, sin la IA; si no, una
-    sola llamada a la IA del espacio (sin reintento), que lo juzga por su sentido y copia la parte
-    que lo dice. El código decide: sí, sólo si la IA dijo que sí y esa parte está dentro del
-    criterio. Una IA que no responde, que no juzgó o cuyo juicio no cierra: `sin_revisar`, nunca
-    un rechazo ni un visto bueno."""
+def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
+                       evidencia: Sequence[str] = (), contexto: Sequence[str] = ()) -> Juicio:
+    """Si el criterio sirve. Una sola llamada a la IA del espacio (sin reintento), que lo juzga
+    por su sentido; el código decide.
+
+    - **Sin `evidencia`** (el área no pide ninguna, o es la manera que dio la ayuda): tiene que
+      decir cómo se comprueba. Vacío o igual al título, no, sin la IA; si no, sí sólo si la IA
+      dijo que sí y copió una parte que está dentro del criterio.
+    - **Con `evidencia`** (la que pide el área, en palabras de todos los días; J2-14): cómo se
+      comprueba sale de ella, y el criterio sólo tiene que decir un resultado. Vacío o igual al
+      título, no, diga lo que diga la IA; si no, lo que diga la IA. Un rechazo trae el criterio
+      que propone Leda: el resultado que escribió la IA más esa evidencia, si pasa los controles
+      de lo inventado (`contexto`: los otros datos de esta tarea que puede nombrar).
+
+    Una IA que no responde, que no juzgó o cuyo juicio no cierra: `sin_revisar`, nunca un rechazo
+    ni un visto bueno; salvo lo que se rechaza sin ella, que queda rechazado sin propuesta."""
     titulo, descripcion, criterio = (" ".join((t or "").split())
                                      for t in (titulo, descripcion, criterio))
+    evidencia = [e for e in (" ".join(str(x).split()) for x in evidencia) if e]
+    if evidencia:
+        return _juzgar_el_resultado(ia, titulo, descripcion, criterio, evidencia, contexto)
     if sin_nada_que_juzgar(titulo, criterio):
         return Juicio("sin_comprobacion")
     try:
@@ -921,6 +1006,42 @@ def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str) -> J
         return Juicio("sin_revisar", RespuestaInvalida(
             "La parte que copió la IA no está en el criterio."))
     return Juicio(None)
+
+
+def _juzgar_el_resultado(ia, titulo: str, descripcion: str, criterio: str,
+                         evidencia: Sequence[str], contexto: Sequence[str]) -> Juicio:
+    """El juicio con la evidencia del área (J2-14): ver `juzgar_el_criterio`."""
+    sin_nada = sin_nada_que_juzgar(titulo, criterio)
+    try:
+        crudo = _pedir_el_juicio(ia, entrada_del_juicio(titulo, descripcion, criterio, evidencia),
+                                 INSTRUCCIONES_DEL_RESULTADO, herramienta_del_resultado())
+    except Exception as falla:  # noqa: BLE001 -- cualquier falla de la IA es que no juzgó
+        return Juicio("sin_resultado", falla) if sin_nada else Juicio("sin_revisar", falla)
+    dice = crudo.get("dice_un_resultado")
+    if not sin_nada:
+        if not isinstance(dice, bool):
+            return Juicio("sin_revisar", RespuestaInvalida("La IA no dijo si hay un resultado."))
+        if dice:
+            return Juicio(None)
+    permitidos = [titulo, descripcion, criterio, *evidencia, *contexto]
+    propuesta, problema = _propuesta_del_resultado(crudo.get("resultado"), evidencia, permitidos)
+    if propuesta is None:
+        return Juicio("sin_resultado", RespuestaInvalida(
+            f"No se pudo proponer un criterio: el resultado de la IA no sirve ({problema})."))
+    return Juicio("sin_resultado", propuesta=propuesta)
+
+
+def _propuesta_del_resultado(resultado: Any, evidencia: Sequence[str],
+                             permitidos: Sequence[str]) -> tuple[str | None, str | None]:
+    """El criterio que propone Leda al rechazar uno escrito: el resultado de la IA más la
+    evidencia del área, como en la ayuda, sólo si pasa los controles del texto (el largo, y ningún
+    número ni nombre que no esté en la tarea); si no, `None` y el motivo."""
+    resultado = _cadena(resultado)
+    if resultado is None:
+        return None, "vacio"
+    candidato = criterio_con_la_evidencia(resultado, evidencia)
+    problema = _problema_del_texto(candidato, permitidos, LARGOS["criterio"])
+    return (candidato, None) if problema is None else (None, problema)
 
 
 def juzgar_la_propuesta(ia, crudo: Mapping[str, Any] | None,
@@ -944,17 +1065,20 @@ def juzgar_la_propuesta(ia, crudo: Mapping[str, Any] | None,
                               criterio=criterio_propuesto(resultado, como))
 
 
-def _pedir_el_juicio(ia, entrada: Mapping[str, Any]) -> dict[str, Any]:
-    """Como `pedir`, con la herramienta del juicio."""
+def _pedir_el_juicio(ia, entrada: Mapping[str, Any],
+                     instrucciones: str = INSTRUCCIONES_DEL_JUICIO,
+                     herramienta_: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Como `pedir`, con la herramienta del juicio (la de cómo se comprueba, o la del resultado
+    con la evidencia del área)."""
     cliente = getattr(ia, "cliente", None)
     if cliente is None:
         raise LookupError(getattr(ia, "motivo", "La IA del espacio no está configurada."))
     return leer(cliente.completar({
         "temperature": 0,
         "max_tokens": _tope_de_salida(cliente),
-        "messages": [{"role": "system", "content": INSTRUCCIONES_DEL_JUICIO},
+        "messages": [{"role": "system", "content": instrucciones},
                      {"role": "user",
                       "content": json.dumps(entrada, ensure_ascii=False, default=str)}],
-        "tools": [herramienta_del_juicio()],
+        "tools": [herramienta_ or herramienta_del_juicio()],
         "tool_choice": "auto",
     }), NOMBRE_DEL_JUICIO)

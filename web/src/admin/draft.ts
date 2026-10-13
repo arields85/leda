@@ -115,6 +115,25 @@ export function checkDraft(draft: Draft, options: Options): Problem[] {
   return problems;
 }
 
+/** The criterion refusals the server decides before loading (J2-9, J2-13 and J2-14): it never
+ * looks the key up for them. */
+export const REFUSED_CRITERION: readonly string[] = ['sin_comprobacion', 'sin_resultado'];
+
+/** A problem as the server may send it: a criterion refused for saying no result brings the one
+ * Leda proposes, the result and the area's evidence (J2-14). */
+type ProblemWithProposal = Problem & { propuesta?: unknown };
+
+/** The criterion Leda proposed with a refusal, when it fits the form's limit. */
+export function proposedCriterion(problems: Problem[]): string | undefined {
+  for (const problem of problems as ProblemWithProposal[]) {
+    const proposal = problem.propuesta;
+    if (problem.campo !== 'criterio' || typeof proposal !== 'string') continue;
+    const n = length(proposal);
+    if (n > 0 && n <= LIMITS.criterio) return proposal.trim();
+  }
+  return undefined;
+}
+
 /** What the form sends: the draft and its key, without `espera_id` when it waits for none, so a
  * load without a wait is the same request as before migration 0067. */
 export function toInput(draft: Draft, clave: string): TaskInput {

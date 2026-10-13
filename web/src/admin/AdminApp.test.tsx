@@ -659,6 +659,69 @@ describe('AdminApp', () => {
     ]);
   });
 
+  // J2-14: a criterion that says no result is refused with the one Leda proposes (the result and
+  // the area's evidence), next to the field, ready to use with one tap.
+  const NO_RESULT_TEXT = 'No dice qué tiene que quedar hecho para darla por terminada.';
+  const PROPOSED_CRITERION =
+    'Las alarmas del SCADA quedan configuradas. Se comprueba con lo que pide el área: una captura de pantalla.';
+  const noResult = (propuesta?: string) => ({
+    status: 422,
+    body: {
+      errores: [{ campo: 'criterio', motivo: 'sin_resultado', texto: NO_RESULT_TEXT, ...(propuesta ? { propuesta } : {}) }],
+    },
+  });
+  const useProposal = () => screen.getByRole('button', { name: '> usar este criterio' });
+
+  it('a criterion with no result comes back with the one Leda proposes, and one tap uses it', async () => {
+    keys('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+    // First a send with no answer: it may have loaded the task, so the key stays until something
+    // settles it, and this refusal does not (the server decides it before looking the key up).
+    const calls = await openForm({ [TASKS]: ['network', noResult(PROPOSED_CRITERION), loaded()] });
+    fillTask();
+    confirm();
+    await screen.findByRole('alert');
+    confirm();
+    await waitFor(() => expect(screen.getByLabelText('Criterio de aceptación')).toHaveFocus());
+    expect(document.getElementById('f-criterio-error')).toHaveTextContent(NO_RESULT_TEXT);
+    expect(screen.getByText(PROPOSED_CRITERION)).toBeInTheDocument();
+    fireEvent.click(useProposal());
+    expect(screen.getByLabelText('Criterio de aceptación')).toHaveValue(PROPOSED_CRITERION);
+    expect(document.getElementById('f-criterio-error')).toBeNull();
+    expect(screen.queryByRole('button', { name: '> usar este criterio' })).toBeNull();
+    expect(markOf('Criterio de aceptación')).toBeInTheDocument();
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const sent = calls.filter((c) => c.key === TASKS).map((c) => c.body as { criterio: string; clave: string });
+    expect(sent[2].criterio).toBe(PROPOSED_CRITERION);
+    expect(sent.map((b) => b.clave)).toEqual([
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    ]);
+  });
+
+  it('the person can write her own instead: the proposal goes with the notice', async () => {
+    await openForm({ [TASKS]: noResult(PROPOSED_CRITERION) });
+    fillTask();
+    confirm();
+    expect(await screen.findByText(PROPOSED_CRITERION)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), {
+      target: { value: 'Las alarmas suenan en la sala de control' },
+    });
+    expect(screen.queryByText(PROPOSED_CRITERION)).toBeNull();
+    expect(document.getElementById('f-criterio-error')).toBeNull();
+    expect(markOf('Criterio de aceptación')).toBeNull();
+  });
+
+  it('without a proposal the notice still says what is missing, and there is nothing to tap', async () => {
+    await openForm({ [TASKS]: noResult() });
+    fillTask();
+    confirm();
+    expect(await screen.findByText(NO_RESULT_TEXT)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '> usar este criterio' })).toBeNull();
+    expect(within(preview()).getByRole('alert')).toHaveTextContent('Hay que corregir: criterio de aceptación.');
+  });
+
   it('a criterion Leda could not review loads with a warning that does not block', async () => {
     await openForm({
       [TASKS]: loaded([
