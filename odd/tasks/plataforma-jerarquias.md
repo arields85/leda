@@ -82,6 +82,9 @@ Ruta: cada porción, delegada (un escritor), porque toca base, servidor, web y p
       la evidencia y "quién la decidió" vacíos → al lado del botón, "Falta completar: criterio de
       aceptación, evidencia, quién la decidió.", y el foco en el criterio; (8) tocar cada campo, el
       calendario y "Espera a" → la página no se agranda ni se corre de costado.
+      **RDD:** `review-88f93736d2c3d327` (`cc9cc41d`), aprobada. Advertencia: reiniciar el formulario por un
+      conflicto mientras se manda (`LoadForm.tsx:499-510`); sugerencia: el chequeo de "demasiado largo" de
+      `checkDraft` sin prueba propia (`draft.ts:105-111`).
 - [x] **J1-6 · Arreglos de la prueba del usuario** (2026-10-13; ruta delegada, un escritor, sólo `web/`).
       **Lo que vio:** (1) tocó confirmar con el criterio, la evidencia y "quién la decidió" vacíos; el
       servidor respondió bien (422 con los tres `errores`), pero nada lo decía cerca de donde miraba, y no
