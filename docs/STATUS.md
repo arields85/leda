@@ -125,8 +125,9 @@ viejo corriendo.
 6. ~~Subir la rama~~: subida el 2026-10-13 (`df191141`). `main`, cuando lo decida el usuario. **En
    observación:** la 35 paso 18.
 
-**Punto exacto para seguir:** escribir la enmienda al ADR 0022 con las decisiones de
-`../odd/tasks/plataforma-p2.md` ("Para decidir") y pasársela al usuario; después, la 22.
+**Punto exacto para seguir:** el [ADR 0023](decisions/0023-quien-crea-en-la-plataforma.md) (quién crea qué
+según la jerarquía del equipo), aceptado el 2026-10-13, se construye en seis porciones, en el orden acordado:
+`../odd/tasks/plataforma-jerarquias.md`. En marcha la J1 (las esperas en el formulario). La 22, después.
 
 **El plan de la noche** (las correcciones, después el acceso por chat; frenar antes del túnel, del
 celular, de toda decisión de producto nueva y de `main`) se cumplió entero; su texto, en la historia de
