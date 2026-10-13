@@ -52,7 +52,7 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
    - La respuesta no dice: que la entregó o que está en revisión; el nombre de Ismael (decisión 11 del
      2026-10-08); que falta que arranque desde el PLC (ya lo dijo); un número o un nombre que no estén en
      el criterio ni en lo que escribió; "contaste" o "contarlo": lo que escribió es su descripción
-     (decisión 10; D7).
+     (decisión 10; D7); que quedó anotado o asentado (T7b: es un borrador).
    - Botones: ninguno: no hay nada para confirmar.
    - Estado después: tema abierto, la entrega del PLC, esperando lo que falta.
 

@@ -76,7 +76,8 @@ porción 3.
      confirmarla lo dice sólo la entrega completa); el cierre, aparte: que mande lo que falta.
    - La respuesta no dice: que la entregó, que está en revisión o terminada; los nombres de los tipos de
      la política ("resultado_de_prueba", "captura"); que Ismael se enteró; "contaste" o "contarlo": lo
-     que escribió es su descripción (decisión 10; D7).
+     que escribió es su descripción (decisión 10; D7); que quedó anotado o asentado (T7b: es un
+     borrador).
    - Botones: ninguno: no hay nada para confirmar.
    - Estado después: tema abierto, la entrega de comunicaciones, esperando lo que falta.
 

@@ -213,7 +213,13 @@ SIGNIFICADOS: Mapping[str, str] = {
         "A la entrega le falta algo porque la administración de Leda retiró una pieza después "
         "de entregarla: la revisión espera a que la persona responsable mande una pieza nueva. "
         "Quién de la administración la retiró no se sabe."),
-    "sumo": "Las piezas (por su alias) que se sumaron a la entrega con este mensaje.",
+    "sumo": "Las piezas (por su alias) que este mensaje sumó a la entrega que se está armando: "
+            "no quedan anotadas hasta que la persona la confirme.",
+    # Lo que espera una confirmación o un dato (T7b, prueba por Telegram del 2026-10-12): la
+    # entrega o el pase que se muestra es un borrador (`fichas.ESPERAN_PARA_ANOTARLO`).
+    "todavia_no_quedo_anotado": "Lo que la persona dijo o mandó para lo que se le muestra a "
+                                "confirmar o completar (la entrega o el pase) todavía no quedó "
+                                "anotado: se anota recién cuando lo confirme.",
     "sacadas": "Las piezas que la persona sacó de la entrega antes de confirmarla: no van.",
     "retiradas": "Las piezas ya entregadas que la persona retiró: dejan de valer, nada se "
                  "borra.",
@@ -253,8 +259,9 @@ SIGNIFICADOS: Mapping[str, str] = {
                    "persona.",
     "como_queda": "Cómo queda lo que se confirmaba (la entrega o el pase) después de esto, con "
                   "su código.",
-    "reemplazada": "Esa vista de la entrega dejó de valer porque cambió lo que mostraba: la "
-                   "reemplazó otra.",
+    "reemplazada": "Esa pregunta de Leda, con lo que mostraba (una entrega, un pase, unas "
+                   "opciones para elegir), dejó de valer porque cambió lo que preguntaba o "
+                   "mostraba: la reemplazó otra.",
     "para_cuando_la_entregue": "Lo que la persona mandó y queda en la conversación para "
                                "mostrárselo cuando entregue esa tarea: no es parte de una "
                                "entrega todavía.",
@@ -643,7 +650,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "no_se_puede": "No se hizo: no se puede ahora (motivo dice por qué).",
     "no_por_chat": "Leda lo reconoce pero no lo hace por chat (motivo dice por qué).",
     "leido": "Se leyó de la base.",
-    "corregido": "Se corrigió: lo anotado antes ya no vale.",
+    "corregido": "Se corrigió: lo dicho o anotado antes ya no vale.",
     "cancelado": "La pregunta quedó sin efecto, sin anotar nada.",
     "sin_efecto": "No tuvo efecto: no cambió nada.",
     "elegida": "La opción quedó elegida.",
@@ -1407,7 +1414,7 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "anotar_quien_destraba": "anotar_quien_puede_destrabarla",
     "cancelar": "dejar_sin_efecto_la_pregunta",
     "consultar_pendientes": "contar_sus_tareas_pendientes",
-    "corregir": "corregir_algo_ya_anotado",
+    "corregir": "corregir_algo_que_dijo_antes",
     "dejar_para_despues": "dejar_la_pregunta_para_mas_tarde",
     "destrabar": "anotar_que_ya_puede_seguir",
     "elegir": "elegir_una_opcion",

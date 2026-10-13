@@ -517,6 +517,19 @@ def _nombrar_pregunta(hecho: dict[str, Any], clave: str, tipo: str,
     if pregunta_id is not None:
         nombrar_efecto(hecho, clave, PREGUNTA, pregunta_id)
     nombrar_tipo_de_pregunta(hecho, clave, tipo)
+    if tipo in ESPERAN_PARA_ANOTARLO:
+        hecho[TODAVIA_NO_QUEDO_ANOTADO] = True
+
+
+# Las preguntas que guardan lo que la persona dijo hasta que lo confirme o mande lo que falta: la
+# entrega y el pase son un borrador, y nada de eso quedó anotado (T7b de las correcciones de la
+# prueba por Telegram del 2026-10-12: del borrador de una entrega Leda escribió "✏️ Anoté que
+# terminaste"). Todo hecho que nombra una de ellas lo dice, en un solo lugar: aquí. Su
+# significado, en `hechos.py`.
+ESPERAN_PARA_ANOTARLO = frozenset({preguntas.CONFIRMAR_ENTREGA,
+                                   preguntas.LO_QUE_FALTA_DE_LA_ENTREGA,
+                                   preguntas.CONFIRMAR_EL_PASE})
+TODAVIA_NO_QUEDO_ANOTADO = "todavia_no_quedo_anotado"
 
 
 def nombrar_tipo_de_pregunta(hecho: dict[str, Any], clave: str, tipo: str) -> None:
@@ -1903,7 +1916,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona elige una de las opciones de la pregunta abierta de Leda (o una de "
              "las jugadas que Leda le propuso), tocando o escribiendo. Sin una pregunta abierta "
              "con opciones, no es esta jugada."),
-    Ficha("corregir", "corregir algo ya anotado que era de otra tarea o que no pasó",
+    Ficha("corregir", "corregir algo que dijo antes: lo ya anotado que era de otra tarea o no "
+                      "pasó, o una parte de lo que espera su confirmación",
           necesita=("corrige", "tarea"),
           opcional=("tarea_correcta", "saca", "el_texto_cubre", "lo_descrito_cubre"),
           comprueba="que sea el responsable y que eso haya quedado anotado en esa tarea en "
@@ -1917,7 +1931,10 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "pasó. Dar un hecho nuevo que reemplaza al de antes no es corregir: es la jugada "
              "de ese hecho. En una entrega (corrige: entregar), sacar una pieza de lo mostrado o "
              "de lo ya entregado (saca, por su alias), o decir qué cubre lo que escribió "
-             "(el_texto_cubre) o qué dice del criterio de aceptación (lo_descrito_cubre)."),
+             "(el_texto_cubre) o qué dice del criterio de aceptación (lo_descrito_cubre). Lo que "
+             "la persona dijo para una pregunta abierta que espera su confirmación o un dato "
+             "(una entrega o un pase sin confirmar) no quedó anotado: cambiarle una parte es "
+             "corregirlo; dejarlo todo es cancelar."),
     Ficha("cancelar", "dejar sin efecto la pregunta abierta",
           necesita=(), opcional=(),
           comprueba="que haya una pregunta abierta y que se pueda dejar (la de quién destraba "
@@ -1926,8 +1943,10 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="no se vuelve a preguntar; vuelve la que quedó para después, si hay",
           manejar=situaciones.cancelar, se_ofrece=False,
           es="La persona deja sin efecto la pregunta abierta de Leda: no la va a contestar. "
-             "Dejar sin efecto algo que la persona dijo antes no es cancelar: es corregirlo o "
-             "dar el hecho nuevo."),
+             "También cuando deja todo lo que dijo para esa pregunta, si espera su "
+             "confirmación o un dato (una entrega o un pase sin confirmar): nada de eso quedó "
+             "anotado. Dejar sin efecto algo que ya quedó anotado no es cancelar: es corregirlo "
+             "o dar el hecho nuevo."),
     Ficha("dejar_para_despues", "dejar la pregunta abierta para más tarde",
           necesita=(), opcional=(),
           comprueba="que haya una pregunta abierta",

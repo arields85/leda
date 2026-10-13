@@ -1187,12 +1187,18 @@ def corregir(ctx, datos: dict, tarea: dict) -> dict:
     if q is not None:
         piezas = _piezas_de(q)
         por_alias = {f"P{i}": p for i, p in enumerate(piezas, 1)}
-        desconocidas = [a for a in saca if a not in por_alias]
-        if desconocidas or (not saca and not isinstance(dicho, list) and juzgado is None):
+        if any(a not in por_alias for a in saca):
             return {"resultado": "falta_dato", "falta": ["saca"], **base}
-        sacadas = [por_alias[a] for a in saca]
         pol = politica(ctx.cur, tarea["id"])
         vistas = mostrar(piezas, pol, ctx.calendario.zona)
+        if not saca and not isinstance(dicho, list) and juzgado is None:
+            # Nada que corregir en lo mostrado (T7a de la prueba por Telegram del 2026-10-12):
+            # no es un dato que falta, y otra pregunta sería otro tema. Lo mostrado sigue como
+            # estaba, sin anotar nada, y su pregunta sigue siendo el tema abierto, que la
+            # respuesta retoma (9d): la persona la completa o la deja (cancelar).
+            return {"resultado": "sin_efecto", "motivo": "nada_que_corregir", **base,
+                    "entrega": vistas, "no_se_anoto_nada": True}
+        sacadas = [por_alias[a] for a in saca]
         quedan = [p for p in piezas if p not in sacadas]
         if isinstance(dicho, list):
             for p in quedan:

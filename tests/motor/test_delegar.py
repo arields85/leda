@@ -178,6 +178,8 @@ def test_pedir_un_pase_muestra_la_vista_previa_y_no_cambia_nada(conn, equipo):
     assert [o["etiqueta"] for o in r.pregunta["opciones"]] == ["Confirmar"]
     assert _pases(conn) == []
     assert _quien_la_tiene(conn, equipo, "COM") == MARCOS
+    # Lo que espera la confirmación no quedó anotado, y el hecho lo dice (T7b, la 51).
+    assert hecho["todavia_no_quedo_anotado"] is True
     # Un pase es una jugada de la lista: no se le avisa a la administración.
     assert todos(conn, "select * from incident") == []
 
