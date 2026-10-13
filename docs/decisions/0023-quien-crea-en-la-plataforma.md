@@ -195,7 +195,7 @@ Las invariantes vigentes (`AGENTS.md`) rigen igual:
 
 ## `PENDIENTE`: lo que estas decisiones no resuelven
 
-No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a uno.
+Los once, preguntados de a uno y decididos por el usuario el 2026-10-13.
 
 1. ~~**Cómo se entera Dirección de una tarea que crea un referente.**~~ **Decidido (usuario,
    2026-10-13): "sin aviso".** Ismael la ve en la web, con quién la creó, y en el resumen semanal; la
@@ -260,9 +260,10 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
     recién entonces, y el espacio nunca queda sin autoridad final: Ismael sigue hasta que Martín
     acepta), y al administrador de plataforma le llega un aviso sólo informativo. Así una sesión
     abierta en un celular perdido no entrega el equipo sin que la otra persona acepte.
-11. **El tipo del objetivo.** La base pide que cada objetivo sea estratégico, hito u operativo.
-    Ejemplo: "Poner el módem colgando en la pared"; ¿lo elige Dirección o se deduce de dónde cuelga?
-    Se puede resolver en el diseño corto de la porción.
+11. ~~**El tipo del objetivo.**~~ **Decidido (usuario, 2026-10-13: "si").** La web ofrece sólo los
+    tipos que tienen sentido según dónde cuelga: sin padre, estratégico, sin preguntar; colgado de un
+    estratégico, hito u operativo, con operativo marcado; colgado de un hito, operativo, sin preguntar.
+    Con los nombres del pack del espacio (mecánica §1: un nivel se puede saltear).
 
 ## Porciones sugeridas (sin código; cada una con su prueba real antes de la siguiente)
 
