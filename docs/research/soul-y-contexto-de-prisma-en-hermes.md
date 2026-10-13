@@ -1,7 +1,7 @@
 # Aprendizajes: SOUL.md y contexto operativo de Prisma en Hermes
 
 - **Fecha:** 2026-10-02
-- **Fuente:** paquete interno del usuario `PRISMA-PACK-SOUL-Y-CONTEXTO-HERMES-20261002`
+- **Fuente:** paquete interno del usuario `PRISMA-PACK-SOUL-Y-CONTEXTO-HERMES-20261002` (borrado el 2026-10-13 a pedido del usuario; lo que servía está en este documento)
   (fuera del repositorio, uso interno: contiene nombres y contexto del equipo). Es trabajo
   propio del usuario: el intento anterior de construir Prisma sobre Hermes, con otra IA.
   Huellas del manifiesto verificadas el 2026-10-02.

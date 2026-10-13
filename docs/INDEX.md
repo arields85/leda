@@ -64,6 +64,7 @@ se trabaja y qué no se hace".
 | Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
 | Relevamiento de NotebookLM y respuestas ancladas en fuentes | [`research/notebooklm-y-grounding.md`](research/notebooklm-y-grounding.md) |
 | Cómo usa Gemini para voz a texto (y texto a voz) el otro proyecto del usuario; base de la J2b | [`research/gemini-voz-del-otro-proyecto.md`](research/gemini-voz-del-otro-proyecto.md) |
+| Google (Gmail, Calendar, Drive, Docs) y la agenda de reuniones en el trabajo anterior del usuario; base para "Correo verificado y Google" | [`research/google-del-trabajo-anterior.md`](research/google-del-trabajo-anterior.md) |
 | Aprendizajes del `SOUL.md` y del contexto operativo de Prisma en Hermes (trabajo anterior del usuario) | [`research/soul-y-contexto-de-prisma-en-hermes.md`](research/soul-y-contexto-de-prisma-en-hermes.md) |
 | Copias de documentos anteriores: `STATUS` y `AGENTS` hasta el 2026-09-30, hasta el 2026-10-04 y hasta el paso M1; el documento de la unidad del Motor hasta el paso M1; y el diario de Leda orienta. Son historia, no instrucciones vigentes | [`historial/`](historial/) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
