@@ -32,6 +32,16 @@ export interface Member {
   revisa: { membership_id: string; nombre: string } | null;
 }
 
+/** A task a new one may wait for (ADR 0023, decision 2; migration 0067): committed and open. */
+export interface WaitableTask {
+  id: string;
+  titulo: string;
+  estado: string;
+  fecha_objetivo: string | null;
+  responsable: string | null;
+  objetivo: string;
+}
+
 export interface EvidenceKind {
   clases: string[];
   en_palabras: string;
@@ -49,6 +59,9 @@ export interface Options {
   espacio: { id: string; nombre: string; zona_horaria: string };
   hoy: string;
   objetivos: Objective[];
+  // The tasks a new one may wait for. The server always sends them since migration 0067; a reply
+  // without them offers none.
+  tareas?: WaitableTask[];
   integrantes: Member[];
   politicas: Policy[];
   calendario: {
@@ -77,6 +90,8 @@ export interface TaskInput {
   criterio: string;
   evidencia: string[];
   decidio_id: string;
+  // The task this one waits for (always blocking); left out when it waits for none.
+  espera_id?: string;
   clave: string;
 }
 

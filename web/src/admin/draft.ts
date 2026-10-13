@@ -1,8 +1,9 @@
 import type { Task } from '../api';
-import type { Member, Options, Policy, TaskInput } from './api';
+import type { Member, Options, Policy, TaskInput, WaitableTask } from './api';
 
-/** What the administrator is writing, before the idempotency key is added. */
-export type Draft = Omit<TaskInput, 'clave'>;
+/** What the administrator is writing, before the idempotency key is added. `espera_id` is ''
+ * while it waits for no task. */
+export type Draft = Omit<TaskInput, 'clave' | 'espera_id'> & { espera_id: string };
 
 export type Field = keyof Draft;
 
@@ -15,6 +16,7 @@ export const EMPTY_DRAFT: Draft = {
   criterio: '',
   evidencia: [],
   decidio_id: '',
+  espera_id: '',
 };
 
 /** The server's limits, in characters of the trimmed text (migration 0062). */
@@ -30,7 +32,29 @@ export const PROBLEM_FIELD: Record<string, Field> = {
   criterio: 'criterio',
   evidencia: 'evidencia',
   decidio: 'decidio_id',
+  espera: 'espera_id',
 };
+
+/** What the form sends: the draft and its key, without `espera_id` when it waits for none, so a
+ * load without a wait is the same request as before migration 0067. */
+export function toInput(draft: Draft, clave: string): TaskInput {
+  const { espera_id, ...rest } = draft;
+  return espera_id ? { ...rest, espera_id, clave } : { ...rest, clave };
+}
+
+/** The tasks a new one may wait for, as the server offers them. */
+export function waitableTasks(options: Options): WaitableTask[] {
+  return options.tareas ?? [];
+}
+
+export function waitOf(options: Options, id: string): WaitableTask | undefined {
+  return id ? waitableTasks(options).find((t) => t.id === id) : undefined;
+}
+
+/** How a task to wait for is named in the form: title, who does it and its objective. */
+export function waitLabel(task: WaitableTask): string {
+  return [task.titulo, task.responsable, task.objetivo].filter(Boolean).join(' · ');
+}
 
 /** A new idempotency key for one attempt. `crypto.randomUUID` exists only on HTTPS or
  * localhost; elsewhere (a phone on the local network over plain HTTP) 32 random hex digits,

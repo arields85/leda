@@ -190,6 +190,88 @@ describe('AdminApp', () => {
     expect(screen.getByLabelText('título')).toHaveValue('');
   });
 
+  it('offers the open tasks to wait for, shows the wait and sends it', async () => {
+    keys('22222222-2222-4222-8222-222222222222');
+    const calls = await openForm({
+      [OPTIONS]: ok(
+        options({
+          tareas: [
+            {
+              id: 't-estante',
+              titulo: 'Colocar el estante',
+              estado: 'asignada',
+              fecha_objetivo: '2026-10-15',
+              responsable: 'Lucas',
+              objetivo: 'Mantenimiento anual',
+            },
+          ],
+        }),
+      ),
+      [TASKS]: loaded(),
+    });
+    const wait = screen.getByLabelText('espera a (opcional)');
+    expect(wait).toHaveValue('');
+    expect(
+      within(wait).getByRole('option', { name: 'Colocar el estante · Lucas · Mantenimiento anual' }),
+    ).toBeInTheDocument();
+    fillTask();
+    pick('espera a (opcional)', 't-estante');
+    const form = screen.getByRole('form', { name: 'Cargar tarea' });
+    expect(within(form).getByText('No puede empezar hasta que esa esté terminada.')).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Así se va a ver' })).toHaveTextContent(
+      'espera aColocar el estante · Lucas',
+    );
+    review();
+    const section = await screen.findByRole('region', { name: 'Revisá la tarea antes de cargarla.' });
+    expect(section).toHaveTextContent('espera aColocar el estante · Lucas');
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const sent = calls.filter((c) => c.key === TASKS);
+    expect(sent).toHaveLength(1);
+    expect((sent[0].body as { espera_id?: string }).espera_id).toBe('t-estante');
+  });
+
+  it('without a wait the form sends what it sent before, and says when there is nothing to wait for', async () => {
+    const calls = await openForm({ [TASKS]: loaded() });
+    expect(screen.getByText('No hay tareas abiertas para esperar en este espacio.')).toBeInTheDocument();
+    fillTask();
+    review();
+    expect(screen.getByRole('region', { name: 'Revisá la tarea antes de cargarla.' })).not.toHaveTextContent('espera a');
+    confirm();
+    await screen.findByText('Tarea cargada.');
+    const sent = calls.filter((c) => c.key === TASKS);
+    expect(sent[0].body).not.toHaveProperty('espera_id');
+  });
+
+  it('a rejected wait lands on its field', async () => {
+    await openForm({
+      [OPTIONS]: ok(
+        options({
+          tareas: [
+            { id: 't-estante', titulo: 'Colocar el estante', estado: 'asignada', fecha_objetivo: null, responsable: 'Lucas', objetivo: 'Mantenimiento anual' },
+          ],
+        }),
+      ),
+      [TASKS]: {
+        status: 422,
+        body: {
+          errores: [
+            { campo: 'espera', motivo: 'esta_cerrada', texto: 'La tarea que espera ya está cerrada: no puede trabar a otra.' },
+          ],
+        },
+      },
+    });
+    fillTask();
+    pick('espera a (opcional)', 't-estante');
+    review();
+    confirm();
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('espera a (opcional)')).toHaveAttribute('aria-invalid', 'true');
+    expect(document.getElementById('f-espera-error')).toHaveTextContent('ya está cerrada');
+    pick('espera a (opcional)', '');
+    expect(document.getElementById('f-espera-error')).toBeNull();
+  });
+
   it('warns when the date is after the objective, without blocking', async () => {
     await openForm();
     pick('objetivo', 'o1');

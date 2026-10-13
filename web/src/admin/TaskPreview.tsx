@@ -3,7 +3,7 @@ import { shortDate } from '../format';
 import { TaskCard } from '../components/TaskCard';
 import type { Options } from './api';
 import { dayLabel } from './DatePicker';
-import { type Draft, evidenceWords, memberOf, policyOf, previewTask } from './draft';
+import { type Draft, evidenceWords, memberOf, policyOf, previewTask, waitOf } from './draft';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -23,6 +23,7 @@ export function TaskPreview({ draft, options, admin }: { draft: Draft; options: 
   const policy = policyOf(options, member);
   const objective = options.objetivos.find((o) => o.id === draft.objetivo_id);
   const decided = memberOf(options, draft.decidio_id);
+  const wait = waitOf(options, draft.espera_id);
   const late =
     objective?.fecha_objetivo && draft.fecha && draft.fecha > objective.fecha_objetivo
       ? objective.fecha_objetivo
@@ -42,6 +43,14 @@ export function TaskPreview({ draft, options, admin }: { draft: Draft; options: 
             </span>
           )}
         </Row>
+        {wait && (
+          <Row label="espera a">
+            {[wait.titulo, wait.responsable].filter(Boolean).join(' · ')}
+            <span className="block text-small text-ink-soft">
+              No puede empezar hasta que esa esté terminada.
+            </span>
+          </Row>
+        )}
         {draft.descripcion.trim() && <Row label="descripción">{draft.descripcion.trim()}</Row>}
         <Row label="criterio de aceptación">{draft.criterio.trim() || MISSING}</Row>
         <Row label="evidencia">

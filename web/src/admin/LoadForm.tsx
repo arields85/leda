@@ -15,6 +15,9 @@ import {
   newKey,
   policyOf,
   PROBLEM_FIELD,
+  toInput,
+  waitableTasks,
+  waitLabel,
 } from './draft';
 import { TaskPreview } from './TaskPreview';
 
@@ -107,6 +110,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const policy = policyOf(options, member);
   const kinds = evidenceKinds(policy);
   const objective = options.objetivos.find((o) => o.id === draft.objetivo_id);
+  const waitable = waitableTasks(options);
 
   function change(patch: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...patch }));
@@ -138,7 +142,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     key.current ??= newKey();
     setStep({ kind: 'review', sending: true, failed: false });
     try {
-      const result = await loadTask(spaceId, { ...draft, clave: key.current });
+      const result = await loadTask(spaceId, toInput(draft, key.current));
       if (result.kind === 'loaded') {
         key.current = null;
         unknown.current = false;
@@ -362,6 +366,35 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             labelledBy="f-fecha-label"
             describedBy={described('f-fecha', 'fecha')}
           />
+        </FieldBlock>
+
+        <FieldBlock
+          id="f-espera"
+          label="espera a (opcional)"
+          errors={on('espera_id')}
+          hint={
+            waitable.length === 0
+              ? 'No hay tareas abiertas para esperar en este espacio.'
+              : draft.espera_id
+                ? 'No puede empezar hasta que esa esté terminada.'
+                : 'Si no puede empezar hasta que otra tarea esté terminada.'
+          }
+        >
+          <select
+            id="f-espera"
+            className={INPUT}
+            value={draft.espera_id}
+            onChange={(e) => change({ espera_id: e.target.value })}
+            aria-invalid={invalid('espera_id')}
+            aria-describedby={described('f-espera', 'espera_id')}
+          >
+            <option value="">no espera a ninguna</option>
+            {waitable.map((t) => (
+              <option key={t.id} value={t.id}>
+                {waitLabel(t)}
+              </option>
+            ))}
+          </select>
         </FieldBlock>
 
         <FieldBlock id="f-criterio" label="criterio de aceptación" errors={on('criterio')}
