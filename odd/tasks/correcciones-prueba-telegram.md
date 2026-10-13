@@ -73,7 +73,7 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
       refrescan el mismo adelanto. **Arreglo, en la herramienta del reloj y no en Leda:** un piso,
       el último momento ya registrado con la hora de Leda; `adelantar` y `hora` no lo cruzan hacia
       atrás (`HoraAtrasada`) y `volver` se niega si dejaría a Leda antes, salvo `--forzar`.
-- [ ] **T7 · "Dejalo pendiente, después lo hago"** en medio de una entrega, y "Anoté" dicho de un
+- [x] **T7 · "Dejalo pendiente, después lo hago"** en medio de una entrega, y "Anoté" dicho de un
       borrador: conversación de prueba; si pide cambiar el diseño, propuesta al usuario.
 - [ ] **T8 · La entrega nueva que se contradice** ("dejé la foto para cuando vuelvas a entregarla" y
       "¿confirmás la entrega así?"; contó lo que esta vez no se escribió).
@@ -208,4 +208,25 @@ nombres de otros en los mensajes.
   `tests/conversaciones` 215 passed; en seco 48 de 48. **RDD:** `review-9939d87a9136e3cf`, aprobada; dos
   sugerencias (`fichas.py:1994-1998`, `preguntas.py:602-603`). El significado de `reemplazada`
   (`hechos.py:256`) hablaba sólo de la entrega: lo generaliza la T7.
+- **T7, hecha** (escritor delegado; `5b52481` la cocina y `0ef7888` la conversación 51, con la lista
+  del corredor ampliada por el coordinador). Una sola marca en un solo lugar: `fichas._nombrar_pregunta`
+  pone `todavia_no_quedo_anotado` en todo hecho que nombra una pregunta con contenido sin confirmar (la
+  confirmación de la entrega, lo que le falta a la entrega y la confirmación de un pase,
+  `ESPERAN_PARA_ANOTARLO`), con su significado en `hechos.py`; `sumo` dice que nada queda anotado hasta
+  confirmar; `reemplazada` es general (una entrega, un pase o unas opciones); la jugada `corregir` se
+  nombra `corregir_algo_que_dijo_antes`. Las fichas de `cancelar` y `corregir` describen el trabajo,
+  sin frases: lo que espera confirmación o un dato no está anotado; dejarlo todo es cancelar, cambiar
+  una parte es corregir. `entrega.corregir` sin nada que corregir con un borrador abierto vuelve
+  `sin_efecto`, `nada_que_corregir`, lo mostrado y `no_se_anoto_nada`, sin abrir otra pregunta (la
+  abierta sigue siendo el tema, 9d). La huella de las instrucciones no cambió (`jugadas
+  8b25f19b4bfe9b8a`, `redaccion 1b181215b77350b8`: las fichas no entran en ella). La 22 (paso 3) y la 27
+  (paso 1) dicen "no dice: que quedó anotado". RED: `test_borrador_no_anotado.py` 5 en rojo; la
+  conversación 51 en seco, 2 fallas sin el arreglo. `test_borrador_no_anotado.py` 9 passed; `pytest
+  tests/motor` 1397 passed; `tests/conversaciones` + la nueva, 225 passed; en seco 49 de 49. **RDD:**
+  `review-e8be884f3aefd3c6` y `review-09e73567d1ac0fa7` (la 51), aprobadas; advertencias: en la 51 la otra
+  lectura del paso 2 no repite los "no dice" (`51-...yaml:94-96`); la marca cae en cualquier hecho que nombre esas
+  preguntas, también en el retiro de una pieza de una tarea entregada que deja la evidencia incompleta
+  (`fichas.py:520-521`); a observar en la ronda real. Límite: sacar todas las piezas con `corregir`
+  arma un borrador vacío en vez de cancelar (es la otra lectura del paso 2, junto con `cancelar`).
+  **Para la ronda real:** 51, 22, 27, 21, 23, 38 y 07.
 
