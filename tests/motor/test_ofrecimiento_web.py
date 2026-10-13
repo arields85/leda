@@ -9,6 +9,9 @@ mandar (`ofrecido_en`) y se libera si el envío falla sin reintento. No va en un
 técnica 4), ni con el enlace de una tarea (espera al turno siguiente, decisión técnica 2), ni en la
 respuesta a "perdí el celular", ni en lo que Leda manda por su cuenta (eso no pasa por el turno).
 También va en la bienvenida al conectarse.
+
+Y el corte del acceso (`web_app.cortar_sesiones`) anula los enlaces de entrada que todavía no
+salieron: el despachador no emite uno después del corte (la advertencia de la revisión de la A-3).
 """
 
 from __future__ import annotations
@@ -264,6 +267,64 @@ def test_un_envio_que_falla_sin_reintento_libera_la_reserva(conn, mundo, escribe
     assert _ofrecimiento(conn, mundo) is None
     hechos, _ = _dice(conn, escribe)
     assert hechos == [OFRECIMIENTO]
+
+
+# --- El corte anula lo que todavía no salió ----------------------------------------------------
+
+def test_perdi_el_celular_anula_un_enlace_que_todavia_no_salio(conn, mundo, escribe, direccion):
+    """La advertencia de la revisión de la A-3: la respuesta anterior, con el enlace, sigue en la
+    salida (por ejemplo, esperando su reintento); después del corte no sale, ni se emite su
+    enlace, y queda el incidente."""
+    _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
+    _dice(conn, escribe, Jugada("perdi_el_celular", {}))
+    assert [m["estado"] for m in _marcas(conn)] == ["descartado"]
+    enviados = _despachar(conn, mundo).enviados
+    assert len(enviados) == 1 and not ENLACE_WEB.search(enviados[0].texto)
+    assert todos(conn, "select 1 from enlace_de_entrada") == []
+    [incidente] = todos(conn, """select etapa, severidad::text, referencia_tipo from incident
+                                  where etapa = 'enlace_de_entrada_web'""")
+    assert incidente["referencia_tipo"] == "message_outbox"
+
+
+def test_el_corte_libera_un_ofrecimiento_que_no_salio(conn, mundo, escribe, nunca):
+    _dice(conn, escribe)
+    _dice(conn, escribe, Jugada("perdi_el_celular", {}))
+    assert [m["estado"] for m in _marcas(conn)] == ["descartado"]
+    assert _ofrecimiento(conn, mundo) is None
+
+
+def test_pedir_otro_enlace_en_el_mismo_mensaje_del_corte_no_lo_manda(conn, mundo, escribe,
+                                                                      direccion):
+    """En el mismo mensaje, en cualquier orden: después del corte no sale ningún enlace."""
+    for orden in ((Jugada("pedir_acceso_web", {}), Jugada("perdi_el_celular", {})),
+                  (Jugada("perdi_el_celular", {}), Jugada("pedir_acceso_web", {}))):
+        hechos, _ = _dice(conn, escribe, *orden)
+        web = next(h for h in hechos if h["jugada"] == "pedir_acceso_web")
+        assert "lleva_el_enlace_de_entrada_a_la_web" not in web
+        assert web["motivo"] == "corta_el_acceso_en_este_mensaje"
+    assert _marcas(conn) == []
+    assert hechos_mod.significado("corta_el_acceso_en_este_mensaje")
+
+
+def test_el_corte_por_la_consola_tambien_anula_lo_que_no_salio(conn, mundo, escribe, direccion):
+    from leda import web_app
+
+    _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
+    with espacio(conn, mundo["id"]) as cur:
+        web_app.cortar_sesiones(cur, _membresia(mundo))
+    conn.commit()
+    assert [m["estado"] for m in _marcas(conn)] == ["descartado"]
+    assert _despachar(conn, mundo).enviados == []
+
+
+def test_el_corte_no_toca_lo_que_no_lleva_el_enlace_ni_lo_de_otra_persona(conn, mundo, escribe,
+                                                                         direccion):
+    _dice(conn, escribe, Jugada("pedir_acceso_web", {}), nombre="Ismael")
+    _dice(conn, escribe, Jugada("consultar_pendientes", {}))
+    _dice(conn, escribe, Jugada("perdi_el_celular", {}))
+    assert [m["estado"] for m in _marcas(conn)] == ["listo"]
+    assert uno(conn, """select count(*) n from message_outbox
+                         where estado = 'descartado'""")["n"] == 0
 
 
 # --- Lo que Leda manda por su cuenta no lo lleva -----------------------------------------------

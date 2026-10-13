@@ -1272,6 +1272,7 @@ def _pedir_enlace(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
 ENTRADA_WEB = "entrada_web"
 YA_LLEVA_OTRO_ENLACE = "ya_lleva_otro_enlace"
 PERDI_EL_CELULAR = "perdi_el_celular"
+CORTA_EL_ACCESO_EN_ESTE_MENSAJE = "corta_el_acceso_en_este_mensaje"
 # Lo que dicen los hechos de un enlace de entrada: que va al final del mensaje, que sirve una
 # sola vez y que vence a las 24 horas si nadie lo usa (decisión 1 del usuario; migración 0065).
 LLEVA_EL_ENLACE_DE_ENTRADA = MappingProxyType({
@@ -1305,6 +1306,10 @@ def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
 
     yo = ctx.quien.membership_id
     ya = ctx.enlace_de_la_respuesta
+    if PERDI_EL_CELULAR in ctx.elegidas:
+        # En el mismo mensaje que el corte, en cualquier orden: después del corte no sale ningún
+        # enlace (quien escribe puede ser quien tiene el celular perdido).
+        return {"resultado": "no_se_puede", "motivo": CORTA_EL_ACCESO_EN_ESTE_MENSAJE}
     if ya and ya[0] != (ENTRADA_WEB, yo):
         return {"resultado": "no_se_puede", "motivo": YA_LLEVA_OTRO_ENLACE}
     if not config.base_url:
@@ -1326,6 +1331,10 @@ def _perdi_el_celular(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     cortadas = web_app.cortar_sesiones(ctx.cur, ctx.quien.membership_id,
                                        motivo=web_app.PERDIO_EL_CELULAR,
                                        actor_app_user_id=ctx.quien.app_user_id)
+    # El corte también anula lo que todavía no salió (`web_app.cortar_sesiones`); en esta misma
+    # respuesta tampoco va ningún enlace de entrada.
+    ctx.enlace_de_la_respuesta[:] = [m for m in ctx.enlace_de_la_respuesta
+                                     if not es_la_entrada_web(m)]
     return {"resultado": "acceso_cortado", "sesiones_cortadas": cortadas,
             "recuerda_cerrar_telegram_en_ese_celular": True, "puede_pedir_otro_enlace": True}
 

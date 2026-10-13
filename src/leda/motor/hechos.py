@@ -950,6 +950,10 @@ SIGNIFICADOS: Mapping[str, str] = {
                                "nuevo para volver a entrar a la web.",
     "ya_lleva_otro_enlace": "Este mensaje ya lleva el enlace a la página de una tarea, y lleva "
                             "uno solo: el de entrada a la web se puede pedir aparte.",
+    "corta_el_acceso_en_este_mensaje":
+        "En este mismo mensaje la persona avisó que perdió el celular y Leda cortó su acceso a "
+        "la web: no se manda ningún enlace nuevo. Lo pide en otro mensaje, cuando tenga otro "
+        "celular.",
     # El ofrecimiento de la web, una sola vez (decisión 2 del usuario, 2026-10-12): lo suma la
     # cocina al final del turno, no es una jugada (`turno._ofrecer_la_web`).
     "ofrecimiento": "Algo que Leda le ofrece a la persona al final de este mensaje, además de "

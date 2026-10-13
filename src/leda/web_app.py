@@ -1043,7 +1043,43 @@ def cortar_sesiones(cur, membership_id: str, *, motivo: str = POR_UN_ADMINISTRAD
     cur.execute("select cortar_sesiones_de_membresia(%s, %s, %s) as cortadas",
                 (str(membership_id), motivo,
                  str(actor_app_user_id) if actor_app_user_id else None))
-    return int(cur.fetchone()["cortadas"])
+    cortadas = int(cur.fetchone()["cortadas"])
+    _anular_los_enlaces_sin_salir(cur, membership_id)
+    return cortadas
+
+
+# El incidente de un mensaje con el enlace de entrada que no salió porque el acceso se cortó antes
+# (la etapa es la del despachador, `despachador.ETAPA_ENLACE_DE_ENTRADA_WEB`).
+ETAPA_ENLACE_DE_ENTRADA_WEB = "enlace_de_entrada_web"
+
+
+def _anular_los_enlaces_sin_salir(cur, membership_id: str) -> None:
+    """Con el corte, los mensajes de la persona que llevan su enlace de entrada y todavía no
+    salieron (`message_outbox_entrada_web`, esperando su turno o su reintento) se descartan: el
+    despachador lo emitiría después del corte, al Telegram que puede estar en el celular perdido
+    (advertencia de la revisión de la A-3). El mensaje entero, no sólo el enlace: decía que lo
+    llevaba, y `leda_app` no borra la marca. Nunca en silencio: cada uno deja su incidente, sin
+    avisar a la administración, porque la respuesta del corte ya le dice a la persona que pida
+    otro enlace. Si era el ofrecimiento, se libera, como un envío que falla sin reintento."""
+    from .incidentes import registrar_incidente
+
+    cur.execute(
+        """update message_outbox o set estado = 'descartado'
+             from message_outbox_entrada_web w
+            where w.outbox_id = o.id and w.membership_id = %s
+              and o.estado in ('pendiente', 'esperando_confirmacion', 'listo')
+        returning o.id, o.workspace_id, w.es_ofrecimiento""", (str(membership_id),))
+    anulados = cur.fetchall()
+    for fila in anulados:
+        registrar_incidente(
+            cur, str(fila["workspace_id"]),
+            "Un mensaje con el enlace de entrada a la web no salió: el acceso de la persona se "
+            "cortó antes de mandarlo.",
+            severidad="baja", etapa=ETAPA_ENLACE_DE_ENTRADA_WEB,
+            referencia_tipo="message_outbox", referencia_id=str(fila["id"]), avisar_admin=False,
+            sin_avisar_porque="la respuesta del corte le dice a la persona que pida otro enlace")
+    if any(fila["es_ofrecimiento"] for fila in anulados):
+        liberar_el_ofrecimiento(cur, membership_id)
 
 
 def entro_alguna_vez(cur, membership_id: str) -> bool:
