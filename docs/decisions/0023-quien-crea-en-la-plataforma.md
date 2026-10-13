@@ -250,8 +250,11 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
    Entra directo, como las de su área; su entrega la aprueba quien revisa el trabajo del referente
    (en CoreWork, Dirección: "a los referentes los aprueba Dirección"), así nadie se aprueba a sí mismo;
    Dirección se entera según lo que eligió en su web (punto 1).
-9. **Una espera sobre una propuesta.** Ejemplo: "Colocar el estante" (comprometida) quiere esperar a
-   "Comprar los tornillos" (todavía propuesta); ¿se puede, o sólo entre tareas comprometidas?
+9. ~~**Una espera sobre una propuesta.**~~ **Decidido (usuario, 2026-10-13: "si"): la espera empieza
+   a contar recién cuando la propuesta se aprueba.** Mientras espera, "Colocar el estante" no figura
+   trabada: la web dice que tiene una propuesta esperando aprobación. Aprobada, figura esperando a
+   "Comprar los tornillos" y un atraso se explica por eso. Rechazada, la espera desaparece con ella y la
+   tarea sigue normal. Una propuesta sin aprobar nunca traba una tarea comprometida.
 10. **Cambiar quién es la autoridad final.** Ejemplo: Ismael quiere que Martín sea Dirección en su
     lugar; ¿lo hace él solo desde la web, o pasa por administración?
 11. **El tipo del objetivo.** La base pide que cada objetivo sea estratégico, hito u operativo.
