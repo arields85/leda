@@ -224,9 +224,11 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
    nadie dijo; nada se compromete incompleto. La misma ayuda, para Dirección y los referentes al cargar
    (usuario: "hace la tarea que tiene que hacer leda, que es facilitar y ayudar"). Es la IA dentro de la
    web, nueva: va en su propia porción, con su prueba.
-5. **El rechazo de una propuesta.** Ejemplo: Marcos no aprueba "Comprar los tornillos"; ¿cómo se
-   entera Nahuel (mensaje de Leda o sólo en la web), con motivo o sin él, y la propuesta queda
-   `cancelada` (que es terminal y pide razón, mecánica §3)?
+5. ~~**El rechazo de una propuesta.**~~ **Decidido (usuario, 2026-10-13: "si").** Quien aprueba
+   pone el motivo (mecánica §3: no se cierra sin razón); a quien la propuso le llega un aviso de Leda
+   por chat con el motivo, de coordinación (mecánica §10: "le rechazaron uno" llega siempre y no cuenta
+   para el tope); la propuesta queda `cancelada`, con quién y por qué, en la auditoría y visible en la
+   web. Si la idea sirve pero no así, quien aprueba la corrige y la aprueba (punto 4).
 6. **Cómo se entera el referente de una propuesta.** Ejemplo: Nahuel propone a las 10; ¿Marcos recibe
    un aviso de Leda por chat o la encuentra arriba en "Tu sector", como el pedido de más tiempo?
 7. **Dirección crea una tarea en un área.** Ejemplo: Ismael crea "Revisar el tablero" para Nahuel,
