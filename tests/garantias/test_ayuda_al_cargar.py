@@ -188,6 +188,45 @@ def test_una_fecha_que_nadie_dijo_no_se_propone(web, conn, intake_world, adminis
     assert [a["motivo"] for a in r.json()["avisos"] if a["campo"] == "fecha"] == ["no_dicha"]
 
 
+def test_un_rango_no_es_una_fecha(web, conn, intake_world, administradora, ia):
+    """Revisión `review-6eec478c3a4ddc11`: "del 10-12" es del 10 al 12, no el 10 de diciembre."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    texto = EJEMPLO.replace("para el viernes", "del 10-12")
+    ia.respuestas.append(_respuesta(espera=None, fecha="2026-12-10", como_dijo_la_fecha="del 10-12"))
+    r = _pedir(navegador, _norte(intake_world)["id"], texto=texto)
+    assert r.status_code == 200, r.text
+    assert "fecha" not in r.json()["propuesta"]
+    assert [a["motivo"] for a in r.json()["avisos"] if a["campo"] == "fecha"] == ["no_entendida"]
+
+
+def test_antes_de_un_dia_es_el_dia_habil_anterior_del_espacio(web, conn, intake_world,
+                                                             administradora, ia):
+    """El usuario (2026-10-13): "antes del jueves" es el miércoles, no el jueves; el día hábil
+    anterior lo da el calendario del espacio en la base (`es_dia_habil`)."""
+    norte = _norte(intake_world)
+    hoy = datetime.now(ZoneInfo("America/Argentina/Buenos_Aires")).date()
+    viernes = hoy + timedelta(days=7 - hoy.weekday() + 4)       # el de la semana que viene
+    anterior = viernes - timedelta(days=1)
+    with admin(conn) as cur:
+        while True:
+            cur.execute("select es_dia_habil(%s, %s) as habil", (norte["id"], anterior))
+            if cur.fetchone()["habil"]:
+                break
+            anterior -= timedelta(days=1)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    texto = EJEMPLO.replace("para el viernes", "antes del viernes de la semana que viene")
+    ia.respuestas.append(_respuesta(espera=None, fecha=anterior.isoformat(),
+                                    como_dijo_la_fecha="antes del viernes de la semana que viene"))
+    r = _pedir(navegador, norte["id"], texto=texto)
+    assert r.status_code == 200, r.text
+    assert r.json()["propuesta"]["fecha"] == anterior.isoformat()
+    # El viernes mismo no vale: la persona dijo "antes".
+    ia.respuestas.append(_respuesta(espera=None, fecha=viernes.isoformat(),
+                                    como_dijo_la_fecha="antes del viernes de la semana que viene"))
+    r = _pedir(navegador, norte["id"], texto=texto)
+    assert "fecha" not in r.json()["propuesta"]
+
+
 # --- Sólo lo vacío ----------------------------------------------------------------------------
 
 def test_lo_escrito_no_se_pide_ni_vuelve(web, conn, intake_world, administradora, con_lucas, ia):

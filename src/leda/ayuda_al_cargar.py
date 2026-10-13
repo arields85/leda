@@ -21,7 +21,9 @@ acá: la persona ve cada dato marcado, lo corrige o lo acepta, y confirma como s
   - la fecha, sólo si la persona la dijo (constitución §4: nunca una fecha que nadie dijo): la IA
     devuelve también las palabras con que la dijo (`como_dijo_la_fecha`), el código comprueba que
     están tal cual en el texto y calcula él mismo el día con ellas (`fecha_dicha`, con hoy y la
-    frase entera del texto donde están); vale sólo si es el mismo día que dio la IA y es hábil;
+    frase entera del texto donde están; si dice "antes de" un día, el hábil anterior del
+    calendario del espacio); vale sólo si es el mismo día que dio la IA y es hábil; un rango
+    ("del 10 al 12") no es una fecha;
   - título, descripción y criterio, con los topes del formulario y sin un número ni un nombre que
     no estén en lo que escribió la persona o en los datos de esta tarea
     (`entrega.problema_del_ejemplo`, punto por punto); el criterio, además, con la parte que dice
@@ -88,6 +90,9 @@ TEXTOS = {
     ("fecha", "no_dicha"):
         "No puse la fecha: no encontré en lo que escribiste qué día es; elegila en el "
         "calendario.",
+    ("fecha", "sin_habil_antes"):
+        'No puse la fecha: dijiste "{dicho}", pero no encontré el día hábil anterior en el '
+        "calendario de este espacio; elegila en el calendario.",
 }
 
 INSTRUCCIONES = """\
@@ -117,9 +122,11 @@ _DATOS = {
               "esta pueda empezar.",
     "objetivo": "El código (O1, O2...) del objetivo al que contribuye la tarea.",
     "fecha": "El día para el que la persona dijo que tiene que estar, como AAAA-MM-DD, de la "
-             "lista de días.",
+             "lista de días. Si dijo que tiene que estar antes de un día, es el día hábil "
+             "anterior a ese.",
     "como_dijo_la_fecha": "Las palabras con que la persona dijo para cuándo tiene que estar, "
-                          "copiadas tal cual de su texto.",
+                          "copiadas tal cual de su texto y enteras, también las que dicen si es "
+                          "antes de ese día.",
 }
 # Los datos que van sólo con otro: la parte del criterio que dice cómo se comprueba, con el
 # criterio, y las palabras de la fecha, con la fecha.
@@ -129,16 +136,25 @@ _ACOMPANAN = {"como_se_comprueba": "criterio", "como_dijo_la_fecha": "fecha"}
 _MESES = {m: i for i, m in enumerate(
     ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
      "octubre", "noviembre", "diciembre"), 1)} | {"setiembre": 9}
-# "por la mañana", "a la mañana", "esta mañana": una hora del día, no mañana.
-_LA_MANANA = {"la", "esta"}
+# "por la mañana", "a la mañana", "esta mañana", "de mañana": una hora del día, no mañana (salvo
+# "antes de mañana", que es un día).
+_LA_MANANA = {"la", "esta", "de"}
 # Lo que antecede al número de un día ("para el 22", "antes del 22", "el día 22").
 _ANTES_DEL_DIA = {"el", "del", "dia", "al"}
 _LA_SEMANA_QUE_VIENE = (("semana", "que", "viene"), ("proxima", "semana"), ("semana", "proxima"))
-# "22/10", "22 / 10", "22-10" o "22/10/2026": una sola ficha, con la barra; un número suelto al
-# lado de otro ("la máquina 3 10 tornillos") no es un día y un mes.
-_CON_BARRAS = re.compile(
-    r"(?<!\d)(\d{1,2})\s*[/-]\s*(\d{1,2})(?:\s*[/-]\s*(\d{4}|\d{2}))?(?!\d)")
-_FICHA = re.compile(r"\d{1,2}/\d{1,2}(?:/\d{2,4})?|[^\W_]+")
+# Lo que une dos días en un rango o una alternativa ("del 10 al 12", "entre el 10 y el 12", "el
+# lunes o el martes"), y lo que puede ir entre la unión y el día siguiente.
+_UNEN = {"y", "e", "o", "u", "a", "al", "hasta"}
+_ANTES_DEL_SEGUNDO = {"el", "del", "dia"}
+# Una cantidad antes de "antes" ("dos días antes del jueves"): no es el día hábil anterior.
+_CANTIDADES = {"dia", "dias", "semana", "semanas", "mes", "meses", "hora", "horas", "rato"}
+# "22/10", "22 / 10" o "22/10/2026": una sola ficha, con la barra; con el guion, sólo con el año
+# ("22-10-2026"): sin él, "10-12" es también del 10 al 12, y queda como una ficha que no es un día
+# (sus números no se leen sueltos). Un número suelto al lado de otro ("la máquina 3 10 tornillos")
+# no es un día y un mes.
+_CON_BARRAS = re.compile(r"(?<!\d)(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{4}|\d{2}))?(?!\d)")
+_CON_GUIONES = re.compile(r"(?<!\d)(\d{1,2})\s*-\s*(\d{1,2})(?:\s*-\s*(\d{4}))?(?!\d)")
+_FICHA = re.compile(r"\d{1,2}/\d{1,2}(?:/\d{2,4})?|\d{1,2}-\d{1,2}|[^\W_]+")
 
 
 @dataclass
@@ -208,6 +224,20 @@ def _hoy(opciones) -> date:
     return date.fromisoformat(str(opciones["hoy"]))
 
 
+def _dias_proximos(hoy: date, opciones) -> list[str]:
+    """Hoy y los días que vienen, como los nombra el motor (`hechos.dia`), con ", no es día
+    hábil" en los que no son hábiles en el calendario del espacio (para que la IA pueda dar el
+    día hábil anterior a otro); sin la lista de días hábiles, sin marcas."""
+    habiles = set((opciones.get("calendario") or {}).get("dias_habiles") or [])
+    dias = []
+    for n in range(DIAS_PROXIMOS + 1):
+        dia = hoy + timedelta(days=n)
+        nombre = hechos.dia(dia, hoy)
+        dias.append(f"{nombre}, no es día hábil" if habiles and dia.isoformat() not in habiles
+                    else nombre)
+    return dias
+
+
 def entrada_de_la_ia(texto: str, escrito: Mapping[str, Any],
                      opciones: Mapping[str, Any]) -> dict[str, Any]:
     """Lo que recibe la IA: sólo del espacio de las opciones, sin ids ni los nombres del
@@ -239,7 +269,7 @@ def entrada_de_la_ia(texto: str, escrito: Mapping[str, Any],
         "pide": [PARA_LA_IA[c] for c in lo_que_se_pide(escrito, opciones)],
         "ya_escrito": ya,
         "hoy": hechos.dia(hoy, hoy),
-        "dias": [hechos.dia(hoy + timedelta(days=n), hoy) for n in range(DIAS_PROXIMOS + 1)],
+        "dias": _dias_proximos(hoy, opciones),
         "objetivos": [{"codigo": c, "titulo": o["titulo"]} for c, o in objetivos.items()],
         "tareas_abiertas": [{"codigo": c, "titulo": t["titulo"],
                              "la_hace": t.get("responsable"), "objetivo": t.get("objetivo")}
@@ -325,34 +355,44 @@ def _contiene(texto: str, frase: str) -> bool:
 # Constitución §4: nunca una fecha que nadie dijo. La IA nombra el día y copia las palabras con que
 # la persona lo dijo; el código no le cree el día: busca esas palabras en el texto y calcula él
 # mismo, con hoy, qué día dice la frase del texto donde están. Lo que entiende, y nada más:
-# - "hoy", "mañana" (no "por la mañana", "a la mañana" ni "esta mañana", que son una hora) y
-#   "pasado mañana";
+# - "hoy", "mañana" (no "por la mañana", "a la mañana", "esta mañana" ni "de mañana", que son una
+#   hora) y "pasado mañana";
 # - el nombre de un día: el próximo, nunca hoy ("el viernes", "este viernes", "el viernes que
 #   viene"; hoy miércoles, "el miércoles" es el de la semana que viene), o el de la semana que
 #   viene si lo dice ("el viernes de la semana que viene", "de la próxima semana");
 # - un número de día con lo que lo hace un día: "el 22", "del 22", "el día 22" (de este mes, o del
-#   que viene si ya pasó), "22/10" o "22-10" (de este año, o del que viene si ya pasó), "22/10/2026",
-#   "el 22 de octubre" y "el viernes 23" (que tiene que ser viernes).
+#   que viene si ya pasó), "22/10" (de este año, o del que viene si ya pasó), "22/10/2026" o
+#   "22-10-2026", "el 22 de octubre" y "el viernes 23" (que tiene que ser viernes);
+# - "antes de" uno de esos días ("antes del jueves", "antes del 22", "antes de mañana"): el día
+#   hábil anterior del calendario del espacio, desde hoy (el usuario, 2026-10-13: "la persona dijo
+#   'antes del jueves' no 'el jueves'"); las palabras de la IA tienen que traer el "antes", y con
+#   una cantidad delante ("dos días antes del jueves") no se entiende.
 # Un número suelto ("12 tornillos", "la máquina 3") nunca es un día, y "la semana que viene" sola
-# no dice qué día. Si las palabras están en más de una frase con días distintos, no se entiende.
+# no dice qué día. Un rango o una alternativa tampoco ("del 10-12", "del 10 al 12", "entre el 10 y
+# el 12", "el lunes o el martes"): no dicen para cuándo. Si las palabras están en más de una frase
+# con días distintos, no se entiende.
 
 @dataclass(frozen=True)
 class _Frase:
-    """Una frase de fecha del texto: sus fichas (`desde` hasta `hasta`, sin incluir) y su día
-    (`None` si no es un día que exista, como "el 31 de febrero" o "el viernes 22" un jueves)."""
+    """Una frase de fecha del texto: sus fichas (`desde` hasta `hasta`, sin incluir), su día
+    (`None` si no es un día que exista, como "el 31 de febrero" o "el viernes 22" un jueves, o si
+    es parte de un rango) y si dice "antes de" ese día (`antes`, y entonces empieza en "antes")."""
 
     desde: int
     hasta: int
     dia: date | None
+    antes: bool = False
 
 
 def _fichas_de_fecha(texto: str) -> list[str]:
-    """Las palabras del texto sin mayúsculas ni acentos, con "22/10" como una sola y "q" como
-    "que"."""
+    """Las palabras del texto sin mayúsculas ni acentos, con "22/10" (o "22-10-2026") como una
+    sola, "10-12" como una sola que no es un día, y "q" como "que"."""
     sin_marcas = "".join(c for c in unicodedata.normalize("NFD", texto.casefold())
                          if unicodedata.category(c) != "Mn")
     con_barras = _CON_BARRAS.sub(lambda m: "/".join(g for g in m.groups() if g), sin_marcas)
-    return ["que" if f == "q" else f for f in _FICHA.findall(con_barras)]
+    con_guiones = _CON_GUIONES.sub(
+        lambda m: "/".join(m.groups()) if m.group(3) else f"{m.group(1)}-{m.group(2)}", con_barras)
+    return ["que" if f == "q" else f for f in _FICHA.findall(con_guiones)]
 
 
 def _es_un_dia_del_mes(valor: str) -> bool:
@@ -426,16 +466,65 @@ def _dia_de_la_semana(fichas: Sequence[str], i: int, hoy: date) -> tuple[int, da
     return hasta, hoy + timedelta(days=(semana - hoy.weekday()) % 7 or 7)
 
 
+def _es_una_hora(fichas: Sequence[str], i: int) -> bool:
+    """"mañana" en "por la mañana", "esta mañana" o "de mañana" es una hora del día; en "antes de
+    mañana", un día."""
+    previa = fichas[i - 1] if i else ""
+    return previa in _LA_MANANA and not (previa == "de" and fichas[i - 2:i - 1] == ["antes"])
+
+
+def _con_el_antes(fichas: Sequence[str], f: _Frase) -> _Frase:
+    """La frase con el "antes de" que la precede ("antes del jueves", "antes del día 22", "antes
+    de mañana"), que empieza entonces en "antes"; con una cantidad delante ("dos días antes del
+    jueves") no es un día. Sin "antes de", la misma frase."""
+    k = f.desde
+    k -= fichas[k - 1:k] == ["dia"] if k else 0
+    k -= fichas[k - 1:k] == ["el"] if k else 0
+    if k < 2 or fichas[k - 1] not in ("de", "del") or fichas[k - 2] != "antes":
+        return f
+    k -= 2
+    previa = fichas[k - 1] if k else ""
+    cantidad = previa in _CANTIDADES or previa.isdigit()
+    return _Frase(k, f.hasta, None if cantidad else f.dia, antes=True)
+
+
+def _sin_rangos(fichas: Sequence[str], frases: list[_Frase]) -> list[_Frase]:
+    """Las frases, sin día las que son parte de un rango o de una alternativa: dos días unidos
+    ("del 10 al 12", "entre el 10 y el 12", "el lunes o el martes", "del 10 a 12") o uno con
+    "entre" delante. No dicen para cuándo tiene que estar."""
+    empieza = {f.desde: n for n, f in enumerate(frases)}
+    en_rango: set[int] = set()
+    for n, f in enumerate(frases):
+        k = f.desde
+        while k and fichas[k - 1] in _ANTES_DEL_SEGUNDO:
+            k -= 1
+        if k and fichas[k - 1] == "entre":
+            en_rango.add(n)
+        j = f.hasta
+        if j >= len(fichas) or fichas[j] not in _UNEN:
+            continue
+        j += 1
+        while j < len(fichas) and fichas[j] in _ANTES_DEL_SEGUNDO:
+            j += 1
+        if j in empieza:
+            en_rango |= {n, empieza[j]}
+        elif (j < len(fichas) and _es_un_dia_del_mes(fichas[j])
+              and (fichas[f.hasta - 1].isdigit() or "/" in fichas[f.hasta - 1])):
+            en_rango.add(n)
+    return [_Frase(f.desde, f.hasta, None, f.antes) if n in en_rango else f
+            for n, f in enumerate(frases)]
+
+
 def _frases_de_fecha(fichas: Sequence[str], hoy: date) -> list[_Frase]:
     frases: list[_Frase] = []
     i = 0
     while i < len(fichas):
-        ficha, previa = fichas[i], fichas[i - 1] if i else ""
+        ficha = fichas[i]
         if ficha == "pasado" and fichas[i + 1:i + 2] == ["manana"]:
             frases.append(_Frase(i, i + 2, hoy + timedelta(days=2)))
             i += 2
             continue
-        if ficha == "manana" and previa not in _LA_MANANA:
+        if ficha == "manana" and not _es_una_hora(fichas, i):
             frases.append(_Frase(i, i + 1, hoy + timedelta(days=1)))
         elif ficha == "hoy":
             frases.append(_Frase(i, i + 1, hoy))
@@ -446,15 +535,38 @@ def _frases_de_fecha(fichas: Sequence[str], hoy: date) -> list[_Frase]:
             i = hasta
             continue
         i += 1
-    return frases
+    return _sin_rangos(fichas, [_con_el_antes(fichas, f) for f in frases])
 
 
-def fecha_dicha(texto: str, dicho: str | None, hoy: date) -> tuple[date | None, str | None]:
+def _habil_anterior(dia: date, hoy: date, calendario: Mapping[str, Any] | None) -> date | None:
+    """El día hábil del espacio anterior a `dia`: el primero hacia atrás, desde el día anterior
+    hasta hoy, que está entre los días hábiles del calendario (`dias_habiles`, con sus
+    feriados). `None` si no hay ninguno desde hoy, si el día anterior queda después del fin del
+    calendario (no se sabe si es hábil) o sin calendario."""
+    calendario = calendario or {}
+    habiles = set(calendario.get("dias_habiles") or [])
+    fin = str(calendario.get("hasta") or (max(habiles) if habiles else ""))
+    anterior = dia - timedelta(days=1)
+    if not fin or anterior.isoformat() > fin:
+        return None
+    while anterior >= hoy:
+        if anterior.isoformat() in habiles:
+            return anterior
+        anterior -= timedelta(days=1)
+    return None
+
+
+def fecha_dicha(texto: str, dicho: str | None, hoy: date,
+                calendario: Mapping[str, Any] | None = None) -> tuple[date | None, str | None]:
     """El día que dicen las palabras `dicho` en el texto de la persona, calculado por el código:
     `(día, None)`, o `(None, motivo)`: `no_dicha` si esas palabras no están tal cual en el texto
     (sin mayúsculas ni acentos); `no_entendida` si no son parte de una frase que nombra un solo
     día que existe. La frase es la del texto, entera: si la persona escribió "el viernes de la
-    semana que viene" y la IA copió "el viernes", el día es el de la semana que viene."""
+    semana que viene" y la IA copió "el viernes", el día es el de la semana que viene.
+
+    Si la frase dice "antes de" un día, las palabras tienen que traer el "antes" (si no,
+    `no_entendida`) y el día es el hábil anterior de `calendario` (las opciones de la carga:
+    `dias_habiles` y `hasta`), desde hoy; si no lo hay, `sin_habil_antes`."""
     buscadas = _fichas_de_fecha(dicho or "")
     if not buscadas:
         return None, "no_dicha"
@@ -463,11 +575,22 @@ def fecha_dicha(texto: str, dicho: str | None, hoy: date) -> tuple[date | None, 
     lugares = [i for i in range(len(fichas) - largo + 1) if fichas[i:i + largo] == buscadas]
     if not lugares:
         return None, "no_dicha"
-    dias = {f.dia for f in _frases_de_fecha(fichas, hoy) for i in lugares
-            if f.desde < i + largo and i < f.hasta}
-    if len(dias) != 1 or None in dias:
+    dias: set[tuple[date | None, bool]] = set()
+    for f in _frases_de_fecha(fichas, hoy):
+        for i in lugares:
+            if f.desde < i + largo and i < f.hasta:
+                # Con "antes de", lo que dijo la persona incluye el "antes".
+                trae_el_antes = i <= f.desde < i + largo
+                dias.add((f.dia, f.antes) if not f.antes or trae_el_antes else (None, True))
+    if len(dias) != 1:
         return None, "no_entendida"
-    return dias.pop(), None
+    ((dia, antes),) = dias
+    if dia is None:
+        return None, "no_entendida"
+    if not antes:
+        return dia, None
+    anterior = _habil_anterior(dia, hoy, calendario)
+    return (anterior, None) if anterior is not None else (None, "sin_habil_antes")
 
 
 def _en_palabras(dia: date) -> str:
@@ -485,11 +608,11 @@ def _revisar_la_fecha(r: Resultado, fecha: Any, dicho: str | None, texto: str,
         r.descartar("fecha", "mal_formada", "no_dicha")
         return
     hoy = _hoy(opciones)
-    dia, motivo = fecha_dicha(texto, dicho, hoy)
+    calendario = opciones.get("calendario") or {}
+    dia, motivo = fecha_dicha(texto, dicho, hoy, calendario)
     if dia is None:
         r.descartar("fecha", motivo, motivo, dicho=dicho or "")
         return
-    calendario = opciones.get("calendario") or {}
     if dia.isoformat() not in set(calendario.get("dias_habiles") or []):
         # Lo que se dice es el día de las palabras de la persona, no el de la IA.
         hasta = calendario.get("hasta")

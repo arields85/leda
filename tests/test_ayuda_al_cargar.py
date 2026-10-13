@@ -69,6 +69,8 @@ OPCIONES: dict[str, Any] = {
                    "hasta": "2027-04-14", "feriados": [], "dias_habiles": _habiles(HOY)},
 }
 
+CALENDARIO = OPCIONES["calendario"]
+
 # Los apodos del equipo de mentira: "lucas" es sólo Lucas Pérez (su apodo) y "el tano", Marcos.
 APODOS = {"m-lucas": ["lucas"], "m-marcos": ["el tano"]}
 
@@ -435,7 +437,6 @@ def test_por_la_manana_es_una_hora_y_no_un_dia(ayuda):
     ("pasado mañana", "pasado mañana", "2026-10-16"),
     # Hoy es miércoles: "el miércoles" es el que viene, no hoy.
     ("el miercoles", "el miércoles", "2026-10-21"),
-    ("antes del jueves", "antes del jueves", "2026-10-15"),
     ("el viernes que viene", "el viernes que viene", "2026-10-16"),
     ("el lunes q viene", "el lunes q viene", "2026-10-19"),
     ("el viernes de la semana que viene", "el viernes de la semana que viene", "2026-10-23"),
@@ -449,13 +450,15 @@ def test_por_la_manana_es_una_hora_y_no_un_dia(ayuda):
     ("para el 10", "el 10", "2026-11-10"),
     ("el 22/10", "22/10", "2026-10-22"),
     ("el 22 / 10", "22/10", "2026-10-22"),
-    ("el 5-1", "5-1", "2027-01-05"),
+    ("el 5/1", "5/1", "2027-01-05"),
     ("el 22/10/2026", "22/10/2026", "2026-10-22"),
+    # Con el guion, sólo con el año: sin él, "10-12" puede ser del 10 al 12.
+    ("el 22-10-2026", "22-10-2026", "2026-10-22"),
     ("el 3 de noviembre", "el 3 de noviembre", "2026-11-03"),
     ("el viernes 23", "el viernes 23", "2026-10-23"),
 ])
 def test_el_codigo_calcula_el_dia_de_las_palabras(ayuda, texto, dicho, fecha):
-    assert ayuda.fecha_dicha(texto, dicho, HOY) == (date.fromisoformat(fecha), None)
+    assert ayuda.fecha_dicha(texto, dicho, HOY, CALENDARIO) == (date.fromisoformat(fecha), None)
 
 
 @pytest.mark.parametrize("texto, dicho, motivo", [
@@ -474,9 +477,122 @@ def test_el_codigo_calcula_el_dia_de_las_palabras(ayuda, texto, dicho, fecha):
     ("colgar el estante para el viernes", "para el jueves", "no_dicha"),
     ("colgar el estante para el viernes", "", "no_dicha"),
     ("colgar el estante para el viernes", None, "no_dicha"),
+    # "De mañana" es una hora del día ("lo hago de mañana"), como "por la mañana".
+    ("lo hago de mañana", "mañana", "no_entendida"),
+    ("lo hago de mañana", "de mañana", "no_entendida"),
+    # Un rango no es un día (revisión `review-6eec478c3a4ddc11`): ni con el guion ni con palabras.
+    ("del 10-12", "del 10-12", "no_entendida"),
+    ("del 10-12", "10-12", "no_entendida"),
+    ("del 10-12", "del 10", "no_dicha"),
+    ("necesita 10-12 tornillos", "10-12", "no_entendida"),
+    ("el 5-1", "5-1", "no_entendida"),
+    ("el 22-10", "el 22-10", "no_entendida"),
+    ("entre el 10 y el 12", "entre el 10 y el 12", "no_entendida"),
+    ("entre el 10 y el 12", "el 12", "no_entendida"),
+    ("entre el 10 y el 12", "el 10", "no_entendida"),
+    ("del 10 al 12", "al 12", "no_entendida"),
+    ("del 10 al 12", "del 10", "no_entendida"),
+    ("del 10 a 12", "del 10", "no_entendida"),
+    ("el lunes o el martes", "el martes", "no_entendida"),
+    ("entre el lunes y el miercoles", "el lunes", "no_entendida"),
 ])
 def test_lo_que_no_es_un_dia_no_se_calcula(ayuda, texto, dicho, motivo):
-    assert ayuda.fecha_dicha(texto, dicho, HOY) == (None, motivo)
+    assert ayuda.fecha_dicha(texto, dicho, HOY, CALENDARIO) == (None, motivo)
+
+
+# --- "Antes de un día" ------------------------------------------------------------------------
+#
+# El usuario (2026-10-13): "si la persona dijo antes del jueves, leda deberia proponer el miercoles,
+# porque la persona dijo 'antes del jueves' no 'el jueves'". El código calcula el día que nombran
+# las palabras, con las mismas reglas, y propone el día hábil anterior del calendario del espacio.
+
+@pytest.mark.parametrize("texto, dicho, fecha", [
+    # Hoy es miércoles 14 y es hábil: antes del jueves 15 es hoy.
+    ("antes del jueves", "antes del jueves", "2026-10-14"),
+    ("lo tiene que ver antes del viernes porq se corta", "antes del viernes", "2026-10-15"),
+    # Antes del lunes es el viernes anterior.
+    ("antes del lunes", "antes del lunes", "2026-10-16"),
+    ("para antes del 22", "antes del 22", "2026-10-21"),
+    ("antes del dia 22", "antes del dia 22", "2026-10-21"),
+    ("antes del 22/10", "antes del 22/10", "2026-10-21"),
+    ("antes del 22 de octubre", "antes del 22 de octubre", "2026-10-21"),
+    ("antes del 20-10-2026", "antes del 20-10-2026", "2026-10-19"),
+    ("antes de pasado mañana", "antes de pasado mañana", "2026-10-15"),
+    ("antes de mañana", "antes de mañana", "2026-10-14"),
+    ("antes del viernes de la semana que viene", "antes del viernes", "2026-10-22"),
+    ("ANTES DEL JUEVES", "antes del jueves", "2026-10-14"),
+])
+def test_antes_de_un_dia_es_el_dia_habil_anterior(ayuda, texto, dicho, fecha):
+    assert ayuda.fecha_dicha(texto, dicho, HOY, CALENDARIO) == (date.fromisoformat(fecha), None)
+
+
+def test_antes_de_un_dia_saltea_lo_que_no_es_habil_en_el_espacio(ayuda):
+    """El miércoles 21 es feriado: antes del jueves 22 es el martes 20."""
+    calendario = {**CALENDARIO, "dias_habiles": [d for d in CALENDARIO["dias_habiles"]
+                                                 if d != "2026-10-21"]}
+    assert ayuda.fecha_dicha("antes del jueves 22", "antes del jueves 22", HOY, calendario) == (
+        date(2026, 10, 20), None)
+
+
+@pytest.mark.parametrize("texto, dicho, motivo", [
+    # Las palabras de la IA tienen que traer el "antes": "jueves" solo no es lo que dijo.
+    ("antes del jueves", "jueves", "no_entendida"),
+    ("antes del jueves", "del jueves", "no_entendida"),
+    # Una cantidad antes del "antes" no es el día hábil anterior.
+    ("dos dias antes del jueves", "antes del jueves", "no_entendida"),
+    ("una semana antes del 22", "antes del 22", "no_entendida"),
+    # Ningún día hábil desde hoy hasta antes de ese día, o fuera del calendario.
+    ("antes de hoy", "antes de hoy", "sin_habil_antes"),
+    ("antes del 3 de mayo", "antes del 3 de mayo", "sin_habil_antes"),
+])
+def test_antes_de_un_dia_que_no_se_puede_proponer(ayuda, texto, dicho, motivo):
+    assert ayuda.fecha_dicha(texto, dicho, HOY, CALENDARIO) == (None, motivo)
+
+
+def test_antes_de_manana_sin_hoy_habil_no_tiene_dia(ayuda):
+    """Pasada la hora de cierre, hoy no está entre los días hábiles para cargar."""
+    calendario = {**CALENDARIO, "dias_habiles": CALENDARIO["dias_habiles"][1:]}
+    assert ayuda.fecha_dicha("antes de mañana", "antes de mañana", HOY, calendario) == (
+        None, "sin_habil_antes")
+
+
+def test_antes_del_jueves_propone_el_miercoles(ayuda):
+    texto = EJEMPLO.replace("para el viernes", "antes del jueves")
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(
+        fecha="2026-10-14", como_dijo_la_fecha="antes del jueves"), texto=texto)
+    assert resultado.propuesta["fecha"] == "2026-10-14"
+    assert not any(a["campo"] == "fecha" for a in resultado.avisos)
+
+
+def test_antes_del_jueves_no_es_el_jueves(ayuda):
+    texto = EJEMPLO.replace("para el viernes", "antes del jueves")
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(
+        fecha="2026-10-15", como_dijo_la_fecha="antes del jueves"), texto=texto)
+    assert "fecha" not in resultado.propuesta
+    assert {"campo": "fecha", "motivo": "no_coincide"} in resultado.descartados
+
+
+def test_sin_dia_habil_antes_se_dice_por_que(ayuda):
+    texto = EJEMPLO.replace("para el viernes", "antes de hoy")
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(
+        fecha="2026-10-13", como_dijo_la_fecha="antes de hoy"), texto=texto)
+    assert "fecha" not in resultado.propuesta
+    assert {"campo": "fecha", "motivo": "sin_habil_antes"} in resultado.descartados
+    assert _avisos(resultado)["fecha"] == (
+        'No puse la fecha: dijiste "antes de hoy", pero no encontré el día hábil anterior en el '
+        'calendario de este espacio; elegila en el calendario.')
+
+
+def test_la_ia_sabe_que_dias_son_habiles_y_que_es_antes_de_un_dia(ayuda):
+    """Para que la IA pueda dar el día hábil anterior, la lista de días dice cuáles no son
+    hábiles, y la herramienta lo describe en general (sin frases de ejemplo)."""
+    _, ia = _proponer(ayuda, _respuesta_del_ejemplo())
+    dias = ia.entrada()["dias"]
+    assert next(d for d in dias if d.startswith(SABADO)).endswith("no es día hábil")
+    assert not next(d for d in dias if d.startswith(VIERNES)).endswith("no es día hábil")
+    datos = ia.pedidos[0]["tools"][0]["function"]["parameters"]["properties"]
+    assert "día hábil anterior" in datos["fecha"]["description"]
+    assert "antes" in datos["como_dijo_la_fecha"]["description"]
 
 
 def test_una_fecha_mal_escrita_no_se_pone(ayuda):
@@ -624,13 +740,51 @@ def test_la_medicion_busca_los_nombres_con_la_funcion_del_servidor(medir, monkey
 
 
 def test_en_seco_la_medicion_prueba_algo(medir, tmp_path, capsys):
-    """La IA en seco propone lo esperado para el ejemplo del usuario y un sábado: el ejemplo
-    pasa entero y el sábado no pone la fecha; los demás, sin guion, no proponen nada."""
+    """La IA en seco propone lo esperado para el ejemplo del usuario, un sábado y "antes del
+    jueves": el ejemplo pasa entero, el sábado no pone la fecha y "antes del jueves" pone el
+    miércoles; los demás, sin guion, no proponen nada."""
     salida = tmp_path / "informe.json"
     assert medir.main(["--salida", str(salida)]) == 1
     informe = json.loads(salida.read_text(encoding="utf-8"))
     bien = {r["pedido"] for r in informe["resultados"] if r["bien"]}
-    assert bien == {"el ejemplo del usuario", "un sábado no es hábil"}
+    assert bien == {"el ejemplo del usuario", "un sábado no es hábil",
+                    "un apodo y un día de la semana"}
     (sabado,) = [r for r in informe["resultados"] if r["pedido"] == "un sábado no es hábil"]
     assert {"campo": "fecha", "motivo": "no_es_habil"} in sabado["descartados"]
-    assert f"2 de {len(medir.PEDIDOS)} bien" in capsys.readouterr().out
+    (antes,) = [r for r in informe["resultados"]
+                if r["pedido"] == "un apodo y un día de la semana"]
+    assert antes["propuesta"]["fecha"] == "2026-10-14"
+    assert f"3 de {len(medir.PEDIDOS)} bien" in capsys.readouterr().out
+
+
+def test_antes_del_jueves_en_la_medicion_espera_el_miercoles(medir):
+    """Hoy, en la medición, es el miércoles 14: antes del jueves 15 es hoy."""
+    (pedido,) = [p for p in medir.PEDIDOS if p["nombre"] == "un apodo y un día de la semana"]
+    assert "antes del jueves" in pedido["texto"]
+    assert medir.HOY == date(2026, 10, 14)
+    assert pedido["propone"]["fecha"] == "2026-10-14"
+
+
+@pytest.mark.parametrize("falla", [KeyError("dato"), IndexError("lista"),
+                                   FileNotFoundError("archivo")])
+def test_un_error_del_programa_dentro_de_la_llamada_no_es_de_la_ia(medir, monkeypatch, tmp_path,
+                                                                    falla):
+    """La revisión `review-f7886a8a6481af78`: `LookupError` y `OSError` también son `KeyError`,
+    `IndexError` o un archivo que falta; un error así es del programa, no de la IA."""
+    ia = IADeLaCarga(falla)
+    monkeypatch.setattr(medir, "la_ia", lambda texto: ia)
+    salida = tmp_path / "informe.json"
+    assert medir.main(["--ia", "x", "--salida", str(salida)]) == medir.ERROR_DEL_PROGRAMA
+    informe = json.loads(salida.read_text(encoding="utf-8"))
+    assert informe["resultados"][0]["falla"] == "programa"
+
+
+@pytest.mark.parametrize("falla", [LookupError("sin configurar"), ConnectionError("red"),
+                                   TimeoutError("plazo")])
+def test_una_ia_sin_configurar_o_sin_red_si_es_de_la_ia(medir, monkeypatch, tmp_path, falla):
+    ia = IADeLaCarga(falla, *([{}] * (len(medir.PEDIDOS) - 1)))
+    monkeypatch.setattr(medir, "la_ia", lambda texto: ia)
+    salida = tmp_path / "informe.json"
+    assert medir.main(["--ia", "x", "--salida", str(salida)]) == 1
+    informe = json.loads(salida.read_text(encoding="utf-8"))
+    assert informe["resultados"][0]["falla"] == "ia"

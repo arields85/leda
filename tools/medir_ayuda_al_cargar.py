@@ -7,8 +7,9 @@ una llamada por pedido y vuelta (11 pedidos).
     .venv\\Scripts\\python.exe tools\\medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3
 
 `--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira con un guion para el
-ejemplo del usuario y para el sábado (lo que tendría que proponer una IA que entendió), y nada para
-los demás; así la corrida en seco prueba los controles y la comparación: da 2 de 11 (sale con 1).
+ejemplo del usuario, el sábado y "antes del jueves" (lo que tendría que proponer una IA que
+entendió), y nada para los demás; así la corrida en seco prueba los controles y la comparación: da
+3 de 11 (sale con 1).
 `--ia PROVEEDOR/MODELO` (o `sol-suscripcion`, la suscripción de ChatGPT del usuario) usa la IA
 real. Sin base de datos: el equipo, los objetivos, las tareas y los días son fijos (hoy, el
 miércoles 14 de octubre de 2026), y quién la hace se busca con la misma función que el servidor,
@@ -111,8 +112,10 @@ PEDIDOS: list[dict[str, Any]] = [
     {"nombre": "un apodo y un día de la semana",
      "texto": "hay q cambiar el ups de la sala de servidores que lo vea el tano antes del "
               "jueves porq se corta todo",
+     # "Antes del jueves" no es el jueves (el usuario, 2026-10-13): hoy es el miércoles 14 y es
+     # hábil, así que el día hábil anterior al jueves 15 es hoy.
      "propone": {"titulo": True, "criterio": True, "responsable_id": "m-marcos",
-                 "fecha": "2026-10-15"}},
+                 "fecha": "2026-10-14"}},
     {"nombre": "mañana, con el nombre en el medio",
      "texto": "revisar las alarmas del scada q no suenan en la sala de control marcos lo tiene "
               "q hacer para mañana",
@@ -150,8 +153,9 @@ PEDIDOS: list[dict[str, Any]] = [
 
 VACIO = {c: "" for c in ayuda_al_cargar.CAMPOS}
 
-# Lo que propone la IA en seco: lo que propondría una IA que entendió el ejemplo del usuario, y
-# un sábado (que los controles no dejan poner). Los demás pedidos, sin guion: no propone nada.
+# Lo que propone la IA en seco: lo que propondría una IA que entendió el ejemplo del usuario, un
+# sábado (que los controles no dejan poner) y "antes del jueves" (el miércoles). Los demás
+# pedidos, sin guion: no propone nada.
 GUION: dict[str, dict[str, str]] = {
     "el ejemplo del usuario": {
         "titulo": "Colgar el estante del módem en la sala",
@@ -165,6 +169,11 @@ GUION: dict[str, dict[str, str]] = {
     "un sábado no es hábil": {
         "titulo": "Pintar el cartel de la entrada", "responsable": "lucas",
         "fecha": "2026-10-17", "como_dijo_la_fecha": "el sabado"},
+    "un apodo y un día de la semana": {
+        "titulo": "Cambiar el UPS de la sala de servidores",
+        "criterio": "El UPS de la sala de servidores está cambiado y no se corta todo.",
+        "como_se_comprueba": "no se corta todo", "responsable": "el tano",
+        "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves"},
 }
 
 
@@ -255,14 +264,21 @@ def _sin_cupo(falla: BaseException) -> bool:
 def _fallas_de_la_ia() -> tuple[type[BaseException], ...]:
     """Lo que dice que la IA no respondió, como lo trata la web (`ayuda_al_cargar.pedir`): sin
     configurar o sin sesión, una respuesta ilegible o cortada, el plazo, la red, el HTTP y un
-    error del servicio de ChatGPT. Cualquier otra excepción es un error del programa."""
+    error del servicio de ChatGPT. Cualquier otra excepción es un error del programa: también
+    `KeyError` e `IndexError`, que son `LookupError`, y un `OSError` que no es de la red, como un
+    archivo que falta (revisión `review-f7886a8a6481af78`; `_es_de_la_ia`)."""
     fallas: tuple[type[BaseException], ...] = (RespuestaInvalida, LookupError, TimeoutError,
-                                               OSError, httpx.HTTPError)
+                                               ConnectionError, httpx.HTTPError)
     try:
         from leda.motor.chatgpt import ErrorDeChatGPT
     except ImportError:
         return fallas
     return (*fallas, ErrorDeChatGPT)
+
+
+def _es_de_la_ia(falla: BaseException) -> bool:
+    return (isinstance(falla, _fallas_de_la_ia())
+            and not isinstance(falla, (KeyError, IndexError)))
 
 
 class SinCupo(Exception):
@@ -278,7 +294,7 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     except Exception as falla:
         if _sin_cupo(falla):
             raise SinCupo() from falla
-        if isinstance(falla, _fallas_de_la_ia()):
+        if _es_de_la_ia(falla):
             return False, {"falla": "ia",
                            "fallas": [f"la IA no respondió ({type(falla).__name__})"]}
         raise
