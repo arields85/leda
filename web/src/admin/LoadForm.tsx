@@ -75,6 +75,12 @@ function focusField(field: Field) {
   bringTo(element.closest<HTMLElement>('[data-field]') ?? element, target);
 }
 
+/** Whether the server looked the key up before refusing: not with a malformed value, nor with a
+ * criterion it refused for not saying how it is checked (J2-9), which it decides before loading. */
+function lookedUpTheKey(problem: Problem): boolean {
+  return !problem.motivo.startsWith('mal_formad') && problem.motivo !== 'sin_comprobacion';
+}
+
 /** The local problems first, then the ones already shown that the local check does not repeat
  * (what the server said). */
 function merge(found: Problem[], shown: Problem[]): Problem[] {
@@ -362,9 +368,10 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         setStep({ kind: 'done', warnings: result.warnings, repeated: result.repeated, sent });
       } else {
         // A rejection writes nothing, and the server looked the key up first: nothing was loaded
-        // with it, unless the key was used with other data (the conflict below) or some data came
-        // malformed (then the server never looks the key up).
-        if (!result.errors.some((e) => e.campo === 'clave' || e.motivo.startsWith('mal_formad'))) {
+        // with it, unless the key was used with other data (the conflict below), some data came
+        // malformed or the criterion does not say how it is checked (then the server never looks
+        // the key up).
+        if (!result.errors.some((e) => e.campo === 'clave' || !lookedUpTheKey(e))) {
           unknown.current = false;
         }
         setProblems(result.errors);

@@ -539,6 +539,71 @@ describe('AdminApp', () => {
     ]);
   });
 
+  // J2-9: a criterion that does not say how it is checked is refused by the server.
+  const NO_CHECK = {
+    status: 422,
+    body: {
+      errores: [{ campo: 'criterio', motivo: 'sin_comprobacion', texto: 'Contame cómo se sabe que está terminada.' }],
+    },
+  };
+
+  it('a criterion that does not say how it is checked lands on its field, in the missing color', async () => {
+    const calls = await openForm({ [TASKS]: NO_CHECK });
+    const scroll = vi.spyOn(window, 'scrollTo');
+    fillTask();
+    confirm();
+    await waitFor(() => expect(screen.getByLabelText('criterio de aceptación')).toHaveFocus());
+    expect(scroll).toHaveBeenCalled();
+    const message = document.getElementById('f-criterio-error');
+    expect(message).toHaveTextContent('Contame cómo se sabe que está terminada.');
+    expect(message).toHaveClass('text-falta');
+    expect(screen.getByLabelText('criterio de aceptación')).toHaveAttribute('aria-invalid', 'true');
+    expect(within(preview()).getByRole('alert')).toHaveTextContent('Hay que corregir: criterio de aceptación.');
+    expect(calls.filter((c) => c.key === TASKS)).toHaveLength(1);
+    // Rewriting it clears the mark.
+    fireEvent.change(screen.getByLabelText('criterio de aceptación'), {
+      target: { value: 'Las 12 alarmas suenan en la sala de control; se prueba disparando cada una' },
+    });
+    expect(document.getElementById('f-criterio-error')).toBeNull();
+  });
+
+  it('after a send with no answer, a refused criterion keeps the key: the server did not look it up', async () => {
+    keys('88888888-8888-4888-8888-888888888888', '99999999-9999-4999-8999-999999999999');
+    const calls = await openForm({ [TASKS]: ['network', NO_CHECK, loaded()] });
+    fillTask();
+    confirm();
+    await screen.findByRole('alert');
+    confirm();
+    expect(await screen.findByText('Contame cómo se sabe que está terminada.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('criterio de aceptación'), {
+      target: { value: 'Las 12 alarmas suenan en la sala de control; se prueba disparando cada una' },
+    });
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
+    expect(sent).toEqual([
+      '88888888-8888-4888-8888-888888888888',
+      '88888888-8888-4888-8888-888888888888',
+      '88888888-8888-4888-8888-888888888888',
+    ]);
+  });
+
+  it('a criterion Leda could not review loads with a warning that does not block', async () => {
+    await openForm({
+      [TASKS]: loaded([
+        {
+          campo: 'criterio',
+          motivo: 'sin_revisar',
+          texto: 'No pude revisar el criterio ahora: la tarea quedó cargada con el criterio como lo escribiste.',
+        },
+      ]),
+    });
+    fillTask();
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    expect(screen.getByText(/No pude revisar el criterio ahora/)).toBeInTheDocument();
+  });
+
   it('each rejection lands on its field, and the rest in the summary', async () => {
     await openForm({
       [TASKS]: {
