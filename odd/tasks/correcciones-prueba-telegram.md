@@ -47,9 +47,11 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
 - [x] **T4 · El comentario de una aprobación que contesta "¿cuál de las dos?"** sale del mensaje original
       (llegó «pasale lo de los colores»).
 - [x] **T5 · Una tarea terminada no "vence".**
-- [ ] **T4b · La advertencia de la revisión de la T4** (`aprobacion.py:246-254`): una pregunta de
+- [x] **T4b · La advertencia de la revisión de la T4** (`aprobacion.py:246-254`): una pregunta de
       "¿cuál de las dos?" vieja que siga abierta no puede pisar el comentario de una aprobación escrita
       después, que no la contesta. Test primero.
+- [ ] **T4c · `fichas.dos_lecturas` sólo con la pregunta abierta** (límite de la T4b): una "¿cuál de
+      las dos?" que quedó para después no se cierra ofreciendo sus botones viejos. Test primero.
 - [ ] **T6 · La hora de los turnos en el registro** (los pasos 22 a 25 figuran a las 10:02): investigar y,
       si quedó mal guardada, corregirla. **Evidencia (coordinador, 2026-10-12, `leda_motor`):** quedó mal
       guardada. `conversation_turn.at` sale de `reloj.ahora()` (`turno.py:232`). Turnos de Marcos
@@ -59,6 +61,18 @@ revisa, corre la revisión RDD de cada commit y lleva este documento.
       de las 11:58 del martes (la pregunta a Ariel se programó a las 12:15:15, 30 minutos después del
       último mensaje de Ariel, a las 11:45:15). El adelanto implícito del n.º 26 (17:39:42) es menor que
       el del n.º 18 (18:36:54): el reloj pareció ir para atrás en esos turnos.
+      **Diagnóstico (explorador de sólo lectura, 2026-10-12, noche): no hubo hora mal guardada.**
+      Cada turno se fechó bien con el reloj de Leda (`turno.py:235`, después de la llamada a la IA:
+      restando `latencia_ms`, el adelanto es plano en cada tramo y coincide con los comandos del
+      reloj). El reloj fue para atrás de verdad, unas 2 horas, a las 16:20:29 reales: un
+      `adelantar` de más (al miércoles), después `volver` (adelanto 0) y otro `adelantar`, que desde
+      el lunes real cayó en el martes 10:00 (adelanto 17:39:31, el de los turnos 26, 28, 30 y 34).
+      El "hoy a las 12:15" a Ariel salió de eso: la regla de no interrumpir sumó 30 minutos al
+      último turno de Ariel (11:45:15), que había quedado en el futuro de Leda
+      (`no_interrumpir.py:57-75`). No hay dos relojes desfasados: escuchador, fondo, webhook y web
+      refrescan el mismo adelanto. **Arreglo, en la herramienta del reloj y no en Leda:** un piso,
+      el último momento ya registrado con la hora de Leda; `adelantar` y `hora` no lo cruzan hacia
+      atrás (`HoraAtrasada`) y `volver` se niega si dejaría a Leda antes, salvo `--forzar`.
 - [ ] **T7 · "Dejalo pendiente, después lo hago"** en medio de una entrega, y "Anoté" dicho de un
       borrador: conversación de prueba; si pide cambiar el diseño, propuesta al usuario.
 - [ ] **T8 · La entrega nueva que se contradice** ("dejé la foto para cuando vuelvas a entregarla" y
@@ -126,3 +140,18 @@ nombres de otros en los mensajes.
   48. Repaso del coordinador: `test_terminada_no_vence.py` y `test_aprobacion.py`, 62 passed. **RDD:**
   `review-488b6f52cd3b174d`, aprobada; advertencia: una pregunta vieja abierta puede pisar el comentario
   (T4b, arriba); sugerencia: la forma del estado (`hechos.py:1510-1514`).
+- **T4b, hecha** (escritor delegado; `01b3aef`). `_la_pregunta_de_cual` ya no toma cualquier "¿cuál de
+  las dos?" abierta sobre la tarea: sólo la pregunta abierta (`preguntas.actual`, un tema a la vez) que
+  la persona vio en un mensaje anterior, la misma guarda de lo último que vio que usan las
+  confirmaciones escritas (`entrega`, `pase`, `apodos`). Una que quedó para después, tapada por otro
+  tema, no pisa lo escrito ahora; `_antes_pregunta_cual` sigue la misma regla. RED:
+  `test_una_pregunta_de_cual_de_las_dos_que_quedo_para_despues_no_pisa_lo_escrito_despues` (aprobar y
+  pedir cambios), 2 en rojo. `test_aprobacion.py` 55 passed; `pytest tests/motor` 1379 passed;
+  `tests/conversaciones` 215 passed; en seco 48 de 48. **RDD:** `review-c2a45f4469c94e9a`, aprobada;
+  advertencia: la guarda compara el id como texto con `preguntas_del_turno` (`aprobacion.py:236`),
+  igual que las guardas hermanas (la lista está declarada `list[str]`). Límites sin regla: una pregunta
+  olvidada que sigue siendo LA abierta (nada pasó en el medio) todavía se toma como contestada; y
+  `fichas.dos_lecturas` busca cualquier "¿cuál de las dos?" abierta de la tarea, así que una que quedó
+  para después puede cerrarse ofreciendo sus botones viejos (más seguro que antes, pero con el
+  comentario viejo en los botones). Va como T4c.
+- **T6, diagnosticada** (ver la tarea): sin hora mal guardada; el arreglo va en la herramienta del reloj.
