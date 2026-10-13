@@ -495,7 +495,20 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
 - [ ] **J2-12 · Repetir la prueba en el celular después de J2-8 y J2-9** (el usuario lo pidió el 2026-10-13: el
       primer paso fue antes de esos arreglos): "antes del jueves" propone el miércoles; un criterio "No sé" escrito a
       mano no se carga y pide "Contame cómo se sabe que está terminada"; cuánto tarda la ayuda y si se nota que Leda
-      está trabajando. RDD de J2-11: `review-23dc736a9afe1fb0` (`080049cd`; WARNING: el agrandado con dos dedos en el navegador de las apps, confirmado; WARNING: una prueba de tamaños que no discrimina, `AdminApp.test.tsx:419-421`; sugerencia en `viewport.test.ts`).
+      está trabajando.
+      **Hecha** (2026-10-13, 17:44-17:50, iPhone, túnel `observations-guide-tsunami-guitar`): la fecha (mié 21.10),
+      Lucas, el aviso "No encontré a «el tano»" en su campo, la caja que nombra lo que no pudo completar y los puntos
+      animados ("quedó muy bien"), bien. **Hallazgos del usuario:** (1) el criterio escrito a mano se rechaza sin
+      decir qué falta ni proponer cómo arreglarlo ("El ups queda cambiado y funcionando", "Quedo ordenado y
+      limpio": "no le veo nada de malo… quedé totalmente encerrado", varias veces), aunque la evidencia que pide el
+      área, justo abajo, ya dice cómo se comprueba; (2) los puntos animados también en "cargando…" al confirmar;
+      (3) las listas desplegables abren con la letra y el tamaño del sistema (el menú nativo de iOS), no los de la
+      web; (4) no propuso objetivo para el UPS (la regla: "si se entiende de lo que contó").
+      **Disparador** (`AGENTS.md`, punto 4): el criterio es la tercera vez (J2-9, J2-13 y ahora) y el usuario dice
+      que se siente mal con las pruebas en verde: no se propone otro arreglo, se cuestiona el diseño con el
+      usuario. Además contradice la constitución §8 (Leda propone lo que falta en lugar de sólo pedirlo; ningún
+      mensaje deja a la persona sin un próximo paso).
+      RDD de J2-11: `review-23dc736a9afe1fb0` (`080049cd`; WARNING: el agrandado con dos dedos en el navegador de las apps, confirmado; WARNING: una prueba de tamaños que no discrimina, `AdminApp.test.tsx:419-421`; sugerencia en `viewport.test.ts`).
 - [x] **J2-13 · El criterio, desde la evidencia y juzgado por su sentido** (2026-10-13; ruta delegada, un
       escritor: servidor, herramienta, web y pruebas).
       **La prueba del usuario en el celular** (2026-10-13, después de J2-9 y J2-10), con "hay que cambiar el ups
@@ -574,6 +587,33 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       **RDD de J2-13:** `review-bfa79042ca12447b` (`a4428fd9`, WARNING: la herramienta de medición descarta una falla del juicio, `tools/medir_ayuda_al_cargar.py:437-440`) y `review-97374544422a6d97` (`73a32f9e`, WARNING: el resumen de la caja puede no coincidir con los avisos de cada campo, `HelpBox.tsx:156-157`); las dos aprobadas, sus avisos para arreglar con el cierre de la J2.
       **Ronda con la IA real** (2026-10-13, autorizada; sobre `c258ee37`): `tools/medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3 --salida tests/conversaciones/resultados/ayuda-al-cargar-3.json`, 20 casos, **59 de 60 bien** (sale con 1). La falla, "sin apuro" (vuelta 1): la IA dejó el criterio vacío en vez de proponer uno que el juicio descartara; para la persona, lo mismo. La ayuda, mediana 3,5 s (máx. 7,2 s). Detalle en la bitácora de flujos.
       **Los dos avisos de RDD, arreglados** (2026-10-13; ruta delegada, un escritor: herramienta y web): un juicio que no respondió queda en el resultado (`falla_del_juicio`, `falla: ia`, el caso sale mal como en `medir_el_juicio`), `67ca78df`; el resumen de la caja sale de los mismos avisos vivos que cada campo, `bfa3943e`. RED observado en las dos pruebas nuevas. `npm test`: 98 passed; `npm run typecheck`: sin errores; `pytest -q tests/test_ayuda_al_cargar.py tests/garantias/test_ayuda_al_cargar.py`: 187 passed. RDD: `review-5f52a868a430fd86`, aprobada (una sugerencia, `tools/medir_ayuda_al_cargar.py:442`). **Falta sólo la J2-12** (la prueba del usuario en el celular).
+- [ ] **J2-14 · El criterio escrito a mano se toma como el que propone Leda, y un rechazo trae su propuesta**
+      (decisión del usuario, 2026-10-13, "si", tras la J2-12). **Chequeo de rumbo:** es la tercera vez que se toca el
+      criterio; la clase de problema no es de palabras sino de diseño: al proponer, el criterio es el resultado más
+      la evidencia del área; al escribirlo a mano, se le exigía al texto solo decir cómo se comprueba, sin mirar la
+      evidencia que el área ya pide, y el rechazo no proponía nada (constitución §8). Lo decidido:
+      1. La persona escribe el resultado; cómo se comprueba sale de la evidencia que pide el área (la misma de la
+         propuesta). Un criterio con un resultado se carga aunque no diga cómo se comprueba.
+      2. Sólo se rechaza lo que no dice ningún resultado ("No sé", vacío o igual al título). Si el área no pide
+         ninguna evidencia, el criterio sigue teniendo que decir cómo se comprueba.
+      3. Todo rechazo trae al lado un criterio propuesto por Leda (resultado más la evidencia del área), que la
+         persona usa con un toque o corrige; y el aviso dice en palabras simples qué falta.
+      Lo que se acepta perder: un resultado general ("queda funcionando") pasa, sostenido por la evidencia.
+      Ruta: delegada, un escritor (servidor, web, herramienta y pruebas). Después, una ronda con la IA real (con
+      permiso) y la prueba en el celular.
+      **Hecha** (escritor delegado): `01bd93bb`. El juicio con evidencia del área pregunta si el criterio dice un
+      resultado (`sin_resultado`) y, en la misma llamada, escribe el resultado para la propuesta
+      (`criterio_con_la_evidencia`, la misma de la ayuda); sin evidencia, el juicio de la J2-13 (`sin_comprobacion`)
+      sin propuesta; se guarda el texto de la persona; el rechazo trae "Leda propone:" y "> usar este criterio";
+      sin propuesta, un incidente (`propuesta_del_criterio`). RED observado (15 + 10 + 2 + 3 pruebas). `pytest` de
+      las cuatro pruebas del criterio y la ayuda: 272 passed; `npm test`: 101 passed; typecheck y build bien; en
+      seco 15 de 23. RDD `review-88b227055a98f635`, aprobada; WARNING para el cierre: si las opciones de la carga
+      no se pueden leer, el criterio se juzga con la regla vieja sin dejar incidente (`web_app.py:974-985`).
+      **Ronda con la IA real** (autorizada): 65 de 69, los criterios escritos todos bien (bitácora). Falta la prueba
+      en el celular.
+- [ ] **J2-15 · Los puntos animados también en "cargando…"** al confirmar (usuario, J2-12). Ruta: delegada, con la J2-16.
+- [ ] **J2-16 · Las listas desplegables propias**, con la letra y el tamaño de la web, como el calendario: el
+      menú nativo de iOS no se puede estilar (usuario, J2-12).
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
