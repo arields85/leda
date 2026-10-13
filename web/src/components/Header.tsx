@@ -15,13 +15,13 @@ export function Header({ space, title, person, active, today, isoWeek }: HeaderP
   return (
     <header className="flex flex-col gap-2.5 pt-[18px]">
       <div className="flex items-center justify-between gap-3 text-meta text-ink-dim">
-        <span className="truncate">{space ? `LEDA · ${space.toUpperCase()}` : 'LEDA'}</span>
+        <span className="min-w-0 truncate">{space ? `LEDA · ${space.toUpperCase()}` : 'LEDA'}</span>
         {today && isoWeek !== undefined && (
           <span className="shrink-0">{weekLine(isoWeek, today)}</span>
         )}
       </div>
-      <div className="flex items-end justify-between gap-3">
-        <h1 className="m-0 text-title font-extrabold tracking-[-0.02em]">{title}</h1>
+      <div className="flex min-w-0 items-end justify-between gap-3">
+        <h1 className="m-0 min-w-0 wrap-break-word text-title font-extrabold tracking-[-0.02em]">{title}</h1>
         {person && (
           <span className="pb-0.5 text-right text-small text-ink-soft">
             {person}

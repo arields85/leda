@@ -52,6 +52,18 @@ describe('App', () => {
     );
   });
 
+  it('a long space name shrinks inside the header instead of pushing the page sideways', async () => {
+    serve({
+      'GET /app/api/yo': ok(me()),
+      'GET /app/api/tareas?vista=tus': ok(view()),
+    });
+    render(<App />);
+    const space = await screen.findByText('LEDA · COREWORK');
+    // A truncated flex item only shrinks with min-w-0; jsdom has no layout, the phone confirms it.
+    expect(space).toHaveClass('min-w-0', 'truncate');
+    expect(screen.getByRole('main')).toHaveClass('min-w-0');
+  });
+
   it('without the bot address there is no button to consult Leda', async () => {
     serve({
       'GET /app/api/yo': ok(me()),

@@ -68,8 +68,8 @@ function fillTask() {
   pick('quién la decidió', 'm-ismael');
 }
 
-const review = () => fireEvent.click(screen.getByRole('button', { name: '> revisar' }));
 const confirm = () => fireEvent.click(screen.getByRole('button', { name: /confirmar|probar de nuevo/ }));
+const preview = () => screen.getByRole('complementary', { name: 'Vista previa' });
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/app/admin/');
@@ -142,23 +142,103 @@ describe('AdminApp', () => {
     expect(screen.getByText('205/200 · sobran 5')).toBeInTheDocument();
   });
 
-  it('reviews the task before loading it, and "volver" edits it', async () => {
+  it('one screen: the live preview under "Vista previa", and confirm right below it', async () => {
     const calls = await openForm();
+    expect(screen.queryByRole('button', { name: '> revisar' })).toBeNull();
     fillTask();
-    review();
-    const section = await screen.findByRole('region', { name: 'Revisá la tarea antes de cargarla.' });
-    const card = section.querySelector('article[data-task]') as HTMLElement;
+    const aside = preview();
+    expect(within(aside).getByRole('heading', { name: 'Vista previa' })).toBeInTheDocument();
+    const card = aside.querySelector('article[data-task]') as HTMLElement;
     expect(card).toHaveTextContent('Configurar alarmas del SCADA');
     expect(card).toHaveTextContent('16.10');
     expect(card).toHaveTextContent('└─ de Marcos');
-    expect(section).toHaveTextContent('Puesta en marcha de la línea 3');
-    expect(section).toHaveTextContent('una captura de pantalla');
-    expect(section).toHaveTextContent('la revisaIsmael');
-    expect(section).toHaveTextContent('la decidióIsmael');
-    expect(section).toHaveTextContent('la cargaAriel');
+    expect(aside).toHaveTextContent('Puesta en marcha de la línea 3');
+    expect(aside).toHaveTextContent('una captura de pantalla');
+    expect(aside).toHaveTextContent('la revisaIsmael');
+    expect(aside).toHaveTextContent('la decidióIsmael');
+    expect(aside).toHaveTextContent('la cargaAriel');
+    const button = within(aside).getByRole('button', { name: '> confirmar' });
+    // The confirm button comes after what it confirms.
+    expect(card.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Writing never sends (Enter in a field submits the form): only confirm does.
+    fireEvent.submit(screen.getByRole('form', { name: 'Cargar tarea' }));
     expect(calls.some((c) => c.key === TASKS)).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: 'volver' }));
-    expect(screen.getByLabelText('título')).toHaveValue('Configurar alarmas del SCADA');
+  });
+
+  it('confirm with missing fields says what is missing next to it, focuses the first and sends nothing', async () => {
+    const calls = await openForm();
+    pick('objetivo', 'o1');
+    fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar alarmas del SCADA' } });
+    pick('quién la hace', 'm-marcos');
+    fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
+    confirm();
+    const summary = within(preview()).getByRole('alert');
+    expect(summary).toHaveTextContent('Falta completar: criterio de aceptación, evidencia, quién la decidió.');
+    expect(screen.getByLabelText('criterio de aceptación')).toHaveFocus();
+    expect(screen.getByLabelText('criterio de aceptación')).toHaveAttribute('aria-invalid', 'true');
+    expect(document.getElementById('f-criterio-error')).toHaveTextContent('Falta el criterio de aceptación');
+    expect(screen.getByLabelText('quién la decidió')).toHaveAttribute('aria-describedby', 'f-decidio-error');
+    expect(calls.some((c) => c.key === TASKS)).toBe(false);
+    // Each name takes you to its field.
+    fireEvent.click(within(summary).getByRole('button', { name: 'quién la decidió' }));
+    expect(screen.getByLabelText('quién la decidió')).toHaveFocus();
+    fireEvent.click(within(summary).getByRole('button', { name: 'evidencia' }));
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toHaveFocus();
+    // Fixing a field takes it off the summary; with nothing missing, the summary goes away.
+    pick('quién la decidió', 'm-ismael');
+    expect(summary).toHaveTextContent('Falta completar: criterio de aceptación, evidencia.');
+    fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
+    fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Suenan las 12' } });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('an empty form lists every required field, the first one focused', async () => {
+    await openForm();
+    confirm();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Falta completar: objetivo, título, quién la hace, fecha, criterio de aceptación, quién la decidió.',
+    );
+    expect(screen.getByLabelText('objetivo')).toHaveFocus();
+  });
+
+  it('a 422 from the server shows the same summary, with its own texts on the fields', async () => {
+    const calls = await openForm({
+      [TASKS]: {
+        status: 422,
+        body: {
+          errores: [
+            { campo: 'criterio', motivo: 'falta', texto: 'Falta el criterio de aceptación: qué tiene que pasar para darla por terminada.' },
+            { campo: 'evidencia', motivo: 'falta', texto: 'Elegí la evidencia que se pide para darla por terminada.' },
+            { campo: 'decidio', motivo: 'falta', texto: 'Elegí quién decidió la tarea.' },
+          ],
+        },
+      },
+    });
+    fillTask();
+    confirm();
+    const summary = await within(preview()).findByRole('alert');
+    expect(summary).toHaveTextContent('Falta completar: criterio de aceptación, evidencia, quién la decidió.');
+    await waitFor(() => expect(screen.getByLabelText('criterio de aceptación')).toHaveFocus());
+    expect(document.getElementById('f-decidio-error')).toHaveTextContent('Elegí quién decidió la tarea.');
+    expect(document.getElementById('f-evidencia-error')).toHaveTextContent('Elegí la evidencia que se pide');
+    expect(calls.filter((c) => c.key === TASKS)).toHaveLength(1);
+  });
+
+  it('every control and the calendar are built to fit the width of a phone', async () => {
+    await openForm();
+    const form = screen.getByRole('form', { name: 'Cargar tarea' });
+    const controls = form.querySelectorAll('select, input:not([type="checkbox"]), textarea');
+    expect(controls.length).toBeGreaterThan(0);
+    for (const control of controls) {
+      expect(control).toHaveClass('w-full', 'min-w-0', 'max-w-full');
+      // 16px on a touch screen, so the phone does not zoom in when the field is touched.
+      expect(control).toHaveClass('pointer-coarse:text-[16px]');
+    }
+    expect(screen.getByRole('group', { name: 'fecha' })).toHaveClass('w-full', 'min-w-0', 'max-w-full');
+    expect(form).toHaveClass('min-w-0');
+    expect(preview()).toHaveClass('min-w-0');
+    // jsdom has no layout: the real width is only confirmed on the phone.
   });
 
   it('confirm sends the data with one key and shows the warnings', async () => {
@@ -169,7 +249,6 @@ describe('AdminApp', () => {
       ]),
     });
     fillTask();
-    review();
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     expect(screen.getByText(/no va a recibir avisos ni seguimiento hasta que la conecte/)).toBeInTheDocument();
@@ -218,12 +297,9 @@ describe('AdminApp', () => {
     pick('espera a (opcional)', 't-estante');
     const form = screen.getByRole('form', { name: 'Cargar tarea' });
     expect(within(form).getByText('No puede empezar hasta que esa esté terminada.')).toBeInTheDocument();
-    expect(screen.getByRole('complementary', { name: 'Así se va a ver' })).toHaveTextContent(
+    expect(preview()).toHaveTextContent(
       'espera aColocar el estante · Lucas',
     );
-    review();
-    const section = await screen.findByRole('region', { name: 'Revisá la tarea antes de cargarla.' });
-    expect(section).toHaveTextContent('espera aColocar el estante · Lucas');
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS);
@@ -235,8 +311,7 @@ describe('AdminApp', () => {
     const calls = await openForm({ [TASKS]: loaded() });
     expect(screen.getByText('No hay tareas abiertas para esperar en este espacio.')).toBeInTheDocument();
     fillTask();
-    review();
-    expect(screen.getByRole('region', { name: 'Revisá la tarea antes de cargarla.' })).not.toHaveTextContent('espera a');
+    expect(preview()).not.toHaveTextContent('espera a');
     confirm();
     await screen.findByText('Tarea cargada.');
     const sent = calls.filter((c) => c.key === TASKS);
@@ -263,7 +338,6 @@ describe('AdminApp', () => {
     });
     fillTask();
     pick('espera a (opcional)', 't-estante');
-    review();
     confirm();
     await screen.findByRole('alert');
     expect(screen.getByLabelText('espera a (opcional)')).toHaveAttribute('aria-invalid', 'true');
@@ -278,16 +352,20 @@ describe('AdminApp', () => {
     fireEvent.click(screen.getByRole('button', { name: 'mes siguiente' }));
     fireEvent.click(screen.getByRole('button', { name: 'lun 02.11' }));
     expect(screen.getAllByText(/Es posterior a la del objetivo \(30\.10\)/).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: '> revisar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '> confirmar' })).toBeEnabled();
   });
 
   it('a retry after a network failure keeps the data and the key', async () => {
     keys('22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333');
     const calls = await openForm({ [TASKS]: ['network', loaded()] });
     fillTask();
-    review();
     confirm();
+    // While it is sending, what is shown is what goes: the form is locked.
+    expect(screen.getByLabelText('título')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'cargando…' })).toBeDisabled();
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar');
+    expect(screen.getByLabelText('título')).toHaveValue('Configurar alarmas del SCADA');
+    expect(screen.getByLabelText('título')).toBeEnabled();
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
@@ -306,19 +384,15 @@ describe('AdminApp', () => {
     };
     const calls = await openForm({ [TASKS]: ['network', conflict, loaded()] });
     fillTask();
-    review();
     confirm();
     await screen.findByRole('alert');
-    fireEvent.click(screen.getByRole('button', { name: 'volver' }));
     fireEvent.change(screen.getByLabelText('título'), { target: { value: 'Configurar las alarmas' } });
-    review();
     confirm();
     // The first send may have loaded it: the server refused the same key with other data.
     expect(await screen.findByText(/Puede que ya se haya cargado: fijate en "El equipo"/)).toBeInTheDocument();
     expect(screen.queryByText(/Recargá la página/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'no está cargada: empezar de nuevo' }));
     expect(screen.queryByText(/Puede que ya se haya cargado/)).toBeNull();
-    review();
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
@@ -337,13 +411,11 @@ describe('AdminApp', () => {
     };
     const calls = await openForm({ [TASKS]: ['network', rejected, loaded()] });
     fillTask();
-    review();
     confirm();
     await screen.findByRole('alert');
     confirm();
     await screen.findByText('No se cargó: hay que corregir lo marcado.');
     fireEvent.change(screen.getByLabelText('criterio de aceptación'), { target: { value: 'Suenan las 12' } });
-    review();
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
@@ -368,11 +440,12 @@ describe('AdminApp', () => {
       },
     });
     fillTask();
-    review();
     confirm();
     const summary = await screen.findByRole('alert');
     expect(summary).toHaveTextContent('No se cargó: hay que corregir lo marcado.');
+    expect(summary).toHaveTextContent('Hay que corregir: quién la hace, fecha.');
     expect(summary).toHaveTextContent('Este dato no es válido.');
+    await waitFor(() => expect(screen.getByLabelText('quién la hace')).toHaveFocus());
     expect(screen.getByLabelText('quién la hace')).toHaveAttribute('aria-invalid', 'true');
     expect(document.getElementById('f-responsable-error')).toHaveTextContent('Nadie activo revisa');
     expect(document.getElementById('f-fecha-error')).toHaveTextContent('Ese día no es hábil');
@@ -384,7 +457,6 @@ describe('AdminApp', () => {
   it('a closed session while confirming asks to come in with a new link', async () => {
     await openForm({ [TASKS]: { status: 401, body: { error: 'sin_sesion' } } });
     fillTask();
-    review();
     confirm();
     expect(await screen.findByText('La sesión está cerrada.')).toBeInTheDocument();
     expect(screen.getByText(/entrá con un enlace nuevo/)).toBeInTheDocument();

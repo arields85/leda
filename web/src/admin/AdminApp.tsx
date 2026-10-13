@@ -115,10 +115,10 @@ export function AdminApp() {
     body = (
       <>
         {(admin.espacios.length > 1 || spaceId === null) && (
-          <label className="flex max-w-[24rem] flex-col gap-1.5 text-meta text-ink-dim">
+          <label className="flex w-full min-w-0 max-w-[24rem] flex-col gap-1.5 text-meta text-ink-dim">
             <span className="uppercase tracking-[0.04em]">espacio</span>
             <select
-              className="w-full rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none focus:border-ink"
+              className="block w-full min-w-0 max-w-full rounded-card border-hard border-line bg-card px-3 py-2 text-body text-ink outline-none pointer-coarse:text-[16px] focus:border-ink"
               value={spaceId ?? ''}
               onChange={(e) => setSpaceId(e.target.value || null)}
             >
@@ -159,13 +159,13 @@ export function AdminApp() {
   const spaceName =
     admin?.espacios.length === 1 ? admin.espacios[0].nombre : options.kind === 'ready' ? options.data.espacio.nombre : '';
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[72rem] flex-col px-5">
+    <div className="mx-auto flex min-h-dvh w-full min-w-0 max-w-[72rem] flex-col px-5">
       <Header
         space={open && spaceName ? `administración · ${spaceName}` : 'administración'}
         title={open ? 'Cargar tarea' : 'Leda'}
         person={open ? admin?.administrador : undefined}
       />
-      <main className="flex flex-col gap-4 pt-4">{body}</main>
+      <main className="flex min-w-0 flex-col gap-4 pt-4">{body}</main>
       {open && (
         <footer className="mt-auto flex justify-end pb-[22px] pt-6">
           <SignOut action={adminSignOut} onDone={() => setSignedOut(true)} />

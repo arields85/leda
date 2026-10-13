@@ -1,5 +1,5 @@
 import type { Task } from '../api';
-import type { Member, Options, Policy, TaskInput, WaitableTask } from './api';
+import type { Member, Options, Policy, Problem, TaskInput, WaitableTask } from './api';
 
 /** What the administrator is writing, before the idempotency key is added. `espera_id` is ''
  * while it waits for no task. */
@@ -34,6 +34,86 @@ export const PROBLEM_FIELD: Record<string, Field> = {
   decidio: 'decidio_id',
   espera: 'espera_id',
 };
+
+/** The fields in the order the form shows them: the first one with a problem gets the focus. */
+export const FIELD_ORDER: Field[] = [
+  'objetivo_id',
+  'titulo',
+  'descripcion',
+  'responsable_id',
+  'fecha',
+  'espera_id',
+  'criterio',
+  'evidencia',
+  'decidio_id',
+];
+
+/** How each field is named to the person, the same words as its label. */
+export const FIELD_NAME: Record<Field, string> = {
+  objetivo_id: 'objetivo',
+  titulo: 'título',
+  descripcion: 'descripción',
+  responsable_id: 'quién la hace',
+  fecha: 'fecha',
+  espera_id: 'espera a',
+  criterio: 'criterio de aceptación',
+  evidencia: 'evidencia',
+  decidio_id: 'quién la decidió',
+};
+
+/** The element of each field in the form (a control, the calendar or the evidence group). */
+export const FIELD_ID: Record<Field, string> = {
+  objetivo_id: 'f-objetivo',
+  titulo: 'f-titulo',
+  descripcion: 'f-descripcion',
+  responsable_id: 'f-responsable',
+  fecha: 'f-fecha',
+  espera_id: 'f-espera',
+  criterio: 'f-criterio',
+  evidencia: 'f-evidencia',
+  decidio_id: 'f-decidio',
+};
+
+// The server's own words for what the form can tell before sending (src/leda/web_app.py,
+// TEXTOS_DE_LA_CARGA), so a problem reads the same whoever found it.
+const MISSING_TEXT = {
+  objetivo: 'Elegí el objetivo al que contribuye la tarea.',
+  titulo: 'Falta el título.',
+  responsable: 'Elegí quién la va a hacer.',
+  fecha: 'Elegí la fecha.',
+  criterio: 'Falta el criterio de aceptación: qué tiene que pasar para darla por terminada.',
+  evidencia: 'Elegí la evidencia que se pide para darla por terminada.',
+  decidio: 'Elegí quién decidió la tarea.',
+} as const;
+const TOO_LONG_TEXT = {
+  titulo: 'El título es demasiado largo: hasta 200 caracteres.',
+  descripcion: 'La descripción es demasiado larga: hasta 800 caracteres.',
+  criterio: 'El criterio es demasiado largo: hasta 500 caracteres.',
+} as const;
+
+/** What the form can already tell is missing or too long, before sending: the same `campo` and
+ * `motivo` the server would answer. The server stays the judge of everything else (a day that
+ * is not a working day, nobody to review, an area without an evidence policy). */
+export function checkDraft(draft: Draft, options: Options): Problem[] {
+  const problems: Problem[] = [];
+  const missing = (campo: keyof typeof MISSING_TEXT) =>
+    problems.push({ campo, motivo: 'falta', texto: MISSING_TEXT[campo] });
+  const tooLong = (campo: keyof typeof TOO_LONG_TEXT) =>
+    problems.push({ campo, motivo: 'demasiado_largo', texto: TOO_LONG_TEXT[campo] });
+
+  if (!draft.objetivo_id) missing('objetivo');
+  if (length(draft.titulo) === 0) missing('titulo');
+  else if (length(draft.titulo) > LIMITS.titulo) tooLong('titulo');
+  if (length(draft.descripcion) > LIMITS.descripcion) tooLong('descripcion');
+  if (!draft.responsable_id) missing('responsable');
+  if (!draft.fecha) missing('fecha');
+  if (length(draft.criterio) === 0) missing('criterio');
+  else if (length(draft.criterio) > LIMITS.criterio) tooLong('criterio');
+  const policy = policyOf(options, memberOf(options, draft.responsable_id));
+  if (policy && policy.evidencia_requerida.length > 0 && draft.evidencia.length === 0) missing('evidencia');
+  if (!draft.decidio_id) missing('decidio');
+  return problems;
+}
 
 /** What the form sends: the draft and its key, without `espera_id` when it waits for none, so a
  * load without a wait is the same request as before migration 0067. */

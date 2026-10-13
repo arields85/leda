@@ -39,6 +39,8 @@ function cells(month: string): (string | null)[] {
 }
 
 interface DatePickerProps {
+  /** The id of the calendar, so a problem with the date can take the focus to it. */
+  id?: string;
   /** The working days the server offers, sorted: nothing else can be chosen. */
   days: string[];
   value: string;
@@ -50,7 +52,7 @@ interface DatePickerProps {
 /** A compact month calendar in the Terminal look that only lets you pick the space's working
  * days from today on (decision 9). Keyboard: Tab reaches the month, the arrows move between the
  * days that can be chosen, Enter or Space picks one. */
-export function DatePicker({ days, value, onChange, labelledBy, describedBy }: DatePickerProps) {
+export function DatePicker({ id, days, value, onChange, labelledBy, describedBy }: DatePickerProps) {
   const allowed = useMemo(() => new Set(days), [days]);
   const first = days[0] ?? null;
   const last = days[days.length - 1] ?? null;
@@ -100,10 +102,11 @@ export function DatePicker({ days, value, onChange, labelledBy, describedBy }: D
     'grid h-7 w-7 place-items-center rounded-card border-hard border-line-soft bg-transparent text-ink-soft disabled:opacity-30';
   return (
     <div
+      id={id}
       role="group"
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
-      className="flex w-full max-w-[19rem] flex-col gap-2 rounded-card border-hard border-line bg-card p-2.5 shadow-hard"
+      className="flex w-full min-w-0 max-w-full flex-col gap-2 sm:max-w-[19rem] rounded-card border-hard border-line bg-card p-2.5 shadow-hard"
     >
       <div className="flex items-center justify-between gap-2 text-small">
         <button
@@ -134,7 +137,7 @@ export function DatePicker({ days, value, onChange, labelledBy, describedBy }: D
           <ChevronRight aria-hidden="true" size={14} strokeWidth={2} />
         </button>
       </div>
-      <div ref={grid} className="grid grid-cols-7 gap-1 text-center text-small">
+      <div ref={grid} className="grid min-w-0 grid-cols-7 gap-1 text-center text-small">
         {WEEK.map((d, i) => (
           <span key={i} aria-hidden="true" className="text-mini text-ink-dim">
             {d}
@@ -162,7 +165,7 @@ export function DatePicker({ days, value, onChange, labelledBy, describedBy }: D
               aria-label={dayLabel(day)}
               onClick={() => onChange(day)}
               onKeyDown={(event) => onKey(event, day)}
-              className={`rounded-card border-hard py-1 ${selected ? 'border-ink bg-ink font-bold text-page' : 'border-line-soft bg-transparent text-ink hover:border-line-strong'}`}
+              className={`min-w-0 rounded-card border-hard py-1 ${selected ? 'border-ink bg-ink font-bold text-page' : 'border-line-soft bg-transparent text-ink hover:border-line-strong'}`}
             >
               {number}
             </button>

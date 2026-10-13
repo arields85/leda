@@ -159,7 +159,7 @@ export function App() {
 
   const open = !signedOut && person !== null && me.kind === 'ready' && tasks.kind !== 'closed';
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[32rem] flex-col px-5">
+    <div className="mx-auto flex min-h-dvh w-full min-w-0 max-w-[32rem] flex-col px-5">
       <Header
         space={person?.espacio ?? ''}
         title={signedOut || !open ? 'Leda' : title}
@@ -168,7 +168,7 @@ export function App() {
         today={open ? ready?.hoy : undefined}
         isoWeek={open ? ready?.semana_iso : undefined}
       />
-      <main className="flex flex-col gap-3.5 pt-3.5">{body}</main>
+      <main className="flex min-w-0 flex-col gap-3.5 pt-3.5">{body}</main>
       {open && (
         <footer className="mt-auto flex flex-col gap-3 pb-[22px] pt-5">
           <TalkButton href={person?.chat_con_leda ?? null} />
