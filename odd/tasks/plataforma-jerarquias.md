@@ -35,7 +35,7 @@ estante → los tornillos) y que el equipo se organice solo.
 3. **La carga por la web del equipo para Dirección y los referentes** (0023, decisión 3, puntos 2, 7 y 8), con
    el préstamo de personas.
 4. **El pedido de más tiempo y el cambio de fecha** (0022, porción 3, decisión 8).
-5. **La propuesta del integrante con la ayuda de la IA** (0023, decisión 3, puntos 3 a 6 y 9).
+5. **La ayuda de la IA al cargar (para todos) y la propuesta del integrante** (0023, decisión 3, puntos 3 a 6 y 9).
 6. **Las jerarquías y los integrantes desde la web de Dirección** (0023, decisiones 4 y 5, puntos 1 y 10; con
    la porción 4 del 0022).
 
@@ -135,7 +135,10 @@ Se detallan al llegar a cada una, con su diseño corto.
 - [ ] **J2 · Los objetivos desde la web.**
 - [ ] **J3 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J4 · El pedido de más tiempo y el cambio de fecha.**
-- [ ] **J5 · La propuesta del integrante con la IA.** Se aprovecha lo que ya existe (usuario, 2026-10-13: "no hay que inventar
+- [ ] **J5 · La ayuda de la IA al cargar (para todos) y la propuesta del integrante.** La ayuda (describir
+      como se habla y que Leda complete título, criterio, fecha y evidencia) es para todos los que cargan:
+      Dirección, referentes, integrantes y la puerta de administración (ADR 0023, punto 4); la propuesta,
+      sólo del integrante (usuario, 2026-10-13). Se aprovecha lo que ya existe (usuario, 2026-10-13: "no hay que inventar
       nada"): el cliente de la IA del motor (`motor/ia_real.py`, `desde_base`), los chequeos de la entrega
       (`entrega.puntos_del_criterio`, `problema_del_ejemplo`: nada de números ni nombres que nadie dijo) y
       la propuesta de título y criterio del alta del flujo congelado (`alta_turno.py` en la etiqueta
