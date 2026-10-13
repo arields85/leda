@@ -75,7 +75,10 @@ Mientras no se decida, lo más restrictivo; abrirlo después no rehace nada.
    los iniciales. Propuesta de lo mínimo: nombre, de qué objetivo cuelga y su referente. Es una porción
    nueva de la plataforma, `PENDIENTE` de diseño corto y construcción; hasta entonces, el formulario
    deja elegir sólo entre los objetivos que ya existen.
-2. **Las esperas.** Si "esta tarea espera a aquella" se carga en el mismo formulario. Mientras tanto, no.
+2. **Las esperas. Decidido (usuario, 2026-10-13): se cargan en el mismo formulario** ("si, tambien se
+   cargan en el mismo formulario"). Propuesta: un campo opcional "espera a", entre las tareas abiertas
+   del mismo espacio, siempre bloqueante; la base ya tiene `dependency` y rechaza los ciclos
+   (`evitar_ciclo_dependencia`). `PENDIENTE` de construcción, junto con los objetivos.
 3. **Quién "decidió" la tarea.** La auditoría guarda quién la decidió (ADR 0017, decisión 2). Mientras
    tanto, el formulario pide elegir a un integrante activo del espacio, sin restringir su rol.
 
