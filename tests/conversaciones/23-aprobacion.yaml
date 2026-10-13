@@ -436,11 +436,14 @@ pasos:
          puede_traer: [el_texto_cubre, lo_descrito_cubre]}
     efectos: {}
     hechos:
+      # Lo que describió la primera entrega sigue contando, aparte: lo escrito ahora no lo dice
+      # (T8 de las correcciones de la prueba por Telegram del 2026-10-12).
       - {jugada: entregar, resultado: para_confirmar, tarea: TAB, pregunta: confirmar_la_entrega,
          le_falta_del_criterio: ausente, ejemplo: ausente,
+         sigue_contando_de_la_entrega_anterior: ["El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba de continuidad y de aislación"],
          entrega: [
            {pieza: P1, es: lo_que_escribio, dice: "ahi va el diagrama del tablero",
-            describe: ["El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba de continuidad y de aislación"]},
+            describe: ausente},
            {pieza: P2, es: una_foto}]}
     pregunta: {tipo: confirmar_la_entrega, tarea: TAB}
     botones: [Confirmar]
@@ -464,13 +467,17 @@ pasos:
       efectos:
         archivos_de_tarea: [{tarea: TAB}]
       hechos:
+        # La foto va sólo dentro de la entrega que se ofrece; que igual queda con la tarea es
+        # otro hecho (T8 de las correcciones de la prueba por Telegram del 2026-10-12).
         - {jugada: guardar_para_la_entrega, resultado: anotado, tarea: TAB,
-           para_cuando_la_entregue: [{es: una_foto}], pregunta: confirmar_la_entrega,
+           para_cuando_la_entregue: ausente, si_no_la_entrega_queda_con_la_tarea: true,
+           pregunta: confirmar_la_entrega,
            le_ofrece_entregarla_con_esto: {
              resultado: para_confirmar, le_falta_del_criterio: ausente, ejemplo: ausente,
+             sigue_contando_de_la_entrega_anterior: ["El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba de continuidad y de aislación"],
              entrega: [
                {pieza: P1, es: lo_que_escribio, dice: "ahi va el diagrama del tablero",
-                describe: ["El tablero de la máquina 3 queda cableado según su diagrama y pasa la prueba de continuidad y de aislación"]},
+                describe: ausente},
                {pieza: P2, es: una_foto, mandado_antes_el: ausente}]}}
       pregunta: {tipo: confirmar_la_entrega, tarea: TAB}
       botones: [Confirmar]
@@ -478,10 +485,11 @@ pasos:
         de: Mariano
         pregunta_abierta: {tipo: confirmar_la_entrega, tarea: TAB}
       dice:
-        - que la foto quedó guardada para la tarea
-        - la entrega nueva, una pieza por renglón
+        - la entrega nueva, una pieza por renglón, con la foto
         - que al confirmarla vuelve a revisión, sin nombrar a Ismael
         - "el cierre, aparte: si la vuelve a entregar con esto"
       no_dice:
         - que falta saber si quedó cableado según el diagrama o si pasó continuidad y aislación (ya lo dijo en la primera entrega)
         - que la tarea quedó entregada o en revisión
+        - que la foto quedó para cuando vuelva a entregarla, junto a la pregunta de si la entrega
+        - que lo que escribió ahora dice que quedó cableado según el diagrama o que pasó continuidad y aislación

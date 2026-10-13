@@ -340,6 +340,17 @@ def test_la_23_por_la_otra_lectura_del_archivo_ofrece_la_misma_entrega(conn):
     assert next(p for p in corrida.pasos if p.paso == 12).lectura == cp.O_BIEN
 
 
+def test_la_27_por_la_otra_lectura_de_la_foto_del_contador_la_vuelve_a_entregar(conn):
+    """T8 (prueba por Telegram del 2026-10-12): si la IA lee la foto del contador de Marcos
+    (paso 17) como un archivo para la tarea, Leda le ofrece volver a entregarla, con la foto sólo
+    dentro de la entrega que ofrece y lo que sigue contando de la primera entrega aparte; su
+    "dale" la vuelve a revisión."""
+    corrida = _por_la_otra_lectura(conn, "27", 17)
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    assert next(p for p in corrida.pasos if p.paso == 17).lectura == cp.O_BIEN
+
+
 def _por_la_otra_lectura(conn, numero: str, paso: int, sin: tuple[str, ...] = (),
                          orden: tuple[int, ...] | None = None, cual: int = 0):
     """La conversación entera con la IA guionada que lee ese paso como su otra lectura (`o_bien`)

@@ -364,3 +364,172 @@ pasos:
       - el nombre de Ismael
       - que la tarea está terminada o aprobada
       - una fecha de inicio anterior a hoy
+
+  # Ismael pide cambios en la del PLC con el botón del aviso del paso 11 (T8 de las correcciones
+  # de la prueba por Telegram del 2026-10-12): el botón pregunta qué falta.
+  - paso: 14
+    quien: Ismael
+    a_las: "2026-10-23 11:00"
+    toca: Pedir cambios
+    de_la_tarea: PLC
+    efectos: {}
+    hechos:
+      - {jugada: pedir_cambios, resultado: falta_dato, falta: [comentario], tarea: PLC,
+         pregunta: que_cambios_pide}
+    pregunta: {tipo: que_cambios_pide, tarea: PLC}
+    botones: []
+    estado_despues:
+      de: Ismael
+      pregunta_abierta: {tipo: que_cambios_pide, tarea: PLC}
+    dice:
+      - la tarea del PLC de Marcos en su renglón con 📋
+      - una pregunta, qué le falta
+    no_dice:
+      - que ya le pidió el cambio a Marcos
+
+  - paso: 15
+    quien: Ismael
+    a_las: "2026-10-23 11:01"
+    escribe: "falta una foto del contador de ciclos"
+    jugadas:
+      - {nombre: pedir_cambios, tarea: PLC, comentario: "falta una foto del contador de ciclos"}
+    efectos:
+      estados: {PLC: en_curso}
+      aprobaciones:
+        - {tarea: PLC, decision: rechazado, de: Ismael}
+      avisos_guardados:
+        - {tipo: pedido_de_cambios, tarea: PLC, a: Marcos, estado: guardado}
+    hechos:
+      # La de comunicaciones, que Marcos entregó a las 10:01, queda por revisar.
+      - {jugada: pedir_cambios, resultado: anotado, tarea: PLC, estado: en_curso,
+         comentario: presente, queda_por_revisar: [{tarea: COM}]}
+    pregunta: null
+    botones: [Ver COM]
+    estado_despues:
+      de: Ismael
+      pregunta_abierta: null
+    dice:
+      - que le pidió el cambio a Marcos con su comentario
+      - que la vuelve a recibir cuando Marcos la entregue
+    no_dice:
+      - que la tarea quedó rechazada o cancelada
+
+  - paso: 16
+    quien: Leda
+    relojes: ["2026-10-23 11:02"]
+    salen:
+      - a: Marcos
+        tipo: pedido_de_cambios
+        tarea: PLC
+        enlace: true
+        hechos: {pidio_cambios: Ismael Soschinski, comentario: presente, estado: en_curso,
+                 necesita_respuesta: false}
+      # Vence hoy y volvió a en curso: la escalera le consulta cómo viene (mecánica §9, `V`).
+      - {a: Marcos, tipo: pedido_de_estado, tarea: PLC, hechos: {numero: 1}}
+    dice:
+      - que le pidieron un cambio en la tarea del PLC, en su renglón con 📋, sin nombrar a Ismael
+      - lo que pidió, con sus palabras (falta una foto del contador de ciclos)
+      - "el cierre, aparte: que la vuelva a entregar cuando lo tenga"
+      - "en su propio mensaje, la consulta de cómo viene la tarea del PLC, que vence hoy"
+    no_dice:
+      - que la tarea fue rechazada
+      - un juicio sobre su trabajo
+
+  # Marcos vuelve a entregarla con la foto que le pidieron. Lo que describió la primera entrega
+  # (que arranca desde el PLC, y el ejemplo que aceptó en el paso 4) sigue contando (decisión 23):
+  # la IA lo juzga junto con lo nuevo. Lo escrito ahora no dice que arranca desde el PLC: lo que
+  # sigue contando va aparte, nunca en lo que escribió ahora (T8 de las correcciones de la prueba
+  # por Telegram del 2026-10-12).
+  - paso: 17
+    quien: Marcos
+    a_las: "2026-10-23 11:30"
+    escribe: "ahi va la del contador completo los 20 ciclos sin fallas"
+    manda: [{que: foto}]
+    jugadas:
+      - {nombre: entregar, tarea: PLC, lo_descrito_cubre: [C1],
+         puede_traer: [el_texto_cubre]}
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: PLC, pregunta: confirmar_la_entrega,
+         le_falta_del_criterio: ausente, ejemplo: ausente,
+         sigue_contando_de_la_entrega_anterior: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
+         entrega: [
+           {pieza: P1, es: lo_que_escribio,
+            dice: "ahi va la del contador completo los 20 ciclos sin fallas", describe: ausente},
+           {pieza: P2, es: una_foto}]}
+    pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
+    dice:
+      - "la entrega nueva, una pieza por renglón: lo que escribió ahora y la foto"
+      - que lo que describió en la primera entrega sigue contando
+      - que al confirmarla vuelve a revisión, sin nombrar a Ismael
+      - "el cierre, aparte, una sola pregunta: si la entrega así"
+    no_dice:
+      - que la foto quedó para cuando vuelva a entregarla, junto a la pregunta de si la entrega
+      - que lo que escribió ahora dice que arranca desde el PLC
+      - que falta saber si arranca desde el PLC (ya lo dijo en la primera entrega)
+      - que la tarea quedó entregada o en revisión
+      - el nombre de Ismael
+    # La otra lectura válida (decisión 68, como la 23, paso 12): un archivo para la tarea. Leda lo
+    # guarda y ofrece volver a entregarla con eso: la misma vista previa, con Confirmar. La foto
+    # va sólo dentro de la entrega que se ofrece.
+    o_bien:
+      jugadas:
+        - {nombre: guardar_para_la_entrega, tarea: PLC, lo_descrito_cubre: [C1],
+           puede_traer: [el_texto_cubre]}
+      efectos:
+        archivos_de_tarea: [{tarea: PLC}]
+      hechos:
+        - {jugada: guardar_para_la_entrega, resultado: anotado, tarea: PLC,
+           para_cuando_la_entregue: ausente, si_no_la_entrega_queda_con_la_tarea: true,
+           pregunta: confirmar_la_entrega,
+           le_ofrece_entregarla_con_esto: {
+             resultado: para_confirmar, le_falta_del_criterio: ausente, ejemplo: ausente,
+             sigue_contando_de_la_entrega_anterior: ["La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"],
+             entrega: [
+               {pieza: P1, es: lo_que_escribio,
+                dice: "ahi va la del contador completo los 20 ciclos sin fallas",
+                describe: ausente},
+               {pieza: P2, es: una_foto, mandado_antes_el: ausente}]}}
+      pregunta: {tipo: confirmar_la_entrega, tarea: PLC}
+      botones: [Confirmar]
+      estado_despues:
+        pregunta_abierta: {tipo: confirmar_la_entrega, tarea: PLC}
+      dice:
+        - "la entrega nueva, una pieza por renglón: lo que escribió ahora y la foto"
+        - que lo que describió en la primera entrega sigue contando
+        - que al confirmarla vuelve a revisión, sin nombrar a Ismael
+        - "el cierre, aparte, una sola pregunta: si la vuelve a entregar con esto"
+      no_dice:
+        - que la foto quedó para cuando vuelva a entregarla, junto a la pregunta de si la entrega
+        - que lo que escribió ahora dice que arranca desde el PLC
+        - que falta saber si arranca desde el PLC (ya lo dijo en la primera entrega)
+        - que la tarea quedó entregada o en revisión
+        - el nombre de Ismael
+
+  - paso: 18
+    quien: Marcos
+    a_las: "2026-10-23 11:31"
+    escribe: "dale"
+    jugadas:
+      - {nombre: confirmar, tarea: PLC, puede_traer: [tarea]}
+    efectos:
+      estados: {PLC: en_revision}
+      evidencias:
+        - {tarea: PLC, clase: texto, cubre: [explicacion]}
+        - {tarea: PLC, clase: imagen, cubre: [captura]}
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: PLC, a: Ismael, estado: guardado}
+    hechos:
+      - {jugada: confirmar, resultado: entregada, tarea: PLC, estado: en_revision}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que quedó entregada y vuelve a revisión
+      - que le avisa cuando la revisen o si hace falta algo más
+    no_dice:
+      - el nombre de Ismael
+      - que la tarea está terminada o aprobada

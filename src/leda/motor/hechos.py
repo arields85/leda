@@ -170,6 +170,13 @@ SIGNIFICADOS: Mapping[str, str] = {
                          "describir lo que falta de la entrega.",
     "describe": "Los puntos del criterio de aceptación que dice lo que la persona escribió en "
                 "esa pieza, como se leyó: la persona lo ve en la entrega y lo puede corregir.",
+    # T8 de las correcciones de la prueba por Telegram del 2026-10-12 (`entrega.SIGUE_CONTANDO`).
+    "sigue_contando_de_la_entrega_anterior": "Los puntos del criterio de aceptación que ya "
+                                             "decía la entrega anterior de esta tarea, antes "
+                                             "del pedido de cambios, y siguen contando en esta "
+                                             "entrega: la persona no tiene que volver a "
+                                             "decirlos. Lo que escribió ahora es lo que dice "
+                                             "cada pieza (dice).",
     "le_falta_del_criterio": "Los puntos del criterio de aceptación que la descripción de la "
                              "persona todavía no dice entero, tal cual están escritos. De cada "
                              "uno, lo que falta saber de la tarea es la parte que la descripción "
@@ -268,8 +275,13 @@ SIGNIFICADOS: Mapping[str, str] = {
     "le_ofrece_entregarla_con_esto": "A la tarea le pidieron cambios: con lo que mandó, Leda le "
                                      "ofrece volver a entregarla, con la entrega como se le "
                                      "muestra (entrega), lo que le falta si le falta algo y lo "
-                                     "que pasa al confirmarla. No se entrega sin su sí; lo que "
-                                     "mandó sigue con la tarea para cuando la entregue.",
+                                     "que pasa al confirmarla. Lo que mandó es parte de esa "
+                                     "entrega. No se entrega sin su sí.",
+    # T8 de las correcciones de la prueba por Telegram del 2026-10-12: con la oferta, lo que
+    # mandó va sólo dentro de la entrega que se ofrece (`entrega._ofrecer_volver_a_entregarla`).
+    "si_no_la_entrega_queda_con_la_tarea": "Lo que la persona mandó ya quedó con la tarea: si "
+                                           "no confirma la entrega que Leda le ofrece, sigue "
+                                           "con la tarea y se suma cuando la entregue.",
     "lo_que_escribio": "Lo que escribió quien entrega la tarea: su descripción del trabajo.",
     "el_ejemplo_que_acepto": "Una descripción que Leda le propuso a quien entrega la tarea "
                              "para lo que faltaba y que esa persona aceptó tal cual: vale como "
@@ -1444,6 +1456,7 @@ _DE_LA_COCINA = {para: de for de, para in PARA_LA_REDACCION.items()}
 _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", "dice",
                                       "como_lo_nombro",
                                       "enlace", "lo_que_pide", "describe",
+                                      "sigue_contando_de_la_entrega_anterior",
                                       "le_falta_del_criterio", "ejemplo", "lo_que_dice",
                                       "motivo_del_retiro", "referencias"})
 # El nombre de un archivo nunca es un código, aunque se escriba como uno (`informe_final`).
@@ -1451,6 +1464,7 @@ _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", 
 # pide la tarea, que es dato del pack (va con sus palabras, `en_palabras`).
 _NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_evidencia",
                               "el_texto_cubre", "lo_que_pide", "describe",
+                              "sigue_contando_de_la_entrega_anterior",
                               "le_falta_del_criterio", "ejemplo", "lo_descrito_cubre",
                               "lo_que_dice", "motivo_del_retiro", "referencias",
                               "nombre_que_no_esta", "como_lo_nombro"})

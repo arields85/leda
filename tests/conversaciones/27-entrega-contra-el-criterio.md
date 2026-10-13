@@ -7,7 +7,10 @@ y cuando Marcos acepta el ejemplo, la entrega se confirma como siempre. Después
 pide la correcta, la revisión espera (Ismael toca Aprobar y no cambia nada) y, con la foto nueva, a
 Ismael le llega un aviso nuevo con todo. Al día siguiente entrega la de comunicaciones, que nunca había
 arrancado, describiendo lo que pide su criterio: se recibe sin preguntas y la historia dice que arrancó
-y se entregó en ese momento. Decisiones 10, 14 y 15 del usuario (2026-10-08; `odd/tasks/fase-c.md`,
+y se entregó en ese momento. Después Ismael le pide cambios en la del PLC (falta una foto del
+contador) y Marcos la vuelve a entregar con esa foto: lo que describió la primera entrega sigue
+contando, aparte de lo que escribe ahora, y la foto va una sola vez, en la entrega (T8 de las
+correcciones de la prueba por Telegram del 2026-10-12). Decisiones 10, 14 y 15 del usuario (2026-10-08; `odd/tasks/fase-c.md`,
 C-3d, unidad D3); constitución §4 y §8 ("lo propone en lugar de sólo pedirlo"); mecánica §3, §5, §6 y
 §13; ADR 0009, enmienda T6i; ADR 0019, decisión 5; regla del mozo (`AGENTS.md`, punto 11).
 
@@ -180,6 +183,60 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
      inicio anterior a hoy.
    - Estado después: sin tema abierto, nada mostrado para confirmar.
 
+14. **Ismael** toca (viernes 23, 11:00) "Pedir cambios" en el aviso de la del PLC (paso 11).
+    →
+    - Efecto: ninguno todavía; Leda le pregunta qué le falta, como en la conversación 23.
+    - La respuesta dice: la tarea del PLC de Marcos en su renglón con 📋; una pregunta, qué le falta.
+    - La respuesta no dice: que ya le pidió el cambio a Marcos.
+    - Estado de Ismael después: tema abierto, qué cambios pide.
+
+15. **Ismael** escribe (11:01): "falta una foto del contador de ciclos"
+    →
+    - Jugadas: `pedir_cambios`, la tarea del PLC, con su comentario.
+    - Efecto: la del PLC vuelve a `en_curso`, con el pedido de cambios de Ismael; el aviso a Marcos
+      queda guardado. La de comunicaciones sigue por revisar (su botón).
+    - La respuesta dice: que le pidió el cambio a Marcos con su comentario; que la vuelve a recibir
+      cuando Marcos la entregue.
+    - La respuesta no dice: que la tarea quedó rechazada o cancelada.
+
+16. **Leda**, por su cuenta, a Marcos (11:02): el pedido de cambios, sin nombrar a Ismael, con lo
+    que pidió en sus palabras y el enlace a la tarea; el cierre, aparte: que la vuelva a entregar
+    cuando lo tenga. La tarea vence hoy y volvió a en curso: en otro mensaje, la consulta del día
+    del vencimiento (mecánica §9).
+
+17. **Marcos** manda (11:30) una foto con el texto: "ahi va la del contador completo los 20 ciclos
+    sin fallas"
+    →
+    - Jugadas: `entregar`, la tarea del PLC. Lo que describió la primera entrega (que arranca desde
+      el PLC, y el ejemplo que aceptó en el paso 4) sigue contando (decisión 23): la IA lo recibe y
+      lo juzga junto con lo nuevo (`lo_descrito_cubre`).
+    - Efecto: ninguno todavía; la vista previa de la entrega nueva, con Confirmar. Lo que sigue
+      contando de la primera entrega va aparte, nunca como lo que describe lo escrito ahora; lo
+      guardado al confirmar lo sigue diciendo (la entrega vigente cuenta desde el pedido de
+      cambios).
+    - La respuesta dice: la entrega nueva, una pieza por renglón (lo que escribió ahora y la foto);
+      que lo que describió en la primera entrega sigue contando; que al confirmarla vuelve a
+      revisión, sin nombrar a Ismael; el cierre, aparte, una sola pregunta: si la entrega así.
+    - La respuesta no dice: que la foto quedó para cuando vuelva a entregarla, junto a la pregunta de
+      si la entrega; que lo que escribió ahora dice que arranca desde el PLC; que falta saber si
+      arranca desde el PLC; que quedó entregada o en revisión; el nombre de Ismael.
+    - Botones: los de la confirmación.
+    - **Otra lectura válida** (decisión 68, como la 23, paso 12): la IA lo lee como un archivo para
+      la tarea (`guardar_para_la_entrega`). Leda lo guarda y en la misma respuesta le ofrece
+      volver a entregarla con eso: la misma vista previa, con Confirmar. La foto va sólo dentro
+      de la entrega que ofrece; que si no la entrega queda con la tarea es otro hecho. La
+      respuesta dice y no dice lo mismo.
+
+18. **Marcos** escribe (11:31): "dale"
+    →
+    - Jugadas: `confirmar` (con la tarea del PLC o sin ella).
+    - Efecto, en un solo acto: las dos filas de evidencia (el texto guarda el punto del criterio
+      que sigue contando) y el paso de `en_curso` a `en_revision`, con evento de Marcos y
+      auditoría; el aviso a Ismael queda guardado.
+    - La respuesta dice: que quedó entregada y vuelve a revisión; que le avisa cuando la revisen o
+      si hace falta algo más.
+    - La respuesta no dice: el nombre de Ismael; que la tarea está terminada o aprobada.
+
 ## Qué mide
 
 - **Garantías:** no pasa a revisión lo que no dice el criterio, aunque la persona insista; el ejemplo
@@ -187,7 +244,8 @@ nombre que no estén en el criterio, en la tarea o en lo que Marcos escribió.
   código); no deja sin salida (cada respuesta dice qué falta y cómo describirlo); "la terminé" lleva a
   revisión, nunca a terminada, aunque la tarea no figure como arrancada, y no inventa una fecha de
   inicio; mientras a una entrega le falta lo que se retiró, nadie la aprueba ni le llega un aviso de
-  ella; nada se borra.
+  ella; nada se borra; al volver a entregarla, lo que sigue contando de la entrega anterior no
+  se presenta como lo escrito ahora, y un archivo va una sola vez en la entrega que se ofrece.
 - **El formato:** el de la conversación 20 en cada mensaje.
 - **Falla de comprensión:** que la IA dé por cubierto el criterio con "ya arranca desde el plc", que lea
   "y que pongo?" como una descripción, que lea "no, asi esta, mandala" como la aceptación del ejemplo o

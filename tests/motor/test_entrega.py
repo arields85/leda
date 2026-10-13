@@ -1271,8 +1271,11 @@ def test_sin_un_pedido_de_cambios_no_hay_entrega_anterior(conn, mundo, marcos):
 
 # --- Un archivo para una tarea que espera cambios (decisión 68 del usuario, 2026-10-11) -------
 
-def _le_pidieron_cambios(conn, mundo, marcos) -> str:
-    """La tarea del PLC, entregada y devuelta por Ismael con un pedido de cambios."""
+def _le_pidieron_cambios(conn, mundo, marcos, *, al_reloj_de_la_prueba: bool = True) -> str:
+    """La tarea del PLC, entregada y devuelta por Ismael con un pedido de cambios. La evidencia
+    se fecha con el reloj de la base (`clock_timestamp()`); el pedido de cambios, con el de la
+    prueba si `al_reloj_de_la_prueba`, o, si no, también con el de la base, después de la
+    entrega: así lo entregado antes es de la entrega anterior (`entrega._ciclo_desde`)."""
     from leda import herramientas
 
     tarea = _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO_PLC)
@@ -1285,10 +1288,11 @@ def _le_pidieron_cambios(conn, mundo, marcos) -> str:
         herramientas.ejecutar(cur, ismael, "pedir_cambios_tarea",
                               {"tarea_id": tarea, "comentario": "falta la foto del contador"},
                               ya_confirmada=True)
-        # El pedido de cambios, en el reloj de la prueba: entre la entrega y lo que sigue.
-        cur.execute("""update approval set at = %s
-                        where sujeto_id = %s and decision = 'rechazado'""",
-                    (AHORA + timedelta(minutes=marcos.minuto, seconds=30), tarea))
+        if al_reloj_de_la_prueba:
+            # El pedido de cambios, en el reloj de la prueba: entre la entrega y lo que sigue.
+            cur.execute("""update approval set at = %s
+                            where sujeto_id = %s and decision = 'rechazado'""",
+                        (AHORA + timedelta(minutes=marcos.minuto, seconds=30), tarea))
     conn.commit()
     assert estado_de(conn, tarea) == "en_curso"
     return tarea
@@ -1312,7 +1316,9 @@ def test_un_archivo_para_una_tarea_que_espera_cambios_ofrece_volver_a_entregarla
 
     hecho = _hecho(r, "guardar_para_la_entrega")
     assert hecho["resultado"] == "anotado"
-    assert hecho["para_cuando_la_entregue"] == [{"es": "una_foto"}]
+    # La foto va sólo dentro de la entrega que se ofrece (T8, más abajo).
+    assert "para_cuando_la_entregue" not in hecho
+    assert hecho["si_no_la_entrega_queda_con_la_tarea"] is True
     oferta = hecho["le_ofrece_entregarla_con_esto"]
     assert oferta["resultado"] == "para_confirmar"
     assert "le_falta_del_criterio" not in oferta
@@ -1341,6 +1347,102 @@ def test_la_entrega_que_ofrece_se_confirma_tambien_por_escrito(conn, mundo, marc
 
     assert _hecho(r, "confirmar")["resultado"] == "entregada"
     assert estado_de(conn, tarea) == "en_revision"
+
+
+# --- La entrega nueva que se contradecía (T8, prueba por Telegram del 2026-10-12) -------------
+#
+# Marcos, con cambios pedidos, mandó una foto con "ahi va la del contador, completo los 20 ciclos
+# sin fallas". La cocina le pasó a la IA dos hechos que se contradecían (la foto "para cuando la
+# entregue", que no es parte de una entrega, y la entrega ofrecida con esa misma foto), y el punto
+# del criterio que sigue contando de la entrega anterior (decisión 23) como si lo dijera lo
+# escrito ahora. Leda escribió las dos cosas y "arranca desde el PLC", que esta vez no se escribió.
+
+def test_con_la_oferta_el_archivo_va_solo_dentro_de_la_entrega_que_se_ofrece(conn, mundo,
+                                                                           marcos):
+    """Decisión 68: el archivo queda guardado y se ofrece volver a entregarla con eso. Con la
+    oferta, el archivo aparece una sola vez, en la entrega que se ofrece; que igual queda con la
+    tarea si no la entrega es otro hecho, que no lo saca de la entrega."""
+    _le_pidieron_cambios(conn, mundo, marcos)
+
+    r = _guarda_la_foto(marcos, lo_descrito_cubre=["C1"])
+
+    hecho = _hecho(r, "guardar_para_la_entrega")
+    assert "para_cuando_la_entregue" not in hecho
+    assert hecho["si_no_la_entrega_queda_con_la_tarea"] is True
+    assert [p["es"] for p in hecho["le_ofrece_entregarla_con_esto"]["entrega"]] == [
+        "lo_que_escribio", "una_foto"]
+    assert hechos.sin_significado(hecho) == set()
+    redactado = hechos.para_redactar(hecho)
+    assert "para_cuando_la_entregue" not in redactado
+    assert redactado["si_no_la_entrega_queda_con_la_tarea"] is True
+
+
+def _vuelve_a_entregar(marcos, jugada: str = "entregar"):
+    return marcos.manda(Jugada(jugada, {"tarea": "T2", "lo_descrito_cubre": ["C1"]}),
+                        texto="ahi va la del contador, completo los 20 ciclos sin fallas",
+                        archivos=[(JPEG, "foto", None)])
+
+
+def _lo_escrito(entrega_vista: list[dict]) -> dict:
+    """La pieza de lo que escribió, en los hechos de la cocina o en los de la redacción."""
+    [escrito] = [p for p in entrega_vista if p["es"] in ("lo_que_escribio", "su_descripcion")]
+    return escrito
+
+
+@pytest.mark.parametrize("jugada", ["entregar", "guardar_para_la_entrega"])
+def test_lo_que_sigue_contando_de_la_entrega_anterior_no_se_muestra_como_lo_escrito_ahora(
+        conn, mundo, marcos, jugada):
+    """Decisión 23: lo que describió la entrega anterior sigue contando, y la IA lo cuenta al
+    juzgar lo descrito (C1). Lo escrito ahora no lo dice: se muestra aparte, como lo que sigue
+    contando de la entrega anterior, y la pieza nueva no lo describe."""
+    _le_pidieron_cambios(conn, mundo, marcos, al_reloj_de_la_prueba=False)
+
+    r = _vuelve_a_entregar(marcos, jugada)
+
+    hecho = _hecho(r, jugada)
+    vista = hecho if jugada == "entregar" else hecho["le_ofrece_entregarla_con_esto"]
+    assert vista["resultado"] == "para_confirmar"
+    assert "le_falta_del_criterio" not in vista
+    assert "describe" not in _lo_escrito(vista["entrega"])
+    assert vista["sigue_contando_de_la_entrega_anterior"] == [CRITERIO_PLC]
+    assert hechos.sin_significado(hecho) == set()
+    redactado = hechos.para_redactar(hecho)
+    redactada = (redactado if jugada == "entregar"
+                 else redactado["le_ofrece_entregarla_con_esto"])
+    assert redactada["sigue_contando_de_la_entrega_anterior"] == [CRITERIO_PLC]
+    assert "describe" not in _lo_escrito(redactada["entrega"])
+
+
+def test_lo_guardado_de_la_entrega_nueva_sigue_cubriendo_el_criterio(conn, mundo, marcos):
+    """Lo que se separa es lo que se muestra, no lo guardado: la cobertura de la entrega vigente
+    cuenta sólo desde el último pedido de cambios (`_ciclo_desde`), así que el texto nuevo guarda
+    el punto que sigue contando y la revisión lo ve cubierto (nada espera otra pieza)."""
+    tarea = _le_pidieron_cambios(conn, mundo, marcos, al_reloj_de_la_prueba=False)
+    _vuelve_a_entregar(marcos)
+
+    marcos.manda(Jugada("confirmar", {}), texto="dale")
+
+    assert estado_de(conn, tarea) == "en_revision"
+    [nuevo] = todos(conn, """select describe_del_criterio d from evidence
+                              where task_id = %s and clase = 'texto' and texto like 'ahi va%%'""",
+                    tarea)
+    assert nuevo["d"] == [CRITERIO_PLC]
+    with espacio(conn, mundo["id"]) as cur:
+        assert entrega.falta_del_criterio_de_lo_entregado(cur, tarea) == []
+        assert entrega.falta_algo_de_lo_entregado(cur, tarea) is False
+    conn.commit()
+
+
+def test_sin_un_pedido_de_cambios_lo_descrito_sigue_en_su_pieza(conn, mundo, marcos):
+    """Sin entrega anterior, lo que juzga la IA es de lo escrito ahora."""
+    _tarea(conn, mundo, pide=("explicacion",), criterio=CRITERIO_PLC)
+
+    r = marcos.manda(_entregar(lo_descrito_cubre=["C1"]),
+                     texto="termine el plc, arranca desde el plc y completa 20 ciclos sin fallas")
+
+    hecho = _hecho(r, "entregar")
+    assert _lo_escrito(hecho["entrega"])["describe"] == [CRITERIO_PLC]
+    assert "sigue_contando_de_la_entrega_anterior" not in hecho
 
 
 def test_un_archivo_para_una_tarea_sin_pedido_de_cambios_no_ofrece_nada(conn, mundo, marcos):

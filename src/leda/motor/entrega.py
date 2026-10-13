@@ -715,6 +715,41 @@ def _la_revisa_quien_la_entrega(ctx, quien: Mapping[str, Any] | None) -> bool:
     return quien is not None and quien["membership_id"] == ctx.quien.membership_id
 
 
+# Lo que sigue contando de la entrega anterior (T8 de las correcciones de la prueba por Telegram
+# del 2026-10-12). Al volver a entregar después de un pedido de cambios, la IA juzga lo descrito
+# contando lo que ya decía la entrega anterior (decisión 23), y la cocina guarda ese juicio en
+# los textos nuevos: la cobertura de la entrega vigente cuenta sólo desde el último pedido de
+# cambios (`_ciclo_desde`), así que lo guardado tiene que seguir diciéndolo. Lo que se muestra es
+# otra cosa: un punto que ya decía la entrega anterior no se presenta como lo que la persona
+# escribió ahora (Leda le contó "arranca desde el PLC", que esta vez no escribió), sino aparte.
+SIGUE_CONTANDO = "sigue_contando_de_la_entrega_anterior"
+
+
+def _con_lo_que_sigue_contando(cur, task_id: str, piezas: Sequence[dict[str, Any]],
+                               muestra: list[dict[str, Any]]
+                               ) -> tuple[list[dict[str, Any]], list[str]]:
+    """La vista de las piezas (`mostrar`, en su mismo orden) sin los puntos del criterio que ya
+    decía la entrega anterior en lo que la persona escribió ahora, y esos puntos, en el orden del
+    criterio. El ejemplo que aceptó en esta entrega conserva lo suyo: lo aceptó ahora. Las piezas
+    no cambian (son lo que se guarda al confirmar)."""
+    anterior = la_entrega_anterior(cur, task_id)
+    if anterior is None:
+        return muestra, []
+    ya_dicho = {d for t in anterior["lo_que_describio"] for d in t["describe"]}
+    sacados: set[str] = set()
+    vista = []
+    for p, una in zip(piezas, muestra):
+        if p["clase"] == "texto" and not _es_el_ejemplo_aceptado(p) and una.get("describe"):
+            una = dict(una)
+            sacados.update(d for d in una["describe"] if d in ya_dicho)
+            una["describe"] = [d for d in una["describe"] if d not in ya_dicho]
+            if not una["describe"]:
+                del una["describe"]
+        vista.append(una)
+    puntos = criterio(cur, task_id)
+    return vista, [d for d in puntos if d in sacados] + sorted(sacados - set(puntos))
+
+
 def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]],
                         vieja: dict[str, Any] | None, *, ejemplo: Any = None,
                         ofrecida: bool | None = None) -> dict[str, Any]:
@@ -736,7 +771,8 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
     huella = _huella(tarea["id"], tarea["estado"], pol, piezas)
     completa = not faltan and not falta_criterio
     tipo = preguntas.CONFIRMAR_ENTREGA if completa else preguntas.LO_QUE_FALTA_DE_LA_ENTREGA
-    muestra = mostrar(piezas, pol, ctx.calendario.zona)
+    muestra, de_antes = _con_lo_que_sigue_contando(
+        cur, tarea["id"], piezas, mostrar(piezas, pol, ctx.calendario.zona))
     fichas = _fichas()
     lo_que_falta: dict[str, Any] = {}
     if faltan:
@@ -781,6 +817,8 @@ def _mostrar_la_entrega(ctx, tarea: dict[str, Any], piezas: list[dict[str, Any]]
         "resultado": PARA_CONFIRMAR if completa else LE_FALTA_EVIDENCIA,
         "tarea": {"alias": tarea["alias"], "titulo": tarea["titulo"]}, "entrega": muestra,
         **lo_que_falta}
+    if de_antes:
+        hecho[SIGUE_CONTANDO] = de_antes
     al_confirmar: dict[str, Any] = {"estado": "en_revision"}
     if _la_revisa_quien_la_entrega(ctx, quien):
         al_confirmar = {"la_aprueba_al_entregarla": True}
@@ -1032,6 +1070,15 @@ def _ofrecer_volver_a_entregarla(ctx, datos: dict, tarea: dict, archivos: list[s
     for k in ("tarea", "sumo"):
         oferta.pop(k, None)
     hecho[LE_OFRECE_ENTREGARLA] = oferta
+    # Lo que mandó va en la entrega que se ofrece, una sola vez: no también como algo que no es
+    # parte de una entrega todavía (T8 de las correcciones de la prueba por Telegram del
+    # 2026-10-12: Leda escribió "dejé la foto para cuando vuelvas a entregarla" y "¿confirmás la
+    # entrega así?"). Que igual queda con la tarea si no la entrega es otro hecho (decisión 68).
+    hecho.pop("para_cuando_la_entregue", None)
+    hecho[SI_NO_LA_ENTREGA] = True
+
+
+SI_NO_LA_ENTREGA = "si_no_la_entrega_queda_con_la_tarea"
 
 
 def confirmar(ctx, datos: dict, tarea: dict | None) -> dict:

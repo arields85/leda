@@ -213,7 +213,12 @@ que abrió la pregunta (prueba por Telegram del 2026-10-12: le llegó «pasale l
       entregar con esto?"): la misma vista previa, con Confirmar. La entrega sale sólo con su sí
       (botón o escrito); si no contesta, nada cambia y no se le vuelve a ofrecer (decisión 73).
       Efecto: la foto queda guardada para la
-      tarea. Estado de Mariano después: lo mismo, lo mostrado para confirmar.
+      tarea. Estado de Mariano después: lo mismo, lo mostrado para confirmar. La foto va en la
+      entrega que se ofrece, una sola vez; que si no la entrega queda con la tarea es otro hecho.
+      La respuesta no dice: que la foto quedó para cuando vuelva a entregarla, junto a la
+      pregunta de si la entrega; que lo que escribió ahora dice que quedó cableado según el
+      diagrama o que pasó continuidad y aislación (T8 de las correcciones de la prueba por
+      Telegram del 2026-10-12: lo que sigue contando de la primera entrega va aparte).
 
 ## Qué mide
 
