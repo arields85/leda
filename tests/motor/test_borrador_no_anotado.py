@@ -161,3 +161,28 @@ def test_las_fichas_dicen_que_lo_que_espera_confirmacion_no_esta_anotado():
     assert "ya quedó anotado" in cancelar
     assert "cancelar" in corregir and "no quedó anotado" in corregir
 
+
+# --- La conversación 51, por su otra lectura ------------------------------------------------
+
+def test_la_51_por_la_otra_lectura_del_paso_2_queda_igual(conn):
+    """Si la IA lee el paso 2 como sacar lo que dijo de la entrega y cancelar (`o_bien`), la
+    conversación sigue igual: nada abierto, nada anotado y, al entregarla, sólo lo de ese día.
+    Como `tests/conversaciones/test_corredor.py`, `_por_la_otra_lectura`."""
+    import copy
+
+    from tests.conversaciones import comprobar as cp
+    from tests.conversaciones.corredor import correr_conversacion, elegir
+    from tests.conversaciones.grabar import IAPerfecta, IAQueGraba
+
+    [conv] = elegir(["51"])
+    ia = IAQueGraba(IAPerfecta({k: t["titulo"] for k, t in conv["tareas"].items()}))
+    guion = copy.deepcopy(conv)
+    paso_2 = next(p for p in guion["pasos"] if p["paso"] == 2)
+    paso_2["jugadas"] = paso_2["o_bien"]["jugadas"]
+    ia.ia.preparar = lambda p: setattr(ia.ia, "paso", next(
+        (q for q in guion["pasos"] if q.get("paso") == p.get("paso")), p))
+
+    corrida = correr_conversacion(conn, conv, ia)
+
+    assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
+    assert next(p for p in corrida.pasos if p.paso == 2).lectura == cp.O_BIEN

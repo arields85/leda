@@ -1,0 +1,155 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/51-dejar-una-entrega-sin-terminar.md
+numero: "51"
+titulo: "Dejar una entrega sin terminar"
+mide: garantias
+persona: Ariel
+inicio: "2026-10-20 09:00"
+
+tareas:
+  INT:
+    titulo: Integrar datos de la comprimidora en CoreLabs
+    criterio: "Los datos de la comprimidora se ven en CoreLabs y se actualizan cada minuto"
+    responsable: Ariel
+    vence: "2026-11-13"
+    estado: en_curso
+    desde: "2026-10-14"
+
+# Más corta que la del pack, para mirar sólo el borrador.
+evidencia:
+  corelabs: [explicacion, captura]
+
+pasos:
+  - paso: 1
+    quien: Ariel
+    a_las: "2026-10-20 10:00"
+    escribe: "termine la integracion de la comprimidora en corelabs"
+    jugadas:
+      - nombre: entregar
+        tarea: INT
+        el_texto_cubre: [explicacion]
+        lo_descrito_cubre: []
+        # El ejemplo lo escribe la IA con sus palabras (sacado del criterio; la cocina lo verifica).
+        puede_traer: [lo_descrito_cubre, ejemplo]
+    efectos: {}
+    # Un borrador: los hechos dicen que nada quedó anotado (T7b).
+    hechos:
+      - {jugada: entregar, resultado: le_falta_evidencia, tarea: INT, sumo: [P1],
+         pregunta: lo_que_falta_de_la_entrega, todavia_no_quedo_anotado: true,
+         le_falta: ["una foto o una captura de la pantalla"],
+         le_falta_del_criterio: ["Los datos de la comprimidora se ven en CoreLabs y se actualizan cada minuto"],
+         ejemplo: presente,
+         entrega: [{pieza: P1, es: lo_que_escribio}]}
+    pregunta: {tipo: lo_que_falta_de_la_entrega, tarea: INT}
+    botones: []
+    estado_despues:
+      pregunta_abierta: {tipo: lo_que_falta_de_la_entrega, tarea: INT}
+    dice:
+      - "lo que falta para entregarla: una captura y lo que pide la tarea, con el ejemplo para que lo acepte o lo escriba con sus palabras"
+      - "el cierre, aparte: que mande lo que falta"
+    no_dice:
+      - que quedó anotado o asentado
+      - que la entregó o que está en revisión
+
+  # "Dice que lo deja" es cancelar, sin insistir (ADR 0018, 9d): lo dicho para la entrega nunca
+  # quedó anotado.
+  - paso: 2
+    quien: Ariel
+    a_las: "2026-10-20 10:05"
+    escribe: "no mejor dejalo pendiente despues lo hago"
+    jugadas:
+      - {nombre: cancelar}
+    efectos: {}
+    hechos:
+      - {jugada: cancelar, resultado: cancelado, no_se_anoto_nada: true}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que no quedó nada entregado ni anotado
+      - "el cierre, aparte: que le escriba cuando la tenga"
+    no_dice:
+      - otra pregunta, qué quiere sacar o si la deja
+      - el ejemplo otra vez
+      - lo que falta
+      - un juicio sobre la decisión
+    # La otra lectura válida: sacar lo que escribió de la entrega y dejar la pregunta sin efecto.
+    o_bien:
+      jugadas:
+        - {nombre: corregir, corrige: entregar, tarea: INT, saca: [P1]}
+        - {nombre: cancelar}
+      efectos: {}
+      hechos:
+        - {jugada: corregir, resultado: corregido, corrige: entregar, tarea: INT,
+           sacadas: [{pieza: P1, es: lo_que_escribio}]}
+        - {jugada: cancelar, resultado: cancelado, no_se_anoto_nada: true}
+      pregunta: null
+      estado_despues:
+        pregunta_abierta: null
+        para_despues: []
+      dice:
+        - que no quedó nada entregado ni anotado
+        - "el cierre, aparte: que le escriba cuando la tenga"
+      no_dice:
+        - otra pregunta, qué quiere sacar o si la deja
+        - el ejemplo otra vez
+
+  # Lo dejado no vuelve: ni la repetición de la pregunta a las 4 horas ni nada al día siguiente.
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-20 14:10", "2026-10-21 10:00"]
+    salen: []
+
+  - paso: 4
+    quien: Ariel
+    a_las: "2026-10-21 11:00"
+    escribe: "ya esta ahi va la captura, se ve todo en corelabs y se actualiza cada minuto"
+    manda: [{que: foto}]
+    jugadas:
+      - {nombre: entregar, tarea: INT, el_texto_cubre: [explicacion], lo_descrito_cubre: [C1],
+         puede_traer: [ejemplo]}
+    efectos: {}
+    # La entrega empieza de nuevo: lo que escribió ayer no está.
+    hechos:
+      - {jugada: entregar, resultado: para_confirmar, tarea: INT, sumo: [P1, P2],
+         pregunta: confirmar_la_entrega, todavia_no_quedo_anotado: true,
+         le_falta: ausente, le_falta_del_criterio: ausente,
+         entrega: [{pieza: P1, es: lo_que_escribio,
+                    dice: "ya esta ahi va la captura, se ve todo en corelabs y se actualiza cada minuto"},
+                   {pieza: P2, es: una_foto}]}
+    pregunta: {tipo: confirmar_la_entrega, tarea: INT}
+    botones: [Confirmar]
+    estado_despues:
+      pregunta_abierta: {tipo: confirmar_la_entrega, tarea: INT}
+    dice:
+      - "la tarea en su renglón con 📋"
+      - lo que escribió hoy y la captura, cada una con lo que cubre
+      - "el cierre, aparte: si la entrega así"
+    no_dice:
+      - lo que escribió ayer
+      - que quedó anotado o asentado
+
+  - paso: 5
+    quien: Ariel
+    a_las: "2026-10-21 11:01"
+    escribe: "dale"
+    jugadas:
+      - {nombre: confirmar, tarea: INT, puede_traer: [tarea]}
+    efectos:
+      estados: {INT: en_revision}
+      evidencias:
+        - {tarea: INT, clase: texto, cubre: [explicacion]}
+        - {tarea: INT, clase: imagen, cubre: [captura]}
+      avisos_guardados:
+        - {tipo: entrega_para_aprobar, tarea: INT, a: Ismael, estado: guardado}
+    hechos:
+      - {jugada: confirmar, resultado: entregada, tarea: INT, estado: en_revision,
+         todavia_no_quedo_anotado: ausente}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que quedó entregada y pasa a revisión, y que le avisa cuando la revisen o si hace falta algo más, sin nombrar a Ismael
+    no_dice:
+      - que la tarea está terminada o aprobada

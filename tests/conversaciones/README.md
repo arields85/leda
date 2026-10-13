@@ -119,6 +119,12 @@ La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 
     esperando, decisión 29); 4 horas después sale aparte el tema siguiente, y al cerrarse una de las
     dos preguntas el código trae la otra en un mensaje aparte, en los dos órdenes de respuesta
     (decisión 21 del usuario, 2026-10-08; D5b).
+51. [`51-dejar-una-entrega-sin-terminar.md`](51-dejar-una-entrega-sin-terminar.md): Ariel empieza una
+    entrega a la que le falta algo y la deja para más adelante. Lo que dijo nunca quedó anotado (es un
+    borrador, y los hechos lo dicen): Leda no dice que lo anotó, dejarlo es cancelar la pregunta sin
+    insistir, nada vuelve después y la entrega de otro día empieza de nuevo. El paso 2 admite también
+    sacar lo escrito y cancelar (`o_bien`). Hallazgo de la prueba por Telegram del 2026-10-12 (T7 de
+    las correcciones; ADR 0018, 9d).
 
 La página de la tarea (ADR 0019, decisión 7):
 

@@ -66,9 +66,11 @@ def test_hay_cuarenta_y_siete_conversaciones_y_cada_una_nombra_su_fuente():
     # decisión 33 (el resumen para cualquiera, el detalle a pedido), y la 48 desde el aviso al
     # encargado anterior (el sector que se queda sin encargado), y la 49 desde las decisiones 57
     # a 60 (la administración retira una pieza), y la 47 desde la tercera porción de los apodos
-    # (ADR 0020; decisión 65).
+    # (ADR 0020; decisión 65), y la 51 desde la T7 de las correcciones de la prueba por
+    # Telegram (dejar una entrega sin terminar); la 50 está reservada para el acceso a la web.
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 50) if n != 46]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 52)
+                                            if n not in (46, 50)]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]
