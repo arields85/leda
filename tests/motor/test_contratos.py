@@ -133,4 +133,10 @@ def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
 # suena a interrogatorio): lo que Leda va a hacer con la persona es "un aviso, un recordatorio o una
 # consulta", la misma palabra que ya leen los hechos (`b2f4afa`). Sin frases de ejemplo.
 # Antes: "420146b697b5124b".
-HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "71b74fdaea8a436d"}
+# Y otra vez a propósito el 2026-10-12 (decisión 77, prueba por Telegram del usuario: "Marcos será
+# informado hoy a las 11:01" es robótico, la hora no aporta y nombrar a quien se entera suena
+# acusatorio; constitución §8): lo que se entera otra persona se dice como algo que quedó
+# asentado, ya no en voz pasiva con esa persona como sujeto; a quién va el aviso y cuándo le
+# llega, que la cocina ahora siempre manda en `solo_si_pregunta` (`hechos.AVISOS`), sólo si la
+# persona lo pregunta. Sin frases de ejemplo. Antes: "71b74fdaea8a436d".
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "1b181215b77350b8"}

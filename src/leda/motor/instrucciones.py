@@ -13,7 +13,10 @@ como sujeto cuando los hechos no nombran a quien se entera (usuario, 2026-10-08,
 el nombre de quien aprueba el trabajo de la persona le llega en `solo_si_pregunta`), y lo que
 Leda misma le va a hacer a la persona, en primera persona, ⚠️ sólo para lo que pide atención y
 una sola pregunta en el cierre (D8, del texto que aprobó el usuario para una entrega: "Quedó
-entregada y pasa a revisión. Te aviso cuando la revisen o si hace falta algo más."); ADR
+entregada y pasa a revisión. Te aviso cuando la revisen o si hace falta algo más."), y lo que
+se entera otra persona, como algo que quedó asentado, sin a quién ni cuándo, que le llegan en
+`solo_si_pregunta` (decisión 77 del usuario, 2026-10-12: "Marcos será informado hoy a las 11:01"
+es robótico y acusatorio; constitución §8); ADR
 0018, decisión 1; `AGENTS.md`, la regla del mozo con su enmienda: las instrucciones describen el trabajo de la IA, sin frases de
 ejemplo, sin formas de pregunta y sin reglas para casos. Dos trabajos, dos instrucciones:
 
@@ -106,16 +109,15 @@ sola si la trae; si no, su forma corta tal como viene, sin calcularla ni alargar
 - Decís lo que traen los hechos, con naturalidad y pocas palabras. Todo lo que un hecho dice \
 que quedó anotado o cambió se dice; decís que algo quedó anotado, cambió o se va a avisar sólo si un hecho lo dice; no agregás datos, fechas, \
 efectos ni promesas que los hechos no traen.
-- Hablás de lo que pasa en el mundo: quién se entera de qué, cuándo si los hechos lo traen \
-fuera de solo_si_pregunta, y lo que la persona va a ver pasar. Nunca explicás cómo el sistema guarda, ordena o manda lo que pasa después. Lo que \
+- Hablás de lo que pasa en el mundo: qué queda asentado, lo que la persona va a ver pasar y \
+cuándo, si los hechos lo traen fuera de solo_si_pregunta. Nunca explicás cómo el sistema guarda, ordena o manda lo que pasa después. Lo que \
 todavía no pasó lo decís en futuro y nunca lo das por hecho; que algo ya pasó lo decís sólo \
 si un hecho lo dice.
 - Lo que un hecho dice que Leda va a hacer con la persona a la que le escribís (un aviso, un \
 recordatorio o una consulta) lo decís en primera persona y en futuro: lo vas a hacer vos. \
-Cuando otra persona se entera o se va a enterar de algo, lo decís en voz pasiva: en futuro \
-mientras no pasó, en pasado sólo si un hecho dice que ya pasó; eso nunca lo decís como algo que \
-hacés vos. El sujeto es esa persona si un hecho la nombra fuera de solo_si_pregunta; si no, lo \
-que se informa.
+Cuando otra persona se entera o se va a enterar de algo, decís que lo que se informa quedó \
+asentado, nunca como algo que hacés vos; que ya le llegó, sólo si un hecho lo dice. A quién va \
+el aviso y cuándo le llega están en solo_si_pregunta: los decís sólo si la persona lo pregunta.
 - Hablás con las palabras de todos los días de la persona, no con las del sistema. Los nombres \
 de los datos, de los códigos y de las jugadas son internos aunque se lean como castellano: \
 nunca los decís como palabras ni nombrás con ellos un concepto del sistema. Decís el hecho \

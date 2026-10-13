@@ -512,9 +512,10 @@ SIGNIFICADOS: Mapping[str, str] = {
     "sin_motivo_todavia": "La persona todavía no dio el porqué de ese día: Leda se lo "
                           "consultó y espera la respuesta. No hay un porqué que contar.",
     "a": "A quién va un aviso.",
-    "llega": "Cuándo se entera quien recibe el aviso (a; sin a, la persona a la que Leda le "
-             "escribe): una fecha y hora es el momento en que le llega, que todavía no pasó; "
-             "si no, su código dice si ya le llegó, si no le va a llegar o si no le llegó.",
+    "llega": "Cuándo se entera quien recibe el aviso (el dato dice a quién va; si no lo dice, "
+             "la persona a la que Leda le escribe): una fecha es el día en que le llega, que "
+             "todavía no pasó; si no, su código dice si ya le llegó, si no le va a llegar o si "
+             "no le llegó.",
     "quien_destraba": "Quién puede destrabar el bloqueo: como dato, lo que dijo la persona; "
                       "como tipo de pregunta, Leda consulta quién lo puede destrabar y espera "
                       "un nombre, que no sabe, o que le toca a la persona que escribe "
@@ -1450,11 +1451,12 @@ _NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_e
 
 def para_redactar(valor: Any) -> Any:
     """Una copia del pedido de redacción con el nombre de quien aprueba el trabajo de la persona
-    dentro de `solo_si_pregunta` (`NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`), cada clave y cada
-    código de la cocina que nombra un concepto cambiado por el suyo para redactar
-    (`PARA_LA_REDACCION`) y cada día de `dias` en la forma corta con que se escribe (segunda
-    vuelta del formato, 2026-10-07); lo demás, tal cual."""
-    return _traducir(_quien_aprueba_solo_si_pregunta(valor))
+    dentro de `solo_si_pregunta` (`NOMBRAN_A_QUIEN_APRUEBA_SU_TRABAJO`); a quién va cada aviso a
+    otra persona y cuándo le llega, también (`AVISOS`, decisión 77); cada hora del reloj de un
+    hecho, en su día; cada clave y cada código de la cocina que nombra un concepto cambiado por el
+    suyo para redactar (`PARA_LA_REDACCION`) y cada día de `dias` en la forma corta con que se
+    escribe (segunda vuelta del formato, 2026-10-07); lo demás, tal cual."""
+    return _traducir(_sin_nombre_ni_hora(_quien_aprueba_solo_si_pregunta(valor)))
 
 
 def _traducir(valor: Any) -> Any:
@@ -1489,8 +1491,9 @@ def _traducir(valor: Any) -> Any:
 # el aviso de que se destrabó y lo que pasa si sigue sin decidir le nombran a quien está
 # arriba, que aprueba su trabajo; quién aprobó o pidió cambios, en el aviso de la decisión a
 # la persona responsable, es quien aprueba su trabajo, y a quien aprobó, él mismo). Los datos
-# que nombran a otra persona quedan a la vista: a quien aprueba se le nombra a la persona
-# responsable (`aviso_al_responsable`, `responsable`); a quien está arriba, quién tiene trabada
+# que nombran a otra persona quedan a la vista, salvo a quién va un aviso, que desde la decisión
+# 77 nunca queda (`AVISOS`): a quien aprueba se le nombra a la persona
+# responsable (`responsable`); a quien está arriba, quién tiene trabada
 # la decisión (`quien_aprueba`); y a quien pide algo que decide otro, quién lo decide
 # (`quien_decide`, `quien_aprueba` en `no_es_quien_aprueba`): es la respuesta a lo que pidió.
 SOLO_SI_PREGUNTA = "solo_si_pregunta"
@@ -1581,6 +1584,82 @@ LLEGA = "llega"
 
 def _es_una_hora(valor: Any) -> bool:
     return isinstance(valor, str) and bool(re.match(r"^\d{4}-\d{2}-\d{2}T", valor))
+
+
+# --- Un aviso a otra persona, sin su nombre ni su hora (decisión 77 del usuario, 2026-10-12) --
+#
+# En la prueba por Telegram, ocho mensajes dijeron a quién y a qué hora le llegaba un aviso
+# ("Recibirá mi pregunta hoy a las 12:15", "Marcos será informado hoy de lo que dijiste",
+# "Mañana a las 10:00 te voy a preguntar cómo te fue"): robótico, la hora del reloj no aporta y
+# nombrar a quien se entera suena acusatorio. Ya lo pedían la constitución §8 ("Leda dice que
+# algo quedó asentado, no a quién se lo contó") y la decisión 35. La IA escribe lo que dicen
+# los hechos: cada hecho de un aviso le pasaba el destinatario (`a`) y la hora exacta (`llega`).
+#
+# La regla, para todos los avisos a la vez y no por mensaje, en el borde de la redacción (los
+# hechos de la cocina no cambian): de un aviso a otra persona, la IA ve que hay un aviso (el
+# dato que lo nombra) y si ya le llegó o no (un código); a quién va (`a`, `se_avisa_a`) y cuándo
+# le llega, dentro de `solo_si_pregunta`. De lo que Leda le va a escribir a la misma persona
+# (`AVISOS_A_LA_PERSONA`), cuándo: sólo el día, que la redacción escribe con las palabras de
+# todos los días (`dias`: hoy, mañana, pasado mañana o su forma corta), y la hora aparte. Y
+# ninguna otra hora del reloj de un hecho queda a la vista: su día, y la hora aparte. Si la
+# persona pregunta a quién se le avisó y cuándo, la redacción lo tiene en `solo_si_pregunta`,
+# también desde los últimos turnos (el paso 7 del guion de la Fase C).
+#
+# Un aviso es un dato con `llega`, o uno de éstos, que también se nombran sin `llega` (la persona
+# trabada se entera de a quién le consulta Leda; lo que quedó asentado del atraso, decisión 35).
+# `test_avisos_sin_nombre_ni_hora.py` recorre el código del motor: un aviso nuevo que no está acá
+# hace fallar la prueba.
+A = "a"
+SE_AVISA_A = "se_avisa_a"
+# Lo que Leda le va a escribir a la persona a la que le escribe ahora (nunca llevan `a`).
+AVISOS_A_LA_PERSONA = frozenset({
+    "proximo_aviso", "antes_le_recuerda_que_vence", "vuelve_a_pedir_el_estado",
+    "le_vuelve_a_preguntar", "le_pregunta_como_le_fue", "le_pregunta_para_cuando"})
+AVISOS = AVISOS_A_LA_PERSONA | frozenset({
+    # A quien aprueba, revisa o está arriba.
+    "aviso_al_referente", "aviso_a_quien_aprueba", "correccion_al_referente",
+    "aviso_de_la_prevision_corregida", "aviso_de_la_prevision_anterior",
+    "aviso_de_que_se_destrabo", "escalado_a", "queda_asentado", "aviso_de_la_cadena",
+    # A la persona responsable, a la trabada y a quienes esperan.
+    "aviso_al_responsable", "aviso_a_quien_esta_trabado", "aviso_a_quien_espera",
+    # A quien destraba: la consulta de Leda y lo que se le avisa.
+    "se_le_pregunta_a", "le_pregunta_tambien_a", "aviso_a_quien_destraba",
+    "aviso_a_quien_destrababa", "aviso_de_que_sigue_haciendo_falta",
+    # Un pase y un pedido del detalle: a quien decide, recibe, pidió o tenía la tarea.
+    "le_pregunta_a", "aviso_a_quien_pidio", "aviso_a_quien_decidio", "aviso_a_quien_la_tenia",
+    "aviso_a_quien_se_le_preguntaba", "aviso_a_quien_lo_pidio", "aviso_a_quienes_lo_pidieron",
+    # Uno que no salió, y los del administrador, por su canal.
+    "aviso_que_no_salio", "se_le_aviso_al_administrador", "aviso_al_administrador"})
+
+
+def _sin_nombre_ni_hora(valor: Any, clave: str | None = None) -> Any:
+    """Una copia del valor con a quién va cada aviso a otra persona y cuándo le llega dentro de
+    `solo_si_pregunta`, y cada otra hora de un hecho en su día, con la hora ahí mismo. `clave`:
+    el nombre del dato que trae el valor (el de una lista, para cada elemento)."""
+    if isinstance(valor, (list, tuple)):
+        return [_sin_nombre_ni_hora(v, clave) for v in valor]
+    if not isinstance(valor, Mapping):
+        return valor
+    es_un_aviso = LLEGA in valor or clave in AVISOS
+    a_la_persona = clave in AVISOS_A_LA_PERSONA and A not in valor
+    # Cuándo pasó un turno de la conversación no es un hecho: el orden de los turnos lo dice.
+    es_un_turno = "sentido" in valor
+    copia: dict[str, Any] = {}
+    aparte: dict[str, Any] = {}
+    for k, v in valor.items():
+        if k in _LO_QUE_ALGUIEN_ESCRIBIO or k == SOLO_SI_PREGUNTA or (es_un_turno and k == "at"):
+            copia[k] = v
+        elif k == SE_AVISA_A or (es_un_aviso and k == A):
+            aparte[k] = v
+        elif k == LLEGA and es_un_aviso and not a_la_persona and _es_una_hora(v):
+            aparte[k] = v
+        elif _es_una_hora(v):
+            copia[k], aparte[k] = v[:10], v
+        else:
+            copia[k] = _sin_nombre_ni_hora(v, k)
+    if aparte:
+        copia[SOLO_SI_PREGUNTA] = {**copia.get(SOLO_SI_PREGUNTA, {}), **aparte}
+    return copia
 
 
 # --- Los días de las fechas (tercera vuelta de ajuste, usuario, 2026-10-06) ------------------

@@ -317,9 +317,10 @@ def test_la_redaccion_cuenta_lo_que_pasa_en_el_mundo_y_no_da_por_hecho_lo_que_no
     decidió que habla del mundo, no de la cocina. Una regla del trabajo, sin frases ni casos."""
     texto = INSTRUCCIONES_REDACCION
     # D8: cuándo, sólo si los hechos lo traen a la vista (la hora del aviso a quien aprueba va en
-    # `solo_si_pregunta`).
-    assert "lo que pasa en el mundo" in texto and "quién se entera de qué" in texto
-    assert "cuándo si los hechos lo traen" in texto
+    # `solo_si_pregunta`). Decisión 77 (2026-10-12): lo que queda asentado, no quién se entera.
+    assert "lo que pasa en el mundo" in texto and "qué queda asentado" in texto
+    assert "quién se entera de qué" not in texto
+    assert "cuándo, si los hechos lo traen" in texto
     assert "todavía no pasó" in texto and "nunca lo das por hecho" in texto
     for palabra in ("guardado", "en cola", "sin enviar", "cuándo sale"):
         assert palabra not in texto, palabra
@@ -351,13 +352,14 @@ def test_la_redaccion_describe_la_tercera_vuelta_del_formato_sin_frases_de_ejemp
     assert "📅" not in texto
     assert "el primero del bloque" in texto and "va debajo" in texto
     assert "al principio de su renglón" in texto and "nunca en el medio" in texto
-    assert "voz pasiva" in texto and "nunca lo decís como algo que hacés vos" in texto
+    assert "nunca como algo que hacés vos" in texto
     # D8: lo que Leda misma le va a hacer a la persona, en primera persona.
     assert "en primera persona" in texto
-    # Decisión 11 (2026-10-08): a quien se entera se lo nombra sólo si un hecho lo nombra a la
-    # vista; si no, el sujeto es lo que se informa.
-    assert "fuera de solo_si_pregunta; si no, lo que se informa" in texto
-    assert "como sujeto del verbo notificar" not in texto
+    # Decisión 77 (2026-10-12; antes, la 11): lo que se entera otra persona quedó asentado; a
+    # quién va el aviso y cuándo le llega, sólo si la persona lo pregunta.
+    assert "lo que se informa quedó asentado" in texto
+    assert "cuándo le llega están en solo_si_pregunta" in texto
+    assert "voz pasiva" not in texto and "como sujeto del verbo notificar" not in texto
     for frase in ("ismael", "marcos", "será notificad", "fue notificad", "le avis", "avisarle",
                   "le voy a"):
         assert frase not in texto.lower(), frase

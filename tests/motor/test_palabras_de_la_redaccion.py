@@ -192,15 +192,18 @@ def test_lo_anunciado_que_ya_no_va_a_pasar_nombra_a_quien_aprueba_solo_si_pregun
     assert primero["solo_si_pregunta"] == {"a": "Ismael Soschinski"}
     assert primero["anuncio"] == "aviso_a_quien_aprueba_su_trabajo"
     assert primero["tarea"] == retirado["tarea"]
-    # Quien no aprueba el trabajo de la persona sigue a la vista.
-    assert recibido["ya_no_va_a_pasar"][2]["a"] == "Mariano"
+    # Desde la decisión 77 (2026-10-12), a quién iba cualquier aviso, también.
+    assert "Mariano" not in a_la_vista(recibido)
+    assert recibido["ya_no_va_a_pasar"][2]["solo_si_pregunta"] == {"a": "Mariano"}
 
 
 def test_a_quien_aprueba_se_le_nombra_a_la_persona_responsable_y_a_terceros():
     """La regla es sobre quien aprueba el trabajo de la persona a la que Leda le escribe: a quien
     aprueba se le nombra a la persona responsable ("Marcos te entregó…", y que Marcos se va a
     enterar de la decisión); a quien está arriba, quién tiene trabada la decisión; y a quien
-    pide algo que decide otro, quién lo decide."""
+    pide algo que decide otro, quién lo decide. Desde la decisión 77 (2026-10-12), a quién va un
+    aviso, a cualquiera, sólo si lo pregunta (`test_avisos_sin_nombre_ni_hora.py`): que Marcos
+    se va a enterar de la decisión ya no se dice con su nombre."""
     pedido = {"hoy": "2026-10-20", "persona": "Ismael", "mensaje": None, "pregunta": None,
               "hechos": [{"jugada": "aprobar",
                           "aviso_al_responsable": {"a": "Marcos", "llega": "ya_le_llego"}},
@@ -214,8 +217,8 @@ def test_a_quien_aprueba_se_le_nombra_a_la_persona_responsable_y_a_terceros():
 
     recibido, _ = _lo_que_recibe_la_redaccion(pedido)
 
-    assert solo_si_pregunta(recibido) == "[]"
-    assert a_la_vista(recibido).count("Marcos") == 4
+    assert solo_si_pregunta(recibido) == '[{"a": "Marcos"}]'
+    assert a_la_vista(recibido).count("Marcos") == 3
 
 
 def test_lo_que_espera_una_decision_se_dice_revision():
