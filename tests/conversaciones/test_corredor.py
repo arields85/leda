@@ -910,33 +910,16 @@ def test_el_enlace_de_entrada_a_la_web_que_espera_un_paso_se_compara_con_su_resp
         (cp.MOTOR, "enlace_web de la respuesta", True, False)]
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="la IA guionada nombra el hecho del ofrecimiento con '?' "
-                          "(tests/conversaciones/grabar.py, fuera de la superficie de la A-4)")
 def test_la_50_en_seco_pasa_entera(conn):
     """El RED de la A-1 (`odd/tasks/acceso-por-chat.md`): con las jugadas esperadas, la 50 pasa
     entera, con el ofrecimiento una sola vez (paso 1), sin repetirlo (2), a quien ya entró no (3),
     el enlace nuevo a pedido que anula el ofrecido (4), la charla que no corta nada (5), el corte
-    enseguida (6) y el aviso sin ofrecimiento (7). Estricta: cuando pase, se le saca la marca."""
+    enseguida (6) y el aviso sin ofrecimiento (7)."""
     [conv] = elegir(["50"])
 
     corrida = correr_conversacion(conn, conv, _perfecta(conv))
 
     assert corrida.error is None and corrida.fallas() == [], corrida.fallas()
-
-
-def test_la_50_en_seco_solo_falla_el_formato_del_texto_de_la_guionada(conn):
-    """Desde la A-4, lo único que le falta a la 50 en seco no es de Leda: el texto que escribe la
-    IA guionada nombra cada hecho por su jugada, su aviso o su resultado, y el del ofrecimiento no
-    tiene ninguno de los tres (`grabar.IAPerfecta.redactar` lo nombra "?"), así que el chequeo del
-    formato lee una pregunta que no es el cierre. Fija exactamente esa falla."""
-    [conv] = elegir(["50"])
-
-    corrida = correr_conversacion(conn, conv, _perfecta(conv))
-
-    assert corrida.error is None
-    assert [(paso, f.clase, f.esperado) for paso, f in corrida.fallas()] == [
-        (1, cp.FORMATO, cp.CIERRE_APARTE)], corrida.fallas()
 
 
 def test_a_las_demas_personas_la_web_se_les_da_por_ofrecida(conn):

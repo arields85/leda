@@ -78,7 +78,8 @@ class IAPerfecta:
         varios avisos del mismo tipo los nombra una vez, con cuántos son (porción 3c)."""
         hechos = pedido.get("hechos") or []
         pregunta = pedido.get("pregunta")
-        cuantos = Counter(str(h.get("aviso") or h.get("jugada") or h.get("resultado") or "?")
+        cuantos = Counter(str(h.get("aviso") or h.get("jugada") or h.get("resultado")
+                             or h.get("ofrecimiento") or "?")
                          for h in hechos)
         resumen = ", ".join(n if k == 1 else f"{n} ×{k}" for n, k in cuantos.items())
         huella = hashlib.sha1(json.dumps([pedido.get("persona"), hechos, pregunta],
