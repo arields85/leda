@@ -160,4 +160,13 @@ describe('Dropdown', () => {
     fireEvent.click(b);
     expect(screen.queryByRole('listbox')).toBeNull();
   });
+  it('a tap on the button closes it where a tap gives the button no focus (iPhone)', () => {
+    render(<Field />);
+    fireEvent.click(button());
+    // On iOS the tap moves the focus out of the list to nowhere before the click arrives.
+    fireEvent.blur(list(), { relatedTarget: null });
+    fireEvent.click(button());
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(button()).toHaveAttribute('aria-expanded', 'false');
+  });
 });

@@ -119,9 +119,12 @@ export function Dropdown({ id, labelledBy, value, options, onChange, describedBy
     setActive(next);
   }
 
-  /** The focus left the list for something outside it (not a tap, which `outside` sees). */
+  /** The focus left the list for something outside it (not a tap, which `outside` sees). A
+   * blur to nowhere is a tap: on iOS a tapped button takes no focus, and closing here would let
+   * the button's own click open the list again. */
   function onListBlur(event: FocusEvent<HTMLUListElement>) {
-    if (!root.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
+    const next = event.relatedTarget as Node | null;
+    if (next && !root.current?.contains(next)) setOpen(false);
   }
 
   return (
