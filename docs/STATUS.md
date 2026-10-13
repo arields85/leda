@@ -113,7 +113,9 @@ viejo corriendo.
 1. ~~Un toque no lleva el ofrecimiento de la web~~: confirmado por el usuario (2026-10-13).
 2. **El túnel o HTTPS y la prueba en el celular** del acceso por chat (el enlace tiene que abrir desde
    Telegram en el teléfono).
-3. **Confirmar `@Leda_Motor_bot` como `bot_usuario`** del pack (lo dice Telegram, `getMe`).
+3. ~~El usuario del bot~~: el usuario creó bots nuevos (2026-10-13), `@Leda_PM_bot` y `@Leda_Admin_bot`;
+   `bot_usuario: Leda_PM_bot` en el pack, importado en `leda_motor` (versión 2; respaldo
+   `db/respaldos/leda_motor-antes-bot-nuevo-20261013.dump`). Los tokens nuevos los pone el usuario en el `.env`.
 4. **Las tres preguntas de "Para decidir"** de `../odd/tasks/plataforma-p2.md`.
 5. **La 22, comprensión 0 de 3** en la ronda de la T9 (la misma clase que en la D6, `PENDIENTE`).
 6. **Subir la rama y `main`:** `origin/feat/motor-de-conversacion` está en `b2e84a2b`; lo de esta
