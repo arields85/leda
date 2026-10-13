@@ -199,10 +199,15 @@ No se decide nada de esto acá; cada uno, con un ejemplo, para preguntarlo de a 
 
 1. ~~**Cómo se entera Dirección de una tarea que crea un referente.**~~ **Decidido (usuario,
    2026-10-13): "sin aviso".** Ismael la ve en la web, con quién la creó, y en el resumen semanal; la
-   decisión 7 del ADR 0022 sigue valiendo.
-2. **La carga por administración en nombre de otro.** Ejemplo: Ariel, desde la puerta de
-   administración, carga una tarea que Ismael le pidió por teléfono; ¿se guarda "decidió Ismael"
-   como declaración, como hoy, o la decidió Ariel?
+   decisión 7 del ADR 0022 sigue valiendo. **Precisión del usuario (2026-10-13):** "se debería poder elegir desde la web de
+   dirección como quiere recibir ese tipo de notificaciones y lo ajusta a su gusto". Sin aviso es lo que
+   viene de fábrica; Dirección lo cambia desde su web (por ejemplo: al momento, juntas en el resumen o
+   ninguna). Es una función disponible que ajusta como quiere (decisión 5); los avisos siguen el tope
+   de contacto de la mecánica §10. Las opciones exactas, en el diseño corto de su porción.
+2. ~~**La carga por administración en nombre de otro.**~~ **Decidido (usuario, 2026-10-13): "la
+   primera".** Como hoy, quien carga por la puerta de administración declara quién la decidió y la
+   auditoría guarda las dos cosas (la cargó Ariel, la decidió Ismael); sólo se puede elegir a quien
+   tiene autoridad sobre esa tarea según la jerarquía: Dirección o el referente del área.
 3. **Quién es "su referente" para aprobar una propuesta.** La base tiene dos datos: el referente del
    área y quién aprueba a cada persona (que puede ser de otra área: "Marcos aprueba a Nahuel aunque
    estén en áreas distintas"). Ejemplo: si no coinciden, ¿quién aprueba "Comprar los tornillos" de
