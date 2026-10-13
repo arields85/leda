@@ -177,8 +177,10 @@ falta, con respaldo previo; nunca `leda` ni `leda_flujo`.
 `odd/tasks/motor-definitivo.md`. Sus cierres están hechos (2026-10-07): las palabras de todos los días, el
 formato de los mensajes (aprobado por el usuario), `prueba_chica/` borrada y `main` con el motor.
 
-**Después:** la Fase C, cerrada con la prueba por Telegram del 2026-10-12 (quedan sus correcciones), y la plataforma web, con su
-ADR 0022 aceptado. No hay equipo real hasta que el usuario lo diga.
+**Después:** la Fase C y sus correcciones, cerradas (2026-10-12 y 13), y la plataforma web (ADR 0022 y 0023).
+El orden de lo que sigue (la plataforma por jerarquía, Leda con un equipo real, la API de lectura y el dashboard,
+y lo anotado para más adelante), acordado con el usuario el 2026-10-13, está en `ROADMAP.md`, "Lo que sigue a
+la plataforma". No hay equipo real hasta que el usuario lo diga.
 
 ## Qué quedó congelado o superado
 

@@ -88,6 +88,27 @@ reutiliza al cerrar el aislamiento entre clientes.
 
 Etapas y criterios de paso a `main` (M1 a M3): [`STATUS.md`](STATUS.md), "Próximo paso".
 
+### Lo que sigue a la plataforma, en orden (usuario, 2026-10-13: "el orden que propones es el correcto")
+
+1. **La plataforma según la jerarquía del equipo** ([ADR 0023](decisions/0023-quien-crea-en-la-plataforma.md)):
+   las porciones J1 a J6 de `odd/tasks/plataforma-jerarquias.md`. Con ellas Leda queda completa para un
+   equipo: el seguimiento por chat y la plataforma.
+2. **Leda con un equipo real:** el servidor en internet (la VPS) con HTTPS de verdad, que el ADR 0022
+   (decisión 16) deja esperando la autorización del usuario; lo que falta para producción (cola de
+   entrada, pool de conexiones, observabilidad, respaldo y restauración: `STATUS.md`, "Deudas
+   registradas"); los riesgos de arquitectura (la salida atada a Telegram, un límite de Telegram que
+   decide un dato de negocio: "Qué se corrige", arriba); la IA de cada cliente con su propio proveedor;
+   cómo se da de alta un segundo cliente; y la primera prueba con un equipo de verdad.
+3. **La API de lectura y el dashboard** (ADR 0017, decisión 5): otros programas que leen el estado de un
+   espacio y un panel con números del equipo. Esperan sus precondiciones (el cierre del aislamiento y
+   el desacople del transporte, que van en el punto 2) y que el seguimiento ande bien en pruebas reales;
+   con un equipo real usando Leda recién hay números de verdad para mostrar.
+4. **"Anotado para más adelante"** (abajo), cuando el seguimiento funcione bien en pruebas reales; su
+   orden se decide al llegar.
+
+Aparte, sin orden: lo que queda abierto de esta etapa (la conversación 22, el paso a `main`, los casos
+de borde de las revisiones y los `PENDIENTE` de los ADR), en `STATUS.md`.
+
 ### Anotado para más adelante
 
 Lo que se pide de pasada desde el Motor; se retoma cuando Leda haga bien el seguimiento en pruebas
