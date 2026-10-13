@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-13, tarde: ADR 0023 aceptado, J1 construida; falta su prueba en el celular. Ver "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-13, tarde: ADR 0023 aceptado; J1 y J2 hechas y probadas en el celular. Ver "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -54,14 +54,14 @@ viejo corriendo.
 - Los bots nuevos del usuario, `@Leda_PM_bot` y `@Leda_Admin_bot` (sus tokens, en el `.env`, los pone el
   usuario); `bot_usuario: Leda_PM_bot` en el pack.
 - Las decisiones de la plataforma por jerarquía: el ADR 0023 y `../odd/tasks/plataforma-p2.md` ("Para decidir").
-- La J1, las esperas en el formulario, construida y revisada por RDD (`980a8f2a`, `fb87d121`).
+- La J1 (las esperas en el formulario) y la J2 (la ayuda de la IA al cargar: "Contame qué querés hacer"),
+  construidas, revisadas por RDD y pasadas en el celular; la J2 con la IA real, 48 de 48.
 - `leda_motor`, en la `0067` (respaldos en `db/respaldos/`, el último `leda_motor-antes-0067-20261013.dump`).
 
-**Punto exacto para seguir: la J1-5, la prueba del usuario en el celular**, con el guion de
-`../odd/tasks/plataforma-jerarquias.md`. Se prende el túnel (`cloudflared tunnel --no-autoupdate --url
-http://127.0.0.1:8000`; la dirección cambia cada vez, autorizado para probar), se reinicia la web, y el usuario
-emite su enlace con `$env:LEDA_BASE_URL` del túnel y `leda enlace-admin Ariel`. Después, la J2. La
-conversación 22, después de la plataforma. Lo que sigue a la plataforma, en orden: `ROADMAP.md`.
+**Punto exacto para seguir: la J2b** (la voz a texto en el servidor: GPT-4o Transcribe por OpenRouter contra
+Gemini, con unos 10 dictados del usuario; base `research/gemini-voz-del-otro-proyecto.md`), después la J3. El
+túnel para probar: `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000` (la dirección cambia cada vez).
+Lo que sigue a la plataforma, en orden: `ROADMAP.md`.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
