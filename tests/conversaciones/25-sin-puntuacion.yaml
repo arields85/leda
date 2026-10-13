@@ -41,7 +41,7 @@ pasos:
     estado_despues:
       ultimo_aviso: {Marcos: [COM, PLC]}
     dice:
-      - las dos tareas de Marcos, cada una en su renglón con 🗓️ y su fecha corta, el jue 22/10
+      - "las dos tareas de Marcos, cada una en su renglón con el ícono de su estado y su fecha corta, el jue 22/10: la del PLC, en curso, con 🟢; la de comunicaciones, sin empezar, con ⚪"
       - que no hace falta contestar, solo en el último renglón
 
   - paso: 2

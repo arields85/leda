@@ -12,7 +12,10 @@ el pedido del usuario al aprobar M3. Tercera vuelta (usuario, 2026-10-07, despu�
 por Telegram): 🗓️ en vez de 📅, que Telegram dibuja con una fecha fija; en un bloque con una tarea, su
 renglón con 📋 es el primero y todo lo de esa tarea, también quién dijo qué, va debajo; una marca va
 siempre al principio de su renglón, nunca en el medio; y cuando otra persona se entera, Leda lo dice en
-pasiva, en futuro mientras no pasó, nunca como algo que ella le avisa. **Desde el 2026-10-08 (decisión 11
+pasiva, en futuro mientras no pasó, nunca como algo que ella le avisa. **Desde el 2026-10-12 (decisión
+79):** en una lista de tareas, el renglón de cada una abre con el ícono de su estado, que pone la cocina
+(🏁 terminada, 🟢 en curso y al día, ⚪ sin empezar o sin novedades, 🔵 entregada, 🟠 atrasada, 🔴
+trabada); la IA sigue escribiendo 🗓️. **Desde el 2026-10-08 (decisión 11
 del usuario, `odd/tasks/fase-c.md`):** a quien aprueba el trabajo de la persona no se lo nombra por su
 cuenta, así que la pasiva va sobre lo que se informa ("La nueva fecha queda informada"), no sobre él
 ("Ismael será notificado" quedó superado); si la persona pregunta a quién se le avisa, Leda le dice el
@@ -41,9 +44,9 @@ nombre.
    - Jugadas: `consultar_pendientes`.
    - Efecto: ninguno.
    - La respuesta dice: primero, en un renglón, que tiene dos tareas pendientes; después las dos, cada una
-     en su renglón con 🗓️, su nombre completo, su estado y su fecha corta: la del PLC sin empezar, que
-     vence el vie 23/10; la de comunicaciones en curso, que vence el vie 30/10. El próximo paso, aparte y
-     al final.
+     en su renglón con el ícono de su estado, su nombre completo, su estado y su fecha corta: la del PLC
+     sin empezar, con ⚪, que vence el vie 23/10; la de comunicaciones en curso, con 🟢, que vence el vie
+     30/10. El próximo paso, aparte y al final.
    - La respuesta no dice: tareas de otras personas; las dos tareas en un mismo renglón; negrita,
      viñetas u otra marca (títulos, enlaces, cursiva, código); una fecha larga ("viernes 23 de
      octubre").

@@ -6,7 +6,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 
 TELEGRAM_TEXT_LIMIT = 4096
@@ -452,9 +452,27 @@ MAX_ENTIDADES_TELEGRAM = 100
 # costados. El corredor de las conversaciones mide con este mismo número
 # (`tests/conversaciones/comprobar.py`).
 RENGLON_MAXIMO = 140
-# Los renglones de una tarea (📋 sola, 🗓️ con su vencimiento y la marca vieja 📅): nunca se
-# tocan. Las marcas se reconocen sin el selector de emoji (U+FE0F) que puede seguirlas.
-_MARCAS_DE_TAREA = ("📋", "\U0001F5D3", "📅")
+# Un ícono por estado en las listas de tareas (decisión 79 del usuario, 2026-10-12): con uno por
+# estado, "todo verde" ya es la buena noticia, y el verde sólo dice lo que Leda sabe. Los pone la
+# cocina (`iconos_por_estado`), con el estado que sabe de los hechos que armó
+# (`motor.hechos.iconos_de_las_listas`); la IA no los elige.
+ICONO_TERMINADA = "🏁"
+ICONO_AL_DIA = "🟢"          # en curso y al día
+ICONO_SIN_NOVEDADES = "⚪"   # sin empezar, o sin contar cómo viene
+ICONO_ENTREGADA = "🔵"       # esperando la revisión
+ICONO_ATRASADA = "🟠"
+ICONO_TRABADA = "🔴"
+ICONOS_DE_ESTADO = (ICONO_TERMINADA, ICONO_AL_DIA, ICONO_SIN_NOVEDADES, ICONO_ENTREGADA,
+                    ICONO_ATRASADA, ICONO_TRABADA)
+# Los renglones de una tarea (📋 sola, 🗓️ con su vencimiento, la marca vieja 📅 y el ícono de su
+# estado en una lista): nunca se tocan. Las marcas se reconocen sin el selector de emoji (U+FE0F)
+# que puede seguirlas.
+_MARCAS_DE_TAREA = ("📋", "\U0001F5D3", "📅", *ICONOS_DE_ESTADO)
+# Lo que puede abrir el renglón de una tarea en una lista y la cocina cambia por el ícono de su
+# estado: una marca de tarea o una viñeta, con el selector de emoji y los espacios que la siguen.
+_ABRE_UNA_TAREA = re.compile(
+    "^(?:" + "|".join(re.escape(m) for m in _MARCAS_DE_TAREA) + r"|[•-](?=[ \t]))"
+    + "️?[ \t]*")
 # Lo que abre un renglón y dice qué es: lo anotado (✏️), lo que pide atención (⚠️) y una viñeta.
 _MARCAS_DE_RENGLON = ("✏", "⚠", "•", "- ")
 # El final de una oración: un punto, un signo que cierra una pregunta o una exclamación o unos
@@ -501,7 +519,8 @@ def dar_forma(texto: str, *, con_cierre: bool = True) -> str:
       renglón, en el mismo bloque. Una oración sola más larga queda como está. La marca o la
       viñeta queda en el primer pedazo y los que siguen van sin marca, debajo: la marca dice qué
       es ese renglón y lo que sigue en el bloque es su continuación (una marca repetida diría
-      que es otra cosa anotada u otra viñeta). Un renglón de una tarea (📋 o 🗓️) nunca se toca.
+      que es otra cosa anotada u otra viñeta). Un renglón de una tarea (📋, 🗓️ o el ícono de su
+      estado en una lista) nunca se toca.
     - Con `con_cierre`, el cierre va solo en su renglón con un renglón en blanco antes
       (`_separar_el_cierre`)."""
     renglones: list[str] = []
@@ -512,6 +531,30 @@ def dar_forma(texto: str, *, con_cierre: bool = True) -> str:
             renglones.append(renglon)
     if con_cierre:
         _separar_el_cierre(renglones)
+    return "\n".join(renglones)
+
+
+def iconos_por_estado(texto: str, iconos: Mapping[str, str]) -> str:
+    """El texto con la marca del renglón de cada tarea de una lista cambiada por el ícono de su
+    estado (decisión 79): `iconos` va del título completo de cada tarea a su ícono. Un renglón que
+    abre con una marca de tarea (📋, 🗓️, 📅 o un ícono de estado) o con una viñeta y nombra una
+    tarea de `iconos` (el título más largo primero, sin importar mayúsculas) abre con su ícono;
+    lo demás del renglón no cambia. Un renglón sin esa marca, o sin una tarea de la lista, queda
+    como está. Dos veces da lo mismo que una."""
+    if not iconos:
+        return texto
+    titulos = sorted(((t.casefold(), i) for t, i in iconos.items() if t),
+                     key=lambda par: len(par[0]), reverse=True)
+    renglones = texto.split("\n")
+    for n, renglon in enumerate(renglones):
+        sangria = renglon[:len(renglon) - len(renglon.lstrip())]
+        marca = _ABRE_UNA_TAREA.match(renglon[len(sangria):])
+        if marca is None:
+            continue
+        resto = renglon[len(sangria) + marca.end():]
+        icono = next((i for t, i in titulos if t in resto.casefold()), None)
+        if icono is not None:
+            renglones[n] = f"{sangria}{icono} {resto}"
     return "\n".join(renglones)
 
 

@@ -1144,16 +1144,42 @@ def _escalado_a(cur, escalon: list[dict[str, Any]]) -> list[dict[str, str]]:
 
 
 def _consultar_pendientes(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
-    filas = ejecutar(ctx.cur, ctx.quien, "consultar_tareas", {})
+    filas = [f for f in ejecutar(ctx.cur, ctx.quien, "consultar_tareas", {})
+             if str(f["estado"]) not in ("terminada", "cancelada")]
     alias = {t["id"]: t["alias"] for t in ctx.tareas}
     zona = ctx.calendario.zona
-    tareas = [
-        {"alias": alias.get(str(f["id"])), "titulo": f["titulo"], "estado": str(f["estado"]),
-         "vence": f["fecha_objetivo"].astimezone(zona).date().isoformat()
-         if f["fecha_objetivo"] else None,
-         **({"cambios_pedidos": f["cambios_pedidos"]} if f.get("cambios_pedidos") else {})}
-        for f in filas if str(f["estado"]) not in ("terminada", "cancelada")]
+    tareas = []
+    for f in filas:
+        tarea = {"alias": alias.get(str(f["id"])), "titulo": f["titulo"],
+                 "estado": str(f["estado"]),
+                 "vence": f["fecha_objetivo"].astimezone(zona).date().isoformat()
+                 if f["fecha_objetivo"] else None,
+                 **({"cambios_pedidos": f["cambios_pedidos"]} if f.get("cambios_pedidos")
+                    else {})}
+        _lo_que_se_sabe_de_como_viene(ctx, tarea, f["id"])
+        tareas.append(tarea)
     return {"resultado": "leido", "tareas": tareas}
+
+
+def _lo_que_se_sabe_de_como_viene(ctx: Contexto, tarea: dict, task_id) -> None:
+    """Lo que la cocina sabe de cómo viene una tarea de la lista, con los datos de siempre, para
+    que el ícono de su estado diga sólo lo que Leda sabe (decisión 79): el día que dio la persona
+    para terminarla, si es otro que el vencimiento, y, si Leda le preguntó cómo viene otro día y
+    no contó, desde cuándo."""
+    from .ancla import prevision_vigente
+    from .cadencias import sin_respuesta_desde
+
+    prevision = prevision_vigente(ctx.cur, task_id)
+    if prevision is not None and prevision["fecha_prevista"].isoformat() != tarea["vence"]:
+        tarea["prevision_vigente"] = {
+            "fecha": prevision["fecha_prevista"].isoformat(),
+            **({"motivo": prevision["motivo"]} if prevision["motivo"] else {})}
+    if tarea["estado"] in ("asignada", "en_curso"):
+        hoy = ctx.ahora.astimezone(ctx.calendario.zona).date()
+        desde = sin_respuesta_desde(ctx.cur, ctx.calendario, ctx.quien.membership_id, task_id,
+                                    hoy)
+        if desde is not None:
+            tarea["sin_respuesta_desde"] = desde.isoformat()
 
 
 # La entrega (ADR 0019, decisiones 4 y 5; porción 2 de la C-3): sus jugadas están en

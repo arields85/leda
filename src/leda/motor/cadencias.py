@@ -87,7 +87,8 @@ from typing import Any, NamedTuple
 from ..incidentes import registrar_incidente
 
 from .ancla import anclaje, prevision_vigente
-from .avisos import ABIERTOS, Momento, guardar, hechos_de_la_escalera, leer_tarea, omitir
+from .avisos import (ABIERTOS, ESPERA_DE_ESTADO, Momento, guardar, hechos_de_la_escalera,
+                     leer_tarea, omitir)
 from .preguntas import COMO_VIENEN_SUS_TAREAS
 from .tiempo import sale, sale_el
 
@@ -375,6 +376,12 @@ def armar(m: Momento, persona: str, del_dia: dict[str, list[dict[str, Any]]]) ->
         dicho = renglon(m, tarea, del_dia.get(tid, []))
         if pregunta and sin_respuesta:
             dicho[SIN_RESPUESTA_DESDE] = desde
+        elif se_puede_mover(tarea):
+            # Lo que Leda preguntó otro día (su escalera, o una lista de otra semana) y la persona
+            # no contestó: Leda no sabe cómo viene (decisión 79: el verde, sólo lo que sabe).
+            antes_de_hoy = sin_respuesta_desde(m.cur, m.cal, persona, tarea["id"], m.hoy)
+            if antes_de_hoy is not None:
+                dicho[SIN_RESPUESTA_DESDE] = antes_de_hoy.isoformat()
         renglones.append(dicho)
         if pregunta:
             preguntadas.append(tid)
@@ -410,6 +417,25 @@ def sin_contestar_en_la_lista(cur, persona: str, task_id, antes_del: date) -> bo
         return False
     desde = dicha.get("sin_respuesta_desde")
     return desde is not None and date.fromisoformat(desde) < antes_del
+
+
+def sin_respuesta_desde(cur, cal, persona: str, task_id, hoy: date) -> date | None:
+    """Desde qué día Leda espera saber cómo viene la tarea sin que la persona le haya contado, si
+    se lo preguntó un día anterior a `hoy`: su espera del estado sigue abierta (la escalera) o la
+    última lista que le salió se la preguntó y no contestó. `None` si no. Es lo que Leda no sabe:
+    en el informe al grupo, ni bien ni atrasada (decisión 55); en una lista, sin el verde de lo
+    que va bien (decisión 79)."""
+    cur.execute("""select min(preguntado_en) as desde from pending_reply
+                    where task_id = %s and membership_id = %s and tipo = %s
+                      and satisfecho_en is null and preguntado_en < %s""",
+                (str(task_id), persona, ESPERA_DE_ESTADO,
+                 datetime.combine(hoy, time.min, tzinfo=cal.zona)))
+    fila = cur.fetchone()
+    dias = [fila["desde"].astimezone(cal.zona).date()] if fila and fila["desde"] else []
+    if sin_contestar_en_la_lista(cur, persona, task_id, hoy):
+        dicha = _la_ultima_que_salio(cur, persona)["tareas_de_la_lista"]["tareas"][str(task_id)]
+        dias.append(date.fromisoformat(dicha["sin_respuesta_desde"]))
+    return min(dias) if dias else None
 
 
 # --- Lo contestado (decisión 31) ----------------------------------------------------------------

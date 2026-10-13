@@ -76,6 +76,7 @@ from . import (aprobacion, archivos, cambios_de_estado, detalle, entrega, fichas
                persecucion, pregunta_sin_contestar, preguntas, registro)
 from .efectos import ANUNCIADOS, YA_NO_VA_A_PASAR, al_final_del_turno
 from .fichas import JUGADAS, LLEGA, Contexto, Manejador, lo_que_puede_hacer
+from .hechos import con_los_iconos
 from .ia import IA, Jugada
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
 from .situaciones import elegir_opcion, sin_elegir
@@ -215,9 +216,11 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
             # (9k). También lo que un turno anterior dejó anunciado y ya no va a pasar, y lo
             # que sigue.
             final = al_final_del_turno(ctx, hechos)
-            texto = pedir_a_la_ia(lambda: no_vacio(_redactar(
-                ia, {**_pedido_de_redaccion(ctx, hechos, pregunta, final.ya_no_sale),
-                     **llegaron}, al_avanzar)))
+            pedido = {**_pedido_de_redaccion(ctx, hechos, pregunta, final.ya_no_sale),
+                      **llegaron}
+            texto = pedir_a_la_ia(lambda: no_vacio(_redactar(ia, pedido, al_avanzar)))
+            # El ícono del estado de cada tarea de una lista lo pone la cocina (decisión 79).
+            texto = con_los_iconos(texto, pedido)
             listo_en = time.monotonic()
     except IANoRespondio as falla:
         return _si_la_ia_falla(cur, ctx, ia, reloj, inicio, elegidas, falla, clave_respuesta,

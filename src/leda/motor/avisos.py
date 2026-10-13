@@ -177,6 +177,7 @@ from .asentado import QUEDA_ASENTADO, queda_asentado
 from .auditoria import auditar
 from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, FICHAS, LLEGA, NO_LE_LLEGO,
                      YA_LE_LLEGO, quien_revisa, referente)
+from .hechos import con_los_iconos
 from .margen import sale_con_margen
 from .ia import IA
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
@@ -698,6 +699,25 @@ def _a_quien_va_ahora(m: Momento, aviso: dict[str, Any], tipo: TipoDeAviso) -> d
     return m.cur.fetchone()
 
 
+def _con_el_estado_de_cada_tarea(m: Momento, envio: list[_Listo]) -> list[_Listo]:
+    """Un envío que junta avisos de varias tareas es una lista: cada aviso dice el estado de la
+    suya, también el que no lo lleva (el aviso previo), para que el ícono de su renglón diga cómo
+    viene (decisión 79; `hechos.iconos_de_las_listas`). Trabada si tiene un bloqueo abierto."""
+    tareas = {x.hechos["tarea"] for x in envio if isinstance(x.hechos.get("tarea"), str)}
+    if len(tareas) < 2:
+        return envio
+    con_estado = []
+    for x in envio:
+        tarea = (leer_tarea(m.cur, x.aviso["task_id"])
+                 if "estado" not in x.hechos and isinstance(x.hechos.get("tarea"), str)
+                 and x.aviso["task_id"] is not None else None)
+        if tarea is not None:
+            estado = "bloqueada" if tarea["bloqueada"] else tarea["estado"]
+            x = replace(x, hechos={**x.hechos, "estado": estado})
+        con_estado.append(x)
+    return con_estado
+
+
 def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     """Un envío: la IA redacta un mensaje desde los hechos de todos sus avisos, con una sola
     pregunta (la del primero que pide respuesta); sale por el outbox una vez y cada aviso queda
@@ -712,6 +732,7 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     envio = [replace(x, hechos={**x.hechos, "botones": [boton_para_ver(x.hechos["tarea"])]})
              if (en_lista or x.tipo.ofrece_ver) and x.hechos.get("tarea") else x
              for x in envio]
+    envio = _con_el_estado_de_cada_tarea(m, envio)
     enlace = _enlace_del_envio(m, envio)
     if enlace is not None:
         envio = [replace(envio[0], hechos={**envio[0].hechos, LLEVA_EL_ENLACE: True}),
@@ -729,6 +750,8 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
         texto = no_vacio(ia.redactar(pedido))
     except Exception as falla:     # la IA es un servicio externo: cualquier falla es no redactar
         return _si_la_ia_no_redacta(m, envio, falla)
+    # El ícono del estado de cada tarea de una lista lo pone la cocina (decisión 79).
+    texto = con_los_iconos(texto, pedido)
 
     primero = str(envio[0].aviso["id"])
     clave = f"motor:aviso:{primero}"

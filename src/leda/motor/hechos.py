@@ -44,6 +44,7 @@ from collections.abc import Iterator, Mapping
 from datetime import date, timedelta
 from typing import Any
 
+from .. import salida
 from .fichas import FICHAS
 
 # Un código: minúsculas y cifras, con al menos un guion bajo (un texto libre lleva espacios).
@@ -1680,3 +1681,83 @@ def bloque(valor: Any) -> str:
     vistos = list(dict.fromkeys(n for n in _nombres(valor) if significado(n) is not None))
     return "\n".join([ENCABEZADO_DEL_BLOQUE]
                      + [f"- {n}: {significado(n)}" for n in vistos])
+
+
+# --- Un ícono por estado en las listas de tareas (decisión 79 del usuario, 2026-10-12) ---------
+#
+# Con un solo ícono para todas hay que leer para saber cómo va; con uno por estado, "todo verde"
+# ya es la buena noticia (constitución §8). El verde sólo dice lo que Leda sabe (§4). Los pone la
+# cocina, no la IA (regla del mozo; decisión 74, la cocina da la forma del mensaje): el estado de
+# cada tarea de una lista sale de los hechos que la cocina armó para ese mensaje, y la marca de su
+# renglón se cambia en el texto (`salida.iconos_por_estado`). Las listas son las que la cocina arma
+# como listas: el informe al grupo (`informe_al_grupo.py`), la lista de la cadencia de cada
+# persona (`cadencias.py`), lo que la persona tiene pendiente (`consultar_pendientes`), la lista
+# de entregas para revisar y un envío que junta avisos de varias tareas (`avisos.py`). Una lista
+# es de dos tareas o más: el 📋 de un mensaje
+# sobre una sola tarea no cambia. Las tareas que un hecho nombra al hablar de otra (las que
+# dependen de ella, las que espera) no son una lista.
+
+# El informe al grupo ya decidió en qué lista va cada tarea (un atraso, sólo el hablado en
+# privado); las que siguen su curso, por su estado.
+_ICONO_DE_CADA_LISTA_DEL_INFORME = {
+    "terminadas": salida.ICONO_TERMINADA, "atrasadas": salida.ICONO_ATRASADA,
+    "trabadas": salida.ICONO_TRABADA, "entregadas": salida.ICONO_ENTREGADA,
+    "sin_saber_como_vienen": salida.ICONO_SIN_NOVEDADES}
+
+
+def icono_del_estado(tarea: Mapping[str, Any], hoy: str) -> str:
+    """El ícono del estado de una tarea, por lo que dicen sus hechos (`hoy`, AAAA-MM-DD):
+    terminada; trabada; entregada (aunque haya vencido); atrasada si venció o si el día que dio la
+    persona es posterior al vencimiento; sin novedades si Leda le preguntó cómo viene y no contó,
+    o si no la empezó; y al día sólo en curso, sin nada de eso."""
+    estado = tarea.get("estado")
+    if estado == "terminada":
+        return salida.ICONO_TERMINADA
+    if estado == "bloqueada" or tarea.get("causas"):
+        return salida.ICONO_TRABADA
+    if estado == "en_revision":
+        return salida.ICONO_ENTREGADA
+    vence = tarea.get("vence")
+    prevision = tarea.get("prevision_vigente")
+    dio = prevision.get("fecha") if isinstance(prevision, Mapping) else None
+    if vence and (vence < hoy or (dio and dio > vence)):
+        return salida.ICONO_ATRASADA
+    if estado != "en_curso" or tarea.get("sin_respuesta_desde"):
+        return salida.ICONO_SIN_NOVEDADES
+    return salida.ICONO_AL_DIA
+
+
+def _tareas_de_las_listas(hecho: Mapping[str, Any], hoy: str) -> Iterator[tuple[str, str]]:
+    """Cada tarea de una lista que trae el hecho, con el ícono de su estado."""
+    if hecho.get("aviso") == "informe_al_grupo":
+        for lista, icono in _ICONO_DE_CADA_LISTA_DEL_INFORME.items():
+            for renglon in hecho.get(lista) or []:
+                yield renglon["tarea"], icono
+        for renglon in hecho.get("siguen") or []:
+            yield renglon["tarea"], icono_del_estado(renglon, hoy)
+    elif hecho.get("aviso") == "entrega_en_la_lista":
+        yield hecho["tarea"], salida.ICONO_ENTREGADA
+    elif hecho.get("aviso") and isinstance(hecho.get("tarea"), str):
+        # Un aviso de una tarea; varios de distintas tareas en un mensaje son una lista
+        # (`avisos._con_el_estado_de_cada_tarea`).
+        yield hecho["tarea"], icono_del_estado(hecho, hoy)
+    elif hecho.get("jugada") == "consultar_pendientes":
+        for tarea in hecho.get("tareas") or []:
+            yield tarea["titulo"], icono_del_estado(tarea, hoy)
+    for renglon in hecho.get("sus_tareas") or []:
+        yield renglon["tarea"], icono_del_estado(renglon, hoy)
+
+
+def iconos_de_las_listas(pedido: Mapping[str, Any]) -> dict[str, str]:
+    """El ícono del estado de cada tarea de las listas de un pedido de redacción, por su título
+    completo; vacío si el mensaje no tiene una lista de dos tareas o más."""
+    iconos: dict[str, str] = {}
+    for hecho in pedido.get("hechos") or []:
+        if isinstance(hecho, Mapping):
+            iconos.update(_tareas_de_las_listas(hecho, str(pedido.get("hoy") or "")))
+    return iconos if len(iconos) > 1 else {}
+
+
+def con_los_iconos(texto: str, pedido: Mapping[str, Any]) -> str:
+    """Lo que redactó la IA, con el ícono del estado de cada tarea de sus listas."""
+    return salida.iconos_por_estado(texto, iconos_de_las_listas(pedido))

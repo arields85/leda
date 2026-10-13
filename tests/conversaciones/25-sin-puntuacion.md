@@ -38,8 +38,9 @@ del día; acá llega antes (paso 6) y a Ismael le llega un solo aviso, con el po
 1. **Leda**, por su cuenta, a Marcos (lunes 19, 10:00): el aviso previo de las dos tareas, juntas en un
    mensaje (mecánica §10, como en la conversación 13).
    →
-   - El mensaje dice: las dos tareas, cada una en su renglón con 🗓️ y su fecha corta, el jue 22/10; que no
-     hace falta contestar, solo en el último renglón.
+   - El mensaje dice: las dos tareas, cada una en su renglón con el ícono de su estado (decisión 79: la
+     del PLC, en curso, con 🟢; la de comunicaciones, sin empezar, con ⚪) y su fecha corta, el jue 22/10;
+     que no hace falta contestar, solo en el último renglón.
    - Botones: ninguno (decisión 9b).
    - Estado después: el último aviso enviado a Marcos es el de las dos tareas.
 

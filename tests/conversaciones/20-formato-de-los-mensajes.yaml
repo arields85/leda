@@ -54,7 +54,7 @@ pasos:
       pregunta_abierta: null
     dice:
       - primero, en un renglón, que tiene dos tareas pendientes
-      - "las dos, cada una en su renglón con 🗓️, su nombre completo, su estado y su fecha corta: la del PLC sin empezar, que vence el vie 23/10; la de comunicaciones en curso, que vence el vie 30/10"
+      - "las dos, cada una en su renglón con el ícono de su estado, su nombre completo, su estado y su fecha corta: la del PLC sin empezar, con ⚪, que vence el vie 23/10; la de comunicaciones en curso, con 🟢, que vence el vie 30/10"
       - el próximo paso, aparte y al final
     no_dice:
       - tareas de otras personas

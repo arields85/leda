@@ -77,7 +77,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from ..incidentes import registrar_incidente
@@ -86,9 +86,10 @@ from . import cambios_de_estado
 from .ancla import prevision_vigente
 from .asentado import AL_GRUPO, hay_informe_al_grupo
 from .auditoria import auditar
-from .avisos import (ESPERA_DE_ESTADO, ESPERAS_TRAS_UN_FALLO, ETAPA_AVISO_GUARDADO,
+from .avisos import (ESPERAS_TRAS_UN_FALLO, ETAPA_AVISO_GUARDADO,
                      ETAPA_AVISO_REINTENTO, INTENTOS, Momento, guardar, omitir)
-from .cadencias import YA_PASO_SU_MOMENTO, atender, leer_ritmo, sin_contestar_en_la_lista
+from .cadencias import YA_PASO_SU_MOMENTO, atender, leer_ritmo, sin_respuesta_desde
+from .hechos import con_los_iconos
 from .registro import no_vacio
 from .tiempo import sale
 
@@ -189,6 +190,9 @@ def _uno(m: Momento, aviso: dict[str, Any], ia) -> str:
         texto = no_vacio(ia.redactar(pedido))
     except Exception as falla:     # la IA es un servicio externo: cualquier falla es no redactar
         return _si_no_sale(m, aviso, falla, hechos)
+    # El ícono del estado de cada tarea lo pone la cocina, con lo que decidió el informe (decisión
+    # 79): un atraso, sólo el ya hablado en privado.
+    texto = con_los_iconos(texto, pedido)
     clave_salida = f"motor:aviso:{aviso_id}"
     try:
         enqueue_outbox(cur, workspace_id=m.workspace_id, chat_id=fila["grupo_chat_id"],
@@ -372,16 +376,10 @@ def _sin_entregar(m: Momento, t: dict[str, Any], renglon: dict[str, Any],
 def _no_contesto(m: Momento, t: dict[str, Any]) -> bool:
     """Si Leda le preguntó a la persona cómo viene la tarea un día anterior y no contestó desde
     entonces: su espera del estado sigue abierta desde antes de hoy, o la lista se la pregunta sin
-    respuesta desde antes de hoy."""
-    persona = str(t["responsable_membership_id"])
-    inicio_de_hoy = datetime.combine(m.hoy, time.min, tzinfo=m.cal.zona)
-    m.cur.execute("""select 1 from pending_reply
-                      where task_id = %s and membership_id = %s and tipo = %s
-                        and satisfecho_en is null and preguntado_en < %s limit 1""",
-                  (str(t["id"]), persona, ESPERA_DE_ESTADO, inicio_de_hoy))
-    if m.cur.fetchone() is not None:
-        return True
-    return sin_contestar_en_la_lista(m.cur, persona, t["id"], m.hoy)
+    respuesta desde antes de hoy (`cadencias.sin_respuesta_desde`, la misma regla que el ícono de
+    la tarea en la lista de la persona, decisión 79)."""
+    return sin_respuesta_desde(m.cur, m.cal, str(t["responsable_membership_id"]), t["id"],
+                               m.hoy) is not None
 
 
 def _semana_buena(m: Momento, desde: datetime, hubo_terminadas: bool) -> bool:
