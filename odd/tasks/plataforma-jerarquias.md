@@ -237,7 +237,13 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         herramienta: sin cupo se perdía el informe, `--veces` menor que 1 corría, toda excepción se
         contaba como de la IA, los nombres se buscaban con una copia de la función del servidor y la
         corrida en seco no probaba nada. Todos, arreglados en la J2-7.
-  - [ ] **J2-5 · Prueba real en el celular** (con el usuario).
+  - [ ] **J2-5 · Prueba real en el celular** (con el usuario). **Lo que vio el usuario**
+        (2026-10-13): la ayuda completó bien el título, la descripción, quién la hace (Marcos) y el
+        objetivo ("me sorprendió, lo hizo perfecto"); el criterio que propuso sólo repetía el
+        resultado, y una tarea cargada antes a mano tenía de criterio "No se" (las dos cosas, en la
+        J2-9). El dictado por el teclado del celular se cortaba una y otra vez (probablemente por el
+        bloqueo de la pantalla), así que lo escribió: insumo para la J2b, que la pantalla no se
+        apague mientras graba (la Wake Lock API). Queda sin marcar hasta repetirla con la J2-9.
   - [x] **J2-6 · La ronda con la IA real** (la lanzó el coordinador, con permiso; 2026-10-13):
         `tools/medir_ayuda_al_cargar.py --ia sol-suscripcion --veces 3` (chatgpt/gpt-6-sol),
         **29 de 33 bien** (`tests/conversaciones/resultados/ayuda-al-cargar.json`). Fallas: 3 ×
@@ -341,6 +347,111 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         (`$env:PYTHONPATH="src"; .venv\Scripts\python.exe tools\medir_ayuda_al_cargar.py --ia
         guionada --veces 1`): 3 de 11 bien (el ejemplo, el sábado y "antes del jueves"), sale con 1.
         Sin tocar la ruta: `tests/garantias` completa no se corrió.
+  - [x] **J2-9 · Un criterio que diga cómo se comprueba** (2026-10-13; ruta delegada, un escritor:
+        servidor, web, herramienta y pruebas).
+        **Lo que encontró el usuario en el celular:** (1) con la ayuda, Leda propuso "El PLC de la
+        comprimidora Fette 2000 y sus variables quedan listos para que Ariel la integre a la
+        interfaz. Se comprueba revisando que el PLC y sus variables estén listos para esa
+        integración.": circular, la parte de cómo se comprueba sólo repite el resultado; pasó
+        porque el código sólo miraba que esa parte existiera y estuviera dentro del criterio. (2)
+        Una tarea escrita a mano antes se cargó con el criterio "No se", y el formulario la aceptó.
+        **Lo que decidió** (2026-10-13): si la persona no dijo cómo se comprueba, Leda propone una
+        manera concreta (por ejemplo "las variables del PLC se leen bien desde la interfaz"),
+        marcada para revisar; y el código rechaza un criterio que sólo repite el resultado o no dice
+        nada comprobable: el campo, en el color de lo que falta, con "Contame cómo se sabe que está
+        terminada."
+        **Diseño corto.** Una regla general, la misma en los dos caminos, sin frases ni palabras de
+        respuestas malas (`AGENTS.md`, "reglas generales, no parches"); mecánica §13: "¿el
+        resultado esperado es concreto y verificable?".
+        - **La regla de lo que agrega** (`lo_que_agrega`, en `ayuda_al_cargar.py`): la parte del
+          criterio que dice cómo se comprueba tiene que traer al menos una palabra con contenido que
+          no esté en el resto del criterio ni en el título. Se comparan sin mayúsculas ni acentos,
+          sin las palabras de función del castellano (artículos, preposiciones, conjunciones,
+          pronombres y las formas de los verbos que sólo unen, ser, estar, haber y quedar: una
+          lista general y chica) y sin el
+          vocabulario del acto mismo de comprobar o de estar terminada (comprobar, verificar,
+          revisar, controlar, chequear, constatar, confirmar, probar, asegurar; listo, terminado,
+          hecho, completo, finalizado, acabado): ese vocabulario es el marco de cualquier
+          comprobación y nunca dice qué se mira, así que no cuenta como contenido. Dos palabras son
+          la misma si, sin la s o la n final ni la vocal final, son iguales o empiezan con las
+          mismas cinco letras ("integre" e "integración", "colgado" y "colgar", "listos" y
+          "lista"). Con el ejemplo del usuario no queda nada
+          ("revisando" y "listos" son del marco, "PLC", "variables" e "integración" ya están en el
+          resultado, "estén" es de estar): no pasa. "Las variables del PLC se leen bien desde la
+          interfaz" trae "leen" y "bien": pasa.
+        - **Al proponer** (la ayuda): la IA devuelve, como hoy, el criterio y la parte que dice cómo
+          se comprueba (`como_se_comprueba`, copiada tal cual); el código comprueba que está dentro
+          del criterio y que agrega algo. Si no, el criterio no se propone y el campo pide "contame
+          cómo se comprueba" (como hoy). Las instrucciones de la IA dicen, sin frases de ejemplo, que
+          si la persona no dijo cómo se comprueba proponga una manera concreta (qué se mira, se prueba
+          o se entrega) con lo que contó, la tarea, el objetivo o la evidencia del área, y que nunca
+          repita el resultado con otras palabras; el control de números y nombres que nadie dijo
+          (`problema_del_ejemplo`) sigue igual. La marca "propuesto por Leda" ya existe.
+        - **Al cargar** (`POST …/tareas`, el servidor, con o sin la ayuda), antes de `cargar_tarea`:
+          1. **Sin la IA:** si el criterio, sin las palabras de función ni el marco, no agrega nada
+             al título, se rechaza ahí ("No se", "No sé", "listo"): no hace falta preguntarle a
+             nadie, y vale también con la IA caída.
+          2. **Con la IA del espacio**, el mismo juicio que la entrega del motor (la IA lee, el
+             código decide): una sola llamada, fuera del candado de la web (como la ayuda), con el
+             título, la descripción y el criterio; devuelve la parte del criterio que dice cómo se
+             comprueba, copiada tal cual, o vacío si no lo dice o sólo repite el resultado. El código
+             aplica la regla de lo que agrega. Vacío o sin nada nuevo: 422 `criterio` /
+             `sin_comprobacion`, "Contame cómo se sabe que está terminada.", y no se carga nada (la
+             base igual dice todo lo demás junto, sin la clave, como con un dato mal formado). La
+             llamada sólo se hace con una sesión de administración vigente y un criterio que la
+             base no va a rechazar por vacío o largo.
+          3. **Si la IA no responde** (sin configurar, sin sesión, plazo, cupo, respuesta ilegible,
+             o una parte que no está en el criterio): no se traba la carga ni se finge la revisión.
+             Se carga con un aviso que no bloquea, "No pude revisar el criterio ahora: la tarea quedó
+             cargada con el criterio como lo escribiste.", y un incidente (etapa
+             `criterio_al_cargar`, sin el error). Una carga repetida (la misma clave) no suma ni el
+             aviso ni el incidente: los tuvo la primera.
+        - **El costo:** una llamada más por cada carga confirmada (las cargas son pocas, a mano; una
+          ronda de conversaciones son 1.500 a 1.800), con una entrada chica (título, descripción y
+          criterio, hasta unos 1.500 caracteres). La espera la ve quien confirma: lo que tarde la
+          IA en contestar, que todavía no está medido; la herramienta ahora guarda los segundos de
+          cada llamada para medirlo en la próxima ronda real. No hace falta una decisión del
+          usuario: si la espera molesta en el celular, la alternativa es no volver a juzgar un
+          criterio que Leda propuso y la persona no tocó (ya pasó la regla al proponerlo), con su
+          huella en la auditoría de la ayuda.
+        - **La web:** el 422 ya va al campo, en el color de lo que falta, y "confirmar" lleva a él;
+          el aviso de la carga ya se muestra. Lo nuevo: un `sin_comprobacion` no miró la clave (como
+          un dato mal formado), así que después de un envío sin respuesta la web conserva la clave al
+          corregir, para que el servidor diga si aquella ya cargó la tarea.
+        - `PENDIENTE` (advertencia, caso de borde): si la respuesta de una carga se perdió y al
+          reintentarla la IA juzga distinto, la persona ve el rechazo aunque la tarea esté cargada;
+          al corregir, la misma clave con otros datos lo dice ("Puede que ya se haya cargado").
+        **Qué cambió:** `3d4ab5fa` (`ayuda_al_cargar.py`: `lo_que_agrega`, `juzgar_el_criterio`;
+        `web_app.py`: el juicio antes de `cargar_tarea`; `incidentes.py`: la etapa
+        `criterio_al_cargar`; la herramienta y las pruebas) y `c0a0b206` (la web conserva la clave
+        después de un `sin_comprobacion`). La herramienta suma el pedido del PLC y cuatro criterios
+        escritos (16 pedidos, 15 llamadas por vuelta), guarda los segundos de cada llamada y cuenta
+        como de la IA un error de la red que no es `ConnectionError` ni `TimeoutError` (la
+        advertencia de la J2-8, que era real: un `socket.gaierror` cortaba la medición como error
+        del programa). Una IA que ni siquiera se puede preparar tampoco traba la carga.
+        **Evidencia (2026-10-13):** contra el código de antes, `pytest -q
+        tests/test_ayuda_al_cargar.py` 16 en rojo y 131 en verde (el criterio circular se proponía,
+        sin `lo_que_agrega` ni `juzgar_el_criterio`); `tests/garantias/test_criterio_verificable.py`
+        9 en rojo y 3 en verde (pasaban la carga concreta, sin sesión y el dato mal formado); las de
+        la herramienta contra su versión anterior, 5 en rojo (la corrida en seco, el juicio y los
+        tres errores de la red). En la web, `AdminApp.test.tsx`: 1 en rojo (la clave después de un
+        envío sin respuesta) y 2 en verde ya antes (el mensaje en su campo, con el color de lo que
+        falta y "confirmar" que lleva a él, y el aviso de la carga: la web ya lo hacía en general).
+        Después: `pytest -q tests/test_ayuda_al_cargar.py` 151 passed; `pytest -q tests/garantias`
+        completa, 766 passed (13 min 51 s; corrió antes de la última prueba, la de la IA que no se
+        puede preparar); `pytest -q tests/garantias/test_criterio_verificable.py
+        tests/garantias/test_carga_de_tareas.py tests/garantias/test_ayuda_al_cargar.py
+        tests/test_ayuda_al_cargar.py tests/test_aviso_incidente_legible.py`, 228 passed, con ella;
+        en `web/`, `npm test` 86 passed y `npm run build` bien; la herramienta en seco
+        (`$env:PYTHONPATH="src"; .venv\Scripts\python.exe tools\medir_ayuda_al_cargar.py --ia
+        guionada --veces 1`): 8 de 16 bien, sale con 1. **Falta:** la ronda con la IA real (con
+        permiso) y repetir la J2-5 en el celular.
+        **La revisión de la J2-8**, `review-ded34de579ff3bc5` (`f000059e`), aprobada: una
+        advertencia, la herramienta acotó `OSError` a `ConnectionError` y `TimeoutError`
+        (`medir_ayuda_al_cargar.py:271`), así que un error de red que no es de esas dos clases
+        (`socket.gaierror` al no encontrar el servidor, `ssl.SSLError`, "red inalcanzable") se
+        contaría como error del programa; y dos sugerencias: el año de dos cifras con guion
+        (`ayuda_al_cargar.py:156`, "22-10-26" no se lee) y una prueba de garantía negativa floja.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
@@ -464,3 +575,7 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
   miércoles. J2-8 hecha (escritor delegado, `f000059e`): "antes de" un día es el hábil anterior del
   espacio, los rangos no son fechas, "de mañana" es una hora, y la herramienta separa mejor los
   errores del programa. Sigue la prueba en el celular (J2-5).
+- 2026-10-13: la prueba en el celular (J2-5) completó bien todo menos el criterio, que propuso
+  circular; una tarea se había cargado con "No se". J2-9 hecha (escritor delegado, `3d4ab5fa` y
+  `c0a0b206`): el criterio tiene que decir cómo se comprueba, al proponerlo y al cargarlo. Siguen
+  la ronda real y repetir la J2-5.
