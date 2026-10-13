@@ -34,7 +34,7 @@ la IA real, al final, de las conversaciones que toquen estos cambios ("si, autor
 Ruta: cada una, un escritor delegado (toca el motor, sus pruebas y las conversaciones); el coordinador
 revisa, corre la revisión RDD de cada commit y lleva este documento.
 
-- [ ] **T1 · Íconos por estado (decisión 79).** Hoy la IA pone 🗓️ por instrucción
+- [x] **T1 · Íconos por estado (decisión 79).** Hoy la IA pone 🗓️ por instrucción
       (`motor/instrucciones.py`); la cocina reconoce los renglones de una tarea (`salida.py`) y cambia el
       ícono según el estado que dicen los hechos del turno: 🏁 terminada, 🟢 en curso y al día, ⚪ sin
       empezar o sin novedades, 🔵 entregada, 🟠 atrasada, 🔴 trabada. El 📋 de una sola tarea no cambia.
@@ -73,3 +73,15 @@ nombres de otros en los mensajes.
 ## Progreso y evidencia
 
 - 2026-10-12, noche: documento abierto.
+- **T1, hecha** (escritor delegado; `11780ef`, más `e599d42` del coordinador: el corrector del formato
+  del corredor acepta los íconos como marca de tarea). La cocina cambia la marca de cada renglón de una
+  tarea, en una lista de dos o más, por el ícono de su estado, después de que redacta la IA
+  (`hechos.con_los_iconos` en `turno`, `avisos._enviar` e `informe_al_grupo._uno`; `salida.iconos_por_estado`);
+  las instrucciones de la IA no cambiaron. RED: `tests/motor/test_iconos_por_estado.py` 15 de 15 en rojo.
+  `pytest tests/motor` 1346 passed; `tests/conversaciones` 214 passed (más la de `e599d42`, 57 passed en
+  `test_comprobar.py`); `test_formato_de_salida.py` 27 passed; en seco 48 de 48. Repaso del coordinador:
+  `test_iconos_por_estado.py` 17 passed. **RDD:** `review-fd5b12f57ba236dc`, aprobada. Advertencias sin
+  arreglar: el título se busca como parte del renglón y un título contenido en otro podría confundirse
+  (`salida.py:546-555`); el paso de los íconos, después de la IA, no tiene una guarda propia
+  (`hechos.py:1731-1747`); sugerencia: títulos repetidos (`hechos.py:1750-1757`). A observar en la ronda
+  real: que la IA copie los íconos de mensajes anteriores en un mensaje de una sola tarea.
