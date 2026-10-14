@@ -1,5 +1,5 @@
 import { RotateCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   fetchMe,
   fetchView,
@@ -8,6 +8,8 @@ import {
   type ViewData,
   type ViewId,
 } from './api';
+import { NewObjective } from './admin/NewObjective';
+import { teamObjectives } from './admin/objectiveApi';
 import { FinishedList } from './components/FinishedList';
 import { Header } from './components/Header';
 import { Notice } from './components/Notice';
@@ -80,6 +82,9 @@ export function App() {
   const [view, setView] = useState<ViewId | null>(null);
   const [tasks, setTasks] = useState<Load<ViewData>>({ kind: 'loading' });
   const [signedOut, setSignedOut] = useState(false);
+  // Dirección creating an objective (ADR 0023, decision 1): the form takes the page's place.
+  const [creating, setCreating] = useState(false);
+  const objectives = useMemo(teamObjectives, []);
 
   useEffect(() => {
     const request = new AbortController();
@@ -119,8 +124,9 @@ export function App() {
   const retry = () => setAttempt((n) => n + 1);
   const person = me.kind === 'ready' ? me.data : null;
   const ready = tasks.kind === 'ready' ? tasks.data : null;
-  const title =
-    ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda';
+  const title = creating
+    ? 'Nuevo objetivo'
+    : (ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda');
 
   let body;
   if (signedOut) {
@@ -131,10 +137,41 @@ export function App() {
     body = <Failed onRetry={retry} />;
   } else if (person === null || view === null) {
     body = me.kind === 'loading' ? <Notice title="Cargando…" /> : <SessionClosed />;
+  } else if (creating) {
+    body = (
+      <>
+        <div>
+          <button
+            type="button"
+            onClick={() => setCreating(false)}
+            className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-dim"
+          >
+            &gt; volver a las tareas
+          </button>
+        </div>
+        <NewObjective
+          api={objectives}
+          author={person.persona}
+          onClosed={() => setMe({ kind: 'closed' })}
+          stacked
+        />
+      </>
+    );
   } else {
     body = (
       <>
         <ViewSwitch views={person.vistas} current={view} onChange={choose} />
+        {person.crea_objetivos && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-soft"
+            >
+              &gt; nuevo objetivo
+            </button>
+          </div>
+        )}
         {tasks.kind === 'loading' && <Notice title="Cargando…" />}
         {tasks.kind === 'failed' && <Failed onRetry={retry} />}
         {ready && (

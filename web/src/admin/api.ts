@@ -101,7 +101,9 @@ export type LoadResult =
 
 const ADMIN = '/app/admin';
 
-async function call(url: string, init: RequestInit = {}): Promise<Response> {
+/** A request with the session's cookie: a closed session (401) throws `SessionClosedError`, no
+ * network throws `RequestError(0)`; any other answer is returned as it came. */
+export async function call(url: string, init: RequestInit = {}): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(url, {

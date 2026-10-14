@@ -15,6 +15,9 @@ export interface Me {
   vistas: ViewRef[];
   // The Telegram chat with the team bot ("> consultar a leda"), when the space declares it.
   chat_con_leda: string | null;
+  // Whether this person creates the team's objectives (Dirección, ADR 0023, decision 1): only then
+  // the page offers "> nuevo objetivo". The server refuses anyone else anyway.
+  crea_objetivos?: boolean;
 }
 
 export interface Wait {

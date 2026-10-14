@@ -926,6 +926,15 @@ def test_la_puerta_del_equipo_crea_solo_para_direccion(web, conn, intake_world):
     assert _creados(conn) == 1
 
 
+def test_la_web_del_equipo_sabe_si_la_persona_crea_objetivos(web, conn, intake_world):
+    """La web le ofrece "> nuevo objetivo" sólo a Dirección; a los demás no se lo muestra (y la
+    base igual los rechaza)."""
+    for nombre, crea in (("Morgan Hale", True), ("Taylor Quinn", False), ("Sam North", False)):
+        r = _navegador_del_equipo(web, conn, intake_world, nombre).get("/app/api/yo")
+        assert r.status_code == 200, r.text
+        assert r.json()["crea_objetivos"] is crea, nombre
+
+
 def test_la_puerta_del_equipo_se_protege(web, conn, intake_world, administradora):
     base = "/app/api/objetivos"
     direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")

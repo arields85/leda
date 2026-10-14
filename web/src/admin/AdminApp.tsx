@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RequestError, SessionClosedError } from '../api';
 import { Header } from '../components/Header';
 import { Notice } from '../components/Notice';
@@ -6,6 +6,8 @@ import { SignOut } from '../components/SignOut';
 import { adminSignOut, fetchAdminMe, fetchOptions, type AdminMe, type Options } from './api';
 import { Dropdown } from './Dropdown';
 import { LoadForm } from './LoadForm';
+import { NewObjective } from './NewObjective';
+import { adminObjectives } from './objectiveApi';
 
 type Load<T> =
   | { kind: 'loading' }
@@ -49,8 +51,40 @@ function Failed({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+/** What the administrator loads: a task (ADR 0022) or an objective (ADR 0023, decision 5). */
+type Kind = 'tarea' | 'objetivo';
+
+const KINDS: { kind: Kind; label: string }[] = [
+  { kind: 'tarea', label: 'tarea' },
+  { kind: 'objetivo', label: 'objetivo' },
+];
+
+/** The choice at the top of the load area: a task or an objective. Gray, like everything that is
+ * not a state (the same look as the team's view switch). */
+function KindSwitch({ current, onChange }: { current: Kind; onChange: (kind: Kind) => void }) {
+  return (
+    <div role="group" aria-label="Qué cargar" className="flex flex-wrap gap-1.5 text-small">
+      {KINDS.map(({ kind, label }) => {
+        const selected = kind === current;
+        return (
+          <button
+            key={kind}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(kind)}
+            className={`rounded-card border-hard px-2.5 py-1 ${selected ? 'border-line bg-card text-ink' : 'border-line-soft bg-transparent text-ink-dim'}`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** The administration door (ADR 0022, decisions 6 and 10): who is in, which space, and the form
- * that loads a task. Wide on a desktop; it stacks on a phone. */
+ * that loads a task or, chosen at the top, the one that creates an objective (ADR 0023, decision
+ * 5). Wide on a desktop; it stacks on a phone. */
 export function AdminApp() {
   const [attempt, setAttempt] = useState(0);
   const [me, setMe] = useState<Load<AdminMe>>({ kind: 'loading' });
@@ -58,6 +92,8 @@ export function AdminApp() {
   const [options, setOptions] = useState<OptionsLoad>({ kind: 'loading' });
   const [closed, setClosed] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
+  const [kind, setKind] = useState<Kind>('tarea');
+  const objectives = useMemo(() => (spaceId ? adminObjectives(spaceId) : null), [spaceId]);
 
   useEffect(() => {
     const request = new AbortController();
@@ -132,8 +168,17 @@ export function AdminApp() {
             />
           </div>
         )}
-        {options.kind === 'loading' && <Notice title="Cargando…" />}
-        {options.kind === 'failed' && <Failed onRetry={retry} />}
+        {spaceId && options.kind !== 'gone' && <KindSwitch current={kind} onChange={setKind} />}
+        {kind === 'objetivo' && objectives && options.kind !== 'gone' && (
+          <NewObjective
+            key={spaceId}
+            api={objectives}
+            author={admin.administrador}
+            onClosed={() => setClosed(true)}
+          />
+        )}
+        {kind === 'tarea' && options.kind === 'loading' && <Notice title="Cargando…" />}
+        {kind === 'tarea' && options.kind === 'failed' && <Failed onRetry={retry} />}
         {options.kind === 'gone' && (
           <Notice title="Ese espacio ya no está disponible.">
             <p className="m-0">
@@ -144,7 +189,7 @@ export function AdminApp() {
             {spaceId !== null && <RetryButton onClick={retry} />}
           </Notice>
         )}
-        {options.kind === 'ready' && spaceId && (
+        {kind === 'tarea' && options.kind === 'ready' && spaceId && (
           <LoadForm
             key={spaceId}
             spaceId={spaceId}
@@ -163,7 +208,7 @@ export function AdminApp() {
     <div className="mx-auto flex min-h-dvh w-full min-w-0 overflow-x-clip max-w-[72rem] flex-col px-5">
       <Header
         space={open && spaceName ? `administración · ${spaceName}` : 'administración'}
-        title={open ? 'Cargar tarea' : 'Leda'}
+        title={open ? (kind === 'objetivo' ? 'Crear objetivo' : 'Cargar tarea') : 'Leda'}
         person={open ? admin?.administrador : undefined}
       />
       <main className="flex min-w-0 flex-col gap-4 pt-4">{body}</main>

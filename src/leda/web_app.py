@@ -336,7 +336,7 @@ def entrar(token: str, request: Request):
 
 @router.get("/api/yo")
 def yo(request: Request):
-    """Quién es la persona de la sesión, de qué espacio y qué vistas tiene."""
+    """Quién es la persona de la sesión, de qué espacio, qué vistas tiene y si crea objetivos."""
     token = _token_de_la_cookie(request)
     if token is None:
         return _sin_sesion()
@@ -348,7 +348,9 @@ def yo(request: Request):
                 return _sin_sesion()
             cur.execute("select vistas from vistas_de_la_sesion(%s)", (_hash(token),))
             vistas = cur.fetchone()
-            cur.execute("select nombre from integrante where membership_id = %s",
+            cur.execute("""select i.nombre, coalesce(r.autoridad_final, false) as direccion
+                             from integrante i left join rol r on r.id = i.rol_id
+                            where i.membership_id = %s""",
                         (sesion["membership_id"],))
             persona = cur.fetchone()
             cur.execute("select nombre from workspace where id = %s", (sesion["workspace_id"],))
@@ -364,7 +366,10 @@ def yo(request: Request):
             "espacio": espacio["nombre"] if espacio else "",
             "vistas": [{"vista": v, "titulo": VISTAS[v]} for v in vistas["vistas"]
                        if v in VISTAS],
-            "chat_con_leda": _chat_con_leda(bot["usuario"] if bot else None)})
+            "chat_con_leda": _chat_con_leda(bot["usuario"] if bot else None),
+            # Si la web le ofrece "> nuevo objetivo": sólo a Dirección (ADR 0023, decisión 1). La
+            # base igual rechaza a cualquier otro (`crear_objetivo_web`).
+            "crea_objetivos": bool(persona and persona["direccion"])})
         _poner_la_cookie(respuesta, token)
         return respuesta
 

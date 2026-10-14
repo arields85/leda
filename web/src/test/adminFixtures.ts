@@ -1,4 +1,5 @@
 import type { AdminMe, Options } from '../admin/api';
+import type { ObjectiveOptions } from '../admin/objectiveApi';
 import { addDays } from '../admin/DatePicker';
 
 export const SPACE = '8f1d2c3b-0000-4000-8000-000000000001';
@@ -84,6 +85,41 @@ export function options(overrides: Partial<Options> = {}): Options {
       feriados: [{ fecha: '2026-11-23', nombre: 'Día de la Soberanía' }],
       dias_habiles: workingDays(),
     },
+    ...overrides,
+  };
+}
+
+/** What the objective form offers in CoreWork (migrations 0068 and 0069): a strategic objective and
+ * a milestone to hang from, two area referentes and the pack's own name for the top level. */
+export function objectiveOptions(overrides: Partial<ObjectiveOptions> = {}): ObjectiveOptions {
+  return {
+    espacio: { id: SPACE, nombre: 'CoreWork' },
+    hoy: '2026-10-12',
+    niveles: { estrategico: 'plan anual', hito: 'hito', operativo: 'objetivo operativo' },
+    sin_padre: ['estrategico'],
+    padres: [
+      {
+        id: 'o-plan',
+        titulo: 'Modernizar la planta',
+        tipo: 'estrategico',
+        estado: 'activo',
+        fecha_objetivo: '2026-12-18',
+        tipos: ['hito', 'operativo'],
+      },
+      {
+        id: 'o-hito',
+        titulo: 'Línea 3 andando',
+        tipo: 'hito',
+        estado: 'activo',
+        fecha_objetivo: null,
+        tipos: ['operativo'],
+      },
+    ],
+    referentes: [
+      { membership_id: 'm-marcos', nombre: 'Marcos', areas: ['Automatización'] },
+      { membership_id: 'm-lucas', nombre: 'Lucas', areas: ['Infraestructura', 'Redes'] },
+    ],
+    calendario: options().calendario,
     ...overrides,
   };
 }
