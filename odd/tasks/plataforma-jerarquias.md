@@ -879,7 +879,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - la clave de un solo uso no repite;
         - la IA nunca elige a una persona que no se nombró.
       Ruta: delegada. Un escritor por tramo (base y servidor; web; ayuda), con RDD por tramo.
-  - [ ] J3-2 · La base y el servidor sin la IA (`0068`, `crear_objetivo_web`, las dos puertas, garantías).
+  - [x] J3-2 · La base y el servidor sin la IA (`0068`, `crear_objetivo_web`, las dos puertas, garantías).
         Construida (escritor delegado) en los commits `81a52ee6`, `fbf70369`, `c281e6c6`, `83c51b5e`, `15e69bfa` y
         `f6482d32`:
         - la herramienta de chat `crear_objetivo` retirada, porque ninguna jugada la usaba;
@@ -895,9 +895,16 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         ON_ERROR_STOP=1` como `postgres`, sin error. Los nombres de los niveles se llenan al reimportar el pack;
         hasta entonces la web muestra los de siempre, que son los de CoreWork.
         Windows se reinició solo a la noche y cortó la sesión; la suite completa se está corriendo de nuevo.
-  - [ ] J3-2b · Las decisiones del usuario del 2026-10-14: la fecha obligatoria, en día hábil, y el
+  - [x] J3-2b · Las decisiones del usuario del 2026-10-14: la fecha obligatoria, en día hábil, y el
         referente, que tiene que ser un referente activo de un área (`0069`).
-  - [ ] J3-3 · La web: el formulario de objetivos en las dos puertas, compartiendo las piezas de la J2.
+  - [x] J3-3 · La web: el formulario de objetivos en las dos puertas, compartiendo las piezas de la J2.
+  - [ ] J3-3b · La decisión 5 (un hijo no vence después que su padre, con "> cargarlo aparte") y las
+        advertencias de la RDD `review-12308947b06404e4`, aprobada sobre `15e69bfa..953c2fab`. Son tres:
+        - el reloj del espacio se lee antes de validar la sesión de administración (`web_app.py:1471`);
+        - cambiar entre tarea y objetivo pierde lo escrito (`AdminApp.tsx:181`);
+        - la `0068` editada después de escrita: falsa alarma, porque se editó antes de aplicarla en
+          cualquier base, y `leda_motor` tiene la versión final.
+        `leda_motor`: la `0069` se aplicó con respaldo (`leda_motor-antes-0069-20261014.dump`) y ensayo previo.
   - [ ] J3-4 · La ayuda de la IA para objetivos (y la ortografía y el dictado en la puerta del equipo), con su
         herramienta de medición; una ronda con la IA real.
   - [ ] J3-5 · La prueba en el celular (usuario), con su guion.
@@ -1002,6 +1009,14 @@ con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue co
   2. **Nace activo:** "ok".
   3. **El referente es siempre un referente activo de un área,** no cualquier integrante.
   Se construyen en la J3-2b (migración nueva, porque la `0068` ya está aplicada en `leda_motor`).
+  4. **Dirección también puede ser referente de un objetivo** (Ismael es el referente del área Dirección):
+     queda como está.
+  5. **Un objetivo no vence después que el objetivo del que cuelga.** Lo que cuelga es parte del padre, y el
+     padre no cierra hasta que cierran sus hijos (mecánica §5). Si se carga así, la vista previa ofrece
+     "> cargarlo aparte": pasa a colgar del mismo lugar que el padre, o de ninguno, y se vuelve a ofrecer el
+     tipo. También se puede cambiar la fecha. La base no acepta un hijo que vence después que su padre, y
+     nunca se llega sin salida. Ejemplo del usuario: "Habilitar el laboratorio" (15/12) no cuelga de "Abrir
+     la planta nueva" (30/11): va al lado, como objetivo aparte. Se construye en la J3-3b.
 
 ## Criterio de aceptación
 
