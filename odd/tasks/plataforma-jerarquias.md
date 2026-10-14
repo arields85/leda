@@ -1109,6 +1109,20 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
           de administración: 1, 7, 30 o 90 días, o **sin vencimiento**, que es el valor de entrada para todos.
         - Se corta al cerrar la sesión, con "perdí el celular", con la baja o cuando lo corta el administrador.
         - "Iniciar sesión con Telegram" (el botón oficial) queda para la VPS, porque pide una dirección fija.
+      - **MA2. La administración también como Mini App,** en `@Leda_Admin_bot`, y por la web de la computadora
+        con el código por Telegram, que llega por ese bot. Ahí se van a usar más las opciones y la configuración,
+        así que la pantalla se diseña para la computadora. El canal decide el sombrero: la Mini App del bot del
+        equipo entra como integrante, y la del bot de administración como administrador.
+      - **MA3. Dónde aparece el botón y qué dice.** Dice lo que va a pasar, nunca "Abrir Leda", y **lleva
+        directo a eso, no a la página principal**:
+        - cuando lo pide la persona y en la bienvenida: **"Ver mis tareas"** (a Dirección, **"Ver el equipo"**);
+        - en un aviso de carga: **"Ver la tarea"**, que abre esa tarea;
+        - ante "quiero crear una tarea": **"Cargar la tarea"**, que abre el formulario;
+        - ante "quiero crear un objetivo" (Dirección): **"Crear el objetivo"**;
+        - en el bot de administración: **"Administración"**;
+        - con la VPS, el botón fijo del menú: **"Tareas"**.
+        No va en cada mensaje (recordatorios, preguntas) ni en grupos, donde Telegram no lo permite. Si se
+        reinicia el túnel, los botones viejos dejan de andar: se toca uno nuevo.
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
       Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
       la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección
