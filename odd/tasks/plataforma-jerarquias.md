@@ -709,6 +709,22 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       resaltarlo, ya dijimos que corrige palabras puntuales, no lo que dice la persona"): sin marca, sin resaltado y
       sin la vuelta de "revisalo y confirmá"; el control palabra por palabra y la auditoría siguen. Con la misma
       unidad, los WARNINGs de las tres revisiones de arriba.
+- [ ] **J2b · El dictado, con Gemini en el servidor** (usuario, 2026-10-13: "directamente con Gemini tal cual la
+      documentación"; la comparación con OpenAI, anotada en `docs/ROADMAP.md`). **Por qué:** el dictado del
+      navegador (`web/src/admin/speech.ts`, reconocimiento del teclado) se cortaba en el iPhone con el bloqueo de la
+      pantalla (J2-5). **De qué se parte:** `docs/research/gemini-voz-del-otro-proyecto.md`, sección 3 (modelo
+      `gemini-3.8-flash`, audio en línea sin convertir, `thinking_budget=0`, `temperature=0`, límites de tamaño,
+      tiempos y errores) y 6; `llm.GEMINI_BASE` y `httpx` (sin sumar dependencias); `LEDA_GEMINI_API_KEY` en el `.env`
+      (la puso el usuario, comprobada sin leerla). **Diseño:**
+      1. "> dictar" graba en el navegador (`MediaRecorder`, el formato que dé cada celular) y mantiene la pantalla
+         encendida mientras graba (`navigator.wakeLock`); "> dejar de dictar" corta. Hasta 2 minutos.
+      2. El audio va a un camino nuevo de la puerta de administración, con su sesión; el servidor lo manda a Gemini
+         con los nombres del equipo, los objetivos y las áreas como palabras a favorecer, y devuelve el texto, que se
+         suma a la caja "Contame qué querés hacer" para que la persona lo vea y lo corrija.
+      3. El audio no se guarda; la auditoría registra el pedido sin el contenido. Toda falla deja un incidente y un
+         aviso neutro (nunca en silencio); la clave nunca sale del servidor.
+      Ruta: delegada, un escritor, después de la J2-23 (comparten la caja). Prueba: unos dictados del usuario en el
+      celular.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
