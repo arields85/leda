@@ -1201,7 +1201,14 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - todas las correcciones del iPhone.
       Suite: 3623 passed, más una lista de importaciones corregida y verificada en su archivo. En seco, 54 de 54.
       `npx vitest`: 310 passed. `leda_motor`: respaldo `leda_motor-antes-0075-20261014.dump`, ensayo previo y la `0075`
-      aplicada. La web, rearmada y reiniciada. Falta: RDD (en curso) y la prueba del usuario.
+      aplicada. La web, rearmada y reiniciada. RDD de los seis commits, sobre una copia en LF: aprobados. Quedan WARNING
+      menores para una tanda posterior, sin ninguno de seguridad:
+      - el motivo de una falla del menú se clasifica por el texto del mensaje;
+      - "Mi equipo" filtra las terminadas por el nombre;
+      - si falla la pantalla completa, no hay alternativa;
+      - la pantalla fija no se adapta a un celular muy bajo;
+      - algunas pruebas no demuestran lo que dicen.
+      Falta la prueba del usuario.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
