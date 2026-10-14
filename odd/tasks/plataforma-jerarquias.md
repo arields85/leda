@@ -773,6 +773,15 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       mayúscula al empezar una oración que coincide con un nombre ("Marcos de la puerta…") puede descartar un buen
       criterio (`ayuda_al_cargar.py:864-867`), apodos sin distinguir mayúsculas (`:851-855`), el hilo del dictado que
       queda vivo tras el plazo (`dictado.py:156-161`), una prueba atada al reloj real (`test_dictado.py:307-314`).
+      **Prueba en el celular de J2-26 a J2-28** (2026-10-13, de noche): "quedó perfecto todo". En la base, ningún
+      incidente en las pruebas del día; la auditoría del dictado sin audio ni texto (el iPhone mandó `audio/webm`).
+- [ ] **J2-29 · Revisión independiente de toda la J2** (pedido del usuario, 2026-10-13: "revisá la tarea por tu
+      cuenta"; después: "hagamos la revisión pero no ahora"): un revisor de sólo lectura sobre todo lo de la J2
+      (desde `c258ee37`): garantías (aislamiento, sesión en cada ruta nueva, una sola vez, auditoría sin contenido,
+      opacidad técnica, nunca en silencio), el flujo de confirmar de punta a punta (respuestas viejas, "empezar de
+      nuevo" en el medio, doble envío), honestidad de lo propuesto, las reglas del criterio y su juicio guardado, el
+      formulario y las pruebas que no prueban. Las deudas anotadas en J2-23, J2b y J2-28 son su punto de partida.
+      **PENDIENTE**: cuándo, lo decide el usuario.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
