@@ -73,12 +73,21 @@ viejo corriendo.
 
 **Punto exacto para seguir** (cierre del 2026-10-13, noche; el usuario se fue a dormir y pidió que el agente
 siga solo con lo pendiente de la J2 a la J7, anotando las decisiones que le hagan falta):
-1. **Cerrar la J2:** la J2-29 está hecha (sin CRITICAL ni HIGH; dos MEDIUM y varios LOW) y sus arreglos
-   son la J2-30, con un escritor delegado. La suite completa pasó: 3286 passed sobre `eaf84ed4`. Quedaron 8
-   bases `leda_test_…` de corridas cortadas: el usuario dijo que no se borren.
-2. **Después, J3 a J7** en el orden de `../odd/tasks/plataforma-jerarquias.md` ("De qué se parte en cada
-   porción"). Cada porción deja su prueba en el celular para el usuario; las decisiones de producto que hagan
-   falta van a "Decisiones pendientes del usuario", abajo, explicadas con un ejemplo.
+1. **Hecho el 2026-10-14:**
+   - La J2 está cerrada: la revisión J2-29 y sus arreglos J2-30, y la suite completa con 3286 passed.
+   - La J3, los objetivos desde la web, pasó en el celular. La IA real dio 45 de 45 y 57 de 57.
+   - La J4a está construida: la carga desde la web del equipo.
+   - `leda_motor` quedó en la `0071`, con el pack reimportado.
+   - Las decisiones de la J4, la Mini App y la J5 se tomaron con el usuario de a una; están en el documento de
+     la unidad.
+   - El [ADR 0024](decisions/0024-entrar-con-telegram.md), la Mini App y el QR para la computadora, quedó
+     aceptado.
+2. **Sigue:**
+   - la J4b, los avisos de la carga y "quiero crear una tarea" por Telegram, con un escritor delegado;
+   - después, la **MA**, la Mini App, adelantada por el usuario: va antes de J5 a J7;
+   - después, J5, J6 y J7. De la J5 hay 11 decisiones preparadas; se respondió la 1 y no se registró.
+   Acuerdo del 2026-10-14: las decisiones de cada porción se le traen al usuario al principio, de a una y en
+   texto, nunca con la ventanita de preguntas.
 3. **Al cerrar cada tarea**, el documento de la unidad, este punto para retomar, la copia en Engram y la memoria
    se actualizan en el momento (`AGENTS.md`, regla nueva del 2026-10-13).
 Para probar en el celular: el agente levanta la web y el túnel en segundo plano y pone la dirección nueva en
