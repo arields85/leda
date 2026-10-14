@@ -1177,6 +1177,19 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       el botón lleva a la página del QR en el navegador, como cualquier compu. El usuario sólo tiene a Ariel en el
       celular: la Mini App se prueba con Ariel, y Marcos e Ismael con Telegram de escritorio. Un escritor (MA-2) hace
       lo de escritorio, los WARNING de las últimas revisiones y el detalle de la tarea completo.
+      **Prueba de la MA con Ariel en el iPhone (2026-10-14).** El botón del menú y la Mini App anduvieron. Correcciones
+      del usuario (MA-3, al mismo escritor):
+      1. El botón del menú se llama "Mi panel".
+      2. El detalle de la tarea se ve dentro de la app, con su estilo y "> volver".
+      3. La Mini App ocupa la pantalla completa.
+      4. "salir" se va de la Mini App y queda sólo en la compu. "> Nueva tarea", con mayúscula, va abajo como botón
+         principal. "Volver al chat" va abajo a la izquierda, chico. Se va "> consultar a leda".
+      5. Las pestañas "Mis tareas", "Mi equipo" y "Lo que pedí" van en una sola fila, como pestañas de verdad.
+         "Mi equipo" muestra sólo las tareas de la gente del referente, con el nombre del área como dato, y no
+         aparece si no tiene a nadie a cargo.
+      6. El título va en una sola línea.
+      7. Se suma el contador "Por empezar".
+      En Telegram de escritorio el mensaje dice "Abrí Leda en el navegador".
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
