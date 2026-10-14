@@ -247,6 +247,10 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   // task. Until something settles it, the key stays even if the data changes, so the server can
   // tell (a different task with that key is refused, never loaded twice).
   const unknown = useRef(false);
+  // A send is in progress (J2-30): from the checks on confirm to the load's answer. Meanwhile the
+  // form is locked and nothing that arrives late changes it, nor the key (a correction of the
+  // spelling, an answer of Leda): a retry goes with the same key and the same data.
+  const sendingRef = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const messages = useRef<HTMLDivElement>(null);
   // The free box (portion J2): what the person told, Leda's answer, and the fields it filled,
@@ -296,6 +300,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
   /** The person left the field (or was not in it): it takes the correction made for its text. */
   function takeFix(field: TextField) {
+    if (sendingRef.current) return;
     const fix = fixesNow.current[field];
     if (!fix) return;
     setFix(field, null);
@@ -319,8 +324,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     } finally {
       if (asking.current[field] === text) delete asking.current[field];
     }
-    // Started over, or the text changed meanwhile: the answer is for a text that is gone.
-    if (round.current !== started || latest.current[field] !== text) return;
+    // Started over, or the text changed meanwhile: the answer is for a text that is gone. While it
+    // sends, an answer is ignored entirely (J2-30): confirm checks what goes on its own.
+    if (sendingRef.current || round.current !== started || latest.current[field] !== text) return;
     // It could not check: nothing is said now (the text stays as typed); confirm tries again.
     if (spelling.unchecked.includes(field)) return;
     const to = spelling.corrected[field]?.text;
@@ -414,7 +420,8 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   /** Fills only what is still empty with what Leda proposed (only what the options offer), and
    * marks it. The evidence (J2-19): only what Leda proposed is ticked, and marked, only kinds the
    * area of whoever does it knows, and only when the person ticked none: what she ticked is hers.
-   * Returns how many fields it filled. */
+   * What stays ticked is only what that area knows (J2-30, as in `chooseResponsible`): a kind it
+   * does not know would be ticked and hidden. Returns how many fields it filled. */
   function apply(proposal: Proposal): number {
     const current = latest.current;
     const valid = validProposal(proposal, options);
@@ -428,7 +435,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     const added =
       current.evidencia.length > 0 ? [] : known.filter((k) => offered.includes(k));
     if (filled.length === 0 && added.length === 0) return 0;
-    if (added.length > 0) next.evidencia = added;
+    next.evidencia = added.length > 0 ? added : current.evidencia.filter((k) => known.includes(k));
     latest.current = next;
     setDraft(next);
     // Other data, another attempt (as in `change`).
@@ -458,6 +465,11 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       const result = await askLeda(spaceId, { texto, ...asked, evidencia: [...evidencia] });
       // The person started over meanwhile (J2-20): the answer is for a form that is gone.
       if (round.current !== asking) return;
+      // It is sending (J2-30): the form is locked and what goes is what it shows; nothing fills.
+      if (sendingRef.current) {
+        setHelp({ kind: 'stale' });
+        return;
+      }
       // The answer is for what the form had when she asked. If she changed the free text or a
       // field meanwhile, it may no longer fit (another person, another wait, other words): it
       // fills nothing, and the box says so quietly (review review-03b5c3a74d3719b7). The evidence
@@ -515,7 +527,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   }
 
   async function confirm() {
-    if (step.kind !== 'edit' || step.sending) return;
+    if (step.kind !== 'edit' || step.sending || sendingRef.current) return;
     // Something required is missing (the button looks disabled): nothing is sent; each field
     // shows its message and the tap takes the person to the next field with a problem.
     const found = checkDraft(draft, options);
@@ -529,14 +541,25 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     }
     // J2-24: what loads is what the preview shows, with the corrections made while typing; the
     // form shows it too, so a retry sends the same data.
-    let sent = withFixes(draft, fixesNow.current);
+    const sent = withFixes(draft, fixesNow.current);
     if (sent !== draft) {
       for (const field of TEXT_FIELDS) if (fixesNow.current[field]) setFix(field, null);
       latest.current = sent;
       setDraft(sent);
       if (!unknown.current) key.current = null;
     }
-    let notice = spellNote;
+    sendingRef.current = true;
+    try {
+      await send(sent, spellNote);
+    } finally {
+      sendingRef.current = false;
+    }
+  }
+
+  /** From the checks on confirm to the load's answer (`confirm`), while `sendingRef` holds. */
+  async function send(draftToSend: Draft, noticeBefore: string | null) {
+    let sent = draftToSend;
+    let notice = noticeBefore;
     // J2-17 and J2-23: before loading, Leda corrects the spelling of the texts not checked yet as
     // they are, and what loads is the corrected text, in the same confirm and unmarked (the user:
     // "que lo corrija directamente sin resaltarlo"; the server accepts only the same word misspelled
@@ -643,6 +666,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
   function another() {
     round.current += 1;
+    // A new round also remounts the free box (`key`): a dictation in progress is cancelled.
     key.current = null;
     unknown.current = false;
     visited.current = null;
@@ -736,7 +760,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         className="flex min-w-0 max-w-full flex-col"
       >
         <fieldset disabled={sending} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
-          <HelpBox spaceId={spaceId} onClosed={onClosed} story={story} onStory={setStory} help={help} notes={notes} onAsk={ask} onChoose={choose} />
+          <HelpBox key={round.current} spaceId={spaceId} onClosed={onClosed} story={story} onStory={setStory} help={help} notes={notes} onAsk={ask} onChoose={choose} />
 
           <FieldBlock id="f-objetivo" label="Objetivo" errors={said('objetivo_id')} proposed={proposed.has('objetivo_id')}
             hint={options.objetivos.length === 0 ? 'No hay objetivos abiertos en este espacio.' : undefined}>

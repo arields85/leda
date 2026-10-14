@@ -2070,3 +2070,150 @@ describe('the checks on confirm, in order (J2-21)', () => {
     expect(calls.filter((c) => c.key === SPELLING)).toHaveLength(1);
   });
 });
+
+// --- J2-30: what arrives late (the review of the whole J2, J2-29) -----------------------------------
+//
+// Answers that arrive after the form moved on: while it loads, after "sí, borrar", and the dictation
+// that was still recording or turning into text when the person started over.
+
+/** Holds every call to these routes until the test answers or fails it, by route and in order; the
+ * other routes answer as `serve` says. */
+function holdEvery(...routes: string[]) {
+  const served = globalThis.fetch;
+  type Held = { resolve: (response: Response) => void; reject: (error: unknown) => void; body: unknown };
+  const pending: Record<string, Held[]> = {};
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) => {
+      const key = `${init?.method ?? 'GET'} ${url}`;
+      if (!routes.includes(key)) return served(url, init);
+      return new Promise<Response>((resolve, reject) => {
+        const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body;
+        (pending[key] ??= []).push({ resolve, reject, body });
+      });
+    }),
+  );
+  const calls = (route: string) => pending[route] ?? [];
+  const answer = (route: string, i: number, status: number, body: unknown) =>
+    act(async () => {
+      calls(route)[i].resolve(
+        new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+      );
+    });
+  const fail = (route: string, i: number) =>
+    act(async () => {
+      calls(route)[i].reject(new TypeError('Failed to fetch'));
+    });
+  return { calls, answer, fail };
+}
+
+describe('what arrives late (J2-30)', () => {
+  const START_OVER = '> empezar de nuevo';
+  const startOver = () => {
+    fireEvent.click(screen.getByRole('button', { name: START_OVER }));
+    fireEvent.click(screen.getByRole('button', { name: '> sí, borrar' }));
+  };
+  const title = () => screen.getByLabelText('Título');
+  const pause = (ms = 1500) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    forgetMicrophone();
+  });
+
+  it('a spelling answer that arrives while it loads changes nothing: a retry goes with the same key and data', async () => {
+    keys('66666666-6666-4666-8666-666666666666', '77777777-7777-4777-8777-777777777777');
+    await openForm();
+    const held = holdEvery(SPELLING, TASKS);
+    fillTask();
+    // The pause checks the title and the criterion; their answers do not come yet.
+    await pause();
+    expect(held.calls(SPELLING)).toHaveLength(2);
+    confirm();
+    await waitFor(() => expect(held.calls(SPELLING)).toHaveLength(3));
+    await held.answer(SPELLING, 2, 200, { corregidos: {}, sin_revisar: [] });
+    await waitFor(() => expect(held.calls(TASKS)).toHaveLength(1));
+    // While it loads, the pause check of the title answers with a correction.
+    await held.answer(SPELLING, 0, 200, {
+      corregidos: { titulo: { texto: 'Configurar Alarmas del SCADA', cambios: [] } },
+      sin_revisar: [],
+    });
+    await held.fail(TASKS, 0);
+    expect(await screen.findByText(/no llegó la respuesta/)).toBeInTheDocument();
+    expect(title()).toHaveValue('Configurar alarmas del SCADA');
+    confirm();
+    await waitFor(() => expect(held.calls(TASKS)).toHaveLength(2));
+    const [first, second] = held.calls(TASKS).map((c) => c.body as { clave: string; titulo: string });
+    expect(second.clave).toBe('66666666-6666-4666-8666-666666666666');
+    expect(second.clave).toBe(first.clave);
+    expect(second.titulo).toBe(first.titulo);
+  });
+
+  it('a "completar con Leda" answer that arrives after "sí, borrar" fills nothing', async () => {
+    await openForm();
+    const held = holdEvery(HELP);
+    tell();
+    askLeda();
+    await waitFor(() => expect(held.calls(HELP)).toHaveLength(1));
+    startOver();
+    // The same story again: only the start over tells the old answer apart.
+    tell();
+    await held.answer(HELP, 0, 200, FULL);
+    expect(title()).toHaveValue('');
+    expect(screen.getByLabelText('Criterio de aceptación')).toHaveValue('');
+    expect(screen.queryByText('· propuesto por Leda')).toBeNull();
+  });
+
+  it('a spelling answer that arrives after "sí, borrar" reaches neither the field nor the preview', async () => {
+    const TYPED = 'configurar las alarmas del scada';
+    const FIXED = 'Configurar las alarmas del SCADA';
+    await openForm();
+    const held = holdEvery(SPELLING);
+    fireEvent.change(title(), { target: { value: TYPED } });
+    await pause();
+    expect(held.calls(SPELLING)).toHaveLength(1);
+    startOver();
+    // The same text again: only the start over tells the old answer apart.
+    fireEvent.change(title(), { target: { value: TYPED } });
+    await held.answer(SPELLING, 0, 200, {
+      corregidos: { titulo: { texto: FIXED, cambios: [] } },
+      sin_revisar: [],
+    });
+    expect(title()).toHaveValue(TYPED);
+    expect(within(preview()).queryByText(FIXED)).toBeNull();
+  });
+
+  it('"sí, borrar" while dictating stops the microphone and sends nothing', async () => {
+    const mic = fakeMicrophone();
+    const calls = await openForm({ [DICTATION]: ok({ texto: 'colgar el estante del módem' }) });
+    tell('hay que');
+    await startDictating();
+    startOver();
+    expect(mic.track.stop).toHaveBeenCalled();
+    expect(mic.release).toHaveBeenCalled();
+    expect(screen.queryByText(/grabando/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'dictar' })).toHaveAttribute('aria-pressed', 'false');
+    await pause();
+    expect(calls.filter((c) => c.key === DICTATION)).toHaveLength(0);
+    expect(screen.getByLabelText(BOX)).toHaveValue('');
+  });
+
+  it('a dictation still turning into text when "sí, borrar" is tapped adds nothing', async () => {
+    fakeMicrophone();
+    await openForm();
+    const held = holdEvery(DICTATION);
+    tell('hay que');
+    fireEvent.click(await startDictating());
+    await waitFor(() => expect(held.calls(DICTATION)).toHaveLength(1));
+    startOver();
+    await held.answer(DICTATION, 0, 200, { texto: 'colgar el estante del módem' });
+    expect(screen.getByLabelText(BOX)).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'dictar' })).toBeEnabled();
+  });
+});
