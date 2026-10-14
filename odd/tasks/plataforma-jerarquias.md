@@ -1299,6 +1299,10 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         referente (Gestión) o el referente ya no está activo, los pedidos van a Dirección, y **cada pedido le dice por
         qué le llega** ("Gestión no tiene referente: mientras no se designe uno, los pedidos de su gente te llegan a
         vos"), así Dirección se entera de que falta un referente. Nombrar uno es de la J7.
+      - **J6-D7. Una subtarea que vence después que su tarea:** la vista previa de Nahuel lo avisa; el referente lo ve en
+        el informe antes de decidir; si la aprueba así, es aceptar la demora de la tarea (fecha original más prevista,
+        J5-D4); si además pasa la fecha del objetivo, también la aprueba el referente del objetivo (decisión 6).
+      Con esto, las decisiones de la J6 están completas.
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
