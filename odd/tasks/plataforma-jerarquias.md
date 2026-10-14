@@ -1156,6 +1156,10 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       `docs/product/guion-celular-ma.md`.
       RDD commit por commit: siete revisiones aprobadas, con WARNING de casos de borde. El `70c0900b` no entraba en
       el presupuesto del revisor y se revisa en cuatro tramos.
+      Los cuatro tramos del `70c0900b` quedaron aprobados: `review-7ad295d37cfb5b24`, `review-fa42ef1720de99d4` (con los
+      cuatro lentes, entre ellos el de riesgo, con dos WARNING de seguridad), `review-d86ed7bfa16f651a` y
+      `review-14e9d271659c29c9`. Todos los WARNING de la MA pasan a una última unidad del escritor, primero los de
+      seguridad. Lo que haya que cambiar en la base va en la `0074`, porque la `0073` ya está aplicada.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
