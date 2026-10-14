@@ -139,4 +139,8 @@ def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
 # asentado, ya no en voz pasiva con esa persona como sujeto; a quién va el aviso y cuándo le
 # llega, que la cocina ahora siempre manda en `solo_si_pregunta` (`hechos.AVISOS`), sólo si la
 # persona lo pregunta. Sin frases de ejemplo. Antes: "71b74fdaea8a436d".
-HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "1b181215b77350b8"}
+# Y otra vez a propósito el 2026-10-14 (prueba de la Mini App en el celular: con una pregunta
+# abierta, Leda repetía la pregunta y no hacía caso de lo que la persona pedía): si el mensaje no
+# contesta la pregunta que venía de antes, primero se le contesta a lo que dijo o pidió y después
+# se vuelve a la pregunta. Sin frases de ejemplo. Antes: "1b181215b77350b8".
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "2355b80431ea0477"}
