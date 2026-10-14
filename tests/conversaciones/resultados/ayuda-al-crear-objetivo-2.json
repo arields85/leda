@@ -1,0 +1,1231 @@
+{
+  "ia": "chatgpt/gpt-6-sol",
+  "veces": 3,
+  "cortada": null,
+  "bien": 57,
+  "total": 57,
+  "resultados": [
+    {
+      "vuelta": 1,
+      "pedido": "el módem colgado",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-lucas",
+        "fecha": "2026-10-30",
+        "titulo": "Ordenar la sala de servidores y colgar el módem en la pared",
+        "descripcion": "Dejar la sala de servidores ordenada, con el módem colgado en la pared. Lucas Pérez se encarga del objetivo."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 7.69,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "parte de la planta nueva, antes de un día",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-planta",
+        "tipo": "hito",
+        "referente_id": "m-nahuel",
+        "fecha": "2026-11-19",
+        "titulo": "Arrancar la producción de envasado",
+        "descripcion": "Arrancar la producción de envasado como parte de Abrir la planta nueva antes del 20 de noviembre."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.81,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "los operarios de la línea 3",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-linea",
+        "tipo": "operativo",
+        "referente_id": "m-ismael",
+        "fecha": "2026-11-13",
+        "titulo": "Capacitar a los operarios del turno noche",
+        "descripcion": "Capacitar a los operarios del turno noche para arrancar la línea 3. Lo ve Ismael Soschinski y tiene que estar listo para el 13/11."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 8.21,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "alguien que no es referente",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Automatizar el envasado",
+        "descripcion": "Automatizar el envasado, a cargo de marcos."
+      },
+      "avisos": [
+        "No encontré a «marcos» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 7.97,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "un apodo que no es de un referente",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Mejorar el mantenimiento preventivo de las compresoras",
+        "descripcion": "Mejorar el mantenimiento preventivo de las compresoras, a cargo del tano."
+      },
+      "avisos": [
+        "No encontré a «el tano» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.19,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "dos referentes con el mismo apodo",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Armar el plan de backups de todos los servidores",
+        "descripcion": "Armar el plan de backups de todos los servidores, a cargo del colo."
+      },
+      "avisos": [
+        "Encontré a más de un referente para el colo: elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "varios"
+        }
+      ],
+      "elegir": [
+        {
+          "membership_id": "m-lucas",
+          "nombre": "Lucas Pérez",
+          "area": "Infraestructura"
+        },
+        {
+          "membership_id": "m-nahuel",
+          "nombre": "Nahuel Gómez",
+          "area": "Calidad"
+        }
+      ],
+      "sin_naturalidad": {},
+      "segundos": 4.42,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "sin fecha",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-iso",
+        "tipo": "operativo",
+        "referente_id": "m-nahuel",
+        "titulo": "Preparar la auditoría interna para la ISO 9001",
+        "descripcion": "Preparar la auditoría interna para la ISO 9001. Nahuel Gómez se encarga."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.6,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "un sábado no es hábil",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-lucas",
+        "titulo": "Renovar los matafuegos de la planta",
+        "descripcion": "Renovar los matafuegos de la planta. Lo lleva Lucas Pérez y tiene que estar listo para el sábado 24."
+      },
+      "avisos": [
+        "No puse la fecha: dijiste \"para el sabado 24\", pero el sábado 24 de octubre no es día hábil en este espacio; elegila en el calendario."
+      ],
+      "descartados": [
+        {
+          "campo": "fecha",
+          "motivo": "no_es_habil"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.26,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "un número que no es una fecha",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-ismael",
+        "titulo": "Reducir un 15 % el consumo de energía de la planta nueva",
+        "descripcion": "Reducir un 15 % el consumo de energía de la planta nueva. Ismael Soschinski está a cargo."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 8.45,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "antes de que termine el mes",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-nahuel",
+        "titulo": "Poner en funcionamiento el laboratorio de calidad",
+        "descripcion": "Necesitamos que el laboratorio de calidad esté funcionando antes de que termine noviembre. Lo ve Nahuel Gómez."
+      },
+      "avisos": [
+        "No puse la fecha: no entendí qué día es \"antes d q termine noviembre\"; elegila en el calendario."
+      ],
+      "descartados": [
+        {
+          "campo": "fecha",
+          "motivo": "no_entendida"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 7.13,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "alguien de afuera",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Ordenar el depósito de repuestos",
+        "descripcion": "Ordenar el depósito de repuestos."
+      },
+      "avisos": [
+        "No encontré a «pepe» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 3.46,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "el viernes de la semana que viene",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-lucas",
+        "fecha": "2026-10-23",
+        "titulo": "Migrar el correo a la nube",
+        "descripcion": "Migrar el correo a la nube, a cargo de Lucas Pérez, para el viernes de la semana que viene."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.17,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "mañana",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-ismael",
+        "fecha": "2026-10-15",
+        "titulo": "Dejar listo el informe de la auditoría",
+        "descripcion": "Dejar listo el informe de la auditoría para mañana. Lo ve Ismael Soschinski."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.11,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "con faltas de ortografía",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-planta",
+        "tipo": "operativo",
+        "referente_id": "m-nahuel",
+        "titulo": "Armar el layout del depósito",
+        "descripcion": "Armar el layout del depósito para la planta nueva."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 4.47,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "vence después que su padre",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-linea",
+        "tipo": "operativo",
+        "referente_id": "m-lucas",
+        "fecha": "2026-12-04",
+        "titulo": "Tener los repuestos críticos de la línea 3 en stock",
+        "descripcion": "Tener los repuestos críticos de la línea 3 en stock para el 4 de diciembre. Lo lleva Lucas Pérez."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 4.56,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "nadie nombrado y el área clara",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-nahuel",
+        "titulo": "Mejorar la medición de piezas en el control de calidad",
+        "descripcion": "Mejorar cómo se miden las piezas durante el control de calidad antes de despacharlas."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 3.42,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "nadie nombrado y el área no se sabe",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Organizar el aniversario de la empresa",
+        "descripcion": "Organizar algo lindo para el aniversario de la empresa."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 4.39,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "el referente nombrado gana sobre el área",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-nahuel",
+        "titulo": "Migrar los servidores y la red a la nube",
+        "descripcion": "Nahuel Gómez lleva la migración de los servidores y la red a la nube."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.21,
+      "fallas": []
+    },
+    {
+      "vuelta": 1,
+      "pedido": "alguien que no es referente, aunque el área se entienda",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Cambiar todo el cableado de red del galpón",
+        "descripcion": "Cambiar todo el cableado de red del galpón. Marcos estará a cargo."
+      },
+      "avisos": [
+        "No encontré a «marcos» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.35,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "el módem colgado",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-lucas",
+        "fecha": "2026-10-30",
+        "titulo": "Ordenar la sala de servidores y colgar el módem en la pared",
+        "descripcion": "Dejar la sala de servidores ordenada, con el módem colgado en la pared. Lucas Pérez se encarga de hacerlo para el viernes 30."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 7.83,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "parte de la planta nueva, antes de un día",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-planta",
+        "tipo": "hito",
+        "referente_id": "m-nahuel",
+        "fecha": "2026-11-19",
+        "titulo": "Arrancar la producción de envasado en la planta nueva",
+        "descripcion": "Arrancar la producción de envasado en la planta nueva antes del 20 de noviembre."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 9.39,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "los operarios de la línea 3",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-linea",
+        "tipo": "operativo",
+        "referente_id": "m-ismael",
+        "fecha": "2026-11-13",
+        "titulo": "Capacitar a los operarios del turno noche",
+        "descripcion": "Para arrancar la línea 3, hay que capacitar a los operarios del turno noche. Lo ve Ismael Soschinski y tiene que estar para el 13/11."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 7.9,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "alguien que no es referente",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Automatizar el envasado",
+        "descripcion": "Automatizar el envasado, a cargo de marcos."
+      },
+      "avisos": [
+        "No encontré a «marcos» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.24,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "un apodo que no es de un referente",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Mejorar el mantenimiento preventivo de las compresoras",
+        "descripcion": "Mejorar el mantenimiento preventivo de las compresoras. Que lo lleve el tano."
+      },
+      "avisos": [
+        "No encontré a «el tano» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.57,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "dos referentes con el mismo apodo",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Armar el plan de backups de todos los servidores",
+        "descripcion": "Armar el plan de backups de todos los servidores, a cargo del colo."
+      },
+      "avisos": [
+        "Encontré a más de un referente para el colo: elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "varios"
+        }
+      ],
+      "elegir": [
+        {
+          "membership_id": "m-lucas",
+          "nombre": "Lucas Pérez",
+          "area": "Infraestructura"
+        },
+        {
+          "membership_id": "m-nahuel",
+          "nombre": "Nahuel Gómez",
+          "area": "Calidad"
+        }
+      ],
+      "sin_naturalidad": {},
+      "segundos": 5.57,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "sin fecha",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-iso",
+        "tipo": "operativo",
+        "referente_id": "m-nahuel",
+        "titulo": "Preparar la auditoría interna para la ISO 9001",
+        "descripcion": "Preparar la auditoría interna para la ISO 9001. Nahuel Gómez se encarga."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.6,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "un sábado no es hábil",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-lucas",
+        "titulo": "Renovar los matafuegos de la planta",
+        "descripcion": "Renovar los matafuegos de la planta para el sábado 24. Lucas Pérez está a cargo."
+      },
+      "avisos": [
+        "No puse la fecha: dijiste \"para el sabado 24\", pero el sábado 24 de octubre no es día hábil en este espacio; elegila en el calendario."
+      ],
+      "descartados": [
+        {
+          "campo": "fecha",
+          "motivo": "no_es_habil"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 8.4,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "un número que no es una fecha",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-planta",
+        "tipo": "operativo",
+        "referente_id": "m-ismael",
+        "titulo": "Reducir un 15 % el consumo de energía de la planta nueva",
+        "descripcion": "Reducir un 15 % el consumo de energía de la planta nueva. Lo lleva Ismael Soschinski."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 8.01,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "antes de que termine el mes",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-nahuel",
+        "titulo": "Poner en funcionamiento el laboratorio de calidad",
+        "descripcion": "Necesitamos que el laboratorio de calidad esté funcionando antes de que termine noviembre. Lo ve Nahuel Gómez."
+      },
+      "avisos": [
+        "No puse la fecha: no entendí qué día es \"antes d q termine noviembre\"; elegila en el calendario."
+      ],
+      "descartados": [
+        {
+          "campo": "fecha",
+          "motivo": "no_entendida"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 8.55,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "alguien de afuera",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Ordenar el depósito de repuestos",
+        "descripcion": "Ordenar el depósito de repuestos. Que lo lleve pepe."
+      },
+      "avisos": [
+        "No encontré a «pepe» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.69,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "el viernes de la semana que viene",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-lucas",
+        "fecha": "2026-10-23",
+        "titulo": "Migrar el correo a la nube",
+        "descripcion": "Migrar el correo a la nube. Lucas Pérez se encarga y tiene que estar listo para el viernes de la semana que viene."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.97,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "mañana",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-ismael",
+        "fecha": "2026-10-15",
+        "titulo": "Dejar listo el informe de la auditoría",
+        "descripcion": "Dejar listo el informe de la auditoría para mañana. Lo ve Ismael Soschinski."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.92,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "con faltas de ortografía",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-planta",
+        "tipo": "operativo",
+        "referente_id": "m-nahuel",
+        "titulo": "Armar el layout del depósito",
+        "descripcion": "Armar el layout del depósito de la planta nueva."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 3.92,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "vence después que su padre",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-linea",
+        "tipo": "operativo",
+        "referente_id": "m-lucas",
+        "fecha": "2026-12-04",
+        "titulo": "Tener en stock los repuestos críticos para la línea 3",
+        "descripcion": "Tener los repuestos críticos en stock para la línea 3 el 4 de diciembre. Lo lleva Lucas Pérez."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.47,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "nadie nombrado y el área clara",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-nahuel",
+        "titulo": "Mejorar la medición de piezas en el control de calidad",
+        "descripcion": "Mejorar la forma de medir las piezas durante el control de calidad, antes de despacharlas."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 4.24,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "nadie nombrado y el área no se sabe",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Organizar el aniversario de la empresa",
+        "descripcion": "Organizar algo lindo para el aniversario de la empresa."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.34,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "el referente nombrado gana sobre el área",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-nahuel",
+        "titulo": "Migrar los servidores y la red a la nube",
+        "descripcion": "Migrar los servidores y la red a la nube. Nahuel Gómez está a cargo."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 4.92,
+      "fallas": []
+    },
+    {
+      "vuelta": 2,
+      "pedido": "alguien que no es referente, aunque el área se entienda",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Cambiar el cableado de red del galpón",
+        "descripcion": "Cambiar todo el cableado de red del galpón. Marcos se encargará del trabajo."
+      },
+      "avisos": [
+        "No encontré a «marcos» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.99,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "el módem colgado",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-lucas",
+        "fecha": "2026-10-30",
+        "titulo": "Ordenar la sala de servidores y colgar el módem en la pared",
+        "descripcion": "Dejar la sala de servidores ordenada, con el módem colgado en la pared. Lucas se encarga de llevarlo adelante para el viernes 30."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 7.13,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "parte de la planta nueva, antes de un día",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-planta",
+        "tipo": "hito",
+        "referente_id": "m-nahuel",
+        "fecha": "2026-11-19",
+        "titulo": "Arrancar la producción de envasado",
+        "descripcion": "Arrancar la producción de envasado en la planta nueva antes del 20 de noviembre."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.27,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "los operarios de la línea 3",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-linea",
+        "tipo": "operativo",
+        "referente_id": "m-ismael",
+        "fecha": "2026-11-13",
+        "titulo": "Capacitar a los operarios del turno noche para arrancar la línea 3",
+        "descripcion": "Capacitar a los operarios del turno noche para arrancar la línea 3. Lo ve Ismael Soschinski."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 2.69,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "alguien que no es referente",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Automatizar el envasado",
+        "descripcion": "Automatizar el envasado, con marcos a cargo."
+      },
+      "avisos": [
+        "No encontré a «marcos» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 4.78,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "un apodo que no es de un referente",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Mejorar el mantenimiento preventivo de las compresoras",
+        "descripcion": "Mejorar el mantenimiento preventivo de las compresoras. Lo lleva el tano."
+      },
+      "avisos": [
+        "No encontré a «el tano» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.87,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "dos referentes con el mismo apodo",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Armar el plan de backups de todos los servidores",
+        "descripcion": "Armar el plan de backups de todos los servidores. Lo lleva el colo."
+      },
+      "avisos": [
+        "Encontré a más de un referente para el colo: elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "varios"
+        }
+      ],
+      "elegir": [
+        {
+          "membership_id": "m-lucas",
+          "nombre": "Lucas Pérez",
+          "area": "Infraestructura"
+        },
+        {
+          "membership_id": "m-nahuel",
+          "nombre": "Nahuel Gómez",
+          "area": "Calidad"
+        }
+      ],
+      "sin_naturalidad": {},
+      "segundos": 6.57,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "sin fecha",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-iso",
+        "tipo": "operativo",
+        "referente_id": "m-nahuel",
+        "titulo": "Preparar la auditoría interna para la ISO 9001",
+        "descripcion": "Preparar la auditoría interna para la ISO. Nahuel Gómez se encarga."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.72,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "un sábado no es hábil",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-lucas",
+        "titulo": "Renovar los matafuegos de la planta",
+        "descripcion": "Renovar los matafuegos de la planta. Lo lleva Lucas Pérez y tiene que estar listo para el sábado 24 de octubre."
+      },
+      "avisos": [
+        "No puse la fecha: dijiste \"para el sabado 24\", pero el sábado 24 de octubre no es día hábil en este espacio; elegila en el calendario."
+      ],
+      "descartados": [
+        {
+          "campo": "fecha",
+          "motivo": "no_es_habil"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.56,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "un número que no es una fecha",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-ismael",
+        "titulo": "Reducir un 15 % el consumo de energía de la planta nueva",
+        "descripcion": "Reducir un 15 % el consumo de energía de la planta nueva. Lo lleva Ismael Soschinski."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.92,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "antes de que termine el mes",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-nahuel",
+        "titulo": "Poner en funcionamiento el laboratorio de calidad",
+        "descripcion": "El laboratorio de calidad tiene que estar en funcionamiento antes de que termine noviembre. Lo ve Nahuel Gómez."
+      },
+      "avisos": [
+        "No puse la fecha: no entendí qué día es \"antes d q termine noviembre\"; elegila en el calendario."
+      ],
+      "descartados": [
+        {
+          "campo": "fecha",
+          "motivo": "no_entendida"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 7.05,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "alguien de afuera",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Ordenar el depósito de repuestos",
+        "descripcion": "Ordenar el depósito de repuestos, a cargo de pepe."
+      },
+      "avisos": [
+        "No encontré a «pepe» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.8,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "el viernes de la semana que viene",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-lucas",
+        "fecha": "2026-10-23",
+        "titulo": "Migrar el correo a la nube",
+        "descripcion": "Migrar el correo a la nube."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 3.34,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "mañana",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-ismael",
+        "fecha": "2026-10-15",
+        "titulo": "Dejar listo el informe de la auditoría",
+        "descripcion": "Dejar listo el informe de la auditoría para mañana. Lo ve Ismael Soschinski."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 7.49,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "con faltas de ortografía",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-planta",
+        "tipo": "operativo",
+        "referente_id": "m-nahuel",
+        "titulo": "Armar el layout del depósito",
+        "descripcion": "Armar el layout del depósito de la planta nueva."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 3.36,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "vence después que su padre",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "padre_id": "o-linea",
+        "tipo": "operativo",
+        "referente_id": "m-lucas",
+        "fecha": "2026-12-04",
+        "titulo": "Tener los repuestos críticos de la línea 3 en stock",
+        "descripcion": "Tener los repuestos críticos en stock para la línea 3 para el 4 de diciembre. Lo lleva Lucas Pérez."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.34,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "nadie nombrado y el área clara",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-nahuel",
+        "titulo": "Mejorar la medición de piezas en el control de calidad",
+        "descripcion": "Mejorar cómo se miden las piezas durante el control de calidad antes de despacharlas."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 3.32,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "nadie nombrado y el área no se sabe",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Organizar algo lindo para el aniversario de la empresa",
+        "descripcion": "Organizar algo lindo para celebrar el aniversario de la empresa."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.07,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "el referente nombrado gana sobre el área",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "referente_id": "m-nahuel",
+        "titulo": "Migrar los servidores y la red a la nube",
+        "descripcion": "Migrar los servidores y la red a la nube. Nahuel Gómez lleva adelante el trabajo."
+      },
+      "avisos": [],
+      "descartados": [],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 5.64,
+      "fallas": []
+    },
+    {
+      "vuelta": 3,
+      "pedido": "alguien que no es referente, aunque el área se entienda",
+      "bien": true,
+      "falla": null,
+      "propuesta": {
+        "tipo": "estrategico",
+        "titulo": "Cambiar todo el cableado de red del galpón",
+        "descripcion": "Cambiar todo el cableado de red del galpón. Lo lleva marcos."
+      },
+      "avisos": [
+        "No encontré a «marcos» entre los referentes de área; elegí el referente."
+      ],
+      "descartados": [
+        {
+          "campo": "referente",
+          "motivo": "no_encontrado"
+        }
+      ],
+      "elegir": [],
+      "sin_naturalidad": {},
+      "segundos": 6.57,
+      "fallas": []
+    }
+  ]
+}
