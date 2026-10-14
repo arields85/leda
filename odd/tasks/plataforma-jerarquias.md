@@ -1185,6 +1185,15 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - si no impacta nada, que lo diga: "No demora a nadie más".
         Ejemplo: "Si aceptás, «Pasar los cables» de Lucas no puede empezar hasta el 23 y vence el 24: llegaría
         justo".
+      - **J5-D3c. "En qué afecta", regla general** (usuario: "recontra importante… cualquier cosa que modifique un
+        plazo de una tarea tiene que dar ese informe"). Todo cambio de plazo trae su informe de impacto: un
+        pedido de más tiempo, una demora aceptada, un cambio de fecha directo o una tarea que espera algo de otro y
+        se demora. El informe dice:
+        - qué depende de esa tarea y cómo se correría, con su responsable, y si llega justo o se atrasa;
+        - si se pasa la fecha de un objetivo;
+        - si no afecta nada, "No demora a nadie más".
+        Lo reciben quien decide y los referentes de las tareas afectadas. Dirección lo recibe sólo cuando toca la
+        fecha de un objetivo o una cadena que cruza áreas.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
