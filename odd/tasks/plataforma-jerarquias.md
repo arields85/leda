@@ -781,8 +781,66 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       opacidad técnica, nunca en silencio), el flujo de confirmar de punta a punta (respuestas viejas, "empezar de
       nuevo" en el medio, doble envío), honestidad de lo propuesto, las reglas del criterio y su juicio guardado, el
       formulario y las pruebas que no prueban. Las deudas anotadas en J2-23, J2b y J2-28 son su punto de partida.
-      **PENDIENTE**: cuándo, lo decide el usuario.
-- [ ] **J3 · Los objetivos desde la web.**
+      Cuándo: el usuario lo pidió para la noche del 2026-10-13, mientras duerme. En curso (revisor de sólo
+      lectura) junto con la suite completa.
+- [ ] **J3 · Los objetivos desde la web** (ADR 0023, decisión 1, decisión 5 y punto 11). Dirección crea los
+      objetivos de su equipo desde su web; el administrador, desde la suya, en cualquier espacio. Con la ayuda
+      de la IA desde el primer día, **reutilizando la J2** (usuario, 2026-10-13: "la j2 tiene muy buena base y
+      podés reutilizar muchas cosas"): se generaliza lo que ya probó el usuario en el celular, no se escribe un
+      formulario nuevo al lado.
+
+      **Diseño corto (J3-1, 2026-10-13, noche; mapa del explorador de sólo lectura).**
+      - **Qué se carga:** el nombre (hasta 200), de qué objetivo cuelga (o de ninguno), el tipo y el referente
+        (cualquier integrante activo del espacio); la descripción, opcional (hasta 800). Sin fecha en esta
+        porción (ver "Para decidir al despertar"). Nace `activo`, con su evento de estado: lo crea quien decide
+        (Dirección o el administrador); `propuesto` queda para lo que proponga un integrante (J6).
+      - **El tipo, según dónde cuelga** (punto 11): sin padre, estratégico, sin preguntar; colgado de un
+        estratégico, hito u operativo, con operativo marcado; colgado de un hito, operativo, sin preguntar.
+        Con los nombres de los niveles del pack: hoy el importador no los guarda (`motor/enlace.py:59-61`); se
+        guardan en `workspace_setting` al importar y la web los lee con las opciones.
+      - **De qué puede colgar:** sólo un objetivo abierto del mismo espacio (los mismos que ofrece
+        `opciones_de_la_carga`); nunca de otro espacio, nunca de un operativo (debajo de un operativo van
+        tareas, mecánica §1).
+      - **La base** (migración `0068`, con su rollback y su paridad): `objective` se cierra como `task`. Se
+        agregan `unique (workspace_id, id)` y claves compuestas para el padre y el referente, y se revocan las
+        escrituras directas de `leda_app` si nada vivo las usa. La herramienta de chat `crear_objetivo`
+        (`herramientas._crear_objetivo`, abierta a cualquier integrante en `autoridad.py:190`) se retira si
+        ninguna jugada del motor la usa, porque por chat no se crean objetivos (ADR 0017, decisión 1; ADR 0023,
+        decisión 6). Si alguna la usa, se para y se anota. Una función `crear_objetivo_web`, `security
+        definer` de `leda_owner` y sólo ejecutable por `leda_app`, con el patrón de `cargar_tarea`: acepta la
+        sesión de administración o la de un integrante con `autoridad_final`, fija el espacio, usa una clave
+        de un solo uso (tabla `creacion_de_objetivo`, como `carga_de_tarea`) y junta los errores en una sola
+        respuesta. Escribe la fila, el evento y la auditoría (`crear_objetivo`, con quién y por qué puerta).
+      - **El servidor:**
+        - La puerta de administración: `GET/POST /app/admin/api/espacios/{id}/objetivos`, con los controles de
+          la carga (otro sitio, JSON, tamaño, la cookie).
+        - La puerta del equipo, sólo para Dirección: `GET/POST /app/api/objetivos`. Es la primera ruta del
+          equipo que escribe; deja armados los controles que reusa la J4.
+      - **La ayuda de la IA:** el recuadro "Contame qué querés hacer y te ayudo", el dictado, "> completar con
+        Leda", "completando…" y la ortografía, reutilizados. La ayuda propone el nombre, de qué cuelga, el tipo
+        y las palabras con que se nombró al referente (el código lo busca con `integrantes_que_coinciden`; si
+        hay más de uno, elige la persona). Se generaliza el recorrido en tres pasos de `ayudar_a_cargar`: con el
+        candado, sin el candado mientras responde la IA, y otra vez con el candado, con la sesión revalidada.
+        Lo propio de la tarea (el juicio del criterio, la fecha y la evidencia) no entra. La ayuda y la
+        ortografía se abren también a Dirección por la puerta del equipo: la ayuda es para todos los que
+        cargan (ADR 0023, punto 4).
+      - **La web:** `FieldBlock` y `Counter` salen de `LoadForm.tsx` a sus archivos; `HelpBox`, `Dropdown`,
+        `Completing`, la vista previa, "confirmar" y "> empezar de nuevo" se comparten. Las funciones de la API
+        se inyectan para que sirvan a las dos puertas. Arriba del formulario se elige "tarea" u "objetivo". En
+        la web del equipo, Dirección ve "Nuevo objetivo"; los demás no lo ven, y el servidor igual lo rechaza.
+      - **Garantías** (ADR 0023, porción 1):
+        - un integrante o un referente no crea objetivos;
+        - un objetivo no cuelga de otro espacio ni de dos padres;
+        - la auditoría guarda quién lo creó y por qué puerta;
+        - una sesión de un espacio no crea en otro;
+        - la clave de un solo uso no repite;
+        - la IA nunca elige a una persona que no se nombró.
+      Ruta: delegada. Un escritor por tramo (base y servidor; web; ayuda), con RDD por tramo.
+  - [ ] J3-2 · La base y el servidor sin la IA (`0068`, `crear_objetivo_web`, las dos puertas, garantías).
+  - [ ] J3-3 · La web: el formulario de objetivos en las dos puertas, compartiendo las piezas de la J2.
+  - [ ] J3-4 · La ayuda de la IA para objetivos (y la ortografía y el dictado en la puerta del equipo), con su
+        herramienta de medición; una ronda con la IA real.
+  - [ ] J3-5 · La prueba en el celular (usuario), con su guion.
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
@@ -873,7 +931,13 @@ Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de ba
 Lo que el agente, trabajando solo desde la noche del 2026-10-13, necesita que decida el usuario. Cada punto,
 con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue con lo que no depende de eso.
 
-- (vacío por ahora)
+- **J3: ¿los objetivos llevan fecha?** Ejemplo: "Poner el módem colgando en la pared", ¿para cuándo? El ADR
+  0023 pide sólo nombre, de dónde cuelga y referente. **Mientras tanto:** sin fecha. Agregarla después es
+  chico: el campo ya existe en la base y la web ya tiene el calendario.
+- **J3: el objetivo nace activo.** Dirección (o el administrador) lo crea y queda en marcha, sin otra
+  aprobación. Si preferís que nazca "propuesto" hasta que alguien lo apruebe, se cambia.
+- **J3: el referente puede ser cualquier integrante activo**, no sólo el referente de un área. Ejemplo: Marcos,
+  que no es referente de ningún área, puede ser referente de "Poner el módem en la pared".
 
 ## Criterio de aceptación
 
