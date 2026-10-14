@@ -85,7 +85,7 @@ siga solo con lo pendiente de la J2 a la J7, anotando las decisiones que le haga
 2. **Sigue:**
    - la J4b, los avisos de la carga y "quiero crear una tarea" por Telegram, con un escritor delegado;
    - después, la **MA**, la Mini App, adelantada por el usuario: va antes de J5 a J7;
-   - después, J5, J6 y J7. De la J5 hay 11 decisiones preparadas; se respondió la 1 y no se registró.
+   - después, J5, J6 y J7. De la J5 hay 11 decisiones preparadas: la 1 se preguntó y está sin contestar.
    Acuerdo del 2026-10-14: las decisiones de cada porción se le traen al usuario al principio, de a una y en
    texto, nunca con la ventanita de preguntas.
 3. **Al cerrar cada tarea**, el documento de la unidad, este punto para retomar, la copia en Engram y la memoria
