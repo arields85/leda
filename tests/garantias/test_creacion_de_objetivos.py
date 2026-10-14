@@ -1,0 +1,600 @@
+"""La creación de un objetivo desde la web (ADR 0023, decisiones 1 y 5 y punto 11; porción J3 de
+`odd/tasks/plataforma-jerarquias.md`, tarea J3-2; migración 0068): la capa de garantías, en la
+base (la entrada HTTP, en la tarea siguiente).
+
+- **Quién crea:** el administrador de plataforma, por su puerta, en cualquier espacio; Dirección
+  (el integrante cuyo rol tiene la autoridad final), por la puerta del equipo, sólo en su espacio.
+  Un integrante o un referente no crea objetivos, aunque la web le esconda el botón.
+- **La crea una función de la base** (`crear_objetivo_web`, `security definer` de `leda_owner`,
+  sólo para `leda_app`): comprueba la sesión de la puerta en cada llamada y fija ella misma el
+  espacio, así que la RLS no le deja encontrar un objetivo ni una persona de otro.
+- **De qué cuelga:** de ninguno o de un objetivo abierto del mismo espacio que no sea operativo
+  (mecánica §1: debajo de un operativo van tareas); nunca de otro espacio, tampoco por la base
+  (claves compuestas). Un solo padre: la tabla tiene una sola columna.
+- **El tipo, según dónde cuelga** (punto 11): sin padre, estratégico; de un estratégico, hito u
+  operativo; de un hito, operativo.
+- **Lo que deja:** el objetivo, su evento `activo` (el estado es la proyección) y la auditoría
+  `crear_objetivo` con quién lo creó y por qué puerta. Una sola vez por clave.
+- **Las opciones:** los objetivos de los que puede colgar, con los tipos que admite cada uno, los
+  integrantes activos para el referente y los nombres de los niveles del pack.
+"""
+
+from __future__ import annotations
+
+import re
+import secrets
+from pathlib import Path
+
+import psycopg
+import pytest
+
+from leda.db import admin, espacio
+from tests.garantias.test_carga_de_tareas import (  # noqa: F401 -- `administradora` y
+    _entrar,                                       # `sesion` son las fixtures
+    _hash,
+    _revocar,
+    administradora,
+    sesion,
+    sin_espacio,
+)
+
+FUNCIONES_DE_LA_WEB = ("crear_objetivo_web", "opciones_del_objetivo")
+
+NIVELES_POR_DEFECTO = {"estrategico": "objetivo estratégico", "hito": "hito",
+                       "operativo": "objetivo operativo"}
+
+
+# --- Ayudas ---------------------------------------------------------------------------------
+
+def _norte(mundo: dict) -> dict:
+    return mundo["north-lab"]
+
+
+def _persona(mundo: dict, nombre: str, slug: str = "north-lab") -> str:
+    return mundo[slug]["people"][nombre]["membership_id"]
+
+
+def _sesion_del_equipo(conn, mundo: dict, nombre: str, slug: str = "north-lab") -> str:
+    """Abre una sesión de la puerta del equipo y devuelve su token en claro."""
+    enlace, equipo = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+    with espacio(conn, mundo[slug]["id"]) as cur:
+        cur.execute("select emitir_enlace_de_entrada(%s, %s, null)",
+                    (_persona(mundo, nombre, slug), _hash(enlace)))
+    conn.commit()
+    with sin_espacio(conn) as cur:
+        cur.execute("select canjear_enlace_de_entrada(%s, %s) as id",
+                    (_hash(enlace), _hash(equipo)))
+        assert cur.fetchone()["id"]
+    conn.commit()
+    return equipo
+
+
+def _objetivo(conn, ws: str, tipo: str, titulo: str, *, padre: str | None = None,
+              estado: str = "activo") -> str:
+    with admin(conn) as cur:
+        cur.execute("""insert into objective (workspace_id, parent_id, tipo, titulo, estado)
+                       values (%s, %s, %s, %s, %s) returning id""",
+                    (ws, padre, tipo, titulo, estado))
+        oid = str(cur.fetchone()["id"])
+    conn.commit()
+    return oid
+
+
+def _datos(mundo: dict, **cambios) -> dict:
+    """Un objetivo estratégico válido en North Lab, con Sam North de referente."""
+    datos = {
+        "puerta": "administracion",
+        "espacio": _norte(mundo)["id"],
+        "titulo": "Poner el módem colgando en la pared",
+        "descripcion": None,
+        "padre": None,
+        "tipo": "estrategico",
+        "referente": _persona(mundo, "Sam North"),
+        "clave": secrets.token_urlsafe(18),
+    }
+    datos.update(cambios)
+    return datos
+
+
+def _llamar(cur, token: str, d: dict) -> dict:
+    cur.execute(
+        """select crear_objetivo_web(%s, %s, %s, %s, %s, %s, %s, %s, %s) as r""",
+        (d["puerta"], _hash(token), d["espacio"], d["titulo"], d["descripcion"], d["padre"],
+         d["tipo"], d["referente"], d["clave"]))
+    return cur.fetchone()["r"]
+
+
+def _crear(conn, token: str, mundo: dict, **cambios) -> dict:
+    with sin_espacio(conn) as cur:
+        resultado = _llamar(cur, token, _datos(mundo, **cambios))
+    conn.commit()
+    return resultado
+
+
+def _como_direccion(conn, mundo: dict, **cambios) -> dict:
+    token = _sesion_del_equipo(conn, mundo, "Morgan Hale")
+    return _crear(conn, token, mundo, **{"puerta": "equipo", "espacio": None, **cambios})
+
+
+def _errores(resultado: dict) -> set[tuple[str, str]]:
+    assert resultado["ok"] is False, resultado
+    return {(e["campo"], e["motivo"]) for e in resultado["errores"]}
+
+
+def _contar(conn, tabla: str, donde: str = "true", *args) -> int:
+    with admin(conn) as cur:
+        cur.execute(f"select count(*) n from {tabla} where {donde}", args)
+        n = cur.fetchone()["n"]
+    conn.commit()
+    return n
+
+
+def _fila(conn, consulta: str, *args) -> dict | None:
+    with admin(conn) as cur:
+        cur.execute(consulta, args)
+        fila = cur.fetchone()
+    conn.commit()
+    return fila
+
+
+def _creados(conn) -> int:
+    return _contar(conn, "objective", "titulo = 'Poner el módem colgando en la pared'")
+
+
+def _nada_creado(conn) -> None:
+    assert _creados(conn) == 0
+    assert _contar(conn, "creacion_de_objetivo") == 0
+    assert _contar(conn, "audit_log", "accion = 'crear_objetivo'") == 0
+
+
+def _opciones(conn, puerta: str, token: str, espacio_id: str | None) -> dict:
+    with sin_espacio(conn) as cur:
+        cur.execute("select opciones_del_objetivo(%s, %s, %s) as r",
+                    (puerta, _hash(token), espacio_id))
+        r = cur.fetchone()["r"]
+    conn.commit()
+    return r
+
+
+# --- Las funciones y la tabla ---------------------------------------------------------------
+
+def test_las_funciones_son_elevadas_y_las_ejecuta_solo_la_web(conn):
+    with admin(conn) as cur:
+        cur.execute(
+            """select p.proname, r.rolname, p.prosecdef, p.proconfig,
+                      has_function_privilege('public', p.oid, 'execute') as de_public,
+                      has_function_privilege('leda_app', p.oid, 'execute') as de_app,
+                      has_function_privilege('leda_gateway', p.oid, 'execute') as de_gateway
+                 from pg_proc p join pg_roles r on r.oid = p.proowner
+                 join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'leda' and p.proname = any(%s)""",
+            (list(FUNCIONES_DE_LA_WEB) + ["quien_crea_el_objetivo"],))
+        filas = {f["proname"]: f for f in cur.fetchall()}
+    conn.commit()
+    assert set(filas) == set(FUNCIONES_DE_LA_WEB) | {"quien_crea_el_objetivo"}
+    for nombre, f in filas.items():
+        assert f["rolname"] == "leda_owner", nombre
+        assert any(c.startswith("search_path=") and c.endswith("pg_temp")
+                   for c in f["proconfig"] or []), nombre
+        assert not f["de_public"] and not f["de_gateway"], nombre
+    for nombre in FUNCIONES_DE_LA_WEB:
+        assert filas[nombre]["prosecdef"] and filas[nombre]["de_app"], nombre
+    # Quién crea se resuelve adentro de las dos funciones: la web no la llama sola.
+    assert not filas["quien_crea_el_objetivo"]["de_app"]
+
+
+def test_la_aplicacion_no_toca_las_claves_de_creacion(conn, intake_world):
+    norte = _norte(intake_world)
+    with espacio(conn, norte["id"]) as cur:
+        for orden in ("select * from creacion_de_objetivo", "delete from creacion_de_objetivo",
+                      "insert into creacion_de_objetivo (workspace_id, clave, huella, "
+                      "objective_id) values (gen_random_uuid(), 'x', 'x', gen_random_uuid())"):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege), conn.transaction():
+                cur.execute(orden)
+    conn.commit()
+
+
+def test_la_tabla_de_claves_tiene_rls_forzada(conn):
+    fila = _fila(conn, """select relrowsecurity r, relforcerowsecurity f from pg_class
+                           where oid = 'leda.creacion_de_objetivo'::regclass""")
+    assert fila["r"] and fila["f"]
+
+
+def test_la_herramienta_de_chat_para_crear_objetivos_se_retiro():
+    """ADR 0017, decisión 1; ADR 0023, decisión 6: por chat no se crean objetivos."""
+    from leda import herramientas
+
+    assert "crear_objetivo" not in herramientas.REGISTRO
+    assert not hasattr(herramientas, "_crear_objetivo")
+
+
+# --- Ningún objetivo cuelga de otro espacio, tampoco por la base -------------------------------
+
+def test_la_base_no_deja_colgar_un_objetivo_de_otro_espacio(conn, intake_world):
+    norte, oeste = _norte(intake_world), intake_world["west-studio"]
+    with admin(conn) as cur:
+        with pytest.raises(psycopg.errors.ForeignKeyViolation), conn.transaction():
+            cur.execute("""insert into objective (workspace_id, parent_id, tipo, titulo)
+                           values (%s, %s, 'hito', 'Cruzado')""",
+                        (norte["id"], oeste["objectives"][0]))
+        with pytest.raises(psycopg.errors.ForeignKeyViolation), conn.transaction():
+            cur.execute("""insert into objective (workspace_id, tipo, titulo,
+                                                  referente_membership_id)
+                           values (%s, 'estrategico', 'Cruzado', %s)""",
+                        (norte["id"], _persona(intake_world, "Sam North", "west-studio")))
+    conn.commit()
+    assert _contar(conn, "objective", "titulo = 'Cruzado'") == 0
+
+
+# --- Crear por la puerta de administración ---------------------------------------------------
+
+def test_el_administrador_crea_un_objetivo_con_su_evento_y_su_auditoria(
+        conn, intake_world, sesion, administradora):
+    with admin(conn) as cur:
+        cur.execute("select set_config('leda.nucleo_hash', 'nucleo-de-prueba', false)")
+    conn.commit()
+    norte = _norte(intake_world)
+    r = _crear(conn, sesion, intake_world, descripcion="  Con los tarugos del depósito  ",
+               titulo="  Poner el módem colgando en la pared  ")
+    assert r["ok"] is True and r["repetida"] is False, r
+    objetivo = _fila(conn, "select * from objective where id = %s", r["objective_id"])
+    assert str(objetivo["workspace_id"]) == norte["id"]
+    assert objetivo["titulo"] == "Poner el módem colgando en la pared"
+    assert objetivo["descripcion"] == "Con los tarugos del depósito"
+    assert objetivo["tipo"] == "estrategico" and objetivo["parent_id"] is None
+    assert str(objetivo["referente_membership_id"]) == _persona(intake_world, "Sam North")
+    assert objetivo["estado"] == "activo"
+    assert objetivo["fecha_objetivo"] is None
+
+    eventos = _fila(conn, "select count(*) n, min(estado_nuevo::text) e, "
+                          "min(actor_kind::text) k, min(actor_app_user_id::text) a "
+                          "from objective_state_event where objective_id = %s",
+                    r["objective_id"])
+    assert (eventos["n"], eventos["e"], eventos["k"], eventos["a"]) == (
+        1, "activo", "persona", administradora)
+
+    auditoria = _fila(conn, "select * from audit_log where accion = 'crear_objetivo'")
+    assert str(auditoria["workspace_id"]) == norte["id"]
+    assert auditoria["sujeto_tipo"] == "objective"
+    assert str(auditoria["sujeto_id"]) == r["objective_id"]
+    assert str(auditoria["actor_app_user_id"]) == administradora
+    assert auditoria["actor_kind"] == "persona"
+    assert auditoria["pack_hash"] == "hash-0"
+    assert auditoria["nucleo_hash"] == "nucleo-de-prueba"
+    detalle = auditoria["detalle"]
+    assert detalle["origen"] == "web" and detalle["puerta"] == "administracion"
+    assert detalle["creado_por_app_user_id"] == administradora
+    assert detalle["creado_por_membership_id"] is None
+    assert detalle["sesion_de_administracion_id"]
+    assert detalle["tipo"] == "estrategico" and detalle["parent_id"] is None
+    assert detalle["referente_membership_id"] == _persona(intake_world, "Sam North")
+    # Sin texto libre ni el token: lo escrito está en el objetivo, no en la auditoría.
+    texto = str(detalle)
+    assert "módem" not in texto and "tarugos" not in texto
+    assert sesion not in texto and _hash(sesion) not in texto
+    assert _contar(conn, "creacion_de_objetivo") == 1
+
+
+def test_el_administrador_crea_en_cualquier_espacio_y_queda_en_ese(
+        conn, intake_world, sesion):
+    oeste = intake_world["west-studio"]
+    with espacio(conn, _norte(intake_world)["id"]) as cur:
+        r = _llamar(cur, sesion, _datos(
+            intake_world, espacio=oeste["id"],
+            referente=_persona(intake_world, "Sam North", "west-studio")))
+        cur.execute("select current_setting('leda.workspace_id', true) ws")
+        assert cur.fetchone()["ws"] == _norte(intake_world)["id"], (
+            "la función no devolvió el espacio previo")
+    conn.commit()
+    assert r["ok"] is True, r
+    for tabla, columna in (("objective", "id"), ("creacion_de_objetivo", "objective_id")):
+        fila = _fila(conn, f"select workspace_id w from {tabla} where {columna} = %s",
+                     r["objective_id"])
+        assert str(fila["w"]) == oeste["id"], tabla
+    assert str(_fila(conn, "select workspace_id w from audit_log "
+                           "where accion = 'crear_objetivo'")["w"]) == oeste["id"]
+
+
+# --- Crear por la puerta del equipo: sólo Dirección ------------------------------------------
+
+def test_direccion_crea_un_objetivo_de_su_equipo(conn, intake_world):
+    norte = _norte(intake_world)
+    morgan = norte["people"]["Morgan Hale"]
+    raiz = _objetivo(conn, norte["id"], "estrategico", "Ordenar la sala de racks")
+    r = _como_direccion(conn, intake_world, padre=raiz, tipo="hito")
+    assert r["ok"] is True, r
+    objetivo = _fila(conn, "select * from objective where id = %s", r["objective_id"])
+    assert (objetivo["tipo"], str(objetivo["parent_id"])) == ("hito", raiz)
+    assert str(objetivo["workspace_id"]) == norte["id"] and objetivo["estado"] == "activo"
+    evento = _fila(conn, "select actor_app_user_id a from objective_state_event "
+                         "where objective_id = %s", r["objective_id"])
+    assert str(evento["a"]) == morgan["app_user_id"]
+    auditoria = _fila(conn, "select * from audit_log where accion = 'crear_objetivo'")
+    assert str(auditoria["actor_app_user_id"]) == morgan["app_user_id"]
+    detalle = auditoria["detalle"]
+    assert detalle["puerta"] == "equipo"
+    assert detalle["creado_por_membership_id"] == morgan["membership_id"]
+    assert detalle["sesion_web_id"]
+    assert "sesion_de_administracion_id" not in detalle
+
+
+def test_un_integrante_o_un_referente_no_crea_objetivos(conn, intake_world):
+    norte = _norte(intake_world)
+    # Taylor Quinn, referente del área, y Sam North, integrante.
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = %s where id = %s",
+                    (_persona(intake_world, "Taylor Quinn"), norte["areas"]["field"]))
+    conn.commit()
+    for nombre in ("Taylor Quinn", "Sam North"):
+        token = _sesion_del_equipo(conn, intake_world, nombre)
+        assert _errores(_crear(conn, token, intake_world, puerta="equipo", espacio=None)) == {
+            ("sesion", "sin_autoridad")}, nombre
+        assert _errores(_opciones(conn, "equipo", token, None)) == {
+            ("sesion", "sin_autoridad")}, nombre
+    _nada_creado(conn)
+
+
+def test_una_sesion_de_un_espacio_no_crea_en_otro(conn, intake_world, sesion):
+    oeste = intake_world["west-studio"]
+    token = _sesion_del_equipo(conn, intake_world, "Morgan Hale")
+    r = _crear(conn, token, intake_world, puerta="equipo", espacio=oeste["id"],
+               referente=_persona(intake_world, "Sam North", "west-studio"))
+    assert _errores(r) == {("espacio", "no_existe")}
+    assert _errores(_opciones(conn, "equipo", token, oeste["id"])) == {
+        ("espacio", "no_existe")}
+    # Y lo de otro espacio no entra: ni el padre ni el referente.
+    r = _crear(conn, token, intake_world, puerta="equipo", espacio=None,
+               padre=oeste["objectives"][0], tipo="operativo",
+               referente=_persona(intake_world, "Sam North", "west-studio"))
+    assert _errores(r) == {("padre", "no_existe"), ("referente", "no_es_integrante_activo")}
+    # Con la sesión de administración, lo mismo.
+    r = _crear(conn, sesion, intake_world, padre=oeste["objectives"][0], tipo="operativo",
+               referente=_persona(intake_world, "Sam North", "west-studio"))
+    assert _errores(r) == {("padre", "no_existe"), ("referente", "no_es_integrante_activo")}
+    _nada_creado(conn)
+    assert _contar(conn, "objective", "workspace_id = %s", oeste["id"]) == 3
+
+
+def test_cada_puerta_pide_su_propia_sesion(conn, intake_world, administradora):
+    administracion = _entrar(conn, administradora)
+    equipo = _sesion_del_equipo(conn, intake_world, "Morgan Hale")
+    # La sesión del equipo no abre la puerta de administración ni la de administración la del
+    # equipo; un token cualquiera, ninguna.
+    assert _errores(_crear(conn, equipo, intake_world)) == {("sesion", "sin_sesion")}
+    assert _errores(_crear(conn, administracion, intake_world, puerta="equipo",
+                           espacio=None)) == {("sesion", "sin_sesion")}
+    for puerta in ("administracion", "equipo"):
+        assert _errores(_crear(conn, secrets.token_urlsafe(32), intake_world,
+                               puerta=puerta)) == {("sesion", "sin_sesion")}
+    assert _errores(_crear(conn, administracion, intake_world, puerta="otra")) == {
+        ("sesion", "sin_sesion")}
+    # Con el rol revocado, la sesión de administración se corta en la llamada.
+    _revocar(conn, administradora)
+    assert _errores(_crear(conn, administracion, intake_world)) == {("sesion", "sin_sesion")}
+    _nada_creado(conn)
+
+
+def test_un_espacio_que_no_existe_no_crea(conn, intake_world, sesion):
+    r = _crear(conn, sesion, intake_world, espacio="00000000-0000-0000-0000-000000000000")
+    assert _errores(r) == {("espacio", "no_existe")}
+    assert _errores(_crear(conn, sesion, intake_world, espacio=None)) == {
+        ("espacio", "no_existe")}
+    _nada_creado(conn)
+
+
+# --- Lo que no se crea ----------------------------------------------------------------------
+
+def test_sin_los_datos_obligatorios_se_rechaza_todo_junto(conn, intake_world, sesion):
+    r = _crear(conn, sesion, intake_world, titulo="   ", tipo=None, referente=None, clave=None)
+    assert _errores(r) == {("titulo", "falta"), ("tipo", "falta"), ("referente", "falta"),
+                           ("clave", "falta")}
+    r = _crear(conn, sesion, intake_world, clave="corta", tipo="campaña")
+    assert _errores(r) == {("clave", "mal_formada"), ("tipo", "no_existe")}
+    _nada_creado(conn)
+
+
+def test_textos_demasiado_largos_no_se_crean(conn, intake_world, sesion):
+    r = _crear(conn, sesion, intake_world, titulo="x" * 201, descripcion="y" * 801)
+    assert _errores(r) == {("titulo", "demasiado_largo"), ("descripcion", "demasiado_largo")}
+    assert _crear(conn, sesion, intake_world, titulo="x" * 200,
+                  descripcion="y" * 800)["ok"] is True
+
+
+@pytest.mark.parametrize("padre, tipo, vale", [
+    (None, "estrategico", True), (None, "hito", False), (None, "operativo", False),
+    ("estrategico", "hito", True), ("estrategico", "operativo", True),
+    ("estrategico", "estrategico", False),
+    ("hito", "operativo", True), ("hito", "hito", False), ("hito", "estrategico", False),
+])
+def test_el_tipo_depende_de_donde_cuelga(conn, intake_world, sesion, padre, tipo, vale):
+    norte = _norte(intake_world)
+    padre_id = _objetivo(conn, norte["id"], padre, f"Padre {padre}") if padre else None
+    r = _crear(conn, sesion, intake_world, padre=padre_id, tipo=tipo)
+    if vale:
+        assert r["ok"] is True, r
+        assert _fila(conn, "select tipo::text t from objective where id = %s",
+                     r["objective_id"])["t"] == tipo
+    else:
+        assert _errores(r) == {("tipo", "no_corresponde")}
+        _nada_creado(conn)
+
+
+def test_de_un_operativo_no_cuelga_un_objetivo(conn, intake_world, sesion):
+    operativo = _norte(intake_world)["objectives"][0]
+    r = _crear(conn, sesion, intake_world, padre=operativo, tipo="operativo")
+    assert _errores(r) == {("padre", "es_operativo")}
+    _nada_creado(conn)
+
+
+def test_el_padre_tiene_que_estar_abierto(conn, intake_world, sesion):
+    norte = _norte(intake_world)
+    cerrado = _objetivo(conn, norte["id"], "estrategico", "Cerrado", estado="terminado")
+    r = _crear(conn, sesion, intake_world, padre=cerrado, tipo="hito")
+    assert _errores(r) == {("padre", "no_esta_abierto")}
+    propuesto = _objetivo(conn, norte["id"], "estrategico", "Propuesto", estado="propuesto")
+    assert _crear(conn, sesion, intake_world, padre=propuesto, tipo="hito")["ok"] is True
+
+
+def test_el_referente_tiene_que_ser_integrante_activo(conn, intake_world, sesion):
+    with admin(conn) as cur:
+        cur.execute("update membership set activo = false where id = %s",
+                    (_persona(intake_world, "Sam Noble"),))
+    conn.commit()
+    r = _crear(conn, sesion, intake_world, referente=_persona(intake_world, "Sam Noble"))
+    assert _errores(r) == {("referente", "no_es_integrante_activo")}
+    _nada_creado(conn)
+    # Cualquier integrante activo puede ser el referente, no sólo el de un área.
+    assert _crear(conn, sesion, intake_world,
+                  referente=_persona(intake_world, "Sam North"))["ok"] is True
+
+
+# --- Una sola vez por clave -------------------------------------------------------------------
+
+def test_la_misma_clave_con_los_mismos_datos_devuelve_el_mismo_objetivo(
+        conn, intake_world, sesion):
+    clave = secrets.token_urlsafe(18)
+    primera = _crear(conn, sesion, intake_world, clave=clave)
+    segunda = _crear(conn, sesion, intake_world, clave=clave)
+    assert primera["ok"] and segunda["ok"]
+    assert segunda["objective_id"] == primera["objective_id"]
+    assert (primera["repetida"], segunda["repetida"]) == (False, True)
+    assert _creados(conn) == 1
+    assert _contar(conn, "audit_log", "accion = 'crear_objetivo'") == 1
+
+
+def test_la_misma_clave_con_otros_datos_se_rechaza(conn, intake_world, sesion):
+    clave = secrets.token_urlsafe(18)
+    assert _crear(conn, sesion, intake_world, clave=clave)["ok"] is True
+    r = _crear(conn, sesion, intake_world, clave=clave, titulo="Otro objetivo")
+    assert _errores(r) == {("clave", "usada_con_otros_datos")}
+    assert _contar(conn, "objective", "titulo = 'Otro objetivo'") == 0
+
+
+def test_la_misma_clave_por_otra_puerta_es_otro_pedido(conn, intake_world, sesion):
+    clave = secrets.token_urlsafe(18)
+    assert _crear(conn, sesion, intake_world, clave=clave)["ok"] is True
+    r = _como_direccion(conn, intake_world, clave=clave)
+    assert _errores(r) == {("clave", "usada_con_otros_datos")}
+    assert _creados(conn) == 1
+
+
+# --- Las opciones del formulario --------------------------------------------------------------
+
+def test_las_opciones_dicen_de_que_puede_colgar_y_quien_puede_ser_referente(
+        conn, intake_world, sesion):
+    norte = _norte(intake_world)
+    raiz = _objetivo(conn, norte["id"], "estrategico", "Ordenar la sala de racks")
+    hito = _objetivo(conn, norte["id"], "hito", "Primer rack", padre=raiz)
+    _objetivo(conn, norte["id"], "estrategico", "Cerrado", estado="terminado")
+    _objetivo(conn, intake_world["west-studio"]["id"], "estrategico", "Ajeno")
+    with admin(conn) as cur:
+        cur.execute("update membership set activo = false where id = %s",
+                    (_persona(intake_world, "Sam Noble"),))
+    conn.commit()
+    r = _opciones(conn, "administracion", sesion, norte["id"])
+    assert r["ok"] is True
+    assert r["espacio"]["id"] == norte["id"]
+    assert r["sin_padre"] == ["estrategico"]
+    padres = {p["id"]: p for p in r["padres"]}
+    assert set(padres) == {raiz, hito}, "ni los operativos, ni los cerrados, ni los ajenos"
+    assert padres[raiz]["tipos"] == ["hito", "operativo"]
+    assert padres[hito]["tipos"] == ["operativo"]
+    assert padres[hito]["tipo"] == "hito"
+    nombres = {p["nombre"] for p in r["integrantes"]}
+    assert nombres == {"Morgan Hale 1", "Taylor Quinn 1", "Sam North 1"}
+    assert r["niveles"] == NIVELES_POR_DEFECTO
+    assert "Ajeno" not in str(r) and "Morgan Hale 2" not in str(r)
+    # Dirección, por la puerta del equipo, ve lo mismo de su espacio.
+    equipo = _opciones(conn, "equipo", _sesion_del_equipo(conn, intake_world, "Morgan Hale"),
+                       None)
+    assert equipo["ok"] is True and {p["id"] for p in equipo["padres"]} == {raiz, hito}
+
+
+def test_las_opciones_usan_los_nombres_de_los_niveles_del_pack(conn, intake_world, sesion):
+    norte = _norte(intake_world)
+    with admin(conn) as cur:
+        cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                       values (%s, 'niveles', %s::jsonb)""",
+                    (norte["id"], '{"estrategico": "plan anual", "hito": "campaña"}'))
+    conn.commit()
+    r = _opciones(conn, "administracion", sesion, norte["id"])
+    assert r["niveles"] == {"estrategico": "plan anual", "hito": "campaña",
+                            "operativo": "objetivo operativo"}
+
+
+def test_la_base_no_acepta_nombres_de_niveles_mal_formados(conn, intake_world):
+    norte = _norte(intake_world)
+    for valor in ('["hito"]', '{"tarea": "orden"}', '{"hito": ""}', '{"hito": 3}',
+                  '{"hito": "%s"}' % ("x" * 61)):
+        with admin(conn) as cur:
+            with pytest.raises(psycopg.errors.CheckViolation), conn.transaction():
+                cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                               values (%s, 'niveles', %s::jsonb)""", (norte["id"], valor))
+        conn.commit()
+
+
+def test_las_opciones_piden_una_sesion_y_un_espacio_que_exista(conn, intake_world,
+                                                               administradora):
+    norte = _norte(intake_world)
+    assert _errores(_opciones(conn, "administracion", secrets.token_urlsafe(32),
+                              norte["id"])) == {("sesion", "sin_sesion")}
+    sesion = _entrar(conn, administradora)
+    assert _errores(_opciones(conn, "administracion", sesion,
+                              "00000000-0000-0000-0000-000000000000")) == {
+        ("espacio", "no_existe")}
+
+
+# --- El importador guarda los nombres de los niveles -----------------------------------------
+
+def _importar_corework(conn, tmp_path, monkeypatch, niveles):
+    import yaml
+
+    from leda.importador import importar
+    from tests.conftest import RAIZ
+
+    monkeypatch.setenv("LEDA_BOT_TOKEN_COREWORK", "prueba:token")
+    pack = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
+    pack["telegram"]["grupo_gestion_id"] = -1001
+    pack.pop("niveles", None)
+    if niveles is not None:
+        pack["niveles"] = niveles
+    ruta = tmp_path / "corework.yaml"
+    ruta.write_text(yaml.safe_dump(pack, allow_unicode=True), "utf-8")
+    r = importar(conn, ruta)
+    fila = _fila(conn, """select valor from workspace_setting
+                           where workspace_id = %s and clave = 'niveles'""", r.workspace_id)
+    return r, (fila["valor"] if fila else None)
+
+
+def test_el_importador_guarda_los_nombres_de_los_niveles_de_objetivo(
+        conn, tmp_path, monkeypatch):
+    r, guardado = _importar_corework(conn, tmp_path, monkeypatch, {
+        "objetivo_estrategico": " plan anual de mantenimiento ", "hito": "campaña",
+        "objetivo_operativo": "equipo o línea", "tarea": "orden de trabajo",
+        "subtarea": "paso"})
+    assert guardado == {"estrategico": "plan anual de mantenimiento", "hito": "campaña",
+                        "operativo": "equipo o línea"}
+    # Uno que falta o que no es un nombre no se guarda (y el pack lo avisa); sin niveles, se saca.
+    r, guardado = _importar_corework(conn, tmp_path, monkeypatch, {
+        "objetivo_estrategico": "plan", "hito": "", "objetivo_operativo": ["x"]})
+    assert guardado == {"estrategico": "plan"}
+    assert any("niveles" in a for a in r.advertencias)
+    _, guardado = _importar_corework(conn, tmp_path, monkeypatch, None)
+    assert guardado is None
+
+
+# --- La vuelta atrás ------------------------------------------------------------------------
+
+def test_el_rollback_de_la_0068_se_niega_si_hay_objetivos_creados(conn, intake_world, sesion):
+    rollbacks = Path(__file__).resolve().parents[2] / "db" / "rollbacks"
+    (archivo,) = rollbacks.glob("0068_*.sql")
+    guarda = re.findall(r"do \$\$.*?end \$\$;", archivo.read_text("utf-8"), re.S)[0]
+    assert _crear(conn, sesion, intake_world)["ok"] is True
+    with admin(conn) as cur:
+        with pytest.raises(psycopg.errors.RaiseException, match="0068 rollback refused"), \
+                conn.transaction():
+            cur.execute("set local search_path = leda, public")
+            cur.execute(guarda)
+    conn.commit()
+    assert _contar(conn, "creacion_de_objetivo") == 1
+

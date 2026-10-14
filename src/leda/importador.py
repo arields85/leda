@@ -86,6 +86,35 @@ def usuario_del_bot(pack: dict[str, Any]) -> str | None:
     return usuario if USUARIO_DEL_BOT.fullmatch(usuario) else None
 
 
+# Los nombres visibles de los niveles de objetivo (`niveles` del pack; mecánica §1), con la clave
+# del tipo en la base. La web los muestra al crear un objetivo (ADR 0023, punto 11; migración
+# 0068); sin uno, usa el del núcleo. Los de tarea y subtarea no se guardan.
+NIVELES = "niveles"
+NIVELES_DE_OBJETIVO = {"objetivo_estrategico": "estrategico", "hito": "hito",
+                       "objetivo_operativo": "operativo"}
+LARGO_MAXIMO_DE_UN_NIVEL = 60
+
+
+def niveles_del_pack(pack: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
+    """Los nombres de los niveles de objetivo que declara el pack, por tipo, y las claves del
+    pack cuyo nombre no sirve (vacío, que no es un texto o más largo que el tope de la base)."""
+    niveles = pack.get(NIVELES)
+    if not isinstance(niveles, dict):
+        return {}, []
+    nombres: dict[str, str] = {}
+    malos: list[str] = []
+    for clave, tipo in NIVELES_DE_OBJETIVO.items():
+        if clave not in niveles or not _definido(niveles[clave]):
+            continue
+        valor = niveles[clave]
+        nombre = valor.strip() if isinstance(valor, str) else ""
+        if nombre and len(nombre) <= LARGO_MAXIMO_DE_UN_NIVEL:
+            nombres[tipo] = nombre
+        else:
+            malos.append(clave)
+    return nombres, malos
+
+
 CLAVES_PROHIBIDAS = {
     "constitucion", "invariantes", "prohibiciones",
     "permitir_cierre_sin_evidencia", "desactivar_auditoria",
@@ -229,6 +258,12 @@ def validar(pack: dict[str, Any]) -> tuple[list[str], list[str]]:
         advertencias.append(
             "El usuario del bot (telegram.bot_usuario) no es un usuario de Telegram: se "
             "ignora y la web no muestra el botón para consultar a Leda.")
+    _, niveles_malos = niveles_del_pack(pack)
+    if niveles_malos:
+        advertencias.append(
+            "Hay nombres de niveles que no sirven (niveles: " + ", ".join(niveles_malos)
+            + "): tienen que ser un texto de hasta "
+            f"{LARGO_MAXIMO_DE_UN_NIVEL} caracteres. Se usa el nombre del núcleo.")
     if not pack.get("calendario"):
         bloqueantes.append(
             "Falta el calendario laboral. Toda la escalera de recordatorios "
@@ -710,6 +745,14 @@ def _importar_ajustes(cur, ws, pack) -> None:
         # Sacarlo del pack (o declararlo mal) lo saca de la web.
         cur.execute("delete from workspace_setting where workspace_id = %s and clave = %s",
                     (ws, BOT_USUARIO))
+
+    niveles, _ = niveles_del_pack(pack)
+    if niveles:
+        ajustes[NIVELES] = niveles
+    else:
+        # Sin niveles en el pack, la web usa los nombres del núcleo.
+        cur.execute("delete from workspace_setting where workspace_id = %s and clave = %s",
+                    (ws, NIVELES))
 
     for clave, valor in ajustes.items():
         cur.execute(

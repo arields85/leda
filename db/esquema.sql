@@ -300,6 +300,18 @@ create table persona_config (
   presentacion    text
 );
 
+-- Los nombres de los niveles de objetivo del pack (migración 0068; mecánica §1): un objeto con
+-- `estrategico`, `hito` u `operativo` y un nombre de 1 a 60 caracteres cada uno.
+create or replace function niveles_validos(p_niveles jsonb) returns boolean as $$
+  select jsonb_typeof(p_niveles) = 'object'
+     and not exists (
+       select 1 from jsonb_each(p_niveles) n
+        where n.key not in ('estrategico', 'hito', 'operativo')
+           or jsonb_typeof(n.value) <> 'string'
+           or btrim(n.value #>> '{}') = ''
+           or char_length(n.value #>> '{}') > 60);
+$$ language sql immutable;
+
 -- Umbrales y límites del pack: re-aprobación, tope de mensajes, días de
 -- escalamiento. Clave-valor para no migrar el esquema cada vez que aparece
 -- un parámetro nuevo.
@@ -334,7 +346,11 @@ create table workspace_setting (
       when clave <> 'bot_usuario' then true
       when jsonb_typeof(valor) <> 'string' then false
       else (valor #>> '{}') ~ '^[A-Za-z][A-Za-z0-9_]{4,31}$'
-    end)
+    end),
+  -- ADR 0023, punto 11 (migración 0068): los nombres de los niveles de objetivo del pack
+  -- (`niveles`), que guarda el importador y muestra la web al crear un objetivo.
+  constraint workspace_setting_niveles check (
+    case when clave <> 'niveles' then true else niveles_validos(valor) end)
 );
 
 -- ADR 0019, decisión 5 (migración 0034): por cada tipo de la política, las clases
@@ -393,15 +409,22 @@ comment on table cadence_job is
 create table objective (
   id                      uuid primary key default gen_random_uuid(),
   workspace_id            uuid not null references workspace(id) on delete cascade,
-  parent_id               uuid references objective(id) on delete cascade,
+  parent_id               uuid,
   tipo                    tipo_objetivo not null,
   titulo                  text not null,
   descripcion             text,
-  referente_membership_id uuid references membership(id),
+  referente_membership_id uuid,
   estado                  estado_objetivo not null default 'propuesto',
   fecha_objetivo          date,
   creado_en               timestamptz not null default now(),
-  actualizado_en          timestamptz not null default now()
+  actualizado_en          timestamptz not null default now(),
+  -- Migración 0068 (ADR 0023, decisión 1): el padre y el referente, del mismo espacio.
+  constraint objective_workspace_id_unique unique (workspace_id, id),
+  constraint objective_padre_del_espacio
+    foreign key (workspace_id, parent_id) references objective(workspace_id, id)
+    on delete cascade,
+  constraint objective_referente_del_espacio
+    foreign key (workspace_id, referente_membership_id) references membership(workspace_id, id)
 );
 
 create index objective_ws on objective (workspace_id, estado);
@@ -3531,6 +3554,279 @@ begin
   return v_resultado;
 end $$;
 
+-- Los objetivos desde la web (migración 0068; ADR 0023, decisiones 1 y 5 y punto 11; mecánica §1).
+-- `quien_crea_el_objetivo` resuelve la puerta: la de administración, en cualquier espacio; la del
+-- equipo, sólo Dirección (el rol con autoridad final), en el suyo. `opciones_del_objetivo` ofrece
+-- de qué puede colgar (un objetivo abierto que no sea operativo, con los tipos que admite), los
+-- integrantes activos para el referente y los nombres de los niveles del pack. `crear_objetivo_web`
+-- crea con el patrón de `cargar_tarea`: el objetivo, su evento `activo`, la auditoría
+-- `crear_objetivo` (quién y por qué puerta) y su clave de un solo uso en `creacion_de_objetivo`.
+create table creacion_de_objetivo (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  clave         text not null,
+  huella        text not null,
+  objective_id  uuid not null,
+  creada_en     timestamptz not null default now(),
+  constraint creacion_de_objetivo_clave_unica unique (workspace_id, clave),
+  constraint creacion_de_objetivo_clave check (clave ~ '^[A-Za-z0-9_-]{16,128}$'),
+  constraint creacion_de_objetivo_huella check (huella ~ '^[0-9a-f]{64}$'),
+  constraint creacion_de_objetivo_objetivo
+    foreign key (workspace_id, objective_id) references objective(workspace_id, id)
+    on delete cascade
+);
+
+comment on table creacion_de_objetivo is
+  'ADR 0023, decisión 1 (migración 0068): la clave de un solo uso de cada creación de un objetivo desde la web, con la huella de lo creado. La misma clave con los mismos datos devuelve el mismo objetivo; con otros, se rechaza. leda_app no tiene privilegios: sólo execute sobre crear_objetivo_web.';
+
+comment on table creacion_de_objetivo is
+  'ADR 0023, decisión 1 (migración 0068): la clave de un solo uso de cada creación de un objetivo desde la web, con la huella de lo creado. La misma clave con los mismos datos devuelve el mismo objetivo; con otros, se rechaza. leda_app no tiene privilegios: sólo execute sobre crear_objetivo_web.';
+
+create or replace function quien_crea_el_objetivo(
+    p_puerta text, p_token_hash text, p_workspace_id uuid)
+returns jsonb
+language plpgsql set search_path = leda, public, pg_temp as $$
+declare v_sesion uuid;
+        v_espacio uuid;
+        v_persona uuid;
+        v_usuario uuid;
+        v_es_autoridad boolean;
+begin
+  if p_puerta = 'administracion' then
+    -- El administrador de plataforma puede en cualquier espacio (ADR 0023, decisión 5).
+    select s.sesion_id, s.app_user_id into v_sesion, v_usuario
+      from sesion_de_administracion_vigente(p_token_hash) s;
+    if v_usuario is null then
+      return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+    end if;
+    select w.id into v_espacio from workspace w where w.id = p_workspace_id;
+    if v_espacio is null then
+      return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'espacio', 'motivo', 'no_existe')));
+    end if;
+  elsif p_puerta = 'equipo' then
+    -- Dirección, sólo en su espacio (ADR 0023, decisión 1): el espacio sale de la sesión, y uno
+    -- pedido que no es el suyo no existe para ella.
+    select s.sesion_id, s.workspace_id, s.membership_id into v_sesion, v_espacio, v_persona
+      from sesion_vigente(p_token_hash) s;
+    if v_persona is null then
+      return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+    end if;
+    if p_workspace_id is not null and p_workspace_id <> v_espacio then
+      return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'espacio', 'motivo', 'no_existe')));
+    end if;
+    perform set_config('leda.workspace_id', v_espacio::text, true);
+    select m.app_user_id, r.autoridad_final into v_usuario, v_es_autoridad
+      from membership m join rol r on r.id = m.rol_id
+     where m.id = v_persona and m.activo;
+    if not coalesce(v_es_autoridad, false) then
+      return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'sesion', 'motivo', 'sin_autoridad')));
+    end if;
+  else
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+  end if;
+  -- Desde acá, la RLS acota todo a ese espacio: un id de otro no se encuentra.
+  perform set_config('leda.workspace_id', v_espacio::text, true);
+  return jsonb_build_object('ok', true, 'puerta', p_puerta, 'sesion_id', v_sesion,
+                            'workspace_id', v_espacio, 'app_user_id', v_usuario,
+                            'membership_id', v_persona);
+end $$;
+
+create or replace function opciones_del_objetivo(
+    p_puerta text, p_token_hash text, p_workspace_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_quien jsonb;
+        v_espacio workspace%rowtype;
+        v_resultado jsonb;
+begin
+  v_quien := quien_crea_el_objetivo(p_puerta, p_token_hash, p_workspace_id);
+  if not (v_quien ->> 'ok')::boolean then
+    perform set_config('leda.workspace_id', previo, true);
+    return v_quien;
+  end if;
+  select * into v_espacio from workspace w where w.id = (v_quien ->> 'workspace_id')::uuid;
+  v_resultado := jsonb_build_object(
+    'ok', true,
+    'espacio', jsonb_build_object('id', v_espacio.id, 'nombre', v_espacio.nombre),
+    -- Los nombres del pack (`niveles`), sobre los del núcleo (mecánica §1).
+    'niveles', jsonb_build_object('estrategico', 'objetivo estratégico', 'hito', 'hito',
+                                  'operativo', 'objetivo operativo')
+               || coalesce((select s.valor from workspace_setting s
+                             where s.workspace_id = v_espacio.id and s.clave = 'niveles'),
+                           '{}'::jsonb),
+    -- Sin padre, sólo un estratégico (punto 11).
+    'sin_padre', jsonb_build_array('estrategico'),
+    -- De qué puede colgar: un objetivo abierto que no sea operativo (debajo de un operativo van
+    -- tareas), con los tipos que admite.
+    'padres', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', o.id, 'titulo', o.titulo, 'tipo', o.tipo, 'estado', o.estado,
+               'tipos', case o.tipo when 'estrategico' then jsonb_build_array('hito', 'operativo')
+                                    else jsonb_build_array('operativo') end)
+             order by o.titulo, o.id)
+        from objective o
+       where o.estado in ('activo', 'propuesto') and o.tipo <> 'operativo'), '[]'::jsonb),
+    -- El referente: cualquier integrante activo del espacio.
+    'integrantes', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'membership_id', m.id, 'nombre', u.nombre, 'area', a.nombre)
+             order by u.nombre, m.id)
+        from membership m
+        join app_user u on u.id = m.app_user_id
+        join area a on a.id = m.area_id
+       where m.activo), '[]'::jsonb));
+  perform set_config('leda.workspace_id', previo, true);
+  return v_resultado;
+end $$;
+
+create or replace function crear_objetivo_web(
+    p_puerta text, p_token_hash text, p_workspace_id uuid, p_titulo text, p_descripcion text,
+    p_parent_id uuid, p_tipo text, p_referente_membership_id uuid, p_clave text)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_quien jsonb;
+        v_espacio uuid;
+        v_usuario uuid;
+        v_padre objective%rowtype;
+        v_referente membership%rowtype;
+        v_previa creacion_de_objetivo%rowtype;
+        v_huella text;
+        v_objetivo uuid;
+        v_errores jsonb := '[]'::jsonb;
+        v_resultado jsonb;
+begin
+  -- La sesión, en cada llamada, y el espacio, fijado.
+  v_quien := quien_crea_el_objetivo(p_puerta, p_token_hash, p_workspace_id);
+  if not (v_quien ->> 'ok')::boolean then
+    perform set_config('leda.workspace_id', previo, true);
+    return v_quien;
+  end if;
+  v_espacio := (v_quien ->> 'workspace_id')::uuid;
+  v_usuario := (v_quien ->> 'app_user_id')::uuid;
+
+  <<creacion>>
+  begin
+    -- La clave de un solo uso: la misma creación dos veces devuelve el mismo objetivo.
+    if nullif(btrim(p_clave), '') is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'clave', 'motivo', 'falta');
+    elsif p_clave !~ '^[A-Za-z0-9_-]{16,128}$' then
+      v_errores := v_errores || jsonb_build_object('campo', 'clave', 'motivo', 'mal_formada');
+    else
+      perform pg_advisory_xact_lock(hashtextextended(v_espacio::text || ':' || p_clave, 0));
+      v_huella := encode(sha256(convert_to(jsonb_build_object(
+        'puerta', p_puerta, 'app_user_id', v_usuario,
+        'membership_id', v_quien -> 'membership_id', 'titulo', p_titulo,
+        'descripcion', p_descripcion, 'padre', p_parent_id, 'tipo', p_tipo,
+        'referente', p_referente_membership_id)::text, 'UTF8')), 'hex');
+      select * into v_previa from creacion_de_objetivo c where c.clave = p_clave;
+      if v_previa.id is not null then
+        if v_previa.huella = v_huella then
+          v_resultado := jsonb_build_object('ok', true, 'objective_id', v_previa.objective_id,
+                                            'repetida', true);
+        else
+          v_resultado := jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+            jsonb_build_object('campo', 'clave', 'motivo', 'usada_con_otros_datos')));
+        end if;
+        exit creacion;
+      end if;
+    end if;
+
+    -- El nombre y la descripción (los topes de la tarea).
+    if nullif(btrim(p_titulo), '') is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'titulo', 'motivo', 'falta');
+    elsif char_length(btrim(p_titulo)) > 200 then
+      v_errores := v_errores || jsonb_build_object('campo', 'titulo', 'motivo', 'demasiado_largo');
+    end if;
+    if char_length(btrim(coalesce(p_descripcion, ''))) > 800 then
+      v_errores := v_errores
+                   || jsonb_build_object('campo', 'descripcion', 'motivo', 'demasiado_largo');
+    end if;
+
+    -- De qué cuelga: de ninguno o de un objetivo abierto de este espacio (la RLS no encuentra uno
+    -- de otro) que no sea operativo. Leído `for share`: no se cierra mientras tanto.
+    if p_parent_id is not null then
+      select * into v_padre from objective o where o.id = p_parent_id for share;
+      if v_padre.id is null then
+        v_errores := v_errores || jsonb_build_object('campo', 'padre', 'motivo', 'no_existe');
+      elsif v_padre.estado not in ('activo', 'propuesto') then
+        v_errores := v_errores || jsonb_build_object('campo', 'padre', 'motivo', 'no_esta_abierto');
+      elsif v_padre.tipo = 'operativo' then
+        v_errores := v_errores || jsonb_build_object('campo', 'padre', 'motivo', 'es_operativo');
+      end if;
+    end if;
+
+    -- El tipo, según dónde cuelga (punto 11): sin padre, estratégico; de un estratégico, hito u
+    -- operativo; de un hito, operativo.
+    if nullif(btrim(p_tipo), '') is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'tipo', 'motivo', 'falta');
+    elsif p_tipo not in ('estrategico', 'hito', 'operativo') then
+      v_errores := v_errores || jsonb_build_object('campo', 'tipo', 'motivo', 'no_existe');
+    elsif (p_parent_id is null and p_tipo <> 'estrategico')
+          or (v_padre.tipo = 'estrategico' and p_tipo not in ('hito', 'operativo'))
+          or (v_padre.tipo = 'hito' and p_tipo <> 'operativo') then
+      v_errores := v_errores || jsonb_build_object('campo', 'tipo', 'motivo', 'no_corresponde');
+    end if;
+
+    -- El referente: cualquier integrante activo de este espacio.
+    if p_referente_membership_id is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'referente', 'motivo', 'falta');
+    else
+      select * into v_referente from membership m
+       where m.id = p_referente_membership_id and m.activo for share;
+      if v_referente.id is null then
+        v_errores := v_errores || jsonb_build_object('campo', 'referente',
+                                                     'motivo', 'no_es_integrante_activo');
+      end if;
+    end if;
+
+    if jsonb_array_length(v_errores) > 0 then
+      v_resultado := jsonb_build_object('ok', false, 'errores', v_errores);
+      exit creacion;
+    end if;
+
+    -- Todo en orden: el objetivo, su evento `activo` (el estado es la proyección; lo crea quien
+    -- decide), su auditoría y su clave.
+    insert into objective (workspace_id, parent_id, tipo, titulo, descripcion,
+                           referente_membership_id)
+    values (v_espacio, v_padre.id, p_tipo::tipo_objetivo, btrim(p_titulo),
+            nullif(btrim(p_descripcion), ''), v_referente.id)
+    returning id into v_objetivo;
+    insert into objective_state_event (objective_id, estado_nuevo, actor_kind,
+                                       actor_app_user_id, motivo)
+    values (v_objetivo, 'activo', 'persona', v_usuario,
+            case p_puerta when 'equipo' then 'creado desde la web por Dirección'
+                          else 'creado desde la web por un administrador de plataforma' end);
+    perform auditar_acceso_web(
+      v_espacio, v_usuario, 'persona', 'crear_objetivo', 'objective', v_objetivo,
+      jsonb_build_object(
+        'origen', 'web',
+        'puerta', p_puerta,
+        'creado_por_app_user_id', v_usuario,
+        'creado_por_membership_id', v_quien -> 'membership_id',
+        'tipo', p_tipo,
+        'parent_id', v_padre.id,
+        'referente_membership_id', v_referente.id)
+      || case p_puerta
+           when 'equipo' then jsonb_build_object('sesion_web_id', v_quien -> 'sesion_id')
+           else jsonb_build_object('sesion_de_administracion_id', v_quien -> 'sesion_id') end);
+    insert into creacion_de_objetivo (workspace_id, clave, huella, objective_id)
+    values (v_espacio, p_clave, v_huella, v_objetivo);
+    v_resultado := jsonb_build_object('ok', true, 'objective_id', v_objetivo,
+                                      'repetida', false);
+  end creacion;
+
+  perform set_config('leda.workspace_id', previo, true);
+  return v_resultado;
+end $$;
+
 -- =========================================================================
 -- Sistema
 -- =========================================================================
@@ -4874,7 +5170,7 @@ begin
     'dicho_de_quien_destraba','pase_de_tarea','cambio_de_responsable',
     'pedido_de_detalle','tarea_compartida','apodo',
     'enlace_de_entrada','sesion_web','carga_de_tarea',
-    'message_outbox_entrada_web','ofrecimiento_web']
+    'message_outbox_entrada_web','ofrecimiento_web','creacion_de_objetivo']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -4948,6 +5244,9 @@ create policy resolver_por_token on sesion_web for select to leda_owner
 -- La clave de cada carga desde la web (migración 0062): `leda_app` no tiene nada sobre ella, sólo
 -- `execute` sobre `cargar_tarea`.
 revoke all on carga_de_tarea from public, leda_app;
+-- La clave de cada creación de un objetivo desde la web (migración 0068): lo mismo, sólo
+-- `execute` sobre `crear_objetivo_web`.
+revoke all on creacion_de_objetivo from public, leda_app;
 
 -- Registros auxiliares. Quedan fuera del bucle de arriba porque `audit_log` e
 -- `incident` admiten espacio nulo para los hechos de alcance global, que sólo
@@ -5185,6 +5484,23 @@ grant execute on function es_dia_habil(uuid, date) to leda_admin;
 grant execute on function opciones_de_la_carga(text, uuid, timestamptz) to leda_app;
 grant execute on function cargar_tarea(text, uuid, uuid, text, text, uuid, date, text, text[],
                                        uuid, text, timestamptz, uuid) to leda_app;
+
+-- Los objetivos desde la web (migración 0068): de la clave, `leda_owner` sólo busca y agrega. La
+-- web (`leda_app`): las opciones y la creación; quién crea se resuelve adentro de las dos.
+revoke all on creacion_de_objetivo from leda_owner;
+grant select, insert on creacion_de_objetivo to leda_owner;
+
+alter function quien_crea_el_objetivo(text, text, uuid) owner to leda_owner;
+alter function opciones_del_objetivo(text, text, uuid) owner to leda_owner;
+alter function crear_objetivo_web(text, text, uuid, text, text, uuid, text, uuid, text)
+  owner to leda_owner;
+revoke execute on function quien_crea_el_objetivo(text, text, uuid) from public;
+revoke execute on function opciones_del_objetivo(text, text, uuid) from public;
+revoke execute on function crear_objetivo_web(text, text, uuid, text, text, uuid, text, uuid,
+                                              text) from public;
+grant execute on function opciones_del_objetivo(text, text, uuid) to leda_app;
+grant execute on function crear_objetivo_web(text, text, uuid, text, text, uuid, text, uuid,
+                                             text) to leda_app;
 
 alter function emitir_acceso_tablero(uuid, text, timestamptz)
   owner to leda_owner;

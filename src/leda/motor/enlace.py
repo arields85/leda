@@ -58,7 +58,8 @@ PALABRAS_DE_UNION = frozenset({
 # Las palabras que dicen qué clase de cosa es y no cuál: "la tarea del switch" nombra el switch,
 # no pide "tarea" en el título (la conversación 45). Son los nombres del núcleo para los niveles
 # que se nombran por chat (mecánica §1). Los nombres visibles de cada nivel son del pack
-# (`niveles`), pero el importador todavía no los guarda en la base: cuando estén, se suman acá.
+# (`niveles`); el importador guarda sólo los de los objetivos (migración 0068, para la web), no
+# los de tarea y subtarea: cuando estén, se suman acá.
 NOMBRES_DE_LA_CLASE = frozenset({"tarea", "tareas", "subtarea", "subtareas"})
 NO_NOMBRAN = PALABRAS_DE_UNION | NOMBRES_DE_LA_CLASE
 
