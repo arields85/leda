@@ -3,8 +3,9 @@
 (un transporte de `httpx` falso; nunca el real).
 
 - **La puerta:** sólo una sesión de administración vigente, con la protección contra otros sitios
-  de la carga; sólo audio de los tipos admitidos (415) y de hasta 10 MB (413); un espacio que no
-  existe, 404. Nada de eso llega a Gemini.
+  de la carga, y validada antes de leer el audio (J2-30); sólo audio de los tipos admitidos (415,
+  con un incidente) y de hasta 10 MB (413); un espacio que no existe, 404; y unos pocos dictados a
+  la vez por proceso (503, con un incidente). Nada de eso llega a Gemini.
 - **Lo que recibe Gemini:** el audio tal cual, en línea, con su tipo; las instrucciones con los
   nombres de ese espacio (integrantes, áreas y objetivos abiertos) y nada de otro; la clave en su
   cabecera, nunca en la dirección. Sin pensar, temperatura 0 y un tope de salida.
@@ -14,19 +15,28 @@
 - **La auditoría** (`dictar_al_cargar`): quién dictó, en qué espacio, el tipo, el tramo de
   tamaño y si respondió; nunca el audio ni el texto. El audio no se guarda en ningún lado.
 - **El candado de la web no espera a Gemini:** la llamada se hace fuera de él.
+- **El plazo total es real** (J2-30): cada operación de la red espera, a lo sumo, lo que queda
+  del plazo; las pruebas lo miden con un reloj de mentira, nunca con el reloj de verdad.
 """
 
 from __future__ import annotations
 
 import base64
 import json
+import threading
 
+import httpcore
 import httpx
 import pytest
+
+from leda import dictado as _dictado
 
 from tests.garantias.test_carga_de_tareas import (  # noqa: F401
     _contar, _fila, _navegador_de_administracion, _navegador_del_equipo, _norte, _revocar,
     administradora, sesion, web)
+
+# El cliente de verdad, antes de que la prueba ponga el de mentira (`gemini`).
+_CLIENTE_DE_VERDAD = _dictado._cliente
 
 CLAVE = "clave-de-mentira-0123456789"
 AUDIO = b"OggS\x00audio de mentira\xff\x00\x01"
@@ -76,8 +86,30 @@ def gemini(monkeypatch):
 
     falso = GeminiDeMentira()
     monkeypatch.setenv("LEDA_GEMINI_API_KEY", CLAVE)
-    monkeypatch.setattr(dictado, "_cliente", lambda: httpx.Client(
+    monkeypatch.setattr(dictado, "_cliente", lambda limite: httpx.Client(
         transport=httpx.MockTransport(falso), timeout=dictado.PLAZO_DEL_PROVEEDOR_S))
+    return falso
+
+
+class RelojDeMentira:
+    """El reloj del plazo total (`dictado._reloj`): no avanza solo, avanza cuando la prueba dice."""
+
+    def __init__(self) -> None:
+        self.ahora = 1000.0
+
+    def __call__(self) -> float:
+        return self.ahora
+
+    def avanzar(self, segundos: float) -> None:
+        self.ahora += segundos
+
+
+@pytest.fixture
+def reloj(monkeypatch) -> RelojDeMentira:
+    from leda import dictado
+
+    falso = RelojDeMentira()
+    monkeypatch.setattr(dictado, "_reloj", falso)
     return falso
 
 
@@ -172,13 +204,79 @@ def test_sin_sesion_de_administracion_no_hay_dictado(web, conn, intake_world, ad
     assert _contar(conn, "audit_log", "accion = 'dictar_al_cargar'") == 0
 
 
-@pytest.mark.parametrize("tipo", ["application/json", "text/plain", "video/mp4",
-                                  "multipart/form-data; boundary=x", ""])
-def test_lo_que_no_es_audio_no_se_manda(web, conn, intake_world, administradora, gemini, tipo):
+def test_la_sesion_se_valida_antes_de_leer_el_audio(web, conn, intake_world, administradora,
+                                                     gemini, monkeypatch):
+    """J2-30: sin una sesión vigente (sin galleta, o con una que ya no vale) el pedido se rechaza
+    sin leer el audio, que puede pesar hasta 10 MB."""
+    from leda import web_app
+
+    leidos = []
+    leer = web_app._el_cuerpo_con_tope
+
+    async def contando(request, tope):
+        leidos.append(tope)
+        return await leer(request, tope)
+
+    monkeypatch.setattr(web_app, "_el_cuerpo_con_tope", contando)
+    norte = _norte(intake_world)
+    assert _dictar(web(), norte["id"]).status_code == 401
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    _revocar(conn, administradora)
+    assert _dictar(navegador, norte["id"]).status_code == 401
+    assert leidos == []
+    assert gemini.pedidos == []
+
+
+@pytest.mark.parametrize("tipo, dice", [
+    ("application/json", "application/json"), ("text/plain", "text/plain"),
+    ("video/mp4", "video/mp4"), ("multipart/form-data; boundary=x", "multipart/form-data"),
+    ("", "vacío"), ("audio/<script>", "ilegible")])
+def test_lo_que_no_es_audio_no_se_manda(web, conn, intake_world, administradora, gemini, tipo,
+                                        dice):
+    """No llega a Gemini y, con una sesión vigente, deja un incidente con el tipo saneado (J2-30:
+    un celular que mandaba el audio sin su tipo fallaba sin que la administración se enterara)."""
     navegador = _navegador_de_administracion(web, conn, administradora)
     r = _dictar(navegador, _norte(intake_world)["id"], tipo=tipo)
     assert r.status_code == 415
     assert gemini.pedidos == []
+    incidente = _incidente(conn)
+    assert incidente is not None
+    assert str(incidente["workspace_id"]) == _norte(intake_world)["id"]
+    assert incidente["referencia_cruda"] == f"content-type: {dice}"
+
+
+def test_sin_sesion_un_tipo_que_no_es_audio_no_deja_incidente(web, conn, intake_world, gemini):
+    assert _dictar(web(), _norte(intake_world)["id"], tipo="text/plain").status_code == 401
+    assert _contar(conn, "incident", "etapa = 'dictado_al_cargar'") == 0
+
+
+def test_hay_un_tope_de_dictados_a_la_vez(web, conn, intake_world, administradora, gemini,
+                                          monkeypatch):
+    """J2-30: unos pocos dictados a la vez por proceso; lleno, no se espera ni se lee el audio:
+    el aviso de siempre y un incidente. Al terminar uno, su lugar se libera."""
+    from leda import web_app
+
+    assert 1 <= web_app.DICTADOS_A_LA_VEZ <= 8
+    tope = threading.BoundedSemaphore(1)
+    monkeypatch.setattr(web_app, "_DICTADOS", tope)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    norte = _norte(intake_world)
+    assert tope.acquire(blocking=False)
+    try:
+        r = _dictar(navegador, norte["id"])
+    finally:
+        tope.release()
+    assert r.status_code == 503
+    assert r.json() == {"error": "sin_dictado", "texto": TEXTO_SIN_DICTADO}
+    assert gemini.pedidos == []
+    incidente = _incidente(conn)
+    assert incidente is not None
+    assert incidente["referencia_cruda"] == f"dictados_a_la_vez: {web_app.DICTADOS_A_LA_VEZ}"
+    gemini.respuestas.append(_con_texto(DICHO))
+    assert _dictar(navegador, norte["id"]).status_code == 200
+    # Terminado, el lugar quedó libre otra vez.
+    assert tope.acquire(blocking=False)
+    tope.release()
 
 
 def test_un_audio_de_mas_de_10_mb_no_se_manda(web, conn, intake_world, administradora, gemini):
@@ -294,28 +392,134 @@ def test_si_no_se_entendio_nada_lo_dice_sin_incidente(web, conn, intake_world, a
 # --- La deuda de la J2b (revisión `review-0f465303e17d9ce6`) ----------------------------------
 
 def test_gemini_tiene_un_plazo_total_que_vence_antes_que_la_web(web, conn, intake_world,
-                                                                administradora, gemini,
-                                                                monkeypatch):
+                                                                administradora, gemini, reloj):
     """El plazo de `httpx` es por operación: una respuesta que llega de a gotas lo estira sin
     fin. El dictado tiene un plazo total, debajo de los 45 s de la web; vencido, es que Gemini no
-    respondió (un aviso y un incidente), aunque la llamada siga colgada."""
-    import time
-
+    respondió (un aviso y un incidente), aunque la respuesta llegue después. Con un reloj de
+    mentira (J2-30): la respuesta llega cuando el plazo ya pasó."""
     from leda import dictado
 
     assert dictado.PLAZO_DEL_PROVEEDOR_S <= dictado.PLAZO_TOTAL_S < 45
-    monkeypatch.setattr(dictado, "PLAZO_TOTAL_S", 0.3)
-    gemini.al_llamar = lambda: time.sleep(2)
+    gemini.al_llamar = lambda: reloj.avanzar(dictado.PLAZO_TOTAL_S + 1)
     gemini.respuestas.append(_con_texto(DICHO))
     navegador = _navegador_de_administracion(web, conn, administradora)
-    desde = time.monotonic()
     r = _dictar(navegador, _norte(intake_world)["id"])
-    assert time.monotonic() - desde < 1.5
+    assert DICHO not in r.text
     assert r.status_code == 502
     assert r.json() == {"error": "sin_dictado", "texto": TEXTO_SIN_DICTADO}
     assert "plazo_total" in _incidente(conn)["referencia_cruda"]
     auditoria = _fila(conn, "select detalle from audit_log where accion = 'dictar_al_cargar'")
     assert auditoria["detalle"]["resultado"] == "sin_respuesta"
+
+
+def test_una_respuesta_dentro_del_plazo_llega(web, conn, intake_world, administradora, gemini,
+                                             reloj):
+    from leda import dictado
+
+    gemini.al_llamar = lambda: reloj.avanzar(dictado.PLAZO_TOTAL_S - 1)
+    gemini.respuestas.append(_con_texto(DICHO))
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    assert _dictar(navegador, _norte(intake_world)["id"]).json() == {"texto": DICHO}
+
+
+class FlujoDeMentira:
+    """Una conexión de mentira: anota el plazo que recibe cada operación."""
+
+    def __init__(self, plazos: list) -> None:
+        self.plazos = plazos
+
+    def read(self, max_bytes, timeout=None):
+        self.plazos.append(("read", timeout))
+        return b""
+
+    def write(self, buffer, timeout=None):
+        self.plazos.append(("write", timeout))
+
+    def close(self):
+        self.plazos.append(("close", None))
+
+    def start_tls(self, ssl_context, server_hostname=None, timeout=None):
+        self.plazos.append(("start_tls", timeout))
+        return FlujoDeMentira(self.plazos)
+
+    def get_extra_info(self, info):
+        return None
+
+
+class RedDeMentira:
+    """La red de mentira debajo del plazo total: nunca sale a internet."""
+
+    def __init__(self) -> None:
+        self.plazos: list = []
+
+    def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        self.plazos.append(("connect_tcp", timeout))
+        return FlujoDeMentira(self.plazos)
+
+    def connect_unix_socket(self, path, timeout=None, socket_options=None):
+        self.plazos.append(("connect_unix_socket", timeout))
+        return FlujoDeMentira(self.plazos)
+
+    def sleep(self, seconds):
+        self.plazos.append(("sleep", seconds))
+
+
+def test_cada_operacion_de_la_red_espera_a_lo_sumo_lo_que_queda_del_plazo(reloj):
+    """J2-30: el hilo del pedido no sobrevive al plazo total. Cada operación (conectar, el TLS,
+    mandar, cada lectura) espera lo suyo o lo que queda del plazo, lo que sea menos; vencido,
+    ninguna espera: falla en el momento, sin tocar la red."""
+    from leda import dictado
+
+    red = RedDeMentira()
+    con_plazo = dictado._RedConPlazo(reloj.ahora + 10, red)
+    flujo = con_plazo.connect_tcp("gemini", 443, timeout=5)
+    reloj.avanzar(4)
+    flujo = flujo.start_tls(None, server_hostname="gemini", timeout=30)
+    reloj.avanzar(4)
+    flujo.write(b"pedido", timeout=30)
+    assert flujo.read(1024, timeout=30) == b""
+    assert flujo.read(1024, timeout=None) == b""
+    assert flujo.read(1024, timeout=1) == b""
+    assert red.plazos == [("connect_tcp", 5), ("start_tls", 6), ("write", 2), ("read", 2),
+                          ("read", 2), ("read", 1)]
+    reloj.avanzar(2)
+    for operacion, falla in ((lambda: flujo.read(1024, timeout=30), httpcore.ReadTimeout),
+                             (lambda: flujo.write(b"x", timeout=30), httpcore.WriteTimeout),
+                             (lambda: flujo.start_tls(None, timeout=30), httpcore.ConnectTimeout),
+                             (lambda: con_plazo.connect_tcp("gemini", 443, timeout=5),
+                              httpcore.ConnectTimeout)):
+        with pytest.raises(falla):
+            operacion()
+    assert len(red.plazos) == 6
+    flujo.close()
+    assert red.plazos[-1] == ("close", None)
+
+
+def test_el_cliente_del_dictado_usa_la_red_con_el_plazo(monkeypatch, reloj):
+    """El cliente de verdad (`dictado._cliente`) manda todo por la red con el plazo: con una red de
+    mentira debajo, conectar recibe lo que queda del plazo total (acá 2 s, menos que los 5 de la
+    conexión). Nunca sale a internet."""
+    from leda import dictado
+
+    red = RedDeMentira()
+
+    def no_conecta(host, port, timeout=None, local_address=None, socket_options=None):
+        red.plazos.append(("connect_tcp", timeout))
+        raise httpcore.ConnectError("sin red")
+
+    red.connect_tcp = no_conecta
+    # Sin un proxy del entorno, que `httpx` usaría en lugar del transporte.
+    for variable in ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy",
+                     "all_proxy"):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setattr(dictado, "_cliente", _CLIENTE_DE_VERDAD)
+    monkeypatch.setattr(dictado, "_red_de_verdad", lambda: red)
+    monkeypatch.setattr(dictado, "GEMINI_BASE", "https://gemini.invalid")
+    monkeypatch.setattr(dictado, "PLAZO_TOTAL_S", 2.0)
+    with pytest.raises(dictado.ProveedorNoResponde) as falla:
+        dictado.transcribir(AUDIO, "audio/webm", [])
+    assert falla.value.motivo == "ConnectError"
+    assert red.plazos == [("connect_tcp", 2.0)]
 
 
 TEXTO_CORTADO = ("Pasé a texto sólo una parte: el dictado se cortó. Dictá lo que falta o "

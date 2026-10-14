@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import secrets
 import threading
 import time
@@ -1845,42 +1846,91 @@ async def _el_cuerpo_con_tope(request: Request, tope: int) -> bytes | None:
     return bytes(partes)
 
 
+# J2-30 (revisión J2-29): pocos dictados a la vez por proceso. Cada uno puede leer hasta 10 MB y
+# esperar a Gemini hasta 35 s; lleno, no se espera un lugar: se avisa como cuando Gemini no
+# responde, con un incidente.
+DICTADOS_A_LA_VEZ = 4
+_DICTADOS = threading.BoundedSemaphore(DICTADOS_A_LA_VEZ)
+
+# Lo que un incidente dice del tipo que llegó: sólo un tipo bien formado, sin sus parámetros.
+_TIPO_MOSTRABLE = re.compile(r"[a-z0-9][a-z0-9.+-]{0,40}/[a-z0-9][a-z0-9.+-]{0,60}")
+
+
+def _tipo_para_el_incidente(content_type: str | None) -> str:
+    tipo = (content_type or "").split(";")[0].strip().lower()
+    if not tipo:
+        return "vacío"
+    return tipo if _TIPO_MOSTRABLE.fullmatch(tipo) else "ilegible"
+
+
 @router.post("/admin/api/espacios/{espacio_id}/dictado")
 async def dictar_al_cargar(espacio_id: str, request: Request):
     """Lo que la persona dictó, como texto: 200 con `texto`; 415 si no es audio de un tipo
     admitido, 413 si pasa de 10 MB, 422 si no hay audio o no se entendió nada; 503 sin la clave de
-    Gemini y 502 si Gemini no respondió, los dos con un texto humano y un incidente. Si Gemini lo
-    cortó por el tope, 200 con lo transcripto y un `aviso`, y un incidente (J2-26)."""
+    Gemini o con demasiados dictados a la vez y 502 si Gemini no respondió, con un texto humano y
+    un incidente (también el 415). Si Gemini lo cortó por el tope, 200 con lo transcripto y un
+    `aviso`, y un incidente (J2-26). La sesión se valida antes de leer el audio (J2-30)."""
     from . import dictado
 
     if _de_otro_sitio(request):
         return _json({"error": "origen_no_verificado"}, 403)
-    tipo = dictado.tipo_de_audio(request.headers.get("content-type"))
-    if tipo is None:
-        return _json({"error": "se_espera_audio"}, 415)
     token = _token_de_administracion(request)
     if token is None:
         return _sin_sesion_de_administracion()
-    audio = await _el_cuerpo_con_tope(request, dictado.TAMANO_MAXIMO)
-    if audio is None:
-        return _json({"error": "demasiado_grande"}, 413)
     espacio = _espacio_de(espacio_id)
     preparado = await run_in_threadpool(_con_la_base, lambda conn: _preparar_el_dictado(
         conn, token, espacio))
     if isinstance(preparado, Response):
         return preparado
-    if not audio:
-        return _json({"error": "no_se_entendio", "texto": TEXTO_NO_SE_ENTENDIO}, 422)
-    transcripcion, falla = None, None
+    crudo = request.headers.get("content-type")
+    tipo = dictado.tipo_de_audio(crudo)
+    if tipo is None:
+        await run_in_threadpool(_con_la_base, lambda conn: _incidente_del_dictado(
+            conn, token, preparado["espacio"],
+            "Un administrador dictó lo que quería cargar en la plataforma y el navegador mandó "
+            "algo que no es audio de un tipo admitido: no se pasó a texto y la persona vio un "
+            "aviso.", f"content-type: {_tipo_para_el_incidente(crudo)}"))
+        return _json({"error": "se_espera_audio"}, 415)
+    if not _DICTADOS.acquire(blocking=False):
+        await run_in_threadpool(_con_la_base, lambda conn: _incidente_del_dictado(
+            conn, token, preparado["espacio"],
+            "Un administrador dictó lo que quería cargar en la plataforma y había demasiados "
+            "dictados a la vez: no se pasó a texto y la persona vio un aviso.",
+            f"dictados_a_la_vez: {DICTADOS_A_LA_VEZ}"))
+        _imprimir("  ! un dictado no se atendió: demasiados a la vez.")
+        return _json({"error": "sin_dictado", "texto": TEXTO_SIN_DICTADO}, 503)
     try:
-        transcripcion = await run_in_threadpool(dictado.transcribir, audio, tipo,
-                                                preparado["palabras"])
-    except Exception as e:  # noqa: BLE001 -- cualquier falla es que no se pudo pasar a texto
-        falla = e
-    tamano = len(audio)
-    del audio  # El audio no queda en ningún lado.
+        audio = await _el_cuerpo_con_tope(request, dictado.TAMANO_MAXIMO)
+        if audio is None:
+            return _json({"error": "demasiado_grande"}, 413)
+        if not audio:
+            return _json({"error": "no_se_entendio", "texto": TEXTO_NO_SE_ENTENDIO}, 422)
+        transcripcion, falla = None, None
+        try:
+            transcripcion = await run_in_threadpool(dictado.transcribir, audio, tipo,
+                                                    preparado["palabras"])
+        except Exception as e:  # noqa: BLE001 -- cualquier falla es que no se pudo pasar a texto
+            falla = e
+        tamano = len(audio)
+        del audio  # El audio no queda en ningún lado.
+    finally:
+        _DICTADOS.release()
     return await run_in_threadpool(_con_la_base, lambda conn: _cerrar_el_dictado(
         conn, token, preparado, tipo, tamano, transcripcion, falla))
+
+
+def _incidente_del_dictado(conn, token: str, espacio: str, resumen: str,
+                           referencia: str) -> Response | None:
+    """Con el candado: el incidente de un dictado que no llegó a Gemini, en el espacio y a nombre
+    de quien dictaba (sólo con su sesión vigente; nunca el audio)."""
+    from .incidentes import ETAPA_DICTADO_AL_CARGAR
+
+    with sin_espacio(conn) as cur:
+        sesion = _sesion_de_administracion(cur, token)
+    if sesion is None:
+        return None
+    _dejar_el_incidente(conn, espacio, sesion, ETAPA_DICTADO_AL_CARGAR, resumen, referencia)
+    return None
 
 
 def _preparar_el_dictado(conn, token: str, espacio: str | None):

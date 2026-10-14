@@ -17,6 +17,12 @@ operación (conectar, mandar, cada lectura), así que una respuesta que llega de
 sin fin; la llamada tiene además un plazo total (`PLAZO_TOTAL_S`), debajo del de la web. Y una
 transcripción que Gemini cortó por el tope de salida no se devuelve como si fuera todo: vuelve
 marcada (`cortada`), para que la persona sepa que falta una parte.
+
+J2-30 (revisión J2-29): el plazo total es real también para el hilo del pedido. Cada operación de
+la red (conectar, el TLS, mandar, cada lectura) espera lo suyo o lo que queda del plazo, lo que sea
+menos (`_RedConPlazo`, debajo del cliente de `httpx`), así que el hilo no queda colgado después del
+plazo (salvo en la búsqueda del nombre del servidor, que el sistema no deja acotar; quien llama
+igual deja de esperarlo al vencer).
 """
 
 from __future__ import annotations
@@ -24,10 +30,13 @@ from __future__ import annotations
 import base64
 import os
 import re
+import ssl
 import threading
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, NamedTuple
 
+import httpcore
 import httpx
 
 from .llm import GEMINI_BASE
@@ -134,17 +143,96 @@ def instrucciones(palabras: Sequence[str]) -> str:
                     "entiende nada de lo que dice, no devuelvas nada.")
 
 
-def _cliente() -> httpx.Client:
-    return httpx.Client(timeout=httpx.Timeout(PLAZO_DEL_PROVEEDOR_S,
+# El reloj del plazo total (las pruebas ponen uno de mentira).
+_reloj = time.monotonic
+
+
+def _lo_que_queda(limite: float, plazo: float | None, falla: type[Exception]) -> float:
+    """El plazo de una operación de la red: el suyo o lo que queda hasta `limite`, lo que sea
+    menos. Vencido, `falla` en el momento, sin tocar la red."""
+    queda = limite - _reloj()
+    if queda <= 0:
+        raise falla("plazo_total")
+    return queda if plazo is None else min(plazo, queda)
+
+
+class _FlujoConPlazo(httpcore.NetworkStream):
+    """Una conexión cuyas operaciones nunca esperan más allá del plazo total."""
+
+    def __init__(self, flujo: httpcore.NetworkStream, limite: float) -> None:
+        self._flujo, self._limite = flujo, limite
+
+    def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
+        return self._flujo.read(max_bytes, _lo_que_queda(self._limite, timeout,
+                                                         httpcore.ReadTimeout))
+
+    def write(self, buffer: bytes, timeout: float | None = None) -> None:
+        self._flujo.write(buffer, _lo_que_queda(self._limite, timeout, httpcore.WriteTimeout))
+
+    def close(self) -> None:
+        self._flujo.close()
+
+    def start_tls(self, ssl_context: ssl.SSLContext, server_hostname: str | None = None,
+                  timeout: float | None = None) -> httpcore.NetworkStream:
+        plazo = _lo_que_queda(self._limite, timeout, httpcore.ConnectTimeout)
+        return _FlujoConPlazo(self._flujo.start_tls(ssl_context, server_hostname, plazo),
+                              self._limite)
+
+    def get_extra_info(self, info: str) -> Any:
+        return self._flujo.get_extra_info(info)
+
+
+class _RedConPlazo(httpcore.NetworkBackend):
+    """La red de `httpcore` con el plazo total en cada operación (J2-30)."""
+
+    def __init__(self, limite: float, red: httpcore.NetworkBackend) -> None:
+        self._limite, self._red = limite, red
+
+    def connect_tcp(self, host: str, port: int, timeout: float | None = None,
+                    local_address: str | None = None,
+                    socket_options: Iterable[Any] | None = None) -> httpcore.NetworkStream:
+        plazo = _lo_que_queda(self._limite, timeout, httpcore.ConnectTimeout)
+        return _FlujoConPlazo(self._red.connect_tcp(host, port, plazo, local_address,
+                                                    socket_options), self._limite)
+
+    def connect_unix_socket(self, path: str, timeout: float | None = None,
+                            socket_options: Iterable[Any] | None = None) -> httpcore.NetworkStream:
+        plazo = _lo_que_queda(self._limite, timeout, httpcore.ConnectTimeout)
+        return _FlujoConPlazo(self._red.connect_unix_socket(path, plazo, socket_options),
+                              self._limite)
+
+    def sleep(self, seconds: float) -> None:
+        self._red.sleep(seconds)
+
+
+def _red_de_verdad() -> httpcore.NetworkBackend:
+    return httpcore.SyncBackend()
+
+
+class _TransporteConPlazo(httpx.HTTPTransport):
+    """El transporte de `httpx` de siempre, con su conjunto de conexiones sobre `_RedConPlazo`
+    (`HTTPTransport` manda cada pedido por `_pool`)."""
+
+    def __init__(self, limite: float) -> None:
+        super().__init__()
+        self._pool = httpcore.ConnectionPool(ssl_context=httpx.create_ssl_context(),
+                                             network_backend=_RedConPlazo(limite,
+                                                                          _red_de_verdad()))
+
+
+def _cliente(limite: float) -> httpx.Client:
+    return httpx.Client(transport=_TransporteConPlazo(limite),
+                        timeout=httpx.Timeout(PLAZO_DEL_PROVEEDOR_S,
                                               connect=PLAZO_DE_CONEXION_S))
 
 
-def _con_plazo_total(cliente: httpx.Client, url: str, clave: str,
-                     cuerpo: Mapping[str, Any]) -> httpx.Response:
-    """El pedido a Gemini, en un hilo aparte que se espera hasta `PLAZO_TOTAL_S`. Vencido, el
-    cliente se cierra (desde otro hilo, sin esperarlo: cortar la conexión despierta la lectura
-    colgada, que termina por su cuenta) y es `ProveedorNoResponde("plazo_total")`. Una falla del
-    pedido se levanta tal cual, como si se hubiera hecho acá."""
+def _con_plazo_total(cliente: httpx.Client, url: str, clave: str, cuerpo: Mapping[str, Any],
+                     limite: float) -> httpx.Response:
+    """El pedido a Gemini, en un hilo aparte que se espera hasta `limite`. Cada operación de la red
+    ya está acotada a ese límite (`_RedConPlazo`); el hilo cubre además lo que no se puede acotar
+    (buscar el nombre del servidor). Vencido, el cliente se cierra desde otro hilo, sin esperarlo,
+    y es `ProveedorNoResponde("plazo_total")`; una respuesta que llega después del límite, también.
+    Una falla del pedido se levanta tal cual, como si se hubiera hecho acá."""
     hecho: dict[str, Any] = {}
 
     def pedir() -> None:
@@ -155,11 +243,13 @@ def _con_plazo_total(cliente: httpx.Client, url: str, clave: str,
 
     hilo = threading.Thread(target=pedir, name="dictado-gemini", daemon=True)
     hilo.start()
-    hilo.join(PLAZO_TOTAL_S)
+    hilo.join(max(0.0, limite - _reloj()))
     if hilo.is_alive():
         threading.Thread(target=cliente.close, name="dictado-cerrar", daemon=True).start()
         raise ProveedorNoResponde("plazo_total")
     cliente.close()
+    if _reloj() >= limite:
+        raise ProveedorNoResponde("plazo_total")
     if "falla" in hecho:
         raise hecho["falla"]
     return hecho["respuesta"]
@@ -193,9 +283,11 @@ def transcribir(audio: bytes, tipo: str, palabras: Sequence[str]) -> Transcripci
         "generationConfig": {"temperature": 0, "maxOutputTokens": TOPE_DE_SALIDA,
                              "thinkingConfig": {"thinkingBudget": 0}},
     }
+    limite = _reloj() + PLAZO_TOTAL_S
     try:
-        respuesta = _con_plazo_total(_cliente(), f"{GEMINI_BASE}/models/{MODELO}:generateContent",
-                                     clave, cuerpo)
+        respuesta = _con_plazo_total(_cliente(limite),
+                                     f"{GEMINI_BASE}/models/{MODELO}:generateContent",
+                                     clave, cuerpo, limite)
     except httpx.HTTPError as falla:
         # Sólo el tipo: el mensaje de `httpx` puede traer la dirección.
         raise ProveedorNoResponde(type(falla).__name__) from None
