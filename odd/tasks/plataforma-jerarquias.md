@@ -1172,6 +1172,11 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       ellos, una falla del botón del menú que corta el registro de los webhooks, y la ventana de la firma, cuyo
       comentario contradice el valor. IA real, 50 y 52 a 55: 14 de 15, con garantías 15 de 15; la falla es de
       formato.
+      **Prueba de la MA (2026-10-14):** en Telegram de escritorio, la Mini App mostró "rechazó la conexión", porque
+      Telegram la abre dentro de un marco y la web no se deja enmarcar. Decisión del usuario: en Telegram de escritorio,
+      el botón lleva a la página del QR en el navegador, como cualquier compu. El usuario sólo tiene a Ariel en el
+      celular: la Mini App se prueba con Ariel, y Marcos e Ismael con Telegram de escritorio. Un escritor (MA-2) hace
+      lo de escritorio, los WARNING de las últimas revisiones y el detalle de la tarea completo.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
