@@ -99,7 +99,8 @@ Etapas y criterios de paso a `main` (M1 a M3): [`STATUS.md`](STATUS.md), "Próxi
    registradas"); los riesgos de arquitectura (la salida atada a Telegram, un límite de Telegram que
    decide un dato de negocio: "Qué se corrige", arriba); la IA de cada cliente con su propio proveedor;
    cómo se da de alta un segundo cliente; y la primera prueba con un equipo de verdad.
-   **La web como Mini App de Telegram** (usuario, 2026-10-13: "si"): se abre desde un botón del bot,
+   **La web como Mini App de Telegram** (usuario, 2026-10-13: "si"; **adelantada** el 2026-10-14 a después de
+   la J4, con el túnel y un botón en el chat, sin esperar la VPS: `odd/tasks/plataforma-jerarquias.md`, MA): se abre desde un botón del bot,
    a pantalla completa y sin las barras del navegador, y Telegram identifica a la persona (con su firma,
    verificable), así que desde el celular no hace falta el enlace de un solo uso; para la puerta del
    equipo y la de administración. Va con la VPS, porque pide una dirección HTTPS fija, y lleva una

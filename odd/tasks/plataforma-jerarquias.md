@@ -1087,6 +1087,15 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - pruebas atadas a la posición de una oración.
   - [ ] **J4b · Los avisos de la carga y "quiero crear una tarea" por Telegram**, más los WARNING de la RDD de
         la J4a.
+- [ ] **MA · La web como Mini App de Telegram**, adelantada por el usuario (2026-10-14: "quisiera atacar antes
+      lo de la mini app"; opción A: apenas termine la J4, antes de J5 a J7). Así las pruebas de J5 a J7 se hacen
+      desde el botón del bot, sin pedir enlaces.
+      - **No espera a la VPS:** el túnel ya es HTTPS, y Leda manda en el chat un botón "Abrir Leda" con la
+        dirección del momento. El botón fijo del menú queda para el servidor definitivo.
+      - **La entrada:** Telegram le pasa a la web quién es la persona, con una firma que el servidor verifica con
+        el token del bot. Es una enmienda a la decisión 4 del ADR 0022, y primero va su diseño escrito.
+      - **Por Telegram:** se resuelve lo de ofrecer abrirla ante "quiero crear una tarea" (ROADMAP).
+      Las decisiones se le traen al usuario antes de escribir código.
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
       Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
       la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección
