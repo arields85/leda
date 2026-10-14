@@ -880,6 +880,21 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - la IA nunca elige a una persona que no se nombró.
       Ruta: delegada. Un escritor por tramo (base y servidor; web; ayuda), con RDD por tramo.
   - [ ] J3-2 · La base y el servidor sin la IA (`0068`, `crear_objetivo_web`, las dos puertas, garantías).
+        Construida (escritor delegado) en los commits `81a52ee6`, `fbf70369`, `c281e6c6`, `83c51b5e`, `15e69bfa` y
+        `f6482d32`:
+        - la herramienta de chat `crear_objetivo` retirada, porque ninguna jugada la usaba;
+        - `objective` con claves compuestas y cerrado a escrituras directas de `leda_app`;
+        - `aplicar_evento_objetivo`, ahora `security definer`;
+        - `crear_objetivo_web` y `opciones_del_objetivo`, con los nombres de los niveles en `niveles`;
+        - las rutas de las dos puertas, con un ayudante de controles para la puerta del equipo.
+        Las pruebas nuevas fallaron 40 de 40 antes de escribir el código y después pasaron 40 de 40.
+        RDD `review-bef6a4c90272c9c7`, aprobada. Su WARNING (el evento de estado después de quitar el permiso de
+        escritura) se arregló en `f6482d32`, con su prueba.
+        `leda_motor`: respaldo `db/respaldos/leda_motor-antes-0068-20261014.dump` (`pg_restore --list` sin error).
+        Ensayo en una copia descartable, sin error y borrada después. La `0068` se aplicó con `psql -v
+        ON_ERROR_STOP=1` como `postgres`, sin error. Los nombres de los niveles se llenan al reimportar el pack;
+        hasta entonces la web muestra los de siempre, que son los de CoreWork.
+        Windows se reinició solo a la noche y cortó la sesión; la suite completa se está corriendo de nuevo.
   - [ ] J3-3 · La web: el formulario de objetivos en las dos puertas, compartiendo las piezas de la J2.
   - [ ] J3-4 · La ayuda de la IA para objetivos (y la ortografía y el dictado en la puerta del equipo), con su
         herramienta de medición; una ronda con la IA real.
