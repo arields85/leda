@@ -141,10 +141,10 @@ describe("Leda's help on the objective form", () => {
     expect(screen.getByLabelText('Nombre')).toHaveValue('Tablero nuevo');
     expect(markedByLeda('Nombre')).toBe(false);
     expect(screen.getByLabelText('Descripción (opcional)')).toHaveValue('Poner el tablero nuevo en la línea 3.');
-    expect(screen.getByLabelText('De qué cuelga')).toHaveTextContent('Modernizar la planta');
+    expect(screen.getByLabelText('Es parte de')).toHaveTextContent('Modernizar la planta');
     expect(typeShown()).toContain('hito');
     expect(screen.getByLabelText('Referente')).toHaveTextContent('Lucas');
-    for (const label of ['Descripción (opcional)', 'De qué cuelga', 'Tipo', 'Referente', 'Fecha']) {
+    for (const label of ['Descripción (opcional)', 'Es parte de', 'Tipo', 'Referente', 'Fecha']) {
       expect(markedByLeda(label)).toBe(true);
     }
     // Edited, the mark goes.
@@ -159,25 +159,25 @@ describe("Leda's help on the objective form", () => {
     tell('dentro de la linea 3 andando, capacitar a los operarios');
     ask();
     await answer(proposed({ padre_id: 'o-hito', tipo: 'hito' }));
-    expect(screen.getByLabelText('De qué cuelga')).toHaveTextContent('Línea 3 andando');
+    expect(screen.getByLabelText('Es parte de')).toHaveTextContent('Línea 3 andando');
     expect(typeShown()).toBe('objetivo operativo');
   });
 
   it('never changes what the person chose herself, also "de ninguno" and the type', async () => {
     const { api, asked, answer } = assisted();
     open(api);
-    pick('De qué cuelga', 'o-plan');
+    pick('Es parte de', 'o-plan');
     pick('Tipo', 'hito');
-    pick('De qué cuelga', '');
+    pick('Es parte de', '');
     tell('un plan para el año que viene');
     ask();
     expect(asked[0].padre_id).toBe('');
     await answer(proposed({ padre_id: 'o-plan', tipo: 'operativo', titulo: 'Plan del año' }));
-    expect(screen.getByLabelText('De qué cuelga')).toHaveTextContent('de ninguno');
+    expect(screen.getByLabelText('Es parte de')).toHaveTextContent('de ninguno');
     expect(typeShown()).toBe('plan anual');
     expect(screen.getByLabelText('Nombre')).toHaveValue('Plan del año');
     // A type the person picked goes with the ask, and stays.
-    pick('De qué cuelga', 'o-plan');
+    pick('Es parte de', 'o-plan');
     pick('Tipo', 'hito');
     tell('otro plan');
     ask();

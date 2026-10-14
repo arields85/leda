@@ -24,9 +24,9 @@ espacio:
 # ---------------------------------------------------------------------------
 
 niveles:
-  objetivo_estrategico: objetivo estratégico
-  hito: hito
-  objetivo_operativo: objetivo operativo
+  objetivo_estrategico: objetivo general
+  hito: etapa
+  objetivo_operativo: objetivo de área
   tarea: tarea
   subtarea: subtarea
 

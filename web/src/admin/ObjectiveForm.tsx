@@ -21,6 +21,7 @@ import {
   type ObjectiveDraft,
   LATE_FOR_PARENT,
   lateForParent,
+  noParentLabel,
   type ObjectiveField,
   OBJECTIVE_FIELD_ID,
   OBJECTIVE_FIELD_NAME,
@@ -28,6 +29,7 @@ import {
   OBJECTIVE_LIMITS,
   OBJECTIVE_PROBLEM_FIELD,
   parentLabel,
+  typeMeaning,
   parentOf,
   referentOf,
   toObjectiveInput,
@@ -537,8 +539,8 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
             />
           </FieldBlock>
 
-          <FieldBlock id="o-padre" label="De qué cuelga" errors={said('padre_id')} proposed={proposed.has('padre_id')}
-            hint={options.padres.length === 0 ? 'Todavía no hay objetivos abiertos de los que pueda colgar.' : undefined}>
+          <FieldBlock id="o-padre" label="Es parte de" errors={said('padre_id')} proposed={proposed.has('padre_id')}
+            hint={options.padres.length === 0 ? 'Todavía no hay objetivos abiertos de los que pueda ser parte.' : undefined}>
             <Dropdown
               id="o-padre"
               labelledBy="o-padre-label"
@@ -547,7 +549,7 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
               invalid={invalid('padre_id')}
               describedBy={described('padre_id')}
               options={[
-                { value: '', label: 'de ninguno' },
+                { value: '', label: noParentLabel(levels) },
                 ...options.padres.map((p) => ({
                   value: p.id,
                   label: parentLabel(p, levels, p.fecha_objetivo ? shortDate(p.fecha_objetivo) : undefined),
@@ -556,7 +558,13 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
             />
           </FieldBlock>
 
-          <FieldBlock id="o-tipo" label="Tipo" errors={said('tipo')} hint={typeHint} proposed={proposed.has('tipo')}>
+          <FieldBlock id="o-tipo" label="Tipo" errors={said('tipo')} proposed={proposed.has('tipo')}
+            hint={
+              <span className="flex flex-col gap-0.5">
+                <span>{typeHint}</span>
+                {draft.tipo && typeMeaning(draft.tipo, levels) && <span>{typeMeaning(draft.tipo, levels)}</span>}
+              </span>
+            }>
             {types.length > 1 ? (
               <Dropdown
                 id="o-tipo"
@@ -638,7 +646,7 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
           {late && (
             <div
               role="group"
-              aria-label="Vence después que el objetivo del que cuelga"
+              aria-label="Vence después que el objetivo del que es parte"
               className="flex min-w-0 flex-col gap-2 rounded-card border-hard border-line px-3 py-2.5 text-body"
             >
               <p className={`m-0 font-bold ${WARN}`}>{dueAfterParentText(late)}</p>

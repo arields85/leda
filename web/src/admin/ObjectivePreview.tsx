@@ -32,7 +32,7 @@ export function ObjectivePreview({
   const parent = parentOf(options, draft.padre_id);
   const referent = referentOf(options, draft.referente_id);
   const level = draft.tipo ? options.niveles[draft.tipo] : null;
-  // Decision 5 (2026-10-14): it does not fall due after the one it hangs from.
+  // Decision 5 (2026-10-14): it does not fall due after the one it is part of.
   const late = lateForParent(draft, options);
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -41,7 +41,7 @@ export function ObjectivePreview({
       </p>
       <dl className="m-0 flex flex-col gap-2.5 rounded-card border-hard border-line-soft px-3 py-2.5">
         <Row label="Nivel">{level ?? MISSING}</Row>
-        <Row label="Cuelga de">
+        <Row label="Es parte de">
           {parent ? `${parent.titulo} · ${options.niveles[parent.tipo]}` : 'ninguno'}
         </Row>
         <Row label="Referente">

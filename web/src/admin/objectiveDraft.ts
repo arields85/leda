@@ -35,7 +35,7 @@ export const OBJECTIVE_FIELD_ORDER: ObjectiveField[] = ['titulo', 'padre_id', 't
 /** How each field is named to the person, the same words as its label. */
 export const OBJECTIVE_FIELD_NAME: Record<ObjectiveField, string> = {
   titulo: 'nombre',
-  padre_id: 'de qué cuelga',
+  padre_id: 'es parte de',
   tipo: 'tipo',
   referente_id: 'referente',
   fecha: 'fecha',
@@ -106,10 +106,34 @@ export function lateForParent(draft: ObjectiveDraft, options: ObjectiveOptions):
   return parent?.fecha_objetivo && draft.fecha && draft.fecha > parent.fecha_objetivo ? parent : undefined;
 }
 
-/** What Leda says when it stops such an objective: the parent by its name and its day. */
+/** What Leda says when it stops such an objective: the parent by its name and its day (J3-7: in
+ * the words of the form, "es parte de"). */
 export function dueAfterParentText(parent: ParentObjective): string {
   const day = parent.fecha_objetivo ? ` (${shortDate(parent.fecha_objetivo)})` : '';
-  return `Este objetivo vence después que «${parent.titulo}»${day}: lo que cuelga de un objetivo es parte de él, y ese objetivo se demoraría.`;
+  return `Este objetivo vence después que «${parent.titulo}»${day}: es parte de ese objetivo, que se demoraría.`;
+}
+
+/** A level's name with its indefinite article ("un objetivo general", "una etapa"), by the first
+ * word of the pack's name: one that ends in "a" takes "una" (J3-7). */
+export function withArticle(level: string): string {
+  const first = level.trim().split(/\s+/)[0] ?? '';
+  return `${/a$/i.test(first) ? 'una' : 'un'} ${level}`;
+}
+
+/** The empty choice of "Es parte de" (J3-7): it is part of nothing, so it is the biggest level. */
+export function noParentLabel(levels: ObjectiveOptions['niveles']): string {
+  return `de ninguno (es ${withArticle(levels.estrategico)})`;
+}
+
+/** One plain line about the chosen type, with the pack's names of the levels (J3-7, the user did
+ * not understand the form): the biggest, what the work is for; an important step of it; something
+ * concrete one area does. */
+export function typeMeaning(tipo: string, levels: ObjectiveOptions['niveles']): string | null {
+  const name = (level: string) => level.charAt(0).toUpperCase() + level.slice(1);
+  if (tipo === 'estrategico') return `${name(levels.estrategico)}: lo más grande, para qué es todo el trabajo.`;
+  if (tipo === 'hito') return `${name(levels.hito)}: un paso importante de ${withArticle(levels.estrategico)}.`;
+  if (tipo === 'operativo') return `${name(levels.operativo)}: algo concreto que hace un área.`;
+  return null;
 }
 
 /** The refusal of a child due after its parent (`fecha`, `vence_despues_del_padre`). */

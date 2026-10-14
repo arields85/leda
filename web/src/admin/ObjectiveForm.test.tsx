@@ -60,7 +60,7 @@ const typeIsAsked = () => document.getElementById('o-tipo')?.tagName === 'BUTTON
 
 function fill() {
   fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Tablero nuevo de la línea 3' } });
-  pick('De qué cuelga', 'o-plan');
+  pick('Es parte de', 'o-plan');
   pick('Referente', 'm-lucas');
   fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
 }
@@ -79,24 +79,28 @@ describe('ObjectiveForm', () => {
     expect(typeIsAsked()).toBe(false);
     expect(typeShown()).toBe('plan anual');
     expect(screen.getByText('Sin un objetivo arriba, es plan anual.')).toBeInTheDocument();
-    expect(offered('De qué cuelga')).toEqual([
-      'de ninguno',
+    // J3-7: what each type is, in plain words with the pack's names.
+    expect(screen.getByText('Plan anual: lo más grande, para qué es todo el trabajo.')).toBeInTheDocument();
+    expect(offered('Es parte de')).toEqual([
+      'de ninguno (es un plan anual)',
       'Modernizar la planta · plan anual · hasta 18.12',
       'Línea 3 andando · hito',
     ]);
     // Under a strategic one: a milestone or an operational one, the operational one chosen.
-    pick('De qué cuelga', 'o-plan');
+    pick('Es parte de', 'o-plan');
     expect(typeIsAsked()).toBe(true);
     expect(typeShown()).toBe('objetivo operativo');
     expect(offered('Tipo')).toEqual(['hito', 'objetivo operativo']);
+    expect(screen.getByText('Objetivo operativo: algo concreto que hace un área.')).toBeInTheDocument();
     pick('Tipo', 'hito');
     expect(typeShown()).toBe('hito');
+    expect(screen.getByText('Hito: un paso importante de un plan anual.')).toBeInTheDocument();
     // Under a milestone: operational, without asking.
-    pick('De qué cuelga', 'o-hito');
+    pick('Es parte de', 'o-hito');
     expect(typeIsAsked()).toBe(false);
     expect(typeShown()).toBe('objetivo operativo');
     expect(screen.getByText('Debajo de «Línea 3 andando» es objetivo operativo.')).toBeInTheDocument();
-    pick('De qué cuelga', '');
+    pick('Es parte de', '');
     expect(typeShown()).toBe('plan anual');
   });
 
@@ -307,12 +311,12 @@ describe('an objective that falls due after its parent', () => {
   }
 
   const STOP_PLAN =
-    'Este objetivo vence después que «Modernizar la planta» (23.10): lo que cuelga de un objetivo es parte de él, y ese objetivo se demoraría.';
-  const stop = () => screen.queryByRole('group', { name: 'Vence después que el objetivo del que cuelga' });
+    'Este objetivo vence después que «Modernizar la planta» (23.10): es parte de ese objetivo, que se demoraría.';
+  const stop = () => screen.queryByRole('group', { name: 'Vence después que el objetivo del que es parte' });
 
   function fillLate(parent = 'o-plan') {
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Habilitar el laboratorio' } });
-    pick('De qué cuelga', parent);
+    pick('Es parte de', parent);
     pick('Referente', 'm-lucas');
     fireEvent.click(screen.getByRole('button', { name: 'mar 27.10' }));
   }
@@ -362,7 +366,7 @@ describe('an objective that falls due after its parent', () => {
     pick('Tipo', 'hito');
     confirm();
     fireEvent.click(within(stop()!).getByRole('button', { name: '> cargarlo aparte' }));
-    expect(screen.getByLabelText('De qué cuelga')).toHaveValue('');
+    expect(screen.getByLabelText('Es parte de')).toHaveValue('');
     expect(typeShown()).toBe('plan anual');
     expect(stop()).toBeNull();
     expect(document.getElementById('o-fecha-error')).toBeNull();
@@ -381,7 +385,7 @@ describe('an objective that falls due after its parent', () => {
     expect(typeIsAsked()).toBe(false);
     fireEvent.click(within(stop()!).getByRole('button', { name: '> cargarlo aparte' }));
     // Now under the strategic one: a milestone or an operational one, the operational one chosen.
-    expect(screen.getByLabelText('De qué cuelga')).toHaveValue('o-plan');
+    expect(screen.getByLabelText('Es parte de')).toHaveValue('o-plan');
     expect(typeIsAsked()).toBe(true);
     expect(typeShown()).toBe('objetivo operativo');
     expect(stop()).toBeNull();
@@ -395,10 +399,10 @@ describe('an objective that falls due after its parent', () => {
     openWith(door(created).api, dated('2026-10-21', '2026-10-23'));
     fillLate('o-hito');
     fireEvent.click(within(stop()!).getByRole('button', { name: '> cargarlo aparte' }));
-    expect(screen.getByLabelText('De qué cuelga')).toHaveValue('o-plan');
+    expect(screen.getByLabelText('Es parte de')).toHaveValue('o-plan');
     expect(stop()).toHaveTextContent(STOP_PLAN);
     fireEvent.click(within(stop()!).getByRole('button', { name: '> cargarlo aparte' }));
-    expect(screen.getByLabelText('De qué cuelga')).toHaveValue('');
+    expect(screen.getByLabelText('Es parte de')).toHaveValue('');
     expect(stop()).toBeNull();
   });
 
@@ -416,7 +420,7 @@ describe('an objective that falls due after its parent', () => {
         {
           campo: 'fecha',
           motivo: 'vence_despues_del_padre',
-          texto: 'Este objetivo vence después que el objetivo del que cuelga, que se demoraría: lo que cuelga de un objetivo es parte de él. Elegí una fecha hasta la de ese objetivo o cargalo aparte.',
+          texto: 'Este objetivo vence después que el objetivo del que es parte, que se demoraría. Elegí una fecha hasta la de ese objetivo o cargalo aparte.',
           hasta: '2026-10-20',
         },
       ],

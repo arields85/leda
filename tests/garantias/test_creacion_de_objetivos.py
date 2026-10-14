@@ -826,6 +826,19 @@ def _importar_corework(conn, tmp_path, monkeypatch, niveles):
     return r, (fila["valor"] if fila else None)
 
 
+def test_el_pack_de_corework_nombra_sus_niveles_en_palabras_del_equipo(conn, tmp_path, monkeypatch):
+    """J3-7 (el usuario no entendía el formulario): CoreWork llama a sus niveles "objetivo general",
+    "etapa" y "objetivo de área"; los nombres de siempre quedan para un pack que no los dice."""
+    import yaml
+
+    from tests.conftest import RAIZ
+
+    niveles = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))["niveles"]
+    _, guardado = _importar_corework(conn, tmp_path, monkeypatch, niveles)
+    assert guardado == {"estrategico": "objetivo general", "hito": "etapa",
+                        "operativo": "objetivo de área"}
+
+
 def test_el_importador_guarda_los_nombres_de_los_niveles_de_objetivo(
         conn, tmp_path, monkeypatch):
     r, guardado = _importar_corework(conn, tmp_path, monkeypatch, {
@@ -988,8 +1001,8 @@ def test_sin_sesion_de_administracion_no_se_lee_el_reloj_del_espacio(
 
 
 TEXTO_VENCE_DESPUES_DEL_PADRE = (
-    "Este objetivo vence después que el objetivo del que cuelga, que se demoraría: lo que cuelga "
-    "de un objetivo es parte de él. Elegí una fecha hasta la de ese objetivo o cargalo aparte.")
+    "Este objetivo vence después que el objetivo del que es parte, que se demoraría. Elegí una "
+    "fecha hasta la de ese objetivo o cargalo aparte.")
 
 
 def test_la_api_rechaza_un_hijo_tardio_igual_en_las_dos_puertas(

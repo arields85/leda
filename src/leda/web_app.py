@@ -1730,7 +1730,7 @@ TEXTOS_DEL_OBJETIVO = {
     ("padre", "no_existe"): "Ese objetivo no está en este espacio.",
     ("padre", "no_esta_abierto"): "Ese objetivo ya no está abierto.",
     ("padre", "es_operativo"):
-        "De un objetivo operativo no cuelga otro objetivo: debajo van sus tareas.",
+        "Un objetivo operativo no tiene otros objetivos como parte: sus partes son tareas.",
     ("tipo", "falta"): "Elegí el tipo de objetivo.",
     ("tipo", "no_existe"): "Ese tipo de objetivo no existe.",
     ("tipo", "no_corresponde"):
@@ -1748,9 +1748,8 @@ TEXTOS_DEL_OBJETIVO = {
        and clave[1] not in ("despues_del_objetivo", "vence_despues_del_objetivo")},
     # Decisión 5 del usuario (2026-10-14; migración 0070): con `hasta`, el día del padre.
     ("fecha", "vence_despues_del_padre"):
-        "Este objetivo vence después que el objetivo del que cuelga, que se demoraría: lo que "
-        "cuelga de un objetivo es parte de él. Elegí una fecha hasta la de ese objetivo o cargalo "
-        "aparte.",
+        "Este objetivo vence después que el objetivo del que es parte, que se demoraría. Elegí una "
+        "fecha hasta la de ese objetivo o cargalo aparte.",
     ("clave", "falta"): TEXTOS_DE_LA_CARGA[("clave", "falta")],
     ("clave", "usada_con_otros_datos"):
         "Este envío ya creó otro objetivo. Recargá la página para crear uno nuevo.",
