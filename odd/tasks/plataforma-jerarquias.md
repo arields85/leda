@@ -819,7 +819,13 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       también exime a "Lucas cambia…".
       Pruebas: `npm test` 185 passed y `npm run build` sin errores. `pytest` de la ayuda, el dictado, la
       ortografía, el criterio y la carga: 484 passed. Control del coordinador: `tests/test_ayuda_al_cargar.py`,
-      316 passed. RDD del tramo `eaf84ed4..269ba8bd`: en curso.
+      316 passed. **RDD** del tramo `eaf84ed4..269ba8bd`: `review-0ea10b790daf0d56`, aprobada. Sus advertencias
+      quedan como deuda menor:
+      - el filtro de evidencia de `apply` no tiene prueba (no se llega desde la pantalla);
+      - el lugar del dictado queda tomado mientras sube el audio (`web_app.py:1908`);
+      - con `audio/mp4` como último recurso, se pierde el tipo real (`api.ts:333`);
+      - el transporte con plazo ignora un proxy del entorno (`dictado.py:216`).
+      Las dos sugerencias: el hilo abandonado sin prueba y la excepción al empezar una oración.
 - [ ] **J3 · Los objetivos desde la web** (ADR 0023, decisión 1, decisión 5 y punto 11). Dirección crea los
       objetivos de su equipo desde su web; el administrador, desde la suya, en cualquier espacio. Con la ayuda
       de la IA desde el primer día, **reutilizando la J2** (usuario, 2026-10-13: "la j2 tiene muy buena base y
