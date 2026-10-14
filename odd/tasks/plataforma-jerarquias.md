@@ -750,7 +750,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       ramas de `api.ts:323-353` sin prueba, falsos positivos posibles de la marca de primera persona.
       **Falta la prueba en el celular:** si Gemini acepta `audio/webm` (Android) y `audio/mp4` (iPhone), si la
       pantalla sigue encendida los 2 minutos, y el tope de 1000 caracteres de la caja.
-- [ ] **J2-26 · El criterio sin nombres** (usuario, 2026-10-13, "confirmo ese cambio"): la ronda de la J2-25
+- [x] **J2-26 · El criterio sin nombres** (usuario, 2026-10-13, "confirmo ese cambio"): la ronda de la J2-25
       (76 de 81) mostró que nombrar a la persona ata el criterio al responsable (si cambia, o con un pase, queda
       mal), cuela nombres que no son del equipo ("pepe", "el tano") y una vez tomó por responsable a quien
       necesitaba la tarea. El criterio va en tercera persona y sin nombres: qué queda hecho y qué se entrega; el
@@ -759,9 +759,20 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       **Prueba en el celular de la J2b, la J2-24 y la J2-25** (2026-10-13, de noche): pasó. Usuario: "salió
       perfecta, tanto la ortografía como el dictado; lo transcribe perfecto y muy rápido". Gemini aceptó el audio
       del iPhone.
-- [ ] **J2-27 · Un gráfico del audio mientras se dicta** (usuario: "que vayan apareciendo un gráfico de audio o
+- [x] **J2-27 · Un gráfico del audio mientras se dicta** (usuario: "que vayan apareciendo un gráfico de audio o
       algo más visual, además de la duración, como lo hacen las apps de mensajería"): barras que se mueven con la
       voz, al lado de "grabando · 0:12 de 2:00". Con el escritor de la J2-26.
+- [x] **J2-28 · Tres detalles de la vista** (prueba en el celular, 22:58): las casillas de evidencia sin fondo, con
+      una tilde clara; "dictar" como ícono de ancho fijo (`Mic` / `Square`); la ayuda de la caja, corta ("Escribilo
+      o dictalo como lo dirías; Leda completa lo que falta.").
+      **J2-26, J2-27 y J2-28 hechas** (escritor delegado): `362f03c6` (servidor: el criterio sin nombres y su red de
+      la cocina `nombra_a_alguien`, el plazo total de 35 s del dictado y el aviso del dictado cortado), `377633fa`
+      (pruebas y la marca `con_nombre`), `8db49ea7` (web: `AudioBars`, el botón del micrófono, las casillas).
+      `pytest`: 437 + 103 passed; `npm test`: 178 passed; typecheck y build bien. RDD aprobadas:
+      `review-1f9aa239975efa97`, `review-a910b5e6f99bca07`, `review-911e312bbe09f01d`; **deuda**: una palabra con
+      mayúscula al empezar una oración que coincide con un nombre ("Marcos de la puerta…") puede descartar un buen
+      criterio (`ayuda_al_cargar.py:864-867`), apodos sin distinguir mayúsculas (`:851-855`), el hilo del dictado que
+      queda vivo tras el plazo (`dictado.py:156-161`), una prueba atada al reloj real (`test_dictado.py:307-314`).
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
