@@ -967,6 +967,32 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - Leda le hace el seguimiento como a cualquiera, sin escalar.
         - Lo da por cumplido el referente que lo pidió.
         - Cuando se cumple, quien espera se entera de que puede seguir.
+      - **D2 a D13, con la recomendación del agente** (el usuario no cambió ninguna, 2026-10-14):
+        - **D2. El área de una tarea prestada:** la del referente que la carga (Martín le carga a Nahuel "Medir el
+          rack": es de IT y pide la evidencia de IT). Nahuel sigue en OT. Marcos la ve en su web como "Nahuel,
+          prestado a IT", sin avisos.
+        - **D3. Quién revisa cuando carga Dirección:** Ismael elige, con el referente de esa persona preseleccionado;
+          puede cambiarlo por sí mismo o por otro referente. Nunca el responsable.
+        - **D4. Un referente no elige quién revisa:** en su área, el de siempre; en un préstamo, él; en una tarea
+          propia, su aprobador (Ismael).
+        - **D5. Bajo qué objetivo:** cualquier objetivo abierto. El referente del objetivo no recibe aviso.
+        - **D6. El aviso al responsable:** en horario, con unos 10 minutos para juntar varias tareas seguidas en un
+          mensaje. Es de coordinación: no cuenta para el tope diario.
+        - **D7. El aviso a quien revisa:** no se manda si quien revisa es quien cargó la tarea. A Dirección no le
+          llega por la tarea propia de un referente: se entera con la entrega.
+        - **D8. Las preferencias de avisos de Dirección:** van en la J7; en la J4, Dirección no recibe aviso.
+        - **D9. Responsable sin Leda conectada:** el aviso va a quien revisa esa tarea.
+        - **D10. "Quién la decidió"** (puerta de administración): sólo Dirección o el referente del área.
+        - **D11. La ayuda de la IA en la puerta del equipo:** igual que en administración, pero sólo propone a
+          quienes puede cargarles el que carga. Sin nadie nombrado, el responsable queda vacío (ADR 0020, decisión 3).
+        - **D12. "Quiero crear una tarea" por Telegram:** a Dirección y a los referentes, Leda les pasa el enlace a
+          su web. A un integrante le dice que las cargan su referente o Dirección, y que proponer llega pronto (J6).
+          "Quiero crear un objetivo": el enlace sólo a Dirección. Deja de ser "fuera de la lista".
+        - **D13. Dirección no se carga tareas a sí misma:** nadie la revisaría. Lo que tiene que hacer Ismael entra
+          como pedido de un referente (D1b).
+        - **D14. El pase de una tarea prestada** lo decide quien la revisa (Martín), no el referente de origen.
+        - **Orden:** "> aceptar la demora" de Dirección espera a la J5; en la J4, la única salida es cambiar la
+          fecha.
       Incluye (usuario, 2026-10-14): si alguien escribe por Telegram "quiero crear una tarea" (o un objetivo),
       Leda le dice que eso se hace en la web y le ofrece el enlace, según lo que esa persona puede cargar.
       Es un hecho de la cocina, no frases (regla del mozo), y lleva su conversación de prueba contra la IA real.
