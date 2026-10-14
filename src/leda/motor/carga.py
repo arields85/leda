@@ -73,7 +73,8 @@ OBJETIVO = "objetivo"
 LA_REVISA = "la_revisa"
 LA_HACE = "la_hace"
 LA_PIDE = "la_pide"
-PARA_EL_AREA = "para_el_area"
+LA_PIDE_DESDE_EL_AREA = "la_pide_desde_el_area"
+SE_LA_PIDE_AL_AREA = "se_la_pide_al_area"
 DECIDE_QUIEN_LA_HACE = "decide_quien_la_hace"
 ES_UN_PEDIDO_A_DIRECCION = "es_un_pedido_a_direccion"
 LA_HIZO = "la_hizo"
@@ -161,9 +162,11 @@ def _sumar(cur, workspace_id: str, tipo: str, destinatario: str, referencia: dic
     hechos = dict(aviso["hechos"] or {})
     referencias = [r for r in hechos.get(REFERENCIAS) or [] if r["tarea"] != referencia["tarea"]]
     hechos[REFERENCIAS] = [*referencias, referencia]
+    # Sale a los minutos de la última carga (D6), aunque el que estaba esperando estuviera
+    # programado más adelante (el reloj de Leda se adelantó y volvió atrás): nunca queda preso
+    # (prueba por Telegram de la J4).
     cur.execute("""update scheduled_notice
-                      set hechos = %s, task_id = null,
-                          programado_para = greatest(programado_para, %s)
+                      set hechos = %s, task_id = null, programado_para = %s
                     where id = %s""", (_json(hechos), sale, aviso["id"]))
     return str(aviso["id"])
 
@@ -259,13 +262,20 @@ def _una_tarea_nueva(m: Momento, tarea: dict[str, Any], referencia: dict[str, An
         if es_de_direccion(cur, tarea):
             hecho[ES_UN_PEDIDO_A_DIRECCION] = True
         else:
-            # Un pedido a otra área (D14): para el área de quien la pide, y quien la recibe
-            # decide quién la hace.
+            # Un pedido a otra área (D14): desde qué área lo piden y a cuál (la de la tarea, la de
+            # quien la recibe), y quien la recibe decide quién la hace. Las dos, para que no se
+            # confundan (prueba por Telegram de la J4: "para el área de OT" era la de quien pide).
             area = _area_que_encabeza(cur, str(pide))
             if area:
-                hecho[PARA_EL_AREA] = area
+                hecho[LA_PIDE_DESDE_EL_AREA] = area
+            if tarea["area"]:
+                hecho[SE_LA_PIDE_AL_AREA] = tarea["area"]
             if str(tarea["responsable_membership_id"]) == para:
                 hecho[DECIDE_QUIEN_LA_HACE] = True
+        if hecho.get(LA_CARGO) == hecho[LA_PIDE]:
+            # Un pedido se cuenta como pedido: quien lo pide no "le cargó" una tarea (prueba por
+            # Telegram de la J4: "Marcos te cargó esta tarea… es un pedido a Dirección").
+            hecho.pop(LA_CARGO)
     return hecho
 
 

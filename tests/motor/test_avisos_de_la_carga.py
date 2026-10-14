@@ -217,7 +217,8 @@ def test_un_pedido_a_otra_area_dice_quien_lo_pide_y_que_el_decide_quien_lo_hace(
     [hecho] = _hechos(_enviar(conn, equipo, AHORA + timedelta(minutes=11)), "Sam Noble")
     [tarea] = hecho["tareas_que_le_cargaron"]
     assert tarea["la_pide"] == "Taylor Quinn 1"
-    assert tarea["para_el_area"] == "Field Services"
+    assert tarea["la_pide_desde_el_area"] == "Field Services"
+    assert tarea["se_la_pide_al_area"] == "Quality Guild"
     assert tarea["decide_quien_la_hace"] is True
     assert "la_revisa" not in tarea
 
@@ -228,6 +229,8 @@ def test_un_pedido_a_direccion_dice_quien_lo_pide(conn, equipo):
     [tarea] = hecho["tareas_que_le_cargaron"]
     assert tarea["la_pide"] == "Taylor Quinn 1" and tarea["es_un_pedido_a_direccion"] is True
     assert tarea["la_revisa"] == "Taylor Quinn 1"
+    # Se cuenta como un pedido, no como una tarea que "le cargaron".
+    assert "la_cargo" not in tarea
     assert "decide_quien_la_hace" not in tarea
 
 
@@ -339,3 +342,55 @@ def test_un_cierre_que_no_salio_antes_de_reabrirse_no_se_cuenta_dos_veces(conn, 
     viejo, nuevo = _para(conn, equipo, TERMINO, "Taylor Quinn")
     assert (viejo["estado"], viejo["motivo_omision"]) == ("omitido", "se_reabrio_antes")
     assert nuevo["estado"] == "enviado"
+
+
+def test_el_aviso_a_quien_la_revisa_sale_aunque_quien_la_hace_no_tenga_leda(conn, equipo):
+    """Prueba por Telegram de la J4 (2026-10-14): Ismael le cargó una tarea a Nahuel, sin
+    Telegram, con Marcos revisándola. El aviso a quien la revisa (D7) sale solo, aunque el de
+    quien la hace espere a que se conecte (D9)."""
+    north = equipo["north-lab"]["people"]["Sam North"]
+    with admin(conn) as cur:
+        cur.execute("update app_user set telegram_user_id = null where id = %s",
+                    (north["app_user_id"],))
+    conn.commit()
+    _cargar(conn, equipo, "Morgan Hale", revisa=_id(equipo, "Sam Noble"))
+    assert len(_para(conn, equipo, PARA_REVISAR, "Sam Noble")) == 1
+    ia = _enviar(conn, equipo, AHORA + timedelta(minutes=11))
+    [a_noble] = _hechos(ia, "Sam Noble")
+    assert a_noble["aviso"] == PARA_REVISAR
+    assert a_noble["tareas_que_va_a_revisar"][0]["la_hace"] == "Sam North 1"
+    assert _para(conn, equipo, PARA_REVISAR, "Sam Noble")[0]["estado"] == "enviado"
+    [aviso] = _avisos(conn, NUEVAS)
+    assert aviso["estado"] == "guardado"
+
+
+def test_un_pedido_a_otra_area_dice_de_que_area_lo_piden_y_a_cual(conn, equipo):
+    """Prueba por Telegram de la J4: "te la cargó para el área de OT" nombraba el área de quien
+    lo pide como si fuera la de la tarea. Los hechos dicen las dos, sin ambigüedad: desde qué área
+    lo piden y a qué área (la de quien lo recibe)."""
+    _cargar(conn, equipo, "Taylor Quinn", responsable=_id(equipo, "Sam Noble"))
+    [hecho] = _hechos(_enviar(conn, equipo, AHORA + timedelta(minutes=11)), "Sam Noble")
+    [tarea] = hecho["tareas_que_le_cargaron"]
+    assert tarea["la_pide"] == "Taylor Quinn 1"
+    assert tarea["la_pide_desde_el_area"] == "Field Services"
+    assert tarea["se_la_pide_al_area"] == "Quality Guild"
+    assert "para_el_area" not in tarea and "la_cargo" not in tarea
+
+
+def test_una_carga_nueva_no_queda_presa_de_un_aviso_corrido_al_futuro(conn, equipo):
+    """Prueba por Telegram de la J4: el aviso a quien la revisa no salió. Una causa posible, que
+    esta prueba fija: la tarea nueva se sumó a un aviso de la misma persona que todavía no había
+    salido y estaba programado más adelante (el reloj de Leda se adelantó y se volvió atrás),
+    y `greatest` lo dejaba ahí. Ahora sale a los 10 minutos de la última carga (D6)."""
+    _cargar(conn, equipo, "Morgan Hale", revisa=_id(equipo, "Sam Noble"))
+    with admin(conn) as cur:
+        cur.execute("""update scheduled_notice set programado_para = programado_para
+                                                                     + interval '5 days'
+                        where tipo = %s""", (PARA_REVISAR,))
+    conn.commit()
+    _cargar(conn, equipo, "Morgan Hale", at=AHORA + timedelta(minutes=1),
+            titulo="Probar el módem", revisa=_id(equipo, "Sam Noble"))
+    [aviso] = _para(conn, equipo, PARA_REVISAR, "Sam Noble")
+    assert aviso["programado_para"] == AHORA + timedelta(minutes=11)
+    [a_noble] = _hechos(_enviar(conn, equipo, AHORA + timedelta(minutes=12)), "Sam Noble")
+    assert len(a_noble["tareas_que_va_a_revisar"]) == 2

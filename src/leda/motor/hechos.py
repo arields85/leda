@@ -289,7 +289,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "la_hace": "La persona que hace esa tarea.",
     "la_pide": "Quién pidió esa tarea, desde otra área o a Dirección: la va a ver, y puede pedir "
                "cambios cuando esté terminada.",
-    "para_el_area": "El área para la que se pide esa tarea: la de quien la pide.",
+    "la_pide_desde_el_area": "El área de quien pide la tarea: desde ahí la piden.",
+    "se_la_pide_al_area": "El área a la que le piden la tarea: la de quien recibe el mensaje, que "
+                          "decide quién de su área la hace.",
     "decide_quien_la_hace": "La persona que recibe el mensaje decide quién de su área hace esa "
                             "tarea: la hace o se la pasa a alguien de su gente desde la "
                             "web.",
