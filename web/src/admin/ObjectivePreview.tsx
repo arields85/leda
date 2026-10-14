@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
+import { shortDate } from '../format';
+import { WARN } from './controls';
 import { dayLabel } from './DatePicker';
 import type { ObjectiveOptions } from './objectiveApi';
-import { type ObjectiveDraft, parentOf, referentOf } from './objectiveDraft';
+import { lateForParent, type ObjectiveDraft, parentOf, referentOf } from './objectiveDraft';
 import { FIELD_HINT, FIELD_TITLE, FIELD_VALUE, PREVIEW_VALUE } from './typography';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -30,6 +32,8 @@ export function ObjectivePreview({
   const parent = parentOf(options, draft.padre_id);
   const referent = referentOf(options, draft.referente_id);
   const level = draft.tipo ? options.niveles[draft.tipo] : null;
+  // Decision 5 (2026-10-14): it does not fall due after the one it hangs from.
+  const late = lateForParent(draft, options);
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <p className={`m-0 wrap-break-word font-bold ${FIELD_VALUE} text-ink`}>
@@ -43,7 +47,14 @@ export function ObjectivePreview({
         <Row label="Referente">
           {referent ? `${referent.nombre} · ${referent.areas.join(', ')}` : MISSING}
         </Row>
-        <Row label="Fecha">{draft.fecha ? dayLabel(draft.fecha) : MISSING}</Row>
+        <Row label="Fecha">
+          {draft.fecha ? dayLabel(draft.fecha) : MISSING}
+          {late?.fecha_objetivo && (
+            <span className={`block font-bold ${FIELD_HINT} ${WARN}`}>
+              Vence después que «{late.titulo}» ({shortDate(late.fecha_objetivo)}).
+            </span>
+          )}
+        </Row>
         {draft.descripcion.trim() && <Row label="Descripción">{draft.descripcion.trim()}</Row>}
         <Row label="Lo crea">
           {author}

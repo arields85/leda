@@ -3569,7 +3569,8 @@ end $$;
 -- su evento `activo`, la auditoría `crear_objetivo` (quién y por qué puerta) y su clave de un solo
 -- uso en `creacion_de_objetivo`. Migración 0069 (decisiones del usuario del 2026-10-14): el
 -- objetivo lleva fecha, obligatoria, con el calendario de las tareas, y su referente es siempre un
--- referente activo de un área del espacio.
+-- referente activo de un área del espacio. Migración 0070 (decisión 5 del usuario, 2026-10-14):
+-- un objetivo no vence después que el objetivo del que cuelga, si ese padre tiene fecha.
 create table creacion_de_objetivo (
   id            uuid primary key default gen_random_uuid(),
   workspace_id  uuid not null references workspace(id) on delete cascade,
@@ -3684,11 +3685,13 @@ begin
     -- Sin padre, sólo un estratégico (punto 11).
     'sin_padre', jsonb_build_array('estrategico'),
     -- De qué puede colgar: un objetivo abierto que no sea operativo (debajo de un operativo van
-    -- tareas), con los tipos que admite.
+    -- tareas), con los tipos que admite. Con su fecha y de qué cuelga él (migración 0070): la web
+    -- avisa antes de confirmar que un hijo vencería después, y "cargarlo aparte" lo pasa a colgar
+    -- del padre de ese padre.
     'padres', coalesce((
       select jsonb_agg(jsonb_build_object(
                'id', o.id, 'titulo', o.titulo, 'tipo', o.tipo, 'estado', o.estado,
-               'fecha_objetivo', o.fecha_objetivo,
+               'fecha_objetivo', o.fecha_objetivo, 'padre_id', o.parent_id,
                'tipos', case o.tipo when 'estrategico' then jsonb_build_array('hito', 'operativo')
                                     else jsonb_build_array('operativo') end)
              order by o.titulo, o.id)
@@ -3849,6 +3852,16 @@ begin
     elsif p_fecha = v_hoy and v_hora_fin is not null
           and (coalesce(p_ahora, now()) at time zone v_zona)::time >= v_hora_fin then
       v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'ya_cerro_el_dia');
+    -- Un objetivo no vence después que el objetivo del que cuelga (decisión 5 del usuario,
+    -- 2026-10-14; migración 0070): lo que cuelga es parte del padre, y el padre no cierra hasta
+    -- que cierran sus hijos (mecánica §5). Sólo si el padre vale como padre y tiene fecha (los
+    -- objetivos iniciales del pack no la tienen); con el día del padre (`hasta`).
+    elsif v_padre.id is not null and v_padre.estado in ('activo', 'propuesto')
+          and v_padre.tipo <> 'operativo' and v_padre.fecha_objetivo is not null
+          and p_fecha > v_padre.fecha_objetivo then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha',
+                                                   'motivo', 'vence_despues_del_padre',
+                                                   'hasta', v_padre.fecha_objetivo);
     end if;
 
     if jsonb_array_length(v_errores) > 0 then

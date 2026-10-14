@@ -9,13 +9,16 @@ import { call, type Options, type Problem } from './api';
 /** The objective levels of the core (mechanics §1), as the server names them. */
 export type ObjectiveType = 'estrategico' | 'hito' | 'operativo';
 
-/** An open objective a new one may hang from, with the types it admits under it. */
+/** An open objective a new one may hang from, with the types it admits under it, its date and
+ * what it hangs from itself (migration 0070: the form stops a child that would fall due after it,
+ * and "cargarlo aparte" moves the child to hang from the parent's own parent). */
 export interface ParentObjective {
   id: string;
   titulo: string;
   tipo: ObjectiveType;
   estado: string;
   fecha_objetivo: string | null;
+  padre_id: string | null;
   tipos: ObjectiveType[];
 }
 

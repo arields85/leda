@@ -22,6 +22,11 @@ base y en la entrada HTTP.
   fecha, obligatoria, con el mismo calendario que las tareas (un día hábil del espacio, hoy o
   después, y hoy sólo si la jornada no cerró); y el referente es siempre un referente activo de un
   área de ese espacio, no cualquier integrante.
+- **Un objetivo no vence después que el objetivo del que cuelga** (decisión 5 del usuario,
+  2026-10-14; migración 0070): lo que cuelga es parte del padre, y el padre no cierra hasta que
+  cierran sus hijos (mecánica §5). Si el padre tiene fecha y el hijo vence después, la base lo
+  rechaza (`vence_despues_del_padre`, con el día del padre en `hasta`), por las dos puertas. Un
+  padre sin fecha (los objetivos iniciales del pack) no pone límite.
 """
 
 from __future__ import annotations
@@ -103,11 +108,12 @@ def _sesion_del_equipo(conn, mundo: dict, nombre: str, slug: str = "north-lab") 
 
 
 def _objetivo(conn, ws: str, tipo: str, titulo: str, *, padre: str | None = None,
-              estado: str = "activo") -> str:
+              estado: str = "activo", fecha: date | None = None) -> str:
     with admin(conn) as cur:
-        cur.execute("""insert into objective (workspace_id, parent_id, tipo, titulo, estado)
-                       values (%s, %s, %s, %s, %s) returning id""",
-                    (ws, padre, tipo, titulo, estado))
+        cur.execute("""insert into objective (workspace_id, parent_id, tipo, titulo, estado,
+                                              fecha_objetivo)
+                       values (%s, %s, %s, %s, %s, %s) returning id""",
+                    (ws, padre, tipo, titulo, estado, fecha))
         oid = str(cur.fetchone()["id"])
     conn.commit()
     return oid
@@ -613,6 +619,68 @@ def test_la_misma_clave_con_otra_fecha_se_rechaza(conn, intake_world, sesion):
     assert _creados(conn) == 1
 
 
+# --- Un objetivo no vence después que el objetivo del que cuelga (decisión 5; migración 0070) --
+
+MARTES = date(2026, 10, 27)
+
+
+def _fecha(conn, objetivo: str) -> date | None:
+    return _fila(conn, "select fecha_objetivo f from objective where id = %s", objetivo)["f"]
+
+
+def test_un_hijo_que_vence_despues_que_su_padre_no_se_crea(conn, intake_world, sesion):
+    """Por las dos puertas, el mismo rechazo, con el día del padre."""
+    norte = _norte(intake_world)
+    padre = _objetivo(conn, norte["id"], "estrategico", "Abrir la planta nueva", fecha=VIERNES)
+    for crear in (lambda **c: _crear(conn, sesion, intake_world, **c),
+                  lambda **c: _como_direccion(conn, intake_world, **c)):
+        r = crear(padre=padre, tipo="hito", fecha=MARTES)
+        assert _errores(r) == {("fecha", "vence_despues_del_padre")}
+        (error,) = r["errores"]
+        assert error["hasta"] == VIERNES.isoformat()
+        _nada_creado(conn)
+    assert _fecha(conn, padre) == VIERNES
+
+
+def test_un_hijo_que_vence_el_dia_de_su_padre_o_antes_se_crea(conn, intake_world, sesion):
+    norte = _norte(intake_world)
+    padre = _objetivo(conn, norte["id"], "estrategico", "Abrir la planta nueva", fecha=MARTES)
+    for fecha in (MARTES, VIERNES):
+        assert _crear(conn, sesion, intake_world, padre=padre, tipo="hito",
+                      fecha=fecha)["ok"] is True, fecha
+    assert _creados(conn) == 2
+    assert _fecha(conn, padre) == MARTES
+
+
+def test_un_padre_sin_fecha_no_pone_limite(conn, intake_world, sesion):
+    """Los objetivos iniciales del pack no tienen fecha: no limitan a sus hijos."""
+    norte = _norte(intake_world)
+    padre = _objetivo(conn, norte["id"], "estrategico", "Plan inicial del pack")
+    r = _crear(conn, sesion, intake_world, padre=padre, tipo="hito", fecha=date(2027, 3, 16))
+    assert r["ok"] is True, r
+
+
+def test_un_padre_que_no_vale_no_suma_el_rechazo_de_la_fecha(conn, intake_world, sesion):
+    """Un padre cerrado ya se rechaza por sí mismo: su fecha no agrega otro rechazo."""
+    norte = _norte(intake_world)
+    cerrado = _objetivo(conn, norte["id"], "estrategico", "Cerrado", estado="terminado",
+                        fecha=VIERNES)
+    r = _crear(conn, sesion, intake_world, padre=cerrado, tipo="hito", fecha=MARTES)
+    assert _errores(r) == {("padre", "no_esta_abierto")}
+
+
+def test_las_opciones_dicen_de_que_cuelga_cada_padre(conn, intake_world, sesion):
+    """La web avisa antes de confirmar y "> cargarlo aparte" lo pasa al padre del padre: necesita
+    la fecha y el padre de cada objetivo del que se puede colgar."""
+    norte = _norte(intake_world)
+    raiz = _objetivo(conn, norte["id"], "estrategico", "Modernizar la planta", fecha=VIERNES)
+    hito = _objetivo(conn, norte["id"], "hito", "Línea 3 andando", padre=raiz)
+    padres = {p["id"]: p for p in _opciones(conn, "administracion", sesion, norte["id"])["padres"]}
+    assert padres[raiz]["padre_id"] is None
+    assert padres[raiz]["fecha_objetivo"] == VIERNES.isoformat()
+    assert padres[hito]["padre_id"] == raiz and padres[hito]["fecha_objetivo"] is None
+
+
 # --- Una sola vez por clave -------------------------------------------------------------------
 
 def test_la_misma_clave_con_los_mismos_datos_devuelve_el_mismo_objetivo(
@@ -917,6 +985,35 @@ def test_sin_sesion_de_administracion_no_se_lee_el_reloj_del_espacio(
                                        norte["id"]) == AHORA
     conn.rollback()
     assert leidos == [norte["id"]]
+
+
+TEXTO_VENCE_DESPUES_DEL_PADRE = (
+    "Este objetivo vence después que el objetivo del que cuelga, que se demoraría: lo que cuelga "
+    "de un objetivo es parte de él. Elegí una fecha hasta la de ese objetivo o cargalo aparte.")
+
+
+def test_la_api_rechaza_un_hijo_tardio_igual_en_las_dos_puertas(
+        web, conn, intake_world, administradora):
+    norte = _norte(intake_world)
+    hasta = _proximo_habil_real()
+    tarde = _proximo_habil_real(14)
+    padre = _objetivo(conn, norte["id"], "estrategico", "Abrir la planta nueva", fecha=hasta)
+    for navegador, base in (
+            (_navegador_de_administracion(web, conn, administradora),
+             f"/app/admin/api/espacios/{norte['id']}/objetivos"),
+            (_navegador_del_equipo(web, conn, intake_world, "Morgan Hale"), "/app/api/objetivos")):
+        r = navegador.post(base, json=_cuerpo(intake_world, padre_id=padre, tipo="hito",
+                                              fecha=tarde.isoformat()))
+        assert r.status_code == 422, r.text
+        (error,) = r.json()["errores"]
+        assert error == {"campo": "fecha", "motivo": "vence_despues_del_padre",
+                         "texto": TEXTO_VENCE_DESPUES_DEL_PADRE, "hasta": hasta.isoformat()}
+    _nada_creado(conn)
+    # Ese mismo día, sí.
+    r = navegador.post(base, json=_cuerpo(intake_world, padre_id=padre, tipo="hito",
+                                          fecha=hasta.isoformat()))
+    assert r.status_code == 201, r.text
+    assert _fecha(conn, padre) == hasta
 
 
 def _un_cuerpo_ilegible_es_un_pedido_mal_formado(navegador, camino: str) -> None:

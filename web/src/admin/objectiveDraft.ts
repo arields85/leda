@@ -1,3 +1,4 @@
+import { shortDate } from '../format';
 import type { Problem } from './api';
 import { length } from './draft';
 import type { AreaReferent, ObjectiveInput, ObjectiveOptions, ObjectiveType, ParentObjective } from './objectiveApi';
@@ -97,6 +98,29 @@ export function emptyObjective(options: ObjectiveOptions): ObjectiveDraft {
   };
 }
 
+/** The user's decision 5 (2026-10-14; migration 0070): an objective never falls due after the one
+ * it hangs from, when that one has a date (the pack's first objectives have none). The parent it
+ * would fall due after, if any. */
+export function lateForParent(draft: ObjectiveDraft, options: ObjectiveOptions): ParentObjective | undefined {
+  const parent = parentOf(options, draft.padre_id);
+  return parent?.fecha_objetivo && draft.fecha && draft.fecha > parent.fecha_objetivo ? parent : undefined;
+}
+
+/** What Leda says when it stops such an objective: the parent by its name and its day. */
+export function dueAfterParentText(parent: ParentObjective): string {
+  const day = parent.fecha_objetivo ? ` (${shortDate(parent.fecha_objetivo)})` : '';
+  return `Este objetivo vence después que «${parent.titulo}»${day}: lo que cuelga de un objetivo es parte de él, y ese objetivo se demoraría.`;
+}
+
+/** The refusal of a child due after its parent (`fecha`, `vence_despues_del_padre`). */
+export const LATE_FOR_PARENT = 'vence_despues_del_padre';
+
+/** Where "cargarlo aparte" takes it: next to its parent, hanging from the parent's own parent
+ * (when it is one it can hang from), or from none when the parent is a root. */
+export function apartFrom(options: ObjectiveOptions, parent: ParentObjective): string {
+  return parent.padre_id && parentOf(options, parent.padre_id) ? parent.padre_id : '';
+}
+
 /** What the form can already tell is missing or too long, before sending: the same `campo` and
  * `motivo` the server would answer. The server stays the judge of everything else (a day that is
  * not a working day, a referente who stopped being one, a parent that closed). */
@@ -112,6 +136,8 @@ export function checkObjective(draft: ObjectiveDraft, options: ObjectiveOptions)
   if (!draft.tipo || !typesFor(options, draft.padre_id).includes(draft.tipo)) missing('tipo');
   if (!draft.referente_id) missing('referente');
   if (!draft.fecha) missing('fecha');
+  const late = lateForParent(draft, options);
+  if (late) problems.push({ campo: 'fecha', motivo: LATE_FOR_PARENT, texto: dueAfterParentText(late) });
   if (length(draft.descripcion) > OBJECTIVE_LIMITS.descripcion) tooLong('descripcion');
   return problems;
 }

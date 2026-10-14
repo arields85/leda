@@ -78,6 +78,9 @@ export interface Problem {
   campo: string;
   motivo: string;
   texto: string;
+  // The day it may fall due on at most, with a date after its objective or its parent (migration
+  // 0070, `vence_despues_del_objetivo` and `vence_despues_del_padre`).
+  hasta?: string;
 }
 
 /** What the form sends: the server's names, with the idempotency key of this attempt. */

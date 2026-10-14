@@ -104,6 +104,7 @@ export function objectiveOptions(overrides: Partial<ObjectiveOptions> = {}): Obj
         tipo: 'estrategico',
         estado: 'activo',
         fecha_objetivo: '2026-12-18',
+        padre_id: null,
         tipos: ['hito', 'operativo'],
       },
       {
@@ -112,6 +113,7 @@ export function objectiveOptions(overrides: Partial<ObjectiveOptions> = {}): Obj
         tipo: 'hito',
         estado: 'activo',
         fecha_objetivo: null,
+        padre_id: 'o-plan',
         tipos: ['operativo'],
       },
     ],

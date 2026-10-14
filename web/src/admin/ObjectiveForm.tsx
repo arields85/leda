@@ -10,12 +10,16 @@ import { Dropdown } from './Dropdown';
 import { FieldBlock, Mark } from './FieldBlock';
 import { bringTo, FieldList, focusField } from './FieldList';
 import { newKey } from './draft';
-import type { ObjectiveApi, ObjectiveOptions } from './objectiveApi';
+import type { ObjectiveApi, ObjectiveOptions, ParentObjective } from './objectiveApi';
 import {
+  apartFrom,
   checkObjective,
   defaultType,
+  dueAfterParentText,
   emptyObjective,
   type ObjectiveDraft,
+  LATE_FOR_PARENT,
+  lateForParent,
   type ObjectiveField,
   OBJECTIVE_FIELD_ID,
   OBJECTIVE_FIELD_NAME,
@@ -114,13 +118,26 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
     if (!unknown.current) key.current = null;
     setStep((current) => (current.kind === 'edit' && current.failed ? { ...current, failed: false } : current));
     const touched = new Set<string>(Object.keys(patch));
-    setProblems((current) => current.filter((p) => !touched.has(OBJECTIVE_PROBLEM_FIELD[p.campo] ?? '')));
+    // A date that fell after the parent stops holding once it hangs from another one.
+    setProblems((current) =>
+      current.filter(
+        (p) =>
+          !touched.has(OBJECTIVE_PROBLEM_FIELD[p.campo] ?? '') &&
+          !(p.motivo === LATE_FOR_PARENT && touched.has('padre_id')),
+      ),
+    );
   }
 
   /** What it hangs from decides the type (point 11): the only one when there is one, and the
    * operational one when it can also be a milestone. */
   function chooseParent(id: string) {
     change({ padre_id: id, tipo: defaultType(typesFor(options, id)) });
+  }
+
+  /** "> cargarlo aparte" (decision 5): it is not really part of its parent, so it goes next to it,
+   * and the type is offered again for the new place, with the same preselection. */
+  function apart(parent: ParentObjective) {
+    chooseParent(apartFrom(options, parent));
   }
 
   async function confirm() {
@@ -221,6 +238,9 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
   const alerted = problems.length > 0;
   const types = typesFor(options, draft.padre_id);
   const parent = parentOf(options, draft.padre_id);
+  // Decision 5 (2026-10-14): it falls due after the one it hangs from. Leda stops and offers the
+  // ways out: another date up to that day, or "cargarlo aparte".
+  const late = lateForParent(draft, options);
   const levels = options.niveles;
   const blank = emptyObjective(options);
   const somethingToClear = (Object.keys(blank) as ObjectiveField[]).some((f) => draft[f] !== blank[f]);
@@ -351,6 +371,23 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
         </h2>
         <ObjectivePreview draft={draft} options={options} author={author} />
         <div ref={messages} tabIndex={-1} className="flex min-w-0 flex-col gap-3 pt-1.5 outline-none">
+          {late && (
+            <div
+              role="group"
+              aria-label="Vence después que el objetivo del que cuelga"
+              className="flex min-w-0 flex-col gap-2 rounded-card border-hard border-line px-3 py-2.5 text-body"
+            >
+              <p className={`m-0 font-bold ${WARN}`}>{dueAfterParentText(late)}</p>
+              <p className="m-0 text-ink-soft">
+                Elegí una fecha hasta ese día o, si no es parte de «{late.titulo}», cargalo aparte.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button type="button" className={`${SECONDARY} w-fit`} onClick={() => apart(late)} disabled={sending}>
+                  &gt; cargarlo aparte
+                </button>
+              </div>
+            </div>
+          )}
           {failed && (
             <p role="alert" className="m-0 text-body text-ink-soft">
               No se pudo crear: no llegó la respuesta. Los datos siguen acá; probá de nuevo.

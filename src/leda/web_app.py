@@ -1432,6 +1432,11 @@ TEXTOS_DEL_OBJETIVO = {
     **{clave: texto for clave, texto in TEXTOS_DE_LA_CARGA.items()
        if clave[0] == "fecha"
        and clave[1] not in ("despues_del_objetivo", "vence_despues_del_objetivo")},
+    # Decisión 5 del usuario (2026-10-14; migración 0070): con `hasta`, el día del padre.
+    ("fecha", "vence_despues_del_padre"):
+        "Este objetivo vence después que el objetivo del que cuelga, que se demoraría: lo que "
+        "cuelga de un objetivo es parte de él. Elegí una fecha hasta la de ese objetivo o cargalo "
+        "aparte.",
     ("clave", "falta"): TEXTOS_DE_LA_CARGA[("clave", "falta")],
     ("clave", "usada_con_otros_datos"):
         "Este envío ya creó otro objetivo. Recargá la página para crear uno nuevo.",

@@ -284,3 +284,147 @@ describe('ObjectiveForm', () => {
     expect(sent.map((s) => s.clave)).toEqual(['k1', 'k2']);
   });
 });
+
+// Decision 5 of the user (2026-10-14; migration 0070): an objective never falls due after the one
+// it hangs from, when that one has a date. Leda stops before confirming and offers the ways out:
+// another date, or "> cargarlo aparte" (to hang from the parent's own parent, or from none).
+describe('an objective that falls due after its parent', () => {
+  /** Options where "Modernizar la planta" (strategic, a root) is due on Friday 23.10 and, if
+   * given, "Línea 3 andando" (a milestone under it) on `milestone`. */
+  function dated(milestone: string | null = null, plan = '2026-10-23') {
+    const options = objectiveOptions();
+    return {
+      ...options,
+      padres: [
+        { ...options.padres[0], fecha_objetivo: plan, padre_id: null },
+        { ...options.padres[1], fecha_objetivo: milestone, padre_id: 'o-plan' },
+      ],
+    };
+  }
+
+  function openWith(api: ObjectiveApi, options = dated()) {
+    render(<ObjectiveForm api={api} options={options} author="Ariel" onClosed={vi.fn()} />);
+  }
+
+  const STOP_PLAN =
+    'Este objetivo vence después que «Modernizar la planta» (23.10): lo que cuelga de un objetivo es parte de él, y ese objetivo se demoraría.';
+  const stop = () => screen.queryByRole('group', { name: 'Vence después que el objetivo del que cuelga' });
+
+  function fillLate(parent = 'o-plan') {
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Habilitar el laboratorio' } });
+    pick('De qué cuelga', parent);
+    pick('Referente', 'm-lucas');
+    fireEvent.click(screen.getByRole('button', { name: 'mar 27.10' }));
+  }
+
+  it('stops before confirming and says why, with the parent by its name and day', () => {
+    const { api } = door(created);
+    openWith(api);
+    fillLate();
+    expect(stop()).toHaveTextContent(STOP_PLAN);
+    expect(within(stop()!).getByRole('button', { name: '> cargarlo aparte' })).toBeInTheDocument();
+    expect(preview()).toHaveTextContent('Vence después que «Modernizar la planta» (23.10).');
+    expect(screen.getByRole('button', { name: '> confirmar' })).toHaveAttribute('aria-disabled', 'true');
+    expect(document.getElementById('lo-que-falta-objetivo')).toHaveTextContent('Hay que corregir: fecha.');
+    confirm();
+    expect(api.create).not.toHaveBeenCalled();
+    expect(document.getElementById('o-fecha-error')).toHaveTextContent(STOP_PLAN);
+  });
+
+  it('exit 1: another date up to the parent\'s day, and it is created where it was', async () => {
+    keys('k1-0000-0000-0000-000000000000');
+    const { api, sent } = door(created);
+    openWith(api);
+    fillLate();
+    fireEvent.click(screen.getByRole('button', { name: 'vie 23.10' }));
+    expect(stop()).toBeNull();
+    expect(document.getElementById('o-fecha-error')).toBeNull();
+    expect(screen.getByRole('button', { name: '> confirmar' })).not.toHaveAttribute('aria-disabled');
+    confirm();
+    await screen.findByRole('heading', { name: 'Objetivo creado.' });
+    expect(sent).toEqual([
+      {
+        titulo: 'Habilitar el laboratorio',
+        descripcion: '',
+        padre_id: 'o-plan',
+        tipo: 'operativo',
+        referente_id: 'm-lucas',
+        fecha: '2026-10-23',
+        clave: 'k1-0000-0000-0000-000000000000',
+      },
+    ]);
+  });
+
+  it('exit 2: "cargarlo aparte" from a root hangs it from none, as a strategic one', async () => {
+    const { api, sent } = door(created);
+    openWith(api);
+    fillLate();
+    pick('Tipo', 'hito');
+    confirm();
+    fireEvent.click(within(stop()!).getByRole('button', { name: '> cargarlo aparte' }));
+    expect(screen.getByLabelText('De qué cuelga')).toHaveValue('');
+    expect(typeShown()).toBe('plan anual');
+    expect(stop()).toBeNull();
+    expect(document.getElementById('o-fecha-error')).toBeNull();
+    expect(preview()).toHaveTextContent('ninguno');
+    confirm();
+    await screen.findByRole('heading', { name: 'Objetivo creado.' });
+    expect(sent[0]).toMatchObject({ tipo: 'estrategico', fecha: '2026-10-27' });
+    expect(sent[0]).not.toHaveProperty('padre_id');
+  });
+
+  it('exit 2 from a milestone goes next to it, and the type is offered again for the new place', async () => {
+    const { api, sent } = door(created);
+    openWith(api, dated('2026-10-21', '2026-12-18'));
+    fillLate('o-hito');
+    expect(stop()).toHaveTextContent('Este objetivo vence después que «Línea 3 andando» (21.10)');
+    expect(typeIsAsked()).toBe(false);
+    fireEvent.click(within(stop()!).getByRole('button', { name: '> cargarlo aparte' }));
+    // Now under the strategic one: a milestone or an operational one, the operational one chosen.
+    expect(screen.getByLabelText('De qué cuelga')).toHaveValue('o-plan');
+    expect(typeIsAsked()).toBe(true);
+    expect(typeShown()).toBe('objetivo operativo');
+    expect(stop()).toBeNull();
+    pick('Tipo', 'hito');
+    confirm();
+    await screen.findByRole('heading', { name: 'Objetivo creado.' });
+    expect(sent[0]).toMatchObject({ padre_id: 'o-plan', tipo: 'hito', fecha: '2026-10-27' });
+  });
+
+  it('when the parent\'s parent is also earlier, it stops again there, never a dead end', () => {
+    openWith(door(created).api, dated('2026-10-21', '2026-10-23'));
+    fillLate('o-hito');
+    fireEvent.click(within(stop()!).getByRole('button', { name: '> cargarlo aparte' }));
+    expect(screen.getByLabelText('De qué cuelga')).toHaveValue('o-plan');
+    expect(stop()).toHaveTextContent(STOP_PLAN);
+    fireEvent.click(within(stop()!).getByRole('button', { name: '> cargarlo aparte' }));
+    expect(screen.getByLabelText('De qué cuelga')).toHaveValue('');
+    expect(stop()).toBeNull();
+  });
+
+  it('a parent without a date sets no limit', () => {
+    openWith(door(created).api, dated(null, '2026-12-18'));
+    fillLate('o-hito');
+    expect(stop()).toBeNull();
+    expect(screen.getByRole('button', { name: '> confirmar' })).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('the server refusing it, with options read earlier, lands on the date', async () => {
+    const { api } = door({
+      kind: 'rejected',
+      errors: [
+        {
+          campo: 'fecha',
+          motivo: 'vence_despues_del_padre',
+          texto: 'Este objetivo vence después que el objetivo del que cuelga, que se demoraría: lo que cuelga de un objetivo es parte de él. Elegí una fecha hasta la de ese objetivo o cargalo aparte.',
+          hasta: '2026-10-20',
+        },
+      ],
+    });
+    openWith(api, dated(null, '2026-12-18'));
+    fillLate('o-hito');
+    confirm();
+    await screen.findByRole('alert');
+    expect(document.getElementById('o-fecha-error')).toHaveTextContent('Elegí una fecha hasta la de ese objetivo');
+  });
+});
