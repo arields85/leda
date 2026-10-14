@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { canDictate, Dictation, DICTATION_LIMIT_MS, MIC_DENIED, MIC_FAILED } from './dictation';
+import { SessionClosedError } from '../api';
+import {
+  DICTATION_FAILED,
+  DICTATION_TIMEOUT_MS,
+  DICTATION_TOO_LONG,
+  DICTATION_UNHEARD,
+  transcribe,
+} from './api';
 
 /** A fake MediaRecorder: `start` records, `stop` gives one chunk and then says it stopped. */
 class FakeRecorder {
@@ -218,5 +226,91 @@ describe('Dictation', () => {
     recorder.onerror?.();
     expect(on.onProblem).toHaveBeenCalledWith(MIC_FAILED);
     expect(on.onAudio).not.toHaveBeenCalled();
+  });
+});
+
+// The transcribe client (`api.ts`, J2b), every way the answer can come back (review
+// review-0f465303e17d9ce6: these branches had no test). Anything but a text reads as "could not",
+// in plain words; only a closed session throws.
+describe('transcribe', () => {
+  const AUDIO = new Blob(['audio'], { type: 'audio/webm;codecs=opus' });
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+  function serve(answer: Response | Error | (() => Promise<Response>)) {
+    const fetch = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (typeof answer === 'function') return answer();
+      if (answer instanceof Error) throw answer;
+      void init;
+      return answer;
+    });
+    vi.stubGlobal('fetch', fetch);
+    return fetch;
+  }
+
+  it('sends the audio as it is, with its type, and gives back the text', async () => {
+    const fetch = serve(json(200, { texto: '  colgar el estante  ' }));
+    expect(await transcribe('s 1', AUDIO)).toEqual({ kind: 'text', text: 'colgar el estante' });
+    const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe('/app/admin/api/espacios/s%201/dictado');
+    expect(init?.method).toBe('POST');
+    expect(init?.body).toBe(AUDIO);
+    expect(init?.headers).toEqual(expect.objectContaining({ 'Content-Type': 'audio/webm;codecs=opus' }));
+  });
+
+  it('a dictation cut by the limit gives the text and the notice that it was cut (J2-26)', async () => {
+    serve(json(200, { texto: 'colgar el estante', aviso: 'Se cortó.' }));
+    expect(await transcribe('s1', AUDIO)).toEqual({ kind: 'text', text: 'colgar el estante', notice: 'Se cortó.' });
+  });
+
+  it('an empty text, or an answer that is not JSON, is that nothing was understood', async () => {
+    serve(json(200, { texto: '   ' }));
+    expect(await transcribe('s1', AUDIO)).toEqual({ kind: 'failed', text: DICTATION_UNHEARD });
+    serve(new Response('<html>', { status: 200 }));
+    expect(await transcribe('s1', AUDIO)).toEqual({ kind: 'failed', text: DICTATION_UNHEARD });
+  });
+
+  it("422 says the server's words, or its own when there are none", async () => {
+    serve(json(422, { error: 'no_se_entendio', texto: 'No te entendí.' }));
+    expect(await transcribe('s1', AUDIO)).toEqual({ kind: 'failed', text: 'No te entendí.' });
+    serve(json(422, { error: 'no_se_entendio' }));
+    expect(await transcribe('s1', AUDIO)).toEqual({ kind: 'failed', text: DICTATION_UNHEARD });
+  });
+
+  it('too long, a server failure or no network, each in plain words', async () => {
+    serve(json(413, { error: 'demasiado_grande' }));
+    expect(await transcribe('s1', AUDIO)).toEqual({ kind: 'failed', text: DICTATION_TOO_LONG });
+    for (const status of [502, 503, 500, 403, 415]) {
+      serve(json(status, { error: 'x', texto: 'el texto del servidor no se muestra' }));
+      expect(await transcribe('s1', AUDIO)).toEqual({ kind: 'failed', text: DICTATION_FAILED });
+    }
+    serve(new TypeError('Failed to fetch'));
+    expect(await transcribe('s1', AUDIO)).toEqual({ kind: 'failed', text: DICTATION_FAILED });
+  });
+
+  it('a closed session throws, to go back to the entry', async () => {
+    serve(json(401, { error: 'sin_sesion' }));
+    await expect(transcribe('s1', AUDIO)).rejects.toBeInstanceOf(SessionClosedError);
+  });
+
+  it('gives up after its own time, longer than the server waits for Gemini', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            signal = init?.signal ?? undefined;
+            signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+          }),
+      ),
+    );
+    const answer = transcribe('s1', AUDIO);
+    await vi.advanceTimersByTimeAsync(DICTATION_TIMEOUT_MS - 1);
+    expect(signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await answer).toEqual({ kind: 'failed', text: DICTATION_FAILED });
+    expect(DICTATION_TIMEOUT_MS).toBeGreaterThan(35_000);
   });
 });

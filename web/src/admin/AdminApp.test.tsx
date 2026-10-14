@@ -1379,9 +1379,42 @@ function hold(route: string) {
 
 const holdDictation = () => hold(DICTATION).answer;
 
+// J2-28: the microphone is an icon of constant width, named by its `aria-label`.
 async function startDictating() {
-  fireEvent.click(screen.getByRole('button', { name: '> dictar' }));
-  return screen.findByRole('button', { name: '> dejar de dictar' });
+  fireEvent.click(screen.getByRole('button', { name: 'dictar' }));
+  return screen.findByRole('button', { name: 'dejar de dictar' });
+}
+
+/** J2-27: a Web Audio of mentira, whose analyser gives a voice at the level of `loud` (0 to 1). */
+function fakeAudio(loud = 0.5) {
+  const made: { resume: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }[] = [];
+  class FakeAudioContext {
+    state = 'suspended';
+    resume = vi.fn(async () => {
+      this.state = 'running';
+    });
+    close = vi.fn(async () => {
+      this.state = 'closed';
+    });
+    constructor() {
+      made.push(this);
+    }
+    createMediaStreamSource() {
+      return { connect: vi.fn(), disconnect: vi.fn() };
+    }
+    createAnalyser() {
+      return {
+        fftSize: 2048,
+        getByteTimeDomainData(samples: Uint8Array) {
+          samples.forEach((_, i) => {
+            samples[i] = 128 + Math.round((i % 2 ? 1 : -1) * loud * 127);
+          });
+        },
+      };
+    }
+  }
+  vi.stubGlobal('AudioContext', FakeAudioContext);
+  return made;
 }
 
 describe('Dictating into the free box', () => {
@@ -1389,7 +1422,7 @@ describe('Dictating into the free box', () => {
 
   it('where the browser cannot record there is no microphone, and typing works', async () => {
     await openForm();
-    expect(screen.queryByRole('button', { name: '> dictar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'dictar' })).toBeNull();
     tell('lo escribo');
     expect(screen.getByLabelText(BOX)).toHaveValue('lo escribo');
   });
@@ -1410,9 +1443,73 @@ describe('Dictating into the free box', () => {
     // The microphone and the screen go back as they were; the box is still the person's to edit.
     expect(mic.track.stop).toHaveBeenCalled();
     expect(mic.release).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: '> dictar' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'dictar' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByLabelText(BOX)).toBeEnabled();
     expect(screen.queryByText(/grabando/)).toBeNull();
+  });
+
+  it('a dictation cut by the limit adds what was heard and says it was cut (J2-26)', async () => {
+    fakeMicrophone();
+    const cut = 'Pasé a texto sólo una parte: el dictado se cortó. Dictá lo que falta o escribilo acá.';
+    await openForm({ [DICTATION]: ok({ texto: 'colgar el estante', aviso: cut }) });
+    fireEvent.click(await startDictating());
+    await waitFor(() => expect(screen.getByLabelText(BOX)).toHaveValue('colgar el estante'));
+    expect(screen.getByText(cut)).toBeInTheDocument();
+  });
+
+  it('the microphone is an icon of the same width in both states, next to "completar" (J2-28)', async () => {
+    fakeMicrophone();
+    await openForm();
+    const mic = screen.getByRole('button', { name: 'dictar' });
+    const complete = screen.getByRole('button', { name: '> completar con Leda' });
+    expect(mic).toHaveAttribute('title', 'dictar');
+    expect(mic.textContent).toBe('');
+    expect(mic.querySelector('svg')).not.toBeNull();
+    expect(mic.className).toMatch(/\bw-11\b/);
+    expect(mic.className).toMatch(/\bh-11\b/);
+    expect(complete.className).toMatch(/\bh-11\b/);
+    // On the same line: one row that does not wrap.
+    expect(mic.parentElement).toBe(complete.parentElement);
+    expect(mic.parentElement?.className).not.toMatch(/flex-wrap/);
+    const stop = await startDictating();
+    expect(stop).toHaveAttribute('title', 'dejar de dictar');
+    expect(stop.textContent).toBe('');
+    expect(stop.className).toBe(mic.className);
+    // The recording line stays below the buttons.
+    expect(stop.parentElement?.contains(screen.getByText(/grabando · 0:00 de 2:00/))).toBe(false);
+  });
+
+  it('the help under the box says it can be written or dictated (J2-28)', async () => {
+    await openForm();
+    expect(screen.getByLabelText(BOX)).toHaveAccessibleDescription(
+      'Escribilo o dictalo como lo dirías; Leda completa lo que falta.',
+    );
+  });
+
+  it('while recording, bars move with the voice, and go away when it stops (J2-27)', async () => {
+    fakeMicrophone();
+    const contexts = fakeAudio(0.6);
+    await openForm({ [DICTATION]: ok({ texto: 'colgar el estante' }) });
+    const stop = await startDictating();
+    // Made and resumed in the tap itself (Safari on the iPhone only lets it play from a tap).
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0].resume).toHaveBeenCalled();
+    const bars = await screen.findByTestId('audio-bars');
+    await waitFor(() => {
+      const heights = [...bars.children].map((b) => (b as HTMLElement).style.height);
+      expect(heights.some((h) => h !== '' && h !== '12%')).toBe(true);
+    });
+    fireEvent.click(stop);
+    await waitFor(() => expect(screen.queryByTestId('audio-bars')).toBeNull());
+    expect(contexts[0].close).toHaveBeenCalled();
+  });
+
+  it('without Web Audio it records all the same, with no bars (J2-27)', async () => {
+    fakeMicrophone();
+    await openForm();
+    await startDictating();
+    expect(screen.getByText(/grabando · 0:00 de 2:00/)).toBeInTheDocument();
+    expect(screen.queryByTestId('audio-bars')).toBeNull();
   });
 
   it('after a sentence that ends, the dictated text starts a new line', async () => {
@@ -1430,21 +1527,23 @@ describe('Dictating into the free box', () => {
     fireEvent.click(await startDictating());
     const busy = await screen.findByRole('button', { name: 'pasando a texto…' });
     expect(busy).toBeDisabled();
-    expect(busy).toHaveTextContent('pasando a texto...');
+    // J2-28: the icon keeps its width; the words with their dots go on the line below.
+    expect(busy.textContent).toBe('');
+    expect(busy.parentElement?.parentElement).toHaveTextContent('pasando a texto...');
     await answer(200, { texto: 'colgar el estante' });
     expect(screen.getByLabelText(BOX)).toHaveValue('colgar el estante');
-    expect(screen.getByRole('button', { name: '> dictar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'dictar' })).toBeEnabled();
   });
 
   it('without permission it says so plainly and the box stays', async () => {
     fakeMicrophone('denied');
     await openForm();
     tell('lo que ya escribí');
-    fireEvent.click(screen.getByRole('button', { name: '> dictar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'dictar' }));
     expect(await screen.findByText('No tengo permiso para el micrófono; escribilo acá.')).toBeInTheDocument();
     expect(screen.getByLabelText(BOX)).toHaveValue('lo que ya escribí');
     expect(screen.getByLabelText(BOX)).toBeEnabled();
-    expect(screen.getByRole('button', { name: '> dictar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'dictar' })).toBeEnabled();
   });
 
   it('when Leda could not turn it into text, it says so and what was written stays', async () => {
@@ -1695,6 +1794,30 @@ describe('the spelling while typing (J2-24)', () => {
     expect(calls.filter((c) => c.key === REVIEW)).toHaveLength(0);
     const sent = calls.filter((c) => c.key === TASKS);
     expect((sent[0].body as { titulo: string }).titulo).toBe(FIXED);
+  });
+});
+
+// J2-28 (the user's phone test, 2026-10-13): a ticked evidence box was hard to tell from an empty
+// one. No background in either state: the square's border, and a check mark only when ticked; the
+// native checkbox stays underneath, for the keyboard, the screen reader and a tap on its words.
+describe('the evidence boxes', () => {
+  it('show a check mark only when ticked, with no background, and the words still tick them', async () => {
+    await openForm();
+    pick('Quién la hace', 'm-marcos');
+    const box = screen.getByRole('checkbox', { name: /un informe/ });
+    const row = box.closest('label') as HTMLElement;
+    expect(box.className).toMatch(/\bsr-only\b/);
+    expect(box.className).not.toMatch(/accent-/);
+    const square = row.querySelector('[data-box]') as HTMLElement;
+    expect(square.className).not.toMatch(/\bbg-(?!transparent)/);
+    expect(square.className).toMatch(/peer-focus-visible:/);
+    expect(square.querySelector('svg')).toBeNull();
+    fireEvent.click(within(row).getByText(/un informe/));
+    expect(box).toBeChecked();
+    expect(square.querySelector('svg')).not.toBeNull();
+    fireEvent.click(box);
+    expect(box).not.toBeChecked();
+    expect(square.querySelector('svg')).toBeNull();
   });
 });
 

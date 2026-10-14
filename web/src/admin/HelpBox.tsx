@@ -1,7 +1,8 @@
-import { CircleAlert } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { CircleAlert, Mic as MicIcon, Square } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SessionClosedError } from '../api';
 import { type Candidate, DICTATION_FAILED, type Problem, transcribe } from './api';
+import { AudioBars } from './AudioBars';
 import { Completing } from './Completing';
 import { canDictate, Dictation, DICTATION_LIMIT_MS } from './dictation';
 import { FIELD_NAME, FIELD_ORDER, length, PROBLEM_FIELD } from './draft';
@@ -27,6 +28,9 @@ export const STALE_ANSWER = 'Cambiaste lo escrito mientras Leda completaba; toc�
 const BOX = `${CONTROL} min-h-24 resize-y`;
 const BUTTON = `inline-flex h-11 items-center rounded-card border-hard border-ink bg-card px-3.5 ${TEXT_SIZE} font-bold text-ink shadow-hard-ink disabled:opacity-50`;
 const QUIET = `inline-flex h-11 items-center rounded-card border-hard border-line-soft bg-transparent px-3.5 ${TEXT_SIZE} text-ink-soft disabled:opacity-50`;
+/** The microphone (J2-28): an icon of the same width whatever it says, so "> completar con Leda"
+ * and it stay on one line on a phone ("> dejar de dictar" was wider and wrapped). */
+const MIC = `inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-card border-hard border-line-soft bg-transparent text-ink-soft disabled:opacity-50`;
 
 function Line({ children, warn }: { children: string; warn?: boolean }) {
   return (
@@ -84,7 +88,9 @@ export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk,
   const [mic, setMic] = useState<Mic>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [micNote, setMicNote] = useState<string | null>(null);
+  const [bars, setBars] = useState(false);
   const dictation = useRef<Dictation | null>(null);
+  const readLevel = useCallback(() => dictation.current?.level() ?? null, []);
   const mounted = useRef(true);
   const storyNow = useRef(story);
   storyNow.current = story;
@@ -102,8 +108,11 @@ export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk,
     try {
       const result = await transcribe(spaceId, audio);
       if (!mounted.current) return;
-      if (result.kind === 'text') onStory(withDictated(storyNow.current, result.text));
-      else setMicNote(result.text);
+      if (result.kind === 'text') {
+        onStory(withDictated(storyNow.current, result.text));
+        // J2-26: Gemini cut it at its limit; what was heard is in, and the rest can be dictated.
+        if (result.notice) setMicNote(result.notice);
+      } else setMicNote(result.text);
     } catch (error) {
       if (!mounted.current) return;
       if (error instanceof SessionClosedError) onClosed();
@@ -124,6 +133,7 @@ export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk,
     const d = new Dictation({
       onRecording: () => {
         setElapsed(0);
+        setBars(d.hasLevel());
         setMic('recording');
       },
       onTick: setElapsed,
@@ -144,6 +154,7 @@ export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk,
   const asking = help.kind === 'asking';
   const over = length(story) > STORY_LIMIT;
   const missed = help.kind === 'done' ? missedFields(notes) : null;
+  const micName = mic === 'transcribing' ? 'pasando a texto…' : mic === 'recording' ? 'dejar de dictar' : 'dictar';
   return (
     <div data-field className="flex min-w-0 max-w-full flex-col gap-2 rounded-card border-hard border-line-soft px-3 py-2.5">
       <div className={`flex min-w-0 items-baseline justify-between gap-2 ${FIELD_HINT}`}>
@@ -162,9 +173,9 @@ export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk,
         aria-describedby="f-contame-ayuda"
       />
       <p id="f-contame-ayuda" className={`m-0 ${FIELD_HINT}`}>
-        Como lo dirías. Leda completa lo que está vacío y lo marca; vos lo corregís y confirmás.
+        Escribilo o dictalo como lo dirías; Leda completa lo que falta.
       </p>
-      <div className="flex flex-wrap gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
           className={BUTTON}
@@ -175,29 +186,38 @@ export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk,
           {asking ? <Completing word="completando" /> : '> completar con Leda'}
         </button>
         {recordable && (
+          // J2-28: a microphone to start and a square to stop, the recorders' own signs (a crossed
+          // microphone would read as "muted"); the words are in its name and its tooltip.
           <button
             type="button"
-            className={QUIET}
+            className={MIC}
             onClick={toggleMic}
             disabled={mic === 'starting' || mic === 'transcribing'}
             aria-pressed={mic === 'recording'}
-            aria-label={mic === 'transcribing' ? 'pasando a texto…' : undefined}
+            aria-label={micName}
+            title={micName}
           >
-            {mic === 'transcribing' ? (
-              <Completing word="pasando a texto" />
-            ) : mic === 'recording' ? (
-              '> dejar de dictar'
+            {mic === 'recording' ? (
+              <Square aria-hidden="true" strokeWidth={2.25} className="size-4 fill-current" />
             ) : (
-              '> dictar'
+              <MicIcon aria-hidden="true" strokeWidth={2.25} className="size-5" />
             )}
           </button>
         )}
-        {mic === 'recording' && (
-          <span className={`self-center ${FIELD_HINT}`}>
+      </div>
+      {mic === 'recording' && (
+        <div className={`flex min-w-0 items-center gap-2.5 ${FIELD_HINT}`}>
+          {bars && <AudioBars read={readLevel} />}
+          <span>
             grabando · {clock(elapsed)} de {clock(DICTATION_LIMIT_MS)}
           </span>
-        )}
-      </div>
+        </div>
+      )}
+      {mic === 'transcribing' && (
+        <p className={`m-0 ${FIELD_HINT}`}>
+          <Completing word="pasando a texto" />
+        </p>
+      )}
       <div role="status" className="flex min-w-0 flex-col gap-1 text-small">
         {micNote && <Line warn>{micNote}</Line>}
         {help.kind === 'failed' && <Line warn>{help.text}</Line>}

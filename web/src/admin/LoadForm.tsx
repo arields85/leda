@@ -1,4 +1,4 @@
-import { CircleAlert } from 'lucide-react';
+import { Check, CircleAlert } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { SessionClosedError } from '../api';
 import { shortDate } from '../format';
@@ -901,13 +901,24 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               <p className={`m-0 ${FIELD_HINT}`}>El área no pide evidencia.</p>
             )}
             {kinds.map((kind) => (
-              <label key={kind} className={`flex min-w-0 items-center gap-2 ${FIELD_VALUE}`}>
+              <label key={kind} className={`flex min-w-0 cursor-pointer items-center gap-2 ${FIELD_VALUE}`}>
+                {/* J2-28 (the user's phone test, 2026-10-13: ticked and empty looked alike): the
+                    native checkbox stays, hidden to the eye, for the keyboard, the screen reader and
+                    a tap on its words; what shows is a square with no background in either state,
+                    and a check mark in ink only when it is ticked. */}
                 <input
                   type="checkbox"
-                  className="h-4 w-4 shrink-0 accent-ink"
+                  className="peer sr-only"
                   checked={draft.evidencia.includes(kind)}
                   onChange={(e) => toggleEvidence(kind, e.target.checked)}
                 />
+                <span
+                  data-box
+                  aria-hidden="true"
+                  className="inline-flex size-4 shrink-0 items-center justify-center rounded-[3px] border-hard border-ink-soft bg-transparent text-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink"
+                >
+                  {draft.evidencia.includes(kind) && <Check strokeWidth={3.5} className="size-3.5" />}
+                </span>
                 <span className="min-w-0 wrap-break-word">
                   {evidenceWords(policy, kind)}
                   {policy?.evidencia_requerida.includes(kind) && (

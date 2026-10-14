@@ -3,6 +3,10 @@
 // speech recognition, which stopped on the iPhone when the screen locked (J2-5); while it records,
 // the screen is kept on where the browser allows it. Typing always works; the microphone is an
 // extra, never the only way.
+//
+// J2-27 (the user, after the phone test, 2026-10-13): while it records, a row of bars moves with
+// the voice, like the messaging apps (`AudioBars.tsx`). The level comes from the same microphone,
+// through Web Audio (`VoiceLevel`); without it there are no bars and the recording is the same.
 
 /** Two minutes at most: then it stops by itself and hands over what it recorded. */
 export const DICTATION_LIMIT_MS = 2 * 60 * 1000;
@@ -21,6 +25,84 @@ interface ScreenLock {
 
 interface WithWakeLock {
   wakeLock?: { request(type: 'screen'): Promise<ScreenLock> };
+}
+
+type AudioContextClass = new () => AudioContext;
+
+/** The browser's Web Audio, also the old Safari name; undefined where there is none. */
+function audioContextClass(): AudioContextClass | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const w = window as unknown as { AudioContext?: AudioContextClass; webkitAudioContext?: AudioContextClass };
+  return w.AudioContext ?? w.webkitAudioContext;
+}
+
+/** How loud the voice is now, from the microphone's own stream (J2-27): an analyser over the
+ * stream, read when asked. It must be made in the tap itself: Safari on the iPhone lets Web Audio
+ * run only from a tap, so it is made, and resumed, before waiting for the microphone. Anything
+ * that fails leaves it without a level (no bars), never without the recording. */
+export class VoiceLevel {
+  private context: AudioContext | null = null;
+  private source: MediaStreamAudioSourceNode | null = null;
+  private analyser: AnalyserNode | null = null;
+  private samples: Uint8Array<ArrayBuffer> | null = null;
+
+  constructor() {
+    const Context = audioContextClass();
+    if (!Context) return;
+    try {
+      this.context = new Context();
+      void Promise.resolve(this.context.resume?.()).catch(() => {});
+    } catch {
+      this.context = null;
+    }
+  }
+
+  /** Listens to the stream; without Web Audio, or if it fails, there is no level. */
+  attach(stream: MediaStream): void {
+    if (!this.context) return;
+    try {
+      this.source = this.context.createMediaStreamSource(stream);
+      this.analyser = this.context.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.source.connect(this.analyser);
+      this.samples = new Uint8Array(this.analyser.fftSize);
+    } catch {
+      this.close();
+    }
+  }
+
+  /** Whether there is a level to read. */
+  get available(): boolean {
+    return this.analyser !== null;
+  }
+
+  /** The voice now, from 0 (silence) to 1, or null without a level. */
+  read(): number | null {
+    if (!this.analyser || !this.samples) return null;
+    this.analyser.getByteTimeDomainData(this.samples);
+    let sum = 0;
+    for (const sample of this.samples) {
+      const centered = (sample - 128) / 128;
+      sum += centered * centered;
+    }
+    // A voice is far from the full scale: three times its loudness fills the bar.
+    return Math.min(1, Math.sqrt(sum / this.samples.length) * 3);
+  }
+
+  /** Lets the microphone's stream go and closes Web Audio. */
+  close(): void {
+    try {
+      this.source?.disconnect();
+    } catch {
+      // Already gone.
+    }
+    const context = this.context;
+    this.context = null;
+    this.source = null;
+    this.analyser = null;
+    this.samples = null;
+    if (context) void Promise.resolve(context.close?.()).catch(() => {});
+  }
 }
 
 /** Whether this browser can record: a microphone to ask for and a recorder. */
@@ -67,17 +149,32 @@ export class Dictation {
   private limit: ReturnType<typeof setTimeout> | null = null;
   private ticker: ReturnType<typeof setInterval> | null = null;
   private discard = false;
+  private voice: VoiceLevel | null = null;
 
   constructor(private readonly on: DictationHandlers) {}
+
+  /** Whether the voice's level can be read while it records (J2-27). */
+  hasLevel(): boolean {
+    return this.voice?.available ?? false;
+  }
+
+  /** The voice now, from 0 to 1, or null when there is no level or it is not recording. */
+  level(): number | null {
+    return this.state === 'recording' ? (this.voice?.read() ?? null) : null;
+  }
 
   async start(): Promise<void> {
     if (this.state !== 'idle') return;
     this.state = 'starting';
+    // Before anything is awaited: still inside the tap (Safari on the iPhone, J2-27).
+    this.voice = new VoiceLevel();
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (error) {
       this.state = 'done';
+      this.voice?.close();
+      this.voice = null;
       if (!this.discard) this.on.onProblem(denied(error) ? MIC_DENIED : MIC_FAILED);
       return;
     }
@@ -98,6 +195,7 @@ export class Dictation {
       this.recorder = recorder;
       // A piece every second, so what was said is kept even if the recorder ends on its own.
       recorder.start(1000);
+      this.voice?.attach(stream);
     } catch {
       this.fail();
       return;
@@ -154,6 +252,8 @@ export class Dictation {
     this.clearTimers();
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.releaseScreen();
+    this.voice?.close();
+    this.voice = null;
     for (const track of this.stream?.getTracks() ?? []) track.stop();
     this.stream = null;
     const recorder = this.recorder;
