@@ -1189,7 +1189,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
          aparece si no tiene a nadie a cargo.
       6. El título y el nombre de la persona en la misma línea. "N activas" pasa al bloque de contadores, donde sirve.
          Todo entra en una pantalla: sólo se desplazan las tarjetas de tareas.
-      7. Se suma el contador "Por empezar".
+      7. Los contadores quedan Vencidas · Sin empezar · En curso · Trabadas · Entregadas, sin "Activas" ni total. Una
+         vencida también cuenta en su estado. El nombre de la persona nunca se corta: si no entra, sigue en una segunda
+         línea alineada a la derecha, sin mover el título.
       En Telegram de escritorio el mensaje dice "Abrí Leda en el navegador".
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
