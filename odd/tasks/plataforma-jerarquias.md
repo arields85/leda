@@ -1133,6 +1133,10 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         el token del bot. Es una enmienda a la decisión 4 del ADR 0022, y primero va su diseño escrito.
       - **Por Telegram:** se resuelve lo de ofrecer abrirla ante "quiero crear una tarea" (ROADMAP).
       Las decisiones se le traen al usuario antes de escribir código.
+      **En la prueba de la MA, recordarle al usuario que mire también la J3-6 y la J3-7** (2026-10-14: "lo miro junto
+      con la prueba de la mini app, recordámelo"): el botón de borrar, "confirmar" apagado, las pestañas "Tarea" y
+      "Objetivo", los nombres objetivo general, etapa y objetivo de área, y "Es parte de". Con su visto bueno se
+      cierra la J3. Va como pasos del guion de la MA.
       **Decisiones del usuario (2026-10-14):**
       - **MA1. En el celular, sólo la Mini App: los enlaces desaparecen.** Hay que revisar cada lugar donde Leda
         ofrece o manda un enlace (el pedido de acceso, el ofrecimiento de una sola vez, la bienvenida, los avisos
