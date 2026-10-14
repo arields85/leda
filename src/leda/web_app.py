@@ -808,9 +808,10 @@ _CAMPOS_TEXTO = {"titulo": "titulo", "descripcion": "descripcion", "criterio": "
 _FEMENINOS = {"descripcion", "fecha", "evidencia", "clave", "espera"}
 
 
-def _con_texto(fila: dict[str, Any]) -> dict[str, str]:
+def _con_texto(fila: dict[str, Any],
+               textos: dict[tuple[str, str], str] = TEXTOS_DE_LA_CARGA) -> dict[str, str]:
     campo, motivo = str(fila.get("campo", "")), str(fila.get("motivo", ""))
-    texto = TEXTOS_DE_LA_CARGA.get((campo, motivo))
+    texto = textos.get((campo, motivo))
     if texto is None:
         texto = (TEXTO_DE_UN_DATO_MAL_FORMADO if motivo.startswith("mal_formad")
                  else TEXTOS_DE_LA_CARGA.get(("clave", "falta")))
@@ -914,19 +915,23 @@ def opciones_de_la_carga(espacio_id: str, request: Request):
     return _con_la_base(leer)
 
 
-async def _el_pedido_de_la_carga(request: Request):
-    """Los controles de la carga (otro sitio, JSON, la sesión de administración, el tamaño) y sus
-    datos: el token, los datos y los mal formados, o la respuesta que corta."""
+async def _el_pedido_que_escribe(request: Request, token_de: Callable[[Request], str | None],
+                                 sin_sesion: Callable[[], Response],
+                                 tope: int = TAMANO_MAXIMO_DE_LA_CARGA):
+    """Los controles de un pedido de la web que escribe, de cualquiera de las dos puertas: otro
+    sitio (403), JSON (415), la cookie de esa puerta (401, con `token_de` y `sin_sesion`) y el
+    tamaño (413). Devuelve el token y el cuerpo leído (`None` si no se pudo leer: un pedido mal
+    formado más), o la respuesta que corta. La sesión misma la revalida la base en cada llamada."""
     if _de_otro_sitio(request):
         return _json({"error": "origen_no_verificado"}, 403)
     tipo = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if tipo != "application/json":
         return _json({"error": "se_espera_json"}, 415)
-    token = _token_de_administracion(request)
+    token = token_de(request)
     if token is None:
-        return _sin_sesion_de_administracion()
+        return sin_sesion()
     crudo = await request.body()
-    if len(crudo) > TAMANO_MAXIMO_DE_LA_CARGA:
+    if len(crudo) > tope:
         return _json({"error": "demasiado_grande"}, 413)
     try:
         cuerpo = json.loads(crudo or b"null")
@@ -934,6 +939,28 @@ async def _el_pedido_de_la_carga(request: Request):
         # Un cuerpo anidado hasta el fondo no tira `ValueError` sino `RecursionError`: es un
         # pedido mal formado más, nunca un 500 (revisión RDD `review-40c4b218bf40f1fa`).
         cuerpo = None
+    return token, cuerpo
+
+
+async def _el_pedido_de_la_administracion(request: Request):
+    """Los controles de un pedido que escribe por la puerta de administración."""
+    return await _el_pedido_que_escribe(request, _token_de_administracion,
+                                        _sin_sesion_de_administracion)
+
+
+async def _el_pedido_del_equipo(request: Request):
+    """Los controles de un pedido que escribe por la puerta del equipo (J3-2: la primera ruta del
+    equipo que escribe; la reusa la carga del equipo, J4)."""
+    return await _el_pedido_que_escribe(request, _token_de_la_cookie, _sin_sesion)
+
+
+async def _el_pedido_de_la_carga(request: Request):
+    """Los controles de la carga (otro sitio, JSON, la sesión de administración, el tamaño) y sus
+    datos: el token, los datos y los mal formados, o la respuesta que corta."""
+    pedido = await _el_pedido_de_la_administracion(request)
+    if isinstance(pedido, Response):
+        return pedido
+    token, cuerpo = pedido
     datos, mal_formados = leer_la_carga(cuerpo)
     return token, datos, mal_formados
 
@@ -1352,6 +1379,198 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
         elif getattr(juicio, "falla", None) is not None:
             _sin_propuesta(conn, espacio, sesion, juicio.falla)
     return _json({"errores": con_texto}, 422)
+
+
+# --- Los objetivos desde la web ---------------------------------------------------------------
+#
+# Porción J3, tarea J3-2 (ADR 0023, decisiones 1 y 5 y punto 11; migración 0068). Dos puertas: la
+# de administración, en cualquier espacio, y la del equipo, sólo para Dirección (el integrante cuyo
+# rol tiene la autoridad final), en el suyo. Lo decide la base (`crear_objetivo_web`,
+# `opciones_del_objetivo`): la sesión de la puerta en cada llamada, el espacio fijado por ella, la
+# clave de un solo uso y lo que no se crea, todo junto. Acá, como en la carga, sólo se revisa la
+# forma de lo que llegó y se pone en palabras. Aunque la web le esconda el botón a quien no es
+# Dirección, la base igual lo rechaza (403).
+
+PUERTA_DE_ADMINISTRACION = "administracion"
+PUERTA_DEL_EQUIPO = "equipo"
+
+TEXTOS_DEL_OBJETIVO = {
+    ("titulo", "falta"): "Falta el nombre del objetivo.",
+    ("titulo", "demasiado_largo"): "El nombre es demasiado largo: hasta 200 caracteres.",
+    ("descripcion", "demasiado_largo"):
+        "La descripción es demasiado larga: hasta 800 caracteres.",
+    ("padre", "no_existe"): "Ese objetivo no está en este espacio.",
+    ("padre", "no_esta_abierto"): "Ese objetivo ya no está abierto.",
+    ("padre", "es_operativo"):
+        "De un objetivo operativo no cuelga otro objetivo: debajo van sus tareas.",
+    ("tipo", "falta"): "Elegí el tipo de objetivo.",
+    ("tipo", "no_existe"): "Ese tipo de objetivo no existe.",
+    ("tipo", "no_corresponde"):
+        "Ese tipo no va ahí: sin un objetivo arriba es estratégico; debajo de un estratégico, hito "
+        "u operativo; debajo de un hito, operativo.",
+    ("referente", "falta"): "Elegí quién es el referente.",
+    ("referente", "no_es_integrante_activo"):
+        "Esa persona no es integrante activo de este espacio.",
+    ("clave", "falta"): TEXTOS_DE_LA_CARGA[("clave", "falta")],
+    ("clave", "usada_con_otros_datos"):
+        "Este envío ya creó otro objetivo. Recargá la página para crear uno nuevo.",
+}
+TEXTO_SIN_AUTORIDAD = "Crear objetivos le corresponde a Dirección."
+
+# Cómo se llama cada dato en el cuerpo del pedido, y el `campo` con que lo nombra la base.
+_CAMPOS_ID_DEL_OBJETIVO = {"padre": "padre_id", "referente": "referente_id"}
+_CAMPOS_TEXTO_DEL_OBJETIVO = {"titulo": "titulo", "descripcion": "descripcion", "tipo": "tipo",
+                              "clave": "clave"}
+
+
+def leer_el_objetivo(cuerpo: Any) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Los datos de un objetivo como los recibe `crear_objetivo_web`, y los que llegaron con una
+    forma que no sirve (`mal_formado`). Lo que falta lo dice la base, todo junto."""
+    cuerpo = cuerpo if isinstance(cuerpo, dict) else {}
+    datos: dict[str, Any] = {}
+    errores: list[dict[str, str]] = []
+    for campo, clave in _CAMPOS_ID_DEL_OBJETIVO.items():
+        valor = cuerpo.get(clave)
+        datos[campo] = None
+        if valor in (None, ""):
+            continue
+        try:
+            datos[campo] = str(uuid.UUID(valor)) if isinstance(valor, str) else None
+        except ValueError:
+            pass
+        if datos[campo] is None:
+            errores.append(_mal_formado(campo))
+    for campo, clave in _CAMPOS_TEXTO_DEL_OBJETIVO.items():
+        valor = cuerpo.get(clave)
+        datos[campo] = valor if isinstance(valor, str) else None
+        if valor is not None and not isinstance(valor, str):
+            errores.append(_mal_formado(campo))
+    return datos, errores
+
+
+def _sin_lo_que_rechaza_la_base_del_objetivo(resultado: dict[str, Any], puerta: str
+                                              ) -> Response | None:
+    """Sin sesión (401, se corta la cookie de esa puerta), sin autoridad (403: no es Dirección) o
+    sin espacio (404): la base lo dice así."""
+    errores = {(e.get("campo"), e.get("motivo")) for e in resultado.get("errores") or []}
+    if ("sesion", "sin_autoridad") in errores:
+        return _json({"error": "sin_autoridad", "texto": TEXTO_SIN_AUTORIDAD}, 403)
+    if any(campo == "sesion" for campo, _ in errores):
+        return (_sin_sesion() if puerta == PUERTA_DEL_EQUIPO
+                else _sin_sesion_de_administracion())
+    if any(campo == "espacio" for campo, _ in errores):
+        return _espacio_que_no_existe()
+    return None
+
+
+def _opciones_del_objetivo(conn, puerta: str, token: str, espacio: str | None) -> Response:
+    with sin_espacio(conn) as cur:
+        _con_la_version_del_nucleo(cur)
+        cur.execute("select opciones_del_objetivo(%s, %s, %s) as r",
+                    (puerta, _hash(token), espacio))
+        resultado = cur.fetchone()["r"]
+    rechazo = _sin_lo_que_rechaza_la_base_del_objetivo(resultado, puerta)
+    if rechazo is not None:
+        return rechazo
+    return _json({k: v for k, v in resultado.items() if k != "ok"})
+
+
+def _crear_el_objetivo(conn, puerta: str, token: str, espacio: str | None,
+                       datos: dict[str, Any], mal_formados: list[dict[str, str]]) -> Response:
+    """La creación: 201 con el id; la misma clave con los mismos datos, 200 con el mismo objetivo;
+    lo que no se crea, 422 con todo lo que hay que corregir. Con un dato mal formado no se crea
+    nada: la base igual dice todo lo demás, y sin la clave nunca escribe."""
+    clave = None if mal_formados else datos["clave"]
+    with sin_espacio(conn) as cur:
+        _con_la_version_del_nucleo(cur)
+        cur.execute(
+            """select crear_objetivo_web(%s, %s, %s, %s, %s, %s, %s, %s, %s) as r""",
+            (puerta, _hash(token), espacio, datos["titulo"], datos["descripcion"],
+             datos["padre"], datos["tipo"], datos["referente"], clave))
+        resultado = cur.fetchone()["r"]
+    rechazo = _sin_lo_que_rechaza_la_base_del_objetivo(resultado, puerta)
+    if rechazo is not None:
+        return rechazo
+    if resultado.get("ok") and not mal_formados:
+        return _json({"objective_id": str(resultado["objective_id"]),
+                      "repetida": bool(resultado.get("repetida"))},
+                     200 if resultado.get("repetida") else 201)
+    ya_dichos = {e["campo"] for e in mal_formados}
+    errores = list(mal_formados)
+    for error in resultado.get("errores") or []:
+        if error.get("campo") in ya_dichos:
+            continue
+        if (mal_formados and (error.get("campo"), error.get("motivo")) == ("clave", "falta")
+                and datos["clave"] is not None):
+            continue
+        errores.append(error)
+    return _json({"errores": [_con_texto(e, TEXTOS_DEL_OBJETIVO) for e in errores]}, 422)
+
+
+@router.get("/admin/api/espacios/{espacio_id}/objetivos/opciones")
+def opciones_del_objetivo_en_la_administracion(espacio_id: str, request: Request):
+    """Lo que el formulario necesita para crear un objetivo en un espacio: de qué objetivos puede
+    colgar (con los tipos que admite cada uno), los integrantes activos para el referente y los
+    nombres de los niveles del pack."""
+    token = _token_de_administracion(request)
+    if token is None:
+        return _sin_sesion_de_administracion()
+    espacio = _espacio_de(espacio_id)
+
+    def leer(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            if _sesion_de_administracion(cur, token) is None:
+                return _sin_sesion_de_administracion()
+        if espacio is None:
+            return _espacio_que_no_existe()
+        return _opciones_del_objetivo(conn, PUERTA_DE_ADMINISTRACION, token, espacio)
+
+    return _con_la_base(leer)
+
+
+@router.post("/admin/api/espacios/{espacio_id}/objetivos")
+async def crear_un_objetivo_en_la_administracion(espacio_id: str, request: Request):
+    """Crea un objetivo en un espacio, por la puerta de administración (ADR 0023, decisión 5)."""
+    pedido = await _el_pedido_de_la_administracion(request)
+    if isinstance(pedido, Response):
+        return pedido
+    token, cuerpo = pedido
+    datos, mal_formados = leer_el_objetivo(cuerpo)
+    espacio = _espacio_de(espacio_id)
+
+    def crear(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            if _sesion_de_administracion(cur, token) is None:
+                return _sin_sesion_de_administracion()
+        if espacio is None:
+            return _espacio_que_no_existe()
+        return _crear_el_objetivo(conn, PUERTA_DE_ADMINISTRACION, token, espacio, datos,
+                                  mal_formados)
+
+    return await run_in_threadpool(_con_la_base, crear)
+
+
+@router.get("/api/objetivos/opciones")
+def opciones_del_objetivo_en_el_equipo(request: Request):
+    """Lo mismo, por la puerta del equipo y sólo para Dirección, en su espacio (403 a los demás)."""
+    token = _token_de_la_cookie(request)
+    if token is None:
+        return _sin_sesion()
+    return _con_la_base(
+        lambda conn: _opciones_del_objetivo(conn, PUERTA_DEL_EQUIPO, token, None))
+
+
+@router.post("/api/objetivos")
+async def crear_un_objetivo_en_el_equipo(request: Request):
+    """Crea un objetivo del equipo de la sesión, sólo si es Dirección (ADR 0023, decisión 1): el
+    espacio sale de la sesión, nunca del pedido."""
+    pedido = await _el_pedido_del_equipo(request)
+    if isinstance(pedido, Response):
+        return pedido
+    token, cuerpo = pedido
+    datos, mal_formados = leer_el_objetivo(cuerpo)
+    return await run_in_threadpool(_con_la_base, lambda conn: _crear_el_objetivo(
+        conn, PUERTA_DEL_EQUIPO, token, None, datos, mal_formados))
 
 
 # --- La ayuda de la IA al cargar --------------------------------------------------------------

@@ -1,6 +1,6 @@
 """La creación de un objetivo desde la web (ADR 0023, decisiones 1 y 5 y punto 11; porción J3 de
 `odd/tasks/plataforma-jerarquias.md`, tarea J3-2; migración 0068): la capa de garantías, en la
-base (la entrada HTTP, en la tarea siguiente).
+base y en la entrada HTTP.
 
 - **Quién crea:** el administrador de plataforma, por su puerta, en cualquier espacio; Dirección
   (el integrante cuyo rol tiene la autoridad final), por la puerta del equipo, sólo en su espacio.
@@ -29,13 +29,16 @@ import psycopg
 import pytest
 
 from leda.db import admin, espacio
-from tests.garantias.test_carga_de_tareas import (  # noqa: F401 -- `administradora` y
-    _entrar,                                       # `sesion` son las fixtures
+from tests.garantias.test_carga_de_tareas import (  # noqa: F401 -- `administradora`, `sesion`
+    _entrar,                                       # y `web` son las fixtures
     _hash,
+    _navegador_de_administracion,
+    _navegador_del_equipo,
     _revocar,
     administradora,
     sesion,
     sin_espacio,
+    web,
 )
 
 FUNCIONES_DE_LA_WEB = ("crear_objetivo_web", "opciones_del_objetivo")
@@ -598,3 +601,128 @@ def test_el_rollback_de_la_0068_se_niega_si_hay_objetivos_creados(conn, intake_w
     conn.commit()
     assert _contar(conn, "creacion_de_objetivo") == 1
 
+
+# --- La entrada HTTP ------------------------------------------------------------------------
+
+def _cuerpo(mundo: dict, **cambios) -> dict:
+    cuerpo = {
+        "titulo": "Poner el módem colgando en la pared",
+        "tipo": "estrategico",
+        "referente_id": _persona(mundo, "Sam North"),
+        "clave": secrets.token_urlsafe(18),
+    }
+    cuerpo.update(cambios)
+    return cuerpo
+
+
+def test_la_puerta_de_administracion_ofrece_y_crea(web, conn, intake_world, administradora):
+    norte = _norte(intake_world)
+    base = f"/app/admin/api/espacios/{norte['id']}/objetivos"
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = navegador.get(f"{base}/opciones")
+    assert r.status_code == 200, r.text
+    assert r.headers["cache-control"] == "no-store"
+    assert "ok" not in r.json() and r.json()["sin_padre"] == ["estrategico"]
+    cuerpo = _cuerpo(intake_world)
+    r = navegador.post(base, json=cuerpo)
+    assert r.status_code == 201, r.text
+    assert r.headers["cache-control"] == "no-store"
+    objetivo = r.json()["objective_id"]
+    otra = navegador.post(base, json=cuerpo)
+    assert otra.status_code == 200 and otra.json()["objective_id"] == objetivo
+    assert otra.json()["repetida"] is True
+    assert _creados(conn) == 1
+    assert navegador.get("/app/admin/api/espacios/no-es-un-id/objetivos/opciones"
+                         ).status_code == 404
+    assert navegador.post("/app/admin/api/espacios/00000000-0000-0000-0000-000000000000/"
+                          "objetivos", json=_cuerpo(intake_world)).status_code == 404
+
+
+def test_la_api_devuelve_todo_lo_que_falta_en_palabras(web, conn, intake_world,
+                                                         administradora):
+    norte = _norte(intake_world)
+    base = f"/app/admin/api/espacios/{norte['id']}/objetivos"
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = navegador.post(base, json=_cuerpo(intake_world, titulo="", tipo=7,
+                                          referente_id="no-es-un-id",
+                                          padre_id=norte["objectives"][0]))
+    assert r.status_code == 422, r.text
+    errores = {(e["campo"], e["motivo"]) for e in r.json()["errores"]}
+    assert errores == {("titulo", "falta"), ("tipo", "mal_formado"),
+                       ("referente", "mal_formado"), ("padre", "es_operativo")}
+    for error in r.json()["errores"]:
+        assert error["texto"]
+        for de_la_cocina in ("traceback", "psycopg", "crear_objetivo", "sql"):
+            assert de_la_cocina not in error["texto"].lower()
+    _nada_creado(conn)
+
+
+def test_la_puerta_de_administracion_se_protege(web, conn, intake_world, administradora):
+    norte = _norte(intake_world)
+    base = f"/app/admin/api/espacios/{norte['id']}/objetivos"
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    for origen in ("https://otro.example", "null"):
+        assert navegador.post(base, json=_cuerpo(intake_world),
+                              headers={"origin": origen}).status_code == 403
+    assert navegador.post(base, content="titulo=x", headers={
+        "content-type": "application/x-www-form-urlencoded"}).status_code == 415
+    assert navegador.post(base, content=b"{" + b" " * (64 * 1024) + b"}", headers={
+        "content-type": "application/json"}).status_code == 413
+    assert web().post(base, json=_cuerpo(intake_world)).status_code == 401
+    assert web().get(f"{base}/opciones").status_code == 401
+    equipo = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    assert equipo.post(base, json=_cuerpo(intake_world)).status_code == 401
+    assert equipo.get(f"{base}/opciones").status_code == 401
+    impostor = web()
+    impostor.cookies.set("leda_admin", equipo.cookies.get("leda_sesion"), domain="testserver",
+                         path="/app/admin")
+    assert impostor.post(base, json=_cuerpo(intake_world)).status_code == 401
+    _revocar(conn, administradora)
+    assert navegador.post(base, json=_cuerpo(intake_world)).status_code == 401
+    _nada_creado(conn)
+
+
+def test_la_puerta_del_equipo_crea_solo_para_direccion(web, conn, intake_world):
+    base = "/app/api/objetivos"
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    r = direccion.get(f"{base}/opciones")
+    assert r.status_code == 200, r.text
+    assert r.headers["cache-control"] == "no-store"
+    assert "ok" not in r.json() and r.json()["sin_padre"] == ["estrategico"]
+    cuerpo = _cuerpo(intake_world)
+    r = direccion.post(base, json=cuerpo)
+    assert r.status_code == 201, r.text
+    assert direccion.post(base, json=cuerpo).status_code == 200
+    assert _creados(conn) == 1
+    detalle = _fila(conn, "select detalle from audit_log where accion = 'crear_objetivo'"
+                    )["detalle"]
+    assert detalle["puerta"] == "equipo"
+    for nombre in ("Sam North", "Taylor Quinn"):
+        otro = _navegador_del_equipo(web, conn, intake_world, nombre)
+        r = otro.post(base, json=_cuerpo(intake_world))
+        assert r.status_code == 403, (nombre, r.text)
+        assert r.json()["error"] == "sin_autoridad"
+        assert otro.get(f"{base}/opciones").status_code == 403
+    assert _creados(conn) == 1
+
+
+def test_la_puerta_del_equipo_se_protege(web, conn, intake_world, administradora):
+    base = "/app/api/objetivos"
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    for origen in ("https://otro.example", "null"):
+        assert direccion.post(base, json=_cuerpo(intake_world),
+                              headers={"origin": origen}).status_code == 403
+    assert direccion.post(base, content="titulo=x", headers={
+        "content-type": "application/x-www-form-urlencoded"}).status_code == 415
+    assert direccion.post(base, content=b"{" + b" " * (64 * 1024) + b"}", headers={
+        "content-type": "application/json"}).status_code == 413
+    assert web().post(base, json=_cuerpo(intake_world)).status_code == 401
+    assert web().get(f"{base}/opciones").status_code == 401
+    # La cookie de administración no abre la puerta del equipo, ni puesta como la del equipo.
+    administracion = _navegador_de_administracion(web, conn, administradora)
+    assert administracion.post(base, json=_cuerpo(intake_world)).status_code == 401
+    impostor = web()
+    impostor.cookies.set("leda_sesion", administracion.cookies.get("leda_admin"),
+                         domain="testserver", path="/app")
+    assert impostor.post(base, json=_cuerpo(intake_world)).status_code == 401
+    _nada_creado(conn)
