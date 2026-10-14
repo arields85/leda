@@ -606,6 +606,10 @@ aprobación en el flujo nuevo (`odd/tasks/circuitos-al-flujo-nuevo.md`, rama de 
 (ADR 0017, decisión 5); de qué depende con el motor de conversación se fija al ordenar "Anotado
 para más adelante" (`PENDIENTE`).
 
+**Nota (2026-10-13):** el dictado de la carga en la web (J2b, `odd/tasks/plataforma-jerarquias.md`) se hace
+directamente con Gemini, como en `docs/research/gemini-voz-del-otro-proyecto.md` (decisión del usuario). La
+comparación con GPT-4o Transcribe por OpenRouter queda anotada acá para más adelante.
+
 ## Horizonte posterior
 
 No se abordan hasta que las unidades anteriores estén cerradas, y cada uno requiere
