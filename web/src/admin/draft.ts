@@ -2,9 +2,12 @@ import type { Task } from '../api';
 import { shortDate } from '../format';
 import type { Member, Objective, Options, Policy, Problem, Proposal, TaskInput, TextField, WaitableTask } from './api';
 
-/** What the administrator is writing, before the idempotency key is added. `espera_id` is ''
- * while it waits for no task. */
-export type Draft = Omit<TaskInput, 'clave' | 'espera_id'> & { espera_id: string };
+/** What the person is writing, before the idempotency key is added. `espera_id` is '' while it
+ * waits for no task; `revisa_id`, '' for the reviewer that corresponds (J4, D3). */
+export type Draft = Omit<TaskInput, 'clave' | 'espera_id' | 'revisa_id'> & {
+  espera_id: string;
+  revisa_id: string;
+};
 
 export type Field = keyof Draft;
 
@@ -18,6 +21,7 @@ export const EMPTY_DRAFT: Draft = {
   evidencia: [],
   decidio_id: '',
   espera_id: '',
+  revisa_id: '',
 };
 
 /** The free-text fields, in the order of the form: the ones whose spelling Leda checks (J2-17). */
@@ -43,6 +47,7 @@ export const PROBLEM_FIELD: Record<string, Field> = {
   evidencia: 'evidencia',
   decidio: 'decidio_id',
   espera: 'espera_id',
+  revisa: 'revisa_id',
 };
 
 /** The fields in the order the form shows them: the first one with a problem gets the focus. */
@@ -55,6 +60,7 @@ export const FIELD_ORDER: Field[] = [
   'espera_id',
   'criterio',
   'evidencia',
+  'revisa_id',
   'decidio_id',
 ];
 
@@ -69,6 +75,7 @@ export const FIELD_NAME: Record<Field, string> = {
   criterio: 'criterio de aceptación',
   evidencia: 'evidencia',
   decidio_id: 'quién la decidió',
+  revisa_id: 'quién la revisa',
 };
 
 /** The element of each field in the form (a control, the calendar or the evidence group). */
@@ -82,6 +89,7 @@ export const FIELD_ID: Record<Field, string> = {
   criterio: 'f-criterio',
   evidencia: 'f-evidencia',
   decidio_id: 'f-decidio',
+  revisa_id: 'f-revisa',
 };
 
 // The server's own words for what the form can tell before sending (src/leda/web_app.py,
@@ -150,8 +158,44 @@ export function checkDraft(draft: Draft, options: Options): Problem[] {
   else if (length(draft.criterio) > LIMITS.criterio) tooLong('criterio');
   const policy = policyOf(options, memberOf(options, draft.responsable_id));
   if (policy && policy.evidencia_requerida.length > 0 && draft.evidencia.length === 0) missing('evidencia');
-  if (!draft.decidio_id) missing('decidio');
+  // Through the team's door (J4) nobody declares who decided it: the person who loads it did.
+  if (!draft.decidio_id && !teamDoor(options)) missing('decidio');
   return problems;
+}
+
+/** Whether these are the team's door options (J4): only they say who loads (`yo`). */
+export function teamDoor(options: Options): boolean {
+  return options.yo !== undefined;
+}
+
+/** Who reviews the task (J4; migration 0071): the one chosen (D3) or, without a choice, the one
+ * that corresponds to whoever does it. */
+export function reviewerName(draft: Draft, options: Options): string | null {
+  if (draft.revisa_id) {
+    return options.revisores?.find((r) => r.membership_id === draft.revisa_id)?.nombre ?? null;
+  }
+  return memberOf(options, draft.responsable_id)?.revisa?.nombre ?? null;
+}
+
+/** Whether the person who loads chooses who reviews (D3): Dirección through the team's door, and
+ * the administration (like Dirección), when the server offers whom. */
+export function choosesReviewer(options: Options): boolean {
+  if (!options.revisores?.length) return false;
+  return teamDoor(options) ? Boolean(options.yo?.elige_quien_revisa) : true;
+}
+
+/** What a request to another area or to Dirección means (J4, D14 and D1b), in plain words, for
+ * whoever does it; nothing for any other load. */
+export function requestNote(options: Options, member: Member | undefined): string | null {
+  if (!member) return null;
+  if (member.como === 'pedido_a_otra_area') {
+    return `Es un pedido a ${member.area}: ${member.nombre} decide quién la hace y la revisa.`;
+  }
+  if (member.como === 'pedido_a_direccion') {
+    const asker = options.yo?.nombre;
+    return `Es un pedido a Dirección: la da por cumplida ${asker ? `quien la pide, ${asker}` : 'quien la pide'}.`;
+  }
+  return null;
 }
 
 /** The criterion refusals the server decides before loading (J2-9, J2-13 and J2-14): it never
@@ -176,8 +220,8 @@ export function proposedCriterion(problems: Problem[]): string | undefined {
 /** What the form sends: the draft and its key, without `espera_id` when it waits for none, so a
  * load without a wait is the same request as before migration 0067. */
 export function toInput(draft: Draft, clave: string): TaskInput {
-  const { espera_id, ...rest } = draft;
-  return espera_id ? { ...rest, espera_id, clave } : { ...rest, clave };
+  const { espera_id, revisa_id, ...rest } = draft;
+  return { ...rest, ...(espera_id ? { espera_id } : {}), ...(revisa_id ? { revisa_id } : {}), clave };
 }
 
 /** The tasks a new one may wait for, as the server offers them. */

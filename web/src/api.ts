@@ -18,6 +18,9 @@ export interface Me {
   // Whether this person creates the team's objectives (Dirección, ADR 0023, decision 1): only then
   // the page offers "> nuevo objetivo". The server refuses anyone else anyway.
   crea_objetivos?: boolean;
+  // Whether this person loads tasks (Dirección and the area referentes, ADR 0023, decision 3; J4):
+  // only then the page offers "> nueva tarea". The server refuses anyone else anyway.
+  carga_tareas?: boolean;
 }
 
 export interface Wait {
@@ -66,6 +69,26 @@ export interface Finished {
   terminada_el: string | null;
 }
 
+/** What the person asked from another area or from Dirección (J4, D14 and D1b): open, or finished
+ * in the last 30 days; finished, she may ask for changes ("> pedir cambios"). */
+export interface Requested {
+  id: string;
+  titulo: string;
+  estado: string;
+  responsable: string | null;
+  area: string | null;
+  fecha_objetivo: string | null;
+  terminada_el: string | null;
+  puede_pedir_cambios: boolean;
+}
+
+/** Someone of the referente's own area, to pass a task of the sector to (J4, D14 steps 2 and 3). */
+export interface Teammate {
+  membership_id: string;
+  nombre: string;
+  area: string;
+}
+
 export interface Day {
   fecha: string;
   dia: string;
@@ -84,6 +107,10 @@ export interface ViewData {
   semana: Day[];
   tareas: Task[];
   terminadas: Finished[];
+  // Only in "Tus tareas" (J4): what the person asked from another area or from Dirección.
+  pedidas?: Requested[];
+  // Only in "Tu sector" (J4): to whom the referente may pass a task of the sector.
+  pasar_a?: Teammate[];
 }
 
 /** The session is gone (cut, expired cookie, or the person left the team). */
@@ -123,6 +150,54 @@ export function fetchMe(signal?: AbortSignal): Promise<Me> {
 
 export function fetchView(view: ViewId, signal?: AbortSignal): Promise<ViewData> {
   return getJson<ViewData>(`/app/api/tareas?vista=${encodeURIComponent(view)}`, signal);
+}
+
+/** One problem the server found with a pass or a reopening, in plain words. */
+export interface ActionProblem {
+  campo: string;
+  motivo: string;
+  texto: string;
+}
+
+export type ActionResult = { kind: 'done' } | { kind: 'rejected'; errors: ActionProblem[] };
+
+async function postJson(url: string, body: unknown): Promise<ActionResult> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new RequestError(0);
+  }
+  if (response.status === 401) throw new SessionClosedError();
+  if (response.ok) return { kind: 'done' };
+  if (response.status === 422 || response.status === 403) {
+    try {
+      const data = (await response.json()) as { errores?: ActionProblem[]; error?: string; texto?: string };
+      if (Array.isArray(data.errores) && data.errores.length > 0) return { kind: 'rejected', errors: data.errores };
+      if (typeof data.texto === 'string') {
+        return { kind: 'rejected', errors: [{ campo: 'sesion', motivo: data.error ?? 'sin_autoridad', texto: data.texto }] };
+      }
+    } catch {
+      // Below: a failure without its reasons is never shown as silence.
+    }
+  }
+  throw new RequestError(response.status);
+}
+
+/** The referente passes a task of the sector to someone of the area (J4): it waits until that
+ * person takes it by chat. */
+export function passTask(taskId: string, to: string): Promise<ActionResult> {
+  return postJson(`/app/api/tareas/${encodeURIComponent(taskId)}/pase`, { a_membership_id: to });
+}
+
+/** Whoever asked for a finished task reopens it, with what has to change (J4, D14 step 5). */
+export function reopenTask(taskId: string, reason: string): Promise<ActionResult> {
+  return postJson(`/app/api/tareas/${encodeURIComponent(taskId)}/reabrir`, { motivo: reason });
 }
 
 /** Closes this session on the server; the server also clears the cookie. */

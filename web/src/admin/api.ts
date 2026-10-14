@@ -29,7 +29,28 @@ export interface Member {
   autoridad_final: boolean;
   conectado: boolean;
   // Who would review this person's work; null when nobody active does (the server rejects it).
+  // Through the team's door (J4), who would review a task this person loads for this member.
   revisa: { membership_id: string; nombre: string } | null;
+  // Through the team's door (J4; migration 0071, `como_carga`): how the person who loads loads for
+  // this member. `pedido_a_otra_area` and `pedido_a_direccion` are requests: the other area's
+  // referente decides who does it (D14), and Dirección's is given as done by who asked (D1b).
+  como?: 'propia' | 'direccion' | 'su_area' | 'pedido_a_otra_area' | 'pedido_a_direccion';
+}
+
+/** An area with its active referente (migration 0071): who decides there (D10) and to whom what
+ * belongs to that area is asked (D14). */
+export interface Area {
+  id: string;
+  nombre: string;
+  referente: { membership_id: string; nombre: string } | null;
+}
+
+/** Who may be chosen to review a task (D3): Dirección and the active area referentes. */
+export interface Reviewer {
+  membership_id: string;
+  nombre: string;
+  autoridad_final: boolean;
+  areas: string[];
 }
 
 /** A task a new one may wait for (ADR 0023, decision 2; migration 0067): committed and open. */
@@ -63,6 +84,11 @@ export interface Options {
   // without them offers none.
   tareas?: WaitableTask[];
   integrantes: Member[];
+  // Since migration 0071; a reply without them offers no reviewer choice.
+  areas?: Area[];
+  revisores?: Reviewer[];
+  // Only through the team's door (J4): who loads, and whether she chooses who reviews (Dirección).
+  yo?: { membership_id: string; nombre: string; autoridad_final: boolean; elige_quien_revisa: boolean };
   politicas: Policy[];
   calendario: {
     dias: string[];
@@ -95,6 +121,8 @@ export interface TaskInput {
   decidio_id: string;
   // The task this one waits for (always blocking); left out when it waits for none.
   espera_id?: string;
+  // Who reviews it, when chosen (D3; migration 0071); left out for the one that corresponds.
+  revisa_id?: string;
   clave: string;
 }
 
@@ -136,10 +164,22 @@ export function fetchOptions(spaceId: string, signal?: AbortSignal): Promise<Opt
   return getJson<Options>(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/opciones`, signal);
 }
 
+/** The options of the team's door (J4): only Dirección and the area referentes; a 403 throws a
+ * `RequestError(403)`. */
+export function fetchTeamOptions(signal?: AbortSignal): Promise<Options> {
+  return getJson<Options>('/app/api/carga/opciones', signal);
+}
+
 /** Loads a committed task (decision 9). 201 loads it; 200 means this key already loaded it (a
  * retry); 422 lists what to fix. Anything else throws, so the form keeps the data for a retry. */
-export async function loadTask(spaceId: string, input: TaskInput): Promise<LoadResult> {
-  const response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/tareas`, {
+export function loadTask(spaceId: string, input: TaskInput): Promise<LoadResult> {
+  return loadTaskAt(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/tareas`, input);
+}
+
+/** The same load at any door's address (the team's, J4). A 403 (not Dirección nor a referente)
+ * reads as a rejection with the server's words. */
+export async function loadTaskAt(url: string, input: TaskInput): Promise<LoadResult> {
+  const response = await call(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -157,8 +197,22 @@ export async function loadTask(spaceId: string, input: TaskInput): Promise<LoadR
     const body = (await response.json()) as { errores?: Problem[] };
     return { kind: 'rejected', errors: body.errores ?? [] };
   }
+  if (response.status === 403) {
+    let texto = NOT_LOADING;
+    try {
+      const body = (await response.json()) as { texto?: unknown };
+      if (typeof body?.texto === 'string' && body.texto.trim()) texto = body.texto;
+    } catch {
+      // The plain words above.
+    }
+    return { kind: 'rejected', errors: [{ campo: 'sesion', motivo: 'sin_autoridad', texto }] };
+  }
   throw new RequestError(response.status);
 }
+
+/** The server's words when the person may not load tasks (src/leda/web_app.py,
+ * TEXTO_SIN_AUTORIDAD_PARA_CARGAR). */
+export const NOT_LOADING = 'Cargar tareas le corresponde a Dirección y a los referentes de área.';
 
 /** What the load would refuse (J2-21), asked before the spelling so a criterion that is going to be
  * refused is never corrected first: `ok` if it would load, `rejected` with the same problems the
@@ -166,10 +220,14 @@ export async function loadTask(spaceId: string, input: TaskInput): Promise<LoadR
  * closed session throws. Nothing is loaded and the key is never used. */
 export type ReviewResult = { kind: 'ok' } | { kind: 'rejected'; errors: Problem[] } | { kind: 'unknown' };
 
-export async function reviewTask(spaceId: string, input: TaskInput): Promise<ReviewResult> {
+export function reviewTask(spaceId: string, input: TaskInput): Promise<ReviewResult> {
+  return reviewTaskAt(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/tareas/revisar`, input);
+}
+
+export async function reviewTaskAt(url: string, input: TaskInput): Promise<ReviewResult> {
   let response: Response;
   try {
-    response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/tareas/revisar`, {
+    response = await call(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -380,6 +438,39 @@ export async function transcribeAt(url: string, audio: Blob, of?: 'objetivo'): P
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** A door's task load (J4): loading, what it would refuse, Leda's help, the spelling and the
+ * dictation, each at that door's own address. The form takes one, so it serves both doors. */
+export interface TaskApi {
+  load(input: TaskInput): Promise<LoadResult>;
+  review(input: TaskInput): Promise<ReviewResult>;
+  help(input: HelpInput): Promise<HelpResult>;
+  spell(texts: Partial<Record<TextField, string>>): Promise<Spelling>;
+  transcribe(audio: Blob): Promise<DictationResult>;
+}
+
+/** The administration's door, in one space. */
+export function adminTasks(spaceId: string): TaskApi {
+  const space = `${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}`;
+  return {
+    load: (input) => loadTaskAt(`${space}/tareas`, input),
+    review: (input) => reviewTaskAt(`${space}/tareas/revisar`, input),
+    help: (input) => askLedaAt<Proposal>(`${space}/ayuda`, input),
+    spell: (texts) => checkSpellingAt(`${space}/ortografia`, texts),
+    transcribe: (audio) => transcribeAt(`${space}/dictado`, audio),
+  };
+}
+
+/** The team's door (J4): the space is the session's, never the request's. */
+export function teamTasks(): TaskApi {
+  return {
+    load: (input) => loadTaskAt('/app/api/tareas', input),
+    review: (input) => reviewTaskAt('/app/api/tareas/revisar', input),
+    help: (input) => askLedaAt<Proposal>('/app/api/ayuda', input),
+    spell: (texts) => checkSpellingAt('/app/api/ortografia', texts),
+    transcribe: (audio) => transcribeAt('/app/api/dictado', audio),
+  };
 }
 
 /** Closes this administration session on the server; the server also clears its cookie. */

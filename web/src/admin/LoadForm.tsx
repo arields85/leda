@@ -1,20 +1,19 @@
 import { Check } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SessionClosedError } from '../api';
 import { shortDate } from '../format';
 import {
-  askLeda,
-  checkSpelling,
+  adminTasks,
   HELP_FAILED,
-  loadTask,
+  type Member,
   type Options,
   type Problem,
   type Proposal,
-  reviewTask,
+  type ReviewResult,
   SPELLING_FAILED,
   type Spelling,
+  type TaskApi,
   type TextField,
-  transcribe,
 } from './api';
 import { Completing } from './Completing';
 import { INPUT, PRIMARY, SECONDARY, WARN } from './controls';
@@ -26,6 +25,7 @@ import { bringTo, FieldList, focusField as focusElement } from './FieldList';
 import { HelpBox, type HelpState, STORY_MISSING } from './HelpBox';
 import {
   checkDraft,
+  choosesReviewer,
   clearedBy,
   type Draft,
   dueAfterObjectiveText,
@@ -45,7 +45,10 @@ import {
   PROBLEM_FIELD,
   proposedCriterion,
   REFUSED_CRITERION,
+  requestNote,
+  reviewerName,
   sameKinds,
+  teamDoor,
   TEXT_FIELDS,
   toCheck,
   toInput,
@@ -105,10 +108,31 @@ function CriterionOffer({ text, onUse }: { text: string; onUse: () => void }) {
 }
 
 interface LoadFormProps {
-  spaceId: string;
+  /** The administration's space, for its door when no `api` is given. */
+  spaceId?: string;
+  /** The door's load (J4): the administration's (`adminTasks`) or the team's (`teamTasks`). */
+  api?: TaskApi;
   options: Options;
+  /** Who loads it, as the preview names her. */
   admin: string;
   onClosed: () => void;
+  /** One column always (the team's page is narrow): the preview goes under the form. */
+  stacked?: boolean;
+}
+
+/** Who may be named as the one who decided a task through the administration's door (D10;
+ * migration 0071): Dirección or the referente of the area of whoever does it (any referente while
+ * nobody is chosen). Everyone, with a server that does not say the areas. */
+function deciders(options: Options, member: Member | undefined): Member[] {
+  const areas = options.areas;
+  if (!areas) return options.integrantes;
+  const referentes = new Set(
+    areas
+      .filter((a) => !member || a.id === member.area_id)
+      .map((a) => a.referente?.membership_id)
+      .filter(Boolean),
+  );
+  return options.integrantes.filter((m) => m.autoridad_final || referentes.has(m.membership_id));
 }
 
 /** The form that loads a committed task (decision 9): it offers only what can be chosen, shows
@@ -116,7 +140,9 @@ interface LoadFormProps {
  * only when confirmed (decision 6). While it sends, the form is locked, so what is shown is what
  * goes. One idempotency key per attempt: kept across retries of the same data, renewed after a
  * success or when the data changes, so a double send never loads two tasks. */
-export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
+export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = false }: LoadFormProps) {
+  const door = useMemo(() => api ?? adminTasks(spaceId ?? ''), [api, spaceId]);
+  const team = teamDoor(options);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [step, setStep] = useState<Step>({ kind: 'edit', sending: false, failed: false });
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -177,7 +203,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     // the same data and the same key (RDD warning of the J3-4, R3-retry-spelling-key).
     open: () => !sendingRef.current && !unknown.current,
     editing: step.kind === 'edit' && !step.sending,
-    check: (texts) => checkSpelling(spaceId, texts),
+    check: (texts) => door.spell(texts),
     onClosed,
     elementId: (field) => `f-${field}`,
     onTake: (next) => {
@@ -243,7 +269,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   function chooseResponsible(id: string) {
     const known = evidenceKinds(policyOf(options, memberOf(options, id)));
     const kept = latest.current.evidencia.filter((k) => known.includes(k));
-    change({ responsable_id: id, evidencia: known.filter((k) => kept.includes(k)) });
+    // Never the one who does it as the one who reviews it (D3).
+    const reviewer = latest.current.revisa_id === id ? { revisa_id: '' } : {};
+    change({ responsable_id: id, evidencia: known.filter((k) => kept.includes(k)), ...reviewer });
     setLedaEvidence((marked) => new Set([...marked].filter((k) => kept.includes(k))));
   }
 
@@ -292,7 +320,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       latest.current;
     const asked = { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio };
     try {
-      const result = await askLeda(spaceId, { texto, ...asked, evidencia: [...evidencia] });
+      const result = await door.help({ texto, ...asked, evidencia: [...evidencia] });
       // The person started over meanwhile (J2-20): the answer is for a form that is gone.
       if (round.current !== asking) return;
       // It is sending (J2-30): the form is locked and what goes is what it shows; nothing fills.
@@ -341,9 +369,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     }
   }
 
-  /** The dictation at this space's administration address (J2b). */
+  /** The dictation at this door's address (J2b). */
   function dictate(audio: Blob) {
-    return transcribe(spaceId, audio);
+    return door.transcribe(audio);
   }
 
   /** The person picked who does it among the ones that fit the name: her choice, not marked. */
@@ -406,9 +434,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       // J2-21: first what the load would refuse (the criterion's judgment and the rest), so a
       // criterion that is going to be refused is never corrected first and the person does not
       // confirm twice. Nothing loads and the key is not used; without an answer, it goes on.
-      let review: Awaited<ReturnType<typeof reviewTask>>;
+      let review: ReviewResult;
       try {
-        review = await reviewTask(spaceId, toInput(sent, key.current ?? ''));
+        review = await door.review(toInput(sent, key.current ?? ''));
       } catch (error) {
         if (error instanceof SessionClosedError) {
           onClosed();
@@ -424,7 +452,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       }
       let spelling: Spelling;
       try {
-        spelling = await checkSpelling(spaceId, Object.fromEntries(asked.map((f) => [f, sent[f]])));
+        spelling = await door.spell(Object.fromEntries(asked.map((f) => [f, sent[f]])));
       } catch (error) {
         if (error instanceof SessionClosedError) {
           onClosed();
@@ -457,7 +485,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     key.current ??= newKey();
     setStep({ kind: 'edit', sending: true, failed: false });
     try {
-      const result = await loadTask(spaceId, toInput(sent, key.current));
+      const result = await door.load(toInput(sent, key.current));
       if (result.kind === 'loaded') {
         key.current = null;
         unknown.current = false;
@@ -590,7 +618,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const lateOnField = on('fecha').some((p) => p.motivo === LATE_FOR_OBJECTIVE);
 
   return (
-    <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10">
+    <div className={`grid w-full min-w-0 max-w-full grid-cols-1 gap-8 ${stacked ? '' : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10'}`}>
       <form
         noValidate
         onSubmit={(event) => event.preventDefault()}
@@ -654,10 +682,13 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             proposed={proposed.has('responsable_id')}
             hint={
               member && (
-                <span className="flex flex-wrap gap-x-2">
-                  <span>{member.area}</span>
-                  <span>· la revisa: {member.revisa?.nombre ?? 'nadie'}</span>
-                  {!member.conectado && <span className="font-bold text-ink-soft">[SIN CONECTAR]</span>}
+                <span className="flex flex-col gap-0.5">
+                  <span className="flex flex-wrap gap-x-2">
+                    <span>{member.area}</span>
+                    <span>· la revisa: {reviewerName(draft, options) ?? 'nadie'}</span>
+                    {!member.conectado && <span className="font-bold text-ink-soft">[SIN CONECTAR]</span>}
+                  </span>
+                  {requestNote(options, member) && <span>{requestNote(options, member)}</span>}
                 </span>
               )
             }
@@ -806,26 +837,59 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             )}
           </fieldset>
 
-          <FieldBlock id="f-decidio" label="Quién la decidió" errors={said('decidio_id')}>
-            <Dropdown
-              id="f-decidio"
-              labelledBy="f-decidio-label"
-              value={draft.decidio_id}
-              onChange={(value) => change({ decidio_id: value })}
-              invalid={invalid('decidio_id')}
-              describedBy={described('f-decidio', 'decidio_id')}
-              options={[
-                { value: '', label: 'elegí a una persona' },
-                ...options.integrantes.map((m) => ({ value: m.membership_id, label: `${m.nombre} · ${m.area}` })),
-              ]}
-            />
-          </FieldBlock>
+          {choosesReviewer(options) && (
+            // D3 (J4): Dirección (and the administration) chooses who reviews it: the one that
+            // corresponds is preselected; herself or another area referente, never who does it.
+            <FieldBlock id="f-revisa" label="Quién la revisa" errors={said('revisa_id')}
+              hint="Dirección o el referente de un área; nunca quien la hace.">
+              <Dropdown
+                id="f-revisa"
+                labelledBy="f-revisa-label"
+                value={draft.revisa_id}
+                onChange={(value) => change({ revisa_id: value })}
+                invalid={invalid('revisa_id')}
+                describedBy={described('f-revisa', 'revisa_id')}
+                options={[
+                  {
+                    value: '',
+                    label: member?.revisa ? `la que corresponde: ${member.revisa.nombre}` : 'la que corresponde',
+                  },
+                  ...(options.revisores ?? [])
+                    .filter((r) => r.membership_id !== draft.responsable_id)
+                    .map((r) => ({
+                      value: r.membership_id,
+                      label: [r.nombre, ...(r.autoridad_final ? ['Dirección'] : []), ...r.areas]
+                        .filter((x, i, all) => all.indexOf(x) === i)
+                        .join(' · '),
+                    })),
+                ]}
+              />
+            </FieldBlock>
+          )}
+
+          {!team && (
+            <FieldBlock id="f-decidio" label="Quién la decidió" errors={said('decidio_id')}
+              hint="Dirección o el referente del área de quien la hace.">
+              <Dropdown
+                id="f-decidio"
+                labelledBy="f-decidio-label"
+                value={draft.decidio_id}
+                onChange={(value) => change({ decidio_id: value })}
+                invalid={invalid('decidio_id')}
+                describedBy={described('f-decidio', 'decidio_id')}
+                options={[
+                  { value: '', label: 'elegí a una persona' },
+                  ...deciders(options, member).map((m) => ({ value: m.membership_id, label: `${m.nombre} · ${m.area}` })),
+                ]}
+              />
+            </FieldBlock>
+          )}
         </fieldset>
       </form>
 
       <aside
         aria-labelledby="vista-previa"
-        className="flex min-w-0 max-w-full flex-col gap-2 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto"
+        className={`flex min-w-0 max-w-full flex-col gap-2 ${stacked ? '' : 'lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto'}`}
       >
         <h2 id="vista-previa" className={`m-0 ${FIELD_TITLE}`}>
           Vista previa

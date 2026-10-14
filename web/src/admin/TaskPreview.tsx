@@ -4,7 +4,17 @@ import { TaskCard } from '../components/TaskCard';
 import type { Options } from './api';
 import { dayLabel } from './DatePicker';
 import { WARN } from './controls';
-import { type Draft, evidenceWords, lateForObjective, memberOf, policyOf, previewTask, waitOf } from './draft';
+import {
+  type Draft,
+  evidenceWords,
+  lateForObjective,
+  memberOf,
+  policyOf,
+  previewTask,
+  reviewerName,
+  teamDoor,
+  waitOf,
+} from './draft';
 import { FIELD_HINT, FIELD_TITLE, PREVIEW_VALUE } from './typography';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -32,7 +42,11 @@ export function TaskPreview({
   const member = memberOf(options, draft.responsable_id);
   const policy = policyOf(options, member);
   const objective = options.objetivos.find((o) => o.id === draft.objetivo_id);
-  const decided = memberOf(options, draft.decidio_id);
+  // Through the team's door (J4) the person who loads it decided it; through the administration's,
+  // the one declared.
+  const decided = teamDoor(options) ? options.yo?.nombre : memberOf(options, draft.decidio_id)?.nombre;
+  const reviewer = reviewerName(draft, options);
+  const request = member?.como === 'pedido_a_otra_area' || member?.como === 'pedido_a_direccion';
   const wait = waitOf(options, draft.espera_id);
   // Decision 6 (2026-10-14): a task never falls due after its objective; it does not load so.
   const late = lateForObjective(draft, options)?.fecha_objetivo ?? null;
@@ -83,9 +97,10 @@ export function TaskPreview({
           )}
         </Row>
         <Row label="La revisa">
-          {member ? (member.revisa?.nombre ?? 'nadie: no se va a poder cargar') : MISSING}
+          {member ? (reviewer ?? 'nadie: no se va a poder cargar') : MISSING}
         </Row>
-        <Row label="La decidió">{decided?.nombre ?? MISSING}</Row>
+        {request && <Row label="La pide">{options.yo?.nombre ?? admin}</Row>}
+        <Row label="La decidió">{decided ?? MISSING}</Row>
         <Row label="La carga">{admin}</Row>
       </dl>
     </div>

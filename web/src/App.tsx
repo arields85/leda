@@ -8,9 +8,13 @@ import {
   type ViewData,
   type ViewId,
 } from './api';
+import { teamTasks } from './admin/api';
 import { NewObjective } from './admin/NewObjective';
+import { NewTask } from './admin/NewTask';
 import { teamObjectives } from './admin/objectiveApi';
 import { FinishedList } from './components/FinishedList';
+import { PassTask } from './components/PassTask';
+import { RequestedList } from './components/RequestedList';
 import { Header } from './components/Header';
 import { Notice } from './components/Notice';
 import { SignOut } from './components/SignOut';
@@ -82,9 +86,11 @@ export function App() {
   const [view, setView] = useState<ViewId | null>(null);
   const [tasks, setTasks] = useState<Load<ViewData>>({ kind: 'loading' });
   const [signedOut, setSignedOut] = useState(false);
-  // Dirección creating an objective (ADR 0023, decision 1): the form takes the page's place.
-  const [creating, setCreating] = useState(false);
+  // Dirección creating an objective (ADR 0023, decision 1), or Dirección or a referente loading a
+  // task (decision 3; J4): the form takes the page's place.
+  const [creating, setCreating] = useState<'tarea' | 'objetivo' | null>(null);
   const objectives = useMemo(teamObjectives, []);
+  const tasksApi = useMemo(teamTasks, []);
 
   useEffect(() => {
     const request = new AbortController();
@@ -125,7 +131,9 @@ export function App() {
   const person = me.kind === 'ready' ? me.data : null;
   const ready = tasks.kind === 'ready' ? tasks.data : null;
   const title = creating
-    ? 'Nuevo objetivo'
+    ? creating === 'tarea'
+      ? 'Nueva tarea'
+      : 'Nuevo objetivo'
     : (ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda');
 
   let body;
@@ -143,33 +151,52 @@ export function App() {
         <div>
           <button
             type="button"
-            onClick={() => setCreating(false)}
+            onClick={() => {
+              setCreating(null);
+              // What was loaded shows in the views.
+              if (creating === 'tarea') retry();
+            }}
             className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-dim"
           >
             &gt; volver a las tareas
           </button>
         </div>
-        <NewObjective
-          api={objectives}
-          author={person.persona}
-          onClosed={() => setMe({ kind: 'closed' })}
-          stacked
-        />
+        {creating === 'tarea' ? (
+          <NewTask api={tasksApi} author={person.persona} onClosed={() => setMe({ kind: 'closed' })} />
+        ) : (
+          <NewObjective
+            api={objectives}
+            author={person.persona}
+            onClosed={() => setMe({ kind: 'closed' })}
+            stacked
+          />
+        )}
       </>
     );
   } else {
     body = (
       <>
         <ViewSwitch views={person.vistas} current={view} onChange={choose} />
-        {person.crea_objetivos && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-soft"
-            >
-              &gt; nuevo objetivo
-            </button>
+        {(person.carga_tareas || person.crea_objetivos) && (
+          <div className="flex flex-wrap gap-1.5">
+            {person.carga_tareas && (
+              <button
+                type="button"
+                onClick={() => setCreating('tarea')}
+                className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-soft"
+              >
+                &gt; nueva tarea
+              </button>
+            )}
+            {person.crea_objetivos && (
+              <button
+                type="button"
+                onClick={() => setCreating('objetivo')}
+                className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-soft"
+              >
+                &gt; nuevo objetivo
+              </button>
+            )}
           </div>
         )}
         {tasks.kind === 'loading' && <Notice title="Cargando…" />}
@@ -183,9 +210,17 @@ export function App() {
             ) : (
               <div className="flex flex-col gap-[11px] pt-0.5 text-body">
                 {ready.tareas.map((task) => (
-                  <TaskCard key={task.id} task={task} view={ready.vista} />
+                  <div key={task.id} className="flex min-w-0 flex-col gap-[11px]">
+                    <TaskCard task={task} view={ready.vista} />
+                    {ready.vista === 'sector' && ready.pasar_a && (
+                      <PassTask task={task} teammates={ready.pasar_a} onClosed={() => setMe({ kind: 'closed' })} />
+                    )}
+                  </div>
                 ))}
               </div>
+            )}
+            {ready.pedidas && (
+              <RequestedList items={ready.pedidas} onChanged={retry} onClosed={() => setMe({ kind: 'closed' })} />
             )}
             <FinishedList items={ready.terminadas ?? []} view={ready.vista} />
           </>
