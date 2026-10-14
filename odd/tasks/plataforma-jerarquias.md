@@ -1240,8 +1240,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - **J5-D7. Un pedido sin contestar:** Leda se lo recuerda a quien decide cada día hábil, como una pregunta
         sin contestar, sin escalar. Mientras tanto vale la fecha original y los recordatorios siguen sobre ella. A
         quien pidió le avisa que su pedido sigue esperando. Nunca se acepta solo.
-      - **J5-D8. Un pedido nuevo reemplaza al pendiente:** a quien decide le llega uno solo, con su informe y la
-        línea "antes había pedido hasta el 28". Nunca se decide sobre un pedido viejo.
+      - **J5-D8. Un pedido nuevo reemplaza al pendiente:** a quien decide le llega uno solo, con su informe, sin la
+        línea "antes había pedido…" (cambiado por la regla general de los avisos, J6-D4). Nunca se decide sobre un
+        pedido viejo.
       Con esto, las decisiones de la J5 están completas.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
@@ -1274,7 +1275,19 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - La regla para todos: a quien está arriba se le pide lo que no depende de uno.
       - **J6-D3. Cómo decide el referente una subtarea:** aprobarla tal cual, corregirla y aprobarla (a Nahuel le llega
         qué cambió), o decir que no con el motivo. También puede dársela a otro de su gente ("que los compre Juan"),
-        avisándoles a los dos.
+        avisándoles a los dos. Avisa Leda, por chat: el referente decide en la web y Leda avisa a quien corresponda.
+      - **J6-D4. El circuito**, con el molde de la J5:
+        - el aviso al referente lleva "Ver la subtarea" o "Ver el pedido" y llega en horario; las que se proponen
+          seguidas van juntas, con 10 minutos de margen;
+        - lo propuesto un sábado sale el lunes, y Nahuel ve cuándo lo va a ver Marcos;
+        - sin respuesta, un recordatorio cada día hábil, sin escalar; nunca se aprueba sola;
+        - antes de que decidan, Nahuel puede retirarla o corregirla.
+      - **Regla general de los avisos** (usuario: "no importa lo que decía antes, importa lo que dice ahora"): se cuenta
+        lo que vale ahora, no la historia; la historia queda en el detalle.
+        - Si se corrige, sólo la versión nueva, sin "antes decía".
+        - Si se retira, no se manda ningún mensaje: desaparece de lo que hay para aprobar, y quien abra el aviso
+          viejo ve "Ya no hace falta".
+        - Esto cambia la J5-D8: sin la línea "antes había pedido hasta el 28".
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
