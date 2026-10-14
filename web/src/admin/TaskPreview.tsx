@@ -23,6 +23,31 @@ function SpellMark({ changes, of }: { changes?: SpellChange[]; of?: string }) {
   );
 }
 
+/** The text with the words Leda corrected in the color of "propuesto por Leda" (J2-19, the
+ * user's phone test): each change, in order, marks the next word of the text that is its
+ * corrected form, so a word written well elsewhere is not marked. */
+export function withCorrections(text: string, changes?: SpellChange[]): ReactNode {
+  if (!changes || changes.length === 0) return text;
+  const parts: ReactNode[] = [];
+  let from = 0;
+  let next = 0;
+  for (const word of text.matchAll(/[\p{L}\p{N}]+/gu)) {
+    if (next >= changes.length) break;
+    if (word[0] !== changes[next].despues) continue;
+    const at = word.index ?? 0;
+    parts.push(text.slice(from, at));
+    parts.push(
+      <span key={at} data-corrected className="text-propuesto">
+        {word[0]}
+      </span>,
+    );
+    from = at + word[0].length;
+    next += 1;
+  }
+  parts.push(text.slice(from));
+  return parts;
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
@@ -59,7 +84,11 @@ export function TaskPreview({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="text-body">
-        <TaskCard task={previewTask(draft, member)} view="equipo" />
+        <TaskCard
+          task={previewTask(draft, member)}
+          view="equipo"
+          title={withCorrections(previewTask(draft, member).titulo, spelled.titulo)}
+        />
         <SpellMark changes={spelled.titulo} of="Título" />
       </div>
       <dl className="m-0 flex flex-col gap-2.5 rounded-card border-hard border-line-soft px-3 py-2.5">
@@ -82,12 +111,12 @@ export function TaskPreview({
         )}
         {draft.descripcion.trim() && (
           <Row label="Descripción">
-            {draft.descripcion.trim()}
+            {withCorrections(draft.descripcion.trim(), spelled.descripcion)}
             <SpellMark changes={spelled.descripcion} />
           </Row>
         )}
         <Row label="Criterio de aceptación">
-          {draft.criterio.trim() || MISSING}
+          {draft.criterio.trim() ? withCorrections(draft.criterio.trim(), spelled.criterio) : MISSING}
           <SpellMark changes={spelled.criterio} />
         </Row>
         <Row label="Evidencia">

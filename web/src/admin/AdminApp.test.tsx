@@ -14,6 +14,9 @@ const OPTIONS = `GET /app/admin/api/espacios/${SPACE}/opciones`;
 // correct, so the tests that do not look at it load as before.
 const SPELLING = `POST /app/admin/api/espacios/${SPACE}/ortografia`;
 const NOTHING_TO_CORRECT = { status: 200, body: { corregidos: {}, sin_revisar: [] } };
+// J2-21: before the spelling, what the load would refuse. By default it would load.
+const REVIEW = `POST /app/admin/api/espacios/${SPACE}/tareas/revisar`;
+const WOULD_LOAD = { status: 200, body: { errores: [] } };
 
 /** A fake server: each route answers with its replies in order (the last one repeats). */
 function serve(routes: Record<string, Reply | Reply[]>) {
@@ -52,6 +55,7 @@ async function openForm(routes: Record<string, Reply | Reply[]> = {}) {
     'GET /app/admin/api/yo': ok(adminMe()),
     [OPTIONS]: ok(options()),
     [SPELLING]: NOTHING_TO_CORRECT,
+    [REVIEW]: WOULD_LOAD,
     ...routes,
   });
   render(<AdminApp />);
@@ -83,6 +87,8 @@ function fillTask() {
   pick('Objetivo', 'o1');
   fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
   pick('Quién la hace', 'm-marcos');
+  // J2-19: choosing who does it ticks nothing; the person ticks the evidence.
+  fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
   fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
   fireEvent.change(screen.getByLabelText('Criterio de aceptación'), {
     target: { value: 'Las 12 alarmas suenan en la sala de control' },
@@ -146,11 +152,19 @@ describe('AdminApp', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'lun 12.10' })).toHaveFocus());
   });
 
-  it('pre-checks the evidence the area asks for', async () => {
+  it('choosing who does it ticks nothing: what the area asks for is only said next to it (J2-19)', async () => {
     await openForm();
     pick('Quién la hace', 'm-marcos');
-    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla · la pide el área/ })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /un informe/ })).not.toBeChecked();
+    // Nothing ticked: the form says the evidence is missing.
+    expect(document.getElementById('lo-que-falta')).toHaveTextContent('evidencia');
+    fireEvent.click(screen.getByRole('checkbox', { name: /un informe/ }));
+    // Another person whose area knows it: what the person ticked stays, nothing new is ticked.
+    pick('Quién la hace', 'm-marcos');
+    expect(screen.getByRole('checkbox', { name: /un informe/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).not.toBeChecked();
     pick('Quién la hace', 'm-lucas');
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.getByText('El área no pide evidencia.')).toBeInTheDocument();
@@ -190,7 +204,6 @@ describe('AdminApp', () => {
     pick('Objetivo', 'o1');
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
     pick('Quién la hace', 'm-marcos');
-    fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
     fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
     confirm();
     const summary = within(preview()).getByRole('alert');
@@ -283,7 +296,7 @@ describe('AdminApp', () => {
       pick('Objetivo', 'o1');
       fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
       pick('Quién la hace', 'm-marcos');
-      fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
+      // J2-19: nothing is ticked on its own, so the evidence is missing.
       fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
       const criterio = screen.getByLabelText('Criterio de aceptación');
       const evidence = screen.getByRole('checkbox', { name: /una captura de pantalla/ });
@@ -924,6 +937,7 @@ const FULL = {
     responsable_id: 'm-marcos',
     fecha: '2026-10-16',
     criterio: 'Las 12 alarmas suenan en la sala de control.',
+    evidencia: ['captura'],
   },
   elegir: [],
   avisos: [],
@@ -955,7 +969,7 @@ class FakeRecognition {
 }
 
 describe('Leda completes the load from the free box', () => {
-  it('fills only the empty fields, marks each one, and ticks the evidence of whoever does it', async () => {
+  it('fills only the empty fields, marks each one, and ticks only the evidence Leda proposed', async () => {
     const calls = await openForm({ [HELP]: proposed(FULL) });
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Mi título' } });
     tell();
@@ -983,6 +997,7 @@ describe('Leda completes the load from the free box', () => {
       expect(markOf(label)).toBeInTheDocument();
     }
     expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /un informe/ })).not.toBeChecked();
     expect(
       within(screen.getByRole('group', { name: 'Fecha' })).getByRole('button', { name: 'vie 16.10' }),
     ).toHaveAttribute('aria-pressed', 'true');
@@ -1043,6 +1058,30 @@ describe('Leda completes the load from the free box', () => {
     expect(screen.getByLabelText('Título')).toHaveValue('');
     expect(screen.getByLabelText('Quién la hace')).toHaveValue('');
     expect(screen.getByLabelText(BOX)).toHaveValue(`${STORY} y que lo revise ismael`);
+  });
+
+  it('the evidence changed while Leda was answering: the old answer fills nothing (R3-001)', async () => {
+    const release = await holdTheAnswer();
+    pick('Quién la hace', 'm-marcos');
+    tell();
+    askLeda();
+    fireEvent.click(screen.getByRole('checkbox', { name: /un informe/ }));
+    release(FULL);
+    expect(await screen.findByText(STALE_ANSWER)).toBeInTheDocument();
+    expect(screen.getByLabelText('Título')).toHaveValue('');
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).not.toBeChecked();
+  });
+
+  it('evidence ticked and unticked while Leda was answering is the same evidence: the answer fills', async () => {
+    const release = await holdTheAnswer();
+    pick('Quién la hace', 'm-marcos');
+    tell();
+    askLeda();
+    fireEvent.click(screen.getByRole('checkbox', { name: /un informe/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /un informe/ }));
+    release(FULL);
+    await waitFor(() => expect(screen.getByLabelText('Título')).toHaveValue(FULL.propuesta.titulo));
+    expect(screen.queryByText(STALE_ANSWER)).toBeNull();
   });
 
   it('nothing changed while Leda was answering: the answer fills the empty fields', async () => {
@@ -1420,9 +1459,10 @@ describe('the spelling before loading', () => {
 
 // --- J2-18: Leda completes everything it can --------------------------------------------------------
 //
-// Leda proposes who does it and the evidence that fits this task on top of the area's minimum; the
-// person reviews, corrects or keeps it. The evidence Leda adds is ticked and marked, the area's
-// minimum follows whoever does it, and a text the spelling check could not check is checked again.
+// Leda proposes who does it and the evidence that fits this task; the person reviews, corrects or
+// keeps it. J2-19: only the evidence Leda proposed is ticked (and marked); what the area asks for is
+// said next to it, never ticked on its own; and a text the spelling check could not check is checked
+// again.
 
 describe('Leda completes everything it can (J2-18)', () => {
   const WITH_EVIDENCE = { ...FULL, propuesta: { ...FULL.propuesta, evidencia: ['informe'] } };
@@ -1432,17 +1472,30 @@ describe('Leda completes everything it can (J2-18)', () => {
     return within(row).queryByText('· propuesto por Leda');
   }
 
-  it('ticks the evidence Leda proposes on top of what the area asks, and marks only that one', async () => {
+  it('ticks only the evidence Leda proposes, not what the area asks, and marks it (J2-19)', async () => {
     const calls = await openForm({ [HELP]: proposed(WITH_EVIDENCE) });
     tell();
     askLeda();
     await waitFor(() => expect(screen.getByRole('checkbox', { name: /un informe/ })).toBeChecked());
-    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla · la pide el área/ })).toBeInTheDocument();
     expect(evidenceMark(/un informe/)).toBeInTheDocument();
     expect(evidenceMark(/una captura de pantalla/)).toBeNull();
     // What the form had goes with the question, so Leda never proposes over what was ticked.
     expect((calls.find((c) => c.key === HELP)?.body as { evidencia: string[] }).evidencia).toEqual([]);
-    expect(preview()).toHaveTextContent('una captura de pantalla · un informe');
+    expect(within(preview()).getByText('un informe')).toBeInTheDocument();
+  });
+
+  it('with evidence the person already ticked, Leda\'s evidence never overwrites it', async () => {
+    await openForm({ [HELP]: proposed({ propuesta: { titulo: 'Configurar las alarmas', evidencia: ['captura'] }, elegir: [], avisos: [] }) });
+    pick('Quién la hace', 'm-marcos');
+    fireEvent.click(screen.getByRole('checkbox', { name: /un informe/ }));
+    tell();
+    askLeda();
+    await waitFor(() => expect(screen.getByLabelText('Título')).toHaveValue('Configurar las alarmas'));
+    expect(screen.getByRole('checkbox', { name: /un informe/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).not.toBeChecked();
+    expect(evidenceMark(/una captura de pantalla/)).toBeNull();
   });
 
   it('unticking the evidence Leda proposed is the person\'s choice: the mark goes', async () => {
@@ -1455,7 +1508,7 @@ describe('Leda completes everything it can (J2-18)', () => {
     expect(evidenceMark(/un informe/)).toBeNull();
   });
 
-  it('another person: the minimum follows her area, and Leda\'s evidence stays if her area knows it', async () => {
+  it('another person: nothing new is ticked, and Leda\'s evidence stays if her area knows it', async () => {
     const both = options({
       politicas: [
         options().politicas[0],
@@ -1476,7 +1529,7 @@ describe('Leda completes everything it can (J2-18)', () => {
     askLeda();
     await waitFor(() => expect(screen.getByRole('checkbox', { name: /un informe/ })).toBeChecked());
     pick('Quién la hace', 'm-lucas');
-    expect(screen.getByRole('checkbox', { name: /una foto/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /una foto/ })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: /un informe/ })).toBeChecked();
     expect(evidenceMark(/un informe/)).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /una captura de pantalla/ })).toBeNull();
@@ -1492,8 +1545,8 @@ describe('Leda completes everything it can (J2-18)', () => {
     expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /un informe/ })).not.toBeChecked();
     expect(screen.queryByRole('checkbox', { name: /inventada/ })).toBeNull();
-    // The minimum is the area's, not Leda's: no mark on it.
-    expect(evidenceMark(/una captura de pantalla/)).toBeNull();
+    // J2-19: what is ticked is Leda's proposal, marked as hers.
+    expect(evidenceMark(/una captura de pantalla/)).toBeInTheDocument();
   });
 
   it('a text the spelling check could not check is checked again on the next confirm', async () => {
@@ -1514,5 +1567,178 @@ describe('Leda completes everything it can (J2-18)', () => {
     const checks = calls.filter((c) => c.key === SPELLING);
     expect(checks).toHaveLength(2);
     expect(checks[1].body).toEqual(checks[0].body);
+  });
+});
+
+
+// --- J2-19: the corrected words, in Leda's color --------------------------------------------------
+
+describe('the corrected words in the preview (J2-19)', () => {
+  it('the words Leda corrected are in the color of "propuesto por Leda", inside the text', async () => {
+    const fix = {
+      status: 200,
+      body: {
+        corregidos: {
+          criterio: {
+            texto: 'Las 12 alarmas suenan en la sala de control de CoreLabs',
+            cambios: [{ antes: 'cirelabs', despues: 'CoreLabs' }],
+          },
+        },
+        sin_revisar: [],
+      },
+    };
+    await openForm({ [SPELLING]: fix });
+    fillTask();
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), {
+      target: { value: 'Las 12 alarmas suenan en la sala de control de cirelabs' },
+    });
+    confirm();
+    await waitFor(() => expect(preview()).toHaveTextContent('cirelabs → CoreLabs'));
+    const marked = [...preview().querySelectorAll('[data-corrected]')];
+    expect(marked.map((m) => m.textContent)).toEqual(['CoreLabs']);
+    expect(marked[0]).toHaveClass('text-propuesto');
+  });
+});
+
+// --- J2-20: starting over --------------------------------------------------------------------------
+
+describe('starting over (J2-20)', () => {
+  const START_OVER = '> empezar de nuevo';
+  const ASK = '¿Borro todo lo que cargaste?';
+
+  it('an empty form offers nothing to clear', async () => {
+    await openForm();
+    expect(screen.queryByRole('button', { name: START_OVER })).toBeNull();
+  });
+
+  it('asks first, and "no" keeps everything', async () => {
+    await openForm();
+    fillTask();
+    tell();
+    fireEvent.click(screen.getByRole('button', { name: START_OVER }));
+    expect(screen.getByText(ASK)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '> no' }));
+    expect(screen.queryByText(ASK)).toBeNull();
+    expect(screen.getByLabelText('Título')).toHaveValue('Configurar alarmas del SCADA');
+    expect(screen.getByLabelText(BOX)).toHaveValue(STORY);
+    expect(screen.getByRole('checkbox', { name: /una captura de pantalla/ })).toBeChecked();
+  });
+
+  it('"sí, borrar" clears every field, the box, Leda\'s marks, the problems and the preview', async () => {
+    await openForm({ [HELP]: proposed(FULL) });
+    tell();
+    askLeda();
+    await waitFor(() => expect(markOf('Criterio de aceptación')).toBeInTheDocument());
+    confirm();
+    expect(screen.getByRole('alert')).toHaveTextContent('quién la decidió');
+    fireEvent.click(screen.getByRole('button', { name: START_OVER }));
+    fireEvent.click(screen.getByRole('button', { name: '> sí, borrar' }));
+    for (const label of ['Título', 'Descripción (opcional)', 'Criterio de aceptación', BOX]) {
+      expect(screen.getByLabelText(label)).toHaveValue('');
+    }
+    expect(screen.getByLabelText('Objetivo')).toHaveValue('');
+    expect(screen.getByLabelText('Quién la hace')).toHaveValue('');
+    expect(screen.queryByText('· propuesto por Leda')).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(within(preview()).getByText('(sin título)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: START_OVER })).toBeNull();
+  });
+
+  it('a load after starting over goes with a new key', async () => {
+    keys('44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555');
+    const calls = await openForm({ [TASKS]: ['network', loaded()] });
+    fillTask();
+    confirm();
+    expect(await screen.findByText(/no llegó la respuesta/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: START_OVER }));
+    fireEvent.click(screen.getByRole('button', { name: '> sí, borrar' }));
+    fillTask();
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { clave: string }).clave);
+    expect(sent).toEqual(['44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555']);
+  });
+
+  it('cannot be used while sending', async () => {
+    const release = { go: (_: Response) => {} };
+    await openForm();
+    const real = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) =>
+        url.endsWith('/tareas') ? new Promise<Response>((resolve) => (release.go = resolve)) : real(url, init),
+      ),
+    );
+    fillTask();
+    confirm();
+    await waitFor(() => expect(screen.getByRole('button', { name: START_OVER })).toBeDisabled());
+  });
+});
+
+// --- J2-21: what would be refused comes before the spelling ---------------------------------------
+//
+// The user's test (2026-10-13): Leda corrected "No se" to "No sé" and only on the second confirm the
+// load refused that criterion. Now the form first asks what the load would refuse; the spelling runs
+// only on what is going to load.
+
+describe('the checks on confirm, in order (J2-21)', () => {
+  const REFUSED = {
+    status: 422,
+    body: {
+      errores: [
+        {
+          campo: 'criterio',
+          motivo: 'sin_resultado',
+          texto: 'No dice qué tiene que quedar hecho para darla por terminada.',
+          propuesta: 'Las 12 alarmas del SCADA suenan en la sala de control.',
+        },
+      ],
+    },
+  };
+
+  it('a criterion that is going to be refused is refused first, with Leda\'s proposal, and nothing is corrected', async () => {
+    const calls = await openForm({ [REVIEW]: REFUSED });
+    fillTask();
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), { target: { value: 'No se' } });
+    confirm();
+    expect(await screen.findByText('Las 12 alarmas del SCADA suenan en la sala de control.')).toBeInTheDocument();
+    expect(screen.getByText('No dice qué tiene que quedar hecho para darla por terminada.')).toBeInTheDocument();
+    expect(calls.some((c) => c.key === SPELLING)).toBe(false);
+    expect(calls.some((c) => c.key === TASKS)).toBe(false);
+    expect(screen.queryByText(/Leda corrigió la ortografía/)).toBeNull();
+    // What was reviewed is what the form had, without loading anything.
+    const reviewed = calls.find((c) => c.key === REVIEW)?.body as { criterio: string; titulo: string };
+    expect(reviewed.criterio).toBe('No se');
+    expect(reviewed.titulo).toBe('Configurar alarmas del SCADA');
+  });
+
+  it('using Leda\'s criterion and confirming goes on: review, spelling, load', async () => {
+    const calls = await openForm({ [REVIEW]: [REFUSED, WOULD_LOAD], [TASKS]: loaded() });
+    fillTask();
+    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), { target: { value: 'No se' } });
+    confirm();
+    fireEvent.click(await screen.findByRole('button', { name: '> usar este criterio' }));
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const order = calls.map((c) => c.key).filter((k) => [REVIEW, SPELLING, TASKS].includes(k));
+    expect(order).toEqual([REVIEW, REVIEW, SPELLING, TASKS]);
+  });
+
+  it('what would load goes to the spelling before loading', async () => {
+    const calls = await openForm({ [TASKS]: loaded() });
+    fillTask();
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const order = calls.map((c) => c.key).filter((k) => [REVIEW, SPELLING, TASKS].includes(k));
+    expect(order).toEqual([REVIEW, SPELLING, TASKS]);
+  });
+
+  it('without an answer to the review nothing blocks: spelling and load as before', async () => {
+    const calls = await openForm({ [REVIEW]: 'network', [TASKS]: loaded() });
+    fillTask();
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    expect(calls.filter((c) => c.key === SPELLING)).toHaveLength(1);
   });
 });

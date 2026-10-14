@@ -186,6 +186,14 @@ export function policyOf(options: Options, member: Member | undefined): Policy |
   return member ? options.politicas.find((p) => p.area_id === member.area_id) : undefined;
 }
 
+/** Whether two lists of evidence are the same kinds, in any order (R3-001: a reordered list is the
+ * same evidence). */
+export function sameKinds(a: readonly string[], b: readonly string[]): boolean {
+  const left = new Set(a);
+  const right = new Set(b);
+  return left.size === right.size && [...left].every((k) => right.has(k));
+}
+
 /** The evidence an area knows: the kinds it asks for first, then the other kinds it accepts. */
 export function evidenceKinds(policy: Policy | undefined): string[] {
   if (!policy) return [];

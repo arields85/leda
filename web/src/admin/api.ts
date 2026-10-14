@@ -155,6 +155,36 @@ export async function loadTask(spaceId: string, input: TaskInput): Promise<LoadR
   throw new RequestError(response.status);
 }
 
+/** What the load would refuse (J2-21), asked before the spelling so a criterion that is going to be
+ * refused is never corrected first: `ok` if it would load, `rejected` with the same problems the
+ * load would answer, `unknown` if there was no answer (it never blocks: the load judges again). A
+ * closed session throws. Nothing is loaded and the key is never used. */
+export type ReviewResult = { kind: 'ok' } | { kind: 'rejected'; errors: Problem[] } | { kind: 'unknown' };
+
+export async function reviewTask(spaceId: string, input: TaskInput): Promise<ReviewResult> {
+  let response: Response;
+  try {
+    response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/tareas/revisar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  } catch (error) {
+    if (error instanceof SessionClosedError) throw error;
+    return { kind: 'unknown' };
+  }
+  if (response.status === 200) return { kind: 'ok' };
+  if (response.status === 422) {
+    try {
+      const body = (await response.json()) as { errores?: Problem[] };
+      return { kind: 'rejected', errors: body.errores ?? [] };
+    } catch {
+      return { kind: 'unknown' };
+    }
+  }
+  return { kind: 'unknown' };
+}
+
 /** What the form sends to ask Leda to complete it (ADR 0023, point 4; portion J2): what the
  * person told in the free box and what the form already has. Leda proposes only what is empty. */
 export interface HelpInput {

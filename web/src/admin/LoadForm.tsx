@@ -10,6 +10,7 @@ import {
   type Options,
   type Problem,
   type Proposal,
+  reviewTask,
   SPELLING_FAILED,
   type Spelling,
   type TextField,
@@ -36,6 +37,7 @@ import {
   PROBLEM_FIELD,
   proposedCriterion,
   REFUSED_CRITERION,
+  sameKinds,
   TEXT_FIELDS,
   toCheck,
   toInput,
@@ -263,9 +265,14 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const [story, setStory] = useState('');
   const [help, setHelp] = useState<HelpState>({ kind: 'idle' });
   const [proposed, setProposed] = useState<ReadonlySet<Field>>(new Set());
-  // The kinds of evidence Leda ticked on top of the area's minimum (J2-18), marked until the person
-  // changes them; they stay when she picks another person whose area knows them.
+  // The kinds of evidence Leda proposed and ticked (J2-18 and J2-19: only those are ticked, never
+  // the area's list on its own), marked until the person changes them; they stay when she picks
+  // another person whose area knows them.
   const [ledaEvidence, setLedaEvidence] = useState<ReadonlySet<string>>(new Set());
+  // J2-20: "empezar de nuevo" asks first, inline, because it loses what was typed.
+  const [clearing, setClearing] = useState(false);
+  // Each start over is a new round: an answer of Leda asked for before it fills nothing.
+  const round = useRef(0);
   // What Leda could not complete, each one shown on its field in the falta color (J2-13: in the
   // phone retest "No encontré a … en el equipo" was only a gray line in the box, out of sight),
   // until the person fills that field or asks again. The box's summary reads these same notes,
@@ -333,21 +340,20 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     setProposed((marked) => new Set([...marked, 'criterio']));
   }
 
-  /** Choosing who does it ticks the evidence her area asks for, as always; the evidence Leda
-   * proposed stays ticked (and marked) if her area knows it (J2-18). */
+  /** Choosing who does it ticks nothing (J2-19, the user: "debería quedar sólo tildado lo que Leda
+   * propone"): what her area asks for is said next to each kind, as information. What was ticked
+   * stays if her area knows it, and Leda's mark with it. */
   function chooseResponsible(id: string) {
-    const policyNow = policyOf(options, memberOf(options, id));
-    const known = evidenceKinds(policyNow);
-    const kept = [...ledaEvidence].filter((k) => known.includes(k));
-    const wanted = new Set([...(policyNow?.evidencia_requerida ?? []), ...kept]);
-    change({ responsable_id: id, evidencia: known.filter((k) => wanted.has(k)) });
-    setLedaEvidence(new Set(kept.filter((k) => !policyNow?.evidencia_requerida.includes(k))));
+    const known = evidenceKinds(policyOf(options, memberOf(options, id)));
+    const kept = latest.current.evidencia.filter((k) => known.includes(k));
+    change({ responsable_id: id, evidencia: known.filter((k) => kept.includes(k)) });
+    setLedaEvidence((marked) => new Set([...marked].filter((k) => kept.includes(k))));
   }
 
   /** Fills only what is still empty with what Leda proposed (only what the options offer), and
-   * marks it. Choosing the responsible person ticks the evidence her area asks for, as by hand,
-   * and the evidence Leda proposes on top of it is ticked and marked (J2-18), only kinds that
-   * area knows. Returns how many fields it filled. */
+   * marks it. The evidence (J2-19): only what Leda proposed is ticked, and marked, only kinds the
+   * area of whoever does it knows, and only when the person ticked none: what she ticked is hers.
+   * Returns how many fields it filled. */
   function apply(proposal: Proposal): number {
     const current = latest.current;
     const valid = validProposal(proposal, options);
@@ -356,18 +362,12 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     );
     const next: Draft = { ...current };
     for (const field of filled) next[field] = valid[field] as string;
-    const policyNext = policyOf(options, memberOf(options, next.responsable_id));
-    const minimum = policyNext?.evidencia_requerida ?? [];
-    const base =
-      filled.includes('responsable_id') && current.evidencia.length === 0 ? minimum : current.evidencia;
-    const known = evidenceKinds(policyNext);
-    const added = (Array.isArray(proposal.evidencia) ? proposal.evidencia : []).filter(
-      (k) => typeof k === 'string' && known.includes(k) && !base.includes(k),
-    );
+    const known = evidenceKinds(policyOf(options, memberOf(options, next.responsable_id)));
+    const offered = Array.isArray(proposal.evidencia) ? proposal.evidencia : [];
+    const added =
+      current.evidencia.length > 0 ? [] : known.filter((k) => offered.includes(k));
     if (filled.length === 0 && added.length === 0) return 0;
-    if (base !== current.evidencia || added.length > 0) {
-      next.evidencia = known.filter((k) => base.includes(k) || added.includes(k));
-    }
+    if (added.length > 0) next.evidencia = added;
     latest.current = next;
     setDraft(next);
     // Other data, another attempt (as in `change`).
@@ -382,6 +382,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
 
   async function ask() {
     if (help.kind === 'asking') return;
+    const asking = round.current;
     const texto = story.trim();
     if (!texto) {
       setHelp({ kind: 'rejected', errors: [{ campo: 'texto', motivo: 'falta', texto: STORY_MISSING }] });
@@ -394,13 +395,17 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     const asked = { objetivo_id, titulo, descripcion, responsable_id, fecha, espera_id, criterio };
     try {
       const result = await askLeda(spaceId, { texto, ...asked, evidencia: [...evidencia] });
+      // The person started over meanwhile (J2-20): the answer is for a form that is gone.
+      if (round.current !== asking) return;
       // The answer is for what the form had when she asked. If she changed the free text or a
       // field meanwhile, it may no longer fit (another person, another wait, other words): it
-      // fills nothing, and the box says so quietly (review review-03b5c3a74d3719b7).
+      // fills nothing, and the box says so quietly (review review-03b5c3a74d3719b7). The evidence
+      // counts as the set of kinds ticked (R3-001: the form fills nothing when it changed, and a
+      // kind ticked and unticked again is the same evidence).
       const now = latest.current;
       const changed =
         latestStory.current.trim() !== texto ||
-        now.evidencia.join('\n') !== evidencia.join('\n') ||
+        !sameKinds(now.evidencia, evidencia) ||
         (Object.keys(asked) as (keyof typeof asked)[]).some((field) => now[field] !== asked[field]);
       if (changed && result.kind !== 'failed') {
         setHelp({ kind: 'stale' });
@@ -429,7 +434,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       }
     } catch (error) {
       if (error instanceof SessionClosedError) onClosed();
-      else setHelp({ kind: 'failed', text: HELP_FAILED });
+      else if (round.current === asking) setHelp({ kind: 'failed', text: HELP_FAILED });
     }
   }
 
@@ -469,6 +474,25 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     const asked = toCheck(sent, checked.current);
     if (asked.length > 0) {
       setStep({ kind: 'edit', sending: true, failed: false, checking: true });
+      // J2-21: first what the load would refuse (the criterion's judgment and the rest), so a
+      // criterion that is going to be refused is never corrected first and the person does not
+      // confirm twice. Nothing loads and the key is not used; without an answer, it goes on.
+      let review: Awaited<ReturnType<typeof reviewTask>>;
+      try {
+        review = await reviewTask(spaceId, toInput(sent, key.current ?? ''));
+      } catch (error) {
+        if (error instanceof SessionClosedError) {
+          onClosed();
+          return;
+        }
+        review = { kind: 'unknown' };
+      }
+      if (review.kind === 'rejected' && review.errors.length > 0) {
+        setProblems(review.errors);
+        setStep({ kind: 'edit', sending: false, failed: false });
+        takeTo(fieldsWith(review.errors)[0] ?? null);
+        return;
+      }
       let spelling: Spelling;
       try {
         spelling = await checkSpelling(spaceId, Object.fromEntries(asked.map((f) => [f, sent[f]])));
@@ -554,8 +578,11 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   }
 
   function another() {
+    round.current += 1;
     key.current = null;
+    unknown.current = false;
     visited.current = null;
+    setClearing(false);
     setStory('');
     setHelp({ kind: 'idle' });
     setNotes([]);
@@ -627,6 +654,11 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const alerted = problems.length > 0;
   const invalid = (field: Field) => (on(field).length ? true : undefined);
   const criterionOffer = proposedCriterion(on('criterio'));
+  // J2-20: there is something to clear when anything was typed, chosen, ticked or told.
+  const somethingToClear =
+    story.trim() !== '' ||
+    draft.evidencia.length > 0 ||
+    (Object.keys(EMPTY_DRAFT) as Field[]).some((f) => f !== 'evidencia' && String(draft[f]).trim() !== '');
   const described = (id: string, field: Field) => (said(field).length ? `${id}-error` : undefined);
 
   return (
@@ -915,7 +947,23 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
                 '> confirmar'
               )}
             </button>
+            {somethingToClear && !clearing && (
+              <button type="button" className={SECONDARY} onClick={() => setClearing(true)} disabled={sending}>
+                &gt; empezar de nuevo
+              </button>
+            )}
           </div>
+          {clearing && (
+            <div role="group" aria-label="Empezar de nuevo" className="flex min-w-0 flex-wrap items-center gap-3 text-body">
+              <p className="m-0 text-ink-soft">¿Borro todo lo que cargaste?</p>
+              <button type="button" className={SECONDARY} onClick={another} disabled={sending}>
+                &gt; sí, borrar
+              </button>
+              <button type="button" className={SECONDARY} onClick={() => setClearing(false)}>
+                &gt; no
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </div>
