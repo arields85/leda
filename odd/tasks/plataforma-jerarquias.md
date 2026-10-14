@@ -952,9 +952,16 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - la ortografía que puede tocar la clave al reintentar;
         - un chequeo de la herramienta de medición.
         **IA real**, primera ronda: 45 de 45 (bitácora, `ayuda-al-crear-objetivo-1.json`).
-  - [ ] J3-4b · Los tres ajustes de la J3-4 (referente por el área, ortografía en la pausa, dictado general) y
+  - [x] J3-4b · Los tres ajustes de la J3-4 (referente por el área, ortografía en la pausa, dictado general) y
         los cinco WARNING de su RDD.
-  - [ ] J3-5 · La prueba en el celular (usuario), con su guion.
+  - [x] J3-5 · La prueba en el celular (usuario), con su guion.
+        **Pasada** (2026-10-14, guion `docs/product/guion-celular-j3.md`, túnel
+        `pharmaceutical-configuring-unix-while`):
+        - **Web de administración:** "salió perfecto", con unas cosas menores que el usuario va a contar.
+        - **Web de Dirección:** primero Leda no contestaba, porque el reinicio de Windows había cortado el
+          escuchador. Al levantarlo: "Muy bueno! está quedando todo muy bien".
+        IA real: 45 de 45 y 57 de 57. RDD aprobada en todos los tramos.
+  - [ ] J3-6 · Las cosas menores de la prueba (las cuenta el usuario).
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
       **Decisiones del usuario (2026-10-14, antes de escribir código):**
       - **D1. A quién le carga un referente:** a su área, a sí mismo y, como préstamo, a cualquiera de otra área,
