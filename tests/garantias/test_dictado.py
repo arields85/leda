@@ -698,8 +698,13 @@ def test_las_instrucciones_dicen_que_se_dicta_una_tarea_o_un_objetivo(web, conn,
     def instrucciones(i: int) -> str:
         return " ".join(p["text"] for p in gemini.cuerpo(i)["contents"][0]["parts"] if "text" in p)
 
-    assert "un objetivo" in instrucciones(0) and "una tarea" not in instrucciones(0)
-    assert "una tarea" in instrucciones(1) and "un objetivo" not in instrucciones(1)
+    # Lo que se dicta lo dice la primera oración; la que sigue nombra los datos del espacio, entre
+    # ellos los objetivos ("una persona, un área o un objetivo de esta lista").
+    def que_se_dicta(i: int) -> str:
+        return instrucciones(i).split(". ")[1]
+
+    assert "un objetivo" in que_se_dicta(0) and "una tarea" not in que_se_dicta(0)
+    assert "una tarea" in que_se_dicta(1) and "un objetivo" not in que_se_dicta(1)
     assert instrucciones(2) == instrucciones(1)
     assert dictado.instrucciones([], de="objetivo") != dictado.instrucciones([])
     with admin(conn) as cur:
