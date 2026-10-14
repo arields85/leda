@@ -81,23 +81,34 @@ viejo corriendo.
    - **MA, la Mini App y el QR del ADR 0024:** construida, con la `0073` aplicada en `leda_motor`. La IA real dio
      12 de 12 y RDD aprobó todo.
    - **Decisiones completas** de la J4, la MA, la J5 y la J6, en el documento de la unidad.
-2. **En curso:** un escritor delegado en tres cosas de la MA:
-   - el botón fijo del menú del bot, que se actualiza con el túnel en cada arranque;
-   - "abrí la app", que hoy no se entiende;
-   - el mensaje sin jugada, al que Leda contesta con la pregunta pendiente y lo ignora.
-   Después sigue una última unidad con los WARNING de RDD de la MA, primero los dos de seguridad; si hace falta
-   tocar la base, va en la `0074`. Una suite completa sobre la MA corre en segundo plano.
-3. **La prueba de la MA en el celular** (`docs/product/guion-celular-ma.md`) quedó en pausa en el paso 1:
-   "quiero ver mis tareas" contestó con la lista y sin botón, como corresponde. Se retoma cuando esté el botón del
-   menú.
-4. **Después:**
-   - la tarea "Lenguaje: sin trabado ni bloqueada";
-   - J5 y J6, con sus decisiones ya tomadas;
-   - J7, de la que todavía faltan las decisiones.
-   Deudas abiertas:
-   - el detalle de la tarea no muestra quién la pidió, qué espera ni quién la espera;
-   - la ortografía de la puerta del equipo falló dos veces; hay que mirarla con la IA real;
-   - cuánto dura la sesión de administración en la computadora.
+2. **En curso (2026-10-14, noche):** un escritor delegado, MA-2 y MA-3.
+   - **MA-2:**
+     - Telegram de escritorio lleva a la página del QR en el navegador, con el mensaje "Abrí Leda en el navegador";
+     - los WARNING de las últimas RDD de la MA;
+     - el detalle de la tarea completo.
+   - **MA-3, las correcciones del usuario en el iPhone:**
+     - el botón del menú se llama "Mi panel";
+     - el detalle de la tarea se ve dentro de la app, con "> volver";
+     - pantalla completa;
+     - "salir" sólo en la compu;
+     - "> Nueva tarea" abajo, como botón principal, y "Volver al chat" abajo a la izquierda, chico;
+     - las pestañas "Mis tareas", "Mi equipo" y "Lo que pedí" en una fila; "Mi equipo" muestra sólo la gente
+       del referente, con el área como dato;
+     - el título y el nombre en una línea, y el nombre, si no entra, sigue debajo alineado a la derecha;
+     - los contadores Vencidas · Sin empezar · En curso · Esperando · Entregadas, sin "Activas";
+     - todo en una pantalla: sólo se desplazan las tarjetas.
+   Cuando termine:
+   - aplicar la migración que haya, con respaldo y ensayo;
+   - rearmar `web/dist` y reiniciar la web;
+   - RDD por commit, sobre una copia en LF si hace falta;
+   - la ronda con la IA real de lo que haya cambiado;
+   - el usuario reinicia el escuchador y repite la prueba de la MA (`docs/product/guion-celular-ma.md`).
+3. **Prueba de la MA:** el usuario sólo tiene a Ariel en el celular. Marcos e Ismael se prueban en Telegram de
+   escritorio, donde el botón tiene que abrir el navegador. En el QR entra la cuenta que lo escanea.
+   - Probado con Ariel: el botón del menú y la Mini App andan, y el detalle de la tarea se abrió (con el estilo
+     viejo, ya en corrección).
+   - Pendiente: los pasos de objetivos y de la J3-6 y la J3-7 (pasos 10 a 12) para cerrar la J3; repetir lo de la J4;
+     la administración; el QR.
 Acuerdos del 2026-10-14:
 - las decisiones de cada porción se traen al principio, de a una y en texto;
 - RDD y las rondas con la IA real, sin preguntar; al primer error de cupo, se para y espera;
