@@ -1690,6 +1690,16 @@ def _cargar(conn, puerta: str, token: str, espacio: str | None, datos: dict[str,
              datos["fecha"], datos["criterio"], datos["evidencia"], datos["decidio"],
              datos["revisa"], clave, ahora, datos["espera"]))
         resultado = cur.fetchone()["r"]
+        if resultado.get("ok") and not resultado.get("repetida") and clave is not None:
+            # Los avisos de la carga (J4b, D6, D7 y D9), en la misma transacción: una tarea
+            # cargada sin su aviso no queda (`motor.carga`). Una carga repetida ya los guardó.
+            from .motor.carga import avisar_la_carga
+
+            cur.execute("select set_config('leda.workspace_id', %s, true)", (ws,))
+            avisar_la_carga(cur, ws, str(resultado["task_id"]), ahora,
+                            cargada_por_app_user=sesion["app_user_id"],
+                            por_la_administracion=puerta == PUERTA_DE_ADMINISTRACION,
+                            decidio=datos["decidio"])
     rechazo = _sin_lo_que_rechaza_la_carga(resultado, puerta)
     if rechazo is not None:
         return rechazo

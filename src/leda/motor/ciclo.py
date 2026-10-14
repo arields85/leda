@@ -52,6 +52,7 @@ from ..incidentes import registrar_incidente
 from .aprobacion import cerrar_las_que_ya_pueden
 from .avisos import enviar_avisos
 from .botones import ConOpciones
+from .carga import avisar_lo_de_los_pedidos
 from .escalera import correr_escalera
 from .ia import IA
 from .tiempo import Reloj
@@ -90,6 +91,10 @@ class Ciclo:
                 "escalera", lambda: correr_escalera(self.conn, self.ws, self.reloj))
             resultados["cierres"] = self._paso(
                 "cierres", lambda: cerrar_las_que_ya_pueden(self.conn, self.ws, self.reloj))
+            # Lo pedido a otra área que terminó o se reabrió (J4b, D14): después de los cierres,
+            # así un pedido que se cerró en esta vuelta ya tiene su aviso.
+            resultados["pedidos"] = self._paso(
+                "pedidos", lambda: avisar_lo_de_los_pedidos(self.conn, self.ws, self.reloj))
             resultados["avisos"] = self._paso(
                 "avisos", lambda: enviar_avisos(self.conn, self.ws, self.ia, self.reloj))
         resultados["huerfanos"] = self._paso(
@@ -146,7 +151,7 @@ class Ciclo:
 
     def _contar(self, resultados: dict[str, Any]) -> None:
         """Lo que hizo la vuelta, en la consola del escuchador, sólo si hizo algo."""
-        for nombre in ("escalera", "cierres", "avisos"):
+        for nombre in ("escalera", "cierres", "pedidos", "avisos"):
             if resultados.get(nombre):
                 self.imprimir(f"  ⏱ {nombre}: {resultados[nombre]}")
         if resultados.get("huerfanos"):

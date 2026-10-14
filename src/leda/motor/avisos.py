@@ -175,8 +175,8 @@ from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, ancl
 from .ancla import prevision_vigente as _prevision_vigente
 from .asentado import QUEDA_ASENTADO, queda_asentado
 from .auditoria import auditar
-from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, FICHAS, LLEGA, NO_LE_LLEGO,
-                     YA_LE_LLEGO, quien_revisa, referente)
+from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, FICHAS, LLEGA,
+                     LLEVA_EL_ENLACE_DE_ENTRADA, NO_LE_LLEGO, YA_LE_LLEGO, quien_revisa, referente)
 from .hechos import con_los_iconos
 from .margen import sale_con_margen
 from .ia import IA
@@ -251,8 +251,12 @@ class TipoDeAviso:
     recuerda: str | None = None
     # A quién le lleva el enlace a la página de su tarea (ADR 0019, 7a): `destinatario`, siempre
     # a quien lo recibe; `responsable`, sólo si quien lo recibe es el responsable de la tarea.
-    # Sólo un aviso de coordinación, que sale solo.
+    # `entrada_web`: el enlace de entrada a la web de quien lo recibe (el de `pedir_acceso_web`;
+    # las tareas nuevas de la carga, J4b, D6). Sólo un aviso de coordinación, que sale solo.
     enlace: str | None = None
+    # Si espera a que quien lo recibe conecte su Telegram, en lugar de omitirse (J4b, D9: cuando
+    # se conecta, le llegan sus tareas juntas).
+    espera_que_se_conecte: bool = False
     # Si los de este tipo a una misma persona que salen juntos van en un solo mensaje, una lista
     # (decisión 17): cada uno con un botón para verlo, sin adjuntos, sin enlace y sin lo que
     # ofrece decidir (`_hechos_en_la_lista`). Uno solo sale como siempre.
@@ -654,6 +658,8 @@ def _preparar(m: Momento, aviso: dict[str, Any]) -> _Listo | str:
         omitir(cur, aviso_id, "destinatario_inactivo", m.ahora)
         return "omitido"
     if destinatario["telegram_user_id"] is None:
+        if tipo is not None and tipo.espera_que_se_conecte:
+            return "en_espera"      # le llega cuando conecte su Telegram (J4b, D9)
         omitir(cur, aviso_id, "destinatario_sin_telegram", m.ahora)
         return "omitido"
     if ausente(cur, str(aviso["destinatario_membership_id"]), m.hoy):
@@ -737,6 +743,10 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     if enlace is not None:
         envio = [replace(envio[0], hechos={**envio[0].hechos, LLEVA_EL_ENLACE: True}),
                  *envio[1:]]
+    entrada_web = _entrada_web_del_envio(m, envio)
+    if entrada_web is not None:
+        envio = [replace(envio[0], hechos={**envio[0].hechos, **LLEVA_EL_ENLACE_DE_ENTRADA}),
+                 *envio[1:]]
     preguntas_de = [None if en_lista else _pregunta_del_aviso(m, x.aviso, x.hechos)
                     for x in envio]
     pregunta = next((q for q in preguntas_de if q is not None), None)
@@ -769,7 +779,8 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                        recipient_membership_id=persona, message_type=tipo_de_mensaje,
                        is_response=es_respuesta,
                        es_coordinacion=tipo.es_coordinacion, scheduled_for=m.ahora,
-                       grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace)
+                       grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace,
+                       enlace_de_entrada_web=entrada_web)
         if adjuntos:
             # El texto de la fila del álbum es sólo el registro de lo que lleva: el álbum sale
             # sin texto (`salida.enqueue_outbox`, `adjuntos`).
@@ -855,12 +866,26 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     return ["enviado"] * len(envio)
 
 
+def _entrada_web_del_envio(m: Momento, envio: list[_Listo]) -> str | None:
+    """La persona del enlace de entrada a la web que lleva el envío (`TipoDeAviso.enlace` =
+    `entrada_web`), o `None`: sólo un aviso de ese tipo que sale solo, con la dirección pública
+    configurada (nunca se promete un enlace que no va a salir). El despachador lo emite al mandar,
+    como el que la persona pide (`fichas.pedir_acceso_web`)."""
+    from ..config import config
+
+    x = envio[0]
+    if len(envio) != 1 or x.tipo.enlace != "entrada_web" or not config.base_url:
+        return None
+    return str(x.destinatario["membership_id"])
+
+
 def _enlace_del_envio(m: Momento, envio: list[_Listo]) -> tuple[str, str] | None:
     """La tarea y la persona del enlace a la página que lleva el envío, o `None`: sólo un aviso
     de un tipo que lo lleva (`TipoDeAviso.enlace`) y sale solo, con la dirección pública
     configurada, y si quien lo recibe puede ver la tarea (la regla vive en la base)."""
     x = envio[0]
-    if len(envio) != 1 or x.tipo.enlace is None or x.aviso["task_id"] is None:
+    if (len(envio) != 1 or x.tipo.enlace not in ("destinatario", "responsable")
+            or x.aviso["task_id"] is None):
         return None
     task_id, persona = str(x.aviso["task_id"]), str(x.destinatario["membership_id"])
     if x.tipo.enlace == "responsable":
@@ -1177,7 +1202,11 @@ def espera_abierta(cur, task_id) -> dict[str, Any] | None:
 def quienes_escalan(cur, tarea: dict[str, Any]) -> list[dict[str, Any]]:
     """A quiénes va el escalamiento por falta de respuesta: la ruta del pack
     (`falta_persistente_de_respuesta`), la del área de la tarea antes que la general y por su
-    orden; una ruta a un rol llega a todos los que lo tienen. Nunca al responsable mismo."""
+    orden; una ruta a un rol llega a todos los que lo tienen. Nunca al responsable mismo, ni por
+    encima de Dirección: la tarea de quien tiene la autoridad final no se escala a nadie (D1b,
+    J4b: Leda le hace el seguimiento como a cualquiera, sin escalar)."""
+    if es_de_direccion(cur, tarea):
+        return []
     cur.execute(
         """select r.destino_membership_id, r.destino_rol_id from escalation_route r
             where r.disparador = 'falta_persistente_de_respuesta'
@@ -1195,6 +1224,15 @@ def quienes_escalan(cur, tarea: dict[str, Any]) -> list[dict[str, Any]]:
         if destinos:
             return destinos
     return []
+
+
+def es_de_direccion(cur, tarea: dict[str, Any]) -> bool:
+    """Si la persona responsable de la tarea tiene la autoridad final del espacio (Dirección):
+    nadie está por encima (D1b, J4b)."""
+    cur.execute("""select r.autoridad_final from membership m join rol r on r.id = m.rol_id
+                    where m.id = %s""", (str(tarea["responsable_membership_id"]),))
+    fila = cur.fetchone()
+    return bool(fila and fila["autoridad_final"])
 
 
 def prevision_vigente(m: Momento, tarea: dict[str, Any]) -> dict[str, Any] | None:
@@ -1718,6 +1756,35 @@ def _vigencia_del_retiro(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]
 def _vigencia_de_la_espera_de_otra_pieza(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
     from . import retiro_de_la_administracion as retiro
     return retiro.vigencia_a_quien_la_revisa(m, aviso)
+
+
+# --- La carga desde la web y lo pedido a otra área (J4b; `carga.py`) ---------------------------
+
+TAREAS_NUEVAS = "tareas_nuevas"
+TAREAS_NUEVAS_PARA_REVISAR = "tareas_nuevas_para_revisar"
+LO_PEDIDO_TERMINO = "lo_pedido_termino"
+LO_PEDIDO_SE_REABRIO = "lo_pedido_se_reabrio"
+
+
+def _vigencia_de_las_tareas_nuevas(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import carga    # importa este módulo
+    return carga.vigencia_de_las_tareas_nuevas(m, aviso)
+
+
+def _vigencia_de_las_tareas_para_revisar(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import carga
+    return carga.vigencia_de_las_tareas_para_revisar(m, aviso)
+
+
+def _vigencia_de_lo_pedido_que_termino(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import carga
+    return carga.vigencia_de_lo_pedido_que_termino(m, aviso)
+
+
+def _vigencia_de_lo_pedido_que_se_reabrio(m: Momento,
+                                          aviso) -> tuple[str | None, dict[str, Any]]:
+    from . import carga
+    return carga.vigencia_de_lo_pedido_que_se_reabrio(m, aviso)
 
 
 # --- Quien aprueba no contesta (porción 3c; `escalera.py`, "La espera de una decisión") ---------
@@ -2289,6 +2356,19 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
                 es_coordinacion=True),
     TipoDeAviso(LA_ENTREGA_ESPERA_OTRA_PIEZA, "informativo",
                 _vigencia_de_la_espera_de_otra_pieza, es_coordinacion=True),
+    # La carga desde la web (J4b; `carga.py`): a quien la hace, sus tareas nuevas juntas, con el
+    # enlace de entrada a su web, y, si no tiene Leda conectada, cuando se conecte (D6 y D9); a
+    # quien la revisa, si no la cargó él (D7). De coordinación: las causa el acto de otra persona.
+    TipoDeAviso(TAREAS_NUEVAS, "informativo", _vigencia_de_las_tareas_nuevas,
+                es_coordinacion=True, enlace="entrada_web", espera_que_se_conecte=True),
+    TipoDeAviso(TAREAS_NUEVAS_PARA_REVISAR, "informativo", _vigencia_de_las_tareas_para_revisar,
+                es_coordinacion=True),
+    # Lo pedido a otra área (D14 y D1b): que terminó, a quien lo pidió y a quien lo esperaba; que
+    # se reabrió, al referente que lo recibe de vuelta.
+    TipoDeAviso(LO_PEDIDO_TERMINO, "informativo", _vigencia_de_lo_pedido_que_termino,
+                es_coordinacion=True),
+    TipoDeAviso(LO_PEDIDO_SE_REABRIO, "normal", _vigencia_de_lo_pedido_que_se_reabrio,
+                es_coordinacion=True),
 )})
 
 

@@ -258,6 +258,61 @@ SIGNIFICADOS: Mapping[str, str] = {
                                     "pide respuesta.",
     "entregas_que_esperan_otra_pieza": "Las entregas que esperan una pieza nueva, cada una con "
                                        "su tarea, su responsable y lo que le falta.",
+    # --- La carga desde la web y lo pedido a otra área (J4b; `carga.py`) -------------------------
+    "tareas_nuevas": "Aviso a la persona: le cargaron una o más tareas nuevas en la plataforma "
+                     "de su equipo (tareas_que_le_cargaron), cada una con quién la cargó, para "
+                     "cuándo es y de qué objetivo. No pide respuesta: puede verlas en la web.",
+    "tareas_nuevas_para_revisar": "Aviso a quien va a revisar una o más tareas nuevas que cargó "
+                                  "otra persona (tareas_que_va_a_revisar): cuando estén "
+                                  "entregadas, le toca a quien recibe el mensaje revisarlas. No "
+                                  "pide respuesta.",
+    "tareas_que_le_cargaron": "Las tareas nuevas de la persona que recibe el mensaje, cada una "
+                              "con lo que se sabe de ella.",
+    "tareas_que_va_a_revisar": "Las tareas nuevas que va a revisar la persona que recibe el "
+                               "mensaje, cada una con quién la hace y quién la cargó.",
+    "la_cargo": "Quién cargó esa tarea en la plataforma (la_administracion, si la cargó la "
+                "administración de Leda).",
+    "la_administracion": "La administración de Leda, sin nombre de persona.",
+    "la_decidio": "Quién decidió esa tarea, cuando la cargó la administración de Leda.",
+    "objetivo": "El objetivo del que es parte esa tarea.",
+    "la_revisa": "Quién va a revisar esa tarea cuando esté entregada.",
+    "la_hace": "La persona que hace esa tarea.",
+    "la_pide": "Quién pidió esa tarea, desde otra área o a Dirección: la va a ver, y puede pedir "
+               "cambios cuando esté terminada.",
+    "para_el_area": "El área para la que se pide esa tarea: la de quien la pide.",
+    "decide_quien_la_hace": "La persona que recibe el mensaje decide quién de su área hace esa "
+                            "tarea: la hace o se la pasa a alguien de su gente desde la "
+                            "web.",
+    "es_un_pedido_a_direccion": "Esa tarea es un pedido a Dirección: algo que se necesita de "
+                                "Dirección para que otra tarea pueda seguir. La da por cumplida "
+                                "quien la pidió.",
+    "lo_pedido_termino": "Aviso de que una tarea pedida quedó terminada y aprobada: a quien la "
+                         "pidió (la_pediste) o a quien tiene una tarea que la esperaba "
+                         "(tareas_que_la_esperaban). No pide respuesta.",
+    "la_hizo": "La persona que hizo esa tarea.",
+    "la_aprobo": "Quién aprobó esa tarea.",
+    "la_pediste": "La persona que recibe el mensaje fue quien pidió esa tarea.",
+    "la_pidio": "Quién pidió esa tarea.",
+    "tareas_que_la_esperaban": "Las tareas abiertas que no podían seguir hasta que esa terminara, "
+                               "cada una con si ya puede seguir y, si no es de quien recibe el "
+                               "mensaje, de quién es.",
+    "ya_puede_seguir": "Si esa tarea ya no espera ninguna otra: puede seguir.",
+    "lo_pedido_se_reabrio": "Aviso a quien recibe de vuelta una tarea terminada que se pidió "
+                            "desde otra área: quien la pidió la reabrió con su motivo "
+                            "(motivo_de_la_reapertura), y volvió abierta a quien recibe el mensaje, "
+                            "que decide quién la retoma.",
+    "la_reabrio": "Quién reabrió la tarea: quien la había pedido.",
+    "motivo_de_la_reapertura": "Qué hay que cambiar, como lo escribió quien reabrió la tarea.",
+    "decide_quien_la_retoma": "La persona que recibe el mensaje decide quién la retoma: la "
+                              "retoma o se la pasa a alguien de su gente.",
+    "la_tenia": "Quién tenía la tarea antes de que se reabriera.",
+    "ya_no_hay_tareas_nuevas": "Ninguna de esas tareas sigue abierta y a cargo de quien iba a "
+                               "recibir el aviso: ya no hace falta.",
+    "se_reabrio_antes": "La tarea se reabrió antes de que saliera el aviso de que terminó: llega "
+                        "otro cuando vuelva a terminar.",
+    "ya_se_cancelo": "La tarea se canceló antes de que saliera el aviso.",
+    "la_aprobo_quien_la_pidio": "Quien pidió la tarea la aprobó él mismo y ninguna otra la "
+                                "esperaba: no hay a quién contarle.",
     "ya_esta_aprobada": "La tarea ya está aprobada o cerrada: el retiro no le cambia nada.",
     "la_entrega_ya_esta_completa": "La entrega ya tiene otra vez todo lo que pide la tarea: "
                                    "quien la revisa recibe la entrega completa en su propio "
@@ -1499,7 +1554,8 @@ _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto", "nombre_del_archivo", 
                                       "enlace", "lo_que_pide", "describe",
                                       "sigue_contando_de_la_entrega_anterior",
                                       "le_falta_del_criterio", "ejemplo", "lo_que_dice",
-                                      "motivo_del_retiro", "referencias"})
+                                      "motivo_del_retiro", "referencias",
+                                      "motivo_de_la_reapertura"})
 # El nombre de un archivo nunca es un código, aunque se escriba como uno (`informe_final`).
 # Ni lo que escribió en una pieza de una entrega, ni un enlace, ni el código de una cosa que
 # pide la tarea, que es dato del pack (va con sus palabras, `en_palabras`).
@@ -1508,6 +1564,7 @@ _NUNCA_UN_CODIGO = frozenset({"nombre_del_archivo", "dice", "enlace", "tipo_de_e
                               "sigue_contando_de_la_entrega_anterior",
                               "le_falta_del_criterio", "ejemplo", "lo_descrito_cubre",
                               "lo_que_dice", "motivo_del_retiro", "referencias",
+                              "motivo_de_la_reapertura",
                               "nombre_que_no_esta", "como_lo_nombro"})
 
 

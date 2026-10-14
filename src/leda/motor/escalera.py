@@ -157,7 +157,8 @@ from .avisos import (ABIERTOS, ANTES_LA_REVISABA_OTRA_PERSONA, APROBACION_TRABAD
                      ESPERA_DE_ESTADO, RECORDATORIO_DE_LA_DECISION, REPREGUNTA, Momento,
                      aprobacion_vigente, ausente, aviso_de_la_entrega, espera_abierta, guardar,
                      hechos_de_la_escalera, hechos_de_una_decision, hechos_de_una_pregunta,
-                     integrante, leer_tarea, omitir, quien_esta_arriba, quienes_escalan)
+                     es_de_direccion, integrante, leer_tarea, omitir, quien_esta_arriba,
+                     quienes_escalan)
 from .avisos import REPETICION_DEL_DIA, hechos_de_la_que_vuelve
 from .pregunta_sin_contestar import (clave_de_la_repeticion, espera_para_repetir, preguntada_en,
                                      se_repite)
@@ -461,6 +462,13 @@ def _pedir_el_estado(m: Momento, tarea, hasta: Anclaje, paso: int, ronda: list[s
 def _escalar(m: Momento, tarea, hasta: Anclaje, pedidos: list[dict[str, Any]],
              ronda: list[str], avance: dict[str, Any] | None, por: dict[str, str]) -> str | None:
     destinos = quienes_escalan(m.cur, tarea)
+    if not destinos and es_de_direccion(m.cur, tarea):
+        # Nadie está por encima de Dirección (D1b, J4b): la escalera termina sin escalar, y no es
+        # una falta de configuración.
+        m.cur.execute("""update pending_reply set escalado_en = %s
+                          where task_id = %s and satisfecho_en is null""",
+                      (m.ahora, str(tarea["id"])))
+        return None
     if not destinos:
         registrar_incidente(
             m.cur, m.workspace_id,
@@ -608,6 +616,10 @@ def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
         _guardar_de_una_pregunta(m, REPREGUNTA, tarea, base, de, siguiente, destinatario=persona)
         return REPREGUNTA
     destinos = quienes_escalan(cur, tarea)
+    if not destinos and es_de_direccion(cur, tarea):
+        cur.execute("update pending_reply set escalado_en = %s where id = %s",
+                    (m.ahora, espera["id"]))
+        return None
     if not destinos:
         registrar_incidente(
             cur, m.workspace_id,

@@ -31,7 +31,7 @@ from leda.motor.tiempo import RelojFijo
 
 from tests.motor.ayudantes import (IAQueRedacta, avisos_guardados, cambiar_el_vencimiento, cuantas,
                                    dice, dice_una_prevision, espera_del_estado, lo_que_salio_para,
-                                   nueva_tarea, octubre, todos, uno)
+                                   nueva_tarea, octubre, poner_estado, todos, uno)
 
 
 # --- El aviso previo (9b; conversaciones 01 y 04) -----------------------------------------------
@@ -578,3 +578,30 @@ def test_el_aviso_previo_no_se_repite_cuando_el_ancla_vuelve_al_vencimiento(conn
     for momento in (octubre(6, 13), octubre(7, 10), octubre(8, 10)):
         assert [p for p in dias.ciclo(momento) if p["persona"] == "Marcos"] == []
     assert len(avisos_guardados(conn, "aviso_previo")) == 1
+
+
+def test_la_tarea_de_direccion_no_se_escala_a_nadie_ni_deja_un_incidente(conn, mundo, dias):
+    """D1b (J4b): un pedido a Dirección se sigue como cualquier tarea, sin escalar: nadie está por
+    encima de quien tiene la autoridad final. No es una falta de configuración, así que no deja el
+    incidente de "sin ruta"; la espera queda escalada y la escalera termina."""
+    poner_estado(conn, mundo["tarea"], "cancelada")
+    with admin(conn) as cur:
+        cur.execute("""insert into task (workspace_id, objective_id, titulo, area_id,
+                                         responsable_membership_id, estado, fecha_objetivo)
+                       select workspace_id, objective_id, 'Aprobar la compra', area_id, %s,
+                              'asignada', fecha_objetivo
+                         from task where id = %s""",
+                    (mundo["personas"]["Ismael"]["membership_id"], mundo["tarea"]))
+    conn.commit()
+    for dia in (9, 13, 14):
+        dias.ciclo(octubre(dia, 10))
+    pedidos = avisos_guardados(conn, "pedido_de_estado")
+    assert len(pedidos) == 3
+    assert "si_no_hay_respuesta" not in pedidos[-1]["hechos"]
+
+    assert dias.ciclo(octubre(15, 10)) == []
+    dias.ciclo(octubre(16, 10))
+
+    assert avisos_guardados(conn, "escalamiento") == []
+    assert cuantas(conn, "incident") == 0
+    assert espera_del_estado(conn)["escalado_en"] == octubre(15, 10)

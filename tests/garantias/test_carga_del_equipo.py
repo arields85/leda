@@ -825,6 +825,24 @@ def test_cargar_por_la_api_del_equipo(web, conn, equipo, administradora):
     assert _contar(conn, "task") == 1
 
 
+def test_la_carga_por_la_web_guarda_sus_avisos_una_sola_vez(web, conn, equipo):
+    """J4b (D6, D7): la carga deja, en su misma transacción, el aviso a quien la hace y, si la
+    revisa otro que no la cargó, el de quien la revisa; repetir la carga con su clave no los
+    repite, y lo que no se carga no avisa a nadie."""
+    morgan = _navegador(web, conn, equipo, "Morgan Hale")
+    cuerpo = _cuerpo(equipo, responsable_id=_id(equipo, "Sam North"),
+                     revisa_id=_id(equipo, "Sam Noble"))
+    assert morgan.post("/app/api/tareas", json=cuerpo).status_code == 201
+    assert morgan.post("/app/api/tareas", json=cuerpo).status_code == 200
+    assert morgan.post("/app/api/tareas", json=_cuerpo(equipo, titulo="")).status_code == 422
+    assert _contar(conn, "scheduled_notice") == 2
+    for tipo, nombre in (("tareas_nuevas", "Sam North"),
+                         ("tareas_nuevas_para_revisar", "Sam Noble")):
+        assert _contar(conn, "scheduled_notice",
+                       "tipo = %s and destinatario_membership_id = %s and estado = 'guardado'",
+                       tipo, _id(equipo, nombre)) == 1, tipo
+
+
 def test_direccion_elige_quien_la_revisa_por_la_api(web, conn, equipo):
     morgan = _navegador(web, conn, equipo, "Morgan Hale")
     r = morgan.post("/app/api/tareas", json=_cuerpo(

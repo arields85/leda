@@ -105,7 +105,10 @@ BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 # (`cadence_job`). Delegar (C-7, `pase.py`): los pases que esperan algo de la persona
 # (`pase_de_tarea`, sólo lee: escribe la cocina). El detalle de una tarea (decisión 33,
 # `detalle.py`): los pedidos que esperan la decisión del encargado (`pedido_de_detalle`, sólo lee:
-# escribe la cocina; lo compartido lo lee sólo la base, `puede_ver_tarea`).
+# escribe la cocina; lo compartido lo lee sólo la base, `puede_ver_tarea`). Los avisos de la carga y
+# de lo pedido (J4b, `carga.py`): el objetivo de una tarea nueva (`objective`), las reaperturas de
+# lo pedido (`reapertura_de_tarea`), sólo lee las dos; y si la persona responsable es Dirección, que
+# no se escala a nadie (`rol`, sólo lee; `avisos.es_de_direccion`).
 TABLAS_PERMITIDAS = {
     "absence", "apodo", "app_user", "approval", "archivo", "archivo_de_mensaje", "archivo_de_tarea",
     "area",
@@ -114,8 +117,8 @@ TABLAS_PERMITIDAS = {
     "conversation_state", "conversation_turn", "dependency", "dicho_de_quien_destraba",
     "escalation_route", "evidence",
     "evidencia_retirada", "inbound_message", "integrante", "membership", "message_outbox",
-    "model_config", "pase_de_tarea", "pedido_de_detalle", "pending_reply", "persona_config",
-    "scheduled_notice",
+    "model_config", "objective", "pase_de_tarea", "pedido_de_detalle", "pending_reply",
+    "persona_config", "reapertura_de_tarea", "rol", "scheduled_notice",
     "task",
     "task_evidence_policy", "task_forecast", "workspace", "workspace_setting",
 }
