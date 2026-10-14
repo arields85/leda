@@ -80,7 +80,27 @@ def leer(cur, token: str) -> dict[str, Any] | None:
     _con_la_version_del_nucleo(cur)
     cur.execute("select leer_pagina_de_tarea(%s) as datos", (_hash(token),))
     fila = cur.fetchone()
-    return fila["datos"] if fila else None
+    datos = fila["datos"] if fila else None
+    if datos is not None:
+        datos["relaciones"] = _relaciones(cur, token)
+    return datos
+
+
+def _relaciones(cur, token: str) -> dict[str, Any] | None:
+    """Quién pidió la tarea, lo que espera y lo que la espera (migración 0075; MA-2), con la regla
+    de la página. Sin la 0075 aplicada, la página sale igual, sin eso, y se dice en la consola (en
+    un punto de guardado: la vista ya registrada no se pierde)."""
+    import psycopg
+
+    try:
+        with cur.connection.transaction():
+            cur.execute("select relaciones_de_la_pagina_de_tarea(%s) as r", (_hash(token),))
+            fila = cur.fetchone()
+    except psycopg.errors.UndefinedFunction:
+        print("  ! falta la migración 0075: la página de la tarea sale sin quién la pidió ni sus "
+              "esperas.")
+        return None
+    return fila["r"] if fila else None
 
 
 def leer_archivo(cur, token: str, evidence_id: str) -> dict[str, Any] | None:

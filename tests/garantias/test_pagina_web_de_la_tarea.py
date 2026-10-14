@@ -330,3 +330,102 @@ def test_la_evidencia_de_otra_tarea_recibe_la_pagina_generica(web, conn, mundo):
     assert _generica(web, f"/tarea/{token}/evidencia/no-es-un-id").text == inventado
     assert _generica(web, "/tarea/inventado/evidencia/"
                           f"{mundo['norte']['piezas']['foto']}").text == inventado
+
+
+# --- Quién la pidió, lo que espera y lo que la espera (MA-2; prueba de la J4, hallazgo 9) -------
+
+def _con_relaciones(conn, mundo) -> dict:
+    """La tarea de Sam Noble la pidió Morgan Hale; espera a "Pintar el galpón" (de Sam North, de
+    otra área), y la espera "Ordenar el depósito" (de Sam Noble, de su misma área)."""
+    from tests.garantias.test_pagina_de_la_tarea import _tarea
+
+    norte = mundo["norte"]
+    with admin(conn) as cur:
+        detras = _tarea(cur, mundo["north-lab"], titulo="Ordenar el depósito")
+        cur.execute("update task set pedida_por_membership_id = %s where id = %s",
+                    (_persona(mundo, "Morgan Hale"), norte["id"]))
+        for origen, destino in ((mundo["vecina"]["id"], norte["id"]), (norte["id"], detras["id"])):
+            cur.execute("""insert into dependency (workspace_id, origen_task_id, destino_task_id)
+                           values (%s, %s, %s)""", (mundo["north-lab"]["id"], origen, destino))
+    conn.commit()
+    return detras
+
+
+def test_el_detalle_dice_quien_la_pidio_lo_que_espera_y_lo_que_la_espera(web, conn, mundo):
+    _con_relaciones(conn, mundo)
+    r = web.get(f"/tarea/{_emitir(conn, mundo, 'Morgan Hale')}")
+    assert r.status_code == 200
+    _tiene_las_cabeceras(r)
+    assert "La pidió" in r.text and "Morgan Hale" in r.text
+    assert "Espera a" in r.text and "Pintar el galpón" in r.text
+    assert "La esperan" in r.text and "Ordenar el depósito" in r.text
+
+
+def test_de_lo_relacionado_solo_se_ve_lo_que_quien_mira_puede_ver(web, conn, mundo):
+    """La misma regla que la página (`puede_ver_tarea`): Sam Noble hace la tarea y ve la que la
+    espera (también suya), pero de la que espera, de otra persona y otra área, sólo que hay una."""
+    _con_relaciones(conn, mundo)
+    r = web.get(f"/tarea/{_emitir(conn, mundo, 'Sam Noble')}")
+    assert r.status_code == 200
+    assert "Pintar el galpón" not in r.text and "Sam North" not in r.text
+    assert "Una tarea que no podés ver" in r.text
+    assert "Ordenar el depósito" in r.text
+
+
+def test_sin_relaciones_el_detalle_lo_dice(web, conn, mundo):
+    r = web.get(f"/tarea/{_emitir(conn, mundo, 'Taylor Quinn')}")
+    assert "La pidió" not in r.text
+    assert "No espera a ninguna tarea." in r.text and "Ninguna tarea la espera." in r.text
+
+
+def test_el_detalle_tiene_un_volver_a_la_web_de_su_espacio(web, conn, mundo):
+    """En la Mini App de iOS no hay un "atrás" del teléfono: la página tiene el suyo, sin ejecutar
+    nada (un enlace), a la puerta del equipo de su espacio."""
+    r = web.get(f"/tarea/{_emitir(conn, mundo, 'Taylor Quinn')}")
+    assert '<a class="volver" href="/app/e/north-lab/">&gt; volver</a>' in r.text
+
+
+def test_un_administrador_ve_lo_relacionado_y_vuelve_a_la_administracion(web, conn, mundo):
+    from leda import pagina_de_tarea as P
+
+    _con_relaciones(conn, mundo)
+    morgan = mundo["north-lab"]["people"]["Morgan Hale"]["app_user_id"]
+    with admin(conn) as cur:
+        cur.execute("insert into platform_role (app_user_id, rol) values (%s, 'administrador')",
+                    (morgan,))
+        token = P.emitir_para_administrador(cur, morgan, mundo["north-lab"]["id"],
+                                            mundo["norte"]["id"])
+    conn.commit()
+    r = web.get(f"/tarea/{token}")
+    assert r.status_code == 200
+    assert "Pintar el galpón" in r.text and "Ordenar el depósito" in r.text
+    assert '<a class="volver" href="/app/admin/">&gt; volver</a>' in r.text
+
+
+def test_sin_la_0075_la_pagina_sale_igual_y_lo_dice_en_la_consola(capsys):
+    """Antes de aplicar la 0075 en una base, la página de la tarea no se rompe: sale sin quién la
+    pidió ni sus esperas, y la consola lo dice (nunca en silencio)."""
+    from contextlib import nullcontext
+
+    import psycopg
+
+    from leda import pagina_de_tarea as P
+
+    class Cursor:
+        connection = type("C", (), {"transaction": lambda self: nullcontext()})()
+
+        def execute(self, sql, *_):
+            self.ultimo = sql
+            if "relaciones_de_la_pagina_de_tarea" in sql:
+                raise psycopg.errors.UndefinedFunction("no existe")
+
+        def fetchone(self):
+            return {"datos": {"tarea": {"titulo": "X"}}}
+
+    datos = P.leer(Cursor(), "t" * 43)
+    assert datos == {"tarea": {"titulo": "X"}, "relaciones": None}
+    assert "falta la migración 0075" in capsys.readouterr().out
+    from leda.tarea_vista import pagina
+
+    html = pagina({**datos, "zona_horaria": "UTC"}, token="t" * 43)
+    assert "Espera a" not in html and "&gt; volver" not in html

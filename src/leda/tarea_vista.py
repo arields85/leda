@@ -61,6 +61,8 @@ li { margin: .45rem 0; overflow-wrap: anywhere; }
 .quien { opacity: .7; font-size: .85rem; }
 .retirada { opacity: .6; }
 .vacio { opacity: .7; font-style: italic; }
+.volver { display: inline-block; margin: 0 0 .75rem; font-family: ui-monospace, Menlo, Consolas,
+          monospace; font-size: .95rem; color: inherit; text-decoration: none; padding: .35rem 0; }
 """
 
 
@@ -205,6 +207,27 @@ def _pieza(p: dict[str, Any], token: str, palabras: dict[str, str], zona: ZoneIn
     return "".join(partes)
 
 
+def _relacionada(r: dict[str, Any]) -> str:
+    """Una tarea que espera o a la que espera, ya escapada: su título, su estado y quién la hace;
+    de una que quien mira no puede ver, sólo que existe (la base no manda nada más)."""
+    if not r.get("ve"):
+        return '<li class="vacio">Una tarea que no podés ver.</li>'
+    texto = f"{_e(r.get('titulo'))} · {_e(_estado(r.get('estado')))}"
+    if r.get("responsable"):
+        texto += f' <span class="quien">· la hace {_e(r["responsable"])}</span>'
+    return f"<li>{texto}</li>"
+
+
+def _lista_de_relacionadas(tareas: list[dict[str, Any]], vacia: str) -> str:
+    if not tareas:
+        return f'<p class="vacio">{_e(vacia)}</p>'
+    return "<ul>" + "".join(_relacionada(r) for r in tareas) + "</ul>"
+
+
+# A dónde lleva "> volver": sólo una puerta de la web de este sitio (la base la arma).
+_VOLVER = ("/app/e/", "/app/admin/")
+
+
 def pagina(datos: dict[str, Any], *, token: str) -> str:
     """Arma la página con lo que devolvió la base para este enlace."""
     zona = ZoneInfo(datos.get("zona_horaria") or "UTC")
@@ -212,8 +235,10 @@ def pagina(datos: dict[str, Any], *, token: str) -> str:
     pide = datos.get("pide") or []
     palabras = {p["tipo"]: p.get("en_palabras") for p in pide if p.get("en_palabras")}
 
+    relaciones = datos.get("relaciones") or {}
     filas = [("Estado", _estado(t.get("estado"))),
              ("Objetivo", t.get("objetivo")),
+             ("La pidió", relaciones.get("pidio")),
              ("Área", t.get("area")),
              ("Responsable", t.get("responsable")),
              ("Quién la aprueba", t.get("quien_aprueba") or "nadie"),
@@ -231,6 +256,18 @@ def pagina(datos: dict[str, Any], *, token: str) -> str:
     else:
         lo_que_pide = '<p class="vacio">Esta tarea no pide evidencia.</p>'
 
+    # Sin la 0075, la página sale sin las esperas (`pagina_de_tarea._relaciones`).
+    esperas = ""
+    if datos.get("relaciones") is not None:
+        esperas = (f"<h2>Espera a</h2>\n"
+                   f"{_lista_de_relacionadas(relaciones.get('espera_a') or [], 'No espera a ninguna tarea.')}\n"
+                   f"<h2>La esperan</h2>\n"
+                   f"{_lista_de_relacionadas(relaciones.get('la_esperan') or [], 'Ninguna tarea la espera.')}\n")
+    volver = relaciones.get("volver") or ""
+    # Dentro de la Mini App de iOS no hay un "atrás" del teléfono, y esta página no ejecuta nada:
+    # un enlace a la web de su espacio.
+    volver = (f'<a class="volver" href="{_e(volver)}">&gt; volver</a>\n'
+              if volver.startswith(_VOLVER) else "")
     historia = [r for r in (_hecho(h, zona) for h in datos.get("historia") or []) if r]
     evidencia = [_pieza(p, token, palabras, zona) for p in datos.get("evidencia") or []]
 
@@ -243,12 +280,12 @@ def pagina(datos: dict[str, Any], *, token: str) -> str:
 <title>Tarea · {_e(datos.get('espacio'))}</title>
 <style>{_ESTILO}</style>
 </head><body>
-<h1>{_e(t.get('titulo'))}</h1>
+{volver}<h1>{_e(t.get('titulo'))}</h1>
 <p class="sub">{_e(datos.get('espacio'))} · Sólo para ver. Hola, {_e(datos.get('persona'))}.</p>
 <dl>
 {ficha}
 </dl>
-<h2>Lo que pide para entregarla</h2>
+{esperas}<h2>Lo que pide para entregarla</h2>
 {lo_que_pide}
 <h2>Lo que se entregó</h2>
 {"".join(evidencia) or '<p class="vacio">Todavía no se entregó nada.</p>'}
