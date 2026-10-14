@@ -93,7 +93,9 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "message_outbox_entrada_web", "ofrecimiento_web",
                     # Los objetivos desde la web (migración 0068): las claves compuestas del
                     # objetivo y la clave de un solo uso de cada creación.
-                    "objective", "creacion_de_objetivo")
+                    "objective", "creacion_de_objetivo",
+                    # La reapertura de una tarea pedida (migración 0071; J4).
+                    "reapertura_de_tarea")
 
 # La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
 # política. `model_config` admite espacio nulo para el modelo global.
@@ -847,7 +849,11 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # 0058. Y antes la 0066, cuya marca del enlace de entrada y cuyo ofrecimiento de la
             # web también apuntan ahí; y antes que nada la 0068, cuyo referente del objetivo
             # también (antes, la 0069, que deja las funciones de los objetivos como las dejó la
-            # 0068; y antes aún la 0070, que deja la carga de una tarea como la dejó la 0067).
+            # 0068; y antes aún la 0070, que deja la carga de una tarea como la dejó la 0067; y
+            # antes que todas la 0071, cuyas columnas de la tarea y cuya reapertura también apuntan
+            # ahí).
+            (rollback_0071,) = (ROOT / "db" / "rollbacks").glob("0071_*.sql")
+            db.execute(_sql_script(rollback_0071))
             (rollback_0070,) = (ROOT / "db" / "rollbacks").glob("0070_*.sql")
             db.execute(_sql_script(rollback_0070))
             (rollback_0069,) = (ROOT / "db" / "rollbacks").glob("0069_*.sql")

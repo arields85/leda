@@ -504,6 +504,10 @@ create table task (
   actualizado_en            timestamptz not null default now(),
   -- Migraciones 0045 y 0046 (C-7, delegar): de quién era antes de su primer pase.
   era_de_membership_id      uuid,
+  -- Migración 0071 (J4): quién la revisa, si se eligió al cargarla, y quién la pidió desde
+  -- otra área o a Dirección.
+  revisor_membership_id     uuid,
+  pedida_por_membership_id  uuid,
   -- Migración 0030: para las claves foráneas con el espacio del motor.
   constraint task_workspace_id_unique unique (workspace_id, id)
 );
@@ -1525,6 +1529,43 @@ alter table task add constraint task_era_de
   foreign key (workspace_id, era_de_membership_id) references membership(workspace_id, id);
 comment on column task.era_de_membership_id is
   'El Motor (C-7, decisión 28): de quién era la tarea antes de su primer pase (lo escribe el cambio de responsable). La revisa quien aprueba el trabajo de esa persona. Nulo: nunca cambió de manos.';
+alter table task add constraint task_revisor
+  foreign key (workspace_id, revisor_membership_id) references membership(workspace_id, id);
+alter table task add constraint task_pedida_por
+  foreign key (workspace_id, pedida_por_membership_id) references membership(workspace_id, id);
+comment on column task.revisor_membership_id is
+  'J4 (ADR 0023, decisión 3; decisiones D3, D4, D13 y D14 del usuario, migración 0071): quién revisa esta tarea, elegido al cargarla. Nulo: la regla de siempre, quien aprueba el trabajo de quien era la tarea (quien_revisa_la_tarea).';
+comment on column task.pedida_por_membership_id is
+  'J4 (decisiones D1b y D14 del usuario, migración 0071): el referente que la pidió desde otra área o a Dirección. La ve, y es el único que la reabre cuando está terminada (reabrir_tarea).';
+
+-- La reapertura de una tarea pedida (migración 0071; decisión D14 del usuario, paso 5): quien la
+-- pidió desde otra área la reabre, terminada, con su motivo (`reabrir_tarea`).
+create table reapertura_de_tarea (
+  id                                  uuid primary key default gen_random_uuid(),
+  workspace_id                        uuid not null references workspace(id) on delete cascade,
+  task_id                             uuid not null,
+  pedida_por_membership_id            uuid not null,
+  responsable_anterior_membership_id  uuid,
+  responsable_membership_id           uuid not null,
+  motivo                              text not null,
+  at                                  timestamptz not null default clock_timestamp(),
+  constraint reapertura_de_tarea_tarea
+    foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
+  constraint reapertura_de_tarea_pedida_por
+    foreign key (workspace_id, pedida_por_membership_id) references membership(workspace_id, id),
+  constraint reapertura_de_tarea_anterior
+    foreign key (workspace_id, responsable_anterior_membership_id)
+    references membership(workspace_id, id),
+  constraint reapertura_de_tarea_responsable
+    foreign key (workspace_id, responsable_membership_id) references membership(workspace_id, id),
+  constraint reapertura_de_tarea_motivo
+    check (btrim(motivo) <> '' and char_length(motivo) <= 500)
+);
+
+create index reapertura_de_tarea_tarea_at on reapertura_de_tarea (task_id, at);
+
+comment on table reapertura_de_tarea is
+  'J4 (decisión D14 del usuario, paso 5; migración 0071): quien pidió una tarea desde otra área la reabre, terminada, con su motivo; vuelve al referente del área de la tarea. Sólo se agrega, por reabrir_tarea. Desde la última, la aprobación y la evidencia de antes no cuentan para cerrarla.';
 
 -- Pasarle una tarea a otra persona (migración 0045; C-7, delegar; ADR 0017, enmienda a la
 -- decisión 2). Un pase se pide con una vista previa confirmada, lo decide el encargado del sector
@@ -1957,13 +1998,13 @@ comment on table message_outbox_enlace is
 -- de su responsable (`membership.aprobador_membership_id`), leído ahora: si la plataforma lo
 -- cambia, la revisión sigue el cambio. Puede ser quien la hace ahora (la tarea de Nahuel que toma
 -- Marcos la revisa Marcos). Es la única regla: el cierre, quién ve la página y la aplicación la
--- leen de acá.
+-- leen de acá. Migración 0071 (J4): primero, quien se eligió al cargarla (`task.revisor_membership_id`).
 create or replace function quien_revisa_la_tarea(p_task uuid)
 returns uuid
 language sql stable set search_path = leda, public, pg_temp as $$
-  select m.aprobador_membership_id
+  select coalesce(t.revisor_membership_id, m.aprobador_membership_id)
     from task t
-    join membership m on m.id = coalesce(t.era_de_membership_id, t.responsable_membership_id)
+    left join membership m on m.id = coalesce(t.era_de_membership_id, t.responsable_membership_id)
    where t.id = p_task;
 $$;
 
@@ -1986,6 +2027,7 @@ language sql stable set search_path = leda, public, pg_temp as $$
        and m.activo
        and (t.responsable_membership_id = m.id
             or quien_revisa_la_tarea(t.id) = m.id
+            or t.pedida_por_membership_id = m.id
             or a.referente_membership_id = m.id
             or r.autoridad_final
             or exists (select 1 from approval ap
@@ -3203,31 +3245,133 @@ language sql stable set search_path = leda, public, pg_temp as $$
      where c.workspace_id = p_workspace_id), false);
 $$;
 
-create or replace function opciones_de_la_carga(
-    p_token_hash text, p_workspace_id uuid, p_ahora timestamptz)
+-- Cómo le carga una tarea `p_quien` a `p_responsable` por la puerta del equipo (ADR 0023, decisión
+-- 3; decisiones D1b, D4, D13 y D14 del usuario): `propia` (Dirección o un referente, a sí mismo),
+-- `direccion` (Dirección, a cualquier otro integrante activo), `su_area` (un referente, a alguien de
+-- un área de la que es referente), `pedido_a_direccion` (un referente, a Dirección) y
+-- `pedido_a_otra_area` (un referente, al referente de otra área). Nulo: no le puede cargar (un
+-- integrante, o un referente a alguien de otra área que no es su referente). Corre con la RLS de
+-- quien llama, dentro de las funciones de la web, con el espacio ya fijado.
+create or replace function como_carga(p_quien uuid, p_responsable uuid)
+returns text
+language sql stable set search_path = leda, public, pg_temp as $$
+  with quien as (
+    select m.id, r.autoridad_final,
+           array(select a.id from area a where a.referente_membership_id = m.id) as areas
+      from membership m join rol r on r.id = m.rol_id
+     where m.id = p_quien and m.activo
+  ),
+  responsable as (
+    select m.id, m.area_id, r.autoridad_final,
+           exists (select 1 from area a where a.referente_membership_id = m.id) as es_referente
+      from membership m join rol r on r.id = m.rol_id
+     where m.id = p_responsable and m.activo
+  )
+  select case
+           when q.id = p.id and (q.autoridad_final or cardinality(q.areas) > 0) then 'propia'
+           when q.autoridad_final then 'direccion'
+           when cardinality(q.areas) = 0 then null
+           when p.area_id = any (q.areas) then 'su_area'
+           when p.autoridad_final then 'pedido_a_direccion'
+           when p.es_referente then 'pedido_a_otra_area'
+         end
+    from quien q cross join responsable p;
+$$;
+
+-- Quién revisaría la tarea que `p_quien` le carga a `p_responsable` (`p_como`, de `como_carga`):
+-- quien la carga, si es suya, de su gente o un pedido a Dirección (D4, D13 y D1b); el referente que
+-- la recibe, si es un pedido a otra área (D14); y lo que Dirección le carga a otra persona, el
+-- referente del área de esa persona (lo que la web le preselecciona, D3) o, si ese referente es
+-- quien la hace o no está activo, la misma Dirección.
+create or replace function quien_revisaria(p_quien uuid, p_responsable uuid, p_como text)
+returns uuid
+language sql stable set search_path = leda, public, pg_temp as $$
+  select case p_como
+           when 'propia' then p_quien
+           when 'su_area' then p_quien
+           when 'pedido_a_direccion' then p_quien
+           when 'pedido_a_otra_area' then p_responsable
+           when 'direccion' then coalesce(
+             (select a.referente_membership_id
+                from membership m
+                join area a on a.id = m.area_id
+                join membership ref on ref.id = a.referente_membership_id and ref.activo
+               where m.id = p_responsable and a.referente_membership_id <> p_responsable),
+             p_quien)
+         end;
+$$;
+
+-- Quién puede ser elegido para revisar una tarea (D3): un integrante activo que es Dirección o el
+-- referente de un área.
+create or replace function puede_ser_quien_revisa(p_membership_id uuid)
+returns boolean
+language sql stable set search_path = leda, public, pg_temp as $$
+  select exists (
+    select 1 from membership m join rol r on r.id = m.rol_id
+     where m.id = p_membership_id and m.activo
+       and (r.autoridad_final
+            or exists (select 1 from area a where a.referente_membership_id = m.id)));
+$$;
+
+-- Quién carga por la puerta del equipo: la persona de la sesión (que deja fijado su espacio), si
+-- sigue activa y es Dirección o el referente de un área. Un espacio pedido que no es el suyo no
+-- existe para ella. Como `quien_crea_el_objetivo`: la llaman las funciones de la web.
+create or replace function quien_carga_en_el_equipo(p_token_hash text, p_workspace_id uuid)
 returns jsonb
-language plpgsql security definer set search_path = leda, public, pg_temp as $$
-declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
-        v_administrador uuid;
-        v_espacio workspace%rowtype;
+language plpgsql set search_path = leda, public, pg_temp as $$
+declare v_sesion uuid;
+        v_espacio uuid;
+        v_persona uuid;
+        v_usuario uuid;
+        v_es_autoridad boolean;
+        v_es_referente boolean;
+begin
+  select s.sesion_id, s.workspace_id, s.membership_id into v_sesion, v_espacio, v_persona
+    from sesion_vigente(p_token_hash) s;
+  if v_persona is null then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+  end if;
+  if p_workspace_id is not null and p_workspace_id <> v_espacio then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'espacio', 'motivo', 'no_existe')));
+  end if;
+  perform set_config('leda.workspace_id', v_espacio::text, true);
+  select m.app_user_id, r.autoridad_final,
+         exists (select 1 from area a where a.referente_membership_id = m.id)
+    into v_usuario, v_es_autoridad, v_es_referente
+    from membership m join rol r on r.id = m.rol_id
+   where m.id = v_persona and m.activo;
+  if v_usuario is null then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+  end if;
+  if not (coalesce(v_es_autoridad, false) or coalesce(v_es_referente, false)) then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'sesion', 'motivo', 'sin_autoridad')));
+  end if;
+  return jsonb_build_object('ok', true, 'puerta', 'equipo', 'sesion_id', v_sesion,
+                            'workspace_id', v_espacio, 'app_user_id', v_usuario,
+                            'membership_id', v_persona, 'autoridad_final', v_es_autoridad);
+end $$;
+
+-- --- Las opciones de la carga, por las dos puertas ---------------------------------------------------
+
+-- Lo que el formulario necesita para cargar en un espacio (migraciones 0062, 0064 y 0067), con el
+-- espacio ya fijado por quien llama: los objetivos abiertos, las tareas que se pueden esperar, los
+-- integrantes activos (con quién revisaría sus tareas por la regla de siempre y si tienen Leda
+-- conectada), la evidencia de cada área y los días hábiles. Migración 0071: las áreas con su
+-- referente (D10 y la explicación de D14) y quiénes pueden revisar una tarea (D3).
+create or replace function opciones_de_la_carga_en(p_workspace_id uuid, p_ahora timestamptz)
+returns jsonb
+language plpgsql stable set search_path = leda, public, pg_temp as $$
+declare v_espacio workspace%rowtype;
         v_hoy date;
         v_desde date;
         v_hora_fin time;
         v_hasta date;
-        v_resultado jsonb;
 begin
-  select s.app_user_id into v_administrador from sesion_de_administracion_vigente(p_token_hash) s;
-  if v_administrador is null then
-    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
-      jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
-  end if;
   select * into v_espacio from workspace w where w.id = p_workspace_id;
-  if v_espacio.id is null then
-    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
-      jsonb_build_object('campo', 'espacio', 'motivo', 'no_existe')));
-  end if;
-  -- Desde acá, la RLS acota todo a ese espacio.
-  perform set_config('leda.workspace_id', v_espacio.id::text, true);
   v_hoy := (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::date;
   v_hasta := (v_hoy + interval '6 months')::date;
   -- Hoy se ofrece sólo si la jornada del espacio no cerró: la tarea vence a esa hora, y cargada
@@ -3237,7 +3381,7 @@ begin
                        and (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::time
                            >= v_hora_fin
                   then v_hoy + 1 else v_hoy end;
-  v_resultado := jsonb_build_object(
+  return jsonb_build_object(
     'ok', true,
     'espacio', jsonb_build_object('id', v_espacio.id, 'nombre', v_espacio.nombre,
                                   'zona_horaria', v_espacio.zona_horaria),
@@ -3275,6 +3419,32 @@ begin
         left join membership ap on ap.id = m.aprobador_membership_id and ap.activo
         left join app_user apu on apu.id = ap.app_user_id
        where m.activo), '[]'::jsonb),
+    -- Las áreas con su referente activo (migración 0071): quién decide en cada una (D10) y a quién
+    -- se le pide lo de otra área (D14).
+    'areas', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', a.id, 'nombre', a.nombre,
+               'referente', case when ref.id is null then null
+                                 else jsonb_build_object('membership_id', ref.id,
+                                                         'nombre', refu.nombre) end)
+             order by a.nombre, a.id)
+        from area a
+        left join membership ref on ref.id = a.referente_membership_id and ref.activo
+        left join app_user refu on refu.id = ref.app_user_id), '[]'::jsonb),
+    -- Quiénes pueden revisar una tarea si quien carga lo elige (D3; migración 0071): Dirección y
+    -- los referentes de área activos.
+    'revisores', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'membership_id', m.id, 'nombre', u.nombre,
+               'autoridad_final', r.autoridad_final,
+               'areas', coalesce((select jsonb_agg(a.nombre order by a.nombre, a.id)
+                                    from area a where a.referente_membership_id = m.id),
+                                 '[]'::jsonb))
+             order by u.nombre, m.id)
+        from membership m
+        join app_user u on u.id = m.app_user_id
+        join rol r on r.id = m.rol_id
+       where m.activo and puede_ser_quien_revisa(m.id)), '[]'::jsonb),
     'politicas', coalesce((
       select jsonb_agg(jsonb_build_object(
                'area_id', p.area_id, 'area', a.nombre,
@@ -3294,20 +3464,97 @@ begin
           from (select g::date as dia
                   from generate_series(v_desde, v_hasta, interval '1 day') g) d
          where es_dia_habil(v_espacio.id, d.dia)), '[]'::jsonb)));
+end $$;
+
+-- La puerta de administración: la sesión de administración vigente y el espacio, como siempre.
+create or replace function opciones_de_la_carga(
+    p_token_hash text, p_workspace_id uuid, p_ahora timestamptz)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_administrador uuid;
+        v_espacio workspace%rowtype;
+        v_resultado jsonb;
+begin
+  select s.app_user_id into v_administrador from sesion_de_administracion_vigente(p_token_hash) s;
+  if v_administrador is null then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+  end if;
+  select * into v_espacio from workspace w where w.id = p_workspace_id;
+  if v_espacio.id is null then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'espacio', 'motivo', 'no_existe')));
+  end if;
+  -- Desde acá, la RLS acota todo a ese espacio.
+  perform set_config('leda.workspace_id', v_espacio.id::text, true);
+  v_resultado := opciones_de_la_carga_en(v_espacio.id, p_ahora);
   perform set_config('leda.workspace_id', previo, true);
   return v_resultado;
 end $$;
 
-create or replace function cargar_tarea(
-    p_token_hash text, p_workspace_id uuid, p_objective_id uuid, p_titulo text,
-    p_descripcion text, p_responsable_membership_id uuid, p_fecha date, p_criterio text,
-    p_evidencia text[], p_decidio_membership_id uuid, p_clave text, p_ahora timestamptz,
-    p_espera_task_id uuid default null)
+-- La puerta del equipo (migración 0071): sólo Dirección y los referentes, en su espacio. Los
+-- integrantes son sólo aquellos a quienes esa persona les puede cargar (`como_carga`), cada uno
+-- con cómo (`como`) y con quién revisaría la tarea (`revisa`: para Dirección, el que se le
+-- preselecciona). `yo` dice quién carga y si elige quién revisa (Dirección, D3).
+create or replace function opciones_de_la_carga_del_equipo(p_token_hash text, p_ahora timestamptz)
 returns jsonb
 language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_quien jsonb;
+        v_persona uuid;
+        v_resultado jsonb;
+begin
+  v_quien := quien_carga_en_el_equipo(p_token_hash, null);
+  if not (v_quien ->> 'ok')::boolean then
+    perform set_config('leda.workspace_id', previo, true);
+    return v_quien;
+  end if;
+  v_persona := (v_quien ->> 'membership_id')::uuid;
+  v_resultado := opciones_de_la_carga_en((v_quien ->> 'workspace_id')::uuid, p_ahora);
+  v_resultado := v_resultado || jsonb_build_object(
+    'integrantes', coalesce((
+      select jsonb_agg(i.fila || jsonb_build_object(
+               'como', c.como,
+               'revisa', (select jsonb_build_object('membership_id', ref.id, 'nombre', u.nombre)
+                            from membership ref join app_user u on u.id = ref.app_user_id
+                           where ref.id = quien_revisaria(v_persona, c.id, c.como)))
+             order by i.orden)
+        from jsonb_array_elements(v_resultado -> 'integrantes') with ordinality i(fila, orden)
+        cross join lateral (select (i.fila ->> 'membership_id')::uuid as id) m
+        cross join lateral (select m.id, como_carga(v_persona, m.id) as como) c
+       where c.como is not null), '[]'::jsonb),
+    'yo', (select jsonb_build_object('membership_id', m.id, 'nombre', u.nombre,
+                                     'autoridad_final', r.autoridad_final,
+                                     'elige_quien_revisa', r.autoridad_final)
+             from membership m join app_user u on u.id = m.app_user_id
+             join rol r on r.id = m.rol_id
+            where m.id = v_persona));
+  perform set_config('leda.workspace_id', previo, true);
+  return v_resultado;
+end $$;
+
+-- La carga de una tarea comprometida desde la web (migraciones 0062, 0064, 0067 y 0070; migración
+-- 0071, J4). `p_puerta`: `administracion` (la sesión de administración, en el espacio pedido; quién
+-- la decidió lo declara quien carga, y tiene que ser Dirección o el referente del área de la tarea,
+-- D10; quién la revisa se puede elegir, D3, o es la regla de siempre) o `equipo` (la sesión de
+-- Dirección o de un referente, en su espacio; sólo a quienes les puede cargar, `como_carga`; quien
+-- carga es quien la decidió; quién la revisa sale de `quien_revisaria`, y Dirección lo puede
+-- elegir, D3). Todo lo demás, como siempre: la clave de un solo uso, los rechazos todos juntos, la
+-- espera, el evento `asignada` y la auditoría `cargar_tarea`, con la puerta, la sesión, quién la
+-- pidió y quién la revisa.
+create or replace function cargar_tarea_web(
+    p_puerta text, p_token_hash text, p_workspace_id uuid, p_objective_id uuid, p_titulo text,
+    p_descripcion text, p_responsable_membership_id uuid, p_fecha date, p_criterio text,
+    p_evidencia text[], p_decidio_membership_id uuid, p_revisa_membership_id uuid, p_clave text,
+    p_ahora timestamptz, p_espera_task_id uuid default null)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_quien jsonb;
         v_sesion uuid;
-        v_administrador uuid;
+        v_usuario uuid;
+        v_persona uuid;
         v_espacio workspace%rowtype;
         v_objetivo objective%rowtype;
         v_espera task%rowtype;
@@ -3317,6 +3564,9 @@ declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
         v_previa carga_de_tarea%rowtype;
         v_es_autoridad boolean;
         v_conectado boolean;
+        v_como text;
+        v_revisa_id uuid;
+        v_pedida_por uuid;
         v_hoy date;
         v_hora_fin time;
         v_huella text;
@@ -3325,17 +3575,32 @@ declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
         v_avisos jsonb := '[]'::jsonb;
         v_resultado jsonb;
 begin
-  -- La sesión, en cada llamada: sin el rol de plataforma vigente, nada.
-  select s.sesion_id, s.app_user_id into v_sesion, v_administrador
-    from sesion_de_administracion_vigente(p_token_hash) s;
-  if v_administrador is null then
+  -- La sesión de la puerta, en cada llamada.
+  if p_puerta = 'administracion' then
+    select s.sesion_id, s.app_user_id into v_sesion, v_usuario
+      from sesion_de_administracion_vigente(p_token_hash) s;
+    if v_usuario is null then
+      return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+    end if;
+    select * into v_espacio from workspace w where w.id = p_workspace_id;
+    if v_espacio.id is null then
+      return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'espacio', 'motivo', 'no_existe')));
+    end if;
+  elsif p_puerta = 'equipo' then
+    v_quien := quien_carga_en_el_equipo(p_token_hash, p_workspace_id);
+    if not (v_quien ->> 'ok')::boolean then
+      perform set_config('leda.workspace_id', previo, true);
+      return v_quien;
+    end if;
+    v_sesion := (v_quien ->> 'sesion_id')::uuid;
+    v_usuario := (v_quien ->> 'app_user_id')::uuid;
+    v_persona := (v_quien ->> 'membership_id')::uuid;
+    select * into v_espacio from workspace w where w.id = (v_quien ->> 'workspace_id')::uuid;
+  else
     return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
       jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
-  end if;
-  select * into v_espacio from workspace w where w.id = p_workspace_id;
-  if v_espacio.id is null then
-    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
-      jsonb_build_object('campo', 'espacio', 'motivo', 'no_existe')));
   end if;
   -- Desde acá, la RLS acota todo a ese espacio: un id de otro no se encuentra.
   perform set_config('leda.workspace_id', v_espacio.id::text, true);
@@ -3349,15 +3614,26 @@ begin
       v_errores := v_errores || jsonb_build_object('campo', 'clave', 'motivo', 'mal_formada');
     else
       perform pg_advisory_xact_lock(hashtextextended(v_espacio.id::text || ':' || p_clave, 0));
-      v_huella := encode(sha256(convert_to((jsonb_build_object(
-        'administrador', v_administrador, 'objetivo', p_objective_id, 'titulo', p_titulo,
-        'descripcion', p_descripcion, 'responsable', p_responsable_membership_id,
-        'fecha', p_fecha, 'criterio', p_criterio, 'evidencia', to_jsonb(p_evidencia),
-        'decidio', p_decidio_membership_id)
-        -- La espera entra en la huella sólo si la hay: una carga sin espera tiene la huella de
-        -- antes de la 0067.
+      -- La huella de la puerta de administración es la de antes (la espera y quién la revisa
+      -- entran sólo si los hay): una carga de antes de la 0071 tiene la misma huella.
+      v_huella := encode(sha256(convert_to((
+        case p_puerta
+          when 'administracion' then jsonb_build_object(
+            'administrador', v_usuario, 'objetivo', p_objective_id, 'titulo', p_titulo,
+            'descripcion', p_descripcion, 'responsable', p_responsable_membership_id,
+            'fecha', p_fecha, 'criterio', p_criterio, 'evidencia', to_jsonb(p_evidencia),
+            'decidio', p_decidio_membership_id)
+          else jsonb_build_object(
+            'puerta', 'equipo', 'persona', v_persona, 'objetivo', p_objective_id,
+            'titulo', p_titulo, 'descripcion', p_descripcion,
+            'responsable', p_responsable_membership_id, 'fecha', p_fecha,
+            'criterio', p_criterio, 'evidencia', to_jsonb(p_evidencia),
+            'decidio', p_decidio_membership_id)
+        end
         || case when p_espera_task_id is null then '{}'::jsonb
-                else jsonb_build_object('espera', p_espera_task_id) end)::text,
+                else jsonb_build_object('espera', p_espera_task_id) end
+        || case when p_revisa_membership_id is null then '{}'::jsonb
+                else jsonb_build_object('revisa', p_revisa_membership_id) end)::text,
         'UTF8')), 'hex');
       select * into v_previa from carga_de_tarea c where c.clave = p_clave;
       if v_previa.id is not null then
@@ -3396,8 +3672,15 @@ begin
                    || jsonb_build_object('campo', 'descripcion', 'motivo', 'demasiado_largo');
     end if;
 
-    -- El responsable: integrante activo de este espacio, con alguien activo que no sea él para
-    -- revisar su trabajo (la regla única: quien aprueba el trabajo del responsable).
+    -- Quién la revisa, si se eligió (D3): Dirección o el referente de un área, activo, y nunca
+    -- quien la hace. Por la puerta del equipo lo elige sólo Dirección; un referente, no.
+    if p_revisa_membership_id is not null and not puede_ser_quien_revisa(p_revisa_membership_id)
+    then
+      v_errores := v_errores || jsonb_build_object('campo', 'revisa',
+                                                   'motivo', 'no_puede_revisarla');
+    end if;
+
+    -- El responsable: integrante activo de este espacio.
     if p_responsable_membership_id is null then
       v_errores := v_errores || jsonb_build_object('campo', 'responsable', 'motivo', 'falta');
     else
@@ -3406,7 +3689,41 @@ begin
       if v_responsable.id is null then
         v_errores := v_errores || jsonb_build_object('campo', 'responsable',
                                                      'motivo', 'no_es_integrante_activo');
+      elsif p_puerta = 'equipo' then
+        -- A quién le puede cargar quien carga, y quién la revisaría (ADR 0023, decisión 3).
+        v_como := como_carga(v_persona, v_responsable.id);
+        if v_como is null then
+          v_errores := v_errores || jsonb_build_object('campo', 'responsable',
+                                                       'motivo', 'no_le_puede_cargar');
+        else
+          v_revisa_id := quien_revisaria(v_persona, v_responsable.id, v_como);
+          if p_revisa_membership_id is not null then
+            if v_como <> 'direccion' then
+              if p_revisa_membership_id <> v_revisa_id then
+                v_errores := v_errores || jsonb_build_object('campo', 'revisa',
+                                                             'motivo', 'no_corresponde');
+              end if;
+            elsif p_revisa_membership_id = v_responsable.id then
+              v_errores := v_errores || jsonb_build_object('campo', 'revisa',
+                                                           'motivo', 'es_quien_la_hace');
+            else
+              v_revisa_id := p_revisa_membership_id;
+            end if;
+          end if;
+          if v_como in ('pedido_a_otra_area', 'pedido_a_direccion') then
+            v_pedida_por := v_persona;
+          end if;
+        end if;
+      elsif p_revisa_membership_id is not null then
+        -- La puerta de administración elige quién la revisa como Dirección (D3).
+        if p_revisa_membership_id = v_responsable.id then
+          v_errores := v_errores || jsonb_build_object('campo', 'revisa',
+                                                       'motivo', 'es_quien_la_hace');
+        else
+          v_revisa_id := p_revisa_membership_id;
+        end if;
       else
+        -- La regla de siempre: alguien activo que no sea él revisa su trabajo.
         select * into v_revisa from membership m
          where m.id = v_responsable.aprobador_membership_id and m.activo;
         select r.autoridad_final into v_es_autoridad from rol r where r.id = v_responsable.rol_id;
@@ -3419,6 +3736,8 @@ begin
           v_errores := v_errores || jsonb_build_object('campo', 'responsable',
                                                        'motivo', 'sin_quien_la_revise');
         end if;
+      end if;
+      if v_responsable.id is not null then
         select u.telegram_user_id is not null into v_conectado
           from app_user u where u.id = v_responsable.app_user_id;
         if not coalesce(v_conectado, false) then
@@ -3442,8 +3761,7 @@ begin
           and (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::time >= v_hora_fin then
       v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'ya_cerro_el_dia');
     -- Una tarea no vence después que su objetivo (decisión 6 del usuario, 2026-10-14; migración
-    -- 0070): el objetivo se demoraría. Antes era un aviso que no bloqueaba; ahora se rechaza, con
-    -- el día del objetivo (`hasta`), y la salida es una fecha hasta ese día.
+    -- 0070): el objetivo se demoraría. La salida es una fecha hasta ese día (`hasta`).
     elsif v_objetivo.fecha_objetivo is not null and p_fecha > v_objetivo.fecha_objetivo then
       v_errores := v_errores || jsonb_build_object('campo', 'fecha',
                                                    'motivo', 'vence_despues_del_objetivo',
@@ -3478,13 +3796,30 @@ begin
       end if;
     end if;
 
-    -- Quién la decidió (ADR 0017, decisión 2): un integrante activo de este espacio.
-    if p_decidio_membership_id is null then
+    -- Quién la decidió. Por la puerta de administración lo declara quien carga (ADR 0017,
+    -- decisión 2): un integrante activo que es Dirección o el referente del área de la tarea (D10).
+    -- Por la del equipo, quien carga (ADR 0023, decisión 3): no se declara otro.
+    if p_puerta = 'equipo' then
+      if p_decidio_membership_id is not null and p_decidio_membership_id <> v_persona then
+        v_errores := v_errores || jsonb_build_object('campo', 'decidio',
+                                                     'motivo', 'no_corresponde');
+      end if;
+    elsif p_decidio_membership_id is null then
       v_errores := v_errores || jsonb_build_object('campo', 'decidio', 'motivo', 'falta');
     elsif not exists (select 1 from membership m
                        where m.id = p_decidio_membership_id and m.activo) then
       v_errores := v_errores || jsonb_build_object('campo', 'decidio',
                                                    'motivo', 'no_es_integrante_activo');
+    elsif not exists (
+        select 1 from membership m join rol r on r.id = m.rol_id
+         where m.id = p_decidio_membership_id
+           and (r.autoridad_final
+                or exists (select 1 from area a
+                            where a.referente_membership_id = m.id
+                              and (v_responsable.id is null
+                                   or a.id = v_responsable.area_id)))) then
+      v_errores := v_errores || jsonb_build_object('campo', 'decidio',
+                                                   'motivo', 'no_puede_decidirla');
     end if;
 
     -- La espera (migración 0067; ADR 0023, decisión 2; mecánica §4): opcional, una sola y
@@ -3514,32 +3849,59 @@ begin
     begin
       insert into task (workspace_id, objective_id, titulo, descripcion, area_id,
                         responsable_membership_id, fecha_objetivo, criterio_aceptacion,
-                        evidencia_requerida, evidencia_policy_version)
+                        evidencia_requerida, evidencia_policy_version, revisor_membership_id,
+                        pedida_por_membership_id)
       values (v_espacio.id, v_objetivo.id, btrim(p_titulo), nullif(btrim(p_descripcion), ''),
               v_responsable.area_id, v_responsable.id,
               (p_fecha + v_hora_fin) at time zone v_espacio.zona_horaria, btrim(p_criterio),
-              p_evidencia, v_politica.version)
+              p_evidencia, v_politica.version, v_revisa_id, v_pedida_por)
       returning id into v_tarea;
       insert into task_state_event (task_id, estado_nuevo, actor_kind, actor_app_user_id, motivo)
-      values (v_tarea, 'asignada', 'persona', v_administrador,
-              'cargada desde la web por un administrador de plataforma');
+      values (v_tarea, 'asignada', 'persona', v_usuario,
+              case p_puerta
+                when 'equipo' then case v_como
+                  when 'pedido_a_otra_area' then 'pedida desde la web por el referente de otra área'
+                  when 'pedido_a_direccion' then 'pedida a Dirección desde la web por un referente'
+                  when 'direccion' then 'cargada desde la web por Dirección'
+                  else 'cargada desde la web del equipo' end
+                else 'cargada desde la web por un administrador de plataforma' end);
       if v_espera.id is not null then
         insert into dependency (workspace_id, origen_task_id, destino_task_id, tipo)
         values (v_espacio.id, v_espera.id, v_tarea, 'bloqueante');
       end if;
       perform auditar_acceso_web(
-        v_espacio.id, v_administrador, 'persona', 'cargar_tarea', 'task', v_tarea,
-        jsonb_build_object(
-          'origen', 'web',
-          'cargada_por_app_user_id', v_administrador,
-          'decidida_por_membership_id', p_decidio_membership_id,
-          'decision_declarada_al_cargar', true,
-          'responsable_membership_id', v_responsable.id,
-          'revisa_membership_id', v_revisa.id,
-          'objective_id', v_objetivo.id,
-          'evidencia_policy_version', v_politica.version,
-          'sesion_de_administracion_id', v_sesion,
-          'avisos', v_avisos)
+        v_espacio.id, v_usuario, 'persona', 'cargar_tarea', 'task', v_tarea,
+        case p_puerta
+          when 'equipo' then jsonb_build_object(
+            'origen', 'web',
+            'puerta', 'equipo',
+            'sesion_web_id', v_sesion,
+            'cargada_por_app_user_id', v_usuario,
+            'cargada_por_membership_id', v_persona,
+            'decidida_por_membership_id', v_persona,
+            'decision_declarada_al_cargar', false,
+            'como', v_como,
+            'responsable_membership_id', v_responsable.id,
+            'revisa_membership_id', v_revisa_id,
+            'revisa_elegido', p_revisa_membership_id is not null,
+            'pedida_por_membership_id', v_pedida_por,
+            'objective_id', v_objetivo.id,
+            'evidencia_policy_version', v_politica.version,
+            'avisos', v_avisos)
+          else jsonb_build_object(
+            'origen', 'web',
+            'puerta', 'administracion',
+            'cargada_por_app_user_id', v_usuario,
+            'decidida_por_membership_id', p_decidio_membership_id,
+            'decision_declarada_al_cargar', true,
+            'responsable_membership_id', v_responsable.id,
+            'revisa_membership_id', coalesce(v_revisa_id, v_revisa.id),
+            'revisa_elegido', p_revisa_membership_id is not null,
+            'objective_id', v_objetivo.id,
+            'evidencia_policy_version', v_politica.version,
+            'sesion_de_administracion_id', v_sesion,
+            'avisos', v_avisos)
+        end
         || case when v_espera.id is null then '{}'::jsonb
                 else jsonb_build_object('espera_task_id', v_espera.id,
                                         'espera_tipo', 'bloqueante') end);
@@ -3558,6 +3920,164 @@ begin
 
   perform set_config('leda.workspace_id', previo, true);
   return v_resultado;
+end $$;
+
+-- La de antes, por la puerta de administración y sin elegir quién la revisa: la misma carga.
+create or replace function cargar_tarea(
+    p_token_hash text, p_workspace_id uuid, p_objective_id uuid, p_titulo text,
+    p_descripcion text, p_responsable_membership_id uuid, p_fecha date, p_criterio text,
+    p_evidencia text[], p_decidio_membership_id uuid, p_clave text, p_ahora timestamptz,
+    p_espera_task_id uuid default null)
+returns jsonb
+language sql security definer set search_path = leda, public, pg_temp as $$
+  select cargar_tarea_web('administracion', p_token_hash, p_workspace_id, p_objective_id,
+                          p_titulo, p_descripcion, p_responsable_membership_id, p_fecha,
+                          p_criterio, p_evidencia, p_decidio_membership_id, null, p_clave,
+                          p_ahora, p_espera_task_id);
+$$;
+
+-- --- La reapertura y lo que pidió cada uno --------------------------------------------------------
+
+-- Quien pidió una tarea desde otra área (o a Dirección) la reabre, terminada, con su motivo (D14,
+-- paso 5): vuelve a `asignada`, con el referente del área de la tarea como responsable, que decide
+-- quién la retoma (si la tenía otro, ese cambio de manos lo hace la base, como un pase aplicado).
+-- Queda en `reapertura_de_tarea`, con su evento de estado y su auditoría. Desde ahí, la aprobación y
+-- la evidencia de antes no cuentan para cerrarla.
+create or replace function reabrir_tarea(p_token_hash text, p_task_id uuid, p_motivo text)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_sesion uuid;
+        v_espacio uuid;
+        v_persona uuid;
+        v_usuario uuid;
+        v_tarea task%rowtype;
+        v_referente uuid;
+        v_reapertura uuid;
+        v_errores jsonb := '[]'::jsonb;
+        v_resultado jsonb;
+begin
+  select s.sesion_id, s.workspace_id, s.membership_id into v_sesion, v_espacio, v_persona
+    from sesion_vigente(p_token_hash) s;
+  if v_persona is null then
+    return jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+      jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+  end if;
+  perform set_config('leda.workspace_id', v_espacio::text, true);
+
+  <<reapertura>>
+  begin
+    select m.app_user_id into v_usuario from membership m where m.id = v_persona and m.activo;
+    if v_usuario is null then
+      v_resultado := jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'sesion', 'motivo', 'sin_sesion')));
+      exit reapertura;
+    end if;
+    select * into v_tarea from task t where t.id = p_task_id for update;
+    -- Sólo quien la pidió: para cualquier otro, como si no existiera.
+    if v_tarea.id is null or v_tarea.pedida_por_membership_id is distinct from v_persona then
+      v_resultado := jsonb_build_object('ok', false, 'errores', jsonb_build_array(
+        jsonb_build_object('campo', 'tarea', 'motivo', 'no_la_pediste')));
+      exit reapertura;
+    end if;
+    if v_tarea.estado <> 'terminada' then
+      v_errores := v_errores || jsonb_build_object('campo', 'tarea', 'motivo', 'no_esta_terminada');
+    end if;
+    if nullif(btrim(p_motivo), '') is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'motivo', 'motivo', 'falta');
+    elsif char_length(btrim(p_motivo)) > 500 then
+      v_errores := v_errores || jsonb_build_object('campo', 'motivo', 'motivo', 'demasiado_largo');
+    end if;
+    select a.referente_membership_id into v_referente
+      from area a join membership m on m.id = a.referente_membership_id and m.activo
+     where a.id = v_tarea.area_id;
+    if v_referente is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'tarea', 'motivo', 'sin_referente');
+    end if;
+    if jsonb_array_length(v_errores) > 0 then
+      v_resultado := jsonb_build_object('ok', false, 'errores', v_errores);
+      exit reapertura;
+    end if;
+
+    insert into reapertura_de_tarea (workspace_id, task_id, pedida_por_membership_id,
+                                     responsable_anterior_membership_id,
+                                     responsable_membership_id, motivo)
+    values (v_espacio, v_tarea.id, v_persona, v_tarea.responsable_membership_id, v_referente,
+            btrim(p_motivo))
+    returning id into v_reapertura;
+    if v_tarea.responsable_membership_id is distinct from v_referente then
+      perform set_config('leda.aplicando_pase', '1', true);
+      update task
+         set responsable_membership_id = v_referente,
+             era_de_membership_id = coalesce(era_de_membership_id, responsable_membership_id),
+             actualizado_en = clock_timestamp()
+       where id = v_tarea.id;
+      perform set_config('leda.aplicando_pase', '0', true);
+    end if;
+    insert into task_state_event (task_id, estado_anterior, estado_nuevo, actor_kind,
+                                  actor_app_user_id, motivo)
+    values (v_tarea.id, 'terminada', 'asignada', 'persona', v_usuario,
+            'reabierta por quien la pidió');
+    perform auditar_acceso_web(
+      v_espacio, v_usuario, 'persona', 'reabrir_tarea', 'task', v_tarea.id,
+      jsonb_build_object(
+        'origen', 'web',
+        'puerta', 'equipo',
+        'sesion_web_id', v_sesion,
+        'reapertura_id', v_reapertura,
+        'pedida_por_membership_id', v_persona,
+        'responsable_anterior_membership_id', v_tarea.responsable_membership_id,
+        'responsable_membership_id', v_referente,
+        'revisa_membership_id', quien_revisa_la_tarea(v_tarea.id)));
+    v_resultado := jsonb_build_object('ok', true, 'task_id', v_tarea.id,
+                                      'reapertura_id', v_reapertura,
+                                      'responsable_membership_id', v_referente);
+  end reapertura;
+
+  perform set_config('leda.workspace_id', previo, true);
+  return v_resultado;
+end $$;
+
+-- Lo que pidió una persona desde otra área o a Dirección (D14 y D1b): las abiertas y las terminadas
+-- de los últimos 30 días, con su estado y quién la tiene. Corre con la RLS de quien llama y
+-- `leda_app` no la ejecuta: la web llama a `pedidas_de_la_sesion`, con la persona de la sesión.
+create or replace function pedidas_que_ve(p_membership_id uuid, p_ahora timestamptz)
+returns table (task_id uuid, titulo text, estado text, fecha_objetivo timestamptz,
+               responsable text, area text, terminada_en timestamptz)
+language sql stable set search_path = leda, public, pg_temp as $$
+  select x.id, x.titulo, x.estado, x.fecha_objetivo, x.responsable, x.area, x.terminada_en
+    from (
+      select t.id, t.titulo, t.estado::text as estado, t.fecha_objetivo, u.nombre as responsable,
+             a.nombre as area,
+             case when t.estado = 'terminada' then
+               coalesce((select max(e.at) from task_state_event e
+                          where e.task_id = t.id and e.estado_nuevo = 'terminada'),
+                        t.actualizado_en) end as terminada_en
+        from task t
+        join membership yo on yo.id = p_membership_id and yo.activo
+                          and yo.workspace_id = t.workspace_id
+        join area a on a.id = t.area_id
+        left join membership rm on rm.id = t.responsable_membership_id
+        left join app_user u on u.id = rm.app_user_id
+       where t.pedida_por_membership_id = yo.id
+         and t.estado <> 'cancelada') x
+   where x.terminada_en is null
+      or x.terminada_en >= coalesce(p_ahora, now()) - interval '30 days'
+   order by x.terminada_en is not null, x.fecha_objetivo nulls last, x.titulo, x.id;
+$$;
+
+create or replace function pedidas_de_la_sesion(p_token_hash text, p_ahora timestamptz)
+returns table (task_id uuid, titulo text, estado text, fecha_objetivo timestamptz,
+               responsable text, area text, terminada_en timestamptz)
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare persona uuid;
+begin
+  -- La persona sale de la sesión, que deja fijado su espacio; si no entra, nada.
+  select s.membership_id into persona from sesion_vigente(p_token_hash) s;
+  if persona is null then
+    return;
+  end if;
+  return query select q.* from pedidas_que_ve(persona, p_ahora) q;
 end $$;
 
 -- Los objetivos desde la web (migración 0068; ADR 0023, decisiones 1 y 5 y punto 11; mecánica §1).
@@ -4426,8 +4946,11 @@ begin
     raise exception 'cambio_de_responsable: la tarea ya no se puede pasar';
   end if;
   era := coalesce(t.era_de_membership_id, t.responsable_membership_id);
-  new.revisa_membership_id := (select m.aprobador_membership_id from membership m
-                                where m.id = era);
+  -- Quien la revisaba la sigue revisando: el elegido al cargarla (migración 0071) o, sin él,
+  -- quien aprueba el trabajo de quien era la tarea.
+  new.revisa_membership_id := coalesce(t.revisor_membership_id,
+                                       (select m.aprobador_membership_id from membership m
+                                         where m.id = era));
   perform set_config('leda.aplicando_pase', '1', true);
   update task
      set responsable_membership_id = p.a_membership_id,
@@ -4988,11 +5511,14 @@ returns text[] as $$
           where e.task_id = t.id
             and r.tipo = any(e.cubre)
             and e.clase = any(clases_de_un_tipo_de_evidencia(t.id, r.tipo))
-            and e.at > coalesce(
-              (select max(a.at) from approval a
-                where a.sujeto_tipo = 'tarea' and a.sujeto_id = t.id
-                  and a.decision = 'rechazado'),
-              '-infinity'::timestamptz)
+            and e.at > greatest(
+              coalesce((select max(a.at) from approval a
+                         where a.sujeto_tipo = 'tarea' and a.sujeto_id = t.id
+                           and a.decision = 'rechazado'),
+                       '-infinity'::timestamptz),
+              -- Ni la de antes de que quien la pidió la reabriera (migración 0071).
+              coalesce((select max(x.at) from reapertura_de_tarea x where x.task_id = t.id),
+                       '-infinity'::timestamptz))
             and not exists (select 1 from evidencia_retirada w where w.evidence_id = e.id))
        and not exists (
          select 1 from jsonb_array_elements(
@@ -5065,6 +5591,10 @@ begin
         where a.sujeto_tipo = 'tarea' and a.sujeto_id = p_task
           and a.decision = 'aprobado'
           and a.aprobador_membership_id = aprobador
+          -- Desde que quien la pidió la reabrió (migración 0071), sólo cuenta una aprobación
+          -- posterior.
+          and a.at > coalesce((select max(x.at) from reapertura_de_tarea x
+                                where x.task_id = p_task), '-infinity'::timestamptz)
           and not exists (
             select 1 from approval r
              where r.sujeto_tipo = 'tarea' and r.sujeto_id = p_task
@@ -5256,7 +5786,8 @@ begin
     'dicho_de_quien_destraba','pase_de_tarea','cambio_de_responsable',
     'pedido_de_detalle','tarea_compartida','apodo',
     'enlace_de_entrada','sesion_web','carga_de_tarea',
-    'message_outbox_entrada_web','ofrecimiento_web','creacion_de_objetivo']
+    'message_outbox_entrada_web','ofrecimiento_web','creacion_de_objetivo',
+    'reapertura_de_tarea']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -5336,6 +5867,10 @@ revoke all on carga_de_tarea from public, leda_app;
 -- La clave de cada creación de un objetivo desde la web (migración 0068): lo mismo, sólo
 -- `execute` sobre `crear_objetivo_web`.
 revoke all on creacion_de_objetivo from public, leda_app;
+-- La reapertura de una tarea pedida (migración 0071): `leda_app` la lee (el cierre) y no la
+-- escribe; la escribe `reabrir_tarea`.
+revoke all on reapertura_de_tarea from public, leda_app;
+grant select on reapertura_de_tarea to leda_app;
 
 -- Registros auxiliares. Quedan fuera del bucle de arriba porque `audit_log` e
 -- `incident` admiten espacio nulo para los hechos de alcance global, que sólo
@@ -5576,6 +6111,43 @@ grant execute on function es_dia_habil(uuid, date) to leda_admin;
 grant execute on function opciones_de_la_carga(text, uuid, timestamptz) to leda_app;
 grant execute on function cargar_tarea(text, uuid, uuid, text, text, uuid, date, text, text[],
                                        uuid, text, timestamptz, uuid) to leda_app;
+
+-- La carga por la puerta del equipo y la reapertura (migración 0071): de la reapertura,
+-- `leda_owner` sólo busca y agrega. La web (`leda_app`): las opciones y la carga del equipo, la
+-- reapertura y lo pedido; los ayudantes, sólo su dueño.
+revoke all on reapertura_de_tarea from leda_owner;
+grant select, insert on reapertura_de_tarea to leda_owner;
+
+alter function como_carga(uuid, uuid) owner to leda_owner;
+alter function quien_revisaria(uuid, uuid, text) owner to leda_owner;
+alter function puede_ser_quien_revisa(uuid) owner to leda_owner;
+alter function quien_carga_en_el_equipo(text, uuid) owner to leda_owner;
+alter function opciones_de_la_carga_en(uuid, timestamptz) owner to leda_owner;
+alter function opciones_de_la_carga_del_equipo(text, timestamptz) owner to leda_owner;
+alter function cargar_tarea_web(text, text, uuid, uuid, text, text, uuid, date, text, text[],
+                                uuid, uuid, text, timestamptz, uuid) owner to leda_owner;
+alter function reabrir_tarea(text, uuid, text) owner to leda_owner;
+alter function pedidas_que_ve(uuid, timestamptz) owner to leda_owner;
+alter function pedidas_de_la_sesion(text, timestamptz) owner to leda_owner;
+
+revoke execute on function como_carga(uuid, uuid) from public;
+revoke execute on function quien_revisaria(uuid, uuid, text) from public;
+revoke execute on function puede_ser_quien_revisa(uuid) from public;
+revoke execute on function quien_carga_en_el_equipo(text, uuid) from public;
+revoke execute on function opciones_de_la_carga_en(uuid, timestamptz) from public;
+revoke execute on function opciones_de_la_carga_del_equipo(text, timestamptz) from public;
+revoke execute on function cargar_tarea_web(text, text, uuid, uuid, text, text, uuid, date, text,
+                                            text[], uuid, uuid, text, timestamptz, uuid)
+  from public;
+revoke execute on function reabrir_tarea(text, uuid, text) from public;
+revoke execute on function pedidas_que_ve(uuid, timestamptz) from public;
+revoke execute on function pedidas_de_la_sesion(text, timestamptz) from public;
+grant execute on function opciones_de_la_carga_del_equipo(text, timestamptz) to leda_app;
+grant execute on function cargar_tarea_web(text, text, uuid, uuid, text, text, uuid, date, text,
+                                           text[], uuid, uuid, text, timestamptz, uuid)
+  to leda_app;
+grant execute on function reabrir_tarea(text, uuid, text) to leda_app;
+grant execute on function pedidas_de_la_sesion(text, timestamptz) to leda_app;
 
 -- Los objetivos desde la web (migración 0068): de la clave, `leda_owner` sólo busca y agrega. La
 -- web (`leda_app`): las opciones y la creación; quién crea se resuelve adentro de las dos.
