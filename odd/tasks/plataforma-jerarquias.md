@@ -915,9 +915,13 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       Hoy cae en "fuera de la lista": no se crea nada, Leda dice lo que sí puede hacer y deja un incidente de
       prioridad baja (`turno._manejar`). Con la Mini App cambia a ofrecer abrirla (`docs/ROADMAP.md`).
       Incluye también (usuario, 2026-10-14): cuando Dirección o administración carga una tarea que vence después
-      que su objetivo, "> aceptar la demora" la carga directo, y la fecha del objetivo se corre como en la
-      decisión 5. El referente del objetivo recibe un aviso con la decisión.
+      que su objetivo, "> aceptar la demora" la carga directo, con una fecha prevista para el objetivo
+      (decisión 7). El referente del objetivo recibe un aviso con la decisión. Necesita las previsiones de
+      objetivos de la J5: si la J4 llega antes, esa salida espera a la J5.
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
+      Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
+      la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección
+      (decisión 6).
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
       Incluye la decisión 6 del 2026-10-14: seguir con una tarea que vence después que su objetivo pide la
@@ -1026,12 +1030,10 @@ con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue co
      - **cambiar la fecha;**
      - **"> cargarlo aparte",** si no es parte del padre: pasa a colgar del mismo lugar que el padre, o de
        ninguno, y se vuelve a ofrecer el tipo. Ejemplo: el laboratorio después de abrir la planta.
-     - **"> aceptar la demora",** si es parte del padre: su fecha se corre a la del hijo, y lo mismo hacia
-       arriba si hace falta. La vista previa muestra cada fecha que cambia, como "Abrir la planta: 30/11 →
-       15/12". Cada corrimiento queda en la auditoría. No hace falta otra aprobación, porque los objetivos
-       sólo los crean Dirección y administración. El aviso a los referentes de los objetivos corridos va con
-       los avisos de la J4.
-     Sin aceptar, la base no acepta un hijo que vence después que su padre. Se construye en la J3-3b.
+     - **"> aceptar la demora",** si es parte del padre. No hace falta otra aprobación, porque los objetivos
+       sólo los crean Dirección y administración. Va en la J5, con el modelo de la decisión 7.
+     Sin aceptar, la base no acepta un hijo que vence después que su padre. La J3-3b construye el freno, "cambiar
+     la fecha" y "cargarlo aparte".
   6. **Una tarea que vence después que su objetivo** (usuario, 2026-10-14: "leda tiene que frenar esas cosas y
      dar aviso"). Una tarea no puede ir "aparte": el objetivo la necesita, y "Poner el módem en la pared" no
      termina sin "Comprar el estante". Leda frena antes de cargar: "Esta tarea vence después que «Poner el
@@ -1040,6 +1042,14 @@ con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue co
      referente aprueba se carga, y si rechaza no, y quien la pidió se entera del motivo. Si quien carga es ese
      referente, su confirmación ya es la aprobación. El freno va en la J3-3b. El pedido de aprobación va en la
      J6, con la maquinaria de las propuestas; hasta entonces la única salida es cambiar la fecha.
+  7. **Aceptar una demora no borra la fecha original** (usuario, 2026-10-14, "pensemos juntos": pisar la fecha
+     haría parecer que nunca hubo un retraso, y dejarla sola haría perseguir un atraso ya decidido). La fecha
+     original del objetivo queda como compromiso, y se anota una **fecha prevista** nueva con su motivo, quién
+     lo decidió y cuándo. Leda sigue la fecha prevista, y la web muestra las dos: "21/10 → previsto 28/10, por
+     «Comprar el estante», lo decidió Ismael". Hacia arriba, igual: si la fecha prevista pasa la del abuelo, se
+     anota su fecha prevista. Es el mismo modelo que la previsión de las tareas (mecánica §9). Se construye en la
+     J5, junto con las previsiones, y vale para "aceptar la demora" de un objetivo hijo (decisión 5) y de una
+     tarea cargada por Dirección o administración (decisión 6).
 
 ## Criterio de aceptación
 
