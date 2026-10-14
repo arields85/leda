@@ -330,7 +330,8 @@ export async function transcribe(spaceId: string, audio: Blob): Promise<Dictatio
     try {
       response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/dictado`, {
         method: 'POST',
-        headers: { 'Content-Type': audio.type },
+        // J2-30: never an empty type (the server refuses it); without one, the iPhone's.
+        headers: { 'Content-Type': audio.type || 'audio/mp4' },
         body: audio,
         signal: controller.signal,
       });

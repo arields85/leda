@@ -136,6 +136,25 @@ describe('Dictation', () => {
     FakeRecorder.supported = ['audio/webm;codecs=opus', 'audio/webm'];
   });
 
+  it('an audio the browser gives with no type at all goes as audio/mp4, the iPhone\'s (J2-30)', async () => {
+    // A recorder that names no type, and pieces with no type either.
+    class Untyped extends FakeRecorder {
+      constructor(stream: MediaStream, options?: { mimeType?: string }) {
+        super(stream, options);
+        this.mimeType = '';
+      }
+    }
+    vi.stubGlobal('MediaRecorder', Untyped);
+    FakeRecorder.supported = [];
+    fakeMicrophone();
+    const on = handlers();
+    const dictation = new Dictation(on);
+    await dictation.start();
+    dictation.stop();
+    FakeRecorder.supported = ['audio/webm;codecs=opus', 'audio/webm'];
+    expect((on.onAudio.mock.calls[0][0] as Blob).type).toBe('audio/mp4');
+  });
+
   it('stops by itself at two minutes and counts the time while it records', async () => {
     vi.useFakeTimers();
     fakeMicrophone();
@@ -256,6 +275,12 @@ describe('transcribe', () => {
     expect(init?.method).toBe('POST');
     expect(init?.body).toBe(AUDIO);
     expect(init?.headers).toEqual(expect.objectContaining({ 'Content-Type': 'audio/webm;codecs=opus' }));
+  });
+
+  it('an audio with no type goes as audio/mp4, never with an empty type (J2-30)', async () => {
+    const fetch = serve(json(200, { texto: 'colgar el estante' }));
+    await transcribe('s1', new Blob(['audio']));
+    expect(fetch.mock.calls[0][1]?.headers).toEqual(expect.objectContaining({ 'Content-Type': 'audio/mp4' }));
   });
 
   it('a dictation cut by the limit gives the text and the notice that it was cut (J2-26)', async () => {

@@ -264,7 +264,8 @@ export class Dictation {
       recorder.onerror = null;
     }
     if (this.discard || !recorder) return;
-    const audio = new Blob(this.chunks, { type: recorder.mimeType || this.chunks[0]?.type || '' });
+    // J2-30: never an empty type (the server refuses it); without one, the iPhone's.
+    const audio = new Blob(this.chunks, { type: recorder.mimeType || this.chunks[0]?.type || 'audio/mp4' });
     this.chunks = [];
     if (audio.size === 0) this.on.onProblem(MIC_FAILED);
     else this.on.onAudio(audio);
