@@ -359,10 +359,20 @@ def _avisar_que_termino(cur, workspace_id: str, task_id: str, evento: str,
     return len(destinatarios)
 
 
+def _el_ultimo_cierre(cur, task_id: str) -> str:
+    """Cómo se reconoce el cierre vigente de una tarea: la última aprobación (o la tarea misma, si
+    no tiene ninguna), igual que en `avisar_lo_de_los_pedidos`."""
+    cur.execute("""select x.id from approval x
+                    where x.sujeto_tipo = 'tarea' and x.sujeto_id = %s and x.decision = 'aprobado'
+                    order by x.at desc, x.id desc limit 1""", (task_id,))
+    fila = cur.fetchone()
+    return str(fila["id"]) if fila else task_id
+
+
 def _quien_aprobo(cur, task_id: str) -> str | None:
     cur.execute("""select aprobador_membership_id from approval
                     where sujeto_tipo = 'tarea' and sujeto_id = %s and decision = 'aprobado'
-                    order by at desc limit 1""", (task_id,))
+                    order by at desc, id desc limit 1""", (task_id,))
     fila = cur.fetchone()
     return str(fila["aprobador_membership_id"]) if fila else None
 
@@ -383,12 +393,16 @@ def _las_que_la_esperan(cur, task_id: str) -> list[dict[str, Any]]:
 
 
 def vigencia_de_lo_pedido_que_termino(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
-    """Sale mientras el pedido siga terminado (si se reabrió antes, no: llegará el del próximo
-    cierre). A quien lo pidió, lo que lo esperaba; a otra persona, sus tareas que lo esperaban."""
+    """Sale mientras el pedido siga terminado por el mismo cierre (si se reabrió antes, no: llega
+    el del próximo cierre; revisión de la J4b, R3-termino-duplicado: si se reabrió y se volvió a
+    cerrar antes de que éste saliera, el del cierre nuevo ya lo cuenta). A quien lo pidió, lo que
+    lo esperaba; a otra persona, sus tareas que lo esperaban."""
     persona = str(aviso["destinatario_membership_id"])
     [referencia] = (dict(aviso["hechos"] or {})).get(REFERENCIAS) or [{}]
     tarea = _la_tarea(m.cur, referencia.get("tarea"))
     if tarea is None or tarea["estado"] != "terminada":
+        return SE_REABRIO_ANTES, {}
+    if referencia.get("evento") != _el_ultimo_cierre(m.cur, str(tarea["id"])):
         return SE_REABRIO_ANTES, {}
     pidio = str(tarea["pedida_por_membership_id"])
     hechos: dict[str, Any] = {"aviso": LO_PEDIDO_TERMINO, "necesita_respuesta": False,

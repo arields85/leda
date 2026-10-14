@@ -89,7 +89,7 @@ describe('clearing the free box while a dictation is on its way', () => {
     expect(FakeRecorder.last).toBeNull();
     expect(mic.track.stop).toHaveBeenCalled();
     expect(screen.queryByText(/grabando/)).toBeNull();
-    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.getByRole('status').textContent?.trim()).toBe('');
     expect(box()).toHaveValue('');
   });
 
@@ -112,6 +112,6 @@ describe('clearing the free box while a dictation is on its way', () => {
     await act(async () => answer({ kind: 'text', text: 'que Lucas cuelgue el módem' }));
     expect(box()).toHaveValue('');
     expect(screen.getByRole('button', { name: 'dictar' })).toBeEnabled();
-    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.getByRole('status').textContent?.trim()).toBe('');
   });
 });

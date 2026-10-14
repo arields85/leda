@@ -557,6 +557,15 @@ def test_la_misma_clave_con_otros_datos_se_rechaza(conn, intake_world, sesion):
         ("clave", "mal_formada")}
 
 
+def test_sin_la_clave_una_carga_valida_nunca_escribe(conn, intake_world, sesion):
+    """Revisión de la J4b (R3-carga-sin-clave-sin-avisos): la web guarda los avisos de toda carga
+    que la base acepta. Una carga sin clave nunca es aceptada (ni con todos los demás datos
+    bien), así que nunca queda una tarea sin sus avisos."""
+    for clave in (None, "", "   "):
+        assert _errores(_cargar(conn, sesion, intake_world, clave=clave)) == {("clave", "falta")}
+    assert _contar(conn, "task") == 0
+
+
 def test_la_misma_clave_en_otro_espacio_es_otra_carga(conn, intake_world, sesion):
     clave = secrets.token_urlsafe(18)
     assert _cargar(conn, sesion, intake_world, clave=clave)["ok"] is True

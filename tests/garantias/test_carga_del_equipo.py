@@ -816,10 +816,14 @@ def test_cargar_por_la_api_del_equipo(web, conn, equipo, administradora):
     assert {(e["campo"], e["motivo"]) for e in r.json()["errores"]} == {
         ("responsable", "no_le_puede_cargar")}
     # Un integrante no carga; otro sitio no carga; la cookie de administración no abre esta puerta.
-    assert _navegador(web, conn, equipo, "Sam North").post(
-        "/app/api/tareas", json=_cuerpo(equipo)).status_code == 403
-    assert taylor.post("/app/api/tareas", json=_cuerpo(equipo),
-                       headers={"origin": "https://otro.example"}).status_code == 403
+    # La web distingue los dos 403 sólo por `error` (revisión de la J4b, R3-403-requires-error-
+    # field; `web/src/admin/api.ts`): el de un integrante lo dice siempre, el de otro sitio no.
+    r = _navegador(web, conn, equipo, "Sam North").post("/app/api/tareas", json=_cuerpo(equipo))
+    assert (r.status_code, r.json()) == (403, {"error": "sin_autoridad", "texto": (
+        "Cargar tareas le corresponde a Dirección y a los referentes de área.")})
+    r = taylor.post("/app/api/tareas", json=_cuerpo(equipo),
+                    headers={"origin": "https://otro.example"})
+    assert (r.status_code, r.json()) == (403, {"error": "origen_no_verificado"})
     administracion = _navegador_de_administracion(web, conn, administradora)
     assert administracion.post("/app/api/tareas", json=_cuerpo(equipo)).status_code == 401
     assert _contar(conn, "task") == 1

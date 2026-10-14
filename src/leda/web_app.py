@@ -1690,9 +1690,11 @@ def _cargar(conn, puerta: str, token: str, espacio: str | None, datos: dict[str,
              datos["fecha"], datos["criterio"], datos["evidencia"], datos["decidio"],
              datos["revisa"], clave, ahora, datos["espera"]))
         resultado = cur.fetchone()["r"]
-        if resultado.get("ok") and not resultado.get("repetida") and clave is not None:
+        if resultado.get("ok") and not resultado.get("repetida"):
             # Los avisos de la carga (J4b, D6, D7 y D9), en la misma transacción: una tarea
             # cargada sin su aviso no queda (`motor.carga`). Una carga repetida ya los guardó.
+            # Toda carga aceptada los guarda: sin la clave la base nunca acepta (revisión de la
+            # J4b, R3-carga-sin-clave-sin-avisos; `test_sin_la_clave_una_carga_valida_nunca_escribe`).
             from .motor.carga import avisar_la_carga
 
             cur.execute("select set_config('leda.workspace_id', %s, true)", (ws,))

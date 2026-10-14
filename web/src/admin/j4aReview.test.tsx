@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RequestError } from '../api';
 import { adminMe, options, SPACE } from '../test/adminFixtures';
@@ -114,5 +114,76 @@ describe('the article of a level name', () => {
     expect(noParentLabel({ estrategico: 'programa', hito: 'etapa', operativo: 'objetivo de área' })).toBe(
       'de ninguno (es un programa)',
     );
+  });
+});
+
+// The review of the J4b (warning R3-proposal-decider-untested): when Leda proposes who does it,
+// the decider already chosen follows the same rule as a hand-picked change.
+describe('who decided, when Leda proposes who does it', () => {
+  const OPTIONS = `GET /app/admin/api/espacios/${SPACE}/opciones`;
+  const HELP = `POST /app/admin/api/espacios/${SPACE}/ayuda`;
+
+  function serve(responsible: string) {
+    const withAreas = options({
+      areas: [
+        { id: 'a-dir', nombre: 'Dirección', referente: { membership_id: 'm-ismael', nombre: 'Ismael' } },
+        { id: 'a-auto', nombre: 'Automatización', referente: { membership_id: 'm-marcos', nombre: 'Marcos' } },
+        { id: 'a-infra', nombre: 'Infraestructura', referente: { membership_id: 'm-lucas', nombre: 'Lucas' } },
+      ],
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const key = `${init?.method ?? 'GET'} ${url}`;
+        const body =
+          key === 'GET /app/admin/api/yo'
+            ? adminMe()
+            : key === OPTIONS
+              ? withAreas
+              : key === HELP
+                ? { propuesta: { responsable_id: responsible }, elegir: [], avisos: [] }
+                : null;
+        return body
+          ? new Response(JSON.stringify(body), { status: 200 })
+          : new Response('{"error":"no_existe"}', { status: 404 });
+      }),
+    );
+  }
+
+  function pick(label: string, value: string) {
+    fireEvent.click(screen.getByLabelText(label));
+    const option = within(screen.getByRole('listbox'))
+      .getAllByRole('option')
+      .find((o) => o.dataset.value === value);
+    if (!option) throw new Error(`"${label}" does not offer "${value}"`);
+    fireEvent.click(option);
+  }
+
+  const decided = () =>
+    within(screen.getByRole('complementary', { name: 'Vista previa' })).getByText('La decidió').nextElementSibling
+      ?.textContent;
+
+  async function proposeAfterDeciding(responsible: string) {
+    window.history.replaceState(null, '', '/app/admin/');
+    serve(responsible);
+    render(<AdminApp />);
+    await screen.findByRole('form', { name: 'Cargar tarea' });
+    pick('Quién la decidió', 'm-marcos');
+    expect(decided()).toBe('Marcos');
+    fireEvent.change(screen.getByLabelText('Contame qué querés hacer y te ayudo'), {
+      target: { value: 'hay que colgar el módem' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '> completar con Leda' }));
+  }
+
+  it('a decider who may not decide for the proposed person is cleared', async () => {
+    await proposeAfterDeciding('m-lucas');
+    await waitFor(() => expect(decided()).toBe('—'));
+  });
+
+  it('a decider who may decide for the proposed person stays', async () => {
+    await proposeAfterDeciding('m-marcos');
+    await screen.findByText('· propuesto por Leda');
+    expect(decided()).toBe('Marcos');
   });
 });

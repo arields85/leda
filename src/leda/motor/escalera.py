@@ -710,6 +710,10 @@ def _revisa_quien_ya_no_esta(m: Momento, task_id: str, aprobador: str) -> bool:
     persona = integrante(m.cur, aprobador)
     if persona is not None and persona["activo"]:
         return False
+    if aprobacion_vigente(m.cur, task_id, aprobador) is not None:
+        # Ya decidió antes de irse (revisión de la J4b, R3-escalera-skip-scope): la entrega no
+        # espera nada de esa persona, así que no hay incidente; el paso de siempre no recuerda.
+        return False
     tarea = leer_tarea(m.cur, task_id)
     registrar_incidente(
         m.cur, m.workspace_id,

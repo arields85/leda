@@ -382,3 +382,49 @@ def test_si_quien_revisa_ya_no_esta_en_el_equipo_queda_un_incidente_y_no_se_le_r
                                  where etapa = 'motor_revisa_quien_ya_no_esta'""")
     assert len(incidentes) == 1
     assert DE_NAHUEL in incidentes[0]["resumen_sanitizado"]
+
+
+def test_si_quien_revisa_ya_decidio_y_despues_deja_el_equipo_no_hay_incidente(conn, mundo, dias):
+    """Revisión de la J4b (R3-escalera-skip-scope): el incidente es para la entrega que espera la
+    decisión de quien ya no está. Si Marcos ya la aprobó antes de irse, no espera nada de él: ni
+    incidente ni recordatorio (lo que falta, si falta, lo sigue la regla de siempre)."""
+    marcos = mundo["personas"]["Marcos"]["membership_id"]
+    with admin(conn) as cur:
+        cur.execute("update task set revisor_membership_id = %s where id = %s",
+                    (marcos, mundo["de_nahuel"]))
+        cur.execute("""insert into approval (workspace_id, sujeto_tipo, sujeto_id,
+                                             aprobador_membership_id, decision)
+                       select workspace_id, 'tarea', id, %s, 'aprobado' from task where id = %s""",
+                    (marcos, mundo["de_nahuel"]))
+        cur.execute("update membership set activo = false where id = %s", (marcos,))
+    conn.commit()
+    for dia in (6, 7):
+        dias.ciclo(octubre(dia, 10))
+    assert [a for a in _de_tipos(conn, RECORDATORIO, TRABADA)
+            if str(a["task_id"]) == mundo["de_nahuel"]] == []
+    assert todos(conn, """select 1 from incident
+                           where etapa = 'motor_revisa_quien_ya_no_esta'""") == []
+
+
+def test_si_quien_se_eligio_para_revisar_deja_el_equipo_la_escalera_sigue_al_de_siempre(
+        conn, mundo, dias):
+    """Revisión de la J4b (R3-fallback-escalera-untested; migración 0072): la entrega de Nahuel
+    la iba a revisar Ismael, elegido al cargarla, e Ismael deja el equipo. Revisa quien aprueba el
+    trabajo de Nahuel (Marcos), y la escalera le recuerda la decisión a él: sin incidente."""
+    ismael = mundo["personas"]["Ismael"]["membership_id"]
+    marcos = mundo["personas"]["Marcos"]["membership_id"]
+    with admin(conn) as cur:
+        cur.execute("update task set revisor_membership_id = %s where id = %s",
+                    (ismael, mundo["de_nahuel"]))
+        cur.execute("update membership set activo = false where id = %s", (ismael,))
+        cur.execute("select quien_revisa_la_tarea(%s) as r", (mundo["de_nahuel"],))
+        assert str(cur.fetchone()["r"]) == marcos
+    conn.commit()
+    dias.ciclo(octubre(6, 10))
+    recordatorios = [a for a in _de_tipos(conn, RECORDATORIO)
+                     if str(a["task_id"]) == mundo["de_nahuel"]]
+    assert [str(a["destinatario_membership_id"]) for a in recordatorios] == [marcos]
+    # El incidente es sólo el de la entrega de Marcos, que espera a Ismael y a nadie más.
+    assert [str(i["referencia_id"]) for i in todos(
+        conn, """select referencia_id from incident
+                  where etapa = 'motor_revisa_quien_ya_no_esta'""")] == [mundo["de_marcos"]]

@@ -308,3 +308,24 @@ def test_lo_que_aprobo_quien_lo_pidio_sin_nadie_que_lo_espere_no_se_cuenta(conn,
     assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "la_aprobo_quien_la_pidio")
     assert _los_pedidos(conn, equipo) == {}
     assert len(_avisos(conn, TERMINO)) == 1
+
+
+def test_un_cierre_que_no_salio_antes_de_reabrirse_no_se_cuenta_dos_veces(conn, equipo):
+    """Revisión de la J4b (R3-termino-duplicado): el aviso del primer cierre todavía no salió
+    (fuera de horario o en la cola) cuando la tarea se reabre y se vuelve a cerrar. Al salir, sólo
+    cuenta el último cierre: quien lo pidió se entera una vez, no dos."""
+    tarea = _pedida_y_terminada(conn, equipo)
+    assert _los_pedidos(conn, equipo) == {TERMINO: 1}
+    r = _reabrir(conn, _sesion_del_equipo(conn, equipo, "Taylor Quinn"), tarea,
+                 "El módem quedó torcido")
+    assert r["ok"], r
+    _entregar(conn, equipo, tarea)
+    _aprobar(conn, equipo, tarea, "Sam Noble")
+    _terminar(conn, tarea)
+    assert _los_pedidos(conn, equipo, AHORA + timedelta(minutes=1)) == {TERMINO: 1,
+                                                                        SE_REABRIO: 1}
+    ia = _enviar(conn, equipo, AHORA + timedelta(minutes=2))
+    assert len([h for h in _hechos(ia, "Taylor Quinn") if h["aviso"] == TERMINO]) == 1
+    viejo, nuevo = _para(conn, equipo, TERMINO, "Taylor Quinn")
+    assert (viejo["estado"], viejo["motivo_omision"]) == ("omitido", "se_reabrio_antes")
+    assert nuevo["estado"] == "enviado"
