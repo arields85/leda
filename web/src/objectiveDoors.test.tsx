@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminApp } from './admin/AdminApp';
 import { App } from './App';
@@ -104,6 +104,37 @@ describe('the administration door', () => {
     fireEvent.click(within(kinds).getByRole('button', { name: 'tarea' }));
     expect(await screen.findByRole('form', { name: 'Cargar tarea' })).toBeInTheDocument();
     expect(read(`GET /app/admin/api/espacios/${SPACE}/opciones`)).toBe(before + 1);
+  });
+
+  it('switching between "tarea" and "objetivo" keeps what was typed in each', async () => {
+    // RDD review-12308947b06404e4: the switch used to drop the other form's draft.
+    const calls = serve({
+      'GET /app/admin/api/yo': ok(adminMe()),
+      [`GET /app/admin/api/espacios/${SPACE}/opciones`]: ok(options()),
+      [`GET ${BASE}/opciones`]: ok(objectiveOptions()),
+    });
+    render(<AdminApp />);
+    await screen.findByRole('form', { name: 'Cargar tarea' });
+    const kinds = screen.getByRole('group', { name: 'Qué cargar' });
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
+    fireEvent.click(within(kinds).getByRole('button', { name: 'objetivo' }));
+    await screen.findByRole('form', { name: 'Crear objetivo' });
+    expect(screen.queryByRole('form', { name: 'Cargar tarea' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Planta 2027' } });
+    fireEvent.click(within(kinds).getByRole('button', { name: 'tarea' }));
+    const task = await screen.findByRole('form', { name: 'Cargar tarea' });
+    expect(within(task).getByLabelText('Título')).toHaveValue('Configurar alarmas del SCADA');
+    expect(screen.queryByRole('form', { name: 'Crear objetivo' })).toBeNull();
+    // Its options are read again, in the background, without losing the draft.
+    await waitFor(() =>
+      expect(calls.filter((c) => c.key === `GET /app/admin/api/espacios/${SPACE}/opciones`)).toHaveLength(2),
+    );
+    expect(within(task).getByLabelText('Título')).toHaveValue('Configurar alarmas del SCADA');
+    fireEvent.click(within(kinds).getByRole('button', { name: 'objetivo' }));
+    const objective = await screen.findByRole('form', { name: 'Crear objetivo' });
+    expect(within(objective).getByLabelText('Nombre')).toHaveValue('Planta 2027');
+    // The objective's options were read once: the form stayed.
+    expect(calls.filter((c) => c.key === `GET ${BASE}/opciones`)).toHaveLength(1);
   });
 });
 
