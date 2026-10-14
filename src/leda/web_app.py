@@ -1519,7 +1519,10 @@ def _sin_lo_que_rechaza_la_base_del_objetivo(resultado: dict[str, Any], puerta: 
     return None
 
 
-def _opciones_del_objetivo(conn, puerta: str, token: str, espacio: str | None) -> Response:
+def _leer_las_opciones_del_objetivo(conn, puerta: str, token: str, espacio: str | None
+                                    ) -> dict[str, Any] | Response:
+    """Las opciones del objetivo de esa puerta (sin `ok`), o la respuesta que corta: sin sesión,
+    sin autoridad (no es Dirección) o sin espacio, como lo dice la base."""
     ahora = _ahora_de_la_puerta(conn, puerta, token, espacio)
     with sin_espacio(conn) as cur:
         _con_la_version_del_nucleo(cur)
@@ -1529,7 +1532,12 @@ def _opciones_del_objetivo(conn, puerta: str, token: str, espacio: str | None) -
     rechazo = _sin_lo_que_rechaza_la_base_del_objetivo(resultado, puerta)
     if rechazo is not None:
         return rechazo
-    return _json({k: v for k, v in resultado.items() if k != "ok"})
+    return {k: v for k, v in resultado.items() if k != "ok"}
+
+
+def _opciones_del_objetivo(conn, puerta: str, token: str, espacio: str | None) -> Response:
+    opciones = _leer_las_opciones_del_objetivo(conn, puerta, token, espacio)
+    return opciones if isinstance(opciones, Response) else _json(opciones)
 
 
 def _crear_el_objetivo(conn, puerta: str, token: str, espacio: str | None,
@@ -1958,6 +1966,252 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
             pack_hash=versiones.pack_hash(cur, ws), nucleo_hash=versiones.nucleo_hash())
     if falla is not None:
         _imprimir(f"  ! la IA no respondió a una ayuda para cargar ({type(falla).__name__}).")
+        return _json({"error": "sin_ayuda", "texto": TEXTO_SI_LA_IA_FALLA}, 503)
+    return _json({"propuesta": resultado.propuesta, "elegir": resultado.elegir,
+                  "avisos": resultado.avisos})
+
+
+# --- La ayuda de la IA al crear un objetivo (J3-4) ---------------------------------------------
+#
+# Porción J3 de `odd/tasks/plataforma-jerarquias.md` (ADR 0023, punto 4: la ayuda es para todos los
+# que cargan; `ayuda_al_crear_objetivo.py`): la misma ayuda de la carga, para un objetivo, por las
+# dos puertas que lo crean. La de administración, con su sesión, en cualquier espacio; la del
+# equipo, sólo para Dirección, en el suyo. Los mismos pasos (`PasosConLaIA`): las opciones del
+# objetivo con el candado (`opciones_del_objetivo`, que ya decide quién puede por cada puerta); sin
+# él, la llamada; y con el candado otra vez, la sesión revalidada (y, por la puerta del equipo,
+# que siga siendo Dirección), lo que decide el código, la auditoría y, si la IA no respondió, el
+# incidente. Nada se crea.
+
+
+def _quien_pide(conn, puerta: str, token: str, espacio: str | None
+                ) -> dict[str, Any] | Response:
+    """La sesión de esa puerta, revalidada, y quién pide: `{puerta, sesion_id, app_user_id,
+    espacio}`, o la respuesta que corta. Por la puerta de administración, una sesión de
+    administración vigente y el espacio del pedido; por la del equipo, una sesión vigente cuya
+    persona sigue activa y es Dirección (la regla de `quien_crea_el_objetivo`), en su espacio.
+    Es la costura de la J4: ahí la ortografía y el dictado de la puerta del equipo se abren
+    también a los referentes."""
+    from .db import espacio as en_el_espacio
+
+    if puerta == PUERTA_DE_ADMINISTRACION:
+        with sin_espacio(conn) as cur:
+            sesion = _sesion_de_administracion(cur, token)
+        if sesion is None:
+            return _sin_sesion_de_administracion()
+        if espacio is None:
+            return _espacio_que_no_existe()
+        return {"puerta": puerta, "sesion_id": str(sesion["sesion_id"]),
+                "app_user_id": str(sesion["app_user_id"]), "espacio": espacio}
+    with sin_espacio(conn) as cur:
+        sesion = _sesion(cur, token)
+    if sesion is None:
+        return _sin_sesion()
+    ws = str(sesion["workspace_id"])
+    if espacio is not None and espacio != ws:
+        return _sin_sesion()
+    with en_el_espacio(conn, ws) as cur:
+        cur.execute("""select m.app_user_id, r.autoridad_final
+                         from membership m join rol r on r.id = m.rol_id
+                        where m.id = %s and m.activo""", (str(sesion["membership_id"]),))
+        fila = cur.fetchone()
+    if fila is None:
+        return _sin_sesion()
+    if not fila["autoridad_final"]:
+        return _json({"error": "sin_autoridad", "texto": TEXTO_SIN_AUTORIDAD}, 403)
+    return {"puerta": puerta, "sesion_id": str(sesion["sesion_id"]),
+            "app_user_id": str(fila["app_user_id"]), "espacio": ws}
+
+
+def _detalle_de_quien_pide(quien: dict[str, Any]) -> dict[str, Any]:
+    """Lo que la auditoría guarda de quien pidió: el origen, la puerta y su sesión."""
+    return {"origen": "web", "puerta": quien["puerta"], "sesion_id": quien["sesion_id"]}
+
+
+def _lo_escrito_del_objetivo(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
+        dict[str, Any], list[dict[str, str]]]:
+    """Lo que ya tiene el formulario del objetivo, revisado contra sus opciones: de qué cuelga,
+    sólo un objetivo de la lista; el referente, sólo un referente de área del espacio; el tipo,
+    uno de los del núcleo (si va en ese lugar lo decide la ayuda). Un id de otro espacio no está en
+    las opciones y se rechaza, como al crear."""
+    escrito: dict[str, Any] = {}
+    errores: list[dict[str, str]] = []
+    listas = {"padre": ("padre_id", "padres", "id", "no_existe"),
+              "referente": ("referente_id", "referentes", "membership_id",
+                            "no_es_referente_de_un_area")}
+    for campo, (clave, lista, id_, motivo) in listas.items():
+        valor = cuerpo.get(clave)
+        escrito[clave] = ""
+        if valor in (None, ""):
+            continue
+        try:
+            valor = str(uuid.UUID(valor)) if isinstance(valor, str) else None
+        except ValueError:
+            valor = None
+        if valor is None:
+            errores.append(_mal_formado(campo))
+        elif not any(str(x.get(id_)) == valor for x in opciones.get(lista) or []):
+            errores.append({"campo": campo, "motivo": motivo})
+        else:
+            escrito[clave] = valor
+    tipo = cuerpo.get("tipo")
+    escrito["tipo"] = ""
+    if tipo is not None and not isinstance(tipo, str):
+        errores.append(_mal_formado("tipo"))
+    elif tipo:
+        if tipo in ("estrategico", "hito", "operativo"):
+            escrito["tipo"] = tipo
+        else:
+            errores.append({"campo": "tipo", "motivo": "no_existe"})
+    for campo in ("titulo", "descripcion"):
+        valor = cuerpo.get(campo)
+        if valor is not None and not isinstance(valor, str):
+            errores.append(_mal_formado(campo))
+        escrito[campo] = valor if isinstance(valor, str) else ""
+    fecha = cuerpo.get("fecha")
+    escrito["fecha"] = ""
+    if fecha not in (None, ""):
+        try:
+            escrito["fecha"] = date.fromisoformat(fecha).isoformat() if isinstance(fecha, str) \
+                else ""
+        except ValueError:
+            pass
+        if not escrito["fecha"]:
+            errores.append(_mal_formado("fecha"))
+    return escrito, errores
+
+
+def _con_texto_de_la_ayuda_del_objetivo(fila: dict[str, Any]) -> dict[str, str]:
+    texto = TEXTOS_DE_LA_AYUDA.get((fila["campo"], fila["motivo"]))
+    return ({"campo": fila["campo"], "motivo": fila["motivo"], "texto": texto} if texto
+            else _con_texto(fila, TEXTOS_DEL_OBJETIVO))
+
+
+@router.post("/admin/api/espacios/{espacio_id}/objetivos/ayuda")
+async def ayudar_a_crear_un_objetivo_en_la_administracion(espacio_id: str, request: Request):
+    """Lo que Leda propone para completar un objetivo a partir de lo que contó la persona, por la
+    puerta de administración: 200 con la propuesta (sólo lo vacío), los referentes para elegir y
+    lo que no pudo proponer; 422 sin texto, con nada para completar o con un dato que no es del
+    espacio; 503 con un texto humano si la IA no respondió (y un incidente)."""
+    pedido = await _el_pedido_que_escribe(request, _token_de_administracion,
+                                          _sin_sesion_de_administracion,
+                                          TAMANO_MAXIMO_DE_LA_AYUDA)
+    if isinstance(pedido, Response):
+        return pedido
+    return await _ayudar_a_crear_un_objetivo(PUERTA_DE_ADMINISTRACION, pedido[0],
+                                             _espacio_de(espacio_id),
+                                             _cuerpo_como_objeto(pedido[1]))
+
+
+@router.post("/api/objetivos/ayuda")
+async def ayudar_a_crear_un_objetivo_en_el_equipo(request: Request):
+    """Lo mismo, por la puerta del equipo y sólo para Dirección, en su espacio (403 a los demás,
+    sin llamar a la IA)."""
+    pedido = await _el_pedido_que_escribe(request, _token_de_la_cookie, _sin_sesion,
+                                          TAMANO_MAXIMO_DE_LA_AYUDA)
+    if isinstance(pedido, Response):
+        return pedido
+    return await _ayudar_a_crear_un_objetivo(PUERTA_DEL_EQUIPO, pedido[0], None,
+                                             _cuerpo_como_objeto(pedido[1]))
+
+
+async def _ayudar_a_crear_un_objetivo(puerta: str, token: str, espacio: str | None,
+                                      cuerpo: dict[str, Any]) -> Response:
+    from . import ayuda_al_crear_objetivo
+
+    return await _con_la_ia(PasosConLaIA(
+        preparar=lambda conn: _preparar_la_ayuda_del_objetivo(conn, puerta, token, espacio,
+                                                              cuerpo),
+        pedir=lambda preparada: ayuda_al_crear_objetivo.pedir(preparada["ia"],
+                                                              preparada["entrada"]),
+        cerrar=lambda conn, preparada, crudo, falla, _juicio: _cerrar_la_ayuda_del_objetivo(
+            conn, token, preparada, crudo, falla)))
+
+
+def _preparar_la_ayuda_del_objetivo(conn, puerta: str, token: str, espacio: str | None,
+                                    cuerpo: dict[str, Any]):
+    """Con el candado: la sesión de la puerta y las opciones del objetivo (que ya rechazan a quien
+    no es Dirección por la puerta del equipo), lo escrito y la IA del espacio."""
+    from . import ayuda_al_crear_objetivo
+
+    if puerta == PUERTA_DE_ADMINISTRACION:
+        quien = _quien_pide(conn, puerta, token, espacio)
+        if isinstance(quien, Response):
+            return quien
+    opciones = _leer_las_opciones_del_objetivo(conn, puerta, token, espacio)
+    if isinstance(opciones, Response):
+        return opciones
+    ws = str(opciones["espacio"]["id"])
+    texto = cuerpo.get("texto")
+    texto = " ".join(texto.split()) if isinstance(texto, str) else ""
+    escrito, errores = _lo_escrito_del_objetivo(cuerpo, opciones)
+    if not texto:
+        errores.insert(0, {"campo": "texto", "motivo": "falta"})
+    elif len(texto) > ayuda_al_crear_objetivo.LARGO_DEL_TEXTO:
+        errores.insert(0, {"campo": "texto", "motivo": "demasiado_largo"})
+    elif not errores and not ayuda_al_crear_objetivo.lo_que_se_pide(escrito, opciones):
+        errores.append({"campo": "ayuda", "motivo": "nada_que_completar"})
+    if errores:
+        return _json({"errores": [_con_texto_de_la_ayuda_del_objetivo(e) for e in errores]}, 422)
+    return {"puerta": puerta, "espacio": ws, "texto": texto, "escrito": escrito,
+            "opciones": opciones,
+            "ia": _la_ia_o_la_que_no_responde(conn, ws, _ia_de_la_ayuda),
+            "entrada": ayuda_al_crear_objetivo.entrada_de_la_ia(texto, escrito, opciones)}
+
+
+def _cerrar_la_ayuda_del_objetivo(conn, token: str, preparada: dict[str, Any],
+                                  crudo: dict[str, Any] | None,
+                                  falla: BaseException | None) -> Response:
+    """Con el candado otra vez y en el espacio: la sesión de la puerta revalidada (cortada
+    mientras respondía la IA, o ya sin ser Dirección, nada), lo que decide el código
+    (`ayuda_al_crear_objetivo.revisar`: el referente, con los apodos del espacio), la auditoría
+    (con la huella de cada texto propuesto, nunca el texto) y, si la IA no respondió, el
+    incidente."""
+    from . import ayuda_al_crear_objetivo, versiones
+    from .db import espacio as en_el_espacio, registrar_auditoria
+    from .incidentes import ETAPA_AYUDA_AL_CREAR_OBJETIVO, registrar_incidente
+    from .motor.fichas import integrantes_que_coinciden
+
+    quien = _quien_pide(conn, preparada["puerta"], token, preparada["espacio"])
+    if isinstance(quien, Response):
+        return quien
+    ws, escrito = preparada["espacio"], preparada["escrito"]
+    resultado = None
+    with en_el_espacio(conn, ws) as cur:
+        detalle: dict[str, Any] = {
+            **_detalle_de_quien_pide(quien), "ia": getattr(preparada["ia"], "nombre", None),
+            "pide": ayuda_al_crear_objetivo.lo_que_se_pide(escrito, preparada["opciones"]),
+            "respondio": falla is None}
+        if falla is None:
+            resultado = ayuda_al_crear_objetivo.revisar(
+                crudo or {}, texto=preparada["texto"], escrito=escrito,
+                opciones=preparada["opciones"],
+                coinciden=lambda dicho: integrantes_que_coinciden(cur, dicho))
+            propuesta = resultado.propuesta
+            detalle.update({
+                "propuestos": sorted(propuesta),
+                "descartados": resultado.descartados,
+                "para_elegir": [e["membership_id"] for e in resultado.elegir],
+                "huellas": {c: hashlib.sha256(propuesta[c].encode("utf-8")).hexdigest()
+                            for c in ("titulo", "descripcion") if c in propuesta},
+                "padre_objective_id": propuesta.get("padre_id"),
+                "tipo": propuesta.get("tipo"),
+                "referente_membership_id": propuesta.get("referente_id"),
+                "fecha": propuesta.get("fecha")})
+        else:
+            registrar_incidente(
+                cur, ws,
+                "La IA del espacio no respondió cuando alguien pidió completar un objetivo en la "
+                "plataforma: no se propuso ni se creó nada y la persona vio un aviso.",
+                severidad="baja", referencia_cruda=f"{type(falla).__name__}: {falla}",
+                etapa=ETAPA_AYUDA_AL_CREAR_OBJETIVO, app_user_id=quien["app_user_id"])
+        registrar_auditoria(
+            cur, accion="proponer_al_crear_objetivo", workspace_id=ws,
+            actor_app_user_id=quien["app_user_id"], actor_kind="persona",
+            sujeto_tipo="workspace", sujeto_id=ws, detalle=detalle,
+            pack_hash=versiones.pack_hash(cur, ws), nucleo_hash=versiones.nucleo_hash())
+    if falla is not None:
+        _imprimir(f"  ! la IA no respondió a una ayuda para crear un objetivo "
+                  f"({type(falla).__name__}).")
         return _json({"error": "sin_ayuda", "texto": TEXTO_SI_LA_IA_FALLA}, 503)
     return _json({"propuesta": resultado.propuesta, "elegir": resultado.elegir,
                   "avisos": resultado.avisos})

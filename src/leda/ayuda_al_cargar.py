@@ -1559,15 +1559,18 @@ _PALABRA = re.compile(r"[^\W_]+")
 
 def _nombres_del_equipo(opciones: Mapping[str, Any]) -> list[str]:
     """Los nombres de los datos del espacio: integrantes, áreas, objetivos y tareas abiertas, sin
-    repetir."""
+    repetir. Sirve también con las opciones de un objetivo (J3-4, `opciones_del_objetivo`): los
+    referentes de área con sus áreas y los objetivos de los que puede colgar."""
     nombres: list[str] = []
     for lista, claves in (("integrantes", ("nombre", "area")), ("objetivos", ("titulo",)),
-                          ("tareas", ("titulo", "responsable", "objetivo"))):
+                          ("tareas", ("titulo", "responsable", "objetivo")),
+                          ("referentes", ("nombre", "areas")), ("padres", ("titulo",))):
         for fila in opciones.get(lista) or []:
             for clave in claves:
                 valor = fila.get(clave)
-                if isinstance(valor, str) and valor.strip() and valor not in nombres:
-                    nombres.append(valor)
+                for v in (valor if isinstance(valor, list) else [valor]):
+                    if isinstance(v, str) and v.strip() and v not in nombres:
+                        nombres.append(v)
     return nombres
 
 

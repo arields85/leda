@@ -127,6 +127,9 @@ ETAPA_EVIDENCIA_DEL_CRITERIO = "evidencia_del_criterio"
 # El dictado al cargar una tarea en la plataforma (J2b, `dictado.py`): sin la clave de Gemini, o
 # Gemini no respondió; el audio no se pasó a texto (ni se guardó) y la persona vio un aviso.
 ETAPA_DICTADO_AL_CARGAR = "dictado_al_cargar"
+# La ayuda de la IA al crear un objetivo en la plataforma (J3-4, `ayuda_al_crear_objetivo.py`), por
+# cualquiera de las dos puertas: la IA del espacio no respondió.
+ETAPA_AYUDA_AL_CREAR_OBJETIVO = "ayuda_al_crear_objetivo"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -460,6 +463,16 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica) y revisá la IA "
                    "del espacio (`python -m leda modelo`, `leda chatgpt estado`). No hace falta "
                    "avisarle a {nombre}: puede volver a tocar el botón o cargarla a mano.")),
+    ETAPA_AYUDA_AL_CREAR_OBJETIVO: ExplicacionDeEtapa(
+        titulo="Leda no pudo completar un objetivo en la plataforma",
+        que_paso=("{nombre} tocó \"completar con Leda\" al crear un objetivo en la plataforma y "
+                  "la IA del espacio no respondió (sin configurar, sin la sesión de la "
+                  "suscripción, sin cupo, el plazo o una respuesta que no se pudo leer)."),
+        que_vio=("Que Leda no pudo completar ahora, con lo que escribió intacto; nada se creó "
+                 "ni cambió."),
+        que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica) y revisá la IA "
+                   "del espacio (`python -m leda modelo`, `leda chatgpt estado`). No hace falta "
+                   "avisarle a {nombre}: puede volver a tocar el botón o completarlo a mano.")),
     ETAPA_CRITERIO_AL_CARGAR: ExplicacionDeEtapa(
         titulo="Leda no pudo revisar el criterio de una tarea cargada",
         que_paso=("{nombre} cargó una tarea en la plataforma y la IA del espacio no pudo revisar "
