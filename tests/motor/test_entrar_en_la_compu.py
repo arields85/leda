@@ -180,3 +180,46 @@ def test_quien_no_es_administrador_no_aprueba_por_el_bot_de_administracion(conn,
         next(_UPDATES), f"compu:{pedido}", marcos))
     assert salida.enviados == []
     assert _estado(conn, pedido)["estado"] == "pendiente"
+
+
+# --- La revisión de la MA (RDD) ----------------------------------------------------------------
+
+def test_si_el_bot_de_administracion_no_puede_contestar_queda_un_incidente(conn, mundo, ada,
+                                                                            monkeypatch):
+    """R3-admin-failure-paths-untested: una falla al mostrar o aprobar un pedido por el bot de
+    administración nunca queda en silencio: un incidente, sin caerse."""
+    from leda.motor import bot_entrar
+
+    def falla(*_a, **_k):
+        raise RuntimeError("la base no contestó")
+
+    pedido, codigo, _ = _pedido(conn, "administracion", None)
+    monkeypatch.setattr(bot_entrar, "mostrar_en_la_administracion", falla)
+    monkeypatch.setattr(bot_entrar, "aprobar_en_la_administracion", falla)
+    salida, _ = _al_bot_de_administracion(conn, mensaje_de_telegram(
+        next(_UPDATES), f"/start {codigo}", ADA))
+    assert salida.enviados == []
+    salida, senales = _al_bot_de_administracion(conn, toque_de_telegram(
+        next(_UPDATES), f"compu:{pedido}", ADA, callback_id="cb-x"))
+    assert salida.enviados == [] and senales == ["cb-x"]
+    incidentes = todos(conn, "select etapa, resumen_sanitizado from incident")
+    assert [i["etapa"] for i in incidentes] == ["bot_de_administracion"] * 2
+    assert all("la base no contestó" not in i["resumen_sanitizado"] for i in incidentes)
+    assert _estado(conn, pedido)["estado"] == "pendiente"
+
+
+def test_el_boton_de_la_administracion_va_solo_con_la_direccion_y_en_un_chat_privado(
+        monkeypatch):
+    """R3-admin-button-untested."""
+    import dataclasses
+
+    from leda.despachador import _boton_de_la_administracion
+
+    aviso = {"boton": "administracion", "chat_id": ADA, "pedido_de_entrada_id": None}
+    assert _boton_de_la_administracion(aviso) is None                 # sin LEDA_BASE_URL
+    monkeypatch.setattr(config_mod, "config",
+                        dataclasses.replace(config_mod.config, base_url="https://leda.invalid/"))
+    boton = _boton_de_la_administracion(aviso)
+    assert (boton.etiqueta, boton.web_app) == ("Administración", "https://leda.invalid/app/admin/")
+    assert _boton_de_la_administracion({**aviso, "chat_id": -100123}) is None
+    assert _boton_de_la_administracion({**aviso, "boton": None}) is None

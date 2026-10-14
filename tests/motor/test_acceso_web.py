@@ -315,3 +315,30 @@ def test_un_pedido_que_ninguna_jugada_hace_nunca_va_como_ninguna_jugada():
     assert "también con una pregunta abierta" in FUERA_DE_LA_LISTA_ES
     assert "antes le contestás a lo que dijo o pidió" in " ".join(INSTRUCCIONES_REDACCION.split())
 
+
+
+def test_un_boton_por_mensaje_el_primero_decide_y_cada_hecho_dice_ese(conn, mundo, escribe,
+                                                                     direccion):
+    """R3-destino-overwrite: con dos jugadas que marcan el botón, el primero decide a dónde lleva
+    y los dos hechos dicen el botón que de verdad sale."""
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = %s",
+                    (mundo["personas"]["Marcos"]["membership_id"],))
+    conn.commit()
+    hechos, _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}),
+                      Jugada("pedir_crear", {"que_quiere_crear": "tarea"}))
+    assert [h.get("lleva_el_boton") for h in hechos] == ["Ver mis tareas", "Ver mis tareas"]
+    [marca] = _marcas(conn)
+    assert marca["destino"] == "inicio"
+    [mensaje] = _despachar(conn, mundo).enviados
+    assert mensaje.botones[-1].etiqueta == "Ver mis tareas"
+
+
+def test_el_dato_para_la_compu_es_un_booleano_de_la_jugada():
+    """R3-para-la-compu-no-consumer-or-test: el esquema que recibe la IA lo ofrece como un
+    verdadero o falso, y la jugada lo usa (`test_la_direccion_para_la_compu_va_sola_y_sin_boton`)."""
+    from leda.motor.ia_real import DATOS
+
+    tipo, descripcion = DATOS["para_la_compu"]
+    assert tipo == "boolean" and "computadora" in descripcion
+    assert "para_la_compu" in FICHAS["pedir_acceso_web"].opcional

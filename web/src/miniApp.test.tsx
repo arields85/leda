@@ -252,3 +252,43 @@ describe('how long a computer stays remembered', () => {
     expect(calls.find((c) => c.key === `POST ${url}`)?.body).toEqual({ dias: 30 });
   });
 });
+
+describe('the review of the MA', () => {
+  it('inside Telegram a closed session never shows a QR: it says to open Leda again', async () => {
+    fakeTelegram();
+    const calls = serve({});
+    render(<SignIn door="equipo" space="corework" onIn={() => {}} phone={false} />);
+    expect(await screen.findByText('Cerrá Leda y volvé a abrirla desde el chat de Telegram.')).toBeInTheDocument();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('a task that cannot be opened says so', async () => {
+    serve({
+      'GET /app/api/yo': ok(me()),
+      'GET /app/api/tareas?vista=tus': ok(view({ tareas: [task({ id: 't9', titulo: 'Probar el módem' })] })),
+      'POST /app/api/tareas/t9/pagina': { status: 403, body: { error: 'no_la_ve' } },
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole('link', { name: 'Ver la tarea Probar el módem' }));
+    expect(await screen.findByText('No se pudo abrir esa tarea.')).toBeInTheDocument();
+  });
+
+  it('the computer setting goes back when saving fails, and a failed read never shows the default', async () => {
+    const url = '/app/admin/api/espacios/w1/sesion-en-la-compu';
+    serve({ [`GET ${url}`]: ok({ dias: 7 }), [`POST ${url}`]: { status: 500, body: {} } });
+    render(<ComputerSession spaceId="w1" onClosed={() => {}} />);
+    const button = await screen.findByRole('button', { name: /una computadora queda recordada/i });
+    expect(button).toHaveTextContent('7 días');
+    fireEvent.click(button);
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: '30 días' }));
+    expect(await screen.findByText('No se pudo guardar ahora; probá de nuevo.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /una computadora queda recordada/i })).toHaveTextContent('7 días');
+  });
+
+  it('a setting that cannot be read is not shown as "sin vencimiento"', async () => {
+    serve({ 'GET /app/admin/api/espacios/w2/sesion-en-la-compu': { status: 500, body: {} } });
+    render(<ComputerSession spaceId="w2" onClosed={() => {}} />);
+    expect(await screen.findByText(/No se pudo leer cuánto dura ahora/)).toBeInTheDocument();
+    expect(screen.queryByText('sin vencimiento')).toBeNull();
+  });
+});

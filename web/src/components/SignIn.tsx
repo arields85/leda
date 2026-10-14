@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { telegramWebApp } from '../telegram';
 import { Notice } from './Notice';
 
 // Entering from a computer, or from a phone's browser outside Telegram (ADR 0024, decisions 4 and
@@ -68,8 +69,12 @@ export function SignIn({ door, space, onIn, phone = onAPhone() }: {
   const onInNow = useRef(onIn);
   onInNow.current = onIn;
 
+  // Inside Telegram there is no QR to scan: the session comes from opening the Mini App again
+  // (review R4-spent-signature-lost-response: the signature was used but its answer was lost).
+  const inTelegram = telegramWebApp() !== null;
+
   useEffect(() => {
-    if (door === 'equipo' && !space) return;
+    if (inTelegram || (door === 'equipo' && !space)) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     setState({ kind: 'asking' });
@@ -139,6 +144,13 @@ export function SignIn({ door, space, onIn, phone = onAPhone() }: {
   );
   const what = door === 'equipo' ? 'tus tareas' : 'la administración';
 
+  if (inTelegram) {
+    return (
+      <Notice title="No se pudo abrir la sesión.">
+        <p className="m-0">Cerrá Leda y volvé a abrirla desde el chat de Telegram.</p>
+      </Notice>
+    );
+  }
   if (door === 'equipo' && !space) {
     return (
       <Notice title="Entrá desde Telegram.">

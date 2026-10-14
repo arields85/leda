@@ -114,6 +114,8 @@ export function App() {
   // The chat's button that opened the page, followed once (ADR 0024, decision 2).
   const link = useRef(deepLink());
   const [opening, setOpening] = useState(false);
+  // A task that could not be opened says so (review R3-open-task-silent-failure).
+  const [unopened, setUnopened] = useState(false);
 
   useEffect(() => {
     const request = new AbortController();
@@ -157,11 +159,14 @@ export function App() {
   /** A task's page (J4 phone test): same origin, with an access for this person. */
   async function openTask(taskId: string) {
     setOpening(true);
+    setUnopened(false);
     try {
       const where = await openTaskPage(taskId);
       if (where) window.location.assign(where);
+      else setUnopened(true);
     } catch (error) {
       if (error instanceof SessionClosedError) setMe({ kind: 'closed' });
+      else setUnopened(true);
     } finally {
       setOpening(false);
     }
@@ -254,6 +259,11 @@ export function App() {
         )}
         {tasks.kind === 'loading' && <Notice title="Cargando…" />}
         {opening && <Notice title="Abriendo la tarea…" />}
+        {unopened && (
+          <Notice title="No se pudo abrir esa tarea.">
+            <p className="m-0">Puede que ya no la veas, o que no haya conexión. Probá de nuevo en un rato.</p>
+          </Notice>
+        )}
         {tasks.kind === 'failed' && <Failed onRetry={retry} />}
         {ready && ready.vista === 'pedidas' && (
           ready.pedidas && ready.pedidas.length > 0 ? (

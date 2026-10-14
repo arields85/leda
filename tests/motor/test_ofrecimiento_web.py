@@ -397,3 +397,25 @@ def test_la_bienvenida_sin_la_direccion_publica_no_lo_lleva(conn, mundo):
     _sin_ofrecer(conn, mundo)
     [bienvenida] = _bienvenida(conn, mundo)
     assert "web" not in bienvenida.texto and _marcas(conn) == []
+
+
+def test_la_bienvenida_de_direccion_lleva_ver_el_equipo(conn, mundo, direccion):
+    """R3-bienvenida-destino-unproved: a Dirección (Ismael, autoridad final), "Ver el equipo"."""
+    from leda.motor.escucha import BotTelegram, Escucha
+
+    with admin(conn) as cur:
+        cur.execute("delete from ofrecimiento_web")
+    conn.commit()
+    telegram = TelegramFalso()
+    salida = TransporteDePrueba()
+    escucha = Escucha(conn, mundo["id"], IAGuionada(), RelojFijo(AHORA),
+                      bot=BotTelegram("token-falso", telegram.cliente()), transporte=salida,
+                      imprimir=lambda *_: None)
+    escucha.preparar(fijar_menus=False)
+    ismael = mundo["personas"]["Ismael"]["telegram"]
+    telegram.lotes = [[mensaje_de_telegram(990, "/start", ismael, 990, "private")]]
+    escucha.una_vuelta(espera=0)
+    [bienvenida] = salida.enviados
+    boton = _boton_de_la_web(bienvenida)
+    assert (boton.etiqueta, boton.web_app) == ("Ver el equipo", MINI_APP + "?vista=equipo")
+    assert "lo que hace el equipo" in bienvenida.texto

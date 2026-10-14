@@ -43,7 +43,7 @@ export async function saveComputerSession(spaceId: string, days: number | null):
 export function ComputerSession({ spaceId, onClosed }: { spaceId: string; onClosed: () => void }) {
   const id = useId();
   const [days, setDays] = useState<string | null>(null);
-  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed' | 'unread'>('idle');
 
   useEffect(() => {
     const request = new AbortController();
@@ -54,13 +54,15 @@ export function ComputerSession({ spaceId, onClosed }: { spaceId: string; onClos
       .catch((error: unknown) => {
         if (request.signal.aborted) return;
         if (error instanceof SessionClosedError) onClosed();
-        else setState('failed');
+        // Never the default as if it were the setting (review): say it could not be read.
+        else setState('unread');
       });
     return () => request.abort();
     // `onClosed` is the page's; a new one is not a reason to read again.
   }, [spaceId]);
 
   async function choose(value: string) {
+    const before = days;
     setDays(value);
     setState('saving');
     try {
@@ -68,6 +70,9 @@ export function ComputerSession({ spaceId, onClosed }: { spaceId: string; onClos
       setDays(saved === null ? '' : String(saved));
       setState('saved');
     } catch (error) {
+      // What did not save goes back to what is saved (review: an optimistic change never
+      // reverted).
+      setDays(before);
       if (error instanceof SessionClosedError) onClosed();
       else setState('failed');
     }
@@ -78,7 +83,9 @@ export function ComputerSession({ spaceId, onClosed }: { spaceId: string; onClos
       <label id={`${id}-label`} htmlFor={id} className="uppercase tracking-[0.04em]">
         una computadora queda recordada
       </label>
-      {days === null && state !== 'failed' ? (
+      {state === 'unread' ? (
+        <p className={`m-0 text-body ${WARN}`}>No se pudo leer cuánto dura ahora; probá de nuevo en un rato.</p>
+      ) : days === null ? (
         <p className="m-0 text-body">Cargando…</p>
       ) : (
         <Dropdown
@@ -90,7 +97,9 @@ export function ComputerSession({ spaceId, onClosed }: { spaceId: string; onClos
         />
       )}
       <p role="status" className={`m-0 text-small ${state === 'failed' ? WARN : ''}`}>
-        {state === 'saving'
+        {state === 'unread'
+          ? ''
+          : state === 'saving'
           ? 'Guardando…'
           : state === 'saved'
             ? 'Guardado.'

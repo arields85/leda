@@ -1345,8 +1345,10 @@ def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None,
     destino = destino or destino_de_sus_tareas(ctx.quien)
     if not ya:
         ya.append((ENTRADA_WEB, yo))
-    ctx.destino_de_la_web[:] = [destino]
-    return {"resultado": BOTON_PARA_ABRIR_LA_WEB, **lleva_el_boton(destino)}
+        ctx.destino_de_la_web[:] = [destino]
+    # Un botón por mensaje: el primero que lo marcó decide a dónde lleva, y cada hecho dice ése
+    # (revisión R3-destino-overwrite: uno posterior lo cambiaba y el hecho anterior mentía).
+    return {"resultado": BOTON_PARA_ABRIR_LA_WEB, **lleva_el_boton(destino_de_la_respuesta(ctx))}
 
 
 # Crear una tarea o un objetivo por chat (J4b; decisión D12 del usuario, 2026-10-14; ADR 0017,
