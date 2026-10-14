@@ -2221,6 +2221,8 @@ def _cerrar_la_ayuda_del_objetivo(conn, token: str, preparada: dict[str, Any],
                 "padre_objective_id": propuesta.get("padre_id"),
                 "tipo": propuesta.get("tipo"),
                 "referente_membership_id": propuesta.get("referente_id"),
+                # J3-4b: si el referente lo nombró la persona o lo propuso Leda por el área.
+                "referente_de": resultado.referente_de,
                 "fecha": propuesta.get("fecha")})
         else:
             registrar_incidente(

@@ -329,3 +329,69 @@ def test_una_respuesta_vacia_no_propone_nada_y_lo_dice():
     assert {a["campo"] for a in r.avisos} == {"titulo", "descripcion"}
     # El tipo sin padre se sabe sin la IA.
     assert r.propuesta == {"tipo": "estrategico"}
+
+
+# --- El referente por el área (J3-4b, como la J2-18 de la carga) ---------------------------------
+#
+# "Leda completa todo lo que puede": si la persona no nombró a nadie, la IA puede decir de qué área
+# es el objetivo, de la lista de áreas con referente, y el código propone a su referente, marcado
+# como propuesto. Quien se nombró gana siempre; nombrado alguien que no es referente, se dice y no
+# se pone a otro por el área; un área que no está en la lista no propone a nadie.
+
+SIN_NOMBRE = "hay q armar el laboratorio de calidad para medir las piezas"
+
+
+def test_la_ia_recibe_las_areas_con_referente_con_un_codigo_y_sin_ids():
+    entrada = ayuda.entrada_de_la_ia(SIN_NOMBRE, _vacio(), OPCIONES)
+    assert entrada["areas"] == [{"codigo": "A1", "area": "Calidad"},
+                                {"codigo": "A2", "area": "Dirección"},
+                                {"codigo": "A3", "area": "Infraestructura"}]
+    propiedades = ayuda.herramienta(["referente"])["function"]["parameters"]["properties"]
+    assert set(propiedades) == {"referente", "area"}
+    # Sin el referente para completar, tampoco el área.
+    assert "area" not in ayuda.herramienta(["titulo"])["function"]["parameters"]["properties"]
+
+
+def test_sin_nadie_nombrado_el_referente_del_area_que_propone_leda():
+    r = _revisar(_respuesta(referente="", area="A1", fecha=None, titulo="Armar el laboratorio",
+                            descripcion="Armar el laboratorio de calidad para medir las piezas."),
+                 texto=SIN_NOMBRE)
+    assert r.propuesta["referente_id"] == "m-nahuel"
+    assert r.referente_de == "leda"
+    assert r.avisos == [] and r.elegir == []
+    # El código del área, escrito como venga.
+    r = _revisar(_respuesta(referente="", area="a3", fecha=None), texto=SIN_NOMBRE)
+    assert r.propuesta["referente_id"] == "m-lucas"
+
+
+def test_sin_nadie_nombrado_y_sin_un_area_clara_no_se_propone_referente():
+    r = _revisar(_respuesta(referente="", area="", fecha=None), texto=SIN_NOMBRE)
+    assert "referente_id" not in r.propuesta and r.referente_de is None
+    assert not [a for a in r.avisos if a["campo"] == "referente"]
+
+
+def test_un_area_que_no_esta_en_la_lista_no_propone_a_nadie():
+    r = _revisar(_respuesta(referente="", area="A9", fecha=None), texto=SIN_NOMBRE)
+    assert "referente_id" not in r.propuesta and r.referente_de is None
+    assert {"campo": "referente", "motivo": "area_no_existe"} in r.descartados
+
+
+def test_el_referente_nombrado_gana_sobre_el_area():
+    r = _revisar(_respuesta(area="A1"))
+    assert r.propuesta["referente_id"] == "m-lucas"
+    assert r.referente_de == "dicho"
+
+
+def test_nombrado_alguien_que_no_es_referente_el_area_no_lo_reemplaza():
+    texto = EJEMPLO.replace("lucas", "marcos")
+    r = _revisar(_respuesta(referente="marcos", area="A3"), texto=texto)
+    assert "referente_id" not in r.propuesta and r.referente_de is None
+    assert [a["motivo"] for a in r.avisos if a["campo"] == "referente"] == ["no_encontrado"]
+    # Palabras que la persona no escribió: igual nombró a alguien, y el área no lo reemplaza.
+    r = _revisar(_respuesta(referente="ismael", area="A3"))
+    assert "referente_id" not in r.propuesta
+
+
+def test_con_el_referente_ya_elegido_el_area_no_se_mira():
+    r = _revisar(_respuesta(referente="", area="A1"), escrito=_vacio(referente_id="m-lucas"))
+    assert "referente_id" not in r.propuesta and r.referente_de is None

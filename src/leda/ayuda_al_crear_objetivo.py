@@ -9,8 +9,9 @@ persona ve cada dato marcado, lo corrige o lo acepta, y confirma como siempre.
 
 - **Qué recibe la IA** (`entrada_de_la_ia`), sólo del espacio de las opciones del objetivo
   (`opciones_del_objetivo`): el texto, lo ya escrito, hoy y los días que vienen, los objetivos de
-  los que puede colgar con un código cada uno (P1…), los tipos con los nombres del pack y los
-  referentes de área con sus áreas. Nunca un id.
+  los que puede colgar con un código cada uno (P1…), los tipos con los nombres del pack, los
+  referentes de área con sus áreas y las áreas con referente, con un código cada una (A1…). Nunca
+  un id.
 - **Lo que decide el código** (`revisar`):
   - de qué cuelga, sólo un código de la lista;
   - el tipo, uno que admita el lugar donde cuelga (punto 11): sin padre, el que va sin padre; si
@@ -19,7 +20,9 @@ persona ve cada dato marcado, lo corrige o lo acepta, y confirma como siempre.
   - el referente, sólo si sus palabras están en el texto y son de un referente de área del
     espacio (decisión 3 del usuario, 2026-10-14; `coinciden`: `fichas.integrantes_que_coinciden`,
     con los apodos); con dos o más, Leda no elige y los muestra (ADR 0020, decisión 3); con nadie,
-    se dice y no se pone a otro;
+    se dice y no se pone a otro. Si la persona no nombró a nadie (J3-4b, como la J2-18 de la
+    carga: "Leda completa todo lo que puede"), el referente del área de la que trata el objetivo,
+    si la IA dio el código de un área de la lista; nombrado alguien, el área no se mira;
   - la fecha, sólo si la persona la dijo, calculada por el código con sus palabras y en un día
     hábil del espacio (`ayuda_al_cargar.fecha_dicha`, la misma de la carga). Si vence después que
     el objetivo del que cuelga se propone igual: el freno del formulario (J3-3b) lo dice;
@@ -83,8 +86,9 @@ código; si no es parte de ninguno, vacío. El tipo, uno de los que admite el lu
 sin un objetivo arriba, el que va sin padre.
 
 El referente: si la persona nombró a quien lleva el objetivo, copiás sus palabras tal cual, aunque \
-no lo encuentres entre los referentes; si no nombró a nadie, vacío. La fecha, sólo si la persona \
-la dijo.
+no lo encuentres entre los referentes, y no proponés un área. Si no nombró a nadie, proponés el \
+área de la que trata el objetivo, de la lista de áreas, si se entiende por lo que hay que lograr; \
+su referente lo pone Leda. La fecha, sólo si la persona la dijo.
 
 Usás sólo lo que recibiste: ningún número, nombre, fecha ni dato que no esté ahí. Lo que no podés \
 saber con lo que recibiste va vacío; la persona lo completa."""
@@ -98,11 +102,14 @@ _DATOS = {
     "tipo": "El código del tipo que le corresponde, de los que admite el lugar donde cuelga.",
     "referente": "Las palabras con que la persona nombró a quien lleva el objetivo, tal cual las "
                  "escribió; vacío si no nombró a nadie.",
-    "fecha": ayuda_al_cargar._DATOS["fecha"],
+    "area": "Si la persona no nombró a nadie, el código (A1, A2...) del área de la que trata el "
+            "objetivo, por lo que hay que lograr; vacío si nombró a alguien o si no se puede "
+            "saber.",
+    "fecha":ayuda_al_cargar._DATOS["fecha"],
     "como_dijo_la_fecha": ayuda_al_cargar._DATOS["como_dijo_la_fecha"],
 }
-# Las palabras de la fecha van con la fecha.
-_ACOMPANAN = {"como_dijo_la_fecha": "fecha"}
+# Las palabras de la fecha van con la fecha, y el área (J3-4b), con el referente.
+_ACOMPANAN = {"como_dijo_la_fecha": "fecha", "area": "referente"}
 
 
 @dataclass
@@ -110,7 +117,11 @@ class Resultado(ayuda_al_cargar.Resultado):
     """Lo que Leda propone para el objetivo (`propuesta`, con los nombres del formulario), los
     referentes para elegir cuando hay más de uno (`elegir`), lo que no se propuso y la persona
     tiene que saber (`avisos`) y lo descartado con su motivo (`descartados`), como en la carga.
-    La fecha se revisa con la misma función de la carga, así que sus textos son los de ella."""
+    La fecha se revisa con la misma función de la carga, así que sus textos son los de ella. De
+    dónde salió el referente, para la auditoría (`referente_de`, J3-4b): `dicho`, si la persona lo
+    nombró; `leda`, si Leda lo propuso por el área."""
+
+    referente_de: str | None = None
 
     def descartar(self, campo: str, motivo: str, aviso: str | None = None, **datos: str) -> None:
         if aviso is not None and (campo, aviso) in TEXTOS:
@@ -141,6 +152,15 @@ def _niveles(opciones: Mapping[str, Any]) -> dict[str, str]:
 
 def _referente(opciones: Mapping[str, Any], membership_id: Any) -> Mapping[str, Any] | None:
     return _por_id(opciones.get("referentes") or [], "membership_id", membership_id)
+
+
+def _areas(opciones: Mapping[str, Any]) -> dict[str, tuple[str, Mapping[str, Any]]]:
+    """Las áreas con referente, con un código cada una (A1…, por su nombre): el área y su
+    referente (J3-4b)."""
+    areas = [(area, r) for r in opciones.get("referentes") or [] for area in r.get("areas") or []
+             if isinstance(area, str) and area.strip()]
+    areas.sort(key=lambda a: (_normal(a[0]), a[0], str(a[1].get("membership_id"))))
+    return {f"A{i}": a for i, a in enumerate(areas, 1)}
 
 
 def _tipos_de(opciones: Mapping[str, Any], padre_id: Any) -> list[str]:
@@ -200,6 +220,7 @@ def entrada_de_la_ia(texto: str, escrito: Mapping[str, Any],
         "sin_padre": list(opciones.get("sin_padre") or []),
         "referentes": [{"nombre": r["nombre"], "areas": list(r.get("areas") or [])}
                        for r in opciones.get("referentes") or []],
+        "areas": [{"codigo": c, "area": area} for c, (area, _r) in _areas(opciones).items()],
     }
 
 
@@ -274,7 +295,8 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
             if por_omision is not None:
                 r.propuesta["tipo"] = por_omision
 
-    # El referente: el que nombró la persona, si es uno solo de los referentes de área.
+    # El referente: el que nombró la persona, si es uno solo de los referentes de área; si no nombró
+    # a nadie, el del área que propone Leda.
     referente = escrito.get("referente_id") or None
     if "referente_id" in pide:
         referente = _el_referente(r, crudo, texto, opciones, coinciden)
@@ -316,10 +338,12 @@ def _el_referente(r: Resultado, crudo: Mapping[str, Any], texto: str,
                   opciones: Mapping[str, Any],
                   coinciden: Callable[[str], list[dict[str, Any]]]) -> str | None:
     """El referente que nombró la persona: con uno solo de los referentes de área, ése; con
-    varios, para elegir; con nadie (o con alguien del equipo que no es referente), se dice."""
+    varios, para elegir; con nadie (o con alguien del equipo que no es referente), se dice. Si no
+    nombró a nadie, el referente del área que propone Leda (J3-4b), sólo un código de la lista.
+    Nombrado alguien, el área no se mira, aunque no se lo encuentre."""
     dicho = _cadena(crudo.get("referente"))
     if dicho is None:
-        return None
+        return _el_del_area(r, crudo, opciones)
     if not set(_normal(dicho).split()) <= set(_normal(texto).split()):
         # Las palabras no son de la persona: no nombró a nadie con ellas.
         r.descartar("referente", "no_lo_dijo")
@@ -331,6 +355,7 @@ def _el_referente(r: Resultado, crudo: Mapping[str, Any], texto: str,
             encontrados.append(referente)
     if len(encontrados) == 1:
         r.propuesta["referente_id"] = encontrados[0]["membership_id"]
+        r.referente_de = "dicho"
         return encontrados[0]["membership_id"]
     if encontrados:
         r.elegir = [{"membership_id": e["membership_id"], "nombre": e["nombre"],
@@ -339,3 +364,19 @@ def _el_referente(r: Resultado, crudo: Mapping[str, Any], texto: str,
     else:
         r.descartar("referente", "no_encontrado", "no_encontrado", quien=dicho)
     return None
+
+
+def _el_del_area(r: Resultado, crudo: Mapping[str, Any],
+                 opciones: Mapping[str, Any]) -> str | None:
+    """El referente del área que propone Leda, si su código es de la lista (J3-4b)."""
+    codigo = _cadena(crudo.get("area"))
+    if codigo is None:
+        return None
+    del_area = _areas(opciones).get(codigo.upper())
+    if del_area is None:
+        r.descartar("referente", "area_no_existe")
+        return None
+    referente = del_area[1]["membership_id"]
+    r.propuesta["referente_id"] = referente
+    r.referente_de = "leda"
+    return referente

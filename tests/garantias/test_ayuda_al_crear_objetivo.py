@@ -400,3 +400,32 @@ def test_lo_escrito_no_se_pide_ni_vuelve(web, conn, intake_world, administradora
     assert "titulo" not in r.json()["propuesta"]
     assert "referente_id" not in r.json()["propuesta"]
     assert set(ia.entrada()["pide"]) == {"descripcion", "tipo", "fecha"}
+
+
+def test_sin_nadie_nombrado_leda_propone_el_referente_del_area(web, conn, intake_world,
+                                                              administradora, ia):
+    """J3-4b ("Leda completa todo lo que puede", como la J2-18): la IA recibe las áreas con
+    referente de ese espacio, con un código y sin ids, y dice de qué área es el objetivo; el
+    código propone a su referente y la auditoría dice que lo propuso Leda."""
+    equipo = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    texto = "hay q revisar como se miden las piezas antes de mandarlas"
+    ia.respuestas.append(_respuesta(referente="", area="A2", fecha="", como_dijo_la_fecha="",
+                                    titulo="Revisar cómo se miden las piezas",
+                                    descripcion="Revisar cómo se miden las piezas antes de "
+                                                "mandarlas."))
+    r = _pedir(equipo, EQUIPO, texto=texto)
+    assert r.status_code == 200, r.text
+    assert ia.entrada()["areas"] == [{"codigo": "A1", "area": "Field Services"},
+                                     {"codigo": "A2", "area": "Quality Guild"}]
+    assert _persona(intake_world, "Sam Noble") not in json.dumps(ia.pedidos[0])
+    assert r.json()["propuesta"]["referente_id"] == _persona(intake_world, "Sam Noble")
+    assert r.json()["avisos"] == []
+    detalle = _fila(conn, """select detalle from audit_log
+                              where accion = 'proponer_al_crear_objetivo'""")["detalle"]
+    assert detalle["referente_de"] == "leda"
+    assert detalle["referente_membership_id"] == _persona(intake_world, "Sam Noble")
+    # Nombrado alguien que no es referente, el área no lo reemplaza.
+    ia.respuestas.append(_respuesta(referente="north", area="A2"))
+    r = _pedir(equipo, EQUIPO, texto=EJEMPLO.replace("taylor", "north"))
+    assert "referente_id" not in r.json()["propuesta"]
+    assert [a["motivo"] for a in r.json()["avisos"]] == ["no_encontrado"]

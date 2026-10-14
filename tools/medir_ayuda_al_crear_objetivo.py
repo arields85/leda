@@ -2,7 +2,7 @@
 `odd/tasks/plataforma-jerarquias.md`): pedidos escritos como en un chat real (sin puntuación, con
 faltas de ortografía, todo seguido), la misma función que usa la web
 (`ayuda_al_crear_objetivo.pedir` y `revisar`) y los mismos controles del código, contra la IA que
-se elija. **No se corre con la IA real sin el coordinador**: gasta una llamada por pedido (15 por
+se elija. **No se corre con la IA real sin el coordinador**: gasta una llamada por pedido (19 por
 vuelta).
 
     $env:PYTHONPATH = "src"
@@ -10,15 +10,16 @@ vuelta).
 
 Cada pedido dice qué tiene que proponer Leda y qué no: de qué cuelga (de la lista), el tipo (uno que
 vaya ahí), el referente (sólo un referente de área nombrado en el texto; con dos, para elegir; con
-nadie, se dice) y la fecha (sólo si se dijo y el código la entiende, en día hábil; si vence después
+nadie, se dice; J3-4b: si no se nombró a nadie, el del área de la que trata, si se entiende, y si
+no, ninguno) y la fecha (sólo si se dijo y el código la entiende, en día hábil; si vence después
 que el padre, igual). El nombre y la descripción, que la IA los escriba con naturalidad
 (`sin_naturalidad` de la medición de la carga) y sin dejar mal escrito un nombre de los datos.
 
 Comparte con la medición de la carga (`medir_ayuda_al_cargar.py`) la corrida (`correr`: las vueltas,
 el informe y la salida), la IA real (`la_ia`), lo que es una falla de la IA o un error del programa
 y el corte sin cupo. `--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira con
-un guion para cinco pedidos (lo que contestaría una IA que entendió) y nada para los demás; da 5 de
-15 (sale con 1). Sin base de datos: el equipo, los objetivos y los días son fijos (hoy, el miércoles
+un guion para nueve pedidos (lo que contestaría una IA que entendió) y nada para los demás; da 9 de
+19 (sale con 1). Sin base de datos: el equipo, los objetivos y los días son fijos (hoy, el miércoles
 14 de octubre de 2026), y el referente se busca con la misma función que el servidor,
 `fichas.integrantes_que_coinciden`, sobre el equipo fijo.
 
@@ -151,6 +152,22 @@ PEDIDOS: list[dict[str, Any]] = [
               "diciembre lo lleva lucas",
      "propone": {"padre_id": "o-linea", "tipo": "operativo", "referente_id": "m-lucas",
                  "fecha": "2026-12-04"}},
+    # J3-4b: el referente por el área de lo que se describe, aunque nadie lo nombre.
+    {"nombre": "nadie nombrado y el área clara",
+     "texto": "hay q mejorar como medimos las piesas en el control de calidad antes de despacharlas",
+     "propone": {"titulo": True, "referente_id": "m-nahuel"},
+     "no_propone": ["fecha"]},
+    {"nombre": "nadie nombrado y el área no se sabe",
+     "texto": "organizar algo lindo para el aniversario de la empresa",
+     "propone": {"titulo": True},
+     "no_propone": ["referente_id", "fecha"]},
+    {"nombre": "el referente nombrado gana sobre el área",
+     "texto": "migrar los servidores y la red a la nube lo lleva nahuel",
+     "propone": {"referente_id": "m-nahuel"}},
+    {"nombre": "alguien que no es referente, aunque el área se entienda",
+     "texto": "cambiar todo el cableado de red del galpon q lo lleve marcos",
+     "no_propone": ["referente_id"],
+     "descarta": [("referente", "no_encontrado")]},
 ]
 
 # Lo que contestaría una IA que entendió, para la corrida en seco.
@@ -179,6 +196,23 @@ GUION: dict[str, dict[str, Any]] = {
         "descripcion": "Tener el laboratorio de calidad andando antes de que termine noviembre.",
         "padre": "P1", "tipo": "operativo", "referente": "nahuel", "fecha": "2026-11-27",
         "como_dijo_la_fecha": "antes d q termine noviembre"},
+    "nadie nombrado y el área clara": {
+        "titulo": "Mejorar cómo se miden las piezas en el control de calidad",
+        "descripcion": "Mejorar cómo se miden las piezas en el control de calidad antes de "
+                       "despacharlas.",
+        "tipo": "estrategico", "referente": "", "area": "A1"},
+    "nadie nombrado y el área no se sabe": {
+        "titulo": "Organizar el aniversario de la empresa",
+        "descripcion": "Organizar algo lindo para el aniversario de la empresa.",
+        "tipo": "estrategico", "referente": "", "area": ""},
+    "el referente nombrado gana sobre el área": {
+        "titulo": "Migrar los servidores y la red a la nube",
+        "descripcion": "Migrar los servidores y la red a la nube.",
+        "tipo": "estrategico", "referente": "nahuel", "area": "A3"},
+    "alguien que no es referente, aunque el área se entienda": {
+        "titulo": "Cambiar el cableado de red del galpón",
+        "descripcion": "Cambiar todo el cableado de red del galpón.",
+        "tipo": "estrategico", "referente": "marcos", "area": "A3"},
 }
 
 

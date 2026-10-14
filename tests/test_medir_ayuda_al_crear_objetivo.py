@@ -30,8 +30,8 @@ class _SinCupo(Exception):
         self.response = type("R", (), {"status_code": 429})()
 
 
-def test_los_pedidos_son_entre_doce_y_dieciseis_y_cada_uno_dice_que_espera(medir):
-    assert 12 <= len(medir.PEDIDOS) <= 16
+def test_los_pedidos_son_entre_doce_y_veinte_y_cada_uno_dice_que_espera(medir):
+    assert 12 <= len(medir.PEDIDOS) <= 20
     nombres = [p["nombre"] for p in medir.PEDIDOS]
     assert len(set(nombres)) == len(nombres)
     for pedido in medir.PEDIDOS:
@@ -123,3 +123,18 @@ def test_los_referentes_se_buscan_con_la_funcion_del_servidor(medir, monkeypatch
         "m-lucas", "m-nahuel"}
     assert medir.coinciden("pepe") == []
     assert llamadas == ["lucas", "el tano", "el colo", "pepe"]
+
+
+def test_el_referente_por_el_area_se_mide(medir):
+    """J3-4b: sin nadie nombrado, el referente del área que dio la IA; un área equivocada sale mal,
+    y nombrado alguien que no es referente, el área no lo reemplaza."""
+    pedido = next(p for p in medir.PEDIDOS if p["nombre"] == "nadie nombrado y el área clara")
+    ok, detalle = medir.medir(medir.IAEnSeco(), pedido)
+    assert ok is True and detalle["propuesta"]["referente_id"] == "m-nahuel"
+    ok, detalle = medir.medir(IADeLaCarga({**medir.GUION[pedido["nombre"]], "area": "A3"}), pedido)
+    assert ok is False
+    assert any(f.startswith("referente_id:") for f in detalle["fallas"])
+    pedido = next(p for p in medir.PEDIDOS
+                  if p["nombre"] == "alguien que no es referente, aunque el área se entienda")
+    ok, detalle = medir.medir(medir.IAEnSeco(), pedido)
+    assert ok is True and "referente_id" not in detalle["propuesta"]
