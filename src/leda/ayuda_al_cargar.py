@@ -19,9 +19,10 @@ acá: la persona ve cada dato marcado, lo corrige o lo acepta, y confirma como s
     o más, Leda no elige y las muestra (ADR 0020, decisión 3); si no es nadie del equipo, se dice
     y no se pone a otro. Si no nombró a nadie (J2-18), el que propone Leda por el trabajo y las
     áreas, sólo si su código es de alguien del equipo que puede hacerla (alguien lo revisa);
-  - la evidencia (J2-18): la que propone Leda para esta tarea, además del mínimo que pide el área
-    de quien la hace (que va siempre), sólo de los tipos que esa área conoce; se propone junto con
-    el criterio y si la persona no eligió ya otra;
+  - la evidencia (J2-18 y J2-19): la que propone Leda para esta tarea, y sólo esa (lo que pide el
+    área de quien la hace es un dato que Leda tiene en cuenta, no un mínimo que se suma), sólo de
+    los tipos que esa área conoce; se propone junto con el criterio y si la persona no tildó
+    ninguna (en el formulario nada se tilda solo: lo tildado es de la persona);
   - la espera y el objetivo, de sus listas; el objetivo es el de la tarea que espera si está
     abierto;
   - la fecha, sólo si la persona la dijo (constitución §4: nunca una fecha que nadie dijo): la IA
@@ -34,10 +35,11 @@ acá: la persona ve cada dato marcado, lo corrige o lo acepta, y confirma como s
     no estén en lo que escribió la persona o en los datos de esta tarea
     (`entrega.problema_del_ejemplo`, punto por punto); un nombre de los datos que la persona
     escribió mal ("cirelabs" por CoreLabs) vale escrito como está en los datos (J2-18);
-  - el criterio (J2-17): lo escribe la IA entero, con sus palabras (la evidencia de quien la
-    hace, la que pide el área y la que propone Leda, es un dato para decir cómo se comprueba, no
-    un texto para copiar), y lo juzga por su sentido otra llamada (`juzgar_la_propuesta`, fuera
-    del candado), ya con esa evidencia (o la del área del objetivo): con evidencia, que diga un
+  - el criterio (J2-17): lo escribe la IA entero, con sus palabras (la evidencia que va a quedar
+    tildada, la que propone Leda o la que tildó la persona, es un dato para decir cómo se
+    comprueba, no un texto para copiar), y lo juzga por su sentido otra llamada
+    (`juzgar_la_propuesta`, fuera del candado), ya con esa evidencia (o, sin quién la hace, la del
+    área del objetivo): con evidencia, que diga un
     resultado; sin ella, que diga cómo se comprueba. Si no pasa, el criterio que escribió el
     juicio; si tampoco, el de reserva (`criterio_con_la_evidencia`, sólo con evidencia). Leda
     propone siempre: "no sé" es un pedido de ayuda. Sin quién la hace (J2-18), ninguna
@@ -133,17 +135,19 @@ Quién la hace: si la persona nombró a alguien, copiás sus palabras tal cual y
 más, aunque no lo encuentres en el equipo. Si no nombró a nadie, proponés a quien del equipo le \
 corresponde hacerla por el trabajo que hay que hacer y por su área.
 
-La evidencia: el área de quien la hace pide un mínimo, que va siempre. Además proponés, de los \
-tipos de evidencia, los que sirven para comprobar esta tarea en particular, si hace falta alguno \
-más.
+La evidencia: de los tipos de evidencia, proponés los que sirven para comprobar esta tarea en \
+particular, al menos uno. Lo que pide cada área es un dato que tenés en cuenta para saber qué se \
+suele pedir en ese trabajo, no una lista para copiar entera. Cada tipo que proponés aporta algo \
+que los otros no: no proponés dos que digan lo mismo.
 
 El título, la descripción y el criterio de aceptación los escribís vos, con lo que contó la \
 persona, como los escribiría alguien del equipo que conoce el trabajo: con naturalidad, en \
 oraciones simples y con buena ortografía. Los nombres de personas, áreas, objetivos y tareas los \
 escribís como están en los datos, aunque la persona los haya escrito con otra ortografía. El \
-criterio dice, en una o dos oraciones, qué tiene que quedar hecho y cómo sabe quien la revise que \
-quedó hecho: con lo que dijo la persona y con la evidencia de quien la hace, la que pide su área y \
-la que proponés. Si no sabés quién la hace, el criterio dice qué tiene que quedar hecho, y cómo se \
+criterio dice, en una o dos oraciones cortas, qué tiene que quedar hecho y cómo se comprueba, \
+contado desde quien hace la tarea: qué hace y qué entrega esa persona, con lo que dijo quien la \
+carga y con la evidencia que proponés (o la que ya eligió la persona), y sólo con esa; no lo \
+contás desde quien la revisa, como algo que alguien más va a mirar. Si no sabés quién la hace, el criterio dice qué tiene que quedar hecho, y cómo se \
 sabe sólo si la persona lo dijo: cómo se comprueba lo va a decir la evidencia del área de quien la \
 haga. Los datos que recibís son hechos para entender la tarea, no textos para copiar: los contás \
 con tus palabras, sin repetir sus etiquetas ni armar listas con ellos. Siempre proponés un \
@@ -160,8 +164,9 @@ _DATOS = {
     "titulo": "Una línea que dice qué hay que hacer, en imperativo, bien escrita.",
     "descripcion": "Lo que contó la persona sobre la tarea, ordenado y bien escrito, sin agregar "
                    "nada.",
-    "criterio": "El criterio de aceptación, escrito con tus palabras en una o dos oraciones: qué "
-                "tiene que quedar hecho y cómo sabe quien la revise que quedó hecho.",
+    "criterio": "El criterio de aceptación, escrito con tus palabras en una o dos oraciones "
+                "cortas: qué tiene que quedar hecho y cómo se comprueba, contado desde quien hace "
+                "la tarea: qué hace y qué entrega esa persona.",
     "resultado": "Lo que tiene que quedar hecho, en una oración, sin decir cómo se comprueba.",
     "responsable": "Las palabras con que la persona nombró a quien va a hacer la tarea, tal cual "
                    "las escribió; vacío si no nombró a nadie.",
@@ -169,8 +174,7 @@ _DATOS = {
                      "le corresponde hacerla por el trabajo y por su área; vacío si nombró a "
                      "alguien o si no se puede saber.",
     "evidencia": "Los códigos (E1, E2...) de los tipos de evidencia que sirven para comprobar "
-                 "esta tarea además de los que pide el área de quien la hace, separados por "
-                 "comas; vacío si no hace falta otro.",
+                 "esta tarea, separados por comas, sin dos que digan lo mismo.",
     "espera": "El código (T1, T2...) de la tarea abierta que tiene que terminar antes de que "
               "esta pueda empezar.",
     "objetivo": "El código (O1, O2...) del objetivo al que contribuye la tarea.",
@@ -214,7 +218,7 @@ _FICHA = re.compile(r"\d{1,2}/\d{1,2}(?:/\d{2,4})?|\d{1,2}-\d{1,2}|[^\W_]+")
 @dataclass
 class Resultado:
     """Lo que Leda propone (`propuesta`, con los nombres del formulario; la evidencia, como la
-    lista de los tipos que Leda suma al mínimo del área), las personas para elegir quién la hace
+    lista de los tipos que eligió Leda para esta tarea: J2-19), las personas para elegir quién la hace
     cuando hay más de una (`elegir`), lo que no se propuso y la persona tiene que saber (`avisos`,
     con su texto) y, para la auditoría, cada dato descartado con su motivo y de dónde salió quién
     la hace (`responsable_de`: `dicho`, si la persona lo nombró; `leda`, si lo propuso Leda)."""
@@ -313,24 +317,32 @@ def _lista(valor: Any) -> list[str]:
     return [v for v in valor if isinstance(v, str)] if isinstance(valor, (list, tuple)) else []
 
 
-def _minimo(politica) -> list[str]:
-    return list((politica or {}).get("evidencia_requerida") or [])
+def tipos_que_conoce(politica) -> set[str]:
+    """Los tipos de evidencia que conoce la política de un área: los que pide y los que acepta
+    (los mismos que acepta la carga, `tipo_no_es_de_la_politica`)."""
+    if politica is None:
+        return set()
+    return set(politica.get("evidencia_requerida") or []) | set(politica.get("tipos") or {})
+
+
+def tipos_del_espacio(opciones: Mapping[str, Any]) -> set[str]:
+    """Los tipos de evidencia que conoce alguna área del espacio (los del pack)."""
+    return {t for p in opciones.get("politicas") or [] for t in tipos_que_conoce(p)}
 
 
 def se_propone_la_evidencia(escrito: Mapping[str, Any], opciones: Mapping[str, Any]) -> bool:
-    """Si Leda propone la evidencia (J2-18): junto con el criterio, que dice cómo se comprueba con
-    ella; si quién la hace ya se eligió, sólo si su área tiene una política y la persona no tildó
-    otra además del mínimo (lo que eligió es suyo); si no se eligió, si hay alguna política."""
+    """Si Leda propone la evidencia (J2-18 y J2-19): junto con el criterio, que dice cómo se
+    comprueba con ella, y sólo si la persona no tildó ninguna. En el formulario nada se tilda
+    solo (J2-19): un tipo tildado lo tildó la persona o lo aceptó de Leda, y es suyo, aunque sea
+    de los que pide el área. Si quién la hace ya se eligió, además, que su área tenga una
+    política; si no se eligió, que haya alguna."""
     if "criterio" not in lo_que_se_pide(escrito, opciones):
         return False
-    if not opciones.get("politicas"):
+    if not opciones.get("politicas") or _lista(escrito.get("evidencia")):
         return False
     if _vacio(escrito.get("responsable_id")):
         return True
-    politica = _politica(opciones, _integrante(opciones, escrito.get("responsable_id")))
-    if politica is None:
-        return False
-    return not set(_lista(escrito.get("evidencia"))) - set(_minimo(politica))
+    return _politica(opciones, _integrante(opciones, escrito.get("responsable_id"))) is not None
 
 
 def _hoy(opciones) -> date:
@@ -793,12 +805,13 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
     if "responsable_id" in pide:
         responsable = _quien_la_hace(r, crudo, texto, opciones, coinciden)
 
-    # La evidencia que propone Leda, además del mínimo del área de quien la hace (J2-18).
+    # La evidencia que va a quedar tildada (J2-19): la que propone Leda si la persona no tildó
+    # ninguna, o la que tildó la persona; nunca la del área sumada sola.
     integrante = _integrante(opciones, responsable)
-    tipos = _minimo(_politica(opciones, integrante)) + _lista(escrito.get("evidencia"))
     if se_propone_la_evidencia(escrito, opciones):
-        tipos += _la_evidencia_de_leda(r, crudo.get("evidencia"), opciones, integrante,
-                                       escrito)
+        tipos = _la_evidencia_de_leda(r, crudo.get("evidencia"), opciones, integrante)
+    else:
+        tipos = _lista(escrito.get("evidencia"))
 
     # La espera, de la lista.
     espera = escrito.get("espera_id") or None
@@ -909,11 +922,11 @@ def _quien_la_hace(r: Resultado, crudo: Mapping[str, Any], texto: str,
 
 
 def _la_evidencia_de_leda(r: Resultado, crudo: Any, opciones: Mapping[str, Any],
-                          integrante: Mapping[str, Any] | None,
-                          escrito: Mapping[str, Any]) -> list[str]:
-    """Los tipos de evidencia que propone Leda además del mínimo del área de quien la hace (y de
-    lo que ya tildó la persona), en el orden del formulario: sólo los que esa área conoce (uno que
-    no, lo rechazaría la carga). Sin quién la hace, ninguno: no hay área de dónde salgan."""
+                          integrante: Mapping[str, Any] | None) -> list[str]:
+    """Los tipos de evidencia que propone Leda para esta tarea (J2-19: el conjunto que eligió, sin
+    el del área sumado), sin repetir y por su nombre: sólo los que conoce el área de quien la hace
+    (uno que no, lo rechazaría la carga). Sin quién la hace, ninguno: no hay área de dónde
+    salgan."""
     if isinstance(crudo, str):
         fichas = [f for f in re.split(r"[\s,;]+", crudo) if f]
     else:
@@ -925,8 +938,7 @@ def _la_evidencia_de_leda(r: Resultado, crudo: Any, opciones: Mapping[str, Any],
         r.descartar("evidencia", "sin_quien_la_hace")
         return []
     por_codigo = _tipos_del_pack(opciones)
-    conoce = set(_minimo(politica)) | set(politica.get("tipos") or {})
-    ya = set(_minimo(politica)) | set(_lista(escrito.get("evidencia")))
+    conoce = tipos_que_conoce(politica)
     elegidos: list[str] = []
     for ficha in fichas:
         tipo = por_codigo.get(ficha.upper(), (None,))[0]
@@ -934,7 +946,7 @@ def _la_evidencia_de_leda(r: Resultado, crudo: Any, opciones: Mapping[str, Any],
             r.descartar("evidencia", "no_existe")
         elif tipo not in conoce:
             r.descartar("evidencia", "no_es_del_area")
-        elif tipo not in ya and tipo not in elegidos:
+        elif tipo not in elegidos:
             elegidos.append(tipo)
     elegidos.sort()
     if elegidos:
@@ -1089,8 +1101,9 @@ NOMBRE_DEL_JUICIO = "revisar_el_criterio"
 _EL_DE_LEDA = """\
 Además escribís tu propio criterio para esta tarea, que Leda le propone a la persona si el suyo no \
 sirve: como lo escribiría alguien del equipo que conoce el trabajo, con naturalidad, en una o dos \
-oraciones y con buena ortografía, que dice qué tiene que quedar hecho y cómo sabe quien la revise \
-que quedó hecho. {como} Usás sólo lo que dicen el título, la descripción y el criterio: ningún \
+oraciones cortas y con buena ortografía, que dice qué tiene que quedar hecho y cómo se comprueba, \
+contado desde quien hace la tarea: qué hace y qué entrega esa persona, no lo que alguien más va a \
+mirar. {como} Usás sólo lo que dicen el título, la descripción y el criterio: ningún \
 número, nombre ni dato que no esté ahí."""
 
 _DEL_JUICIO = """\
@@ -1105,7 +1118,7 @@ cual la parte del criterio que lo dice. No corregís ni completás el criterio.
 """
 
 INSTRUCCIONES_DEL_JUICIO = _DEL_JUICIO + _EL_DE_LEDA.format(
-    como="Cómo se sabe lo decís con lo que la tarea misma deja ver.")
+    como="Cómo se comprueba lo decís con lo que, según la tarea, hace y entrega quien la hace.")
 
 # J2-18: al proponer sin saber quién la hace no hay evidencia de un área de donde salga cómo se
 # comprueba, y lo que "la tarea misma deja ver" salía flojo o circular (la ronda de la J2-17). El
@@ -1123,22 +1136,23 @@ INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN = _DEL_JUICIO + _EL_DE_LEDA.format(
 INSTRUCCIONES_DEL_RESULTADO = """\
 Sos Leda, la project manager del equipo. Alguien está cargando una tarea en la plataforma y \
 escribió su criterio de aceptación: lo que tiene que pasar para darla por terminada. Cómo se \
-comprueba que pasó lo dice la evidencia que pide el área (evidencia_que_pide_el_area), así que el \
-criterio no necesita decirlo. Tu trabajo es leer el criterio y decir, por lo que significa y no \
+comprueba que pasó lo dice la evidencia que se va a pedir para esta tarea \
+(evidencia_que_pide_el_area), así que el criterio no necesita decirlo. Tu trabajo es leer el criterio y decir, por lo que significa y no \
 por las palabras que usa, si dice un resultado: algo que tiene que quedar hecho o pasar con la \
 tarea. Si no dice ninguno, no lo dice. No corregís el criterio. También escribís el resultado de \
 la tarea en una oración, sin decir cómo se comprueba.
 
 """ + _EL_DE_LEDA.format(
-    como="Cómo se sabe lo decís con la evidencia que pide el área, contada con tus palabras: es "
-         "un dato para entender qué se entrega, no un texto para copiar, así que no repetís sus "
-         "etiquetas ni armás una lista con ellas.")
+    como="Cómo se comprueba lo decís con esa evidencia, y sólo con ella, contada con tus palabras "
+         "como lo que entrega quien hace la tarea: es un dato para entender qué se entrega, no un "
+         "texto para copiar, así que no repetís sus etiquetas ni armás una lista con ellas.")
 
 _CRITERIO_DE_LEDA = {
     "type": "string",
     "description": "Tu propio criterio de aceptación para esta tarea, con tus palabras, en una o "
-                   "dos oraciones: qué tiene que quedar hecho y cómo sabe quien la revise que "
-                   "quedó hecho, sin ningún dato que no esté en lo que recibiste."}
+                   "dos oraciones cortas: qué tiene que quedar hecho y cómo se comprueba, contado "
+                   "desde quien hace la tarea: qué hace y qué entrega esa persona; sin ningún "
+                   "dato que no esté en lo que recibiste."}
 
 
 def entrada_del_juicio(titulo: str, descripcion: str, criterio: str,
@@ -1479,6 +1493,11 @@ def _misma_palabra(antes: str, despues: str, de_los_nombres: set[str]) -> bool:
         return True
     if any(c.isdigit() for c in a + d):
         return False
+    # J2-19 (la prueba en el celular, 2026-10-13): la regla es simétrica, así que sin esto "CoreLabs"
+    # bien escrito se podía "corregir" a "cirelabs". Una palabra que ya está como en los datos sólo
+    # cambia de mayúsculas o de tildes.
+    if a in de_los_nombres:
+        return False
     largo = len(a)
     tope = 0 if largo <= 3 else 1 if largo <= 6 else 2
     if d in de_los_nombres:
@@ -1519,16 +1538,26 @@ def palabra_por_palabra(original: str, corregido: str, nombres: Sequence[str]) -
 def nombres_mal_escritos(texto: str, opciones: Mapping[str, Any]) -> list[str]:
     """Las palabras de los nombres de los datos del espacio (personas, áreas, objetivos y tareas)
     que la persona escribió mal en `texto`, como están en los datos (J2-18: "cirelabs" es
-    CoreLabs): lo que Leda puede escribir bien en lo que propone sin inventar un nombre. Sólo
-    palabras de cuatro letras o más, y la misma palabra mal escrita (`_misma_palabra`)."""
+    CoreLabs): lo que Leda puede escribir bien en lo que propone sin inventar un nombre.
+
+    Habilitar un nombre deja que la IA lo escriba aunque la persona no lo haya escrito así, así
+    que la regla es la estricta (advertencia de RDD de la J2-18): sólo palabras de cuatro letras o
+    más; la misma palabra mal escrita como cualquier otra (`_misma_palabra` sin la holgura de los
+    nombres: que suene igual, o letras de más, de menos, dadas vuelta o cambiadas por una vecina
+    del teclado o que suena igual, pocas para su largo), nunca otra letra cualquiera ("marcas" no
+    es Marcos); y una palabra que ya es de un nombre de los datos no es otro nombre mal escrito
+    (quien escribió "lucas" nombró a Lucas, no a Lucio)."""
+    nombres = _nombres_del_equipo(opciones)
+    de_los_nombres = {_sin_marcas(p) for n in nombres for p in _PALABRA.findall(n)}
     escritas = {_sin_marcas(p) for p in _PALABRA.findall(texto) if len(p) >= 4}
+    escritas -= de_los_nombres
     encontradas: list[str] = []
-    for nombre in _nombres_del_equipo(opciones):
+    for nombre in nombres:
         for palabra in _PALABRA.findall(nombre):
             d = _sin_marcas(palabra)
-            if len(d) < 4 or d in escritas or palabra in encontradas:
+            if len(d) < 4 or palabra in encontradas:
                 continue
-            if any(_misma_palabra(a, palabra, {d}) for a in escritas):
+            if any(_misma_palabra(a, d, set()) for a in escritas):
                 encontradas.append(palabra)
     return encontradas
 

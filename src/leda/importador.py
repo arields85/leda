@@ -518,14 +518,19 @@ CLASES_DE_EVIDENCIA = ("texto", "imagen", "archivo", "enlace")
 
 
 def _validar_tipos_de_evidencia(pack: dict[str, Any]) -> list[str]:
-    """Cada tipo que pide una política de evidencia declara qué clases lo cubren y cómo se le
-    dice a la persona (`evidencia.tipos`; ADR 0019, decisión 5). Sin eso, ninguna pieza lo
-    cubriría y la tarea no se podría entregar nunca: se rechaza al importar, no al entregar."""
+    """Cada tipo que pide una política de evidencia, y cada tipo que describe el pack, declara qué
+    clases lo cubren y cómo se le dice a la persona (`evidencia.tipos`; ADR 0019, decisión 5). Sin
+    eso, ninguna pieza lo cubriría y la tarea no se podría entregar nunca: se rechaza al importar,
+    no al entregar. Desde la J2-18 cada área conoce todos los tipos del pack (`_tipos_del_area`):
+    uno mal formado que ninguna área pide también llegaría a todas, así que se revisa igual."""
     evidencia = pack.get("evidencia") or {}
     tipos = evidencia.get("tipos") or {}
+    if not isinstance(tipos, dict):
+        return ["Los tipos de evidencia del pack (evidencia.tipos) no describen cada tipo con "
+                "sus clases y sus palabras."]
     errores = []
     usados = {t for lista in (evidencia.get("por_area") or {}).values() for t in lista or []}
-    for tipo in sorted(usados):
+    for tipo in sorted(usados | set(tipos), key=str):
         definido = tipos.get(tipo)
         clases = (definido or {}).get("clases") if isinstance(definido, dict) else None
         palabras = (definido or {}).get("en_palabras") if isinstance(definido, dict) else None
@@ -544,13 +549,18 @@ def _validar_tipos_de_evidencia(pack: dict[str, Any]) -> list[str]:
     return errores
 
 
-def _tipos_del_area(pack: dict[str, Any], evidencia: list[str]) -> dict[str, Any]:
-    """Las clases y las palabras de todos los tipos de evidencia del pack: cada área conoce todos;
-    lo que pide su política (`evidencia`) es el mínimo, no un límite (J2-18). Si el pack no
-    describe un tipo que el área pide, no se agrega: lo rechaza `validar`."""
+def _tipos_del_area(pack: dict[str, Any]) -> dict[str, Any]:
+    """Las clases y las palabras de todos los tipos de evidencia del pack: cada área conoce todos,
+    y lo que pide su política es un dato que Leda tiene en cuenta al proponer, no un límite (J2-18
+    y J2-19). Un tipo mal formado lo rechaza `validar` antes de importar; si igual llegara uno, no
+    se agrega a medias ni rompe la importación: queda afuera."""
     tipos = (pack.get("evidencia") or {}).get("tipos") or {}
+    if not isinstance(tipos, dict):
+        return {}
     return {t: {"clases": list(d["clases"]), "en_palabras": d["en_palabras"]}
-            for t, d in tipos.items() if isinstance(d, dict)}
+            for t, d in tipos.items()
+            if isinstance(d, dict) and isinstance(d.get("clases"), list) and d["clases"]
+            and isinstance(d.get("en_palabras"), str) and d["en_palabras"].strip()}
 
 
 def _importar_politica_evidencia(cur, ws, pack) -> None:
@@ -586,7 +596,7 @@ def _importar_politica_evidencia(cur, ws, pack) -> None:
                          or task_evidence_policy.tipos is distinct from excluded.tipos
                        then now() else task_evidence_policy.actualizado_en
                      end""",
-            (ws, evidencia or [], Jsonb(_tipos_del_area(pack, evidencia or [])), ws,
+            (ws, evidencia or [], Jsonb(_tipos_del_area(pack)), ws,
              area_slug))
 
 

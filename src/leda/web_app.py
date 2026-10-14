@@ -912,11 +912,9 @@ def opciones_de_la_carga(espacio_id: str, request: Request):
     return _con_la_base(leer)
 
 
-@router.post("/admin/api/espacios/{espacio_id}/tareas")
-async def cargar_una_tarea(espacio_id: str, request: Request):
-    """Carga una tarea comprometida en un espacio (decisión 9): 201 con su id y los avisos; la
-    misma clave con los mismos datos, 200 con la misma tarea; lo que no se carga, 422 con todo
-    lo que hay que corregir."""
+async def _el_pedido_de_la_carga(request: Request):
+    """Los controles de la carga (otro sitio, JSON, la sesión de administración, el tamaño) y sus
+    datos: el token, los datos y los mal formados, o la respuesta que corta."""
     if _de_otro_sitio(request):
         return _json({"error": "origen_no_verificado"}, 403)
     tipo = request.headers.get("content-type", "").split(";")[0].strip().lower()
@@ -935,12 +933,51 @@ async def cargar_una_tarea(espacio_id: str, request: Request):
         # pedido mal formado más, nunca un 500 (revisión RDD `review-40c4b218bf40f1fa`).
         cuerpo = None
     datos, mal_formados = leer_la_carga(cuerpo)
+    return token, datos, mal_formados
+
+
+@router.post("/admin/api/espacios/{espacio_id}/tareas")
+async def cargar_una_tarea(espacio_id: str, request: Request):
+    """Carga una tarea comprometida en un espacio (decisión 9): 201 con su id y los avisos; la
+    misma clave con los mismos datos, 200 con la misma tarea; lo que no se carga, 422 con todo
+    lo que hay que corregir."""
+    pedido = await _el_pedido_de_la_carga(request)
+    if isinstance(pedido, Response):
+        return pedido
+    token, datos, mal_formados = pedido
     espacio = _espacio_de(espacio_id)
     juicio = await _juzgar_el_criterio(token, espacio, datos, mal_formados)
     if isinstance(juicio, Response):
         return juicio
     return await run_in_threadpool(_con_la_base, lambda conn: _cargar(
         conn, token, espacio, datos, mal_formados, juicio))
+
+
+# --- Revisar antes de la ortografía (J2-21) ---------------------------------------------------
+#
+# La prueba del usuario (2026-10-13): al confirmar, la web corregía primero la ortografía ("No se"
+# por "No sé") y sólo en el segundo "confirmar" la carga rechazaba ese criterio: corregir lo que se
+# va a rechazar es trabajo perdido y hace confirmar dos veces. Ahora, antes de la ortografía, la web
+# pide revisar la carga: el mismo juicio del criterio y la misma `cargar_tarea`, sin la clave (sin
+# ella la base nunca escribe) y sin el rechazo de la clave que falta. Lo que no se cargaría vuelve
+# como en la carga (422, con el criterio que propone Leda) y la ortografía no corre; si se cargaría,
+# 200 y la web sigue con la ortografía. El juicio queda un rato para la misma sesión
+# (`_JUICIOS_RECIENTES`), así la carga con los mismos textos no vuelve a llamar a la IA.
+
+@router.post("/admin/api/espacios/{espacio_id}/tareas/revisar")
+async def revisar_una_carga(espacio_id: str, request: Request):
+    """Lo que la carga rechazaría, sin cargar nada: 200 con `errores` vacío si se cargaría (con
+    los avisos que daría), 422 con todo lo que hay que corregir, como la carga."""
+    pedido = await _el_pedido_de_la_carga(request)
+    if isinstance(pedido, Response):
+        return pedido
+    token, datos, mal_formados = pedido
+    espacio = _espacio_de(espacio_id)
+    juicio = await _juzgar_el_criterio(token, espacio, datos, mal_formados)
+    if isinstance(juicio, Response):
+        return juicio
+    return await run_in_threadpool(_con_la_base, lambda conn: _cargar(
+        conn, token, espacio, datos, mal_formados, juicio, solo_revisar=True))
 
 
 # --- Un criterio que se pueda comprobar (J2-9, J2-13 y J2-14) --------------------------------
@@ -1040,11 +1077,46 @@ def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
     return {"ia": ia, "evidencia": evidencia, "contexto": contexto}
 
 
+# J2-21: el juicio de un criterio, por un rato y sólo para la misma sesión de administración y los
+# mismos datos (lo que revisó `revisar_una_carga`, para la carga que sigue). Sólo un juicio de la
+# IA que respondió: uno sin revisar se vuelve a pedir.
+_JUICIOS_RECIENTES: dict[str, tuple[datetime, Any]] = {}
+_JUICIOS_CANDADO = threading.Lock()
+_JUICIO_DURA = timedelta(minutes=10)
+_JUICIOS_MAXIMO = 256
+
+
+def _clave_del_juicio(token: str, espacio: str, ia, entrada: dict[str, Any]) -> str:
+    plano = json.dumps([_hash(token), espacio, getattr(ia, "nombre", None), entrada],
+                       ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(plano.encode("utf-8")).hexdigest()
+
+
+def _juicio_reciente(clave: str):
+    ahora = datetime.now()
+    with _JUICIOS_CANDADO:
+        for vieja in [k for k, (cuando, _) in _JUICIOS_RECIENTES.items()
+                      if ahora - cuando > _JUICIO_DURA]:
+            del _JUICIOS_RECIENTES[vieja]
+        guardado = _JUICIOS_RECIENTES.get(clave)
+    return guardado[1] if guardado else None
+
+
+def _guardar_el_juicio(clave: str, juicio) -> None:
+    if getattr(juicio, "falla", None) is not None:
+        return
+    with _JUICIOS_CANDADO:
+        while len(_JUICIOS_RECIENTES) >= _JUICIOS_MAXIMO:
+            del _JUICIOS_RECIENTES[next(iter(_JUICIOS_RECIENTES))]
+        _JUICIOS_RECIENTES[clave] = (datetime.now(), juicio)
+
+
 async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, Any],
                               mal_formados: list[dict[str, str]]):
     """El juicio del criterio de una carga, o `None` si no se juzga: con un dato mal formado, sin
     espacio, sin sesión o con un criterio que la base ya rechaza (vacío o largo). Un 503 de la
-    base vuelve tal cual."""
+    base vuelve tal cual. Uno reciente de la misma sesión con los mismos datos (J2-21) no se pide
+    otra vez."""
     from . import ayuda_al_cargar
 
     criterio, titulo = datos.get("criterio"), datos.get("titulo") or ""
@@ -1057,10 +1129,17 @@ async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, 
         return preparado
     if "juicio" in preparado:
         return preparado["juicio"]
-    return await run_in_threadpool(
-        ayuda_al_cargar.juzgar_el_criterio, preparado["ia"], titulo=titulo,
-        descripcion=datos.get("descripcion") or "", criterio=criterio,
-        evidencia=preparado["evidencia"], contexto=preparado["contexto"])
+    entrada = {"titulo": titulo, "descripcion": datos.get("descripcion") or "",
+               "criterio": criterio, "evidencia": list(preparado["evidencia"]),
+               "contexto": list(preparado["contexto"])}
+    clave = _clave_del_juicio(token, espacio, preparado["ia"], entrada)
+    reciente = _juicio_reciente(clave)
+    if reciente is not None:
+        return reciente
+    juicio = await run_in_threadpool(
+        ayuda_al_cargar.juzgar_el_criterio, preparado["ia"], **entrada)
+    _guardar_el_juicio(clave, juicio)
+    return juicio
 
 
 def _sin_revisar(conn, espacio: str, sesion: dict[str, Any], falla: BaseException | None) -> None:
@@ -1140,7 +1219,10 @@ _CRITERIO_RECHAZADO = {"sin_comprobacion", "sin_resultado"}
 
 
 def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
-            mal_formados: list[dict[str, str]], juicio=None) -> Response:
+            mal_formados: list[dict[str, str]], juicio=None, *,
+            solo_revisar: bool = False) -> Response:
+    """La carga, o con `solo_revisar` (J2-21) lo que la carga rechazaría: sin la clave (la base
+    nunca escribe) y sin el rechazo de la clave que falta; 200 si se cargaría."""
     with sin_espacio(conn) as cur:
         sesion = _sesion_de_administracion(cur, token)
     if sesion is None:
@@ -1154,8 +1236,8 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
         mal_formados = [*mal_formados, {"campo": "criterio", "motivo": motivo}]
     ahora = _ahora(conn, espacio)
     # Con un dato mal formado no se carga nada: la base igual dice todo lo demás, y sin la clave
-    # nunca escribe (la falta de la clave es un rechazo más).
-    clave = None if mal_formados else datos["clave"]
+    # nunca escribe (la falta de la clave es un rechazo más). Al sólo revisar, nunca la clave.
+    clave = None if mal_formados or solo_revisar else datos["clave"]
     with sin_espacio(conn) as cur:
         _con_la_version_del_nucleo(cur)
         cur.execute(
@@ -1168,6 +1250,12 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
     rechazo = _sin_lo_que_rechaza_la_base(resultado)
     if rechazo is not None:
         return rechazo
+    if solo_revisar:
+        resultado = {**resultado, "errores": [
+            e for e in resultado.get("errores") or []
+            if (e.get("campo"), e.get("motivo")) != ("clave", "falta")]}
+        if not resultado["errores"] and not mal_formados:
+            return _json({"errores": []})
     if resultado.get("ok") and not mal_formados:
         avisos = [_con_texto(a) for a in resultado.get("avisos") or []]
         if motivo == "sin_revisar" and not resultado.get("repetida"):
@@ -1182,8 +1270,9 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
     for error in resultado.get("errores") or []:
         if error.get("campo") in ya_dichos:
             continue
-        if (mal_formados and (error.get("campo"), error.get("motivo")) == ("clave", "falta")
-                and datos["clave"] is not None):
+        if ((mal_formados or solo_revisar)
+                and (error.get("campo"), error.get("motivo")) == ("clave", "falta")
+                and (datos["clave"] is not None or solo_revisar)):
             continue
         errores.append(error)
     con_texto = [_con_texto(e) for e in errores]
@@ -1239,6 +1328,8 @@ def _lo_escrito(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
         dict[str, Any], list[dict[str, str]]]:
     """Lo que ya tiene el formulario, revisado contra las opciones del espacio: un id que no
     está ahí (de otro espacio, cerrado o inventado) se rechaza como en la carga."""
+    from . import ayuda_al_cargar
+
     escrito: dict[str, Any] = {}
     errores: list[dict[str, str]] = []
     listas = {"objetivo": ("objetivos", "id", "no_existe"),
@@ -1277,11 +1368,26 @@ def _lo_escrito(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
             pass
         if not escrito["fecha"]:
             errores.append(_mal_formado("fecha"))
-    # La evidencia ya tildada (J2-18): lo que la persona eligió es suyo, y Leda no propone otra.
+    # La evidencia ya tildada (J2-18 y J2-19): lo que la persona eligió es suyo, y Leda no propone
+    # otra. Se revisa antes de usarla (advertencia de RDD de la J2-18), como en la carga: cada
+    # tipo, de los que conoce el área de quien la hace; sin ella, de los del pack del espacio.
+    # Un tipo repetido cuenta una vez.
     evidencia = cuerpo.get("evidencia")
     escrito["evidencia"] = []
     if isinstance(evidencia, list) and all(isinstance(e, str) for e in evidencia):
-        escrito["evidencia"] = evidencia
+        integrante = next((m for m in opciones.get("integrantes") or []
+                           if str(m.get("membership_id")) == escrito["responsable_id"]), None)
+        politica = (next((p for p in opciones.get("politicas") or []
+                          if p.get("area_id") == integrante.get("area_id")), None)
+                    if integrante is not None else None)
+        conocidos = (ayuda_al_cargar.tipos_que_conoce(politica) if integrante is not None
+                     else ayuda_al_cargar.tipos_del_espacio(opciones))
+        if evidencia and integrante is not None and politica is None:
+            errores.append({"campo": "evidencia", "motivo": "sin_politica_del_area"})
+        elif any(e not in conocidos for e in evidencia):
+            errores.append({"campo": "evidencia", "motivo": "tipo_no_es_de_la_politica"})
+        else:
+            escrito["evidencia"] = list(dict.fromkeys(evidencia))
     elif evidencia is not None:
         errores.append(_mal_formado("evidencia"))
     return escrito, errores
