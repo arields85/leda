@@ -323,6 +323,42 @@ def test_registrar_webhooks_le_da_a_cada_bot_su_direccion_y_su_secreto(webhook, 
     assert len({p["secret_token"] for p in pedidos.values()}) == len(TOKENS)
 
 
+def test_una_falla_del_boton_del_menu_nunca_corta_el_registro_de_los_webhooks(webhook, conn,
+                                                                            monkeypatch):
+    """R3-menu-failure-aborts-webhook-registration y R2-webhook-path-only-prints: si Telegram no
+    acepta el botón del menú, o no se le puede pedir, los webhooks de todos los bots se registran
+    igual, y cada falla deja su incidente con su causa (no sólo una línea en la consola)."""
+    import httpx
+
+    telegram = TelegramFalso()
+    monkeypatch.setattr(entrada.config.__class__, "espacios_con_token",
+                        lambda self: dict(TOKENS))
+
+    def atender(pedido: httpx.Request) -> httpx.Response:
+        if pedido.url.path.endswith("/setChatMenuButton"):
+            if TOKENS["north-lab"] in pedido.url.path:
+                raise httpx.ConnectError("sin red")
+            if TOKENS["west-studio"] in pedido.url.path:
+                return httpx.Response(200, json={"ok": False, "description": "Bad Request"})
+        return telegram(pedido)
+
+    resultado = entrada.registrar_webhooks(httpx.Client(transport=httpx.MockTransport(atender)))
+
+    assert resultado == {slug: True for slug in TOKENS}
+    assert sorted(p["url"].rsplit("/", 1)[-1] for metodo, p in telegram.llamadas
+                  if metodo == "setWebhook") == sorted(TOKENS)
+    mundo = webhook["mundo"]
+    with admin(conn) as cur:
+        cur.execute("""select workspace_id, resumen_sanitizado from incident
+                        where etapa = 'menu_del_bot'""")
+        incidentes = {str(f["workspace_id"]): f["resumen_sanitizado"] for f in cur.fetchall()}
+    conn.commit()
+    assert set(incidentes) == {mundo["north-lab"]["id"], mundo["west-studio"]["id"]}
+    assert "no se pudo hacer el pedido a Telegram" in incidentes[mundo["north-lab"]["id"]]
+    assert "Telegram no lo aceptó" in incidentes[mundo["west-studio"]["id"]]
+    assert all(token not in texto for token in TOKENS.values() for texto in incidentes.values())
+
+
 def test_registrar_webhooks_se_niega_sin_direccion_o_sin_secreto(monkeypatch):
     for falta in ({"base_url": ""}, {"webhook_secret": ""}):
         monkeypatch.setattr(entrada, "config", dataclasses.replace(

@@ -800,9 +800,104 @@ def test_al_arrancar_fija_el_boton_del_menu_de_cada_bot_con_la_direccion_del_mom
     assert admin_menu["menu_button"]["web_app"]["url"] == "https://tunel.invalid/app/abrir/admin/"
 
 
-def test_sin_la_direccion_publica_no_fija_el_menu_y_deja_un_incidente(conn, mundo):
+def _con_la_direccion(monkeypatch, base_url: str) -> None:
+    """La dirección pública, explícita: nunca la del entorno de quien corre las pruebas."""
+    import dataclasses
+
+    from leda import config as config_mod
+
+    monkeypatch.setattr(config_mod, "config",
+                        dataclasses.replace(config_mod.config, base_url=base_url))
+
+
+def _incidentes_del_menu(conn) -> list[dict]:
+    return todos(conn, """select workspace_id, resumen_sanitizado from incident
+                           where etapa = 'menu_del_bot' order by resumen_sanitizado""")
+
+
+def test_sin_la_direccion_publica_no_fija_el_menu_y_deja_un_incidente(conn, mundo, monkeypatch):
+    _con_la_direccion(monkeypatch, "")
     m = _montar(conn, mundo, IAGuionada())
     m.escucha.fijar_los_menus()
     assert "setChatMenuButton" not in m.telegram.metodos()
     incidentes = todos(conn, "select etapa from incident where etapa = 'menu_del_bot'")
     assert len(incidentes) == 2       # el del equipo y el de administración
+
+
+@pytest.mark.parametrize("falla, causa", [
+    (lambda: RuntimeError("Telegram respondió ok=false a setChatMenuButton."),
+     "Telegram no lo aceptó"),
+    (lambda: __import__("leda.despachador", fromlist=["x"]).ErrorTelegram("ConnectError"),
+     "no se pudo hacer el pedido a Telegram"),
+])
+def test_el_incidente_del_menu_dice_la_causa_real(conn, mundo, monkeypatch, falla, causa):
+    """R2-except-mislabels-cause: que Telegram lo rechace y que no se lo pueda llamar no son lo
+    mismo; el escuchador sigue y el bot de administración recibe su botón."""
+    _con_la_direccion(monkeypatch, "https://tunel.invalid")
+    m = _montar(conn, mundo, IAGuionada())
+
+    def llamar(metodo, **_):
+        raise falla()
+
+    m.escucha.bot.llamar = llamar
+    m.escucha.fijar_los_menus()
+    [incidente] = _incidentes_del_menu(conn)
+    assert str(incidente["workspace_id"]) == str(mundo["id"])
+    assert causa in incidente["resumen_sanitizado"]
+    assert "setChatMenuButton" in m.telegram_admin.metodos()
+
+
+def test_una_falla_al_armar_el_boton_no_se_atribuye_a_telegram(conn, mundo, monkeypatch):
+    from leda import menu_del_bot
+
+    _con_la_direccion(monkeypatch, "https://tunel.invalid")
+
+    def roto(*_a, **_k):
+        raise ValueError("roto")
+
+    monkeypatch.setattr(menu_del_bot, "boton_del_menu", roto)
+    m = _montar(conn, mundo, IAGuionada())
+    m.escucha.fijar_los_menus()
+    incidentes = _incidentes_del_menu(conn)
+    assert len(incidentes) == 2
+    for incidente in incidentes:
+        assert "falló antes de pedírselo a Telegram (ValueError)" in incidente["resumen_sanitizado"]
+        assert "no lo aceptó" not in incidente["resumen_sanitizado"]
+
+
+def test_si_no_se_puede_registrar_el_incidente_el_escuchador_arranca_igual(conn, mundo,
+                                                                           monkeypatch):
+    """R3-incident-path-misclassified-and-unguarded: el incidente de un menú que no se fijó no
+    puede cortar el arranque, ni dejar de intentar con el otro bot."""
+    from leda import menu_del_bot
+
+    _con_la_direccion(monkeypatch, "https://tunel.invalid")
+    impreso: list[str] = []
+    m = _montar(conn, mundo, IAGuionada(), imprimir=impreso.append)
+
+    def llamar(metodo, **_):
+        raise RuntimeError("Telegram respondió ok=false a setChatMenuButton.")
+
+    def no_registra(*_a, **_k):
+        raise psycopg.OperationalError("la base no contesta")
+
+    m.escucha.bot.llamar = llamar
+    monkeypatch.setattr(menu_del_bot, "registrar_que_no_se_fijo", no_registra)
+    m.escucha.fijar_los_menus()
+    assert "setChatMenuButton" in m.telegram_admin.metodos()
+    assert any("tampoco se pudo registrar" in linea for linea in impreso)
+    assert not any("la base no contesta" in linea for linea in impreso)
+
+
+def test_sin_el_espacio_del_bot_no_se_saltea_en_silencio(conn, mundo, monkeypatch):
+    """R2: un bot del equipo sin su espacio deja un incidente; nunca se saltea callado."""
+    import uuid
+
+    _con_la_direccion(monkeypatch, "https://tunel.invalid")
+    m = _montar(conn, mundo, IAGuionada())
+    m.escucha.ws = str(uuid.uuid4())
+    m.escucha.fijar_los_menus()
+    [incidente] = _incidentes_del_menu(conn)
+    assert incidente["workspace_id"] is None
+    assert "no se encontró el espacio del bot" in incidente["resumen_sanitizado"]
+    assert "setChatMenuButton" not in m.telegram.metodos()

@@ -70,3 +70,34 @@ def registrar_que_no_se_fijo(conn, workspace_id: str | None, slug: str, motivo: 
             sin_avisar_porque="no impide conversar; se ve en la consola",
             clave=f"{ETAPA_MENU_DEL_BOT}:{slug}:{motivo}:{ahora_iso_dia}")
     conn.commit()
+
+
+def causa_de_la_falla(falla: Exception) -> str:
+    """Por qué no se fijó, en palabras y sin el token (revisión R2-except-mislabels-cause): que
+    Telegram lo rechace, que no se le pueda hacer el pedido y que falle antes de llegar a Telegram
+    no son lo mismo."""
+    from .despachador import ErrorTelegram
+
+    if isinstance(falla, ErrorTelegram):
+        return "no se pudo hacer el pedido a Telegram"
+    if isinstance(falla, RuntimeError) and "ok=false" in str(falla):
+        return "Telegram no lo aceptó"
+    return f"falló antes de pedírselo a Telegram ({type(falla).__name__})"
+
+
+def registrar_sin_fallar(conn, workspace_id: str | None, slug: str, motivo: str,
+                         ahora_iso_dia: str, imprimir: Callable[[str], Any] = print) -> bool:
+    """`registrar_que_no_se_fijo`, sin que su propia falla corte a quien llama (el arranque del
+    escuchador o el registro de los webhooks; revisión R3-incident-path-misclassified-and-
+    unguarded): si la base no lo acepta, se dice en la consola, sólo con el tipo de la falla."""
+    try:
+        registrar_que_no_se_fijo(conn, workspace_id, slug, motivo, ahora_iso_dia)
+        return True
+    except Exception as falla:  # noqa: BLE001 -- el chat sigue sin el botón y sin el incidente
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001 -- una conexión rota se reabre en el próximo uso
+            pass
+        imprimir(f"  ! tampoco se pudo registrar el incidente del botón del menú "
+                 f"({type(falla).__name__}).")
+        return False

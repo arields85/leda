@@ -157,7 +157,8 @@ class Escucha(Recepcion):
         """El botón del menú de cada bot, con la dirección del momento (ADR 0024; `menu_del_bot`):
         "Tareas" en el del equipo, "Administración" en el de administración. Sin la dirección
         pública, o si Telegram no lo acepta, el escuchador sigue igual, con un incidente."""
-        from ..menu_del_bot import SLUG_DE_LA_ADMINISTRACION, fijar_el_menu, registrar_que_no_se_fijo
+        from ..menu_del_bot import (SLUG_DE_LA_ADMINISTRACION, causa_de_la_falla, fijar_el_menu,
+                                    registrar_sin_fallar)
 
         with espacio(self.conn, self.ws) as cur:
             cur.execute("select slug from workspace where id = %s", (self.ws,))
@@ -169,17 +170,25 @@ class Escucha(Recepcion):
             bots.append((self.bot_admin, SLUG_DE_LA_ADMINISTRACION, None))
         for bot, slug, espacio_del_bot in bots:
             if slug is None:
+                # Nunca en silencio: el bot del equipo se queda sin botón porque su espacio no
+                # está (el incidente va sin espacio, que no existe).
+                self.imprimir("  ! no se encontró el espacio del bot: no se fija su botón del menú.")
+                registrar_sin_fallar(self.conn, None, "sin-espacio",
+                                     "no se encontró el espacio del bot", dia, self.imprimir)
                 continue
+            # Sólo el pedido va dentro del `try`: una falla del incidente no se confunde con una
+            # de Telegram, ni corta el arranque (`registrar_sin_fallar`).
             try:
-                if not fijar_el_menu(bot.llamar, slug):
-                    self.imprimir("  ! sin LEDA_BASE_URL: no se fija el botón del menú del bot.")
-                    registrar_que_no_se_fijo(self.conn, espacio_del_bot, slug,
-                                             "sin la dirección pública", dia)
+                fijado = fijar_el_menu(bot.llamar, slug)
             except Exception as e:  # noqa: BLE001 -- el escuchador sigue sin el botón
-                self.conn.rollback()
                 self.imprimir(f"  ! no se pudo fijar el botón del menú: {texto_error_seguro(e)}")
-                registrar_que_no_se_fijo(self.conn, espacio_del_bot, slug,
-                                         "Telegram no lo aceptó", dia)
+                motivo = causa_de_la_falla(e)
+            else:
+                if fijado:
+                    continue
+                self.imprimir("  ! sin LEDA_BASE_URL: no se fija el botón del menú del bot.")
+                motivo = "sin la dirección pública"
+            registrar_sin_fallar(self.conn, espacio_del_bot, slug, motivo, dia, self.imprimir)
 
     # -- una vuelta ----------------------------------------------------------------------
 

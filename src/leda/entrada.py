@@ -497,11 +497,51 @@ def registrar_webhooks(cliente=None) -> dict[str, bool]:
                   "allowed_updates": ["message", "callback_query"]})
         resultado[slug] = r.status_code == 200 and bool(r.json().get("ok", False))
         # El botón del menú, con la dirección del momento (ADR 0024; `menu_del_bot`): "Tareas"
-        # en el del equipo, "Administración" en el de administración, para todos sus chats.
-        from .menu_del_bot import boton_del_menu
-
-        m = pedido_telegram(cliente.post, f"https://api.telegram.org/bot{token}/setChatMenuButton",
-                            json={"menu_button": boton_del_menu(slug, base)})
-        if m.status_code != 200 or not m.json().get("ok", False):
-            print(f"  ! Telegram no aceptó el botón del menú del bot de {slug}.")
+        # en el del equipo, "Administración" en el de administración, para todos sus chats. Si
+        # no se puede fijar, los webhooks se registran igual y queda un incidente (revisión
+        # R3-menu-failure-aborts-webhook-registration).
+        _fijar_el_menu_al_registrar(cliente, slug, token, base)
     return resultado
+
+
+def _fijar_el_menu_al_registrar(cliente, slug: str, token: str, base: str) -> None:
+    """El botón del menú de un bot al registrar los webhooks. Nunca levanta: una falla se dice en
+    la consola, sin el token, y deja su incidente con su causa."""
+    from .despachador import pedido_telegram, texto_error_seguro
+    from .menu_del_bot import boton_del_menu, causa_de_la_falla
+
+    try:
+        m = pedido_telegram(cliente.post,
+                            f"https://api.telegram.org/bot{token}/setChatMenuButton",
+                            json={"menu_button": boton_del_menu(slug, base)})
+        if m.status_code == 200 and m.json().get("ok", False):
+            return
+        motivo = "Telegram no lo aceptó"
+        print(f"  ! Telegram no aceptó el botón del menú del bot de {slug}.")
+    except Exception as falla:  # noqa: BLE001 -- el registro sigue sin el botón
+        motivo = causa_de_la_falla(falla)
+        print(f"  ! no se pudo fijar el botón del menú del bot de {slug}: "
+              f"{texto_error_seguro(falla)}")
+    _menu_que_no_se_fijo(slug, motivo)
+
+
+def _menu_que_no_se_fijo(slug: str, motivo: str) -> None:
+    """El incidente de un botón del menú que no se fijó al registrar los webhooks (con el
+    espacio de ese bot; el de administración, sin espacio). Nunca levanta."""
+    from .menu_del_bot import SLUG_DE_LA_ADMINISTRACION, registrar_sin_fallar
+
+    try:
+        conn = _conn()
+        espacio_del_bot = None
+        if slug != SLUG_DE_LA_ADMINISTRACION:
+            with admin(conn) as cur:
+                cur.execute("select id from workspace where slug = %s", (slug,))
+                fila = cur.fetchone()
+            conn.commit()
+            espacio_del_bot = str(fila["id"]) if fila else None
+    except Exception as falla:  # noqa: BLE001 -- sin la base, sólo la consola
+        print(f"  ! tampoco se pudo registrar el incidente del botón del menú "
+              f"({type(falla).__name__}).")
+        return
+    registrar_sin_fallar(conn, espacio_del_bot, slug, motivo,
+                         datetime.now(timezone.utc).date().isoformat())
