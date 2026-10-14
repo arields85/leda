@@ -1,53 +1,30 @@
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { options } from '../test/adminFixtures';
 import { EMPTY_DRAFT } from './draft';
-import { TaskPreview, withCorrections } from './TaskPreview';
+import { TaskPreview } from './TaskPreview';
 
-// J2-19 (the user's phone test, 2026-10-13): in the preview, the words Leda corrected are in the
-// color of "propuesto por Leda", inside the text; the note line stays as it was.
+// J2-23 (the user, 2026-10-13: "que lo corrija directamente sin resaltarlo"): Leda corrects single
+// words, never what the person says, so the preview shows the texts as they will load, unmarked.
 
-describe('the corrected words in the preview', () => {
-  it('marks each corrected word in Leda\'s color, inside the text, and keeps the note', () => {
+describe('the texts in the preview', () => {
+  it('shows the title, the description and the criterion as plain text, with no spelling mark', () => {
     const { container } = render(
       <TaskPreview
-        draft={{ ...EMPTY_DRAFT, descripcion: 'Plantar el árbol y cambiar la batería del árbol viejo' }}
-        options={options()}
-        admin="Ariel"
-        spelled={{
-          descripcion: [
-            { antes: 'arvol', despues: 'árbol' },
-            { antes: 'bateria', despues: 'batería' },
-          ],
+        draft={{
+          ...EMPTY_DRAFT,
+          titulo: 'Integrar la paila 3 a CoreLabs',
+          descripcion: 'Plantar el árbol y cambiar la batería del árbol viejo',
+          criterio: 'La paila 3 se ve en CoreLabs',
         }}
-      />,
-    );
-    const marked = [...container.querySelectorAll('[data-corrected]')];
-    // Only the corrected ones, in order: the second "árbol" was written well and is not marked.
-    expect(marked.map((m) => m.textContent)).toEqual(['árbol', 'batería']);
-    for (const m of marked) expect(m).toHaveClass('text-propuesto');
-    expect(screen.getByText(/Plantar el/)).toHaveTextContent('Plantar el árbol y cambiar la batería del árbol viejo');
-    expect(container).toHaveTextContent('Leda corrigió la ortografía (arvol → árbol, bateria → batería).');
-  });
-
-  it('marks the corrected words of the title too, in the card', () => {
-    const { container } = render(
-      <TaskPreview
-        draft={{ ...EMPTY_DRAFT, titulo: 'Integrar la paila 3 a CoreLabs' }}
         options={options()}
         admin="Ariel"
-        spelled={{ titulo: [{ antes: 'cirelabs', despues: 'CoreLabs' }] }}
       />,
     );
-    const card = container.querySelector('[data-task]')!;
-    expect(card).toHaveTextContent('Integrar la paila 3 a CoreLabs');
-    const marked = [...card.querySelectorAll('[data-corrected]')];
-    expect(marked.map((m) => m.textContent)).toEqual(['CoreLabs']);
-    expect(marked[0]).toHaveClass('text-propuesto');
-  });
-
-  it('without changes the text is plain', () => {
-    expect(withCorrections('El tablero queda revisado.', undefined)).toBe('El tablero queda revisado.');
-    expect(withCorrections('El tablero queda revisado.', [])).toBe('El tablero queda revisado.');
+    expect(container.querySelector('[data-task]')).toHaveTextContent('Integrar la paila 3 a CoreLabs');
+    expect(container).toHaveTextContent('Plantar el árbol y cambiar la batería del árbol viejo');
+    expect(container).toHaveTextContent('La paila 3 se ve en CoreLabs');
+    expect(container.querySelector('[data-corrected], [data-spelling]')).toBeNull();
+    expect(container).not.toHaveTextContent('Leda corrigió la ortografía');
   });
 });

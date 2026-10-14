@@ -1357,9 +1357,9 @@ describe('Dictating into the free box', () => {
   });
 });
 
-// J2-17: before the preview is confirmed, Leda corrects the spelling of what the person typed (and
-// writes the team's names as they are in the data), never the wording. The corrected text shows in
-// the preview, marked, and what loads is what the preview showed.
+// J2-17 and J2-23: on confirm, Leda corrects the spelling of what the person typed (and writes the
+// team's names as they are in the data), never the wording, and the corrected text loads in the same
+// confirm, unmarked (the user: "que lo corrija directamente sin resaltarlo").
 describe('the spelling before loading', () => {
   const corrected = (fields: Record<string, { texto: string; cambios: { antes: string; despues: string }[] }>) => ({
     status: 200,
@@ -1380,51 +1380,63 @@ describe('the spelling before loading', () => {
     fireEvent.change(screen.getByLabelText('Título'), { target: { value } });
   }
 
-  it('shows the corrected text marked in the preview, and loads it only on the next confirm', async () => {
+  /** Nothing in the page says or shows that Leda corrected the spelling (J2-23). */
+  function expectNoSpellingMark() {
+    expect(screen.queryByText(/Leda corrigió la ortografía/)).toBeNull();
+    expect(screen.queryByText(/ortografía corregida/)).toBeNull();
+    expect(document.querySelector('[data-corrected], [data-spelling]')).toBeNull();
+  }
+
+  it('one confirm loads the corrected text, and nothing marks the correction', async () => {
     const calls = await openForm({ [SPELLING]: corrected(TITLE_FIX), [TASKS]: loaded() });
     fillTask();
     typeTitle('configurar las alarmas del scada con cirelabs');
     confirm();
-    await waitFor(() => expect(screen.getByLabelText('Título')).toHaveValue('Configurar las alarmas del SCADA con CoreLabs'));
-    // Nothing loaded yet: the preview is the confirmation, and it changed.
-    expect(calls.some((c) => c.key === TASKS)).toBe(false);
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     expect(calls.find((c) => c.key === SPELLING)?.body).toEqual({
       titulo: 'configurar las alarmas del scada con cirelabs',
       criterio: 'Las 12 alarmas suenan en la sala de control',
     });
-    expect(preview()).toHaveTextContent(
-      'Título: Leda corrigió la ortografía (configurar → Configurar, scada → SCADA, cirelabs → CoreLabs).',
-    );
-    expect(screen.getByText('Leda corrigió la ortografía de lo marcado: revisalo en la vista previa y confirmá.')).toBeInTheDocument();
-    confirm();
-    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
     const sent = calls.filter((c) => c.key === TASKS);
     expect(sent).toHaveLength(1);
-    // What loads is what the preview showed, and the checked texts are not checked again.
     expect((sent[0].body as { titulo: string }).titulo).toBe('Configurar las alarmas del SCADA con CoreLabs');
+    // The task as it loaded, with the corrected words written as any other.
+    expect(screen.getByText('Configurar las alarmas del SCADA con CoreLabs')).toBeInTheDocument();
+    expectNoSpellingMark();
+  });
+
+  it('a load refused after the correction keeps the corrected text, and the next confirm loads it without checking it again', async () => {
+    const refused = {
+      status: 422,
+      body: { errores: [{ campo: 'fecha', motivo: 'no_es_dia_habil', texto: 'Ese día no es hábil en este espacio.' }] },
+    };
+    const calls = await openForm({ [SPELLING]: corrected(TITLE_FIX), [TASKS]: [refused, loaded()] });
+    fillTask();
+    typeTitle('configurar las alarmas del scada con cirelabs');
+    confirm();
+    expect(await screen.findByText('Ese día no es hábil en este espacio.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Título')).toHaveValue('Configurar las alarmas del SCADA con CoreLabs');
+    expectNoSpellingMark();
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    const sent = calls.filter((c) => c.key === TASKS).map((c) => (c.body as { titulo: string }).titulo);
+    expect(sent).toEqual(['Configurar las alarmas del SCADA con CoreLabs', 'Configurar las alarmas del SCADA con CoreLabs']);
     expect(calls.filter((c) => c.key === SPELLING)).toHaveLength(1);
   });
 
-  it('the mark is never in the attention color, and goes when the person edits that text', async () => {
-    await openForm({ [SPELLING]: corrected(TITLE_FIX) });
-    fillTask();
-    typeTitle('configurar las alarmas del scada con cirelabs');
-    confirm();
-    await waitFor(() => expect(preview()).toHaveTextContent('Leda corrigió la ortografía'));
-    const mark = preview().querySelector('[data-spelling]') as HTMLElement;
-    expect(mark.className).not.toMatch(/falta|yellow|amber/);
-    expect(screen.getByText('· ortografía corregida')).toBeInTheDocument();
-    typeTitle('Configurar las alarmas del SCADA con CoreLabs ya');
-    expect(preview().querySelector('[data-spelling]')).toBeNull();
-    expect(screen.queryByText('· ortografía corregida')).toBeNull();
-  });
-
   it('an edited text is checked again before loading', async () => {
-    const calls = await openForm({ [SPELLING]: [corrected(TITLE_FIX), NOTHING_TO_CORRECT], [TASKS]: loaded() });
+    const refused = {
+      status: 422,
+      body: { errores: [{ campo: 'fecha', motivo: 'no_es_dia_habil', texto: 'Ese día no es hábil en este espacio.' }] },
+    };
+    const calls = await openForm({
+      [SPELLING]: [corrected(TITLE_FIX), NOTHING_TO_CORRECT],
+      [TASKS]: [refused, loaded()],
+    });
     fillTask();
     typeTitle('configurar las alarmas del scada con cirelabs');
     confirm();
-    await waitFor(() => expect(preview()).toHaveTextContent('Leda corrigió la ortografía'));
+    expect(await screen.findByText('Ese día no es hábil en este espacio.')).toBeInTheDocument();
     typeTitle('Configurar las alarmas del SCADA');
     confirm();
     expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
@@ -1445,7 +1457,6 @@ describe('the spelling before loading', () => {
     const sent = calls.filter((c) => c.key === TASKS);
     expect((sent[0].body as { titulo: string }).titulo).toBe('configurar las alarmas del scada');
     expect(screen.getByText('No pude revisar la ortografía ahora: quedó como lo escribiste.')).toBeInTheDocument();
-    expect(document.querySelector('[data-spelling]')).toBeNull();
   });
 
   it('a closed session while checking goes back to the door', async () => {
@@ -1570,35 +1581,6 @@ describe('Leda completes everything it can (J2-18)', () => {
   });
 });
 
-
-// --- J2-19: the corrected words, in Leda's color --------------------------------------------------
-
-describe('the corrected words in the preview (J2-19)', () => {
-  it('the words Leda corrected are in the color of "propuesto por Leda", inside the text', async () => {
-    const fix = {
-      status: 200,
-      body: {
-        corregidos: {
-          criterio: {
-            texto: 'Las 12 alarmas suenan en la sala de control de CoreLabs',
-            cambios: [{ antes: 'cirelabs', despues: 'CoreLabs' }],
-          },
-        },
-        sin_revisar: [],
-      },
-    };
-    await openForm({ [SPELLING]: fix });
-    fillTask();
-    fireEvent.change(screen.getByLabelText('Criterio de aceptación'), {
-      target: { value: 'Las 12 alarmas suenan en la sala de control de cirelabs' },
-    });
-    confirm();
-    await waitFor(() => expect(preview()).toHaveTextContent('cirelabs → CoreLabs'));
-    const marked = [...preview().querySelectorAll('[data-corrected]')];
-    expect(marked.map((m) => m.textContent)).toEqual(['CoreLabs']);
-    expect(marked[0]).toHaveClass('text-propuesto');
-  });
-});
 
 // --- J2-20: starting over --------------------------------------------------------------------------
 

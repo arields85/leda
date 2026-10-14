@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import type { Task, ViewId } from '../api';
 import { daysLeft, shortDate, STATE_TEXT, stateLabels } from '../format';
 import { WaitTree } from './WaitTree';
@@ -26,9 +25,8 @@ function corner(task: Task): string | null {
 
 /** A task: its states in brackets (in color only for the four states; blocked and late can come
  * together), its date, its title, and, when there is one, the chain of waits or the bar of
- * working days. `title`, when given, is shown in place of the task's title (the load preview
- * marks there the words Leda corrected, J2-19). */
-export function TaskCard({ task, view, title }: { task: Task; view: ViewId; title?: ReactNode }) {
+ * working days. */
+export function TaskCard({ task, view }: { task: Task; view: ViewId }) {
   const delivered = task.marcas.includes('entregada');
   const frame = delivered
     ? 'border-dashed border-line-dashed'
@@ -53,7 +51,7 @@ export function TaskCard({ task, view, title }: { task: Task; view: ViewId; titl
         {top && <span className="shrink-0 text-ink-dim">{top}</span>}
       </div>
       <span className={`wrap-break-word font-medium ${delivered ? 'text-ink-soft' : ''}`}>
-        {title ?? task.titulo}
+        {task.titulo}
       </span>
       {owner && <span className="wrap-break-word text-small text-ink-dim">{owner}</span>}
       <WaitTree waits={waits} />

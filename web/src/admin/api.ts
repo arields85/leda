@@ -249,19 +249,13 @@ export async function askLeda(spaceId: string, input: HelpInput): Promise<HelpRe
   return { kind: 'failed', text: HELP_FAILED };
 }
 
-/** The form's free-text fields, the ones whose spelling Leda checks before the preview (J2-17). */
+/** The form's free-text fields, the ones whose spelling Leda checks before loading (J2-17). */
 export type TextField = 'titulo' | 'descripcion' | 'criterio';
 
-/** One word Leda corrected: as the person wrote it and as it is now. */
-export interface SpellChange {
-  antes: string;
-  despues: string;
-}
-
-/** What the spelling check said: the corrected texts with their changes (only the ones that
- * changed), the fields it could not check, and, if any, the plain words to say so. */
+/** What the spelling check said: the corrected texts (only the ones that changed; J2-23: they load
+ * as corrected, unmarked), the fields it could not check, and, if any, the plain words to say so. */
 export interface Spelling {
-  corrected: Partial<Record<TextField, { text: string; changes: SpellChange[] }>>;
+  corrected: Partial<Record<TextField, { text: string }>>;
   unchecked: TextField[];
   notice?: string;
 }
@@ -270,7 +264,7 @@ export interface Spelling {
  * incident). Nothing blocks: the text stays as written. */
 export const SPELLING_FAILED = 'No pude revisar la ortografía ahora: quedó como lo escribiste.';
 
-/** Asks Leda to correct the spelling of the texts the person wrote (J2-17), before the preview.
+/** Asks Leda to correct the spelling of the texts the person wrote (J2-17), before loading.
  * Never blocks the load: anything but an answer (no network, a server failure) reads as "could not
  * check", with the text as written; only a closed session throws. */
 export async function checkSpelling(
@@ -292,19 +286,14 @@ export async function checkSpelling(
   }
   if (response.status !== 200) return failed;
   const body = (await response.json()) as {
-    corregidos?: Record<string, { texto?: unknown; cambios?: unknown }>;
+    corregidos?: Record<string, { texto?: unknown }>;
     sin_revisar?: unknown;
     aviso?: unknown;
   };
   const corrected: Spelling['corrected'] = {};
   for (const field of asked) {
     const fix = body?.corregidos?.[field];
-    if (fix && typeof fix.texto === 'string' && fix.texto.trim()) {
-      const changes = Array.isArray(fix.cambios)
-        ? (fix.cambios as SpellChange[]).filter((c) => typeof c?.antes === 'string' && typeof c?.despues === 'string')
-        : [];
-      corrected[field] = { text: fix.texto, changes };
-    }
+    if (fix && typeof fix.texto === 'string' && fix.texto.trim()) corrected[field] = { text: fix.texto };
   }
   const unchecked = Array.isArray(body?.sin_revisar)
     ? asked.filter((f) => (body.sin_revisar as unknown[]).includes(f))
