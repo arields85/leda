@@ -689,6 +689,17 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       la tarea (sin repetir tipos que dicen lo mismo) y sólo eso queda tildado; la persona agrega o saca (la base
       exige al menos una). "· la pide el área" sigue como información. Con la misma unidad, los WARNING de RDD de
       la J2-18 (ver arriba). Ruta: delegada, un escritor.
+      **De la misma prueba en el celular** (2026-10-13, 21:15-21:30), sumado al escritor de la J2-19. El usuario: "estamos
+      puliendo pero la ayuda que está dando Leda al completar los campos es muy buena". Pasaron: CoreLabs, Lucas, el
+      viernes 16 y el objetivo propuestos solos; "arvol → árbol, bateria → batería" marcados; "No sé" con su propuesta.
+      Hallazgos: el nombre de los datos en la ortografía salió al revés ("CoreLabs → cirelabs", sin aplicar).
+- [ ] **J2-20 · "> empezar de nuevo"**: limpiar el formulario entero, preguntando antes (usuario: "falta algo básico…
+      no le queda otra alternativa que borrar campo por campo").
+- [ ] **J2-21 · El rechazo del criterio antes que la ortografía**: corregir "No se" → "No sé" y después rechazarlo
+      obligaba a confirmar dos veces (lo detectó el agente; el usuario: "no lo dije a ver si lo notabas").
+- [ ] **J2-22 · El criterio, desde quien hace la tarea**: qué hace y qué entrega, nunca "quien revise puede ver…"
+      (usuario: esa parte "está de más"); con sólo la evidencia que corresponde, sale corto.
+      Y en la vista previa, lo que Leda corrigió resaltado con el verde agua de "propuesto por Leda".
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
