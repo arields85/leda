@@ -1272,6 +1272,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
           con el seguimiento del bloqueo que ya hace el motor, y la tarea lo espera. Antes de trabarse se llama
           "pedir", después "me falta algo": es una sola cosa.
         - La regla para todos: a quien está arriba se le pide lo que no depende de uno.
+      - **J6-D3. Cómo decide el referente una subtarea:** aprobarla tal cual, corregirla y aprobarla (a Nahuel le llega
+        qué cambió), o decir que no con el motivo. También puede dársela a otro de su gente ("que los compre Juan"),
+        avisándoles a los dos.
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
