@@ -967,7 +967,15 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         2. "confirmar" apagado no parecía apagado, y "cargarlo aparte" y "empezar de nuevo", activos, parecían
            apagados;
         3. las pestañas "tarea" y "objetivo" con la letra del encabezado ("LEDA · ADMINISTRACIÓN ·
-           COREWORK"); si no convence, "Tarea" y "Objetivo".
+           COREWORK"); si no convence, "Tarea" y "Objetivo". Cambiado por el usuario: como las pestañas "Tus
+        tareas / Tu sector" de la web del equipo, con mayúscula ("Tarea", "Objetivo").
+  - [ ] J3-7 · Las palabras del formulario de objetivos (usuario, 2026-10-14: "no me gustaron y no me quedó
+        claro"). Los niveles de CoreWork pasan a **objetivo general, etapa, objetivo de área**, tarea y subtarea,
+        en el pack (mecánica §1). En el formulario:
+        - "De qué cuelga" pasa a "Es parte de", y la opción vacía a "de ninguno (es un objetivo general)";
+        - debajo del tipo, una línea corta que lo explica;
+        - los avisos dicen "es parte de".
+        Va con el escritor de la J4a. Después hay que reimportar el pack en `leda_motor`.
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
       **Decisiones del usuario (2026-10-14, antes de escribir código):**
       - **D1. A quién le carga un referente:** a su área, a sí mismo y, como préstamo, a cualquiera de otra área,
