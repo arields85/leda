@@ -12,9 +12,10 @@ del motor: los causa el acto de otra persona, así que no cuentan para el tope d
   las tareas que le cargaron seguidas, unos minutos después de la última (`VENTANA`): cada carga
   nueva para la misma persona se suma al aviso que todavía no salió y lo corre. De cada tarea, quién
   la cargó (o que la cargó la administración, y quién la decidió), para cuándo, de qué objetivo y
-  quién la revisa. Si es un pedido de otra área (D14), quién la pide y para qué área, y que quien la
-  recibe decide quién la hace; si es un pedido a Dirección (D1b), quién la pide. Lleva al final el
-  enlace de entrada a su web (`TipoDeAviso.enlace`, el de `pedir_acceso_web`), con la dirección
+  quién la revisa. Si es un pedido de otra área (D14), quién la pide, desde qué área y a cuál (la de
+  quien la recibe), y que quien la recibe decide quién la hace; si es un pedido a Dirección (D1b),
+  quién la pide. Un pedido se cuenta como pedido, sin "la cargó" de quien lo pide. Lleva el botón
+  que abre su web (ADR 0024: "Ver la tarea", o "Ver mis tareas" si son varias), con la dirección
   pública configurada.
 - **A quien la revisa** (`TAREAS_NUEVAS_PARA_REVISAR`, D7), sólo si quien la carga no es quien la
   revisa ni quien la hace: por ejemplo, Ismael le carga a Nahuel y deja a Marcos revisándola. Con
