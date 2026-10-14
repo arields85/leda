@@ -358,3 +358,27 @@ def test_una_aprobacion_que_no_cierra_igual_corta_los_recordatorios(conn, mundo)
     for dia in (7, 8, 9):
         assert _de(d.ciclo(octubre(dia, 10)), RECORDATORIO) == []
     assert _de_tipos(conn, TRABADA) == []
+
+
+# --- Quien revisa ya no está en el equipo (J4b; migración 0072) --------------------------------
+
+def test_si_quien_revisa_ya_no_esta_en_el_equipo_queda_un_incidente_y_no_se_le_recuerda(
+        conn, mundo, dias):
+    """La entrega de Nahuel la revisa Marcos (elegido al cargarla, J4), y Marcos deja el equipo:
+    sin nadie activo que la revise por la regla de siempre (a Nahuel lo aprueba Marcos), la
+    aprobación se sigue exigiendo (migración 0072). La escalera no le recuerda la decisión a
+    quien ya no está: deja un incidente para la administración, una vez por tarea y persona."""
+    marcos = mundo["personas"]["Marcos"]["membership_id"]
+    with admin(conn) as cur:
+        cur.execute("update task set revisor_membership_id = %s where id = %s",
+                    (marcos, mundo["de_nahuel"]))
+        cur.execute("update membership set activo = false where id = %s", (marcos,))
+    conn.commit()
+    for dia in (6, 7):
+        dias.ciclo(octubre(dia, 10))
+    assert [a for a in _de_tipos(conn, RECORDATORIO, TRABADA)
+            if str(a["task_id"]) == mundo["de_nahuel"]] == []
+    incidentes = todos(conn, """select resumen_sanitizado, etapa from incident
+                                 where etapa = 'motor_revisa_quien_ya_no_esta'""")
+    assert len(incidentes) == 1
+    assert DE_NAHUEL in incidentes[0]["resumen_sanitizado"]

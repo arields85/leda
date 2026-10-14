@@ -173,6 +173,8 @@ from .preguntas import TIPOS as TIPOS_DE_PREGUNTA
 from .tiempo import Reloj, sale
 
 ETAPA_ESCALERA = "motor_escalera"
+# Una entrega espera la decisión de alguien que ya no está en el equipo (J4b; migración 0072).
+ETAPA_REVISA_QUIEN_YA_NO_ESTA = "motor_revisa_quien_ya_no_esta"
 CLAVE_AVISO_PREVIO = "aviso_previo_dias_habiles"
 MINIMO_DEL_NUCLEO = 1          # mecánica §9: nunca menos de un día hábil entre pasos
 
@@ -252,6 +254,8 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
                         where t.estado = 'en_revision' and quien_revisa_la_tarea(t.id) is not null
                         order by t.titulo, t.id""")
         for fila in cur.fetchall():
+            if _revisa_quien_ya_no_esta(m, str(fila["id"]), str(fila["aprobador_membership_id"])):
+                continue
             resumen.update(_un_paso_de_una_decision(m, str(fila["id"]),
                                                     str(fila["aprobador_membership_id"])))
         # Los bloqueos que siguen abiertos a los días hábiles del espacio (C-5, porción 5).
@@ -685,6 +689,27 @@ def _repetir_las_preguntas_abiertas(m: Momento) -> int:
 
 
 # --- La espera de una decisión: quien aprueba no contesta (porción 3c) ----------------------------
+
+def _revisa_quien_ya_no_esta(m: Momento, task_id: str, aprobador: str) -> bool:
+    """Si la entrega espera la decisión de alguien que ya no está en el equipo (J4b; migración
+    0072: quien se eligió al cargarla y nadie activo por la regla de siempre). La aprobación se
+    sigue exigiendo, así que nunca queda en silencio: un incidente para la administración, una vez
+    por tarea y por persona, y ningún recordatorio a quien ya no lo puede leer."""
+    persona = integrante(m.cur, aprobador)
+    if persona is not None and persona["activo"]:
+        return False
+    tarea = leer_tarea(m.cur, task_id)
+    registrar_incidente(
+        m.cur, m.workspace_id,
+        f"La entrega de «{tarea['titulo'] if tarea else 'una tarea'}» espera la decisión de "
+        f"{persona['nombre'] if persona else 'alguien'}, que ya no está en el equipo, y nadie "
+        f"activo la revisa por la regla de siempre: no se cierra hasta que alguien la revise. Hay "
+        f"que decidir quién la revisa.",
+        severidad="media", etapa=ETAPA_REVISA_QUIEN_YA_NO_ESTA,
+        referencia_tipo="task", referencia_id=task_id,
+        clave=f"{ETAPA_REVISA_QUIEN_YA_NO_ESTA}:{task_id}:{aprobador}")
+    return True
+
 
 def _un_paso_de_una_decision(m: Momento, task_id: str, aprobador: str) -> list[str]:
     """Lo que toca de la espera de la decisión sobre una entrega, contada en días hábiles desde

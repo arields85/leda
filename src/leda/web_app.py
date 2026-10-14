@@ -1151,6 +1151,9 @@ TEXTOS_DEL_PASE = {
     ("tarea", "estado"): "Esa tarea ya no se puede pasar: está entregada, terminada o cancelada.",
     ("a", "ya_la_tiene"): "Esa persona ya la tiene.",
     ("tarea", "ya_hay_un_pase"): "Esa tarea ya tiene un pase esperando respuesta.",
+    # Un rechazo de la cocina que la web no sabe decir (revisión de la J4a): un mensaje humano y
+    # genérico, y el código queda en un incidente (constitución §10).
+    ("tarea", "no_se_pudo"): "No se pudo pasar la tarea; el caso quedó registrado.",
 }
 TEXTOS_DE_LA_REAPERTURA = {
     ("tarea", "no_la_pediste"):
@@ -1166,7 +1169,12 @@ _ERRORES_DEL_PASE = {"estado": ("tarea", "estado"), "ya_la_tiene": ("a", "ya_la_
                      "es_la_misma_persona": ("a", "ya_la_tiene"),
                      "ya_hay_un_pase": ("tarea", "ya_hay_un_pase"),
                      "persona_desconocida": ("a", "no_es_de_tu_area"),
-                     "tarea_desconocida": ("tarea", "no_es_de_tu_area")}
+                     "tarea_desconocida": ("tarea", "no_es_de_tu_area"),
+                     # La regla del pase (`autoridad.regla_del_pase`): quien recibe es de otro
+                     # sector, o su sector no tiene encargado.
+                     "otro_sector": ("a", "no_es_de_tu_area"),
+                     "sin_encargado": ("a", "no_es_de_tu_area")}
+ETAPA_PASE_DESDE_LA_WEB = "pase_desde_la_web"
 
 
 def _uuid_del_cuerpo(cuerpo: dict[str, Any], clave: str) -> str | None:
@@ -1197,6 +1205,7 @@ async def pasar_una_tarea(task_id: str, request: Request):
 def _pasar(conn, token: str, tarea: str | None, a: str | None) -> Response:
     from .autoridad import Canal, Solicitante
     from .db import espacio as en_el_espacio
+    from .incidentes import registrar_incidente
     from .motor import pase
     from .motor.persecucion import alcanzable
 
@@ -1240,8 +1249,19 @@ def _pasar(conn, token: str, tarea: str | None, a: str | None) -> Response:
         r = pase.pedir_desde_la_web(cur, quien, tarea, a, ahora,
                                     Calendario.desde_base(cur, ws))
     if "error" in r:
-        campo, motivo = _ERRORES_DEL_PASE.get(r["error"], ("tarea", "estado"))
-        return _json({"errores": [_con_texto_de(TEXTOS_DEL_PASE, campo, motivo)]}, 422)
+        conocido = _ERRORES_DEL_PASE.get(r["error"])
+        if conocido is None:
+            # Nunca disfrazado de otro rechazo (revisión de la J4a): la persona recibe un mensaje
+            # genérico y la administración, el código. Nada se pasó.
+            with en_el_espacio(conn, ws) as cur:
+                registrar_incidente(
+                    cur, ws, "La web no supo decir un rechazo del pase de una tarea.",
+                    severidad="baja", etapa=ETAPA_PASE_DESDE_LA_WEB,
+                    referencia_cruda=f"pedir_desde_la_web: {str(r['error'])[:80]}",
+                    referencia_tipo="task", referencia_id=tarea,
+                    app_user_id=str(yo["app_user_id"]))
+            conocido = ("tarea", "no_se_pudo")
+        return _json({"errores": [_con_texto_de(TEXTOS_DEL_PASE, *conocido)]}, 422)
     return _json({"pase_id": r["pase_id"], "estado": r["estado"]})
 
 
@@ -1256,9 +1276,13 @@ async def reabrir_una_tarea(task_id: str, request: Request):
     token, cuerpo = pedido[0], _cuerpo_como_objeto(pedido[1])
     tarea = _espacio_de(task_id)
     motivo = cuerpo.get("motivo")
-    if tarea is None or (motivo is not None and not isinstance(motivo, str)):
+    if tarea is None:
         return _json({"errores": [_con_texto_de(TEXTOS_DE_LA_REAPERTURA, "tarea",
                                                 "no_la_pediste")]}, 422)
+    if motivo is not None and not isinstance(motivo, str):
+        # Un dato mal formado, no "no la pediste" (revisión de la J4a): nada se reabre.
+        return _json({"errores": [_con_texto_de(TEXTOS_DE_LA_REAPERTURA, "motivo",
+                                                "mal_formado")]}, 422)
 
     def reabrir(conn) -> Response:
         with sin_espacio(conn) as cur:

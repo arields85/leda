@@ -504,6 +504,36 @@ def test_quien_la_revisa_en_la_tarea_manda_en_la_pagina_la_escalera_y_la_aprobac
     assert _no_cierra(conn, tarea) is None
 
 
+def _dar_de_baja(conn, mundo: dict, nombre: str) -> None:
+    with admin(conn) as cur:
+        cur.execute("update membership set activo = false where id = %s", (_id(mundo, nombre),))
+    conn.commit()
+
+
+def test_si_quien_se_eligio_deja_el_equipo_revisa_la_regla_de_siempre(conn, equipo):
+    """Migración 0072 (revisión de la J4a): Dirección le carga a Sam North con Sam Noble
+    revisando; Sam Noble deja el equipo. La aprobación no espera a quien ya no puede darla: revisa
+    quien aprueba el trabajo de Sam North (Taylor), y su aprobación la cierra."""
+    tarea = _como(conn, equipo, "Morgan Hale", revisa=_id(equipo, "Sam Noble"))["task_id"]
+    _entregar(conn, equipo, tarea)
+    _dar_de_baja(conn, equipo, "Sam Noble")
+    assert str(_tarea(conn, tarea)["revisa"]) == _id(equipo, "Taylor Quinn")
+    _aprobar(conn, equipo, tarea, "Taylor Quinn")
+    assert _no_cierra(conn, tarea) is None
+
+
+def test_si_nadie_activo_la_puede_revisar_la_aprobacion_se_sigue_exigiendo(conn, equipo):
+    """Migración 0072: si tampoco hay nadie activo por la regla de siempre, sigue siendo quien se
+    eligió. La aprobación nunca se saltea (constitución §11): la tarea no cierra, y el motor lo
+    registra (`escalera`, un incidente en lugar del recordatorio)."""
+    tarea = _como(conn, equipo, "Morgan Hale", revisa=_id(equipo, "Sam Noble"))["task_id"]
+    _entregar(conn, equipo, tarea)
+    _dar_de_baja(conn, equipo, "Sam Noble")
+    _dar_de_baja(conn, equipo, "Taylor Quinn")
+    assert str(_tarea(conn, tarea)["revisa"]) == _id(equipo, "Sam Noble")
+    assert _no_cierra(conn, tarea) == "Falta la aprobación de quien revisa ese trabajo."
+
+
 def test_quien_revisa_por_la_regla_de_la_aplicacion_es_el_de_la_tarea(conn, equipo):
     from leda.autoridad import puede_revisar_la_tarea
 
@@ -850,6 +880,41 @@ def test_quien_la_pidio_ve_lo_pedido_y_pide_cambios_desde_la_web(web, conn, equi
     assert r.status_code == 200, r.text
     assert r.json()["responsable_membership_id"] == _id(equipo, "Sam Noble")
     assert _tarea(conn, tarea)["estado"] == "asignada"
+
+
+def test_un_motivo_que_no_es_un_texto_es_un_dato_mal_formado(web, conn, equipo):
+    """Revisión de la J4a: un motivo que no es un texto no es "no la pediste" (eso es de quien no
+    la pidió): es un dato mal formado, y no se reabre nada."""
+    from leda.web_app import TEXTO_DE_UN_DATO_MAL_FORMADO
+
+    tarea = _pedida_y_terminada(conn, equipo)
+    r = _navegador(web, conn, equipo, "Taylor Quinn").post(f"/app/api/tareas/{tarea}/reabrir",
+                                                           json={"motivo": 5})
+    assert r.status_code == 422
+    assert r.json()["errores"] == [{"campo": "motivo", "motivo": "mal_formado",
+                                    "texto": TEXTO_DE_UN_DATO_MAL_FORMADO}]
+    assert _tarea(conn, tarea)["estado"] == "terminada"
+
+
+def test_un_rechazo_del_pase_que_la_web_no_conoce_no_se_disfraza_de_otro(web, conn, equipo,
+                                                                        monkeypatch):
+    """Revisión de la J4a: un rechazo de la cocina que la web no sabe decir no se presenta como
+    "ya no se puede pasar" (un estado que no es): la persona recibe un mensaje humano y genérico,
+    y queda un incidente con el código, para la administración (constitución §10)."""
+    from leda.motor import pase
+    from leda.web_app import TEXTOS_DEL_PASE
+
+    tarea = _como(conn, equipo, "Taylor Quinn", responsable=_id(equipo, "Sam Noble"))["task_id"]
+    monkeypatch.setattr(pase, "pedir_desde_la_web",
+                        lambda *a, **k: {"error": "un_rechazo_nuevo"})
+    antes = _contar(conn, "incident")
+    r = _navegador(web, conn, equipo, "Sam Noble").post(
+        f"/app/api/tareas/{tarea}/pase", json={"a_membership_id": _id(equipo, "Alex Rivera")})
+    assert r.status_code == 422
+    assert r.json()["errores"] == [{"campo": "tarea", "motivo": "no_se_pudo",
+                                    "texto": TEXTOS_DEL_PASE[("tarea", "no_se_pudo")]}]
+    assert _contar(conn, "incident") == antes + 1
+    assert _contar(conn, "incident", "referencia_cruda like %s", "%un_rechazo_nuevo%") == 1
 
 
 def test_la_ortografia_y_el_dictado_del_equipo_se_abren_a_los_referentes(web, conn, equipo):

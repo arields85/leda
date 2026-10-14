@@ -1999,12 +1999,23 @@ comment on table message_outbox_enlace is
 -- cambia, la revisión sigue el cambio. Puede ser quien la hace ahora (la tarea de Nahuel que toma
 -- Marcos la revisa Marcos). Es la única regla: el cierre, quién ve la página y la aplicación la
 -- leen de acá. Migración 0071 (J4): primero, quien se eligió al cargarla (`task.revisor_membership_id`).
+-- Migración 0072 (J4b): si quien se eligió ya no está activo, la regla de siempre, si esa persona
+-- está activa; si nadie de las dos lo está, el elegido, que sigue exigiéndose (el motor lo registra).
 create or replace function quien_revisa_la_tarea(p_task uuid)
 returns uuid
 language sql stable set search_path = leda, public, pg_temp as $$
-  select coalesce(t.revisor_membership_id, m.aprobador_membership_id)
+  select case
+           when t.revisor_membership_id is null then m.aprobador_membership_id
+           when elegido_activo.id is not null then t.revisor_membership_id
+           when regla_activa.id is not null then regla_activa.id
+           else t.revisor_membership_id
+         end
     from task t
     left join membership m on m.id = coalesce(t.era_de_membership_id, t.responsable_membership_id)
+    left join membership elegido_activo
+           on elegido_activo.id = t.revisor_membership_id and elegido_activo.activo
+    left join membership regla_activa
+           on regla_activa.id = m.aprobador_membership_id and regla_activa.activo
    where t.id = p_task;
 $$;
 

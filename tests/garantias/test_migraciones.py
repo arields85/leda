@@ -851,7 +851,9 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # también (antes, la 0069, que deja las funciones de los objetivos como las dejó la
             # 0068; y antes aún la 0070, que deja la carga de una tarea como la dejó la 0067; y
             # antes que todas la 0071, cuyas columnas de la tarea y cuya reapertura también apuntan
-            # ahí).
+            # ahí; antes aún, la 0072, que deja quién revisa como la dejó la 0071).
+            (rollback_0072,) = (ROOT / "db" / "rollbacks").glob("0072_*.sql")
+            db.execute(_sql_script(rollback_0072))
             (rollback_0071,) = (ROOT / "db" / "rollbacks").glob("0071_*.sql")
             db.execute(_sql_script(rollback_0071))
             (rollback_0070,) = (ROOT / "db" / "rollbacks").glob("0070_*.sql")
