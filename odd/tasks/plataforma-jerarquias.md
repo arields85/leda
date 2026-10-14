@@ -1233,6 +1233,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         claro.
       - **J5-D6. Decir que no lleva motivo, y le llega al que pidió:** "Marcos no aceptó pasar la tarea al 28: la
         necesita para la auditoría del 22. Sigue para el 21/10". Ningún mensaje deja a la persona sin saber qué sigue.
+      - **J5-D7. Un pedido sin contestar:** Leda se lo recuerda a quien decide cada día hábil, como una pregunta
+        sin contestar, sin escalar. Mientras tanto vale la fecha original y los recordatorios siguen sobre ella. A
+        quien pidió le avisa que su pedido sigue esperando. Nunca se acepta solo.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
