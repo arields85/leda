@@ -461,3 +461,73 @@ def test_una_ia_que_no_se_puede_preparar_igual_rechaza_lo_igual_al_titulo(
     incidente = _fila(conn, "select * from incident where etapa = 'propuesta_del_criterio'")
     assert incidente is not None and "RuntimeError" in incidente["referencia_cruda"]
     assert _contar(conn, "incident", "etapa = 'criterio_al_cargar'") == 0
+
+
+# --- J2-21: revisar antes de la ortografía -----------------------------------------------------
+#
+# La prueba del usuario (2026-10-13): la web corregía primero la ortografía ("No se" por "No sé") y
+# sólo en el segundo "confirmar" la carga rechazaba ese criterio. Ahora la web pide antes revisar
+# la carga (`/tareas/revisar`): el mismo juicio y la misma `cargar_tarea`, sin la clave, sin cargar
+# nada; y el juicio queda para la carga que sigue con los mismos datos.
+
+def _revisar(navegador, intake_world, **cambios):
+    return navegador.post(f"{_camino(intake_world)}/revisar",
+                          json=_cuerpo(intake_world, titulo=TITULO_PLC, **cambios))
+
+
+def test_revisar_trae_el_rechazo_del_criterio_sin_cargar_ni_usar_la_clave(
+        web, conn, intake_world, administradora, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(SIN_RESULTADO)
+    r = _revisar(navegador, intake_world, criterio="No se")
+    assert r.status_code == 422, r.text
+    (error,) = r.json()["errores"]
+    assert error == {"campo": "criterio", "motivo": "sin_resultado",
+                     "texto": TEXTO_SIN_RESULTADO, "propuesta": PROPUESTO_PLC}
+    assert _contar(conn, "task") == 0 and _contar(conn, "carga_de_tarea") == 0
+
+
+def test_revisar_lo_que_se_cargaria_no_carga_nada_y_la_carga_no_vuelve_a_juzgar(
+        web, conn, intake_world, administradora, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(DICE_UN_RESULTADO)
+    r = _revisar(navegador, intake_world, criterio=CONCRETO)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"errores": []}
+    assert _contar(conn, "task") == 0 and _contar(conn, "carga_de_tarea") == 0
+    # La carga con los mismos datos usa ese juicio: una sola llamada a la IA.
+    r = _cargar(navegador, intake_world, criterio=CONCRETO)
+    assert r.status_code == 201, r.text
+    assert len(ia.pedidos) == 1
+
+
+def test_revisar_dice_tambien_lo_que_rechaza_la_base(web, conn, intake_world, administradora, ia):
+    """Lo que no depende de la ortografía, todo junto: un día que no es hábil y el criterio."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(SIN_RESULTADO)
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    sabado = datetime.now(ZoneInfo("America/Argentina/Buenos_Aires")).date() + timedelta(days=1)
+    while sabado.weekday() != 5:
+        sabado += timedelta(days=1)
+    r = _revisar(navegador, intake_world, criterio="No se", fecha=sabado.isoformat())
+    assert r.status_code == 422, r.text
+    campos = {campo for campo, _ in _errores(r)}
+    assert {"criterio", "fecha"} <= campos
+    assert "clave" not in campos
+
+
+def test_sin_el_juicio_guardado_la_carga_lo_vuelve_a_pedir(web, conn, intake_world,
+                                                          administradora, ia):
+    """La carga nunca depende de que se haya revisado antes: sin el juicio guardado (pasó el rato,
+    otra sesión u otro proceso), lo pide otra vez."""
+    from leda import web_app
+
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(DICE_UN_RESULTADO)
+    assert _revisar(navegador, intake_world, criterio=CONCRETO).status_code == 200
+    web_app._JUICIOS_RECIENTES.clear()
+    ia.respuestas.append(DICE_UN_RESULTADO)
+    assert _cargar(navegador, intake_world, criterio=CONCRETO).status_code == 201
+    assert len(ia.pedidos) == 2

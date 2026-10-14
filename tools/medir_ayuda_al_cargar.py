@@ -21,12 +21,16 @@ oración); y una lista: un "·", o dos ";" o más en una misma oración. Así la
 muestra si la IA escribe como una persona del equipo.
 
 J2-18 (Leda completa todo lo que puede): los pedidos sin quién la hace esperan que Leda proponga a
-alguien del equipo (y, en el de los tornillos, también evidencia además del mínimo del área); el
-que nombra a alguien que no es del equipo, que no lo reemplace. Las áreas del equipo fijo conocen
-los cinco tipos de evidencia del pack, como pide la J2-18 (el formulario ofrece los cinco y el
-área fija un mínimo); en `leda_motor` hoy cada área conoce sólo su mínimo (lo que importa el
-importador), así que la evidencia que Leda sume allí no pasa el control hasta que el importador le
-dé a cada área los tipos del pack.
+alguien del equipo; el que nombra a alguien que no es del equipo, que no lo reemplace. Las áreas
+del equipo fijo conocen los cinco tipos de evidencia del pack, como `leda_motor` desde que el
+importador le da a cada área todos los tipos del pack (`c99791b7`). J2-19: la evidencia propuesta
+es sólo la que eligió Leda para esta tarea (lo que pide el área es un dato, no un mínimo que se
+suma), y los pedidos con quién la hace y un criterio esperan evidencia propuesta, sin dos tipos que
+digan lo mismo (`DICEN_LO_MISMO`, los que el usuario vio tildados juntos en el celular). J2-22:
+un criterio que cuenta la comprobación desde quien revisa, y no desde quien hace la tarea, se marca
+`desde_quien_revisa`; sólo cuando nombra a quien revisa por su papel ("quien la revise", "el que la
+revisa", "el revisor"): un "se ve" o el nombre de una persona pueden ser legítimos y no se pueden
+distinguir por las palabras, así que no se marcan.
 
 `--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira con un guion para el
 ejemplo del usuario, el sábado, "antes del jueves", el PLC, el UPS de la prueba del usuario (con
@@ -150,7 +154,7 @@ APODOS = {"m-marcos": ["el tano"]}
 # tiene que descartar con su motivo (`descarta`) y, para la ortografía (J2-17), las palabras que
 # tienen que aparecer bien escritas en lo que propone (`bien_escrito`) y las que no (`mal_escrito`).
 # J2-17: Leda propone siempre un criterio, también sin quién la hace ni evidencia de su área ("no
-# sé" es un pedido de ayuda).
+# sé" es un pedido de ayuda). J2-19: con quién la hace y el criterio, también la evidencia.
 PEDIDOS: list[dict[str, Any]] = [
     {"nombre": "el ejemplo del usuario",
      "texto": "hay que colgar el estante del modem en la sala que lo haga lucas necesita 12 "
@@ -158,9 +162,9 @@ PEDIDOS: list[dict[str, Any]] = [
               "tablero de la maquina 3",
      "propone": {"titulo": True, "descripcion": True, "criterio": True,
                  "responsable_id": "m-lucas", "espera_id": "t-tablero",
-                 "objetivo_id": "o-modem", "fecha": "2026-10-16"}},
+                 "objetivo_id": "o-modem", "fecha": "2026-10-16", "evidencia": True}},
     # J2-18: sin quién la hace, Leda propone a alguien del equipo por el trabajo y las áreas, y la
-    # evidencia que sirve para esta tarea además del mínimo del área.
+    # evidencia que sirve para esta tarea (J2-19: sólo esa).
     {"nombre": "los tornillos, sin quién ni cuándo",
      "texto": "faltan los tornillos para colgar el estante, necesito 12 de 8 mm",
      "propone": {"titulo": True, "criterio": True, "responsable_id": True, "evidencia": True},
@@ -171,15 +175,15 @@ PEDIDOS: list[dict[str, Any]] = [
      # "Antes del jueves" no es el jueves (el usuario, 2026-10-13): hoy es el miércoles 14 y es
      # hábil, así que el día hábil anterior al jueves 15 es hoy.
      "propone": {"titulo": True, "criterio": True, "responsable_id": "m-marcos",
-                 "fecha": "2026-10-14"}},
+                 "fecha": "2026-10-14", "evidencia": True}},
     {"nombre": "mañana, con el nombre en el medio",
      "texto": "revisar las alarmas del scada q no suenan en la sala de control marcos lo tiene "
               "q hacer para mañana",
      "propone": {"titulo": True, "criterio": True, "responsable_id": "m-marcos",
-                 "fecha": "2026-10-15"}},
+                 "fecha": "2026-10-15", "evidencia": True}},
     {"nombre": "sin apuro",
      "texto": "pedir presupuesto de cables para el tablero 4 sin apuro",
-     "propone": {"titulo": True, "criterio": True, "responsable_id": True},
+     "propone": {"titulo": True, "criterio": True, "responsable_id": True, "evidencia": True},
      "no_propone": ["fecha", "espera_id"]},
     {"nombre": "un sábado no es hábil",
      "texto": "lucas tiene que pintar el cartel de la entrada el sabado",
@@ -211,7 +215,7 @@ PEDIDOS: list[dict[str, Any]] = [
     {"nombre": "el PLC, sin quién ni cómo se comprueba",
      "texto": "hay que dejar el plc de la comprimidora fette 2000 y sus variables listos para "
               "que ariel la integre a la interfaz",
-     "propone": {"titulo": True, "criterio": True, "responsable_id": True}},
+     "propone": {"titulo": True, "criterio": True, "responsable_id": True, "evidencia": True}},
     # J2-13: el pedido de la prueba del usuario, tal cual (2026-10-13). En `leda_motor` "el tano"
     # no es el apodo de nadie, así que no hay quién la hace (J2-18: Leda no pone a otro) ni
     # evidencia de su área: la comprobación circular que dio la IA real se rechaza por su sentido
@@ -230,7 +234,7 @@ PEDIDOS: list[dict[str, Any]] = [
      "texto": "hay q integrar el plc de la fette con cirelabs para q ariel lo vea en la "
               "interfaz",
      "propone": {"titulo": True, "criterio": True, "objetivo_id": "o-corelabs",
-                 "responsable_id": True},
+                 "responsable_id": True, "evidencia": True},
      "bien_escrito": ["CoreLabs"], "mal_escrito": ["cirelabs"]},
     # J2-9, J2-13 y J2-14: el criterio que escribió la persona, juzgado al cargar por su sentido
     # (`juicio`: lo que tiene que decidir el código; `None` es que sirve), con la evidencia que se
@@ -306,6 +310,11 @@ PEDIDOS: list[dict[str, Any]] = [
 
 VACIO = {c: "" for c in ayuda_al_cargar.CAMPOS}
 
+# J2-19, sólo en la medición: los tipos de evidencia del pack que dicen lo mismo (el usuario los vio
+# tildados juntos en el celular: "una foto o una captura de la pantalla" y "una foto del trabajo
+# terminado"). Leda no los propone juntos; el código de Leda no lo decide, lo mide la herramienta.
+DICEN_LO_MISMO: list[set[str]] = [{"captura", "foto"}]
+
 # Lo que propone la IA en seco: lo que propondría una IA que entendió el ejemplo del usuario, un
 # sábado (que los controles no dejan poner), "antes del jueves" (el miércoles), el PLC y
 # "cirelabs"; y, en el UPS de la prueba del usuario, lo que propuso la IA real (una comprobación
@@ -320,21 +329,22 @@ GUION: dict[str, dict[str, str]] = {
                     "firme y derecho.",
         "resultado": "El estante del módem está colgado en la sala con los 12 tornillos de 8 mm",
         "responsable": "lucas", "espera": "T1", "objetivo": "O1",
-        "fecha": "2026-10-16", "como_dijo_la_fecha": "para el viernes"},
+        "fecha": "2026-10-16", "como_dijo_la_fecha": "para el viernes", "evidencia": "E4"},
     "un sábado no es hábil": {
         "titulo": "Pintar el cartel de la entrada", "responsable": "lucas",
         "criterio": "El cartel de la entrada queda pintado y se ve terminado.",
-        "fecha": "2026-10-17", "como_dijo_la_fecha": "el sabado"},
+        "fecha": "2026-10-17", "como_dijo_la_fecha": "el sabado", "evidencia": "E4"},
     "un apodo y un día de la semana": {
         "titulo": "Cambiar el UPS de la sala de servidores",
         "criterio": "El UPS de la sala de servidores queda cambiado y funcionando.",
         "resultado": "El UPS de la sala de servidores está cambiado",
-        "responsable": "el tano", "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves"},
+        "responsable": "el tano", "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves",
+        "evidencia": "E5"},
     "el PLC, sin quién ni cómo se comprueba": {
         "titulo": "Dejar listo el PLC de la comprimidora Fette 2000",
         "criterio": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos, y Ariel "
                     "los ve desde la interfaz.",
-        "quien_la_hace": "P2"},
+        "quien_la_hace": "P2", "evidencia": "E1"},
     # J2-18: Leda propone a Lucas (Infraestructura) y una foto del trabajo terminado, dicha dentro
     # de una oración natural.
     "los tornillos, sin quién ni cuándo": {
@@ -357,7 +367,7 @@ GUION: dict[str, dict[str, str]] = {
         "titulo": "Integrar el PLC de la Fette con CoreLabs",
         "criterio": "El PLC de la Fette queda integrado con CoreLabs y Ariel lo ve en la "
                     "interfaz.",
-        "objetivo": "O4", "quien_la_hace": "P2"},
+        "objetivo": "O4", "quien_la_hace": "P2", "evidencia": "E1"},
 }
 # Lo que contesta en seco el juicio de un criterio (escrito o propuesto), por su texto: lo que
 # diría una IA que lo juzga por su sentido y que, si no sirve, escribe el suyo con sus palabras
@@ -389,7 +399,7 @@ GUION_DEL_JUICIO: dict[str, dict[str, Any]] = {
          "criterio": ""},
 }
 _ESTANTE = "El estante queda colocado"
-_ESTANTE_DE_LEDA = "El estante queda colocado, firme y derecho, y quien lo revisa lo ve terminado."
+_ESTANTE_DE_LEDA = "El estante queda colocado, firme y derecho, y quien lo colocó cuenta cómo quedó."
 GUION_DEL_RESULTADO: dict[str, dict[str, Any]] = {
     "El PLC de la comprimidora Fette 2000 y sus variables quedan listos para que Ariel la integre "
     "a la interfaz. Se comprueba revisando que el PLC y sus variables estén listos para esa "
@@ -495,6 +505,19 @@ def _pegada_como_fragmento(texto: str, etiqueta: str) -> bool:
 def _es_una_lista(texto: str) -> bool:
     return "·" in texto or any(oracion.count(";") >= 2
                                for oracion in _FIN_DE_ORACION.split(texto))
+
+
+# J2-22, sólo en la medición: quien revisa nombrado por su papel ("quien la revise", "quienes lo
+# revisan", "el que la revisa", "la revisora"), en el texto sin tildes ni mayúsculas.
+_DESDE_QUIEN_REVISA = re.compile(
+    r"\b(?:quien(?:es)?|el que|la que|los que|las que)\s+(?:(?:la|lo|las|los|le)\s+)?revis\w*"
+    r"|\brevisor\w*")
+
+
+def desde_quien_revisa(texto: str) -> list[str]:
+    """Lo que delata un criterio contado desde quien revisa (J2-22): quien revisa nombrado por su
+    papel. Sólo eso: un "se ve" o un nombre no se distinguen de un uso legítimo por las palabras."""
+    return [m.group(0) for m in _DESDE_QUIEN_REVISA.finditer(_plano(texto))]
 
 
 def sin_naturalidad(texto: str, etiquetas: list[str]) -> list[str]:
@@ -675,8 +698,11 @@ def medir_el_juicio(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     naturalidad = (sin_naturalidad(juicio.propuesta, _etiquetas(pedido))
                    if juicio.propuesta else [])
     fallas += [f"propuesta sin naturalidad: {m}" for m in naturalidad]
+    revisa = desde_quien_revisa(juicio.propuesta) if juicio.propuesta else []
+    fallas += [f"propuesta desde quien revisa: «{m}»" for m in revisa]
     return not fallas, {"falla": None, "juicio": juicio.motivo, "propuesta": juicio.propuesta,
                         "de_reserva": juicio.de_reserva, "sin_naturalidad": naturalidad,
+                        "desde_quien_revisa": revisa,
                         "segundos": segundos, "fallas": fallas}
 
 
@@ -748,6 +774,11 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     for campo in pedido.get("no_propone", []):
         if campo in r.propuesta:
             fallas.append(f"{campo}: no tenía que proponerlo y propuso {r.propuesta[campo]!r}")
+    # J2-19: sin dos tipos de evidencia que digan lo mismo.
+    propuesta_de_evidencia = set(r.propuesta.get("evidencia") or [])
+    for par in DICEN_LO_MISMO:
+        if par <= propuesta_de_evidencia:
+            fallas.append(f"evidencia: propuso juntos {', '.join(sorted(par))}, que dicen lo mismo")
     for campo, motivo in pedido.get("descarta", []):
         if {"campo": campo, "motivo": motivo} not in r.descartados:
             fallas.append(f"{campo}: esperaba descartarlo por {motivo}")
@@ -755,6 +786,8 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     textos = {c: r.propuesta[c] for c in ayuda_al_cargar.CAMPOS_DE_TEXTO if c in r.propuesta}
     naturalidad = {c: m for c, t in textos.items() if (m := sin_naturalidad(t, _etiquetas(pedido)))}
     fallas += [f"{c}: sin naturalidad: {', '.join(m)}" for c, m in naturalidad.items()]
+    revisa = desde_quien_revisa(r.propuesta["criterio"]) if "criterio" in r.propuesta else []
+    fallas += [f"criterio: desde quien revisa: «{m}»" for m in revisa]
     todo = " ".join(textos.values())
     for palabra in pedido.get("bien_escrito", []):
         if palabra not in todo:
@@ -765,7 +798,7 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     return not fallas, {"falla": None if falla_del_juicio is None else "ia",
                         "falla_del_juicio": falla_del_juicio, "propuesta": r.propuesta,
                         "criterio_de": r.criterio_de, "responsable_de": r.responsable_de,
-                        "sin_naturalidad": naturalidad,
+                        "sin_naturalidad": naturalidad, "desde_quien_revisa": revisa,
                         "avisos": [a["texto"] for a in r.avisos],
                         "descartados": r.descartados, "elegir": r.elegir,
                         "juicio": None if juicio is None else (juicio.motivo or "lo_dice"),

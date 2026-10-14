@@ -239,3 +239,34 @@ def test_una_sesion_cortada_mientras_responde_la_ia_no_recibe_nada(web, conn, in
     assert "corregidos" not in r.text
     assert _contar(conn, "audit_log", "accion = 'corregir_al_cargar'") == 0
     assert _contar(conn, "incident", "etapa = 'ortografia_al_cargar'") == 0
+
+
+# --- J2-19: un nombre de los datos nunca se "corrige" a otra forma --------------------------------
+#
+# La prueba en el celular de la J2-18 (2026-10-13, 21:19): el título que propuso Leda decía
+# "CoreLabs", como está en los datos; la corrección de la IA devolvió "cirelabs" (la forma con que
+# lo escribió la persona en el recuadro) y el código la aceptó, porque la regla de la misma palabra
+# mal escrita es simétrica: la vista previa mostró "cirelabs" con la marca "CoreLabs → cirelabs".
+# Una palabra que ya está como en los datos sólo puede cambiar de mayúsculas o de tildes.
+
+def test_un_nombre_bien_escrito_no_se_cambia_por_su_forma_mal_escrita(web, conn, intake_world,
+                                                                      administradora, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({"titulo": "Revisar el tablero con Sam Norht"})
+    r = _pedir(navegador, _norte(intake_world)["id"], titulo="revisar el tablero con Sam North")
+    assert r.status_code == 200, r.text
+    corregido = r.json()["corregidos"]["titulo"]
+    assert corregido["texto"] == "Revisar el tablero con Sam North"
+    assert corregido["cambios"] == [{"antes": "revisar", "despues": "Revisar"}]
+
+
+def test_el_nombre_mal_escrito_se_corrige_al_de_los_datos(web, conn, intake_world,
+                                                         administradora, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({"titulo": "Integrar la paila 3 con Sam North"})
+    r = _pedir(navegador, _norte(intake_world)["id"], titulo="Integrar la paila 3 con sam norht")
+    assert r.status_code == 200, r.text
+    corregido = r.json()["corregidos"]["titulo"]
+    assert corregido["texto"] == "Integrar la paila 3 con Sam North"
+    assert corregido["cambios"] == [{"antes": "sam", "despues": "Sam"},
+                                    {"antes": "norht", "despues": "North"}]

@@ -253,6 +253,38 @@ def test_el_pack_declara_las_clases_de_cada_tipo_que_pide():
     assert not any("evidencia" in b for b in validar(buena)[0])
 
 
+@pytest.mark.parametrize("definido", [
+    {"en_palabras": "un plano"},                         # sin clases
+    {"clases": ["archivo"]},                              # sin cómo se dice
+    {"clases": "archivo", "en_palabras": "un plano"},     # las clases no son una lista
+    {"clases": ["video"], "en_palabras": "un plano"},     # una clase que no existe
+    "un plano",                                           # ni siquiera un tipo
+])
+def test_un_tipo_del_pack_mal_formado_se_rechaza_aunque_ningun_area_lo_pida(definido):
+    """Advertencia de RDD de la J2-18 (`R3-tipos-malformados-ampliados`): desde que cada área
+    conoce todos los tipos del pack, uno mal formado que nadie pide también llegaría a todas las
+    áreas (o rompería la importación). `validar` lo rechaza antes de importar."""
+    base = {"roles": [{"slug": "d", "autoridad_final": True}],
+            "personas": [{"id": "a", "nombre": "A", "area": "x", "rol": "d",
+                          "aprobado_por": None}],
+            "areas": [{"slug": "x"}], "calendario": {"dias": ["lunes"]},
+            "telegram": {"grupo_gestion_id": 1}}
+    pack = {**base, "evidencia": {"por_area": {"x": ["foto"]},
+                                  "tipos": {"foto": {"clases": ["imagen"],
+                                                     "en_palabras": "una foto"},
+                                            "plano": definido}}}
+    bloqueantes, _ = validar(pack)
+    assert any("'plano'" in b for b in bloqueantes), bloqueantes
+    assert not any("'foto'" in b for b in bloqueantes)
+
+
+def test_los_tipos_del_area_son_los_del_pack_bien_formados():
+    from leda.importador import _tipos_del_area
+
+    pack = {"evidencia": {"tipos": {"foto": {"clases": ["imagen"], "en_palabras": "una foto"}}}}
+    assert _tipos_del_area(pack) == {"foto": {"clases": ["imagen"], "en_palabras": "una foto"}}
+
+
 def test_el_pack_de_corework_queda_con_las_clases_de_cada_tipo(corework, conn):
     with admin(conn) as cur:
         cur.execute("""select a.slug, p.tipos from task_evidence_policy p

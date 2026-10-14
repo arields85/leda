@@ -251,7 +251,7 @@ def test_lo_escrito_no_se_pide_ni_vuelve(web, conn, intake_world, administradora
     assert r.status_code == 200, r.text
     assert "titulo" not in r.json()["propuesta"]
     assert "responsable_id" not in r.json()["propuesta"]
-    # J2-18: con el criterio por pedir, también la evidencia que Leda suma al mínimo del área.
+    # J2-18 y J2-19: con el criterio por pedir y nada tildado, también la evidencia.
     assert set(ia.entrada()["pide"]) == {"descripcion", "criterio", "espera", "objetivo", "fecha",
                                          "evidencia"}
 
@@ -419,11 +419,11 @@ def _auditoria(conn) -> dict:
 
 def test_el_criterio_de_la_ia_llega_tal_cual_sin_plantilla(web, conn, intake_world,
                                                           administradora, con_lucas, ia):
-    """J2-17: la IA escribe el criterio entero y el juicio, con la evidencia del área de Sam North
-    ("lucas", Field Services, que pide "test record"), dice que sirve: llega tal cual, sin que el
-    código le pegue nada."""
+    """J2-17: la IA escribe el criterio entero y el juicio, con la evidencia que propone Leda para
+    la tarea de Sam North ("lucas", Field Services; J2-19: "test record", E1), dice que sirve:
+    llega tal cual, sin que el código le pegue nada."""
     navegador = _navegador_de_administracion(web, conn, administradora)
-    ia.respuestas.append(_respuesta(espera=None))
+    ia.respuestas.append(_respuesta(espera=None, evidencia="E1"))
     r = _pedir(navegador, _norte(intake_world)["id"])
     assert r.status_code == 200, r.text
     criterio = r.json()["propuesta"]["criterio"]
@@ -462,10 +462,11 @@ def test_si_el_juicio_no_responde_al_proponer_queda_un_incidente(web, conn, inta
 
     navegador = _navegador_de_administracion(web, conn, administradora)
     ia.juzga = lambda entrada: PlazoAgotado(40)
-    ia.respuestas.append(_respuesta(espera=None))
+    ia.respuestas.append(_respuesta(espera=None, evidencia="E1"))
     r = _pedir(navegador, _norte(intake_world)["id"])
     assert r.status_code == 200, r.text
-    # El criterio de la IA no se propone sin juzgar: vale el de reserva, con la evidencia del área.
+    # El criterio de la IA no se propone sin juzgar: vale el de reserva, con la evidencia que
+    # propuso Leda.
     assert r.json()["propuesta"]["criterio"] == (
         f"{RESULTADO_DEL_EJEMPLO}. Se comprueba con lo que pide el área: test record.")
     incidente = _fila(conn, "select * from incident where etapa = 'ayuda_al_cargar'")
@@ -518,7 +519,8 @@ def test_leda_propone_quien_la_hace_y_la_evidencia_aunque_no_se_dijo(web, conn, 
     assert propuesta["evidencia"] == ["foto"]
     juicio = json.loads(next(m["content"] for m in ia.pedidos[1]["messages"]
                              if m["role"] == "user"))
-    assert juicio["evidencia_que_pide_el_area"] == ["test record", "una foto"]
+    # J2-19: el criterio se juzga con exactamente la evidencia que propuso Leda, sin la del área.
+    assert juicio["evidencia_que_pide_el_area"] == ["una foto"]
     detalle = _auditoria(conn)
     assert detalle["responsable_de"] == "leda"
     assert detalle["evidencia_propuesta"] == ["foto"]
@@ -573,3 +575,35 @@ def test_una_ia_de_la_ayuda_que_no_se_puede_preparar_deja_un_incidente(
     assert r.status_code == 503 and r.json()["texto"] == TEXTO_SI_LA_IA_FALLA
     incidente = _fila(conn, "select * from incident where etapa = 'ayuda_al_cargar'")
     assert incidente is not None and "RuntimeError" in incidente["referencia_cruda"]
+
+
+# --- J2-19: la evidencia tildada, revisada antes de usarla ------------------------------------
+
+@pytest.mark.parametrize("quien", [None, "Sam North"])
+def test_una_evidencia_que_el_area_no_conoce_se_rechaza_sin_llamar_a_la_ia(
+        web, conn, intake_world, administradora, ia, quien):
+    """Advertencia de RDD de la J2-18 (`R3-evidencia-escrita-sin-validar`): la evidencia que manda
+    el formulario se usaba tal cual, también para decidir que la persona ya eligió. Ahora se revisa
+    como en la carga: cada tipo, de los que conoce el área de quien la hace (sin ella, de los del
+    pack del espacio)."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    cuerpo = {"evidencia": ["test record", "inventada"]}
+    if quien:
+        cuerpo["responsable_id"] = _persona(intake_world, quien)
+    r = _pedir(navegador, _norte(intake_world)["id"], **cuerpo)
+    assert r.status_code == 422, r.text
+    errores = {(e["campo"], e["motivo"]): e["texto"] for e in r.json()["errores"]}
+    assert ("evidencia", "tipo_no_es_de_la_politica") in errores
+    assert errores[("evidencia", "tipo_no_es_de_la_politica")]
+    assert ia.pedidos == []
+
+
+def test_la_evidencia_conocida_y_repetida_se_toma_una_vez(web, conn, intake_world,
+                                                          administradora, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(_respuesta(responsable=None, espera=None))
+    r = _pedir(navegador, _norte(intake_world)["id"],
+               responsable_id=_persona(intake_world, "Sam North"),
+               evidencia=["test record", "test record"])
+    assert r.status_code == 200, r.text
+    assert ia.entrada()["ya_escrito"]["evidencia_elegida"] == ["test record"]
