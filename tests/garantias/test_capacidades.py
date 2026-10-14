@@ -89,7 +89,20 @@ TABLAS_POR_FUNCION = ("acceso_tablero", "acceso_tarea", "vista_de_tarea",
                       "enlace_de_administracion", "sesion_de_administracion",
                       # La clave de cada carga desde la web (migración 0062): la toca sólo
                       # `cargar_tarea`.
-                      "carga_de_tarea")
+                      "carga_de_tarea",
+                      # La reapertura de una tarea pedida (migración 0071, J4): la escribe sólo
+                      # `reabrir_tarea`, y la leen `motivo_no_cierra_tarea` y
+                      # `tipos_de_evidencia_que_faltan`.
+                      "reapertura_de_tarea")
+
+# Columnas sueltas de una tabla que sí usa `src/`, que sólo escriben y leen funciones de la base,
+# cada una con la función que la lee. No es una lista de promesas: estas columnas se usan.
+COLUMNAS_POR_FUNCION = {
+    # `task.pedida_por_membership_id` (migración 0071, J4; decisiones D1b y D14): la escribe
+    # `cargar_tarea_web` y la leen `puede_ver_tarea`, `pedidas_que_ve` y `reabrir_tarea`.
+    "pedida_por_membership_id": "task: cargar_tarea_web, puede_ver_tarea, pedidas_que_ve, "
+                                "reabrir_tarea",
+}
 
 # Las tablas del motor de conversación (migraciones 0030 y 0031) estuvieron
 # exentas mientras `conversation_state.mostrado_para_confirmar` no la leía nadie.
@@ -153,7 +166,7 @@ def test_no_hay_esquema_nuevo_sin_uso_ni_declarado():
         for columna in columnas if not _referenciado(columna, fuente)
     }
 
-    nuevas = sorted(sin_uso - set(PROMESAS_SIN_CUMPLIR))
+    nuevas = sorted(sin_uso - set(PROMESAS_SIN_CUMPLIR) - set(COLUMNAS_POR_FUNCION))
     assert not nuevas, (
         "Estas columnas se declararon y ningún código las usa. O se "
         "implementan, o se agregan a PROMESAS_SIN_CUMPLIR diciendo qué "
