@@ -505,6 +505,30 @@ def _preguntar(ctx: Contexto, pase: dict, tipo: str, a: str) -> dict:
     return hecho
 
 
+def pedir_desde_la_web(cur, quien, task_id: str, a_membership_id: str, ahora,
+                       calendario) -> dict:
+    """El pase que pide un referente desde la web del equipo (J4, decisión D14 del usuario, pasos 2
+    y 3): el mismo de siempre (`herramientas.pedir_pase_de_tarea`, ya confirmado en la web, con la
+    misma regla y su auditoría) y la pregunta a quien sigue, como la deja la confirmación por chat:
+    a quien decide o, si quien pide es el referente de quien la recibe, directamente a quien la
+    recibe, terminado el margen para corregir. Un rechazo de la cocina vuelve como `error`; el
+    pase, con su `pase_id` y su `estado`."""
+    r = ejecutar(cur, quien, "pedir_pase_de_tarea",
+                 {"tarea_id": task_id, "a_membership_id": a_membership_id,
+                  "at": ahora.isoformat()}, ya_confirmada=True)
+    if "error" in r:
+        return r
+    pase = _el_pase(cur, r["pase_id"])
+    tipo, a = _lo_que_espera(pase)
+    if tipo is not None:
+        guardar(cur, quien.workspace_id, tipo, task_id=pase["task_id"], destinatario=a,
+                hechos={"aviso": tipo, "tarea": pase["titulo"],
+                        **hechos_de_la_pregunta(pase, tipo, calendario.zona)},
+                programado_para=sale_con_margen(cur, calendario, quien.workspace_id, ahora),
+                clave=f"motor:{tipo}:{pase['task_id']}:p{pase['id']}", ahora=ahora)
+    return {"pase_id": pase["id"], "estado": pase["estado"]}
+
+
 def _como_termino(ctx: Contexto, pase: dict, a: str, clave: str, hechos: dict) -> dict:
     """Cómo terminó el pase, a quien pidió o a quien decidió: información."""
     aviso_id, sale = _guardar(ctx, pase, COMO_TERMINO_EL_PASE, a,

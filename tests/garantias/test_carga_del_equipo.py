@@ -701,3 +701,211 @@ def test_lo_pedido_terminado_hace_mas_de_30_dias_ya_no_se_lista(conn, equipo):
     conn.commit()
     assert tarea
 
+
+# --- La entrada HTTP de la puerta del equipo ---------------------------------------------------------
+
+@pytest.fixture
+def web(conn, monkeypatch):
+    """Un navegador nuevo por llamada, con la conexión de la prueba y el reloj de la prueba (el
+    miércoles 14/10/2026 al mediodía). El juicio del criterio usa una IA de mentira que lo da por
+    comprobable: nunca la real."""
+    from fastapi.testclient import TestClient
+
+    from leda import entrada, web_app
+    from tests.test_ayuda_al_cargar import IAQueCopiaElCriterio
+
+    monkeypatch.setattr(web_app, "_conn_de_la_web", lambda: conn)
+    monkeypatch.setattr(web_app, "_ahora", lambda _conn, _ws: AHORA)
+    monkeypatch.setattr(web_app, "_ia_del_criterio",
+                        lambda conn, espacio: IAQueCopiaElCriterio())
+
+    def nuevo():
+        return TestClient(entrada.app, base_url="https://testserver", follow_redirects=False)
+    return nuevo
+
+
+def _navegador(web, conn, mundo: dict, nombre: str):
+    from leda import web_app
+
+    with espacio(conn, _norte(mundo)["id"]) as cur:
+        token = web_app.emitir_enlace(cur, _id(mundo, nombre))
+    conn.commit()
+    navegador = web()
+    assert navegador.post(f"/app/entrar/{token}").status_code == 303
+    return navegador
+
+
+def _cuerpo(mundo: dict, **cambios) -> dict:
+    cuerpo = {"objetivo_id": _norte(mundo)["objectives"][0],
+              "titulo": "Colgar el módem en la pared", "descripcion": "",
+              "responsable_id": _id(mundo, "Sam Noble"), "fecha": VIERNES.isoformat(),
+              "criterio": "El módem queda colgado y prende", "evidencia": ["test record"],
+              "clave": secrets.token_urlsafe(18)}
+    cuerpo.update(cambios)
+    return cuerpo
+
+
+def test_la_web_sabe_quien_carga_tareas(web, conn, equipo):
+    for nombre, carga in (("Morgan Hale", True), ("Taylor Quinn", True), ("Sam North", False)):
+        r = _navegador(web, conn, equipo, nombre).get("/app/api/yo")
+        assert r.json()["carga_tareas"] is carga, nombre
+
+
+def test_las_opciones_por_la_api_son_de_quien_carga(web, conn, equipo):
+    r = _navegador(web, conn, equipo, "Taylor Quinn").get("/app/api/carga/opciones")
+    assert r.status_code == 200, r.text
+    assert "ok" not in r.json()
+    assert {i["membership_id"] for i in r.json()["integrantes"]} == {
+        _id(equipo, n) for n in ("Taylor Quinn", "Sam North", "Sam Noble", "Morgan Hale")}
+    r = _navegador(web, conn, equipo, "Sam North").get("/app/api/carga/opciones")
+    assert r.status_code == 403
+    assert r.json() == {"error": "sin_autoridad", "texto": (
+        "Cargar tareas le corresponde a Dirección y a los referentes de área.")}
+    assert web().get("/app/api/carga/opciones").status_code == 401
+
+
+def test_cargar_por_la_api_del_equipo(web, conn, equipo, administradora):
+    from tests.garantias.test_carga_de_tareas import _navegador_de_administracion
+
+    taylor = _navegador(web, conn, equipo, "Taylor Quinn")
+    cuerpo = _cuerpo(equipo)
+    assert taylor.post("/app/api/tareas/revisar", json=cuerpo).json() == {"errores": []}
+    r = taylor.post("/app/api/tareas", json=cuerpo)
+    assert r.status_code == 201, r.text
+    tarea = _tarea(conn, r.json()["task_id"])
+    assert str(tarea["pedida_por_membership_id"]) == _id(equipo, "Taylor Quinn")
+    assert str(tarea["revisa"]) == _id(equipo, "Sam Noble")
+    assert taylor.post("/app/api/tareas", json=cuerpo).status_code == 200
+    # Un referente no elige quién la revisa, y lo dice con palabras.
+    r = taylor.post("/app/api/tareas", json=_cuerpo(equipo, revisa_id=_id(equipo, "Morgan Hale")))
+    assert r.status_code == 422
+    assert r.json()["errores"] == [{"campo": "revisa", "motivo": "no_corresponde", "texto": (
+        "Quién revisa esta tarea no se elige: la revisa quien corresponde.")}]
+    r = taylor.post("/app/api/tareas", json=_cuerpo(equipo, responsable_id=_id(equipo,
+                                                                               "Alex Rivera")))
+    assert {(e["campo"], e["motivo"]) for e in r.json()["errores"]} == {
+        ("responsable", "no_le_puede_cargar")}
+    # Un integrante no carga; otro sitio no carga; la cookie de administración no abre esta puerta.
+    assert _navegador(web, conn, equipo, "Sam North").post(
+        "/app/api/tareas", json=_cuerpo(equipo)).status_code == 403
+    assert taylor.post("/app/api/tareas", json=_cuerpo(equipo),
+                       headers={"origin": "https://otro.example"}).status_code == 403
+    administracion = _navegador_de_administracion(web, conn, administradora)
+    assert administracion.post("/app/api/tareas", json=_cuerpo(equipo)).status_code == 401
+    assert _contar(conn, "task") == 1
+
+
+def test_direccion_elige_quien_la_revisa_por_la_api(web, conn, equipo):
+    morgan = _navegador(web, conn, equipo, "Morgan Hale")
+    r = morgan.post("/app/api/tareas", json=_cuerpo(
+        equipo, responsable_id=_id(equipo, "Sam North"), revisa_id=_id(equipo, "Sam Noble")))
+    assert r.status_code == 201, r.text
+    assert str(_tarea(conn, r.json()["task_id"])["revisa"]) == _id(equipo, "Sam Noble")
+
+
+def test_el_referente_pasa_un_pedido_a_su_gente_desde_la_web(web, conn, equipo):
+    tarea = _como(conn, equipo, "Taylor Quinn", responsable=_id(equipo, "Sam Noble"))["task_id"]
+    noble = _navegador(web, conn, equipo, "Sam Noble")
+    sector = noble.get("/app/api/tareas?vista=sector").json()
+    assert sector["pasar_a"] == [{"membership_id": _id(equipo, "Alex Rivera"),
+                                  "nombre": "Alex Rivera 1", "area": "Quality Guild"}]
+    # A alguien de otra área, no.
+    r = noble.post(f"/app/api/tareas/{tarea}/pase",
+                   json={"a_membership_id": _id(equipo, "Sam North")})
+    assert r.status_code == 422
+    assert r.json()["errores"][0]["motivo"] == "no_es_de_tu_area"
+    r = noble.post(f"/app/api/tareas/{tarea}/pase",
+                   json={"a_membership_id": _id(equipo, "Alex Rivera")})
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "esperando_que_la_tome"
+    # Sigue con ella hasta que Alex la toma, y a Alex le llega la pregunta del pase.
+    assert str(_tarea(conn, tarea)["responsable_membership_id"]) == _id(equipo, "Sam Noble")
+    aviso = _fila(conn, "select * from scheduled_notice where task_id = %s", tarea)
+    assert aviso["tipo"] == "pase_para_tomar"
+    assert str(aviso["destinatario_membership_id"]) == _id(equipo, "Alex Rivera")
+    # Taylor no es el referente de esa tarea; Alex no es referente.
+    r = _navegador(web, conn, equipo, "Taylor Quinn").post(
+        f"/app/api/tareas/{tarea}/pase", json={"a_membership_id": _id(equipo, "Sam North")})
+    assert r.status_code == 422
+    assert {e["campo"] for e in r.json()["errores"]} == {"tarea"}
+    assert _navegador(web, conn, equipo, "Alex Rivera").post(
+        f"/app/api/tareas/{tarea}/pase",
+        json={"a_membership_id": _id(equipo, "Sam Noble")}).status_code == 403
+
+
+def test_quien_la_pidio_ve_lo_pedido_y_pide_cambios_desde_la_web(web, conn, equipo):
+    tarea = _pedida_y_terminada(conn, equipo)
+    taylor = _navegador(web, conn, equipo, "Taylor Quinn")
+    pedidas = taylor.get("/app/api/tareas?vista=tus").json()["pedidas"]
+    assert [(p["id"], p["estado"], p["puede_pedir_cambios"]) for p in pedidas] == [
+        (tarea, "terminada", True)]
+    r = _navegador(web, conn, equipo, "Sam Noble").post(f"/app/api/tareas/{tarea}/reabrir",
+                                                        json={"motivo": "Torcido"})
+    assert r.status_code == 422 and r.json()["errores"][0]["motivo"] == "no_la_pediste"
+    r = taylor.post(f"/app/api/tareas/{tarea}/reabrir", json={"motivo": ""})
+    assert r.status_code == 422
+    assert r.json()["errores"] == [{"campo": "motivo", "motivo": "falta",
+                                    "texto": "Contá qué hay que cambiar."}]
+    r = taylor.post(f"/app/api/tareas/{tarea}/reabrir", json={"motivo": "Quedó torcido"})
+    assert r.status_code == 200, r.text
+    assert r.json()["responsable_membership_id"] == _id(equipo, "Sam Noble")
+    assert _tarea(conn, tarea)["estado"] == "asignada"
+
+
+def test_la_ortografia_y_el_dictado_del_equipo_se_abren_a_los_referentes(web, conn, equipo):
+    """Sin textos no se llama a la IA: alcanza para ver quién pasa la puerta."""
+    taylor = _navegador(web, conn, equipo, "Taylor Quinn")
+    assert taylor.post("/app/api/ortografia", json={}).json() == {"corregidos": {},
+                                                                    "sin_revisar": []}
+    integrante = _navegador(web, conn, equipo, "Sam North")
+    assert integrante.post("/app/api/ortografia", json={}).status_code == 403
+    assert integrante.post("/app/api/dictado", content=b"x",
+                           headers={"content-type": "audio/mp4"}).status_code == 403
+
+
+# --- La ayuda de la IA por la puerta del equipo (D11) ---------------------------------------------
+
+@pytest.fixture
+def ia(monkeypatch):
+    from leda import web_app
+    from tests.test_ayuda_al_cargar import IADeLaCarga, juzga_que_si
+
+    falsa = IADeLaCarga(juzga=juzga_que_si)
+    monkeypatch.setattr(web_app, "_ia_de_la_ayuda", lambda conn, espacio: falsa)
+    return falsa
+
+
+def _ayuda(navegador, texto: str):
+    return navegador.post("/app/api/ayuda", json={
+        "texto": texto, "objetivo_id": "", "titulo": "", "descripcion": "", "responsable_id": "",
+        "fecha": "", "espera_id": "", "criterio": ""})
+
+
+def test_la_ayuda_propone_al_referente_de_quien_es_de_otra_area_y_lo_explica(web, conn, equipo,
+                                                                              ia):
+    ia.respuestas.append({"titulo": "Colgar el módem en la pared", "responsable": "Alex"})
+    r = _ayuda(_navegador(web, conn, equipo, "Taylor Quinn"),
+               "que Alex cuelgue el módem en la pared")
+    assert r.status_code == 200, r.text
+    assert r.json()["propuesta"]["responsable_id"] == _id(equipo, "Sam Noble")
+    assert {"campo": "ayuda", "motivo": "de_otra_area", "texto": (
+        "«Alex» es de Quality Guild: lo de otra área se le pide a su referente, Sam Noble 1, que "
+        "decide quién la hace.")} in r.json()["avisos"]
+    detalle = _fila(conn, "select detalle from audit_log where accion = 'proponer_al_cargar'")[
+        "detalle"]
+    assert detalle["puerta"] == "equipo" and detalle["sesion_web_id"]
+    assert detalle["responsable_de"] == "su_referente"
+
+
+def test_la_ayuda_del_equipo_no_propone_a_nadie_que_no_se_nombro(web, conn, equipo, ia):
+    ia.respuestas.append({"titulo": "Colgar el módem en la pared", "quien_la_hace": "P1"})
+    r = _ayuda(_navegador(web, conn, equipo, "Taylor Quinn"), "hay que colgar el módem")
+    assert r.status_code == 200, r.text
+    assert "responsable_id" not in r.json()["propuesta"]
+
+
+def test_la_ayuda_del_equipo_no_es_para_un_integrante(web, conn, equipo, ia):
+    ia.respuestas.append({"titulo": "Colgar el módem en la pared"})
+    assert _ayuda(_navegador(web, conn, equipo, "Sam North"),
+                  "colgar el módem").status_code == 403
+    assert ia.pedidos == []

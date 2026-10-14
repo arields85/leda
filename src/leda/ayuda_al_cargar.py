@@ -109,6 +109,11 @@ TEXTOS = {
     ("responsable", "no_encontrado"): "No encontré a «{quien}» en el equipo; elegí quién la hace.",
     ("responsable", "varios"):
         "Encontré a más de una persona para {quien}: elegí quién la hace.",
+    # La puerta del equipo (J4, D11 y D14): lo de otra área se le pide a su referente. Va en la
+    # ayuda, no en el campo: el campo ya tiene al referente propuesto.
+    ("ayuda", "de_otra_area"):
+        "«{quien}» es de {area}: lo de otra área se le pide a su referente, {referente}, que "
+        "decide quién la hace.",
     ("fecha", "no_es_habil"):
         'No puse la fecha: dijiste "{dicho}", pero el {dia} no es día hábil en este espacio; '
         "elegila en el calendario.",
@@ -230,7 +235,8 @@ class Resultado:
     lista de los tipos que eligió Leda para esta tarea: J2-19), las personas para elegir quién la hace
     cuando hay más de una (`elegir`), lo que no se propuso y la persona tiene que saber (`avisos`,
     con su texto) y, para la auditoría, cada dato descartado con su motivo y de dónde salió quién
-    la hace (`responsable_de`: `dicho`, si la persona lo nombró; `leda`, si lo propuso Leda)."""
+    la hace (`responsable_de`: `dicho`, si la persona lo nombró; `leda`, si lo propuso Leda;
+    `su_referente`, si nombró a alguien de otra área y Leda propuso a su referente, J4)."""
 
     propuesta: dict[str, Any] = field(default_factory=dict)
     elegir: list[dict[str, str]] = field(default_factory=list)
@@ -936,12 +942,18 @@ def nombra_a_alguien(texto: str, personas: Sequence[str], dichos: Sequence[str] 
 def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
             opciones: Mapping[str, Any], coinciden: Callable[[str], list[dict[str, Any]]],
             objetivo_de: Callable[[str], str | None],
-            apodos: Sequence[str] = ()) -> Resultado:
+            apodos: Sequence[str] = (), solo_quien_se_nombro: bool = False,
+            area_de: Callable[[str], str | None] | None = None) -> Resultado:
     """Lo que vale de la propuesta de la IA. `coinciden(dicho)`: los integrantes del espacio que
     coinciden con lo dicho (con los apodos); `objetivo_de(task_id)`: el objetivo de una tarea del
     espacio; `apodos`: los apodos vigentes del espacio (J2-26: el criterio no nombra a nadie). El
     criterio queda por juzgar (`por_juzgar`): lo juzga `juzgar_la_propuesta`, fuera del
-    candado, y lo decide `cerrar_el_criterio`."""
+    candado, y lo decide `cerrar_el_criterio`.
+
+    La puerta del equipo (J4, D11): las opciones traen sólo a quienes quien carga les puede
+    cargar; con `solo_quien_se_nombro`, si la persona no nombró a nadie, quién la hace queda vacío
+    (Leda no propone a nadie por su cuenta); con `area_de(membership_id)` (el área de alguien del
+    espacio), si nombró a alguien de otra área, Leda propone a su referente y lo explica."""
     r = Resultado()
     pide = set(lo_que_se_pide(escrito, opciones))
     objetivos, tareas = _con_codigos(opciones)
@@ -951,7 +963,8 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
     # equipo, o a varios, Leda no pone a otro.
     responsable = escrito.get("responsable_id") or None
     if "responsable_id" in pide:
-        responsable = _quien_la_hace(r, crudo, texto, opciones, coinciden)
+        responsable = _quien_la_hace(r, crudo, texto, opciones, coinciden,
+                                     solo_quien_se_nombro=solo_quien_se_nombro, area_de=area_de)
 
     # La evidencia que va a quedar tildada (J2-19): la que propone Leda si la persona no tildó
     # ninguna, o la que tildó la persona; nunca la del área sumada sola.
@@ -1036,12 +1049,27 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
     return r
 
 
+def _referente_de_su_area(opciones: Mapping[str, Any], area_id: str | None
+                          ) -> tuple[Mapping[str, Any], Mapping[str, Any]] | None:
+    """El área de las opciones y su referente, si quien carga le puede cargar a ese referente
+    (está entre los integrantes de las opciones de la puerta del equipo, J4)."""
+    area = _por_id(opciones.get("areas") or [], "id", area_id) if area_id else None
+    referente = (area or {}).get("referente") or {}
+    integrante = _integrante(opciones, referente.get("membership_id"))
+    return (area, integrante) if area is not None and integrante is not None else None
+
+
 def _quien_la_hace(r: Resultado, crudo: Mapping[str, Any], texto: str,
                    opciones: Mapping[str, Any],
-                   coinciden: Callable[[str], list[dict[str, Any]]]) -> str | None:
+                   coinciden: Callable[[str], list[dict[str, Any]]], *,
+                   solo_quien_se_nombro: bool = False,
+                   area_de: Callable[[str], str | None] | None = None) -> str | None:
     """Quién la hace, si se pidió: el que nombró la persona, si es uno solo del equipo; con varios,
-    para elegir; con nadie, se dice. Si no nombró a nadie, el que propone Leda, si su código es de
-    alguien del equipo que puede hacerla."""
+    para elegir; con nadie, se dice. Si nombró a alguien a quien quien carga no le puede cargar
+    porque es de otra área (`area_de`, la puerta del equipo, D11 y D14), el referente de esa área,
+    con el aviso que lo explica. Si no nombró a nadie, el que propone Leda, si su código es de
+    alguien del equipo que puede hacerla, salvo con `solo_quien_se_nombro` (la puerta del equipo):
+    entonces nadie."""
     dicho = _cadena(crudo.get("responsable"))
     if dicho is not None:
         if not set(_normal(dicho).split()) <= set(_normal(texto).split()):
@@ -1061,9 +1089,32 @@ def _quien_la_hace(r: Resultado, crudo: Mapping[str, Any], texto: str,
                 r.elegir = [{"membership_id": i["membership_id"], "nombre": i["nombre"],
                              "area": i["area"]} for i in encontrados]
                 r.descartar("responsable", "varios", "varios", quien=dicho)
+                return None
+            # Nadie a quien le pueda cargar: si es de otra área, su referente (D14).
+            referentes: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
+            for f in (coinciden(dicho) if area_de is not None else []):
+                de_su_area = _referente_de_su_area(opciones, area_de(str(f["membership_id"])))
+                if de_su_area is not None and de_su_area[1] not in [x[1] for x in referentes]:
+                    referentes.append(de_su_area)
+            if len(referentes) == 1:
+                area, referente = referentes[0]
+                r.propuesta["responsable_id"] = referente["membership_id"]
+                r.responsable_de = "su_referente"
+                r.avisos.append({"campo": "ayuda", "motivo": "de_otra_area",
+                                 "texto": TEXTOS[("ayuda", "de_otra_area")].format(
+                                     quien=dicho, area=area["nombre"],
+                                     referente=referente["nombre"])})
+                return referente["membership_id"]
+            if referentes:
+                r.elegir = [{"membership_id": i["membership_id"], "nombre": i["nombre"],
+                             "area": i["area"]} for _, i in referentes]
+                r.descartar("responsable", "varios", "varios", quien=dicho)
             else:
                 r.descartar("responsable", "no_encontrado", "no_encontrado", quien=dicho)
             return None
+    if solo_quien_se_nombro:
+        # La puerta del equipo (D11): sin nadie nombrado, quién la hace queda vacío.
+        return None
     codigo = _cadena(crudo.get("quien_la_hace"))
     if codigo is None:
         return None

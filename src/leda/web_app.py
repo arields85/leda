@@ -349,7 +349,10 @@ def yo(request: Request):
                 return _sin_sesion()
             cur.execute("select vistas from vistas_de_la_sesion(%s)", (_hash(token),))
             vistas = cur.fetchone()
-            cur.execute("""select i.nombre, coalesce(r.autoridad_final, false) as direccion
+            cur.execute("""select i.nombre, coalesce(r.autoridad_final, false) as direccion,
+                                  exists (select 1 from area a
+                                           where a.referente_membership_id = i.membership_id)
+                                    as referente
                              from integrante i left join rol r on r.id = i.rol_id
                             where i.membership_id = %s""",
                         (sesion["membership_id"],))
@@ -370,7 +373,10 @@ def yo(request: Request):
             "chat_con_leda": _chat_con_leda(bot["usuario"] if bot else None),
             # Si la web le ofrece "> nuevo objetivo": sólo a Dirección (ADR 0023, decisión 1). La
             # base igual rechaza a cualquier otro (`crear_objetivo_web`).
-            "crea_objetivos": bool(persona and persona["direccion"])})
+            "crea_objetivos": bool(persona and persona["direccion"]),
+            # Si la web le ofrece "> nueva tarea": Dirección y los referentes de área (ADR 0023,
+            # decisión 3; J4). La base igual rechaza a cualquier otro (`cargar_tarea_web`).
+            "carga_tareas": bool(persona and (persona["direccion"] or persona["referente"]))})
         _poner_la_cookie(respuesta, token)
         return respuesta
 
@@ -422,8 +428,20 @@ def tareas(request: Request, vista: str = "tus"):
             cur.execute("select * from terminadas_de_la_sesion(%s, %s, %s)",
                         (_hash(token), vista, ahora))
             terminadas = cur.fetchall()
+            pedidas = pasar_a = None
+            if vista == "tus":
+                # Lo que pidió desde otra área o a Dirección (J4; decisiones D1b y D14).
+                cur.execute("select * from pedidas_de_la_sesion(%s, %s)", (_hash(token), ahora))
+                pedidas = cur.fetchall()
+            elif vista == "sector":
+                pasar_a = _a_quien_la_puede_pasar(cur, str(sesion["membership_id"]))
             calendario = Calendario.desde_base(cur, ws)
-        return _json(armar_vista(vista, filas, esperas, calendario, ahora, terminadas))
+        vista_armada = armar_vista(vista, filas, esperas, calendario, ahora, terminadas)
+        if pedidas is not None:
+            vista_armada["pedidas"] = [_pedida(f, calendario) for f in pedidas]
+        if pasar_a is not None:
+            vista_armada["pasar_a"] = pasar_a
+        return _json(vista_armada)
 
     return _con_la_base(leer)
 
@@ -519,6 +537,36 @@ def _terminada(fila: dict[str, Any], calendario) -> dict[str, Any]:
         "area": fila["area"],
         "terminada_el": terminada.isoformat() if terminada else None,
     }
+
+
+def _pedida(fila: dict[str, Any], calendario) -> dict[str, Any]:
+    """Algo que la persona pidió desde otra área o a Dirección (J4): qué, en qué estado, quién la
+    tiene, para cuándo y, terminada, cuándo; terminada, la puede reabrir con "> pedir cambios"."""
+    vence = _local(fila["fecha_objetivo"], calendario)
+    terminada = _local(fila["terminada_en"], calendario)
+    return {
+        "id": str(fila["task_id"]),
+        "titulo": fila["titulo"],
+        "estado": fila["estado"],
+        "responsable": fila["responsable"],
+        "area": fila["area"],
+        "fecha_objetivo": vence.isoformat() if vence else None,
+        "terminada_el": terminada.isoformat() if terminada else None,
+        "puede_pedir_cambios": fila["estado"] == "terminada",
+    }
+
+
+def _a_quien_la_puede_pasar(cur, membership_id: str) -> list[dict[str, str]]:
+    """La gente de las áreas de las que la persona es referente, sin ella (J4, D14 pasos 2 y 3): a
+    quién le puede pasar una tarea de su sector desde la web. La regla la vuelve a decidir la
+    cocina al pasarla (`autoridad.regla_del_pase`)."""
+    cur.execute("""select i.membership_id, i.nombre, a.nombre as area
+                     from integrante i join area a on a.id = i.area_id
+                    where a.referente_membership_id = %s and i.activo
+                      and i.membership_id <> %s
+                    order by i.nombre, i.membership_id""", (membership_id, membership_id))
+    return [{"membership_id": str(f["membership_id"]), "nombre": f["nombre"], "area": f["area"]}
+            for f in cur.fetchall()]
 
 
 def _barra(calendario, desde: date, hasta: date, hoy: date) -> list[dict[str, str]]:
@@ -808,12 +856,25 @@ TEXTOS_DE_LA_CARGA = {
     ("clave", "falta"): "No se pudo identificar este envío. Recargá la página y probá de nuevo.",
     ("clave", "usada_con_otros_datos"):
         "Este envío ya cargó otra tarea. Recargá la página para cargar una nueva.",
+    # La carga del equipo (J4; migración 0071): a quién le carga cada uno (ADR 0023, decisión 3;
+    # D14: lo de otra área se le pide a su referente), quién la revisa (D3) y quién la decidió
+    # (D10, por la puerta de administración).
+    ("responsable", "no_le_puede_cargar"):
+        "A esa persona no le podés cargar tareas: lo de otra área se le pide a su referente.",
+    ("revisa", "no_puede_revisarla"):
+        "Quien la revisa tiene que ser Dirección o el referente de un área.",
+    ("revisa", "es_quien_la_hace"): "Quien la revisa no puede ser quien la hace.",
+    ("revisa", "no_corresponde"):
+        "Quién revisa esta tarea no se elige: la revisa quien corresponde.",
+    ("decidio", "no_puede_decidirla"):
+        "Quien la decidió tiene que ser Dirección o el referente del área de la tarea.",
+    ("decidio", "no_corresponde"): "Por esta puerta, la decide quien la carga.",
 }
 TEXTO_DE_UN_DATO_MAL_FORMADO = "Este dato no es válido."
 
 # Cómo se llama cada dato en el cuerpo del pedido, y el `campo` con que lo nombra la base.
 _CAMPOS_ID = {"objetivo": "objetivo_id", "responsable": "responsable_id",
-              "decidio": "decidio_id", "espera": "espera_id"}
+              "decidio": "decidio_id", "espera": "espera_id", "revisa": "revisa_id"}
 _CAMPOS_TEXTO = {"titulo": "titulo", "descripcion": "descripcion", "criterio": "criterio",
                  "clave": "clave"}
 _FEMENINOS = {"descripcion", "fecha", "evidencia", "clave", "espera"}
@@ -889,16 +950,6 @@ def _espacio_que_no_existe() -> JSONResponse:
     return _json({"error": "espacio_no_existe"}, 404)
 
 
-def _sin_lo_que_rechaza_la_base(resultado: dict[str, Any]) -> Response | None:
-    """Sin sesión (401, se corta la cookie) o sin espacio (404): la base lo dice así."""
-    campos = {e.get("campo") for e in resultado.get("errores") or []}
-    if "sesion" in campos:
-        return _sin_sesion_de_administracion()
-    if "espacio" in campos:
-        return _espacio_que_no_existe()
-    return None
-
-
 @router.get("/admin/api/espacios/{espacio_id}/opciones")
 def opciones_de_la_carga(espacio_id: str, request: Request):
     """Lo que el formulario necesita para cargar una tarea en un espacio: los objetivos abiertos,
@@ -911,6 +962,47 @@ def opciones_de_la_carga(espacio_id: str, request: Request):
     espacio = _espacio_de(espacio_id)
 
     def leer(conn) -> Response:
+        opciones = _leer_las_opciones_de_la_carga(conn, PUERTA_DE_ADMINISTRACION, token, espacio)
+        return opciones if isinstance(opciones, Response) else _json(
+            {k: v for k, v in opciones.items() if k != "ok"})
+
+    return _con_la_base(leer)
+
+
+# --- La carga por la puerta del equipo (J4) -----------------------------------------------------
+#
+# Porción J4 de `odd/tasks/plataforma-jerarquias.md`, tarea J4a (ADR 0023, decisión 3; decisiones
+# del usuario D1b, D3, D4, D10, D13 y D14; migración 0071). Dirección y los referentes de área cargan
+# tareas desde la web del equipo, con el mismo formulario y la misma ayuda: la base decide a quién
+# le carga cada uno (`como_carga`), quién la revisa y quién la pidió (`cargar_tarea_web`), y sólo
+# ofrece a quienes les puede cargar (`opciones_de_la_carga_del_equipo`). Por esta puerta no se
+# declara quién la decidió: la decidió quien la carga. El espacio sale de la sesión, nunca del
+# pedido. Un integrante no carga: 403, aunque la web le esconda el botón.
+
+TEXTO_SIN_AUTORIDAD_PARA_CARGAR = (
+    "Cargar tareas le corresponde a Dirección y a los referentes de área.")
+
+
+def _sin_lo_que_rechaza_la_carga(resultado: dict[str, Any], puerta: str) -> Response | None:
+    """Sin sesión (401, se corta la cookie de esa puerta), sin autoridad (403: no es Dirección ni
+    referente) o sin espacio (404): la base lo dice así."""
+    errores = {(e.get("campo"), e.get("motivo")) for e in resultado.get("errores") or []}
+    if ("sesion", "sin_autoridad") in errores:
+        return _json({"error": "sin_autoridad", "texto": TEXTO_SIN_AUTORIDAD_PARA_CARGAR}, 403)
+    if any(campo == "sesion" for campo, _ in errores):
+        return (_sin_sesion() if puerta == PUERTA_DEL_EQUIPO
+                else _sin_sesion_de_administracion())
+    if any(campo == "espacio" for campo, _ in errores):
+        return _espacio_que_no_existe()
+    return None
+
+
+def _leer_las_opciones_de_la_carga(conn, puerta: str, token: str, espacio: str | None
+                                   ) -> dict[str, Any] | Response:
+    """Las opciones de la carga de esa puerta (con `ok`), o la respuesta que corta. Por la de
+    administración, las de su espacio, con la sesión validada antes de leer su reloj; por la del
+    equipo, las de la persona de la sesión (sólo Dirección y los referentes), en su espacio."""
+    if puerta == PUERTA_DE_ADMINISTRACION:
         with sin_espacio(conn) as cur:
             if _sesion_de_administracion(cur, token) is None:
                 return _sin_sesion_de_administracion()
@@ -922,10 +1014,34 @@ def opciones_de_la_carga(espacio_id: str, request: Request):
             cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
                         (_hash(token), espacio, ahora))
             resultado = cur.fetchone()["r"]
-        rechazo = _sin_lo_que_rechaza_la_base(resultado)
-        if rechazo is not None:
-            return rechazo
-        return _json({k: v for k, v in resultado.items() if k != "ok"})
+    else:
+        with sin_espacio(conn) as cur:
+            sesion = _sesion(cur, token)
+        if sesion is None:
+            return _sin_sesion()
+        ahora = _ahora(conn, str(sesion["workspace_id"]))
+        with sin_espacio(conn) as cur:
+            _con_la_version_del_nucleo(cur)
+            cur.execute("select opciones_de_la_carga_del_equipo(%s, %s) as r",
+                        (_hash(token), ahora))
+            resultado = cur.fetchone()["r"]
+    rechazo = _sin_lo_que_rechaza_la_carga(resultado, puerta)
+    return rechazo if rechazo is not None else resultado
+
+
+@router.get("/api/carga/opciones")
+def opciones_de_la_carga_en_el_equipo(request: Request):
+    """Lo que el formulario necesita para cargar una tarea por la puerta del equipo: lo de la
+    puerta de administración, con sólo las personas a quienes quien carga les puede cargar (con
+    cómo y con quién revisaría cada tarea) y quién carga (`yo`). 403 a un integrante."""
+    token = _token_de_la_cookie(request)
+    if token is None:
+        return _sin_sesion()
+
+    def leer(conn) -> Response:
+        opciones = _leer_las_opciones_de_la_carga(conn, PUERTA_DEL_EQUIPO, token, None)
+        return opciones if isinstance(opciones, Response) else _json(
+            {k: v for k, v in opciones.items() if k != "ok"})
 
     return _con_la_base(leer)
 
@@ -969,10 +1085,11 @@ async def _el_pedido_del_equipo(request: Request):
     return await _el_pedido_que_escribe(request, _token_de_la_cookie, _sin_sesion)
 
 
-async def _el_pedido_de_la_carga(request: Request):
-    """Los controles de la carga (otro sitio, JSON, la sesión de administración, el tamaño) y sus
+async def _el_pedido_de_la_carga(request: Request, puerta: str = "administracion"):
+    """Los controles de la carga (otro sitio, JSON, la sesión de esa puerta, el tamaño) y sus
     datos: el token, los datos y los mal formados, o la respuesta que corta."""
-    pedido = await _el_pedido_de_la_administracion(request)
+    pedido = await (_el_pedido_del_equipo(request) if puerta == PUERTA_DEL_EQUIPO
+                    else _el_pedido_de_la_administracion(request))
     if isinstance(pedido, Response):
         return pedido
     token, cuerpo = pedido
@@ -980,21 +1097,184 @@ async def _el_pedido_de_la_carga(request: Request):
     return token, datos, mal_formados
 
 
+async def _cargar_por(request: Request, puerta: str, espacio: str | None, *,
+                      solo_revisar: bool = False) -> Response:
+    """La carga (o, con `solo_revisar`, lo que rechazaría) por una puerta: los controles del
+    pedido, el juicio del criterio sin el candado y la carga con él."""
+    pedido = await _el_pedido_de_la_carga(request, puerta)
+    if isinstance(pedido, Response):
+        return pedido
+    token, datos, mal_formados = pedido
+    juicio = await _juzgar_el_criterio(puerta, token, espacio, datos, mal_formados)
+    if isinstance(juicio, Response):
+        return juicio
+    return await run_in_threadpool(_con_la_base, lambda conn: _cargar(
+        conn, puerta, token, espacio, datos, mal_formados, juicio, solo_revisar=solo_revisar))
+
+
 @router.post("/admin/api/espacios/{espacio_id}/tareas")
 async def cargar_una_tarea(espacio_id: str, request: Request):
     """Carga una tarea comprometida en un espacio (decisión 9): 201 con su id y los avisos; la
     misma clave con los mismos datos, 200 con la misma tarea; lo que no se carga, 422 con todo
     lo que hay que corregir."""
-    pedido = await _el_pedido_de_la_carga(request)
+    return await _cargar_por(request, PUERTA_DE_ADMINISTRACION, _espacio_de(espacio_id))
+
+
+@router.post("/api/tareas")
+async def cargar_una_tarea_en_el_equipo(request: Request):
+    """Lo mismo, por la puerta del equipo (J4): Dirección o un referente, en su espacio, sólo para
+    quienes les puede cargar; quién la revisa y quién la pidió los decide la base. 403 a un
+    integrante."""
+    return await _cargar_por(request, PUERTA_DEL_EQUIPO, None)
+
+
+@router.post("/api/tareas/revisar")
+async def revisar_una_carga_en_el_equipo(request: Request):
+    """Lo que la carga del equipo rechazaría, sin cargar nada (como `revisar_una_carga`)."""
+    return await _cargar_por(request, PUERTA_DEL_EQUIPO, None, solo_revisar=True)
+
+
+# El pase desde la web (J4, D14 pasos 2 y 3): el referente le pasa una tarea de su sector (también
+# un pedido de otra área dirigido a él) a alguien de su gente. Es el pase de siempre
+# (`herramientas.pedir_pase_de_tarea`, `motor.pase.pedir_desde_la_web`): lo decide el referente del
+# sector de quien la recibe, que acá es quien la pasa, así que su pedido es la decisión, y quien la
+# recibe la toma por chat. La tarea sigue con quien la tenía hasta que la toma; quién la revisa y
+# quién la pidió no cambian.
+TEXTOS_DEL_PASE = {
+    ("sesion", "sin_autoridad"): "Pasar una tarea de un área le corresponde a su referente.",
+    ("tarea", "no_es_de_tu_area"): "Esa tarea no es de tu sector.",
+    ("a", "falta"): "Elegí a quién se la pasás.",
+    ("a", "no_es_de_tu_area"): "Sólo se la podés pasar a alguien de tu sector.",
+    ("a", "sin_conectar"):
+        "Esa persona todavía no tiene Leda conectada: no puede tomar la tarea. Pedile a "
+        "administración que la conecte, o pasásela a otra persona.",
+    ("tarea", "estado"): "Esa tarea ya no se puede pasar: está entregada, terminada o cancelada.",
+    ("a", "ya_la_tiene"): "Esa persona ya la tiene.",
+    ("tarea", "ya_hay_un_pase"): "Esa tarea ya tiene un pase esperando respuesta.",
+}
+TEXTOS_DE_LA_REAPERTURA = {
+    ("tarea", "no_la_pediste"):
+        "Esa tarea no la pediste vos: los cambios los pide quien la pidió.",
+    ("tarea", "no_esta_terminada"): "Esa tarea todavía no está terminada.",
+    ("tarea", "sin_referente"):
+        "El área de esa tarea no tiene referente: no hay quien decida quién la retoma.",
+    ("motivo", "falta"): "Contá qué hay que cambiar.",
+    ("motivo", "demasiado_largo"): "El motivo es demasiado largo: hasta 500 caracteres.",
+}
+# Los errores de la cocina al pedir un pase, con el `campo` y el `motivo` de la web.
+_ERRORES_DEL_PASE = {"estado": ("tarea", "estado"), "ya_la_tiene": ("a", "ya_la_tiene"),
+                     "es_la_misma_persona": ("a", "ya_la_tiene"),
+                     "ya_hay_un_pase": ("tarea", "ya_hay_un_pase"),
+                     "persona_desconocida": ("a", "no_es_de_tu_area"),
+                     "tarea_desconocida": ("tarea", "no_es_de_tu_area")}
+
+
+def _uuid_del_cuerpo(cuerpo: dict[str, Any], clave: str) -> str | None:
+    valor = cuerpo.get(clave)
+    try:
+        return str(uuid.UUID(valor)) if isinstance(valor, str) else None
+    except ValueError:
+        return None
+
+
+def _con_texto_de(textos: dict[tuple[str, str], str], campo: str, motivo: str) -> dict[str, str]:
+    return {"campo": campo, "motivo": motivo,
+            "texto": textos.get((campo, motivo), TEXTO_DE_UN_DATO_MAL_FORMADO)}
+
+
+@router.post("/api/tareas/{task_id}/pase")
+async def pasar_una_tarea(task_id: str, request: Request):
+    """El referente le pasa una tarea de su sector a alguien de su gente: 200 con el pase (espera
+    que esa persona la tome), 422 con lo que no se puede, 403 a quien no es referente."""
+    pedido = await _el_pedido_del_equipo(request)
     if isinstance(pedido, Response):
         return pedido
-    token, datos, mal_formados = pedido
-    espacio = _espacio_de(espacio_id)
-    juicio = await _juzgar_el_criterio(token, espacio, datos, mal_formados)
-    if isinstance(juicio, Response):
-        return juicio
-    return await run_in_threadpool(_con_la_base, lambda conn: _cargar(
-        conn, token, espacio, datos, mal_formados, juicio))
+    token, cuerpo = pedido[0], _cuerpo_como_objeto(pedido[1])
+    tarea, a = _espacio_de(task_id), _uuid_del_cuerpo(cuerpo, "a_membership_id")
+    return await run_in_threadpool(_con_la_base, lambda conn: _pasar(conn, token, tarea, a))
+
+
+def _pasar(conn, token: str, tarea: str | None, a: str | None) -> Response:
+    from .autoridad import Canal, Solicitante
+    from .db import espacio as en_el_espacio
+    from .motor import pase
+    from .motor.persecucion import alcanzable
+
+    with sin_espacio(conn) as cur:
+        sesion = _sesion(cur, token)
+    if sesion is None:
+        return _sin_sesion()
+    ws, persona = str(sesion["workspace_id"]), str(sesion["membership_id"])
+    ahora = _ahora(conn, ws)
+    with en_el_espacio(conn, ws) as cur:
+        cur.execute("""select i.app_user_id, i.nombre, i.area_id, r.slug, r.autoridad_final,
+                              exists (select 1 from area a
+                                       where a.referente_membership_id = i.membership_id)
+                                as referente
+                         from integrante i join rol r on r.id = i.rol_id
+                        where i.membership_id = %s and i.activo""", (persona,))
+        yo = cur.fetchone()
+        if yo is None:
+            return _sin_sesion()
+        if not yo["referente"]:
+            return _json({"error": "sin_autoridad",
+                          "texto": TEXTOS_DEL_PASE[("sesion", "sin_autoridad")]}, 403)
+        errores = []
+        cur.execute("""select 1 from task t join area a on a.id = t.area_id
+                        where t.id = %s and a.referente_membership_id = %s""", (tarea, persona))
+        if tarea is None or cur.fetchone() is None:
+            errores.append(("tarea", "no_es_de_tu_area"))
+        if a is None:
+            errores.append(("a", "falta"))
+        elif not any(f["membership_id"] == a for f in _a_quien_la_puede_pasar(cur, persona)):
+            errores.append(("a", "no_es_de_tu_area"))
+        elif alcanzable(cur, a)[1] is not None:
+            errores.append(("a", "sin_conectar"))
+        if errores:
+            return _json({"errores": [_con_texto_de(TEXTOS_DEL_PASE, c, m) for c, m in errores]},
+                         422)
+        quien = Solicitante(app_user_id=str(yo["app_user_id"]), canal=Canal.ESPACIO,
+                            workspace_id=ws, membership_id=persona, nombre=yo["nombre"],
+                            rol_slug=yo["slug"], area_id=str(yo["area_id"]),
+                            autoridad_final=yo["autoridad_final"])
+        r = pase.pedir_desde_la_web(cur, quien, tarea, a, ahora,
+                                    Calendario.desde_base(cur, ws))
+    if "error" in r:
+        campo, motivo = _ERRORES_DEL_PASE.get(r["error"], ("tarea", "estado"))
+        return _json({"errores": [_con_texto_de(TEXTOS_DEL_PASE, campo, motivo)]}, 422)
+    return _json({"pase_id": r["pase_id"], "estado": r["estado"]})
+
+
+@router.post("/api/tareas/{task_id}/reabrir")
+async def reabrir_una_tarea(task_id: str, request: Request):
+    """Quien pidió una tarea desde otra área (o a Dirección) la reabre, terminada, con su motivo
+    (J4, D14 paso 5): vuelve al referente del área de la tarea. 200 con a quién volvió; 422 con lo
+    que no se puede (también si no la pidió: para cualquier otro, como si no existiera)."""
+    pedido = await _el_pedido_del_equipo(request)
+    if isinstance(pedido, Response):
+        return pedido
+    token, cuerpo = pedido[0], _cuerpo_como_objeto(pedido[1])
+    tarea = _espacio_de(task_id)
+    motivo = cuerpo.get("motivo")
+    if tarea is None or (motivo is not None and not isinstance(motivo, str)):
+        return _json({"errores": [_con_texto_de(TEXTOS_DE_LA_REAPERTURA, "tarea",
+                                                "no_la_pediste")]}, 422)
+
+    def reabrir(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            _con_la_version_del_nucleo(cur)
+            cur.execute("select reabrir_tarea(%s, %s, %s) as r", (_hash(token), tarea, motivo))
+            r = cur.fetchone()["r"]
+        if not r.get("ok"):
+            if any(e.get("campo") == "sesion" for e in r.get("errores") or []):
+                return _sin_sesion()
+            return _json({"errores": [_con_texto_de(TEXTOS_DE_LA_REAPERTURA, e["campo"],
+                                                    e["motivo"])
+                                      for e in r.get("errores") or []]}, 422)
+        return _json({"task_id": str(r["task_id"]),
+                      "responsable_membership_id": str(r["responsable_membership_id"])})
+
+    return await run_in_threadpool(_con_la_base, reabrir)
 
 
 # --- Revisar antes de la ortografía (J2-21) ---------------------------------------------------
@@ -1017,16 +1297,8 @@ async def revisar_una_carga(espacio_id: str, request: Request):
     auditoría (no cargó nada); sí un incidente cuando rechaza el criterio sin poder proponer otro
     (`_sin_propuesta`: la IA no respondió, su propuesta no pasó los controles o no se pudieron
     leer las opciones), como la carga."""
-    pedido = await _el_pedido_de_la_carga(request)
-    if isinstance(pedido, Response):
-        return pedido
-    token, datos, mal_formados = pedido
-    espacio = _espacio_de(espacio_id)
-    juicio = await _juzgar_el_criterio(token, espacio, datos, mal_formados)
-    if isinstance(juicio, Response):
-        return juicio
-    return await run_in_threadpool(_con_la_base, lambda conn: _cargar(
-        conn, token, espacio, datos, mal_formados, juicio, solo_revisar=True))
+    return await _cargar_por(request, PUERTA_DE_ADMINISTRACION, _espacio_de(espacio_id),
+                             solo_revisar=True)
 
 
 # --- Un criterio que se pueda comprobar (J2-9, J2-13 y J2-14) --------------------------------
@@ -1049,14 +1321,20 @@ def _ia_del_criterio(conn, espacio: str):
     return _ia_de(conn, espacio)
 
 
-def _opciones_para_el_juicio(conn, token: str, espacio: str) -> dict[str, Any]:
-    """Las opciones de la carga de ese espacio (`opciones_de_la_carga`), de donde salen la
-    evidencia que pide el área y los otros datos de la tarea."""
+def _opciones_para_el_juicio(conn, token: str, espacio: str,
+                             puerta: str = "administracion") -> dict[str, Any]:
+    """Las opciones de la carga de ese espacio por esa puerta (`opciones_de_la_carga` u
+    `opciones_de_la_carga_del_equipo`), de donde salen la evidencia que pide el área y los otros
+    datos de la tarea."""
     ahora = _ahora(conn, espacio)
     with sin_espacio(conn) as cur:
         _con_la_version_del_nucleo(cur)
-        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
-                    (_hash(token), espacio, ahora))
+        if puerta == PUERTA_DEL_EQUIPO:
+            cur.execute("select opciones_de_la_carga_del_equipo(%s, %s) as r",
+                        (_hash(token), ahora))
+        else:
+            cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
+                        (_hash(token), espacio, ahora))
         return cur.fetchone()["r"] or {}
 
 
@@ -1065,8 +1343,9 @@ class OpcionesIlegibles(Exception):
     evidencia pide el área (advertencia de `review-88b227055a98f635`)."""
 
 
-def _lo_que_sabe_la_tarea(conn, token: str, espacio: str,
-                          datos: dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
+def _lo_que_sabe_la_tarea(conn, token: str, espacio: str, datos: dict[str, Any],
+                          puerta: str = "administracion"
+                          ) -> tuple[list[str], list[str], list[str]]:
     """La evidencia que se eligió, en palabras de todos los días (`ayuda_al_cargar.
     evidencia_de_la_carga`), los otros datos de esta tarea que un criterio propuesto puede
     nombrar (quién la hace y su área, el objetivo, la tarea que espera) y las personas del
@@ -1078,7 +1357,10 @@ def _lo_que_sabe_la_tarea(conn, token: str, espacio: str,
     from .motor import apodos
 
     try:
-        opciones = _opciones_para_el_juicio(conn, token, espacio)
+        # La de administración, con los tres datos de siempre (las pruebas la reemplazan así).
+        opciones = (_opciones_para_el_juicio(conn, token, espacio)
+                    if puerta == PUERTA_DE_ADMINISTRACION
+                    else _opciones_para_el_juicio(conn, token, espacio, puerta))
         with en_el_espacio(conn, espacio) as cur:
             del_espacio = [a["apodo"] for a in apodos.vigentes(cur)]
     except Exception as falla:  # noqa: BLE001 -- cualquier falla es que no se leyeron
@@ -1099,21 +1381,29 @@ def _lo_que_sabe_la_tarea(conn, token: str, espacio: str,
     return evidencia, contexto, ayuda_al_cargar.personas_del_espacio(opciones, del_espacio)
 
 
-def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
+def _lo_del_juicio(conn, token: str, espacio: str | None, datos: dict[str, Any],
+                   puerta: str = "administracion"):
     """Con el candado: la evidencia y lo demás de la tarea (`_lo_que_sabe_la_tarea`) y la IA del
-    espacio, sólo con una sesión de administración vigente (sin ella, `None`: nadie gasta una
-    llamada sin entrar). Sin las opciones, el juicio ya está decidido (`juicio`) y no se prepara
-    la IA. Una IA que no se puede preparar es una que no responde: la carga no se traba por
-    eso."""
+    espacio, sólo con una sesión vigente de esa puerta (sin ella, o por la del equipo sin poder
+    cargar, `None`: nadie gasta una llamada sin poder cargar). Por la puerta del equipo, el espacio
+    es el de la sesión. Sin las opciones, el juicio ya está decidido (`juicio`) y no se prepara la
+    IA. Una IA que no se puede preparar es una que no responde: la carga no se traba por eso."""
     from . import ayuda_al_cargar
     from .motor.recibir import IANoConfigurada
 
-    with sin_espacio(conn) as cur:
-        if _sesion_de_administracion(cur, token) is None:
+    if puerta == PUERTA_DEL_EQUIPO:
+        quien = _quien_pide(conn, puerta, token, None, para=PARA_CARGAR)
+        if isinstance(quien, Response):
             return None
+        espacio = quien["espacio"]
+    else:
+        with sin_espacio(conn) as cur:
+            if _sesion_de_administracion(cur, token) is None:
+                return None
     vacio = ayuda_al_cargar.sin_nada_que_juzgar(datos.get("titulo") or "", datos["criterio"])
     try:
-        evidencia, contexto, personas = _lo_que_sabe_la_tarea(conn, token, espacio, datos)
+        evidencia, contexto, personas = _lo_que_sabe_la_tarea(conn, token, espacio, datos,
+                                                              puerta)
     except OpcionesIlegibles as falla:
         # Sin saber qué evidencia pide el área no se juzga con la regla de otra (la J2-13 pediría
         # decir cómo se comprueba, que quizás ya lo dice el área): lo vacío o igual al título se
@@ -1128,7 +1418,8 @@ def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
     except Exception as falla:  # noqa: BLE001 -- queda como `sin_revisar`, con su incidente
         _sin_transaccion(conn)
         ia = IANoConfigurada(f"La IA del espacio no se pudo preparar ({type(falla).__name__}).")
-    return {"ia": ia, "evidencia": evidencia, "contexto": contexto, "personas": personas}
+    return {"ia": ia, "evidencia": evidencia, "contexto": contexto, "personas": personas,
+            "espacio": espacio}
 
 
 # J2-21: el juicio de un criterio, por un rato y sólo para la misma sesión de administración, el
@@ -1210,24 +1501,27 @@ def _como_se_escribio(token: str, espacio: str, campo: str, texto: str) -> str:
     return original if isinstance(original, str) else texto
 
 
-async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, Any],
-                              mal_formados: list[dict[str, str]]):
+async def _juzgar_el_criterio(puerta: str, token: str, espacio: str | None,
+                              datos: dict[str, Any], mal_formados: list[dict[str, str]]):
     """El juicio del criterio de una carga, o `None` si no se juzga: con un dato mal formado, sin
-    espacio, sin sesión o con un criterio que la base ya rechaza (vacío o largo). Un 503 de la
-    base vuelve tal cual. Uno reciente de la misma sesión con los mismos datos (J2-21) no se pide
-    otra vez; un texto que la ortografía acaba de corregir se juzga como se escribió (J2-23)."""
+    espacio (por la puerta de administración), sin sesión o con un criterio que la base ya
+    rechaza (vacío o largo). Un 503 de la base vuelve tal cual. Uno reciente de la misma sesión
+    con los mismos datos (J2-21) no se pide otra vez; un texto que la ortografía acaba de corregir
+    se juzga como se escribió (J2-23)."""
     from . import ayuda_al_cargar
 
     criterio, titulo = datos.get("criterio"), datos.get("titulo") or ""
-    if (mal_formados or espacio is None or not isinstance(criterio, str) or not criterio.strip()
+    if (mal_formados or (espacio is None and puerta == PUERTA_DE_ADMINISTRACION)
+            or not isinstance(criterio, str) or not criterio.strip()
             or len(criterio.strip()) > ayuda_al_cargar.LARGOS["criterio"]):
         return None
     preparado = await run_in_threadpool(_con_la_base, lambda conn: _lo_del_juicio(
-        conn, token, espacio, datos))
+        conn, token, espacio, datos, puerta))
     if preparado is None or isinstance(preparado, Response):
         return preparado
     if "juicio" in preparado:
         return preparado["juicio"]
+    espacio = preparado["espacio"]
     entrada = {"titulo": _como_se_escribio(token, espacio, "titulo", titulo),
                "descripcion": _como_se_escribio(token, espacio, "descripcion",
                                                 datos.get("descripcion") or ""),
@@ -1324,36 +1618,55 @@ def _sin_propuesta(conn, espacio: str, sesion: dict[str, Any], falla: BaseExcept
 _CRITERIO_RECHAZADO = {"sin_comprobacion", "sin_resultado"}
 
 
-def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
-            mal_formados: list[dict[str, str]], juicio=None, *,
-            solo_revisar: bool = False) -> Response:
-    """La carga, o con `solo_revisar` (J2-21) lo que la carga rechazaría: sin la clave (la base
-    nunca escribe) y sin el rechazo de la clave que falta; 200 si se cargaría."""
+def _quien_carga(conn, puerta: str, token: str, espacio: str | None
+                 ) -> dict[str, Any] | Response:
+    """La sesión de esa puerta, revalidada, para cargar: por la de administración, una sesión de
+    administración vigente y el espacio del pedido; por la del equipo, Dirección o un referente
+    (`_quien_pide`), en su espacio. `{puerta, sesion_id, app_user_id, espacio}`, o la respuesta que
+    corta."""
+    if puerta == PUERTA_DEL_EQUIPO:
+        return _quien_pide(conn, puerta, token, None, para=PARA_CARGAR)
     with sin_espacio(conn) as cur:
         sesion = _sesion_de_administracion(cur, token)
     if sesion is None:
         return _sin_sesion_de_administracion()
     if espacio is None:
         return _espacio_que_no_existe()
+    return {"puerta": puerta, "sesion_id": str(sesion["sesion_id"]),
+            "app_user_id": str(sesion["app_user_id"]), "espacio": espacio}
+
+
+def _cargar(conn, puerta: str, token: str, espacio: str | None, datos: dict[str, Any],
+            mal_formados: list[dict[str, str]], juicio=None, *,
+            solo_revisar: bool = False) -> Response:
+    """La carga por esa puerta, o con `solo_revisar` (J2-21) lo que la carga rechazaría: sin la
+    clave (la base nunca escribe) y sin el rechazo de la clave que falta; 200 si se cargaría. La
+    base decide todo (`cargar_tarea_web`); por la puerta del equipo, el espacio es el de la
+    sesión."""
+    sesion = _quien_carga(conn, puerta, token, espacio)
+    if isinstance(sesion, Response):
+        return sesion
+    ws = sesion["espacio"]
     motivo = getattr(juicio, "motivo", None)
     if motivo in _CRITERIO_RECHAZADO:
         # Como un dato mal formado: no se carga nada (sin la clave, la base nunca escribe) y la
         # base igual dice todo lo demás.
         mal_formados = [*mal_formados, {"campo": "criterio", "motivo": motivo}]
-    ahora = _ahora(conn, espacio)
+    ahora = _ahora(conn, ws)
     # Con un dato mal formado no se carga nada: la base igual dice todo lo demás, y sin la clave
     # nunca escribe (la falta de la clave es un rechazo más). Al sólo revisar, nunca la clave.
     clave = None if mal_formados or solo_revisar else datos["clave"]
     with sin_espacio(conn) as cur:
         _con_la_version_del_nucleo(cur)
         cur.execute(
-            """select cargar_tarea(%s, %s, %s, %s, %s, %s, %s, %s, %s::text[], %s, %s, %s,
-                                   %s::uuid) as r""",
-            (_hash(token), espacio, datos["objetivo"], datos["titulo"], datos["descripcion"],
-             datos["responsable"], datos["fecha"], datos["criterio"], datos["evidencia"],
-             datos["decidio"], clave, ahora, datos["espera"]))
+            """select cargar_tarea_web(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::text[], %s, %s,
+                                       %s, %s, %s::uuid) as r""",
+            (puerta, _hash(token), espacio if puerta == PUERTA_DE_ADMINISTRACION else None,
+             datos["objetivo"], datos["titulo"], datos["descripcion"], datos["responsable"],
+             datos["fecha"], datos["criterio"], datos["evidencia"], datos["decidio"],
+             datos["revisa"], clave, ahora, datos["espera"]))
         resultado = cur.fetchone()["r"]
-    rechazo = _sin_lo_que_rechaza_la_base(resultado)
+    rechazo = _sin_lo_que_rechaza_la_carga(resultado, puerta)
     if rechazo is not None:
         return rechazo
     if solo_revisar:
@@ -1366,7 +1679,7 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
         avisos = [_con_texto(a) for a in resultado.get("avisos") or []]
         if motivo == "sin_revisar" and not resultado.get("repetida"):
             # Una carga repetida ya tuvo su aviso y su incidente, la primera vez.
-            _sin_revisar(conn, espacio, sesion, getattr(juicio, "falla", None))
+            _sin_revisar(conn, ws, sesion, getattr(juicio, "falla", None))
             avisos.append(_con_texto({"campo": "criterio", "motivo": "sin_revisar"}))
         return _json({"task_id": str(resultado["task_id"]), "avisos": avisos,
                       "repetida": bool(resultado.get("repetida"))},
@@ -1392,7 +1705,7 @@ def _cargar(conn, token: str, espacio: str | None, datos: dict[str, Any],
                 if (error["campo"], error["motivo"]) == ("criterio", motivo):
                     error["propuesta"] = propuesta
         elif getattr(juicio, "falla", None) is not None:
-            _sin_propuesta(conn, espacio, sesion, juicio.falla)
+            _sin_propuesta(conn, ws, sesion, juicio.falla)
     return _json({"errores": con_texto}, 422)
 
 
@@ -1685,7 +1998,7 @@ def _lo_escrito(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
               "responsable": ("integrantes", "membership_id", "no_es_integrante_activo"),
               "espera": ("tareas", "id", "no_existe")}
     for campo, clave in _CAMPOS_ID.items():
-        if campo == "decidio":
+        if campo in ("decidio", "revisa"):
             continue
         valor = cuerpo.get(clave)
         escrito[clave] = ""
@@ -1807,13 +2120,33 @@ async def ayudar_a_cargar(espacio_id: str, request: Request):
                                           TAMANO_MAXIMO_DE_LA_AYUDA)
     if isinstance(pedido, Response):
         return pedido
-    token, cuerpo = pedido[0], _cuerpo_como_objeto(pedido[1])
-    espacio = _espacio_de(espacio_id)
+    return await _ayudar_a_cargar(PUERTA_DE_ADMINISTRACION, pedido[0], _espacio_de(espacio_id),
+                                  _cuerpo_como_objeto(pedido[1]))
+
+
+@router.post("/api/ayuda")
+async def ayudar_a_cargar_en_el_equipo(request: Request):
+    """La misma ayuda, por la puerta del equipo (J4), para Dirección y los referentes, en su
+    espacio: propone sólo a quienes quien carga les puede cargar; si se nombra a alguien de otra
+    área, propone a su referente y lo explica; sin nadie nombrado, no propone a nadie (D11). 403 a
+    un integrante, sin llamar a la IA."""
+    pedido = await _el_pedido_que_escribe(request, _token_de_la_cookie, _sin_sesion,
+                                          TAMANO_MAXIMO_DE_LA_AYUDA)
+    if isinstance(pedido, Response):
+        return pedido
+    return await _ayudar_a_cargar(PUERTA_DEL_EQUIPO, pedido[0], None,
+                                  _cuerpo_como_objeto(pedido[1]))
+
+
+async def _ayudar_a_cargar(puerta: str, token: str, espacio: str | None,
+                           cuerpo: dict[str, Any]) -> Response:
+    from . import ayuda_al_cargar
+
     # J2-17: lo que decide el código (quién la hace, con su área y su evidencia) con el candado; el
     # juicio del criterio que escribió la IA, ya con esa evidencia, sin él (nunca levanta: una IA
     # que no juzga es `sin_revisar`).
     return await _con_la_ia(PasosConLaIA(
-        preparar=lambda conn: _preparar_la_ayuda(conn, token, espacio, cuerpo),
+        preparar=lambda conn: _preparar_la_ayuda(conn, token, espacio, cuerpo, puerta),
         pedir=lambda preparada: ayuda_al_cargar.pedir(preparada["ia"], preparada["entrada"]),
         revisar=lambda conn, preparada, crudo: _revisar_la_ayuda(conn, token, preparada, crudo),
         juzgar=lambda preparada, revisada: ayuda_al_cargar.juzgar_la_propuesta(
@@ -1822,24 +2155,16 @@ async def ayudar_a_cargar(espacio_id: str, request: Request):
             conn, token, preparada, revisada, falla, juicio)))
 
 
-def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, Any]):
-    """Con el candado: la sesión, las opciones del espacio, lo escrito y la IA del espacio."""
+def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, Any],
+                       puerta: str = "administracion"):
+    """Con el candado: la sesión de la puerta, las opciones de su carga (por la del equipo, sólo
+    las personas a quienes quien carga les puede cargar), lo escrito y la IA del espacio."""
     from . import ayuda_al_cargar
 
-    with sin_espacio(conn) as cur:
-        if _sesion_de_administracion(cur, token) is None:
-            return _sin_sesion_de_administracion()
-    if espacio is None:
-        return _espacio_que_no_existe()
-    ahora = _ahora(conn, espacio)
-    with sin_espacio(conn) as cur:
-        _con_la_version_del_nucleo(cur)
-        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
-                    (_hash(token), espacio, ahora))
-        opciones = cur.fetchone()["r"]
-    rechazo = _sin_lo_que_rechaza_la_base(opciones)
-    if rechazo is not None:
-        return rechazo
+    opciones = _leer_las_opciones_de_la_carga(conn, puerta, token, espacio)
+    if isinstance(opciones, Response):
+        return opciones
+    espacio = str(opciones["espacio"]["id"])
     texto = cuerpo.get("texto")
     texto = " ".join(texto.split()) if isinstance(texto, str) else ""
     escrito, errores = _lo_escrito(cuerpo, opciones)
@@ -1851,7 +2176,8 @@ def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, 
         errores.append({"campo": "ayuda", "motivo": "nada_que_completar"})
     if errores:
         return _json({"errores": [_con_texto_de_la_ayuda(e) for e in errores]}, 422)
-    return {"espacio": espacio, "texto": texto, "escrito": escrito, "opciones": opciones,
+    return {"puerta": puerta, "espacio": espacio, "texto": texto, "escrito": escrito,
+            "opciones": opciones,
             "ia": _la_ia_o_la_que_no_responde(conn, espacio, _ia_de_la_ayuda),
             "entrada": ayuda_al_cargar.entrada_de_la_ia(texto, escrito, opciones)}
 
@@ -1880,20 +2206,30 @@ def _revisar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[s
     from .motor import apodos
     from .motor.fichas import integrantes_que_coinciden
 
-    with sin_espacio(conn) as cur:
-        if _sesion_de_administracion(cur, token) is None:
-            return _sin_sesion_de_administracion()
+    puerta = preparada.get("puerta", PUERTA_DE_ADMINISTRACION)
+    quien = _quien_carga(conn, puerta, token, preparada["espacio"])
+    if isinstance(quien, Response):
+        return quien
     with en_el_espacio(conn, preparada["espacio"]) as cur:
         def objetivo_de(task_id: str) -> str | None:
             cur.execute("select objective_id from task where id = %s", (task_id,))
             fila = cur.fetchone()
             return str(fila["objective_id"]) if fila else None
 
+        def area_de(membership_id: str) -> str | None:
+            cur.execute("select area_id from integrante where membership_id = %s",
+                        (membership_id,))
+            fila = cur.fetchone()
+            return str(fila["area_id"]) if fila else None
+
+        # Por la puerta del equipo (D11): sólo quien se nombró, y de otra área, su referente.
+        del_equipo = puerta == PUERTA_DEL_EQUIPO
         return ayuda_al_cargar.revisar(
             crudo or {}, texto=preparada["texto"], escrito=preparada["escrito"],
             opciones=preparada["opciones"],
             coinciden=lambda dicho: integrantes_que_coinciden(cur, dicho),
-            objetivo_de=objetivo_de, apodos=[a["apodo"] for a in apodos.vigentes(cur)])
+            objetivo_de=objetivo_de, apodos=[a["apodo"] for a in apodos.vigentes(cur)],
+            solo_quien_se_nombro=del_equipo, area_de=area_de if del_equipo else None)
 
 
 def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
@@ -1907,15 +2243,15 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
     from .db import espacio as en_el_espacio, registrar_auditoria
     from .incidentes import ETAPA_AYUDA_AL_CARGAR, registrar_incidente
 
-    with sin_espacio(conn) as cur:
-        sesion = _sesion_de_administracion(cur, token)
-    if sesion is None:
-        return _sin_sesion_de_administracion()
+    sesion = _quien_carga(conn, preparada.get("puerta", PUERTA_DE_ADMINISTRACION), token,
+                          preparada["espacio"])
+    if isinstance(sesion, Response):
+        return sesion
     ws, escrito = preparada["espacio"], preparada["escrito"]
     pide = ayuda_al_cargar.lo_que_se_pide(escrito, preparada["opciones"])
     with en_el_espacio(conn, ws) as cur:
         detalle: dict[str, Any] = {
-            "origen": "web", "sesion_de_administracion_id": str(sesion["sesion_id"]),
+            **_detalle_de_quien_pide(sesion),
             "ia": getattr(preparada["ia"], "nombre", None), "pide": pide,
             "respondio": falla is None}
         if falla is None:
@@ -1954,9 +2290,8 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
         else:
             registrar_incidente(
                 cur, ws,
-                "La IA del espacio no respondió cuando un administrador pidió completar una "
-                "carga en la plataforma: no se propuso ni se cargó nada y la persona vio un "
-                "aviso.",
+                "La IA del espacio no respondió cuando alguien pidió completar una carga en la "
+                "plataforma: no se propuso ni se cargó nada y la persona vio un aviso.",
                 severidad="baja", referencia_cruda=f"{type(falla).__name__}: {falla}",
                 etapa=ETAPA_AYUDA_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
         registrar_auditoria(
@@ -1983,14 +2318,21 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
 # incidente. Nada se crea.
 
 
-def _quien_pide(conn, puerta: str, token: str, espacio: str | None
-                ) -> dict[str, Any] | Response:
+# Para qué pide alguien por la puerta del equipo: crear un objetivo (sólo Dirección, ADR 0023,
+# decisión 1) o cargar una tarea, con su ortografía y su dictado (Dirección y los referentes de área,
+# decisión 3; J4).
+PARA_EL_OBJETIVO = "objetivo"
+PARA_CARGAR = "carga"
+
+
+def _quien_pide(conn, puerta: str, token: str, espacio: str | None, *,
+                para: str = PARA_EL_OBJETIVO) -> dict[str, Any] | Response:
     """La sesión de esa puerta, revalidada, y quién pide: `{puerta, sesion_id, app_user_id,
     espacio}`, o la respuesta que corta. Por la puerta de administración, una sesión de
     administración vigente y el espacio del pedido; por la del equipo, una sesión vigente cuya
-    persona sigue activa y es Dirección (la regla de `quien_crea_el_objetivo`), en su espacio.
-    Es la costura de la J4: ahí la ortografía y el dictado de la puerta del equipo se abren
-    también a los referentes."""
+    persona sigue activa y, para un objetivo, es Dirección (la regla de `quien_crea_el_objetivo`)
+    o, para cargar una tarea (J4), Dirección o el referente de un área (la de
+    `quien_carga_en_el_equipo`), en su espacio."""
     from .db import espacio as en_el_espacio
 
     if puerta == PUERTA_DE_ADMINISTRACION:
@@ -2010,16 +2352,23 @@ def _quien_pide(conn, puerta: str, token: str, espacio: str | None
     if espacio is not None and espacio != ws:
         return _sin_sesion()
     with en_el_espacio(conn, ws) as cur:
-        cur.execute("""select m.app_user_id, r.autoridad_final
+        cur.execute("""select m.app_user_id, r.autoridad_final,
+                              exists (select 1 from area a
+                                       where a.referente_membership_id = m.id) as es_referente
                          from membership m join rol r on r.id = m.rol_id
                         where m.id = %s and m.activo""", (str(sesion["membership_id"]),))
         fila = cur.fetchone()
     if fila is None:
         return _sin_sesion()
-    if not fila["autoridad_final"]:
+    if para == PARA_CARGAR:
+        if not (fila["autoridad_final"] or fila["es_referente"]):
+            return _json({"error": "sin_autoridad", "texto": TEXTO_SIN_AUTORIDAD_PARA_CARGAR},
+                         403)
+    elif not fila["autoridad_final"]:
         return _json({"error": "sin_autoridad", "texto": TEXTO_SIN_AUTORIDAD}, 403)
     return {"puerta": puerta, "sesion_id": str(sesion["sesion_id"]),
-            "app_user_id": str(fila["app_user_id"]), "espacio": ws}
+            "app_user_id": str(fila["app_user_id"]), "espacio": ws,
+            "membership_id": str(sesion["membership_id"])}
 
 
 def _detalle_de_quien_pide(quien: dict[str, Any]) -> dict[str, Any]:
@@ -2032,24 +2381,11 @@ def _detalle_de_quien_pide(quien: dict[str, Any]) -> dict[str, Any]:
 
 def _opciones_de_quien_pide(conn, puerta: str, token: str, espacio: str | None
                             ) -> dict[str, Any] | Response:
-    """Las opciones de la puerta, de donde salen los nombres del equipo (la ortografía y el
-    dictado), o la respuesta que corta. Por la de administración, las de la carga
-    (`opciones_de_la_carga`), con su sesión validada antes; por la del equipo, las del objetivo
-    (`opciones_del_objetivo`: sólo Dirección, en su espacio). La J4 abre la puerta del equipo a
-    los referentes con las opciones de su carga: es acá."""
-    if puerta == PUERTA_DEL_EQUIPO:
-        return _leer_las_opciones_del_objetivo(conn, PUERTA_DEL_EQUIPO, token, None)
-    quien = _quien_pide(conn, puerta, token, espacio)
-    if isinstance(quien, Response):
-        return quien
-    ahora = _ahora(conn, quien["espacio"])
-    with sin_espacio(conn) as cur:
-        _con_la_version_del_nucleo(cur)
-        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
-                    (_hash(token), quien["espacio"], ahora))
-        opciones = cur.fetchone()["r"]
-    rechazo = _sin_lo_que_rechaza_la_base(opciones)
-    return rechazo if rechazo is not None else opciones
+    """Las opciones de la carga de la puerta, de donde salen los nombres del equipo (la ortografía
+    y el dictado), o la respuesta que corta: por la de administración, con su sesión validada
+    antes; por la del equipo (J4), las de Dirección o de un referente, en su espacio
+    (`opciones_de_la_carga_del_equipo`, que traen también los objetivos abiertos)."""
+    return _leer_las_opciones_de_la_carga(conn, puerta, token, espacio)
 
 
 def _lo_escrito_del_objetivo(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
@@ -2287,8 +2623,8 @@ async def revisar_la_ortografia(espacio_id: str, request: Request):
 
 @router.post("/api/ortografia")
 async def revisar_la_ortografia_en_el_equipo(request: Request):
-    """Lo mismo, por la puerta del equipo y, por ahora, sólo para Dirección, que crea objetivos
-    (J3-4; la J4 la abre a los referentes): el espacio y los nombres salen de su sesión."""
+    """Lo mismo, por la puerta del equipo, para Dirección y los referentes, que cargan tareas
+    (J3-4 y J4): el espacio y los nombres salen de su sesión. 403 a un integrante."""
     pedido = await _el_pedido_que_escribe(request, _token_de_la_cookie, _sin_sesion,
                                           TAMANO_MAXIMO_DE_LA_AYUDA)
     if isinstance(pedido, Response):
@@ -2352,7 +2688,8 @@ def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
     from .db import espacio as en_el_espacio, registrar_auditoria
     from .incidentes import ETAPA_ORTOGRAFIA_AL_CARGAR, registrar_incidente
 
-    quien = _quien_pide(conn, preparada["puerta"], token, preparada["espacio"])
+    quien = _quien_pide(conn, preparada["puerta"], token, preparada["espacio"],
+                        para=PARA_CARGAR)
     if isinstance(quien, Response):
         return quien
     ws, textos = preparada["espacio"], preparada["textos"]
@@ -2476,9 +2813,9 @@ async def dictar_al_cargar(espacio_id: str, request: Request):
 
 @router.post("/api/dictado")
 async def dictar_en_el_equipo(request: Request):
-    """El mismo dictado, por la puerta del equipo y, por ahora, sólo para Dirección, que crea
-    objetivos (J3-4; la J4 lo abre a los referentes): la sesión del equipo (y que sea Dirección)
-    se valida antes de leer el audio, y los nombres para Gemini salen de su espacio."""
+    """El mismo dictado, por la puerta del equipo, para Dirección y los referentes (J3-4 y J4):
+    la sesión del equipo (y que pueda cargar) se valida antes de leer el audio, y los nombres para
+    Gemini salen de su espacio. 403 a un integrante."""
     if _de_otro_sitio(request):
         return _json({"error": "origen_no_verificado"}, 403)
     token = _token_de_la_cookie(request)
@@ -2489,7 +2826,7 @@ async def dictar_en_el_equipo(request: Request):
 
 # Quién dictó, en el resumen de un incidente del dictado (nunca su nombre: lo dice la auditoría).
 _QUIEN_DICTA = {PUERTA_DE_ADMINISTRACION: "Un administrador",
-                PUERTA_DEL_EQUIPO: "Alguien de Dirección"}
+                PUERTA_DEL_EQUIPO: "Alguien del equipo (Dirección o un referente)"}
 
 
 async def _dictar(request: Request, puerta: str, token: str, espacio: str | None) -> Response:
@@ -2545,7 +2882,7 @@ def _incidente_del_dictado(conn, token: str, preparado: dict[str, Any], resumen:
     de quien dictaba (sólo con su sesión vigente; nunca el audio)."""
     from .incidentes import ETAPA_DICTADO_AL_CARGAR
 
-    quien = _quien_pide(conn, preparado["puerta"], token, preparado["espacio"])
+    quien = _quien_pide(conn, preparado["puerta"], token, preparado["espacio"], para=PARA_CARGAR)
     if isinstance(quien, Response):
         return None
     _dejar_el_incidente(conn, preparado["espacio"], quien, ETAPA_DICTADO_AL_CARGAR, resumen,
@@ -2574,7 +2911,7 @@ def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, t
     from .db import espacio as en_el_espacio, registrar_auditoria
     from .incidentes import ETAPA_DICTADO_AL_CARGAR, registrar_incidente
 
-    quien = _quien_pide(conn, preparado["puerta"], token, preparado["espacio"])
+    quien = _quien_pide(conn, preparado["puerta"], token, preparado["espacio"], para=PARA_CARGAR)
     if isinstance(quien, Response):
         return quien
     ws = preparado["espacio"]
