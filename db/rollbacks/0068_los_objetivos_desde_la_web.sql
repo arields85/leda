@@ -6,7 +6,7 @@
 -- Borra `crear_objetivo_web`, `opciones_del_objetivo`, `quien_crea_el_objetivo`,
 -- `creacion_de_objetivo`, la restricción de `niveles` en `workspace_setting` y `niveles_validos`,
 -- vuelve a las claves simples del padre y del referente de `objective` y le devuelve a `leda_app`
--- la escritura directa de `objective`. Se niega a correr si eso
+-- la escritura directa de `objective`, y `aplicar_evento_objetivo` deja de ser elevada. Se niega a correr si eso
 -- perdiera datos: una clave de creación guardada (sin ella, un formulario reenviado volvería a
 -- crear el mismo objetivo). Los objetivos creados, sus eventos, lo que quedó en `audit_log` y las
 -- filas `niveles` de `workspace_setting` no se tocan (sin la restricción, son un ajuste más que
@@ -40,5 +40,23 @@ alter table objective add constraint objective_referente_membership_id_fkey
 alter table objective drop constraint if exists objective_workspace_id_unique;
 
 grant insert, update, delete on objective to leda_app;
+
+-- La proyección del estado vuelve a correr con los privilegios de quien agrega el evento. Se
+-- recrea (con su disparador) para que vuelva a ser de quien corre esto, como antes de la 0068.
+drop trigger trg_aplicar_evento_objetivo on objective_state_event;
+drop function aplicar_evento_objetivo();
+create or replace function aplicar_evento_objetivo() returns trigger as $$
+begin
+  perform set_config('leda.aplicando_evento', '1', true);
+  update objective
+     set estado = new.estado_nuevo, actualizado_en = new.at
+   where id = new.objective_id;
+  perform set_config('leda.aplicando_evento', '0', true);
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_aplicar_evento_objetivo
+  after insert on objective_state_event
+  for each row execute function aplicar_evento_objetivo();
 
 commit;

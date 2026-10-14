@@ -220,6 +220,42 @@ def test_la_aplicacion_no_escribe_objetivos_directo_y_la_funcion_si(conn, intake
     assert _creados(conn) == 1
 
 
+def test_el_estado_de_un_objetivo_sigue_cambiando_por_su_evento(conn, intake_world):
+    """Revisión RDD `review-bef6a4c90272c9c7`: sin `update` sobre `objective`, la proyección del
+    estado la aplica la base (`aplicar_evento_objetivo`, elevada, como la de la tarea) cuando
+    `leda_app` agrega el evento; y el evento sigue sin cruzar de espacio."""
+    norte, oeste = _norte(intake_world), intake_world["west-studio"]
+    objetivo = norte["objectives"][0]
+    with espacio(conn, norte["id"]) as cur:
+        cur.execute("""insert into objective_state_event
+                         (objective_id, estado_anterior, estado_nuevo, actor_kind, motivo)
+                       values (%s, 'activo', 'suspendido', 'persona', 'en pausa')""",
+                    (objetivo,))
+        cur.execute("select current_setting('leda.workspace_id', true) ws")
+        assert cur.fetchone()["ws"] == norte["id"], "el disparador no devolvió el espacio"
+    conn.commit()
+    assert _fila(conn, "select estado::text e from objective where id = %s",
+                 objetivo)["e"] == "suspendido"
+    with espacio(conn, norte["id"]) as cur:
+        with pytest.raises(psycopg.Error), conn.transaction():
+            cur.execute("""insert into objective_state_event
+                             (objective_id, estado_nuevo, actor_kind)
+                           values (%s, 'cancelado', 'persona')""", (oeste["objectives"][0],))
+    conn.commit()
+    assert _fila(conn, "select estado::text e from objective where id = %s",
+                 oeste["objectives"][0])["e"] == "activo"
+
+
+def test_la_funcion_que_aplica_el_estado_es_elevada_y_no_la_llama_nadie(conn):
+    fila = _fila(conn, """select r.rolname, p.prosecdef, p.proconfig,
+                                 has_function_privilege('public', p.oid, 'execute') de_public
+                            from pg_proc p join pg_roles r on r.oid = p.proowner
+                           where p.oid = 'leda.aplicar_evento_objetivo()'::regprocedure""")
+    assert fila["rolname"] == "leda_owner" and fila["prosecdef"] and not fila["de_public"]
+    assert any(c.startswith("search_path=") and c.endswith("pg_temp")
+               for c in fila["proconfig"] or [])
+
+
 def test_la_tabla_de_claves_tiene_rls_forzada(conn):
     fila = _fila(conn, """select relrowsecurity r, relforcerowsecurity f from pg_class
                            where oid = 'leda.creacion_de_objetivo'::regclass""")
@@ -691,6 +727,7 @@ def test_la_puerta_de_administracion_se_protege(web, conn, intake_world, adminis
         "content-type": "application/x-www-form-urlencoded"}).status_code == 415
     assert navegador.post(base, content=b"{" + b" " * (64 * 1024) + b"}", headers={
         "content-type": "application/json"}).status_code == 413
+    _un_cuerpo_ilegible_es_un_pedido_mal_formado(navegador, base)
     assert web().post(base, json=_cuerpo(intake_world)).status_code == 401
     assert web().get(f"{base}/opciones").status_code == 401
     equipo = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
@@ -703,6 +740,15 @@ def test_la_puerta_de_administracion_se_protege(web, conn, intake_world, adminis
     _revocar(conn, administradora)
     assert navegador.post(base, json=_cuerpo(intake_world)).status_code == 401
     _nada_creado(conn)
+
+
+def _un_cuerpo_ilegible_es_un_pedido_mal_formado(navegador, camino: str) -> None:
+    """Como en la carga: un cuerpo que no se puede leer (anidado hasta el fondo, o que no es
+    JSON) es un pedido mal formado, 422 con lo que falta, nunca un 500 ni un objetivo."""
+    for cuerpo in ("[" * 30000 + "]" * 30000, '{"a":' * 5000 + "1" + "}" * 5000, "{no es json"):
+        r = navegador.post(camino, content=cuerpo, headers={"content-type": "application/json"})
+        assert r.status_code == 422, r.text
+        assert ("clave", "falta") in {(e["campo"], e["motivo"]) for e in r.json()["errores"]}
 
 
 def test_la_puerta_del_equipo_crea_solo_para_direccion(web, conn, intake_world):
@@ -739,6 +785,7 @@ def test_la_puerta_del_equipo_se_protege(web, conn, intake_world, administradora
         "content-type": "application/x-www-form-urlencoded"}).status_code == 415
     assert direccion.post(base, content=b"{" + b" " * (64 * 1024) + b"}", headers={
         "content-type": "application/json"}).status_code == 413
+    _un_cuerpo_ilegible_es_un_pedido_mal_formado(direccion, base)
     assert web().post(base, json=_cuerpo(intake_world)).status_code == 401
     assert web().get(f"{base}/opciones").status_code == 401
     # La cookie de administración no abre la puerta del equipo, ni puesta como la del equipo.

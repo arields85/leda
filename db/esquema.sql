@@ -3578,9 +3578,6 @@ create table creacion_de_objetivo (
 comment on table creacion_de_objetivo is
   'ADR 0023, decisión 1 (migración 0068): la clave de un solo uso de cada creación de un objetivo desde la web, con la huella de lo creado. La misma clave con los mismos datos devuelve el mismo objetivo; con otros, se rechaza. leda_app no tiene privilegios: sólo execute sobre crear_objetivo_web.';
 
-comment on table creacion_de_objetivo is
-  'ADR 0023, decisión 1 (migración 0068): la clave de un solo uso de cada creación de un objetivo desde la web, con la huella de lo creado. La misma clave con los mismos datos devuelve el mismo objetivo; con otros, se rechaza. leda_app no tiene privilegios: sólo execute sobre crear_objetivo_web.';
-
 create or replace function quien_crea_el_objetivo(
     p_puerta text, p_token_hash text, p_workspace_id uuid)
 returns jsonb
@@ -3679,7 +3676,7 @@ begin
              order by u.nombre, m.id)
         from membership m
         join app_user u on u.id = m.app_user_id
-        join area a on a.id = m.area_id
+        left join area a on a.id = m.area_id
        where m.activo), '[]'::jsonb));
   perform set_config('leda.workspace_id', previo, true);
   return v_resultado;
@@ -4692,13 +4689,21 @@ create trigger trg_bloquear_estado_directo
   before update on task
   for each row execute function bloquear_estado_directo();
 
-create or replace function aplicar_evento_objetivo() returns trigger as $$
+create or replace function aplicar_evento_objetivo() returns trigger
+security definer set search_path = leda, public, pg_temp as $$
+declare espacio_anterior text := current_setting('leda.workspace_id', true);
 begin
+  -- Como `aplicar_evento_tarea` (migración 0068): `leda_app` agrega el evento pero no escribe
+  -- `objective`, así que la proyección la aplica el dueño, que no saltea la RLS. Se acota al
+  -- espacio del propio evento, que el disparador de derivación ya resolvió desde el objetivo, y se
+  -- restaura el espacio previo.
+  perform set_config('leda.workspace_id', new.workspace_id::text, true);
   perform set_config('leda.aplicando_evento', '1', true);
   update objective
      set estado = new.estado_nuevo, actualizado_en = new.at
    where id = new.objective_id;
   perform set_config('leda.aplicando_evento', '0', true);
+  perform set_config('leda.workspace_id', coalesce(espacio_anterior, ''), true);
   return new;
 end $$ language plpgsql;
 
@@ -5328,6 +5333,8 @@ alter function resolver_ingreso_borrador(uuid, text, bigint, bigint)
   owner to leda_owner;
 alter function aplicar_evento_tarea()
   owner to leda_owner;
+alter function aplicar_evento_objetivo()
+  owner to leda_owner;
 alter function aplicar_cambio_de_responsable()
   owner to leda_owner;
 alter function estado_previo_a_bloqueo(uuid)
@@ -5340,6 +5347,7 @@ alter function estado_previo_a_revision(uuid)
 revoke execute on function resolver_pendiente(text, uuid, timestamptz) from public;
 grant execute on function resolver_pendiente(text, uuid, timestamptz) to leda_app;
 revoke execute on function aplicar_evento_tarea() from public;
+revoke execute on function aplicar_evento_objetivo() from public;
 revoke execute on function aplicar_cambio_de_responsable() from public;
 revoke execute on function estado_previo_a_bloqueo(uuid) from public;
 grant execute on function estado_previo_a_bloqueo(uuid) to leda_app;

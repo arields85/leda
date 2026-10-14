@@ -23,7 +23,8 @@
 --   escribía así desde que se retiró la herramienta de chat `crear_objetivo`; los objetivos los crea
 --   `crear_objetivo_web` (como `leda_owner`) y el importador (la conexión administrativa). El
 --   estado sigue siendo la proyección de `objective_state_event`: sin `update`, `leda_app` no lo
---   puede escribir directo, así que no hace falta una guarda como la de `task`.
+--   puede escribir directo, así que no hace falta una guarda como la de `task`. Lo aplica
+--   `aplicar_evento_objetivo`, que pasa a ser elevada (de `leda_owner`), como `aplicar_evento_tarea`.
 --
 -- Mismo dueño (`leda_owner`), `search_path` y privilegios (sólo `leda_app`). Se deshace con
 -- `db/rollbacks/0068_los_objetivos_desde_la_web.sql`.
@@ -72,6 +73,29 @@ alter table objective add constraint objective_referente_del_espacio
 
 -- `leda_app` lee los objetivos y no los escribe: los crea `crear_objetivo_web`.
 revoke insert, update, delete on objective from leda_app;
+
+-- La proyección del estado, como la de la tarea: `leda_app` sigue agregando eventos de estado, y el
+-- `update` del estado lo hace el dueño (revisión RDD `review-bef6a4c90272c9c7`).
+create or replace function aplicar_evento_objetivo() returns trigger
+security definer set search_path = leda, public, pg_temp as $$
+declare espacio_anterior text := current_setting('leda.workspace_id', true);
+begin
+  -- Como `aplicar_evento_tarea` (migración 0068): `leda_app` agrega el evento pero no escribe
+  -- `objective`, así que la proyección la aplica el dueño, que no saltea la RLS. Se acota al
+  -- espacio del propio evento, que el disparador de derivación ya resolvió desde el objetivo, y se
+  -- restaura el espacio previo.
+  perform set_config('leda.workspace_id', new.workspace_id::text, true);
+  perform set_config('leda.aplicando_evento', '1', true);
+  update objective
+     set estado = new.estado_nuevo, actualizado_en = new.at
+   where id = new.objective_id;
+  perform set_config('leda.aplicando_evento', '0', true);
+  perform set_config('leda.workspace_id', coalesce(espacio_anterior, ''), true);
+  return new;
+end $$ language plpgsql;
+
+alter function aplicar_evento_objetivo() owner to leda_owner;
+revoke execute on function aplicar_evento_objetivo() from public;
 
 -- --- Los nombres de los niveles del pack ---------------------------------------------------------
 
@@ -222,7 +246,7 @@ begin
              order by u.nombre, m.id)
         from membership m
         join app_user u on u.id = m.app_user_id
-        join area a on a.id = m.area_id
+        left join area a on a.id = m.area_id
        where m.activo), '[]'::jsonb));
   perform set_config('leda.workspace_id', previo, true);
   return v_resultado;
