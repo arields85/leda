@@ -1193,6 +1193,15 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
          vencida también cuenta en su estado. El nombre de la persona nunca se corta: si no entra, sigue en una segunda
          línea alineada a la derecha, sin mover el título.
       En Telegram de escritorio el mensaje dice "Abrí Leda en el navegador".
+      **MA-2 y MA-3, hechas** en los commits `90516634`, `9288fd54`, `cf2fa4cc`, `dd7574b9`, `10b6bbe5` y `e46044e9`, con la
+      migración `0075`:
+      - el lanzador para Telegram en computadora (ADR 0024, punto 12);
+      - el botón del menú ya no corta los webhooks ni el escuchador;
+      - el detalle de la tarea dentro de la app, con quién la pidió, qué espera y quién la espera;
+      - todas las correcciones del iPhone.
+      Suite: 3623 passed, más una lista de importaciones corregida y verificada en su archivo. En seco, 54 de 54.
+      `npx vitest`: 310 passed. `leda_motor`: respaldo `leda_motor-antes-0075-20261014.dump`, ensayo previo y la `0075`
+      aplicada. La web, rearmada y reiniciada. Falta: RDD (en curso) y la prueba del usuario.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza

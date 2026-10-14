@@ -106,6 +106,16 @@ una firma que el servidor comprueba con el token del bot.
 11. **Se retiran** el enlace de un solo uso de la puerta del equipo y `enlace-admin`, una vez que la
     Mini App y el QR andan y la prueba del usuario pasa.
 
+### Precisión (2026-10-14, prueba en Telegram de escritorio)
+
+12. **Telegram en una computadora abre el navegador** (usuario). Telegram de escritorio y Telegram Web muestran la Mini
+    App dentro de un marco, y la web no se deja enmarcar. Por eso los botones apuntan a un **lanzador** mínimo
+    (`/app/abrir/…`). En un celular sigue a la Mini App. En una computadora abre la web en el navegador, donde entra
+    el QR, y dentro de Telegram dice "Abrí Leda en el navegador".
+    - El lanzador es lo único que se puede mostrar dentro de un marco, y sólo desde `https://web.telegram.org`. No
+      tiene sesión, datos ni formularios.
+    - Todo lo demás sigue con `frame-ancestors 'none'` y `X-Frame-Options: DENY`. Esto precisa la decisión 10.
+
 ## Qué texto reemplaza a cuál
 
 - **ADR 0022, decisión 2,** "una sola web, responsive, que se instala en el celular": la web sigue
