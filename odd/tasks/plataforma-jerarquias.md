@@ -188,7 +188,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       en `ddb822e8` (J2-3). La revisión de estilo de los últimos detalles de la J1-5 (el color de lo que
       falta y el ícono), `review-62463f212ed0f53d`, aprobada con dos sugerencias: la marca del resumen
       ("Falta completar") y la de los avisos no tienen prueba propia. Sin arreglar todavía.
-- [ ] **J2 · La ayuda de la IA al cargar, para todos.** Se describe como se habla y Leda completa título,
+- [x] **J2 · La ayuda de la IA al cargar, para todos.** Se describe como se habla y Leda completa título,
       criterio, fecha y evidencia; la persona corrige y confirma (ADR 0023, punto 4). Para todos los que
       cargan: la puerta de administración primero, y después Dirección, referentes e integrantes en sus
       porciones. Se aprovecha lo que ya existe (usuario, 2026-10-13: "no hay que inventar nada"): el
@@ -775,7 +775,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       queda vivo tras el plazo (`dictado.py:156-161`), una prueba atada al reloj real (`test_dictado.py:307-314`).
       **Prueba en el celular de J2-26 a J2-28** (2026-10-13, de noche): "quedó perfecto todo". En la base, ningún
       incidente en las pruebas del día; la auditoría del dictado sin audio ni texto (el iPhone mandó `audio/webm`).
-- [ ] **J2-29 · Revisión independiente de toda la J2** (pedido del usuario, 2026-10-13: "revisá la tarea por tu
+- [x] **J2-29 · Revisión independiente de toda la J2** (pedido del usuario, 2026-10-13: "revisá la tarea por tu
       cuenta"; después: "hagamos la revisión pero no ahora"): un revisor de sólo lectura sobre todo lo de la J2
       (desde `c258ee37`): garantías (aislamiento, sesión en cada ruta nueva, una sola vez, auditoría sin contenido,
       opacidad técnica, nunca en silencio), el flujo de confirmar de punta a punta (respuestas viejas, "empezar de
@@ -801,7 +801,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         real (deuda de J2-28).
       Las deudas de J2-23 y casi todas las de J2b ya estaban resueltas. La de la herramienta de medición (falsos
       positivos de "primera persona") sigue abierta y no afecta al producto. Se arreglan en la J2-30.
-- [ ] **J2-30 · Los arreglos de la J2-29** (escritor delegado; hallazgos 1 a 10, cada uno con su prueba).
+- [x] **J2-30 · Los arreglos de la J2-29** (escritor delegado; hallazgos 1 a 10, cada uno con su prueba).
       Ruta: delegada. Fuera de alcance: la regla de `maximum-scale=1` en iOS (decisión del usuario, opción A).
       **Hecha** en los commits `8a0b6b56`, `94887d44`, `25b215dd`, `f70f77d5`, `b67f81eb` y `269ba8bd`:
       - **La carga:** mientras se confirma, se ignoran las respuestas tardías y la clave de un solo uso no se borra.
