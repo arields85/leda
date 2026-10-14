@@ -352,6 +352,16 @@ def test_la_ia_recibe_las_areas_con_referente_con_un_codigo_y_sin_ids():
     assert "area" not in ayuda.herramienta(["titulo"])["function"]["parameters"]["properties"]
 
 
+def test_un_area_repetida_va_una_vez_y_la_de_dos_referentes_no_va():
+    """R3-area-duplicada (RDD de la J3-4b): la IA elige por el nombre del área."""
+    opciones = {**OPCIONES, "referentes": [
+        {"membership_id": "m1", "nombre": "Uno", "areas": ["Calidad", "calidad", "Planta"]},
+        {"membership_id": "m2", "nombre": "Dos", "areas": ["Planta", "Depósito"]}]}
+    entrada = ayuda.entrada_de_la_ia(SIN_NOMBRE, _vacio(), opciones)
+    assert entrada["areas"] == [{"codigo": "A1", "area": "Calidad"},
+                                {"codigo": "A2", "area": "Depósito"}]
+
+
 def test_sin_nadie_nombrado_el_referente_del_area_que_propone_leda():
     r = _revisar(_respuesta(referente="", area="A1", fecha=None, titulo="Armar el laboratorio",
                             descripcion="Armar el laboratorio de calidad para medir las piezas."),

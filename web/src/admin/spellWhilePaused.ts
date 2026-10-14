@@ -66,8 +66,11 @@ export function useSpellWhilePaused<F extends TextField, D extends Record<F, str
   now.current = options;
   const [fixes, setFixesState] = useState<Partial<Record<F, SpellFix>>>({});
   const fixesNow = useRef(fixes);
-  // The text of each field whose check is on its way.
-  const asking = useRef<Partial<Record<F, string>>>({});
+  // The text of each field whose check is on its way, with the check it belongs to: an older check
+  // that answers late never clears the mark of a newer one for the same text (RDD warning of the
+  // J3-4b, R3-001: after a start over, the same text asked again would be checked twice).
+  const asking = useRef<Partial<Record<F, { text: string; id: number }>>>({});
+  const asked = useRef(0);
   const checked = useRef<Partial<Record<F, string>>>({});
   // Each send is a new one: a check asked before it lands nowhere (what goes was settled then).
   const sends = useRef(0);
@@ -96,7 +99,8 @@ export function useSpellWhilePaused<F extends TextField, D extends Record<F, str
     if (!o.check || !o.open()) return;
     const started = o.round.current;
     const send = sends.current;
-    asking.current[field] = text;
+    const mine = { text, id: (asked.current += 1) };
+    asking.current[field] = mine;
     let spelling: Spelling;
     try {
       spelling = await o.check({ [field]: text } as Partial<Record<F, string>>);
@@ -104,7 +108,7 @@ export function useSpellWhilePaused<F extends TextField, D extends Record<F, str
       if (error instanceof SessionClosedError) now.current.onClosed();
       return;
     } finally {
-      if (asking.current[field] === text) delete asking.current[field];
+      if (asking.current[field] === mine) delete asking.current[field];
     }
     const later = now.current;
     // Started over, sent meanwhile, or the text changed: the answer is for a text that is gone.
@@ -133,7 +137,7 @@ export function useSpellWhilePaused<F extends TextField, D extends Record<F, str
         o.draft[f].trim() &&
         checked.current[f] !== o.draft[f] &&
         fixesNow.current[f]?.from !== o.draft[f] &&
-        asking.current[f] !== o.draft[f],
+        asking.current[f]?.text !== o.draft[f],
     );
     if (waiting.length === 0) return;
     const timer = setTimeout(() => {

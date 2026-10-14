@@ -156,9 +156,19 @@ def _referente(opciones: Mapping[str, Any], membership_id: Any) -> Mapping[str, 
 
 def _areas(opciones: Mapping[str, Any]) -> dict[str, tuple[str, Mapping[str, Any]]]:
     """Las áreas con referente, con un código cada una (A1…, por su nombre): el área y su
-    referente (J3-4b)."""
-    areas = [(area, r) for r in opciones.get("referentes") or [] for area in r.get("areas") or []
-             if isinstance(area, str) and area.strip()]
+    referente (J3-4b). Cada nombre, una vez (advertencia de RDD de la J3-4b, R3-area-duplicada): la
+    IA elige por el nombre, así que dos códigos con el mismo nombre no se distinguen. Si el mismo
+    nombre es de un solo referente, queda una vez; si es de más de uno, no queda: Leda no elige
+    entre personas (ADR 0020, decisión 3)."""
+    por_nombre: dict[str, list[tuple[str, Mapping[str, Any]]]] = {}
+    for r in opciones.get("referentes") or []:
+        for area in r.get("areas") or []:
+            if isinstance(area, str) and area.strip():
+                por_nombre.setdefault(_normal(area), []).append((area, r))
+    areas = []
+    for mismas in por_nombre.values():
+        if len({str(r.get("membership_id")) for _, r in mismas}) == 1:
+            areas.append(mismas[0])
     areas.sort(key=lambda a: (_normal(a[0]), a[0], str(a[1].get("membership_id"))))
     return {f"A{i}": a for i, a in enumerate(areas, 1)}
 
