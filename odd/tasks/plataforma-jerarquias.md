@@ -942,7 +942,18 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - proponer el referente por el área de lo que se describe, aunque nadie lo nombre, como en la J2-18;
         - corregir la ortografía de la vista previa en la pausa;
         - que las instrucciones del dictado no digan sólo "una tarea".
-  - [ ] J3-4b · Los tres ajustes de la J3-4 (referente por el área, ortografía en la pausa, dictado general).
+        **RDD:** el tramo entero no entraba en el presupuesto del revisor, así que se revisó commit por commit.
+        Cinco revisiones, todas aprobadas: `review-fb930886587de8eb`, `review-d7b10e1a0bbd8f09`,
+        `review-2c829c10d1ff7207`, `review-a2d2a9636529b999` y `review-b2a852e448439273`. Sus cinco WARNING pasan a
+        la J3-4b:
+        - la equivalencia del ayudante de pedidos;
+        - el tipo corregido sin prueba;
+        - una clave de auditoría renombrada;
+        - la ortografía que puede tocar la clave al reintentar;
+        - un chequeo de la herramienta de medición.
+        **IA real**, primera ronda: 45 de 45 (bitácora, `ayuda-al-crear-objetivo-1.json`).
+  - [ ] J3-4b · Los tres ajustes de la J3-4 (referente por el área, ortografía en la pausa, dictado general) y
+        los cinco WARNING de su RDD.
   - [ ] J3-5 · La prueba en el celular (usuario), con su guion.
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
       Incluye (usuario, 2026-10-14): si alguien escribe por Telegram "quiero crear una tarea" (o un objetivo),
