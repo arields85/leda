@@ -343,14 +343,15 @@ export function transcribe(spaceId: string, audio: Blob): Promise<DictationResul
   return transcribeAt(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/dictado`, audio);
 }
 
-/** The same dictation at any door's address (the team's, J3-4). */
-export async function transcribeAt(url: string, audio: Blob): Promise<DictationResult> {
+/** The same dictation at any door's address (the team's, J3-4). `of`: what is being dictated, so
+ * the server's instructions say it (J3-4b); without it, a task. */
+export async function transcribeAt(url: string, audio: Blob, of?: 'objetivo'): Promise<DictationResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DICTATION_TIMEOUT_MS);
   try {
     let response: Response;
     try {
-      response = await call(url, {
+      response = await call(of ? `${url}?de=${of}` : url, {
         method: 'POST',
         // J2-30: never an empty type (the server refuses it); without one, the iPhone's.
         headers: { 'Content-Type': audio.type || 'audio/mp4' },

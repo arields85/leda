@@ -2499,6 +2499,8 @@ async def _dictar(request: Request, puerta: str, token: str, espacio: str | None
         conn, puerta, token, espacio))
     if isinstance(preparado, Response):
         return preparado
+    # J3-4b: qué se dicta, según el formulario (`?de=objetivo`); sin decirlo, una tarea.
+    preparado["de"] = dictado.lo_que_se_dicta(request.query_params.get("de"))
     quien_dicta = _QUIEN_DICTA[puerta]
     crudo = request.headers.get("content-type")
     tipo = dictado.tipo_de_audio(crudo)
@@ -2526,7 +2528,7 @@ async def _dictar(request: Request, puerta: str, token: str, espacio: str | None
         transcripcion, falla = None, None
         try:
             transcripcion = await run_in_threadpool(dictado.transcribir, audio, tipo,
-                                                    preparado["palabras"])
+                                                    preparado["palabras"], preparado["de"])
         except Exception as e:  # noqa: BLE001 -- cualquier falla es que no se pudo pasar a texto
             falla = e
         tamano = len(audio)
@@ -2614,7 +2616,7 @@ def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, t
             cur, accion="dictar_al_cargar", workspace_id=ws,
             actor_app_user_id=quien["app_user_id"], actor_kind="persona",
             sujeto_tipo="workspace", sujeto_id=ws,
-            detalle={**_detalle_de_quien_pide(quien),
+            detalle={**_detalle_de_quien_pide(quien), "de": preparado["de"],
                      "proveedor": "gemini", "modelo": dictado.MODELO, "tipo": tipo,
                      "tamano": dictado.tramo_de_tamano(tamano),
                      "respondio": resultado in ("texto", "cortado", "vacio"),

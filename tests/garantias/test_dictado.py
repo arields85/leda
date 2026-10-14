@@ -677,3 +677,32 @@ def test_por_la_puerta_del_equipo_sin_clave_un_aviso_y_un_incidente(web, conn, i
     assert incidente is not None
     assert str(incidente["workspace_id"]) == _norte(intake_world)["id"]
     assert gemini.pedidos == []
+
+
+def test_las_instrucciones_dicen_que_se_dicta_una_tarea_o_un_objetivo(web, conn, intake_world,
+                                                                      gemini):
+    """J3-4b: las instrucciones a Gemini dicen qué se está dictando, según el formulario
+    (`?de=objetivo`); sin decirlo, una tarea, como siempre. Los nombres del espacio van igual, y
+    la auditoría dice qué se dictó."""
+    from leda import dictado
+    from leda.db import admin
+
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    gemini.respuestas += [_con_texto(DICHO), _con_texto(DICHO), _con_texto(DICHO)]
+    assert direccion.post(f"{EQUIPO}?de=objetivo", content=AUDIO,
+                          headers={"content-type": "audio/mp4"}).status_code == 200
+    assert _dictar_por_el_equipo(direccion).status_code == 200
+    assert direccion.post(f"{EQUIPO}?de=otra-cosa", content=AUDIO,
+                          headers={"content-type": "audio/mp4"}).status_code == 200
+
+    def instrucciones(i: int) -> str:
+        return " ".join(p["text"] for p in gemini.cuerpo(i)["contents"][0]["parts"] if "text" in p)
+
+    assert "un objetivo" in instrucciones(0) and "una tarea" not in instrucciones(0)
+    assert "una tarea" in instrucciones(1) and "un objetivo" not in instrucciones(1)
+    assert instrucciones(2) == instrucciones(1)
+    assert dictado.instrucciones([], de="objetivo") != dictado.instrucciones([])
+    with admin(conn) as cur:
+        cur.execute("""select detalle ->> 'de' as de from audit_log
+                        where accion = 'dictar_al_cargar' order by at, id""")
+        assert [f["de"] for f in cur.fetchall()] == ["objetivo", "tarea", "tarea"]

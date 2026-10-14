@@ -1,5 +1,6 @@
-"""El dictado al cargar una tarea en la plataforma, con Gemini en el servidor (porción J2b de
-`odd/tasks/plataforma-jerarquias.md`).
+"""El dictado al cargar una tarea o crear un objetivo en la plataforma, con Gemini en el servidor
+(porción J2b de `odd/tasks/plataforma-jerarquias.md`; el objetivo, J3-4b: las instrucciones dicen
+qué se dicta, según el formulario).
 
 El navegador graba lo que la persona dicta y lo manda tal cual a la puerta de administración
 (`web_app.dictar_al_cargar`); acá se lo pasa a texto con Gemini, como en el otro proyecto
@@ -66,6 +67,19 @@ TOPE_DE_SALIDA = 1024
 # Las palabras del espacio para favorecer: las primeras, sin repetir y acotadas.
 TOPE_DE_PALABRAS = 80
 LARGO_DE_UNA_PALABRA = 120
+# Lo que se dicta, según el formulario (J3-4b: `?de=objetivo` en el pedido), y cómo se describe en
+# las instrucciones: qué es y qué suele decir la persona. Sin decirlo, una tarea.
+LO_QUE_SE_DICTA = {
+    "tarea": "una tarea que quiere cargar en la plataforma de gestión de su equipo: qué hay que "
+             "hacer, quién, para cuándo y cómo se sabe que quedó hecho",
+    "objetivo": "un objetivo que quiere crear en la plataforma de gestión de su equipo: qué se "
+                "quiere lograr, de qué es parte, quién lo lleva y para cuándo",
+}
+
+
+def lo_que_se_dicta(de: str | None) -> str:
+    """Qué se dicta: `objetivo` si el formulario lo dice; cualquier otra cosa, una tarea."""
+    return de if de in LO_QUE_SE_DICTA else "tarea"
 
 _ESTADO_DE_GEMINI = re.compile(r"^[A-Z_]{1,40}$")
 
@@ -132,13 +146,12 @@ def palabras_del_espacio(opciones: Mapping[str, Any]) -> list[str]:
     return palabras[:TOPE_DE_PALABRAS]
 
 
-def instrucciones(palabras: Sequence[str]) -> str:
-    """Qué tiene que hacer Gemini, en castellano: describe el trabajo, sin casos."""
+def instrucciones(palabras: Sequence[str], de: str = "tarea") -> str:
+    """Qué tiene que hacer Gemini, en castellano: describe el trabajo, sin casos. `de`: qué se
+    dicta (`tarea` u `objetivo`, J3-4b)."""
     texto = ("Transcribí fielmente este audio. Es una persona que dicta, en castellano rioplatense, "
-             "una tarea que quiere cargar en la plataforma de gestión de su equipo: qué hay que "
-             "hacer, quién, para cuándo y cómo se sabe que quedó hecho. Escribí lo que dice tal "
-             "como lo dice, con la puntuación de un texto escrito, sin resumir, sin ordenar y sin "
-             "agregar nada.")
+             + LO_QUE_SE_DICTA[lo_que_se_dicta(de)] + ". Escribí lo que dice tal como lo dice, con "
+             "la puntuación de un texto escrito, sin resumir, sin ordenar y sin agregar nada.")
     if palabras:
         texto += (" Si nombra a alguien, un área o un objetivo de esta lista, escribilo como está "
                   "en ella: " + "; ".join(palabras) + ".")
@@ -271,16 +284,17 @@ def _motivo_de_la_respuesta(respuesta: httpx.Response) -> str:
     return motivo
 
 
-def transcribir(audio: bytes, tipo: str, palabras: Sequence[str]) -> Transcripcion:
-    """El texto de lo que se dictó y si se cortó por el tope. Una sola llamada, sin reintento (la
-    persona puede volver a dictar), con el plazo total. Levanta `SinClave`, `ProveedorNoResponde`
-    o `TranscripcionVacia`."""
+def transcribir(audio: bytes, tipo: str, palabras: Sequence[str],
+                de: str = "tarea") -> Transcripcion:
+    """El texto de lo que se dictó (`de`: una tarea o un objetivo) y si se cortó por el tope. Una
+    sola llamada, sin reintento (la persona puede volver a dictar), con el plazo total. Levanta
+    `SinClave`, `ProveedorNoResponde` o `TranscripcionVacia`."""
     clave = os.environ.get(VARIABLE_DE_LA_CLAVE, "").strip()
     if not clave:
         raise SinClave(f"falta {VARIABLE_DE_LA_CLAVE}")
     cuerpo = {
         "contents": [{"role": "user", "parts": [
-            {"text": instrucciones(palabras)},
+            {"text": instrucciones(palabras, de)},
             {"inline_data": {"mime_type": tipo,
                              "data": base64.b64encode(audio).decode("ascii")}}]}],
         "generationConfig": {"temperature": 0, "maxOutputTokens": TOPE_DE_SALIDA,

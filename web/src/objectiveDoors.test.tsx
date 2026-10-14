@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminApp } from './admin/AdminApp';
 import { App } from './App';
+import { transcribe } from './admin/api';
+import { adminObjectives, teamObjectives } from './admin/objectiveApi';
 import { adminMe, objectiveOptions, options, SPACE } from './test/adminFixtures';
 import { me, view } from './test/fixtures';
 
@@ -263,5 +265,27 @@ describe('the team door', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '> nuevo objetivo' }));
     expect(await screen.findByText('Crear objetivos le corresponde a Dirección.')).toBeInTheDocument();
+  });
+});
+
+// J3-4b: the dictation's instructions say what is being dictated; each objective door tells the
+// server it is an objective, and the task's dictation says nothing (a task, as always).
+describe('the dictation of an objective', () => {
+  it('goes to each door with "de=objetivo", and the task\'s without it', async () => {
+    const said = { texto: 'armar la planta nueva' };
+    const calls = serve({
+      [`POST /app/admin/api/espacios/${SPACE}/dictado?de=objetivo`]: ok(said),
+      'POST /app/api/dictado?de=objetivo': ok(said),
+      [`POST /app/admin/api/espacios/${SPACE}/dictado`]: ok(said),
+    });
+    const audio = new Blob(['audio'], { type: 'audio/webm' });
+    expect(await adminObjectives(SPACE).assist!.transcribe(audio)).toEqual({ kind: 'text', text: said.texto });
+    expect(await teamObjectives().assist!.transcribe(audio)).toEqual({ kind: 'text', text: said.texto });
+    expect(await transcribe(SPACE, audio)).toEqual({ kind: 'text', text: said.texto });
+    expect(calls.map((c) => c.key)).toEqual([
+      `POST /app/admin/api/espacios/${SPACE}/dictado?de=objetivo`,
+      'POST /app/api/dictado?de=objetivo',
+      `POST /app/admin/api/espacios/${SPACE}/dictado`,
+    ]);
   });
 });

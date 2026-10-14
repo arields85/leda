@@ -116,7 +116,7 @@ export function objectiveAssist(base: string, spelling: string, dictation: strin
   return {
     help: (input) => askLedaAt<ObjectiveProposal>(`${base}/ayuda`, input),
     spell: (texts) => checkSpellingAt(spelling, texts, 'objetivo'),
-    transcribe: (audio) => transcribeAt(dictation, audio),
+    transcribe: (audio) => transcribeAt(dictation, audio, 'objetivo'),
   };
 }
 
