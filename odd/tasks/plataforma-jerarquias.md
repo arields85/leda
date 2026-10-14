@@ -1231,6 +1231,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         pasa a ser el compromiso, sin "previsto" ni atraso, porque no fue un atraso de nadie; la anterior queda en el
         historial con el motivo y quién la cambió. Al responsable le llega el aviso, y si se la adelantan, se lo dice
         claro.
+      - **J5-D6. Decir que no lleva motivo, y le llega al que pidió:** "Marcos no aceptó pasar la tarea al 28: la
+        necesita para la auditoría del 22. Sigue para el 21/10". Ningún mensaje deja a la persona sin saber qué sigue.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
