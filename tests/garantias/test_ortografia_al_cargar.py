@@ -457,3 +457,29 @@ def test_por_la_puerta_del_equipo_la_ia_que_no_responde_no_bloquea(web, conn, in
     assert r.status_code == 200, r.text
     assert r.json() == {"corregidos": {}, "sin_revisar": ["titulo"], "aviso": TEXTO_SIN_REVISAR}
     assert _contar(conn, "incident", "etapa = 'ortografia_al_cargar'") == 1
+
+
+def test_las_dos_puertas_le_piden_la_ortografia_a_la_ia_con_la_misma_forma(
+        web, conn, intake_world, administradora, ia):
+    """Prueba por Telegram de la J4: dos veces, al confirmar por la puerta del equipo, la IA no
+    llamó a `corregir_la_ortografia`, y por la de administración sí. Para los mismos textos de una
+    tarea, las dos puertas mandan el mismo pedido: las mismas instrucciones, la misma herramienta,
+    la misma elección y los mismos textos; cambian sólo los nombres del equipo que ve cada puerta.
+    (Ni la ortografía ni la ayuda fuerzan la herramienta: `tool_choice` forzado no lo acepta
+    Claude, `ia_real`; si no la llama, `RespuestaInvalida`, y nada se bloquea.)"""
+    textos = {"titulo": "configurar el ruter de la planta", "descripcion": "",
+              "criterio": "el ruter responde desde la sala"}
+    ia.respuestas.extend([{"titulo": "Configurar el ruter de la planta",
+                           "criterio": "El ruter responde desde la sala"}] * 2)
+    administracion = _navegador_de_administracion(web, conn, administradora)
+    assert _pedir(administracion, _norte(intake_world)["id"], **textos).status_code == 200
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    assert direccion.post(EQUIPO, json=textos).status_code == 200
+    por_admin, por_el_equipo = ia.pedidos[-2], ia.pedidos[-1]
+    for clave in ("temperature", "max_tokens", "tools", "tool_choice"):
+        assert por_admin[clave] == por_el_equipo[clave], clave
+    assert por_admin["messages"][0] == por_el_equipo["messages"][0]
+    assert ia.entrada(len(ia.pedidos) - 2)["textos"] == ia.entrada(len(ia.pedidos) - 1)["textos"]
+    assert ia.entrada(len(ia.pedidos) - 1)["textos"] == {
+        "titulo": "configurar el ruter de la planta",
+        "criterio": "el ruter responde desde la sala"}

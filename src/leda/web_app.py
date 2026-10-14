@@ -145,7 +145,13 @@ TIPOS_DE_LA_WEB = {
     ".webmanifest": "application/manifest+json", ".txt": "text/plain", ".html": "text/html",
 }
 
-VISTAS = {"tus": "Tus tareas", "sector": "Tu sector", "equipo": "El equipo"}
+# Las pestañas de la puerta del equipo y su nombre, en un solo lugar (decisión del usuario del
+# 2026-10-14, prueba por Telegram de la J4): "Mis tareas"; el sector de un referente, con el nombre
+# de su área (de los datos, `_titulo_de_la_vista`); "Todo el equipo", de Dirección, que no tiene
+# sector (el suyo es Dirección misma, que repetía sus tareas); "Lo que pedí", de quien puede pedir
+# (un referente y Dirección; un integrante, cuando tenga pedidos).
+VISTAS = {"tus": "Mis tareas", "sector": "Mi sector", "equipo": "Todo el equipo",
+          "pedidas": "Lo que pedí"}
 DIAS_CORTOS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
 
 # Los cuatro estados con color de la decisión 18. Trabada y vencida pueden ir juntas (decisión 5
@@ -363,13 +369,18 @@ def yo(request: Request):
                             where workspace_id = %s and clave = %s""",
                         (sesion["workspace_id"], BOT_USUARIO))
             bot = cur.fetchone()
+            pestanas = _pestanas(cur, token, sesion, vistas["vistas"] if vistas else [],
+                                 persona) if vistas else []
+            cur.execute("select slug from workspace where id = %s", (sesion["workspace_id"],))
+            slug = cur.fetchone()
         if vistas is None:
             return _sin_sesion()
         respuesta = _json({
             "persona": persona["nombre"] if persona else "",
             "espacio": espacio["nombre"] if espacio else "",
-            "vistas": [{"vista": v, "titulo": VISTAS[v]} for v in vistas["vistas"]
-                       if v in VISTAS],
+            # El espacio, para entrar otra vez con el QR desde esta computadora (ADR 0024).
+            "espacio_slug": slug["slug"] if slug else None,
+            "vistas": pestanas,
             "chat_con_leda": _chat_con_leda(bot["usuario"] if bot else None),
             # Si la web le ofrece "> nuevo objetivo": sólo a Dirección (ADR 0023, decisión 1). La
             # base igual rechaza a cualquier otro (`crear_objetivo_web`).
@@ -381,6 +392,36 @@ def yo(request: Request):
         return respuesta
 
     return _con_la_base(leer)
+
+
+def _pestanas(cur, token: str, sesion: dict[str, Any], vistas: list[str],
+              persona: dict[str, Any] | None) -> list[dict[str, str]]:
+    """Las pestañas de la persona, con su nombre (`VISTAS`): las vistas que le da la base, sin
+    el sector a Dirección, y "Lo que pedí" a quien puede pedir o ya pidió algo."""
+    direccion = bool(persona and persona["direccion"])
+    pestanas = [v for v in vistas if v in VISTAS and not (direccion and v == "sector")]
+    if direccion or (persona and persona["referente"]) or _pidio_algo(cur, token):
+        pestanas.append("pedidas")
+    return [{"vista": v, "titulo": _titulo_de_la_vista(cur, v, str(sesion["membership_id"]))}
+            for v in pestanas]
+
+
+def _pidio_algo(cur, token: str) -> bool:
+    cur.execute("select exists (select 1 from pedidas_de_la_sesion(%s, now())) as si",
+                (_hash(token),))
+    return bool(cur.fetchone()["si"])
+
+
+def _titulo_de_la_vista(cur, vista: str, membership_id: str) -> str:
+    """El nombre de una pestaña: el de `VISTAS`, salvo el sector, que se llama como el área (o
+    las áreas) de quien la encabeza."""
+    if vista == "sector":
+        cur.execute("""select nombre from area where referente_membership_id = %s
+                        order by nombre""", (membership_id,))
+        areas = [f["nombre"] for f in cur.fetchall()]
+        if areas:
+            return " y ".join(areas)
+    return VISTAS[vista]
 
 
 def _chat_con_leda(usuario: str | None) -> str | None:
@@ -409,36 +450,56 @@ def tareas(request: Request, vista: str = "tus"):
                 return _sin_sesion()
             cur.execute("select vistas from vistas_de_la_sesion(%s)", (_hash(token),))
             vistas = cur.fetchone()
+            if vistas is not None:
+                cur.execute("""select coalesce(r.autoridad_final, false) as direccion,
+                                      exists (select 1 from area a
+                                               where a.referente_membership_id = i.membership_id)
+                                        as referente
+                                 from integrante i left join rol r on r.id = i.rol_id
+                                where i.membership_id = %s""", (sesion["membership_id"],))
+                persona = cur.fetchone()
+                pestanas = _pestanas(cur, token, sesion, vistas["vistas"], persona)
         if vistas is None:
             return _sin_sesion()
-        if vista not in vistas["vistas"]:
+        if vista not in {p["vista"] for p in pestanas}:
             return _json({"error": "vista_no_disponible"}, 403)
+        titulo = next(p["titulo"] for p in pestanas if p["vista"] == vista)
         ws = str(sesion["workspace_id"])
         ahora = _ahora(conn, ws)
         with sin_espacio(conn) as cur:
             # Otra vez la sesión: pudo cortarse mientras se leía el reloj.
             if _sesion(cur, token) is None:
                 return _sin_sesion()
-            cur.execute("select * from tareas_de_la_sesion(%s, %s, %s)",
-                        (_hash(token), vista, ahora))
-            filas = cur.fetchall()
-            cur.execute("select * from esperas_de_la_sesion(%s, %s, %s)",
-                        (_hash(token), vista, ahora))
-            esperas = cur.fetchall()
-            cur.execute("select * from terminadas_de_la_sesion(%s, %s, %s)",
-                        (_hash(token), vista, ahora))
-            terminadas = cur.fetchall()
+            filas = esperas = terminadas = []
+            if vista != "pedidas":
+                cur.execute("select * from tareas_de_la_sesion(%s, %s, %s)",
+                            (_hash(token), vista, ahora))
+                filas = cur.fetchall()
+                cur.execute("select * from esperas_de_la_sesion(%s, %s, %s)",
+                            (_hash(token), vista, ahora))
+                esperas = cur.fetchall()
+                cur.execute("select * from terminadas_de_la_sesion(%s, %s, %s)",
+                            (_hash(token), vista, ahora))
+                terminadas = cur.fetchall()
             pedidas = pasar_a = None
-            if vista == "tus":
+            if vista in ("tus", "pedidas"):
                 # Lo que pidió desde otra área o a Dirección (J4; decisiones D1b y D14).
                 cur.execute("select * from pedidas_de_la_sesion(%s, %s)", (_hash(token), ahora))
                 pedidas = cur.fetchall()
-            elif vista == "sector":
+            if vista == "sector":
                 pasar_a = _a_quien_la_puede_pasar(cur, str(sesion["membership_id"]))
             calendario = Calendario.desde_base(cur, ws)
+        if vista == "tus" and pedidas:
+            # Lo que pidió vive sólo en "Lo que pedí" (prueba por Telegram de la J4): en sus
+            # tareas no aparece repetido como una que espera; la suya que lo espera sigue
+            # diciendo "la esperás".
+            pedidas_ids = {str(f["task_id"]) for f in pedidas}
+            filas = [f for f in filas
+                     if not (f["papel"] == "espero" and str(f["task_id"]) in pedidas_ids)]
         vista_armada = armar_vista(vista, filas, esperas, calendario, ahora, terminadas)
-        if pedidas is not None:
-            vista_armada["pedidas"] = [_pedida(f, calendario) for f in pedidas]
+        vista_armada["titulo"] = titulo
+        if vista == "pedidas":
+            vista_armada["pedidas"] = [_pedida(f, calendario) for f in pedidas or []]
         if pasar_a is not None:
             vista_armada["pasar_a"] = pasar_a
         return _json(vista_armada)
@@ -1200,6 +1261,39 @@ async def pasar_una_tarea(task_id: str, request: Request):
     token, cuerpo = pedido[0], _cuerpo_como_objeto(pedido[1])
     tarea, a = _espacio_de(task_id), _uuid_del_cuerpo(cuerpo, "a_membership_id")
     return await run_in_threadpool(_con_la_base, lambda conn: _pasar(conn, token, tarea, a))
+
+
+@router.post("/api/tareas/{task_id}/pagina")
+def abrir_la_pagina_de_la_tarea(task_id: str, request: Request):
+    """El detalle de una tarea desde la web del equipo (prueba por Telegram de la J4; ADR 0024,
+    decisión 2, "Ver la tarea"): la página de la tarea de siempre (`tarea_vista`, con su estado,
+    sus fechas, el criterio, la evidencia, quién la hace y quién la revisa), con un acceso para la
+    persona de la sesión. La regla de quién ve qué es la de la página (`puede_ver_tarea`, en la
+    base): a quien no la puede ver, 403. Devuelve la dirección, del mismo origen."""
+    from . import pagina_de_tarea
+    from .db import espacio as en_el_espacio
+
+    if _de_otro_sitio(request):
+        return _json({"error": "origen_no_verificado"}, 403)
+    token = _token_de_la_cookie(request)
+    if token is None:
+        return _sin_sesion()
+    tarea = _espacio_de(task_id)
+    if tarea is None:
+        return _json({"error": "no_existe"}, 404)
+
+    def abrir(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            sesion = _sesion(cur, token)
+        if sesion is None:
+            return _sin_sesion()
+        with en_el_espacio(conn, str(sesion["workspace_id"])) as cur:
+            acceso = pagina_de_tarea.emitir(cur, str(sesion["membership_id"]), tarea)
+        if acceso is None:
+            return _json({"error": "no_la_ve"}, 403)
+        return _json({"direccion": f"{pagina_de_tarea.CAMINO}{acceso}"})
+
+    return _con_la_base(abrir)
 
 
 def _pasar(conn, token: str, tarea: str | None, a: str | None) -> Response:

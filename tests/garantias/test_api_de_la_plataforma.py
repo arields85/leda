@@ -250,8 +250,10 @@ def test_un_enlace_anulado_por_otro_no_entra(web, conn, mundo):
 # --- Quién es ---------------------------------------------------------------------------------
 
 def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
-    esperado = {"Sam North": ["tus"], "Taylor Quinn": ["tus", "sector"],
-                "Morgan Hale": ["tus", "equipo"]}
+    # Las pestañas (decisión del usuario del 2026-10-14): Dirección no tiene sector; quien puede
+    # pedir tiene "Lo que pedí"; el sector se llama como su área.
+    esperado = {"Sam North": ["tus"], "Taylor Quinn": ["tus", "sector", "pedidas"],
+                "Morgan Hale": ["tus", "equipo", "pedidas"]}
     for nombre, vistas in esperado.items():
         r = _entrar(web, conn, mundo, nombre).get("/app/api/yo")
         assert r.status_code == 200
@@ -261,7 +263,10 @@ def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
         assert [v["vista"] for v in datos["vistas"]] == vistas
     titulos = {v["vista"]: v["titulo"]
                for v in _entrar(web, conn, mundo, "Morgan Hale").get("/app/api/yo").json()["vistas"]}
-    assert titulos == {"tus": "Tus tareas", "equipo": "El equipo"}
+    assert titulos == {"tus": "Mis tareas", "equipo": "Todo el equipo", "pedidas": "Lo que pedí"}
+    titulos = {v["vista"]: v["titulo"]
+               for v in _entrar(web, conn, mundo, "Taylor Quinn").get("/app/api/yo").json()["vistas"]}
+    assert titulos["sector"] == "Field Services"
 
 
 def test_yo_renueva_la_cookie_sin_cambiar_la_sesion(web, conn, mundo):
@@ -303,7 +308,7 @@ def test_una_sesion_cortada_o_de_quien_dejo_el_equipo_no_entra(web, conn, mundo)
 
 def test_el_integrante_ve_lo_suyo_y_lo_ajeno_sin_un_atraso_que_no_se_hablo(web, conn, mundo):
     datos = _vista(_entrar(web, conn, mundo, "Sam North"))
-    assert datos["vista"] == "tus" and datos["titulo"] == "Tus tareas"
+    assert datos["vista"] == "tus" and datos["titulo"] == "Mis tareas"
     tareas = _por_titulo(datos)
     assert {t: f["papel"] for t, f in tareas.items()} == {
         "Pintar el galpón": "mia", "Medir el ruido": "mia", "Montar la línea": "mia",
@@ -434,7 +439,7 @@ def test_el_referente_ve_su_sector_con_atrasos_y_bloqueos(web, conn, mundo):
     navegador = _entrar(web, conn, mundo, "Taylor Quinn")
     datos = _vista(navegador, "sector")
     tareas = _por_titulo(datos)
-    assert datos["titulo"] == "Tu sector"
+    assert datos["titulo"] == "Field Services"
     assert set(tareas) == {"Pintar el galpón", "Medir el ruido", "Montar la línea",
                            "Ordenar el depósito"}
     assert tareas["Pintar el galpón"]["vencida"] is True
@@ -451,7 +456,7 @@ def test_la_autoridad_ve_el_equipo_y_nada_de_otro_espacio(web, conn, mundo):
     assert set(tareas) == {"Pintar el galpón", "Medir el ruido", "Montar la línea",
                            "Calibrar la balanza", "Auditar proveedores", "Ordenar el depósito"}
     assert tareas["Auditar proveedores"]["vencida"] is True
-    assert datos["titulo"] == "El equipo"
+    assert datos["titulo"] == "Todo el equipo"
     assert datos["panel"] == {"vencida": 3, "trabada": 1, "en_curso": 0, "entregada": 0}
 
 

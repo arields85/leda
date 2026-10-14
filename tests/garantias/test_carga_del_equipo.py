@@ -888,7 +888,9 @@ def test_el_referente_pasa_un_pedido_a_su_gente_desde_la_web(web, conn, equipo):
 def test_quien_la_pidio_ve_lo_pedido_y_pide_cambios_desde_la_web(web, conn, equipo):
     tarea = _pedida_y_terminada(conn, equipo)
     taylor = _navegador(web, conn, equipo, "Taylor Quinn")
-    pedidas = taylor.get("/app/api/tareas?vista=tus").json()["pedidas"]
+    # "Lo que pedí" es su propia pestaña (prueba por Telegram de la J4).
+    assert "pedidas" not in taylor.get("/app/api/tareas?vista=tus").json()
+    pedidas = taylor.get("/app/api/tareas?vista=pedidas").json()["pedidas"]
     assert [(p["id"], p["estado"], p["puede_pedir_cambios"]) for p in pedidas] == [
         (tarea, "terminada", True)]
     r = _navegador(web, conn, equipo, "Sam Noble").post(f"/app/api/tareas/{tarea}/reabrir",
@@ -996,3 +998,50 @@ def test_la_ayuda_del_equipo_no_es_para_un_integrante(web, conn, equipo, ia):
     assert _ayuda(_navegador(web, conn, equipo, "Sam North"),
                   "colgar el módem").status_code == 403
     assert ia.pedidos == []
+
+
+def test_lo_pedido_no_se_repite_en_mis_tareas(web, conn, equipo):
+    """Prueba por Telegram de la J4: Taylor pide algo a Dirección y una tarea suya lo espera. En
+    "Mis tareas" queda su tarea (que lo espera), no lo pedido, que vive en "Lo que pedí"."""
+    taylor = _navegador(web, conn, equipo, "Taylor Quinn")
+    pedido = taylor.post("/app/api/tareas", json=_cuerpo(
+        equipo, responsable_id=_id(equipo, "Morgan Hale"), titulo="Aprobar la compra del módem",
+        revisa_id=None)).json()
+    assert "task_id" in pedido, pedido
+    suya = taylor.post("/app/api/tareas", json=_cuerpo(
+        equipo, responsable_id=_id(equipo, "Taylor Quinn"), titulo="Colgar el módem nuevo",
+        espera_id=pedido["task_id"])).json()
+    assert "task_id" in suya, suya
+    mis = [t["titulo"] for t in taylor.get("/app/api/tareas?vista=tus").json()["tareas"]]
+    assert "Colgar el módem nuevo" in mis and "Aprobar la compra del módem" not in mis
+    pedidas = taylor.get("/app/api/tareas?vista=pedidas").json()
+    assert pedidas["titulo"] == "Lo que pedí"
+    assert [p["titulo"] for p in pedidas["pedidas"]] == ["Aprobar la compra del módem"]
+
+
+def test_cada_tarea_abre_su_pagina_desde_la_web_con_la_regla_de_quien_ve_que(web, conn, equipo,
+                                                                             monkeypatch):
+    """Prueba por Telegram de la J4: tocar una tarea abre su detalle, la página de la tarea de
+    siempre, con un acceso para la persona de la sesión; la regla es la de la base
+    (`puede_ver_tarea`). Una tarea de otro espacio no se abre."""
+    from leda import entrada
+
+    monkeypatch.setattr(entrada, "_conn_de_paginas", lambda: conn)
+    taylor = _navegador(web, conn, equipo, "Taylor Quinn")
+    tarea = taylor.post("/app/api/tareas", json=_cuerpo(equipo)).json()["task_id"]
+    r = taylor.post(f"/app/api/tareas/{tarea}/pagina")
+    assert r.status_code == 200, r.text
+    direccion = r.json()["direccion"]
+    assert direccion.startswith("/tarea/")
+    pagina = web().get(direccion)
+    assert pagina.status_code == 200 and "Colgar el módem en la pared" in pagina.text
+    # Una de otro espacio: no.
+    with admin(conn) as cur:
+        cur.execute("select id from task where workspace_id = %s limit 1",
+                    (equipo["west-studio"]["id"],))
+        ajena = cur.fetchone()
+    conn.commit()
+    if ajena is not None:
+        assert taylor.post(f"/app/api/tareas/{ajena['id']}/pagina").status_code == 403
+    assert taylor.post("/app/api/tareas/no-es-un-id/pagina").status_code == 404
+    assert web().post(f"/app/api/tareas/{tarea}/pagina").status_code == 401
