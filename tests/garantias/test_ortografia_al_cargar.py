@@ -348,3 +348,112 @@ def test_el_incidente_de_una_palabra_no_aceptada_no_habla_de_marcas(web, conn, i
                   titulo="cambiar la bateria del ups q no anda").status_code == 200
     incidente = _fila(conn, "select * from incident where etapa = 'ortografia_al_cargar'")
     assert "marcado" not in incidente["resumen_sanitizado"]
+
+
+# --- J3-4: la ortografía de un objetivo, por las dos puertas --------------------------------------
+#
+# El nombre y la descripción de un objetivo se corrigen con la misma ruta y el mismo control,
+# diciéndole a la IA que es un objetivo (`de: objetivo`). Por la puerta del equipo
+# (`/app/api/ortografia`), sólo Dirección, como la ayuda del objetivo (la J4 la abre a los
+# referentes); los nombres que recibe la IA son los de las opciones del objetivo de su espacio.
+
+EQUIPO = "/app/api/ortografia"
+
+
+def _taylor_referente(conn, intake_world) -> None:
+    from leda.db import admin
+
+    norte = _norte(intake_world)
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = %s where id = %s",
+                    (norte["people"]["Taylor Quinn"]["membership_id"], norte["areas"]["field"]))
+    conn.commit()
+
+
+def test_la_ortografia_de_un_objetivo_le_dice_a_la_ia_que_es_un_objetivo(
+        web, conn, intake_world, administradora, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({"titulo": "Ordenar el depósito"})
+    r = navegador.post(_camino(_norte(intake_world)["id"]),
+                       json={"titulo": "ordenar el deposito", "de": "objetivo"})
+    assert r.status_code == 200, r.text
+    assert r.json()["corregidos"]["titulo"]["texto"] == "Ordenar el depósito"
+    assert "crear un objetivo" in ia.instrucciones()
+    # Sin decirlo, como siempre: la de la carga de una tarea.
+    ia.respuestas.append({"titulo": "Ordenar el depósito"})
+    navegador.post(_camino(_norte(intake_world)["id"]), json={"titulo": "ordenar el deposito"})
+    assert "cargar una tarea" in ia.instrucciones(1)
+
+
+def test_direccion_corrige_por_la_puerta_del_equipo(web, conn, intake_world, ia):
+    _taylor_referente(conn, intake_world)
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    ia.respuestas.append({"titulo": "Ordenar el depósito con Taylor Quinn 1"})
+    r = direccion.post(EQUIPO, json={"titulo": "ordenar el deposito con taylor quin 1",
+                                     "de": "objetivo"})
+    assert r.status_code == 200, r.text
+    assert r.headers["cache-control"] == "no-store"
+    assert r.json()["corregidos"]["titulo"]["texto"] == "Ordenar el depósito con Taylor Quinn 1"
+    # Los nombres de las opciones del objetivo de su espacio, y de ningún otro.
+    nombres = ia.entrada()["nombres"]
+    assert "Taylor Quinn 1" in nombres and "Field Services" in nombres
+    plano = json.dumps(nombres, ensure_ascii=False)
+    for persona in intake_world["west-studio"]["people"].values():
+        assert persona["name"] not in plano
+    detalle = _fila(conn, "select detalle from audit_log where accion = 'corregir_al_cargar'")[
+        "detalle"]
+    assert detalle["puerta"] == "equipo" and detalle["sesion_web_id"]
+    assert "sesion_de_administracion_id" not in detalle
+
+
+def test_la_puerta_del_equipo_es_solo_para_direccion_y_con_su_sesion(
+        web, conn, intake_world, administradora, ia):
+    ia.respuestas.append({"titulo": "Ordenar el depósito"})
+    for nombre in ("Sam North", "Taylor Quinn"):
+        r = _navegador_del_equipo(web, conn, intake_world, nombre).post(
+            EQUIPO, json={"titulo": "ordenar el deposito"})
+        assert r.status_code == 403, (nombre, r.text)
+    assert web().post(EQUIPO, json={"titulo": "x"}).status_code == 401
+    administracion = _navegador_de_administracion(web, conn, administradora)
+    assert administracion.post(EQUIPO, json={"titulo": "x"}).status_code == 401
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    assert direccion.post(EQUIPO, json={"titulo": "x"},
+                          headers={"origin": "https://otro.example"}).status_code == 403
+    assert direccion.post(EQUIPO, content="titulo=x", headers={
+        "content-type": "application/x-www-form-urlencoded"}).status_code == 415
+    assert direccion.post(EQUIPO, content=json.dumps({"titulo": "x" * 70000}), headers={
+        "content-type": "application/json"}).status_code == 413
+    assert ia.pedidos == []
+    assert _contar(conn, "audit_log", "accion = 'corregir_al_cargar'") == 0
+
+
+def test_por_la_puerta_del_equipo_una_sesion_cortada_mientras_corrige_no_recibe_nada(
+        web, conn, intake_world, ia):
+    from leda import web_app
+    from leda.db import espacio
+
+    norte = _norte(intake_world)
+
+    def cortar():
+        with espacio(conn, norte["id"]) as cur:
+            web_app.cortar_sesiones(cur, norte["people"]["Morgan Hale"]["membership_id"])
+        conn.commit()
+
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    ia.respuestas.append({"titulo": "Ordenar el depósito"})
+    ia.al_llamar = cortar
+    r = direccion.post(EQUIPO, json={"titulo": "ordenar el deposito"})
+    assert r.status_code == 401
+    assert "corregidos" not in r.text
+    assert _contar(conn, "audit_log", "accion = 'corregir_al_cargar'") == 0
+
+
+def test_por_la_puerta_del_equipo_la_ia_que_no_responde_no_bloquea(web, conn, intake_world, ia):
+    from leda.motor.ia_real import PlazoAgotado
+
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    ia.respuestas.append(PlazoAgotado(40))
+    r = direccion.post(EQUIPO, json={"titulo": "ordenar el deposito"})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"corregidos": {}, "sin_revisar": ["titulo"], "aviso": TEXTO_SIN_REVISAR}
+    assert _contar(conn, "incident", "etapa = 'ortografia_al_cargar'") == 1

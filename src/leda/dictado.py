@@ -115,17 +115,20 @@ def tramo_de_tamano(n: int) -> str:
 
 def palabras_del_espacio(opciones: Mapping[str, Any]) -> list[str]:
     """Los nombres de ese espacio (de `opciones_de_la_carga`, nada de otro): sus integrantes, sus
-    áreas y sus objetivos abiertos, sin repetir."""
+    áreas y sus objetivos abiertos, sin repetir. Con las opciones de un objetivo (J3-4, la puerta
+    del equipo), los referentes de área con sus áreas y los objetivos de los que puede colgar."""
     palabras: list[str] = []
-    for lista, claves in (("integrantes", ("nombre", "area")), ("objetivos", ("titulo",))):
+    for lista, claves in (("integrantes", ("nombre", "area")), ("objetivos", ("titulo",)),
+                          ("referentes", ("nombre", "areas")), ("padres", ("titulo",))):
         for fila in opciones.get(lista) or []:
             for clave in claves:
                 valor = fila.get(clave)
-                if not isinstance(valor, str):
-                    continue
-                valor = " ".join(valor.split())[:LARGO_DE_UNA_PALABRA]
-                if valor and valor not in palabras:
-                    palabras.append(valor)
+                for v in (valor if isinstance(valor, list) else [valor]):
+                    if not isinstance(v, str):
+                        continue
+                    v = " ".join(v.split())[:LARGO_DE_UNA_PALABRA]
+                    if v and v not in palabras:
+                        palabras.append(v)
     return palabras[:TOPE_DE_PALABRAS]
 
 

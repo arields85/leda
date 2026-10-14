@@ -2023,8 +2023,33 @@ def _quien_pide(conn, puerta: str, token: str, espacio: str | None
 
 
 def _detalle_de_quien_pide(quien: dict[str, Any]) -> dict[str, Any]:
-    """Lo que la auditoría guarda de quien pidió: el origen, la puerta y su sesión."""
-    return {"origen": "web", "puerta": quien["puerta"], "sesion_id": quien["sesion_id"]}
+    """Lo que la auditoría guarda de quien pidió: el origen, la puerta y su sesión, con el nombre
+    de cada puerta (como `crear_objetivo`: `sesion_de_administracion_id` o `sesion_web_id`)."""
+    clave = ("sesion_de_administracion_id" if quien["puerta"] == PUERTA_DE_ADMINISTRACION
+             else "sesion_web_id")
+    return {"origen": "web", "puerta": quien["puerta"], clave: quien["sesion_id"]}
+
+
+def _opciones_de_quien_pide(conn, puerta: str, token: str, espacio: str | None
+                            ) -> dict[str, Any] | Response:
+    """Las opciones de la puerta, de donde salen los nombres del equipo (la ortografía y el
+    dictado), o la respuesta que corta. Por la de administración, las de la carga
+    (`opciones_de_la_carga`), con su sesión validada antes; por la del equipo, las del objetivo
+    (`opciones_del_objetivo`: sólo Dirección, en su espacio). La J4 abre la puerta del equipo a
+    los referentes con las opciones de su carga: es acá."""
+    if puerta == PUERTA_DEL_EQUIPO:
+        return _leer_las_opciones_del_objetivo(conn, PUERTA_DEL_EQUIPO, token, None)
+    quien = _quien_pide(conn, puerta, token, espacio)
+    if isinstance(quien, Response):
+        return quien
+    ahora = _ahora(conn, quien["espacio"])
+    with sin_espacio(conn) as cur:
+        _con_la_version_del_nucleo(cur)
+        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
+                    (_hash(token), quien["espacio"], ahora))
+        opciones = cur.fetchone()["r"]
+    rechazo = _sin_lo_que_rechaza_la_base(opciones)
+    return rechazo if rechazo is not None else opciones
 
 
 def _lo_escrito_del_objetivo(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
@@ -2245,23 +2270,42 @@ def _ia_de_la_ortografia(conn, espacio: str):
 
 @router.post("/admin/api/espacios/{espacio_id}/ortografia")
 async def revisar_la_ortografia(espacio_id: str, request: Request):
-    """La ortografía de los textos de una carga (título, descripción y criterio): 200 con lo que
-    se corrigió (`corregidos`: por campo, el texto y sus cambios) y lo que no se pudo revisar
-    (`sin_revisar`, con un `aviso` humano y un incidente); 422 con un dato que no es un texto."""
-    from . import ayuda_al_cargar
-
+    """La ortografía de los textos de una carga (título, descripción y criterio) o de un objetivo
+    (nombre y descripción, con `de: objetivo`, J3-4): 200 con lo que se corrigió (`corregidos`:
+    por campo, el texto y sus cambios) y lo que no se pudo revisar (`sin_revisar`, con un `aviso`
+    humano y un incidente); 422 con un dato que no es un texto."""
     pedido = await _el_pedido_que_escribe(request, _token_de_administracion,
                                           _sin_sesion_de_administracion,
                                           TAMANO_MAXIMO_DE_LA_AYUDA)
     if isinstance(pedido, Response):
         return pedido
-    token, cuerpo = pedido[0], _cuerpo_como_objeto(pedido[1])
+    return await _revisar_la_ortografia(PUERTA_DE_ADMINISTRACION, pedido[0],
+                                        _espacio_de(espacio_id), _cuerpo_como_objeto(pedido[1]))
+
+
+@router.post("/api/ortografia")
+async def revisar_la_ortografia_en_el_equipo(request: Request):
+    """Lo mismo, por la puerta del equipo y, por ahora, sólo para Dirección, que crea objetivos
+    (J3-4; la J4 la abre a los referentes): el espacio y los nombres salen de su sesión."""
+    pedido = await _el_pedido_que_escribe(request, _token_de_la_cookie, _sin_sesion,
+                                          TAMANO_MAXIMO_DE_LA_AYUDA)
+    if isinstance(pedido, Response):
+        return pedido
+    return await _revisar_la_ortografia(PUERTA_DEL_EQUIPO, pedido[0], None,
+                                        _cuerpo_como_objeto(pedido[1]))
+
+
+async def _revisar_la_ortografia(puerta: str, token: str, espacio: str | None,
+                                 cuerpo: dict[str, Any]) -> Response:
+    from . import ayuda_al_cargar
+
     errores, textos = _los_textos_de_la_ortografia(cuerpo)
-    espacio = _espacio_de(espacio_id)
+    de = "objetivo" if cuerpo.get("de") == "objetivo" else "tarea"
     return await _con_la_ia(PasosConLaIA(
-        preparar=lambda conn: _preparar_la_ortografia(conn, token, espacio, textos, errores),
-        pedir=lambda preparada: ayuda_al_cargar.pedir_la_ortografia(preparada["ia"],
-                                                                    preparada["entrada"]),
+        preparar=lambda conn: _preparar_la_ortografia(conn, puerta, token, espacio, textos,
+                                                      errores, de),
+        pedir=lambda preparada: ayuda_al_cargar.pedir_la_ortografia(
+            preparada["ia"], preparada["entrada"], de=preparada["de"]),
         cerrar=lambda conn, preparada, crudo, falla, _juicio: _cerrar_la_ortografia(
             conn, token, preparada, crudo, falla)))
 
@@ -2278,32 +2322,22 @@ def _los_textos_de_la_ortografia(cuerpo: dict[str, Any]) -> tuple[
     return errores, textos
 
 
-def _preparar_la_ortografia(conn, token: str, espacio: str | None, textos: dict[str, str],
-                            errores: list[dict[str, str]]):
-    """Con el candado: la sesión, las opciones del espacio (de donde salen los nombres del
-    equipo) y la IA del espacio. Sin textos, nada que revisar: no se llama a la IA."""
+def _preparar_la_ortografia(conn, puerta: str, token: str, espacio: str | None,
+                            textos: dict[str, str], errores: list[dict[str, str]], de: str):
+    """Con el candado: la sesión de la puerta, las opciones del espacio (de donde salen los
+    nombres del equipo) y la IA del espacio. Sin textos, nada que revisar: no se llama a la IA."""
     from . import ayuda_al_cargar
 
-    with sin_espacio(conn) as cur:
-        if _sesion_de_administracion(cur, token) is None:
-            return _sin_sesion_de_administracion()
-    if espacio is None:
-        return _espacio_que_no_existe()
-    ahora = _ahora(conn, espacio)
-    with sin_espacio(conn) as cur:
-        _con_la_version_del_nucleo(cur)
-        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
-                    (_hash(token), espacio, ahora))
-        opciones = cur.fetchone()["r"]
-    rechazo = _sin_lo_que_rechaza_la_base(opciones)
-    if rechazo is not None:
-        return rechazo
+    opciones = _opciones_de_quien_pide(conn, puerta, token, espacio)
+    if isinstance(opciones, Response):
+        return opciones
     if errores:
         return _json({"errores": [_con_texto(e) for e in errores]}, 422)
     if not textos:
         return _json({"corregidos": {}, "sin_revisar": []})
-    return {"espacio": espacio, "textos": textos, "opciones": opciones,
-            "ia": _la_ia_o_la_que_no_responde(conn, espacio, _ia_de_la_ortografia),
+    ws = str(opciones["espacio"]["id"])
+    return {"puerta": puerta, "espacio": ws, "textos": textos, "opciones": opciones, "de": de,
+            "ia": _la_ia_o_la_que_no_responde(conn, ws, _ia_de_la_ortografia),
             "entrada": ayuda_al_cargar.entrada_de_la_ortografia(textos, opciones)}
 
 
@@ -2316,10 +2350,9 @@ def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
     from .db import espacio as en_el_espacio, registrar_auditoria
     from .incidentes import ETAPA_ORTOGRAFIA_AL_CARGAR, registrar_incidente
 
-    with sin_espacio(conn) as cur:
-        sesion = _sesion_de_administracion(cur, token)
-    if sesion is None:
-        return _sin_sesion_de_administracion()
+    quien = _quien_pide(conn, preparada["puerta"], token, preparada["espacio"])
+    if isinstance(quien, Response):
+        return quien
     ws, textos = preparada["espacio"], preparada["textos"]
     palabras: list[dict[str, Any]] = []
     if falla is None:
@@ -2351,12 +2384,12 @@ def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
                  (" y la persona vio un aviso." if sin_revisar else
                   "; lo demás se corrigió.")),
                 severidad="baja", referencia_cruda=referencia,
-                etapa=ETAPA_ORTOGRAFIA_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
+                etapa=ETAPA_ORTOGRAFIA_AL_CARGAR, app_user_id=quien["app_user_id"])
         registrar_auditoria(
             cur, accion="corregir_al_cargar", workspace_id=ws,
-            actor_app_user_id=str(sesion["app_user_id"]), actor_kind="persona",
+            actor_app_user_id=quien["app_user_id"], actor_kind="persona",
             sujeto_tipo="workspace", sujeto_id=ws,
-            detalle={"origen": "web", "sesion_de_administracion_id": str(sesion["sesion_id"]),
+            detalle={**_detalle_de_quien_pide(quien), "de": preparada["de"],
                      "ia": getattr(preparada["ia"], "nombre", None), "pide": list(textos),
                      "respondio": falla is None, "corregidos": list(corregidos),
                      "rechazados": rechazados, "sin_revisar": sin_revisar,
@@ -2431,31 +2464,53 @@ async def dictar_al_cargar(espacio_id: str, request: Request):
     Gemini o con demasiados dictados a la vez y 502 si Gemini no respondió, con un texto humano y
     un incidente (también el 415). Si Gemini lo cortó por el tope, 200 con lo transcripto y un
     `aviso`, y un incidente (J2-26). La sesión se valida antes de leer el audio (J2-30)."""
-    from . import dictado
-
     if _de_otro_sitio(request):
         return _json({"error": "origen_no_verificado"}, 403)
     token = _token_de_administracion(request)
     if token is None:
         return _sin_sesion_de_administracion()
-    espacio = _espacio_de(espacio_id)
+    return await _dictar(request, PUERTA_DE_ADMINISTRACION, token, _espacio_de(espacio_id))
+
+
+@router.post("/api/dictado")
+async def dictar_en_el_equipo(request: Request):
+    """El mismo dictado, por la puerta del equipo y, por ahora, sólo para Dirección, que crea
+    objetivos (J3-4; la J4 lo abre a los referentes): la sesión del equipo (y que sea Dirección)
+    se valida antes de leer el audio, y los nombres para Gemini salen de su espacio."""
+    if _de_otro_sitio(request):
+        return _json({"error": "origen_no_verificado"}, 403)
+    token = _token_de_la_cookie(request)
+    if token is None:
+        return _sin_sesion()
+    return await _dictar(request, PUERTA_DEL_EQUIPO, token, None)
+
+
+# Quién dictó, en el resumen de un incidente del dictado (nunca su nombre: lo dice la auditoría).
+_QUIEN_DICTA = {PUERTA_DE_ADMINISTRACION: "Un administrador",
+                PUERTA_DEL_EQUIPO: "Alguien de Dirección"}
+
+
+async def _dictar(request: Request, puerta: str, token: str, espacio: str | None) -> Response:
+    from . import dictado
+
     preparado = await run_in_threadpool(_con_la_base, lambda conn: _preparar_el_dictado(
-        conn, token, espacio))
+        conn, puerta, token, espacio))
     if isinstance(preparado, Response):
         return preparado
+    quien_dicta = _QUIEN_DICTA[puerta]
     crudo = request.headers.get("content-type")
     tipo = dictado.tipo_de_audio(crudo)
     if tipo is None:
         await run_in_threadpool(_con_la_base, lambda conn: _incidente_del_dictado(
-            conn, token, preparado["espacio"],
-            "Un administrador dictó lo que quería cargar en la plataforma y el navegador mandó "
+            conn, token, preparado,
+            f"{quien_dicta} dictó lo que quería cargar en la plataforma y el navegador mandó "
             "algo que no es audio de un tipo admitido: no se pasó a texto y la persona vio un "
             "aviso.", f"content-type: {_tipo_para_el_incidente(crudo)}"))
         return _json({"error": "se_espera_audio"}, 415)
     if not _DICTADOS.acquire(blocking=False):
         await run_in_threadpool(_con_la_base, lambda conn: _incidente_del_dictado(
-            conn, token, preparado["espacio"],
-            "Un administrador dictó lo que quería cargar en la plataforma y había demasiados "
+            conn, token, preparado,
+            f"{quien_dicta} dictó lo que quería cargar en la plataforma y había demasiados "
             "dictados a la vez: no se pasó a texto y la persona vio un aviso.",
             f"dictados_a_la_vez: {DICTADOS_A_LA_VEZ}"))
         _imprimir("  ! un dictado no se atendió: demasiados a la vez.")
@@ -2480,40 +2535,30 @@ async def dictar_al_cargar(espacio_id: str, request: Request):
         conn, token, preparado, tipo, tamano, transcripcion, falla))
 
 
-def _incidente_del_dictado(conn, token: str, espacio: str, resumen: str,
+def _incidente_del_dictado(conn, token: str, preparado: dict[str, Any], resumen: str,
                            referencia: str) -> Response | None:
     """Con el candado: el incidente de un dictado que no llegó a Gemini, en el espacio y a nombre
     de quien dictaba (sólo con su sesión vigente; nunca el audio)."""
     from .incidentes import ETAPA_DICTADO_AL_CARGAR
 
-    with sin_espacio(conn) as cur:
-        sesion = _sesion_de_administracion(cur, token)
-    if sesion is None:
+    quien = _quien_pide(conn, preparado["puerta"], token, preparado["espacio"])
+    if isinstance(quien, Response):
         return None
-    _dejar_el_incidente(conn, espacio, sesion, ETAPA_DICTADO_AL_CARGAR, resumen, referencia)
+    _dejar_el_incidente(conn, preparado["espacio"], quien, ETAPA_DICTADO_AL_CARGAR, resumen,
+                        referencia)
     return None
 
 
-def _preparar_el_dictado(conn, token: str, espacio: str | None):
-    """Con el candado: la sesión y los nombres de ese espacio (`opciones_de_la_carga`, las mismas
-    del formulario), para que Gemini los escriba como están."""
+def _preparar_el_dictado(conn, puerta: str, token: str, espacio: str | None):
+    """Con el candado: la sesión de la puerta y los nombres de ese espacio (las opciones del
+    formulario de esa puerta), para que Gemini los escriba como están."""
     from . import dictado
 
-    with sin_espacio(conn) as cur:
-        if _sesion_de_administracion(cur, token) is None:
-            return _sin_sesion_de_administracion()
-    if espacio is None:
-        return _espacio_que_no_existe()
-    ahora = _ahora(conn, espacio)
-    with sin_espacio(conn) as cur:
-        _con_la_version_del_nucleo(cur)
-        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
-                    (_hash(token), espacio, ahora))
-        opciones = cur.fetchone()["r"]
-    rechazo = _sin_lo_que_rechaza_la_base(opciones)
-    if rechazo is not None:
-        return rechazo
-    return {"espacio": espacio, "palabras": dictado.palabras_del_espacio(opciones)}
+    opciones = _opciones_de_quien_pide(conn, puerta, token, espacio)
+    if isinstance(opciones, Response):
+        return opciones
+    return {"puerta": puerta, "espacio": str(opciones["espacio"]["id"]),
+            "palabras": dictado.palabras_del_espacio(opciones)}
 
 
 def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, tamano: int,
@@ -2525,11 +2570,11 @@ def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, t
     from .db import espacio as en_el_espacio, registrar_auditoria
     from .incidentes import ETAPA_DICTADO_AL_CARGAR, registrar_incidente
 
-    with sin_espacio(conn) as cur:
-        sesion = _sesion_de_administracion(cur, token)
-    if sesion is None:
-        return _sin_sesion_de_administracion()
+    quien = _quien_pide(conn, preparado["puerta"], token, preparado["espacio"])
+    if isinstance(quien, Response):
+        return quien
     ws = preparado["espacio"]
+    quien_dicta = _QUIEN_DICTA[preparado["puerta"]]
     texto = transcripcion.texto if transcripcion is not None else None
     if falla is None:
         resultado = "cortado" if transcripcion.cortada else "texto"
@@ -2546,28 +2591,28 @@ def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, t
                                                        dictado.ProveedorNoResponde)) else "")
             registrar_incidente(
                 cur, ws,
-                "Un administrador dictó lo que quería cargar en la plataforma y el audio no se "
+                f"{quien_dicta} dictó lo que quería cargar en la plataforma y el audio no se "
                 "pudo pasar a texto" + (": falta la clave de Gemini en el entorno del servidor."
                                         if resultado == "sin_clave" else
                                         ": Gemini no respondió.") +
                 " No se guardó el audio y la persona vio un aviso.",
                 severidad="baja", referencia_cruda=f"{type(falla).__name__}{motivo}",
-                etapa=ETAPA_DICTADO_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
+                etapa=ETAPA_DICTADO_AL_CARGAR, app_user_id=quien["app_user_id"])
         elif resultado == "cortado":
             # Lo transcripto llega, con su aviso; el incidente, por si el tope quedó corto.
             registrar_incidente(
                 cur, ws,
-                "Un administrador dictó lo que quería cargar en la plataforma y Gemini cortó la "
+                f"{quien_dicta} dictó lo que quería cargar en la plataforma y Gemini cortó la "
                 "transcripción por el tope de salida: la persona recibió la parte transcripta "
                 "con un aviso de que se cortó. No se guardó el audio.",
                 severidad="baja", referencia_cruda=f"finishReason MAX_TOKENS, tope "
                                                    f"{dictado.TOPE_DE_SALIDA}",
-                etapa=ETAPA_DICTADO_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
+                etapa=ETAPA_DICTADO_AL_CARGAR, app_user_id=quien["app_user_id"])
         registrar_auditoria(
             cur, accion="dictar_al_cargar", workspace_id=ws,
-            actor_app_user_id=str(sesion["app_user_id"]), actor_kind="persona",
+            actor_app_user_id=quien["app_user_id"], actor_kind="persona",
             sujeto_tipo="workspace", sujeto_id=ws,
-            detalle={"origen": "web", "sesion_de_administracion_id": str(sesion["sesion_id"]),
+            detalle={**_detalle_de_quien_pide(quien),
                      "proveedor": "gemini", "modelo": dictado.MODELO, "tipo": tipo,
                      "tamano": dictado.tramo_de_tamano(tamano),
                      "respondio": resultado in ("texto", "cortado", "vacio"),

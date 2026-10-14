@@ -580,3 +580,100 @@ def test_el_tramo_de_tamano():
     assert dictado.tramo_de_tamano(256 * 1024 + 1) == "hasta_1_mb"
     assert dictado.tramo_de_tamano(3 * 1024 * 1024) == "hasta_4_mb"
     assert dictado.tramo_de_tamano(dictado.TAMANO_MAXIMO) == "hasta_10_mb"
+
+
+# --- J3-4: el dictado por la puerta del equipo, para Dirección ------------------------------------
+#
+# El mismo dictado, por `/app/api/dictado`, sólo para Dirección (como la ayuda del objetivo; la J4
+# lo abre a los referentes): la sesión del equipo validada antes de leer el audio, los nombres de
+# las opciones del objetivo de su espacio para Gemini, y la auditoría con su sesión.
+
+EQUIPO = "/app/api/dictado"
+
+
+def _dictar_por_el_equipo(navegador, audio: bytes = AUDIO, tipo: str = "audio/mp4", **cabeceras):
+    return navegador.post(EQUIPO, content=audio, headers={"content-type": tipo, **cabeceras})
+
+
+def test_direccion_dicta_por_la_puerta_del_equipo(web, conn, intake_world, gemini):
+    from leda.db import admin
+
+    norte = _norte(intake_world)
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = %s where id = %s",
+                    (norte["people"]["Taylor Quinn"]["membership_id"], norte["areas"]["field"]))
+    conn.commit()
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    gemini.respuestas.append(_con_texto(DICHO))
+    r = _dictar_por_el_equipo(direccion)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"texto": DICHO}
+    instrucciones = json.dumps(gemini.cuerpo(), ensure_ascii=False)
+    assert "Taylor Quinn 1" in instrucciones
+    for persona in intake_world["west-studio"]["people"].values():
+        assert persona["name"] not in instrucciones
+    detalle = _fila(conn, "select detalle from audit_log where accion = 'dictar_al_cargar'")[
+        "detalle"]
+    assert detalle["puerta"] == "equipo" and detalle["sesion_web_id"]
+    assert "sesion_de_administracion_id" not in detalle
+    _sin_nada_sensible(json.dumps(detalle, ensure_ascii=False))
+
+
+def test_la_puerta_del_equipo_dicta_solo_para_direccion(web, conn, intake_world, administradora,
+                                                        gemini, monkeypatch):
+    from leda import web_app
+
+    leidos = []
+    leer = web_app._el_cuerpo_con_tope
+
+    async def contando(request, tope):
+        leidos.append(tope)
+        return await leer(request, tope)
+
+    monkeypatch.setattr(web_app, "_el_cuerpo_con_tope", contando)
+    for nombre in ("Sam North", "Taylor Quinn"):
+        r = _dictar_por_el_equipo(_navegador_del_equipo(web, conn, intake_world, nombre))
+        assert r.status_code == 403, (nombre, r.text)
+    assert _dictar_por_el_equipo(web()).status_code == 401
+    administracion = _navegador_de_administracion(web, conn, administradora)
+    assert _dictar_por_el_equipo(administracion).status_code == 401
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    assert _dictar_por_el_equipo(direccion, origin="https://otro.example").status_code == 403
+    # Nada de eso leyó el audio ni llegó a Gemini.
+    assert leidos == []
+    assert gemini.pedidos == []
+    assert _contar(conn, "audit_log", "accion = 'dictar_al_cargar'") == 0
+
+
+def test_por_la_puerta_del_equipo_una_sesion_cortada_mientras_responde_gemini(
+        web, conn, intake_world, gemini):
+    from leda import web_app
+    from leda.db import espacio
+
+    norte = _norte(intake_world)
+
+    def cortar():
+        with espacio(conn, norte["id"]) as cur:
+            web_app.cortar_sesiones(cur, norte["people"]["Morgan Hale"]["membership_id"])
+        conn.commit()
+
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    gemini.respuestas.append(_con_texto(DICHO))
+    gemini.al_llamar = cortar
+    r = _dictar_por_el_equipo(direccion)
+    assert r.status_code == 401
+    assert DICHO not in r.text
+    assert _contar(conn, "audit_log", "accion = 'dictar_al_cargar'") == 0
+
+
+def test_por_la_puerta_del_equipo_sin_clave_un_aviso_y_un_incidente(web, conn, intake_world,
+                                                                    gemini, monkeypatch):
+    monkeypatch.delenv("LEDA_GEMINI_API_KEY", raising=False)
+    direccion = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    r = _dictar_por_el_equipo(direccion)
+    assert r.status_code == 503
+    assert r.json() == {"error": "sin_dictado", "texto": TEXTO_SIN_DICTADO}
+    incidente = _incidente(conn)
+    assert incidente is not None
+    assert str(incidente["workspace_id"]) == _norte(intake_world)["id"]
+    assert gemini.pedidos == []

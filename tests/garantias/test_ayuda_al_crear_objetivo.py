@@ -311,7 +311,7 @@ def test_la_auditoria_guarda_lo_propuesto_con_su_huella_y_sin_el_texto(
     detalle = fila["detalle"]
     assert (detalle["origen"], detalle["puerta"], detalle["ia"]) == (
         "web", "administracion", "de-mentira")
-    assert detalle["respondio"] is True and detalle["sesion_id"]
+    assert detalle["respondio"] is True and detalle["sesion_de_administracion_id"]
     # Sin objetivos de los que colgar (los del mundo de prueba son operativos), eso no se pide.
     assert set(detalle["pide"]) == {"titulo", "descripcion", "tipo", "referente_id", "fecha"}
     assert set(detalle["propuestos"]) == {"titulo", "tipo", "referente_id", "fecha"}
@@ -329,7 +329,8 @@ def test_la_auditoria_guarda_lo_propuesto_con_su_huella_y_sin_el_texto(
                            where accion = 'proponer_al_crear_objetivo'
                              and detalle ->> 'puerta' = 'equipo'""")
     assert str(fila["actor_app_user_id"]) == administradora     # Morgan Hale, Dirección
-    assert fila["detalle"]["sesion_id"]
+    assert fila["detalle"]["sesion_web_id"]
+    assert "sesion_de_administracion_id" not in fila["detalle"]
 
 
 # --- Lo que decide el código ------------------------------------------------------------------

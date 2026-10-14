@@ -1594,15 +1594,23 @@ def herramienta_de_la_ortografia(campos: Sequence[str]) -> dict[str, Any]:
             "additionalProperties": False}}}
 
 
-def pedir_la_ortografia(ia, entrada: Mapping[str, Any]) -> dict[str, Any]:
-    """Una sola llamada a la IA del espacio (sin reintento), como `pedir`."""
+# J3-4: el nombre y la descripción de un objetivo, con el mismo trabajo y el mismo control.
+INSTRUCCIONES_DE_LA_ORTOGRAFIA_DEL_OBJETIVO = INSTRUCCIONES_DE_LA_ORTOGRAFIA.replace(
+    "está por cargar una tarea", "está por crear un objetivo")
+
+
+def pedir_la_ortografia(ia, entrada: Mapping[str, Any], *, de: str = "tarea") -> dict[str, Any]:
+    """Una sola llamada a la IA del espacio (sin reintento), como `pedir`. `de`: si los textos son
+    de una tarea o de un objetivo (J3-4)."""
     cliente = getattr(ia, "cliente", None)
     if cliente is None:
         raise LookupError(getattr(ia, "motivo", "La IA del espacio no está configurada."))
+    instrucciones = (INSTRUCCIONES_DE_LA_ORTOGRAFIA_DEL_OBJETIVO if de == "objetivo"
+                     else INSTRUCCIONES_DE_LA_ORTOGRAFIA)
     return leer(cliente.completar({
         "temperature": 0,
         "max_tokens": _tope_de_salida(cliente),
-        "messages": [{"role": "system", "content": INSTRUCCIONES_DE_LA_ORTOGRAFIA},
+        "messages": [{"role": "system", "content": instrucciones},
                      {"role": "user",
                       "content": json.dumps(entrada, ensure_ascii=False, default=str)}],
         "tools": [herramienta_de_la_ortografia(list(entrada.get("textos") or {}))],
