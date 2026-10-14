@@ -178,3 +178,24 @@ def test_sin_persona_identificada_no_se_inventa_un_nombre():
     texto = _aviso(nombre=None)
     assert texto.split("\n")[0] == "⚠️ Leda tuvo un problema"
     assert "Qué vio la persona" in texto
+
+
+def test_ningun_aviso_de_ninguna_etapa_lleva_un_marcador_sin_reemplazar():
+    """Prueba por Telegram de la J4 (2026-10-14): el aviso de `ortografia_al_cargar` llegó con
+    "{nombre} tocó…" literal en "Qué pasó". Ninguna etapa, con o sin persona, deja un `{…}`."""
+    for etapa in [*EXPLICACION_POR_ETAPA, None, "una_etapa_desconocida"]:
+        for nombre in ("Marcos Tarquini", None):
+            aviso = incidentes.armar_aviso_admin(
+                incident_id="0123456789abcdef", slug="corework",
+                zona_horaria="America/Argentina/Buenos_Aires",
+                momento=datetime(2026, 10, 14, 18, 27, tzinfo=timezone.utc), etapa=etapa,
+                severidad="baja", resumen="un resumen", nombre=nombre, mensaje="(sin mensaje)")
+            assert not re.search(r"\{[^}]*\}", aviso), (etapa, nombre, aviso)
+            if nombre:
+                assert "{nombre}" not in aviso
+    texto = incidentes.armar_aviso_admin(
+        incident_id="0123456789abcdef", slug="corework", zona_horaria=None,
+        momento=datetime(2026, 10, 14, 18, 27, tzinfo=timezone.utc),
+        etapa=incidentes.ETAPA_ORTOGRAFIA_AL_CARGAR, severidad="baja", resumen="r",
+        nombre="Marcos Tarquini", mensaje="-")
+    assert 'Marcos Tarquini tocó "confirmar"' in texto
