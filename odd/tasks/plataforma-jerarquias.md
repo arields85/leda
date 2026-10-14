@@ -716,13 +716,13 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       **deuda** (no se siguen persiguiendo en esta unidad): la equivalencia de las dos búsquedas del integrante
       (`web_app.py:1432-1433`), pruebas del vencimiento y de otros datos del juicio guardado más aisladas
       (`test_criterio_verificable.py:563-598`), y un pedido directo a la API con evidencia sin quién la hace.
-- [ ] **J2-24 · La ortografía, corregida en la vista previa** (prueba en el celular, 2026-10-13: "la idea es que
+- [x] **J2-24 · La ortografía, corregida en la vista previa** (prueba en el celular, 2026-10-13: "la idea es que
       la corrija en la vista previa, sin tener que apretar confirmar; lo demás parece que quedó bien"): al salir de
       un campo de texto, Leda corrige su ortografía y el campo y la vista previa la muestran corregida, sin marcas.
-- [ ] **J2-25 · El criterio en tercera persona**: tras la J2-22 salió en primera persona ("Dejo pintado el cartel…
+- [x] **J2-25 · El criterio en tercera persona**: tras la J2-22 salió en primera persona ("Dejo pintado el cartel…
       y entrego una foto"; lo notó el agente en la captura); tiene que nombrar a quien la hace: qué hace y qué entrega.
       Las dos, con el escritor de la J2b (comparten archivos).
-- [ ] **J2b · El dictado, con Gemini en el servidor** (usuario, 2026-10-13: "directamente con Gemini tal cual la
+- [x] **J2b · El dictado, con Gemini en el servidor** (usuario, 2026-10-13: "directamente con Gemini tal cual la
       documentación"; la comparación con OpenAI, anotada en `docs/ROADMAP.md`). **Por qué:** el dictado del
       navegador (`web/src/admin/speech.ts`, reconocimiento del teclado) se cortaba en el iPhone con el bloqueo de la
       pantalla (J2-5). **De qué se parte:** `docs/research/gemini-voz-del-otro-proyecto.md`, sección 3 (modelo
@@ -738,6 +738,18 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
          aviso neutro (nunca en silencio); la clave nunca sale del servidor.
       Ruta: delegada, un escritor, después de la J2-23 (comparten la caja). Prueba: unos dictados del usuario en el
       celular.
+      **Hecha, con la J2-24 y la J2-25** (escritor delegado): `81b9aa7e` (servidor: `dictado.py`, la ruta
+      `POST /app/admin/api/espacios/{id}/dictado`, audio crudo con su tipo, hasta 10 MB, `gemini-3.8-flash` por REST con
+      la clave en la cabecera, los nombres del espacio como palabras a favorecer, plazo de 30 s; el criterio en
+      tercera persona), `3d72ba96` (pruebas y la marca `en_primera_persona` de la herramienta), `d200681b` (web:
+      `dictation.ts`, pantalla encendida, "grabando · 0:12 de 2:00", "pasando a texto…"; la ortografía en la vista
+      previa a la pausa de 1,5 s y en el campo al salir). `pytest` del dictado, la ayuda y la ortografía: 370 passed;
+      `npm test`: 155 passed; typecheck y build bien. Sin llamar a Gemini de verdad. RDD aprobadas:
+      `review-0f465303e17d9ce6`, `review-13901a14989af226`, `review-fe347cca3b99b434`; **deuda**: el plazo de Gemini
+      no es total (`dictado.py:115-117`), una transcripción cortada por el tope no avisa (`dictado.py:160-170`),
+      ramas de `api.ts:323-353` sin prueba, falsos positivos posibles de la marca de primera persona.
+      **Falta la prueba en el celular:** si Gemini acepta `audio/webm` (Android) y `audio/mp4` (iPhone), si la
+      pantalla sigue encendida los 2 minutos, y el tope de 1000 caracteres de la caja.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
