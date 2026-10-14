@@ -261,7 +261,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     # --- Crear una tarea o un objetivo por chat (J4b, D12; `fichas.pedir_crear`) ------------------
     "pedir_crear": "La persona quiere crear una tarea o un objetivo: Leda le dice quién lo crea.",
     "que_quiere_crear": "Qué quiere crear la persona: una tarea o un objetivo.",
-    "lo_puede_crear": "La persona lo crea ella misma, en su web, con el botón de este mensaje.",
+    "lo_puede_crear": "La persona lo crea en su web, con el botón de este mensaje.",
     "lo_crean_otros": "Esto no lo crea la persona: lo crean quienes se nombran.",
     "lo_hacen": "Quiénes lo crean: lo que necesite se lo pide a ellos.",
     "pronto_podra_proponerlo": "Pronto la persona va a poder proponerlo desde su web, para que lo "
@@ -997,6 +997,7 @@ SIGNIFICADOS: Mapping[str, str] = {
         "Debajo de este mensaje va un botón con este texto: al tocarlo se abre la web de Leda "
         "dentro de Telegram, justo ahí. El botón lo pone el código; la IA no escribe ninguna "
         "dirección ni enlace.",
+    "para_la_compu": "Si la persona pidió la dirección de la web para abrirla en la computadora.",
     "direccion_para_la_compu":
         "La dirección de la web para abrir en la computadora, que la IA escribe tal cual. Sola "
         "no da acceso: en la computadora aparece un código QR que se escanea con la cámara del "
