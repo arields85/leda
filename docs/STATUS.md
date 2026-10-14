@@ -73,8 +73,8 @@ viejo corriendo.
 
 **Punto exacto para seguir** (cierre del 2026-10-13, noche; el usuario se fue a dormir y pidió que el agente
 siga solo con lo pendiente de la J2 a la J7, anotando las decisiones que le hagan falta):
-1. **Cerrar la J2:** la J2-29, la revisión independiente de toda la J2 (desde `c258ee37`; qué mira, en el
-   documento de la unidad), y la suite completa (`LEDA_BASE_URL= LEDA_GEMINI_API_KEY= pytest -q`; la corrida del
+1. **Cerrar la J2:** la J2-29 está hecha (sin CRITICAL ni HIGH; dos MEDIUM y varios LOW). Sus arreglos son la
+   J2-30, con un escritor delegado. Falta la suite completa (`LEDA_BASE_URL= LEDA_GEMINI_API_KEY= pytest -q`; la corrida del
    2026-10-13 se cortó al 8 %, todo en verde hasta ahí). Las deudas de RDD anotadas en J2-23, J2b y J2-28 entran
    en esa revisión. Quedaron 8 bases `leda_test_…` de corridas cortadas: el usuario dijo que no se borren.
 2. **Después, J3 a J7** en el orden de `../odd/tasks/plataforma-jerarquias.md` ("De qué se parte en cada
