@@ -1085,8 +1085,21 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - la línea del tipo y el artículo de los nombres;
       - la exención por nombre en `test_capacidades`;
       - pruebas atadas a la posición de una oración.
-  - [ ] **J4b · Los avisos de la carga y "quiero crear una tarea" por Telegram**, más los WARNING de la RDD de
+  - [x] **J4b · Los avisos de la carga y "quiero crear una tarea" por Telegram**, más los WARNING de la RDD de
         la J4a.
+        **Construida** (escritor delegado, 2026-10-14) en los commits `c65917c2`, `034bc34d`, `542b621d`,
+        `1a2bed65` y `463c5a12`, más la migración `0072_quien_revisa_sigue_activo`:
+        - **Los WARNING de la J4a:** si quien revisa ya no está activo, revisa el aprobador de siempre; si nadie
+          está activo, la escalera deja un incidente.
+        - **Los avisos de la carga** (`motor/carga.py`): al responsable, uno solo a los 10 minutos y en horario;
+          a quien revisa, cuando no es quien cargó; nada a Dirección por lo de un referente; el ciclo de los
+          pedidos entre áreas (terminado y reabierto); Dirección como responsable no escala.
+        - **La jugada `pedir_crear`** y las conversaciones 52 a 54.
+        Pruebas: `tests/motor` 1461 passed, `tests/garantias` 1015 passed, `npm test` 261 passed, y en seco 53 de
+        53. IA real, conversaciones 52 a 54: 9 de 9 (bitácora).
+        `leda_motor`: respaldo `leda_motor-antes-0072-20261014.dump`, ensayo previo y la `0072` aplicada.
+        **RDD** commit por commit: cinco revisiones, todas aprobadas. Sus 8 WARNING pasan a la primera unidad de la
+        MA; entre ellos, una carga sin clave que no deja avisos y un aviso de "terminada" duplicado.
 - [ ] **MA · La web como Mini App de Telegram**, adelantada por el usuario (2026-10-14: "quisiera atacar antes
       lo de la mini app"; opción A: apenas termine la J4, antes de J5 a J7). Así las pruebas de J5 a J7 se hacen
       desde el botón del bot, sin pedir enlaces.
