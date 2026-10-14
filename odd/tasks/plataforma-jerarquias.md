@@ -678,7 +678,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       y los tipos malformados del pack (`importador.py:552-553`). Ronda con la IA real: 76 de 81 (bitácora).
       **Falta la prueba en el celular.** Nota: `test_el_enganche_de_la_cocina_da_la_marca…` falla si `LEDA_BASE_URL`
       está en el `.env` (la prueba depende del entorno).
-- [ ] **J2-19 · En la evidencia, tildado sólo lo que propone Leda** (prueba en el celular de la J2-18,
+- [x] **J2-19 · En la evidencia, tildado sólo lo que propone Leda** (prueba en el celular de la J2-18,
       2026-10-13, 21:07). Hallazgos: (1) al elegir a Nahuel (OT) quedaron tildados los cuatro tipos que pide el
       área más la foto que propuso Leda, y "una foto o una captura" con "una foto del trabajo terminado" a la vez;
       el usuario: "debería quedar sólo tildado lo que Leda propone, no todos; si la persona lo quiere modificar, lo
@@ -693,11 +693,11 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       puliendo pero la ayuda que está dando Leda al completar los campos es muy buena". Pasaron: CoreLabs, Lucas, el
       viernes 16 y el objetivo propuestos solos; "arvol → árbol, bateria → batería" marcados; "No sé" con su propuesta.
       Hallazgos: el nombre de los datos en la ortografía salió al revés ("CoreLabs → cirelabs", sin aplicar).
-- [ ] **J2-20 · "> empezar de nuevo"**: limpiar el formulario entero, preguntando antes (usuario: "falta algo básico…
+- [x] **J2-20 · "> empezar de nuevo"**: limpiar el formulario entero, preguntando antes (usuario: "falta algo básico…
       no le queda otra alternativa que borrar campo por campo").
-- [ ] **J2-21 · El rechazo del criterio antes que la ortografía**: corregir "No se" → "No sé" y después rechazarlo
+- [x] **J2-21 · El rechazo del criterio antes que la ortografía**: corregir "No se" → "No sé" y después rechazarlo
       obligaba a confirmar dos veces (lo detectó el agente; el usuario: "no lo dije a ver si lo notabas").
-- [ ] **J2-22 · El criterio, desde quien hace la tarea**: qué hace y qué entrega, nunca "quien revise puede ver…"
+- [x] **J2-22 · El criterio, desde quien hace la tarea**: qué hace y qué entrega, nunca "quien revise puede ver…"
       (usuario: esa parte "está de más"); con sólo la evidencia que corresponde, sale corto.
       Y en la vista previa, lo que Leda corrigió resaltado con el verde agua de "propuesto por Leda".
       **J2-19 a J2-22 hechas** (escritor delegado; el título resaltado, inline): `9d8bbc6a` (servidor), `b3791619`
@@ -705,10 +705,17 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       la marca de J2-22 (escrita después). `pytest` de la ayuda, el criterio, la evidencia y la ortografía: 426
       passed; `npm test`: 138 passed; typecheck y build bien. RDD aprobadas con WARNINGs: `review-13a33db35d62cdde`,
       `review-799c8ba1b905e81a`, `review-4f7c39f0d5f744a7`.
-- [ ] **J2-23 · La ortografía, corregida directamente** (usuario, 2026-10-13: "que lo corrija directamente sin
+- [x] **J2-23 · La ortografía, corregida directamente** (usuario, 2026-10-13: "que lo corrija directamente sin
       resaltarlo, ya dijimos que corrige palabras puntuales, no lo que dice la persona"): sin marca, sin resaltado y
       sin la vuelta de "revisalo y confirmá"; el control palabra por palabra y la auditoría siguen. Con la misma
       unidad, los WARNINGs de las tres revisiones de arriba.
+      **Hecha** (escritor delegado): `7a5d6b60` (servidor), `06a8a7ed` (pruebas), `4b21a034` (web). Un toque en
+      "> confirmar": primero `/tareas/revisar` (un rechazo frena y no se corrige ese campo), después `/ortografia`,
+      después la carga con el texto corregido, sin marcas. `pytest`: 433 passed; `npm test`: 135 passed; typecheck y
+      build bien. RDD aprobadas: `review-e7206d73feefec16`, `review-a2b0c18ddedf102d`, `review-d5dcc44710b44c3f`;
+      **deuda** (no se siguen persiguiendo en esta unidad): la equivalencia de las dos búsquedas del integrante
+      (`web_app.py:1432-1433`), pruebas del vencimiento y de otros datos del juicio guardado más aisladas
+      (`test_criterio_verificable.py:563-598`), y un pedido directo a la API con evidencia sin quién la hace.
 - [ ] **J2b · El dictado, con Gemini en el servidor** (usuario, 2026-10-13: "directamente con Gemini tal cual la
       documentación"; la comparación con OpenAI, anotada en `docs/ROADMAP.md`). **Por qué:** el dictado del
       navegador (`web/src/admin/speech.ts`, reconocimiento del teclado) se cortaba en el iPhone con el bloqueo de la
