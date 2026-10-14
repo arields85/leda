@@ -750,6 +750,12 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       ramas de `api.ts:323-353` sin prueba, falsos positivos posibles de la marca de primera persona.
       **Falta la prueba en el celular:** si Gemini acepta `audio/webm` (Android) y `audio/mp4` (iPhone), si la
       pantalla sigue encendida los 2 minutos, y el tope de 1000 caracteres de la caja.
+- [ ] **J2-26 · El criterio sin nombres** (usuario, 2026-10-13, "confirmo ese cambio"): la ronda de la J2-25
+      (76 de 81) mostró que nombrar a la persona ata el criterio al responsable (si cambia, o con un pase, queda
+      mal), cuela nombres que no son del equipo ("pepe", "el tano") y una vez tomó por responsable a quien
+      necesitaba la tarea. El criterio va en tercera persona y sin nombres: qué queda hecho y qué se entrega; el
+      nombre está en "La hace". Con la misma unidad, la deuda del dictado: el plazo total de Gemini y avisar si la
+      transcripción se cortó por el tope. Ruta: delegada, un escritor.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
