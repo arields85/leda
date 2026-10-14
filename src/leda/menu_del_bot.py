@@ -4,7 +4,9 @@
 Al lado de donde se escribe, Telegram muestra el botón del menú del bot. Con `setChatMenuButton`
 sin `chat_id` se fija el de todos los chats del bot: un botón `web_app` que abre la Mini App. El
 del bot de un espacio dice "Tareas" y abre la puerta del equipo de ese espacio
-(`/app/e/<espacio>/`); el del bot de administración dice "Administración" y abre esa puerta.
+(`/app/e/<espacio>/`); el del bot de administración dice "Administración" y abre esa puerta. Los
+dos pasan por el lanzador (`/app/abrir/...`), que en Telegram de la computadora abre la web en el
+navegador.
 
 Mientras la web vive en un túnel, su dirección cambia: por eso se vuelve a fijar en cada arranque
 del escuchador (`motor.escucha.Escucha.preparar`) y en cada registro de los webhooks
@@ -28,7 +30,8 @@ ETAPA_MENU_DEL_BOT = "menu_del_bot"
 def boton_del_menu(slug: str, base_url: str | None = None) -> dict[str, Any] | None:
     """El botón del menú del bot de `slug` (el de un espacio, o `admin`), o `None` sin la
     dirección pública."""
-    from .despachador import direccion_de_la_administracion, direccion_de_la_web
+    from .despachador import (direccion_de_la_mini_app,
+                              direccion_de_la_mini_app_de_administracion)
 
     # Se lee al llamar: la dirección del momento.
     base = configuracion.config.base_url if base_url is None else base_url
@@ -36,9 +39,9 @@ def boton_del_menu(slug: str, base_url: str | None = None) -> dict[str, Any] | N
         return None
     if slug == SLUG_DE_LA_ADMINISTRACION:
         return {"type": "web_app", "text": TEXTO_DE_LA_ADMINISTRACION,
-                "web_app": {"url": direccion_de_la_administracion(base)}}
+                "web_app": {"url": direccion_de_la_mini_app_de_administracion(base)}}
     return {"type": "web_app", "text": TEXTO_DEL_EQUIPO,
-            "web_app": {"url": direccion_de_la_web(base, slug, "inicio")}}
+            "web_app": {"url": direccion_de_la_mini_app(base, slug, "inicio")}}
 
 
 def fijar_el_menu(llamar: Callable[..., Any], slug: str) -> bool:

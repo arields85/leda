@@ -302,7 +302,7 @@ def test_el_despachador_arma_el_boton_de_la_mini_app_al_mandar(conn, intake_worl
     [mensaje] = transporte.enviados
     assert mensaje.texto == "Ahí va tu enlace."
     [boton] = mensaje.botones
-    assert (boton.etiqueta, boton.web_app) == ("Ver mis tareas", f"{BASE}/app/e/north-lab/")
+    assert (boton.etiqueta, boton.web_app) == ("Ver mis tareas", f"{BASE}/app/abrir/e/north-lab/")
     assert _filas(conn, "select * from enlace_de_entrada") == []
 
 
@@ -336,7 +336,7 @@ def test_cada_boton_dice_lo_que_va_a_pasar_y_lleva_directo_a_eso(conn, intake_wo
     _despachar(conn, intake_world, transporte)
     [boton] = transporte.enviados[0].botones
     assert boton.etiqueta == etiqueta
-    assert boton.web_app == f"{BASE}/app/e/north-lab/{consulta}" + (task_id or "")
+    assert boton.web_app == f"{BASE}/app/abrir/e/north-lab/{consulta}" + (task_id or "")
 
 
 def test_en_un_grupo_no_va_el_boton_y_queda_un_incidente(conn, intake_world, direccion):

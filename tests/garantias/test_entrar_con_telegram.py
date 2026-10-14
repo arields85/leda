@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import time
 from urllib.parse import urlencode
@@ -738,3 +739,127 @@ def test_el_tope_de_pedidos_pendientes_se_cuenta_con_un_candado(conn):
         definicion = cur.fetchone()["d"]
     conn.commit()
     assert definicion.index("pg_advisory_xact_lock") < definicion.index("count(*)")
+
+
+# --- El lanzador: Telegram en la computadora abre la web en el navegador (MA-2) ----------------
+#
+# Telegram de escritorio muestra la Mini App dentro de un marco, y la web no se deja enmarcar
+# (`frame-ancestors 'none'`). Decisión del usuario (2026-10-14): ahí el botón abre la web en el
+# navegador, con el QR. Sólo el lanzador se deja enmarcar, y sólo por Telegram: no tiene sesión,
+# ni datos, ni formularios.
+
+TELEGRAM_EN_LA_WEB = "https://web.telegram.org"
+
+
+@pytest.fixture
+def todo_el_servidor(conn, monkeypatch, tmp_path, bots):
+    """Todas las rutas del servidor con la conexión de la prueba y una web compilada de mentira:
+    nada toca otra base."""
+    from fastapi.testclient import TestClient
+
+    from leda import entrada, web_app
+
+    (tmp_path / "index.html").write_text("<!doctype html><title>Leda</title>", encoding="utf-8")
+    (tmp_path / "abrir.js").write_text("// lanzador", encoding="utf-8")
+    monkeypatch.setattr(web_app, "CARPETA_DE_LA_WEB", tmp_path)
+    monkeypatch.setattr(web_app, "_conn_de_la_web", lambda: conn)
+    monkeypatch.setattr(entrada, "_conn_de_paginas", lambda: conn)
+    monkeypatch.setattr(entrada, "_conn", lambda: conn)
+    return TestClient(entrada.app, base_url=BASE, follow_redirects=False)
+
+
+def _directivas(r) -> dict[str, str]:
+    partes = [p.strip() for p in r.headers["content-security-policy"].split(";") if p.strip()]
+    return {p.split()[0]: " ".join(p.split()[1:]) for p in partes}
+
+
+@pytest.mark.parametrize("camino", ["/app/abrir/e/north-lab/", "/app/abrir/e/north-lab/?tarea=x",
+                                    "/app/abrir/admin/"])
+def test_el_lanzador_solo_se_deja_enmarcar_por_telegram(todo_el_servidor, camino):
+    r = todo_el_servidor.get(camino)
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    politica = _directivas(r)
+    assert politica["frame-ancestors"] == TELEGRAM_EN_LA_WEB
+    assert "x-frame-options" not in r.headers
+    # Sólo sus propios scripts (el de Telegram y el del lanzador), sin pedidos ni formularios.
+    assert politica["script-src"] == "'self'"
+    assert politica["default-src"] == "'none'"
+    assert politica["connect-src"] == "'none'"
+    assert politica["form-action"] == "'none'"
+    assert r.headers["cache-control"] == "no-store"
+    assert '<script src="/app/telegram-web-app.js"></script>' in r.text
+    assert '<script src="/app/abrir.js" defer></script>' in r.text
+    assert "<form" not in r.text.lower()
+
+
+def test_el_lanzador_es_el_mismo_para_cualquiera_y_nunca_toca_una_sesion(todo_el_servidor):
+    """Ni lee ni pone una cookie: con la sesión del equipo o de la administración, o sin ninguna,
+    la misma página; y nada del pedido vuelve en ella."""
+    from leda.web_app import COOKIE, COOKIE_DE_ADMINISTRACION
+
+    sin = todo_el_servidor.get("/app/abrir/e/north-lab/?tarea=%3Cscript%3E")
+    con = todo_el_servidor.get("/app/abrir/e/north-lab/?tarea=%3Cscript%3E",
+                               cookies={COOKIE: "a" * 43, COOKIE_DE_ADMINISTRACION: "b" * 43})
+    admin_ = todo_el_servidor.get("/app/abrir/admin/")
+    assert sin.text == con.text == admin_.text
+    for r in (sin, con, admin_):
+        assert "set-cookie" not in r.headers
+        assert "north-lab" not in r.text and "script%3E" not in r.text
+
+
+@pytest.mark.parametrize("camino", ["/app/abrir/", "/app/abrir/e/", "/app/abrir/e/admin/",
+                                    "/app/abrir/e/North_Lab/", "/app/abrir/api/yo",
+                                    "/app/abrir/admin/x"])
+def test_un_lanzador_que_no_lleva_a_una_puerta_no_existe_y_no_se_enmarca(todo_el_servidor, camino):
+    r = todo_el_servidor.get(camino)
+    assert r.status_code == 404
+    assert r.headers["x-frame-options"] == "DENY"
+    assert _directivas(r)["frame-ancestors"] == "'none'"
+
+
+def _caminos_de_prueba(app) -> list[tuple[str, str]]:
+    """Cada ruta del servidor, con valores de mentira en sus partes variables."""
+    caminos = []
+    rutas = []
+    for ruta in app.routes:
+        # Las de un router incluido (FastAPI las guarda aparte), con su camino entero.
+        incluido = getattr(ruta, "original_router", None)
+        rutas.extend(incluido.routes if incluido is not None else [ruta])
+    for ruta in rutas:
+        metodos = getattr(ruta, "methods", None) or set()
+        camino = re.sub(r"\{[^}]+\}", "x", getattr(ruta, "path", ""))
+        for metodo in sorted(metodos & {"GET", "POST"}):
+            caminos.append((metodo, camino))
+    return caminos
+
+
+def test_ninguna_otra_ruta_se_deja_enmarcar(todo_el_servidor):
+    """Todo lo que no es el lanzador sigue con `frame-ancestors 'none'` y `X-Frame-Options:
+    DENY`: la web, la API, las páginas, el webhook y la salud."""
+    from leda import entrada
+
+    caminos = _caminos_de_prueba(entrada.app)
+    assert ("GET", "/app/abrir/x") in caminos and ("POST", "/telegram/x") in caminos
+    for metodo, camino in caminos:
+        r = todo_el_servidor.request(metodo, camino, json={})
+        assert r.headers.get("x-frame-options") == "DENY", (metodo, camino)
+        assert _directivas(r).get("frame-ancestors") == "'none'", (metodo, camino)
+
+
+def test_los_botones_de_la_mini_app_pasan_por_el_lanzador_y_la_direccion_para_la_compu_no():
+    """El botón `web_app` (y el del menú) abre el lanzador; la dirección que Leda pasa para la
+    computadora es la de la web, sin lanzador."""
+    from leda.despachador import (direccion_de_la_administracion, direccion_de_la_mini_app,
+                                  direccion_de_la_mini_app_de_administracion,
+                                  direccion_de_la_web)
+
+    assert direccion_de_la_mini_app("https://l.example/", "north-lab", "tarea", "t-1") == (
+        "https://l.example/app/abrir/e/north-lab/?tarea=t-1")
+    assert direccion_de_la_mini_app("https://l.example", "north-lab", "inicio") == (
+        "https://l.example/app/abrir/e/north-lab/")
+    assert direccion_de_la_mini_app_de_administracion("https://l.example/") == (
+        "https://l.example/app/abrir/admin/")
+    assert direccion_de_la_web("https://l.example", "north-lab", "inicio") == (
+        "https://l.example/app/e/north-lab/")
+    assert direccion_de_la_administracion("https://l.example") == "https://l.example/app/admin/"

@@ -36,7 +36,9 @@ from leda.motor.turno import procesar_turno
 from tests.motor.ayudantes import AHORA, todos
 
 DIRECCION = "https://leda.invalid/"
-MINI_APP = "https://leda.invalid/app/e/prueba/"
+# Los botones abren el lanzador (MA-2); la dirección para la computadora es la de la web.
+MINI_APP = "https://leda.invalid/app/abrir/e/prueba/"
+WEB = "https://leda.invalid/app/e/prueba/"
 
 BOTON = {"jugada": "pedir_acceso_web", "resultado": "boton_para_abrir_la_web",
          "lleva_el_boton": "Ver mis tareas"}
@@ -166,7 +168,7 @@ def test_a_direccion_el_boton_lleva_al_equipo(conn, mundo, escribe, direccion):
 def test_la_direccion_para_la_compu_va_sola_y_sin_boton(conn, mundo, escribe, direccion):
     [hecho], pedido = _dice(conn, escribe, Jugada("pedir_acceso_web", {"para_la_compu": True}))
     assert hecho == {"jugada": "pedir_acceso_web", "resultado": "direccion_para_la_compu",
-                     "direccion_para_la_compu": MINI_APP}
+                     "direccion_para_la_compu": WEB}
     assert _marcas(conn) == []
     [mensaje] = _despachar(conn, mundo).enviados
     assert mensaje.botones == []

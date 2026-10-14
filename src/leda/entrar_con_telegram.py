@@ -23,6 +23,11 @@ Rutas, todas bajo `/app` y del mismo origen que la web (la cookie de cada puerta
   base le da su sesión una sola vez, y queda la cookie de esa puerta.
 - `GET` y `POST /app/admin/api/espacios/{id}/sesion-en-la-compu`: cuánto queda recordada una
   computadora en ese espacio (1, 7, 30 o 90 días, o sin vencimiento; decisión 5).
+- `GET /app/abrir/e/<espacio>/` y `GET /app/abrir/admin/`: el lanzador que abren los botones de la
+  Mini App y el del menú (`despachador.direccion_de_la_mini_app`). En el celular sigue a la web
+  dentro de Telegram; en Telegram de la computadora, que muestra la Mini App dentro de un marco,
+  abre la web en el navegador, donde se entra con el QR (decisión del usuario, 2026-10-14). Es lo
+  único que se deja enmarcar, y sólo por Telegram: no tiene sesión, ni datos, ni formularios.
 
 **Nunca se registran** `initData`, la firma, los tokens de los bots ni los de las sesiones: en la
 consola, sólo el tipo de una falla.
@@ -43,7 +48,7 @@ from typing import Any
 from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Request
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 
 from . import qr
 from .config import config
@@ -53,7 +58,7 @@ from .db import sin_espacio
 from .web_app import (BOT_USUARIO, CAMINO_DE_ADMINISTRACION, COOKIE, COOKIE_DE_ADMINISTRACION,
                       LARGO_MAXIMO_DEL_TOKEN, USUARIO_DEL_BOT, _con_la_base,
                       _con_la_version_del_nucleo, _de_otro_sitio, _hash, _imprimir, _json,
-                      _sin_sesion_de_administracion, _token_de_administracion)
+                      _no_existe, _sin_sesion_de_administracion, _token_de_administracion)
 
 router = APIRouter(prefix="/app")
 
@@ -61,7 +66,10 @@ PUERTA_DEL_EQUIPO = "equipo"
 PUERTA_DE_ADMINISTRACION = "administracion"
 
 # Cuánto vale una firma de Telegram desde que se emitió (decisión 7), y cuánto puede venir del
-# futuro por la diferencia de relojes.
+# futuro por la diferencia de relojes. La base exige lo mismo (migración 0074,
+# `abrir_sesion_por_telegram`): el vencimiento que recibe es `auth_date` más 10 minutos, así que
+# nunca está a más de 11 minutos de su reloj (los 10 de la vigencia más el minuto de adelanto). El
+# comentario de esa función dice "vale 10 minutos" y compara con 11: los dos valores son estos.
 VIGENCIA_DE_LA_FIRMA_S = 10 * 60
 ADELANTO_TOLERADO_S = 60
 # Lo más largo que se acepta mirar de `initData` (Telegram manda unos 500 caracteres).
@@ -271,6 +279,67 @@ async def _en_un_hilo(funcion, *args):
     from starlette.concurrency import run_in_threadpool
 
     return await run_in_threadpool(funcion, *args)
+
+
+# --- El lanzador de la Mini App (Telegram en la computadora; MA-2) ------------------------------
+#
+# Telegram de escritorio y Telegram Web muestran la Mini App dentro de un marco cuya página es de
+# `https://web.telegram.org` (en Linux, Telegram de escritorio carga ahí su propio marco; en
+# Windows y en Mac, según la versión, la abre directo en su navegador interno, sin marco). La web
+# no se deja enmarcar, así que el botón abre este lanzador, que sí, y sólo por ese origen. En un
+# celular (`ios`, `android`) sigue a la web dentro de Telegram, con lo que Telegram le pasó en el
+# fragmento (la firma); en la computadora abre la web en el navegador (`openLink`), sin la firma,
+# y muestra "Abrí Leda en el navegador" con un botón para volver a abrirla. La lógica está en
+# `web/public/abrir.js`; esta página no tiene nada del pedido, ni sesión, ni datos.
+
+ORIGENES_QUE_ENMARCAN_EL_LANZADOR = ("https://web.telegram.org",)
+# A dónde puede llevar: la puerta del equipo de un espacio, o la de administración.
+DESTINO_DEL_LANZADOR = re.compile(r"^(?:e/([a-z0-9][a-z0-9-]{0,63})/|admin/)$")
+CABECERAS_DEL_LANZADOR = {
+    "Cache-Control": "no-store",
+    "Referrer-Policy": "no-referrer",
+    "X-Robots-Tag": "noindex, nofollow",
+    "X-Content-Type-Options": "nosniff",
+    # Sin `X-Frame-Options`: no admite una lista de orígenes, y `frame-ancestors` la reemplaza.
+    "Content-Security-Policy": ("default-src 'none'; script-src 'self'; "
+                                "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; "
+                                "connect-src 'none'; frame-ancestors "
+                                + " ".join(ORIGENES_QUE_ENMARCAN_EL_LANZADOR)),
+}
+PAGINA_DEL_LANZADOR = """<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Leda</title>
+<style>
+html,body{margin:0;min-height:100%;background:#0F1010;color:#E4E4E4}
+body{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;font-size:15px}
+main{max-width:28rem;margin:0 auto;padding:3rem 1.25rem}
+p{margin:0 0 1.5rem;line-height:1.5}
+button{font:inherit;color:#E4E4E4;background:#1C1D1D;border:1px solid #3A3B3B;border-radius:6px;padding:.6rem 1rem;cursor:pointer}
+button:hover{border-color:#6B6C6C}
+</style>
+<script src="/app/telegram-web-app.js"></script>
+<script src="/app/abrir.js" defer></script>
+</head>
+<body>
+<main id="lanzador"></main>
+</body>
+</html>
+"""
+
+
+@router.get("/abrir/{destino:path}", include_in_schema=False)
+def el_lanzador(destino: str):
+    """El lanzador de la Mini App: la misma página para cualquiera, sin sesión. Un destino que no
+    es una puerta no existe (y no se deja enmarcar)."""
+    encontrado = DESTINO_DEL_LANZADOR.match(destino)
+    if encontrado is None or (encontrado.group(1) is not None
+                              and not es_un_espacio(encontrado.group(1))):
+        return _no_existe()
+    return HTMLResponse(PAGINA_DEL_LANZADOR, headers=CABECERAS_DEL_LANZADOR)
 
 
 # --- El QR de la computadora (decisiones 4 y 8) -------------------------------------------------

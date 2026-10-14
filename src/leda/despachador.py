@@ -1206,6 +1206,29 @@ def direccion_de_la_administracion(base_url: str) -> str:
     return f"{base_url.rstrip('/')}/app/admin/"
 
 
+# El lanzador de la Mini App (`entrar_con_telegram.el_lanzador`): lo que abre cada botón `web_app`
+# y el del menú. En el celular sigue a la web dentro de Telegram; en Telegram de la computadora,
+# que la muestra dentro de un marco, abre la web en el navegador (decisión del usuario,
+# 2026-10-14). La dirección que Leda pasa para la computadora no pasa por él.
+CAMINO_DEL_LANZADOR = "/app/abrir/"
+
+
+def _por_el_lanzador(base_url: str, direccion: str) -> str:
+    base = f"{base_url.rstrip('/')}/app/"
+    return f"{base_url.rstrip('/')}{CAMINO_DEL_LANZADOR}{direccion[len(base):]}"
+
+
+def direccion_de_la_mini_app(base_url: str, slug: str, destino: str,
+                             tarea: str | None = None) -> str:
+    """Lo que abre un botón `web_app` del bot del espacio: el lanzador, con el mismo destino."""
+    return _por_el_lanzador(base_url, direccion_de_la_web(base_url, slug, destino, tarea))
+
+
+def direccion_de_la_mini_app_de_administracion(base_url: str) -> str:
+    """Lo que abre el botón `web_app` del bot de administración: el lanzador."""
+    return _por_el_lanzador(base_url, direccion_de_la_administracion(base_url))
+
+
 def _boton_de_la_marca(cur, workspace_id: str, m) -> Boton | None:
     """El botón que lleva la fila (`message_outbox_entrada_web`, migración 0073): el que abre la
     web donde corresponde, como Mini App del bot del espacio, o "Entrar en la compu" de un pedido
@@ -1240,8 +1263,8 @@ def _boton_de_la_marca(cur, workspace_id: str, m) -> Boton | None:
             sin_avisar_porque="el mensaje salió igual; sólo le falta el botón")
         return None
     return Boton(ETIQUETA_DEL_BOTON_DE_LA_WEB[destino], "",
-                 web_app=direccion_de_la_web(config.base_url, espacio["slug"], destino,
-                                             str(m["entrada_web_tarea"] or "") or None))
+                 web_app=direccion_de_la_mini_app(config.base_url, espacio["slug"], destino,
+                                                  str(m["entrada_web_tarea"] or "") or None))
 
 
 def _el_ofrecimiento_al_salir(cur, m, boton: Boton | None, ahora: datetime) -> None:
@@ -1608,7 +1631,7 @@ def _boton_de_la_administracion(n) -> Boton | None:
 
         if config.base_url and int(n["chat_id"]) > 0:
             return Boton(ETIQUETA_DE_LA_ADMINISTRACION, "",
-                         web_app=direccion_de_la_administracion(config.base_url))
+                         web_app=direccion_de_la_mini_app_de_administracion(config.base_url))
     return None
 
 

@@ -435,6 +435,37 @@ def salud():
     return {"ok": True}
 
 
+class NadaEnUnMarco:
+    """Ninguna respuesta del servidor se deja meter en un marco, salvo el lanzador de la Mini App
+    (`entrar_con_telegram.el_lanzador`, que se deja enmarcar sólo por Telegram): a la que no lo
+    dice, le pone `X-Frame-Options: DENY` y `frame-ancestors 'none'` (la web, la API, las páginas
+    y la salud ya lo dicen; el webhook y lo que se sume, desde acá)."""
+
+    def __init__(self, aplicacion):
+        self.aplicacion = aplicacion
+
+    async def __call__(self, scope, receive, send):
+        from .despachador import CAMINO_DEL_LANZADOR
+
+        if scope["type"] != "http" or scope.get("path", "").startswith(CAMINO_DEL_LANZADOR):
+            await self.aplicacion(scope, receive, send)
+            return
+
+        async def enviar(mensaje):
+            if mensaje["type"] == "http.response.start":
+                from starlette.datastructures import MutableHeaders
+
+                cabeceras = MutableHeaders(scope=mensaje)
+                if "x-frame-options" not in cabeceras:
+                    cabeceras["X-Frame-Options"] = "DENY"
+                if "content-security-policy" not in cabeceras:
+                    cabeceras["Content-Security-Policy"] = "frame-ancestors 'none'"
+            await send(mensaje)
+
+        await self.aplicacion(scope, receive, enviar)
+
+
+app.add_middleware(NadaEnUnMarco)
 app.include_router(router)
 # Entrar con Telegram (ADR 0024): la Mini App y el QR. Antes que la web, cuya última ruta toma
 # cualquier página bajo `/app`.

@@ -793,11 +793,11 @@ def test_al_arrancar_fija_el_boton_del_menu_de_cada_bot_con_la_direccion_del_mom
     [menu] = [p for metodo, p in m.telegram.llamadas if metodo == "setChatMenuButton"]
     assert "chat_id" not in menu
     assert menu["menu_button"] == {"type": "web_app", "text": "Tareas",
-                                   "web_app": {"url": "https://tunel.invalid/app/e/prueba/"}}
+                                   "web_app": {"url": "https://tunel.invalid/app/abrir/e/prueba/"}}
     [admin_menu] = [p for metodo, p in m.telegram_admin.llamadas
                     if metodo == "setChatMenuButton"]
     assert admin_menu["menu_button"]["text"] == "Administración"
-    assert admin_menu["menu_button"]["web_app"]["url"] == "https://tunel.invalid/app/admin/"
+    assert admin_menu["menu_button"]["web_app"]["url"] == "https://tunel.invalid/app/abrir/admin/"
 
 
 def test_sin_la_direccion_publica_no_fija_el_menu_y_deja_un_incidente(conn, mundo):

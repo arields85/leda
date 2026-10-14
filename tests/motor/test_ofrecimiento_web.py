@@ -39,7 +39,7 @@ DIRECCION = "https://leda.invalid/"
 ENLACE_WEB = re.compile(r"\nhttps://leda\.invalid/app/entrar/([A-Za-z0-9_-]{43})$")
 
 OFRECIMIENTO = {"ofrecimiento": "acceso_a_la_web", "lleva_el_boton": "Ver mis tareas"}
-MINI_APP = "https://leda.invalid/app/e/prueba/"
+MINI_APP = "https://leda.invalid/app/abrir/e/prueba/"
 
 
 def _boton_de_la_web(mensaje):

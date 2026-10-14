@@ -151,7 +151,7 @@ def test_start_en_el_bot_de_administracion_trae_el_boton_de_la_administracion(co
     [mensaje] = salida.enviados
     [boton] = mensaje.botones
     assert (boton.etiqueta, boton.web_app) == ("Administración",
-                                               "https://leda.invalid/app/admin/")
+                                               "https://leda.invalid/app/abrir/admin/")
 
 
 def test_el_qr_de_la_administracion_lo_aprueba_un_administrador(conn, mundo, ada):
@@ -220,6 +220,6 @@ def test_el_boton_de_la_administracion_va_solo_con_la_direccion_y_en_un_chat_pri
     monkeypatch.setattr(config_mod, "config",
                         dataclasses.replace(config_mod.config, base_url="https://leda.invalid/"))
     boton = _boton_de_la_administracion(aviso)
-    assert (boton.etiqueta, boton.web_app) == ("Administración", "https://leda.invalid/app/admin/")
+    assert (boton.etiqueta, boton.web_app) == ("Administración", "https://leda.invalid/app/abrir/admin/")
     assert _boton_de_la_administracion({**aviso, "chat_id": -100123}) is None
     assert _boton_de_la_administracion({**aviso, "boton": None}) is None
