@@ -1,5 +1,5 @@
-import { Check, CircleAlert } from 'lucide-react';
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Check } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { SessionClosedError } from '../api';
 import { shortDate } from '../format';
 import {
@@ -16,8 +16,12 @@ import {
   type TextField,
 } from './api';
 import { Completing } from './Completing';
+import { INPUT, PRIMARY, SECONDARY, WARN } from './controls';
+import { Counter } from './Counter';
 import { DatePicker, dayLabel } from './DatePicker';
 import { Dropdown } from './Dropdown';
+import { FieldBlock, Mark } from './FieldBlock';
+import { bringTo, FieldList, focusField as focusElement } from './FieldList';
 import { HelpBox, type HelpState } from './HelpBox';
 import {
   checkDraft,
@@ -29,7 +33,6 @@ import {
   FIELD_ID,
   FIELD_NAME,
   FIELD_ORDER,
-  length,
   LIMITS,
   memberOf,
   newKey,
@@ -49,7 +52,7 @@ import {
   withFixes,
 } from './draft';
 import { TaskPreview } from './TaskPreview';
-import { CONTROL, FIELD_HINT, FIELD_TITLE, FIELD_VALUE, TEXT_SIZE } from './typography';
+import { FIELD_HINT, FIELD_TITLE, FIELD_VALUE } from './typography';
 
 // The server's words when the free box is empty (src/leda/web_app.py, TEXTOS_DE_LA_AYUDA).
 const STORY_MISSING = 'Contame primero qué querés hacer; con eso Leda completa lo que pueda.';
@@ -58,40 +61,14 @@ type Step =
   | { kind: 'edit'; sending: boolean; failed: boolean; checking?: boolean }
   | { kind: 'done'; warnings: Problem[]; repeated: boolean; sent: Draft; notice: string | null };
 
-// What is missing or wrong is said in the palette's attention color (the one of an overdue
-// task): the only color on the form, and only while something needs fixing.
-const WARN = 'text-falta';
-// The shared box of every control (`typography.ts`), with the attention border while it is wrong.
-const INPUT = `${CONTROL} aria-[invalid=true]:border-falta`;
-// Dimmed while something required is missing, but never `disabled`: a tap still says what is
-// missing and takes the person there.
-const PRIMARY = `inline-flex h-11 items-center gap-2 rounded-card border-hard border-ink bg-card px-3.5 ${TEXT_SIZE} font-bold text-ink shadow-hard-ink disabled:opacity-50 aria-disabled:opacity-50 aria-disabled:shadow-none`;
-const SECONDARY = `inline-flex h-11 items-center rounded-card border-hard border-line-soft bg-transparent px-3.5 ${TEXT_SIZE} text-ink-soft disabled:opacity-50`;
-// Takes the color of the line it is in.
-const FIELD_LINK =
-  'cursor-pointer border-0 bg-transparent p-0 text-left font-bold underline decoration-dotted underline-offset-2';
-
-/** Brings `area` to the middle of the screen with a vertical-only scroll, then focuses `target`
- * without letting the browser scroll on its own: on a phone a focus that scrolls can also move
- * the page sideways. */
-function bringTo(area: HTMLElement, target: HTMLElement) {
-  const box = area.getBoundingClientRect();
-  const top = window.scrollY + box.top - Math.max(16, (window.innerHeight - box.height) / 2);
-  const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  window.scrollTo({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
-  target.focus({ preventScroll: true });
+/** Takes the person to a field of the task form (`FieldList.focusField`). */
+function focusField(field: Field) {
+  focusElement(FIELD_ID[field]);
 }
 
-/** Takes the person to a field: its whole block (label, control and message) in view, and the
- * focus on the control itself (a list's button), the chosen (or first) day of the calendar, or the
- * first evidence box (the group itself when it has none). */
-function focusField(field: Field) {
-  const element = document.getElementById(FIELD_ID[field]);
-  if (!element) return;
-  const target = element.matches('input, select, textarea, button')
-    ? element
-    : (element.querySelector<HTMLElement>('[tabindex="0"], input, select, textarea') ?? element);
-  bringTo(element.closest<HTMLElement>('[data-field]') ?? element, target);
+/** A field of the task form as a summary names it. */
+function named(fields: Field[]) {
+  return fields.map((field) => ({ key: field, name: FIELD_NAME[field], elementId: FIELD_ID[field] }));
 }
 
 /** Whether the server looked the key up before refusing: not with a malformed value, nor with a
@@ -111,88 +88,6 @@ function fieldsWith(problems: Problem[]): Field[] {
   return FIELD_ORDER.filter((field) => problems.some((p) => PROBLEM_FIELD[p.campo] === field));
 }
 
-/** "Falta completar: criterio de aceptación, evidencia." Each name takes the focus to its field. */
-/** The mark in front of what the form still needs: a Lucide icon, not a "!" character (user,
- * 2026-10-13). Decorative: the text next to it says it all. */
-function Mark() {
-  return <CircleAlert aria-hidden="true" strokeWidth={2.25} className="mt-[0.2em] size-[1em] shrink-0" />;
-}
-
-function FieldList({ label, fields }: { label: string; fields: Field[] }) {
-  if (fields.length === 0) return null;
-  return (
-    <p className="m-0 flex min-w-0 items-start gap-1.5">
-      <Mark />
-      <span className="min-w-0">
-      {label}:{' '}
-      {fields.map((field, i) => (
-        <Fragment key={field}>
-          {i > 0 && ', '}
-          <button type="button" className={FIELD_LINK} onClick={() => focusField(field)}>
-            {FIELD_NAME[field]}
-          </button>
-        </Fragment>
-      ))}
-      .
-      </span>
-    </p>
-  );
-}
-
-/** The small mark of a value Leda proposed, until the person changes it. Outside the label, so
- * the field keeps its name. */
-function Proposed({ on }: { on?: boolean }) {
-  return on ? <span className="shrink-0 text-propuesto">· propuesto por Leda</span> : null;
-}
-
-function FieldBlock({
-  id,
-  label,
-  extra,
-  errors,
-  hint,
-  proposed,
-  after,
-  children,
-}: {
-  id: string;
-  label: string;
-  extra?: ReactNode;
-  errors: Problem[];
-  hint?: ReactNode;
-  proposed?: boolean;
-  // Below the messages: what Leda proposes for this field, if anything.
-  after?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div data-field className="flex min-w-0 flex-col gap-1.5">
-      <div className={`flex min-w-0 items-baseline justify-between gap-2 ${FIELD_HINT}`}>
-        <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-          <label id={`${id}-label`} htmlFor={id} className={`min-w-0 ${FIELD_TITLE}`}>
-            {label}
-          </label>
-          <Proposed on={proposed} />
-        </span>
-        {extra}
-      </div>
-      {children}
-      {hint && <div className={`wrap-break-word ${FIELD_HINT}`}>{hint}</div>}
-      {errors.length > 0 && (
-        <ul id={`${id}-error`} className={`m-0 flex list-none flex-col gap-0.5 p-0 text-small font-bold ${WARN}`}>
-          {errors.map((e) => (
-            <li key={`${e.campo}-${e.motivo}`} className="flex min-w-0 items-start gap-1.5">
-              <Mark />
-              <span className="min-w-0">{e.texto}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {after}
-    </div>
-  );
-}
-
 /** The criterion Leda proposes with a refusal (J2-14 and J2-17: written by the AI in its own
  * words), with a one-tap button to use it. A shortcut: the person can also write her own. */
 function CriterionOffer({ text, onUse }: { text: string; onUse: () => void }) {
@@ -206,17 +101,6 @@ function CriterionOffer({ text, onUse }: { text: string; onUse: () => void }) {
         &gt; usar este criterio
       </button>
     </div>
-  );
-}
-
-function Counter({ value, limit }: { value: string; limit: number }) {
-  const n = length(value);
-  const over = n > limit;
-  return (
-    <span aria-live="polite" className={`shrink-0 ${over ? `font-bold ${WARN}` : ''}`}>
-      {n}/{limit}
-      {over && ` · sobran ${n - limit}`}
-    </span>
   );
 }
 
@@ -1019,8 +903,8 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               className={`flex min-w-0 flex-col gap-1 wrap-break-word text-body ${WARN} ${alerted ? 'rounded-card border-hard border-line px-3 py-2.5' : ''}`}
             >
               {alerted && <p className="m-0 font-bold text-ink">No se cargó: hay que corregir lo marcado.</p>}
-              <FieldList label="Falta completar" fields={missing} />
-              <FieldList label="Hay que corregir" fields={wrong} />
+              <FieldList label="Falta completar" fields={named(missing)} />
+              <FieldList label="Hay que corregir" fields={named(wrong)} />
               {general.map((p) => (
                 <p key={`${p.campo}-${p.motivo}`} className="m-0 flex min-w-0 items-start gap-1.5">
                   <Mark />
