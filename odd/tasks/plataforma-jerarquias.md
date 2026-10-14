@@ -1288,6 +1288,12 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - Si se retira, no se manda ningún mensaje: desaparece de lo que hay para aprobar, y quien abra el aviso
           viejo ve "Ya no hace falta".
         - Esto cambia la J5-D8: sin la línea "antes había pedido hasta el 28".
+        - **El botón de Nahuel dice "> ya no hace falta"** (no "retirar", que genera dudas) y pregunta por qué en una
+          línea. Si lo resolvió él: "Ya no hace falta: Nahuel lo resolvió (los encontró en el taller)". Si fue otra
+          cosa: sólo "Ya no hace falta", sin inventar que lo resolvió.
+      - **J6-D5. La propuesta de objetivo de un referente no existe para nadie hasta que Dirección la aprueba.** Martín
+        la ve sólo en "Lo que pedí" ("esperando a Ismael") y no le puede colgar tareas. Ismael aprueba, corrige o dice
+        que no con el motivo.
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
