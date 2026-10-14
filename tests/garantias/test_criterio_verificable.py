@@ -130,6 +130,30 @@ def test_no_se_no_se_carga_y_trae_un_criterio_propuesto(web, conn, intake_world,
     assert _contar(conn, "task") == 1
 
 
+def test_j2_26_la_propuesta_de_un_rechazo_no_nombra_a_nadie_del_espacio(
+        web, conn, intake_world, administradora, ia):
+    """El criterio que escribe la IA al rechazar nombra a Sam North (quien la hace): no se
+    propone; va el de reserva, con la evidencia del área y sin nombres."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({**SIN_RESULTADO,
+                          "criterio": "Sam North deja listo el PLC y sube el registro de la prueba."})
+    r = _cargar(navegador, intake_world, criterio="No se")
+    assert r.status_code == 422, r.text
+    (error,) = r.json()["errores"]
+    assert (error["motivo"], error["propuesta"]) == ("sin_resultado", PROPUESTO_PLC)
+
+
+def test_j2_26_el_criterio_que_escribe_la_persona_con_un_nombre_es_suyo(
+        web, conn, intake_world, administradora, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    criterio = "Sam North deja listo el PLC para integrarlo"
+    ia.respuestas.append({"dice_un_resultado": True, "resultado": criterio})
+    r = _cargar(navegador, intake_world, criterio=criterio)
+    assert r.status_code == 201, r.text
+    assert _fila(conn, "select criterio_aceptacion c from task where id = %s",
+                 r.json()["task_id"])["c"] == criterio
+
+
 @pytest.mark.parametrize("respuesta", [DICE_UN_RESULTADO, SIN_RESULTADO])
 def test_igual_al_titulo_no_se_carga_diga_lo_que_diga_la_ia(web, conn, intake_world,
                                                             administradora, ia, respuesta):

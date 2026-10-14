@@ -1,7 +1,7 @@
 """La medición de la ayuda de la IA al cargar (porción J2 de `odd/tasks/plataforma-jerarquias.md`):
 pedidos escritos como en un chat real, la misma función que usa la web y los mismos controles del
 código, contra la IA que se elija. **No se corre sin permiso del usuario**: con una IA real gasta
-unas 41 llamadas por vuelta (27 pedidos: 14 propuestas, cada una con dos llamadas, la propuesta y
+unas 43 llamadas por vuelta (28 pedidos: 15 propuestas, cada una con dos llamadas, la propuesta y
 el juicio por el sentido del criterio que escribió la IA, J2-13 y J2-17; 10 criterios escritos
 para juzgar al cargar, una llamada cada uno: J2-14, con la evidencia que pide el área basta un
 resultado, y todo rechazo trae un criterio propuesto; y 3 correcciones de la ortografía, J2-17,
@@ -32,14 +32,22 @@ un criterio que cuenta la comprobación desde quien revisa, y no desde quien hac
 revisa", "el revisor"): un "se ve" o el nombre de una persona pueden ser legítimos y no se pueden
 distinguir por las palabras, así que no se marcan. J2-25: un criterio en primera persona, como si
 hablara quien hace la tarea, se marca `en_primera_persona`; sólo por la primera palabra de cada
-oración (`en_primera_persona` dice cómo, y lo que no ve).
+oración (`en_primera_persona` dice cómo, y lo que no ve). J2-26: el criterio que propone Leda va
+sin nombres (el de quien la hace está en "La hace" y puede cambiar); uno que nombra a alguien del
+equipo o a una persona de los textos de los pedidos se marca `con_nombre` (la cocina lo descarta
+sólo para las del equipo y a quien la persona nombró para hacerla; a otra persona del texto, como
+"ariel", no la puede ver, y lo mide la herramienta). El UPS de la prueba del usuario ya no espera
+el rechazo de la comprobación circular: desde la J2-25 la IA real dice cómo se comprueba y el
+criterio se acepta (76 de 81: la expectativa había quedado vieja); y "el nombre en el criterio"
+muestra la red de la cocina: el criterio de la IA nombra a quien la hace, se descarta y se propone
+el del juicio.
 
 `--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira con un guion para el
 ejemplo del usuario, el sábado, "antes del jueves", el PLC, el UPS de la prueba del usuario (con
 la comprobación circular que dio la IA real), "cirelabs", los tornillos (con quién la hace y la
 evidencia que propone Leda), "pepe" (que no es del equipo), los juicios de los criterios y las
 correcciones de la ortografía (lo que tendría que contestar una IA que entendió), y nada para los
-demás; así la corrida en seco prueba los controles y la comparación: da 21 de 27 (sale con 1).
+demás; así la corrida en seco prueba los controles y la comparación: da 22 de 28 (sale con 1).
 `--ia PROVEEDOR/MODELO` (o `sol-suscripcion`, la suscripción de ChatGPT del usuario) usa la IA
 real. Sin base de datos: el equipo, los objetivos, las tareas y los días son fijos (hoy, el
 miércoles 14 de octubre de 2026), y quién la hace se busca con la misma función que el servidor,
@@ -222,13 +230,23 @@ PEDIDOS: list[dict[str, Any]] = [
     # no es el apodo de nadie, así que no hay quién la hace (J2-18: Leda no pone a otro) ni
     # evidencia de su área: la comprobación circular que dio la IA real se rechaza por su sentido
     # y Leda propone otro criterio (J2-17), que no inventa cómo se comprueba (J2-18).
+    # J2-26: desde la J2-25 la IA real dice cómo se comprueba (se lo ve encendido) y el criterio se
+    # acepta; la expectativa ya no es el rechazo de la comprobación circular, que sigue probada
+    # escrita ("el UPS circular, escrito") y en las pruebas del código.
     {"nombre": "el UPS de la prueba del usuario",
      "texto": "hay que cambiar el ups de la sala de servidores que lo vea el tano antes del "
               "jueves se corta todo",
      "apodos": {},
      "propone": {"titulo": True, "fecha": "2026-10-14", "criterio": True},
      "no_propone": ["responsable_id"],
-     "descarta": [["criterio", "sin_comprobacion"], ["responsable", "no_encontrado"]]},
+     "descarta": [["responsable", "no_encontrado"]]},
+    # J2-26: la IA nombra en el criterio a quien la hace; la cocina lo descarta y se propone el del
+    # juicio, sin nombres.
+    {"nombre": "el nombre en el criterio",
+     "texto": "lucas tiene que pintar el cartel de la entrada para el viernes",
+     "propone": {"titulo": True, "criterio": True, "responsable_id": "m-lucas",
+                 "fecha": "2026-10-16", "evidencia": True},
+     "descarta": [["criterio", "nombra_a_alguien"]]},
     # J2-17: el nombre mal escrito de la segunda prueba del usuario en el celular: la IA eligió
     # bien el objetivo ("Integrar el PLC con CoreLabs") pero escribió "cirelabs". J2-18: y Leda
     # propone a quién la hace.
@@ -312,6 +330,10 @@ PEDIDOS: list[dict[str, Any]] = [
 
 VACIO = {c: "" for c in ayuda_al_cargar.CAMPOS}
 
+# J2-26, sólo en la medición: las personas que nombran los textos de los pedidos y no son del
+# equipo, para marcar un criterio con nombre (`con_nombre`); las del equipo salen de `OPCIONES`.
+PERSONAS_DE_LOS_PEDIDOS = ("ariel", "pepe", "el tano", "tano")
+
 # J2-19, sólo en la medición: los tipos de evidencia del pack que dicen lo mismo (el usuario los vio
 # tildados juntos en el celular: "una foto o una captura de la pantalla" y "una foto del trabajo
 # terminado"). Leda no los propone juntos; el código de Leda no lo decide, lo mide la herramienta.
@@ -344,8 +366,8 @@ GUION: dict[str, dict[str, str]] = {
         "evidencia": "E5"},
     "el PLC, sin quién ni cómo se comprueba": {
         "titulo": "Dejar listo el PLC de la comprimidora Fette 2000",
-        "criterio": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos, y Ariel "
-                    "los ve desde la interfaz.",
+        "criterio": "El PLC de la comprimidora Fette 2000 y sus variables quedan listos, y se "
+                    "leen desde la interfaz.",
         "quien_la_hace": "P2", "evidencia": "E1"},
     # J2-18: Leda propone a Lucas (Infraestructura) y una foto del trabajo terminado, dicha dentro
     # de una oración natural.
@@ -359,17 +381,24 @@ GUION: dict[str, dict[str, str]] = {
     "alguien que no es del equipo": {
         "titulo": "Ordenar el depósito", "criterio": "El depósito queda ordenado.",
         "responsable": "pepe", "quien_la_hace": "P1"},
+    # Como la IA real de la ronda de la J2-25: dice cómo se comprueba.
     "el UPS de la prueba del usuario": {
         "titulo": "Cambiar el UPS de la sala de servidores",
-        "criterio": "El UPS de la sala de servidores está cambiado. Se comprueba verificando en la "
-                    "sala de servidores que el UPS fue reemplazado.",
+        "criterio": "El UPS de la sala de servidores queda cambiado y funcionando, y se lo ve "
+                    "encendido en la sala.",
         "resultado": "El UPS de la sala de servidores está cambiado",
         "responsable": "el tano", "fecha": "2026-10-14", "como_dijo_la_fecha": "antes del jueves"},
     "cirelabs": {
         "titulo": "Integrar el PLC de la Fette con CoreLabs",
-        "criterio": "El PLC de la Fette queda integrado con CoreLabs y Ariel lo ve en la "
-                    "interfaz.",
+        "criterio": "El PLC de la Fette queda integrado con CoreLabs y se ve en la interfaz.",
         "objetivo": "O4", "quien_la_hace": "P2", "evidencia": "E1"},
+    # Como la IA real de la ronda de la J2-25: nombra a quien la hace.
+    "el nombre en el criterio": {
+        "titulo": "Pintar el cartel de la entrada", "responsable": "lucas",
+        "criterio": "Lucas Pérez pinta el cartel de la entrada y entrega una foto del trabajo "
+                    "terminado.",
+        "resultado": "El cartel de la entrada queda pintado",
+        "fecha": "2026-10-16", "como_dijo_la_fecha": "para el viernes", "evidencia": "E4"},
 }
 # Lo que contesta en seco el juicio de un criterio (escrito o propuesto), por su texto: lo que
 # diría una IA que lo juzga por su sentido y que, si no sirve, escribe el suyo con sus palabras
@@ -387,17 +416,20 @@ GUION_DEL_JUICIO: dict[str, dict[str, Any]] = {
     "servidores que el UPS fue reemplazado.":
         {"dice_como_se_comprueba": False, "como_se_comprueba": "",
          "criterio": "El UPS de la sala de servidores queda cambiado."},
+    _UPS_DE_LEDA:
+        {"dice_como_se_comprueba": True, "como_se_comprueba": "se lo ve encendido en la sala",
+         "criterio": ""},
     "El depósito queda ordenado.":
         {"dice_como_se_comprueba": False, "como_se_comprueba": "",
          "criterio": "El depósito queda ordenado."},
     "El ups queda cambiado y funcionando":
         {"dice_como_se_comprueba": False, "como_se_comprueba": "", "criterio": _UPS_DE_LEDA},
-    "El PLC de la comprimidora Fette 2000 y sus variables quedan listos, y Ariel los ve desde la "
+    "El PLC de la comprimidora Fette 2000 y sus variables quedan listos, y se leen desde la "
     "interfaz.":
-        {"dice_como_se_comprueba": True, "como_se_comprueba": "Ariel los ve desde la interfaz",
+        {"dice_como_se_comprueba": True, "como_se_comprueba": "se leen desde la interfaz",
          "criterio": ""},
-    "El PLC de la Fette queda integrado con CoreLabs y Ariel lo ve en la interfaz.":
-        {"dice_como_se_comprueba": True, "como_se_comprueba": "Ariel lo ve en la interfaz",
+    "El PLC de la Fette queda integrado con CoreLabs y se ve en la interfaz.":
+        {"dice_como_se_comprueba": True, "como_se_comprueba": "se ve en la interfaz",
          "criterio": ""},
 }
 _ESTANTE = "El estante queda colocado"
@@ -441,14 +473,21 @@ GUION_DEL_RESULTADO: dict[str, dict[str, Any]] = {
     "El cartel de la entrada queda pintado y se ve terminado.":
         {"dice_un_resultado": True, "resultado": "", "criterio": ""},
     # J2-18: con quién la hace propuesto por Leda, el juicio tiene la evidencia de su área.
-    "El PLC de la comprimidora Fette 2000 y sus variables quedan listos, y Ariel los ve desde la "
+    "El PLC de la comprimidora Fette 2000 y sus variables quedan listos, y se leen desde la "
     "interfaz.":
         {"dice_un_resultado": True, "resultado": "", "criterio": ""},
-    "El PLC de la Fette queda integrado con CoreLabs y Ariel lo ve en la interfaz.":
+    "El PLC de la Fette queda integrado con CoreLabs y se ve en la interfaz.":
         {"dice_un_resultado": True, "resultado": "", "criterio": ""},
     "Están los 12 tornillos de 8 mm y el estante queda colgado, y se puede ver en una foto del "
     "trabajo terminado.":
         {"dice_un_resultado": True, "resultado": "", "criterio": ""},
+}
+# J2-26: lo que contesta en seco el juicio cuando el criterio de la IA no llegó a juzgarse (la cocina
+# lo descartó: nombraba a alguien), por el título de la tarea: el criterio de Leda, sin nombres.
+GUION_SIN_CRITERIO: dict[str, dict[str, Any]] = {
+    "Pintar el cartel de la entrada":
+        {"dice_un_resultado": False, "resultado": "El cartel de la entrada queda pintado",
+         "criterio": "El cartel de la entrada queda pintado, con una foto del trabajo terminado."},
 }
 # Lo que corrige en seco la IA de la ortografía, por el primer texto del pedido: lo que haría una
 # IA que entendió (sólo la ortografía, con los nombres de los datos).
@@ -544,6 +583,20 @@ def en_primera_persona(texto: str) -> list[str]:
             and p not in _NO_SON_VERBOS]
 
 
+def _personas_de_la_medicion() -> list[str]:
+    nombres = [i["nombre"] for i in OPCIONES["integrantes"]]
+    partes = [p for n in nombres for p in ayuda_al_cargar._normal(n).split() if len(p) >= 3]
+    return [*(ayuda_al_cargar._normal(n) for n in nombres), *partes, *PERSONAS_DE_LOS_PEDIDOS]
+
+
+def con_nombre(texto: str) -> list[str]:
+    """Las personas que nombra un criterio propuesto (J2-26), sin mayúsculas ni tildes: del equipo
+    (enteras o una parte) o de los textos de los pedidos. Vacío si no nombra a nadie. Más amplia
+    que la de la cocina (también en minúscula, y "ariel"): es para medir, no decide nada."""
+    plano = f" {_plano(texto)} "
+    return list(dict.fromkeys(p for p in _personas_de_la_medicion() if f" {p} " in plano))
+
+
 def sin_naturalidad(texto: str, etiquetas: list[str]) -> list[str]:
     """Por qué un texto propuesto parece armado por el código y no escrito por una persona: la
     frase de la plantilla, una etiqueta de la evidencia de cuatro palabras o más pegada como un
@@ -606,10 +659,12 @@ class IAEnSeco:
         entrada = json.loads(next(m["content"] for m in cuerpo["messages"]
                                   if m["role"] == "user"))
         nombre = cuerpo["tools"][0]["function"]["name"]
-        if nombre == ayuda_al_cargar.NOMBRE_DEL_JUICIO:
+        if nombre == ayuda_al_cargar.NOMBRE_DEL_JUICIO and not entrada["criterio"]:
+            datos: dict[str, Any] = GUION_SIN_CRITERIO.get(entrada["titulo"], {})
+        elif nombre == ayuda_al_cargar.NOMBRE_DEL_JUICIO:
             guion = (GUION_DEL_RESULTADO if "evidencia_que_pide_el_area" in entrada
                      else GUION_DEL_JUICIO)
-            datos: dict[str, Any] = guion.get(entrada["criterio"], {})
+            datos = guion.get(entrada["criterio"], {})
         elif nombre == ayuda_al_cargar.NOMBRE_DE_LA_ORTOGRAFIA:
             primero = next(iter(entrada["textos"].values()), "")
             datos = GUION_DE_LA_ORTOGRAFIA.get(primero, {})
@@ -726,10 +781,12 @@ def medir_el_juicio(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     fallas += [f"propuesta desde quien revisa: «{m}»" for m in revisa]
     primera = en_primera_persona(juicio.propuesta) if juicio.propuesta else []
     fallas += [f"propuesta en primera persona: «{m}»" for m in primera]
+    nombres = con_nombre(juicio.propuesta) if juicio.propuesta else []
+    fallas += [f"propuesta con un nombre: «{m}»" for m in nombres]
     return not fallas, {"falla": None, "juicio": juicio.motivo, "propuesta": juicio.propuesta,
                         "de_reserva": juicio.de_reserva, "sin_naturalidad": naturalidad,
                         "desde_quien_revisa": revisa, "en_primera_persona": primera,
-                        "segundos": segundos, "fallas": fallas}
+                        "con_nombre": nombres, "segundos": segundos, "fallas": fallas}
 
 
 def medir_la_ortografia(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
@@ -776,9 +833,11 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
         return False, {**_de_la_ia(falla), "segundos": round(time.monotonic() - desde, 2)}
     segundos = round(time.monotonic() - desde, 2)
     apodos = pedido.get("apodos")
+    del_pedido = APODOS if apodos is None else apodos
     r = ayuda_al_cargar.revisar(crudo, texto=pedido["texto"], escrito=VACIO, opciones=OPCIONES,
                                 coinciden=lambda dicho: coinciden(dicho, apodos),
-                                objetivo_de=OBJETIVO_DE.get)
+                                objetivo_de=OBJETIVO_DE.get,
+                                apodos=[a for lista in del_pedido.values() for a in lista])
     # Como la web: el criterio que escribió la IA se juzga por su sentido, ya con la evidencia del
     # área de quien la hace (J2-13 y J2-17). Si el juicio no responde o no deja un criterio, la
     # propuesta sigue como en la web (con el de reserva, si hay evidencia), salvo sin cupo o con un
@@ -816,6 +875,8 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     fallas += [f"criterio: desde quien revisa: «{m}»" for m in revisa]
     primera = en_primera_persona(r.propuesta["criterio"]) if "criterio" in r.propuesta else []
     fallas += [f"criterio: en primera persona: «{m}»" for m in primera]
+    nombres = con_nombre(r.propuesta["criterio"]) if "criterio" in r.propuesta else []
+    fallas += [f"criterio: con un nombre: «{m}»" for m in nombres]
     todo = " ".join(textos.values())
     for palabra in pedido.get("bien_escrito", []):
         if palabra not in todo:
@@ -827,7 +888,7 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
                         "falla_del_juicio": falla_del_juicio, "propuesta": r.propuesta,
                         "criterio_de": r.criterio_de, "responsable_de": r.responsable_de,
                         "sin_naturalidad": naturalidad, "desde_quien_revisa": revisa,
-                        "en_primera_persona": primera,
+                        "en_primera_persona": primera, "con_nombre": nombres,
                         "avisos": [a["texto"] for a in r.avisos],
                         "descartados": r.descartados, "elegir": r.elegir,
                         "juicio": None if juicio is None else (juicio.motivo or "lo_dice"),

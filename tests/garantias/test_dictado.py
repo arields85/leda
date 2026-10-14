@@ -291,6 +291,58 @@ def test_si_no_se_entendio_nada_lo_dice_sin_incidente(web, conn, intake_world, a
     assert auditoria["detalle"]["resultado"] == "vacio"
 
 
+# --- La deuda de la J2b (revisión `review-0f465303e17d9ce6`) ----------------------------------
+
+def test_gemini_tiene_un_plazo_total_que_vence_antes_que_la_web(web, conn, intake_world,
+                                                                administradora, gemini,
+                                                                monkeypatch):
+    """El plazo de `httpx` es por operación: una respuesta que llega de a gotas lo estira sin
+    fin. El dictado tiene un plazo total, debajo de los 45 s de la web; vencido, es que Gemini no
+    respondió (un aviso y un incidente), aunque la llamada siga colgada."""
+    import time
+
+    from leda import dictado
+
+    assert dictado.PLAZO_DEL_PROVEEDOR_S <= dictado.PLAZO_TOTAL_S < 45
+    monkeypatch.setattr(dictado, "PLAZO_TOTAL_S", 0.3)
+    gemini.al_llamar = lambda: time.sleep(2)
+    gemini.respuestas.append(_con_texto(DICHO))
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    desde = time.monotonic()
+    r = _dictar(navegador, _norte(intake_world)["id"])
+    assert time.monotonic() - desde < 1.5
+    assert r.status_code == 502
+    assert r.json() == {"error": "sin_dictado", "texto": TEXTO_SIN_DICTADO}
+    assert "plazo_total" in _incidente(conn)["referencia_cruda"]
+    auditoria = _fila(conn, "select detalle from audit_log where accion = 'dictar_al_cargar'")
+    assert auditoria["detalle"]["resultado"] == "sin_respuesta"
+
+
+TEXTO_CORTADO = ("Pasé a texto sólo una parte: el dictado se cortó. Dictá lo que falta o "
+                 "escribilo acá.")
+
+
+def test_una_transcripcion_cortada_por_el_tope_lo_avisa(web, conn, intake_world, administradora,
+                                                       gemini):
+    """Si Gemini se detuvo por el tope de salida, el texto llega con un aviso de que se cortó
+    (nunca en silencio, como si fuera todo); la auditoría lo dice y queda un incidente, por si el
+    tope quedó corto."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    gemini.respuestas.append(httpx.Response(200, json={"candidates": [
+        {"content": {"role": "model", "parts": [{"text": DICHO}]},
+         "finishReason": "MAX_TOKENS"}]}))
+    r = _dictar(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 200, r.text
+    assert r.json() == {"texto": DICHO, "aviso": TEXTO_CORTADO}
+    auditoria = _fila(conn, "select detalle from audit_log where accion = 'dictar_al_cargar'")
+    assert auditoria["detalle"]["resultado"] == "cortado"
+    assert auditoria["detalle"]["respondio"] is True
+    assert auditoria["detalle"]["caracteres"] == len(DICHO)
+    incidente = _incidente(conn)
+    assert incidente is not None and "MAX_TOKENS" in incidente["referencia_cruda"]
+    _sin_nada_sensible(incidente["referencia_cruda"], incidente["resumen_sanitizado"])
+
+
 # --- La auditoría -----------------------------------------------------------------------------
 
 def test_la_auditoria_guarda_el_pedido_sin_el_audio_ni_el_texto(web, conn, intake_world,

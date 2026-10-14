@@ -456,6 +456,44 @@ def test_el_ups_circular_del_usuario_se_reemplaza_por_el_del_juicio(web, conn, i
     assert _contar(conn, "incident", "etapa = 'ayuda_al_cargar'") == 0
 
 
+def test_j2_26_un_criterio_que_nombra_a_alguien_del_espacio_no_se_propone(
+        web, conn, intake_world, administradora, con_lucas, ia):
+    """J2-26: "lucas" es el apodo de Sam North en este espacio (de la base, no de lo que nombró
+    la persona): el criterio de la IA que lo dice no se propone; el del juicio, sin nombres, sí.
+    La auditoría lo dice, sin incidente (hubo un criterio para proponer)."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.juzga = lambda entrada: {"dice_como_se_comprueba": False, "como_se_comprueba": "",
+                                "criterio": DEL_JUICIO}
+    ia.respuestas.append(_respuesta(
+        responsable=None, espera=None,
+        criterio="El estante del módem queda colgado y lucas lo deja firme en la sala."))
+    r = _pedir(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 200, r.text
+    assert r.json()["propuesta"]["criterio"] == DEL_JUICIO
+    assert {"campo": "criterio", "motivo": "nombra_a_alguien"} in _auditoria(conn)["descartados"]
+    assert _auditoria(conn)["criterio_de"] == "juicio"
+    assert _contar(conn, "incident", "etapa = 'ayuda_al_cargar'") == 0
+
+
+def test_j2_26_si_tampoco_el_del_juicio_sirve_se_dice_y_queda_un_incidente(
+        web, conn, intake_world, administradora, con_lucas, ia):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.juzga = lambda entrada: {"dice_como_se_comprueba": False, "como_se_comprueba": "",
+                                "criterio": "Sam deja el estante del módem colgado y firme."}
+    ia.respuestas.append(_respuesta(
+        responsable=None, espera=None,
+        criterio="Sam North cuelga el estante del módem en la sala y lo deja firme."))
+    r = _pedir(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 200, r.text
+    assert "criterio" not in r.json()["propuesta"]
+    avisos = {a["campo"]: a["texto"] for a in r.json()["avisos"]}
+    assert avisos["criterio"] == (
+        "No pude proponer el criterio con lo que escribiste; contame cómo se comprueba.")
+    incidente = _fila(conn, "select * from incident where etapa = 'ayuda_al_cargar'")
+    assert incidente is not None and "nombra_a_alguien" in incidente["referencia_cruda"]
+    assert "Sam" not in incidente["referencia_cruda"]
+
+
 def test_si_el_juicio_no_responde_al_proponer_queda_un_incidente(web, conn, intake_world,
                                                                   administradora, con_lucas, ia):
     from leda.motor.ia_real import PlazoAgotado

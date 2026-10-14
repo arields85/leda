@@ -205,7 +205,7 @@ def ayuda():
 
 def _proponer(ayuda, respuesta: dict[str, Any], *, texto: str = EJEMPLO, escrito=None,
               coinciden=_coinciden, objetivo_de=_objetivo_de, juzga=juzga_que_si,
-              opciones=None):
+              opciones=None, apodos=()):
     """Como la ruta de la ayuda: la propuesta, lo que decide el código, el juicio por el sentido
     del criterio que escribió la IA (`juzgar_la_propuesta`, J2-13 y J2-17, ya con la evidencia
     del área de quien la hace) y el criterio que se propone."""
@@ -215,7 +215,7 @@ def _proponer(ayuda, respuesta: dict[str, Any], *, texto: str = EJEMPLO, escrito
     entrada = ayuda.entrada_de_la_ia(texto, escrito, opciones)
     crudo = ayuda.pedir(ia, entrada)
     resultado = ayuda.revisar(crudo, texto=texto, escrito=escrito, opciones=opciones,
-                              coinciden=coinciden, objetivo_de=objetivo_de)
+                              coinciden=coinciden, objetivo_de=objetivo_de, apodos=apodos)
     ayuda.cerrar_el_criterio(resultado, ayuda.juzgar_la_propuesta(ia, resultado))
     return resultado, ia
 
@@ -307,12 +307,12 @@ def test_un_numero_o_un_nombre_que_nadie_dijo_no_se_propone(ayuda, campo, valor)
 
 
 def test_un_nombre_de_los_datos_de_la_tarea_vale(ayuda):
-    """El objetivo, la tarea que espera, quién la hace y su área son de esta tarea: nombrarlos no
-    es inventar."""
-    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(
-        criterio=("Lucas Pérez colgó el estante en la sala, después del tablero de la "
-                  "máquina 3, y se ve en una foto.")))
-    assert resultado.propuesta["criterio"].startswith("Lucas Pérez colgó")
+    """El objetivo, la tarea que espera y el área de quien la hace son de esta tarea: nombrarlos no
+    es inventar. (A quien la hace, el criterio ya no lo nombra: J2-26.)"""
+    criterio = ("El estante queda colgado en la sala de Infraestructura, después del tablero de "
+                "la máquina 3, y se ve en una foto.")
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(criterio=criterio))
+    assert resultado.propuesta["criterio"] == criterio
 
 
 def test_los_topes_del_formulario(ayuda):
@@ -1202,8 +1202,10 @@ def test_en_seco_la_medicion_prueba_algo(medir, tmp_path, capsys):
                     "ortografía: el árbol y CoreLabs", "ortografía: bien escrito no se toca",
                     "ortografía: como en un chat",
                     # J2-18: Leda propone quién la hace y la evidencia; a "pepe" no lo reemplaza.
-                    "los tornillos, sin quién ni cuándo", "alguien que no es del equipo"}
-    assert len(medir.PEDIDOS) == 27
+                    "los tornillos, sin quién ni cuándo", "alguien que no es del equipo",
+                    # J2-26: la cocina descarta el criterio que nombra a quien la hace.
+                    "el nombre en el criterio"}
+    assert len(medir.PEDIDOS) == 28
     (tornillos,) = [r for r in informe["resultados"]
                     if r["pedido"] == "los tornillos, sin quién ni cuándo"]
     assert tornillos["propuesta"]["responsable_id"] == "m-lucas"
@@ -1225,15 +1227,20 @@ def test_en_seco_la_medicion_prueba_algo(medir, tmp_path, capsys):
     assert ejemplo["propuesta"]["criterio"] == medir.GUION["el ejemplo del usuario"]["criterio"]
     assert ejemplo["criterio_de"] == "ia" and ejemplo["sin_naturalidad"] == {}
     (ups,) = [r for r in informe["resultados"] if r["pedido"] == "el UPS de la prueba del usuario"]
-    assert ups["juicio"] == "sin_comprobacion" and ups["criterio_de"] == "juicio"
+    # J2-26: como la IA real desde la J2-25, el criterio dice cómo se comprueba y se acepta.
+    assert ups["juicio"] == "lo_dice" and ups["criterio_de"] == "ia"
     assert "Contame cómo se sabe que está terminada." not in ups["avisos"]
+    (nombre,) = [r for r in informe["resultados"] if r["pedido"] == "el nombre en el criterio"]
+    assert {"campo": "criterio", "motivo": "nombra_a_alguien"} in nombre["descartados"]
+    assert nombre["criterio_de"] == "juicio" and nombre["con_nombre"] == []
+    assert all(not r.get("con_nombre") for r in informe["resultados"])
     (no_se,) = [r for r in informe["resultados"] if r["pedido"] == "no se"]
     assert no_se["juicio"] == "sin_resultado" and no_se["de_reserva"] is False
     assert "Se comprueba con lo que pide el área" not in no_se["propuesta"]
     (arbol,) = [r for r in informe["resultados"]
                 if r["pedido"] == "ortografía: el árbol y CoreLabs"]
     assert arbol["corregidos"]["titulo"]["texto"] == "Plantar el árbol de la entrada"
-    assert f"21 de {len(medir.PEDIDOS)} bien" in capsys.readouterr().out
+    assert f"22 de {len(medir.PEDIDOS)} bien" in capsys.readouterr().out
 
 
 def test_la_medicion_marca_lo_escrito_sin_naturalidad(medir):
@@ -2001,8 +2008,9 @@ def test_j2_22_las_instrucciones_piden_la_comprobacion_desde_quien_la_hace(ayuda
     }
     for donde, texto in textos.items():
         plano = " ".join(texto.lower().split())
-        assert "desde quien hace la tarea" in plano, donde
-        assert "qué hace y qué entrega" in plano, donde
+        # J2-26: lo que queda hecho y lo que se entrega, sin nombrar a quien la hace.
+        assert "qué queda hecho y qué se entrega" in plano, donde
+        assert "ni como algo que mira quien la revisa" in plano, donde
         assert "cómo sabe quien la revise" not in plano, donde
     # Corto: sólo con la evidencia propuesta (J2-19).
     assert "y sólo con esa" in " ".join(ayuda.INSTRUCCIONES.split())
@@ -2046,9 +2054,7 @@ def test_j2_25_las_instrucciones_piden_el_criterio_en_tercera_persona(ayuda):
     for donde, texto in textos.items():
         plano = " ".join(texto.lower().split())
         assert "en tercera persona" in plano, donde
-        assert "nunca como si esa persona hablara" in plano, donde
-    # Con su nombre cuando se sabe quién la hace (la propuesta lo recibe; el juicio, no).
-    assert "por su nombre" in " ".join(ayuda.INSTRUCCIONES.lower().split())
+        assert "nunca como si hablara quien la hace" in plano, donde
 
 
 @pytest.mark.parametrize("criterio, marcado", [
@@ -2071,6 +2077,178 @@ def test_j2_25_la_medicion_hace_fallar_la_propuesta_en_primera_persona(medir):
     ok, detalle = medir.medir(IADeLaCarga(estante), no_se)
     assert ok is False
     assert detalle["en_primera_persona"] == ["coloco"]
+
+
+# --- J2-26: el criterio sin nombres -----------------------------------------------------------
+#
+# La ronda de la J2-25 (76 de 81): nombrar a la persona ata el criterio a un responsable que puede
+# cambiar, cuela nombres que no son del equipo ("pepe", "el tano") y una vez tomó por responsable a
+# quien necesitaba la tarea. El criterio va en tercera persona y sin nombres; el nombre está en "La
+# hace". La instrucción lo describe; la cocina lo asegura: un criterio que propone Leda y nombra a
+# alguien (del equipo, por su nombre, una parte de él o su apodo, o a quien la persona nombró para
+# hacerla) no se propone, como cualquier otro que no pasa los controles. El que escribe la persona
+# a mano es suyo y no se toca.
+
+def test_j2_26_las_instrucciones_piden_el_criterio_sin_nombres(ayuda):
+    textos = {
+        "la propuesta": ayuda.INSTRUCCIONES,
+        "el dato del criterio": ayuda._DATOS["criterio"],
+        "el juicio": ayuda.INSTRUCCIONES_DEL_JUICIO,
+        "el juicio sin quién": ayuda.INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN,
+        "el resultado": ayuda.INSTRUCCIONES_DEL_RESULTADO,
+        "el criterio del juicio": ayuda._CRITERIO_DE_LEDA["description"],
+    }
+    for donde, texto in textos.items():
+        plano = " ".join(texto.lower().split())
+        assert "sin nombrar a nadie" in plano, donde
+    # Ya no se pide el nombre de quien la hace (J2-25).
+    plano = " ".join(ayuda.INSTRUCCIONES.lower().split())
+    assert "por su nombre" not in plano
+    assert "su propio dato" in plano
+
+
+CON_NOMBRE = "Lucas Pérez cuelga el estante del módem en la sala y entrega una foto."
+SIN_NOMBRE = "El estante del módem queda colgado en la sala, con una foto del trabajo terminado."
+
+
+def test_j2_26_un_criterio_de_la_ia_que_nombra_a_quien_la_hace_no_se_propone(ayuda):
+    """El de la IA nombra a Lucas: se descarta y se propone el del juicio, sin nombres."""
+    def juzga(entrada):
+        assert entrada["criterio"] == ""       # el que nombraba no llega a juzgarse
+        return {"dice_un_resultado": False, "resultado": RESULTADO_DEL_EJEMPLO,
+                "criterio": SIN_NOMBRE}
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(criterio=CON_NOMBRE, evidencia="E1"),
+                             juzga=juzga)
+    assert resultado.propuesta["criterio"] == SIN_NOMBRE
+    assert resultado.criterio_de == "juicio"
+    assert {"campo": "criterio", "motivo": "nombra_a_alguien"} in resultado.descartados
+    assert "criterio" not in _avisos(resultado)
+    # Lucas sigue siendo quien la hace: su nombre está en su dato.
+    assert resultado.propuesta["responsable_id"] == "m-lucas"
+
+
+@pytest.mark.parametrize("criterio", [
+    "Lucas cuelga el estante del módem en la sala y entrega una foto.",        # el nombre solo
+    "Pérez deja colgado el estante del módem en la sala.",                     # el apellido
+    "El estante del módem queda colgado por lucas pérez en la sala.",          # el nombre entero
+    "El estante queda colgado y Marcos Díaz lo ve en la sala.",               # otro del equipo
+])
+def test_j2_26_cualquier_nombre_del_equipo_cuenta(ayuda, criterio):
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(criterio=criterio, evidencia="E1"),
+                             juzga=lambda e: {"dice_un_resultado": False, "resultado": "",
+                                              "criterio": SIN_NOMBRE})
+    assert {"campo": "criterio", "motivo": "nombra_a_alguien"} in resultado.descartados
+    assert resultado.propuesta["criterio"] == SIN_NOMBRE
+
+
+def test_j2_26_a_quien_la_persona_nombro_y_no_es_del_equipo_tampoco(ayuda):
+    """"pepe" no es del equipo: el criterio que lo nombra, aunque sea en minúsculas, no se
+    propone; sin evidencia ni otro criterio, el campo lo dice."""
+    texto = "que lo haga pepe, ordenar el deposito para la semana que viene"
+    resultado, _ = _proponer(ayuda, {"titulo": "Ordenar el depósito",
+                                     "criterio": "pepe ordena el depósito y queda limpio.",
+                                     "responsable": "pepe"},
+                             texto=texto, coinciden=_nadie,
+                             juzga=lambda e: {"dice_como_se_comprueba": False,
+                                              "como_se_comprueba": "",
+                                              "criterio": "Pepe deja el depósito ordenado."})
+    assert {"campo": "criterio", "motivo": "nombra_a_alguien"} in resultado.descartados
+    assert "criterio" not in resultado.propuesta
+    assert _avisos(resultado)["criterio"] == (
+        "No pude proponer el criterio con lo que escribiste; contame cómo se comprueba.")
+
+
+def test_j2_26_un_apodo_del_equipo_tambien(ayuda):
+    resultado, _ = _proponer(
+        ayuda, _respuesta_del_ups(criterio="El tano cambia el UPS de la sala de servidores.",
+                                  responsable=None),
+        texto=UPS, coinciden=_nadie, apodos=["el tano"],
+        juzga=lambda e: {"dice_como_se_comprueba": False, "como_se_comprueba": "",
+                         "criterio": DEL_JUICIO})
+    assert {"campo": "criterio", "motivo": "nombra_a_alguien"} in resultado.descartados
+    assert resultado.propuesta["criterio"] == DEL_JUICIO
+
+
+def test_j2_26_el_criterio_del_juicio_que_nombra_cae_al_de_reserva(ayuda):
+    """El del juicio también nombra: el de reserva, con la evidencia, sin nombres; y el juicio deja
+    la causa para el incidente."""
+    resultado, _ = _proponer(ayuda, _respuesta_del_ejemplo(criterio=CON_NOMBRE, evidencia="E1"),
+                             juzga=lambda e: {"dice_un_resultado": False,
+                                              "resultado": RESULTADO_DEL_EJEMPLO,
+                                              "criterio": CON_NOMBRE})
+    assert resultado.criterio_de == "reserva"
+    assert "Lucas" not in resultado.propuesta["criterio"]
+    assert resultado.propuesta["criterio"].startswith(RESULTADO_DEL_EJEMPLO)
+
+
+def test_j2_26_un_resultado_que_nombra_no_arma_el_de_reserva(ayuda):
+    resultado, _ = _proponer(
+        ayuda, _respuesta_del_ejemplo(criterio=CON_NOMBRE, evidencia="E1",
+                                      resultado="Lucas colgó el estante del módem en la sala"),
+        juzga=lambda e: {"dice_un_resultado": False, "resultado": "", "criterio": ""})
+    assert "criterio" not in resultado.propuesta
+    assert "criterio" in _avisos(resultado)
+
+
+@pytest.mark.parametrize("criterio, nombra", [
+    # Una parte de un nombre cuenta escrita como nombre, con mayúscula; en minúscula es una palabra
+    # del trabajo ("la luz del pasillo" con Luz Gómez en el equipo).
+    ("La luz del pasillo queda encendida y se ve en una foto.", False),
+    ("Luz cambia la lámpara del pasillo y entrega una foto.", True),
+    ("Queda encendida la lámpara que cambió luz gómez.", True),   # el nombre entero, en minúscula
+    ("La lámpara del pasillo queda encendida.", False),
+])
+def test_j2_26_que_cuenta_como_un_nombre(ayuda, criterio, nombra):
+    personas = ["Luz Gómez", "Ismael Soschinski"]
+    assert ayuda.nombra_a_alguien(criterio, personas) is nombra
+
+
+def test_j2_26_al_cargar_el_criterio_de_la_persona_es_suyo(ayuda):
+    """El que escribió la persona a mano no se toca aunque nombre a alguien: si sirve, sirve."""
+    ia = IADeLaCarga({"dice_un_resultado": True, "resultado": "", "criterio": ""})
+    juicio = ayuda.juzgar_el_criterio(
+        ia, titulo=TITULO_UPS, descripcion="",
+        criterio="Lucas cambia el UPS y lo deja funcionando.", evidencia=[PRUEBA],
+        personas=["Lucas Pérez"])
+    assert juicio.motivo is None
+
+
+def test_j2_26_al_cargar_la_propuesta_de_un_rechazo_no_nombra(ayuda):
+    """El rechazo trae el criterio de Leda: si el de la IA nombra a alguien del equipo, el de
+    reserva; si tampoco hay, la causa queda para el incidente."""
+    ia = IADeLaCarga({"dice_un_resultado": False, "resultado": RESULTADO_PROPUESTO,
+                      "criterio": "Lucas Pérez cambia el UPS y entrega cómo lo probó."})
+    juicio = ayuda.juzgar_el_criterio(ia, titulo=TITULO_UPS, descripcion="", criterio="No se",
+                                      evidencia=[PRUEBA], personas=["Lucas Pérez"])
+    assert juicio.motivo == "sin_resultado" and juicio.de_reserva
+    assert "Lucas" not in juicio.propuesta
+    ia = IADeLaCarga({"dice_como_se_comprueba": False, "como_se_comprueba": "",
+                      "criterio": "Lucas cambia el UPS y lo ve encendido."})
+    juicio = ayuda.juzgar_el_criterio(ia, titulo=TITULO_UPS, descripcion="", criterio="No se",
+                                      personas=["Lucas Pérez"])
+    assert juicio.motivo == "sin_comprobacion" and juicio.propuesta is None
+    assert "nombra_a_alguien" in str(juicio.falla)
+
+
+@pytest.mark.parametrize("criterio, nombres", [
+    ("Lucas Pérez pinta el cartel y entrega una foto.", ["lucas perez", "lucas", "perez"]),
+    ("El PLC queda listo y ariel lo ve desde la interfaz.", ["ariel"]),
+    ("El tano cambia el UPS.", ["el tano", "tano"]),
+    ("El cartel de la entrada queda pintado, con una foto del trabajo terminado.", []),
+])
+def test_j2_26_la_medicion_marca_el_criterio_con_un_nombre(medir, criterio, nombres):
+    assert medir.con_nombre(criterio) == nombres
+
+
+def test_j2_26_la_medicion_hace_fallar_la_propuesta_con_un_nombre(medir):
+    """Una persona que la cocina no puede ver (no es del equipo ni la nombraron para hacerla) la
+    marca la medición."""
+    (no_se,) = [p for p in medir.PEDIDOS if p["nombre"] == "no se"]
+    estante = {"dice_un_resultado": False, "resultado": "El estante queda colocado",
+               "criterio": "El estante queda colocado y firme, y ariel lo ve terminado."}
+    ok, detalle = medir.medir(IADeLaCarga(estante), no_se)
+    assert ok is False
+    assert detalle["con_nombre"] == ["ariel"]
 
 
 # --- Advertencia de RDD de la J2-19: quién la hace y su área, con una sola búsqueda --------------
