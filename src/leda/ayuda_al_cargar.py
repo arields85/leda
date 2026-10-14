@@ -828,19 +828,62 @@ def _problema_del_texto(texto: str, permitidos: Sequence[str], largo: int, *,
 # mayúscula: en minúscula es una palabra del trabajo ("la luz del pasillo" con Luz en el equipo).
 # Lo que no ve: a alguien que no es del equipo y la persona nombró para otra cosa ("para que ariel
 # lo vea"); eso lo pide la instrucción, y lo mide la herramienta de la medición.
+#
+# J2-30 (revisión J2-29): al empezar una oración (al principio del texto, o después de un punto,
+# "!", "?", ":" o un renglón nuevo) la mayúscula es de la oración y no dice que la palabra sea un
+# nombre: ahí una palabra suelta no cuenta ("Marcos de la puerta…" con Marcos en el equipo). Y un
+# apodo cuenta escrito como está registrado, con sus mismas mayúsculas (`motor.apodos` lo guarda en
+# minúsculas; la de un artículo no dice nada: "El tano" es "el tano"), o escrito como nombre en el
+# medio de una oración, como cualquier palabra suelta.
 
 _NO_SON_NOMBRES = frozenset({"el", "la", "los", "las", "lo", "de", "del", "y"})
+_FIN_DE_ORACION = frozenset(".!?:…\n\r")
+# Lo que puede haber entre el fin de una oración y su primera palabra.
+_ANTES_DE_UNA_ORACION = " \t\"'«“‘([¿¡"
+
+
+class Apodo(str):
+    """Un apodo vigente del espacio, entre los nombres de `personas_del_espacio`: cuenta escrito
+    como está registrado (J2-30)."""
 
 
 def personas_del_espacio(opciones: Mapping[str, Any], apodos: Sequence[str] = ()) -> list[str]:
     """Los nombres de las personas del espacio que un criterio de Leda no nombra: los integrantes,
-    quienes hacen las tareas abiertas y los apodos vigentes, sin repetir."""
+    quienes hacen las tareas abiertas y los apodos vigentes (como `Apodo`), sin repetir."""
     nombres: list[str] = []
     for valor in [*(m.get("nombre") for m in opciones.get("integrantes") or []),
-                  *(t.get("responsable") for t in opciones.get("tareas") or []), *apodos]:
+                  *(t.get("responsable") for t in opciones.get("tareas") or [])]:
         if isinstance(valor, str) and valor.strip() and valor not in nombres:
             nombres.append(valor)
+    for valor in apodos:
+        if isinstance(valor, str) and valor.strip() and valor not in nombres:
+            nombres.append(Apodo(valor))
     return nombres
+
+
+def _al_empezar_una_oracion(texto: str, inicio: int) -> bool:
+    antes = texto[:inicio].rstrip(_ANTES_DE_UNA_ORACION)
+    return not antes or antes[-1] in _FIN_DE_ORACION
+
+
+def _sin_tildes(palabra: str) -> str:
+    """La palabra sin tildes, con sus mayúsculas."""
+    return "".join(c for c in unicodedata.normalize("NFD", palabra)
+                   if unicodedata.category(c) != "Mn")
+
+
+def _como_el_apodo(escrita: str, del_apodo: str) -> bool:
+    """Una palabra escrita como la del apodo registrado: con sus mismas mayúsculas, salvo un
+    artículo, cuya mayúscula no dice nada ("El tano" es "el tano")."""
+    if del_apodo.casefold() in _NO_SON_NOMBRES:
+        return escrita.casefold() == del_apodo.casefold()
+    return escrita == del_apodo
+
+
+def _escrito_el_apodo(escritas: Sequence[str], apodo: Sequence[str]) -> bool:
+    n = len(apodo)
+    return n > 0 and any(all(_como_el_apodo(e, a) for e, a in zip(escritas[i:i + n], apodo))
+                         for i in range(len(escritas) - n + 1))
 
 
 def nombra_a_alguien(texto: str, personas: Sequence[str], dichos: Sequence[str] = ()) -> bool:
@@ -849,10 +892,14 @@ def nombra_a_alguien(texto: str, personas: Sequence[str], dichos: Sequence[str] 
     plano = _normal(texto)
     frases: set[str] = set()
     sueltas: set[str] = set()
+    apodos: list[list[str]] = []
     for persona in personas:
         normal = _normal(persona)
         if normal:
-            frases.add(normal)
+            if isinstance(persona, Apodo):
+                apodos.append([_sin_tildes(p) for p in _PALABRA.findall(persona)])
+            else:
+                frases.add(normal)
             sueltas |= {p for p in normal.split() if len(p) >= 3 and p not in _NO_SON_NOMBRES}
     for dicho in dichos:
         palabras = _normal(dicho).split()
@@ -864,8 +911,12 @@ def nombra_a_alguien(texto: str, personas: Sequence[str], dichos: Sequence[str] 
             frases.add(palabras[1])
     if any(_contiene(plano, f) for f in frases):
         return True
-    return any(m.group(0)[0].isupper() and _sin_marcas(m.group(0)) in sueltas
-               for m in _PALABRA.finditer(texto))
+    palabras = list(_PALABRA.finditer(texto))
+    escritas = [_sin_tildes(m.group(0)) for m in palabras]
+    if any(_escrito_el_apodo(escritas, apodo) for apodo in apodos):
+        return True
+    return any(m.group(0)[0].isupper() and not _al_empezar_una_oracion(texto, m.start())
+               and _sin_marcas(m.group(0)) in sueltas for m in palabras)
 
 
 def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],

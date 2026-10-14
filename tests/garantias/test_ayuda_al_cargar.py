@@ -479,7 +479,9 @@ def test_j2_26_si_tampoco_el_del_juicio_sirve_se_dice_y_queda_un_incidente(
         web, conn, intake_world, administradora, con_lucas, ia):
     navegador = _navegador_de_administracion(web, conn, administradora)
     ia.juzga = lambda entrada: {"dice_como_se_comprueba": False, "como_se_comprueba": "",
-                                "criterio": "Sam deja el estante del módem colgado y firme."}
+                                # J2-30: "Sam" solo al empezar la oración ya no cuenta como
+                                # nombre; su apodo, escrito como está registrado, sí.
+                                "criterio": "El estante del módem queda colgado y lucas lo ve."}
     ia.respuestas.append(_respuesta(
         responsable=None, espera=None,
         criterio="Sam North cuelga el estante del módem en la sala y lo deja firme."))

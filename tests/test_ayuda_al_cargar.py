@@ -2129,7 +2129,7 @@ def test_j2_26_un_criterio_de_la_ia_que_nombra_a_quien_la_hace_no_se_propone(ayu
 
 @pytest.mark.parametrize("criterio", [
     "Lucas cuelga el estante del módem en la sala y entrega una foto.",        # el nombre solo
-    "Pérez deja colgado el estante del módem en la sala.",                     # el apellido
+    "El estante del módem lo deja colgado Pérez en la sala.",                  # el apellido
     "El estante del módem queda colgado por lucas pérez en la sala.",          # el nombre entero
     "El estante queda colgado y Marcos Díaz lo ve en la sala.",               # otro del equipo
 ])
@@ -2194,12 +2194,39 @@ def test_j2_26_un_resultado_que_nombra_no_arma_el_de_reserva(ayuda):
     # Una parte de un nombre cuenta escrita como nombre, con mayúscula; en minúscula es una palabra
     # del trabajo ("la luz del pasillo" con Luz Gómez en el equipo).
     ("La luz del pasillo queda encendida y se ve en una foto.", False),
-    ("Luz cambia la lámpara del pasillo y entrega una foto.", True),
+    ("La lámpara del pasillo la cambia Luz y entrega una foto.", True),
     ("Queda encendida la lámpara que cambió luz gómez.", True),   # el nombre entero, en minúscula
+    ("Luz Gómez cambia la lámpara del pasillo.", True),           # el nombre entero, al empezar
     ("La lámpara del pasillo queda encendida.", False),
+    # J2-30 (revisión J2-29): al empezar una oración la mayúscula es de la oración, no dice que sea
+    # un nombre. Al principio del texto o después de un punto, "!", "?", ":" o un renglón nuevo,
+    # una parte suelta no cuenta; tampoco cuando la oración es la de un nombre ("Luz cambia…").
+    ("Luz del pasillo encendida, con una foto.", False),
+    ("La lámpara queda cambiada. Luz del pasillo encendida.", False),
+    ("¿Quedó cambiada? Luz del pasillo encendida.", False),
+    ("Revisado: Luz del pasillo encendida.", False),
+    ("La lámpara queda cambiada\nLuz del pasillo encendida.", False),
+    ("Luz cambia la lámpara del pasillo y entrega una foto.", False),
 ])
 def test_j2_26_que_cuenta_como_un_nombre(ayuda, criterio, nombra):
     personas = ["Luz Gómez", "Ismael Soschinski"]
+    assert ayuda.nombra_a_alguien(criterio, personas) is nombra
+
+
+@pytest.mark.parametrize("criterio, nombra", [
+    # J2-30 (revisión J2-29): un apodo cuenta escrito como está registrado ("lucas", en minúscula,
+    # como lo guarda `motor.apodos`), o escrito como nombre en el medio de la oración; con otras
+    # mayúsculas al empezar una oración, no ("Lucas de la puerta…": los marcos de la puerta).
+    ("Lucas de la puerta quedan pintados y se ve en una foto.", False),
+    ("Los marcos de la puerta quedan pintados y lucas lo ve.", True),
+    ("Los marcos de la puerta quedan pintados y Lucas lo ve.", True),
+    ("Los marcos de la puerta quedan pintados.", False),
+    # La mayúscula de un artículo no dice nada: "El tano" es el apodo "el tano".
+    ("El tano cambia el UPS de la sala.", True),
+])
+def test_j2_30_un_apodo_cuenta_escrito_como_esta_registrado(ayuda, criterio, nombra):
+    personas = ayuda.personas_del_espacio({"integrantes": [{"nombre": "Sam North"}]},
+                                          ["lucas", "el tano"])
     assert ayuda.nombra_a_alguien(criterio, personas) is nombra
 
 
@@ -2222,8 +2249,10 @@ def test_j2_26_al_cargar_la_propuesta_de_un_rechazo_no_nombra(ayuda):
                                       evidencia=[PRUEBA], personas=["Lucas Pérez"])
     assert juicio.motivo == "sin_resultado" and juicio.de_reserva
     assert "Lucas" not in juicio.propuesta
+    # El nombre entero, en minúscula: sólo `nombra_a_alguien` lo ve (J2-30: "Lucas" solo al
+    # empezar la oración ya no cuenta, y con mayúscula en el medio lo rechaza antes `nombre`).
     ia = IADeLaCarga({"dice_como_se_comprueba": False, "como_se_comprueba": "",
-                      "criterio": "Lucas cambia el UPS y lo ve encendido."})
+                      "criterio": "El UPS lo cambia lucas pérez y lo ve encendido."})
     juicio = ayuda.juzgar_el_criterio(ia, titulo=TITULO_UPS, descripcion="", criterio="No se",
                                       personas=["Lucas Pérez"])
     assert juicio.motivo == "sin_comprobacion" and juicio.propuesta is None
