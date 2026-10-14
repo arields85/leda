@@ -1059,6 +1059,34 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       que su objetivo, "> aceptar la demora" la carga directo, con una fecha prevista para el objetivo
       (decisión 7). El referente del objetivo recibe un aviso con la decisión. Necesita las previsiones de
       objetivos de la J5: si la J4 llega antes, esa salida espera a la J5.
+      **J4a, construida** (escritor delegado, 2026-10-14). Commits:
+      - `311e5b56`: la base y la migración `0071_la_carga_del_equipo`;
+      - `9ce0b235`: el servidor;
+      - `9d2fa373`: la web;
+      - `cedc94d0`, `e48fa4d6`, `e7b176e0`, `1387c38c`, `3a29a51e` y `2ed6759d`: arreglos de RDD, la J3-6, la J3-7
+        y pruebas.
+      Qué trae:
+      - **Cada tarea guarda quién la revisa y quién la pidió.** `quien_revisa_la_tarea` lee primero el de la
+        tarea, así que la página, la escalera, la aprobación y el pase lo siguen.
+      - **`cargar_tarea_web`** sirve a las dos puertas, con quién le carga a quién (D1b, D3, D4, D10, D13 y D14).
+      - **La reapertura** por quien pidió la tarea: la tarea vuelve a `asignada`, con el referente del área como
+        responsable.
+      - **La web del equipo:** "> nueva tarea", "Lo que pediste" con "> pedir cambios" y "> pasarla" en el sector.
+      - **Para la J4b:** la auditoría de cada carga guarda la puerta, quién revisa y quién pidió.
+      Pruebas: las 30 de la base fallaron antes del código y pasan después. `tests/garantias`: 1004 passed, y las
+      3 fallas eran de dos pruebas, ya arregladas. `npm test`: 244 passed.
+      `leda_motor`: respaldo `leda_motor-antes-0071-20261014.dump`, ensayo en una copia descartable, `0071`
+      aplicada y el pack reimportado (`niveles` con los nombres nuevos).
+      **RDD** commit por commit: nueve revisiones, todas aprobadas, con 13 WARNING que pasan a la J4b. Entre ellos:
+      - quién revisa queda fijo aunque la persona cambie de rol;
+      - borrar el recuadro mientras arranca el dictado;
+      - errores de pase y de reapertura mal clasificados;
+      - quién decidió quedaba viejo al cambiar de espacio;
+      - la línea del tipo y el artículo de los nombres;
+      - la exención por nombre en `test_capacidades`;
+      - pruebas atadas a la posición de una oración.
+  - [ ] **J4b · Los avisos de la carga y "quiero crear una tarea" por Telegram**, más los WARNING de la RDD de
+        la J4a.
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
       Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
       la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección
