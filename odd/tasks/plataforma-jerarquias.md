@@ -1187,7 +1187,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       5. Las pestañas "Mis tareas", "Mi equipo" y "Lo que pedí" van en una sola fila, como pestañas de verdad.
          "Mi equipo" muestra sólo las tareas de la gente del referente, con el nombre del área como dato, y no
          aparece si no tiene a nadie a cargo.
-      6. El título va en una sola línea.
+      6. El título y el nombre de la persona en la misma línea. "N activas" pasa al bloque de contadores, donde sirve.
+         Todo entra en una pantalla: sólo se desplazan las tarjetas de tareas.
       7. Se suma el contador "Por empezar".
       En Telegram de escritorio el mensaje dice "Abrí Leda en el navegador".
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
