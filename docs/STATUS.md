@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-13, cierre de la noche: la J2 pasó en el celular ("quedó perfecto todo"); quedan su revisión de conjunto (J2-29) y la suite completa; sigue la J3. Ver "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-14, tarde: J2 cerrada, J3 pasada, J4 construida y probada, MA construida y en prueba; decisiones de J4, MA, J5 y J6 tomadas. Ver "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -71,25 +71,40 @@ viejo corriendo.
   Usuario: "quedó perfecto todo".
 - `leda_motor`, en la `0067` (respaldos en `db/respaldos/`, el último `leda_motor-antes-0067-20261013.dump`).
 
-**Punto exacto para seguir** (cierre del 2026-10-13, noche; el usuario se fue a dormir y pidió que el agente
-siga solo con lo pendiente de la J2 a la J7, anotando las decisiones que le hagan falta):
+**Punto exacto para seguir** (2026-10-14, tarde; actualizado por contexto, sin cerrar la sesión):
 1. **Hecho el 2026-10-14:**
-   - La J2 está cerrada: la revisión J2-29 y sus arreglos J2-30, y la suite completa con 3286 passed.
-   - La J3, los objetivos desde la web, pasó en el celular. La IA real dio 45 de 45 y 57 de 57.
-   - La J4a está construida: la carga desde la web del equipo.
-   - `leda_motor` quedó en la `0071`, con el pack reimportado.
-   - Las decisiones de la J4, la Mini App y la J5 se tomaron con el usuario de a una; están en el documento de
-     la unidad.
-   - El [ADR 0024](decisions/0024-entrar-con-telegram.md), la Mini App y el QR para la computadora, quedó
-     aceptado.
-2. **Sigue:**
-   - la J4b, los avisos de la carga y "quiero crear una tarea" por Telegram, con un escritor delegado;
-   - después, la **MA**, la Mini App, adelantada por el usuario: va antes de J5 a J7;
-   - después, J5, J6 y J7. De la J5 hay 11 decisiones preparadas: la 1 se preguntó y está sin contestar.
-   Acuerdo del 2026-10-14: las decisiones de cada porción se le traen al usuario al principio, de a una y en
-   texto, nunca con la ventanita de preguntas.
-3. **Al cerrar cada tarea**, el documento de la unidad, este punto para retomar, la copia en Engram y la memoria
-   se actualizan en el momento (`AGENTS.md`, regla nueva del 2026-10-13).
+   - **J2:** cerrada (la J2-29 y sus arreglos, la J2-30, y la suite con 3286 passed).
+   - **J3:** pasó en el celular. Quedan la J3-6 y la J3-7 para que el usuario las mire en la prueba de la MA
+     (pasos 10 a 12 del guion); con eso se cierra.
+   - **J4a y J4b:** construidas y revisadas por RDD. La prueba de la J4 en el celular está hecha y sus hallazgos
+     se arreglaron en la MA.
+   - **MA, la Mini App y el QR del ADR 0024:** construida, con la `0073` aplicada en `leda_motor`. La IA real dio
+     12 de 12 y RDD aprobó todo.
+   - **Decisiones completas** de la J4, la MA, la J5 y la J6, en el documento de la unidad.
+2. **En curso:** un escritor delegado en tres cosas de la MA:
+   - el botón fijo del menú del bot, que se actualiza con el túnel en cada arranque;
+   - "abrí la app", que hoy no se entiende;
+   - el mensaje sin jugada, al que Leda contesta con la pregunta pendiente y lo ignora.
+   Después sigue una última unidad con los WARNING de RDD de la MA, primero los dos de seguridad; si hace falta
+   tocar la base, va en la `0074`. Una suite completa sobre la MA corre en segundo plano.
+3. **La prueba de la MA en el celular** (`docs/product/guion-celular-ma.md`) quedó en pausa en el paso 1:
+   "quiero ver mis tareas" contestó con la lista y sin botón, como corresponde. Se retoma cuando esté el botón del
+   menú.
+4. **Después:**
+   - la tarea "Lenguaje: sin trabado ni bloqueada";
+   - J5 y J6, con sus decisiones ya tomadas;
+   - J7, de la que todavía faltan las decisiones.
+   Deudas abiertas:
+   - el detalle de la tarea no muestra quién la pidió, qué espera ni quién la espera;
+   - la ortografía de la puerta del equipo falló dos veces; hay que mirarla con la IA real;
+   - cuánto dura la sesión de administración en la computadora.
+Acuerdos del 2026-10-14:
+- las decisiones de cada porción se traen al principio, de a una y en texto;
+- RDD y las rondas con la IA real, sin preguntar; al primer error de cupo, se para y espera;
+- los avisos cuentan lo que vale ahora, no la historia;
+- un cambio de plazo trae el informe de "en qué afecta" antes de decidir.
+`leda_motor`: en la `0073` (respaldos `db/respaldos/leda_motor-antes-006x/007x-20261014.dump`). La web corre en
+segundo plano y el túnel es `pharmaceutical-configuring-unix-while`. El escuchador lo reinicia el usuario.
 Para probar en el celular: el agente levanta la web y el túnel en segundo plano y pone la dirección nueva en
 `LEDA_BASE_URL` del `.env`; el usuario emite el enlace con `leda enlace-admin Ariel` (en una terminal sin un
 `$env:LEDA_BASE_URL` viejo). La web y el túnel de la sesión del 2026-10-13 corren en segundo plano de esa sesión
