@@ -330,3 +330,34 @@ def test_registrar_webhooks_se_niega_sin_direccion_o_sin_secreto(monkeypatch):
                                   "webhook_secret": SECRETO, **falta}))
         with pytest.raises(LookupError):
             entrada.registrar_webhooks(TelegramFalso().cliente())
+
+
+def test_el_toque_de_entrar_en_la_compu_por_el_webhook_del_bot_de_administracion(webhook, conn):
+    """R3-admin-callback-wiring-unproved: por el webhook, el toque de "Entrar en la compu" del
+    bot de administración recibe su acuse (`answerCallbackQuery`) y aprueba el pedido."""
+    import hashlib
+    import secrets
+
+    morgan = webhook["mundo"]["north-lab"]["people"]["Morgan Hale"]
+    with admin(conn) as cur:
+        cur.execute("insert into platform_role (app_user_id, rol) values (%s, 'administrador')",
+                    (morgan["app_user_id"],))
+    conn.commit()
+    codigo, secreto = "compu_" + secrets.token_urlsafe(24), secrets.token_urlsafe(32)
+    from leda.db import sin_espacio
+
+    with sin_espacio(conn) as cur:
+        cur.execute("""select pedir_entrada_por_qr('administracion', null, %s, %s, 'Chrome') as r""",
+                    (hashlib.sha256(codigo.encode()).hexdigest(),
+                     hashlib.sha256(secreto.encode()).hexdigest()))
+        pedido = cur.fetchone()["r"]["pedido_id"]
+    conn.commit()
+    r = _post(webhook["cliente"], "admin",
+              toque_de_telegram(4001, f"compu:{pedido}", morgan["telegram"], "cb-web"),
+              entrada.secreto_del_bot("admin"))
+    assert r.status_code == 200, r.text
+    acuses = [p for metodo, p in webhook["telegram"].llamadas if metodo == "answerCallbackQuery"]
+    assert acuses == [{"callback_query_id": "cb-web"}]
+    with admin(conn) as cur:
+        cur.execute("select estado from pedido_de_entrada where id = %s", (pedido,))
+        assert cur.fetchone()["estado"] == "aprobado"

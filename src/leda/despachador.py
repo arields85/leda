@@ -1218,6 +1218,9 @@ def _boton_de_la_marca(cur, workspace_id: str, m) -> Boton | None:
         return None
     destino = m.get("entrada_web_destino") or "inicio"
     if destino == "entrar_en_la_compu":
+        # Un pedido ya purgado (vencido hace más de un día; migración 0074) no tiene botón.
+        if not m.get("entrada_web_pedido"):
+            return None
         return Boton(ETIQUETA_ENTRAR_EN_LA_COMPU,
                      f"{PREFIJO_ENTRAR_EN_LA_COMPU}{m['entrada_web_pedido']}")
     from .config import config
@@ -1595,6 +1598,9 @@ def _boton_de_la_administracion(n) -> Boton | None:
     abre la Mini App de la administración (sólo en un chat privado y con la dirección pública) o
     "Entrar en la compu" de un pedido de entrada."""
     if n.get("boton") == "entrar_en_la_compu":
+        # Un pedido ya purgado (migración 0074) no tiene botón.
+        if not n.get("pedido_de_entrada_id"):
+            return None
         return Boton(ETIQUETA_ENTRAR_EN_LA_COMPU,
                      f"{PREFIJO_ENTRAR_EN_LA_COMPU}{n['pedido_de_entrada_id']}")
     if n.get("boton") == "administracion":

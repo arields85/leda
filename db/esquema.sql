@@ -2485,12 +2485,13 @@ create table message_outbox_entrada_web (
                        'entrar_en_la_compu')),
   constraint message_outbox_entrada_web_tarea
     check ((destino = 'tarea') = (task_id is not null)),
+  -- Un pedido purgado queda en nulo (0074): el botón de ese mensaje ya no sale.
   constraint message_outbox_entrada_web_pedido
-    check ((destino = 'entrar_en_la_compu') = (pedido_de_entrada_id is not null)),
+    check (pedido_de_entrada_id is null or destino = 'entrar_en_la_compu'),
   constraint message_outbox_entrada_web_task
     foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
   constraint message_outbox_entrada_web_pedido_de_entrada
-    foreign key (pedido_de_entrada_id) references pedido_de_entrada(id) on delete cascade,
+    foreign key (pedido_de_entrada_id) references pedido_de_entrada(id) on delete set null,
   constraint message_outbox_entrada_web_outbox
     foreign key (workspace_id, outbox_id) references message_outbox(workspace_id, id)
     on delete cascade,
@@ -3369,6 +3370,11 @@ begin
      or p_telegram_user_id is null or p_vence_en is null then
     return jsonb_build_object('ok', false, 'motivo', 'mal_formado');
   end if;
+  -- La firma vale 10 minutos desde que Telegram la emitió (migración 0074, revisión
+  -- R3-firma-expiry-not-enforced): la base también lo exige, no sólo el servidor.
+  if p_vence_en <= now() or p_vence_en > now() + interval '11 minutes' then
+    return jsonb_build_object('ok', false, 'motivo', 'firma_vencida');
+  end if;
   select w.id into espacio from workspace w where w.slug = p_slug and w.activo;
   if espacio is null then
     return jsonb_build_object('ok', false, 'motivo', 'sin_espacio');
@@ -3407,6 +3413,11 @@ begin
      or p_sesion_token_hash is null or p_sesion_token_hash !~ '^[0-9a-f]{64}$'
      or p_telegram_user_id is null or p_vence_en is null then
     return jsonb_build_object('ok', false, 'motivo', 'mal_formado');
+  end if;
+  -- La firma vale 10 minutos desde que Telegram la emitió (migración 0074, revisión
+  -- R3-firma-expiry-not-enforced): la base también lo exige, no sólo el servidor.
+  if p_vence_en <= now() or p_vence_en > now() + interval '11 minutes' then
+    return jsonb_build_object('ok', false, 'motivo', 'firma_vencida');
   end if;
   if not gastar_firma_de_telegram(p_huella, 'administracion', p_vence_en) then
     return jsonb_build_object('ok', false, 'motivo', 'firma_usada');
@@ -3449,6 +3460,10 @@ begin
       return jsonb_build_object('ok', false, 'motivo', 'sin_espacio');
     end if;
   end if;
+  -- Uno a la vez por puerta y espacio, así el tope no se pasa con pedidos al mismo tiempo
+  -- (migración 0074, revisión R3-pending-cap-race).
+  perform pg_advisory_xact_lock(hashtextextended(
+    'pedido_de_entrada:' || p_puerta || ':' || coalesce(espacio::text, ''), 0));
   delete from pedido_de_entrada p where p.vence_en < now() - interval '1 day';
   if (select count(*) from pedido_de_entrada p
        where p.puerta = p_puerta and p.workspace_id is not distinct from espacio
@@ -5098,9 +5113,9 @@ create table admin_notice (
     check ((incident_id is null) = es_respuesta),
   constraint admin_notice_boton check (boton in ('administracion', 'entrar_en_la_compu')),
   constraint admin_notice_boton_del_pedido
-    check ((boton is not distinct from 'entrar_en_la_compu') = (pedido_de_entrada_id is not null)),
+    check (pedido_de_entrada_id is null or boton = 'entrar_en_la_compu'),
   constraint admin_notice_pedido_de_entrada
-    foreign key (pedido_de_entrada_id) references pedido_de_entrada(id) on delete cascade
+    foreign key (pedido_de_entrada_id) references pedido_de_entrada(id) on delete set null
 );
 
 comment on table admin_notice is

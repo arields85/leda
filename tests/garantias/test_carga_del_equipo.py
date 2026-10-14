@@ -1035,13 +1035,17 @@ def test_cada_tarea_abre_su_pagina_desde_la_web_con_la_regla_de_quien_ve_que(web
     assert direccion.startswith("/tarea/")
     pagina = web().get(direccion)
     assert pagina.status_code == 200 and "Colgar el módem en la pared" in pagina.text
-    # Una de otro espacio: no.
+    # Una de otro espacio: no (revisión R3-001: siempre hay una, nunca un control condicional).
+    oeste = equipo["west-studio"]
     with admin(conn) as cur:
-        cur.execute("select id from task where workspace_id = %s limit 1",
-                    (equipo["west-studio"]["id"],))
-        ajena = cur.fetchone()
+        cur.execute("""insert into task (workspace_id, objective_id, titulo, area_id,
+                                         responsable_membership_id)
+                       select %s, %s, 'Una de West Studio', m.area_id, m.id
+                         from membership m where m.workspace_id = %s limit 1
+                       returning id""",
+                    (oeste["id"], oeste["objectives"][0], oeste["id"]))
+        ajena = str(cur.fetchone()["id"])
     conn.commit()
-    if ajena is not None:
-        assert taylor.post(f"/app/api/tareas/{ajena['id']}/pagina").status_code == 403
+    assert taylor.post(f"/app/api/tareas/{ajena}/pagina").status_code == 403
     assert taylor.post("/app/api/tareas/no-es-un-id/pagina").status_code == 404
     assert web().post(f"/app/api/tareas/{tarea}/pagina").status_code == 401

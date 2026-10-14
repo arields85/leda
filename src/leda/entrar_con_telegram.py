@@ -146,6 +146,13 @@ def validar_init_data(init_data: str, token_del_bot: str,
         datetime.fromtimestamp(emitida + VIGENCIA_DE_LA_FIRMA_S, tz=timezone.utc))
 
 
+def es_un_espacio(slug: Any) -> bool:
+    """Si `slug` puede ser el espacio de la puerta del equipo: con la forma de un espacio y nunca
+    el del bot de administración (revisión R3-team-door-accepts-admin-slug: su firma no abre
+    nunca la puerta del equipo)."""
+    return isinstance(slug, str) and bool(SLUG.match(slug)) and slug != "admin"
+
+
 def _token_del_bot(slug: str) -> str | None:
     try:
         return config.token_bot(slug)
@@ -184,7 +191,7 @@ async def entrar_con_la_mini_app(request: Request):
         return _json({"error": "cuerpo_invalido"}, 415)
     slug = cuerpo.get("espacio")
     init_data = cuerpo.get("init_data")
-    if not isinstance(slug, str) or not SLUG.match(slug) or not isinstance(init_data, str):
+    if not es_un_espacio(slug) or not isinstance(init_data, str):
         return _json({"error": "cuerpo_invalido"}, 422)
     token = _token_del_bot(slug)
     firma = validar_init_data(init_data, token or "")
@@ -248,13 +255,22 @@ def _respuesta_de_la_apertura(resultado: dict[str, Any], puerta: str, sesion: st
         return _json({"error": "sin_rol", "texto": TEXTO_SIN_ROL}, 403)
     if motivo == "sin_espacio":
         return _json({"error": "sin_espacio"}, 404)
-    return _json({"error": "firma_invalida", "texto": TEXTO_FIRMA_INVALIDA}, 401)
+    if motivo in ("mal_formado", "firma_vencida"):
+        return _json({"error": "firma_invalida", "texto": TEXTO_FIRMA_INVALIDA}, 401)
+    # Un motivo que este código no conoce no es una firma inválida (revisión R2-catchall): la
+    # persona ve que no se pudo, sin detalles, y la consola, el motivo.
+    _imprimir(f"  ! la entrada con Telegram devolvió un motivo desconocido ({motivo!r}).")
+    return _json({"error": "no_disponible"}, 503)
 
 
 async def _en_la_base(trabajo) -> Response:
+    return await _en_un_hilo(_con_la_base, trabajo)
+
+
+async def _en_un_hilo(funcion, *args):
     from starlette.concurrency import run_in_threadpool
 
-    return await run_in_threadpool(_con_la_base, trabajo)
+    return await run_in_threadpool(funcion, *args)
 
 
 # --- El QR de la computadora (decisiones 4 y 8) -------------------------------------------------
@@ -270,12 +286,30 @@ def desde_donde(request: Request) -> str:
         ("Windows", "Windows"), ("iPhone", "un iPhone"), ("iPad", "un iPad"),
         ("Android", "Android"), ("CrOS", "ChromeOS"), ("Mac OS X", "una Mac"),
         ("Linux", "Linux")) if marca in agente), None)
-    ip = (request.headers.get("cf-connecting-ip")
-          or (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
-          or (request.client.host if request.client else ""))
-    ip = re.sub(r"[^0-9A-Fa-f.:]", "", ip)[:45]
+    ip = _ip_de_quien_pide(request)
     texto = navegador + (f" en {sistema}" if sistema else "")
     return (texto + (f", IP {ip}" if ip else ""))[:120]
+
+
+def _ip_de_quien_pide(request: Request) -> str | None:
+    """La IP que se muestra (revisión R1-001): la de quien se conecta; la que manda el túnel
+    (`CF-Connecting-IP`) sólo si quien se conecta es el túnel en esta misma máquina (una dirección
+    local), porque cualquiera puede escribir esa cabecera. `X-Forwarded-For` no se cree. Nunca
+    algo que no sea una IP."""
+    import ipaddress
+
+    def ip(valor: str | None) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+        try:
+            return ipaddress.ip_address((valor or "").strip())
+        except ValueError:
+            return None
+
+    directa = ip(request.client.host if request.client else None)
+    if directa is not None and directa.is_loopback:
+        del_tunel = ip(request.headers.get("cf-connecting-ip"))
+        if del_tunel is not None:
+            return str(del_tunel)
+    return str(directa) if directa is not None else None
 
 
 _USUARIO_DEL_BOT_DE_ADMINISTRACION: dict[str, str] = {}
@@ -343,15 +377,19 @@ async def _pedir_el_qr(request: Request, puerta: str) -> Response:
     if cuerpo is None:
         return _json({"error": "cuerpo_invalido"}, 415)
     slug = cuerpo.get("espacio") if puerta == PUERTA_DEL_EQUIPO else None
-    if puerta == PUERTA_DEL_EQUIPO and (not isinstance(slug, str) or not SLUG.match(slug)):
+    if puerta == PUERTA_DEL_EQUIPO and not es_un_espacio(slug):
         return _json({"error": "cuerpo_invalido"}, 422)
     codigo = PREFIJO_DEL_CODIGO + secrets.token_urlsafe(24)
     secreto = secrets.token_urlsafe(32)
     desde = desde_donde(request)
+    # El usuario del bot de administración se averigua antes de tomar el candado de la web: puede
+    # ser una llamada a Telegram (revisión R4-getme-under-lock-in-db-work).
+    usuario_admin = (await _en_un_hilo(usuario_del_bot_de_administracion)
+                     if puerta == PUERTA_DE_ADMINISTRACION else None)
 
     def pedir(conn) -> Response:
         usuario = (_usuario_del_bot_del_espacio(conn, slug) if puerta == PUERTA_DEL_EQUIPO
-                   else usuario_del_bot_de_administracion())
+                   else usuario_admin)
         if usuario is None:
             return _json({"error": "sin_bot"}, 404)
         with sin_espacio(conn) as cur:

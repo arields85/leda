@@ -584,3 +584,157 @@ def test_la_validacion_no_registra_init_data(web, conn, intake_world, capsys):
     salida = capsys.readouterr()
     assert init_data not in salida.out + salida.err
     assert TOKEN_NORTE not in salida.out + salida.err
+
+
+# --- La revisión de la MA (RDD) ----------------------------------------------------------------
+
+def _pedido_http(cliente: str, cabeceras: dict[str, str]):
+    from starlette.requests import Request
+
+    return Request({"type": "http", "method": "POST", "path": "/", "client": (cliente, 5000),
+                    "headers": [(k.lower().encode(), v.encode()) for k, v in cabeceras.items()]})
+
+
+def test_la_ip_que_se_muestra_no_se_puede_inventar_con_una_cabecera():
+    """R1-001: cualquiera puede escribir `CF-Connecting-IP` o `X-Forwarded-For`. Se cree la del
+    túnel sólo si quien se conecta es el túnel en esta máquina; si no, la de quien se conecta."""
+    from leda.entrar_con_telegram import desde_donde
+
+    agente = {"user-agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130"}
+    falsa = {**agente, "cf-connecting-ip": "10.1.2.3", "x-forwarded-for": "10.9.9.9"}
+    assert desde_donde(_pedido_http("203.0.113.5", falsa)) == "Chrome en Windows, IP 203.0.113.5"
+    assert desde_donde(_pedido_http("127.0.0.1", falsa)) == "Chrome en Windows, IP 10.1.2.3"
+    assert desde_donde(_pedido_http("127.0.0.1", {**agente, "x-forwarded-for": "10.9.9.9"})) == (
+        "Chrome en Windows, IP 127.0.0.1")
+    assert desde_donde(_pedido_http("127.0.0.1", {**agente, "cf-connecting-ip": "no es una ip"})
+                       ) == "Chrome en Windows, IP 127.0.0.1"
+    assert desde_donde(_pedido_http("testclient", agente)) == "Chrome en Windows"
+
+
+def test_la_puerta_del_equipo_nunca_acepta_el_espacio_del_bot_de_administracion(web, conn,
+                                                                                intake_world):
+    """R3-team-door-accepts-admin-slug: la firma del bot de administración no abre la puerta del
+    equipo aunque la dirección diga `admin`, ni pide un QR de equipo para ese bot."""
+    morgan = intake_world["north-lab"]["people"]["Morgan Hale"]
+    r = _mini_app(web(), firmar(TOKEN_ADMIN, morgan["telegram"]), slug="admin")
+    assert r.status_code == 422
+    assert web().post("/app/api/entrar/qr", json={"espacio": "admin"}).status_code == 422
+
+
+def test_un_motivo_desconocido_de_la_base_no_es_una_firma_invalida():
+    """R2-catchall-firma-invalida."""
+    from leda.entrar_con_telegram import _respuesta_de_la_apertura
+
+    r = _respuesta_de_la_apertura({"ok": False, "motivo": "otro"}, "equipo", "x")
+    assert r.status_code == 503
+    r = _respuesta_de_la_apertura({"ok": False, "motivo": "firma_vencida"}, "equipo", "x")
+    assert r.status_code == 401
+
+
+def test_el_usuario_del_bot_de_administracion_se_pide_fuera_del_candado_de_la_web(
+        web, conn, intake_world, monkeypatch):
+    """R4-getme-under-lock-in-db-work: `getMe` es una llamada a Telegram; nunca con el candado de
+    la web tomado (la web entera esperaría a la red)."""
+    from leda import entrar_con_telegram, web_app
+
+    monkeypatch.delenv("LEDA_BOT_USUARIO_ADMIN")
+    entrar_con_telegram._USUARIO_DEL_BOT_DE_ADMINISTRACION.clear()
+    con_el_candado = []
+
+    def pedir(token):
+        con_el_candado.append(web_app._WEB.locked())
+        return "Leda_Admin_bot"
+
+    monkeypatch.setattr(entrar_con_telegram, "_pedir_el_usuario", pedir)
+    r = web().post("/app/admin/api/entrar/qr", json={})
+    entrar_con_telegram._USUARIO_DEL_BOT_DE_ADMINISTRACION.clear()
+    assert r.status_code == 201, r.text
+    assert con_el_candado == [False]
+
+
+# --- La 0074 (la revisión de la MA) -------------------------------------------------------------
+
+def test_la_base_no_abre_una_sesion_con_una_firma_vencida(conn, intake_world):
+    """R3-firma-expiry-not-enforced: también la base exige que la firma esté vigente."""
+    with sin_espacio(conn) as cur:
+        for vence in ("now() - interval '1 second'", "now() + interval '1 hour'"):
+            cur.execute(f"""select abrir_sesion_por_telegram('north-lab', %s, %s, {vence}, %s)
+                              as r""",
+                        (_tg(intake_world, "Sam North"), secrets.token_hex(32),
+                         _hash(secrets.token_urlsafe(32))))
+            assert cur.fetchone()["r"] == {"ok": False, "motivo": "firma_vencida"}
+            cur.execute(f"""select abrir_sesion_de_administracion_por_telegram(%s, %s, {vence}, %s)
+                              as r""",
+                        (_tg(intake_world, "Sam North"), secrets.token_hex(32),
+                         _hash(secrets.token_urlsafe(32))))
+            assert cur.fetchone()["r"] == {"ok": False, "motivo": "firma_vencida"}
+    conn.commit()
+
+
+def test_las_firmas_viejas_se_purgan_y_una_repetida_no_abre(conn, intake_world):
+    """R3-no-behavioral-tests: la huella de una firma vencida hace más de un día se purga al
+    gastar otra; una repetida dentro de su vigencia sigue sin abrir."""
+    vieja = secrets.token_hex(32)
+    with admin(conn) as cur:
+        cur.execute("""insert into firma_de_telegram (huella, puerta, vence_en)
+                       values (%s, 'equipo', now() - interval '2 days')""", (vieja,))
+    conn.commit()
+    huella = secrets.token_hex(32)
+    assert _abrir(conn, "north-lab", _tg(intake_world, "Sam North"), huella)["ok"] is True
+    assert _abrir(conn, "north-lab", _tg(intake_world, "Sam North"), huella)["motivo"] == \
+        "firma_usada"
+    with admin(conn) as cur:
+        cur.execute("select count(*) as n from firma_de_telegram where huella = %s", (vieja,))
+        assert cur.fetchone()["n"] == 0
+
+
+def test_purgar_un_pedido_viejo_no_borra_los_mensajes_que_lo_nombraban(conn, intake_world):
+    """R3-cascade-purge-deletes-notices: la purga de un pedido vencido hace más de un día deja el
+    mensaje (y la respuesta del bot de administración) con el pedido en nulo, sin borrarlos; el
+    despachador no le pone el botón."""
+    from leda.despachador import _boton_de_la_administracion, _boton_de_la_marca
+    from leda.salida import enqueue_outbox
+
+    r, _c, _s = _pedir(conn)
+    ws = intake_world["north-lab"]["id"]
+    persona = _membresia(intake_world, "Sam North")
+    with espacio(conn, ws) as cur:
+        enqueue_outbox(cur, workspace_id=ws, chat_id=_tg(intake_world, "Sam North"),
+                       text="Pediste entrar.", dedupe_key="compu-1", recipient_membership_id=persona,
+                       is_response=True, enlace_de_entrada_web=persona,
+                       destino_web="entrar_en_la_compu", pedido_de_entrada=r["pedido_id"])
+    with admin(conn) as cur:
+        cur.execute("""insert into admin_notice (es_respuesta, destinatario_app_user_id, chat_id,
+                                                 cuerpo, dedupe_key, boton, pedido_de_entrada_id)
+                       values (true, %s, 1, 'Pediste entrar.', 'compu-admin', 'entrar_en_la_compu',
+                               %s)""",
+                    (intake_world["north-lab"]["people"]["Morgan Hale"]["app_user_id"],
+                     r["pedido_id"]))
+        cur.execute("update pedido_de_entrada set vence_en = now() - interval '2 days'")
+    conn.commit()
+    _pedir(conn)                       # purga el viejo
+    with admin(conn) as cur:
+        cur.execute("select count(*) as n from pedido_de_entrada where id = %s", (r["pedido_id"],))
+        assert cur.fetchone()["n"] == 0
+        cur.execute("""select w.pedido_de_entrada_id from message_outbox_entrada_web w
+                        join message_outbox o on o.id = w.outbox_id where o.dedupe_key = 'compu-1'""")
+        [marca] = cur.fetchall()
+        cur.execute("select * from admin_notice where dedupe_key = 'compu-admin'")
+        aviso = cur.fetchone()
+    conn.commit()
+    assert marca["pedido_de_entrada_id"] is None
+    assert aviso is not None and aviso["pedido_de_entrada_id"] is None
+    assert _boton_de_la_administracion(aviso) is None
+    assert _boton_de_la_marca(None, ws, {"entrada_web_persona": persona, "chat_id": 1,
+                                         "entrada_web_destino": "entrar_en_la_compu",
+                                         "entrada_web_pedido": None}) is None
+
+
+def test_el_tope_de_pedidos_pendientes_se_cuenta_con_un_candado(conn):
+    """R3-pending-cap-race: el conteo y el alta van con un candado por puerta y espacio."""
+    with admin(conn) as cur:
+        cur.execute("""select pg_get_functiondef('leda.pedir_entrada_por_qr(text, text, text,
+                                                  text, text)'::regprocedure) as d""")
+        definicion = cur.fetchone()["d"]
+    conn.commit()
+    assert definicion.index("pg_advisory_xact_lock") < definicion.index("count(*)")
