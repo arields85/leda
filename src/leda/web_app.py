@@ -63,6 +63,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -1732,6 +1733,59 @@ def _lo_escrito(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
     return escrito, errores
 
 
+@dataclass
+class PasosConLaIA:
+    """Los pasos de un pedido de la web que espera a la IA del espacio (la ayuda al cargar, la de
+    crear un objetivo y la ortografía), para que el candado de la web nunca la espere:
+
+    1. `preparar(conn)`, con el candado: la sesión, las opciones y la IA del espacio; devuelve lo
+       preparado o la respuesta que corta;
+    2. `pedir(preparado)`, sin el candado: una sola llamada, sin reintento; si levanta, la IA no
+       respondió;
+    3. `revisar(conn, preparado, crudo)`, con el candado y sólo si respondió (opcional): lo que
+       decide el código antes de otra llamada; puede cortar con una respuesta;
+    4. `juzgar(preparado, revisado)`, sin el candado (opcional): otra llamada, que nunca levanta;
+    5. `cerrar(conn, preparado, revisado, falla, juicio)`, con el candado: la sesión revalidada,
+       la auditoría y, si la IA no respondió, el incidente.
+
+    Sin `revisar`, lo revisado es lo que devolvió la IA."""
+
+    preparar: Callable[[Any], Any]
+    pedir: Callable[[Any], Any]
+    cerrar: Callable[[Any, Any, Any, BaseException | None, Any], Response]
+    revisar: Callable[[Any, Any, Any], Any] | None = None
+    juzgar: Callable[[Any, Any], Any] | None = None
+
+
+async def _con_la_ia(pasos: PasosConLaIA) -> Response:
+    """Corre los pasos de `PasosConLaIA`: los de la base, de a uno con el candado; los de la IA,
+    sin él."""
+    preparado = await run_in_threadpool(_con_la_base, pasos.preparar)
+    if isinstance(preparado, Response):
+        return preparado
+    crudo, falla, revisado, juicio = None, None, None, None
+    try:
+        crudo = await run_in_threadpool(pasos.pedir, preparado)
+    except Exception as e:  # noqa: BLE001 -- cualquier falla de la IA es que no respondió
+        falla = e
+    if falla is None:
+        revisado = crudo
+        if pasos.revisar is not None:
+            revisado = await run_in_threadpool(_con_la_base, lambda conn: pasos.revisar(
+                conn, preparado, crudo))
+            if isinstance(revisado, Response):
+                return revisado
+        if pasos.juzgar is not None:
+            juicio = await run_in_threadpool(pasos.juzgar, preparado, revisado)
+    return await run_in_threadpool(_con_la_base, lambda conn: pasos.cerrar(
+        conn, preparado, revisado, falla, juicio))
+
+
+def _cuerpo_como_objeto(cuerpo: Any) -> dict[str, Any]:
+    """Un cuerpo que no es un objeto JSON (o que no se pudo leer) es un pedido sin datos."""
+    return cuerpo if isinstance(cuerpo, dict) else {}
+
+
 @router.post("/admin/api/espacios/{espacio_id}/ayuda")
 async def ayudar_a_cargar(espacio_id: str, request: Request):
     """Lo que Leda propone para completar una carga a partir de lo que contó la persona: 200 con
@@ -1740,45 +1794,24 @@ async def ayudar_a_cargar(espacio_id: str, request: Request):
     la IA no respondió (y un incidente)."""
     from . import ayuda_al_cargar
 
-    if _de_otro_sitio(request):
-        return _json({"error": "origen_no_verificado"}, 403)
-    tipo = request.headers.get("content-type", "").split(";")[0].strip().lower()
-    if tipo != "application/json":
-        return _json({"error": "se_espera_json"}, 415)
-    token = _token_de_administracion(request)
-    if token is None:
-        return _sin_sesion_de_administracion()
-    crudo = await request.body()
-    if len(crudo) > TAMANO_MAXIMO_DE_LA_AYUDA:
-        return _json({"error": "demasiado_grande"}, 413)
-    try:
-        cuerpo = json.loads(crudo or b"null")
-    except (ValueError, RecursionError):
-        cuerpo = None
-    cuerpo = cuerpo if isinstance(cuerpo, dict) else {}
+    pedido = await _el_pedido_que_escribe(request, _token_de_administracion,
+                                          _sin_sesion_de_administracion,
+                                          TAMANO_MAXIMO_DE_LA_AYUDA)
+    if isinstance(pedido, Response):
+        return pedido
+    token, cuerpo = pedido[0], _cuerpo_como_objeto(pedido[1])
     espacio = _espacio_de(espacio_id)
-    preparada = await run_in_threadpool(_con_la_base, lambda conn: _preparar_la_ayuda(
-        conn, token, espacio, cuerpo))
-    if isinstance(preparada, Response):
-        return preparada
-    crudo_de_la_ia, falla, revisada, juicio = None, None, None, None
-    try:
-        crudo_de_la_ia = await run_in_threadpool(ayuda_al_cargar.pedir, preparada["ia"],
-                                                 preparada["entrada"])
-    except Exception as e:  # noqa: BLE001 -- cualquier falla de la IA es que no respondió
-        falla = e
-    if falla is None:
-        # J2-17: lo que decide el código (quién la hace, con su área y su evidencia) con el
-        # candado; el juicio del criterio que escribió la IA, ya con esa evidencia, sin él.
-        revisada = await run_in_threadpool(_con_la_base, lambda conn: _revisar_la_ayuda(
-            conn, token, preparada, crudo_de_la_ia))
-        if isinstance(revisada, Response):
-            return revisada
-        # Nunca levanta: una IA que no juzga es `sin_revisar`.
-        juicio = await run_in_threadpool(ayuda_al_cargar.juzgar_la_propuesta, preparada["ia"],
-                                         revisada)
-    return await run_in_threadpool(_con_la_base, lambda conn: _cerrar_la_ayuda(
-        conn, token, preparada, revisada, falla, juicio))
+    # J2-17: lo que decide el código (quién la hace, con su área y su evidencia) con el candado; el
+    # juicio del criterio que escribió la IA, ya con esa evidencia, sin él (nunca levanta: una IA
+    # que no juzga es `sin_revisar`).
+    return await _con_la_ia(PasosConLaIA(
+        preparar=lambda conn: _preparar_la_ayuda(conn, token, espacio, cuerpo),
+        pedir=lambda preparada: ayuda_al_cargar.pedir(preparada["ia"], preparada["entrada"]),
+        revisar=lambda conn, preparada, crudo: _revisar_la_ayuda(conn, token, preparada, crudo),
+        juzgar=lambda preparada, revisada: ayuda_al_cargar.juzgar_la_propuesta(
+            preparada["ia"], revisada),
+        cerrar=lambda conn, preparada, revisada, falla, juicio: _cerrar_la_ayuda(
+            conn, token, preparada, revisada, falla, juicio)))
 
 
 def _preparar_la_ayuda(conn, token: str, espacio: str | None, cuerpo: dict[str, Any]):
@@ -1963,39 +1996,32 @@ async def revisar_la_ortografia(espacio_id: str, request: Request):
     (`sin_revisar`, con un `aviso` humano y un incidente); 422 con un dato que no es un texto."""
     from . import ayuda_al_cargar
 
-    if _de_otro_sitio(request):
-        return _json({"error": "origen_no_verificado"}, 403)
-    tipo = request.headers.get("content-type", "").split(";")[0].strip().lower()
-    if tipo != "application/json":
-        return _json({"error": "se_espera_json"}, 415)
-    token = _token_de_administracion(request)
-    if token is None:
-        return _sin_sesion_de_administracion()
-    crudo = await request.body()
-    if len(crudo) > TAMANO_MAXIMO_DE_LA_AYUDA:
-        return _json({"error": "demasiado_grande"}, 413)
-    try:
-        cuerpo = json.loads(crudo or b"null")
-    except (ValueError, RecursionError):
-        cuerpo = None
-    cuerpo = cuerpo if isinstance(cuerpo, dict) else {}
+    pedido = await _el_pedido_que_escribe(request, _token_de_administracion,
+                                          _sin_sesion_de_administracion,
+                                          TAMANO_MAXIMO_DE_LA_AYUDA)
+    if isinstance(pedido, Response):
+        return pedido
+    token, cuerpo = pedido[0], _cuerpo_como_objeto(pedido[1])
+    errores, textos = _los_textos_de_la_ortografia(cuerpo)
+    espacio = _espacio_de(espacio_id)
+    return await _con_la_ia(PasosConLaIA(
+        preparar=lambda conn: _preparar_la_ortografia(conn, token, espacio, textos, errores),
+        pedir=lambda preparada: ayuda_al_cargar.pedir_la_ortografia(preparada["ia"],
+                                                                    preparada["entrada"]),
+        cerrar=lambda conn, preparada, crudo, falla, _juicio: _cerrar_la_ortografia(
+            conn, token, preparada, crudo, falla)))
+
+
+def _los_textos_de_la_ortografia(cuerpo: dict[str, Any]) -> tuple[
+        list[dict[str, str]], dict[str, str]]:
+    """Los textos para revisar (los que no están vacíos) y los datos que no son un texto."""
+    from . import ayuda_al_cargar
+
     errores = [_mal_formado(c) for c in ayuda_al_cargar.CAMPOS_DE_TEXTO
                if cuerpo.get(c) is not None and not isinstance(cuerpo.get(c), str)]
     textos = {c: cuerpo[c] for c in ayuda_al_cargar.CAMPOS_DE_TEXTO
               if isinstance(cuerpo.get(c), str) and cuerpo[c].strip()}
-    espacio = _espacio_de(espacio_id)
-    preparada = await run_in_threadpool(_con_la_base, lambda conn: _preparar_la_ortografia(
-        conn, token, espacio, textos, errores))
-    if isinstance(preparada, Response):
-        return preparada
-    crudo_de_la_ia, falla = None, None
-    try:
-        crudo_de_la_ia = await run_in_threadpool(ayuda_al_cargar.pedir_la_ortografia,
-                                                 preparada["ia"], preparada["entrada"])
-    except Exception as e:  # noqa: BLE001 -- cualquier falla de la IA es que no respondió
-        falla = e
-    return await run_in_threadpool(_con_la_base, lambda conn: _cerrar_la_ortografia(
-        conn, token, preparada, crudo_de_la_ia, falla))
+    return errores, textos
 
 
 def _preparar_la_ortografia(conn, token: str, espacio: str | None, textos: dict[str, str],
