@@ -248,6 +248,10 @@ hallazgo por hallazgo y parecía progreso. Por eso la señal de parar está escr
 
 - Actualizar `docs/STATUS.md` ("Punto exacto para retomar", hechos, riesgos) y el documento de la unidad (tareas,
   evidencia, próximo paso). `AGENTS.md` sólo cambia si cambió una regla estable.
+- **Al completar cada tarea, en el momento y sin que lo pidan** (usuario, 2026-10-13): marcarla en el documento
+  de la unidad con su evidencia, actualizar el "Punto exacto para retomar" de `docs/STATUS.md`, la copia en
+  Engram y la memoria del agente que corresponda, y hacer el commit de documentos. Así una compactación del
+  contexto no pierde nada: lo vigente siempre está escrito.
 - **Cierre por contexto** (usuario, 2026-10-09): el usuario mira cuánto contexto se usó y avisa cuándo
   conviene cerrar; el agente no se ocupa de eso. Cuando el usuario no va a estar, lo avisa y el agente hace
   solo el control de cierre en el momento oportuno. El cierre es limpio: no arranca nada nuevo, espera a que

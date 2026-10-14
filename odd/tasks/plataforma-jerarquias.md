@@ -868,6 +868,13 @@ Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de ba
   de avisos de Dirección.
 - **La etiqueta congelada** sólo aporta el mismo `crear_objetivo` de hoy; nada de más tiempo ni de integrantes.
 
+## Para decidir al despertar
+
+Lo que el agente, trabajando solo desde la noche del 2026-10-13, necesita que decida el usuario. Cada punto,
+con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue con lo que no depende de eso.
+
+- (vacío por ahora)
+
 ## Criterio de aceptación
 
 Cada porción: sus garantías en verde, `tests/garantias` completa en verde, cada commit de código revisado por
@@ -914,3 +921,7 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
   `73a32f9e`): la comprobación sale de la evidencia del área y el criterio lo juzga la IA por su
   sentido (sin la lista de palabras de la J2-9); lo que la ayuda no completa se ve en su campo, y
   los puntos de "completando…" se animan. Siguen una ronda real (con permiso) y la J2-12.
+- 2026-10-13, noche: la J2 pasó en el celular (J2-14 a J2-28 y J2b; "quedó perfecto todo"; IA real 79 de 84).
+  El usuario se fue a dormir y pidió: cerrar la J2 con su revisión de conjunto (J2-29) y la suite completa, y
+  seguir solo con J3 a J7, anotando en "Para decidir al despertar" lo que necesite de él.
+

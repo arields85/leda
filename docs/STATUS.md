@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-13, cierre de la tarde: J1 cerrada; J2 hecha y medida (59 de 60), con su prueba en el celular pendiente. Ver "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-13, cierre de la noche: la J2 pasó en el celular ("quedó perfecto todo"); quedan su revisión de conjunto (J2-29) y la suite completa; sigue la J3. Ver "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -32,7 +32,7 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-13, tarde)
+## Punto exacto para retomar (2026-10-13, noche)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
 La unidad en curso es [`../odd/tasks/plataforma-jerarquias.md`](../odd/tasks/plataforma-jerarquias.md): el
@@ -61,22 +61,31 @@ viejo corriendo.
   (salió la lista de palabras, porque un sinónimo dejaba pasar un criterio circular); lo que la ayuda no pudo
   completar se ve en su campo; los puntos de "completando…" se animan. El aspecto del formulario, ajustado
   con el usuario hasta "quedó perfecto la parte visual".
+- **La J2, cerrada en el celular** (2026-10-13, tarde y noche; detalle y evidencia en el documento de la unidad,
+  J2-14 a J2-28 y J2b): Leda completa todo lo que puede (quién la hace, la evidencia que corresponde, el
+  objetivo, la espera; la fecha sólo si se dijo); todo lo que propone lo escribe la IA con naturalidad; el
+  criterio va en tercera persona, sin nombres, y "no sé" trae una propuesta; la ortografía se corrige sola,
+  sin marcas (la vista previa a la pausa, el campo al salir); "> empezar de nuevo"; el dictado con Gemini
+  (`gemini-3.8-flash`, pantalla encendida, barras del audio). Cada área conoce los cinco tipos de evidencia
+  del pack (lo que pide es un mínimo informativo; `leda_motor` reimportada). IA real: 79 de 84 (bitácora).
+  Usuario: "quedó perfecto todo".
 - `leda_motor`, en la `0067` (respaldos en `db/respaldos/`, el último `leda_motor-antes-0067-20261013.dump`).
 
-**Punto exacto para seguir** (cierre del 2026-10-13, tarde):
-1. **Cerrar la J2:** la J2-12 (2026-10-13) dio tres arreglos, hechos: J2-14 (el criterio escrito a mano se toma
-   como el de Leda y un rechazo trae su propuesta; IA real 65 de 69), J2-15 (puntos en "cargando…") y J2-16 (listas
-   desplegables propias). Falta repetir la prueba en el celular con eso (el guion, en
-   `../odd/tasks/plataforma-jerarquias.md`, J2-12; sumar: el aviso "No encontré a…" en su campo, los puntos
-   animados y que el resumen de la caja deje de nombrar un campo al completarlo). La ronda con la IA real de la
-   J2-13 dio 59 de 60 (2026-10-13, bitácora) y los dos avisos de RDD están arreglados (`67ca78df`, `bfa3943e`).
-   En `leda_motor` el reloj de Leda está adelantado (hoy para Leda es jueves 15) y "el tano" no es apodo de nadie.
-2. **La J2b, la voz a texto:** GPT-4o Transcribe por OpenRouter contra Gemini, con unos 10 dictados del usuario;
-   el usuario pone `LEDA_GEMINI_API_KEY` en el `.env`; base `research/gemini-voz-del-otro-proyecto.md`;
-   mantener la pantalla encendida mientras graba.
-3. **Después, la J3** (los objetivos desde la web) y las siguientes, en el orden del documento de la unidad.
-Para probar en el celular, el túnel: `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000` (la
-dirección cambia cada vez), reiniciar la web y emitir el enlace con `leda enlace-admin Ariel`. Lo que sigue a
+**Punto exacto para seguir** (cierre del 2026-10-13, noche; el usuario se fue a dormir y pidió que el agente
+siga solo con lo pendiente de la J2 a la J7, anotando las decisiones que le hagan falta):
+1. **Cerrar la J2:** la J2-29, la revisión independiente de toda la J2 (desde `c258ee37`; qué mira, en el
+   documento de la unidad), y la suite completa (`LEDA_BASE_URL= LEDA_GEMINI_API_KEY= pytest -q`; la corrida del
+   2026-10-13 se cortó al 8 %, todo en verde hasta ahí). Las deudas de RDD anotadas en J2-23, J2b y J2-28 entran
+   en esa revisión. Quedaron 8 bases `leda_test_…` de corridas cortadas: el usuario dijo que no se borren.
+2. **Después, J3 a J7** en el orden de `../odd/tasks/plataforma-jerarquias.md` ("De qué se parte en cada
+   porción"). Cada porción deja su prueba en el celular para el usuario; las decisiones de producto que hagan
+   falta van a "Decisiones pendientes del usuario", abajo, explicadas con un ejemplo.
+3. **Al cerrar cada tarea**, el documento de la unidad, este punto para retomar, la copia en Engram y la memoria
+   se actualizan en el momento (`AGENTS.md`, regla nueva del 2026-10-13).
+Para probar en el celular: el agente levanta la web y el túnel en segundo plano y pone la dirección nueva en
+`LEDA_BASE_URL` del `.env`; el usuario emite el enlace con `leda enlace-admin Ariel` (en una terminal sin un
+`$env:LEDA_BASE_URL` viejo). La web y el túnel de la sesión del 2026-10-13 corren en segundo plano de esa sesión
+(dirección `observations-guide-tsunami-guitar`); en una sesión nueva, hay que volver a levantarlos. Lo que sigue a
 la plataforma, en orden: `ROADMAP.md`.
 
 **La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
@@ -137,6 +146,8 @@ validador de invariantes. Destino de cada uno:
 
 ## Decisiones pendientes del usuario
 
+- **Las que deje el agente trabajando solo** (desde la noche del 2026-10-13): en
+  `../odd/tasks/plataforma-jerarquias.md`, sección "Para decidir al despertar".
 - **Copiar el respaldo a la nube o a otro disco.** El `git bundle` del repositorio entero, con la rama congelada
   `feat/flujo-de-un-mensaje` y todas las etiquetas, está en
   `D:\Proyectos\Leda-PM-respaldos\leda-repositorio-completo-20261007.bundle` (2026-10-07, verificado), en el
