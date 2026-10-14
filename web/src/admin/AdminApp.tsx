@@ -93,6 +93,9 @@ export function AdminApp() {
   const [closed, setClosed] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
   const [kind, setKind] = useState<Kind>('tarea');
+  // Back to the task after the objective form, the task's options are read again: an objective
+  // just created is one a task can contribute to.
+  const [reread, setReread] = useState(0);
   const objectives = useMemo(() => (spaceId ? adminObjectives(spaceId) : null), [spaceId]);
 
   useEffect(() => {
@@ -136,7 +139,13 @@ export function AdminApp() {
         }
       });
     return () => request.abort();
-  }, [spaceId, attempt]);
+  }, [spaceId, attempt, reread]);
+
+  function chooseKind(next: Kind) {
+    if (next === kind) return;
+    if (next === 'tarea') setReread((n) => n + 1);
+    setKind(next);
+  }
 
   const retry = () => setAttempt((n) => n + 1);
   const admin = me.kind === 'ready' ? me.data : null;
@@ -168,7 +177,7 @@ export function AdminApp() {
             />
           </div>
         )}
-        {spaceId && options.kind !== 'gone' && <KindSwitch current={kind} onChange={setKind} />}
+        {spaceId && options.kind !== 'gone' && <KindSwitch current={kind} onChange={chooseKind} />}
         {kind === 'objetivo' && objectives && options.kind !== 'gone' && (
           <NewObjective
             key={spaceId}

@@ -92,9 +92,18 @@ describe('the administration door', () => {
       fecha: '2026-10-16',
       clave: 'k1-0000-0000-0000-000000000000',
     });
-    // Back to the task, the task form is there again.
+    // "crear otro" reads the options again: the one just created can be a parent.
+    const read = (key: string) => calls.filter((c) => c.key === key).length;
+    fireEvent.click(screen.getByRole('button', { name: '> crear otro' }));
+    await screen.findByRole('form', { name: 'Crear objetivo' });
+    expect(read(`GET ${BASE}/opciones`)).toBe(2);
+    expect(screen.getByLabelText('Nombre')).toHaveValue('');
+    // Back to the task, the task form is there again, with its options read again (the new
+    // objective is one a task can contribute to).
+    const before = read(`GET /app/admin/api/espacios/${SPACE}/opciones`);
     fireEvent.click(within(kinds).getByRole('button', { name: 'tarea' }));
     expect(await screen.findByRole('form', { name: 'Cargar tarea' })).toBeInTheDocument();
+    expect(read(`GET /app/admin/api/espacios/${SPACE}/opciones`)).toBe(before + 1);
   });
 });
 

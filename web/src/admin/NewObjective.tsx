@@ -59,5 +59,14 @@ export function NewObjective({
       </Notice>
     );
   }
-  return <ObjectiveForm api={api} options={load.data} author={author} onClosed={onClosed} stacked={stacked} />;
+  return (
+    <ObjectiveForm
+      api={api}
+      options={load.data}
+      author={author}
+      onClosed={onClosed}
+      stacked={stacked}
+      onAnother={() => setAttempt((n) => n + 1)}
+    />
+  );
 }

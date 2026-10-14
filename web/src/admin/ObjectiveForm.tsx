@@ -63,6 +63,9 @@ interface ObjectiveFormProps {
   onClosed: () => void;
   /** One column also on a wide screen: the team's page is narrow. */
   stacked?: boolean;
+  /** "> crear otro" with the options read again (the one just created can be a parent); without
+   * it, the same options. */
+  onAnother?: () => void;
 }
 
 /** The form that creates an objective (ADR 0023, decisions 1 and 5 and point 11): its name, what it
@@ -73,7 +76,7 @@ interface ObjectiveFormProps {
  * idempotency key per attempt: kept across retries of the same data and while an outcome is
  * unknown, renewed after a success or when the data changes, so a double send never creates two.
  * Leda's help box (J3-4) goes first in the form, above the fields. */
-export function ObjectiveForm({ api, options, author, onClosed, stacked = false }: ObjectiveFormProps) {
+export function ObjectiveForm({ api, options, author, onClosed, stacked = false, onAnother }: ObjectiveFormProps) {
   const [draft, setDraft] = useState<ObjectiveDraft>(() => emptyObjective(options));
   const [step, setStep] = useState<Step>({ kind: 'edit', sending: false, failed: false });
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -191,7 +194,7 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false 
         </h2>
         <ObjectivePreview draft={step.sent} options={options} author={author} />
         <div>
-          <button type="button" className={PRIMARY} onClick={another}>
+          <button type="button" className={PRIMARY} onClick={onAnother ?? another}>
             &gt; crear otro
           </button>
         </div>
