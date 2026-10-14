@@ -12,11 +12,22 @@ export const WARN = 'text-falta';
 // The shared box of every control (`typography.ts`), with the attention border while it is wrong.
 export const INPUT = `${CONTROL} aria-[invalid=true]:border-falta`;
 
-// Dimmed while something required is missing, but never `disabled`: a tap still says what is
-// missing and takes the person there.
-export const PRIMARY = `inline-flex h-11 items-center gap-2 rounded-card border-hard border-ink bg-card px-3.5 ${TEXT_SIZE} font-bold text-ink shadow-hard-ink disabled:opacity-50 aria-disabled:opacity-50 aria-disabled:shadow-none`;
+// A button that cannot act now reads as off (the user's phone test of the J3): dimmed text and
+// border and no shadow, whether it is `disabled` (while it sends) or only `aria-disabled` (while
+// something required is missing: a tap still says what and takes the person there). Gray, never a
+// color: color is only for states.
+export const OFF =
+  'disabled:border-line-soft disabled:text-ink-dim disabled:shadow-none aria-disabled:border-line-soft aria-disabled:text-ink-dim aria-disabled:shadow-none';
 
-export const SECONDARY = `inline-flex h-11 items-center rounded-card border-hard border-line-soft bg-transparent px-3.5 ${TEXT_SIZE} text-ink-soft disabled:opacity-50`;
+export const PRIMARY = `inline-flex h-11 items-center gap-2 rounded-card border-hard border-ink bg-card px-3.5 ${TEXT_SIZE} font-bold text-ink shadow-hard-ink ${OFF}`;
+
+// Active, it reads as active: the strong gray border and the ink text ("> cargarlo aparte",
+// "> empezar de nuevo"), without the primary's weight and shadow.
+export const SECONDARY = `inline-flex h-11 items-center rounded-card border-hard border-line-strong bg-transparent px-3.5 ${TEXT_SIZE} text-ink ${OFF}`;
+
+// A square button with an icon, the same height as the others (the microphone and "borrar el
+// texto" of the free box).
+export const ICON = `inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-card border-hard border-line-strong bg-transparent text-ink ${OFF}`;
 
 // Takes the color of the line it is in.
 export const FIELD_LINK =

@@ -73,10 +73,10 @@ describe('the administration door', () => {
     render(<AdminApp />);
     await screen.findByRole('form', { name: 'Cargar tarea' });
     const kinds = screen.getByRole('group', { name: 'Qué cargar' });
-    expect(within(kinds).getByRole('button', { name: 'tarea' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(kinds).getByRole('button', { name: 'Tarea' })).toHaveAttribute('aria-pressed', 'true');
     // The objective's options are read only when it is chosen.
     expect(calls.some((c) => c.key === `GET ${BASE}/opciones`)).toBe(false);
-    fireEvent.click(within(kinds).getByRole('button', { name: 'objetivo' }));
+    fireEvent.click(within(kinds).getByRole('button', { name: 'Objetivo' }));
     await screen.findByRole('form', { name: 'Crear objetivo' });
     expect(screen.queryByRole('form', { name: 'Cargar tarea' })).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Crear objetivo');
@@ -103,7 +103,7 @@ describe('the administration door', () => {
     // Back to the task, the task form is there again, with its options read again (the new
     // objective is one a task can contribute to).
     const before = read(`GET /app/admin/api/espacios/${SPACE}/opciones`);
-    fireEvent.click(within(kinds).getByRole('button', { name: 'tarea' }));
+    fireEvent.click(within(kinds).getByRole('button', { name: 'Tarea' }));
     expect(await screen.findByRole('form', { name: 'Cargar tarea' })).toBeInTheDocument();
     expect(read(`GET /app/admin/api/espacios/${SPACE}/opciones`)).toBe(before + 1);
   });
@@ -118,7 +118,7 @@ describe('the administration door', () => {
     });
     render(<AdminApp />);
     await screen.findByRole('form', { name: 'Cargar tarea' });
-    fireEvent.click(within(screen.getByRole('group', { name: 'Qué cargar' })).getByRole('button', { name: 'objetivo' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Qué cargar' })).getByRole('button', { name: 'Objetivo' }));
     const form = await screen.findByRole('form', { name: 'Crear objetivo' });
     fireEvent.change(within(form).getByLabelText('Contame qué querés hacer y te ayudo'), {
       target: { value: 'la planta del 2027' },
@@ -150,11 +150,11 @@ describe('the administration door', () => {
     await screen.findByRole('form', { name: 'Cargar tarea' });
     const kinds = screen.getByRole('group', { name: 'Qué cargar' });
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
-    fireEvent.click(within(kinds).getByRole('button', { name: 'objetivo' }));
+    fireEvent.click(within(kinds).getByRole('button', { name: 'Objetivo' }));
     await screen.findByRole('form', { name: 'Crear objetivo' });
     expect(screen.queryByRole('form', { name: 'Cargar tarea' })).toBeNull();
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Planta 2027' } });
-    fireEvent.click(within(kinds).getByRole('button', { name: 'tarea' }));
+    fireEvent.click(within(kinds).getByRole('button', { name: 'Tarea' }));
     const task = await screen.findByRole('form', { name: 'Cargar tarea' });
     expect(within(task).getByLabelText('Título')).toHaveValue('Configurar alarmas del SCADA');
     expect(screen.queryByRole('form', { name: 'Crear objetivo' })).toBeNull();
@@ -163,7 +163,7 @@ describe('the administration door', () => {
       expect(calls.filter((c) => c.key === `GET /app/admin/api/espacios/${SPACE}/opciones`)).toHaveLength(2),
     );
     expect(within(task).getByLabelText('Título')).toHaveValue('Configurar alarmas del SCADA');
-    fireEvent.click(within(kinds).getByRole('button', { name: 'objetivo' }));
+    fireEvent.click(within(kinds).getByRole('button', { name: 'Objetivo' }));
     const objective = await screen.findByRole('form', { name: 'Crear objetivo' });
     expect(within(objective).getByLabelText('Nombre')).toHaveValue('Planta 2027');
     // The objective's options were read once: the form stayed.

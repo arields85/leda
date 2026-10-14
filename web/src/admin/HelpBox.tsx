@@ -1,12 +1,13 @@
-import { CircleAlert, Mic as MicIcon, Square } from 'lucide-react';
+import { CircleAlert, Eraser, Mic as MicIcon, Square } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SessionClosedError } from '../api';
 import { type Candidate, DICTATION_FAILED, type DictationResult, type Problem } from './api';
 import { AudioBars } from './AudioBars';
+import { ICON, PRIMARY, SECONDARY } from './controls';
 import { Completing } from './Completing';
 import { canDictate, Dictation, DICTATION_LIMIT_MS } from './dictation';
 import { FIELD_NAME, FIELD_ORDER, length, PROBLEM_FIELD } from './draft';
-import { CONTROL, FIELD_HINT, FIELD_TITLE, TEXT_SIZE } from './typography';
+import { CONTROL, FIELD_HINT, FIELD_TITLE } from './typography';
 
 /** The server's own limit for the free text (src/leda/ayuda_al_cargar.py, LARGO_DEL_TEXTO). */
 export const STORY_LIMIT = 1000;
@@ -29,11 +30,15 @@ export const STALE_ANSWER = 'Cambiaste lo escrito mientras Leda completaba; tocÃ
 
 // The shared box of every control (`typography.ts`), taller for a story.
 const BOX = `${CONTROL} min-h-24 resize-y`;
-const BUTTON = `inline-flex h-11 items-center rounded-card border-hard border-ink bg-card px-3.5 ${TEXT_SIZE} font-bold text-ink shadow-hard-ink disabled:opacity-50`;
-const QUIET = `inline-flex h-11 items-center rounded-card border-hard border-line-soft bg-transparent px-3.5 ${TEXT_SIZE} text-ink-soft disabled:opacity-50`;
-/** The microphone (J2-28): an icon of the same width whatever it says, so "> completar con Leda"
- * and it stay on one line on a phone ("> dejar de dictar" was wider and wrapped). */
-const MIC = `inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-card border-hard border-line-soft bg-transparent text-ink-soft disabled:opacity-50`;
+// The buttons of the box, with the forms' looks (`controls.ts`): "> completar con Leda" is the
+// primary one; the microphone and "borrar el texto" (J2-28 and J3), icons of the same width
+// whatever they say, so they stay on one line with it on a phone.
+const BUTTON = PRIMARY;
+const QUIET = SECONDARY;
+const MIC = ICON;
+
+/** The name of the button that empties the free box (the user's phone test of the J3). */
+export const CLEAR_STORY = 'Borrar el texto';
 
 function Line({ children, warn }: { children: string; warn?: boolean }) {
   return (
@@ -122,6 +127,9 @@ export function HelpBox({
   const dictation = useRef<Dictation | null>(null);
   const readLevel = useCallback(() => dictation.current?.level() ?? null, []);
   const mounted = useRef(true);
+  // Each clear of the box is a new one (J3, "borrar el texto"): a dictation that was recording or
+  // turning into text before it puts nothing in the box.
+  const generation = useRef(0);
   const storyNow = useRef(story);
   storyNow.current = story;
 
@@ -133,11 +141,12 @@ export function HelpBox({
     };
   }, []);
 
-  async function heard(audio: Blob) {
+  async function heard(audio: Blob, mine: number) {
+    if (generation.current !== mine) return;
     setMic('transcribing');
     try {
       const result = await transcribe(audio);
-      if (!mounted.current) return;
+      if (!mounted.current || generation.current !== mine) return;
       if (result.kind === 'text') {
         onStory(withDictated(storyNow.current, result.text));
         // J2-26: Gemini cut it at its limit; what was heard is in, and the rest can be dictated.
@@ -146,10 +155,22 @@ export function HelpBox({
     } catch (error) {
       if (!mounted.current) return;
       if (error instanceof SessionClosedError) onClosed();
-      else setMicNote(DICTATION_FAILED);
+      else if (generation.current === mine) setMicNote(DICTATION_FAILED);
     } finally {
-      if (mounted.current) setMic('idle');
+      if (mounted.current && generation.current === mine) setMic('idle');
     }
+  }
+
+  /** Empties the free box, and only it (the form's fields stay): a dictation in progress is
+   * cancelled, and an answer of "completar" asked for the text that was there fills nothing (the
+   * form sees the text changed). */
+  function clear() {
+    generation.current += 1;
+    dictation.current?.cancel();
+    dictation.current = null;
+    setMic('idle');
+    setMicNote(null);
+    onStory('');
   }
 
   function toggleMic() {
@@ -160,6 +181,7 @@ export function HelpBox({
     if (mic !== 'idle') return;
     setMicNote(null);
     setMic('starting');
+    const mine = generation.current;
     const d = new Dictation({
       onRecording: () => {
         setElapsed(0);
@@ -169,7 +191,7 @@ export function HelpBox({
       onTick: setElapsed,
       onAudio: (audio) => {
         dictation.current = null;
-        void heard(audio);
+        void heard(audio, mine);
       },
       onProblem: (text) => {
         dictation.current = null;
@@ -234,6 +256,16 @@ export function HelpBox({
             )}
           </button>
         )}
+        <button
+          type="button"
+          className={MIC}
+          onClick={clear}
+          disabled={story === '' && mic === 'idle'}
+          aria-label={CLEAR_STORY}
+          title={CLEAR_STORY}
+        >
+          <Eraser aria-hidden="true" strokeWidth={2.25} className="size-5" />
+        </button>
       </div>
       {mic === 'recording' && (
         <div className={`flex min-w-0 items-center gap-2.5 ${FIELD_HINT}`}>

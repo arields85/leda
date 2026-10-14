@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Switch, type SwitchItem } from '../components/Switch';
 import { RequestError, SessionClosedError } from '../api';
 import { Header } from '../components/Header';
 import { Notice } from '../components/Notice';
@@ -54,32 +55,15 @@ function Failed({ onRetry }: { onRetry: () => void }) {
 /** What the administrator loads: a task (ADR 0022) or an objective (ADR 0023, decision 5). */
 type Kind = 'tarea' | 'objetivo';
 
-const KINDS: { kind: Kind; label: string }[] = [
-  { kind: 'tarea', label: 'tarea' },
-  { kind: 'objetivo', label: 'objetivo' },
+const KINDS: SwitchItem<Kind>[] = [
+  { value: 'tarea', label: 'Tarea' },
+  { value: 'objetivo', label: 'Objetivo' },
 ];
 
-/** The choice at the top of the load area: a task or an objective. Gray, like everything that is
- * not a state (the same look as the team's view switch). */
+/** The choice at the top of the load area: a task or an objective, with the tabs of the team's
+ * views (`Switch`). */
 function KindSwitch({ current, onChange }: { current: Kind; onChange: (kind: Kind) => void }) {
-  return (
-    <div role="group" aria-label="Qué cargar" className="flex flex-wrap gap-1.5 text-small">
-      {KINDS.map(({ kind, label }) => {
-        const selected = kind === current;
-        return (
-          <button
-            key={kind}
-            type="button"
-            aria-pressed={selected}
-            onClick={() => onChange(kind)}
-            className={`rounded-card border-hard px-2.5 py-1 ${selected ? 'border-line bg-card text-ink' : 'border-line-soft bg-transparent text-ink-dim'}`}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
+  return <Switch label="Qué cargar" items={KINDS} current={current} onChange={onChange} />;
 }
 
 /** The administration door (ADR 0022, decisions 6 and 10): who is in, which space, and the form
