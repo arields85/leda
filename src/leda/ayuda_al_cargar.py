@@ -267,9 +267,19 @@ def _integrante(opciones, membership_id: Any) -> Mapping[str, Any] | None:
 
 
 def _politica(opciones, integrante) -> Mapping[str, Any] | None:
-    if integrante is None:
+    """La política del área de un integrante; sin área, ninguna (nunca la de una política que
+    tampoco dice su área)."""
+    if integrante is None or not integrante.get("area_id"):
         return None
     return _por_id(opciones.get("politicas") or [], "area_id", integrante.get("area_id"))
+
+
+def quien_y_su_politica(opciones: Mapping[str, Any], membership_id: Any) -> tuple[
+        Mapping[str, Any] | None, Mapping[str, Any] | None]:
+    """Quién la hace y la política de su área, de las opciones de la carga: la misma búsqueda para
+    revisar la evidencia escrita (`web_app._lo_escrito`) y para proponer (`revisar`)."""
+    integrante = _integrante(opciones, membership_id) if membership_id else None
+    return integrante, _politica(opciones, integrante)
 
 
 def _evidencia_en_palabras(politica) -> list[str]:

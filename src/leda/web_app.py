@@ -59,6 +59,7 @@ import hashlib
 import json
 import secrets
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
@@ -961,13 +962,16 @@ async def cargar_una_tarea(espacio_id: str, request: Request):
 # pide revisar la carga: el mismo juicio del criterio y la misma `cargar_tarea`, sin la clave (sin
 # ella la base nunca escribe) y sin el rechazo de la clave que falta. Lo que no se cargaría vuelve
 # como en la carga (422, con el criterio que propone Leda) y la ortografía no corre; si se cargaría,
-# 200 y la web sigue con la ortografía. El juicio queda un rato para la misma sesión
-# (`_JUICIOS_RECIENTES`), así la carga con los mismos textos no vuelve a llamar a la IA.
+# 200 con `{"errores": []}` y nada más (los avisos, como "sin conectar", los da la carga: la base no
+# los arma cuando hay un rechazo, y la falta de la clave lo es) y la web sigue con la ortografía. El
+# juicio queda un rato para la misma sesión (`_JUICIOS_RECIENTES`), así la carga con los mismos
+# textos (o con los mismos corregidos por la ortografía, J2-23) no vuelve a llamar a la IA.
 
 @router.post("/admin/api/espacios/{espacio_id}/tareas/revisar")
 async def revisar_una_carga(espacio_id: str, request: Request):
-    """Lo que la carga rechazaría, sin cargar nada: 200 con `errores` vacío si se cargaría (con
-    los avisos que daría), 422 con todo lo que hay que corregir, como la carga."""
+    """Lo que la carga rechazaría, sin cargar nada: 200 con `{"errores": []}` si se cargaría (sin
+    avisos: los dice la carga), 422 con todo lo que hay que corregir, como la carga. Nunca deja un
+    incidente ni una auditoría: no cargó nada."""
     pedido = await _el_pedido_de_la_carga(request)
     if isinstance(pedido, Response):
         return pedido
@@ -1077,38 +1081,83 @@ def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
     return {"ia": ia, "evidencia": evidencia, "contexto": contexto}
 
 
-# J2-21: el juicio de un criterio, por un rato y sólo para la misma sesión de administración y los
-# mismos datos (lo que revisó `revisar_una_carga`, para la carga que sigue). Sólo un juicio de la
-# IA que respondió: uno sin revisar se vuelve a pedir.
-_JUICIOS_RECIENTES: dict[str, tuple[datetime, Any]] = {}
-_JUICIOS_CANDADO = threading.Lock()
-_JUICIO_DURA = timedelta(minutes=10)
-_JUICIOS_MAXIMO = 256
+# J2-21: el juicio de un criterio, por un rato y sólo para la misma sesión de administración, el
+# mismo espacio y los mismos datos (lo que revisó `revisar_una_carga`, para la carga que sigue).
+# Sólo un juicio de la IA que respondió: uno sin revisar se vuelve a pedir. J2-23: la ortografía
+# corrige al confirmar y la carga lleva el texto corregido; lo corregido queda el mismo rato, con el
+# texto como se escribió, y el juicio se pide (o se lee) con ese texto: sólo cambió la ortografía,
+# palabra por palabra, así que es el mismo criterio y la carga no vuelve a llamar a la IA.
+
+def _reloj() -> float:
+    """El reloj de lo que se guarda por un rato: monotónico (un cambio de la hora del equipo no lo
+    alarga ni lo corta); las pruebas lo reemplazan para ver el vencimiento."""
+    return time.monotonic()
 
 
-def _clave_del_juicio(token: str, espacio: str, ia, entrada: dict[str, Any]) -> str:
-    plano = json.dumps([_hash(token), espacio, getattr(ia, "nombre", None), entrada],
-                       ensure_ascii=False, sort_keys=True, default=str)
+class _PorUnRato:
+    """Lo que se guarda por un rato (`dura`) y hasta `maximo` (sale lo más viejo), con su candado.
+    Cada clave lleva la sesión y el espacio (`_clave_de`): nada guardado sirve a otra sesión ni a
+    otro espacio."""
+
+    def __init__(self, dura: timedelta, maximo: int) -> None:
+        self.dura, self.maximo = dura.total_seconds(), maximo
+        self._guardado: dict[str, tuple[float, Any]] = {}
+        self._candado = threading.Lock()
+
+    def leer(self, clave: str):
+        ahora = _reloj()
+        with self._candado:
+            for vieja in [k for k, (cuando, _) in self._guardado.items()
+                          if ahora - cuando >= self.dura]:
+                del self._guardado[vieja]
+            guardado = self._guardado.get(clave)
+        return guardado[1] if guardado else None
+
+    def guardar(self, clave: str, valor: Any) -> None:
+        with self._candado:
+            # Una clave que ya estaba vuelve a ser la más nueva y no saca a otra.
+            self._guardado.pop(clave, None)
+            while len(self._guardado) >= self.maximo:
+                del self._guardado[next(iter(self._guardado))]
+            self._guardado[clave] = (_reloj(), valor)
+
+    def vaciar(self) -> None:
+        with self._candado:
+            self._guardado.clear()
+
+    def __len__(self) -> int:
+        with self._candado:
+            return len(self._guardado)
+
+
+_JUICIOS_RECIENTES = _PorUnRato(timedelta(minutes=10), 256)
+_CORREGIDOS_RECIENTES = _PorUnRato(timedelta(minutes=10), 256)
+
+
+def _clave_de(token: str, espacio: str, *partes: Any) -> str:
+    plano = json.dumps([_hash(token), espacio, *partes], ensure_ascii=False, sort_keys=True,
+                       default=str)
     return hashlib.sha256(plano.encode("utf-8")).hexdigest()
 
 
-def _juicio_reciente(clave: str):
-    ahora = datetime.now()
-    with _JUICIOS_CANDADO:
-        for vieja in [k for k, (cuando, _) in _JUICIOS_RECIENTES.items()
-                      if ahora - cuando > _JUICIO_DURA]:
-            del _JUICIOS_RECIENTES[vieja]
-        guardado = _JUICIOS_RECIENTES.get(clave)
-    return guardado[1] if guardado else None
+def _clave_del_juicio(token: str, espacio: str, ia, entrada: dict[str, Any]) -> str:
+    return _clave_de(token, espacio, "juicio", getattr(ia, "nombre", None), entrada)
 
 
 def _guardar_el_juicio(clave: str, juicio) -> None:
-    if getattr(juicio, "falla", None) is not None:
-        return
-    with _JUICIOS_CANDADO:
-        while len(_JUICIOS_RECIENTES) >= _JUICIOS_MAXIMO:
-            del _JUICIOS_RECIENTES[next(iter(_JUICIOS_RECIENTES))]
-        _JUICIOS_RECIENTES[clave] = (datetime.now(), juicio)
+    if getattr(juicio, "falla", None) is None:
+        _JUICIOS_RECIENTES.guardar(clave, juicio)
+
+
+def _clave_de_lo_corregido(token: str, espacio: str, campo: str, corregido: str) -> str:
+    return _clave_de(token, espacio, "ortografia", campo, corregido)
+
+
+def _como_se_escribio(token: str, espacio: str, campo: str, texto: str) -> str:
+    """El texto como lo escribió la persona si es uno que la ortografía de esta misma sesión y
+    este espacio acaba de corregir (J2-23); si no, el mismo."""
+    original = _CORREGIDOS_RECIENTES.leer(_clave_de_lo_corregido(token, espacio, campo, texto))
+    return original if isinstance(original, str) else texto
 
 
 async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, Any],
@@ -1116,7 +1165,7 @@ async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, 
     """El juicio del criterio de una carga, o `None` si no se juzga: con un dato mal formado, sin
     espacio, sin sesión o con un criterio que la base ya rechaza (vacío o largo). Un 503 de la
     base vuelve tal cual. Uno reciente de la misma sesión con los mismos datos (J2-21) no se pide
-    otra vez."""
+    otra vez; un texto que la ortografía acaba de corregir se juzga como se escribió (J2-23)."""
     from . import ayuda_al_cargar
 
     criterio, titulo = datos.get("criterio"), datos.get("titulo") or ""
@@ -1129,11 +1178,14 @@ async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, 
         return preparado
     if "juicio" in preparado:
         return preparado["juicio"]
-    entrada = {"titulo": titulo, "descripcion": datos.get("descripcion") or "",
-               "criterio": criterio, "evidencia": list(preparado["evidencia"]),
+    entrada = {"titulo": _como_se_escribio(token, espacio, "titulo", titulo),
+               "descripcion": _como_se_escribio(token, espacio, "descripcion",
+                                                datos.get("descripcion") or ""),
+               "criterio": _como_se_escribio(token, espacio, "criterio", criterio),
+               "evidencia": list(preparado["evidencia"]),
                "contexto": list(preparado["contexto"])}
     clave = _clave_del_juicio(token, espacio, preparado["ia"], entrada)
-    reciente = _juicio_reciente(clave)
+    reciente = _JUICIOS_RECIENTES.leer(clave)
     if reciente is not None:
         return reciente
     juicio = await run_in_threadpool(
@@ -1371,15 +1423,14 @@ def _lo_escrito(cuerpo: dict[str, Any], opciones: dict[str, Any]) -> tuple[
     # La evidencia ya tildada (J2-18 y J2-19): lo que la persona eligió es suyo, y Leda no propone
     # otra. Se revisa antes de usarla (advertencia de RDD de la J2-18), como en la carga: cada
     # tipo, de los que conoce el área de quien la hace; sin ella, de los del pack del espacio.
-    # Un tipo repetido cuenta una vez.
+    # Un tipo repetido cuenta una vez. Quién la hace y su área, con la misma búsqueda que usa la
+    # propuesta (`ayuda_al_cargar.quien_y_su_politica`; advertencia de RDD de la J2-19): nunca se
+    # revisa contra un área y se propone con otra.
     evidencia = cuerpo.get("evidencia")
     escrito["evidencia"] = []
     if isinstance(evidencia, list) and all(isinstance(e, str) for e in evidencia):
-        integrante = next((m for m in opciones.get("integrantes") or []
-                           if str(m.get("membership_id")) == escrito["responsable_id"]), None)
-        politica = (next((p for p in opciones.get("politicas") or []
-                          if p.get("area_id") == integrante.get("area_id")), None)
-                    if integrante is not None else None)
+        integrante, politica = ayuda_al_cargar.quien_y_su_politica(
+            opciones, escrito["responsable_id"] or None)
         conocidos = (ayuda_al_cargar.tipos_que_conoce(politica) if integrante is not None
                      else ayuda_al_cargar.tipos_del_espacio(opciones))
         if evidencia and integrante is not None and politica is None:
@@ -1590,14 +1641,17 @@ def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
                   "avisos": resultado.avisos})
 
 
-# --- La ortografía, antes de la vista previa (J2-17) --------------------------------------------
+# --- La ortografía, al confirmar (J2-17 y J2-23) ---------------------------------------------------
 #
 # El usuario (2026-10-13): Leda corrige la ortografía de lo que la persona escribió a mano y pone
-# los nombres como están en los datos del equipo, sin cambiar cómo está redactado; las correcciones
-# se ven en la vista previa (que es la confirmación), marcadas, y lo que se guarda es lo que se vio
-# y se confirmó. La web llama acá al tocar "confirmar", con los textos que todavía no se revisaron
-# tal como están: si algo cambió, la vista previa lo muestra y la persona confirma otra vez; si no,
-# la carga sigue. Los mismos tres pasos que la ayuda, para que el candado nunca espere a la IA. La
+# los nombres como están en los datos del equipo, sin cambiar cómo está redactado. J2-23 ("que lo
+# corrija directamente sin resaltarlo, ya dijimos que corrige palabras puntuales, no lo que dice la
+# persona"): la web llama acá al tocar "confirmar", después de revisar la carga (J2-21: lo que se
+# va a rechazar nunca se corrige) y con los textos que todavía no se revisaron tal como están, y
+# carga en el mismo toque lo corregido, sin marcas ni otra confirmación. Lo corregido queda un rato
+# para esta sesión (`_CORREGIDOS_RECIENTES`), así la carga juzga el criterio como se escribió y usa
+# el juicio de la revisión. Los mismos tres pasos que la ayuda, para que el candado nunca espere a
+# la IA. La
 # cocina acepta, palabra por palabra, sólo la que es la misma palabra mal escrita
 # (`ayuda_al_cargar.palabra_por_palabra`, J2-18); la que no, queda como se escribió, con un
 # incidente que cuenta cuántas. Si la IA no responde (o no se puede preparar), nada se bloquea: el
@@ -1726,7 +1780,7 @@ def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
                  "volvió, cambiaba algo más que la ortografía o cambiaba una palabra por otra): "
                  "lo que no aceptó quedó como se escribió" +
                  (" y la persona vio un aviso." if sin_revisar else
-                  "; lo demás se corrigió y la persona lo ve marcado.")),
+                  "; lo demás se corrigió.")),
                 severidad="baja", referencia_cruda=referencia,
                 etapa=ETAPA_ORTOGRAFIA_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
         registrar_auditoria(
@@ -1741,6 +1795,10 @@ def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
                      "huellas": {c: hashlib.sha256(v["texto"].encode("utf-8")).hexdigest()
                                  for c, v in corregidos.items()}},
             pack_hash=versiones.pack_hash(cur, ws), nucleo_hash=versiones.nucleo_hash())
+    # J2-23: la carga que sigue juzga el criterio como se escribió (`_como_se_escribio`).
+    for campo, corregido in corregidos.items():
+        _CORREGIDOS_RECIENTES.guardar(
+            _clave_de_lo_corregido(token, ws, campo, corregido["texto"]), textos[campo])
     if sin_revisar:
         causa = type(falla).__name__ if falla is not None else "corrección rechazada"
         _imprimir(f"  ! no se pudo revisar la ortografía de una carga ({causa}).")
