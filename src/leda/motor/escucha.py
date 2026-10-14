@@ -136,12 +136,15 @@ class Escucha(Recepcion):
 
     # -- arranque ------------------------------------------------------------------------
 
-    def preparar(self) -> str:
-        """El id y el nombre del bot; saca un webhook del bot del equipo. Del bot de
-        administración sólo pregunta: con webhook, no se lo sondea."""
+    def preparar(self, *, fijar_menus: bool = True) -> str:
+        """El id y el nombre del bot; saca un webhook del bot del equipo y fija el botón del menú
+        de cada bot (`fijar_los_menus`; las pruebas que no miran eso lo dejan de lado). Del bot
+        de administración sólo pregunta: con webhook, no se lo sondea."""
         yo = self.bot.llamar("getMe")
         self.bot_id = int(yo["id"])
         self.bot.llamar("deleteWebhook")
+        if fijar_menus:
+            self.fijar_los_menus()
         if self.bot_admin is not None:
             webhook = (self.bot_admin.llamar("getWebhookInfo") or {}).get("url")
             self.admin_listo = not webhook
@@ -149,6 +152,34 @@ class Escucha(Recepcion):
                 self.imprimir("  ! el bot de administración tiene un webhook puesto: no se "
                               "sondea, para no robarle los mensajes a quien lo sirve.")
         return yo.get("username", "?")
+
+    def fijar_los_menus(self) -> None:
+        """El botón del menú de cada bot, con la dirección del momento (ADR 0024; `menu_del_bot`):
+        "Tareas" en el del equipo, "Administración" en el de administración. Sin la dirección
+        pública, o si Telegram no lo acepta, el escuchador sigue igual, con un incidente."""
+        from ..menu_del_bot import SLUG_DE_LA_ADMINISTRACION, fijar_el_menu, registrar_que_no_se_fijo
+
+        with espacio(self.conn, self.ws) as cur:
+            cur.execute("select slug from workspace where id = %s", (self.ws,))
+            fila = cur.fetchone()
+        self.conn.commit()
+        dia = self.reloj.ahora().date().isoformat()
+        bots = [(self.bot, fila["slug"] if fila else None, self.ws)]
+        if self.bot_admin is not None:
+            bots.append((self.bot_admin, SLUG_DE_LA_ADMINISTRACION, None))
+        for bot, slug, espacio_del_bot in bots:
+            if slug is None:
+                continue
+            try:
+                if not fijar_el_menu(bot.llamar, slug):
+                    self.imprimir("  ! sin LEDA_BASE_URL: no se fija el botón del menú del bot.")
+                    registrar_que_no_se_fijo(self.conn, espacio_del_bot, slug,
+                                             "sin la dirección pública", dia)
+            except Exception as e:  # noqa: BLE001 -- el escuchador sigue sin el botón
+                self.conn.rollback()
+                self.imprimir(f"  ! no se pudo fijar el botón del menú: {texto_error_seguro(e)}")
+                registrar_que_no_se_fijo(self.conn, espacio_del_bot, slug,
+                                         "Telegram no lo aceptó", dia)
 
     # -- una vuelta ----------------------------------------------------------------------
 

@@ -191,6 +191,15 @@ _BUSCAR_DETALLE = "Buscá el detalle con `python -m leda incidentes <espacio>`"
 # `tests/test_aviso_incidente_legible.py` falla si una etapa conocida queda sin
 # entrada.
 EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
+    # El botón del menú de un bot (ADR 0024; `menu_del_bot.py`).
+    "menu_del_bot": ExplicacionDeEtapa(
+        titulo="Leda no pudo fijar el botón del menú de un bot",
+        que_paso=("Al arrancar el escuchador, Leda no pudo fijar el botón del menú del bot que "
+                  "abre la web («Tareas» o «Administración»): falta la dirección pública "
+                  "(LEDA_BASE_URL) o Telegram no lo aceptó."),
+        que_vio="Nada: el chat sigue andando; sólo falta el botón del menú.",
+        que_hacer=("Poné la dirección pública en LEDA_BASE_URL y volvé a arrancar el escuchador "
+                   "o a registrar los webhooks.")),
     "turno_texto": ExplicacionDeEtapa(
         que_paso=("Falló algo dentro de Leda mientras procesaba un mensaje de "
                   "texto, y ningún control más específico lo atajó."),

@@ -465,4 +465,12 @@ def registrar_webhooks(cliente=None) -> dict[str, bool]:
                   # (ADR 0024, decisión 8).
                   "allowed_updates": ["message", "callback_query"]})
         resultado[slug] = r.status_code == 200 and bool(r.json().get("ok", False))
+        # El botón del menú, con la dirección del momento (ADR 0024; `menu_del_bot`): "Tareas"
+        # en el del equipo, "Administración" en el de administración, para todos sus chats.
+        from .menu_del_bot import boton_del_menu
+
+        m = pedido_telegram(cliente.post, f"https://api.telegram.org/bot{token}/setChatMenuButton",
+                            json={"menu_button": boton_del_menu(slug, base)})
+        if m.status_code != 200 or not m.json().get("ok", False):
+            print(f"  ! Telegram no aceptó el botón del menú del bot de {slug}.")
     return resultado

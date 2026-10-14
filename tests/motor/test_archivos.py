@@ -262,7 +262,7 @@ def test_el_escuchador_espera_poco_mientras_hay_un_album_y_despues_lo_atiende(co
     escucha = Escucha(conn, mundo["id"], ia, RelojFijo(AHORA),
                       bot=BotTelegram("token-falso", telegram.cliente()), transporte=salida,
                       imprimir=lambda *_: None, bajar=Bajadas({"A1": JPEG, "A2": JPEG_2}))
-    escucha.preparar()
+    escucha.preparar(fijar_menus=False)
     telegram.lotes = [[_foto(520, "A1", album="g2"), _foto(521, "A2", JPEG_2, album="g2")]]
 
     escucha.una_vuelta()

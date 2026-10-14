@@ -201,7 +201,7 @@ def test_el_escuchador_atiende_el_pedido_por_el_bot_de_administracion(conn, mund
                       bot=BotTelegram("token-falso", telegram.cliente()), transporte=salida,
                       bot_admin=BotTelegram("token-admin-falso", telegram_admin.cliente()),
                       transporte_admin=salida_admin, imprimir=lambda *_: None)
-    escucha.preparar()
+    escucha.preparar(fijar_menus=False)
     telegram_admin.lotes = [[mensaje_de_telegram(1, "/enlace prueba tablero", ADA)]]
     escucha.una_vuelta(espera=0)
     [enviado] = salida_admin.enviados

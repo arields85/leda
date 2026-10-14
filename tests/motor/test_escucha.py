@@ -63,7 +63,8 @@ def _montar(conn, mundo, ia, *, webhook_admin: str = "",
         transporte=salida,
         bot_admin=BotTelegram("token-admin-falso", telegram_admin.cliente()),
         transporte_admin=salida_admin, imprimir=imprimir, indicador=indicador)
-    escucha.preparar()
+    # El botón del menú (ADR 0024) lo miran sus propias pruebas, abajo.
+    escucha.preparar(fijar_menus=False)
     return Montaje(escucha, telegram, telegram_admin, salida, salida_admin)
 
 
@@ -632,7 +633,7 @@ def _con_indicador_de_verdad(conn, mundo, ia_de, *, borrador_lento: float = 0.0)
         indicador=lambda chat_id: mantener_chat_activo(
             "token-falso", chat_id, cliente=telegram, chat_type="private", umbral=10.0,
             intervalo=10.0, intervalo_borrador=0.0))
-    escucha.preparar()
+    escucha.preparar(fijar_menus=False)
     return escucha, bot, telegram, ia, lineas
 
 
@@ -713,7 +714,7 @@ def test_si_la_respuesta_no_sale_el_borrador_se_retira_igual(conn, mundo):
         indicador=lambda chat_id: mantener_chat_activo(
             "token-falso", chat_id, cliente=telegram, chat_type="private", umbral=10.0,
             intervalo=10.0, intervalo_borrador=0.0))
-    escucha.preparar()
+    escucha.preparar(fijar_menus=False)
     bot.lotes = [[_mensaje(2850, "hola")]]
 
     escucha.recibir(0)
@@ -775,3 +776,33 @@ def _indicador_que_muestra_algo(telegram, chat_id):
         assert telegram.esperar(lambda: telegram.metodos()[-2:] == ["sendMessageDraft",
                                                                    "sendChatAction"])
         yield abierto
+
+
+# --- El botón del menú (ADR 0024) ---------------------------------------------------------------
+
+def test_al_arrancar_fija_el_boton_del_menu_de_cada_bot_con_la_direccion_del_momento(
+        conn, mundo, monkeypatch):
+    import dataclasses
+
+    from leda import config as config_mod
+
+    monkeypatch.setattr(config_mod, "config",
+                        dataclasses.replace(config_mod.config, base_url="https://tunel.invalid"))
+    m = _montar(conn, mundo, IAGuionada())
+    m.escucha.fijar_los_menus()
+    [menu] = [p for metodo, p in m.telegram.llamadas if metodo == "setChatMenuButton"]
+    assert "chat_id" not in menu
+    assert menu["menu_button"] == {"type": "web_app", "text": "Tareas",
+                                   "web_app": {"url": "https://tunel.invalid/app/e/prueba/"}}
+    [admin_menu] = [p for metodo, p in m.telegram_admin.llamadas
+                    if metodo == "setChatMenuButton"]
+    assert admin_menu["menu_button"]["text"] == "Administración"
+    assert admin_menu["menu_button"]["web_app"]["url"] == "https://tunel.invalid/app/admin/"
+
+
+def test_sin_la_direccion_publica_no_fija_el_menu_y_deja_un_incidente(conn, mundo):
+    m = _montar(conn, mundo, IAGuionada())
+    m.escucha.fijar_los_menus()
+    assert "setChatMenuButton" not in m.telegram.metodos()
+    incidentes = todos(conn, "select etapa from incident where etapa = 'menu_del_bot'")
+    assert len(incidentes) == 2       # el del equipo y el de administración

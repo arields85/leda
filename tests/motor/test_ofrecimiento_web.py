@@ -355,7 +355,7 @@ def _bienvenida(conn, mundo, update_id: int = 901):
                       bot=BotTelegram("token-falso", telegram.cliente()), transporte=salida,
                       bot_admin=BotTelegram("token-admin-falso", telegram_admin.cliente()),
                       transporte_admin=TransporteDePrueba(), imprimir=lambda *_: None)
-    escucha.preparar()
+    escucha.preparar(fijar_menus=False)
     telegram.lotes = [[mensaje_de_telegram(update_id, "/start", _telegram(mundo), update_id,
                                            "private")]]
     escucha.una_vuelta(espera=0)

@@ -68,7 +68,7 @@ def _escucha(conn, mundo, ia) -> tuple[Escucha, TelegramFalso, TransporteDePrueb
     escucha = Escucha(conn, mundo["id"], ia, RelojFijo(AHORA),
                       bot=BotTelegram("token-falso", telegram.cliente()), transporte=salida,
                       imprimir=lambda *_: None)
-    escucha.preparar()
+    escucha.preparar(fijar_menus=False)
     return escucha, telegram, salida
 
 

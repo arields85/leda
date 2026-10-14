@@ -77,6 +77,8 @@ PERMITIDOS: dict[str, set[str] | None] = {
     # entrada de una computadora, por las funciones de la base que lo auditan.
     "entrar_con_telegram": {"CODIGO", "PUERTA_DE_ADMINISTRACION", "PUERTA_DEL_EQUIPO",
                             "es_un_uuid", "aprobar_pedido", "ver_pedido"},
+    # El botón del menú de cada bot, al arrancar el escuchador (ADR 0024; `menu_del_bot`).
+    "menu_del_bot": {"SLUG_DE_LA_ADMINISTRACION", "fijar_el_menu", "registrar_que_no_se_fijo"},
 }
 
 # Los módulos de los flujos A y B, borrados en la E3-4, por si volvieran. La escalera, el reloj

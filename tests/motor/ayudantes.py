@@ -406,6 +406,7 @@ class TelegramFalso:
                 "getWebhookInfo": {"url": self.webhook},
                 "answerCallbackQuery": True,
                 "setWebhook": True,
+                "setChatMenuButton": True,
                 # El indicador de actividad (el webhook usa este mismo cliente): el borrador,
                 # "escribiendo…" y su retiro, la semilla como mensaje y su borrado (D8).
                 "sendMessageDraft": True,

@@ -181,7 +181,7 @@ def test_el_escuchador_corre_el_ciclo_en_cada_vuelta(conn, mundo, espacio_con_es
     escucha = Escucha(conn, mundo["id"], IAQueRedacta(), RelojFijo(octubre(9, 10)),
                       bot=BotTelegram("token-falso", TelegramFalso().cliente()),
                       transporte=salida, seguimiento=True, imprimir=lambda *_: None)
-    escucha.preparar()
+    escucha.preparar(fijar_menus=False)
 
     escucha.una_vuelta(espera=0)
 
