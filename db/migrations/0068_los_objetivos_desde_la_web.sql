@@ -19,9 +19,11 @@
 --   con el patrón de `cargar_tarea` (la sesión en cada llamada, el espacio fijado, la clave, los
 --   errores juntos, la fila, su evento `activo` y la auditoría `crear_objetivo`).
 --
--- `leda_app` sigue con sus privilegios directos sobre `objective`: los usan pruebas que crean
--- objetivos con esa conexión; ningún camino vivo escribe objetivos como `leda_app` desde que se
--- retiró la herramienta de chat `crear_objetivo`.
+-- - `objective` se cierra como `task`: `leda_app` lo lee pero no lo escribe. Ningún camino vivo lo
+--   escribía así desde que se retiró la herramienta de chat `crear_objetivo`; los objetivos los crea
+--   `crear_objetivo_web` (como `leda_owner`) y el importador (la conexión administrativa). El
+--   estado sigue siendo la proyección de `objective_state_event`: sin `update`, `leda_app` no lo
+--   puede escribir directo, así que no hace falta una guarda como la de `task`.
 --
 -- Mismo dueño (`leda_owner`), `search_path` y privilegios (sólo `leda_app`). Se deshace con
 -- `db/rollbacks/0068_los_objetivos_desde_la_web.sql`.
@@ -67,6 +69,9 @@ alter table objective add constraint objective_padre_del_espacio
   foreign key (workspace_id, parent_id) references objective(workspace_id, id) on delete cascade;
 alter table objective add constraint objective_referente_del_espacio
   foreign key (workspace_id, referente_membership_id) references membership(workspace_id, id);
+
+-- `leda_app` lee los objetivos y no los escribe: los crea `crear_objetivo_web`.
+revoke insert, update, delete on objective from leda_app;
 
 -- --- Los nombres de los niveles del pack ---------------------------------------------------------
 

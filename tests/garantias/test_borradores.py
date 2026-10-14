@@ -33,11 +33,16 @@ def _quien(cur, nombre, ws):
 
 
 def _objetivo(cur, ws):
+    # Desde la migración 0068, `leda_app` no escribe objetivos: los crea la base
+    # (`crear_objetivo_web`). La preparación de la prueba usa la conexión administrativa.
+    cur.execute("set local role leda_admin")
     cur.execute(
         """insert into objective (workspace_id, tipo, titulo, estado)
            values (%s, 'operativo', 'Objetivo simulado', 'activo') returning id""",
         (ws,))
-    return str(cur.fetchone()["id"])
+    objetivo = str(cur.fetchone()["id"])
+    cur.execute("set local role leda_app")
+    return objetivo
 
 
 def _args(objetivo, **cambios):
@@ -236,10 +241,14 @@ def test_preview_obsoleta_no_crea_tarea(corework, conn, authority_conn,
                     where id = (select membership_id from integrante
                                   where nombre = 'Nahuel Gimenez')""")
         elif obsolescencia == "objetivo":
+            # Desde la migración 0068, `leda_app` no cambia objetivos: los cambia la conexión
+            # administrativa.
+            cur.execute("set local role leda_admin")
             cur.execute(
                 """update objective set titulo = 'Objetivo cambiado'
                     where id = (select objective_id from task_draft
                                   where id = %s)""", (resultado["draft_id"],))
+            cur.execute("set local role leda_app")
         elif obsolescencia == "politica":
             cur.execute("set local role leda_admin")
             cur.execute(

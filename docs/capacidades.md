@@ -300,10 +300,26 @@ con `vitest` y Testing Library sobre un servidor de mentira, y a 390 y 1280 px c
   (`ve_la_pagina`);
 - las tareas canceladas no aparecen en ninguna vista (decisión del usuario, 2026-10-12).
 
+## Lo que agregó la plataforma por jerarquía, J3-2 (2026-10-14)
+
+Los objetivos desde la web, sin la ayuda de la IA y sin la pantalla todavía (J3-3). Plan en
+[`odd/tasks/plataforma-jerarquias.md`](../odd/tasks/plataforma-jerarquias.md); diseño en el
+[ADR 0023](decisions/0023-quien-crea-en-la-plataforma.md), decisiones 1 y 5 y punto 11. Lo probado es
+con `TestClient` y datos ficticios (`tests/garantias/test_creacion_de_objetivos.py`).
+
+| Capacidad | Dónde |
+|---|---|
+| Crear un objetivo: una función de la base (`security definer` de `leda_owner`, sólo para `leda_app`) que acepta la sesión de administración (en cualquier espacio) o la de la puerta del equipo de Dirección (el integrante cuyo rol tiene la autoridad final, sólo en su espacio; a cualquier otro, `sin_autoridad`), fija ella misma el espacio y usa una clave de un solo uso (`creacion_de_objetivo`, RLS forzada, nada para `leda_app`). Lo que no se crea vuelve todo junto (`campo`, `motivo`): sin nombre, tipo o referente; textos de más de 200 y 800 caracteres; un padre de otro espacio, cerrado u operativo; un tipo que no corresponde a dónde cuelga (sin padre, estratégico; de un estratégico, hito u operativo; de un hito, operativo); un referente que no es integrante activo (cualquiera del espacio, no sólo el de un área). Escribe el objetivo (sin fecha), su evento `activo` (actor: quien lo creó) y la auditoría `crear_objetivo` con quién, por qué puerta y qué sesión, sin el texto | migración `0068` (`crear_objetivo_web`, `quien_crea_el_objetivo`) |
+| Lo que ofrece el formulario: de qué objetivos puede colgar (abiertos y no operativos, con los tipos que admite cada uno), los integrantes activos para el referente y los nombres de los niveles del pack | migración `0068` (`opciones_del_objetivo`) |
+| Un objetivo nunca cuelga de otro espacio ni nombra un referente de otro, tampoco por la base: `unique (workspace_id, id)` y claves compuestas del padre y del referente. `leda_app` lee los objetivos y no los escribe (sin `insert`, `update` ni `delete`, como `task`) | migración `0068` |
+| Los nombres de los niveles de objetivo del pack (`niveles`: `objetivo_estrategico`, `hito`, `objetivo_operativo`) los guarda el importador en `workspace_setting` (`niveles`, con su restricción: de 1 a 60 caracteres); uno que no sirve se avisa al importar y se usa el del núcleo. Sin la fila (un espacio importado antes de la `0068`), los del núcleo | `importador.py` (`niveles_del_pack`), migración `0068` |
+| Las rutas: por la puerta de administración, `GET /app/admin/api/espacios/{id}/objetivos/opciones` y `POST /app/admin/api/espacios/{id}/objetivos`; por la del equipo, sólo Dirección, `GET /app/api/objetivos/opciones` y `POST /app/api/objetivos` (los demás, 403 aunque la web no les muestre el botón). Los mismos controles que la carga (otro sitio 403, JSON 415, tamaño 413, la cookie de esa puerta 401), en un ayudante que sirve a las dos puertas (`_el_pedido_que_escribe`); 201, 200 con la misma clave y 422 con cada rechazo en palabras | `web_app.py` |
+| **Retirado:** la herramienta de chat `crear_objetivo`, que dejaba crear objetivos a cualquier integrante: por chat no se crean objetivos (ADR 0017, decisión 1; ADR 0023, decisión 6) | `herramientas.py`, `autoridad.py` |
+
 ## Vigencia
 
 Levantado el 2026-09-22 auditando `nucleo/`, la especificación funcional y el
 código completo; notas del 2026-10-04 con los ADR 0017 y 0018. Puesto al día el 2026-10-11 con lo
 que construyó la Fase C, contrastado contra `src/leda/` y el plan, y el 2026-10-12 con la porción 1
-de la plataforma web, contrastada contra su código y sus pruebas. Todo lo de arriba es
+de la plataforma web, contrastada contra su código y sus pruebas, y el 2026-10-14 con la J3-2. Todo lo de arriba es
 una foto y envejece; la única parte que se mantiene sola es la prueba.

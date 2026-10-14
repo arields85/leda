@@ -5,7 +5,8 @@
 --
 -- Borra `crear_objetivo_web`, `opciones_del_objetivo`, `quien_crea_el_objetivo`,
 -- `creacion_de_objetivo`, la restricción de `niveles` en `workspace_setting` y `niveles_validos`,
--- y vuelve a las claves simples del padre y del referente de `objective`. Se niega a correr si eso
+-- vuelve a las claves simples del padre y del referente de `objective` y le devuelve a `leda_app`
+-- la escritura directa de `objective`. Se niega a correr si eso
 -- perdiera datos: una clave de creación guardada (sin ella, un formulario reenviado volvería a
 -- crear el mismo objetivo). Los objetivos creados, sus eventos, lo que quedó en `audit_log` y las
 -- filas `niveles` de `workspace_setting` no se tocan (sin la restricción, son un ajuste más que
@@ -37,5 +38,7 @@ alter table objective add constraint objective_parent_id_fkey
 alter table objective add constraint objective_referente_membership_id_fkey
   foreign key (referente_membership_id) references membership(id);
 alter table objective drop constraint if exists objective_workspace_id_unique;
+
+grant insert, update, delete on objective to leda_app;
 
 commit;

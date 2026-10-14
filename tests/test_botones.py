@@ -36,12 +36,14 @@ def _quien(cur, nombre, ws):
 
 
 def _tarea(cur, ws, persona="Marcos Tarquini"):
+    # El objetivo también con la conexión administrativa: desde la migración 0068, `leda_app` no
+    # escribe objetivos.
+    cur.execute("set local role leda_admin")
     cur.execute(
         """insert into objective (workspace_id, tipo, titulo)
            values (%s, 'operativo', 'Integrar comprimidora 3') returning id""",
         (ws,))
     obj = cur.fetchone()["id"]
-    cur.execute("set local role leda_admin")
     # Por la vista y no por app_user: bajo el rol del agente esa tabla no se
     # toca, que es exactamente lo que el esquema quiere.
     cur.execute(

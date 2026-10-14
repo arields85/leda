@@ -197,6 +197,29 @@ def test_la_aplicacion_no_toca_las_claves_de_creacion(conn, intake_world):
     conn.commit()
 
 
+def test_la_aplicacion_no_escribe_objetivos_directo_y_la_funcion_si(conn, intake_world, sesion):
+    """Como `task`: `leda_app` lee los objetivos y no los escribe; los crea la base."""
+    norte = _norte(intake_world)
+    objetivo = norte["objectives"][0]
+    with espacio(conn, norte["id"]) as cur:
+        for orden, args in (
+                ("insert into objective (workspace_id, tipo, titulo) "
+                 "values (%s, 'estrategico', 'Directo')", (norte["id"],)),
+                ("update objective set titulo = 'Cambiado' where id = %s", (objetivo,)),
+                ("update objective set estado = 'cancelado' where id = %s", (objetivo,)),
+                ("delete from objective where id = %s", (objetivo,))):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege), conn.transaction():
+                cur.execute(orden, args)
+        cur.execute("select count(*) n from objective")
+        assert cur.fetchone()["n"] == 3, "leer, sí"
+    conn.commit()
+    fila = _fila(conn, "select titulo, estado::text e from objective where id = %s", objetivo)
+    assert (fila["e"], fila["titulo"]) == ("activo", "Reduce service delay 1")
+    assert _contar(conn, "objective", "titulo = 'Directo'") == 0
+    assert _crear(conn, sesion, intake_world)["ok"] is True
+    assert _creados(conn) == 1
+
+
 def test_la_tabla_de_claves_tiene_rls_forzada(conn):
     fila = _fila(conn, """select relrowsecurity r, relforcerowsecurity f from pg_class
                            where oid = 'leda.creacion_de_objetivo'::regclass""")

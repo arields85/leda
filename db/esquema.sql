@@ -5186,6 +5186,9 @@ end $$;
 revoke insert on task from leda_app;
 revoke update, delete on task from leda_app;
 grant select on task to leda_app;
+-- Los objetivos, igual (migración 0068): los crea `crear_objetivo_web` (ADR 0023, decisión 1) y
+-- el importador; `leda_app` sólo los lee.
+revoke insert, update, delete on objective from leda_app;
 revoke update, delete on task_draft from leda_app;
 grant update (objective_id, objective_snapshot, titulo, descripcion, area_id,
               responsable_membership_id, fecha_objetivo,

@@ -27,11 +27,16 @@ def _quien(cur, nombre, ws):
 
 
 def _objetivo(cur, ws):
+    # Desde la migración 0068, `leda_app` no escribe objetivos: los crea la base
+    # (`crear_objetivo_web`). La preparación de la prueba usa la conexión administrativa.
+    cur.execute("set local role leda_admin")
     cur.execute(
         """insert into objective (workspace_id, tipo, titulo)
            values (%s, 'operativo', 'Integrar comprimidora 3') returning id""",
         (ws,))
-    return str(cur.fetchone()["id"])
+    objetivo = str(cur.fetchone()["id"])
+    cur.execute("set local role leda_app")
+    return objetivo
 
 
 # ---------------------------------------------------------------------------
