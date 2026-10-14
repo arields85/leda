@@ -63,6 +63,15 @@ def test_cada_etapa_conocida_tiene_su_explicacion():
         assert explicacion.que_vio.strip(), etapa
 
 
+def test_el_dictado_al_cargar_tiene_su_explicacion():
+    """J2b: el dictado que no se pudo pasar a texto dice qué vio la persona y dónde mirar, sin
+    pedir que se le avise (puede volver a dictar o escribirlo)."""
+    explicacion = EXPLICACION_POR_ETAPA[incidentes.ETAPA_DICTADO_AL_CARGAR]
+    assert incidentes.ETAPA_DICTADO_AL_CARGAR == "dictado_al_cargar"
+    assert "dict" in explicacion.que_paso
+    assert "LEDA_GEMINI_API_KEY" in explicacion.que_hacer
+
+
 def _llamadas_sin_etapa_valida(fuente: str, nombre: str = "x.py") -> list[str]:
     """Llamadas a `registrar_incidente` cuya etapa no está nombrada de forma
     verificable: sin `etapa=`, con `etapa=None`, o con los argumentos pasados

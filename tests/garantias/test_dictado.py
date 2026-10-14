@@ -1,0 +1,326 @@
+"""El dictado al cargar, con Gemini en el servidor (porción J2b de
+`odd/tasks/plataforma-jerarquias.md`): las garantías en la entrada HTTP, con un Gemini de mentira
+(un transporte de `httpx` falso; nunca el real).
+
+- **La puerta:** sólo una sesión de administración vigente, con la protección contra otros sitios
+  de la carga; sólo audio de los tipos admitidos (415) y de hasta 10 MB (413); un espacio que no
+  existe, 404. Nada de eso llega a Gemini.
+- **Lo que recibe Gemini:** el audio tal cual, en línea, con su tipo; las instrucciones con los
+  nombres de ese espacio (integrantes, áreas y objetivos abiertos) y nada de otro; la clave en su
+  cabecera, nunca en la dirección. Sin pensar, temperatura 0 y un tope de salida.
+- **Nunca en silencio:** sin clave o si Gemini no responde, un aviso humano y un incidente
+  (`dictado_al_cargar`), saneado: ni el audio, ni el texto, ni la clave. Si no se entendió nada,
+  "No te entendí", sin incidente (es una respuesta, no una falla), y la auditoría lo dice.
+- **La auditoría** (`dictar_al_cargar`): quién dictó, en qué espacio, el tipo, el tramo de
+  tamaño y si respondió; nunca el audio ni el texto. El audio no se guarda en ningún lado.
+- **El candado de la web no espera a Gemini:** la llamada se hace fuera de él.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+
+import httpx
+import pytest
+
+from tests.garantias.test_carga_de_tareas import (  # noqa: F401
+    _contar, _fila, _navegador_de_administracion, _navegador_del_equipo, _norte, _revocar,
+    administradora, sesion, web)
+
+CLAVE = "clave-de-mentira-0123456789"
+AUDIO = b"OggS\x00audio de mentira\xff\x00\x01"
+TEXTO_SIN_DICTADO = "No pude pasar el audio a texto ahora. Probá de nuevo en un rato o escribilo acá."
+TEXTO_NO_SE_ENTENDIO = "No te entendí; probá de nuevo o escribilo acá."
+DICHO = "Hay que colgar el estante del módem para el viernes, que lo haga Sam North."
+
+
+def _camino(espacio_id: str) -> str:
+    return f"/app/admin/api/espacios/{espacio_id}/dictado"
+
+
+class GeminiDeMentira:
+    """Lo que contesta Gemini, en orden; cada pedido queda guardado para mirarlo."""
+
+    def __init__(self) -> None:
+        self.respuestas: list = []
+        self.pedidos: list[httpx.Request] = []
+        self.al_llamar = None
+
+    def __call__(self, pedido: httpx.Request) -> httpx.Response:
+        self.pedidos.append(pedido)
+        if self.al_llamar is not None:
+            self.al_llamar()
+        if not self.respuestas:
+            # Nadie lo esperaba: la prueba lo mira en `pedidos`.
+            return httpx.Response(500, json={"error": {"status": "INTERNAL"}})
+        respuesta = self.respuestas.pop(0)
+        if isinstance(respuesta, Exception):
+            raise respuesta
+        return respuesta
+
+    def cuerpo(self, i: int = 0) -> dict:
+        return json.loads(self.pedidos[i].content)
+
+
+def _con_texto(texto: str) -> httpx.Response:
+    return httpx.Response(200, json={"candidates": [
+        {"content": {"role": "model", "parts": [{"text": texto}]}, "finishReason": "STOP"}]})
+
+
+@pytest.fixture(autouse=True)
+def gemini(monkeypatch):
+    """Nunca el Gemini real: el cliente del dictado usa un transporte falso, y la clave es una de
+    mentira (aunque el `.env` tenga la real)."""
+    from leda import dictado
+
+    falso = GeminiDeMentira()
+    monkeypatch.setenv("LEDA_GEMINI_API_KEY", CLAVE)
+    monkeypatch.setattr(dictado, "_cliente", lambda: httpx.Client(
+        transport=httpx.MockTransport(falso), timeout=dictado.PLAZO_DEL_PROVEEDOR_S))
+    return falso
+
+
+def _dictar(navegador, espacio_id: str, audio: bytes = AUDIO,
+            tipo: str = "audio/webm;codecs=opus", **cabeceras):
+    return navegador.post(_camino(espacio_id), content=audio,
+                          headers={"content-type": tipo, **cabeceras})
+
+
+# --- El dictado, de punta a punta ---------------------------------------------------------------
+
+def test_el_audio_vuelve_como_texto(web, conn, intake_world, administradora, gemini):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    gemini.respuestas.append(_con_texto(f"  {DICHO}\n"))
+    r = _dictar(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 200, r.text
+    assert r.json() == {"texto": DICHO}
+    assert r.headers["cache-control"] == "no-store"
+    # Nada se cargó: dictar no es cargar.
+    assert _contar(conn, "task") == 0
+
+
+def test_gemini_recibe_el_audio_tal_cual_con_su_tipo_y_la_clave_en_su_cabecera(
+        web, conn, intake_world, administradora, gemini):
+    from leda import dictado
+    from leda.llm import GEMINI_BASE
+
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    gemini.respuestas.append(_con_texto(DICHO))
+    assert _dictar(navegador, _norte(intake_world)["id"]).status_code == 200
+    (pedido,) = gemini.pedidos
+    assert str(pedido.url) == f"{GEMINI_BASE}/models/{dictado.MODELO}:generateContent"
+    assert dictado.MODELO == "gemini-3.8-flash"
+    assert pedido.headers["x-goog-api-key"] == CLAVE
+    assert CLAVE not in str(pedido.url)
+    cuerpo = gemini.cuerpo()
+    partes = cuerpo["contents"][0]["parts"]
+    (audio,) = [p["inline_data"] for p in partes if "inline_data" in p]
+    # El tipo sin sus parámetros (`codecs`), y el audio sin convertir.
+    assert audio["mime_type"] == "audio/webm"
+    assert base64.b64decode(audio["data"]) == AUDIO
+    configuracion = cuerpo["generationConfig"]
+    assert configuracion["temperature"] == 0
+    assert configuracion["thinkingConfig"] == {"thinkingBudget": 0}
+    assert 0 < configuracion["maxOutputTokens"] <= 2048
+
+
+def test_las_instrucciones_favorecen_los_nombres_de_ese_espacio_y_de_ningun_otro(
+        web, conn, intake_world, administradora, gemini):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    gemini.respuestas.append(_con_texto(DICHO))
+    assert _dictar(navegador, _norte(intake_world)["id"]).status_code == 200
+    instrucciones = " ".join(p["text"] for p in gemini.cuerpo()["contents"][0]["parts"]
+                             if "text" in p)
+    assert "transcrib" in instrucciones.lower()
+    for persona in _norte(intake_world)["people"].values():
+        assert persona["name"] in instrucciones
+    assert "Field Services" in instrucciones
+    assert "Reduce service delay 1" in instrucciones
+    oeste = intake_world["west-studio"]
+    for persona in oeste["people"].values():
+        assert persona["name"] not in instrucciones
+    assert "Reduce service delay 2" not in instrucciones
+
+
+@pytest.mark.parametrize("tipo", ["audio/mp4", "audio/ogg;codecs=opus", "audio/mpeg",
+                                  "audio/aac", "audio/wav", "AUDIO/WEBM"])
+def test_los_tipos_de_audio_de_los_celulares_se_admiten(web, conn, intake_world, administradora,
+                                                       gemini, tipo):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    gemini.respuestas.append(_con_texto(DICHO))
+    assert _dictar(navegador, _norte(intake_world)["id"], tipo=tipo).status_code == 200
+    (audio,) = [p["inline_data"] for p in gemini.cuerpo()["contents"][0]["parts"]
+                if "inline_data" in p]
+    assert audio["mime_type"] == tipo.split(";")[0].lower()
+
+
+# --- La puerta --------------------------------------------------------------------------------
+
+def test_sin_sesion_de_administracion_no_hay_dictado(web, conn, intake_world, administradora,
+                                                    gemini):
+    norte = _norte(intake_world)
+    assert _dictar(web(), norte["id"]).status_code == 401
+    equipo = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    assert _dictar(equipo, norte["id"]).status_code == 401
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    for origen in ("https://otro.example", "null"):
+        assert _dictar(navegador, norte["id"], origin=origen).status_code == 403
+    assert _dictar(navegador, "00000000-0000-0000-0000-000000000000").status_code == 404
+    assert _dictar(navegador, "no-es-un-id").status_code == 404
+    assert gemini.pedidos == []
+    assert _contar(conn, "audit_log", "accion = 'dictar_al_cargar'") == 0
+
+
+@pytest.mark.parametrize("tipo", ["application/json", "text/plain", "video/mp4",
+                                  "multipart/form-data; boundary=x", ""])
+def test_lo_que_no_es_audio_no_se_manda(web, conn, intake_world, administradora, gemini, tipo):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _dictar(navegador, _norte(intake_world)["id"], tipo=tipo)
+    assert r.status_code == 415
+    assert gemini.pedidos == []
+
+
+def test_un_audio_de_mas_de_10_mb_no_se_manda(web, conn, intake_world, administradora, gemini):
+    from leda import dictado
+
+    assert dictado.TAMANO_MAXIMO == 10 * 1024 * 1024
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _dictar(navegador, _norte(intake_world)["id"], audio=b"x" * (dictado.TAMANO_MAXIMO + 1))
+    assert r.status_code == 413
+    assert gemini.pedidos == []
+
+
+def test_sin_audio_no_se_manda(web, conn, intake_world, administradora, gemini):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _dictar(navegador, _norte(intake_world)["id"], audio=b"")
+    assert r.status_code == 422
+    assert r.json()["texto"] == TEXTO_NO_SE_ENTENDIO
+    assert gemini.pedidos == []
+
+
+def test_una_sesion_cortada_mientras_responde_gemini_no_recibe_el_texto(
+        web, conn, intake_world, administradora, gemini):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    gemini.respuestas.append(_con_texto(DICHO))
+    gemini.al_llamar = lambda: _revocar(conn, administradora)
+    r = _dictar(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 401
+    assert DICHO not in r.text
+
+
+def test_la_web_no_espera_a_gemini_con_su_candado(web, conn, intake_world, administradora,
+                                                 gemini):
+    from leda import web_app
+
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    candado = []
+    gemini.al_llamar = lambda: candado.append(web_app._WEB.locked())
+    gemini.respuestas.append(_con_texto(DICHO))
+    assert _dictar(navegador, _norte(intake_world)["id"]).status_code == 200
+    assert candado == [False]
+
+
+# --- Las fallas: un aviso humano y un incidente, saneado ----------------------------------------
+
+def _incidente(conn) -> dict:
+    return _fila(conn, "select * from incident where etapa = 'dictado_al_cargar'")
+
+
+def _sin_nada_sensible(*textos: str | None) -> None:
+    plano = " ".join(t or "" for t in textos)
+    for sensible in (CLAVE, DICHO, AUDIO.decode("latin-1"),
+                     base64.b64encode(AUDIO).decode("ascii"), "generativelanguage"):
+        assert sensible not in plano
+
+
+def test_sin_clave_un_aviso_y_un_incidente(web, conn, intake_world, administradora, gemini,
+                                          monkeypatch):
+    monkeypatch.delenv("LEDA_GEMINI_API_KEY", raising=False)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _dictar(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 503
+    assert r.json() == {"error": "sin_dictado", "texto": TEXTO_SIN_DICTADO}
+    assert gemini.pedidos == []
+    incidente = _incidente(conn)
+    assert incidente is not None
+    assert str(incidente["workspace_id"]) == _norte(intake_world)["id"]
+    assert "SinClave" in incidente["referencia_cruda"]
+    auditoria = _fila(conn, "select detalle from audit_log where accion = 'dictar_al_cargar'")
+    assert auditoria["detalle"]["respondio"] is False
+    assert auditoria["detalle"]["resultado"] == "sin_clave"
+
+
+@pytest.mark.parametrize("respuesta, causa", [
+    (httpx.Response(429, json={"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
+                                         "message": f"cupo; clave {CLAVE}; dijo {DICHO}"}}),
+     "status_429 RESOURCE_EXHAUSTED"),
+    (httpx.Response(400, text=f"<html>{DICHO}</html>"), "status_400"),
+    (httpx.ReadTimeout(f"tardó: https://generativelanguage.googleapis.com/?key={CLAVE}"),
+     "ReadTimeout"),
+    (httpx.ConnectError("sin red"), "ConnectError"),
+    (httpx.Response(200, text="no es json"), "respuesta_ilegible"),
+    (httpx.Response(200, json={"promptFeedback": {"blockReason": "OTHER"}}), "sin_candidatos"),
+])
+def test_si_gemini_no_responde_un_aviso_y_un_incidente_saneado(
+        web, conn, intake_world, administradora, gemini, respuesta, causa):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    gemini.respuestas.append(respuesta)
+    r = _dictar(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 502
+    assert r.json() == {"error": "sin_dictado", "texto": TEXTO_SIN_DICTADO}
+    _sin_nada_sensible(r.text)
+    incidente = _incidente(conn)
+    assert incidente is not None
+    assert causa in incidente["referencia_cruda"]
+    _sin_nada_sensible(incidente["referencia_cruda"], incidente["resumen_sanitizado"])
+    auditoria = _fila(conn, "select detalle from audit_log where accion = 'dictar_al_cargar'")
+    assert auditoria["detalle"]["resultado"] == "sin_respuesta"
+
+
+def test_si_no_se_entendio_nada_lo_dice_sin_incidente(web, conn, intake_world, administradora,
+                                                     gemini):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    gemini.respuestas.append(_con_texto("  \n "))
+    r = _dictar(navegador, _norte(intake_world)["id"])
+    assert r.status_code == 422
+    assert r.json() == {"error": "no_se_entendio", "texto": TEXTO_NO_SE_ENTENDIO}
+    assert _contar(conn, "incident", "etapa = 'dictado_al_cargar'") == 0
+    auditoria = _fila(conn, "select detalle from audit_log where accion = 'dictar_al_cargar'")
+    assert auditoria["detalle"]["respondio"] is True
+    assert auditoria["detalle"]["resultado"] == "vacio"
+
+
+# --- La auditoría -----------------------------------------------------------------------------
+
+def test_la_auditoria_guarda_el_pedido_sin_el_audio_ni_el_texto(web, conn, intake_world,
+                                                               administradora, gemini):
+    norte = _norte(intake_world)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    gemini.respuestas.append(_con_texto(DICHO))
+    assert _dictar(navegador, norte["id"], tipo="audio/mp4").status_code == 200
+    fila = _fila(conn, """select workspace_id, actor_app_user_id, actor_kind, sujeto_tipo,
+                                 sujeto_id, detalle, pack_hash, nucleo_hash
+                            from audit_log where accion = 'dictar_al_cargar'""")
+    assert str(fila["workspace_id"]) == norte["id"]
+    assert str(fila["actor_app_user_id"]) == administradora
+    assert (fila["actor_kind"], fila["sujeto_tipo"]) == ("persona", "workspace")
+    assert fila["pack_hash"] and fila["nucleo_hash"]
+    detalle = fila["detalle"]
+    assert detalle["origen"] == "web" and detalle["sesion_de_administracion_id"]
+    assert detalle["proveedor"] == "gemini" and detalle["modelo"] == "gemini-3.8-flash"
+    assert detalle["tipo"] == "audio/mp4"
+    assert detalle["tamano"] == "hasta_256_kb"
+    assert detalle["respondio"] is True and detalle["resultado"] == "texto"
+    assert detalle["caracteres"] == len(DICHO)
+    _sin_nada_sensible(json.dumps(detalle, ensure_ascii=False))
+
+
+def test_el_tramo_de_tamano():
+    from leda import dictado
+
+    assert dictado.tramo_de_tamano(1) == "hasta_256_kb"
+    assert dictado.tramo_de_tamano(256 * 1024) == "hasta_256_kb"
+    assert dictado.tramo_de_tamano(256 * 1024 + 1) == "hasta_1_mb"
+    assert dictado.tramo_de_tamano(3 * 1024 * 1024) == "hasta_4_mb"
+    assert dictado.tramo_de_tamano(dictado.TAMANO_MAXIMO) == "hasta_10_mb"

@@ -30,7 +30,9 @@ digan lo mismo (`DICEN_LO_MISMO`, los que el usuario vio tildados juntos en el c
 un criterio que cuenta la comprobación desde quien revisa, y no desde quien hace la tarea, se marca
 `desde_quien_revisa`; sólo cuando nombra a quien revisa por su papel ("quien la revise", "el que la
 revisa", "el revisor"): un "se ve" o el nombre de una persona pueden ser legítimos y no se pueden
-distinguir por las palabras, así que no se marcan.
+distinguir por las palabras, así que no se marcan. J2-25: un criterio en primera persona, como si
+hablara quien hace la tarea, se marca `en_primera_persona`; sólo por la primera palabra de cada
+oración (`en_primera_persona` dice cómo, y lo que no ve).
 
 `--ia guionada` (lo de omisión) corre en seco, sin red: una IA de mentira con un guion para el
 ejemplo del usuario, el sábado, "antes del jueves", el PLC, el UPS de la prueba del usuario (con
@@ -520,6 +522,28 @@ def desde_quien_revisa(texto: str) -> list[str]:
     return [m.group(0) for m in _DESDE_QUIEN_REVISA.finditer(_plano(texto))]
 
 
+# J2-25, sólo en la medición: al principio de una oración, un verbo en presente termina en "o" en
+# primera persona ("dejo", "reviso") y en "a" o "e" en tercera ("deja", "revisa"). Se marca la primera
+# palabra de cada oración que termina en "o", salvo un participio ("terminado", "cumplido") y las
+# palabras que no son verbos y suelen abrir una oración de un criterio. No ve un verbo en primera
+# persona en el medio ("… y entrego"): ahí un participio o un nombre se confunden con él.
+_NO_SON_VERBOS = frozenset({
+    "todo", "toda", "cada", "cuando", "como", "luego", "primero", "solo", "otro", "mismo", "uno",
+    "ninguno", "alguno", "eso", "esto", "ello", "algo", "tanto", "mucho", "poco", "pero", "medio",
+    "nuevo", "dentro", "centro", "tablero", "equipo", "trabajo", "proyecto", "objetivo"})
+_PRIMERA_DE_LA_ORACION = re.compile(r"(?:^|[.!?:;]\s+)[\"'«(¿¡]*([^\W\d_]+)")
+
+
+def en_primera_persona(texto: str) -> list[str]:
+    """La primera palabra de cada oración que parece un verbo en primera persona (J2-25), sin
+    tildes ni mayúsculas. Vacío si el criterio está en tercera persona (o la marca no lo ve)."""
+    plano = "".join(ayuda_al_cargar._sin_marcas(c) if c.isalpha() else c for c in texto)
+    palabras = [m.group(1) for m in _PRIMERA_DE_LA_ORACION.finditer(plano)]
+    return [p for p in palabras
+            if len(p) >= 3 and p.endswith("o") and not p.endswith(("ado", "ido"))
+            and p not in _NO_SON_VERBOS]
+
+
 def sin_naturalidad(texto: str, etiquetas: list[str]) -> list[str]:
     """Por qué un texto propuesto parece armado por el código y no escrito por una persona: la
     frase de la plantilla, una etiqueta de la evidencia de cuatro palabras o más pegada como un
@@ -700,9 +724,11 @@ def medir_el_juicio(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     fallas += [f"propuesta sin naturalidad: {m}" for m in naturalidad]
     revisa = desde_quien_revisa(juicio.propuesta) if juicio.propuesta else []
     fallas += [f"propuesta desde quien revisa: «{m}»" for m in revisa]
+    primera = en_primera_persona(juicio.propuesta) if juicio.propuesta else []
+    fallas += [f"propuesta en primera persona: «{m}»" for m in primera]
     return not fallas, {"falla": None, "juicio": juicio.motivo, "propuesta": juicio.propuesta,
                         "de_reserva": juicio.de_reserva, "sin_naturalidad": naturalidad,
-                        "desde_quien_revisa": revisa,
+                        "desde_quien_revisa": revisa, "en_primera_persona": primera,
                         "segundos": segundos, "fallas": fallas}
 
 
@@ -788,6 +814,8 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     fallas += [f"{c}: sin naturalidad: {', '.join(m)}" for c, m in naturalidad.items()]
     revisa = desde_quien_revisa(r.propuesta["criterio"]) if "criterio" in r.propuesta else []
     fallas += [f"criterio: desde quien revisa: «{m}»" for m in revisa]
+    primera = en_primera_persona(r.propuesta["criterio"]) if "criterio" in r.propuesta else []
+    fallas += [f"criterio: en primera persona: «{m}»" for m in primera]
     todo = " ".join(textos.values())
     for palabra in pedido.get("bien_escrito", []):
         if palabra not in todo:
@@ -799,6 +827,7 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
                         "falla_del_juicio": falla_del_juicio, "propuesta": r.propuesta,
                         "criterio_de": r.criterio_de, "responsable_de": r.responsable_de,
                         "sin_naturalidad": naturalidad, "desde_quien_revisa": revisa,
+                        "en_primera_persona": primera,
                         "avisos": [a["texto"] for a in r.avisos],
                         "descartados": r.descartados, "elegir": r.elegir,
                         "juicio": None if juicio is None else (juicio.motivo or "lo_dice"),

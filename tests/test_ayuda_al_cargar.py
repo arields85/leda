@@ -2028,6 +2028,51 @@ def test_j2_22_la_medicion_hace_fallar_la_propuesta_desde_quien_revisa(medir):
     assert detalle["desde_quien_revisa"] == ["quien lo revisa"]
 
 
+# --- J2-25: el criterio, en tercera persona ------------------------------------------------------
+#
+# Después de la J2-22 la IA real escribía el criterio como si hablara quien hace la tarea, en primera
+# persona. El usuario (2026-10-13): tiene que nombrarla o referirse a ella en tercera persona. Va en
+# la descripción del trabajo, sin frases de ejemplo ni listas de palabras (AGENTS.md, punto 11).
+
+def test_j2_25_las_instrucciones_piden_el_criterio_en_tercera_persona(ayuda):
+    textos = {
+        "la propuesta": ayuda.INSTRUCCIONES,
+        "el dato del criterio": ayuda._DATOS["criterio"],
+        "el juicio": ayuda.INSTRUCCIONES_DEL_JUICIO,
+        "el juicio sin quién": ayuda.INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN,
+        "el resultado": ayuda.INSTRUCCIONES_DEL_RESULTADO,
+        "el criterio del juicio": ayuda._CRITERIO_DE_LEDA["description"],
+    }
+    for donde, texto in textos.items():
+        plano = " ".join(texto.lower().split())
+        assert "en tercera persona" in plano, donde
+        assert "nunca como si esa persona hablara" in plano, donde
+    # Con su nombre cuando se sabe quién la hace (la propuesta lo recibe; el juicio, no).
+    assert "por su nombre" in " ".join(ayuda.INSTRUCCIONES.lower().split())
+
+
+@pytest.mark.parametrize("criterio, marcado", [
+    ("Dejo pintado el cartel de la entrada y entrego una foto del trabajo terminado.", ["dejo"]),
+    ("Reviso el cableado de la paila y entrego el registro de la prueba.", ["reviso"]),
+    ("El cartel queda pintado. Entrego una foto.", ["entrego"]),
+    ("Lucas deja pintado el cartel y entrega una foto del trabajo terminado.", []),
+    ("El estante queda colgado y firme, y quien lo colgó cuenta cómo quedó.", []),
+    ("Todo el cableado queda revisado. Cuando termina, Marcos sube el registro.", []),
+    ("Terminado el tablero, Marcos entrega la captura.", []),
+])
+def test_j2_25_la_medicion_marca_el_criterio_en_primera_persona(medir, criterio, marcado):
+    assert medir.en_primera_persona(criterio) == marcado
+
+
+def test_j2_25_la_medicion_hace_fallar_la_propuesta_en_primera_persona(medir):
+    (no_se,) = [p for p in medir.PEDIDOS if p["nombre"] == "no se"]
+    estante = {"dice_un_resultado": False, "resultado": "El estante queda colocado",
+               "criterio": "Coloco el estante firme y derecho y cuento cómo quedó."}
+    ok, detalle = medir.medir(IADeLaCarga(estante), no_se)
+    assert ok is False
+    assert detalle["en_primera_persona"] == ["coloco"]
+
+
 # --- Advertencia de RDD de la J2-19: quién la hace y su área, con una sola búsqueda --------------
 
 def test_quien_y_su_politica_es_la_misma_busqueda_que_la_propuesta(ayuda):
