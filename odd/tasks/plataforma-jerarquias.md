@@ -917,6 +917,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
+      Incluye la decisión 6 del 2026-10-14: seguir con una tarea que vence después que su objetivo pide la
+      aprobación del referente del objetivo, con la misma maquinaria de las propuestas.
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
@@ -1017,6 +1019,14 @@ con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue co
      tipo. También se puede cambiar la fecha. La base no acepta un hijo que vence después que su padre, y
      nunca se llega sin salida. Ejemplo del usuario: "Habilitar el laboratorio" (15/12) no cuelga de "Abrir
      la planta nueva" (30/11): va al lado, como objetivo aparte. Se construye en la J3-3b.
+  6. **Una tarea que vence después que su objetivo** (usuario, 2026-10-14: "leda tiene que frenar esas cosas y
+     dar aviso"). Una tarea no puede ir "aparte": el objetivo la necesita, y "Poner el módem en la pared" no
+     termina sin "Comprar el estante". Leda frena antes de cargar: "Esta tarea vence después que «Poner el
+     módem en la pared» (21/10): el objetivo se demoraría." La persona puede cambiar la fecha, o seguir y
+     pedirle la aprobación al referente del objetivo. Mientras tanto la tarea queda pendiente: si el
+     referente aprueba se carga, y si rechaza no, y quien la pidió se entera del motivo. Si quien carga es ese
+     referente, su confirmación ya es la aprobación. El freno va en la J3-3b. El pedido de aprobación va en la
+     J6, con la maquinaria de las propuestas; hasta entonces la única salida es cambiar la fecha.
 
 ## Criterio de aceptación
 
