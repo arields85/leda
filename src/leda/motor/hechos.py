@@ -258,6 +258,19 @@ SIGNIFICADOS: Mapping[str, str] = {
                                     "pide respuesta.",
     "entregas_que_esperan_otra_pieza": "Las entregas que esperan una pieza nueva, cada una con "
                                        "su tarea, su responsable y lo que le falta.",
+    # --- Crear una tarea o un objetivo por chat (J4b, D12; `fichas.pedir_crear`) ------------------
+    "pedir_crear": "La persona quiere crear una tarea o un objetivo: por chat no se crean; Leda le "
+                   "dice dónde se hace y quién lo hace.",
+    "que_quiere_crear": "Qué quiere crear la persona: una tarea o un objetivo.",
+    "se_crea_en_la_web": "Las tareas y los objetivos se crean en la web de Leda, nunca por chat: "
+                         "no se creó nada.",
+    "puede_hacerlo_en_la_web": "Si la persona que escribe lo puede crear en su web. Si puede, "
+                               "el mensaje lleva al final su enlace para entrar.",
+    "lo_hacen": "Quiénes lo crean, si la persona no puede: lo que necesite se lo pide a ellos.",
+    "pronto_podra_proponerlo": "Pronto la persona va a poder proponerlo desde su web, para que lo "
+                               "apruebe quien corresponde; hoy todavía no.",
+    "el_enlace_no_va": "Por qué el mensaje no lleva el enlace para entrar a la web, aunque la "
+                       "persona lo puede crear ahí.",
     # --- La carga desde la web y lo pedido a otra área (J4b; `carga.py`) -------------------------
     "tareas_nuevas": "Aviso a la persona: le cargaron una o más tareas nuevas en la plataforma "
                      "de su equipo (tareas_que_le_cargaron), cada una con quién la cargó, para "
@@ -1537,6 +1550,7 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "ver_entrega": "mostrar_la_entrega_para_revisar",
     "pedir_enlace": "pasar_el_enlace_a_la_pagina_de_una_tarea",
     "pedir_acceso_web": "pasar_un_enlace_nuevo_para_entrar_a_la_web",
+    "pedir_crear": "decir_donde_se_crea_una_tarea_o_un_objetivo",
     "perdi_el_celular": "cortar_el_acceso_a_la_web_por_el_celular_perdido",
     "decir_cuando_destraba": "anotar_para_cuando_destraba_la_tarea_de_otra_persona",
     "no_escribirle": "no_escribirle_a_quien_destraba",

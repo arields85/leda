@@ -1,0 +1,70 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/52-crear-por-chat-direccion.md
+numero: "52"
+titulo: "Crear por chat: Dirección"
+mide: garantias
+persona: Ismael
+inicio: "2026-10-19 09:00"
+
+tareas:
+  SRV:
+    titulo: Aprobar la compra del servidor nuevo
+    criterio: "La compra del servidor queda aprobada por escrito con su presupuesto"
+    responsable: Ismael
+    vence: "2026-10-23"
+    estado: asignada
+
+# Por chat no se crea nada (ADR 0017, decisión 2): la cocina dice dónde se hace según quién es la
+# persona (D12). Dirección crea tareas y objetivos: la respuesta lleva su enlace de entrada a la
+# web, que el despachador emite al mandar (`enlaces_de_entrada`) y agrega al final (`enlace_web`).
+pasos:
+  - paso: 1
+    quien: Ismael
+    a_las: "2026-10-19 10:30"
+    escribe: "quiero crear una tarea nueva para lucas, que instale el servidor"
+    jugadas:
+      - {nombre: pedir_crear, que_quiere_crear: tarea}
+    efectos:
+      enlaces_de_entrada: [{de: Ismael}]
+    hechos:
+      - {jugada: pedir_crear, resultado: se_crea_en_la_web, que_quiere_crear: tarea,
+         puede_hacerlo_en_la_web: true, lleva_el_enlace_de_entrada_a_la_web: true,
+         sirve_una_sola_vez: true, vence_a_las_24_horas: true, el_anterior_ya_no_sirve: false}
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: true
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que las tareas se crean en la web y que ahí va su enlace para entrar
+      - que el enlace sirve una vez y vence en 24 horas
+    no_dice:
+      - que creó la tarea
+      - una dirección o un enlace escrito por la IA
+
+  - paso: 2
+    quien: Ismael
+    a_las: "2026-10-19 11:00"
+    escribe: "y un objetivo nuevo para la ampliación de la planta como lo armo?"
+    jugadas:
+      - {nombre: pedir_crear, que_quiere_crear: objetivo}
+    efectos:
+      enlaces_de_entrada: [{de: Ismael}]
+      enlaces_anulados: [{de: Ismael}]
+    hechos:
+      - {jugada: pedir_crear, resultado: se_crea_en_la_web, que_quiere_crear: objetivo,
+         puede_hacerlo_en_la_web: true, lleva_el_enlace_de_entrada_a_la_web: true,
+         sirve_una_sola_vez: true, vence_a_las_24_horas: true, el_anterior_ya_no_sirve: true}
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: true
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que el objetivo se crea en la web y que ahí va el enlace nuevo para entrar
+      - que el enlace anterior ya no sirve
+    no_dice:
+      - que creó el objetivo
+      - una dirección o un enlace escrito por la IA

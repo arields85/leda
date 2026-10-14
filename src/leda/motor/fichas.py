@@ -1321,6 +1321,51 @@ def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
             "el_anterior_ya_no_sirve": anterior}
 
 
+# Crear una tarea o un objetivo por chat (J4b; decisión D12 del usuario, 2026-10-14; ADR 0017,
+# decisión 2: por chat, hechos del trabajo; por la web, su estructura). Nada se crea por chat: la
+# cocina dice, según quién es la persona y qué quiere crear, si lo hace en su web (y entonces lleva
+# el enlace de entrada, con la mecánica de `pedir_acceso_web`: uno por mensaje) o quiénes lo hacen.
+# Una tarea la crean Dirección y los referentes de área (ADR 0023, decisión 3); un objetivo, sólo
+# Dirección (decisión 1). Un integrante no crea ninguna de las dos: las propone desde la J6.
+QUE_SE_CREA = ("tarea", "objetivo")
+SE_CREA_EN_LA_WEB = "se_crea_en_la_web"
+
+
+def _pedir_crear(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
+    """Dónde y quién crea lo que la persona quiere crear. Nada cambia hasta mandar (el enlace, si
+    va, lo emite el despachador)."""
+    que = datos.get("que_quiere_crear")
+    if que not in QUE_SE_CREA:
+        return {"resultado": "falta_dato", "falta": ["que_quiere_crear"]}
+    cur, yo = ctx.cur, ctx.quien.membership_id
+    cur.execute("select id from area where referente_membership_id = %s limit 1", (yo,))
+    es_referente = cur.fetchone() is not None
+    puede = bool(ctx.quien.autoridad_final) or (que == "tarea" and es_referente)
+    hechos: dict[str, Any] = {"resultado": SE_CREA_EN_LA_WEB, "que_quiere_crear": que,
+                              "puede_hacerlo_en_la_web": puede}
+    if puede:
+        enlace = _pedir_acceso_web(ctx, {}, None)
+        if enlace["resultado"] == "enlace_nuevo":
+            hechos.update({k: v for k, v in enlace.items() if k != "resultado"})
+        else:
+            hechos["el_enlace_no_va"] = enlace["motivo"]
+        return hechos
+    cur.execute("""select i.nombre from integrante i join rol r on r.id = i.rol_id
+                    where i.activo and r.autoridad_final order by i.nombre""")
+    direccion = [f["nombre"] for f in cur.fetchall()]
+    if que == "objetivo" and es_referente:
+        hechos["lo_hacen"] = direccion
+        return hechos
+    cur.execute("""select i.nombre from area a
+                     join integrante i on i.membership_id = a.referente_membership_id
+                    where a.id = %s and i.activo and i.membership_id <> %s""",
+                (ctx.quien.area_id, yo))
+    referente = [f["nombre"] for f in cur.fetchall()]
+    hechos["lo_hacen"] = referente + [n for n in direccion if n not in referente]
+    hechos["pronto_podra_proponerlo"] = True
+    return hechos
+
+
 def _perdi_el_celular(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     """Corta enseguida, sin confirmación (decisión 3 del usuario), todas las sesiones de la web de
     la persona y su enlace sin usar, con el motivo de que perdió el celular y la persona como
@@ -1812,6 +1857,19 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona pide entrar a la web de Leda, donde ve sus tareas: necesita un enlace "
              "de entrada nuevo, porque no tiene uno, no le anda, se le venció o lo perdió. "
              "Pedir el enlace a la página de una tarea es otra jugada."),
+    Ficha("pedir_crear", "decir dónde se crea una tarea o un objetivo",
+          necesita=("que_quiere_crear",), opcional=(),
+          comprueba="quién es la persona: Dirección crea tareas y objetivos; un referente de "
+                    "área, tareas; un integrante, ninguno de los dos",
+          hace="nada se crea por chat; si la persona lo puede crear, marca la respuesta para que "
+               "lleve el enlace de entrada a su web",
+          despues="si lo puede crear, el código emite el enlace de entrada al mandar la "
+                  "respuesta y lo agrega al final; si no, la respuesta dice quiénes lo hacen",
+          manejar=_pedir_crear, se_ofrece=False,
+          es="La persona quiere crear, cargar o agregar una tarea nueva o un objetivo nuevo, "
+             "suyo o de otra persona. Por chat no se crean: se hacen en la web, y Leda le "
+             "dice dónde y quién. Contar cómo viene una tarea que ya existe, o pasarle una tarea "
+             "propia a otra persona, son otras jugadas."),
     Ficha("perdi_el_celular", "cortar el acceso a la web si perdió el celular",
           necesita=(), opcional=(),
           comprueba="nada: se corta sin confirmación (decisión 3 del usuario)",

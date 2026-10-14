@@ -103,6 +103,8 @@ DATOS = {
                              "Leda)."),
     "palabras": ("string", "Lo que la persona contó de cómo viene la tarea, con sus palabras."),
     "a": ("string", "A quién quiere pasarle la tarea, como lo nombró la persona."),
+    "que_quiere_crear": ("string", "Qué quiere crear la persona: tarea (una tarea nueva) u "
+                                   "objetivo (un objetivo nuevo)."),
     "quien_es": ("string", "Cuando Leda pregunta quién es alguien que la persona nombró: el "
                            "nombre de esa persona, como lo dice. Sólo si lo dijo."),
     "de_afuera": ("boolean", "Verdadero sólo si la persona dice que a quien nombró no es del "

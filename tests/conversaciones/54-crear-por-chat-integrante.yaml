@@ -1,0 +1,65 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/54-crear-por-chat-integrante.md
+numero: "54"
+titulo: "Crear por chat: un integrante"
+mide: garantias
+persona: Nahuel
+inicio: "2026-10-19 09:00"
+
+tareas:
+  SEN:
+    titulo: Revisar los sensores de la comprimidora
+    criterio: "Los sensores de la comprimidora miden dentro del rango del fabricante"
+    responsable: Nahuel
+    vence: "2026-10-23"
+    estado: asignada
+
+# D12: un integrante no crea tareas ni objetivos; sin enlace, quiénes los cargan (su referente y
+# Dirección) y que pronto podrá proponerlos (J6).
+pasos:
+  - paso: 1
+    quien: Nahuel
+    a_las: "2026-10-19 10:30"
+    escribe: "quiero crear una tarea para cambiar el sensor roto"
+    jugadas:
+      - {nombre: pedir_crear, que_quiere_crear: tarea}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_crear, resultado: se_crea_en_la_web, que_quiere_crear: tarea,
+         puede_hacerlo_en_la_web: false, lo_hacen: [Marcos Tarquini, Ismael Soschinski],
+         pronto_podra_proponerlo: true, lleva_el_enlace_de_entrada_a_la_web: ausente}
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: false
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que las tareas las cargan Marcos o Ismael
+      - que pronto va a poder proponerlas desde su web
+    no_dice:
+      - que creó la tarea
+      - que él la puede crear en la web
+
+  - paso: 2
+    quien: Nahuel
+    a_las: "2026-10-19 11:00"
+    escribe: "y un objetivo? se puede?"
+    jugadas:
+      - {nombre: pedir_crear, que_quiere_crear: objetivo}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_crear, resultado: se_crea_en_la_web, que_quiere_crear: objetivo,
+         puede_hacerlo_en_la_web: false, lo_hacen: [Marcos Tarquini, Ismael Soschinski],
+         pronto_podra_proponerlo: true, lleva_el_enlace_de_entrada_a_la_web: ausente}
+    pregunta: null
+    botones: []
+    enlace: false
+    enlace_web: false
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que los objetivos tampoco los crea él, que se los puede pedir a Marcos o a Ismael
+      - que pronto va a poder proponerlos desde su web
+    no_dice:
+      - que creó el objetivo
