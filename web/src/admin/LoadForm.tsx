@@ -38,12 +38,15 @@ import {
   proposedCriterion,
   REFUSED_CRITERION,
   sameKinds,
+  SPELL_PAUSE_MS,
+  type SpellFix,
   TEXT_FIELDS,
   toCheck,
   toInput,
   validProposal,
   waitableTasks,
   waitLabel,
+  withFixes,
 } from './draft';
 import { TaskPreview } from './TaskPreview';
 import { CONTROL, FIELD_HINT, FIELD_TITLE, FIELD_VALUE, TEXT_SIZE } from './typography';
@@ -274,6 +277,79 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   // marked (J2-23): Leda corrects single words, never what the person says.
   const checked = useRef<Partial<Record<TextField, string>>>({});
   const [spellNote, setSpellNote] = useState<string | null>(null);
+  // J2-24 (the user: "la ortografía la idea es que la corrija en la vista previa, sin tener que
+  // apretar confirmar"): after a pause in the typing, Leda checks the text and the preview shows it
+  // corrected at once; the field takes it when the person leaves it, never under her cursor. Each
+  // correction holds only for the text it was made for (`withFixes`); an answer for an older text
+  // is dropped. `asking` is the text of each field whose check is on its way.
+  const [fixes, setFixesState] = useState<Partial<Record<TextField, SpellFix>>>({});
+  const fixesNow = useRef(fixes);
+  const asking = useRef<Partial<Record<TextField, string>>>({});
+
+  function setFix(field: TextField, fix: SpellFix | null) {
+    const next = { ...fixesNow.current };
+    if (fix) next[field] = fix;
+    else delete next[field];
+    fixesNow.current = next;
+    setFixesState(next);
+  }
+
+  /** The person left the field (or was not in it): it takes the correction made for its text. */
+  function takeFix(field: TextField) {
+    const fix = fixesNow.current[field];
+    if (!fix) return;
+    setFix(field, null);
+    if (latest.current[field] !== fix.from || fix.to === fix.from) return;
+    const next: Draft = { ...latest.current, [field]: fix.to };
+    latest.current = next;
+    setDraft(next);
+    // Other data, another attempt (as in `change`).
+    if (!unknown.current) key.current = null;
+  }
+
+  async function checkWhilePaused(field: TextField, text: string) {
+    const started = round.current;
+    asking.current[field] = text;
+    let spelling: Spelling;
+    try {
+      spelling = await checkSpelling(spaceId, { [field]: text });
+    } catch (error) {
+      if (error instanceof SessionClosedError) onClosed();
+      return;
+    } finally {
+      if (asking.current[field] === text) delete asking.current[field];
+    }
+    // Started over, or the text changed meanwhile: the answer is for a text that is gone.
+    if (round.current !== started || latest.current[field] !== text) return;
+    // It could not check: nothing is said now (the text stays as typed); confirm tries again.
+    if (spelling.unchecked.includes(field)) return;
+    const to = spelling.corrected[field]?.text;
+    if (to === undefined || to === text) {
+      checked.current[field] = text;
+      return;
+    }
+    checked.current[field] = to;
+    setFix(field, { from: text, to });
+    if (document.activeElement?.id !== `f-${field}`) takeFix(field);
+  }
+
+  const sendingNow = step.kind === 'edit' && step.sending;
+  useEffect(() => {
+    if (step.kind !== 'edit' || sendingNow) return;
+    const waiting = TEXT_FIELDS.filter(
+      (f) =>
+        draft[f].trim() &&
+        checked.current[f] !== draft[f] &&
+        fixesNow.current[f]?.from !== draft[f] &&
+        asking.current[f] !== draft[f],
+    );
+    if (waiting.length === 0) return;
+    const timer = setTimeout(() => {
+      for (const field of waiting) void checkWhilePaused(field, latest.current[field]);
+    }, SPELL_PAUSE_MS);
+    return () => clearTimeout(timer);
+    // Only the texts and whether it is sending: a pause in the typing.
+  }, [draft.titulo, draft.descripcion, draft.criterio, step.kind, sendingNow]);
 
   useEffect(() => {
     if (step.kind === 'done') heading.current?.focus();
@@ -307,6 +383,8 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     );
     // An edited text is checked again on confirm, so the notice that it could not be checked goes.
     if (TEXT_FIELDS.some((f) => changed.includes(f))) setSpellNote(null);
+    // A correction made for the text before this change no longer holds (J2-24).
+    for (const field of TEXT_FIELDS) if (changed.includes(field) && fixesNow.current[field]) setFix(field, null);
     // Other data, another attempt: a new key, so it never collides with the one already sent.
     // Not while the last send's outcome is unknown: that one may have loaded the task.
     if (!unknown.current) key.current = null;
@@ -449,7 +527,15 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
       takeTo(fields.find((field) => FIELD_ORDER.indexOf(field) > after) ?? fields[0] ?? null);
       return;
     }
-    let sent = draft;
+    // J2-24: what loads is what the preview shows, with the corrections made while typing; the
+    // form shows it too, so a retry sends the same data.
+    let sent = withFixes(draft, fixesNow.current);
+    if (sent !== draft) {
+      for (const field of TEXT_FIELDS) if (fixesNow.current[field]) setFix(field, null);
+      latest.current = sent;
+      setDraft(sent);
+      if (!unknown.current) key.current = null;
+    }
     let notice = spellNote;
     // J2-17 and J2-23: before loading, Leda corrects the spelling of the texts not checked yet as
     // they are, and what loads is the corrected text, in the same confirm and unmarked (the user:
@@ -567,6 +653,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     setProposed(new Set());
     setLedaEvidence(new Set());
     checked.current = {};
+    asking.current = {};
+    fixesNow.current = {};
+    setFixesState({});
     setSpellNote(null);
     setDraft(EMPTY_DRAFT);
     setProblems([]);
@@ -647,7 +736,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         className="flex min-w-0 max-w-full flex-col"
       >
         <fieldset disabled={sending} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
-          <HelpBox story={story} onStory={setStory} help={help} notes={notes} onAsk={ask} onChoose={choose} />
+          <HelpBox spaceId={spaceId} onClosed={onClosed} story={story} onStory={setStory} help={help} notes={notes} onAsk={ask} onChoose={choose} />
 
           <FieldBlock id="f-objetivo" label="Objetivo" errors={said('objetivo_id')} proposed={proposed.has('objetivo_id')}
             hint={options.objetivos.length === 0 ? 'No hay objetivos abiertos en este espacio.' : undefined}>
@@ -675,6 +764,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               className={INPUT}
               value={draft.titulo}
               onChange={(e) => change({ titulo: e.target.value })}
+              onBlur={() => takeFix('titulo')}
               aria-invalid={invalid('titulo')}
               aria-describedby={described('f-titulo', 'titulo')}
               autoComplete="off"
@@ -689,6 +779,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               className={`${INPUT} min-h-20 resize-y`}
               value={draft.descripcion}
               onChange={(e) => change({ descripcion: e.target.value })}
+              onBlur={() => takeFix('descripcion')}
               aria-invalid={invalid('descripcion')}
               aria-describedby={described('f-descripcion', 'descripcion')}
             />
@@ -788,6 +879,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               className={`${INPUT} min-h-20 resize-y`}
               value={draft.criterio}
               onChange={(e) => change({ criterio: e.target.value })}
+              onBlur={() => takeFix('criterio')}
               aria-invalid={invalid('criterio')}
               aria-describedby={described('f-criterio', 'criterio')}
             />
@@ -863,7 +955,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         <h2 id="vista-previa" className={`m-0 ${FIELD_TITLE}`}>
           Vista previa
         </h2>
-        <TaskPreview draft={draft} options={options} admin={admin} />
+        <TaskPreview draft={withFixes(draft, fixes)} options={options} admin={admin} />
         <div ref={messages} tabIndex={-1} className="flex min-w-0 flex-col gap-3 pt-1.5 outline-none">
           {spellNote && <p className="m-0 text-body text-ink-soft">{spellNote}</p>}
           {failed && (

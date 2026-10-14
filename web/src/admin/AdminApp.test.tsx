@@ -6,7 +6,7 @@ import { newKey } from './draft';
 import { CONTROL, FIELD_HINT, FIELD_TITLE, FIELD_VALUE, PREVIEW_VALUE, TEXT_SIZE } from './typography';
 
 type Reply = { status: number; body?: unknown } | 'network';
-type Call = { key: string; body: unknown };
+type Call = { key: string; body: unknown; headers?: HeadersInit };
 
 const TASKS = `POST /app/admin/api/espacios/${SPACE}/tareas`;
 const OPTIONS = `GET /app/admin/api/espacios/${SPACE}/opciones`;
@@ -25,7 +25,9 @@ function serve(routes: Record<string, Reply | Reply[]>) {
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       const key = `${init?.method ?? 'GET'} ${url}`;
-      calls.push({ key, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      // JSON as sent, read back; anything else (the dictated audio, J2b) as it is.
+      const sentBody = typeof init?.body === 'string' ? JSON.parse(init.body) : (init?.body ?? undefined);
+      calls.push({ key, body: sentBody, headers: init?.headers });
       const route = routes[key];
       const replies = Array.isArray(route) ? route : route ? [route] : [];
       const sent = calls.filter((c) => c.key === key).length;
@@ -953,18 +955,49 @@ function markOf(label: string) {
   return within(row).queryByText('· propuesto por Leda');
 }
 
-class FakeRecognition {
-  static last: FakeRecognition | null = null;
-  lang = '';
-  interimResults = true;
-  continuous = true;
-  onresult: ((e: unknown) => void) | null = null;
-  onerror: ((e: { error: string }) => void) | null = null;
-  onend: (() => void) | null = null;
-  start = vi.fn();
-  stop = vi.fn(() => this.onend?.());
-  constructor() {
-    FakeRecognition.last = this;
+/** A fake MediaRecorder (J2b): it records in webm/opus and, stopped, gives one piece of audio. */
+class FakeRecorder {
+  static last: FakeRecorder | null = null;
+  static isTypeSupported = (type: string) => type === 'audio/webm;codecs=opus';
+  state: 'inactive' | 'recording' = 'inactive';
+  mimeType: string;
+  ondataavailable: ((event: { data: Blob }) => void) | null = null;
+  onstop: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  start = vi.fn(() => {
+    this.state = 'recording';
+  });
+  stop = vi.fn(() => {
+    if (this.state === 'inactive') return;
+    this.state = 'inactive';
+    this.ondataavailable?.({ data: new Blob(['audio dictado'], { type: this.mimeType }) });
+    this.onstop?.();
+  });
+  constructor(_stream: MediaStream, options?: { mimeType?: string }) {
+    this.mimeType = options?.mimeType ?? '';
+    FakeRecorder.last = this;
+  }
+}
+
+/** The microphone and the screen lock of the phone, faked on `navigator` (taken away after each
+ * test by `forgetMicrophone`). */
+function fakeMicrophone(allow: 'yes' | 'denied' = 'yes') {
+  vi.stubGlobal('MediaRecorder', FakeRecorder);
+  const track = { stop: vi.fn() };
+  const getUserMedia = vi.fn(async () => {
+    if (allow === 'denied') throw new DOMException('no', 'NotAllowedError');
+    return { getTracks: () => [track] } as unknown as MediaStream;
+  });
+  const release = vi.fn(async () => {});
+  const request = vi.fn(async () => ({ release, addEventListener: vi.fn() }));
+  Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia }, configurable: true });
+  Object.defineProperty(navigator, 'wakeLock', { value: { request }, configurable: true });
+  return { getUserMedia, track, request, release };
+}
+
+function forgetMicrophone() {
+  for (const key of ['mediaDevices', 'wakeLock'] as const) {
+    if (Object.getOwnPropertyDescriptor(navigator, key)) delete (navigator as unknown as Record<string, unknown>)[key];
   }
 }
 
@@ -1317,43 +1350,129 @@ describe('Leda completes the load from the free box', () => {
   });
 });
 
+// J2b: the browser records and the server turns the audio into text with Gemini.
+const DICTATION = `POST /app/admin/api/espacios/${SPACE}/dictado`;
+
+/** Holds the server's answers to one route until the test gives them, in order, to see what shows
+ * meanwhile; the other routes answer as `serve` says. `held` counts the calls to that route. */
+function hold(route: string) {
+  const served = globalThis.fetch;
+  const waiting: ((response: Response) => void)[] = [];
+  const held = { count: 0, bodies: [] as unknown[] };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) => {
+      if (`${init?.method ?? 'GET'} ${url}` !== route) return served(url, init);
+      held.count += 1;
+      held.bodies.push(typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body);
+      return new Promise<Response>((resolve) => {
+        waiting.push(resolve);
+      });
+    }),
+  );
+  const answer = (status: number, body: unknown) =>
+    act(async () => {
+      waiting.shift()?.(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
+    });
+  return { answer, held };
+}
+
+const holdDictation = () => hold(DICTATION).answer;
+
+async function startDictating() {
+  fireEvent.click(screen.getByRole('button', { name: '> dictar' }));
+  return screen.findByRole('button', { name: '> dejar de dictar' });
+}
+
 describe('Dictating into the free box', () => {
-  it('without speech recognition there is no microphone, and typing works', async () => {
+  afterEach(() => forgetMicrophone());
+
+  it('where the browser cannot record there is no microphone, and typing works', async () => {
     await openForm();
     expect(screen.queryByRole('button', { name: '> dictar' })).toBeNull();
     tell('lo escribo');
     expect(screen.getByLabelText(BOX)).toHaveValue('lo escribo');
   });
 
-  it('where the browser recognizes speech, what is heard goes into the box', async () => {
-    vi.stubGlobal('webkitSpeechRecognition', FakeRecognition);
-    await openForm();
+  it('records, shows it is recording, and the text Leda heard goes after what was written', async () => {
+    const mic = fakeMicrophone();
+    const calls = await openForm({ [DICTATION]: ok({ texto: 'colgar el estante del módem' }) });
     tell('hay que');
-    fireEvent.click(screen.getByRole('button', { name: '> dictar' }));
-    const r = FakeRecognition.last as FakeRecognition;
-    expect(r.start).toHaveBeenCalledTimes(1);
-    expect(r.lang).toBe('es-AR');
-    expect(screen.getByRole('button', { name: '> dejar de dictar' })).toHaveAttribute('aria-pressed', 'true');
-    act(() => r.onresult?.({ resultIndex: 0, results: [[{ transcript: 'colgar el estante' }]] }));
-    expect(screen.getByLabelText(BOX)).toHaveValue('hay que colgar el estante');
-    fireEvent.click(screen.getByRole('button', { name: '> dejar de dictar' }));
-    expect(r.stop).toHaveBeenCalled();
+    const stop = await startDictating();
+    expect(stop).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/grabando · 0:00 de 2:00/)).toBeInTheDocument();
+    expect(mic.request).toHaveBeenCalledWith('screen');
+    fireEvent.click(stop);
+    await waitFor(() => expect(screen.getByLabelText(BOX)).toHaveValue('hay que colgar el estante del módem'));
+    const sent = calls.find((c) => c.key === DICTATION);
+    expect(sent?.body).toBeInstanceOf(Blob);
+    expect(sent?.headers).toEqual(expect.objectContaining({ 'Content-Type': 'audio/webm;codecs=opus' }));
+    // The microphone and the screen go back as they were; the box is still the person's to edit.
+    expect(mic.track.stop).toHaveBeenCalled();
+    expect(mic.release).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '> dictar' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByLabelText(BOX)).toBeEnabled();
+    expect(screen.queryByText(/grabando/)).toBeNull();
+  });
+
+  it('after a sentence that ends, the dictated text starts a new line', async () => {
+    fakeMicrophone();
+    await openForm({ [DICTATION]: ok({ texto: 'Que lo haga Lucas.' }) });
+    tell('Colgar el estante.');
+    fireEvent.click(await startDictating());
+    await waitFor(() => expect(screen.getByLabelText(BOX)).toHaveValue('Colgar el estante.\nQue lo haga Lucas.'));
+  });
+
+  it('while the audio turns into text, the button says so with its dots', async () => {
+    fakeMicrophone();
+    await openForm();
+    const answer = holdDictation();
+    fireEvent.click(await startDictating());
+    const busy = await screen.findByRole('button', { name: 'pasando a texto…' });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveTextContent('pasando a texto...');
+    await answer(200, { texto: 'colgar el estante' });
+    expect(screen.getByLabelText(BOX)).toHaveValue('colgar el estante');
+    expect(screen.getByRole('button', { name: '> dictar' })).toBeEnabled();
   });
 
   it('without permission it says so plainly and the box stays', async () => {
-    vi.stubGlobal('SpeechRecognition', FakeRecognition);
+    fakeMicrophone('denied');
     await openForm();
     tell('lo que ya escribí');
     fireEvent.click(screen.getByRole('button', { name: '> dictar' }));
-    const r = FakeRecognition.last as FakeRecognition;
-    act(() => {
-      r.onerror?.({ error: 'not-allowed' });
-      r.onend?.();
-    });
-    expect(screen.getByText('No tengo permiso para el micrófono; escribilo acá.')).toBeInTheDocument();
+    expect(await screen.findByText('No tengo permiso para el micrófono; escribilo acá.')).toBeInTheDocument();
     expect(screen.getByLabelText(BOX)).toHaveValue('lo que ya escribí');
     expect(screen.getByLabelText(BOX)).toBeEnabled();
+    expect(screen.getByRole('button', { name: '> dictar' })).toBeEnabled();
+  });
+
+  it('when Leda could not turn it into text, it says so and what was written stays', async () => {
+    fakeMicrophone();
+    await openForm({ [DICTATION]: { status: 502, body: { error: 'sin_dictado', texto: 'x' } } });
+    tell('lo que ya escribí');
+    fireEvent.click(await startDictating());
+    expect(
+      await screen.findByText('No pude pasar el audio a texto ahora. Probá de nuevo en un rato o escribilo acá.'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(BOX)).toHaveValue('lo que ya escribí');
+  });
+
+  it('when nothing could be understood, it says so in its words', async () => {
+    fakeMicrophone();
+    await openForm({
+      [DICTATION]: { status: 422, body: { error: 'no_se_entendio', texto: 'No te entendí; probá de nuevo o escribilo acá.' } },
+    });
+    fireEvent.click(await startDictating());
+    expect(await screen.findByText('No te entendí; probá de nuevo o escribilo acá.')).toBeInTheDocument();
+    expect(screen.getByLabelText(BOX)).toHaveValue('');
+  });
+
+  it('a session that closed while dictating goes back to the entry', async () => {
+    fakeMicrophone();
+    await openForm({ [DICTATION]: { status: 401, body: { error: 'sin_sesion' } } });
+    fireEvent.click(await startDictating());
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'Cargar tarea' })).toBeNull());
   });
 });
 
@@ -1474,6 +1593,110 @@ describe('the spelling before loading', () => {
 // keeps it. J2-19: only the evidence Leda proposed is ticked (and marked); what the area asks for is
 // said next to it, never ticked on its own; and a text the spelling check could not check is checked
 // again.
+
+// J2-24 (the user: "la ortografía la idea es que la corrija en la vista previa, sin tener que apretar
+// confirmar"; and then: the preview must not look wrong until the person leaves the field): after a
+// pause in the typing, the preview shows the text corrected; the field takes it when she leaves it.
+describe('the spelling while typing (J2-24)', () => {
+  const TYPED = 'configurar las alarmas del scada con cirelabs';
+  const FIXED = 'Configurar las alarmas del SCADA con CoreLabs';
+  const fixTitle = {
+    status: 200,
+    body: { corregidos: { titulo: { texto: FIXED, cambios: [{ antes: 'scada', despues: 'SCADA' }] } }, sin_revisar: [] },
+  };
+  const title = () => screen.getByLabelText('Título');
+  const typeTitle = (value: string) => fireEvent.change(title(), { target: { value } });
+  const pause = (ms = 1500) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  const spellingCalls = (calls: Call[]) => calls.filter((c) => c.key === SPELLING);
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('after a pause the preview shows the text corrected; the field takes it only when the person leaves it', async () => {
+    const calls = await openForm({ [SPELLING]: fixTitle });
+    title().focus();
+    typeTitle(TYPED);
+    await pause(1000);
+    expect(spellingCalls(calls)).toHaveLength(0);
+    await pause(500);
+    await waitFor(() => expect(within(preview()).getByText(FIXED)).toBeInTheDocument());
+    expect(spellingCalls(calls).map((c) => c.body)).toEqual([{ titulo: TYPED }]);
+    // Never under her cursor.
+    expect(title()).toHaveValue(TYPED);
+    fireEvent.blur(title());
+    expect(title()).toHaveValue(FIXED);
+    expect(within(preview()).getByText(FIXED)).toBeInTheDocument();
+    // Nothing marks it (J2-23), and a text already checked is not checked again.
+    expect(screen.queryByText(/ortografía/)).toBeNull();
+    await pause(3000);
+    expect(spellingCalls(calls)).toHaveLength(1);
+  });
+
+  it('outside the field, the correction goes straight into it', async () => {
+    await openForm({ [SPELLING]: fixTitle });
+    typeTitle(TYPED);
+    await pause();
+    await waitFor(() => expect(title()).toHaveValue(FIXED));
+  });
+
+  it('an answer for a text the person kept typing reaches neither the preview nor the field', async () => {
+    await openForm();
+    const { answer, held } = hold(SPELLING);
+    title().focus();
+    typeTitle(TYPED);
+    await pause();
+    expect(held.count).toBe(1);
+    typeTitle(`${TYPED} y el tablero`);
+    await answer(200, fixTitle.body);
+    expect(within(preview()).queryByText(FIXED)).toBeNull();
+    expect(within(preview()).getByText(`${TYPED} y el tablero`)).toBeInTheDocument();
+    fireEvent.blur(title());
+    expect(title()).toHaveValue(`${TYPED} y el tablero`);
+    // The next pause checks what she wrote last.
+    await pause();
+    expect(held.bodies).toEqual([{ titulo: TYPED }, { titulo: `${TYPED} y el tablero` }]);
+  });
+
+  it('when the check fails it says nothing, and confirm tries again', async () => {
+    const calls = await openForm({
+      [SPELLING]: [{ status: 503, body: { error: 'no_disponible' } }, NOTHING_TO_CORRECT],
+      [TASKS]: loaded(),
+    });
+    fillTask();
+    typeTitle(TYPED);
+    await pause();
+    await waitFor(() => expect(spellingCalls(calls).length).toBeGreaterThan(0));
+    expect(screen.queryByText(/No pude revisar la ortografía/)).toBeNull();
+    expect(title()).toHaveValue(TYPED);
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    expect(spellingCalls(calls).at(-1)?.body).toEqual(expect.objectContaining({ titulo: TYPED }));
+  });
+
+  it('confirm loads what the preview shows and does not check again what was already checked', async () => {
+    const calls = await openForm({ [SPELLING]: fixTitle, [TASKS]: loaded() });
+    fillTask();
+    title().focus();
+    typeTitle(TYPED);
+    await pause();
+    await waitFor(() => expect(within(preview()).getByText(FIXED)).toBeInTheDocument());
+    const checks = spellingCalls(calls).length;
+    // Still in the field: what loads is what the preview shows.
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    expect(spellingCalls(calls)).toHaveLength(checks);
+    expect(calls.filter((c) => c.key === REVIEW)).toHaveLength(0);
+    const sent = calls.filter((c) => c.key === TASKS);
+    expect((sent[0].body as { titulo: string }).titulo).toBe(FIXED);
+  });
+});
 
 describe('Leda completes everything it can (J2-18)', () => {
   const WITH_EVIDENCE = { ...FULL, propuesta: { ...FULL.propuesta, evidencia: ['informe'] } };

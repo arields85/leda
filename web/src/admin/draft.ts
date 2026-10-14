@@ -28,6 +28,27 @@ export function toCheck(draft: Draft, checked: Partial<Record<TextField, string>
   return TEXT_FIELDS.filter((field) => draft[field].trim() && checked[field] !== draft[field]);
 }
 
+/** How long after the last keystroke Leda checks the spelling of a text (J2-24). */
+export const SPELL_PAUSE_MS = 1500;
+
+/** A spelling correction made for one text as it was typed (J2-24): it holds only while the field
+ * still has that text. */
+export interface SpellFix {
+  from: string;
+  to: string;
+}
+
+/** The draft as the preview shows it and as it loads (J2-24): each text with the correction made
+ * for it, if the field still has the text it was made for. */
+export function withFixes(draft: Draft, fixes: Partial<Record<TextField, SpellFix>>): Draft {
+  let shown = draft;
+  for (const field of TEXT_FIELDS) {
+    const fix = fixes[field];
+    if (fix && fix.from === draft[field] && fix.to !== draft[field]) shown = { ...shown, [field]: fix.to };
+  }
+  return shown;
+}
+
 /** The server's limits, in characters of the trimmed text (migration 0062). */
 export const LIMITS = { titulo: 200, descripcion: 800, criterio: 500 } as const;
 

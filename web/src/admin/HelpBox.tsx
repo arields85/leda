@@ -1,9 +1,10 @@
 import { CircleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { Candidate, Problem } from './api';
+import { SessionClosedError } from '../api';
+import { type Candidate, DICTATION_FAILED, type Problem, transcribe } from './api';
 import { Completing } from './Completing';
+import { canDictate, Dictation, DICTATION_LIMIT_MS } from './dictation';
 import { FIELD_NAME, FIELD_ORDER, length, PROBLEM_FIELD } from './draft';
-import { heard, micProblem, type Recognizer, speechRecognition } from './speech';
 import { CONTROL, FIELD_HINT, FIELD_TITLE, TEXT_SIZE } from './typography';
 
 /** The server's own limit for the free text (src/leda/ayuda_al_cargar.py, LARGO_DEL_TEXTO). */
@@ -43,7 +44,26 @@ function missedFields(notes: Problem[]): string | null {
   return fields.length ? `No pude completar: ${fields.map((f) => FIELD_NAME[f]).join(', ')}.` : null;
 }
 
+/** "1:05": minutes and seconds of a recording. */
+function clock(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+/** What was written, then what was dictated: on a new line after a sentence that ends, after a
+ * space otherwise. */
+export function withDictated(story: string, said: string): string {
+  const before = story.trimEnd();
+  if (!before) return said;
+  return `${before}${/[.!?…]$/.test(before) ? '\n' : ' '}${said}`;
+}
+
+type Mic = 'idle' | 'starting' | 'recording' | 'transcribing';
+
 interface HelpBoxProps {
+  spaceId: string;
+  /** The administration session closed (the dictation's answer said so). */
+  onClosed: () => void;
   story: string;
   onStory: (text: string) => void;
   help: HelpState;
@@ -57,45 +77,68 @@ interface HelpBoxProps {
 
 /** "Contame qué querés hacer y te ayudo" (ADR 0023, point 4; portion J2): one free box, typed or
  * dictated, and "completar con Leda". Optional: the form below works by hand as always. The
- * microphone shows only where the browser recognizes speech. */
-export function HelpBox({ story, onStory, help, notes, onAsk, onChoose }: HelpBoxProps) {
-  const [Recognition] = useState(() => speechRecognition());
-  const [listening, setListening] = useState(false);
+ * microphone shows only where the browser can record (J2b: the audio goes to the server, which
+ * turns it into text with Gemini; the text goes into the box, for the person to read and fix). */
+export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk, onChoose }: HelpBoxProps) {
+  const [recordable] = useState(() => canDictate());
+  const [mic, setMic] = useState<Mic>('idle');
+  const [elapsed, setElapsed] = useState(0);
   const [micNote, setMicNote] = useState<string | null>(null);
-  const recognizer = useRef<Recognizer | null>(null);
+  const dictation = useRef<Dictation | null>(null);
+  const mounted = useRef(true);
   const storyNow = useRef(story);
   storyNow.current = story;
 
-  useEffect(() => () => recognizer.current?.stop(), []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      dictation.current?.cancel();
+    };
+  }, []);
+
+  async function heard(audio: Blob) {
+    setMic('transcribing');
+    try {
+      const result = await transcribe(spaceId, audio);
+      if (!mounted.current) return;
+      if (result.kind === 'text') onStory(withDictated(storyNow.current, result.text));
+      else setMicNote(result.text);
+    } catch (error) {
+      if (!mounted.current) return;
+      if (error instanceof SessionClosedError) onClosed();
+      else setMicNote(DICTATION_FAILED);
+    } finally {
+      if (mounted.current) setMic('idle');
+    }
+  }
 
   function toggleMic() {
-    if (!Recognition) return;
-    if (listening) {
-      recognizer.current?.stop();
+    if (mic === 'recording') {
+      dictation.current?.stop();
       return;
     }
+    if (mic !== 'idle') return;
     setMicNote(null);
-    const r = new Recognition();
-    r.lang = 'es-AR';
-    r.interimResults = false;
-    r.continuous = false;
-    r.onresult = (event) => {
-      const text = heard(event);
-      if (text) onStory(storyNow.current.trim() ? `${storyNow.current.trimEnd()} ${text}` : text);
-    };
-    r.onerror = (event) => setMicNote(micProblem(event.error));
-    r.onend = () => {
-      setListening(false);
-      recognizer.current = null;
-    };
-    recognizer.current = r;
-    try {
-      r.start();
-      setListening(true);
-    } catch {
-      recognizer.current = null;
-      setMicNote(micProblem('start-failed'));
-    }
+    setMic('starting');
+    const d = new Dictation({
+      onRecording: () => {
+        setElapsed(0);
+        setMic('recording');
+      },
+      onTick: setElapsed,
+      onAudio: (audio) => {
+        dictation.current = null;
+        void heard(audio);
+      },
+      onProblem: (text) => {
+        dictation.current = null;
+        setMic('idle');
+        setMicNote(text);
+      },
+    });
+    dictation.current = d;
+    void d.start();
   }
 
   const asking = help.kind === 'asking';
@@ -131,10 +174,28 @@ export function HelpBox({ story, onStory, help, notes, onAsk, onChoose }: HelpBo
         >
           {asking ? <Completing word="completando" /> : '> completar con Leda'}
         </button>
-        {Recognition && (
-          <button type="button" className={QUIET} onClick={toggleMic} aria-pressed={listening}>
-            {listening ? '> dejar de dictar' : '> dictar'}
+        {recordable && (
+          <button
+            type="button"
+            className={QUIET}
+            onClick={toggleMic}
+            disabled={mic === 'starting' || mic === 'transcribing'}
+            aria-pressed={mic === 'recording'}
+            aria-label={mic === 'transcribing' ? 'pasando a texto…' : undefined}
+          >
+            {mic === 'transcribing' ? (
+              <Completing word="pasando a texto" />
+            ) : mic === 'recording' ? (
+              '> dejar de dictar'
+            ) : (
+              '> dictar'
+            )}
           </button>
+        )}
+        {mic === 'recording' && (
+          <span className={`self-center ${FIELD_HINT}`}>
+            grabando · {clock(elapsed)} de {clock(DICTATION_LIMIT_MS)}
+          </span>
         )}
       </div>
       <div role="status" className="flex min-w-0 flex-col gap-1 text-small">

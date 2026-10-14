@@ -305,6 +305,53 @@ export async function checkSpelling(
   };
 }
 
+/** The plain words when the dictated audio could not be turned into text (J2b; the server says the
+ * same, with an incident). What was written stays. */
+export const DICTATION_FAILED = 'No pude pasar el audio a texto ahora. Probá de nuevo en un rato o escribilo acá.';
+/** Gemini answered, but understood nothing (the server's own words win when it sends them). */
+export const DICTATION_UNHEARD = 'No te entendí; probá de nuevo o escribilo acá.';
+export const DICTATION_TOO_LONG = 'El audio es demasiado largo para pasarlo a texto; probá con uno más corto o escribilo acá.';
+/** How long the form waits for the text: more than the server waits for Gemini (30 s,
+ * `dictado.PLAZO_DEL_PROVEEDOR_S`), so a stuck call ends on the server first. */
+export const DICTATION_TIMEOUT_MS = 45_000;
+
+export type DictationResult = { kind: 'text'; text: string } | { kind: 'failed'; text: string };
+
+/** Sends the recorded audio as it is, with its own type, and returns what was said as text (J2b).
+ * Anything but a text (no network, the time running out, a server failure) reads as "could not",
+ * in plain words; only a closed session throws. */
+export async function transcribe(spaceId: string, audio: Blob): Promise<DictationResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DICTATION_TIMEOUT_MS);
+  try {
+    let response: Response;
+    try {
+      response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/dictado`, {
+        method: 'POST',
+        headers: { 'Content-Type': audio.type },
+        body: audio,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof SessionClosedError) throw error;
+      return { kind: 'failed', text: DICTATION_FAILED };
+    }
+    if (response.status === 413) return { kind: 'failed', text: DICTATION_TOO_LONG };
+    let body: { texto?: unknown } | null = null;
+    try {
+      body = (await response.json()) as { texto?: unknown };
+    } catch {
+      body = null;
+    }
+    const said = typeof body?.texto === 'string' ? body.texto.trim() : '';
+    if (response.status === 200) return said ? { kind: 'text', text: said } : { kind: 'failed', text: DICTATION_UNHEARD };
+    if (response.status === 422) return { kind: 'failed', text: said || DICTATION_UNHEARD };
+    return { kind: 'failed', text: DICTATION_FAILED };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Closes this administration session on the server; the server also clears its cookie. */
 export async function adminSignOut(): Promise<void> {
   const response = await fetch(`${ADMIN}/salir`, { method: 'POST', credentials: 'same-origin' });
