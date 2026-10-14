@@ -3558,9 +3558,12 @@ end $$;
 -- `quien_crea_el_objetivo` resuelve la puerta: la de administración, en cualquier espacio; la del
 -- equipo, sólo Dirección (el rol con autoridad final), en el suyo. `opciones_del_objetivo` ofrece
 -- de qué puede colgar (un objetivo abierto que no sea operativo, con los tipos que admite), los
--- integrantes activos para el referente y los nombres de los niveles del pack. `crear_objetivo_web`
--- crea con el patrón de `cargar_tarea`: el objetivo, su evento `activo`, la auditoría
--- `crear_objetivo` (quién y por qué puerta) y su clave de un solo uso en `creacion_de_objetivo`.
+-- referentes de área activos para el referente, los nombres de los niveles del pack y los días
+-- hábiles para la fecha. `crear_objetivo_web` crea con el patrón de `cargar_tarea`: el objetivo,
+-- su evento `activo`, la auditoría `crear_objetivo` (quién y por qué puerta) y su clave de un solo
+-- uso en `creacion_de_objetivo`. Migración 0069 (decisiones del usuario del 2026-10-14): el
+-- objetivo lleva fecha, obligatoria, con el calendario de las tareas, y su referente es siempre un
+-- referente activo de un área del espacio.
 create table creacion_de_objetivo (
   id            uuid primary key default gen_random_uuid(),
   workspace_id  uuid not null references workspace(id) on delete cascade,
@@ -3634,12 +3637,16 @@ begin
 end $$;
 
 create or replace function opciones_del_objetivo(
-    p_puerta text, p_token_hash text, p_workspace_id uuid)
+    p_puerta text, p_token_hash text, p_workspace_id uuid, p_ahora timestamptz)
 returns jsonb
 language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
         v_quien jsonb;
         v_espacio workspace%rowtype;
+        v_hoy date;
+        v_desde date;
+        v_hora_fin time;
+        v_hasta date;
         v_resultado jsonb;
 begin
   v_quien := quien_crea_el_objetivo(p_puerta, p_token_hash, p_workspace_id);
@@ -3648,9 +3655,20 @@ begin
     return v_quien;
   end if;
   select * into v_espacio from workspace w where w.id = (v_quien ->> 'workspace_id')::uuid;
+  -- El calendario de la carga de tareas (migraciones 0062 y 0064): hoy, en la zona del espacio,
+  -- sólo si su jornada no cerró. Un objetivo puede ir más lejos que una tarea: hasta un año.
+  v_hoy := (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::date;
+  v_hasta := (v_hoy + interval '1 year')::date;
+  select c.hora_fin into v_hora_fin from work_calendar c where c.workspace_id = v_espacio.id;
+  v_desde := case when v_hora_fin is not null
+                       and (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::time
+                           >= v_hora_fin
+                  then v_hoy + 1 else v_hoy end;
   v_resultado := jsonb_build_object(
     'ok', true,
-    'espacio', jsonb_build_object('id', v_espacio.id, 'nombre', v_espacio.nombre),
+    'espacio', jsonb_build_object('id', v_espacio.id, 'nombre', v_espacio.nombre,
+                                  'zona_horaria', v_espacio.zona_horaria),
+    'hoy', v_hoy,
     -- Los nombres del pack (`niveles`), sobre los del núcleo (mecánica §1).
     'niveles', jsonb_build_object('estrategico', 'objetivo estratégico', 'hito', 'hito',
                                   'operativo', 'objetivo operativo')
@@ -3664,36 +3682,57 @@ begin
     'padres', coalesce((
       select jsonb_agg(jsonb_build_object(
                'id', o.id, 'titulo', o.titulo, 'tipo', o.tipo, 'estado', o.estado,
+               'fecha_objetivo', o.fecha_objetivo,
                'tipos', case o.tipo when 'estrategico' then jsonb_build_array('hito', 'operativo')
                                     else jsonb_build_array('operativo') end)
              order by o.titulo, o.id)
         from objective o
        where o.estado in ('activo', 'propuesto') and o.tipo <> 'operativo'), '[]'::jsonb),
-    -- El referente: cualquier integrante activo del espacio.
-    'integrantes', coalesce((
+    -- El referente: un referente activo de un área del espacio (decisión del usuario,
+    -- 2026-10-14), con las áreas de las que es referente.
+    'referentes', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'membership_id', m.id, 'nombre', u.nombre, 'area', a.nombre)
+               'membership_id', m.id, 'nombre', u.nombre,
+               'areas', (select jsonb_agg(a.nombre order by a.nombre, a.id)
+                           from area a where a.referente_membership_id = m.id))
              order by u.nombre, m.id)
         from membership m
         join app_user u on u.id = m.app_user_id
-        left join area a on a.id = m.area_id
-       where m.activo), '[]'::jsonb));
+       where m.activo
+         and exists (select 1 from area a where a.referente_membership_id = m.id)), '[]'::jsonb),
+    'calendario', jsonb_build_object(
+      'dias', coalesce((select to_jsonb(c.dias) from work_calendar c
+                         where c.workspace_id = v_espacio.id), '[]'::jsonb),
+      'hasta', v_hasta,
+      'feriados', coalesce((
+        select jsonb_agg(jsonb_build_object('fecha', h.fecha, 'nombre', h.nombre)
+                         order by h.fecha)
+          from holiday h where h.fecha between v_hoy and v_hasta), '[]'::jsonb),
+      'dias_habiles', coalesce((
+        select jsonb_agg(d.dia order by d.dia)
+          from (select g::date as dia
+                  from generate_series(v_desde, v_hasta, interval '1 day') g) d
+         where es_dia_habil(v_espacio.id, d.dia)), '[]'::jsonb)));
   perform set_config('leda.workspace_id', previo, true);
   return v_resultado;
 end $$;
 
 create or replace function crear_objetivo_web(
     p_puerta text, p_token_hash text, p_workspace_id uuid, p_titulo text, p_descripcion text,
-    p_parent_id uuid, p_tipo text, p_referente_membership_id uuid, p_clave text)
+    p_parent_id uuid, p_tipo text, p_referente_membership_id uuid, p_fecha date, p_clave text,
+    p_ahora timestamptz)
 returns jsonb
 language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
         v_quien jsonb;
         v_espacio uuid;
+        v_zona text;
         v_usuario uuid;
         v_padre objective%rowtype;
         v_referente membership%rowtype;
         v_previa creacion_de_objetivo%rowtype;
+        v_hoy date;
+        v_hora_fin time;
         v_huella text;
         v_objetivo uuid;
         v_errores jsonb := '[]'::jsonb;
@@ -3707,6 +3746,7 @@ begin
   end if;
   v_espacio := (v_quien ->> 'workspace_id')::uuid;
   v_usuario := (v_quien ->> 'app_user_id')::uuid;
+  select w.zona_horaria into v_zona from workspace w where w.id = v_espacio;
 
   <<creacion>>
   begin
@@ -3721,7 +3761,7 @@ begin
         'puerta', p_puerta, 'app_user_id', v_usuario,
         'membership_id', v_quien -> 'membership_id', 'titulo', p_titulo,
         'descripcion', p_descripcion, 'padre', p_parent_id, 'tipo', p_tipo,
-        'referente', p_referente_membership_id)::text, 'UTF8')), 'hex');
+        'referente', p_referente_membership_id, 'fecha', p_fecha)::text, 'UTF8')), 'hex');
       select * into v_previa from creacion_de_objetivo c where c.clave = p_clave;
       if v_previa.id is not null then
         if v_previa.huella = v_huella then
@@ -3771,7 +3811,8 @@ begin
       v_errores := v_errores || jsonb_build_object('campo', 'tipo', 'motivo', 'no_corresponde');
     end if;
 
-    -- El referente: cualquier integrante activo de este espacio.
+    -- El referente: un integrante activo de este espacio que sea referente de un área (decisión
+    -- del usuario, 2026-10-14). Las áreas se leen `for share`: no deja de serlo mientras tanto.
     if p_referente_membership_id is null then
       v_errores := v_errores || jsonb_build_object('campo', 'referente', 'motivo', 'falta');
     else
@@ -3780,7 +3821,28 @@ begin
       if v_referente.id is null then
         v_errores := v_errores || jsonb_build_object('campo', 'referente',
                                                      'motivo', 'no_es_integrante_activo');
+      else
+        perform 1 from area a where a.referente_membership_id = v_referente.id for share;
+        if not found then
+          v_errores := v_errores || jsonb_build_object('campo', 'referente',
+                                                       'motivo', 'no_es_referente_de_un_area');
+        end if;
       end if;
+    end if;
+
+    -- La fecha, con el calendario de las tareas (`cargar_tarea`): un día hábil del espacio, hoy o
+    -- después (hoy, en su zona), y hoy sólo si la jornada no cerró.
+    v_hoy := (coalesce(p_ahora, now()) at time zone v_zona)::date;
+    select c.hora_fin into v_hora_fin from work_calendar c where c.workspace_id = v_espacio;
+    if p_fecha is null then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'falta');
+    elsif p_fecha < v_hoy then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'en_el_pasado');
+    elsif not es_dia_habil(v_espacio, p_fecha) then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'no_es_dia_habil');
+    elsif p_fecha = v_hoy and v_hora_fin is not null
+          and (coalesce(p_ahora, now()) at time zone v_zona)::time >= v_hora_fin then
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'ya_cerro_el_dia');
     end if;
 
     if jsonb_array_length(v_errores) > 0 then
@@ -3791,9 +3853,9 @@ begin
     -- Todo en orden: el objetivo, su evento `activo` (el estado es la proyección; lo crea quien
     -- decide), su auditoría y su clave.
     insert into objective (workspace_id, parent_id, tipo, titulo, descripcion,
-                           referente_membership_id)
+                           referente_membership_id, fecha_objetivo)
     values (v_espacio, v_padre.id, p_tipo::tipo_objetivo, btrim(p_titulo),
-            nullif(btrim(p_descripcion), ''), v_referente.id)
+            nullif(btrim(p_descripcion), ''), v_referente.id, p_fecha)
     returning id into v_objetivo;
     insert into objective_state_event (objective_id, estado_nuevo, actor_kind,
                                        actor_app_user_id, motivo)
@@ -3809,7 +3871,8 @@ begin
         'creado_por_membership_id', v_quien -> 'membership_id',
         'tipo', p_tipo,
         'parent_id', v_padre.id,
-        'referente_membership_id', v_referente.id)
+        'referente_membership_id', v_referente.id,
+        'fecha_objetivo', p_fecha)
       || case p_puerta
            when 'equipo' then jsonb_build_object('sesion_web_id', v_quien -> 'sesion_id')
            else jsonb_build_object('sesion_de_administracion_id', v_quien -> 'sesion_id') end);
@@ -5501,16 +5564,16 @@ revoke all on creacion_de_objetivo from leda_owner;
 grant select, insert on creacion_de_objetivo to leda_owner;
 
 alter function quien_crea_el_objetivo(text, text, uuid) owner to leda_owner;
-alter function opciones_del_objetivo(text, text, uuid) owner to leda_owner;
-alter function crear_objetivo_web(text, text, uuid, text, text, uuid, text, uuid, text)
-  owner to leda_owner;
+alter function opciones_del_objetivo(text, text, uuid, timestamptz) owner to leda_owner;
+alter function crear_objetivo_web(text, text, uuid, text, text, uuid, text, uuid, date, text,
+                                  timestamptz) owner to leda_owner;
 revoke execute on function quien_crea_el_objetivo(text, text, uuid) from public;
-revoke execute on function opciones_del_objetivo(text, text, uuid) from public;
+revoke execute on function opciones_del_objetivo(text, text, uuid, timestamptz) from public;
 revoke execute on function crear_objetivo_web(text, text, uuid, text, text, uuid, text, uuid,
-                                              text) from public;
-grant execute on function opciones_del_objetivo(text, text, uuid) to leda_app;
+                                              date, text, timestamptz) from public;
+grant execute on function opciones_del_objetivo(text, text, uuid, timestamptz) to leda_app;
 grant execute on function crear_objetivo_web(text, text, uuid, text, text, uuid, text, uuid,
-                                             text) to leda_app;
+                                             date, text, timestamptz) to leda_app;
 
 alter function emitir_acceso_tablero(uuid, text, timestamptz)
   owner to leda_owner;

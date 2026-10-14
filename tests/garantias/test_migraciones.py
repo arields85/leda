@@ -846,7 +846,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # lee esas listas; antes de todas, la 0060, que deja esas listas como las dejó la
             # 0058. Y antes la 0066, cuya marca del enlace de entrada y cuyo ofrecimiento de la
             # web también apuntan ahí; y antes que nada la 0068, cuyo referente del objetivo
-            # también.
+            # también (antes, la 0069, que deja las funciones de los objetivos como las dejó la
+            # 0068).
+            (rollback_0069,) = (ROOT / "db" / "rollbacks").glob("0069_*.sql")
+            db.execute(_sql_script(rollback_0069))
             db.execute(_sql_script(
                 ROOT / "db" / "rollbacks" / "0068_los_objetivos_desde_la_web.sql"))
             db.execute(_sql_script(

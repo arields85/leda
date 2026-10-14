@@ -16,24 +16,38 @@ base y en la entrada HTTP.
 - **Lo que deja:** el objetivo, su evento `activo` (el estado es la proyección) y la auditoría
   `crear_objetivo` con quién lo creó y por qué puerta. Una sola vez por clave.
 - **Las opciones:** los objetivos de los que puede colgar, con los tipos que admite cada uno, los
-  integrantes activos para el referente y los nombres de los niveles del pack.
+  referentes de área activos para el referente, los nombres de los niveles del pack y los días
+  hábiles para la fecha.
+- **Las decisiones del usuario del 2026-10-14** (tarea J3-2b; migración 0069): el objetivo lleva
+  fecha, obligatoria, con el mismo calendario que las tareas (un día hábil del espacio, hoy o
+  después, y hoy sólo si la jornada no cerró); y el referente es siempre un referente activo de un
+  área de ese espacio, no cualquier integrante.
 """
 
 from __future__ import annotations
 
 import re
 import secrets
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import psycopg
 import pytest
 
 from leda.db import admin, espacio
 from tests.garantias.test_carga_de_tareas import (  # noqa: F401 -- `administradora`, `sesion`
-    _entrar,                                       # y `web` son las fixtures
+    AHORA,                                         # y `web` son las fixtures
+    AYER,
+    FERIADO,
+    HOY,
+    SABADO,
+    VIERNES,
+    _entrar,
     _hash,
     _navegador_de_administracion,
     _navegador_del_equipo,
+    _proximo_habil_real,
     _revocar,
     administradora,
     sesion,
@@ -48,6 +62,22 @@ NIVELES_POR_DEFECTO = {"estrategico": "objetivo estratégico", "hito": "hito",
 
 
 # --- Ayudas ---------------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _referentes_de_area(request):
+    """Los referentes de área de los dos espacios (decisión del usuario, 2026-10-14: el referente
+    de un objetivo es un referente activo de un área): Taylor Quinn, de Field Services; Sam Noble,
+    de Quality Guild. Sam North y Morgan Hale no son referentes de ningún área."""
+    if "intake_world" not in request.fixturenames:
+        return
+    mundo, conn = request.getfixturevalue("intake_world"), request.getfixturevalue("conn")
+    with admin(conn) as cur:
+        for datos in mundo.values():
+            for area, nombre in (("field", "Taylor Quinn"), ("quality", "Sam Noble")):
+                cur.execute("update area set referente_membership_id = %s where id = %s",
+                            (datos["people"][nombre]["membership_id"], datos["areas"][area]))
+    conn.commit()
+
 
 def _norte(mundo: dict) -> dict:
     return mundo["north-lab"]
@@ -84,7 +114,8 @@ def _objetivo(conn, ws: str, tipo: str, titulo: str, *, padre: str | None = None
 
 
 def _datos(mundo: dict, **cambios) -> dict:
-    """Un objetivo estratégico válido en North Lab, con Sam North de referente."""
+    """Un objetivo estratégico válido en North Lab, con Taylor Quinn (referente de Field
+    Services) de referente y para el viernes 16/10/2026, visto el miércoles 14 al mediodía."""
     datos = {
         "puerta": "administracion",
         "espacio": _norte(mundo)["id"],
@@ -92,8 +123,10 @@ def _datos(mundo: dict, **cambios) -> dict:
         "descripcion": None,
         "padre": None,
         "tipo": "estrategico",
-        "referente": _persona(mundo, "Sam North"),
+        "referente": _persona(mundo, "Taylor Quinn"),
+        "fecha": VIERNES,
         "clave": secrets.token_urlsafe(18),
+        "ahora": AHORA,
     }
     datos.update(cambios)
     return datos
@@ -101,9 +134,9 @@ def _datos(mundo: dict, **cambios) -> dict:
 
 def _llamar(cur, token: str, d: dict) -> dict:
     cur.execute(
-        """select crear_objetivo_web(%s, %s, %s, %s, %s, %s, %s, %s, %s) as r""",
+        """select crear_objetivo_web(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) as r""",
         (d["puerta"], _hash(token), d["espacio"], d["titulo"], d["descripcion"], d["padre"],
-         d["tipo"], d["referente"], d["clave"]))
+         d["tipo"], d["referente"], d["fecha"], d["clave"], d["ahora"]))
     return cur.fetchone()["r"]
 
 
@@ -150,10 +183,11 @@ def _nada_creado(conn) -> None:
     assert _contar(conn, "audit_log", "accion = 'crear_objetivo'") == 0
 
 
-def _opciones(conn, puerta: str, token: str, espacio_id: str | None) -> dict:
+def _opciones(conn, puerta: str, token: str, espacio_id: str | None,
+              ahora: datetime = AHORA) -> dict:
     with sin_espacio(conn) as cur:
-        cur.execute("select opciones_del_objetivo(%s, %s, %s) as r",
-                    (puerta, _hash(token), espacio_id))
+        cur.execute("select opciones_del_objetivo(%s, %s, %s, %s) as r",
+                    (puerta, _hash(token), espacio_id, ahora))
         r = cur.fetchone()["r"]
     conn.commit()
     return r
@@ -304,9 +338,9 @@ def test_el_administrador_crea_un_objetivo_con_su_evento_y_su_auditoria(
     assert objetivo["titulo"] == "Poner el módem colgando en la pared"
     assert objetivo["descripcion"] == "Con los tarugos del depósito"
     assert objetivo["tipo"] == "estrategico" and objetivo["parent_id"] is None
-    assert str(objetivo["referente_membership_id"]) == _persona(intake_world, "Sam North")
+    assert str(objetivo["referente_membership_id"]) == _persona(intake_world, "Taylor Quinn")
     assert objetivo["estado"] == "activo"
-    assert objetivo["fecha_objetivo"] is None
+    assert objetivo["fecha_objetivo"] == VIERNES
 
     eventos = _fila(conn, "select count(*) n, min(estado_nuevo::text) e, "
                           "min(actor_kind::text) k, min(actor_app_user_id::text) a "
@@ -329,7 +363,8 @@ def test_el_administrador_crea_un_objetivo_con_su_evento_y_su_auditoria(
     assert detalle["creado_por_membership_id"] is None
     assert detalle["sesion_de_administracion_id"]
     assert detalle["tipo"] == "estrategico" and detalle["parent_id"] is None
-    assert detalle["referente_membership_id"] == _persona(intake_world, "Sam North")
+    assert detalle["referente_membership_id"] == _persona(intake_world, "Taylor Quinn")
+    assert detalle["fecha_objetivo"] == VIERNES.isoformat()
     # Sin texto libre ni el token: lo escrito está en el objetivo, no en la auditoría.
     texto = str(detalle)
     assert "módem" not in texto and "tarugos" not in texto
@@ -343,7 +378,7 @@ def test_el_administrador_crea_en_cualquier_espacio_y_queda_en_ese(
     with espacio(conn, _norte(intake_world)["id"]) as cur:
         r = _llamar(cur, sesion, _datos(
             intake_world, espacio=oeste["id"],
-            referente=_persona(intake_world, "Sam North", "west-studio")))
+            referente=_persona(intake_world, "Taylor Quinn", "west-studio")))
         cur.execute("select current_setting('leda.workspace_id', true) ws")
         assert cur.fetchone()["ws"] == _norte(intake_world)["id"], (
             "la función no devolvió el espacio previo")
@@ -400,18 +435,19 @@ def test_una_sesion_de_un_espacio_no_crea_en_otro(conn, intake_world, sesion):
     oeste = intake_world["west-studio"]
     token = _sesion_del_equipo(conn, intake_world, "Morgan Hale")
     r = _crear(conn, token, intake_world, puerta="equipo", espacio=oeste["id"],
-               referente=_persona(intake_world, "Sam North", "west-studio"))
+               referente=_persona(intake_world, "Taylor Quinn", "west-studio"))
     assert _errores(r) == {("espacio", "no_existe")}
     assert _errores(_opciones(conn, "equipo", token, oeste["id"])) == {
         ("espacio", "no_existe")}
     # Y lo de otro espacio no entra: ni el padre ni el referente.
     r = _crear(conn, token, intake_world, puerta="equipo", espacio=None,
                padre=oeste["objectives"][0], tipo="operativo",
-               referente=_persona(intake_world, "Sam North", "west-studio"))
+               referente=_persona(intake_world, "Taylor Quinn", "west-studio"))
     assert _errores(r) == {("padre", "no_existe"), ("referente", "no_es_integrante_activo")}
-    # Con la sesión de administración, lo mismo.
+    # Con la sesión de administración, lo mismo: el referente de un área de otro espacio no es
+    # referente acá.
     r = _crear(conn, sesion, intake_world, padre=oeste["objectives"][0], tipo="operativo",
-               referente=_persona(intake_world, "Sam North", "west-studio"))
+               referente=_persona(intake_world, "Taylor Quinn", "west-studio"))
     assert _errores(r) == {("padre", "no_existe"), ("referente", "no_es_integrante_activo")}
     _nada_creado(conn)
     assert _contar(conn, "objective", "workspace_id = %s", oeste["id"]) == 3
@@ -447,9 +483,10 @@ def test_un_espacio_que_no_existe_no_crea(conn, intake_world, sesion):
 # --- Lo que no se crea ----------------------------------------------------------------------
 
 def test_sin_los_datos_obligatorios_se_rechaza_todo_junto(conn, intake_world, sesion):
-    r = _crear(conn, sesion, intake_world, titulo="   ", tipo=None, referente=None, clave=None)
+    r = _crear(conn, sesion, intake_world, titulo="   ", tipo=None, referente=None, fecha=None,
+               clave=None)
     assert _errores(r) == {("titulo", "falta"), ("tipo", "falta"), ("referente", "falta"),
-                           ("clave", "falta")}
+                           ("fecha", "falta"), ("clave", "falta")}
     r = _crear(conn, sesion, intake_world, clave="corta", tipo="campaña")
     assert _errores(r) == {("clave", "mal_formada"), ("tipo", "no_existe")}
     _nada_creado(conn)
@@ -498,6 +535,7 @@ def test_el_padre_tiene_que_estar_abierto(conn, intake_world, sesion):
 
 
 def test_el_referente_tiene_que_ser_integrante_activo(conn, intake_world, sesion):
+    # Sam Noble es el referente de Quality Guild, pero ya no es integrante activo.
     with admin(conn) as cur:
         cur.execute("update membership set activo = false where id = %s",
                     (_persona(intake_world, "Sam Noble"),))
@@ -505,9 +543,74 @@ def test_el_referente_tiene_que_ser_integrante_activo(conn, intake_world, sesion
     r = _crear(conn, sesion, intake_world, referente=_persona(intake_world, "Sam Noble"))
     assert _errores(r) == {("referente", "no_es_integrante_activo")}
     _nada_creado(conn)
-    # Cualquier integrante activo puede ser el referente, no sólo el de un área.
+
+
+@pytest.mark.parametrize("nombre", ["Sam North", "Morgan Hale"])
+def test_el_referente_tiene_que_ser_referente_de_un_area(conn, intake_world, sesion, nombre):
+    """Decisión del usuario (2026-10-14): un integrante activo que no es referente de ningún área
+    (Sam North, integrante; Morgan Hale, Dirección) no es el referente de un objetivo."""
+    r = _crear(conn, sesion, intake_world, referente=_persona(intake_world, nombre))
+    assert _errores(r) == {("referente", "no_es_referente_de_un_area")}
+    r = _como_direccion(conn, intake_world, referente=_persona(intake_world, nombre))
+    assert _errores(r) == {("referente", "no_es_referente_de_un_area")}
+    _nada_creado(conn)
+
+
+def test_quien_deja_de_ser_referente_de_su_area_ya_no_es_referente(conn, intake_world, sesion):
+    norte = _norte(intake_world)
     assert _crear(conn, sesion, intake_world,
-                  referente=_persona(intake_world, "Sam North"))["ok"] is True
+                  referente=_persona(intake_world, "Sam Noble"))["ok"] is True
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = null where id = %s",
+                    (norte["areas"]["quality"],))
+    conn.commit()
+    r = _crear(conn, sesion, intake_world, titulo="Otro objetivo",
+               referente=_persona(intake_world, "Sam Noble"))
+    assert _errores(r) == {("referente", "no_es_referente_de_un_area")}
+    assert _contar(conn, "objective", "titulo = 'Otro objetivo'") == 0
+
+
+# --- La fecha, con el calendario de las tareas ------------------------------------------------
+
+def test_la_fecha_se_guarda_y_hoy_vale_si_es_habil(conn, intake_world, sesion):
+    r = _crear(conn, sesion, intake_world, fecha=HOY)
+    assert r["ok"] is True, r
+    assert _fila(conn, "select fecha_objetivo f from objective where id = %s",
+                 r["objective_id"])["f"] == HOY
+
+
+def test_la_fecha_tiene_que_ser_un_dia_habil_del_espacio(conn, intake_world, sesion):
+    norte = _norte(intake_world)
+    with admin(conn) as cur:
+        cur.execute("insert into holiday (workspace_id, fecha, nombre) values (%s, %s, 'Feriado')",
+                    (norte["id"], FERIADO))
+    conn.commit()
+    for fecha in (SABADO, SABADO + timedelta(days=1), FERIADO):
+        assert _errores(_crear(conn, sesion, intake_world, fecha=fecha)) == {
+            ("fecha", "no_es_dia_habil")}, fecha
+    assert _errores(_crear(conn, sesion, intake_world, fecha=AYER)) == {
+        ("fecha", "en_el_pasado")}
+    _nada_creado(conn)
+    # El feriado es de North Lab: en West Studio ese lunes es hábil.
+    oeste = intake_world["west-studio"]
+    assert _crear(conn, sesion, intake_world, espacio=oeste["id"], fecha=FERIADO,
+                  referente=_persona(intake_world, "Taylor Quinn", "west-studio"))["ok"] is True
+
+
+def test_hoy_ya_no_vale_cuando_cerro_la_jornada_del_espacio(conn, intake_world, sesion):
+    al_cierre = datetime(2026, 10, 14, 18, 0, tzinfo=ZoneInfo("America/Argentina/Buenos_Aires"))
+    assert _errores(_crear(conn, sesion, intake_world, fecha=HOY, ahora=al_cierre)) == {
+        ("fecha", "ya_cerro_el_dia")}
+    _nada_creado(conn)
+    assert _crear(conn, sesion, intake_world, fecha=VIERNES, ahora=al_cierre)["ok"] is True
+
+
+def test_la_misma_clave_con_otra_fecha_se_rechaza(conn, intake_world, sesion):
+    clave = secrets.token_urlsafe(18)
+    assert _crear(conn, sesion, intake_world, clave=clave)["ok"] is True
+    r = _crear(conn, sesion, intake_world, clave=clave, fecha=VIERNES + timedelta(days=3))
+    assert _errores(r) == {("clave", "usada_con_otros_datos")}
+    assert _creados(conn) == 1
 
 
 # --- Una sola vez por clave -------------------------------------------------------------------
@@ -562,14 +665,41 @@ def test_las_opciones_dicen_de_que_puede_colgar_y_quien_puede_ser_referente(
     assert padres[raiz]["tipos"] == ["hito", "operativo"]
     assert padres[hito]["tipos"] == ["operativo"]
     assert padres[hito]["tipo"] == "hito"
-    nombres = {p["nombre"] for p in r["integrantes"]}
-    assert nombres == {"Morgan Hale 1", "Taylor Quinn 1", "Sam North 1"}
+    # El referente: sólo los referentes de área activos (Sam Noble, el de Quality Guild, no está
+    # activo); ni Dirección ni un integrante.
+    referentes = {p["nombre"]: p for p in r["referentes"]}
+    assert set(referentes) == {"Taylor Quinn 1"}
+    assert referentes["Taylor Quinn 1"]["membership_id"] == _persona(intake_world, "Taylor Quinn")
+    assert referentes["Taylor Quinn 1"]["areas"] == ["Field Services"]
+    assert "integrantes" not in r
     assert r["niveles"] == NIVELES_POR_DEFECTO
-    assert "Ajeno" not in str(r) and "Morgan Hale 2" not in str(r)
+    assert "Ajeno" not in str(r) and "Taylor Quinn 2" not in str(r)
     # Dirección, por la puerta del equipo, ve lo mismo de su espacio.
     equipo = _opciones(conn, "equipo", _sesion_del_equipo(conn, intake_world, "Morgan Hale"),
                        None)
     assert equipo["ok"] is True and {p["id"] for p in equipo["padres"]} == {raiz, hito}
+
+
+def test_las_opciones_traen_los_dias_habiles_para_la_fecha(conn, intake_world, sesion):
+    norte = _norte(intake_world)
+    with admin(conn) as cur:
+        cur.execute("insert into holiday (workspace_id, fecha, nombre) values (%s, %s, 'Feriado')",
+                    (norte["id"], FERIADO))
+    conn.commit()
+    r = _opciones(conn, "administracion", sesion, norte["id"])
+    assert r["hoy"] == HOY.isoformat()
+    habiles = r["calendario"]["dias_habiles"]
+    assert habiles[0] == HOY.isoformat() and VIERNES.isoformat() in habiles
+    assert SABADO.isoformat() not in habiles and FERIADO.isoformat() not in habiles
+    # Un objetivo puede ir más lejos que una tarea: hasta un año.
+    assert date.fromisoformat(habiles[-1]) >= HOY + timedelta(days=360)
+    assert r["calendario"]["hasta"] >= habiles[-1]
+    assert {"fecha": FERIADO.isoformat(), "nombre": "Feriado"} in r["calendario"]["feriados"]
+    assert r["calendario"]["dias"] == ["lunes", "martes", "miercoles", "jueves", "viernes"]
+    # Cerrada la jornada, hoy ya no se ofrece.
+    al_cierre = datetime(2026, 10, 14, 18, 0, tzinfo=ZoneInfo("America/Argentina/Buenos_Aires"))
+    r = _opciones(conn, "administracion", sesion, norte["id"], al_cierre)
+    assert r["calendario"]["dias_habiles"][0] == "2026-10-15"
 
 
 def test_las_opciones_usan_los_nombres_de_los_niveles_del_pack(conn, intake_world, sesion):
@@ -667,7 +797,8 @@ def _cuerpo(mundo: dict, **cambios) -> dict:
     cuerpo = {
         "titulo": "Poner el módem colgando en la pared",
         "tipo": "estrategico",
-        "referente_id": _persona(mundo, "Sam North"),
+        "referente_id": _persona(mundo, "Taylor Quinn"),
+        "fecha": _proximo_habil_real().isoformat(),
         "clave": secrets.token_urlsafe(18),
     }
     cuerpo.update(cambios)
@@ -703,16 +834,33 @@ def test_la_api_devuelve_todo_lo_que_falta_en_palabras(web, conn, intake_world,
     base = f"/app/admin/api/espacios/{norte['id']}/objetivos"
     navegador = _navegador_de_administracion(web, conn, administradora)
     r = navegador.post(base, json=_cuerpo(intake_world, titulo="", tipo=7,
-                                          referente_id="no-es-un-id",
+                                          referente_id="no-es-un-id", fecha="16/10",
                                           padre_id=norte["objectives"][0]))
     assert r.status_code == 422, r.text
     errores = {(e["campo"], e["motivo"]) for e in r.json()["errores"]}
     assert errores == {("titulo", "falta"), ("tipo", "mal_formado"),
-                       ("referente", "mal_formado"), ("padre", "es_operativo")}
+                       ("referente", "mal_formado"), ("fecha", "mal_formada"),
+                       ("padre", "es_operativo")}
     for error in r.json()["errores"]:
         assert error["texto"]
         for de_la_cocina in ("traceback", "psycopg", "crear_objetivo", "sql"):
             assert de_la_cocina not in error["texto"].lower()
+    _nada_creado(conn)
+    # Sin fecha, un día no hábil o alguien que no es referente: cada uno con su texto.
+    sabado = _proximo_habil_real()
+    while sabado.weekday() != 5:
+        sabado += timedelta(days=1)
+    for cambios, esperado, texto in (
+            ({"fecha": None}, ("fecha", "falta"), "Elegí la fecha."),
+            ({"fecha": sabado.isoformat()}, ("fecha", "no_es_dia_habil"),
+             "Ese día no es hábil en este espacio."),
+            ({"referente_id": _persona(intake_world, "Sam North")},
+             ("referente", "no_es_referente_de_un_area"),
+             "El referente tiene que ser el referente de un área del equipo.")):
+        r = navegador.post(base, json=_cuerpo(intake_world, **cambios))
+        assert r.status_code == 422, r.text
+        (error,) = r.json()["errores"]
+        assert (error["campo"], error["motivo"], error["texto"]) == (*esperado, texto)
     _nada_creado(conn)
 
 
@@ -758,11 +906,14 @@ def test_la_puerta_del_equipo_crea_solo_para_direccion(web, conn, intake_world):
     assert r.status_code == 200, r.text
     assert r.headers["cache-control"] == "no-store"
     assert "ok" not in r.json() and r.json()["sin_padre"] == ["estrategico"]
+    assert r.json()["referentes"] and r.json()["calendario"]["dias_habiles"]
     cuerpo = _cuerpo(intake_world)
     r = direccion.post(base, json=cuerpo)
     assert r.status_code == 201, r.text
     assert direccion.post(base, json=cuerpo).status_code == 200
     assert _creados(conn) == 1
+    assert _fila(conn, "select fecha_objetivo f from objective where id = %s",
+                 r.json()["objective_id"])["f"].isoformat() == cuerpo["fecha"]
     detalle = _fila(conn, "select detalle from audit_log where accion = 'crear_objetivo'"
                     )["detalle"]
     assert detalle["puerta"] == "equipo"

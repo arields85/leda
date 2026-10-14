@@ -1411,6 +1411,12 @@ TEXTOS_DEL_OBJETIVO = {
     ("referente", "falta"): "Elegí quién es el referente.",
     ("referente", "no_es_integrante_activo"):
         "Esa persona no es integrante activo de este espacio.",
+    # Decisiones del usuario del 2026-10-14 (migración 0069): el referente es siempre el de un
+    # área, y la fecha es obligatoria, con el calendario de las tareas.
+    ("referente", "no_es_referente_de_un_area"):
+        "El referente tiene que ser el referente de un área del equipo.",
+    **{clave: texto for clave, texto in TEXTOS_DE_LA_CARGA.items()
+       if clave[0] == "fecha" and clave[1] != "despues_del_objetivo"},
     ("clave", "falta"): TEXTOS_DE_LA_CARGA[("clave", "falta")],
     ("clave", "usada_con_otros_datos"):
         "Este envío ya creó otro objetivo. Recargá la página para crear uno nuevo.",
@@ -1445,7 +1451,28 @@ def leer_el_objetivo(cuerpo: Any) -> tuple[dict[str, Any], list[dict[str, str]]]
         datos[campo] = valor if isinstance(valor, str) else None
         if valor is not None and not isinstance(valor, str):
             errores.append(_mal_formado(campo))
+    fecha = cuerpo.get("fecha")
+    datos["fecha"] = None
+    if fecha not in (None, ""):
+        try:
+            datos["fecha"] = date.fromisoformat(fecha) if isinstance(fecha, str) else None
+        except ValueError:
+            pass
+        if datos["fecha"] is None:
+            errores.append(_mal_formado("fecha"))
     return datos, errores
+
+
+def _ahora_de_la_puerta(conn, token: str, espacio: str | None) -> datetime | None:
+    """El reloj del espacio (como en la carga): el pedido de la administración trae el espacio;
+    el del equipo, su sesión. Sin sesión, `None`: la base igual la rechaza."""
+    if espacio is None:
+        with sin_espacio(conn) as cur:
+            sesion = _sesion(cur, token)
+        if sesion is None:
+            return None
+        espacio = str(sesion["workspace_id"])
+    return _ahora(conn, espacio)
 
 
 def _sin_lo_que_rechaza_la_base_del_objetivo(resultado: dict[str, Any], puerta: str
@@ -1464,10 +1491,11 @@ def _sin_lo_que_rechaza_la_base_del_objetivo(resultado: dict[str, Any], puerta: 
 
 
 def _opciones_del_objetivo(conn, puerta: str, token: str, espacio: str | None) -> Response:
+    ahora = _ahora_de_la_puerta(conn, token, espacio)
     with sin_espacio(conn) as cur:
         _con_la_version_del_nucleo(cur)
-        cur.execute("select opciones_del_objetivo(%s, %s, %s) as r",
-                    (puerta, _hash(token), espacio))
+        cur.execute("select opciones_del_objetivo(%s, %s, %s, %s) as r",
+                    (puerta, _hash(token), espacio, ahora))
         resultado = cur.fetchone()["r"]
     rechazo = _sin_lo_que_rechaza_la_base_del_objetivo(resultado, puerta)
     if rechazo is not None:
@@ -1481,12 +1509,13 @@ def _crear_el_objetivo(conn, puerta: str, token: str, espacio: str | None,
     lo que no se crea, 422 con todo lo que hay que corregir. Con un dato mal formado no se crea
     nada: la base igual dice todo lo demás, y sin la clave nunca escribe."""
     clave = None if mal_formados else datos["clave"]
+    ahora = _ahora_de_la_puerta(conn, token, espacio)
     with sin_espacio(conn) as cur:
         _con_la_version_del_nucleo(cur)
         cur.execute(
-            """select crear_objetivo_web(%s, %s, %s, %s, %s, %s, %s, %s, %s) as r""",
+            """select crear_objetivo_web(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) as r""",
             (puerta, _hash(token), espacio, datos["titulo"], datos["descripcion"],
-             datos["padre"], datos["tipo"], datos["referente"], clave))
+             datos["padre"], datos["tipo"], datos["referente"], datos["fecha"], clave, ahora))
         resultado = cur.fetchone()["r"]
     rechazo = _sin_lo_que_rechaza_la_base_del_objetivo(resultado, puerta)
     if rechazo is not None:
@@ -1510,8 +1539,8 @@ def _crear_el_objetivo(conn, puerta: str, token: str, espacio: str | None,
 @router.get("/admin/api/espacios/{espacio_id}/objetivos/opciones")
 def opciones_del_objetivo_en_la_administracion(espacio_id: str, request: Request):
     """Lo que el formulario necesita para crear un objetivo en un espacio: de qué objetivos puede
-    colgar (con los tipos que admite cada uno), los integrantes activos para el referente y los
-    nombres de los niveles del pack."""
+    colgar (con los tipos que admite cada uno), los referentes de área activos para el referente,
+    los nombres de los niveles del pack y los días hábiles para la fecha (migración 0069)."""
     token = _token_de_administracion(request)
     if token is None:
         return _sin_sesion_de_administracion()
