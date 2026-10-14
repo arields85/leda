@@ -747,3 +747,12 @@ y 9d). Ninguna conversación prueba todavía dos preguntas encadenadas por un ca
   destraba y su espera se cierran; si el bloqueo había detenido el seguimiento, vuelve: antes de su
   fecha, la escalera sigue sola; con el seguimiento ya empezado, Leda vuelve a pedir el estado el día
   hábil siguiente, como después de un avance (9l; conversación 17).
+
+Pedir crear algo por chat (J4b, decisión D12 del 2026-10-14; `odd/tasks/plataforma-jerarquias.md`):
+
+52. [`52-crear-por-chat-direccion.md`](52-crear-por-chat-direccion.md): Ismael (Dirección) pide crear una
+    tarea y un objetivo; recibe la entrada a su web.
+53. [`53-crear-por-chat-referente.md`](53-crear-por-chat-referente.md): un referente pide crear una tarea
+    (recibe la entrada) y un objetivo (Leda le dice que los crea Dirección).
+54. [`54-crear-por-chat-integrante.md`](54-crear-por-chat-integrante.md): un integrante pide crear una
+    tarea; sin enlace, Leda le dice quién las carga y que proponer llega pronto.
