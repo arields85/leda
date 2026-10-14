@@ -2026,3 +2026,22 @@ def test_j2_22_la_medicion_hace_fallar_la_propuesta_desde_quien_revisa(medir):
     ok, detalle = medir.medir(IADeLaCarga(estante), no_se)
     assert ok is False
     assert detalle["desde_quien_revisa"] == ["quien lo revisa"]
+
+
+# --- Advertencia de RDD de la J2-19: quién la hace y su área, con una sola búsqueda --------------
+
+def test_quien_y_su_politica_es_la_misma_busqueda_que_la_propuesta(ayuda):
+    integrante, politica = ayuda.quien_y_su_politica(OPCIONES, "m-lucas")
+    assert integrante["nombre"] == "Lucas Pérez" and politica["area_id"] == "a-infra"
+    assert ayuda.quien_y_su_politica(OPCIONES, "m-marcos")[1] is None    # su área no tiene
+    assert ayuda.quien_y_su_politica(OPCIONES, None) == (None, None)
+    assert ayuda.quien_y_su_politica(OPCIONES, "m-de-otro-espacio") == (None, None)
+
+
+def test_un_integrante_sin_area_no_toma_la_politica_de_nadie(ayuda):
+    """Sin área no hay política: nunca la primera que tampoco dice su área."""
+    opciones = {**OPCIONES,
+                "integrantes": [{**OPCIONES["integrantes"][0], "area_id": None}],
+                "politicas": [{**OPCIONES["politicas"][0], "area_id": None}]}
+    assert ayuda.quien_y_su_politica(opciones, "m-lucas")[1] is None
+    assert ayuda.evidencia_de_la_carga(opciones, "m-lucas", ["foto"]) == []

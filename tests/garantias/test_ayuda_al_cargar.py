@@ -607,3 +607,55 @@ def test_la_evidencia_conocida_y_repetida_se_toma_una_vez(web, conn, intake_worl
                evidencia=["test record", "test record"])
     assert r.status_code == 200, r.text
     assert ia.entrada()["ya_escrito"]["evidencia_elegida"] == ["test record"]
+
+
+# --- Advertencia de RDD de la J2-19: la evidencia, con el área de quien la hace -------------------
+#
+# `review-13a33db35d62cdde` (`R3-responsable-match`): la evidencia escrita se revisaba buscando a
+# quien la hace y su área con una búsqueda propia, distinta de la que usa la propuesta. Ahora es la
+# misma (`ayuda_al_cargar.quien_y_su_politica`): un tipo que conoce otra área del espacio pero no la
+# de quien la hace se rechaza; sin quien la hace, vale cualquiera del pack del espacio.
+
+def _plano_en_calidad(conn, intake_world) -> None:
+    """El área de Sam Noble (calidad) conoce un plano; la de Sam North (campo), no."""
+    with admin(conn) as cur:
+        cur.execute("""update task_evidence_policy
+                          set tipos = '{"plano": {"clases": ["archivo"], "en_palabras": "un plano"}}'
+                        where area_id = %s""", (_norte(intake_world)["areas"]["quality"],))
+    conn.commit()
+
+
+@pytest.mark.parametrize("quien, vale", [("Sam North", False), ("Sam Noble", True), (None, True)])
+def test_la_evidencia_escrita_se_revisa_con_el_area_de_quien_la_hace(
+        web, conn, intake_world, administradora, ia, quien, vale):
+    _plano_en_calidad(conn, intake_world)
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(_respuesta(responsable=None, espera=None))
+    cuerpo = {"evidencia": ["plano"]}
+    if quien:
+        cuerpo["responsable_id"] = _persona(intake_world, quien)
+    r = _pedir(navegador, _norte(intake_world)["id"], **cuerpo)
+    if vale:
+        assert r.status_code == 200, r.text
+        if quien:
+            assert ia.entrada()["ya_escrito"]["evidencia_elegida"] == ["un plano"]
+    else:
+        assert r.status_code == 422, r.text
+        assert ("evidencia", "tipo_no_es_de_la_politica") in {
+            (e["campo"], e["motivo"]) for e in r.json()["errores"]}
+        assert ia.pedidos == []
+
+
+def test_la_evidencia_escrita_de_un_area_sin_politica_se_rechaza(web, conn, intake_world,
+                                                                  administradora, ia):
+    with admin(conn) as cur:
+        cur.execute("delete from task_evidence_policy where area_id = %s",
+                    (_norte(intake_world)["areas"]["field"],))
+    conn.commit()
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = _pedir(navegador, _norte(intake_world)["id"],
+               responsable_id=_persona(intake_world, "Sam North"), evidencia=["test record"])
+    assert r.status_code == 422, r.text
+    assert ("evidencia", "sin_politica_del_area") in {(e["campo"], e["motivo"])
+                                                      for e in r.json()["errores"]}
+    assert ia.pedidos == []

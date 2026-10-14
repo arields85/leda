@@ -16,6 +16,8 @@ acepta una corrección sólo si cambió nada más que la ortografía, palabra po
 - **La auditoría** (`corregir_al_cargar`): qué se pidió, qué se corrigió y qué no, con la huella de
   cada texto corregido y nunca el texto.
 - **El candado de la web no espera a la IA.**
+- **Sin marcas (J2-23):** lo corregido se carga en el mismo "confirmar", y la carga juzga el
+  criterio como se escribió, con el juicio de la revisión de esa misma sesión.
 """
 
 from __future__ import annotations
@@ -270,3 +272,79 @@ def test_el_nombre_mal_escrito_se_corrige_al_de_los_datos(web, conn, intake_worl
     assert corregido["texto"] == "Integrar la paila 3 con Sam North"
     assert corregido["cambios"] == [{"antes": "sam", "despues": "Sam"},
                                     {"antes": "norht", "despues": "North"}]
+
+
+# --- J2-23: la ortografía, corregida directamente ------------------------------------------------
+#
+# El usuario (2026-10-13): "que lo corrija directamente sin resaltarlo, ya dijimos que corrige
+# palabras puntuales, no lo que dice la persona". Al confirmar, la web revisa la carga (J2-21), pide
+# la ortografía y carga lo corregido en el mismo toque. La carga juzga el criterio como se escribió
+# (sólo cambió la ortografía, palabra por palabra) y usa el juicio de la revisión: una sola llamada.
+
+ESCRITO = "El switch de la bateria responde desde la sala de control"
+CORREGIDO = "El switch de la batería responde desde la sala de control"
+
+
+@pytest.fixture
+def juez(monkeypatch):
+    """La IA de mentira del juicio del criterio, aparte de la de la ortografía."""
+    from leda import web_app
+
+    falsa = IADeLaCarga()
+    monkeypatch.setattr(web_app, "_ia_del_criterio", lambda conn, espacio: falsa)
+    web_app._JUICIOS_RECIENTES.vaciar()
+    web_app._CORREGIDOS_RECIENTES.vaciar()
+    return falsa
+
+
+def _tareas(intake_world) -> str:
+    return f"/app/admin/api/espacios/{_norte(intake_world)['id']}/tareas"
+
+
+def test_un_confirmar_carga_lo_corregido_con_un_solo_juicio(web, conn, intake_world,
+                                                             administradora, ia, juez):
+    from tests.garantias.test_carga_de_tareas import _cuerpo
+
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    juez.respuestas.append({"dice_un_resultado": True, "resultado": ESCRITO})
+    ia.respuestas.append({"criterio": CORREGIDO})
+    cuerpo = _cuerpo(intake_world, criterio=ESCRITO)
+    assert navegador.post(f"{_tareas(intake_world)}/revisar", json=cuerpo).status_code == 200
+    r = _pedir(navegador, _norte(intake_world)["id"], criterio=ESCRITO)
+    assert r.json()["corregidos"]["criterio"]["texto"] == CORREGIDO
+    r = navegador.post(_tareas(intake_world), json={**cuerpo, "criterio": CORREGIDO})
+    assert r.status_code == 201, r.text
+    assert r.json()["avisos"] == []
+    assert len(juez.pedidos) == 1
+    assert _fila(conn, "select criterio_aceptacion c from task where id = %s",
+                 r.json()["task_id"])["c"] == CORREGIDO
+    assert _contar(conn, "audit_log", "accion = 'corregir_al_cargar'") == 1
+
+
+def test_lo_corregido_no_sirve_a_otra_sesion(web, conn, intake_world, administradora, ia, juez):
+    """Otra sesión que carga el texto corregido lo juzga como lo manda: no hereda lo de otra."""
+    from tests.garantias.test_carga_de_tareas import _cuerpo
+
+    una = _navegador_de_administracion(web, conn, administradora)
+    otra = _navegador_de_administracion(web, conn, administradora)
+    juez.respuestas += [{"dice_un_resultado": True, "resultado": ESCRITO},
+                        {"dice_un_resultado": True, "resultado": CORREGIDO}]
+    ia.respuestas.append({"criterio": CORREGIDO})
+    cuerpo = _cuerpo(intake_world, criterio=ESCRITO)
+    assert una.post(f"{_tareas(intake_world)}/revisar", json=cuerpo).status_code == 200
+    assert _pedir(una, _norte(intake_world)["id"], criterio=ESCRITO).status_code == 200
+    r = otra.post(_tareas(intake_world), json={**cuerpo, "criterio": CORREGIDO})
+    assert r.status_code == 201, r.text
+    assert len(juez.pedidos) == 2
+    assert juez.entrada(1)["criterio"] == CORREGIDO
+
+
+def test_el_incidente_de_una_palabra_no_aceptada_no_habla_de_marcas(web, conn, intake_world,
+                                                                    administradora, ia):
+    """J2-23: nada se marca, y el incidente no lo dice."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({"titulo": "Cambiar la batería del UPS que no anda"})
+    assert _pedir(navegador, _norte(intake_world)["id"],
+                  titulo="cambiar la bateria del ups q no anda").status_code == 200
+    incidente = _fila(conn, "select * from incident where etapa = 'ortografia_al_cargar'")
+    assert "marcado" not in incidente["resumen_sanitizado"]

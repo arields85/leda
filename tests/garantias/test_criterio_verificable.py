@@ -61,6 +61,9 @@ def ia(web, monkeypatch):
 
     falsa = IADeLaCarga()
     monkeypatch.setattr(web_app, "_ia_del_criterio", lambda conn, espacio: falsa)
+    # Lo guardado por un rato es del proceso: cada prueba empieza sin nada.
+    web_app._JUICIOS_RECIENTES.vaciar()
+    web_app._CORREGIDOS_RECIENTES.vaciar()
     return falsa
 
 
@@ -527,7 +530,156 @@ def test_sin_el_juicio_guardado_la_carga_lo_vuelve_a_pedir(web, conn, intake_wor
     navegador = _navegador_de_administracion(web, conn, administradora)
     ia.respuestas.append(DICE_UN_RESULTADO)
     assert _revisar(navegador, intake_world, criterio=CONCRETO).status_code == 200
-    web_app._JUICIOS_RECIENTES.clear()
+    web_app._JUICIOS_RECIENTES.vaciar()
     ia.respuestas.append(DICE_UN_RESULTADO)
     assert _cargar(navegador, intake_world, criterio=CONCRETO).status_code == 201
     assert len(ia.pedidos) == 2
+
+
+# --- Advertencias de RDD de la J2-19 y la J2-23: lo que se guarda por un rato ---------------------
+#
+# `review-13a33db35d62cdde` y `review-799c8ba1b905e81a`: el juicio guardado usaba la hora del equipo
+# (no se podía probar su vencimiento) y nada mostraba que no sirve a otra sesión, a otros datos ni a
+# otro espacio. El reloj es ahora `web_app._reloj` (monotónico), que la prueba adelanta.
+
+class _Reloj:
+    def __init__(self) -> None:
+        self.ahora = 1000.0
+
+    def __call__(self) -> float:
+        return self.ahora
+
+
+@pytest.fixture
+def reloj(monkeypatch):
+    from leda import web_app
+
+    falso = _Reloj()
+    monkeypatch.setattr(web_app, "_reloj", falso)
+    return falso
+
+
+def test_el_juicio_guardado_vale_diez_minutos_y_despues_se_pide_otra_vez(
+        web, conn, intake_world, administradora, ia, reloj):
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(DICE_UN_RESULTADO)
+    assert _revisar(navegador, intake_world, criterio=CONCRETO).status_code == 200
+    reloj.ahora += 10 * 60 - 1
+    cuerpo = _cuerpo(intake_world, titulo=TITULO_PLC, criterio=CONCRETO)
+    assert navegador.post(_camino(intake_world), json=cuerpo).status_code == 201
+    assert len(ia.pedidos) == 1
+    # Diez minutos después de guardado ya no vale: la misma carga otra vez lo pide.
+    reloj.ahora += 1
+    ia.respuestas.append(DICE_UN_RESULTADO)
+    otra = _cuerpo(intake_world, titulo=TITULO_PLC, criterio=CONCRETO)
+    assert navegador.post(_camino(intake_world), json=otra).status_code == 201
+    assert len(ia.pedidos) == 2
+
+
+def test_el_juicio_guardado_no_sirve_a_otra_sesion(web, conn, intake_world, administradora, ia):
+    """La misma persona en otro navegador es otra sesión: su carga lo pide otra vez."""
+    una = _navegador_de_administracion(web, conn, administradora)
+    otra = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas += [DICE_UN_RESULTADO, DICE_UN_RESULTADO]
+    assert _revisar(una, intake_world, criterio=CONCRETO).status_code == 200
+    assert _cargar(otra, intake_world, criterio=CONCRETO).status_code == 201
+    assert len(ia.pedidos) == 2
+
+
+def test_el_juicio_guardado_no_sirve_con_otros_datos(web, conn, intake_world, administradora, ia):
+    """Otro criterio, otra descripción u otra evidencia: otro juicio."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas += [DICE_UN_RESULTADO, DICE_UN_RESULTADO, DICE_UN_RESULTADO]
+    assert _revisar(navegador, intake_world, criterio=CONCRETO).status_code == 200
+    assert _revisar(navegador, intake_world, criterio=f"{CONCRETO} y anda").status_code == 200
+    assert _revisar(navegador, intake_world, criterio=CONCRETO,
+                    descripcion="La de la línea 2").status_code == 200
+    assert len(ia.pedidos) == 3
+
+
+def test_lo_guardado_no_sirve_en_otro_espacio_ni_a_otra_sesion():
+    """La clave lleva la sesión y el espacio: lo que juzgó una sesión en un espacio no lo lee ni
+    otra sesión ni la misma en otro espacio (el resto, idéntico)."""
+    from leda import web_app
+
+    entrada = {"titulo": TITULO_PLC, "descripcion": "", "criterio": CONCRETO,
+               "evidencia": ["test record"], "contexto": []}
+    ia = IADeLaCarga()
+    guardado = web_app._PorUnRato(web_app.timedelta(minutes=10), 8)
+    guardado.guardar(web_app._clave_del_juicio("sesion-a", "espacio-1", ia, entrada), "juicio")
+    assert guardado.leer(web_app._clave_del_juicio("sesion-a", "espacio-1", ia, entrada)) == "juicio"
+    assert guardado.leer(web_app._clave_del_juicio("sesion-a", "espacio-2", ia, entrada)) is None
+    assert guardado.leer(web_app._clave_del_juicio("sesion-b", "espacio-1", ia, entrada)) is None
+    # Lo corregido por la ortografía (J2-23), igual.
+    clave = web_app._clave_de_lo_corregido("sesion-a", "espacio-1", "criterio", "No sé")
+    assert clave != web_app._clave_de_lo_corregido("sesion-a", "espacio-2", "criterio", "No sé")
+    assert clave != web_app._clave_de_lo_corregido("sesion-b", "espacio-1", "criterio", "No sé")
+    assert clave != web_app._clave_de_lo_corregido("sesion-a", "espacio-1", "titulo", "No sé")
+
+
+def test_lo_guardado_tiene_un_tope_y_volver_a_guardar_no_saca_a_otro():
+    from leda import web_app
+
+    guardado = web_app._PorUnRato(web_app.timedelta(minutes=10), 2)
+    guardado.guardar("a", 1)
+    guardado.guardar("b", 2)
+    guardado.guardar("b", 3)      # la misma clave: no saca a "a"
+    assert (guardado.leer("a"), guardado.leer("b"), len(guardado)) == (1, 3, 2)
+    guardado.guardar("c", 4)      # sale la más vieja, "a"
+    assert (guardado.leer("a"), guardado.leer("b"), guardado.leer("c")) == (None, 3, 4)
+
+
+# --- Advertencia de RDD de la J2-19: lo que dice y lo que no deja `/tareas/revisar` ---------------
+
+def test_revisar_lo_que_se_cargaria_responde_sin_avisos_y_la_carga_los_da(
+        web, conn, intake_world, administradora, ia):
+    """El contrato (`R3-avisos-contract`): 200 con `{"errores": []}` y nada más; los avisos (acá,
+    quien la hace sin Leda conectada) los da la carga."""
+    with admin(conn) as cur:
+        cur.execute("update app_user set telegram_user_id = null where id = %s",
+                    (_norte(intake_world)["people"]["Sam North"]["app_user_id"],))
+    conn.commit()
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append(DICE_UN_RESULTADO)
+    r = _revisar(navegador, intake_world, criterio=CONCRETO)
+    assert r.status_code == 200 and r.json() == {"errores": []}
+    r = _cargar(navegador, intake_world, criterio=CONCRETO)
+    assert r.status_code == 201
+    assert [(a["campo"], a["motivo"]) for a in r.json()["avisos"]] == [
+        ("responsable", "sin_conectar")]
+
+
+def test_revisar_con_la_ia_caida_no_deja_rastro_y_la_carga_la_vuelve_a_pedir(
+        web, conn, intake_world, administradora, ia):
+    """Sin cargar nada no hay aviso ni incidente (los deja la carga, si la IA sigue sin juzgar), y
+    un juicio que no se hizo no se guarda."""
+    from leda.motor.ia_real import PlazoAgotado
+
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas += [PlazoAgotado(40), DICE_UN_RESULTADO]
+    r = _revisar(navegador, intake_world, criterio=CONCRETO)
+    assert r.status_code == 200 and r.json() == {"errores": []}
+    assert _contar(conn, "incident") == 0
+    assert _contar(conn, "task") == 0 and _contar(conn, "carga_de_tarea") == 0
+    r = _cargar(navegador, intake_world, criterio=CONCRETO)
+    assert r.status_code == 201 and r.json()["avisos"] == []
+    assert len(ia.pedidos) == 2
+
+
+def test_revisar_tiene_la_puerta_de_la_carga(web, conn, intake_world, administradora, ia):
+    """Sin sesión de administración, desde otro sitio, sin JSON o con un dato mal formado no se
+    llama a la IA ni se escribe nada."""
+    camino = f"{_camino(intake_world)}/revisar"
+    cuerpo = _cuerpo(intake_world, titulo=TITULO_PLC, criterio=CONCRETO)
+    assert web().post(camino, json=cuerpo).status_code == 401
+    equipo = _navegador_del_equipo(web, conn, intake_world, "Morgan Hale")
+    assert equipo.post(camino, json=cuerpo).status_code == 401
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    assert navegador.post(camino, json=cuerpo,
+                          headers={"origin": "https://otro.example"}).status_code == 403
+    assert navegador.post(camino, content="criterio=x", headers={
+        "content-type": "application/x-www-form-urlencoded"}).status_code == 415
+    r = _revisar(navegador, intake_world, criterio=CONCRETO, fecha="31/12/2026")
+    assert r.status_code == 422 and ("fecha", "mal_formada") in _errores(r)
+    assert ia.pedidos == []
+    assert _contar(conn, "task") == 0 and _contar(conn, "carga_de_tarea") == 0
