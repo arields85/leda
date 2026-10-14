@@ -1173,6 +1173,18 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         con la fecha original y la prevista. Lo mismo Dirección en una tarea propia. **Si la fecha nueva pasa la
         del objetivo,** es igual que la decisión 6: Leda frena, avisa que el objetivo se demoraría, y lo **aprueba**
         el referente del objetivo (Ismael, si el objetivo es de Dirección). Hasta que aprueba, no corre.
+      - **J5-D3. Todo pedido de más tiempo de un integrante lo decide su referente,** sea de 1 o de 10 días
+        (usuario: si un integrante corre la fecha solo, el plan del referente se mueve sin que lo decida). Hasta
+        que decide, vale la fecha original y los recordatorios siguen sobre ella. El umbral de 3 días del pack
+        no se usa para esto; queda anotado por si sirve, por ejemplo, para avisarle a Dirección de los
+        corrimientos grandes.
+      - **J5-D3b. El pedido le muestra al referente qué impacta aceptarlo** (mecánica §4, el impacto en cadena),
+        antes de decidir:
+        - qué tareas esperan a ésta y cómo se correrían, con sus responsables;
+        - si se pasa la fecha del objetivo y, entonces, quién tiene que aprobarlo;
+        - si no impacta nada, que lo diga: "No demora a nadie más".
+        Ejemplo: "Si aceptás, «Pasar los cables» de Lucas no puede empezar hasta el 23 y vence el 24: llegaría
+        justo".
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
