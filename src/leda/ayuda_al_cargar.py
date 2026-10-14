@@ -1462,8 +1462,10 @@ def _pedir_el_juicio(ia, entrada: Mapping[str, Any],
 # de menos, dos dadas vuelta o una cambiada por otra vecina en el teclado o que suena igual (J2-18:
 # "mesa" por "masa" ya no pasa). Una palabra de una o dos letras sólo cambia de tildes o mayúsculas
 # ("a" y "ha", "q" y "que" son otras palabras), y un número nunca. Lo que no puede ver sin un
-# diccionario (dos palabras que suenan igual, como "casa" y "caza") lo muestra la vista previa,
-# marcado, antes de confirmar.
+# diccionario (dos palabras que suenan igual, como "casa" y "caza") lo acepta como la misma
+# palabra: la corrección va sin marcas (J2-23), y la persona la ve en la vista previa antes de
+# confirmar (J2-24: después de una pausa al escribir, o en el texto que se carga) y puede volver a
+# escribirla.
 
 NOMBRE_DE_LA_ORTOGRAFIA = "corregir_la_ortografia"
 CAMPOS_DE_TEXTO = ("titulo", "descripcion", "criterio")

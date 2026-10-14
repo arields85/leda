@@ -971,8 +971,10 @@ async def cargar_una_tarea(espacio_id: str, request: Request):
 @router.post("/admin/api/espacios/{espacio_id}/tareas/revisar")
 async def revisar_una_carga(espacio_id: str, request: Request):
     """Lo que la carga rechazaría, sin cargar nada: 200 con `{"errores": []}` si se cargaría (sin
-    avisos: los dice la carga), 422 con todo lo que hay que corregir, como la carga. Nunca deja un
-    incidente ni una auditoría: no cargó nada."""
+    avisos: los dice la carga), 422 con todo lo que hay que corregir, como la carga. No deja una
+    auditoría (no cargó nada); sí un incidente cuando rechaza el criterio sin poder proponer otro
+    (`_sin_propuesta`: la IA no respondió, su propuesta no pasó los controles o no se pudieron
+    leer las opciones), como la carga."""
     pedido = await _el_pedido_de_la_carga(request)
     if isinstance(pedido, Response):
         return pedido
