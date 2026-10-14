@@ -91,7 +91,7 @@ describe('ObjectiveForm', () => {
     expect(typeIsAsked()).toBe(true);
     expect(typeShown()).toBe('objetivo operativo');
     expect(offered('Tipo')).toEqual(['hito', 'objetivo operativo']);
-    expect(screen.getByText('Objetivo operativo: algo concreto que hace un área.')).toBeInTheDocument();
+    expect(screen.getByText('Objetivo operativo: lo que le toca lograr a un área del equipo para que se cumpla lo de arriba.')).toBeInTheDocument();
     pick('Tipo', 'hito');
     expect(typeShown()).toBe('hito');
     expect(screen.getByText('Hito: un paso importante de un plan anual.')).toBeInTheDocument();

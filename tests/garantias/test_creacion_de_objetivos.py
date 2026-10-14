@@ -828,7 +828,7 @@ def _importar_corework(conn, tmp_path, monkeypatch, niveles):
 
 def test_el_pack_de_corework_nombra_sus_niveles_en_palabras_del_equipo(conn, tmp_path, monkeypatch):
     """J3-7 (el usuario no entendía el formulario): CoreWork llama a sus niveles "objetivo general",
-    "etapa" y "objetivo de área"; los nombres de siempre quedan para un pack que no los dice."""
+    "etapa" y "objetivo de un área"; los nombres de siempre quedan para un pack que no los dice."""
     import yaml
 
     from tests.conftest import RAIZ
@@ -836,7 +836,7 @@ def test_el_pack_de_corework_nombra_sus_niveles_en_palabras_del_equipo(conn, tmp
     niveles = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))["niveles"]
     _, guardado = _importar_corework(conn, tmp_path, monkeypatch, niveles)
     assert guardado == {"estrategico": "objetivo general", "hito": "etapa",
-                        "operativo": "objetivo de área"}
+                        "operativo": "objetivo de un área"}
 
 
 def test_el_importador_guarda_los_nombres_de_los_niveles_de_objetivo(

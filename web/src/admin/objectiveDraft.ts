@@ -141,12 +141,12 @@ export function noParentLabel(levels: ObjectiveOptions['niveles']): string {
 
 /** One plain line about the chosen type, with the pack's names of the levels (J3-7, the user did
  * not understand the form): the biggest, what the work is for; an important step of it; something
- * concrete one area does. */
+ * an area of the team has to achieve for the level above. */
 export function typeMeaning(tipo: string, levels: ObjectiveOptions['niveles']): string | null {
   const name = (level: string) => level.charAt(0).toUpperCase() + level.slice(1);
   if (tipo === 'estrategico') return `${name(levels.estrategico)}: lo más grande, para qué es todo el trabajo.`;
   if (tipo === 'hito') return `${name(levels.hito)}: un paso importante de ${withArticle(levels.estrategico)}.`;
-  if (tipo === 'operativo') return `${name(levels.operativo)}: algo concreto que hace un área.`;
+  if (tipo === 'operativo') return `${name(levels.operativo)}: lo que le toca lograr a un área del equipo para que se cumpla lo de arriba.`;
   return null;
 }
 
