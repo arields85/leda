@@ -52,6 +52,7 @@ paquete del espacio y la consola hasta la segunda versión.
 | Enlaces de activación individuales, entregados uno a uno | `python -m leda enlaces <espacio> --solo <nombres>` | alta de equipo, bloque 8 |
 | Ver incidentes: dónde falla y qué lo hizo fallar, con acceso a la conversación que lo causó | `python -m leda incidentes <espacio>` | ROADMAP, "Panel de plataforma" |
 | Respaldo, restauración y migraciones | Consola y `db/respaldos/` | constitución §2 |
+| Cuánto queda recordada una computadora que entró con el código por Telegram, por equipo: 1, 7, 30 o 90 días, o sin vencimiento | Se construye en la MA, desde la web de administración; arranca sin vencimiento para todos (usuario, 2026-10-14) | `odd/tasks/plataforma-jerarquias.md`, MA |
 | Dónde corre: Leda y la plataforma van en un VPS (usuario, 2026-10-08) | Hoy, la PC del usuario; las pruebas del enlace a la página de la tarea, con `LEDA_BASE_URL=http://localhost:8000` y Telegram en la misma PC | Hace falta, antes de subir: dominio con HTTPS (la dirección del enlace), secretos fuera del repositorio, respaldo y restauración, el webhook atendiendo más de un mensaje a la vez, registros sin datos sensibles. Subir es una operación remota: la autoriza el usuario, con su plan |
 
 ## Configuración global

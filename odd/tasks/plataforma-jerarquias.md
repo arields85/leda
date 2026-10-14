@@ -1096,6 +1096,19 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         el token del bot. Es una enmienda a la decisión 4 del ADR 0022, y primero va su diseño escrito.
       - **Por Telegram:** se resuelve lo de ofrecer abrirla ante "quiero crear una tarea" (ROADMAP).
       Las decisiones se le traen al usuario antes de escribir código.
+      **Decisiones del usuario (2026-10-14):**
+      - **MA1. En el celular, sólo la Mini App: los enlaces desaparecen.** Hay que revisar cada lugar donde Leda
+        ofrece o manda un enlace (el pedido de acceso, el ofrecimiento de una sola vez, la bienvenida, los avisos
+        y "quiero crear una tarea"). Ahí Leda pregunta si querés abrir la Mini App, u ofrece el botón para
+        abrirla cuando quieras. Leda nunca sugiere pedir un enlace.
+      - **MA1b. En la computadora, ni Telegram Web ni enlaces** ("son bastante molestos"): **un código por
+        Telegram, sin contraseña.**
+        - La persona pone su usuario y Leda le manda por Telegram un código de 6 números que vence en minutos y
+          sirve una vez.
+        - La computadora queda recordada el tiempo que elige el administrador **para cada equipo**, desde la web
+          de administración: 1, 7, 30 o 90 días, o **sin vencimiento**, que es el valor de entrada para todos.
+        - Se corta al cerrar la sesión, con "perdí el celular", con la baja o cuando lo corta el administrador.
+        - "Iniciar sesión con Telegram" (el botón oficial) queda para la VPS, porque pide una dirección fija.
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
       Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
       la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección
