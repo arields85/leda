@@ -6,6 +6,9 @@
     <meta name="theme-color" content="#0F1010" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Leda</title>
+    <!-- Telegram's Mini App script (ADR 0024, decision 10), served by Leda itself so the CSP stays
+         script-src 'self'. Outside Telegram it does nothing. -->
+    <script src="/app/telegram-web-app.js"></script>
   </head>
   <body>
     <div id="root"></div>

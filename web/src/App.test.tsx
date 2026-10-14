@@ -126,11 +126,11 @@ describe('App', () => {
     expect(calls).not.toContain('GET /app/api/tareas?vista=equipo');
   });
 
-  it('a closed session asks for a new link from Leda', async () => {
+  it('a closed session never asks for a link: without its space, it says to open Leda from Telegram', async () => {
     serve({ 'GET /app/api/yo': { status: 401, body: { error: 'sin_sesion' } } });
     render(<App />);
-    expect(await screen.findByText('La sesión está cerrada.')).toBeInTheDocument();
-    expect(screen.getByText(/pedile a Leda un enlace nuevo/)).toBeInTheDocument();
+    expect(await screen.findByText('Entrá desde Telegram.')).toBeInTheDocument();
+    expect(screen.queryByText(/enlace/)).toBeNull();
     expect(screen.queryByText('> consultar a leda')).toBeNull();
   });
 

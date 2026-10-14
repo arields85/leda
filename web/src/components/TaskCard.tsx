@@ -26,7 +26,7 @@ function corner(task: Task): string | null {
 /** A task: its states in brackets (in color only for the four states; blocked and late can come
  * together), its date, its title, and, when there is one, the chain of waits or the bar of
  * working days. */
-export function TaskCard({ task, view }: { task: Task; view: ViewId }) {
+export function TaskCard({ task, view, onOpen }: { task: Task; view: ViewId; onOpen?: (id: string) => void }) {
   const delivered = task.marcas.includes('entregada');
   const frame = delivered
     ? 'border-dashed border-line-dashed'
@@ -38,7 +38,13 @@ export function TaskCard({ task, view }: { task: Task; view: ViewId }) {
   return (
     <article
       data-task={task.id}
-      className={`flex min-w-0 flex-col rounded-card border-hard px-3 py-2.5 ${bar.length ? 'gap-[5px]' : 'gap-1'} ${frame}`}
+      // Every card opens its page (J4 phone test): a tap, or Enter.
+      role={onOpen ? 'link' : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      aria-label={onOpen ? `Ver la tarea ${task.titulo}` : undefined}
+      onClick={onOpen ? () => onOpen(task.id) : undefined}
+      onKeyDown={onOpen ? (event) => event.key === 'Enter' && onOpen(task.id) : undefined}
+      className={`flex min-w-0 flex-col rounded-card border-hard px-3 py-2.5 ${bar.length ? 'gap-[5px]' : 'gap-1'} ${frame} ${onOpen ? 'cursor-pointer' : ''}`}
     >
       <div className="flex justify-between gap-2">
         <span className="flex min-w-0 flex-wrap gap-x-1.5">

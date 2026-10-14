@@ -3,7 +3,9 @@ import { Switch, type SwitchItem } from '../components/Switch';
 import { RequestError, SessionClosedError } from '../api';
 import { Header } from '../components/Header';
 import { Notice } from '../components/Notice';
+import { SignIn } from '../components/SignIn';
 import { SignOut } from '../components/SignOut';
+import { ComputerSession } from './ComputerSession';
 import { adminSignOut, fetchAdminMe, fetchOptions, type AdminMe, type Options } from './api';
 import { Dropdown } from './Dropdown';
 import { LoadForm } from './LoadForm';
@@ -23,11 +25,14 @@ function failure(error: unknown): { kind: 'closed' } | { kind: 'failed' } {
   return error instanceof SessionClosedError ? { kind: 'closed' } : { kind: 'failed' };
 }
 
-function SessionClosed({ byPerson = false }: { byPerson?: boolean }) {
+/** Without a session: enter with Telegram, through the administration bot (ADR 0024, decisions
+ * 3 and 4). */
+function SessionClosed({ byPerson = false, onIn }: { byPerson?: boolean; onIn: () => void }) {
   return (
-    <Notice title={byPerson ? 'Cerraste la sesión.' : 'La sesión está cerrada.'}>
-      <p className="m-0">Para volver a entrar a la administración, entrá con un enlace nuevo.</p>
-    </Notice>
+    <>
+      {byPerson && <Notice title="Cerraste la sesión." />}
+      <SignIn door="administracion" space={null} onIn={onIn} />
+    </>
   );
 }
 
@@ -146,9 +151,14 @@ export function AdminApp() {
   const admin = me.kind === 'ready' ? me.data : null;
   const open = !signedOut && !closed && admin !== null && options.kind !== 'closed';
 
+  const enter = () => {
+    setSignedOut(false);
+    setClosed(false);
+    retry();
+  };
   let body;
-  if (signedOut) body = <SessionClosed byPerson />;
-  else if (closed || me.kind === 'closed' || options.kind === 'closed') body = <SessionClosed />;
+  if (signedOut) body = <SessionClosed byPerson onIn={enter} />;
+  else if (closed || me.kind === 'closed' || options.kind === 'closed') body = <SessionClosed onIn={enter} />;
   else if (me.kind === 'failed') body = <Failed onRetry={retry} />;
   else if (admin === null) body = <Notice title="Cargando…" />;
   else if (admin.espacios.length === 0) body = <Notice title="Todavía no hay espacios." />;
@@ -171,6 +181,9 @@ export function AdminApp() {
               ]}
             />
           </div>
+        )}
+        {spaceId && options.kind !== 'gone' && (
+          <ComputerSession key={spaceId} spaceId={spaceId} onClosed={() => setClosed(true)} />
         )}
         {spaceId && options.kind !== 'gone' && <KindSwitch current={kind} onChange={chooseKind} />}
         {objectives && options.kind !== 'gone' && (kind === 'objetivo' || objectiveSpace === spaceId) && (
@@ -203,6 +216,7 @@ export function AdminApp() {
               options={options.data}
               admin={admin.administrador}
               onClosed={() => setClosed(true)}
+              onLoaded={() => setReread((n) => n + 1)}
             />
           </div>
         )}

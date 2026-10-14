@@ -9,6 +9,10 @@ import { CONTROL, TEXT_SIZE } from './typography';
 // the only color on a form, and only while something needs fixing.
 export const WARN = 'text-falta';
 
+// A task or an objective just created, said where "confirmar" was (J4 phone test, 2026-10-14):
+// teal, the only other color on a form, and only for that success.
+export const CREATED = 'text-creado';
+
 // The shared box of every control (`typography.ts`), with the attention border while it is wrong.
 export const INPUT = `${CONTROL} aria-[invalid=true]:border-falta`;
 

@@ -1,13 +1,17 @@
 import { RotateCw } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchMe,
   fetchView,
+  openTaskPage,
   SessionClosedError,
   type Me,
   type ViewData,
   type ViewId,
 } from './api';
+import { SignIn } from './components/SignIn';
+import { rememberedSpace, rememberSpace, spaceOfPath } from './door';
+import { bindBackButton, telegramWebApp } from './telegram';
 import { teamTasks } from './admin/api';
 import { NewObjective } from './admin/NewObjective';
 import { NewTask } from './admin/NewTask';
@@ -34,7 +38,20 @@ const EMPTY: Record<ViewId, string> = {
   tus: 'No tenés tareas abiertas.',
   sector: 'No hay tareas abiertas en tu sector.',
   equipo: 'No hay tareas abiertas en el equipo.',
+  pedidas: 'No pediste nada a otra área ni a Dirección.',
 };
+
+/** Where a button of Leda's chat leads (ADR 0024, decision 2): `?vista=`, `?tarea=<id>` (that
+ * task's page) or `?nueva=tarea|objetivo` (the form), read once when the page opens. */
+function deepLink(search: string = window.location.search): { task: string | null; create: string | null } {
+  const params = new URLSearchParams(search);
+  return { task: params.get('tarea'), create: params.get('nueva') };
+}
+
+/** The team's space for the QR: the one in the address, or the last one this browser entered. */
+function spaceForSignIn(): string | null {
+  return spaceOfPath(window.location.pathname) ?? rememberedSpace();
+}
 
 function failure(error: unknown): { kind: 'closed' } | { kind: 'failed' } {
   return error instanceof SessionClosedError ? { kind: 'closed' } : { kind: 'failed' };
@@ -72,11 +89,14 @@ function Failed({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function SessionClosed({ byPerson = false }: { byPerson?: boolean }) {
+/** Without a session: enter with Telegram (ADR 0024, decisions 4 and 5), never asking for a
+ * link. */
+function SessionClosed({ byPerson = false, onIn }: { byPerson?: boolean; onIn: () => void }) {
   return (
-    <Notice title={byPerson ? 'Cerraste la sesión.' : 'La sesión está cerrada.'}>
-      <p className="m-0">Para volver a ver tus tareas, pedile a Leda un enlace nuevo por Telegram.</p>
-    </Notice>
+    <>
+      {byPerson && <Notice title="Cerraste la sesión." />}
+      <SignIn door="equipo" space={spaceForSignIn()} onIn={onIn} />
+    </>
   );
 }
 
@@ -91,6 +111,9 @@ export function App() {
   const [creating, setCreating] = useState<'tarea' | 'objetivo' | null>(null);
   const objectives = useMemo(teamObjectives, []);
   const tasksApi = useMemo(teamTasks, []);
+  // The chat's button that opened the page, followed once (ADR 0024, decision 2).
+  const link = useRef(deepLink());
+  const [opening, setOpening] = useState(false);
 
   useEffect(() => {
     const request = new AbortController();
@@ -98,7 +121,14 @@ export function App() {
     fetchMe(request.signal)
       .then((data) => {
         setMe({ kind: 'ready', data });
+        setSignedOut(false);
+        rememberSpace(data.espacio_slug);
         setView((current) => pickView(data, current ?? viewInAddress()));
+        const { create, task } = link.current;
+        link.current = { create: null, task: null };
+        if (create === 'tarea' && data.carga_tareas) setCreating('tarea');
+        else if (create === 'objetivo' && data.crea_objetivos) setCreating('objetivo');
+        if (task) void openTask(task);
       })
       .catch((error: unknown) => {
         if (!request.signal.aborted) setMe(failure(error));
@@ -118,6 +148,25 @@ export function App() {
     return () => request.abort();
   }, [view, attempt]);
 
+  // Telegram's "Atrás" closes the form the page is showing (ADR 0024, decision 10).
+  useEffect(
+    () => bindBackButton(telegramWebApp(), creating !== null, () => setCreating(null)),
+    [creating],
+  );
+
+  /** A task's page (J4 phone test): same origin, with an access for this person. */
+  async function openTask(taskId: string) {
+    setOpening(true);
+    try {
+      const where = await openTaskPage(taskId);
+      if (where) window.location.assign(where);
+    } catch (error) {
+      if (error instanceof SessionClosedError) setMe({ kind: 'closed' });
+    } finally {
+      setOpening(false);
+    }
+  }
+
   function choose(next: ViewId) {
     setView(next);
     try {
@@ -136,15 +185,19 @@ export function App() {
       : 'Nuevo objetivo'
     : (ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda');
 
+  const enter = () => {
+    setSignedOut(false);
+    retry();
+  };
   let body;
   if (signedOut) {
-    body = <SessionClosed byPerson />;
+    body = <SessionClosed byPerson onIn={enter} />;
   } else if (me.kind === 'closed' || tasks.kind === 'closed') {
-    body = <SessionClosed />;
+    body = <SessionClosed onIn={enter} />;
   } else if (me.kind === 'failed') {
     body = <Failed onRetry={retry} />;
   } else if (person === null || view === null) {
-    body = me.kind === 'loading' ? <Notice title="Cargando…" /> : <SessionClosed />;
+    body = me.kind === 'loading' ? <Notice title="Cargando…" /> : <SessionClosed onIn={enter} />;
   } else if (creating) {
     body = (
       <>
@@ -200,8 +253,16 @@ export function App() {
           </div>
         )}
         {tasks.kind === 'loading' && <Notice title="Cargando…" />}
+        {opening && <Notice title="Abriendo la tarea…" />}
         {tasks.kind === 'failed' && <Failed onRetry={retry} />}
-        {ready && (
+        {ready && ready.vista === 'pedidas' && (
+          ready.pedidas && ready.pedidas.length > 0 ? (
+            <RequestedList items={ready.pedidas} onChanged={retry} onClosed={() => setMe({ kind: 'closed' })} />
+          ) : (
+            <p className="m-0 pt-1 text-body text-ink-soft">{EMPTY.pedidas}</p>
+          )
+        )}
+        {ready && ready.vista !== 'pedidas' && (
           <>
             <StatePanel panel={ready.panel} />
             <WeekStrip days={ready.semana} tasks={ready.tareas} />
@@ -211,16 +272,13 @@ export function App() {
               <div className="flex flex-col gap-[11px] pt-0.5 text-body">
                 {ready.tareas.map((task) => (
                   <div key={task.id} className="flex min-w-0 flex-col gap-[11px]">
-                    <TaskCard task={task} view={ready.vista} />
+                    <TaskCard task={task} view={ready.vista} onOpen={(id) => void openTask(id)} />
                     {ready.vista === 'sector' && ready.pasar_a && (
                       <PassTask task={task} teammates={ready.pasar_a} onClosed={() => setMe({ kind: 'closed' })} />
                     )}
                   </div>
                 ))}
               </div>
-            )}
-            {ready.pedidas && (
-              <RequestedList items={ready.pedidas} onChanged={retry} onClosed={() => setMe({ kind: 'closed' })} />
             )}
             <FinishedList items={ready.terminadas ?? []} view={ready.vista} />
           </>

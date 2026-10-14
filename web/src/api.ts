@@ -2,7 +2,8 @@
 // which is in Spanish like the rest of Leda's data.
 
 export type Marca = 'vencida' | 'trabada' | 'en_curso' | 'entregada';
-export type ViewId = 'tus' | 'sector' | 'equipo';
+// "Lo que pedí" is a tab of its own (J4 phone test); the names come from the server (`VISTAS`).
+export type ViewId = 'tus' | 'sector' | 'equipo' | 'pedidas';
 
 export interface ViewRef {
   vista: ViewId;
@@ -12,6 +13,8 @@ export interface ViewRef {
 export interface Me {
   persona: string;
   espacio: string;
+  // The space's slug, to enter again with the QR from this computer (ADR 0024).
+  espacio_slug?: string | null;
   vistas: ViewRef[];
   // The Telegram chat with the team bot ("> consultar a leda"), when the space declares it.
   chat_con_leda: string | null;
@@ -107,7 +110,7 @@ export interface ViewData {
   semana: Day[];
   tareas: Task[];
   terminadas: Finished[];
-  // Only in "Tus tareas" (J4): what the person asked from another area or from Dirección.
+  // Only in "Lo que pedí" (J4): what the person asked from another area or from Dirección.
   pedidas?: Requested[];
   // Only in "Tu sector" (J4): to whom the referente may pass a task of the sector.
   pasar_a?: Teammate[];
@@ -198,6 +201,27 @@ export function passTask(taskId: string, to: string): Promise<ActionResult> {
 /** Whoever asked for a finished task reopens it, with what has to change (J4, D14 step 5). */
 export function reopenTask(taskId: string, reason: string): Promise<ActionResult> {
   return postJson(`/app/api/tareas/${encodeURIComponent(taskId)}/reabrir`, { motivo: reason });
+}
+
+/** The page of a task (J4 phone test; ADR 0024, "Ver la tarea"): the server opens an access for
+ * the session's person, under the rule of who sees what, and says where it is (same origin).
+ * `null` when the person may not see it. */
+export async function openTaskPage(taskId: string): Promise<string | null> {
+  let response: Response;
+  try {
+    response = await fetch(`/app/api/tareas/${encodeURIComponent(taskId)}/pagina`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    });
+  } catch {
+    throw new RequestError(0);
+  }
+  if (response.status === 401) throw new SessionClosedError();
+  if (response.status === 403 || response.status === 404) return null;
+  if (!response.ok) throw new RequestError(response.status);
+  const body = (await response.json()) as { direccion?: unknown };
+  return typeof body.direccion === 'string' && body.direccion.startsWith('/tarea/') ? body.direccion : null;
 }
 
 /** Closes this session on the server; the server also clears the cookie. */

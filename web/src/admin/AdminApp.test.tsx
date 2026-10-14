@@ -892,8 +892,9 @@ describe('AdminApp', () => {
     await openForm({ [TASKS]: { status: 401, body: { error: 'sin_sesion' } } });
     fillTask();
     confirm();
-    expect(await screen.findByText('La sesión está cerrada.')).toBeInTheDocument();
-    expect(screen.getByText(/entrá con un enlace nuevo/)).toBeInTheDocument();
+    // ADR 0024: never a link; the administration's sign-in (with Telegram) takes the page.
+    expect(await screen.findByText(/Entrá con Telegram|Esta dirección no sirve/)).toBeInTheDocument();
+    expect(screen.queryByText(/enlace nuevo/)).toBeNull();
     expect(screen.queryByRole('form')).toBeNull();
   });
 
@@ -905,7 +906,7 @@ describe('AdminApp', () => {
   it('without a session there is no form', async () => {
     serve({ 'GET /app/admin/api/yo': { status: 401, body: { error: 'sin_sesion' } } });
     render(<AdminApp />);
-    expect(await screen.findByText('La sesión está cerrada.')).toBeInTheDocument();
+    expect(await screen.findByText(/Entrá con Telegram|Esta dirección no sirve/)).toBeInTheDocument();
     expect(screen.queryByText('salir')).toBeNull();
   });
 
@@ -2309,5 +2310,49 @@ describe('what arrives late (J2-30)', () => {
     await held.answer(DICTATION, 0, 200, { texto: 'colgar el estante del módem' });
     expect(screen.getByLabelText(BOX)).toHaveValue('');
     expect(screen.getByRole('button', { name: 'dictar' })).toBeEnabled();
+  });
+});
+
+// --- The J4 phone test (2026-10-14) -----------------------------------------------------------
+
+describe('after loading a task', () => {
+  it('says it in teal where confirm was, warns in the warning color, and offers it to wait on next', async () => {
+    keys('33333333-3333-4333-8333-333333333333');
+    const calls = await openForm({
+      [OPTIONS]: [
+        ok(options()),
+        ok(
+          options({
+            tareas: [
+              {
+                id: 't-new',
+                titulo: 'Configurar alarmas del SCADA',
+                estado: 'asignada',
+                fecha_objetivo: '2026-10-16',
+                responsable: 'Marcos',
+                objetivo: 'Mantenimiento anual',
+              },
+            ],
+          }),
+        ),
+      ],
+      [TASKS]: loaded([
+        { campo: 'responsable', motivo: 'sin_conectar', texto: 'Esa persona todavía no tiene Leda conectada.' },
+      ]),
+    });
+    fillTask();
+    confirm();
+    const done = await screen.findByText('Tarea cargada.');
+    expect(done).toHaveClass('text-creado');
+    // Below the preview, where the button was.
+    const section = done.closest('section') as HTMLElement;
+    const order = [...section.children];
+    expect(order.indexOf(done)).toBeGreaterThan(0);
+    expect(screen.getByText('Esa persona todavía no tiene Leda conectada.').closest('ul')).toHaveClass('text-falta');
+    // The options are read again after the load.
+    await waitFor(() => expect(calls.filter((c) => c.key === OPTIONS)).toHaveLength(2));
+    fireEvent.click(screen.getByRole('button', { name: '> cargar otra' }));
+    await screen.findByRole('form', { name: 'Cargar tarea' });
+    expect(offered('Espera a (opcional)')).toContain('Configurar alarmas del SCADA · Marcos · Mantenimiento anual');
   });
 });

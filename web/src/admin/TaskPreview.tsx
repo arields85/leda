@@ -11,6 +11,7 @@ import {
   memberOf,
   policyOf,
   previewTask,
+  requestNote,
   reviewerName,
   teamDoor,
   waitOf,
@@ -91,7 +92,7 @@ export function TaskPreview({
         <Row label="La hace">
           {member ? `${member.nombre} · ${member.area}` : MISSING}
           {member && !member.conectado && (
-            <span className={`block ${FIELD_HINT}`}>
+            <span className={`block ${FIELD_HINT} ${WARN}`}>
               [SIN CONECTAR] no va a recibir avisos ni seguimiento hasta que conecte Leda.
             </span>
           )}
@@ -99,7 +100,13 @@ export function TaskPreview({
         <Row label="La revisa">
           {member ? (reviewer ?? 'nadie: no se va a poder cargar') : MISSING}
         </Row>
-        {request && <Row label="La pide">{options.yo?.nombre ?? admin}</Row>}
+        {/* What a request is, in one plain line, with the form's same words (J4 phone test). */}
+        {request && (
+          <Row label="La pide">
+            {options.yo?.nombre ?? admin}
+            <span className={`block ${FIELD_HINT}`}>{requestNote(options, member)}</span>
+          </Row>
+        )}
         <Row label="La decidió">{decided ?? MISSING}</Row>
         <Row label="La carga">{admin}</Row>
       </dl>

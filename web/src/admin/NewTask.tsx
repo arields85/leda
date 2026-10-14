@@ -18,6 +18,21 @@ export function NewTask({ api, author, onClosed }: { api: TaskApi; author: strin
   const [attempt, setAttempt] = useState(0);
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
 
+  // After a load the options are read again in the background, keeping the form (J4 phone test:
+  // the task just loaded has to be offered in "espera a" for the next one).
+  const [reread, setReread] = useState(0);
+  useEffect(() => {
+    if (reread === 0) return;
+    const request = new AbortController();
+    fetchTeamOptions(request.signal)
+      .then((data) => setLoad({ kind: 'ready', data }))
+      .catch((error: unknown) => {
+        if (!request.signal.aborted && error instanceof SessionClosedError) onClosed();
+      });
+    return () => request.abort();
+    // `onClosed` is the page's; a new one is not a reason to read again.
+  }, [reread]);
+
   useEffect(() => {
     const request = new AbortController();
     setLoad({ kind: 'loading' });
@@ -49,5 +64,14 @@ export function NewTask({ api, author, onClosed }: { api: TaskApi; author: strin
       </Notice>
     );
   }
-  return <LoadForm api={api} options={load.data} admin={author} onClosed={onClosed} stacked />;
+  return (
+    <LoadForm
+      api={api}
+      options={load.data}
+      admin={author}
+      onClosed={onClosed}
+      stacked
+      onLoaded={() => setReread((n) => n + 1)}
+    />
+  );
 }

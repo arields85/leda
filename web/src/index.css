@@ -36,6 +36,10 @@
   /* What Leda proposed in the load form (user, 2026-10-13: "un verde agua suave, nada exagerado"). */
   --color-propuesto: #8ccfc0;
 
+  /* A task or an objective just created, next to "confirmar" (J4 phone test, 2026-10-14: "verde
+   * agua", so it is clearly seen that it was created). Only for that success. */
+  --color-creado: #5fd6c3;
+
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
 
   --text-tiny: 9px;
@@ -97,6 +101,11 @@
   #root {
     max-width: 100%;
     overflow-x: clip;
+    /* Inside Telegram (ADR 0024, decision 6): the safe areas, set by `bootTelegram`. */
+    padding-top: var(--tg-safe-top, 0px);
+    padding-bottom: var(--tg-safe-bottom, 0px);
+    padding-left: var(--tg-safe-left, 0px);
+    padding-right: var(--tg-safe-right, 0px);
   }
 
   button {

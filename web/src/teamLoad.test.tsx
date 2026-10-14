@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import type { Options } from './admin/api';
 import { choosesReviewer, EMPTY_DRAFT, requestNote, reviewerName, toInput } from './admin/draft';
@@ -96,14 +96,21 @@ describe('the team door load form', () => {
     pick('Objetivo', 'o1');
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Colgar el módem en la pared' } });
     pick('Quién la hace', 'm-marcos');
-    expect(screen.getByText('Es un pedido a Automatización: Marcos decide quién la hace y la revisa.')).toBeInTheDocument();
+    expect(screen.getAllByText('Es un pedido a Automatización: Marcos decide quién la hace y la revisa.')).toHaveLength(2);
     fireEvent.click(screen.getByRole('checkbox', { name: /una captura de pantalla/ }));
     fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
     fireEvent.change(screen.getByLabelText('Criterio de aceptación'), { target: { value: 'El módem queda colgado' } });
     const preview = screen.getByRole('complementary', { name: 'Vista previa' });
     expect(within(preview).getByText('La pide')).toBeInTheDocument();
+    // The preview says what it is too, with the form's same words (J4 phone test).
+    expect(
+      within(preview).getByText('Es un pedido a Automatización: Marcos decide quién la hace y la revisa.'),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '> confirmar' }));
     await screen.findByText('Tarea cargada.');
+    // The options are read again in the background (J4 phone test: "espera a" offers it next).
+    await waitFor(() => expect(calls.filter((c) => c.key === 'GET /app/api/carga/opciones')).toHaveLength(2));
+    expect(screen.getByText('Tarea cargada.')).toBeInTheDocument();
     const load = calls.find((c) => c.key === 'POST /app/api/tareas');
     expect(load?.body).toMatchObject({ responsable_id: 'm-marcos', objetivo_id: 'o1', decidio_id: '' });
     expect(load?.body).not.toHaveProperty('revisa_id');
@@ -151,11 +158,22 @@ describe('the draft through the team door', () => {
   });
 });
 
+// "Lo que pedí" is a tab of its own (J4 phone test): the page opens on it from the address.
+const REQUESTER_TABS = [
+  { vista: 'tus' as const, titulo: 'Mis tareas' },
+  { vista: 'pedidas' as const, titulo: 'Lo que pedí' },
+];
+
 describe('what the requester sees', () => {
+  beforeEach(() => window.history.replaceState(null, '', '/app/?vista=pedidas'));
+  afterEach(() => window.history.replaceState(null, '', '/app/'));
+
   it('lists what she asked and asks for changes on a finished one', async () => {
     const calls = serve({
-      'GET /app/api/yo': ok(me({ persona: 'Martín' })),
-      'GET /app/api/tareas?vista=tus': ok(view({
+      'GET /app/api/yo': ok(me({ persona: 'Martín', vistas: REQUESTER_TABS })),
+      'GET /app/api/tareas?vista=pedidas': ok(view({
+        vista: 'pedidas',
+        titulo: 'Lo que pedí',
         pedidas: [
           { id: 't-modem', titulo: 'Colgar el módem en la pared', estado: 'terminada', responsable: 'Nahuel',
             area: 'Automatización', fecha_objetivo: '2026-10-16', terminada_el: '2026-10-22', puede_pedir_cambios: true },
@@ -177,13 +195,14 @@ describe('what the requester sees', () => {
       expect(calls.find((c) => c.key === 'POST /app/api/tareas/t-modem/reabrir')?.body).toEqual({ motivo: 'Quedó torcido' }),
     );
     // The view is read again.
-    await waitFor(() => expect(calls.filter((c) => c.key === 'GET /app/api/tareas?vista=tus')).toHaveLength(2));
+    await waitFor(() => expect(calls.filter((c) => c.key === 'GET /app/api/tareas?vista=pedidas')).toHaveLength(2));
   });
 
   it('says why when the server refuses', async () => {
     serve({
-      'GET /app/api/yo': ok(me()),
-      'GET /app/api/tareas?vista=tus': ok(view({
+      'GET /app/api/yo': ok(me({ vistas: REQUESTER_TABS })),
+      'GET /app/api/tareas?vista=pedidas': ok(view({
+        vista: 'pedidas',
         pedidas: [{ id: 't-modem', titulo: 'Colgar el módem', estado: 'terminada', responsable: 'Nahuel',
           area: 'Automatización', fecha_objetivo: null, terminada_el: '2026-10-22', puede_pedir_cambios: true }],
       })),

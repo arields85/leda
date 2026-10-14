@@ -16,7 +16,7 @@ import {
   type TextField,
 } from './api';
 import { Completing } from './Completing';
-import { INPUT, PRIMARY, SECONDARY, WARN } from './controls';
+import { CREATED, INPUT, PRIMARY, SECONDARY, WARN } from './controls';
 import { Counter } from './Counter';
 import { DatePicker, dayLabel } from './DatePicker';
 import { Dropdown } from './Dropdown';
@@ -118,6 +118,9 @@ interface LoadFormProps {
   onClosed: () => void;
   /** One column always (the team's page is narrow): the preview goes under the form. */
   stacked?: boolean;
+  /** After a task is loaded, so the page reads the options again (J4 phone test): the task just
+   * loaded can then be waited on by the next one. */
+  onLoaded?: () => void;
 }
 
 /** Who may be named as the one who decided a task through the administration's door (D10;
@@ -140,7 +143,7 @@ function deciders(options: Options, member: Member | undefined): Member[] {
  * only when confirmed (decision 6). While it sends, the form is locked, so what is shown is what
  * goes. One idempotency key per attempt: kept across retries of the same data, renewed after a
  * success or when the data changes, so a double send never loads two tasks. */
-export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = false }: LoadFormProps) {
+export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = false, onLoaded }: LoadFormProps) {
   const door = useMemo(() => api ?? adminTasks(spaceId ?? ''), [api, spaceId]);
   const team = teamDoor(options);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -514,6 +517,7 @@ export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = fal
           sent,
           notice,
         });
+        onLoaded?.();
       } else {
         // A rejection writes nothing, and the server looked the key up first: nothing was loaded
         // with it, unless the key was used with other data (the conflict below), some data came
@@ -565,11 +569,14 @@ export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = fal
   if (step.kind === 'done') {
     return (
       <section aria-labelledby="cargada" className="flex w-full min-w-0 max-w-[40rem] flex-col gap-3.5">
-        <h2 id="cargada" ref={heading} tabIndex={-1} className="m-0 text-button font-bold outline-none">
+        <TaskPreview draft={step.sent} options={options} admin={admin} />
+        {/* Where "confirmar" was, in teal, so it is clearly seen that it was loaded (J4 phone
+            test, 2026-10-14). */}
+        <h2 id="cargada" ref={heading} tabIndex={-1} className={`m-0 text-button font-bold outline-none ${CREATED}`}>
           {step.repeated ? 'Esta tarea ya estaba cargada.' : 'Tarea cargada.'}
         </h2>
         {(step.warnings.length > 0 || step.notice) && (
-          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-body text-ink-soft">
+          <ul className={`m-0 flex list-none flex-col gap-1 p-0 text-body ${WARN}`}>
             {step.warnings.map((w) => (
               <li key={`${w.campo}-${w.motivo}`} className="flex min-w-0 items-start gap-1.5">
                 <Mark />
@@ -584,7 +591,6 @@ export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = fal
             )}
           </ul>
         )}
-        <TaskPreview draft={step.sent} options={options} admin={admin} />
         <div>
           <button type="button" className={PRIMARY} onClick={another}>
             &gt; cargar otra
@@ -912,9 +918,9 @@ export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = fal
         </h2>
         <TaskPreview draft={spell.shown(draft)} options={options} admin={admin} />
         <div ref={messages} tabIndex={-1} className="flex min-w-0 flex-col gap-3 pt-1.5 outline-none">
-          {spellNote && <p className="m-0 text-body text-ink-soft">{spellNote}</p>}
+          {spellNote && <p className={`m-0 text-body ${WARN}`}>{spellNote}</p>}
           {failed && (
-            <p role="alert" className="m-0 text-body text-ink-soft">
+            <p role="alert" className={`m-0 text-body ${WARN}`}>
               No se pudo cargar: no llegó la respuesta. Los datos siguen acá; probá de nuevo.
             </p>
           )}

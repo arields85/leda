@@ -3,7 +3,7 @@ import { SessionClosedError } from '../api';
 import { shortDate } from '../format';
 import { HELP_FAILED, type Problem, SPELLING_FAILED, type Spelling } from './api';
 import { Completing } from './Completing';
-import { INPUT, PRIMARY, SECONDARY, WARN } from './controls';
+import { CREATED, INPUT, PRIMARY, SECONDARY, WARN } from './controls';
 import { Counter } from './Counter';
 import { DatePicker, dayLabel } from './DatePicker';
 import { Dropdown } from './Dropdown';
@@ -444,11 +444,17 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
   if (step.kind === 'done') {
     return (
       <section aria-labelledby="objetivo-creado" className="flex w-full min-w-0 max-w-[40rem] flex-col gap-3.5">
-        <h2 id="objetivo-creado" ref={heading} tabIndex={-1} className="m-0 text-button font-bold outline-none">
+        <ObjectivePreview draft={step.sent} options={options} author={author} />
+        {/* Where "confirmar" was, in teal (J4 phone test, 2026-10-14), like a loaded task. */}
+        <h2
+          id="objetivo-creado"
+          ref={heading}
+          tabIndex={-1}
+          className={`m-0 text-button font-bold outline-none ${CREATED}`}
+        >
           {step.repeated ? 'Este objetivo ya estaba creado.' : 'Objetivo creado.'}
         </h2>
-        <ObjectivePreview draft={step.sent} options={options} author={author} />
-        {step.notice && <p className="m-0 text-body text-ink-soft">{step.notice}</p>}
+        {step.notice && <p className={`m-0 text-body ${WARN}`}>{step.notice}</p>}
         <div>
           <button type="button" className={PRIMARY} onClick={onAnother ?? another}>
             &gt; crear otro
@@ -666,9 +672,9 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
               </div>
             </div>
           )}
-          {spellNote && <p className="m-0 text-body text-ink-soft">{spellNote}</p>}
+          {spellNote && <p className={`m-0 text-body ${WARN}`}>{spellNote}</p>}
           {failed && (
-            <p role="alert" className="m-0 text-body text-ink-soft">
+            <p role="alert" className={`m-0 text-body ${WARN}`}>
               No se pudo crear: no llegó la respuesta. Los datos siguen acá; probá de nuevo.
             </p>
           )}
