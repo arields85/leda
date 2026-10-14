@@ -1166,6 +1166,12 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - los WARNING de RDD, en `c5815851` y `0beaf5cc`, con la migración `0074`.
       Suite: 3595 passed; la única falla era una huella esperada y quedó actualizada. En seco, 54 de 54.
       `leda_motor`: respaldo `leda_motor-antes-0074-20261014.dump`, ensayo previo y la `0074` aplicada.
+      Algunos archivos habían quedado con fin de línea CRLF y git veía esos commits como reescritos enteros. Se
+      restauró LF en `32a374d0`. RDD de `2edebfb6`, `58d91ba3`, `c5815851` y `0beaf5cc` (los tres últimos sobre una copia en
+      LF): las cuatro aprobadas. Sus WARNING van con los hallazgos de la prueba de la MA en una última tanda; entre
+      ellos, una falla del botón del menú que corta el registro de los webhooks, y la ventana de la firma, cuyo
+      comentario contradice el valor. IA real, 50 y 52 a 55: 14 de 15, con garantías 15 de 15; la falla es de
+      formato.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
