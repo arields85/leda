@@ -967,30 +967,27 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - Leda le hace el seguimiento como a cualquiera, sin escalar.
         - Lo da por cumplido el referente que lo pidió.
         - Cuando se cumple, quien espera se entera de que puede seguir.
-      - **D2 a D13, con la recomendación del agente** (el usuario no cambió ninguna, 2026-10-14):
-        - **D2. El área de una tarea prestada:** la del referente que la carga (Martín le carga a Nahuel "Medir el
-          rack": es de IT y pide la evidencia de IT). Nahuel sigue en OT. Marcos la ve en su web como "Nahuel,
-          prestado a IT", sin avisos.
-        - **D3. Quién revisa cuando carga Dirección:** Ismael elige, con el referente de esa persona preseleccionado;
-          puede cambiarlo por sí mismo o por otro referente. Nunca el responsable.
-        - **D4. Un referente no elige quién revisa:** en su área, el de siempre; en un préstamo, él; en una tarea
-          propia, su aprobador (Ismael).
-        - **D5. Bajo qué objetivo:** cualquier objetivo abierto. El referente del objetivo no recibe aviso.
-        - **D6. El aviso al responsable:** en horario, con unos 10 minutos para juntar varias tareas seguidas en un
-          mensaje. Es de coordinación: no cuenta para el tope diario.
-        - **D7. El aviso a quien revisa:** no se manda si quien revisa es quien cargó la tarea. A Dirección no le
-          llega por la tarea propia de un referente: se entera con la entrega.
-        - **D8. Las preferencias de avisos de Dirección:** van en la J7; en la J4, Dirección no recibe aviso.
-        - **D9. Responsable sin Leda conectada:** el aviso va a quien revisa esa tarea.
-        - **D10. "Quién la decidió"** (puerta de administración): sólo Dirección o el referente del área.
-        - **D11. La ayuda de la IA en la puerta del equipo:** igual que en administración, pero sólo propone a
-          quienes puede cargarles el que carga. Sin nadie nombrado, el responsable queda vacío (ADR 0020, decisión 3).
-        - **D12. "Quiero crear una tarea" por Telegram:** a Dirección y a los referentes, Leda les pasa el enlace a
-          su web. A un integrante le dice que las cargan su referente o Dirección, y que proponer llega pronto (J6).
-          "Quiero crear un objetivo": el enlace sólo a Dirección. Deja de ser "fuera de la lista".
-        - **D13. Dirección no se carga tareas a sí misma:** nadie la revisaría. Lo que tiene que hacer Ismael entra
-          como pedido de un referente (D1b).
-        - **D14. El pase de una tarea prestada** lo decide quien la revisa (Martín), no el referente de origen.
+      - **Revisadas una por una con el usuario (2026-10-14):**
+        - **D1, revisada. Lo que se necesita de otra área se pide de dos maneras.** Ejemplo: Martín (IT) necesita
+          que alguien de OT cuelgue el módem para poder configurarlo.
+          - **Pedir prestado** (Martín elige a la persona): carga la tarea para Nahuel. La tarea no arranca hasta
+            que **Marcos, el referente de Nahuel, la aprueba**. Si aprueba, le llega a Nahuel; si rechaza, Martín se
+            entera del motivo. La revisa Martín.
+          - **Delegar en el referente** (Marcos elige a la persona): Martín carga la tarea para Marcos, y Marcos la
+            hace o se la pasa a Nahuel (el pase, también desde la web). La revisa Martín.
+          - En los dos casos, la tarea de Martín puede esperar a la otra. Esta aprobación es el **primer circuito de
+            aprobación**: se construye en la J4 y la J6 lo reutiliza para las propuestas.
+        - **D2. El área de una tarea prestada:** la del referente que la pidió. "Medir el rack" para Nahuel, pedida
+          por Martín, es de IT y pide la evidencia de IT. Nahuel sigue en OT. Marcos la ve como "Nahuel, prestado
+          a IT".
+        - **D3. Cuando carga Dirección:** Ismael elige quién revisa, con el referente de esa persona preseleccionado;
+          puede poner a sí mismo o a otro referente. Nunca el responsable.
+        - **D4, revisada. Dirección no revisa las tareas de los referentes:** le importa el objetivo, no cada tarea
+          (mecánica §7: Leda no convierte a Dirección en aprobadora de tareas menores). La tarea propia de un
+          referente la revisa él mismo, y la de su gente también. Ismael sólo revisa lo que él carga y elige
+          revisar, y aprueba el objetivo al cerrarse. Por la tarea propia de un referente, a Ismael no le llega
+          nada.
+        - **D5. Bajo qué objetivo:** cualquier objetivo abierto.
         - **Orden:** "> aceptar la demora" de Dirección espera a la J5; en la J4, la única salida es cambiar la
           fecha.
       Incluye (usuario, 2026-10-14): si alguien escribe por Telegram "quiero crear una tarea" (o un objetivo),
