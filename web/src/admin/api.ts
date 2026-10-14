@@ -218,8 +218,8 @@ export interface Candidate {
   area: string;
 }
 
-export type HelpResult =
-  | { kind: 'proposed'; proposal: Proposal; choices: Candidate[]; notes: Problem[] }
+export type HelpResult<P = Proposal> =
+  | { kind: 'proposed'; proposal: P; choices: Candidate[]; notes: Problem[] }
   | { kind: 'rejected'; errors: Problem[] }
   | { kind: 'failed'; text: string };
 
@@ -229,10 +229,15 @@ export const HELP_FAILED =
 
 /** Asks Leda to complete the empty fields. 200 proposes, 422 says why not, 503 means the AI did
  * not answer; anything else (no network, a server failure) also reads as "could not complete". */
-export async function askLeda(spaceId: string, input: HelpInput): Promise<HelpResult> {
+export function askLeda(spaceId: string, input: HelpInput): Promise<HelpResult> {
+  return askLedaAt<Proposal>(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/ayuda`, input);
+}
+
+/** The same request to any door's help address (the task's or the objective's, J3-4). */
+export async function askLedaAt<P>(url: string, input: object): Promise<HelpResult<P>> {
   let response: Response;
   try {
-    response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/ayuda`, {
+    response = await call(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -242,8 +247,8 @@ export async function askLeda(spaceId: string, input: HelpInput): Promise<HelpRe
     return { kind: 'failed', text: HELP_FAILED };
   }
   if (response.status === 200) {
-    const body = (await response.json()) as { propuesta?: Proposal; elegir?: Candidate[]; avisos?: Problem[] };
-    return { kind: 'proposed', proposal: body.propuesta ?? {}, choices: body.elegir ?? [], notes: body.avisos ?? [] };
+    const body = (await response.json()) as { propuesta?: P; elegir?: Candidate[]; avisos?: Problem[] };
+    return { kind: 'proposed', proposal: body.propuesta ?? ({} as P), choices: body.elegir ?? [], notes: body.avisos ?? [] };
   }
   if (response.status === 422) {
     const body = (await response.json()) as { errores?: Problem[] };
@@ -272,18 +277,25 @@ export const SPELLING_FAILED = 'No pude revisar la ortografía ahora: quedó com
 /** Asks Leda to correct the spelling of the texts the person wrote (J2-17), before loading.
  * Never blocks the load: anything but an answer (no network, a server failure) reads as "could not
  * check", with the text as written; only a closed session throws. */
-export async function checkSpelling(
-  spaceId: string,
+export function checkSpelling(spaceId: string, texts: Partial<Record<TextField, string>>): Promise<Spelling> {
+  return checkSpellingAt(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/ortografia`, texts);
+}
+
+/** The same check at any door's spelling address; `of` tells the server whose texts they are (an
+ * objective's, J3-4; a task's when left out). */
+export async function checkSpellingAt(
+  url: string,
   texts: Partial<Record<TextField, string>>,
+  of?: 'objetivo',
 ): Promise<Spelling> {
   const asked = Object.keys(texts) as TextField[];
   const failed: Spelling = { corrected: {}, unchecked: asked, notice: SPELLING_FAILED };
   let response: Response;
   try {
-    response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/ortografia`, {
+    response = await call(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(texts),
+      body: JSON.stringify(of ? { ...texts, de: of } : texts),
     });
   } catch (error) {
     if (error instanceof SessionClosedError) throw error;
@@ -327,13 +339,18 @@ export type DictationResult = { kind: 'text'; text: string; notice?: string } | 
 /** Sends the recorded audio as it is, with its own type, and returns what was said as text (J2b).
  * Anything but a text (no network, the time running out, a server failure) reads as "could not",
  * in plain words; only a closed session throws. */
-export async function transcribe(spaceId: string, audio: Blob): Promise<DictationResult> {
+export function transcribe(spaceId: string, audio: Blob): Promise<DictationResult> {
+  return transcribeAt(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/dictado`, audio);
+}
+
+/** The same dictation at any door's address (the team's, J3-4). */
+export async function transcribeAt(url: string, audio: Blob): Promise<DictationResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DICTATION_TIMEOUT_MS);
   try {
     let response: Response;
     try {
-      response = await call(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/dictado`, {
+      response = await call(url, {
         method: 'POST',
         // J2-30: never an empty type (the server refuses it); without one, the iPhone's.
         headers: { 'Content-Type': audio.type || 'audio/mp4' },

@@ -1,7 +1,7 @@
 import { CircleAlert, Mic as MicIcon, Square } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SessionClosedError } from '../api';
-import { type Candidate, DICTATION_FAILED, type Problem, transcribe } from './api';
+import { type Candidate, DICTATION_FAILED, type DictationResult, type Problem } from './api';
 import { AudioBars } from './AudioBars';
 import { Completing } from './Completing';
 import { canDictate, Dictation, DICTATION_LIMIT_MS } from './dictation';
@@ -19,7 +19,10 @@ export type HelpState =
   | { kind: 'rejected'; errors: Problem[] }
   | { kind: 'failed'; text: string };
 
-export const NOTHING_TO_COMPLETE = 'Leda no encontró nada para completar con lo que escribiste.';
+// The server's words when the free box is empty (src/leda/web_app.py, TEXTOS_DE_LA_AYUDA).
+export const STORY_MISSING = 'Contame primero qué querés hacer; con eso Leda completa lo que pueda.';
+
+export const NOTHING_TO_COMPLETE ='Leda no encontró nada para completar con lo que escribiste.';
 /** The person changed the free text or a field while Leda was answering: the answer was made for
  * what the form had when she asked, so it fills nothing (review review-03b5c3a74d3719b7). */
 export const STALE_ANSWER = 'Cambiaste lo escrito mientras Leda completaba; tocá completar de nuevo.';
@@ -41,11 +44,22 @@ function Line({ children, warn }: { children: string; warn?: boolean }) {
   );
 }
 
+/** The fields of the form the box helps with: their order, how the server names each one in a
+ * notice (`campo`) and how each is said to the person. The task's by default; the objective's form
+ * passes its own (J3-4). */
+export interface HelpFields {
+  order: readonly string[];
+  problemField: Readonly<Record<string, string>>;
+  name: Readonly<Record<string, string>>;
+}
+
+const TASK_FIELDS: HelpFields = { order: FIELD_ORDER, problemField: PROBLEM_FIELD, name: FIELD_NAME };
+
 /** "No pude completar: quién la hace, criterio de aceptación." for the notes that belong to a
  * field (each one also shows its own text on that field), in the order of the form. */
-function missedFields(notes: Problem[]): string | null {
-  const fields = FIELD_ORDER.filter((field) => notes.some((n) => PROBLEM_FIELD[n.campo] === field));
-  return fields.length ? `No pude completar: ${fields.map((f) => FIELD_NAME[f]).join(', ')}.` : null;
+function missedFields(notes: Problem[], fields: HelpFields): string | null {
+  const missed = fields.order.filter((field) => notes.some((n) => fields.problemField[n.campo] === field));
+  return missed.length ? `No pude completar: ${missed.map((f) => fields.name[f]).join(', ')}.` : null;
 }
 
 /** "1:05": minutes and seconds of a recording. */
@@ -65,8 +79,9 @@ export function withDictated(story: string, said: string): string {
 type Mic = 'idle' | 'starting' | 'recording' | 'transcribing';
 
 interface HelpBoxProps {
-  spaceId: string;
-  /** The administration session closed (the dictation's answer said so). */
+  /** Turns the recorded audio into text at the form's door (the administration's or the team's). */
+  transcribe: (audio: Blob) => Promise<DictationResult>;
+  /** The session closed (the dictation's answer said so). */
   onClosed: () => void;
   story: string;
   onStory: (text: string) => void;
@@ -77,13 +92,28 @@ interface HelpBoxProps {
   notes: Problem[];
   onAsk: () => void;
   onChoose: (membershipId: string) => void;
+  /** The form's fields, for the notes (the task's when left out). */
+  fields?: HelpFields;
+  /** The name of the group of people to choose from, when the name fits more than one. */
+  chooseLabel?: string;
 }
 
 /** "Contame qué querés hacer y te ayudo" (ADR 0023, point 4; portion J2): one free box, typed or
  * dictated, and "completar con Leda". Optional: the form below works by hand as always. The
  * microphone shows only where the browser can record (J2b: the audio goes to the server, which
  * turns it into text with Gemini; the text goes into the box, for the person to read and fix). */
-export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk, onChoose }: HelpBoxProps) {
+export function HelpBox({
+  transcribe,
+  onClosed,
+  story,
+  onStory,
+  help,
+  notes,
+  onAsk,
+  onChoose,
+  fields = TASK_FIELDS,
+  chooseLabel = 'elegí quién la hace',
+}: HelpBoxProps) {
   const [recordable] = useState(() => canDictate());
   const [mic, setMic] = useState<Mic>('idle');
   const [elapsed, setElapsed] = useState(0);
@@ -106,7 +136,7 @@ export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk,
   async function heard(audio: Blob) {
     setMic('transcribing');
     try {
-      const result = await transcribe(spaceId, audio);
+      const result = await transcribe(audio);
       if (!mounted.current) return;
       if (result.kind === 'text') {
         onStory(withDictated(storyNow.current, result.text));
@@ -153,7 +183,7 @@ export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk,
 
   const asking = help.kind === 'asking';
   const over = length(story) > STORY_LIMIT;
-  const missed = help.kind === 'done' ? missedFields(notes) : null;
+  const missed = help.kind === 'done' ? missedFields(notes, fields) : null;
   const micName = mic === 'transcribing' ? 'pasando a texto…' : mic === 'recording' ? 'dejar de dictar' : 'dictar';
   return (
     <div data-field className="flex min-w-0 max-w-full flex-col gap-2 rounded-card border-hard border-line-soft px-3 py-2.5">
@@ -227,12 +257,12 @@ export function HelpBox({ spaceId, onClosed, story, onStory, help, notes, onAsk,
         {help.kind === 'stale' && <Line>{STALE_ANSWER}</Line>}
         {help.kind === 'done' && help.nothing && <Line>{NOTHING_TO_COMPLETE}</Line>}
         {missed && <Line warn>{missed}</Line>}
-        {help.kind === 'done' && notes.filter((n) => !(n.campo in PROBLEM_FIELD)).map((n) => (
+        {help.kind === 'done' && notes.filter((n) => !(n.campo in fields.problemField)).map((n) => (
           <Line key={`${n.campo}-${n.motivo}`}>{n.texto}</Line>
         ))}
       </div>
       {help.kind === 'done' && help.choices.length > 0 && (
-        <div role="group" aria-label="elegí quién la hace" className="flex flex-wrap gap-2">
+        <div role="group" aria-label={chooseLabel} className="flex flex-wrap gap-2">
           {help.choices.map((c) => (
             <button key={c.membership_id} type="button" className={QUIET} onClick={() => onChoose(c.membership_id)}>
               {c.nombre} · {c.area}

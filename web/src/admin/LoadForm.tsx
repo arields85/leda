@@ -14,6 +14,7 @@ import {
   SPELLING_FAILED,
   type Spelling,
   type TextField,
+  transcribe,
 } from './api';
 import { Completing } from './Completing';
 import { INPUT, PRIMARY, SECONDARY, WARN } from './controls';
@@ -22,7 +23,7 @@ import { DatePicker, dayLabel } from './DatePicker';
 import { Dropdown } from './Dropdown';
 import { FieldBlock, Mark } from './FieldBlock';
 import { bringTo, FieldList, focusField as focusElement } from './FieldList';
-import { HelpBox, type HelpState } from './HelpBox';
+import { HelpBox, type HelpState, STORY_MISSING } from './HelpBox';
 import {
   checkDraft,
   clearedBy,
@@ -57,9 +58,6 @@ import {
 } from './draft';
 import { TaskPreview } from './TaskPreview';
 import { FIELD_HINT, FIELD_TITLE, FIELD_VALUE } from './typography';
-
-// The server's words when the free box is empty (src/leda/web_app.py, TEXTOS_DE_LA_AYUDA).
-const STORY_MISSING = 'Contame primero qué querés hacer; con eso Leda completa lo que pueda.';
 
 type Step =
   | { kind: 'edit'; sending: boolean; failed: boolean; checking?: boolean }
@@ -398,6 +396,11 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     }
   }
 
+  /** The dictation at this space's administration address (J2b). */
+  function dictate(audio: Blob) {
+    return transcribe(spaceId, audio);
+  }
+
   /** The person picked who does it among the ones that fit the name: her choice, not marked. */
   function choose(id: string) {
     if (memberOf(options, id)) chooseResponsible(id);
@@ -653,7 +656,7 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
         className="flex min-w-0 max-w-full flex-col"
       >
         <fieldset disabled={sending} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
-          <HelpBox key={round.current} spaceId={spaceId} onClosed={onClosed} story={story} onStory={setStory} help={help} notes={notes} onAsk={ask} onChoose={choose} />
+          <HelpBox key={round.current} transcribe={dictate} onClosed={onClosed} story={story} onStory={setStory} help={help} notes={notes} onAsk={ask} onChoose={choose} />
 
           <FieldBlock id="f-objetivo" label="Objetivo" errors={said('objetivo_id')} proposed={proposed.has('objetivo_id')}
             hint={options.objetivos.length === 0 ? 'No hay objetivos abiertos en este espacio.' : undefined}>

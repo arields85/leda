@@ -106,6 +106,35 @@ describe('the administration door', () => {
     expect(read(`GET /app/admin/api/espacios/${SPACE}/opciones`)).toBe(before + 1);
   });
 
+  it("Leda's help and the spelling go to this space's administration addresses (J3-4)", async () => {
+    const calls = serve({
+      'GET /app/admin/api/yo': ok(adminMe()),
+      [`GET /app/admin/api/espacios/${SPACE}/opciones`]: ok(options()),
+      [`GET ${BASE}/opciones`]: ok(objectiveOptions()),
+      [`POST ${BASE}/ayuda`]: ok({ propuesta: { titulo: 'Planta 2027' }, elegir: [], avisos: [] }),
+      [`POST /app/admin/api/espacios/${SPACE}/ortografia`]: ok({ corregidos: {}, sin_revisar: [] }),
+    });
+    render(<AdminApp />);
+    await screen.findByRole('form', { name: 'Cargar tarea' });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Qué cargar' })).getByRole('button', { name: 'objetivo' }));
+    const form = await screen.findByRole('form', { name: 'Crear objetivo' });
+    fireEvent.change(within(form).getByLabelText('Contame qué querés hacer y te ayudo'), {
+      target: { value: 'la planta del 2027' },
+    });
+    fireEvent.click(within(form).getByRole('button', { name: '> completar con Leda' }));
+    await waitFor(() => expect(within(form).getByLabelText('Nombre')).toHaveValue('Planta 2027'));
+    expect(calls.filter((c) => c.key === `POST ${BASE}/ayuda`)).toHaveLength(1);
+    // The task's help address is not the objective's.
+    expect(calls.some((c) => c.key === `POST /app/admin/api/espacios/${SPACE}/ayuda`)).toBe(false);
+    fireEvent.blur(within(form).getByLabelText('Nombre'));
+    await waitFor(() =>
+      expect(calls.find((c) => c.key === `POST /app/admin/api/espacios/${SPACE}/ortografia`)?.body).toEqual({
+        titulo: 'Planta 2027',
+        de: 'objetivo',
+      }),
+    );
+  });
+
   it('switching between "tarea" and "objetivo" keeps what was typed in each', async () => {
     // RDD review-12308947b06404e4: the switch used to drop the other form's draft.
     const calls = serve({
@@ -179,6 +208,45 @@ describe('the team door', () => {
     expect(calls.some((c) => c.key.includes('/app/admin/'))).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: '> volver a las tareas' }));
     expect(await screen.findByText('Configurar alarmas del SCADA')).toBeInTheDocument();
+  });
+
+  it("Leda's help and the spelling go to the team's own addresses (J3-4)", async () => {
+    const calls = serve({
+      'GET /app/api/yo': ok(me({ persona: 'Ismael', crea_objetivos: true })),
+      'GET /app/api/tareas?vista=tus': ok(view()),
+      'GET /app/api/objetivos/opciones': ok(objectiveOptions()),
+      'POST /app/api/objetivos/ayuda': ok({
+        propuesta: { titulo: 'Planta 2027', referente_id: 'm-marcos', fecha: '2026-10-16' },
+        elegir: [],
+        avisos: [],
+      }),
+      'POST /app/api/ortografia': ok({ corregidos: {}, sin_revisar: [] }),
+      'POST /app/api/objetivos': created,
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '> nuevo objetivo' }));
+    await screen.findByRole('form', { name: 'Crear objetivo' });
+    fireEvent.change(screen.getByLabelText('Contame qué querés hacer y te ayudo'), {
+      target: { value: 'la planta del 2027 la lleva marcos para el viernes' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '> completar con Leda' }));
+    await waitFor(() => expect(screen.getByLabelText('Nombre')).toHaveValue('Planta 2027'));
+    expect(calls.find((c) => c.key === 'POST /app/api/objetivos/ayuda')?.body).toEqual({
+      texto: 'la planta del 2027 la lleva marcos para el viernes',
+      titulo: '',
+      descripcion: '',
+      padre_id: '',
+      tipo: '',
+      referente_id: '',
+      fecha: '',
+    });
+    fireEvent.click(screen.getByRole('button', { name: '> confirmar' }));
+    await screen.findByRole('heading', { name: 'Objetivo creado.' });
+    expect(calls.find((c) => c.key === 'POST /app/api/ortografia')?.body).toEqual({
+      titulo: 'Planta 2027',
+      de: 'objetivo',
+    });
+    expect(calls.some((c) => c.key.includes('/app/admin/'))).toBe(false);
   });
 
   it('if the server says she is not Dirección, the page says so', async () => {
