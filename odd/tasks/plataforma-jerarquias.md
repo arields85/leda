@@ -956,6 +956,17 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         los cinco WARNING de su RDD.
   - [ ] J3-5 · La prueba en el celular (usuario), con su guion.
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
+      **Decisiones del usuario (2026-10-14, antes de escribir código):**
+      - **D1. A quién le carga un referente:** a su área, a sí mismo y, como préstamo, a cualquiera de otra área,
+        también a otro referente. En un préstamo la tarea la revisa él y Leda le avisa al referente de esa persona.
+      - **D1b. El pedido a Dirección:** una tarea puede frenarse porque depende de una decisión o una ejecución de
+        Dirección. Ejemplo: Lucas no puede instalar el servidor nuevo hasta que Dirección apruebe la compra.
+        - Un referente puede cargarle a Dirección un **pedido** ("Aprobar la compra del servidor", para Ismael), y
+          su tarea **espera** ese pedido, con la espera de la J1.
+        - Se ve en la web y a Dirección le llega un aviso por chat.
+        - Leda le hace el seguimiento como a cualquiera, sin escalar.
+        - Lo da por cumplido el referente que lo pidió.
+        - Cuando se cumple, quien espera se entera de que puede seguir.
       Incluye (usuario, 2026-10-14): si alguien escribe por Telegram "quiero crear una tarea" (o un objetivo),
       Leda le dice que eso se hace en la web y le ofrece el enlace, según lo que esa persona puede cargar.
       Es un hecho de la cocina, no frases (regla del mozo), y lleva su conversación de prueba contra la IA real.
