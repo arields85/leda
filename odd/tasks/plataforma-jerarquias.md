@@ -781,8 +781,28 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       opacidad técnica, nunca en silencio), el flujo de confirmar de punta a punta (respuestas viejas, "empezar de
       nuevo" en el medio, doble envío), honestidad de lo propuesto, las reglas del criterio y su juicio guardado, el
       formulario y las pruebas que no prueban. Las deudas anotadas en J2-23, J2b y J2-28 son su punto de partida.
-      Cuándo: el usuario lo pidió para la noche del 2026-10-13, mientras duerme. En curso (revisor de sólo
-      lectura) junto con la suite completa.
+      Cuándo: el usuario lo pidió para la noche del 2026-10-13, mientras duerme.
+      **Hecha** (revisor de sólo lectura, 2026-10-13, noche, sobre `c258ee37..eaf84ed4`): **ningún hallazgo
+      CRITICAL ni HIGH.** Se sostienen la sesión antes y después de la IA en las cuatro rutas nuevas, el candado
+      nunca esperando a la IA, la auditoría sólo con huellas, la carga con "no pude revisar" e incidente si la IA
+      falta, la fecha calculada por el código, y la persona elegida por quien carga cuando hay más de una. La J2 no
+      tocó `db/`. Hallazgos:
+      - **MEDIUM:** una respuesta tardía de la ortografía durante "confirmar" borra la clave de un solo uso
+        (`LoadForm.tsx:298-334`).
+      - **MEDIUM:** el dictado lee hasta 10 MB antes de validar la sesión (`web_app.py:1861-1869`).
+      - **LOW-MEDIUM:** el criterio se descarta cuando una palabra al principio de la oración o un apodo en
+        minúscula parecen un nombre (`ayuda_al_cargar.py:852-868`, deuda de J2-28).
+      - **LOW:** "sí, borrar" no corta el dictado.
+      - **LOW:** evidencia marcada que queda oculta cuando Leda completa quién la hace.
+      - **LOW:** un audio sin tipo falla sin dejar incidente.
+      - **LOW:** el hilo de Gemini sobrevive al plazo total (deuda de J2-28).
+      - **LOW:** un comentario y una documentación desactualizados.
+      - **Pruebas que faltan:** las respuestas tardías después de "empezar de nuevo", y una prueba atada al reloj
+        real (deuda de J2-28).
+      Las deudas de J2-23 y casi todas las de J2b ya estaban resueltas. La de la herramienta de medición (falsos
+      positivos de "primera persona") sigue abierta y no afecta al producto. Se arreglan en la J2-30.
+- [ ] **J2-30 · Los arreglos de la J2-29** (escritor delegado; hallazgos 1 a 10, cada uno con su prueba).
+      Ruta: delegada. Fuera de alcance: la regla de `maximum-scale=1` en iOS (decisión del usuario, opción A).
 - [ ] **J3 · Los objetivos desde la web** (ADR 0023, decisión 1, decisión 5 y punto 11). Dirección crea los
       objetivos de su equipo desde su web; el administrador, desde la suya, en cualquier espacio. Con la ayuda
       de la IA desde el primer día, **reutilizando la J2** (usuario, 2026-10-13: "la j2 tiene muy buena base y
