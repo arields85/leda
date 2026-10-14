@@ -1123,6 +1123,11 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - con la VPS, el botón fijo del menú: **"Tareas"**.
         No va en cada mensaje (recordatorios, preguntas) ni en grupos, donde Telegram no lo permite. Si se
         reinicia el túnel, los botones viejos dejan de andar: se toca uno nuevo.
+      - **MA4. Cómo se ve:**
+        - el aspecto oscuro de Leda, gris y con letra de máquina, sin tomar los colores de cada Telegram;
+        - grande, pero dejando la barrita de Telegram con "Cerrar": se usa `expand()`, no la pantalla completa;
+        - el zoom con dos dedos se prueba en el celular. Si dentro de la Mini App la página ya no se agranda sola
+          al tocar un campo, se libera; si se agranda, queda bloqueado como hoy.
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
       Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
       la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección
