@@ -3169,7 +3169,9 @@ end $$;
 -- se guarda al cierre de la jornada del espacio, en su zona. `carga_de_tarea` es la clave de un
 -- solo uso de cada carga, con RLS forzada y sin ningún privilegio para `leda_app`. La espera
 -- (migración 0067; ADR 0023, decisión 2): la carga puede esperar a una tarea comprometida y
--- abierta del espacio, siempre bloqueante; `opciones_de_la_carga` las ofrece en `tareas`.
+-- abierta del espacio, siempre bloqueante; `opciones_de_la_carga` las ofrece en `tareas`. Una
+-- tarea no vence después que su objetivo, si el objetivo tiene fecha (migración 0070; decisión 6
+-- del usuario, 2026-10-14): se rechaza con el día del objetivo.
 create table carga_de_tarea (
   id            uuid primary key default gen_random_uuid(),
   workspace_id  uuid not null references workspace(id) on delete cascade,
@@ -3439,9 +3441,13 @@ begin
     elsif p_fecha = v_hoy and v_hora_fin is not null
           and (coalesce(p_ahora, now()) at time zone v_espacio.zona_horaria)::time >= v_hora_fin then
       v_errores := v_errores || jsonb_build_object('campo', 'fecha', 'motivo', 'ya_cerro_el_dia');
+    -- Una tarea no vence después que su objetivo (decisión 6 del usuario, 2026-10-14; migración
+    -- 0070): el objetivo se demoraría. Antes era un aviso que no bloqueaba; ahora se rechaza, con
+    -- el día del objetivo (`hasta`), y la salida es una fecha hasta ese día.
     elsif v_objetivo.fecha_objetivo is not null and p_fecha > v_objetivo.fecha_objetivo then
-      v_avisos := v_avisos || jsonb_build_object('campo', 'fecha',
-                                                 'motivo', 'despues_del_objetivo');
+      v_errores := v_errores || jsonb_build_object('campo', 'fecha',
+                                                   'motivo', 'vence_despues_del_objetivo',
+                                                   'hasta', v_objetivo.fecha_objetivo);
     end if;
 
     if nullif(btrim(p_criterio), '') is null then

@@ -566,13 +566,68 @@ describe('AdminApp', () => {
     expect(document.getElementById('f-espera-error')).toBeNull();
   });
 
-  it('warns when the date is after the objective, without blocking', async () => {
-    await openForm();
-    pick('Objetivo', 'o1');
+  // Decision 6 of the user (2026-10-14; migration 0070): a task never falls due after its
+  // objective. Leda stops before loading and says why; the way out is a date up to that day.
+  const LATE =
+    'Esta tarea vence después que «Puesta en marcha de la línea 3» (30.10): el objetivo se demoraría. Para cargarla ahora, elegí una fecha hasta ese día.';
+
+  it('stops a task that falls due after its objective: confirm is disabled and says why', async () => {
+    const calls = await openForm({ [TASKS]: loaded() });
+    fillTask();
     fireEvent.click(screen.getByRole('button', { name: 'mes siguiente' }));
     fireEvent.click(screen.getByRole('button', { name: 'lun 02.11' }));
-    expect(screen.getAllByText(/Es posterior a la del objetivo \(30\.10\)/).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: '> confirmar' })).toBeEnabled();
+    // Before any tap: next to confirm and on the date, in plain words with the objective's name.
+    expect(within(preview().parentElement as HTMLElement).getAllByText(LATE).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: '> confirmar' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByText(/se avisa, no se bloquea/)).toBeNull();
+    confirm();
+    // Nothing is sent; the tap takes the person to the date, which says it.
+    expect(calls.some((c) => c.key === TASKS || c.key === REVIEW)).toBe(false);
+    expect(document.getElementById('f-fecha-error')).toHaveTextContent(LATE);
+    // A date up to the objective's day: the conflict goes, and it loads.
+    fireEvent.click(screen.getByRole('button', { name: 'mes anterior' }));
+    fireEvent.click(screen.getByRole('button', { name: 'vie 30.10' }));
+    expect(screen.queryByText(LATE)).toBeNull();
+    expect(screen.getByRole('button', { name: '> confirmar' })).not.toHaveAttribute('aria-disabled');
+    confirm();
+    await screen.findByRole('heading', { name: 'Tarea cargada.' });
+    expect(calls.filter((c) => c.key === TASKS)).toHaveLength(1);
+  });
+
+  it('an objective without a date sets no limit, and changing the objective clears the stop', async () => {
+    await openForm();
+    fillTask();
+    fireEvent.click(screen.getByRole('button', { name: 'mes siguiente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'lun 02.11' }));
+    confirm();
+    expect(document.getElementById('f-fecha-error')).toHaveTextContent(LATE);
+    pick('Objetivo', 'o2');
+    expect(screen.queryByText(LATE)).toBeNull();
+    expect(document.getElementById('f-fecha-error')).toBeNull();
+    expect(screen.getByRole('button', { name: '> confirmar' })).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('the server refusing a late date lands on the date with the day it says', async () => {
+    await openForm({
+      [REVIEW]: {
+        status: 422,
+        body: {
+          errores: [
+            {
+              campo: 'fecha',
+              motivo: 'vence_despues_del_objetivo',
+              texto: 'Esta tarea vence después que su objetivo: el objetivo se demoraría. Para cargarla ahora, elegí una fecha hasta la del objetivo.',
+              hasta: '2026-10-14',
+            },
+          ],
+        },
+      },
+    });
+    fillTask();
+    confirm();
+    await screen.findByRole('alert');
+    expect(screen.getByRole('group', { name: 'Fecha' })).toBeInTheDocument();
+    expect(document.getElementById('f-fecha-error')).toHaveTextContent('Para cargarla ahora, elegí una fecha hasta la del objetivo.');
   });
 
   it('a retry after a network failure keeps the data and the key', async () => {
@@ -1037,6 +1092,20 @@ describe('Leda completes the load from the free box', () => {
     // The free text stays in its box, and the preview shows what was proposed.
     expect(screen.getByLabelText(BOX)).toHaveValue(STORY);
     expect(preview()).toHaveTextContent('Las 12 alarmas suenan en la sala de control.');
+  });
+
+  it('a date Leda fills after the objective stops the load the same way (decision 6)', async () => {
+    const calls = await openForm({
+      [HELP]: proposed({ ...FULL, propuesta: { ...FULL.propuesta, fecha: '2026-11-02' } }),
+    });
+    tell();
+    askLeda();
+    await waitFor(() => expect(screen.getByLabelText('Objetivo')).toHaveValue('o1'));
+    pick('Quién la decidió', 'm-ismael');
+    expect(screen.getAllByText(/Esta tarea vence después que «Puesta en marcha de la línea 3» \(30\.10\)/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: '> confirmar' })).toHaveAttribute('aria-disabled', 'true');
+    confirm();
+    expect(calls.some((c) => c.key === TASKS || c.key === REVIEW)).toBe(false);
   });
 
   it('a field the person edits loses its mark', async () => {

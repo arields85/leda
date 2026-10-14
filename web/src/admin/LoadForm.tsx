@@ -25,7 +25,9 @@ import { bringTo, FieldList, focusField as focusElement } from './FieldList';
 import { HelpBox, type HelpState } from './HelpBox';
 import {
   checkDraft,
+  clearedBy,
   type Draft,
+  dueAfterObjectiveText,
   EMPTY_DRAFT,
   evidenceKinds,
   evidenceWords,
@@ -33,6 +35,8 @@ import {
   FIELD_ID,
   FIELD_NAME,
   FIELD_ORDER,
+  LATE_FOR_OBJECTIVE,
+  lateForObjective,
   LIMITS,
   memberOf,
   newKey,
@@ -261,7 +265,6 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
   const member = memberOf(options, draft.responsable_id);
   const policy = policyOf(options, member);
   const kinds = evidenceKinds(policy);
-  const objective = options.objetivos.find((o) => o.id === draft.objetivo_id);
   const waitable = waitableTasks(options);
 
   function change(patch: Partial<Draft>) {
@@ -280,8 +283,8 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     if (!unknown.current) key.current = null;
     setStep((current) => (current.kind === 'edit' && current.failed ? { ...current, failed: false } : current));
     const touched = new Set(Object.keys(patch));
-    setProblems((current) => current.filter((p) => !touched.has(PROBLEM_FIELD[p.campo] ?? '')));
-    setNotes((current) => current.filter((n) => !touched.has(PROBLEM_FIELD[n.campo] ?? '')));
+    setProblems((current) => current.filter((p) => !clearedBy(p, touched)));
+    setNotes((current) => current.filter((n) => !clearedBy(n, touched)));
   }
 
   /** Takes the criterion Leda proposed with a refusal: it fills the field (the notice goes, as
@@ -326,9 +329,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     if (!unknown.current) key.current = null;
     setProposed((marked) => new Set([...marked, ...filled]));
     if (added.length > 0) setLedaEvidence((marked) => new Set([...marked, ...added]));
-    const touched: string[] = [...filled, ...(added.length > 0 ? ['evidencia'] : [])];
-    setProblems((shown) => shown.filter((p) => !touched.includes(PROBLEM_FIELD[p.campo] ?? '')));
-    setNotes((shown) => shown.filter((n) => !touched.includes(PROBLEM_FIELD[n.campo] ?? '')));
+    const touched = new Set<string>([...filled, ...(added.length > 0 ? ['evidencia'] : [])]);
+    setProblems((shown) => shown.filter((p) => !clearedBy(p, touched)));
+    setNotes((shown) => shown.filter((n) => !clearedBy(n, touched)));
     return filled.length + added.length;
   }
 
@@ -634,6 +637,12 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     draft.evidencia.length > 0 ||
     (Object.keys(EMPTY_DRAFT) as Field[]).some((f) => f !== 'evidencia' && String(draft[f]).trim() !== '');
   const described = (id: string, field: Field) => (said(field).length ? `${id}-error` : undefined);
+  // Decision 6 (2026-10-14): a task that falls due after its objective is stopped before loading,
+  // said from the start next to the date and next to confirm; once a tap marks the date, the field
+  // says it in its message instead of its hint.
+  const late = lateForObjective(draft, options);
+  const lateText = late ? dueAfterObjectiveText(late) : null;
+  const lateOnField = on('fecha').some((p) => p.motivo === LATE_FOR_OBJECTIVE);
 
   return (
     <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10">
@@ -732,9 +741,11 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
             proposed={proposed.has('fecha')}
             extra={draft.fecha ? <span className={`shrink-0 ${FIELD_VALUE}`}>{dayLabel(draft.fecha)}</span> : undefined}
             hint={
-              objective?.fecha_objetivo && draft.fecha > objective.fecha_objetivo
-                ? `Es posterior a la del objetivo (${shortDate(objective.fecha_objetivo)}): se avisa, no se bloquea.`
-                : 'Sólo los días hábiles del espacio, desde hoy.'
+              lateText && !lateOnField ? (
+                <span className={`font-bold ${WARN}`}>{lateText}</span>
+              ) : (
+                'Sólo los días hábiles del espacio, desde hoy.'
+              )
             }
           >
             <DatePicker
@@ -905,6 +916,12 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
               {alerted && <p className="m-0 font-bold text-ink">No se cargó: hay que corregir lo marcado.</p>}
               <FieldList label="Falta completar" fields={named(missing)} />
               <FieldList label="Hay que corregir" fields={named(wrong)} />
+              {lateText && (
+                <p className="m-0 flex min-w-0 items-start gap-1.5">
+                  <Mark />
+                  <span className="min-w-0">{lateText}</span>
+                </p>
+              )}
               {general.map((p) => (
                 <p key={`${p.campo}-${p.motivo}`} className="m-0 flex min-w-0 items-start gap-1.5">
                   <Mark />

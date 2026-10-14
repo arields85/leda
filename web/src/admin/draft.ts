@@ -1,5 +1,6 @@
 import type { Task } from '../api';
-import type { Member, Options, Policy, Problem, Proposal, TaskInput, TextField, WaitableTask } from './api';
+import { shortDate } from '../format';
+import type { Member, Objective, Options, Policy, Problem, Proposal, TaskInput, TextField, WaitableTask } from './api';
 
 /** What the administrator is writing, before the idempotency key is added. `espera_id` is ''
  * while it waits for no task. */
@@ -121,6 +122,33 @@ const TOO_LONG_TEXT = {
   criterio: 'El criterio es demasiado largo: hasta 500 caracteres.',
 } as const;
 
+/** The user's decision 6 (2026-10-14; migration 0070): a task never falls due after its
+ * objective, when the objective has a date (the pack's first objectives have none). The objective
+ * it would fall due after, if any. */
+export function lateForObjective(draft: Draft, options: Options): Objective | undefined {
+  const objective = options.objetivos.find((o) => o.id === draft.objetivo_id);
+  return objective?.fecha_objetivo && draft.fecha && draft.fecha > objective.fecha_objetivo ? objective : undefined;
+}
+
+/** What Leda says when it stops such a task: the objective by its name and its day, and the way
+ * out. Asking the objective's referente to accept the delay comes with portion J6. */
+export function dueAfterObjectiveText(objective: Objective): string {
+  const day = objective.fecha_objetivo ? ` (${shortDate(objective.fecha_objetivo)})` : '';
+  return `Esta tarea vence después que «${objective.titulo}»${day}: el objetivo se demoraría. Para cargarla ahora, elegí una fecha hasta ese día.`;
+}
+
+/** The refusal of a late date (`fecha`, `vence_despues_del_objetivo`), as the server names it. */
+export const LATE_FOR_OBJECTIVE = 'vence_despues_del_objetivo';
+
+/** Whether a problem already shown stops holding once these fields changed: its own field, and
+ * the late date also when the objective changed (another objective, another day). */
+export function clearedBy(problem: Problem, touched: ReadonlySet<string>): boolean {
+  return (
+    touched.has(PROBLEM_FIELD[problem.campo] ?? '') ||
+    (problem.motivo === LATE_FOR_OBJECTIVE && touched.has('objetivo_id'))
+  );
+}
+
 /** What the form can already tell is missing or too long, before sending: the same `campo` and
  * `motivo` the server would answer. The server stays the judge of everything else (a day that
  * is not a working day, nobody to review, an area without an evidence policy). */
@@ -137,6 +165,8 @@ export function checkDraft(draft: Draft, options: Options): Problem[] {
   if (length(draft.descripcion) > LIMITS.descripcion) tooLong('descripcion');
   if (!draft.responsable_id) missing('responsable');
   if (!draft.fecha) missing('fecha');
+  const late = lateForObjective(draft, options);
+  if (late) problems.push({ campo: 'fecha', motivo: LATE_FOR_OBJECTIVE, texto: dueAfterObjectiveText(late) });
   if (length(draft.criterio) === 0) missing('criterio');
   else if (length(draft.criterio) > LIMITS.criterio) tooLong('criterio');
   const policy = policyOf(options, memberOf(options, draft.responsable_id));

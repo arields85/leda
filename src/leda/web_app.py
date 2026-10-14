@@ -772,7 +772,12 @@ TEXTOS_DE_LA_CARGA = {
     ("fecha", "no_es_dia_habil"): "Ese día no es hábil en este espacio.",
     ("fecha", "ya_cerro_el_dia"):
         "La jornada de hoy ya terminó en este espacio: elegí otro día.",
+    # Un aviso de antes de la 0070: una carga repetida devuelve los avisos que tuvo la primera vez.
     ("fecha", "despues_del_objetivo"): "La fecha es posterior a la del objetivo.",
+    # Decisión 6 del usuario (2026-10-14; migración 0070): con `hasta`, el día del objetivo.
+    ("fecha", "vence_despues_del_objetivo"):
+        "Esta tarea vence después que su objetivo: el objetivo se demoraría. Para cargarla ahora, "
+        "elegí una fecha hasta la del objetivo.",
     ("criterio", "falta"):
         "Falta el criterio de aceptación: qué tiene que pasar para darla por terminada.",
     ("criterio", "demasiado_largo"): "El criterio es demasiado largo: hasta 500 caracteres.",
@@ -820,7 +825,11 @@ def _con_texto(fila: dict[str, Any],
     if texto is None:
         texto = (TEXTO_DE_UN_DATO_MAL_FORMADO if motivo.startswith("mal_formad")
                  else TEXTOS_DE_LA_CARGA.get(("clave", "falta")))
-    return {"campo": campo, "motivo": motivo, "texto": texto}
+    con_texto = {"campo": campo, "motivo": motivo, "texto": texto}
+    # El día hasta el que puede vencer (migración 0070), para que la web lo diga con su nombre.
+    if isinstance(fila.get("hasta"), str):
+        con_texto["hasta"] = fila["hasta"]
+    return con_texto
 
 
 def _mal_formado(campo: str) -> dict[str, str]:
@@ -1421,7 +1430,8 @@ TEXTOS_DEL_OBJETIVO = {
     ("referente", "no_es_referente_de_un_area"):
         "El referente tiene que ser el referente de un área del equipo.",
     **{clave: texto for clave, texto in TEXTOS_DE_LA_CARGA.items()
-       if clave[0] == "fecha" and clave[1] != "despues_del_objetivo"},
+       if clave[0] == "fecha"
+       and clave[1] not in ("despues_del_objetivo", "vence_despues_del_objetivo")},
     ("clave", "falta"): TEXTOS_DE_LA_CARGA[("clave", "falta")],
     ("clave", "usada_con_otros_datos"):
         "Este envío ya creó otro objetivo. Recargá la página para crear uno nuevo.",

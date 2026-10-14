@@ -3,7 +3,8 @@ import { shortDate } from '../format';
 import { TaskCard } from '../components/TaskCard';
 import type { Options } from './api';
 import { dayLabel } from './DatePicker';
-import { type Draft, evidenceWords, memberOf, policyOf, previewTask, waitOf } from './draft';
+import { WARN } from './controls';
+import { type Draft, evidenceWords, lateForObjective, memberOf, policyOf, previewTask, waitOf } from './draft';
 import { FIELD_HINT, FIELD_TITLE, PREVIEW_VALUE } from './typography';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -33,10 +34,8 @@ export function TaskPreview({
   const objective = options.objetivos.find((o) => o.id === draft.objetivo_id);
   const decided = memberOf(options, draft.decidio_id);
   const wait = waitOf(options, draft.espera_id);
-  const late =
-    objective?.fecha_objetivo && draft.fecha && draft.fecha > objective.fecha_objetivo
-      ? objective.fecha_objetivo
-      : null;
+  // Decision 6 (2026-10-14): a task never falls due after its objective; it does not load so.
+  const late = lateForObjective(draft, options)?.fecha_objetivo ?? null;
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="text-body">
@@ -47,8 +46,8 @@ export function TaskPreview({
         <Row label="Fecha">
           {draft.fecha ? dayLabel(draft.fecha) : MISSING}
           {late && (
-            <span className={`block ${FIELD_HINT}`}>
-              Es posterior a la del objetivo ({shortDate(late)}): se avisa, no se bloquea.
+            <span className={`block font-bold ${FIELD_HINT} ${WARN}`}>
+              Vence después que su objetivo ({shortDate(late)}): así no se carga.
             </span>
           )}
         </Row>

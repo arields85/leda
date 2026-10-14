@@ -13,8 +13,10 @@ capa de garantías, en la base y en la entrada HTTP.
   o pasado; alguien que no es integrante activo; nadie que pueda revisarla (tampoco la autoridad
   final sin aprobador, que se revisaría a sí misma); quien la decidió, si no es integrante
   activo; un tipo de evidencia que la política del área no conoce.
-- **Lo que se avisa y no bloquea:** una fecha posterior a la de su objetivo; un responsable sin
-  Leda conectada.
+- **Lo que se avisa y no bloquea:** un responsable sin Leda conectada.
+- **Una tarea no vence después que su objetivo** (decisión 6 del usuario, 2026-10-14; migración
+  0070): si el objetivo tiene fecha, una tarea que vence después se rechaza, con el día hasta el
+  que puede vencer. Antes era un aviso que no bloqueaba.
 - **Lo que deja:** la tarea, su evento `asignada` (el estado sigue siendo la proyección) y una
   fila de auditoría en el espacio de la tarea con quién la cargó y quién la decidió (declarado
   por quien la carga, nunca una aprobación hecha en Leda), y las versiones del paquete y del
@@ -484,24 +486,47 @@ def test_un_espacio_que_no_existe_no_carga(conn, intake_world, sesion):
     _nada_cargado(conn)
 
 
-# --- Lo que se avisa y no bloquea -----------------------------------------------------------
+# --- Una tarea no vence después que su objetivo (decisión 6; migración 0070) ------------------
 
-def test_una_fecha_despues_de_la_del_objetivo_y_alguien_sin_conectar_se_avisan(
-        conn, intake_world, sesion):
-    norte = _norte(intake_world)
+def _fecha_del_objetivo(conn, objetivo: str, fecha: date | None) -> None:
     with admin(conn) as cur:
-        cur.execute("update objective set fecha_objetivo = %s where id = %s",
-                    (date(2026, 10, 15), norte["objectives"][0]))
+        cur.execute("update objective set fecha_objetivo = %s where id = %s", (fecha, objetivo))
+    conn.commit()
+
+
+def test_una_tarea_que_vence_despues_que_su_objetivo_no_se_carga(conn, intake_world, sesion):
+    """Decisión 6 del usuario (2026-10-14): "leda tiene que frenar esas cosas". El objetivo se
+    demoraría; la base lo rechaza y dice hasta qué día puede vencer."""
+    norte = _norte(intake_world)
+    _fecha_del_objetivo(conn, norte["objectives"][0], date(2026, 10, 15))
+    r = _cargar(conn, sesion, intake_world, fecha=VIERNES)
+    assert _errores(r) == {("fecha", "vence_despues_del_objetivo")}
+    (error,) = r["errores"]
+    assert error["hasta"] == "2026-10-15"
+    _nada_cargado(conn)
+
+
+def test_una_tarea_que_vence_el_dia_de_su_objetivo_se_carga(conn, intake_world, sesion):
+    norte = _norte(intake_world)
+    _fecha_del_objetivo(conn, norte["objectives"][0], VIERNES)
+    with admin(conn) as cur:
         cur.execute("update app_user set telegram_user_id = null where id = %s",
                     (norte["people"]["Sam North"]["app_user_id"],))
     conn.commit()
-    r = _cargar(conn, sesion, intake_world)
-    assert _avisos(r) == {("fecha", "despues_del_objetivo"), ("responsable", "sin_conectar")}
-    assert _contar(conn, "task") == 1
-    # La misma fecha que la del objetivo no se avisa; alguien conectado, tampoco.
-    r = _cargar(conn, sesion, intake_world, fecha=date(2026, 10, 15),
+    # El mismo día que el objetivo vale, y alguien sin Leda conectada se sigue avisando.
+    r = _cargar(conn, sesion, intake_world, fecha=VIERNES)
+    assert _avisos(r) == {("responsable", "sin_conectar")}
+    r = _cargar(conn, sesion, intake_world, fecha=HOY,
                 responsable=_persona(intake_world, "Sam Noble"))
     assert _avisos(r) == set()
+    assert _contar(conn, "task") == 2
+
+
+def test_un_objetivo_sin_fecha_no_pone_limite(conn, intake_world, sesion):
+    """Los objetivos iniciales del pack no tienen fecha: no limitan a sus tareas."""
+    norte = _norte(intake_world)
+    _fecha_del_objetivo(conn, norte["objectives"][0], None)
+    assert _cargar(conn, sesion, intake_world, fecha=date(2027, 3, 16))["ok"] is True
 
 
 # --- Una sola vez por clave -----------------------------------------------------------------
@@ -795,6 +820,34 @@ def test_cargar_por_la_api_devuelve_todo_lo_que_falta_y_los_avisos(web, conn, in
     (aviso,) = r.json()["avisos"]
     assert (aviso["campo"], aviso["motivo"]) == ("responsable", "sin_conectar")
     assert "no va a recibir avisos ni seguimiento" in aviso["texto"]
+
+
+TEXTO_VENCE_DESPUES_DEL_OBJETIVO = (
+    "Esta tarea vence después que su objetivo: el objetivo se demoraría. Para cargarla ahora, "
+    "elegí una fecha hasta la del objetivo.")
+
+
+def test_cargar_y_revisar_por_la_api_rechazan_una_tarea_que_vence_despues_que_su_objetivo(
+        web, conn, intake_world, administradora):
+    """Decisión 6: la carga y la revisión previa (J2-21) rechazan igual, con palabras y con el
+    día del objetivo, para que la web diga hasta cuándo puede vencer."""
+    norte = _norte(intake_world)
+    objetivo_hasta = _proximo_habil_real()
+    _fecha_del_objetivo(conn, norte["objectives"][0], objetivo_hasta)
+    camino = f"/app/admin/api/espacios/{norte['id']}/tareas"
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    tarde = _proximo_habil_real(14).isoformat()
+    for ruta in (camino, f"{camino}/revisar"):
+        r = navegador.post(ruta, json=_cuerpo(intake_world, fecha=tarde))
+        assert r.status_code == 422, (ruta, r.text)
+        (error,) = r.json()["errores"]
+        assert error == {"campo": "fecha", "motivo": "vence_despues_del_objetivo",
+                         "texto": TEXTO_VENCE_DESPUES_DEL_OBJETIVO,
+                         "hasta": objetivo_hasta.isoformat()}, ruta
+    assert _contar(conn, "task") == 0
+    # Ese mismo día, sí.
+    r = navegador.post(camino, json=_cuerpo(intake_world, fecha=objetivo_hasta.isoformat()))
+    assert r.status_code == 201, r.text
 
 
 def test_un_cuerpo_anidado_hasta_el_fondo_es_un_pedido_mal_formado_y_no_un_error(
