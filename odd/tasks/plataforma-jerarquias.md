@@ -756,6 +756,12 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       necesitaba la tarea. El criterio va en tercera persona y sin nombres: qué queda hecho y qué se entrega; el
       nombre está en "La hace". Con la misma unidad, la deuda del dictado: el plazo total de Gemini y avisar si la
       transcripción se cortó por el tope. Ruta: delegada, un escritor.
+      **Prueba en el celular de la J2b, la J2-24 y la J2-25** (2026-10-13, de noche): pasó. Usuario: "salió
+      perfecta, tanto la ortografía como el dictado; lo transcribe perfecto y muy rápido". Gemini aceptó el audio
+      del iPhone.
+- [ ] **J2-27 · Un gráfico del audio mientras se dicta** (usuario: "que vayan apareciendo un gráfico de audio o
+      algo más visual, además de la duración, como lo hacen las apps de mensajería"): barras que se mueven con la
+      voz, al lado de "grabando · 0:12 de 2:00". Con el escritor de la J2-26.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
