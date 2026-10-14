@@ -1131,8 +1131,14 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - **MA5. Fuera de Telegram, siempre el código por Telegram,** también en el navegador del celular. Es una
         sola puerta para todo lo que no es la Mini App. Adentro de Telegram, cada apertura vuelve a identificar a
         la persona, así que no hace falta un "Salir".
-      Con esto, las decisiones de la MA están completas. La primera pieza es la enmienda escrita a la decisión 4
-      del ADR 0022.
+      - **MA1c. El código pasa a ser un QR, como WhatsApp Web** (usuario, 2026-10-14: "el qr es mucho mejor").
+        La compu muestra un QR; se escanea con la cámara del celular y Telegram abre el chat de Leda con
+        "Entrar en la compu". No hay usuario ni código para tipear. En el navegador de un celular, fuera de
+        Telegram, aparece "Entrar con Telegram". La dirección es fija con la VPS; mientras dure el túnel, Leda
+        la pasa por chat si se le pide.
+      Con esto, las decisiones de la MA están completas. Su diseño escrito es el
+      [ADR 0024](../../docs/decisions/0024-entrar-con-telegram.md), propuesto el 2026-10-14 y a la espera de que
+      el usuario lo acepte.
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
       Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
       la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección
