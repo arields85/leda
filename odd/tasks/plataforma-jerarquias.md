@@ -969,7 +969,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - Lo da por cumplido el referente que lo pidió.
         - Cuando se cumple, quien espera se entera de que puede seguir.
       - **Revisadas una por una con el usuario (2026-10-14):**
-        - **D1, revisada. Lo que se necesita de otra área se pide de dos maneras.** Ejemplo: Martín (IT) necesita
+        - **D1, revisada (reemplazada por D14 más abajo: sólo se pide al referente).** Ejemplo: Martín (IT) necesita
           que alguien de OT cuelgue el módem para poder configurarlo.
           - **Pedir prestado** (Martín elige a la persona): carga la tarea para Nahuel. La tarea no arranca hasta
             que **Marcos, el referente de Nahuel, la aprueba**. Si aprueba, le llega a Nahuel; si rechaza, Martín se
@@ -1010,6 +1010,23 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
           - **Objetivo:** a Dirección, el enlace. A un referente, que los crea Dirección; desde la J6, que puede
             proponerle uno desde su web. A un integrante, lo mismo que con una tarea.
           - Lleva su conversación de prueba contra la IA real.
+        - **D13. Las tareas propias de Dirección:** Ismael puede cargarse tareas y las revisa él, con el
+          seguimiento de cualquier tarea. Es distinto de la secretaria del ROADMAP: un recordatorio no es una
+          tarea; aquélla es personal, por chat, a una hora, privada, y lleva su ADR.
+        - **D14 y la revisión final de D1 y D2. Lo de otra área se le pide a su referente** (usuario: "esto puede
+          traer conflictos"). No hay préstamo eligiendo a la persona.
+          1. Martín necesita que OT cuelgue el módem: carga "Colgar el módem en la pared" **para Marcos**.
+          2. Marcos decide quién la hace (Nahuel, otro de OT o él mismo).
+          3. Si Nahuel no llega, lo maneja Marcos, con la regla del pase de hoy. Martín no interviene.
+          4. **La revisa Marcos.** Cuando la aprueba, queda terminada y a Martín le llega el aviso.
+          5. **Martín puede pedir cambios** sobre la tarea terminada, con su motivo: se reabre y vuelve a Marcos,
+             que decide quién la retoma. La reabre sólo quien la pidió desde otra área, y queda auditado.
+          6. Cuando Marcos la vuelve a aprobar, a Martín le llega el aviso otra vez. La tarea de Martín puede
+             esperar a ésta.
+          - Así se van el préstamo directo y su aprobación; el primer circuito de aprobación vuelve a la J6. La
+            tarea es del área de quien la hace (OT, con su evidencia), y guarda quién la pidió.
+          - D11 cambia en consecuencia: si Martín nombra a alguien de otra área, la ayuda propone a su referente y
+            lo explica.
         - **Orden:** "> aceptar la demora" de Dirección espera a la J5; en la J4, la única salida es cambiar la
           fecha.
       Incluye (usuario, 2026-10-14): si alguien escribe por Telegram "quiero crear una tarea" (o un objetivo),
