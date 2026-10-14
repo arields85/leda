@@ -91,7 +91,6 @@ create table creacion_de_objetivo (
   clave         text not null,
   huella        text not null,
   objective_id  uuid not null,
-  creada_en     timestamptz not null default now(),
   constraint creacion_de_objetivo_clave_unica unique (workspace_id, clave),
   constraint creacion_de_objetivo_clave check (clave ~ '^[A-Za-z0-9_-]{16,128}$'),
   constraint creacion_de_objetivo_huella check (huella ~ '^[0-9a-f]{64}$'),
