@@ -1807,6 +1807,147 @@ def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
     return _json({"corregidos": corregidos, "sin_revisar": []})
 
 
+# --- El dictado, con Gemini (J2b) ---------------------------------------------------------------
+#
+# El navegador graba lo que la persona dicta en "Contame qué querés hacer" y manda el audio tal
+# cual, como cuerpo del pedido con su `Content-Type` (sin `multipart`: un solo archivo, sin otra
+# dependencia, y el tipo viaja en la cabecera). Los mismos tres pasos que la ayuda, para que el
+# candado de la web nunca espere a Gemini: la sesión y los nombres del espacio con el candado; sin
+# él, la llamada (`dictado.transcribir`); y la sesión revalidada, la auditoría y, si falló, el
+# incidente, con el candado otra vez y en el espacio. El audio no se guarda ni se registra: la
+# auditoría dice el tipo, el tramo de tamaño y si respondió, nunca el audio ni el texto.
+
+TEXTO_SIN_DICTADO = ("No pude pasar el audio a texto ahora. Probá de nuevo en un rato o "
+                     "escribilo acá.")
+TEXTO_NO_SE_ENTENDIO = "No te entendí; probá de nuevo o escribilo acá."
+
+
+async def _el_cuerpo_con_tope(request: Request, tope: int) -> bytes | None:
+    """El cuerpo del pedido, o `None` si pasa del tope (se deja de leer apenas pasa)."""
+    declarado = request.headers.get("content-length", "")
+    if declarado.isdigit() and int(declarado) > tope:
+        return None
+    partes = bytearray()
+    async for trozo in request.stream():
+        partes += trozo
+        if len(partes) > tope:
+            return None
+    return bytes(partes)
+
+
+@router.post("/admin/api/espacios/{espacio_id}/dictado")
+async def dictar_al_cargar(espacio_id: str, request: Request):
+    """Lo que la persona dictó, como texto: 200 con `texto`; 415 si no es audio de un tipo
+    admitido, 413 si pasa de 10 MB, 422 si no hay audio o no se entendió nada; 503 sin la clave de
+    Gemini y 502 si Gemini no respondió, los dos con un texto humano y un incidente."""
+    from . import dictado
+
+    if _de_otro_sitio(request):
+        return _json({"error": "origen_no_verificado"}, 403)
+    tipo = dictado.tipo_de_audio(request.headers.get("content-type"))
+    if tipo is None:
+        return _json({"error": "se_espera_audio"}, 415)
+    token = _token_de_administracion(request)
+    if token is None:
+        return _sin_sesion_de_administracion()
+    audio = await _el_cuerpo_con_tope(request, dictado.TAMANO_MAXIMO)
+    if audio is None:
+        return _json({"error": "demasiado_grande"}, 413)
+    espacio = _espacio_de(espacio_id)
+    preparado = await run_in_threadpool(_con_la_base, lambda conn: _preparar_el_dictado(
+        conn, token, espacio))
+    if isinstance(preparado, Response):
+        return preparado
+    if not audio:
+        return _json({"error": "no_se_entendio", "texto": TEXTO_NO_SE_ENTENDIO}, 422)
+    texto, falla = None, None
+    try:
+        texto = await run_in_threadpool(dictado.transcribir, audio, tipo, preparado["palabras"])
+    except Exception as e:  # noqa: BLE001 -- cualquier falla es que no se pudo pasar a texto
+        falla = e
+    tamano = len(audio)
+    del audio  # El audio no queda en ningún lado.
+    return await run_in_threadpool(_con_la_base, lambda conn: _cerrar_el_dictado(
+        conn, token, preparado, tipo, tamano, texto, falla))
+
+
+def _preparar_el_dictado(conn, token: str, espacio: str | None):
+    """Con el candado: la sesión y los nombres de ese espacio (`opciones_de_la_carga`, las mismas
+    del formulario), para que Gemini los escriba como están."""
+    from . import dictado
+
+    with sin_espacio(conn) as cur:
+        if _sesion_de_administracion(cur, token) is None:
+            return _sin_sesion_de_administracion()
+    if espacio is None:
+        return _espacio_que_no_existe()
+    ahora = _ahora(conn, espacio)
+    with sin_espacio(conn) as cur:
+        _con_la_version_del_nucleo(cur)
+        cur.execute("select opciones_de_la_carga(%s, %s, %s) as r",
+                    (_hash(token), espacio, ahora))
+        opciones = cur.fetchone()["r"]
+    rechazo = _sin_lo_que_rechaza_la_base(opciones)
+    if rechazo is not None:
+        return rechazo
+    return {"espacio": espacio, "palabras": dictado.palabras_del_espacio(opciones)}
+
+
+def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, tamano: int,
+                       texto: str | None, falla: BaseException | None) -> Response:
+    """Con el candado otra vez y en el espacio: la sesión revalidada (cortada mientras respondía
+    Gemini, no recibe el texto), la auditoría y, si no se pudo pasar a texto, el incidente, con la
+    causa saneada (el tipo de la falla y su motivo, nunca el audio, el texto ni la clave)."""
+    from . import dictado, versiones
+    from .db import espacio as en_el_espacio, registrar_auditoria
+    from .incidentes import ETAPA_DICTADO_AL_CARGAR, registrar_incidente
+
+    with sin_espacio(conn) as cur:
+        sesion = _sesion_de_administracion(cur, token)
+    if sesion is None:
+        return _sin_sesion_de_administracion()
+    ws = preparado["espacio"]
+    if falla is None:
+        resultado = "texto"
+    elif isinstance(falla, dictado.TranscripcionVacia):
+        resultado = "vacio"
+    elif isinstance(falla, dictado.SinClave):
+        resultado = "sin_clave"
+    else:
+        resultado = "sin_respuesta"
+    with en_el_espacio(conn, ws) as cur:
+        if resultado in ("sin_clave", "sin_respuesta"):
+            # Sólo el motivo saneado de las clases propias; de otra falla, sólo su tipo.
+            motivo = (f": {falla}" if isinstance(falla, (dictado.SinClave,
+                                                       dictado.ProveedorNoResponde)) else "")
+            registrar_incidente(
+                cur, ws,
+                "Un administrador dictó lo que quería cargar en la plataforma y el audio no se "
+                "pudo pasar a texto" + (": falta la clave de Gemini en el entorno del servidor."
+                                        if resultado == "sin_clave" else
+                                        ": Gemini no respondió.") +
+                " No se guardó el audio y la persona vio un aviso.",
+                severidad="baja", referencia_cruda=f"{type(falla).__name__}{motivo}",
+                etapa=ETAPA_DICTADO_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
+        registrar_auditoria(
+            cur, accion="dictar_al_cargar", workspace_id=ws,
+            actor_app_user_id=str(sesion["app_user_id"]), actor_kind="persona",
+            sujeto_tipo="workspace", sujeto_id=ws,
+            detalle={"origen": "web", "sesion_de_administracion_id": str(sesion["sesion_id"]),
+                     "proveedor": "gemini", "modelo": dictado.MODELO, "tipo": tipo,
+                     "tamano": dictado.tramo_de_tamano(tamano),
+                     "respondio": resultado in ("texto", "vacio"), "resultado": resultado,
+                     "caracteres": len(texto or "")},
+            pack_hash=versiones.pack_hash(cur, ws), nucleo_hash=versiones.nucleo_hash())
+    if resultado == "texto":
+        return _json({"texto": texto})
+    if resultado == "vacio":
+        return _json({"error": "no_se_entendio", "texto": TEXTO_NO_SE_ENTENDIO}, 422)
+    _imprimir(f"  ! no se pudo pasar un dictado a texto ({type(falla).__name__}).")
+    return _json({"error": "sin_dictado", "texto": TEXTO_SIN_DICTADO},
+                 503 if resultado == "sin_clave" else 502)
+
+
 # --- La web -----------------------------------------------------------------------------------
 
 def _no_existe() -> HTMLResponse:

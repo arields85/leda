@@ -124,6 +124,9 @@ ETAPA_ORTOGRAFIA_AL_CARGAR = "ortografia_al_cargar"
 # El criterio que no se revisó al cargar porque las opciones de la carga (de donde sale la evidencia
 # que pide el área) no se pudieron leer: no se lo juzga con la regla de otra (`review-88b227055a98f635`).
 ETAPA_EVIDENCIA_DEL_CRITERIO = "evidencia_del_criterio"
+# El dictado al cargar una tarea en la plataforma (J2b, `dictado.py`): sin la clave de Gemini, o
+# Gemini no respondió; el audio no se pasó a texto (ni se guardó) y la persona vio un aviso.
+ETAPA_DICTADO_AL_CARGAR = "dictado_al_cargar"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -505,6 +508,18 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica) y revisá la base "
                    "y las opciones de la carga del espacio. Si la tarea se cargó, mirá su "
                    "criterio y, si no dice qué tiene que quedar hecho, hablalo con {nombre}.")),
+    ETAPA_DICTADO_AL_CARGAR: ExplicacionDeEtapa(
+        titulo="Leda no pudo pasar un dictado a texto",
+        que_paso=("{nombre} dictó lo que quería cargar en la plataforma y el audio no se pudo "
+                  "pasar a texto: falta la clave de Gemini en el entorno del servidor, o Gemini "
+                  "no respondió (el plazo, el cupo, un formato de audio que no aceptó o una "
+                  "respuesta que no se pudo leer). El audio no se guardó."),
+        que_vio=("Que Leda no pudo pasar el audio a texto ahora, con lo que ya había escrito "
+                 "intacto; nada se cargó ni cambió."),
+        que_hacer=(f"{_BUSCAR_DETALLE} para ver la causa (la referencia técnica: el tipo de "
+                   "falla o el estado que devolvió Gemini) y revisá `LEDA_GEMINI_API_KEY` en el "
+                   "entorno del servidor. No hace falta avisarle a {nombre}: puede volver a "
+                   "dictar o escribirlo.")),
 }
 
 _EXPLICACION_GENERICA = ExplicacionDeEtapa(

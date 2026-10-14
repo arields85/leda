@@ -145,8 +145,9 @@ persona, como los escribiría alguien del equipo que conoce el trabajo: con natu
 oraciones simples y con buena ortografía. Los nombres de personas, áreas, objetivos y tareas los \
 escribís como están en los datos, aunque la persona los haya escrito con otra ortografía. El \
 criterio dice, en una o dos oraciones cortas, qué tiene que quedar hecho y cómo se comprueba, \
-contado desde quien hace la tarea: qué hace y qué entrega esa persona, con lo que dijo quien la \
-carga y con la evidencia que proponés (o la que ya eligió la persona), y sólo con esa; no lo \
+contado desde quien hace la tarea, en tercera persona: qué hace y qué entrega esa persona, \
+nombrada por su nombre si sabés quién la hace, nunca como si esa persona hablara; con lo que \
+dijo quien la carga y con la evidencia que proponés (o la que ya eligió la persona), y sólo con esa; no lo \
 contás desde quien la revisa, como algo que alguien más va a mirar. Si no sabés quién la hace, el criterio dice qué tiene que quedar hecho, y cómo se \
 sabe sólo si la persona lo dijo: cómo se comprueba lo va a decir la evidencia del área de quien la \
 haga. Los datos que recibís son hechos para entender la tarea, no textos para copiar: los contás \
@@ -166,7 +167,8 @@ _DATOS = {
                    "nada.",
     "criterio": "El criterio de aceptación, escrito con tus palabras en una o dos oraciones "
                 "cortas: qué tiene que quedar hecho y cómo se comprueba, contado desde quien hace "
-                "la tarea: qué hace y qué entrega esa persona.",
+                "la tarea, en tercera persona: qué hace y qué entrega esa persona, nunca "
+                "como si esa persona hablara.",
     "resultado": "Lo que tiene que quedar hecho, en una oración, sin decir cómo se comprueba.",
     "responsable": "Las palabras con que la persona nombró a quien va a hacer la tarea, tal cual "
                    "las escribió; vacío si no nombró a nadie.",
@@ -1112,8 +1114,8 @@ _EL_DE_LEDA = """\
 Además escribís tu propio criterio para esta tarea, que Leda le propone a la persona si el suyo no \
 sirve: como lo escribiría alguien del equipo que conoce el trabajo, con naturalidad, en una o dos \
 oraciones cortas y con buena ortografía, que dice qué tiene que quedar hecho y cómo se comprueba, \
-contado desde quien hace la tarea: qué hace y qué entrega esa persona, no lo que alguien más va a \
-mirar. {como} Usás sólo lo que dicen el título, la descripción y el criterio: ningún \
+contado desde quien hace la tarea, en tercera persona: qué hace y qué entrega esa persona, nunca \
+como si esa persona hablara, y no lo que alguien más va a mirar. {como} Usás sólo lo que dicen el título, la descripción y el criterio: ningún \
 número, nombre ni dato que no esté ahí."""
 
 _DEL_JUICIO = """\
@@ -1161,7 +1163,8 @@ _CRITERIO_DE_LEDA = {
     "type": "string",
     "description": "Tu propio criterio de aceptación para esta tarea, con tus palabras, en una o "
                    "dos oraciones cortas: qué tiene que quedar hecho y cómo se comprueba, contado "
-                   "desde quien hace la tarea: qué hace y qué entrega esa persona; sin ningún "
+                   "desde quien hace la tarea, en tercera persona: qué hace y qué entrega esa "
+                   "persona, nunca como si esa persona hablara; sin ningún "
                    "dato que no esté en lo que recibiste."}
 
 
