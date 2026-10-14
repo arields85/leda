@@ -311,7 +311,7 @@ def test_registrar_webhooks_le_da_a_cada_bot_su_direccion_y_su_secreto(webhook, 
     assert resultado == {slug: True for slug in TOKENS}
     pedidos = {p["url"].rsplit("/", 1)[-1]: p for metodo, p in telegram.llamadas}
     assert pedidos["north-lab"]["secret_token"] == entrada.secreto_del_bot("north-lab")
-    assert pedidos["admin"]["allowed_updates"] == ["message"]
+    assert pedidos["admin"]["allowed_updates"] == ["message", "callback_query"]
     assert pedidos["west-studio"]["allowed_updates"] == ["message", "callback_query"]
     assert len({p["secret_token"] for p in pedidos.values()}) == len(TOKENS)
 

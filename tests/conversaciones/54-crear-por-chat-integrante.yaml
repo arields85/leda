@@ -25,9 +25,9 @@ pasos:
       - {nombre: pedir_crear, que_quiere_crear: tarea}
     efectos: {}
     hechos:
-      - {jugada: pedir_crear, resultado: se_crea_en_la_web, que_quiere_crear: tarea,
-         puede_hacerlo_en_la_web: false, lo_hacen: [Marcos Tarquini, Ismael Soschinski],
-         pronto_podra_proponerlo: true, lleva_el_enlace_de_entrada_a_la_web: ausente}
+      - {jugada: pedir_crear, resultado: lo_crean_otros, que_quiere_crear: tarea,
+         lo_hacen: [Marcos Tarquini, Ismael Soschinski], pronto_podra_proponerlo: true,
+         lleva_el_boton: ausente}
     pregunta: null
     botones: []
     enlace: false
@@ -49,9 +49,9 @@ pasos:
       - {nombre: pedir_crear, que_quiere_crear: objetivo}
     efectos: {}
     hechos:
-      - {jugada: pedir_crear, resultado: se_crea_en_la_web, que_quiere_crear: objetivo,
-         puede_hacerlo_en_la_web: false, lo_hacen: [Marcos Tarquini, Ismael Soschinski],
-         pronto_podra_proponerlo: true, lleva_el_enlace_de_entrada_a_la_web: ausente}
+      - {jugada: pedir_crear, resultado: lo_crean_otros, que_quiere_crear: objetivo,
+         lo_hacen: [Marcos Tarquini, Ismael Soschinski], pronto_podra_proponerlo: true,
+         lleva_el_boton: ausente}
     pregunta: null
     botones: []
     enlace: false

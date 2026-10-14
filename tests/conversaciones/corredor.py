@@ -697,9 +697,11 @@ class _Corredor:
                     salidas.append(Salida(quien, "", [], False, el=cp.dia(self.reloj.ahora()),
                                           fotos=len(e.fotos), album_suelto=True))
                 continue
-            # El enlace a la página de la tarea y el de entrada a la web van al final de lo que se
-            # entregó, nunca en la salida: se compara sin ellos.
-            entregado, enlace, enlace_web = _sin_los_enlaces(e.texto)
+            # El enlace a la página de la tarea va al final de lo que se entregó, nunca en la
+            # salida: se compara sin él. El botón de la web (ADR 0024: abre la Mini App) va
+            # debajo, aparte de los botones de las opciones.
+            entregado, enlace, enlace_viejo = _sin_los_enlaces(e.texto)
+            enlace_web = enlace_viejo or any(getattr(b, "web_app", None) for b in e.botones)
             # El outbox guarda el texto con las marcas de formato de la IA y el transporte
             # entrega el texto plano (`salida.formatear`): se comparan ya convertidos.
             fila_id = next((k for k, s in despues["salidas"].items()
@@ -716,7 +718,8 @@ class _Corredor:
                 texto = entregado[:len(entregado) - len(plano)] + fila["cuerpo"]
             avisos, hechos = _avisos_del_envio(avisos_de.get(fila_id, []), self.mundo.titulos)
             tipos = sorted({a["tipo"] for a in avisos})
-            botones = [self._etiqueta(b.etiqueta) for b in e.botones]
+            botones = [self._etiqueta(b.etiqueta) for b in e.botones
+                       if not getattr(b, "web_app", None)]
             # Lo que sale de un aviso guardado es lo que Leda manda por su cuenta, aunque su fila
             # vaya como una respuesta: la pregunta que vuelve es parte de contestarle a la persona
             # (mecánica §10) y sale también fuera del horario (decisión 50).
@@ -825,19 +828,15 @@ class _Corredor:
 
 
 def comprobar_los_enlaces(c: cp.Comprobacion, s: Salida) -> None:
-    """Las garantías de los enlaces que el despachador agrega al final de un mensaje: el de la
-    página de una tarea (ADR 0019, decisión 6) y el de entrada a la web (ADR 0022, decisión 4; la
-    50). Cada uno sale sin vista previa, y ninguno está en lo que escribió la IA: la IA nunca ve
-    ni escribe una dirección."""
+    """Las garantías de lo que el despachador agrega a un mensaje: el enlace de la página de una
+    tarea (ADR 0019, decisión 6), que sale sin vista previa, y el botón de la web (ADR 0024; la
+    50). Ninguno está en lo que escribió la IA: la IA nunca ve ni escribe un enlace de entrada."""
     if s.enlace and not s.sin_vista_previa:
         c.falla(cp.GARANTIA, "el enlace a la página sale sin vista previa",
                 "sin vista previa", _resumen(s))
     if s.redactado is not None and CAMINO_DE_LA_TAREA in s.redactado:
         c.falla(cp.GARANTIA, "el enlace a la página no queda en la salida",
                 "sin el enlace", _resumen(s))
-    if s.enlace_web and not s.sin_vista_previa:
-        c.falla(cp.GARANTIA, "el enlace de entrada a la web sale sin vista previa",
-                "sin vista previa", _resumen(s))
     if s.redactado is not None and CAMINO_DE_LA_WEB in s.redactado:
         c.falla(cp.GARANTIA, "el enlace de entrada a la web no queda en la salida",
                 "sin el enlace", _resumen(s))

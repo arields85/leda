@@ -1,5 +1,10 @@
 # 53. Crear por chat: un referente
 
+**Enmienda (ADR 0024, 2026-10-14; prueba por Telegram de la J4):** en lugar del enlace, la respuesta
+del paso 1 lleva el botón "Cargar la tarea", que abre el formulario. En el paso 2, sólo que los
+objetivos los crea Dirección (Ismael), sin decir que por chat no se creó. El YAML es la versión
+vigente.
+
 **Qué prueba:** Marcos (referente de OT) quiere cargarle una tarea a Nahuel y, después, crear un
 objetivo. Una tarea la crea él en su web: la respuesta lleva su enlace de entrada al final. Un
 objetivo no: los crea Dirección, y Leda se lo dice nombrando a Ismael, sin enlace. Por chat no se

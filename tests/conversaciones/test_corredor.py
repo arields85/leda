@@ -68,9 +68,9 @@ def test_hay_cincuenta_conversaciones_y_cada_una_nombra_su_fuente():
     # a 60 (la administración retira una pieza), y la 47 desde la tercera porción de los apodos
     # (ADR 0020; decisión 65), y la 51 desde la T7 de las correcciones de la prueba por
     # Telegram (dejar una entrega sin terminar), y la 50 desde la A-1 del acceso a la web por chat
-    # (`odd/tasks/acceso-por-chat.md`).
+    # (`odd/tasks/acceso-por-chat.md`), y la 52 a la 54 desde la J4b (crear por chat).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 52) if n != 46]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 55) if n != 46]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]
@@ -828,9 +828,9 @@ def test_los_enlaces_del_final_se_sacan_de_lo_entregado_y_se_dice_cuales_eran():
     assert _sin_los_enlaces(f"{_DIRECCION}/app/entrar/b\nHola")[1:] == (False, False)
 
 
-def test_el_enlace_de_entrada_a_la_web_sale_sin_vista_previa_y_nunca_en_lo_que_escribio_la_ia():
-    """Las dos garantías del enlace de la página de una tarea valen también para el de entrada a
-    la web: sin vista previa, y la IA nunca escribe su dirección."""
+def test_el_enlace_de_entrada_nunca_esta_en_lo_que_escribio_la_ia():
+    """El botón de la web (ADR 0024) no es un enlace en el texto: no tiene vista previa que
+    apagar, y la IA nunca escribe un enlace de entrada."""
     from tests.conversaciones.corredor import Salida, comprobar_los_enlaces
 
     def fallas(**salida) -> list[tuple[str, str]]:
@@ -839,8 +839,7 @@ def test_el_enlace_de_entrada_a_la_web_sale_sin_vista_previa_y_nunca_en_lo_que_e
         return [(f.clase, f.que) for f in c.fallas]
 
     assert fallas(enlace_web=True, sin_vista_previa=True) == []
-    assert fallas(enlace_web=True, sin_vista_previa=False) == [
-        (cp.GARANTIA, "el enlace de entrada a la web sale sin vista previa")]
+    assert fallas(enlace_web=True, sin_vista_previa=False) == []
     assert fallas(enlace_web=False) == []
     c = cp.Comprobacion()
     comprobar_los_enlaces(c, Salida("Marcos", "Hola", [], True,

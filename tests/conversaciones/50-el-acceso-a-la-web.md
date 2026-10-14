@@ -1,5 +1,11 @@
 # 50. El acceso a la web
 
+**Enmienda (ADR 0024, 2026-10-14):** Leda ya no manda enlaces de entrada ni sugiere pedirlos. Donde
+este hilo dice "el enlace", la respuesta lleva el botón "Ver mis tareas", que abre la web como Mini
+App de Telegram (lo pone el código, no la IA); ningún enlace se emite ni se anula, y después del
+corte del paso 6 la persona vuelve a abrir la web desde el chat de Leda. El YAML es la versión
+vigente.
+
 **Qué prueba:** cada integrante recibe por chat su entrada a la plataforma web y la puede cortar si
 pierde el celular. Leda le ofrece el acceso, una sola vez y al final de su respuesta, a quien nunca
 entró; lo manda de nuevo a pedido, con el aviso de que sirve una vez y vence en 24 horas, y el

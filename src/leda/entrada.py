@@ -47,6 +47,7 @@ from fastapi.responses import HTMLResponse, Response
 
 from .config import config
 from .db import admin, conectar, espacio
+from .entrar_con_telegram import router as router_de_entrar
 from .web_app import router as router_de_la_web
 
 app = FastAPI(title="Leda", docs_url=None, redoc_url=None)
@@ -161,7 +162,7 @@ def atender_update(slug: str, update: dict[str, Any]) -> dict[str, bool]:
         except LookupError:
             raise HTTPException(status_code=404, detail="bot desconocido") from None
         if slug == "admin":
-            atender_admin(conn, update, _transporte_de(token), _imprimir)
+            atender_admin(conn, update, _transporte_de(token), _imprimir, senal=_senal(token))
             return {"ok": True}
         with admin(conn) as cur:
             cur.execute("select id from workspace where slug = %s and activo", (slug,))
@@ -435,6 +436,9 @@ def salud():
 
 
 app.include_router(router)
+# Entrar con Telegram (ADR 0024): la Mini App y el QR. Antes que la web, cuya última ruta toma
+# cualquier página bajo `/app`.
+app.include_router(router_de_entrar)
 # La plataforma web (ADR 0022): su API interna, del mismo origen que la página de la tarea.
 app.include_router(router_de_la_web)
 
@@ -457,7 +461,8 @@ def registrar_webhooks(cliente=None) -> dict[str, bool]:
         r = pedido_telegram(
             cliente.post, f"https://api.telegram.org/bot{token}/setWebhook",
             json={"url": f"{base}/telegram/{slug}", "secret_token": secreto_del_bot(slug),
-                  "allowed_updates": (["message"] if slug == "admin"
-                                      else ["message", "callback_query"])})
+                  # El bot de administración también recibe toques: "Entrar en la compu"
+                  # (ADR 0024, decisión 8).
+                  "allowed_updates": ["message", "callback_query"]})
         resultado[slug] = r.status_code == 200 and bool(r.json().get("ok", False))
     return resultado

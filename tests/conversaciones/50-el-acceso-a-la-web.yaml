@@ -36,9 +36,9 @@ tareas:
     desde: "2026-10-19"
 
 # El ofrecimiento (decisión 2 del usuario) no es una jugada: es un hecho que la cocina suma al
-# final del turno, con la marca del enlace, si la persona nunca entró ni se le ofreció. El enlace
-# de entrada a la web lo emite el despachador al mandar (`enlaces_de_entrada`) y lo agrega al
-# final, sin vista previa (`enlace_web`); la IA nunca lo ve ni lo escribe.
+# final del turno, con la marca del botón, si la persona nunca entró ni se le ofreció. Desde el ADR
+# 0024, el despachador pone el botón "Ver mis tareas", que abre la web como Mini App de Telegram
+# (`enlace_web`): ningún enlace de entrada se emite ni se escribe.
 pasos:
   - paso: 1
     quien: Marcos
@@ -46,16 +46,14 @@ pasos:
     escribe: "que tengo pendiente?"
     jugadas:
       - {nombre: consultar_pendientes}
-    efectos:
-      enlaces_de_entrada: [{de: Marcos}]
+    efectos: {}
     hechos:
       - jugada: consultar_pendientes
         resultado: leido
         tareas:
           - {titulo: PLC, estado: asignada, vence: "2026-10-26"}
           - {titulo: COM, estado: en_curso, vence: "2026-10-30"}
-      - {ofrecimiento: acceso_a_la_web, lleva_el_enlace_de_entrada_a_la_web: true,
-         sirve_una_sola_vez: true, vence_a_las_24_horas: true}
+      - {ofrecimiento: acceso_a_la_web, lleva_el_boton: Ver mis tareas}
     pregunta: null
     botones: []
     enlace: false
@@ -64,10 +62,11 @@ pasos:
       pregunta_abierta: null
     dice:
       - "sus dos tareas: la del PLC sin empezar, que vence el lun 26/10; la de comunicaciones en curso, que vence el vie 30/10"
-      - al final, que ahora también puede ver sus tareas en la web, que ahí va el enlace, que sirve una vez y vence en 24 horas, y que si no lo usa le pida otro
+      - al final, que ahora también puede ver sus tareas en la web, tocando «Ver mis tareas»
     no_dice:
       - tareas de otras personas
-      - una dirección o un enlace escrito por la IA
+      - un enlace, o que pida uno
+      - una dirección escrita por la IA
 
   # Ya se le ofreció: no se vuelve a ofrecer.
   - paso: 2
@@ -114,21 +113,17 @@ pasos:
       - el acceso a la web
       - tareas de otras personas
 
-  # Un enlace nuevo a pedido: el del paso 1, sin usar, deja de servir (`emitir_enlace_de_entrada`
-  # lo anula al emitir el nuevo).
+  # A pedido, el botón otra vez (ADR 0024, decisión 1: Leda nunca manda ni hace pedir un enlace).
   - paso: 4
     quien: Marcos
     a_las: "2026-10-20 10:30"
     escribe: "no me anda el link de la web, pasame otro"
     jugadas:
       - {nombre: pedir_acceso_web}
-    efectos:
-      enlaces_de_entrada: [{de: Marcos}]
-      enlaces_anulados: [{de: Marcos}]
+    efectos: {}
     hechos:
-      - {jugada: pedir_acceso_web, resultado: enlace_nuevo,
-         lleva_el_enlace_de_entrada_a_la_web: true, sirve_una_sola_vez: true,
-         vence_a_las_24_horas: true, el_anterior_ya_no_sirve: true}
+      - {jugada: pedir_acceso_web, resultado: boton_para_abrir_la_web,
+         lleva_el_boton: Ver mis tareas}
     pregunta: null
     botones: []
     enlace: false
@@ -136,12 +131,11 @@ pasos:
     estado_despues:
       pregunta_abierta: null
     dice:
-      - que ahí va el enlace nuevo, que sirve una vez y vence en 24 horas
-      - que el anterior ya no sirve
+      - que toque «Ver mis tareas» y la web se abre ahí mismo, en Telegram
     no_dice:
-      - que el enlace anterior tenía un problema técnico
-      - cómo funciona el enlace por dentro
-      - una dirección o un enlace escrito por la IA
+      - un enlace nuevo, o que pida otro
+      - cómo funciona por dentro
+      - una dirección escrita por la IA
 
   # Una charla, no un aviso: no corta nada (el enlace del paso 4 sigue sirviendo).
   - paso: 5
@@ -163,19 +157,18 @@ pasos:
       - que le cortó el acceso a la web
       - el acceso a la web otra vez
 
-  # Corta enseguida, sin confirmación (decisión 3 del usuario): no tiene ninguna sesión abierta,
-  # así que se anula su enlace sin usar, el del paso 4. La sesión de Ariel no se toca.
+  # Corta enseguida, sin confirmación (decisión 3 del usuario): no tiene ninguna sesión abierta, y
+  # el corte vale igual. La sesión de Ariel no se toca.
   - paso: 6
     quien: Marcos
     a_las: "2026-10-20 10:50"
     escribe: "perdi el celular"
     jugadas:
       - {nombre: perdi_el_celular}
-    efectos:
-      enlaces_anulados: [{de: Marcos}]
+    efectos: {}
     hechos:
       - {jugada: perdi_el_celular, resultado: acceso_cortado, sesiones_cortadas: 0,
-         recuerda_cerrar_telegram_en_ese_celular: true, puede_pedir_otro_enlace: true}
+         recuerda_cerrar_telegram_en_ese_celular: true, vuelve_a_entrar_desde_telegram: true}
     pregunta: null
     botones: []
     enlace: false
@@ -185,7 +178,7 @@ pasos:
     dice:
       - que le cortó el acceso a la web
       - que cierre Telegram en ese celular desde otro dispositivo, en Ajustes → Dispositivos
-      - que pida un enlace nuevo cuando tenga otro celular
+      - que con otro celular vuelve a abrir la web desde el chat de Leda
     no_dice:
       - una confirmación o una pregunta antes de cortar
       - el motivo con su código

@@ -1,5 +1,10 @@
 # 52. Crear por chat: Dirección
 
+**Enmienda (ADR 0024, 2026-10-14; prueba por Telegram de la J4):** en lugar del enlace, la respuesta
+lleva el botón que abre el formulario: "Cargar la tarea" (paso 1) y "Crear el objetivo" (paso 2).
+Los hechos son los mínimos: que lo crea él y el botón; la respuesta no dice que "por chat no se
+creó", que nadie creía. El YAML es la versión vigente.
+
 **Qué prueba:** Ismael (Dirección) escribe que quiere crear una tarea y, más tarde, un objetivo. Por
 chat no se crea nada: Leda le dice, con sus palabras, que eso se hace en su web, y la respuesta lleva
 al final su enlace de entrada (uno por mensaje, como el de `pedir_acceso_web`). El segundo enlace

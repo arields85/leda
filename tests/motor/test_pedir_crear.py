@@ -4,11 +4,12 @@ decisión 1: una jugada de la lista cerrada, que la IA elige por su definición)
 
 Nada se crea por chat. La cocina dice, según quién es la persona y qué quiere crear:
 
-- **Una tarea:** a Dirección y a un referente, que la crea en su web, con el enlace de entrada al
-  final (la mecánica de `pedir_acceso_web`, uno por mensaje); a un integrante, sin enlace, quiénes
-  las cargan (su referente y Dirección) y que pronto podrá proponerlas.
-- **Un objetivo:** a Dirección, el enlace; a un referente, que los crea Dirección; a un integrante,
-  lo mismo que con una tarea.
+- **Una tarea:** a Dirección y a un referente, que la crean ellos, con el botón "Cargar la tarea"
+  que abre el formulario (ADR 0024, decisión 2; la mecánica de `pedir_acceso_web`, uno por
+  mensaje); a un integrante, sin botón, quiénes las cargan (su referente y Dirección) y que pronto
+  podrá proponerlas.
+- **Un objetivo:** a Dirección, "Crear el objetivo"; a un referente, que los crea Dirección; a un
+  integrante, lo mismo que con una tarea.
 - Ya no es algo "fuera de la lista": no deja el incidente de una jugada que falta.
 """
 
@@ -26,10 +27,6 @@ from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import procesar_turno
 
 from tests.motor.ayudantes import AHORA, cuantas, todos, ya_ofrecida_la_web
-
-ENLACE = {"lleva_el_enlace_de_entrada_a_la_web": True, "sirve_una_sola_vez": True,
-          "vence_a_las_24_horas": True}
-
 
 @pytest.fixture
 def equipo(conn, mundo) -> dict:
@@ -74,8 +71,10 @@ def _pide(conn, escribe, nombre: str, que: str | None) -> tuple[dict, list[dict]
     conn.commit()
     assert resultado.error is None
     [hecho] = resultado.hechos
-    marcas = todos(conn, """select w.membership_id::text persona from message_outbox_entrada_web w
-                             join message_outbox o on o.id = w.outbox_id where o.es_respuesta""")
+    marcas = todos(conn, """select w.membership_id::text persona, w.destino
+                              from message_outbox_entrada_web w
+                              join message_outbox o on o.id = w.outbox_id
+                             where o.es_respuesta order by o.programado_para""")
     return hecho, marcas
 
 
@@ -87,13 +86,16 @@ def test_es_una_jugada_de_la_lista_cerrada_sin_tarea_que_no_se_ofrece():
 
 
 @pytest.mark.usefixtures("con_la_web")
-def test_direccion_crea_tareas_y_objetivos_en_su_web(conn, equipo, escribe):
-    for que in ("tarea", "objetivo"):
+def test_direccion_crea_tareas_y_objetivos_con_el_boton_del_formulario(conn, equipo, escribe):
+    """ADR 0024, decisión 2: "Cargar la tarea" y "Crear el objetivo" abren el formulario. Los
+    hechos son los mínimos: que lo puede crear y el botón; nada de "por chat no se creó"."""
+    for que, boton, destino in (("tarea", "Cargar la tarea", "cargar_tarea"),
+                                ("objetivo", "Crear el objetivo", "crear_objetivo")):
         hecho, marcas = _pide(conn, escribe, "Ismael", que)
-        assert hecho == {"jugada": "pedir_crear", "resultado": "se_crea_en_la_web",
-                         "que_quiere_crear": que, "puede_hacerlo_en_la_web": True, **ENLACE,
-                         "el_anterior_ya_no_sirve": False}
-    assert [m["persona"] for m in marcas] == [equipo["personas"]["Ismael"]["membership_id"]] * 2
+        assert hecho == {"jugada": "pedir_crear", "resultado": "lo_puede_crear",
+                         "que_quiere_crear": que, "lleva_el_boton": boton}
+        assert {"persona": equipo["personas"]["Ismael"]["membership_id"],
+                "destino": destino} in marcas
     # Ya no es algo fuera de la lista.
     assert cuantas(conn, "incident") == 0
 
@@ -101,30 +103,40 @@ def test_direccion_crea_tareas_y_objetivos_en_su_web(conn, equipo, escribe):
 @pytest.mark.usefixtures("con_la_web")
 def test_un_referente_crea_tareas_y_los_objetivos_los_crea_direccion(conn, equipo, escribe):
     hecho, marcas = _pide(conn, escribe, "Marcos", "tarea")
-    assert hecho["puede_hacerlo_en_la_web"] is True and hecho["sirve_una_sola_vez"] is True
+    assert (hecho["resultado"], hecho["lleva_el_boton"]) == ("lo_puede_crear", "Cargar la tarea")
     assert len(marcas) == 1
     hecho, marcas = _pide(conn, escribe, "Marcos", "objetivo")
-    assert hecho == {"jugada": "pedir_crear", "resultado": "se_crea_en_la_web",
-                     "que_quiere_crear": "objetivo", "puede_hacerlo_en_la_web": False,
-                     "lo_hacen": ["Ismael"]}
-    assert len(marcas) == 1, "el pedido de un objetivo no lleva enlace"
+    assert hecho == {"jugada": "pedir_crear", "resultado": "lo_crean_otros",
+                     "que_quiere_crear": "objetivo", "lo_hacen": ["Ismael"]}
+    assert len(marcas) == 1, "el pedido de un objetivo no lleva botón"
 
 
 @pytest.mark.usefixtures("con_la_web")
-def test_un_integrante_no_recibe_enlace_y_sabe_quien_las_carga(conn, equipo, escribe):
+def test_un_integrante_no_recibe_boton_y_sabe_quien_las_carga(conn, equipo, escribe):
     for que in ("tarea", "objetivo"):
         hecho, marcas = _pide(conn, escribe, "Nahuel", que)
-        assert hecho == {"jugada": "pedir_crear", "resultado": "se_crea_en_la_web",
-                         "que_quiere_crear": que, "puede_hacerlo_en_la_web": False,
-                         "lo_hacen": ["Marcos", "Ismael"], "pronto_podra_proponerlo": True}
+        assert hecho == {"jugada": "pedir_crear", "resultado": "lo_crean_otros",
+                         "que_quiere_crear": que, "lo_hacen": ["Marcos", "Ismael"],
+                         "pronto_podra_proponerlo": True}
         assert marcas == []
 
 
-def test_sin_la_direccion_publica_ningun_enlace_se_promete(conn, equipo, escribe):
+def test_sin_la_direccion_publica_ningun_boton_se_promete(conn, equipo, escribe):
     hecho, marcas = _pide(conn, escribe, "Ismael", "tarea")
-    assert hecho["puede_hacerlo_en_la_web"] is True
-    assert hecho["el_enlace_no_va"] == "la_pagina_no_esta_disponible"
-    assert "lleva_el_enlace_de_entrada_a_la_web" not in hecho and marcas == []
+    assert hecho["resultado"] == "lo_puede_crear"
+    assert hecho["el_boton_no_va"] == "la_pagina_no_esta_disponible"
+    assert "lleva_el_boton" not in hecho and marcas == []
+
+
+def test_los_hechos_no_dicen_lo_que_nadie_creia():
+    """Prueba por Telegram del 2026-10-14: "por chat no se creó" era un hecho de la cocina que
+    se colaba. Ningún significado de esta jugada lo dice."""
+    from leda.motor import hechos as hechos_mod
+
+    for codigo in ("pedir_crear", "lo_puede_crear", "lo_crean_otros", "lo_hacen",
+                   "que_quiere_crear", "el_boton_no_va"):
+        texto = hechos_mod.significado(codigo)
+        assert texto and "por chat" not in texto and "no se creó" not in texto, codigo
 
 
 def test_sin_decir_que_quiere_crear_falta_el_dato(conn, equipo, escribe):

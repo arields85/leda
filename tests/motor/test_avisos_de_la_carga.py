@@ -112,26 +112,36 @@ def test_las_tareas_cargadas_seguidas_van_en_un_mensaje_despues_de_la_ultima(con
                          "objetivo": "Reduce service delay 1", "la_cargo": "Taylor Quinn 1",
                          "la_revisa": "Taylor Quinn 1"}
     # Sin la dirección pública, ningún enlace se promete.
-    assert "lleva_el_enlace_de_entrada_a_la_web" not in hecho
+    assert "lleva_el_boton" not in hecho
     salida = uno(conn, "select * from message_outbox where not es_respuesta")
     assert salida["es_coordinacion"] is True and salida["tipo"] == "informativo"
 
 
-def test_con_la_direccion_publica_lleva_el_enlace_de_entrada_a_su_web(conn, equipo, monkeypatch):
+def test_con_la_direccion_publica_lleva_el_boton_que_abre_la_tarea(conn, equipo, monkeypatch):
+    """ADR 0024, decisión 2: el aviso de una tarea lleva "Ver la tarea", que abre esa tarea (no la
+    página principal); el de varias, "Ver mis tareas"."""
     import dataclasses
 
     from leda import config as config_mod
 
     monkeypatch.setattr(config_mod, "config",
                         dataclasses.replace(config_mod.config, base_url="https://leda.example"))
-    _cargar(conn, equipo, "Taylor Quinn")
+    tarea = _cargar(conn, equipo, "Taylor Quinn")
     [hecho] = _hechos(_enviar(conn, equipo, AHORA + timedelta(minutes=11)), "Sam North")
-    assert hecho["lleva_el_enlace_de_entrada_a_la_web"] is True
+    assert hecho["lleva_el_boton"] == "Ver la tarea"
     salida = uno(conn, "select id from message_outbox where not es_respuesta")
     marca = uno(conn, "select * from message_outbox_entrada_web where outbox_id = %s",
                 salida["id"])
     assert str(marca["membership_id"]) == _id(equipo, "Sam North")
-    assert marca["es_ofrecimiento"] is False
+    assert (marca["es_ofrecimiento"], marca["destino"], str(marca["task_id"])) == (
+        False, "tarea", tarea)
+
+    _cargar(conn, equipo, "Taylor Quinn", at=AHORA + timedelta(hours=1), titulo="Probar el módem")
+    _cargar(conn, equipo, "Taylor Quinn", at=AHORA + timedelta(hours=1, minutes=1),
+            titulo="Medir la señal")
+    [hecho] = _hechos(_enviar(conn, equipo, AHORA + timedelta(hours=2)), "Sam North")
+    assert len(hecho["tareas_que_le_cargaron"]) == 2
+    assert hecho["lleva_el_boton"] == "Ver mis tareas"
 
 
 def test_fuera_del_horario_sale_al_empezar_el_siguiente(conn, equipo):

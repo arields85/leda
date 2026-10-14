@@ -1,5 +1,8 @@
 # 54. Crear por chat: un integrante
 
+**Enmienda (ADR 0024, 2026-10-14):** a un integrante no le sale ningún botón para crear; la
+respuesta dice quiénes las cargan, sin decir que por chat no se creó. El YAML es la versión vigente.
+
 **Qué prueba:** Nahuel (de OT, no es referente) quiere crear una tarea y después un objetivo. No
 puede crear ninguno de los dos: Leda le dice, sin enlace, que las tareas las cargan su referente
 (Marcos) o Dirección (Ismael), y que pronto podrá proponerlas desde su web; con un objetivo, lo

@@ -201,6 +201,19 @@ avisos de la decisión 7 y el de "sin conectar" al referente son del motor.
 | La evidencia marcada al elegir a la persona | La que pide la política de su área; se pueden sumar los demás tipos que el área conoce | Cambiar de persona vuelve a marcar la de su área |
 | Los meses del calendario | Del mes de hoy al del último día hábil que ofrecen las opciones (seis meses) | |
 
+## La entrada con Telegram (ADR 0024, 2026-10-14)
+
+| Qué | Hoy | Dónde vive |
+|---|---|---|
+| Cuánto queda recordada una computadora que entró por el QR, por espacio: 1, 7, 30 o 90 días, o sin vencimiento | Sin vencimiento para todos; lo cambia la administración desde su web | `workspace_setting` (`sesion_en_la_compu_dias`), `fijar_sesion_en_la_compu` (migración `0073`) |
+| Cuánto dura la sesión de la Mini App (se abre otra en cada apertura) | 24 horas | `sesion_vigente` y `sesion_de_administracion_vigente` (migración `0073`) |
+| Cuánto vale la firma de Telegram (`auth_date`) | 10 minutos, una sola vez | `entrar_con_telegram.VIGENCIA_DE_LA_FIRMA_S` |
+| Cuánto vale un pedido de entrada por QR | 5 minutos, una sola vez; hasta 30 pendientes por puerta y espacio | `pedir_entrada_por_qr` (migración `0073`) |
+| Cuánto queda recordada una computadora en la puerta de administración | Sin vencimiento (no es de un espacio) | `PENDIENTE` de decisión |
+| La zona horaria con que el bot de administración dice la hora de un pedido | Buenos Aires | `motor/bot_entrar.ZONA_DE_LA_ADMINISTRACION` |
+| El usuario público del bot de administración, para el QR | `LEDA_BOT_USUARIO_ADMIN` o, sin ella, el que contesta `getMe` | `entrar_con_telegram.usuario_del_bot_de_administracion` |
+| El botón fijo del menú del bot ("Tareas") | Espera a la VPS (dirección fija) | ADR 0024, decisión 2 |
+
 ## Decisiones abiertas que la plataforma va a necesitar
 
 - Cómo se autentica quien opera Leda.

@@ -203,6 +203,11 @@ class Escucha(Recepcion):
     def _senal(self, callback_query_id: str) -> None:
         self.bot.llamar("answerCallbackQuery", callback_query_id=callback_query_id)
 
+    def _senal_admin(self, callback_query_id: str) -> None:
+        """El acuse de un toque en el bot de administración ("Entrar en la compu")."""
+        if self.bot_admin is not None:
+            self.bot_admin.llamar("answerCallbackQuery", callback_query_id=callback_query_id)
+
     # -- el bot de administración --------------------------------------------------------
 
     def recibir_admin(self) -> int:
@@ -210,14 +215,15 @@ class Escucha(Recepcion):
             return 0
         try:
             updates = self.bot_admin.llamar("getUpdates", offset=self.offset_admin, timeout=0,
-                                            allowed_updates=["message"])
+                                            allowed_updates=["message", "callback_query"])
         except Exception as e:  # noqa: BLE001
             self.imprimir(f"  (sin conexión con el bot de administración: "
                           f"{texto_error_seguro(e)})")
             return 0
         for u in updates:
             self.offset_admin = u["update_id"] + 1
-            atender_admin(self.conn, u, self.transporte_admin, self.imprimir)
+            atender_admin(self.conn, u, self.transporte_admin, self.imprimir,
+                          senal=self._senal_admin)
         return len(updates)
 
     # -- lo que sale ---------------------------------------------------------------------

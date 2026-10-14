@@ -108,7 +108,11 @@ TABLAS_DE_CONFIGURACION = ("work_calendar", "holiday", "persona_config",
 # puerta de administración (migración 0061), igual: no tienen espacio (un administrador abarca
 # todos) ni política.
 TABLAS_DE_LA_ADMINISTRACION = ("admin_notice", "admin_notice_enlace",
-                               "enlace_de_administracion", "sesion_de_administracion")
+                               "enlace_de_administracion", "sesion_de_administracion",
+                               # La entrada con Telegram (migración 0073; ADR 0024): la huella de
+                               # cada firma y el pedido de entrada del QR, sin política (sólo sus
+                               # funciones las tocan).
+                               "firma_de_telegram", "pedido_de_entrada")
 
 # Las políticas de más de una tabla, además de la de aislamiento: `acceso_tarea` (migración
 # 0036) se encuentra por el hash del token antes de saber su espacio, sólo desde las funciones
@@ -851,7 +855,11 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # también (antes, la 0069, que deja las funciones de los objetivos como las dejó la
             # 0068; y antes aún la 0070, que deja la carga de una tarea como la dejó la 0067; y
             # antes que todas la 0071, cuyas columnas de la tarea y cuya reapertura también apuntan
-            # ahí; antes aún, la 0072, que deja quién revisa como la dejó la 0071).
+            # ahí; antes aún, la 0072, que deja quién revisa como la dejó la 0071; y antes de todas,
+            # la 0073, cuya marca del botón de la web apunta a la tarea y cuyo pedido de entrada,
+            # a la membresía).
+            (rollback_0073,) = (ROOT / "db" / "rollbacks").glob("0073_*.sql")
+            db.execute(_sql_script(rollback_0073))
             (rollback_0072,) = (ROOT / "db" / "rollbacks").glob("0072_*.sql")
             db.execute(_sql_script(rollback_0072))
             (rollback_0071,) = (ROOT / "db" / "rollbacks").glob("0071_*.sql")

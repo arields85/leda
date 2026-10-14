@@ -38,8 +38,13 @@ from tests.motor.ayudantes import (AHORA, TelegramFalso, mensaje_de_telegram,
 DIRECCION = "https://leda.invalid/"
 ENLACE_WEB = re.compile(r"\nhttps://leda\.invalid/app/entrar/([A-Za-z0-9_-]{43})$")
 
-OFRECIMIENTO = {"ofrecimiento": "acceso_a_la_web", "lleva_el_enlace_de_entrada_a_la_web": True,
-                "sirve_una_sola_vez": True, "vence_a_las_24_horas": True}
+OFRECIMIENTO = {"ofrecimiento": "acceso_a_la_web", "lleva_el_boton": "Ver mis tareas"}
+MINI_APP = "https://leda.invalid/app/e/prueba/"
+
+
+def _boton_de_la_web(mensaje):
+    """El botón que abre la web como Mini App (ADR 0024), o `None`."""
+    return next((b for b in mensaje.botones if b.web_app), None)
 
 
 @pytest.fixture
@@ -144,10 +149,11 @@ def test_la_primera_respuesta_a_lo_que_escribe_lleva_el_ofrecimiento_al_final(co
     assert _marcas(conn) == [{"persona": _membresia(mundo), "es_ofrecimiento": True,
                               "estado": "listo"}]
     [mensaje] = _despachar(conn, mundo).enviados
-    encontrado = ENLACE_WEB.search(mensaje.texto)
-    assert encontrado and mensaje.sin_vista_previa
+    boton = _boton_de_la_web(mensaje)
+    assert (boton.etiqueta, boton.web_app) == ("Ver mis tareas", MINI_APP)
+    assert not ENLACE_WEB.search(mensaje.texto)
     assert _ofrecimiento(conn, mundo)["ofrecido_en"] is not None
-    assert _canjear(conn, encontrado.group(1)) is not None
+    assert todos(conn, "select 1 from enlace_de_entrada") == []
 
 
 def test_no_se_ofrece_dos_veces(conn, mundo, escribe, nunca):
@@ -163,7 +169,7 @@ def test_no_se_ofrece_dos_veces(conn, mundo, escribe, nunca):
 
 def test_ni_aunque_la_misma_respuesta_se_despache_dos_veces(conn, mundo, escribe, nunca):
     """El mismo mensaje que vuelve a llegar no tiene otro turno, y una segunda pasada del
-    despachador no lo vuelve a mandar: un solo enlace emitido."""
+    despachador no lo vuelve a mandar: un solo botón."""
     quien, entrante = escribe("Marcos", "que tengo pendiente?")
     for _ in range(2):
         procesar_turno(conn, quien, entrante,
@@ -172,7 +178,6 @@ def test_ni_aunque_la_misma_respuesta_se_despache_dos_veces(conn, mundo, escribe
         conn.commit()
     assert len(_despachar(conn, mundo).enviados) == 1
     assert _despachar(conn, mundo).enviados == []
-    assert len(todos(conn, "select 1 from enlace_de_entrada")) == 1
     assert len(_marcas(conn)) == 1
 
 
@@ -212,10 +217,10 @@ def test_con_el_enlace_de_una_tarea_espera_al_turno_siguiente(conn, mundo, escri
 
 def test_quien_pide_el_enlace_ya_lo_recibio_y_no_se_le_ofrece_despues(conn, mundo, escribe,
                                                                        nunca):
-    """Si el ofrecimiento saliera después, su enlace anularía el que pidió."""
+    """Ya tiene el botón: el ofrecimiento sería repetirlo."""
     hechos, _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
-    assert [h["resultado"] for h in hechos] == ["enlace_nuevo"]
-    # Mientras su enlace no salió, tampoco.
+    assert [h["resultado"] for h in hechos] == ["boton_para_abrir_la_web"]
+    # Mientras su botón no salió, tampoco.
     hechos, _ = _dice(conn, escribe)
     assert hechos == []
     _despachar(conn, mundo)
@@ -252,7 +257,6 @@ def test_un_envio_que_se_reintenta_guarda_la_reserva(conn, mundo, escribe, nunca
     _despachar(conn, mundo, TransporteDePrueba(falla_en={_telegram(mundo)}))
     reserva = _ofrecimiento(conn, mundo)
     assert reserva["reservado_en"] is not None and reserva["ofrecido_en"] is None
-    assert todos(conn, "select 1 from enlace_de_entrada") == []   # el token volvió atrás
     hechos, _ = _dice(conn, escribe)
     assert hechos == []
 
@@ -362,11 +366,13 @@ def test_la_bienvenida_de_quien_nunca_entro_lleva_el_ofrecimiento(conn, mundo, d
     _sin_ofrecer(conn, mundo)
     [bienvenida] = _bienvenida(conn, mundo)
     assert bienvenida.texto.startswith("Listo, Marcos.")
-    encontrado = ENLACE_WEB.search(bienvenida.texto)
-    assert encontrado and bienvenida.sin_vista_previa
-    sin_enlace = bienvenida.texto[:encontrado.start()]
-    assert "web" in sin_enlace and "24 horas" in sin_enlace and "una sola vez" in sin_enlace
-    assert "otro" in sin_enlace.rsplit("\n\n", 1)[-1]          # que le pida otro
+    boton = _boton_de_la_web(bienvenida)
+    assert (boton.etiqueta, boton.web_app) == ("Ver mis tareas", MINI_APP)
+    assert not ENLACE_WEB.search(bienvenida.texto)
+    ofrecimiento = bienvenida.texto.rsplit("\n\n", 1)[-1]
+    assert "web" in ofrecimiento and "«Ver mis tareas»" in ofrecimiento
+    # Leda nunca sugiere pedir un enlace (ADR 0024, decisión 1).
+    assert "enlace" not in ofrecimiento and "pedime" not in ofrecimiento
     assert _ofrecimiento(conn, mundo)["ofrecido_en"] is not None
     assert [m["es_ofrecimiento"] for m in _marcas(conn)] == [True]
 

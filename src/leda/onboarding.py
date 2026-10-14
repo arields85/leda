@@ -164,11 +164,28 @@ def bienvenida(cur: psycopg.Cursor, workspace_id: str, nombre: str) -> str:
     return texto
 
 
-# El ofrecimiento de la web en la bienvenida (decisión 2 del usuario, 2026-10-12; ADR 0022,
-# decisión 4), texto fijo como la bienvenida: el despachador agrega el enlace al final.
-OFRECIMIENTO_DE_LA_WEB = ("Ahora también podés ver tus tareas en la web: al final de este "
-                          "mensaje va tu enlace para entrar. Sirve una sola vez y vence en 24 "
-                          "horas; si no te anda, pedime otro.")
+# El ofrecimiento de la web en la bienvenida (decisión 2 del usuario, 2026-10-12; ADR 0024,
+# decisiones 1 y 2), texto fijo como la bienvenida: el despachador pone el botón debajo, "Ver mis
+# tareas" (a Dirección, "Ver el equipo"), que abre la web dentro de Telegram.
+OFRECIMIENTO_DE_LA_WEB = ("Ahora también podés ver {que} en la web, sin salir de Telegram: tocá "
+                          "«{boton}» cuando quieras.")
+
+
+def ofrecimiento_de_la_web(destino: str) -> str:
+    """El ofrecimiento de la bienvenida, con lo que dice su botón."""
+    from .despachador import ETIQUETA_DEL_BOTON_DE_LA_WEB
+
+    return OFRECIMIENTO_DE_LA_WEB.format(
+        que="lo que hace el equipo" if destino == "equipo" else "tus tareas",
+        boton=ETIQUETA_DEL_BOTON_DE_LA_WEB[destino])
+
+
+def destino_de_la_bienvenida(cur: psycopg.Cursor, membership_id: str) -> str:
+    """A Dirección, el equipo; a los demás, sus tareas (ADR 0024, decisión 2)."""
+    cur.execute("""select r.autoridad_final from membership m join rol r on r.id = m.rol_id
+                    where m.id = %s""", (membership_id,))
+    fila = cur.fetchone()
+    return "equipo" if fila and fila["autoridad_final"] else "inicio"
 
 
 def ofrecer_la_web_en_la_bienvenida(cur: psycopg.Cursor, membership_id: str) -> bool:

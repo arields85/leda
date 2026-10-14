@@ -1,12 +1,13 @@
-"""La entrada a la web por chat: las jugadas `pedir_acceso_web` y `perdi_el_celular` (ADR 0022,
-decisión 4; decisiones 1 y 3 del usuario del 2026-10-12; conversación 50, pasos 4 a 6; tarea A-3
-de `odd/tasks/acceso-por-chat.md`).
+"""La entrada a la web por chat: las jugadas `pedir_acceso_web` y `perdi_el_celular` (ADR 0024,
+decisiones 1, 2 y 4, que enmiendan la decisión 4 del ADR 0022; decisión 3 del usuario del
+2026-10-12; conversación 50).
 
-- `pedir_acceso_web`: la respuesta lleva la marca del enlace de entrada de la persona
-  (`message_outbox_entrada_web`); el despachador lo emite al mandar y anula el que tenía sin
-  usar. Los hechos dicen que va el enlace, que sirve una vez, que vence a las 24 horas y si el
-  anterior deja de servir. La IA nunca ve ni escribe una dirección. Un mensaje lleva un solo
-  enlace (decisión técnica 2): con el de una tarea, el otro no se promete.
+- `pedir_acceso_web`: la respuesta lleva la marca del botón de la web de la persona
+  (`message_outbox_entrada_web`); el despachador lo arma al mandar, como Mini App del bot del
+  espacio: "Ver mis tareas" (a Dirección, "Ver el equipo"). No se emite ningún enlace. Los hechos
+  dicen qué dice el botón; la IA nunca ve ni escribe una dirección. Pedida la dirección para la
+  computadora, la dirección sola (no da acceso: ahí se entra con el QR). Un mensaje lleva uno
+  solo (decisión técnica 2): con el enlace de una tarea, el botón no se promete.
 - `perdi_el_celular`: corta enseguida, sin confirmación, todas las sesiones de la persona y su
   enlace sin usar, con el motivo `perdio_el_celular` y la persona como actor; el corte queda en la
   auditoría también sin sesiones (decisión técnica 3).
@@ -35,11 +36,10 @@ from leda.motor.turno import procesar_turno
 from tests.motor.ayudantes import AHORA, todos
 
 DIRECCION = "https://leda.invalid/"
-ENLACE_WEB = re.compile(r"\nhttps://leda\.invalid/app/entrar/([A-Za-z0-9_-]{43})$")
+MINI_APP = "https://leda.invalid/app/e/prueba/"
 
-ENLACE_NUEVO = {"jugada": "pedir_acceso_web", "resultado": "enlace_nuevo",
-                "lleva_el_enlace_de_entrada_a_la_web": True, "sirve_una_sola_vez": True,
-                "vence_a_las_24_horas": True}
+BOTON = {"jugada": "pedir_acceso_web", "resultado": "boton_para_abrir_la_web",
+         "lleva_el_boton": "Ver mis tareas"}
 
 
 @pytest.fixture
@@ -81,7 +81,7 @@ def _canjear(conn, token: str) -> str | None:
 
 
 def _marcas(conn) -> list[dict]:
-    return todos(conn, """select w.membership_id::text persona, w.es_ofrecimiento
+    return todos(conn, """select w.membership_id::text persona, w.es_ofrecimiento, w.destino
                             from message_outbox_entrada_web w
                             join message_outbox o on o.id = w.outbox_id
                            where o.es_respuesta""")
@@ -110,11 +110,13 @@ def test_las_dos_jugadas_son_de_la_lista_cerrada_y_sin_tarea():
         ficha = FICHAS[nombre]
         assert nombre in JUGADAS
         assert ficha.se_ofrece and not ficha.del_responsable
-        assert ficha.necesita == () and ficha.opcional == ()
+        assert ficha.necesita == ()
         assert ficha.es and ficha.para_que in lo_que_puede_hacer(JUGADAS)
         # La redacción las recibe por lo que hacen.
         assert hechos_mod.es_un_concepto_de_la_cocina(nombre)
         assert nombre in hechos_mod.PARA_LA_REDACCION
+    assert FICHAS["pedir_acceso_web"].opcional == ("para_la_compu",)
+    assert FICHAS["perdi_el_celular"].opcional == ()
 
 
 def test_lo_que_es_cada_jugada_no_trae_frases_de_ejemplo():
@@ -124,66 +126,69 @@ def test_lo_que_es_cada_jugada_no_trae_frases_de_ejemplo():
 
 
 def test_cada_clave_y_codigo_de_sus_hechos_tiene_significado():
-    for codigo in ("enlace_nuevo", "lleva_el_enlace_de_entrada_a_la_web", "sirve_una_sola_vez",
-                   "vence_a_las_24_horas", "el_anterior_ya_no_sirve", "acceso_cortado",
-                   "sesiones_cortadas", "recuerda_cerrar_telegram_en_ese_celular",
-                   "puede_pedir_otro_enlace", "ya_lleva_otro_enlace"):
+    for codigo in ("boton_para_abrir_la_web", "lleva_el_boton", "direccion_para_la_compu",
+                   "acceso_cortado", "sesiones_cortadas",
+                   "recuerda_cerrar_telegram_en_ese_celular", "vuelve_a_entrar_desde_telegram",
+                   "ya_lleva_otro_enlace"):
         assert hechos_mod.significado(codigo), codigo
-    # El significado dice que la dirección la agrega el código: la IA no escribe ninguna.
-    assert "no lo ve ni lo escribe" in hechos_mod.significado(
-        "lleva_el_enlace_de_entrada_a_la_web")
+    # Leda nunca sugiere pedir un enlace (ADR 0024, decisión 1).
+    for codigo, texto in hechos_mod.SIGNIFICADOS.items():
+        assert "pedir otro enlace" not in texto and "le pide otro" not in texto, codigo
+    # El significado dice que el botón lo pone el código: la IA no escribe ninguna dirección.
+    assert "la IA no escribe ninguna" in hechos_mod.significado("lleva_el_boton")
 
 
 # --- Pedir el acceso ------------------------------------------------------------------------
 
-def test_pedir_el_acceso_lleva_la_marca_y_el_enlace_se_emite_al_mandar(conn, mundo, escribe,
-                                                                       direccion):
+def test_pedir_el_acceso_lleva_el_boton_que_abre_la_web_en_telegram(conn, mundo, escribe,
+                                                                     direccion):
     [hecho], pedido = _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
-    assert hecho == {**ENLACE_NUEVO, "el_anterior_ya_no_sirve": False}
-    assert _marcas(conn) == [{"persona": _membresia(mundo), "es_ofrecimiento": False}]
-    assert todos(conn, "select 1 from enlace_de_entrada") == []    # todavía no se emitió
+    assert hecho == BOTON
+    assert _marcas(conn) == [{"persona": _membresia(mundo), "es_ofrecimiento": False,
+                              "destino": "inicio"}]
     # La IA nunca ve una dirección ni un nombre de la base.
     assert "http" not in repr(pedido) and "leda.invalid" not in repr(pedido)
-    assert "entro_a_la_web" not in repr(pedido) and "tiene_un_enlace" not in repr(pedido)
     [mensaje] = _despachar(conn, mundo).enviados
-    encontrado = ENLACE_WEB.search(mensaje.texto)
-    assert encontrado and mensaje.sin_vista_previa
-    assert _canjear(conn, encontrado.group(1)) is not None
+    assert mensaje.texto == "Listo."
+    assert mensaje.botones[-1].etiqueta == "Ver mis tareas"
+    assert mensaje.botones[-1].web_app == MINI_APP
+    # Ningún enlace de entrada se emitió: la Mini App identifica a la persona.
+    assert todos(conn, "select 1 from enlace_de_entrada") == []
 
 
-def test_con_un_enlace_sin_usar_el_anterior_deja_de_servir(conn, mundo, escribe, direccion):
-    anterior = _emitir(conn, mundo)
-    [hecho], _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
-    assert hecho == {**ENLACE_NUEVO, "el_anterior_ya_no_sirve": True}
-    _despachar(conn, mundo)
-    assert _canjear(conn, anterior) is None
+def test_a_direccion_el_boton_lleva_al_equipo(conn, mundo, escribe, direccion):
+    [hecho], _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}), nombre="Ismael")
+    assert hecho["lleva_el_boton"] == "Ver el equipo"
+    [mensaje] = _despachar(conn, mundo).enviados
+    assert mensaje.botones[-1].web_app == MINI_APP + "?vista=equipo"
 
 
-def test_un_enlace_ya_usado_no_es_uno_que_deja_de_servir(conn, mundo, escribe, direccion):
-    """La sesión que abrió sigue abierta: pedir otro no la corta."""
-    assert _canjear(conn, _emitir(conn, mundo)) is not None
-    [hecho], _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
-    assert hecho["el_anterior_ya_no_sirve"] is False
+def test_la_direccion_para_la_compu_va_sola_y_sin_boton(conn, mundo, escribe, direccion):
+    [hecho], pedido = _dice(conn, escribe, Jugada("pedir_acceso_web", {"para_la_compu": True}))
+    assert hecho == {"jugada": "pedir_acceso_web", "resultado": "direccion_para_la_compu",
+                     "direccion_para_la_compu": MINI_APP}
+    assert _marcas(conn) == []
+    [mensaje] = _despachar(conn, mundo).enviados
+    assert mensaje.botones == []
 
 
-def test_sin_la_direccion_publica_no_se_promete_ningun_enlace(conn, mundo, escribe):
+def test_sin_la_direccion_publica_no_se_promete_ningun_boton(conn, mundo, escribe):
     [hecho], _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
     assert hecho == {"jugada": "pedir_acceso_web", "resultado": "no_se_puede",
                      "motivo": "la_pagina_no_esta_disponible"}
     assert _marcas(conn) == []
 
 
-def test_pedirlo_dos_veces_en_un_mensaje_lleva_un_solo_enlace(conn, mundo, escribe, direccion):
+def test_pedirlo_dos_veces_en_un_mensaje_lleva_un_solo_boton(conn, mundo, escribe, direccion):
     hechos, _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}),
                       Jugada("pedir_acceso_web", {}))
-    assert [h["resultado"] for h in hechos] == ["enlace_nuevo", "enlace_nuevo"]
+    assert [h["resultado"] for h in hechos] == ["boton_para_abrir_la_web"] * 2
     assert len(_marcas(conn)) == 1
 
 
-def test_con_el_enlace_de_una_tarea_el_de_entrada_no_se_promete(conn, mundo, escribe,
-                                                                  direccion):
-    """Un enlace por mensaje (decisión técnica 2): el de la tarea, pedido primero, sale; el de
-    entrada se puede pedir aparte."""
+def test_con_el_enlace_de_una_tarea_el_boton_no_se_promete(conn, mundo, escribe, direccion):
+    """Uno por mensaje (decisión técnica 2): el enlace de la tarea, pedido primero, sale; el
+    botón de la web va en otro mensaje."""
     tarea, web = _dice(conn, escribe, Jugada("pedir_enlace", {"tarea": "T1"}),
                        Jugada("pedir_acceso_web", {}))[0]
     assert tarea[LLEVA_EL_ENLACE] is True
@@ -193,21 +198,19 @@ def test_con_el_enlace_de_una_tarea_el_de_entrada_no_se_promete(conn, mundo, esc
     assert len(todos(conn, "select 1 from message_outbox_enlace")) == 1
 
 
-def test_con_el_de_entrada_el_enlace_de_una_tarea_no_se_promete(conn, mundo, escribe,
-                                                                  direccion):
+def test_con_el_boton_el_enlace_de_una_tarea_no_se_promete(conn, mundo, escribe, direccion):
     web, tarea = _dice(conn, escribe, Jugada("pedir_acceso_web", {}),
                        Jugada("pedir_enlace", {"tarea": "T1"}))[0]
-    assert web["resultado"] == "enlace_nuevo"
+    assert web["resultado"] == "boton_para_abrir_la_web"
     assert (tarea["resultado"], tarea["motivo"]) == ("no_se_puede",
                                                      "ya_lleva_el_enlace_de_otra_tarea")
     assert LLEVA_EL_ENLACE not in tarea
     assert todos(conn, "select 1 from message_outbox_enlace") == []
     assert len(_marcas(conn)) == 1
-    # El significado del código dice la verdad también acá: lleva otro enlace.
-    assert "entrada a la web" in hechos_mod.significado("ya_lleva_el_enlace_de_otra_tarea")
+    assert "botón" in hechos_mod.significado("ya_lleva_el_enlace_de_otra_tarea")
 
 
-def test_si_la_ia_no_redacta_no_sale_ningun_enlace(conn, mundo, escribe, direccion):
+def test_si_la_ia_no_redacta_no_sale_ningun_boton(conn, mundo, escribe, direccion):
     """El texto fijo no lleva lo que hicieron las jugadas: se deshizo."""
     from leda.motor.ia import IAGuionada as Guionada
 
@@ -234,7 +237,7 @@ def test_perdi_el_celular_corta_enseguida_todas_sus_sesiones_y_su_enlace(conn, m
     [hecho], pedido = _dice(conn, escribe, Jugada("perdi_el_celular", {}))
     assert hecho == {"jugada": "perdi_el_celular", "resultado": "acceso_cortado",
                      "sesiones_cortadas": 2, "recuerda_cerrar_telegram_en_ese_celular": True,
-                     "puede_pedir_otro_enlace": True}
+                     "vuelve_a_entrar_desde_telegram": True}
     # Sin confirmación: ninguna pregunta ni botón.
     assert todos(conn, "select 1 from conversation_question") == []
     assert _canjear(conn, pendiente) is None

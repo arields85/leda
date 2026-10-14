@@ -424,7 +424,9 @@ def _ofrecer_la_web(ctx: Contexto) -> list[dict[str, Any]]:
             or not web_app.reservar_el_ofrecimiento(ctx.cur, yo)):
         return []
     ctx.enlace_de_la_respuesta.append((fichas.OFRECIMIENTO_WEB, yo))
-    return [{"ofrecimiento": ACCESO_A_LA_WEB, **fichas.LLEVA_EL_ENLACE_DE_ENTRADA}]
+    destino = fichas.destino_de_sus_tareas(ctx.quien)
+    ctx.destino_de_la_web[:] = [destino]
+    return [{"ofrecimiento": ACCESO_A_LA_WEB, **fichas.lleva_el_boton(destino)}]
 
 
 def _pedido_de_redaccion(ctx: Contexto, hechos: list[dict[str, Any]],
@@ -618,7 +620,9 @@ def _responder(cur, ctx: Contexto, texto: str, ahora: datetime, ia_nombre: str |
                    is_response=True, scheduled_for=ahora,
                    grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace,
                    enlace_de_entrada_web=entrada_web,
-                   es_ofrecimiento=entrada_web is not None and es_el_ofrecimiento_web(marca))
+                   es_ofrecimiento=entrada_web is not None and es_el_ofrecimiento_web(marca),
+                   destino_web=(fichas.destino_de_la_respuesta(ctx) if entrada_web is not None
+                                else "inicio"))
     if adjuntos:
         enqueue_outbox(cur, workspace_id=ctx.quien.workspace_id, chat_id=ctx.chat_id,
                        text=f"(adjuntos: {len(adjuntos)})", dedupe_key=f"{clave}:adjuntos",

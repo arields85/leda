@@ -93,7 +93,10 @@ TABLAS_POR_FUNCION = ("acceso_tablero", "acceso_tarea", "vista_de_tarea",
                       # La reapertura de una tarea pedida (migración 0071, J4): la escribe sólo
                       # `reabrir_tarea`, y la leen `motivo_no_cierra_tarea` y
                       # `tipos_de_evidencia_que_faltan`.
-                      "reapertura_de_tarea")
+                      "reapertura_de_tarea",
+                      # La entrada con Telegram (migración 0073; ADR 0024): la huella de cada
+                      # firma y el pedido de entrada del QR, sólo desde sus funciones.
+                      "firma_de_telegram", "pedido_de_entrada")
 
 # Columnas sueltas de una tabla que sí usa `src/`, que sólo escriben y leen funciones de la base:
 # `(tabla, columna)` → las funciones que la usan. Se exime el par, nunca el nombre (la misma

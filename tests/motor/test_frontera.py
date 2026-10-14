@@ -59,8 +59,8 @@ PERMITIDOS: dict[str, set[str] | None] = {
                    "REFERENCIA_INBOUND_MESSAGE"},
     "llm": None,
     "config": None,
-    "onboarding": {"activar", "bienvenida", "ActivacionInvalida", "OFRECIMIENTO_DE_LA_WEB",
-                   "ofrecer_la_web_en_la_bienvenida"},
+    "onboarding": {"activar", "bienvenida", "ActivacionInvalida", "ofrecimiento_de_la_web",
+                   "destino_de_la_bienvenida", "ofrecer_la_web_en_la_bienvenida"},
     "versiones": None,
     "huerfanos": {"barrer"},
     # La ventana del turno en curso: los álbumes que esperan su turno más que eso quedan para
@@ -72,7 +72,11 @@ PERMITIDOS: dict[str, set[str] | None] = {
     # La entrada a la web por chat (`pedir_acceso_web`, `perdi_el_celular`; migración 0066): lo
     # que la cocina pregunta del acceso de la persona y el corte, por las mismas funciones de la
     # base que usa la consola, que lo auditan ellas. El enlace lo emite el despachador.
-    "web_app": {"tiene_un_enlace_sin_usar", "cortar_sesiones", "PERDIO_EL_CELULAR"},
+    "web_app": {"cortar_sesiones", "PERDIO_EL_CELULAR"},
+    # Entrar en la compu (ADR 0024, decisión 8; `bot_entrar.py`): ver y aprobar el pedido de
+    # entrada de una computadora, por las funciones de la base que lo auditan.
+    "entrar_con_telegram": {"CODIGO", "PUERTA_DE_ADMINISTRACION", "PUERTA_DEL_EQUIPO",
+                            "es_un_uuid", "aprobar_pedido", "ver_pedido"},
 }
 
 # Los módulos de los flujos A y B, borrados en la E3-4, por si volvieran. La escalera, el reloj

@@ -94,8 +94,8 @@ CERRO_LA_SESION = "cerro_la_sesion"
 POR_UN_ADMINISTRADOR = "administrador"
 PERDIO_EL_CELULAR = "perdio_el_celular"
 # El camino del enlace de entrada (`enlace`) y lo más largo que es su token
-# (`secrets.token_urlsafe(32)`: 43): la salida le reserva ese lugar al texto que lo lleva
-# (`salida.reserva_del_enlace_de_entrada`).
+# (`secrets.token_urlsafe(32)`: 43). Desde la 0073 (ADR 0024) Leda no lo ofrece por chat: sigue
+# andando, para la consola, hasta que se retire (decisión 11).
 CAMINO_DE_ENTRADA = "/app/entrar/"
 LARGO_DEL_TOKEN_DE_ENTRADA = 43
 

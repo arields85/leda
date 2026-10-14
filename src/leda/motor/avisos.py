@@ -176,7 +176,7 @@ from .ancla import prevision_vigente as _prevision_vigente
 from .asentado import QUEDA_ASENTADO, queda_asentado
 from .auditoria import auditar
 from .fichas import (ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, FICHAS, LLEGA,
-                     LLEVA_EL_ENLACE_DE_ENTRADA, NO_LE_LLEGO, YA_LE_LLEGO, quien_revisa, referente)
+                     NO_LE_LLEGO, YA_LE_LLEGO, lleva_el_boton, quien_revisa, referente)
 from .hechos import con_los_iconos
 from .margen import sale_con_margen
 from .ia import IA
@@ -744,8 +744,9 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
         envio = [replace(envio[0], hechos={**envio[0].hechos, LLEVA_EL_ENLACE: True}),
                  *envio[1:]]
     entrada_web = _entrada_web_del_envio(m, envio)
+    destino_web, tarea_web = _destino_del_envio(envio)
     if entrada_web is not None:
-        envio = [replace(envio[0], hechos={**envio[0].hechos, **LLEVA_EL_ENLACE_DE_ENTRADA}),
+        envio = [replace(envio[0], hechos={**envio[0].hechos, **lleva_el_boton(destino_web)}),
                  *envio[1:]]
     preguntas_de = [None if en_lista else _pregunta_del_aviso(m, x.aviso, x.hechos)
                     for x in envio]
@@ -780,7 +781,9 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                        is_response=es_respuesta,
                        es_coordinacion=tipo.es_coordinacion, scheduled_for=m.ahora,
                        grupo_respuesta=clave if adjuntos else None, enlace_de_tarea=enlace,
-                       enlace_de_entrada_web=entrada_web)
+                       enlace_de_entrada_web=entrada_web,
+                       destino_web=destino_web if entrada_web is not None else "inicio",
+                       tarea_web=tarea_web if entrada_web is not None else None)
         if adjuntos:
             # El texto de la fila del álbum es sólo el registro de lo que lleva: el álbum sale
             # sin texto (`salida.enqueue_outbox`, `adjuntos`).
@@ -877,6 +880,17 @@ def _entrada_web_del_envio(m: Momento, envio: list[_Listo]) -> str | None:
     if len(envio) != 1 or x.tipo.enlace != "entrada_web" or not config.base_url:
         return None
     return str(x.destinatario["membership_id"])
+
+
+def _destino_del_envio(envio: list[_Listo]) -> tuple[str, str | None]:
+    """A dónde lleva el botón de la web de un aviso que lo lleva (ADR 0024, decisión 2): a la
+    tarea, si el aviso es de una sola ("Ver la tarea"); si es de varias, a las tareas de quien lo
+    recibe ("Ver mis tareas")."""
+    referencias = (dict(envio[0].aviso["hechos"] or {})).get("referencias") or []
+    tareas = [r["tarea"] for r in referencias if isinstance(r, dict) and r.get("tarea")]
+    if len(envio) == 1 and len(tareas) == 1:
+        return "tarea", str(tareas[0])
+    return "inicio", None
 
 
 def _enlace_del_envio(m: Momento, envio: list[_Listo]) -> tuple[str, str] | None:

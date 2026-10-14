@@ -377,7 +377,8 @@ def etiquetas_de_tarea(titulos: list[str], *, fijas: list[bool] | None = None,
 def prepare_buttons(buttons: Iterable[Any]) -> list[tuple]:
     """Valida los botones. Uno de callback sale como `(etiqueta, callback)`; uno
     de copiar (`copiar`, el texto que copia al tocarlo, 1 a `COPY_TEXT_LIMIT`
-    unidades) como `(etiqueta, "", copiar)`: no lleva callback."""
+    unidades) como `(etiqueta, "", copiar)`: no lleva callback; uno que abre una Mini
+    App (`web_app`, una dirección https), como `(etiqueta, "", None, dirección)`."""
     prepared = []
     for button in buttons:
         as_tuple = isinstance(button, tuple)
@@ -394,6 +395,15 @@ def prepare_buttons(buttons: Iterable[Any]) -> list[tuple]:
                     f"El texto de un botón de copiar tiene de 1 a {COPY_TEXT_LIMIT} "
                     "unidades UTF-16.")
             prepared.append((label, "", copiar))
+            continue
+        web_app = getattr(button, "web_app", button[3] if as_tuple and len(button) > 3
+                          else None)
+        if web_app is not None:
+            # El botón que abre una Mini App (ADR 0024, decisión 10): sólo una dirección https.
+            if not str(web_app).startswith("https://") or len(str(web_app)) > 2048:
+                raise PayloadValidationError(
+                    "El botón de una Mini App lleva una dirección https.")
+            prepared.append((label, "", None, str(web_app)))
             continue
         callback = str(getattr(
             button, "callback_data", button[1] if as_tuple else ""))
@@ -703,17 +713,6 @@ def reserva_del_enlace() -> int:
             + pagina_de_tarea.LARGO_DEL_TOKEN)
 
 
-def reserva_del_enlace_de_entrada() -> int:
-    """Lo que ocupa, con su salto de renglón, el enlace de entrada a la web que el despachador
-    agrega al final de un mensaje (`enqueue_outbox`, `enlace_de_entrada_web`): la dirección
-    pública configurada, el camino y el token. Importado adentro, como el de una tarea."""
-    from . import web_app
-    from .config import config
-
-    return (1 + len(config.base_url.rstrip("/")) + len(web_app.CAMINO_DE_ENTRADA)
-            + web_app.LARGO_DEL_TOKEN_DE_ENTRADA)
-
-
 def margen_saludo(*, personal: bool) -> int:
     """Cuánto hay que reservarle al saludo diario en el presupuesto de un
     mensaje -- `saludo.MARGEN_SALUDO` si `personal` (tiene
@@ -761,7 +760,10 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    adjuntos: Sequence[str] = (),
                    enlace_de_tarea: tuple[str, str] | None = None,
                    enlace_de_entrada_web: str | None = None,
-                   es_ofrecimiento: bool = False) -> int:
+                   es_ofrecimiento: bool = False,
+                   destino_web: str = "inicio",
+                   tarea_web: str | None = None,
+                   pedido_de_entrada: str | None = None) -> int:
     """Encola un mensaje visible. `es_coordinacion` marca el aviso causado
     directamente por el acto de otra persona sobre trabajo compartido (una
     entrega para revisar, cambios pedidos, una aprobación, un borrador para
@@ -789,11 +791,13 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     sólo su hash. El texto le reserva su lugar. Un mensaje con enlace no se parte, no lleva
     adjuntos ni bloque copiable: el enlace va al final de su único texto.
 
-    `enlace_de_entrada_web` (ADR 0022, decisión 4; migración 0066), una persona: la fila lleva al
-    final su enlace de entrada a la web, con las mismas reglas que el de una tarea (sólo la marca,
-    `message_outbox_entrada_web`; el despachador lo emite al mandar). `es_ofrecimiento` dice que
-    es el ofrecimiento de una sola vez y no un pedido de la persona. Un mensaje lleva un solo
-    enlace: el de una tarea y el de entrada juntos se rechazan."""
+    `enlace_de_entrada_web` (ADR 0024, decisiones 1, 2 y 10; migraciones 0066 y 0073), una
+    persona: la fila lleva un botón para ella (sólo la marca, `message_outbox_entrada_web`; el
+    despachador lo arma al mandar): el que abre la web en `destino_web` (`inicio`, `equipo`,
+    `tarea` con `tarea_web`, `cargar_tarea` o `crear_objetivo`), o "Entrar en la compu" del
+    `pedido_de_entrada` (destino `entrar_en_la_compu`). No va en el texto, así que no le reserva
+    lugar. `es_ofrecimiento` dice que es el ofrecimiento de una sola vez y no un pedido de la
+    persona. Un mensaje lleva uno solo: con el enlace de una tarea se rechaza."""
     adjuntos = [str(a) for a in adjuntos]
     if enlace_de_tarea is not None and (adjuntos or allow_split
                                         or bloque_copiable is not None):
@@ -809,6 +813,10 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     if es_ofrecimiento and enlace_de_entrada_web is None:
         raise PayloadValidationError(
             "El ofrecimiento de la web va con el enlace de entrada de la persona.")
+    if ((destino_web == "tarea") != (tarea_web is not None)
+            or (destino_web == "entrar_en_la_compu") != (pedido_de_entrada is not None)):
+        raise PayloadValidationError(
+            "El botón de una tarea lleva la tarea, y el de entrar en la compu, su pedido.")
     if adjuntos and (len(adjuntos) > MAX_ADJUNTOS or allow_split
                      or pending_action_id is not None or bloque_copiable is not None):
         raise PayloadValidationError(
@@ -832,8 +840,6 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     margen = margen_saludo(personal=recipient_membership_id is not None)
     if enlace_de_tarea is not None:
         margen += reserva_del_enlace()
-    if enlace_de_entrada_web is not None:
-        margen += reserva_del_enlace_de_entrada()
     payloads = prepare_payload(
         text, dedupe_key=dedupe_key, has_buttons=has_buttons,
         allow_split=allow_split, margen=margen,
@@ -885,9 +891,12 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
             outbox_id = fila["id"] if isinstance(fila, dict) else fila[0]
             cur.execute(
                 """insert into message_outbox_entrada_web (workspace_id, outbox_id,
-                                                         membership_id, es_ofrecimiento)
-                   values (%s, %s, %s, %s)""",
-                (workspace_id, outbox_id, str(enlace_de_entrada_web), es_ofrecimiento))
+                                                         membership_id, es_ofrecimiento,
+                                                         destino, task_id,
+                                                         pedido_de_entrada_id)
+                   values (%s, %s, %s, %s, %s, %s, %s)""",
+                (workspace_id, outbox_id, str(enlace_de_entrada_web), es_ofrecimiento,
+                 destino_web, tarea_web, pedido_de_entrada))
         if fila is not None and adjuntos:
             outbox_id = fila["id"] if isinstance(fila, dict) else fila[0]
             for orden, archivo_id in enumerate(adjuntos, 1):

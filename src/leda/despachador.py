@@ -90,10 +90,12 @@ def pedido_telegram(fn, *args, **kwargs):
 
 class Boton(NamedTuple):
     """Un botón inline. Con `copiar` es el botón de copiar de Telegram
-    (`copy_text`, T9-R1c-3): no lleva callback."""
+    (`copy_text`, T9-R1c-3): no lleva callback. Con `web_app`, el que abre esa dirección como
+    Mini App de Telegram (ADR 0024, decisión 10; sólo en un chat privado): tampoco."""
     etiqueta: str
     callback_data: str
     copiar: str | None = None
+    web_app: str | None = None
 
 
 class Entregado(NamedTuple):
@@ -166,6 +168,17 @@ class TransporteDePrueba:
         return len(self.enviados)
 
 
+def boton_de_telegram(label: str, callback: str, copiar: str | None = None,
+                      web_app: str | None = None) -> dict:
+    """Un botón inline de la Bot API: el que abre una Mini App (`web_app`), el de copiar
+    (`copy_text`) o el de callback."""
+    if web_app:
+        return {"text": label, "web_app": {"url": web_app}}
+    if copiar:
+        return {"text": label, "copy_text": {"text": copiar}}
+    return {"text": label, "callback_data": callback}
+
+
 class TransporteTelegram:
     def __init__(self, token: str, cliente=None) -> None:
         import httpx
@@ -197,9 +210,7 @@ class TransporteTelegram:
             # Uno por fila: las etiquetas son nombres de personas o frases
             # cortas, y en el teléfono dos por fila se cortan.
             cuerpo["reply_markup"] = {"inline_keyboard": [
-                [{"text": label, "copy_text": {"text": resto[0]}} if resto
-                 else {"text": label, "callback_data": callback}]
-                for label, callback, *resto in prepared_buttons]}
+                [boton_de_telegram(*boton)] for boton in prepared_buttons]}
         r = pedido_telegram(self._cliente.post, self._url, json=cuerpo)
         pedido_telegram(r.raise_for_status)
         return r.json()["result"]["message_id"]
@@ -946,7 +957,13 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
                       where w.outbox_id = message_outbox.id) as entrada_web_persona,
                     coalesce((select w.es_ofrecimiento from message_outbox_entrada_web w
                                where w.outbox_id = message_outbox.id), false)
-                      as entrada_web_ofrecimiento
+                      as entrada_web_ofrecimiento,
+                    (select w.destino from message_outbox_entrada_web w
+                      where w.outbox_id = message_outbox.id) as entrada_web_destino,
+                    (select w.task_id from message_outbox_entrada_web w
+                      where w.outbox_id = message_outbox.id) as entrada_web_tarea,
+                    (select w.pedido_de_entrada_id from message_outbox_entrada_web w
+                      where w.outbox_id = message_outbox.id) as entrada_web_pedido
               from message_outbox
              where workspace_id = %(ws)s
                and estado = 'listo'
@@ -1160,47 +1177,81 @@ def _enlace_de_la_tarea(cur, workspace_id: str, m) -> str | None:
 
 ETAPA_ENLACE_DE_ENTRADA_WEB = "enlace_de_entrada_web"
 
+# Lo que dice cada botón de la web, según a dónde lleva (ADR 0024, decisión 2: dice lo que va a
+# pasar y lleva directo a eso).
+ETIQUETA_DEL_BOTON_DE_LA_WEB = {
+    "inicio": "Ver mis tareas", "equipo": "Ver el equipo", "tarea": "Ver la tarea",
+    "cargar_tarea": "Cargar la tarea", "crear_objetivo": "Crear el objetivo"}
+ETIQUETA_ENTRAR_EN_LA_COMPU = "Entrar en la compu"
+# El toque de "Entrar en la compu" (`motor.bot_entrar`): el pedido va en el callback.
+PREFIJO_ENTRAR_EN_LA_COMPU = "compu:"
 
-def _enlace_de_entrada_web(cur, workspace_id: str, m) -> str | None:
-    """El enlace de entrada a la web que lleva la fila (`message_outbox_entrada_web`; ADR 0022,
-    decisión 4), emitido ahora para esa persona como lo emite la consola (`web_app.
-    emitir_enlace`, con la conexión de la aplicación en el espacio): la base guarda sólo su hash
-    y anula el que la persona tenía sin usar. Se emite dentro del punto de retorno del envío: un
-    envío que falla no deja ningún enlace emitido ni anula el anterior. El mensaje se escribió
-    diciendo que lleva el enlace, así que si no sale (sin la dirección pública configurada, o la
-    persona ya no es del equipo) queda un incidente, sin avisar a la administración: el mensaje
-    salió. Nunca se inventa una dirección (constitución §4)."""
+
+def direccion_de_la_web(base_url: str, slug: str, destino: str,
+                        tarea: str | None = None) -> str:
+    """La dirección que abre la Mini App del bot del espacio donde corresponde (ADR 0024,
+    decisiones 2 y 10): el espacio va en el camino (`/app/e/<espacio>/`), y la web lo usa para
+    mandar la firma de Telegram de ese bot; a dónde lleva, en la consulta."""
+    from urllib.parse import quote, urlencode
+
+    consulta = {"inicio": {}, "equipo": {"vista": "equipo"}, "tarea": {"tarea": tarea or ""},
+                "cargar_tarea": {"nueva": "tarea"},
+                "crear_objetivo": {"nueva": "objetivo"}}[destino]
+    camino = f"{base_url.rstrip('/')}/app/e/{quote(slug, safe='')}/"
+    return camino + (f"?{urlencode(consulta)}" if consulta else "")
+
+
+def direccion_de_la_administracion(base_url: str) -> str:
+    """La dirección de la Mini App del bot de administración (ADR 0024, decisión 3)."""
+    return f"{base_url.rstrip('/')}/app/admin/"
+
+
+def _boton_de_la_marca(cur, workspace_id: str, m) -> Boton | None:
+    """El botón que lleva la fila (`message_outbox_entrada_web`, migración 0073): el que abre la
+    web donde corresponde, como Mini App del bot del espacio, o "Entrar en la compu" de un pedido
+    de entrada. Nunca lleva un enlace de entrada ni un token: la Mini App identifica a la persona
+    con la firma de Telegram. Un botón de Mini App va sólo en un chat privado (la Bot API no lo
+    deja en un grupo) y con la dirección pública: el mensaje se escribió diciendo que lo lleva,
+    así que si no puede ir queda un incidente, sin avisar a la administración (el mensaje sale
+    igual). Nunca se inventa una dirección (constitución §4)."""
     if not m.get("entrada_web_persona"):
         return None
-    from . import web_app
+    destino = m.get("entrada_web_destino") or "inicio"
+    if destino == "entrar_en_la_compu":
+        return Boton(ETIQUETA_ENTRAR_EN_LA_COMPU,
+                     f"{PREFIJO_ENTRAR_EN_LA_COMPU}{m['entrada_web_pedido']}")
     from .config import config
 
-    token = (web_app.emitir_enlace(cur, m["entrada_web_persona"])
-             if config.base_url else None)
-    if token is None:
+    cur.execute("select slug from workspace where id = %s", (workspace_id,))
+    espacio = cur.fetchone()
+    privado = int(m["chat_id"]) > 0
+    if not config.base_url or not privado or espacio is None:
         registrar_incidente(
             cur, workspace_id,
-            "Un mensaje salió sin el enlace de entrada a la web que anunciaba: "
+            "Un mensaje salió sin el botón para abrir la web que anunciaba: "
             + ("la dirección pública no está configurada." if not config.base_url
-               else "la base no lo emitió (la persona ya no es del equipo)."),
+               else "no va en un chat que no es privado." if not privado
+               else "no se encontró el espacio."),
             severidad="baja", etapa=ETAPA_ENLACE_DE_ENTRADA_WEB,
             referencia_tipo="message_outbox", referencia_id=str(m["id"]), avisar_admin=False,
-            sin_avisar_porque="el mensaje salió igual; sólo le falta el enlace")
+            sin_avisar_porque="el mensaje salió igual; sólo le falta el botón")
         return None
-    return web_app.enlace(config.base_url, token)
+    return Boton(ETIQUETA_DEL_BOTON_DE_LA_WEB[destino], "",
+                 web_app=direccion_de_la_web(config.base_url, espacio["slug"], destino,
+                                             str(m["entrada_web_tarea"] or "") or None))
 
 
-def _el_ofrecimiento_al_salir(cur, m, entrada_web: str | None, ahora: datetime) -> None:
-    """Lo que deja en `ofrecimiento_web` un mensaje con el enlace de entrada que salió (decisión
-    2 del usuario, 2026-10-12): si llevó el enlace, ya no se le ofrece a la persona, sea el
-    ofrecimiento o uno que pidió (otro ofrecimiento anularía ése). Si era el ofrecimiento y salió
-    sin el enlace (sin la dirección pública: ya quedó su incidente), la reserva se libera."""
+def _el_ofrecimiento_al_salir(cur, m, boton: Boton | None, ahora: datetime) -> None:
+    """Lo que deja en `ofrecimiento_web` un mensaje con el botón de la web que salió (decisión 2
+    del usuario, 2026-10-12): si llevó el botón, ya no se le ofrece a la persona, sea el
+    ofrecimiento o uno que pidió. Si era el ofrecimiento y salió sin el botón (sin la dirección
+    pública: ya quedó su incidente), la reserva se libera. "Entrar en la compu" no cuenta."""
     from . import web_app
 
     persona = m.get("entrada_web_persona")
-    if not persona:
+    if not persona or m.get("entrada_web_destino") == "entrar_en_la_compu":
         return
-    if entrada_web:
+    if boton is not None:
         web_app.quedo_ofrecido(cur, persona, ahora)
     elif m.get("entrada_web_ofrecimiento"):
         web_app.liberar_el_ofrecimiento(cur, persona)
@@ -1291,9 +1342,11 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
             # El enlace a la página de la tarea, si la fila lo lleva: al final del texto, nunca
             # en la salida ni en el registro de turnos (ADR 0019, decisión 6).
             enlace = _enlace_de_la_tarea(cur, workspace_id, m)
-            # O el de entrada a la web (0066): uno solo por mensaje, la salida lo garantiza.
-            entrada_web = None if enlace else _enlace_de_entrada_web(cur, workspace_id, m)
-            enlace = enlace or entrada_web
+            # O el botón de la web (0073; antes, el enlace de entrada de la 0066): uno solo por
+            # mensaje, la salida lo garantiza; va después de los demás botones.
+            boton_web = None if enlace else _boton_de_la_marca(cur, workspace_id, m)
+            if boton_web is not None:
+                botones = [*botones, boton_web]
             cuerpo = f"{m['cuerpo']}\n{enlace}" if enlace else m["cuerpo"]
             texto, falla_saludo = saludo.reclamar_y_anteponer(
                 cur, workspace_id=workspace_id,
@@ -1310,7 +1363,7 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
                 tg_id = transporte.enviar(m["chat_id"], texto, botones)
             # Salió: el ofrecimiento de la web queda hecho, dentro de este punto de retorno (si
             # el envío hubiera fallado, no contaba).
-            _el_ofrecimiento_al_salir(cur, m, entrada_web, ahora)
+            _el_ofrecimiento_al_salir(cur, m, boton_web, ahora)
             try:
                 with cur.connection.transaction():
                     _guardar_id_telegram(cur, tg_id, m["id"])
@@ -1427,6 +1480,7 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
 
     cur.execute(
         """select a.id, a.workspace_id, a.chat_id, a.cuerpo, a.intentos, a.es_respuesta,
+                  a.boton, a.pedido_de_entrada_id,
                   e.task_id as enlace_tarea, e.workspace_id as enlace_espacio,
                   e.admin_app_user_id as enlace_admin
              from admin_notice a
@@ -1442,8 +1496,11 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
 
     for n in pendientes:
         try:
+            boton = _boton_de_la_administracion(n)
             if n["enlace_tarea"] is not None:
                 tg_id = _mandar_la_respuesta_con_enlace(cur, transporte, n, ahora)
+            elif boton is not None:
+                tg_id = transporte.enviar(n["chat_id"], n["cuerpo"], [boton])
             else:
                 tg_id = transporte.enviar(n["chat_id"], n["cuerpo"])
         except RespuestaSinEnlace as e:
@@ -1533,9 +1590,30 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
     return resumen
 
 
+def _boton_de_la_administracion(n) -> Boton | None:
+    """El botón de una respuesta del bot de administración (migración 0073; ADR 0024): el que
+    abre la Mini App de la administración (sólo en un chat privado y con la dirección pública) o
+    "Entrar en la compu" de un pedido de entrada."""
+    if n.get("boton") == "entrar_en_la_compu":
+        return Boton(ETIQUETA_ENTRAR_EN_LA_COMPU,
+                     f"{PREFIJO_ENTRAR_EN_LA_COMPU}{n['pedido_de_entrada_id']}")
+    if n.get("boton") == "administracion":
+        from .config import config
+
+        if config.base_url and int(n["chat_id"]) > 0:
+            return Boton(ETIQUETA_DE_LA_ADMINISTRACION, "",
+                         web_app=direccion_de_la_administracion(config.base_url))
+    return None
+
+
+ETIQUETA_DE_LA_ADMINISTRACION = "Administración"
+
+
 def encolar_respuesta_admin(cur, admin_app_user_id: str, chat_id: int, texto: str, *,
                             clave: str,
-                            enlace_de: tuple[str, str] | None = None) -> str | None:
+                            enlace_de: tuple[str, str] | None = None,
+                            boton: str | None = None,
+                            pedido_de_entrada: str | None = None) -> str | None:
     """La respuesta del bot de administración a un pedido de un administrador, en su cola
     (`admin_notice`, `es_respuesta`; migración 0054), bajo la conexión administrativa. Sin el
     enlace: si lo lleva (`enlace_de`: el espacio y la tarea), queda su marca
@@ -1544,11 +1622,11 @@ def encolar_respuesta_admin(cur, admin_app_user_id: str, chat_id: int, texto: st
     guarda el texto con su forma (`salida.dar_forma`), como la de los mensajes del equipo."""
     cur.execute(
         """insert into admin_notice (es_respuesta, workspace_id, destinatario_app_user_id,
-                                     chat_id, cuerpo, dedupe_key)
-           values (true, %s, %s, %s, %s, %s)
+                                     chat_id, cuerpo, dedupe_key, boton, pedido_de_entrada_id)
+           values (true, %s, %s, %s, %s, %s, %s, %s)
            on conflict (dedupe_key) do nothing returning id""",
         (enlace_de[0] if enlace_de else None, str(admin_app_user_id), chat_id, dar_forma(texto),
-         clave))
+         clave, boton, pedido_de_entrada))
     fila = cur.fetchone()
     if fila is None:
         return None

@@ -88,8 +88,8 @@ from ..despachador import (Transporte, despachar, registrar_falla_del_retiro,
 from ..entrada import VENTANA_TURNO_EN_CURSO, clave_de_candado_del_mensaje, sql_respondido
 from ..incidentes import (ETAPA_TURNO_CONVERSACION, REFERENCIA_INBOUND_MESSAGE,
                           registrar_incidente)
-from ..onboarding import (OFRECIMIENTO_DE_LA_WEB, ActivacionInvalida, activar, bienvenida,
-                          ofrecer_la_web_en_la_bienvenida)
+from ..onboarding import (ActivacionInvalida, activar, bienvenida, destino_de_la_bienvenida,
+                          ofrecer_la_web_en_la_bienvenida, ofrecimiento_de_la_web)
 from ..salida import enqueue_outbox
 
 from . import archivos
@@ -264,6 +264,16 @@ class Recepcion:
         tg_user = mensaje["from"]["id"]
         chat_id = mensaje["chat"]["id"]
         if llegada is None and texto.startswith("/start"):
+            from . import bot_entrar
+
+            codigo = bot_entrar.codigo_de(texto)
+            if codigo is not None:
+                # El QR de la computadora (ADR 0024, decisión 8): no es una activación.
+                if bot_entrar.mostrar_en_el_equipo(self.conn, self.ws, codigo, tg_user, chat_id,
+                                                   mensaje["message_id"], self.reloj.ahora(),
+                                                   self.bot_id):
+                    self.imprimir("  ← /start de un pedido de entrada en la compu")
+                return
             self._activar(texto, tg_user, chat_id, mensaje["message_id"])
             self.conn.commit()
             return
@@ -424,9 +434,20 @@ class Recepcion:
                 self.senal(toque["id"])
             except Exception as e:  # noqa: BLE001 -- un acuse: si falla, el toque se atiende igual
                 self.imprimir(f"  (no se pudo dar la señal del toque: {texto_error_seguro(e)})")
-        token = token_de(str(toque.get("data") or ""))
+        from . import bot_entrar
+
         chat = (toque.get("message") or {}).get("chat") or {}
         tg_user = (toque.get("from") or {}).get("id")
+        pedido = bot_entrar.pedido_del_toque(str(toque.get("data") or ""))
+        if pedido is not None:
+            # "Entrar en la compu" (ADR 0024, decisión 8): no es una opción del motor.
+            if (chat.get("type") == "private" and tg_user is not None
+                    and bot_entrar.aprobar_en_el_equipo(self.conn, self.ws, pedido, tg_user,
+                                                        chat["id"], str(toque["id"]),
+                                                        self.reloj.ahora())):
+                self.imprimir("  ← tocó «Entrar en la compu»")
+            return
+        token = token_de(str(toque.get("data") or ""))
         if token is None or chat.get("type") != "private" or tg_user is None:
             return
         with espacio(self.conn, self.ws) as cur:
@@ -701,18 +722,19 @@ class Recepcion:
                                 where m.id = %s""", (membership_id,))
                 cuerpo = bienvenida(cur, self.ws, cur.fetchone()["nombre"])
             # A quien nunca entró a la web, la bienvenida también se la ofrece, una sola vez: en
-            # el mismo mensaje, que entonces no se parte (lleva el enlace al final).
+            # el mismo mensaje, que entonces no se parte (lleva el botón debajo).
             ofrece = (membership_id is not None
                       and ofrecer_la_web_en_la_bienvenida(cur, membership_id))
+            destino = destino_de_la_bienvenida(cur, membership_id) if ofrece else "inicio"
             if ofrece:
-                cuerpo = f"{cuerpo}\n\n{OFRECIMIENTO_DE_LA_WEB}"
+                cuerpo = f"{cuerpo}\n\n{ofrecimiento_de_la_web(destino)}"
             enqueue_outbox(cur, workspace_id=self.ws, chat_id=chat_id, text=cuerpo,
                            recipient_membership_id=membership_id, message_type="informativo",
                            dedupe_key=f"motor:alta:{self.bot_id}:{chat_id}:{message_id}",
                            is_response=True, allow_split=not ofrece,
                            es_bienvenida=membership_id is not None,
                            enlace_de_entrada_web=membership_id if ofrece else None,
-                           es_ofrecimiento=ofrece,
+                           es_ofrecimiento=ofrece, destino_web=destino,
                            scheduled_for=self.reloj.ahora())
         self.imprimir("  ← /start")
 

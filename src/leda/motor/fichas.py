@@ -121,6 +121,11 @@ class Contexto:
     # el ofrecimiento de una sola vez (`turno._ofrecer_la_web`): `(OFRECIMIENTO_WEB, persona)`.
     adjuntos_de_la_respuesta: list[str] = field(default_factory=list)
     enlace_de_la_respuesta: list[tuple[str, str]] = field(default_factory=list)
+    # A dónde lleva el botón de la web que lleva la respuesta (ADR 0024, decisión 2): `inicio`
+    # ("Ver mis tareas"), `equipo` ("Ver el equipo", a Dirección), `cargar_tarea` o
+    # `crear_objetivo` (uno solo; sin ninguno, `inicio`). Lo deciden las jugadas que marcan la
+    # respuesta (`destino_de_la_respuesta`).
+    destino_de_la_web: list[str] = field(default_factory=list)
     # Los nombres de las jugadas que la IA eligió para este mensaje, también las que quedan fuera
     # de la lista: una jugada mira si el mensaje también dice otra cosa (`entrega.
     # _contesta_otra_cosa`, D7).
@@ -1259,25 +1264,40 @@ def _pedir_enlace(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     return enlace.pedir_enlace(ctx, datos, tarea)
 
 
-# La entrada a la web por chat (ADR 0022, decisión 4; decisiones 1 y 3 del usuario del
-# 2026-10-12; conversación 50; `odd/tasks/acceso-por-chat.md`). El enlace nunca pasa por la IA,
-# como el de la página de una tarea: la respuesta lleva la marca de la persona en
-# `enlace_de_la_respuesta`, la misma lista de "un enlace por mensaje" (decisión técnica 2), con
-# `ENTRADA_WEB` en el lugar de la tarea. Así un enlace de tarea pedido después ve que el mensaje
-# ya lleva otro (`enlace.YA_LLEVA_OTRO`), y éste, si ya va el de una tarea, no se promete
-# (`YA_LLEVA_OTRO_ENLACE`). El despachador lo emite al mandar, dentro del punto de retorno del
-# envío, y la base anula el que la persona tenía sin usar (`despachador._enlace_de_entrada_web`).
-# Las dos jugadas llaman a `web_app` directo, no a la cocina: la base audita emitir y cortar ella
-# misma (`auditar_acceso_web`), y por `herramientas.ejecutar` quedaría dos veces.
+# La entrada a la web por chat (ADR 0024, decisiones 1 y 2, que enmiendan la decisión 4 del ADR
+# 0022; conversación 50). Leda no manda enlaces ni sugiere pedirlos: la respuesta lleva un botón
+# que abre la web como Mini App de Telegram, donde corresponde, y la Mini App identifica a la
+# persona con la firma de Telegram. El botón nunca pasa por la IA: la respuesta lleva la marca de
+# la persona en `enlace_de_la_respuesta`, la misma lista de "uno por mensaje" (decisión técnica
+# 2), con `ENTRADA_WEB` en el lugar de la tarea, y su destino en `destino_de_la_web`; el
+# despachador lo arma al mandar (`despachador._boton_de_la_marca`). Las dos jugadas llaman a
+# `web_app` directo, no a la cocina: la base audita cortar ella misma (`auditar_acceso_web`).
 ENTRADA_WEB = "entrada_web"
 YA_LLEVA_OTRO_ENLACE = "ya_lleva_otro_enlace"
 PERDI_EL_CELULAR = "perdi_el_celular"
 CORTA_EL_ACCESO_EN_ESTE_MENSAJE = "corta_el_acceso_en_este_mensaje"
-# Lo que dicen los hechos de un enlace de entrada: que va al final del mensaje, que sirve una
-# sola vez y que vence a las 24 horas si nadie lo usa (decisión 1 del usuario; migración 0065).
-LLEVA_EL_ENLACE_DE_ENTRADA = MappingProxyType({
-    "lleva_el_enlace_de_entrada_a_la_web": True, "sirve_una_sola_vez": True,
-    "vence_a_las_24_horas": True})
+# Lo que dicen los hechos de un botón de la web: lo que dice el botón (ADR 0024, decisión 2).
+LLEVA_EL_BOTON = "lleva_el_boton"
+BOTON_PARA_ABRIR_LA_WEB = "boton_para_abrir_la_web"
+DIRECCION_PARA_LA_COMPU = "direccion_para_la_compu"
+
+
+def lleva_el_boton(destino: str) -> dict[str, str]:
+    """El hecho del botón de la web que lleva el mensaje: su texto, que dice a dónde lleva."""
+    from ..despachador import ETIQUETA_DEL_BOTON_DE_LA_WEB
+
+    return {LLEVA_EL_BOTON: ETIQUETA_DEL_BOTON_DE_LA_WEB[destino]}
+
+
+def destino_de_la_respuesta(ctx: Contexto) -> str:
+    """A dónde lleva el botón de la web que lleva la respuesta."""
+    return ctx.destino_de_la_web[0] if ctx.destino_de_la_web else "inicio"
+
+
+def destino_de_sus_tareas(quien) -> str:
+    """A dónde lleva "ver mis tareas" a esa persona: a Dirección, el equipo (ADR 0024, decisión
+    2: "Ver el equipo"); a los demás, sus tareas."""
+    return "equipo" if quien.autoridad_final else "inicio"
 
 
 # La misma marca, cuando el enlace de entrada es el ofrecimiento de una sola vez, reservado en
@@ -1296,44 +1316,56 @@ def es_el_ofrecimiento_web(marca: tuple[str, str]) -> bool:
     return marca[0] == OFRECIMIENTO_WEB
 
 
-def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
-    """Un enlace de entrada nuevo para la persona, al final de la respuesta. Si tenía uno sin
-    usar, ése deja de servir cuando se emite el nuevo (lo dice el hecho, leído ahora de la base).
-    Sin la dirección pública configurada, ninguno se promete. Nada cambia hasta mandar."""
-    from .. import web_app
+def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None,
+                      destino: str | None = None) -> dict:
+    """El botón que abre la web de la persona, debajo de la respuesta (ADR 0024, decisiones 1 y
+    2): "Ver mis tareas" (a Dirección, "Ver el equipo"), o el destino que pide quien llama. Si la
+    persona pide la dirección para la computadora (`para_la_compu`), la dirección sola, sin
+    botón: no da acceso por sí misma (ahí se entra con el QR; decisión 4). Sin la dirección
+    pública configurada, nada se promete. Nada cambia hasta mandar."""
     from ..config import config
+    from ..despachador import direccion_de_la_web
     from .enlace import SIN_PAGINA
 
     yo = ctx.quien.membership_id
     ya = ctx.enlace_de_la_respuesta
     if PERDI_EL_CELULAR in ctx.elegidas:
         # En el mismo mensaje que el corte, en cualquier orden: después del corte no sale ningún
-        # enlace (quien escribe puede ser quien tiene el celular perdido).
+        # botón (quien escribe puede ser quien tiene el celular perdido).
         return {"resultado": "no_se_puede", "motivo": CORTA_EL_ACCESO_EN_ESTE_MENSAJE}
-    if ya and ya[0] != (ENTRADA_WEB, yo):
-        return {"resultado": "no_se_puede", "motivo": YA_LLEVA_OTRO_ENLACE}
     if not config.base_url:
         return {"resultado": "no_se_puede", "motivo": SIN_PAGINA}
-    anterior = web_app.tiene_un_enlace_sin_usar(ctx.cur, yo)
+    if datos.get("para_la_compu") is True and destino is None:
+        ctx.cur.execute("select slug from workspace where id = %s", (ctx.quien.workspace_id,))
+        slug = ctx.cur.fetchone()["slug"]
+        return {"resultado": DIRECCION_PARA_LA_COMPU,
+                DIRECCION_PARA_LA_COMPU: direccion_de_la_web(config.base_url, slug, "inicio")}
+    if ya and ya[0] != (ENTRADA_WEB, yo):
+        return {"resultado": "no_se_puede", "motivo": YA_LLEVA_OTRO_ENLACE}
+    destino = destino or destino_de_sus_tareas(ctx.quien)
     if not ya:
         ya.append((ENTRADA_WEB, yo))
-    return {"resultado": "enlace_nuevo", **LLEVA_EL_ENLACE_DE_ENTRADA,
-            "el_anterior_ya_no_sirve": anterior}
+    ctx.destino_de_la_web[:] = [destino]
+    return {"resultado": BOTON_PARA_ABRIR_LA_WEB, **lleva_el_boton(destino)}
 
 
 # Crear una tarea o un objetivo por chat (J4b; decisión D12 del usuario, 2026-10-14; ADR 0017,
-# decisión 2: por chat, hechos del trabajo; por la web, su estructura). Nada se crea por chat: la
-# cocina dice, según quién es la persona y qué quiere crear, si lo hace en su web (y entonces lleva
-# el enlace de entrada, con la mecánica de `pedir_acceso_web`: uno por mensaje) o quiénes lo hacen.
-# Una tarea la crean Dirección y los referentes de área (ADR 0023, decisión 3); un objetivo, sólo
-# Dirección (decisión 1). Un integrante no crea ninguna de las dos: las propone desde la J6.
+# decisión 2: por chat, hechos del trabajo; por la web, su estructura; ADR 0024, decisión 2). Nada
+# se crea por chat: la cocina dice, según quién es la persona y qué quiere crear, si lo puede
+# hacer (y entonces la respuesta lleva el botón que abre el formulario, "Cargar la tarea" o "Crear
+# el objetivo", con la mecánica de `pedir_acceso_web`: uno por mensaje) o quiénes lo hacen. Una
+# tarea la crean Dirección y los referentes de área (ADR 0023, decisión 3); un objetivo, sólo
+# Dirección (decisión 1). Un integrante no crea ninguna de las dos: las propone desde la J6. Los
+# hechos son los mínimos (prueba por Telegram del 2026-10-14): lo que esa persona puede hacer y el
+# botón, o quiénes lo hacen; nunca que "por chat no se creó", que nadie creía.
 QUE_SE_CREA = ("tarea", "objetivo")
-SE_CREA_EN_LA_WEB = "se_crea_en_la_web"
+LO_PUEDE_CREAR = "lo_puede_crear"
+LO_CREAN_OTROS = "lo_crean_otros"
 
 
 def _pedir_crear(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
-    """Dónde y quién crea lo que la persona quiere crear. Nada cambia hasta mandar (el enlace, si
-    va, lo emite el despachador)."""
+    """Quién crea lo que la persona quiere crear y, si es ella, el botón que abre el formulario.
+    Nada cambia hasta mandar (el botón lo arma el despachador)."""
     que = datos.get("que_quiere_crear")
     if que not in QUE_SE_CREA:
         return {"resultado": "falta_dato", "falta": ["que_quiere_crear"]}
@@ -1341,15 +1373,16 @@ def _pedir_crear(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     cur.execute("select id from area where referente_membership_id = %s limit 1", (yo,))
     es_referente = cur.fetchone() is not None
     puede = bool(ctx.quien.autoridad_final) or (que == "tarea" and es_referente)
-    hechos: dict[str, Any] = {"resultado": SE_CREA_EN_LA_WEB, "que_quiere_crear": que,
-                              "puede_hacerlo_en_la_web": puede}
     if puede:
-        enlace = _pedir_acceso_web(ctx, {}, None)
-        if enlace["resultado"] == "enlace_nuevo":
-            hechos.update({k: v for k, v in enlace.items() if k != "resultado"})
+        hechos: dict[str, Any] = {"resultado": LO_PUEDE_CREAR, "que_quiere_crear": que}
+        boton = _pedir_acceso_web(ctx, {}, None,
+                                  "cargar_tarea" if que == "tarea" else "crear_objetivo")
+        if boton["resultado"] == BOTON_PARA_ABRIR_LA_WEB:
+            hechos.update({k: v for k, v in boton.items() if k != "resultado"})
         else:
-            hechos["el_enlace_no_va"] = enlace["motivo"]
+            hechos["el_boton_no_va"] = boton["motivo"]
         return hechos
+    hechos = {"resultado": LO_CREAN_OTROS, "que_quiere_crear": que}
     cur.execute("""select i.nombre from integrante i join rol r on r.id = i.rol_id
                     where i.activo and r.autoridad_final order by i.nombre""")
     direccion = [f["nombre"] for f in cur.fetchall()]
@@ -1381,7 +1414,8 @@ def _perdi_el_celular(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     ctx.enlace_de_la_respuesta[:] = [m for m in ctx.enlace_de_la_respuesta
                                      if not es_la_entrada_web(m)]
     return {"resultado": "acceso_cortado", "sesiones_cortadas": cortadas,
-            "recuerda_cerrar_telegram_en_ese_celular": True, "puede_pedir_otro_enlace": True}
+            "recuerda_cerrar_telegram_en_ese_celular": True,
+            "vuelve_a_entrar_desde_telegram": True}
 
 
 # La persecución del bloqueo (C-5, porción 1): las jugadas están en `persecucion.py`, que
@@ -1844,27 +1878,26 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "suya, una que espera su revisión o cualquier otra que nombre. Si la tarea no está "
              "en la lista, como_la_nombra dice cómo la nombró. Pedir ver lo entregado de una "
              "tarea que espera su revisión es otra jugada."),
-    Ficha("pedir_acceso_web", "pasar un enlace nuevo para entrar a la web",
-          necesita=(), opcional=(),
-          comprueba="que la página esté disponible y que el mensaje no lleve ya el enlace de una "
+    Ficha("pedir_acceso_web", "dejar el botón para abrir la web",
+          necesita=(), opcional=("para_la_compu",),
+          comprueba="que la web esté disponible y que el mensaje no lleve ya el enlace de una "
                     "tarea (uno solo por mensaje)",
-          hace="marca la respuesta para que lleve el enlace de entrada de la persona; no cambia "
-               "nada todavía",
-          despues="el código emite el enlace al mandar la respuesta y lo agrega al final: sirve "
-                  "una sola vez, vence a las 24 horas si nadie lo usa, y el que la persona tenía "
-                  "sin usar deja de servir",
+          hace="marca la respuesta para que lleve el botón que abre la web de la persona dentro "
+               "de Telegram; con para_la_compu, da la dirección para abrirla en la computadora; "
+               "no cambia nada",
+          despues="el código pone el botón debajo de la respuesta; la dirección para la "
+                  "computadora sola no da acceso: ahí se entra escaneando el QR que muestra",
           manejar=_pedir_acceso_web,
-          es="La persona pide entrar a la web de Leda, donde ve sus tareas: necesita un enlace "
-             "de entrada nuevo, porque no tiene uno, no le anda, se le venció o lo perdió. "
-             "Pedir el enlace a la página de una tarea es otra jugada."),
+          es="La persona quiere entrar o ver la web de Leda, donde ve sus tareas, o dice que no "
+             "le anda. Si pide la dirección para abrirla en la computadora, para_la_compu es "
+             "verdadero. Pedir el enlace a la página de una tarea es otra jugada."),
     Ficha("pedir_crear", "decir dónde se crea una tarea o un objetivo",
           necesita=("que_quiere_crear",), opcional=(),
           comprueba="quién es la persona: Dirección crea tareas y objetivos; un referente de "
                     "área, tareas; un integrante, ninguno de los dos",
-          hace="nada se crea por chat; si la persona lo puede crear, marca la respuesta para que "
-               "lleve el enlace de entrada a su web",
-          despues="si lo puede crear, el código emite el enlace de entrada al mandar la "
-                  "respuesta y lo agrega al final; si no, la respuesta dice quiénes lo hacen",
+          hace="si la persona lo puede crear, marca la respuesta para que lleve el botón que "
+               "abre el formulario en su web; si no, dice quiénes lo crean",
+          despues="si lo puede crear, el código pone el botón debajo de la respuesta",
           manejar=_pedir_crear, se_ofrece=False,
           es="La persona quiere crear, cargar o agregar una tarea nueva o un objetivo nuevo, "
              "suyo o de otra persona. Por chat no se crean: se hacen en la web, y Leda le "

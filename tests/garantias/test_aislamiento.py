@@ -187,6 +187,11 @@ EXCEPCIONES_SIN_RLS = {
         "la marca del enlace de una respuesta del bot de administración (migración 0054): como "
         "admin_notice, la escribe y la despacha sólo leda_admin; la tarea es del espacio de la "
         "marca por su clave compuesta"),
+    "pedido_de_entrada": (
+        "el pedido de entrada de una computadora por el QR (migración 0073; ADR 0024): el de la "
+        "puerta de administración no tiene espacio; sólo se llega por sus funciones (security "
+        "definer, dueño leda_owner), que fijan el espacio del bot; leda_app no tiene privilegio "
+        "sobre la tabla"),
     "conversation_access_log": (
         "el registro de accesos del administrador a conversaciones (constitución §12): lo "
         "escribe y lo lee sólo la administración de plataforma"),

@@ -57,17 +57,26 @@ SIN_PAGINA = ("La página de las tareas no está disponible: falta la dirección
 
 
 def atender_admin(conn, u: dict[str, Any], transporte: Transporte | None,
-                  imprimir: Callable[[str], None] = print) -> bool:
+                  imprimir: Callable[[str], None] = print,
+                  senal: Callable[[str], Any] | None = None) -> bool:
     """Un update del bot de administración: registra el chat de un administrador de plataforma
-    y, si es el pedido `/enlace` en un chat privado, le contesta. `True` si era de un
-    administrador."""
+    y, en un chat privado, le contesta el pedido `/enlace`, `/start` (el botón
+    "Administración", que abre la Mini App de la administración; ADR 0024, decisión 3) o
+    `/start compu_<código>` (el QR de la computadora, con "Entrar en la compu"; decisión 8). Un
+    toque de "Entrar en la compu" aprueba el pedido. `True` si era de un administrador."""
+    if u.get("callback_query"):
+        return _toque(conn, u["callback_query"], transporte, imprimir, senal)
     if not registrar_admin(conn, u, imprimir):
         return False
     mensaje = u.get("message") or {}
     partes = (mensaje.get("text") or "").split()
     chat = mensaje.get("chat") or {}
-    if (not partes or partes[0].split("@", 1)[0].lower() != COMANDO
-            or chat.get("type") != "private" or transporte is None):
+    comando = partes[0].split("@", 1)[0].lower() if partes else ""
+    if chat.get("type") != "private" or transporte is None:
+        return True
+    if comando == "/start":
+        return _start(conn, mensaje, chat, transporte, imprimir)
+    if comando != COMANDO:
         return True
     quien = None
     try:
@@ -101,6 +110,97 @@ def atender_admin(conn, u: dict[str, Any], transporte: Transporte | None,
                 sin_avisar_porque="falló el mismo canal de administración.")
         conn.commit()
     return True
+
+
+TEXTO_DE_LA_ADMINISTRACION = "La administración de Leda: tocá «Administración» para abrirla."
+SIN_ADMINISTRACION = ("La administración no está disponible por acá: falta la dirección "
+                      "pública (LEDA_BASE_URL).")
+
+
+def _start(conn, mensaje: dict[str, Any], chat: dict[str, Any], transporte: Transporte,
+           imprimir: Callable[[str], None]) -> bool:
+    """`/start`: el botón "Administración"; `/start compu_<código>`: el pedido de entrada de una
+    computadora, con "Entrar en la compu". Nunca en silencio si falla."""
+    from ..config import config
+    from . import bot_entrar
+
+    quien = None
+    try:
+        with admin(conn) as cur:
+            quien = identificar(cur, mensaje["from"]["id"], Canal.ADMINISTRACION, None)
+        conn.commit()
+        codigo = bot_entrar.codigo_de(mensaje.get("text") or "")
+        if codigo is not None:
+            aviso = bot_entrar.mostrar_en_la_administracion(
+                conn, quien.app_user_id, codigo, chat["id"], mensaje.get("message_id"))
+        else:
+            with admin(conn) as cur:
+                aviso = encolar_respuesta_admin(
+                    cur, quien.app_user_id, chat["id"],
+                    TEXTO_DE_LA_ADMINISTRACION if config.base_url else SIN_ADMINISTRACION,
+                    clave=f"respuesta-admin:{chat['id']}:{mensaje.get('message_id')}",
+                    boton="administracion" if config.base_url else None)
+            conn.commit()
+        _despachar(conn, transporte, aviso)
+        imprimir("  ← [admin] /start atendido")
+    except Denegado:
+        conn.rollback()
+    except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y consola
+        _falla(conn, quien, e, imprimir, "su pedido de entrar a la administración")
+    return True
+
+
+def _toque(conn, toque: dict[str, Any], transporte: Transporte | None,
+           imprimir: Callable[[str], None], senal: Callable[[str], Any] | None) -> bool:
+    """Un toque en el bot de administración: sólo "Entrar en la compu", de un administrador de
+    plataforma, en un chat privado."""
+    from . import bot_entrar
+
+    if senal is not None:
+        try:
+            senal(toque["id"])
+        except Exception as e:  # noqa: BLE001 -- un acuse: si falla, el toque se atiende igual
+            imprimir(f"  (no se pudo dar la señal del toque: {texto_error_seguro(e)})")
+    chat = (toque.get("message") or {}).get("chat") or {}
+    tg_user = (toque.get("from") or {}).get("id")
+    pedido = bot_entrar.pedido_del_toque(str(toque.get("data") or ""))
+    if pedido is None or tg_user is None or chat.get("type") != "private" or transporte is None:
+        return False
+    quien = None
+    try:
+        with admin(conn) as cur:
+            quien = identificar(cur, tg_user, Canal.ADMINISTRACION, None)
+        conn.commit()
+        aviso = bot_entrar.aprobar_en_la_administracion(conn, quien.app_user_id, pedido,
+                                                        tg_user, chat["id"], str(toque["id"]))
+        _despachar(conn, transporte, aviso)
+        imprimir("  ← [admin] tocó «Entrar en la compu»")
+    except Denegado:
+        conn.rollback()
+        return False
+    except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y consola
+        _falla(conn, quien, e, imprimir, "su pedido de entrar en la compu")
+    return True
+
+
+def _despachar(conn, transporte: Transporte, aviso: str | None) -> None:
+    if aviso is not None:
+        with admin(conn) as cur:
+            despachar_avisos_admin(cur, transporte, solo=[aviso])
+        conn.commit()
+
+
+def _falla(conn, quien, e: Exception, imprimir: Callable[[str], None], que: str) -> None:
+    conn.rollback()
+    imprimir(f"  ! [admin] no se pudo contestar {que}: {texto_error_seguro(e)}")
+    with admin(conn) as cur:
+        registrar_incidente(
+            cur, None, f"No se pudo contestarle a un administrador de plataforma {que} por el "
+            "bot de administración.",
+            severidad="baja", etapa=ETAPA, referencia_cruda=texto_error_seguro(e),
+            app_user_id=quien.app_user_id if quien is not None else None,
+            avisar_admin=False, sin_avisar_porque="falló el mismo canal de administración.")
+    conn.commit()
 
 
 def _pedir_enlace(conn, palabras: list[str]) -> tuple[str, dict[str, str] | None]:

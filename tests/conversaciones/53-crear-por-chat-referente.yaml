@@ -14,8 +14,8 @@ tareas:
     vence: "2026-10-26"
     estado: asignada
 
-# D12: un referente crea tareas en su web (con el enlace de entrada); los objetivos los crea
-# Dirección (sin enlace, nombrando a quien los crea).
+# D12: un referente crea tareas en su web (con el botón "Cargar la tarea", ADR 0024); los
+# objetivos los crea Dirección (sin botón, nombrando a quien los crea).
 pasos:
   - paso: 1
     quien: Marcos
@@ -23,12 +23,10 @@ pasos:
     escribe: "necesito cargarle una tarea a nahuel para que revise los sensores"
     jugadas:
       - {nombre: pedir_crear, que_quiere_crear: tarea}
-    efectos:
-      enlaces_de_entrada: [{de: Marcos}]
+    efectos: {}
     hechos:
-      - {jugada: pedir_crear, resultado: se_crea_en_la_web, que_quiere_crear: tarea,
-         puede_hacerlo_en_la_web: true, lleva_el_enlace_de_entrada_a_la_web: true,
-         sirve_una_sola_vez: true, vence_a_las_24_horas: true}
+      - {jugada: pedir_crear, resultado: lo_puede_crear, que_quiere_crear: tarea,
+         lleva_el_boton: Cargar la tarea}
     pregunta: null
     botones: []
     enlace: false
@@ -36,11 +34,12 @@ pasos:
     estado_despues:
       pregunta_abierta: null
     dice:
-      - que las tareas se cargan en la web y que ahí va su enlace para entrar
-      - que el enlace sirve una vez y vence en 24 horas
+      - que la carga él mismo, tocando «Cargar la tarea»
     no_dice:
       - que cargó la tarea
-      - una dirección o un enlace escrito por la IA
+      - que por chat no se creó nada
+      - un enlace, o que pida uno
+      - una dirección escrita por la IA
 
   - paso: 2
     quien: Marcos
@@ -50,9 +49,9 @@ pasos:
       - {nombre: pedir_crear, que_quiere_crear: objetivo}
     efectos: {}
     hechos:
-      - {jugada: pedir_crear, resultado: se_crea_en_la_web, que_quiere_crear: objetivo,
-         puede_hacerlo_en_la_web: false, lo_hacen: [Ismael Soschinski],
-         lleva_el_enlace_de_entrada_a_la_web: ausente, pronto_podra_proponerlo: ausente}
+      - {jugada: pedir_crear, resultado: lo_crean_otros, que_quiere_crear: objetivo,
+         lo_hacen: [Ismael Soschinski], lleva_el_boton: ausente,
+         pronto_podra_proponerlo: ausente}
     pregunta: null
     botones: []
     enlace: false
@@ -63,4 +62,5 @@ pasos:
       - que los objetivos los crea Dirección, Ismael
     no_dice:
       - que creó el objetivo
+      - que por chat no se creó ninguno
       - que él lo puede crear en la web

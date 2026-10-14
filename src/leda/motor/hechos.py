@@ -259,18 +259,15 @@ SIGNIFICADOS: Mapping[str, str] = {
     "entregas_que_esperan_otra_pieza": "Las entregas que esperan una pieza nueva, cada una con "
                                        "su tarea, su responsable y lo que le falta.",
     # --- Crear una tarea o un objetivo por chat (J4b, D12; `fichas.pedir_crear`) ------------------
-    "pedir_crear": "La persona quiere crear una tarea o un objetivo: por chat no se crean; Leda le "
-                   "dice dónde se hace y quién lo hace.",
+    "pedir_crear": "La persona quiere crear una tarea o un objetivo: Leda le dice quién lo crea.",
     "que_quiere_crear": "Qué quiere crear la persona: una tarea o un objetivo.",
-    "se_crea_en_la_web": "Las tareas y los objetivos se crean en la web de Leda, nunca por chat: "
-                         "no se creó nada.",
-    "puede_hacerlo_en_la_web": "Si la persona que escribe lo puede crear en su web. Si puede, "
-                               "el mensaje lleva al final su enlace para entrar.",
-    "lo_hacen": "Quiénes lo crean, si la persona no puede: lo que necesite se lo pide a ellos.",
+    "lo_puede_crear": "La persona lo crea ella misma, en su web, con el botón de este mensaje.",
+    "lo_crean_otros": "Esto no lo crea la persona: lo crean quienes se nombran.",
+    "lo_hacen": "Quiénes lo crean: lo que necesite se lo pide a ellos.",
     "pronto_podra_proponerlo": "Pronto la persona va a poder proponerlo desde su web, para que lo "
                                "apruebe quien corresponde; hoy todavía no.",
-    "el_enlace_no_va": "Por qué el mensaje no lleva el enlace para entrar a la web, aunque la "
-                       "persona lo puede crear ahí.",
+    "el_boton_no_va": "Por qué el mensaje no lleva el botón para abrir la web, aunque la persona "
+                      "lo puede crear ahí.",
     # --- La carga desde la web y lo pedido a otra área (J4b; `carga.py`) -------------------------
     "tareas_nuevas": "Aviso a la persona: le cargaron una o más tareas nuevas en la plataforma "
                      "de su equipo (tareas_que_le_cargaron), cada una con quién la cargó, para "
@@ -988,47 +985,42 @@ SIGNIFICADOS: Mapping[str, str] = {
                                     "persona.",
     "la_pagina_no_esta_disponible": "La página de las tareas no está disponible ahora: no hay "
                                     "enlace para pasar.",
-    "ya_lleva_el_enlace_de_otra_tarea": "Este mensaje ya lleva otro enlace (el de otra tarea o "
-                                        "el de entrada a la web), y lleva uno solo: el de ésta "
+    "ya_lleva_el_enlace_de_otra_tarea": "Este mensaje ya lleva otro enlace o botón (el de otra "
+                                        "tarea o el de la web), y lleva uno solo: el de ésta "
                                         "se puede pedir aparte.",
     # --- La entrada a la web por chat (`fichas`: `pedir_acceso_web`, `perdi_el_celular`) -------
-    "enlace_nuevo": "Leda le pasa a la persona un enlace nuevo para entrar a la web, donde ve "
-                    "sus tareas.",
-    "lleva_el_enlace_de_entrada_a_la_web":
-        "Al final de este mensaje, el código agrega el enlace personal para entrar a la web, "
-        "donde la persona ve sus tareas. La IA no lo ve ni lo escribe: no hay ninguna dirección "
-        "para escribir.",
-    "sirve_una_sola_vez": "El enlace sirve para entrar una sola vez: al usarlo, la persona queda "
-                          "adentro en ese dispositivo, sin volver a usarlo.",
-    "vence_a_las_24_horas": "Si nadie lo usa, el enlace deja de servir a las 24 horas de "
-                            "mandado; entonces la persona le pide otro a Leda.",
-    "el_anterior_ya_no_sirve": "Si es verdadero, la persona tenía otro enlace de entrada sin "
-                               "usar, y ése deja de servir: vale sólo el nuevo. Si es falso, no "
-                               "tenía ninguno sin usar.",
+    "boton_para_abrir_la_web": "Leda le deja a la persona el botón que abre su web, donde ve "
+                               "sus tareas, dentro de Telegram.",
+    "lleva_el_boton":
+        "Debajo de este mensaje va un botón con este texto: al tocarlo se abre la web de Leda "
+        "dentro de Telegram, justo ahí. El botón lo pone el código; la IA no escribe ninguna "
+        "dirección ni enlace.",
+    "direccion_para_la_compu":
+        "La dirección de la web para abrir en la computadora, que la IA escribe tal cual. Sola "
+        "no da acceso: en la computadora aparece un código QR que se escanea con la cámara del "
+        "celular, y en Telegram se toca «Entrar en la compu».",
     "acceso_cortado": "Leda cortó enseguida el acceso a la web de la persona, en todos sus "
-                      "dispositivos: con ese celular ya no se entra a la web, y el enlace que "
-                      "no había usado tampoco sirve.",
+                      "dispositivos: con ese celular ya no se entra a la web.",
     "sesiones_cortadas": "Cuántos dispositivos tenían la web abierta y quedaron afuera; con 0 "
                          "no había ninguno, y el corte vale igual.",
     "recuerda_cerrar_telegram_en_ese_celular":
         "Leda le recuerda a la persona que cierre también Telegram en ese celular, desde otro "
         "dispositivo, en Ajustes → Dispositivos; si no tiene ningún otro, lo corta la "
         "administración.",
-    "puede_pedir_otro_enlace": "Cuando tenga otro celular, la persona le pide a Leda un enlace "
-                               "nuevo para volver a entrar a la web.",
+    "vuelve_a_entrar_desde_telegram": "Cuando tenga otro celular, la persona vuelve a abrir la "
+                                      "web desde el chat de Leda en Telegram.",
     "ya_lleva_otro_enlace": "Este mensaje ya lleva el enlace a la página de una tarea, y lleva "
-                            "uno solo: el de entrada a la web se puede pedir aparte.",
+                            "uno solo: el botón de la web va en otro mensaje.",
     "corta_el_acceso_en_este_mensaje":
         "En este mismo mensaje la persona avisó que perdió el celular y Leda cortó su acceso a "
-        "la web: no se manda ningún enlace nuevo. Lo pide en otro mensaje, cuando tenga otro "
-        "celular.",
+        "la web: este mensaje no lleva el botón para abrirla.",
     # El ofrecimiento de la web, una sola vez (decisión 2 del usuario, 2026-10-12): lo suma la
     # cocina al final del turno, no es una jugada (`turno._ofrecer_la_web`).
     "ofrecimiento": "Algo que Leda le ofrece a la persona al final de este mensaje, además de "
                     "lo que contesta, sin que lo haya pedido: se dice después de lo demás.",
-    "acceso_a_la_web": "Ahora la persona también puede ver sus tareas en la web de Leda: al "
-                       "final del mensaje va su enlace personal para entrar. Se le ofrece una "
-                       "sola vez; si no lo usa a tiempo, le pide otro a Leda.",
+    "acceso_a_la_web": "Ahora la persona también puede ver sus tareas en la web de Leda, que "
+                       "se abre dentro de Telegram con el botón de este mensaje. Se le ofrece "
+                       "una sola vez.",
     # --- La persecución del bloqueo (C-5, porción 1; `persecucion.py`) -------------------------
     "se_le_pregunta_a": "A quién le consulta Leda, como Leda y no en nombre de nadie, para "
                         "cuándo destraba la tarea (a), y cuándo le llega (llega).",
@@ -1549,7 +1541,7 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "pedir_cambios": "devolver_la_entrega_con_cambios",
     "ver_entrega": "mostrar_la_entrega_para_revisar",
     "pedir_enlace": "pasar_el_enlace_a_la_pagina_de_una_tarea",
-    "pedir_acceso_web": "pasar_un_enlace_nuevo_para_entrar_a_la_web",
+    "pedir_acceso_web": "dejar_el_boton_para_abrir_la_web",
     "pedir_crear": "decir_donde_se_crea_una_tarea_o_un_objetivo",
     "perdi_el_celular": "cortar_el_acceso_a_la_web_por_el_celular_perdido",
     "decir_cuando_destraba": "anotar_para_cuando_destraba_la_tarea_de_otra_persona",
