@@ -1100,6 +1100,30 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         `leda_motor`: respaldo `leda_motor-antes-0072-20261014.dump`, ensayo previo y la `0072` aplicada.
         **RDD** commit por commit: cinco revisiones, todas aprobadas. Sus 8 WARNING pasan a la primera unidad de la
         MA; entre ellos, una carga sin clave que no deja avisos y un aviso de "terminada" duplicado.
+  - [ ] **J4-P · La prueba en el celular** (2026-10-14, guion `docs/product/guion-celular-j4.md`, completo).
+        **Anduvo:**
+        - los avisos de los pedidos: a Ismael el pedido a Dirección, a Ariel el de Marcos, y a administración que
+          hay que conectar a Nahuel;
+        - nada a Marcos por su tarea propia, ni a Ismael por lo que Marcos se cargó;
+        - "Lo que pediste".
+        **Hallazgos** (van con el escritor de la MA, en una unidad aparte):
+        1. la vista previa de un pedido no dice qué es ("Es un pedido al área de Ariel: Ariel decide quién lo hace");
+        2. un aviso de administración salió con `{nombre}` sin reemplazar;
+        3. las respuestas por chat a "quiero crear" salieron toscas ("por chat no se creó": un dato de la cocina);
+        4. "espera a" no muestra lo recién cargado, porque no se vuelven a leer las opciones;
+        5. la ortografía al confirmar falla siempre en la web del equipo (la IA no usa la herramienta);
+        6. "Tarea cargada" va al lado de "confirmar", en verde agua;
+        7. no llegó el aviso a quien revisa (Marcos) por la tarea que Ismael le cargó a Nahuel, que no tiene
+           Telegram;
+        8. el aviso a Ariel dice el área al revés ("para el área de OT");
+        9. las tarjetas no se abren: falta el detalle, que es también el destino de "Ver la tarea";
+        10. las advertencias tienen que ir en color;
+        11. "Lo que pediste" pasa a pestaña propia, sin repetir el pedido en las tareas;
+        12. los nombres de las pestañas (usuario: "mucho mejor"):
+            - Dirección: "Mis tareas" y "Todo el equipo";
+            - un referente: "Mis tareas", el nombre de su área ("OT y automatización") y "Lo que pedí";
+            - un integrante: "Mis tareas", y "Lo que pedí" desde la J6.
+        La prueba se repite con la MA.
 - [ ] **MA · La web como Mini App de Telegram**, adelantada por el usuario (2026-10-14: "quisiera atacar antes
       lo de la mini app"; opción A: apenas termine la J4, antes de J5 a J7). Así las pruebas de J5 a J7 se hacen
       desde el botón del bot, sin pedir enlaces.
