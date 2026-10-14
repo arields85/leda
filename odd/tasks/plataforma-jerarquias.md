@@ -1221,6 +1221,10 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         **Siempre antes de decidir** (usuario: "si no, no tiene ningún sentido"): va dentro del pedido, antes de
         "aceptar" o "no"; y cuando el cambio no necesita aprobación (un referente en una tarea suya), en la vista previa,
         antes de confirmar. Después de decidir sólo se avisa lo que se decidió.
+      - **J5-D4. Al aceptar más tiempo, la fecha original queda y se anota la prevista** (el modelo de la
+        decisión 7), con el motivo y quién la aceptó. Leda sigue la prevista. La web muestra "21/10 → previsto
+        28/10, aceptado por Marcos: era más trabajo". El informe de "en qué afecta" se ve antes de aceptar, lo
+        afecte o no.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
