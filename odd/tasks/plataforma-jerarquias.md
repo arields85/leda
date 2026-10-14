@@ -1008,4 +1008,6 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
 - 2026-10-13, noche: la J2 pasó en el celular (J2-14 a J2-28 y J2b; "quedó perfecto todo"; IA real 79 de 84).
   El usuario se fue a dormir y pidió: cerrar la J2 con su revisión de conjunto (J2-29) y la suite completa, y
   seguir solo con J3 a J7, anotando en "Para decidir al despertar" lo que necesite de él.
-
+- 2026-10-13, noche: la J2-29 se hizo sin CRITICAL ni HIGH y sus arreglos son la J2-30. La suite completa sobre
+  `eaf84ed4` dio `3286 passed, 1 warning in 1889.71s`, con `salida=0` (`LEDA_BASE_URL= LEDA_GEMINI_API_KEY=
+  .venv/Scripts/python.exe -m pytest -q -p no:cacheprovider`).
