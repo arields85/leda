@@ -1225,6 +1225,12 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         decisión 7), con el motivo y quién la aceptó. Leda sigue la prevista. La web muestra "21/10 → previsto
         28/10, aceptado por Marcos: era más trabajo". El informe de "en qué afecta" se ve antes de aceptar, lo
         afecte o no.
+      - **J5-D5. El cambio de fecha directo, cuando cambió el plan** (nadie lo pidió; ejemplo: Marcos corre "Revisar
+        el tablero" del 22/10 al 30/10 porque primero va otra cosa). Lo hacen quien revisa la tarea y Dirección, con
+        "> cambiar la fecha": motivo obligatorio y el informe de "en qué afecta" antes de confirmar. La fecha nueva
+        pasa a ser el compromiso, sin "previsto" ni atraso, porque no fue un atraso de nadie; la anterior queda en el
+        historial con el motivo y quién la cambió. Al responsable le llega el aviso, y si se la adelantan, se lo dice
+        claro.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
