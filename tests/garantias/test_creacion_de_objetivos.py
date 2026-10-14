@@ -890,6 +890,35 @@ def test_la_puerta_de_administracion_se_protege(web, conn, intake_world, adminis
     _nada_creado(conn)
 
 
+def test_sin_sesion_de_administracion_no_se_lee_el_reloj_del_espacio(
+        web, conn, intake_world, administradora, monkeypatch):
+    """Revisión RDD `review-12308947b06404e4`: el reloj de un espacio que trae el pedido se lee
+    sólo después de validar la sesión de administración. Sin ella, 401 sin tocar ese espacio."""
+    from leda import web_app
+
+    norte = _norte(intake_world)
+    leidos: list[str] = []
+    monkeypatch.setattr(web_app, "_ahora", lambda _conn, ws: leidos.append(ws) or AHORA)
+    falso = secrets.token_urlsafe(32)
+    assert web_app._ahora_de_la_puerta(conn, web_app.PUERTA_DE_ADMINISTRACION, falso,
+                                       norte["id"]) is None
+    conn.rollback()
+    assert leidos == []
+    base = f"/app/admin/api/espacios/{norte['id']}/objetivos"
+    impostor = web()
+    impostor.cookies.set("leda_admin", falso, domain="testserver", path="/app/admin")
+    assert impostor.get(f"{base}/opciones").status_code == 401
+    assert impostor.post(base, json=_cuerpo(intake_world)).status_code == 401
+    assert leidos == []
+    _nada_creado(conn)
+    # Con la sesión vigente, sí: el reloj de ese espacio.
+    sesion = _entrar(conn, administradora)
+    assert web_app._ahora_de_la_puerta(conn, web_app.PUERTA_DE_ADMINISTRACION, sesion,
+                                       norte["id"]) == AHORA
+    conn.rollback()
+    assert leidos == [norte["id"]]
+
+
 def _un_cuerpo_ilegible_es_un_pedido_mal_formado(navegador, camino: str) -> None:
     """Como en la carga: un cuerpo que no se puede leer (anidado hasta el fondo, o que no es
     JSON) es un pedido mal formado, 422 con lo que falta, nunca un 500 ni un objetivo."""

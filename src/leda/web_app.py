@@ -1478,16 +1478,24 @@ def leer_el_objetivo(cuerpo: Any) -> tuple[dict[str, Any], list[dict[str, str]]]
     return datos, errores
 
 
-def _ahora_de_la_puerta(conn, token: str, espacio: str | None) -> datetime | None:
+def _ahora_de_la_puerta(conn, puerta: str, token: str, espacio: str | None
+                        ) -> datetime | None:
     """El reloj del espacio (como en la carga): el pedido de la administración trae el espacio;
-    el del equipo, su sesión. Sin sesión, `None`: la base igual la rechaza."""
-    if espacio is None:
+    el del equipo, su sesión. Sin sesión, `None`: la base igual la rechaza. La sesión se valida
+    antes de leer nada del espacio que trae el pedido (revisión RDD `review-12308947b06404e4`):
+    sin una sesión de administración vigente, ese espacio no se toca."""
+    if puerta == PUERTA_DE_ADMINISTRACION:
         with sin_espacio(conn) as cur:
-            sesion = _sesion(cur, token)
-        if sesion is None:
+            if _sesion_de_administracion(cur, token) is None:
+                return None
+        if espacio is None:
             return None
-        espacio = str(sesion["workspace_id"])
-    return _ahora(conn, espacio)
+        return _ahora(conn, espacio)
+    with sin_espacio(conn) as cur:
+        sesion = _sesion(cur, token)
+    if sesion is None:
+        return None
+    return _ahora(conn, str(sesion["workspace_id"]))
 
 
 def _sin_lo_que_rechaza_la_base_del_objetivo(resultado: dict[str, Any], puerta: str
@@ -1506,7 +1514,7 @@ def _sin_lo_que_rechaza_la_base_del_objetivo(resultado: dict[str, Any], puerta: 
 
 
 def _opciones_del_objetivo(conn, puerta: str, token: str, espacio: str | None) -> Response:
-    ahora = _ahora_de_la_puerta(conn, token, espacio)
+    ahora = _ahora_de_la_puerta(conn, puerta, token, espacio)
     with sin_espacio(conn) as cur:
         _con_la_version_del_nucleo(cur)
         cur.execute("select opciones_del_objetivo(%s, %s, %s, %s) as r",
@@ -1524,7 +1532,7 @@ def _crear_el_objetivo(conn, puerta: str, token: str, espacio: str | None,
     lo que no se crea, 422 con todo lo que hay que corregir. Con un dato mal formado no se crea
     nada: la base igual dice todo lo demás, y sin la clave nunca escribe."""
     clave = None if mal_formados else datos["clave"]
-    ahora = _ahora_de_la_puerta(conn, token, espacio)
+    ahora = _ahora_de_la_puerta(conn, puerta, token, espacio)
     with sin_espacio(conn) as cur:
         _con_la_version_del_nucleo(cur)
         cur.execute(
