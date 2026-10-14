@@ -904,7 +904,15 @@ def _al_menos_una(valor: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    return correr(argv, PEDIDOS, medir, la_ia, __doc__)
+
+
+def correr(argv: list[str] | None, pedidos: list[dict[str, Any]], medir_uno, elegir_la_ia,
+           descripcion: str) -> int:
+    """La corrida de una medición, compartida con la de los objetivos
+    (`tools/medir_ayuda_al_crear_objetivo.py`, J3-4): los argumentos, las vueltas sobre `pedidos`
+    con `medir_uno(ia, pedido)`, el informe y la salida (0, 1, 3 o 4)."""
+    p = argparse.ArgumentParser(description=descripcion.split("\n\n")[0])
     p.add_argument("--ia", default=GUIONADA)
     p.add_argument("--veces", type=_al_menos_una, default=1)
     p.add_argument("--salida", help="un archivo para el informe en JSON")
@@ -913,15 +921,15 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")    # la consola de Windows
     except (AttributeError, ValueError):
         pass
-    ia = la_ia(args.ia)
+    ia = elegir_la_ia(args.ia)
     nombre = getattr(ia, "nombre", args.ia)
     resultados: list[dict[str, Any]] = []
     bien = total = 0
     cortada: str | None = None
     for vuelta in range(1, args.veces + 1):
-        for pedido in PEDIDOS:
+        for pedido in pedidos:
             try:
-                ok, detalle = medir(ia, pedido)
+                ok, detalle = medir_uno(ia, pedido)
             except SinCupo:
                 print("La IA se quedó sin cupo: la medición se corta acá.")
                 cortada = "sin_cupo"
