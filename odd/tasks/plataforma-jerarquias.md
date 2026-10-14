@@ -700,6 +700,15 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
 - [ ] **J2-22 · El criterio, desde quien hace la tarea**: qué hace y qué entrega, nunca "quien revise puede ver…"
       (usuario: esa parte "está de más"); con sólo la evidencia que corresponde, sale corto.
       Y en la vista previa, lo que Leda corrigió resaltado con el verde agua de "propuesto por Leda".
+      **J2-19 a J2-22 hechas** (escritor delegado; el título resaltado, inline): `9d8bbc6a` (servidor), `b3791619`
+      (pruebas, herramienta y capacidades), `b7c98613` (web). RED observado salvo J2-21 (rojo apagando el arreglo) y
+      la marca de J2-22 (escrita después). `pytest` de la ayuda, el criterio, la evidencia y la ortografía: 426
+      passed; `npm test`: 138 passed; typecheck y build bien. RDD aprobadas con WARNINGs: `review-13a33db35d62cdde`,
+      `review-799c8ba1b905e81a`, `review-4f7c39f0d5f744a7`.
+- [ ] **J2-23 · La ortografía, corregida directamente** (usuario, 2026-10-13: "que lo corrija directamente sin
+      resaltarlo, ya dijimos que corrige palabras puntuales, no lo que dice la persona"): sin marca, sin resaltado y
+      sin la vuelta de "revisalo y confirmá"; el control palabra por palabra y la auditoría siguen. Con la misma
+      unidad, los WARNINGs de las tres revisiones de arriba.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
