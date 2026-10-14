@@ -610,6 +610,11 @@ def test_la_ip_que_se_muestra_no_se_puede_inventar_con_una_cabecera():
     assert desde_donde(_pedido_http("127.0.0.1", {**agente, "cf-connecting-ip": "no es una ip"})
                        ) == "Chrome en Windows, IP 127.0.0.1"
     assert desde_donde(_pedido_http("testclient", agente)) == "Chrome en Windows"
+    # R3-003: el túnel en esta máquina también puede llegar por IPv6 (`::1`, o una IPv4 escrita
+    # como IPv6); una dirección de la red local no es el túnel.
+    assert desde_donde(_pedido_http("::1", falsa)) == "Chrome en Windows, IP 10.1.2.3"
+    assert desde_donde(_pedido_http("::ffff:127.0.0.1", falsa)) == "Chrome en Windows, IP 10.1.2.3"
+    assert desde_donde(_pedido_http("192.168.0.10", falsa)) == "Chrome en Windows, IP 192.168.0.10"
 
 
 def test_la_puerta_del_equipo_nunca_acepta_el_espacio_del_bot_de_administracion(web, conn,
@@ -638,8 +643,10 @@ def test_el_usuario_del_bot_de_administracion_se_pide_fuera_del_candado_de_la_we
     la web tomado (la web entera esperaría a la red)."""
     from leda import entrar_con_telegram, web_app
 
-    monkeypatch.delenv("LEDA_BOT_USUARIO_ADMIN")
-    entrar_con_telegram._USUARIO_DEL_BOT_DE_ADMINISTRACION.clear()
+    monkeypatch.delenv("LEDA_BOT_USUARIO_ADMIN", raising=False)
+    # R3-002: lo que se aprende de `getMe` vive por proceso; la prueba usa uno propio, vacío, que
+    # se devuelve solo aunque falle (ni hereda el de otra prueba ni le deja el suyo).
+    monkeypatch.setattr(entrar_con_telegram, "_USUARIO_DEL_BOT_DE_ADMINISTRACION", {})
     con_el_candado = []
 
     def pedir(token):
@@ -648,7 +655,6 @@ def test_el_usuario_del_bot_de_administracion_se_pide_fuera_del_candado_de_la_we
 
     monkeypatch.setattr(entrar_con_telegram, "_pedir_el_usuario", pedir)
     r = web().post("/app/admin/api/entrar/qr", json={})
-    entrar_con_telegram._USUARIO_DEL_BOT_DE_ADMINISTRACION.clear()
     assert r.status_code == 201, r.text
     assert con_el_candado == [False]
 
@@ -731,14 +737,36 @@ def test_purgar_un_pedido_viejo_no_borra_los_mensajes_que_lo_nombraban(conn, int
                                          "entrada_web_pedido": None}) is None
 
 
-def test_el_tope_de_pedidos_pendientes_se_cuenta_con_un_candado(conn):
-    """R3-pending-cap-race: el conteo y el alta van con un candado por puerta y espacio."""
-    with admin(conn) as cur:
-        cur.execute("""select pg_get_functiondef('leda.pedir_entrada_por_qr(text, text, text,
-                                                  text, text)'::regprocedure) as d""")
-        definicion = cur.fetchone()["d"]
-    conn.commit()
-    assert definicion.index("pg_advisory_xact_lock") < definicion.index("count(*)")
+def _pedir_en(cur, slug: str) -> dict:
+    cur.execute("select pedir_entrada_por_qr('equipo', %s, %s, %s, 'Chrome en Windows') as r",
+                (slug, _hash(secrets.token_urlsafe(24)), _hash(secrets.token_urlsafe(32))))
+    return cur.fetchone()["r"]
+
+
+def test_el_tope_de_pedidos_pendientes_se_cuenta_con_un_candado(conn, uri, intake_world):
+    """R3-pending-cap-race, por lo que hace y no por su texto: mientras un pedido de una puerta y
+    un espacio no terminó, otro de esa misma puerta y espacio espera su turno (con un tope de
+    espera, se ve que no pasa); uno de otro espacio no espera; terminado el primero, pasa."""
+    import psycopg
+
+    from leda.db import conectar
+
+    otra = conectar(uri)
+    try:
+        with sin_espacio(conn) as cur:
+            assert _pedir_en(cur, "north-lab")["ok"] is True
+            with pytest.raises(psycopg.errors.LockNotAvailable):
+                with sin_espacio(otra) as cur_otra:
+                    cur_otra.execute("set local lock_timeout = '300ms'")
+                    _pedir_en(cur_otra, "north-lab")
+            with sin_espacio(otra) as cur_otra:
+                cur_otra.execute("set local lock_timeout = '300ms'")
+                assert _pedir_en(cur_otra, "west-studio")["ok"] is True
+        with sin_espacio(otra) as cur_otra:
+            cur_otra.execute("set local lock_timeout = '300ms'")
+            assert _pedir_en(cur_otra, "north-lab")["ok"] is True
+    finally:
+        otra.close()
 
 
 # --- El lanzador: Telegram en la computadora abre la web en el navegador (MA-2) ----------------

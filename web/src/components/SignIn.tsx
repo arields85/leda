@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { telegramWebApp } from '../telegram';
+import { insideTelegram } from '../telegram';
 import { Notice } from './Notice';
 
 // Entering from a computer, or from a phone's browser outside Telegram (ADR 0024, decisions 4 and
@@ -71,7 +71,8 @@ export function SignIn({ door, space, onIn, phone = onAPhone() }: {
 
   // Inside Telegram there is no QR to scan: the session comes from opening the Mini App again
   // (review R4-spent-signature-lost-response: the signature was used but its answer was lost).
-  const inTelegram = telegramWebApp() !== null;
+  // Decided once, by Telegram's platform too: opened without signed data, it is still Telegram.
+  const [inTelegram] = useState(() => insideTelegram());
 
   useEffect(() => {
     if (inTelegram || (door === 'equipo' && !space)) return;
@@ -131,7 +132,7 @@ export function SignIn({ door, space, onIn, phone = onAPhone() }: {
       stopped = true;
       if (timer) clearTimeout(timer);
     };
-  }, [door, space, attempt]);
+  }, [door, space, attempt, inTelegram]);
 
   const again = (
     <button

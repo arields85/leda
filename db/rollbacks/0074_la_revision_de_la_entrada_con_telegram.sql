@@ -5,6 +5,15 @@
 --
 -- Devuelve las funciones y las restricciones a como las dejó la 0073. Se niega a correr si una marca
 -- o una respuesta quedó con el pedido en nulo (la 0073 lo exige).
+--
+-- Vuelta atrás de una sola vía después de la primera purga (revisión de la MA-2). Desde la 0074,
+-- cada pedido de entrada nuevo borra los pedidos vencidos hace más de un día y deja en nulo el
+-- pedido de sus marcas y respuestas (`pedir_entrada_por_qr`), y cada firma nueva borra las huellas
+-- de firmas vencidas hace más de un día. Lo purgado no vuelve con esta vuelta atrás: los pedidos y
+-- las huellas viejos ya no existen, y en cuanto hay una marca o una respuesta con el pedido en nulo
+-- este archivo se niega (abajo). Para volver a la 0073 después de eso, hay que restaurar el
+-- respaldo de antes de la 0074 (`leda_motor-antes-0074-20261014.dump`, en `db/respaldos/`) o
+-- decidir a mano qué hacer con esas filas; ni las marcas ni las respuestas se borran desde acá.
 begin;
 set search_path = leda, public;
 set local row_security = off;

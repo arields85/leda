@@ -32,6 +32,7 @@ interface Insets {
 
 export interface TelegramWebApp {
   initData: string;
+  platform?: string;
   ready(): void;
   expand(): void;
   setHeaderColor(color: string): void;
@@ -46,6 +47,16 @@ export interface TelegramWebApp {
 export function telegramWebApp(win: Window = window): TelegramWebApp | null {
   const app = (win as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
   return app && typeof app.initData === 'string' && app.initData ? app : null;
+}
+
+/** Whether this page runs inside Telegram, with or without its signed data: Telegram's script
+ * defines `WebApp` everywhere, but outside Telegram its platform is `unknown` and it has no data.
+ * Used where a QR would make no sense (it cannot be scanned from inside Telegram). */
+export function insideTelegram(win: Window = window): boolean {
+  const app = (win as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+  if (!app) return false;
+  if (typeof app.initData === 'string' && app.initData) return true;
+  return typeof app.platform === 'string' && app.platform !== '' && app.platform !== 'unknown';
 }
 
 function safely(action: () => void): void {
