@@ -1137,8 +1137,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         Telegram, aparece "Entrar con Telegram". La dirección es fija con la VPS; mientras dure el túnel, Leda
         la pasa por chat si se le pide.
       Con esto, las decisiones de la MA están completas. Su diseño escrito es el
-      [ADR 0024](../../docs/decisions/0024-entrar-con-telegram.md), propuesto el 2026-10-14 y a la espera de que
-      el usuario lo acepte.
+      [ADR 0024](../../docs/decisions/0024-entrar-con-telegram.md), aceptado por el usuario el 2026-10-14
+      ("si").
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
       Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
       la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección

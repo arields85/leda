@@ -1,6 +1,6 @@
 # ADR 0024: Entrar a la web con Telegram: la Mini App en el celular y el QR en la computadora
 
-- **Estado:** Propuesto el 2026-10-14. Las decisiones son del usuario (2026-10-14, de a una, en
+- **Estado:** Aceptado por el usuario el 2026-10-14 ("si"). Las decisiones son del usuario (2026-10-14, de a una, en
   `odd/tasks/plataforma-jerarquias.md`, MA1 a MA5). La redacción y la parte técnica son del agente.
 - **Fecha:** 2026-10-14.
 - **Alcance:** cómo se entra a las dos puertas de la web (la del equipo y la de administración),
