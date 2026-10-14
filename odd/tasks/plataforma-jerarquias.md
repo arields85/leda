@@ -1128,6 +1128,11 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - grande, pero dejando la barrita de Telegram con "Cerrar": se usa `expand()`, no la pantalla completa;
         - el zoom con dos dedos se prueba en el celular. Si dentro de la Mini App la página ya no se agranda sola
           al tocar un campo, se libera; si se agranda, queda bloqueado como hoy.
+      - **MA5. Fuera de Telegram, siempre el código por Telegram,** también en el navegador del celular. Es una
+        sola puerta para todo lo que no es la Mini App. Adentro de Telegram, cada apertura vuelve a identificar a
+        la persona, así que no hace falta un "Salir".
+      Con esto, las decisiones de la MA están completas. La primera pieza es la enmienda escrita a la decisión 4
+      del ADR 0022.
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
       Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
       la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección
