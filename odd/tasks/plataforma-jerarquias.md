@@ -1143,6 +1143,19 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       Incluye la decisión 7 del 2026-10-14: la fecha prevista de los objetivos y "> aceptar la demora", con
       la fecha original intacta, para los objetivos hijos (decisión 5) y para las tareas de Dirección
       (decisión 6).
+      **Decisiones del usuario (2026-10-14):**
+      - **J5-D1. Dos botones distintos, por chat y por la Mini App:**
+        - **"> Me falta algo para seguir"**, cuando la demora depende de otro ("no llegó el cable"). Arranca el
+          circuito del bloqueo que ya tiene el motor (`motor/persecucion.py`): pregunta qué falta y quién se
+          ocupa, le escribe a esa persona, le repite cada día hábil sin escalar, sigue la cadena y avisa lo que
+          diga. Mientras tanto, la demora no es de quien la espera.
+        - **"> pedir más tiempo"**, sólo cuando la demora es del propio trabajo. Ése es el pedido que alguien
+          decide.
+        Si se pide más tiempo con un motivo que es de otro, Leda pregunta si le falta algo y sigue por el bloqueo.
+      - **El lenguaje (usuario: "trabado" no deja claro que depende de otra cosa):** en todo lo que ve la persona,
+        en el chat y en la web, se reemplazan "trabado" y "bloqueada". La web dice "Esperando el cable
+        (Mariano)". Los nombres internos no cambian. Es una tarea aparte, antes de la J5.
+
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
       Incluye la decisión 6 del 2026-10-14: seguir con una tarea que vence después que su objetivo pide la
