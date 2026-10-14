@@ -803,6 +803,23 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       positivos de "primera persona") sigue abierta y no afecta al producto. Se arreglan en la J2-30.
 - [ ] **J2-30 · Los arreglos de la J2-29** (escritor delegado; hallazgos 1 a 10, cada uno con su prueba).
       Ruta: delegada. Fuera de alcance: la regla de `maximum-scale=1` en iOS (decisión del usuario, opción A).
+      **Hecha** en los commits `8a0b6b56`, `94887d44`, `25b215dd`, `f70f77d5`, `b67f81eb` y `269ba8bd`:
+      - **La carga:** mientras se confirma, se ignoran las respuestas tardías y la clave de un solo uso no se borra.
+      - **El dictado:** valida la sesión antes de leer el audio, admite hasta 4 a la vez, el plazo total es real y
+        un audio sin tipo deja un incidente.
+      - **"Sí, borrar":** corta el dictado.
+      - **La evidencia** que el área nueva no conoce se quita.
+      - **Comentarios** actualizados, y la prueba que dependía del reloj real ahora usa uno simulado.
+      **Hallazgo 3, los nombres en el criterio:** el primer arreglo dejaba de contar cualquier mayúscula al empezar
+      una oración, y así pasaba "Luz cambia la lámpara…", que nombra a una persona. El coordinador lo cambió por
+      una regla general. Al empezar una oración, la palabra cuenta como nombre salvo que la persona la haya usado
+      en minúscula en lo que escribió (el recuadro y los campos). Ejemplo: con "pintar los marcos de la puerta",
+      "Marcos de la puerta…" no es Marcos. Ante la duda, Leda propone menos y lo dice.
+      Queda abierto: si la persona escribe en minúscula el nombre de un compañero ("que lo haga lucas"), al cargar
+      también exime a "Lucas cambia…".
+      Pruebas: `npm test` 185 passed y `npm run build` sin errores. `pytest` de la ayuda, el dictado, la
+      ortografía, el criterio y la carga: 484 passed. Control del coordinador: `tests/test_ayuda_al_cargar.py`,
+      316 passed. RDD del tramo `eaf84ed4..269ba8bd`: en curso.
 - [ ] **J3 · Los objetivos desde la web** (ADR 0023, decisión 1, decisión 5 y punto 11). Dirección crea los
       objetivos de su equipo desde su web; el administrador, desde la suya, en cualquier espacio. Con la ayuda
       de la IA desde el primer día, **reutilizando la J2** (usuario, 2026-10-13: "la j2 tiene muy buena base y
