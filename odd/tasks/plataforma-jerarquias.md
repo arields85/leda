@@ -958,7 +958,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
       **Decisiones del usuario (2026-10-14, antes de escribir código):**
       - **D1. A quién le carga un referente:** a su área, a sí mismo y, como préstamo, a cualquiera de otra área,
-        también a otro referente. En un préstamo la tarea la revisa él y Leda le avisa al referente de esa persona.
+        también a otro referente. Cómo funciona el préstamo quedó revisado más abajo ("D1, revisada": lo aprueba
+        el referente de esa persona).
       - **D1b. El pedido a Dirección:** una tarea puede frenarse porque depende de una decisión o una ejecución de
         Dirección. Ejemplo: Lucas no puede instalar el servidor nuevo hasta que Dirección apruebe la compra.
         - Un referente puede cargarle a Dirección un **pedido** ("Aprobar la compra del servidor", para Ismael), y
