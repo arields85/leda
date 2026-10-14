@@ -1294,6 +1294,11 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - **J6-D5. La propuesta de objetivo de un referente no existe para nadie hasta que Dirección la aprueba.** Martín
         la ve sólo en "Lo que pedí" ("esperando a Ismael") y no le puede cargar tareas. Ismael aprueba, corrige o dice
         que no con el motivo.
+      - **J6-D6. A quién se pide:** siempre al referente propio. Algo de otra área lo pide a Marcos, que si está de
+        acuerdo lo convierte en un pedido entre áreas (J4); Nahuel nunca tiene que saber a quién pedirle. Si no hay
+        referente (Gestión) o el referente ya no está activo, los pedidos van a Dirección, y **cada pedido le dice por
+        qué le llega** ("Gestión no tiene referente: mientras no se designe uno, los pedidos de su gente te llegan a
+        vos"), así Dirección se entera de que falta un referente. Nombrar uno es de la J7.
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
