@@ -716,6 +716,12 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       **deuda** (no se siguen persiguiendo en esta unidad): la equivalencia de las dos búsquedas del integrante
       (`web_app.py:1432-1433`), pruebas del vencimiento y de otros datos del juicio guardado más aisladas
       (`test_criterio_verificable.py:563-598`), y un pedido directo a la API con evidencia sin quién la hace.
+- [ ] **J2-24 · La ortografía, corregida en la vista previa** (prueba en el celular, 2026-10-13: "la idea es que
+      la corrija en la vista previa, sin tener que apretar confirmar; lo demás parece que quedó bien"): al salir de
+      un campo de texto, Leda corrige su ortografía y el campo y la vista previa la muestran corregida, sin marcas.
+- [ ] **J2-25 · El criterio en tercera persona**: tras la J2-22 salió en primera persona ("Dejo pintado el cartel…
+      y entrego una foto"; lo notó el agente en la captura); tiene que nombrar a quien la hace: qué hace y qué entrega.
+      Las dos, con el escritor de la J2b (comparten archivos).
 - [ ] **J2b · El dictado, con Gemini en el servidor** (usuario, 2026-10-13: "directamente con Gemini tal cual la
       documentación"; la comparación con OpenAI, anotada en `docs/ROADMAP.md`). **Por qué:** el dictado del
       navegador (`web/src/admin/speech.ts`, reconocimiento del teclado) se cortaba en el iPhone con el bloqueo de la
