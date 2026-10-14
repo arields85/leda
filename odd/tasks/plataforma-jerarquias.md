@@ -678,6 +678,17 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       y los tipos malformados del pack (`importador.py:552-553`). Ronda con la IA real: 76 de 81 (bitácora).
       **Falta la prueba en el celular.** Nota: `test_el_enganche_de_la_cocina_da_la_marca…` falla si `LEDA_BASE_URL`
       está en el `.env` (la prueba depende del entorno).
+- [ ] **J2-19 · En la evidencia, tildado sólo lo que propone Leda** (prueba en el celular de la J2-18,
+      2026-10-13, 21:07). Hallazgos: (1) al elegir a Nahuel (OT) quedaron tildados los cuatro tipos que pide el
+      área más la foto que propuso Leda, y "una foto o una captura" con "una foto del trabajo terminado" a la vez;
+      el usuario: "debería quedar sólo tildado lo que Leda propone, no todos; si la persona lo quiere modificar, lo
+      hace". (2) Sin quién la hace, la IA no propuso a nadie para "pintar el cartel" (ninguna área pinta) y por eso
+      tampoco evidencia; con la persona elegida a mano y el criterio borrado, el segundo "completar" propuso la
+      foto y un criterio natural con cómo se comprueba. **Lo decidido:** la lista de cada área del pack deja de ser
+      un mínimo que se tilda solo: es un dato que Leda tiene en cuenta; Leda propone la evidencia que corresponde a
+      la tarea (sin repetir tipos que dicen lo mismo) y sólo eso queda tildado; la persona agrega o saca (la base
+      exige al menos una). "· la pide el área" sigue como información. Con la misma unidad, los WARNING de RDD de
+      la J2-18 (ver arriba). Ruta: delegada, un escritor.
 - [ ] **J3 · Los objetivos desde la web.**
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
