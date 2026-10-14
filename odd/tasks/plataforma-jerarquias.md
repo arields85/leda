@@ -1160,6 +1160,12 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       cuatro lentes, entre ellos el de riesgo, con dos WARNING de seguridad), `review-d86ed7bfa16f651a` y
       `review-14e9d271659c29c9`. Todos los WARNING de la MA pasan a una última unidad del escritor, primero los de
       seguridad. Lo que haya que cambiar en la base va en la `0074`, porque la `0073` ya está aplicada.
+      **Hecho, tras el paso 1 de la prueba:**
+      - el botón fijo del menú, en `58d91ba3`;
+      - "abrí la app" y el mensaje sin jugada, en `2edebfb6` y `bf961074`, con la conversación 55;
+      - los WARNING de RDD, en `c5815851` y `0beaf5cc`, con la migración `0074`.
+      Suite: 3595 passed; la única falla era una huella esperada y quedó actualizada. En seco, 54 de 54.
+      `leda_motor`: respaldo `leda_motor-antes-0074-20261014.dump`, ensayo previo y la `0074` aplicada.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
