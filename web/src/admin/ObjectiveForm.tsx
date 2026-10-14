@@ -498,6 +498,8 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
     : types.length > 1
       ? `Debajo de «${parent.titulo}» puede ser ${types.map((t) => levels[t]).reduce((a, b) => `${a} ${/^h?o/i.test(b) ? 'u' : 'o'} ${b}`)}.`
       : `Debajo de «${parent.titulo}» es ${types[0] ? levels[types[0]] : levels.operativo}.`;
+  // The plain line about the chosen type (J3-7), once: without a type, only the hint above.
+  const meaning = draft.tipo ? typeMeaning(draft.tipo, levels) : null;
 
   return (
     <div
@@ -560,10 +562,14 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
 
           <FieldBlock id="o-tipo" label="Tipo" errors={said('tipo')} proposed={proposed.has('tipo')}
             hint={
-              <span className="flex flex-col gap-0.5">
-                <span>{typeHint}</span>
-                {draft.tipo && typeMeaning(draft.tipo, levels) && <span>{typeMeaning(draft.tipo, levels)}</span>}
-              </span>
+              meaning ? (
+                <span className="flex flex-col gap-0.5">
+                  <span>{typeHint}</span>
+                  <span>{meaning}</span>
+                </span>
+              ) : (
+                typeHint
+              )
             }>
             {types.length > 1 ? (
               <Dropdown

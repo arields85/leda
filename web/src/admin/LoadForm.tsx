@@ -256,6 +256,16 @@ export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = fal
     setNotes((current) => current.filter((n) => !clearedBy(n, touched)));
   }
 
+  /** Who decided stays only if that person may decide a task of whoever does it now (D10; review
+   * of the J4a): Dirección always, the referente of that area only for it. Otherwise it empties, so
+   * what is shown and sent is never a decider the server refuses. */
+  function stillDecides(decider: string, responsible: string): Partial<Draft> {
+    if (!decider) return {};
+    return deciders(options, memberOf(options, responsible)).some((m) => m.membership_id === decider)
+      ? {}
+      : { decidio_id: '' };
+  }
+
   /** Takes the criterion Leda proposed with a refusal: it fills the field (the notice goes, as
    * with any change) and stays marked as hers until the person edits it. */
   function takeCriterion(text: string) {
@@ -271,7 +281,12 @@ export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = fal
     const kept = latest.current.evidencia.filter((k) => known.includes(k));
     // Never the one who does it as the one who reviews it (D3).
     const reviewer = latest.current.revisa_id === id ? { revisa_id: '' } : {};
-    change({ responsable_id: id, evidencia: known.filter((k) => kept.includes(k)), ...reviewer });
+    change({
+      responsable_id: id,
+      evidencia: known.filter((k) => kept.includes(k)),
+      ...reviewer,
+      ...stillDecides(latest.current.decidio_id, id),
+    });
     setLedaEvidence((marked) => new Set([...marked].filter((k) => kept.includes(k))));
   }
 
@@ -288,6 +303,7 @@ export function LoadForm({ spaceId, api, options, admin, onClosed, stacked = fal
     );
     const next: Draft = { ...current };
     for (const field of filled) next[field] = valid[field] as string;
+    if (filled.includes('responsable_id')) Object.assign(next, stillDecides(next.decidio_id, next.responsable_id));
     const known = evidenceKinds(policyOf(options, memberOf(options, next.responsable_id)));
     const offered = Array.isArray(proposal.evidencia) ? proposal.evidencia : [];
     const added =

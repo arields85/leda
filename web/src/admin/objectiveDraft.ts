@@ -113,11 +113,25 @@ export function dueAfterParentText(parent: ParentObjective): string {
   return `Este objetivo vence después que «${parent.titulo}»${day}: es parte de ese objetivo, que se demoraría.`;
 }
 
+// The pack's level names that do not follow the ending of their first word (mecánica §1 names
+// "plan anual / campaña / orden de trabajo / intervención / paso"; review of the J4a): masculine
+// words in -a (most of them Greek ones in -ma), and "orden", feminine as an order of work.
+const MASCULINE_IN_A = new Set([
+  'día', 'dia', 'mapa', 'planeta', 'programa', 'sistema', 'problema', 'tema', 'esquema', 'clima', 'idioma',
+  'diagrama',
+]);
+const FEMININE = new Set(['orden', 'imagen', 'red', 'fase', 'clase', 'parte', 'serie', 'base']);
+
 /** A level's name with its indefinite article ("un objetivo general", "una etapa"), by the first
- * word of the pack's name: one that ends in "a" takes "una" (J3-7). */
+ * word of the pack's name (J3-7): feminine when it ends in "a" (not the masculine ones listed) or
+ * in "-ión", "-dad", "-tad", "-tud" or "-umbre", and the few feminine ones listed. */
 export function withArticle(level: string): string {
-  const first = level.trim().split(/\s+/)[0] ?? '';
-  return `${/a$/i.test(first) ? 'una' : 'un'} ${level}`;
+  const first = (level.trim().split(/\s+/)[0] ?? '').toLowerCase();
+  const feminine =
+    FEMININE.has(first) ||
+    (!MASCULINE_IN_A.has(first) && /a$/.test(first)) ||
+    /(ión|dad|tad|tud|umbre)$/.test(first);
+  return `${feminine ? 'una' : 'un'} ${level}`;
 }
 
 /** The empty choice of "Es parte de" (J3-7): it is part of nothing, so it is the biggest level. */

@@ -176,8 +176,10 @@ export function loadTask(spaceId: string, input: TaskInput): Promise<LoadResult>
   return loadTaskAt(`${ADMIN}/api/espacios/${encodeURIComponent(spaceId)}/tareas`, input);
 }
 
-/** The same load at any door's address (the team's, J4). A 403 (not Dirección nor a referente)
- * reads as a rejection with the server's words. */
+/** The same load at any door's address (the team's, J4). A 403 that says the person may not load
+ * (`sin_autoridad`: not Dirección nor a referente) reads as a rejection with the server's words;
+ * any other 403 (another site, at either door) throws, like any failure, so it is never reworded as
+ * "only Dirección loads" (review of the J4a). */
 export async function loadTaskAt(url: string, input: TaskInput): Promise<LoadResult> {
   const response = await call(url, {
     method: 'POST',
@@ -198,13 +200,14 @@ export async function loadTaskAt(url: string, input: TaskInput): Promise<LoadRes
     return { kind: 'rejected', errors: body.errores ?? [] };
   }
   if (response.status === 403) {
-    let texto = NOT_LOADING;
+    let body: { error?: unknown; texto?: unknown } | null = null;
     try {
-      const body = (await response.json()) as { texto?: unknown };
-      if (typeof body?.texto === 'string' && body.texto.trim()) texto = body.texto;
+      body = (await response.json()) as { error?: unknown; texto?: unknown };
     } catch {
-      // The plain words above.
+      body = null;
     }
+    if (body?.error !== 'sin_autoridad') throw new RequestError(403);
+    const texto = typeof body.texto === 'string' && body.texto.trim() ? body.texto : NOT_LOADING;
     return { kind: 'rejected', errors: [{ campo: 'sesion', motivo: 'sin_autoridad', texto }] };
   }
   throw new RequestError(response.status);
