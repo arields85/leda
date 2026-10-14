@@ -902,6 +902,11 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         herramienta de medición; una ronda con la IA real.
   - [ ] J3-5 · La prueba en el celular (usuario), con su guion.
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
+      Incluye (usuario, 2026-10-14): si alguien escribe por Telegram "quiero crear una tarea" (o un objetivo),
+      Leda le dice que eso se hace en la web y le ofrece el enlace, según lo que esa persona puede cargar.
+      Es un hecho de la cocina, no frases (regla del mozo), y lleva su conversación de prueba contra la IA real.
+      Hoy cae en "fuera de la lista": no se crea nada, Leda dice lo que sí puede hacer y deja un incidente de
+      prioridad baja (`turno._manejar`). Con la Mini App cambia a ofrecer abrirla (`docs/ROADMAP.md`).
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).

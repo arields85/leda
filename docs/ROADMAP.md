@@ -105,6 +105,9 @@ Etapas y criterios de paso a `main` (M1 a M3): [`STATUS.md`](STATUS.md), "Próxi
    equipo y la de administración. Va con la VPS, porque pide una dirección HTTPS fija, y lleva una
    enmienda al ADR 0022 (decisión 4, cómo se entra). Se descartó "agregar a la pantalla de inicio": hay
    que instalarla desde Safari y en el iPhone no comparte la sesión.
+   Al hacerla, cambiar lo que dice Leda ante "quiero crear una tarea" (u objetivo) por Telegram: no pasar
+   el enlace, sino preguntar si quiere abrir la Mini App para crearla (usuario, 2026-10-14; hasta entonces,
+   la J4 ofrece el enlace a la web). Se resuelve en detalle al hacer la Mini App.
    Al hacerla, revisar el agrandado con dos dedos: hoy, en el navegador de Telegram, la regla que evita que el
    iPhone agrande la página al tocar un campo también lo bloquea (decisión del usuario, 2026-10-13: se acepta por
    ahora; queda el Zoom de accesibilidad del sistema).
