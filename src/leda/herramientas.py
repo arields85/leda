@@ -76,8 +76,10 @@ class Herramienta:
     # handler devolvería (para que una vista previa nunca proponga algo que
     # el confirmar va a negar). `ejecutar` es quien decide, con esto, si la
     # herramienta necesita confirmación: no una lista aparte por nombre de
-    # acción, que `crear_objetivo` ya demostró que se puede desalinear
-    # (`accion="crear_tarea"`, corregido en esta misma unidad).
+    # acción, que la herramienta de chat que creaba objetivos ya demostró que
+    # se puede desalinear (`accion="crear_tarea"`). Esa herramienta se retiró
+    # (migración 0068): los objetivos se crean desde la web (ADR 0023,
+    # decisiones 1 y 6).
     preparar: Callable[..., Any] | None = None
 
 
@@ -770,57 +772,6 @@ def _consultar_bloqueos(cur, quien: Solicitante):
 # ---------------------------------------------------------------------------
 # Trabajo
 # ---------------------------------------------------------------------------
-
-def _preparar_crear_objetivo(cur, quien: Solicitante, titulo, tipo,
-                             padre_id=None, descripcion=None,
-                             fecha_objetivo=None):
-    padre_titulo = None
-    padre_estado = None
-    if padre_id:
-        cur.execute("select titulo, estado from objective where id = %s",
-                   (padre_id,))
-        padre = cur.fetchone()
-        if not padre:
-            return {"error": "el objetivo del que iba a colgar no existe en "
-                             "este equipo"}
-        padre_titulo, padre_estado = padre["titulo"], padre["estado"]
-
-    cambio = _filas(
-        ("Nuevo objetivo", titulo), ("Tipo", tipo),
-        ("Cuelga de", f"«{padre_titulo}»" if padre_titulo else None),
-        ("Fecha objetivo", fecha_objetivo or None))
-    huella = _huella("crear_objetivo", titulo, tipo, padre_id, padre_estado,
-                     descripcion, fecha_objetivo)
-    return Preparacion(cambio=cambio, huella=huella,
-                       hecho=f"Creé el objetivo «{titulo}».")
-
-
-@herramienta(
-    "crear_objetivo", "crear_objetivo",
-    "Crea un objetivo. Usalo cuando el trabajo que piden no encaja en ninguno "
-    "de los que ya existen. Consultá primero los objetivos actuales.",
-    {"titulo": {"type": "string", "requerido": True},
-     "tipo": {"type": "string", "requerido": True,
-              "enum": ["estrategico", "hito", "operativo"]},
-     "padre_id": {"type": "string", "description": "objetivo del que cuelga"},
-     "descripcion": {"type": "string"},
-     "fecha_objetivo": {"type": "string", "description": "AAAA-MM-DD"}},
-    preparar=_preparar_crear_objetivo)
-def _crear_objetivo(cur, quien: Solicitante, titulo, tipo, padre_id=None,
-                    descripcion=None, fecha_objetivo=None):
-    cur.execute(
-        """insert into objective (workspace_id, parent_id, tipo, titulo,
-                                  descripcion, fecha_objetivo, estado)
-           values (%s, %s, %s, %s, %s, %s, 'activo') returning id""",
-        (quien.workspace_id, padre_id, tipo, titulo, descripcion, fecha_objetivo))
-    oid = cur.fetchone()["id"]
-    cur.execute(
-        """insert into objective_state_event (objective_id, estado_nuevo,
-                                              actor_kind, actor_app_user_id)
-           values (%s, 'activo', 'persona', %s)""",
-        (oid, quien.app_user_id))
-    return {"id": str(oid), "titulo": titulo}
-
 
 def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
                          area_slug=None, responsable=None, fecha_objetivo=None,

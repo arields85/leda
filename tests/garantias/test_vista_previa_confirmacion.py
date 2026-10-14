@@ -278,18 +278,3 @@ def test_propiedad_aprobar_tarea(corework, conn):
 
         _propiedad(cur, ws, quien, "aprobar_tarea", {"tarea_id": tid}, aplicado)
 
-
-def test_propiedad_crear_objetivo(corework, conn):
-    ws = corework.workspace_id
-    with espacio(conn, ws) as cur:
-        quien = _quien(cur, "Marcos Tarquini", ws)
-        titulo = "Objetivo de la propiedad de confirmación"
-
-        def aplicado(cur):
-            cur.execute(
-                "select count(*) n from objective where workspace_id = %s and titulo = %s",
-                (ws, titulo))
-            return cur.fetchone()["n"] > 0
-
-        _propiedad(cur, ws, quien, "crear_objetivo",
-                  {"titulo": titulo, "tipo": "operativo"}, aplicado)

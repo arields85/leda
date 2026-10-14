@@ -180,14 +180,11 @@ def verificar(cur: psycopg.Cursor, quien: Solicitante, accion: str,
     # Sin regla explícita, las acciones de gestión corriente están permitidas
     # a cualquier integrante; las de decisión, no.
     #
-    # "crear_objetivo" se agregó acá al separarla de "crear_tarea"
-    # (`herramientas.py`, `_crear_objetivo`): antes compartían acción, así
-    # que un permiso o una restricción sobre "crear_tarea" alcanzaba también
-    # a crear objetivos sin que nadie lo hubiera decidido así. Separarlas sin
-    # agregar "crear_objetivo" acá le habría cambiado el comportamiento a
-    # cualquier equipo existente, de permitido a denegado, sin que fuera la
-    # intención de esta corrección.
-    if accion in ("crear_tarea", "crear_objetivo", "actualizar_estado",
+    # "crear_objetivo" ya no está: la herramienta de chat que creaba objetivos
+    # se retiró (migración 0068). Los objetivos los crea Dirección o el
+    # administrador de plataforma desde la web (ADR 0023, decisiones 1 y 6), y
+    # esa autoridad la comprueba la base (`crear_objetivo_web`), no esta lista.
+    if accion in ("crear_tarea", "actualizar_estado",
                   "registrar_bloqueo", "adjuntar_evidencia", "consultar"):
         return
 
