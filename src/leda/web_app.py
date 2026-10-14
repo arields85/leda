@@ -1193,6 +1193,9 @@ async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, 
                "evidencia": list(preparado["evidencia"]),
                "contexto": list(preparado["contexto"]),
                "personas": list(preparado["personas"])}
+    # J2-30: lo que escribió la persona en los campos, para una palabra al empezar una oración.
+    entrada["de_la_persona"] = "\n".join([entrada["titulo"], entrada["descripcion"],
+                                          entrada["criterio"]])
     clave = _clave_del_juicio(token, espacio, preparado["ia"], entrada)
     reciente = _JUICIOS_RECIENTES.leer(clave)
     if reciente is not None:

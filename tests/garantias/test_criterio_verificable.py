@@ -143,6 +143,25 @@ def test_j2_26_la_propuesta_de_un_rechazo_no_nombra_a_nadie_del_espacio(
     assert (error["motivo"], error["propuesta"]) == ("sin_resultado", PROPUESTO_PLC)
 
 
+NOBLE = "Noble madera de la sala barnizada, y se ve en el registro de la prueba."
+
+
+@pytest.mark.parametrize("titulo, propone", [
+    ("Barnizar la madera noble de la sala", True),
+    ("Barnizar la madera de la sala", False)])
+def test_j2_30_al_cargar_lo_que_escribio_la_persona_llega_al_juicio(
+        web, conn, intake_world, administradora, ia, titulo, propone):
+    """J2-30: "Noble" al empezar la propuesta es Sam Noble, salvo que la persona haya escrito
+    "noble" en minúscula en la tarea: la carga le pasa al juicio lo que ella escribió."""
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    ia.respuestas.append({**SIN_RESULTADO, "criterio": NOBLE})
+    r = navegador.post(_camino(intake_world),
+                       json=_cuerpo(intake_world, titulo=titulo, criterio="No se"))
+    assert r.status_code == 422, r.text
+    (error,) = [e for e in r.json()["errores"] if e["campo"] == "criterio"]
+    assert (error.get("propuesta") == NOBLE) is propone
+
+
 def test_j2_26_el_criterio_que_escribe_la_persona_con_un_nombre_es_suyo(
         web, conn, intake_world, administradora, ia):
     navegador = _navegador_de_administracion(web, conn, administradora)

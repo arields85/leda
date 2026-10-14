@@ -2129,7 +2129,7 @@ def test_j2_26_un_criterio_de_la_ia_que_nombra_a_quien_la_hace_no_se_propone(ayu
 
 @pytest.mark.parametrize("criterio", [
     "Lucas cuelga el estante del módem en la sala y entrega una foto.",        # el nombre solo
-    "El estante del módem lo deja colgado Pérez en la sala.",                  # el apellido
+    "Pérez deja colgado el estante del módem en la sala.",                     # el apellido
     "El estante del módem queda colgado por lucas pérez en la sala.",          # el nombre entero
     "El estante queda colgado y Marcos Díaz lo ve en la sala.",               # otro del equipo
 ])
@@ -2198,26 +2198,57 @@ def test_j2_26_un_resultado_que_nombra_no_arma_el_de_reserva(ayuda):
     ("Queda encendida la lámpara que cambió luz gómez.", True),   # el nombre entero, en minúscula
     ("Luz Gómez cambia la lámpara del pasillo.", True),           # el nombre entero, al empezar
     ("La lámpara del pasillo queda encendida.", False),
-    # J2-30 (revisión J2-29): al empezar una oración la mayúscula es de la oración, no dice que sea
-    # un nombre. Al principio del texto o después de un punto, "!", "?", ":" o un renglón nuevo,
-    # una parte suelta no cuenta; tampoco cuando la oración es la de un nombre ("Luz cambia…").
-    ("Luz del pasillo encendida, con una foto.", False),
-    ("La lámpara queda cambiada. Luz del pasillo encendida.", False),
-    ("¿Quedó cambiada? Luz del pasillo encendida.", False),
-    ("Revisado: Luz del pasillo encendida.", False),
-    ("La lámpara queda cambiada\nLuz del pasillo encendida.", False),
-    ("Luz cambia la lámpara del pasillo y entrega una foto.", False),
+    # Al empezar una oración también cuenta, si la persona no usó esa palabra en minúscula (J2-30:
+    # sin lo que escribió, no hay con qué decir que es una palabra del trabajo).
+    ("Luz cambia la lámpara del pasillo y entrega una foto.", True),
+    ("Luz del pasillo encendida, con una foto.", True),
 ])
 def test_j2_26_que_cuenta_como_un_nombre(ayuda, criterio, nombra):
     personas = ["Luz Gómez", "Ismael Soschinski"]
     assert ayuda.nombra_a_alguien(criterio, personas) is nombra
 
 
+LUZ_DEL_PASILLO = "hay que cambiar la luz del pasillo que quedo quemada"
+
+
+@pytest.mark.parametrize("criterio, nombra", [
+    # J2-30 (revisión J2-29): la persona escribió "la luz del pasillo": al empezar una oración
+    # (al principio, o después de un punto, "!", "?", ":" o un renglón nuevo), "Luz" es esa palabra
+    # del trabajo, no Luz Gómez.
+    ("Luz del pasillo encendida, con una foto.", False),
+    ("La lámpara queda cambiada. Luz del pasillo encendida.", False),
+    ("¿Quedó cambiada? Luz del pasillo encendida.", False),
+    ("Revisado: Luz del pasillo encendida.", False),
+    ("La lámpara queda cambiada\nLuz del pasillo encendida.", False),
+    # En el medio de una oración, con mayúscula, es un nombre igual.
+    ("La lámpara del pasillo la cambia Luz y entrega una foto.", True),
+    # Otra palabra de un nombre que la persona no usó en minúscula, también.
+    ("Ismael cambia la luz del pasillo.", True),
+])
+def test_j2_30_al_empezar_una_oracion_una_palabra_del_trabajo_no_es_un_nombre(ayuda, criterio,
+                                                                              nombra):
+    personas = ["Luz Gómez", "Ismael Soschinski"]
+    assert ayuda.nombra_a_alguien(criterio, personas,
+                                  de_la_persona=LUZ_DEL_PASILLO) is nombra
+
+
+def test_j2_30_lo_que_escribio_la_persona_llega_a_la_propuesta(ayuda):
+    """"Marcos de la puerta" con Marcos Díaz en el equipo: la persona escribió "los marcos de la
+    puerta", así que el criterio de la IA no nombra a nadie y se propone."""
+    texto = "hay que pintar los marcos de la puerta de la sala"
+    criterio = "Marcos de la puerta pintados, y se ve en una foto del trabajo terminado."
+    resultado, _ = _proponer(ayuda, {"titulo": "Pintar los marcos de la puerta de la sala",
+                                     "criterio": criterio},
+                             texto=texto, coinciden=_nadie)
+    assert {"campo": "criterio", "motivo": "nombra_a_alguien"} not in resultado.descartados
+    assert resultado.propuesta["criterio"] == criterio
+
+
 @pytest.mark.parametrize("criterio, nombra", [
     # J2-30 (revisión J2-29): un apodo cuenta escrito como está registrado ("lucas", en minúscula,
-    # como lo guarda `motor.apodos`), o escrito como nombre en el medio de la oración; con otras
-    # mayúsculas al empezar una oración, no ("Lucas de la puerta…": los marcos de la puerta).
-    ("Lucas de la puerta quedan pintados y se ve en una foto.", False),
+    # como lo guarda `motor.apodos`), o escrito como nombre, como cualquier palabra suelta: al
+    # empezar una oración también, si la persona no usó esa palabra en minúscula.
+    ("Lucas de la puerta quedan pintados y se ve en una foto.", True),
     ("Los marcos de la puerta quedan pintados y lucas lo ve.", True),
     ("Los marcos de la puerta quedan pintados y Lucas lo ve.", True),
     ("Los marcos de la puerta quedan pintados.", False),
@@ -2228,6 +2259,19 @@ def test_j2_30_un_apodo_cuenta_escrito_como_esta_registrado(ayuda, criterio, nom
     personas = ayuda.personas_del_espacio({"integrantes": [{"nombre": "Sam North"}]},
                                           ["lucas", "el tano"])
     assert ayuda.nombra_a_alguien(criterio, personas) is nombra
+
+
+def test_j2_30_al_cargar_una_palabra_del_trabajo_al_empezar_no_es_un_nombre(ayuda):
+    """Al cargar, lo que escribió la persona en los campos llega al juicio: "Marcos de la
+    puerta…", que propone la IA al rechazar el criterio, no nombra a Marcos Díaz."""
+    propuesta = "Marcos de la puerta pintados, con una foto del trabajo terminado."
+    ia = IADeLaCarga({"dice_como_se_comprueba": False, "como_se_comprueba": "",
+                      "criterio": propuesta})
+    juicio = ayuda.juzgar_el_criterio(ia, titulo="Pintar los marcos de la puerta",
+                                      descripcion="", criterio="No se",
+                                      personas=["Marcos Díaz"],
+                                      de_la_persona="Pintar los marcos de la puerta\nNo se")
+    assert juicio.motivo == "sin_comprobacion" and juicio.propuesta == propuesta
 
 
 def test_j2_26_al_cargar_el_criterio_de_la_persona_es_suyo(ayuda):
@@ -2249,10 +2293,8 @@ def test_j2_26_al_cargar_la_propuesta_de_un_rechazo_no_nombra(ayuda):
                                       evidencia=[PRUEBA], personas=["Lucas Pérez"])
     assert juicio.motivo == "sin_resultado" and juicio.de_reserva
     assert "Lucas" not in juicio.propuesta
-    # El nombre entero, en minúscula: sólo `nombra_a_alguien` lo ve (J2-30: "Lucas" solo al
-    # empezar la oración ya no cuenta, y con mayúscula en el medio lo rechaza antes `nombre`).
     ia = IADeLaCarga({"dice_como_se_comprueba": False, "como_se_comprueba": "",
-                      "criterio": "El UPS lo cambia lucas pérez y lo ve encendido."})
+                      "criterio": "Lucas cambia el UPS y lo ve encendido."})
     juicio = ayuda.juzgar_el_criterio(ia, titulo=TITULO_UPS, descripcion="", criterio="No se",
                                       personas=["Lucas Pérez"])
     assert juicio.motivo == "sin_comprobacion" and juicio.propuesta is None

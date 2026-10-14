@@ -797,7 +797,7 @@ def _cadena(valor: Any) -> str | None:
 
 def _problema_del_texto(texto: str, permitidos: Sequence[str], largo: int, *,
                         personas: Sequence[str] | None = None,
-                        dichos: Sequence[str] = ()) -> str | None:
+                        dichos: Sequence[str] = (), de_la_persona: str = "") -> str | None:
     """`None` si el texto sirve; si no, el motivo (`largo`, `dato`, `nombre`). Con `personas`
     (un criterio que escribe Leda, J2-26), también `nombra_a_alguien`."""
     if len(texto) > largo:
@@ -806,7 +806,8 @@ def _problema_del_texto(texto: str, permitidos: Sequence[str], largo: int, *,
         problema = problema_del_ejemplo(punto, permitidos)
         if problema is not None:
             return "largo" if problema == "largo" else problema.split(":")[0]
-    if personas is not None and nombra_a_alguien(texto, personas, dichos):
+    if personas is not None and nombra_a_alguien(texto, personas, dichos,
+                                                 de_la_persona=de_la_persona):
         return "nombra_a_alguien"
     return None
 
@@ -830,8 +831,11 @@ def _problema_del_texto(texto: str, permitidos: Sequence[str], largo: int, *,
 # lo vea"); eso lo pide la instrucción, y lo mide la herramienta de la medición.
 #
 # J2-30 (revisión J2-29): al empezar una oración (al principio del texto, o después de un punto,
-# "!", "?", ":" o un renglón nuevo) la mayúscula es de la oración y no dice que la palabra sea un
-# nombre: ahí una palabra suelta no cuenta ("Marcos de la puerta…" con Marcos en el equipo). Y un
+# "!", "?", ":" o un renglón nuevo) la mayúscula es de la oración: ahí una palabra suelta de un
+# nombre cuenta igual (un falso nombre sólo hace que Leda proponga menos y lo diga; un nombre que se
+# cuela no se ve), salvo que la persona haya usado esa misma palabra en minúscula, como palabra del
+# trabajo, en lo que escribió o dictó (`de_la_persona`: "pintar los marcos de la puerta" hace que
+# "Marcos de la puerta quedan pintados" no nombre a Marcos). Sin lo de la persona, cuenta. Y un
 # apodo cuenta escrito como está registrado, con sus mismas mayúsculas (`motor.apodos` lo guarda en
 # minúsculas; la de un artículo no dice nada: "El tano" es "el tano"), o escrito como nombre en el
 # medio de una oración, como cualquier palabra suelta.
@@ -886,9 +890,16 @@ def _escrito_el_apodo(escritas: Sequence[str], apodo: Sequence[str]) -> bool:
                          for i in range(len(escritas) - n + 1))
 
 
-def nombra_a_alguien(texto: str, personas: Sequence[str], dichos: Sequence[str] = ()) -> bool:
+def _en_minuscula(texto: str) -> set[str]:
+    """Las palabras que `texto` usa en minúscula (sin tildes): palabras del trabajo."""
+    return {_sin_marcas(m.group(0)) for m in _PALABRA.finditer(texto) if m.group(0)[0].islower()}
+
+
+def nombra_a_alguien(texto: str, personas: Sequence[str], dichos: Sequence[str] = (), *,
+                     de_la_persona: str = "") -> bool:
     """Si el texto nombra a una de `personas` (nombres enteros o apodos) o a quien la persona
-    nombró con `dichos` (la regla, en el comentario de la sección)."""
+    nombró con `dichos` (la regla, en el comentario de la sección). `de_la_persona`: lo que ella
+    escribió o dictó (el texto libre y los campos), para la palabra al empezar una oración."""
     plano = _normal(texto)
     frases: set[str] = set()
     sueltas: set[str] = set()
@@ -915,8 +926,11 @@ def nombra_a_alguien(texto: str, personas: Sequence[str], dichos: Sequence[str] 
     escritas = [_sin_tildes(m.group(0)) for m in palabras]
     if any(_escrito_el_apodo(escritas, apodo) for apodo in apodos):
         return True
-    return any(m.group(0)[0].isupper() and not _al_empezar_una_oracion(texto, m.start())
-               and _sin_marcas(m.group(0)) in sueltas for m in palabras)
+    del_trabajo = _en_minuscula(de_la_persona)
+    return any(m.group(0)[0].isupper() and _sin_marcas(m.group(0)) in sueltas
+               and not (_al_empezar_una_oracion(texto, m.start())
+                        and _sin_marcas(m.group(0)) in del_trabajo)
+               for m in palabras)
 
 
 def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
@@ -1012,9 +1026,13 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
     if "criterio" in pide:
         # J2-26: a quien la persona nombró para hacerla, sea o no del equipo, tampoco.
         dicho = _cadena(crudo.get("responsable")) if "responsable_id" in pide else None
+        # J2-30: lo que escribió o dictó la persona, para una palabra al empezar una oración.
+        de_la_persona = "\n".join([texto, *(str(escrito.get(c) or "") for c in
+                                             ("titulo", "descripcion", "criterio"))])
         r.por_juzgar = _el_criterio_por_juzgar(
             r, crudo, escrito, evidencia, permitidos, sin_quien=integrante is None,
-            personas=personas_del_espacio(opciones, apodos), dichos=[dicho] if dicho else [])
+            personas=personas_del_espacio(opciones, apodos), dichos=[dicho] if dicho else [],
+            de_la_persona=de_la_persona)
     return r
 
 
@@ -1156,7 +1174,7 @@ def _evidencia_de_la_tarea(opciones, integrante, objetivo) -> list[str]:
 def _el_criterio_por_juzgar(r: Resultado, crudo: Mapping[str, Any], escrito: Mapping[str, Any],
                             evidencia: Sequence[str], permitidos: Sequence[str], *,
                             sin_quien: bool = False, personas: Sequence[str] = (),
-                            dichos: Sequence[str] = ()) -> dict[str, Any]:
+                            dichos: Sequence[str] = (), de_la_persona: str = "") -> dict[str, Any]:
     """Lo que se juzga del criterio que escribió la IA: el texto entero, si pasa los controles de
     lo inventado y no nombra a nadie (J2-26; si no, vacío: el juicio igual escribe uno), con el
     título y la descripción de la tarea (los escritos o los propuestos), la evidencia de quien la
@@ -1167,7 +1185,8 @@ def _el_criterio_por_juzgar(r: Resultado, crudo: Mapping[str, Any], escrito: Map
         r.descartar("criterio", "vacio")
     else:
         problema = _problema_del_texto(criterio, permitidos, LARGOS["criterio"],
-                                       personas=personas, dichos=dichos)
+                                       personas=personas, dichos=dichos,
+                                       de_la_persona=de_la_persona)
         if problema is not None:
             r.descartar("criterio", problema)
             criterio = None
@@ -1180,7 +1199,8 @@ def _el_criterio_por_juzgar(r: Resultado, crudo: Mapping[str, Any], escrito: Map
     return {"titulo": de_la_tarea("titulo"), "descripcion": de_la_tarea("descripcion"),
             "criterio": criterio or "", "evidencia": list(evidencia),
             "contexto": list(permitidos), "resultado": _cadena(crudo.get("resultado")),
-            "sin_quien": sin_quien, "personas": list(personas), "dichos": list(dichos)}
+            "sin_quien": sin_quien, "personas": list(personas), "dichos": list(dichos),
+            "de_la_persona": de_la_persona}
 
 
 def juzgar_la_propuesta(ia, r: Resultado) -> Juicio | None:
@@ -1194,7 +1214,8 @@ def juzgar_la_propuesta(ia, r: Resultado) -> Juicio | None:
     return juzgar_el_criterio(ia, titulo=p["titulo"], descripcion=p["descripcion"],
                               criterio=p["criterio"], evidencia=p["evidencia"],
                               contexto=p["contexto"], sin_quien=p.get("sin_quien", False),
-                              personas=p.get("personas", ()), dichos=p.get("dichos", ()))
+                              personas=p.get("personas", ()), dichos=p.get("dichos", ()),
+                              de_la_persona=p.get("de_la_persona", ""))
 
 
 def cerrar_el_criterio(r: Resultado, juicio: Juicio | None) -> None:
@@ -1215,7 +1236,8 @@ def cerrar_el_criterio(r: Resultado, juicio: Juicio | None) -> None:
         r.criterio_de = "reserva" if juicio.de_reserva else "juicio"
         return
     reserva, _ = _de_reserva(p["resultado"], p["evidencia"], p["contexto"],
-                             personas=p.get("personas", ()), dichos=p.get("dichos", ()))
+                             personas=p.get("personas", ()), dichos=p.get("dichos", ()),
+                             de_la_persona=p.get("de_la_persona", ""))
     if reserva is not None:
         r.propuesta["criterio"], r.criterio_de = reserva, "reserva"
         return
@@ -1223,8 +1245,8 @@ def cerrar_el_criterio(r: Resultado, juicio: Juicio | None) -> None:
 
 
 def _de_reserva(resultado: Any, evidencia: Sequence[str], permitidos: Sequence[str], *,
-                personas: Sequence[str] = (),
-                dichos: Sequence[str] = ()) -> tuple[str | None, str | None]:
+                personas: Sequence[str] = (), dichos: Sequence[str] = (),
+                de_la_persona: str = "") -> tuple[str | None, str | None]:
     """El criterio de reserva, si hay evidencia del área y un resultado que, armado, pasa los
     controles del texto y no nombra a nadie (J2-26); si no, `None` y el motivo."""
     resultado = _cadena(resultado)
@@ -1234,7 +1256,7 @@ def _de_reserva(resultado: Any, evidencia: Sequence[str], permitidos: Sequence[s
         return None, "vacio"
     candidato = criterio_con_la_evidencia(resultado, evidencia)
     problema = _problema_del_texto(candidato, permitidos, LARGOS["criterio"],
-                                   personas=personas, dichos=dichos)
+                                   personas=personas, dichos=dichos, de_la_persona=de_la_persona)
     return (candidato, None) if problema is None else (None, problema)
 
 
@@ -1378,7 +1400,7 @@ def sin_nada_que_juzgar(titulo: str, criterio: str) -> bool:
 def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
                        evidencia: Sequence[str] = (), contexto: Sequence[str] = (),
                        sin_quien: bool = False, personas: Sequence[str] = (),
-                       dichos: Sequence[str] = ()) -> Juicio:
+                       dichos: Sequence[str] = (), de_la_persona: str = "") -> Juicio:
     """Si el criterio sirve. Una sola llamada a la IA del espacio (sin reintento), que lo juzga
     por su sentido y escribe su propio criterio; el código decide.
 
@@ -1400,7 +1422,7 @@ def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
 
     J2-26: el criterio que propone Leda no nombra a nadie de `personas` (las del espacio) ni de
     `dichos` (a quien la persona nombró para hacerla); el que se juzga, el de la persona, sí puede:
-    es suyo."""
+    es suyo. `de_la_persona`: lo que ella escribió o dictó (J2-30, `nombra_a_alguien`)."""
     titulo, descripcion, criterio = (" ".join((t or "").split())
                                      for t in (titulo, descripcion, criterio))
     evidencia = [e for e in (" ".join(str(x).split()) for x in evidencia) if e]
@@ -1425,7 +1447,7 @@ def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
             return Juicio(None)
     permitidos = [titulo, descripcion, criterio, *evidencia, *contexto]
     propuesta, de_reserva, problema = _propuesta_del_juicio(crudo, evidencia, permitidos,
-                                                            personas, dichos)
+                                                            personas, dichos, de_la_persona)
     if propuesta is None:
         return Juicio(rechazo, RespuestaInvalida(
             f"No se pudo proponer un criterio: lo que escribió la IA no sirve ({problema})."))
@@ -1456,7 +1478,8 @@ def _lo_que_dice(crudo: Mapping[str, Any], criterio: str,
 
 def _propuesta_del_juicio(crudo: Mapping[str, Any], evidencia: Sequence[str],
                           permitidos: Sequence[str], personas: Sequence[str] = (),
-                          dichos: Sequence[str] = ()) -> tuple[str | None, bool, str | None]:
+                          dichos: Sequence[str] = (),
+                          de_la_persona: str = "") -> tuple[str | None, bool, str | None]:
     """El criterio que propone Leda al rechazar uno: el que escribió la IA, tal cual, si pasa los
     controles del texto (el largo, ningún número ni nombre que no esté en la tarea, y ninguna
     persona nombrada: J2-26); si no, el de
@@ -1466,11 +1489,12 @@ def _propuesta_del_juicio(crudo: Mapping[str, Any], evidencia: Sequence[str],
     problema = "vacio"
     if propio is not None:
         problema = _problema_del_texto(propio, permitidos, LARGOS["criterio"],
-                                       personas=personas, dichos=dichos)
+                                       personas=personas, dichos=dichos,
+                                       de_la_persona=de_la_persona)
         if problema is None:
             return propio, False, None
     reserva, otro = _de_reserva(crudo.get("resultado"), evidencia, permitidos,
-                                personas=personas, dichos=dichos)
+                                personas=personas, dichos=dichos, de_la_persona=de_la_persona)
     if reserva is not None:
         return reserva, True, None
     return None, False, problema if otro in ("sin_evidencia", "vacio") else otro
