@@ -1156,6 +1156,11 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       `docs/product/guion-celular-ma.md`.
       RDD commit por commit: siete revisiones aprobadas, con WARNING de casos de borde. El `70c0900b` no entraba en
       el presupuesto del revisor y se revisa en cuatro tramos.
+      **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
+      chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
+      bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
+      la dirección (). Leda ofrece un botón **sólo para lo que se hace sí o sí en la app** (crear
+      una tarea, ver una tarea cargada), no en cada respuesta.
       **Decisiones del usuario (2026-10-14):**
       - **MA1. En el celular, sólo la Mini App: los enlaces desaparecen.** Hay que revisar cada lugar donde Leda
         ofrece o manda un enlace (el pedido de acceso, el ofrecimiento de una sola vez, la bienvenida, los avisos
