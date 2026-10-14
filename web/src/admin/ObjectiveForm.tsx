@@ -34,6 +34,7 @@ import {
   typesFor,
 } from './objectiveDraft';
 import { ObjectivePreview } from './ObjectivePreview';
+import { useSpellWhilePaused } from './spellWhilePaused';
 import { FIELD_TITLE, FIELD_VALUE } from './typography';
 
 type Step =
@@ -42,7 +43,7 @@ type Step =
 
 /** The texts whose spelling Leda corrects (J3-4, as the task's: J2-23 and J2-24). */
 type SpellField = 'titulo' | 'descripcion';
-const SPELL_FIELDS: SpellField[] = ['titulo', 'descripcion'];
+const SPELL_FIELDS: readonly SpellField[] = ['titulo', 'descripcion'];
 
 /** The objective form's fields, for the help box's notes. */
 const HELP_FIELDS: HelpFields = {
@@ -98,7 +99,9 @@ interface ObjectiveFormProps {
  * ayudo" goes first in the form, as in the task's (J2), and Leda fills only what is still empty and
  * never what the person wrote or chose herself, marked until the person changes it; an answer for a
  * form that changed, was cleared or is being sent fills nothing. The spelling of the name and the
- * description is corrected when the person leaves them and before creating, unmarked. */
+ * description, unmarked, as the task's (J3-4b, J2-24): after a pause in the typing the preview shows
+ * it corrected and the field takes it when the person leaves it; before creating, what was not
+ * checked yet. */
 export function ObjectiveForm({ api, options, author, onClosed, stacked = false, onAnother }: ObjectiveFormProps) {
   const [draft, setDraft] = useState<ObjectiveDraft>(() => emptyObjective(options));
   const [step, setStep] = useState<Step>({ kind: 'edit', sending: false, failed: false });
@@ -130,9 +133,25 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
   // What the person chose herself in a list (what it hangs from, also "de ninguno", and the type):
   // Leda never changes it.
   const chosen = useRef<Set<ObjectiveField>>(new Set());
-  // The spelling: each text as Leda last checked or corrected it (it is not checked again), and
-  // what to say when it could not check.
-  const checked = useRef<Partial<Record<SpellField, string>>>({});
+  // The spelling while typing (J3-4b, the task's J2-24 with its J2-30 rules), and what to say when it
+  // could not check. `spell.checked` is each text as Leda last checked or corrected it.
+  const spell = useSpellWhilePaused<SpellField, ObjectiveDraft>({
+    fields: SPELL_FIELDS,
+    draft,
+    latest,
+    round,
+    open: () => !sendingRef.current,
+    editing: step.kind === 'edit' && !step.sending,
+    check: assist ? (texts) => assist.spell(texts) : null,
+    onClosed,
+    elementId: (field) => OBJECTIVE_FIELD_ID[field],
+    onTake: (next) => {
+      latest.current = next;
+      setDraft(next);
+      // Other data, another attempt (as in `change`).
+      if (!unknown.current) key.current = null;
+    },
+  });
   const [spellNote, setSpellNote] = useState<string | null>(null);
 
   useEffect(() => {
@@ -172,8 +191,10 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
         ? new Set([...marked].filter((f) => !touched.has(f)))
         : marked,
     );
-    // An edited text is checked again on confirm, so the notice that it could not be goes.
+    // An edited text is checked again on confirm, so the notice that it could not be goes, and a
+    // correction made for the text before this change no longer holds.
     if (SPELL_FIELDS.some((f) => touched.has(f))) setSpellNote(null);
+    spell.forget([...touched]);
     setProblems((current) => current.filter((p) => !clearedBy(p, touched)));
     setNotes((current) => current.filter((n) => !clearedBy(n, touched)));
   }
@@ -298,36 +319,6 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
     setHelp((current) => (current.kind === 'done' ? { ...current, choices: [] } : current));
   }
 
-  /** The person left a text: Leda corrects its spelling, unmarked, if it is still the same text and
-   * the person is not back in it (then, the next time she leaves it). It never blocks: without an
-   * answer, the text stays as written and confirm tries again. */
-  async function checkOnLeave(field: SpellField) {
-    if (!assist) return;
-    const text = latest.current[field];
-    if (!text.trim() || checked.current[field] === text || sendingRef.current) return;
-    const started = round.current;
-    let spelling: Spelling;
-    try {
-      spelling = await assist.spell({ [field]: text });
-    } catch (error) {
-      if (error instanceof SessionClosedError) onClosed();
-      return;
-    }
-    if (sendingRef.current || round.current !== started || latest.current[field] !== text) return;
-    if (spelling.unchecked.includes(field)) return;
-    const to = spelling.corrected[field]?.text;
-    if (to === undefined || to === text) {
-      checked.current[field] = text;
-      return;
-    }
-    if (document.activeElement?.id === OBJECTIVE_FIELD_ID[field]) return;
-    checked.current[field] = to;
-    const next = { ...latest.current, [field]: to };
-    latest.current = next;
-    setDraft(next);
-    if (!unknown.current) key.current = null;
-  }
-
   /** "> cargarlo aparte" (decision 5): it is not really part of its parent, so it goes next to it,
    * and the type is offered again for the new place, with the same preselection. */
   function apart(parent: ParentObjective) {
@@ -346,7 +337,14 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
       return;
     }
     const started = round.current;
-    let sent = draft;
+    // J3-4b (J2-24): what is created is what the preview shows, with the corrections made while
+    // typing; the form shows it too, so a retry sends the same data.
+    let sent = spell.forSend(draft);
+    if (sent !== draft) {
+      latest.current = sent;
+      setDraft(sent);
+      if (!unknown.current) key.current = null;
+    }
     let notice = spellNote;
     sendingRef.current = true;
     setStep({ kind: 'edit', sending: true, failed: false });
@@ -354,7 +352,7 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
       // J3-4, as the task's (J2-23): before creating, Leda corrects the spelling of the texts not
       // checked yet as they are, and what is created is the corrected text, unmarked. If it could
       // not check, nothing blocks: it is created as written, with the notice.
-      const asked = assist ? SPELL_FIELDS.filter((f) => sent[f].trim() && checked.current[f] !== sent[f]) : [];
+      const asked = assist ? SPELL_FIELDS.filter((f) => sent[f].trim() && spell.checked.current[f] !== sent[f]) : [];
       if (assist && asked.length > 0) {
         let spelling: Spelling;
         try {
@@ -369,7 +367,7 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
           const fix = spelling.corrected[field];
           if (fix && fix.text !== sent[field]) next[field] = fix.text;
           // Only what was really checked counts as checked.
-          if (!spelling.unchecked.includes(field)) checked.current[field] = next[field];
+          if (!spelling.unchecked.includes(field)) spell.checked.current[field] = next[field];
         }
         notice = spelling.unchecked.length > 0 ? (spelling.notice ?? SPELLING_FAILED) : null;
         setSpellNote(notice);
@@ -429,7 +427,7 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
     setNotes([]);
     setProposed(new Set());
     chosen.current = new Set();
-    checked.current = {};
+    spell.reset();
     setSpellNote(null);
     latest.current = emptyObjective(options);
     setDraft(emptyObjective(options));
@@ -528,7 +526,7 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
               className={INPUT}
               value={draft.titulo}
               onChange={(e) => change({ titulo: e.target.value })}
-              onBlur={() => void checkOnLeave('titulo')}
+              onBlur={() => spell.takeFix('titulo')}
               aria-invalid={invalid('titulo')}
               aria-describedby={described('titulo')}
               autoComplete="off"
@@ -616,7 +614,7 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
               className={`${INPUT} min-h-20 resize-y`}
               value={draft.descripcion}
               onChange={(e) => change({ descripcion: e.target.value })}
-              onBlur={() => void checkOnLeave('descripcion')}
+              onBlur={() => spell.takeFix('descripcion')}
               aria-invalid={invalid('descripcion')}
               aria-describedby={described('descripcion')}
             />
@@ -631,7 +629,7 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
         <h2 id="vista-previa-objetivo" className={`m-0 ${FIELD_TITLE}`}>
           Vista previa
         </h2>
-        <ObjectivePreview draft={draft} options={options} author={author} />
+        <ObjectivePreview draft={spell.shown(draft)} options={options} author={author} />
         <div ref={messages} tabIndex={-1} className="flex min-w-0 flex-col gap-3 pt-1.5 outline-none">
           {late && (
             <div

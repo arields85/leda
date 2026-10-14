@@ -126,12 +126,14 @@ describe('the administration door', () => {
     expect(calls.filter((c) => c.key === `POST ${BASE}/ayuda`)).toHaveLength(1);
     // The task's help address is not the objective's.
     expect(calls.some((c) => c.key === `POST /app/admin/api/espacios/${SPACE}/ayuda`)).toBe(false);
-    fireEvent.blur(within(form).getByLabelText('Nombre'));
-    await waitFor(() =>
-      expect(calls.find((c) => c.key === `POST /app/admin/api/espacios/${SPACE}/ortografia`)?.body).toEqual({
-        titulo: 'Planta 2027',
-        de: 'objetivo',
-      }),
+    // The spelling, after a pause in the typing (J3-4b, as the task's J2-24).
+    await waitFor(
+      () =>
+        expect(calls.find((c) => c.key === `POST /app/admin/api/espacios/${SPACE}/ortografia`)?.body).toEqual({
+          titulo: 'Planta 2027',
+          de: 'objetivo',
+        }),
+      { timeout: 3000 },
     );
   });
 

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { objectiveOptions } from '../test/adminFixtures';
 import { HELP_FAILED, type HelpResult, type Spelling } from './api';
 import type {
@@ -246,28 +246,184 @@ describe("Leda's help on the objective form", () => {
     expect(screen.getByLabelText('Nombre')).toHaveValue('Planta 2027');
   });
 
-  it('corrects the spelling when leaving a text and before creating, unmarked', async () => {
-    const { api, spelled, sent } = assisted({
-      'tablero nuebo': 'tablero nuevo',
-      'cambiar el tablero viejo x el nuebo': 'cambiar el tablero viejo x el nuevo',
+  it('corrects the spelling while typing and before creating, unmarked', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { api, spelled, sent } = assisted({
+        'tablero nuebo': 'tablero nuevo',
+        'cambiar el tablero viejo x el nuebo': 'cambiar el tablero viejo x el nuevo',
+      });
+      open(api);
+      const name = screen.getByLabelText('Nombre');
+      fireEvent.change(name, { target: { value: 'tablero nuebo' } });
+      await pause();
+      await waitFor(() => expect(name).toHaveValue('tablero nuevo'));
+      expect(spelled[0]).toEqual({ titulo: 'tablero nuebo' });
+      expect(markedByLeda('Nombre')).toBe(false);
+      pick('Referente', 'm-lucas');
+      fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
+      fireEvent.change(screen.getByLabelText('Descripción (opcional)'), {
+        target: { value: 'cambiar el tablero viejo x el nuebo' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: '> confirmar' }));
+      await screen.findByRole('heading', { name: 'Objetivo creado.' });
+      // Only what was not checked yet, as it was.
+      expect(spelled[1]).toEqual({ descripcion: 'cambiar el tablero viejo x el nuebo' });
+      expect(sent[0].titulo).toBe('tablero nuevo');
+      expect(sent[0].descripcion).toBe('cambiar el tablero viejo x el nuevo');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+const pause = (ms = 1500) =>
+  act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+
+/** The spelling of a door that waits until the test answers each check (`answer`, by its order). */
+function heldSpelling(api: ObjectiveApi) {
+  const asked: Record<string, string>[] = [];
+  const pending: ((spelling: Spelling) => void)[] = [];
+  api.assist!.spell = vi.fn(
+    (texts: Partial<Record<'titulo' | 'descripcion', string>>) =>
+      new Promise<Spelling>((resolve) => {
+        asked.push(texts as Record<string, string>);
+        pending.push(resolve);
+      }),
+  );
+  async function answer(i: number, corrected: Record<string, string> = {}) {
+    const fixes: Spelling['corrected'] = {};
+    for (const [field, text] of Object.entries(corrected)) fixes[field as 'titulo'] = { text };
+    await act(async () => {
+      pending[i]({ corrected: fixes, unchecked: [] });
     });
-    open(api);
-    const name = screen.getByLabelText('Nombre');
-    fireEvent.change(name, { target: { value: 'tablero nuebo' } });
-    fireEvent.blur(name);
-    await waitFor(() => expect(name).toHaveValue('tablero nuevo'));
-    expect(spelled[0]).toEqual({ titulo: 'tablero nuebo' });
-    expect(markedByLeda('Nombre')).toBe(false);
-    fireEvent.change(screen.getByLabelText('Descripción (opcional)'), {
-      target: { value: 'cambiar el tablero viejo x el nuebo' },
-    });
+  }
+  return { asked, answer };
+}
+
+// J3-4b, as the task's (J2-24, the user: "la ortografía la idea es que la corrija en la vista
+// previa, sin tener que apretar confirmar"): after a pause in the typing, the preview shows the
+// text corrected; the field takes it when the person leaves it, never under her cursor. The same
+// rules as the task's (J2-30): an answer for a text that changed, for a form that was cleared or
+// that arrives while it sends changes nothing, and never the idempotency key.
+describe('the spelling of the objective while typing', () => {
+  const TYPED = 'modernisar el tablero de la linea';
+  const FIXED = 'modernizar el tablero de la línea';
+  const name = () => screen.getByLabelText('Nombre');
+  const preview = () => screen.getByRole('complementary', { name: 'Vista previa' });
+  const fill = () => {
     pick('Referente', 'm-lucas');
     fireEvent.click(screen.getByRole('button', { name: 'vie 16.10' }));
-    fireEvent.click(screen.getByRole('button', { name: '> confirmar' }));
+  };
+  const confirm = () => fireEvent.click(screen.getByRole('button', { name: /confirmar|probar de nuevo/ }));
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('after a pause the preview shows the name corrected; the field takes it only when the person leaves it', async () => {
+    const { api, spelled } = assisted({ [TYPED]: FIXED });
+    open(api);
+    name().focus();
+    fireEvent.change(name(), { target: { value: TYPED } });
+    await pause(1000);
+    expect(spelled).toHaveLength(0);
+    await pause(500);
+    await waitFor(() => expect(within(preview()).getByText(FIXED)).toBeInTheDocument());
+    expect(spelled).toEqual([{ titulo: TYPED }]);
+    // Never under her cursor.
+    expect(name()).toHaveValue(TYPED);
+    fireEvent.blur(name());
+    expect(name()).toHaveValue(FIXED);
+    expect(markedByLeda('Nombre')).toBe(false);
+    // A text already checked is not checked again.
+    await pause(3000);
+    expect(spelled).toHaveLength(1);
+  });
+
+  it('an answer for a text the person kept typing reaches neither the preview nor the field', async () => {
+    const { api } = assisted();
+    const { asked, answer } = heldSpelling(api);
+    open(api);
+    name().focus();
+    fireEvent.change(name(), { target: { value: TYPED } });
+    await pause();
+    expect(asked).toEqual([{ titulo: TYPED }]);
+    fireEvent.change(name(), { target: { value: `${TYPED} 3` } });
+    await answer(0, { titulo: FIXED });
+    expect(within(preview()).queryByText(FIXED)).toBeNull();
+    fireEvent.blur(name());
+    expect(name()).toHaveValue(`${TYPED} 3`);
+  });
+
+  it('confirm creates what the preview shows and does not check again what was checked', async () => {
+    const { api, spelled, sent } = assisted({ [TYPED]: FIXED });
+    open(api);
+    fill();
+    name().focus();
+    fireEvent.change(name(), { target: { value: TYPED } });
+    await pause();
+    await waitFor(() => expect(within(preview()).getByText(FIXED)).toBeInTheDocument());
+    // Still in the field: what is created is what the preview shows.
+    confirm();
     await screen.findByRole('heading', { name: 'Objetivo creado.' });
-    // Only what was not checked yet, as it was.
-    expect(spelled[1]).toEqual({ descripcion: 'cambiar el tablero viejo x el nuebo' });
-    expect(sent[0].titulo).toBe('tablero nuevo');
-    expect(sent[0].descripcion).toBe('cambiar el tablero viejo x el nuevo');
+    expect(spelled).toHaveLength(1);
+    expect(sent[0].titulo).toBe(FIXED);
+  });
+
+  it('an answer that arrives while it sends changes neither what goes nor the key', async () => {
+    const { api, sent } = assisted();
+    const { answer } = heldSpelling(api);
+    let fail: ((error: Error) => void) | null = null;
+    api.create = vi.fn(
+      (input: ObjectiveInput) =>
+        new Promise<CreateResult>((_resolve, reject) => {
+          sent.push(input);
+          fail = reject;
+        }),
+    );
+    open(api);
+    fill();
+    fireEvent.change(name(), { target: { value: TYPED } });
+    await pause();
+    // The check of the pause is on its way; confirm checks the name on its own.
+    confirm();
+    await answer(1);
+    await waitFor(() => expect(sent).toHaveLength(1));
+    // The pause's answer arrives while it sends: nothing changes.
+    await answer(0, { titulo: FIXED });
+    await act(async () => {
+      fail?.(new Error('sin red'));
+    });
+    await screen.findByText(/No se pudo crear/);
+    expect(name()).toHaveValue(TYPED);
+    expect(within(preview()).queryByText(FIXED)).toBeNull();
+    api.create = vi.fn(async (input: ObjectiveInput): Promise<CreateResult> => {
+      sent.push(input);
+      return { kind: 'created', objectiveId: 'ob-1', repeated: false };
+    });
+    confirm();
+    await screen.findByRole('heading', { name: 'Objetivo creado.' });
+    // The retry goes with the same data and the same key.
+    expect(sent[1]).toEqual(sent[0]);
+  });
+
+  it('an answer asked for before a start over changes nothing', async () => {
+    const { api } = assisted();
+    const { answer } = heldSpelling(api);
+    open(api);
+    fireEvent.change(name(), { target: { value: TYPED } });
+    await pause();
+    fireEvent.click(screen.getByRole('button', { name: '> empezar de nuevo' }));
+    fireEvent.click(screen.getByRole('button', { name: '> sí, borrar' }));
+    fireEvent.change(name(), { target: { value: TYPED } });
+    await answer(0, { titulo: FIXED });
+    expect(name()).toHaveValue(TYPED);
+    expect(within(preview()).queryByText(FIXED)).toBeNull();
   });
 });
