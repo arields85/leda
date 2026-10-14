@@ -914,13 +914,17 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       Es un hecho de la cocina, no frases (regla del mozo), y lleva su conversación de prueba contra la IA real.
       Hoy cae en "fuera de la lista": no se crea nada, Leda dice lo que sí puede hacer y deja un incidente de
       prioridad baja (`turno._manejar`). Con la Mini App cambia a ofrecer abrirla (`docs/ROADMAP.md`).
+      Incluye también (usuario, 2026-10-14): cuando Dirección o administración carga una tarea que vence después
+      que su objetivo, "> aceptar la demora" la carga directo, y la fecha del objetivo se corre como en la
+      decisión 5. El referente del objetivo recibe un aviso con la decisión.
 - [ ] **J5 · El pedido de más tiempo y el cambio de fecha.**
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
       Incluye la decisión 6 del 2026-10-14: seguir con una tarea que vence después que su objetivo pide la
       aprobación del referente del objetivo, con la misma maquinaria de las propuestas.
-      Queda para su diseño: si quien carga es Dirección, ¿también puede aceptar la demora sin pedirla, como
-      con los objetivos (decisión 5)?
+      Si quien carga es Dirección o administración (usuario, 2026-10-14): Leda le avisa que demora el objetivo;
+      si acepta, se carga directo, sin pedirle la aprobación al referente del objetivo, y el referente recibe un
+      aviso de Leda con la decisión de Dirección. Esa parte va en la J4, con la carga de Dirección y sus avisos.
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
