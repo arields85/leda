@@ -898,13 +898,26 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
   - [x] J3-2b · Las decisiones del usuario del 2026-10-14: la fecha obligatoria, en día hábil, y el
         referente, que tiene que ser un referente activo de un área (`0069`).
   - [x] J3-3 · La web: el formulario de objetivos en las dos puertas, compartiendo las piezas de la J2.
-  - [ ] J3-3b · La decisión 5 (un hijo no vence después que su padre, con "> cargarlo aparte") y las
+  - [x] J3-3b · La decisión 5 (un hijo no vence después que su padre, con "> cargarlo aparte") y las
         advertencias de la RDD `review-12308947b06404e4`, aprobada sobre `15e69bfa..953c2fab`. Son tres:
         - el reloj del espacio se lee antes de validar la sesión de administración (`web_app.py:1471`);
         - cambiar entre tarea y objetivo pierde lo escrito (`AdminApp.tsx:181`);
         - la `0068` editada después de escrita: falsa alarma, porque se editó antes de aplicarla en
           cualquier base, y `leda_motor` tiene la versión final.
         `leda_motor`: la `0069` se aplicó con respaldo (`leda_motor-antes-0069-20261014.dump`) y ensayo previo.
+        **Hecha** en los commits `d03e27b0`, `482e3172`, `584fafa2` y `4e56c086`, con la migración
+        `0070_nada_vence_despues_de_su_objetivo`:
+        - **Las tareas:** una tarea no vence después que su objetivo. El formulario frena antes de confirmar y
+          la base la rechaza.
+        - **Los objetivos:** un objetivo no vence después que su padre. La vista previa ofrece "cambiar la
+          fecha" y "> cargarlo aparte", y deja el lugar para "aceptar la demora" de la J5.
+        - **Los arreglos de RDD:** el reloj se lee después de validar la sesión, y cambiar entre tarea y
+          objetivo ya no pierde lo escrito.
+        Cada caso con su prueba, que falló antes del arreglo y pasó después. `pytest tests/garantias`: 938
+        passed. `npm test`: 213 passed. Build sin errores.
+        RDD `review-e9df8c837fa7a6ea`, aprobada, con dos sugerencias menores: una prueba de la web no mira el
+        día tope y la `0070` no comprueba de antemano la `0069`.
+        `leda_motor`: la `0070` se aplicó con respaldo (`leda_motor-antes-0070-20261014.dump`) y ensayo previo.
   - [ ] J3-4 · La ayuda de la IA para objetivos (y la ortografía y el dictado en la puerta del equipo), con su
         herramienta de medición; una ronda con la IA real.
   - [ ] J3-5 · La prueba en el celular (usuario), con su guion.
