@@ -2224,6 +2224,31 @@ describe('what arrives late (J2-30)', () => {
     expect(second.titulo).toBe(first.titulo);
   });
 
+  // RDD warning of the J3-4 (R3-retry-spelling-key), the J2-30 rule: while the last send's outcome
+  // is unknown, the spelling changes nothing, so a retry goes with the same data and the same key.
+  it('after a send with no answer, the spelling changes nothing: the retry goes with the same data and key', async () => {
+    keys('88888888-8888-4888-8888-888888888888', '99999999-9999-4999-8999-999999999999');
+    const calls = await openForm({
+      [SPELLING]: [
+        { status: 503, body: { error: 'no_disponible' } },
+        { status: 200, body: { corregidos: { titulo: { texto: 'Configurar Alarmas del SCADA', cambios: [] } }, sin_revisar: [] } },
+      ],
+      [TASKS]: ['network', loaded()],
+    });
+    fillTask();
+    confirm();
+    expect(await screen.findByText(/no llegó la respuesta/)).toBeInTheDocument();
+    const checks = calls.filter((c) => c.key === SPELLING).length;
+    await pause(3000);
+    expect(calls.filter((c) => c.key === SPELLING)).toHaveLength(checks);
+    expect(title()).toHaveValue('Configurar alarmas del SCADA');
+    confirm();
+    expect(await screen.findByText('Tarea cargada.')).toBeInTheDocument();
+    expect(calls.filter((c) => c.key === SPELLING)).toHaveLength(checks);
+    const [first, second] = calls.filter((c) => c.key === TASKS).map((c) => c.body as { clave: string; titulo: string });
+    expect(second).toEqual(first);
+  });
+
   it('a "completar con Leda" answer that arrives after "sí, borrar" fills nothing', async () => {
     await openForm();
     const held = holdEvery(HELP);

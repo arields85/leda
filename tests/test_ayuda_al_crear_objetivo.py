@@ -395,3 +395,28 @@ def test_nombrado_alguien_que_no_es_referente_el_area_no_lo_reemplaza():
 def test_con_el_referente_ya_elegido_el_area_no_se_mira():
     r = _revisar(_respuesta(referente="", area="A1"), escrito=_vacio(referente_id="m-lucas"))
     assert "referente_id" not in r.propuesta and r.referente_de is None
+
+
+def test_el_tipo_que_eligio_la_persona_cambia_si_leda_propone_un_padre_donde_no_va():
+    """RDD de la J3-4 (R3-tipo-override-untested): la persona eligió el tipo sin elegir de qué
+    cuelga; si Leda propone un padre debajo del cual ese tipo no va, el tipo pasa a uno que vaya
+    ahí (como hace la web al cambiar de qué cuelga): el de la IA si va, o el que preselecciona el
+    formulario. Si el tipo elegido va ahí, no se toca."""
+    texto = "es parte de arrancar la linea 3: capacitar a los operarios, lo ve nahuel"
+    # Estratégico no va debajo de un hito, ni el hito que dice la IA: el operativo.
+    r = _revisar(_respuesta(padre="P2", tipo="hito", referente="nahuel", fecha=None),
+                 texto=texto, escrito=_vacio(tipo="estrategico"))
+    assert (r.propuesta["padre_id"], r.propuesta["tipo"]) == ("o-linea", "operativo")
+    assert {"campo": "tipo", "motivo": "no_corresponde"} in r.descartados
+    # Debajo de un estratégico, el hito que dice la IA va.
+    r = _revisar(_respuesta(padre="P1", tipo="hito", referente="nahuel", fecha=None),
+                 texto=texto, escrito=_vacio(tipo="estrategico"))
+    assert (r.propuesta["padre_id"], r.propuesta["tipo"]) == ("o-planta", "hito")
+    # Sin tipo de la IA, el que preselecciona el formulario.
+    r = _revisar(_respuesta(padre="P1", tipo="", referente="nahuel", fecha=None),
+                 texto=texto, escrito=_vacio(tipo="estrategico"))
+    assert r.propuesta["tipo"] == "operativo"
+    # El operativo que eligió la persona va debajo de un estratégico: no se toca.
+    r = _revisar(_respuesta(padre="P1", tipo="hito", referente="nahuel", fecha=None),
+                 texto=texto, escrito=_vacio(tipo="operativo"))
+    assert r.propuesta["padre_id"] == "o-planta" and "tipo" not in r.propuesta

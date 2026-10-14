@@ -697,3 +697,35 @@ def test_la_evidencia_escrita_de_un_area_sin_politica_se_rechaza(web, conn, inta
     assert ("evidencia", "sin_politica_del_area") in {(e["campo"], e["motivo"])
                                                       for e in r.json()["errores"]}
     assert ia.pedidos == []
+
+
+def test_el_ayudante_del_pedido_controla_en_el_mismo_orden_que_antes(web, conn, intake_world,
+                                                                    administradora, ia):
+    """RDD de la J3-4 (R3-pedido-helper-equivalence): el ayudante compartido
+    (`_el_pedido_que_escribe`, desde `21ccaca3`) controla en el mismo orden y con los mismos
+    estados que el código de antes: otro sitio (403), JSON (415), la cookie (401) y el tamaño
+    (413), en ese orden; con la sesión, un cuerpo que no se puede leer, o que no es un objeto, es
+    un pedido sin datos (422, sin llamar a la IA)."""
+    camino = _camino(_norte(intake_world)["id"])
+    sin_cookie = web()
+    formulario = {"content-type": "application/x-www-form-urlencoded"}
+    grande = json.dumps({"texto": "x" * 70000})
+    # Otro sitio, antes que el JSON y que la cookie.
+    r = sin_cookie.post(camino, content="texto=x",
+                        headers={**formulario, "origin": "https://otro.example"})
+    assert (r.status_code, r.json()["error"]) == (403, "origen_no_verificado")
+    # El JSON, antes que la cookie.
+    r = sin_cookie.post(camino, content="texto=x", headers=formulario)
+    assert (r.status_code, r.json()["error"]) == (415, "se_espera_json")
+    # La cookie, antes que el tamaño.
+    r = sin_cookie.post(camino, content=grande, headers={"content-type": "application/json"})
+    assert r.status_code == 401
+    navegador = _navegador_de_administracion(web, conn, administradora)
+    r = navegador.post(camino, content=grande, headers={"content-type": "application/json"})
+    assert (r.status_code, r.json()["error"]) == (413, "demasiado_grande")
+    for cuerpo in ("{no es json", "[1, 2]", "[" * 5000):
+        r = navegador.post(camino, content=cuerpo,
+                           headers={"content-type": "application/json; charset=utf-8"})
+        assert r.status_code == 422, (cuerpo[:12], r.text)
+        assert [(e["campo"], e["motivo"]) for e in r.json()["errores"]][:1] == [("texto", "falta")]
+    assert ia.pedidos == []

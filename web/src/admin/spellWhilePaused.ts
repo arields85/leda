@@ -36,7 +36,8 @@ export interface SpellWhilePausedOptions<F extends TextField, D extends Record<F
   latest: MutableRefObject<D>;
   /** The form's round: an answer asked for before a start over changes nothing. */
   round: MutableRefObject<number>;
-  /** Whether a check may start and an answer may still land now: never while it sends (J2-30). */
+  /** Whether a check may start and an answer may still land now: never while it sends (J2-30), nor
+   * while the last send's outcome is unknown (then a retry goes with the same data and key). */
   open: () => boolean;
   /** The form is editing and not sending: a pause can start. */
   editing: boolean;

@@ -294,6 +294,11 @@ def medir(ia, pedido: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     naturalidad = {c: m for c, t in textos.items() if (m := base.sin_naturalidad(t, []))}
     fallas += [f"{c}: sin naturalidad: {', '.join(m)}" for c, m in naturalidad.items()]
     todo = " ".join(textos.values())
+    # Sin el nombre ni la descripción no hay cómo ver la ortografía: no pasa sin mirar nada (RDD
+    # de la J3-4, R3-001).
+    if pedido.get("mal_escrito") and not textos:
+        fallas.append("ortografía: no propuso el nombre ni la descripción, y no se pudo ver cómo "
+                      "escribió los nombres de los datos")
     for palabra in pedido.get("mal_escrito") or []:
         if palabra.casefold() in todo.casefold():
             fallas.append(f"ortografía: propuso «{palabra}» tal cual")

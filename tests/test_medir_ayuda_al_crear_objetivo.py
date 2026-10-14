@@ -138,3 +138,18 @@ def test_el_referente_por_el_area_se_mide(medir):
                   if p["nombre"] == "alguien que no es referente, aunque el área se entienda")
     ok, detalle = medir.medir(medir.IAEnSeco(), pedido)
     assert ok is True and "referente_id" not in detalle["propuesta"]
+
+
+def test_la_ortografia_no_pasa_sin_un_texto_que_mirar(medir):
+    """RDD de la J3-4 (R3-001): el control de la ortografía de un pedido con un nombre mal escrito
+    no puede pasar sin mirar nada: si Leda no propuso ni el nombre ni la descripción, sale mal."""
+    pedido = next(p for p in medir.PEDIDOS if p["nombre"] == "con faltas de ortografía")
+    ok, detalle = medir.medir(IADeLaCarga({"padre": "P1", "tipo": "hito", "referente": "nahuel"}),
+                              pedido)
+    assert ok is False
+    assert any(f.startswith("ortografía:") for f in detalle["fallas"])
+    ok, detalle = medir.medir(IADeLaCarga({
+        "padre": "P1", "tipo": "hito", "referente": "nahuel",
+        "titulo": "Armar el layout del depósito de la planta nueva",
+        "descripcion": "Armar el layout del depósito de la planta nueva."}), pedido)
+    assert ok is True, detalle["fallas"]

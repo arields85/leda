@@ -413,6 +413,38 @@ describe('the spelling of the objective while typing', () => {
     expect(sent[1]).toEqual(sent[0]);
   });
 
+  // RDD warning of the J3-4 (R3-retry-spelling-key), the J2-30 rule: while the last send's outcome
+  // is unknown, the spelling changes nothing, so a retry goes with the same data and the same key.
+  it('after a send with no answer, the spelling changes nothing: the retry goes with the same data and key', async () => {
+    const { api, sent } = assisted();
+    let checks = 0;
+    api.assist!.spell = vi.fn(async (texts: Partial<Record<'titulo' | 'descripcion', string>>): Promise<Spelling> => {
+      checks += 1;
+      // The first check (on confirm) could not be done; any later one would correct the name.
+      if (checks === 1) return { corrected: {}, unchecked: ['titulo'], notice: 'No pude revisar la ortografía ahora.' };
+      return { corrected: texts.titulo ? { titulo: { text: FIXED } } : {}, unchecked: [] };
+    });
+    let attempts = 0;
+    api.create = vi.fn(async (input: ObjectiveInput): Promise<CreateResult> => {
+      sent.push(input);
+      attempts += 1;
+      if (attempts === 1) throw new Error('sin red');
+      return { kind: 'created', objectiveId: 'ob-1', repeated: false };
+    });
+    open(api);
+    fill();
+    fireEvent.change(name(), { target: { value: TYPED } });
+    confirm();
+    await screen.findByText(/No se pudo crear/);
+    await pause(3000);
+    expect(checks).toBe(1);
+    expect(name()).toHaveValue(TYPED);
+    confirm();
+    await screen.findByRole('heading', { name: 'Objetivo creado.' });
+    expect(checks).toBe(1);
+    expect(sent[1]).toEqual(sent[0]);
+  });
+
   it('an answer asked for before a start over changes nothing', async () => {
     const { api } = assisted();
     const { answer } = heldSpelling(api);

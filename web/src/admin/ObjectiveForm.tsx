@@ -140,7 +140,9 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
     draft,
     latest,
     round,
-    open: () => !sendingRef.current,
+    // Never while it sends (J2-30), nor while the last send's outcome is unknown: a retry goes with
+    // the same data and the same key (RDD warning of the J3-4, R3-retry-spelling-key).
+    open: () => !sendingRef.current && !unknown.current,
     editing: step.kind === 'edit' && !step.sending,
     check: assist ? (texts) => assist.spell(texts) : null,
     onClosed,
@@ -352,7 +354,9 @@ export function ObjectiveForm({ api, options, author, onClosed, stacked = false,
       // J3-4, as the task's (J2-23): before creating, Leda corrects the spelling of the texts not
       // checked yet as they are, and what is created is the corrected text, unmarked. If it could
       // not check, nothing blocks: it is created as written, with the notice.
-      const asked = assist ? SPELL_FIELDS.filter((f) => sent[f].trim() && spell.checked.current[f] !== sent[f]) : [];
+      // A retry after a send with no answer goes as it went: nothing is checked again.
+      const asked =
+        assist && !unknown.current ? SPELL_FIELDS.filter((f) => sent[f].trim() && spell.checked.current[f] !== sent[f]) : [];
       if (assist && asked.length > 0) {
         let spelling: Spelling;
         try {

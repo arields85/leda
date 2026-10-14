@@ -173,7 +173,9 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     draft,
     latest,
     round,
-    open: () => !sendingRef.current,
+    // Never while it sends (J2-30), nor while the last send's outcome is unknown: a retry goes with
+    // the same data and the same key (RDD warning of the J3-4, R3-retry-spelling-key).
+    open: () => !sendingRef.current && !unknown.current,
     editing: step.kind === 'edit' && !step.sending,
     check: (texts) => checkSpelling(spaceId, texts),
     onClosed,
@@ -397,7 +399,8 @@ export function LoadForm({ spaceId, options, admin, onClosed }: LoadFormProps) {
     // "que lo corrija directamente sin resaltarlo"; the server accepts only the same word misspelled
     // or a name as the team's data has it). If it could not check, nothing blocks: it loads as
     // written, with the notice.
-    const asked = toCheck(sent, spell.checked.current);
+    // A retry after a send with no answer goes as it went: nothing is checked again.
+    const asked = unknown.current ? [] : toCheck(sent, spell.checked.current);
     if (asked.length > 0) {
       setStep({ kind: 'edit', sending: true, failed: false, checking: true });
       // J2-21: first what the load would refuse (the criterion's judgment and the rest), so a
