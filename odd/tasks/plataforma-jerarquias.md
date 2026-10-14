@@ -826,7 +826,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - con `audio/mp4` como último recurso, se pierde el tipo real (`api.ts:333`);
       - el transporte con plazo ignora un proxy del entorno (`dictado.py:216`).
       Las dos sugerencias: el hilo abandonado sin prueba y la excepción al empezar una oración.
-- [ ] **J3 · Los objetivos desde la web** (ADR 0023, decisión 1, decisión 5 y punto 11). Dirección crea los
+- [x] **J3 · Los objetivos desde la web** (ADR 0023, decisión 1, decisión 5 y punto 11). Dirección crea los
       objetivos de su equipo desde su web; el administrador, desde la suya, en cualquier espacio. Con la ayuda
       de la IA desde el primer día, **reutilizando la J2** (usuario, 2026-10-13: "la j2 tiene muy buena base y
       podés reutilizar muchas cosas"): se generaliza lo que ya probó el usuario en el celular, no se escribe un
@@ -961,7 +961,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - **Web de Dirección:** primero Leda no contestaba, porque el reinicio de Windows había cortado el
           escuchador. Al levantarlo: "Muy bueno! está quedando todo muy bien".
         IA real: 45 de 45 y 57 de 57. RDD aprobada en todos los tramos.
-  - [ ] J3-6 · Las cosas menores de la prueba (usuario, 2026-10-14, con capturas). Van con el escritor de la
+  - [x] J3-6 · Las cosas menores de la prueba (usuario, 2026-10-14, con capturas). Van con el escritor de la
         J4a, que toca los mismos componentes:
         1. un botón con ícono al lado del micrófono para borrar el recuadro;
         2. "confirmar" apagado no parecía apagado, y "cargarlo aparte" y "empezar de nuevo", activos, parecían
@@ -969,13 +969,18 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         3. las pestañas "tarea" y "objetivo" con la letra del encabezado ("LEDA · ADMINISTRACIÓN ·
            COREWORK"); si no convence, "Tarea" y "Objetivo". Cambiado por el usuario: como las pestañas "Tus
         tareas / Tu sector" de la web del equipo, con mayúscula ("Tarea", "Objetivo").
-  - [ ] J3-7 · Las palabras del formulario de objetivos (usuario, 2026-10-14: "no me gustaron y no me quedó
+  - [x] J3-7 · Las palabras del formulario de objetivos (usuario, 2026-10-14: "no me gustaron y no me quedó
         claro"). Los niveles de CoreWork pasan a **objetivo general, etapa, objetivo de área**, tarea y subtarea,
         en el pack (mecánica §1). En el formulario:
         - "De qué cuelga" pasa a "Es parte de", y la opción vacía a "de ninguno (es un objetivo general)";
         - debajo del tipo, una línea corta que lo explica;
         - los avisos dicen "es parte de".
         Va con el escritor de la J4a. Después hay que reimportar el pack en `leda_motor`.
+      **J3 cerrada (2026-10-14, noche).** El usuario revisó la J3-6 y la J3-7 en la compu: las pestañas "Tarea" y
+      "Objetivo", "Es parte de", el botón de borrar, "confirmar" apagado frente a "cargarlo aparte" y "empezar de
+      nuevo" activos, y los tipos con su explicación. Pidió un nombre más claro para el tercer nivel: pasó a
+      "objetivo de un área" ("lo que le toca lograr a un área del equipo para que se cumpla lo de arriba"), en
+      `3ab0f9e1`, con el pack reimportado.
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
       **Decisiones del usuario (2026-10-14, antes de escribir código):**
       - **D1. A quién le carga un referente:** a su área, a sí mismo y, como préstamo, a cualquiera de otra área,
