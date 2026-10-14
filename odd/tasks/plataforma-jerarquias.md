@@ -920,6 +920,29 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         `leda_motor`: la `0070` se aplicó con respaldo (`leda_motor-antes-0070-20261014.dump`) y ensayo previo.
   - [ ] J3-4 · La ayuda de la IA para objetivos (y la ortografía y el dictado en la puerta del equipo), con su
         herramienta de medición; una ronda con la IA real.
+        **Construida** (escritor delegado) en los commits `21ccaca3`, `2a7c7752`, `41976b3a`, `2910ef93` y
+        `f8d257f1`:
+        - **Un solo recorrido de tres pasos** para la ayuda de tareas, la de objetivos y la ortografía.
+        - **`ayuda_al_crear_objetivo.py`,** con la herramienta `proponer_el_objetivo`. La IA propone y el código
+          decide qué vale:
+          - el padre, de la lista;
+          - el tipo, según el padre;
+          - el referente, sólo un referente de área nombrado en el texto;
+          - la fecha, sólo si se dijo y en día hábil;
+          - el nombre y la descripción, con las comprobaciones de honestidad de la J2.
+        - **La auditoría** `proponer_al_crear_objetivo` guarda huellas, no el texto. Si la IA falla, deja un
+          incidente y la persona ve un 503 neutro.
+        - **La puerta del equipo:** la ortografía y el dictado, sólo para Dirección.
+        - **La web:** el recuadro de ayuda en el formulario de objetivos de las dos puertas.
+        - **La herramienta** `tools/medir_ayuda_al_crear_objetivo.py`, con 15 casos escritos como en el chat.
+        Pruebas: las nuevas fallaron antes del código y pasan después (salvo dos de la web, escritas después).
+        `pytest tests/garantias`: 964 passed. `npm test`: 223 passed. Build sin errores.
+        Quedan para la J3-4b, porque las piden las reglas ya acordadas ("Leda completa todo lo que puede" y la
+        ortografía de la J2-24):
+        - proponer el referente por el área de lo que se describe, aunque nadie lo nombre, como en la J2-18;
+        - corregir la ortografía de la vista previa en la pausa;
+        - que las instrucciones del dictado no digan sólo "una tarea".
+  - [ ] J3-4b · Los tres ajustes de la J3-4 (referente por el área, ortografía en la pausa, dictado general).
   - [ ] J3-5 · La prueba en el celular (usuario), con su guion.
 - [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
       Incluye (usuario, 2026-10-14): si alguien escribe por Telegram "quiero crear una tarea" (o un objetivo),
