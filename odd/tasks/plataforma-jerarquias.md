@@ -989,6 +989,27 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
           revisar, y aprueba el objetivo al cerrarse. Por la tarea propia de un referente, a Ismael no le llega
           nada.
         - **D5. Bajo qué objetivo:** cualquier objetivo abierto.
+        - **D6. El aviso al responsable:** un solo mensaje con todas las tareas cargadas seguidas, unos 10
+          minutos después de la última, dentro del horario. Fuera de horario sale al empezar el siguiente. Es de
+          coordinación: no cuenta para el tope diario.
+        - **D7. El aviso a quien revisa:** sólo cuando carga uno y revisa otro. Ejemplo: Ismael le carga a Nahuel
+          y deja a Marcos de revisor. Mismo margen, en horario.
+        - **D9. Responsable sin Leda conectada:**
+          1. la vista previa lo avisa antes de confirmar;
+          2. a administración le llega un aviso para conectarlo;
+          3. al conectarse, Leda le manda sus tareas juntas como bienvenida.
+        - **D10. "Quién la decidió"** (web de administración): sólo Dirección o el referente del área de la tarea.
+          El usuario ya lo había visto y se le había pasado mencionarlo.
+        - **D11. La ayuda de la IA en la web del equipo:** propone sólo a quienes puede cargarles quien carga.
+          Nombrar a alguien de otra área lo propone como préstamo y avisa que su referente tiene que aprobarlo. Sin
+          nadie nombrado, "quién la hace" queda vacío. Lo demás, igual que la J2.
+        - **D12. "Quiero crear una tarea" (u objetivo) por Telegram:** Leda lo dice con sus palabras, desde los
+          datos de quién es y qué puede cargar.
+          - **Tarea:** a Dirección y a los referentes, el enlace a su web. A un integrante, sin enlace: que las
+            cargan su referente o Dirección, y que pronto podrá proponerlas.
+          - **Objetivo:** a Dirección, el enlace. A un referente, que los crea Dirección; desde la J6, que puede
+            proponerle uno desde su web. A un integrante, lo mismo que con una tarea.
+          - Lleva su conversación de prueba contra la IA real.
         - **Orden:** "> aceptar la demora" de Dirección espera a la J5; en la J4, la única salida es cambiar la
           fecha.
       Incluye (usuario, 2026-10-14): si alguien escribe por Telegram "quiero crear una tarea" (o un objetivo),
@@ -1008,6 +1029,10 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       directo).
       Incluye la decisión 6 del 2026-10-14: seguir con una tarea que vence después que su objetivo pide la
       aprobación del referente del objetivo, con la misma maquinaria de las propuestas.
+      Incluye también (usuario, 2026-10-14): **la propuesta de objetivo de un referente**. Martín toca "> proponer
+      un objetivo" en su web, con el mismo formulario y la ayuda de la IA. A Ismael le llega un aviso, y lo aprueba
+      (tal cual o con cambios) o lo rechaza con el motivo, que Martín recibe. Por Telegram, Leda le ofrece el enlace
+      para proponerlo.
       Si quien carga es Dirección o administración (usuario, 2026-10-14): Leda le avisa que demora el objetivo;
       si acepta, se carga directo, sin pedirle la aprobación al referente del objetivo, y el referente recibe un
       aviso de Leda con la decisión de Dirección. Esa parte va en la J4, con la carga de Dirección y sus avisos.
