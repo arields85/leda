@@ -1878,7 +1878,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "suya, una que espera su revisión o cualquier otra que nombre. Si la tarea no está "
              "en la lista, como_la_nombra dice cómo la nombró. Pedir ver lo entregado de una "
              "tarea que espera su revisión es otra jugada."),
-    Ficha("pedir_acceso_web", "dejar el botón para abrir la web",
+    Ficha("pedir_acceso_web", "abrir la aplicación de Leda, donde ve sus tareas",
           necesita=(), opcional=("para_la_compu",),
           comprueba="que la web esté disponible y que el mensaje no lleve ya el enlace de una "
                     "tarea (uno solo por mensaje)",
@@ -1888,9 +1888,11 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="el código pone el botón debajo de la respuesta; la dirección para la "
                   "computadora sola no da acceso: ahí se entra escaneando el QR que muestra",
           manejar=_pedir_acceso_web,
-          es="La persona quiere entrar o ver la web de Leda, donde ve sus tareas, o dice que no "
-             "le anda. Si pide la dirección para abrirla en la computadora, para_la_compu es "
-             "verdadero. Pedir el enlace a la página de una tarea es otra jugada."),
+          es="La persona quiere abrir, ver o entrar a la aplicación de Leda (la que se abre "
+             "dentro de Telegram, que también es una web), donde ve sus tareas, o dice que no le "
+             "anda. Leda le deja el botón que la abre. Si pide la dirección para abrirla en la "
+             "computadora, para_la_compu es verdadero. Pedir el enlace a la página de una tarea "
+             "es otra jugada."),
     Ficha("pedir_crear", "decir dónde se crea una tarea o un objetivo",
           necesita=("que_quiere_crear",), opcional=(),
           comprueba="quién es la persona: Dirección crea tareas y objetivos; un referente de "

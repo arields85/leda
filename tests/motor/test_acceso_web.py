@@ -291,3 +291,27 @@ def test_perdi_el_celular_de_un_espacio_no_toca_otro(conn, mundo, escribe):
     assert _canjear(conn, token) is not None
     _dice(conn, escribe, Jugada("perdi_el_celular", {}))
     assert len(todos(conn, "select 1 from sesion_web where cortada_en is null")) == 1
+
+
+# --- Abrir la app y un pedido con la pregunta abierta (prueba de la Mini App, 2026-10-14) ------
+
+def test_la_jugada_describe_abrir_la_aplicacion_sin_frases_de_ejemplo():
+    """"abrí la app" no eligió ninguna jugada: la definición hablaba de un enlace. Ahora describe
+    el trabajo (abrir la aplicación de Leda, que se abre dentro de Telegram), sin frases."""
+    ficha = FICHAS["pedir_acceso_web"]
+    assert "aplicación" in ficha.es and "Telegram" in ficha.es and "enlace de entrada" not in ficha.es
+    assert "aplicación" in ficha.para_que
+    assert not re.search(r"[\"“”«»]", ficha.es)
+
+
+def test_un_pedido_que_ninguna_jugada_hace_nunca_va_como_ninguna_jugada():
+    """La regla general de ADR 0018 (decisión 1), dicha también en la definición de lo que no
+    está en la lista: un pedido va ahí, también con una pregunta abierta; y la redacción, con una
+    pregunta que vuelve, contesta antes lo que el mensaje dijo o pidió."""
+    from leda.motor.ia_real import FUERA_DE_LA_LISTA_ES
+    from leda.motor.instrucciones import INSTRUCCIONES_REDACCION
+
+    assert "nunca como ninguna jugada" in FUERA_DE_LA_LISTA_ES
+    assert "también con una pregunta abierta" in FUERA_DE_LA_LISTA_ES
+    assert "antes le contestás a lo que dijo o pidió" in " ".join(INSTRUCCIONES_REDACCION.split())
+

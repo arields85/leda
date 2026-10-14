@@ -188,8 +188,9 @@ DATOS = {
 FUERA_DE_LA_LISTA_ES = (
     "La persona le pide a Leda que haga algo que ninguna jugada hace. Es sólo un pedido de "
     "hacer algo: una pregunta sobre la conversación o sobre lo que Leda hizo o dijo no es un "
-    "pedido y no lleva jugada. Si es la respuesta de la persona a la pregunta abierta de Leda, "
-    "lo dice contesta_la_pregunta.")
+    "pedido y no lleva jugada. Un pedido que ninguna jugada hace va siempre acá, nunca como "
+    "ninguna jugada, también con una pregunta abierta. Si es la respuesta de la persona a la "
+    "pregunta abierta de Leda, lo dice contesta_la_pregunta.")
 # Sus datos: qué pidió y si es la respuesta a la pregunta abierta (D7: una respuesta que no es
 # ninguna jugada no es un pedido nuevo; la maneja esa pregunta, `turno.contesta_la_abierta`).
 DATOS_FUERA_DE_LA_LISTA = ("que_pide", "contesta_la_pregunta")

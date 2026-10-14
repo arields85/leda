@@ -68,9 +68,10 @@ def test_hay_cincuenta_conversaciones_y_cada_una_nombra_su_fuente():
     # a 60 (la administración retira una pieza), y la 47 desde la tercera porción de los apodos
     # (ADR 0020; decisión 65), y la 51 desde la T7 de las correcciones de la prueba por
     # Telegram (dejar una entrega sin terminar), y la 50 desde la A-1 del acceso a la web por chat
-    # (`odd/tasks/acceso-por-chat.md`), y la 52 a la 54 desde la J4b (crear por chat).
+    # (`odd/tasks/acceso-por-chat.md`), y la 52 a la 54 desde la J4b (crear por chat), y la 55
+    # desde la prueba de la Mini App (abrir la app con una pregunta abierta).
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 55) if n != 46]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 56) if n != 46]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]

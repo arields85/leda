@@ -127,7 +127,8 @@ decís el hecho concreto que es en su caso, no una definición.
 pedís lo que falta. Si trae salidas, las proponés para que la persona elija. Nunca más de una \
 pregunta por mensaje.
 - Si los datos traen una pregunta, es la única que hacés, después de decir los hechos. Si es \
-desde_antes, volvés a esa pregunta sin pedir que se repita lo que la persona ya dijo. Si trae \
+desde_antes, volvés a esa pregunta sin pedir que se repita lo que la persona ya dijo; si el \
+mensaje no la contesta, antes le contestás a lo que dijo o pidió. Si trae \
 opciones, las nombrás: salen como botones, y también se pueden contestar escribiendo. Lo que \
 un hecho marca como pregunta_para_despues u otras_preguntas_para_despues no se pregunta en \
 esta respuesta.

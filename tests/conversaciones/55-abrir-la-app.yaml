@@ -1,0 +1,110 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/55-abrir-la-app.md
+numero: "55"
+titulo: "Abrir la app, con una pregunta abierta"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-21 09:00"
+foco: [PLC, COM]
+
+# Sólo la cadencia del lunes, a cada integrante en privado: abre la pregunta de cómo vienen.
+cadencias:
+  - {nombre: objetivos_semanales, cuando: "lunes 09:15", audiencia: privado_cada_integrante}
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    criterio: "La comprimidora arranca desde el PLC y completa 20 ciclos sin fallas"
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    criterio: "Los equipos de la comprimidora se comunican con el PLC por la red de planta sin errores durante una hora"
+    responsable: Marcos
+    vence: "2026-11-06"
+
+# Prueba de la Mini App en el celular (2026-10-14): "abrí la app" no eligió ninguna jugada, y Leda
+# contestó sólo con la pregunta abierta, como si la hubiera contestado. Pedir abrir la aplicación
+# de Leda es `pedir_acceso_web`, que deja el botón que la abre (ADR 0024); un pedido que ninguna
+# jugada hace es `fuera_de_la_lista`, nunca ninguna jugada (ADR 0018). En los dos casos la
+# pregunta abierta sigue abierta y vuelve después de contestar lo que pidió.
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-26 10:00"]
+    salen:
+      - a: Marcos
+        tipo: como_vienen_sus_tareas
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+    dice:
+      - "cada tarea con su vencimiento"
+      - "la pregunta de cómo vienen, una sola, en el último renglón"
+    no_dice:
+      - un reproche
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-26 10:30"
+    escribe: "abri la app"
+    jugadas:
+      - {nombre: pedir_acceso_web}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_acceso_web, resultado: boton_para_abrir_la_web,
+         lleva_el_boton: Ver mis tareas}
+    pregunta: {tipo: como_vienen_sus_tareas, desde_antes: true}
+    enlace: false
+    enlace_web: true
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+    dice:
+      - "primero, que la abre tocando «Ver mis tareas»"
+      - "después, la pregunta de cómo vienen sus tareas, sin pedir que repita nada"
+    no_dice:
+      - un enlace, o que pida uno
+      - "sólo la pregunta de cómo vienen, sin decir nada de la app"
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-26 10:35"
+    escribe: "quiero entrar a la app desde la compu, pasame la direccion"
+    jugadas:
+      - {nombre: pedir_acceso_web, para_la_compu: true}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_acceso_web, resultado: direccion_para_la_compu,
+         direccion_para_la_compu: presente}
+    pregunta: {tipo: como_vienen_sus_tareas, desde_antes: true}
+    enlace: false
+    enlace_web: false
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+    dice:
+      - "la dirección para la computadora, y que ahí entra escaneando el código con el celular"
+      - "después, la pregunta de cómo vienen sus tareas"
+    no_dice:
+      - que la dirección sola le da acceso
+
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-26 10:40"
+    escribe: "pasame el pronostico del tiempo para mañana"
+    jugadas:
+      - {nombre: fuera_de_la_lista, que_pide: "el pronóstico del tiempo para mañana"}
+    efectos:
+      avisos_al_administrador: 1
+    hechos:
+      - {resultado: fuera_de_la_lista, lo_que_puede_hacer: presente}
+    pregunta: {tipo: como_vienen_sus_tareas, desde_antes: true}
+    enlace: false
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+    dice:
+      - "primero, que eso no lo puede hacer y lo que sí puede hacer"
+      - "después, la pregunta de cómo vienen sus tareas"
+    no_dice:
+      - "sólo la pregunta de cómo vienen, como si la hubiera contestado"
+      - un pronóstico
