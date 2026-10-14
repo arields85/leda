@@ -1194,6 +1194,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - si no afecta nada, "No demora a nadie más".
         Lo reciben quien decide y los referentes de las tareas afectadas. Dirección lo recibe sólo cuando toca la
         fecha de un objetivo o una cadena que cruza áreas.
+        **Siempre antes de decidir** (usuario: "si no, no tiene ningún sentido"): va dentro del pedido, antes de
+        "aceptar" o "no"; y cuando el cambio no necesita aprobación (un referente en una tarea suya), en la vista previa,
+        antes de confirmar. Después de decidir sólo se avisa lo que se decidió.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
