@@ -74,14 +74,13 @@ viejo corriendo.
 **Punto exacto para seguir** (2026-10-14, tarde; actualizado por contexto, sin cerrar la sesión):
 1. **Hecho el 2026-10-14:**
    - **J2:** cerrada (la J2-29 y sus arreglos, la J2-30, y la suite con 3286 passed).
-   - **J3:** pasó en el celular. Quedan la J3-6 y la J3-7 para que el usuario las mire en la prueba de la MA
-     (pasos 10 a 12 del guion); con eso se cierra.
+   - **J3:** cerrada (2026-10-14, noche). El tercer nivel pasó a llamarse "objetivo de un área".
    - **J4a y J4b:** construidas y revisadas por RDD. La prueba de la J4 en el celular está hecha y sus hallazgos
      se arreglaron en la MA.
    - **MA, la Mini App y el QR del ADR 0024:** construida, con la `0073` aplicada en `leda_motor`. La IA real dio
      12 de 12 y RDD aprobó todo.
    - **Decisiones completas** de la J4, la MA, la J5 y la J6, en el documento de la unidad.
-2. **En curso (2026-10-14, noche):** un escritor delegado, MA-2 y MA-3.
+2. **MA-2 y MA-3, hechas y revisadas por RDD** (`0075` aplicada, web rearmada). Fueron:
    - **MA-2:**
      - Telegram de escritorio lleva a la página del QR en el navegador, con el mensaje "Abrí Leda en el navegador";
      - los WARNING de las últimas RDD de la MA;
