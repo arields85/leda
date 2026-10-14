@@ -95,13 +95,16 @@ TABLAS_POR_FUNCION = ("acceso_tablero", "acceso_tarea", "vista_de_tarea",
                       # `tipos_de_evidencia_que_faltan`.
                       "reapertura_de_tarea")
 
-# Columnas sueltas de una tabla que sí usa `src/`, que sólo escriben y leen funciones de la base,
-# cada una con la función que la lee. No es una lista de promesas: estas columnas se usan.
-COLUMNAS_POR_FUNCION = {
+# Columnas sueltas de una tabla que sí usa `src/`, que sólo escriben y leen funciones de la base:
+# `(tabla, columna)` → las funciones que la usan. Se exime el par, nunca el nombre (la misma
+# columna en otra tabla tiene que usarse o declararse aparte), y cada función nombrada tiene que
+# existir en el esquema y nombrar la columna en su cuerpo
+# (`test_las_columnas_por_funcion_se_usan_en_esas_funciones`): no es una lista de promesas.
+COLUMNAS_POR_FUNCION: dict[tuple[str, str], tuple[str, ...]] = {
     # `task.pedida_por_membership_id` (migración 0071, J4; decisiones D1b y D14): la escribe
     # `cargar_tarea_web` y la leen `puede_ver_tarea`, `pedidas_que_ve` y `reabrir_tarea`.
-    "pedida_por_membership_id": "task: cargar_tarea_web, puede_ver_tarea, pedidas_que_ve, "
-                                "reabrir_tarea",
+    ("task", "pedida_por_membership_id"): ("cargar_tarea_web", "puede_ver_tarea",
+                                           "pedidas_que_ve", "reabrir_tarea"),
 }
 
 # Las tablas del motor de conversación (migraciones 0030 y 0031) estuvieron
@@ -139,6 +142,55 @@ def _referenciado(identificador: str, fuente: str) -> bool:
     return re.search(rf"\b{re.escape(identificador)}\b", fuente) is not None
 
 
+def _esquema_nuevo_sin_uso(tablas: dict[str, set[str]], fuente: str) -> list[str]:
+    """Las columnas que ningún código usa y nadie declaró: ni promesas, ni de una tabla exenta,
+    ni el par `(tabla, columna)` que usan sólo funciones de la base."""
+    exentas = (set(TABLAS_MUERTAS) | set(TABLAS_POR_FUNCION)
+               | set(TABLAS_DEL_MOTOR))
+    return sorted(
+        f"{tabla}.{columna}"
+        for tabla, columnas in tablas.items() if tabla not in exentas
+        for columna in columnas
+        if not _referenciado(columna, fuente) and columna not in PROMESAS_SIN_CUMPLIR
+        and (tabla, columna) not in COLUMNAS_POR_FUNCION)
+
+
+def _cuerpo_de_la_funcion(esquema: str, nombre: str) -> str | None:
+    """El cuerpo de la última definición de una función en el esquema (la vigente), desde su
+    nombre hasta el `$$` que la cierra."""
+    definiciones = list(re.finditer(
+        rf"create (?:or replace )?function {re.escape(nombre)}\((.*?)\$\$(.*?)\$\$",
+        esquema, re.S))
+    return definiciones[-1].group(2) if definiciones else None
+
+
+def test_las_columnas_por_funcion_se_usan_en_esas_funciones():
+    """Cada columna eximida por usarse sólo en funciones de la base es de esa tabla, y cada
+    función nombrada existe y la nombra en su cuerpo: si una deja de usarla o cambia de nombre,
+    la exención no queda como una promesa vacía (revisión de la J4a)."""
+    esquema = ESQUEMA.read_text("utf-8")
+    tablas = _columnas_por_tabla()
+    problemas = []
+    for (tabla, columna), funciones in COLUMNAS_POR_FUNCION.items():
+        if columna not in tablas.get(tabla, set()):
+            problemas.append(f"{tabla}.{columna}: la tabla no tiene esa columna")
+        for funcion in funciones:
+            cuerpo = _cuerpo_de_la_funcion(esquema, funcion)
+            if cuerpo is None:
+                problemas.append(f"{tabla}.{columna}: {funcion} no está en el esquema")
+            elif not _referenciado(columna, cuerpo):
+                problemas.append(f"{tabla}.{columna}: {funcion} no la usa")
+    assert not problemas, "\n  ".join(["Exenciones que no se cumplen:", *problemas])
+
+
+def test_eximir_una_columna_por_funcion_no_exime_su_nombre_en_otra_tabla():
+    """La exención es del par: la misma columna en otra tabla, sin uso, sigue siendo esquema
+    nuevo sin uso (revisión de la J4a)."""
+    (tabla, columna), = list(COLUMNAS_POR_FUNCION)[:1]
+    tablas = {tabla: {columna}, "otra_tabla": {columna}}
+    assert _esquema_nuevo_sin_uso(tablas, fuente="") == [f"otra_tabla.{columna}"]
+
+
 def test_las_promesas_sin_cumplir_siguen_sin_cumplirse():
     """Si una se implementó, hay que sacarla de la lista."""
     fuente = _fuente()
@@ -155,18 +207,7 @@ def test_las_promesas_sin_cumplir_siguen_sin_cumplirse():
 
 def test_no_hay_esquema_nuevo_sin_uso_ni_declarado():
     """Esquema nuevo que nadie usa tiene que ser una decisión, no un olvido."""
-    fuente = _fuente()
-    tablas = _columnas_por_tabla()
-
-    exentas = (set(TABLAS_MUERTAS) | set(TABLAS_POR_FUNCION)
-               | set(TABLAS_DEL_MOTOR))
-    sin_uso = {
-        columna
-        for tabla, columnas in tablas.items() if tabla not in exentas
-        for columna in columnas if not _referenciado(columna, fuente)
-    }
-
-    nuevas = sorted(sin_uso - set(PROMESAS_SIN_CUMPLIR) - set(COLUMNAS_POR_FUNCION))
+    nuevas = _esquema_nuevo_sin_uso(_columnas_por_tabla(), _fuente())
     assert not nuevas, (
         "Estas columnas se declararon y ningún código las usa. O se "
         "implementan, o se agregan a PROMESAS_SIN_CUMPLIR diciendo qué "
