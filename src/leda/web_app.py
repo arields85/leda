@@ -1021,16 +1021,21 @@ class OpcionesIlegibles(Exception):
 
 
 def _lo_que_sabe_la_tarea(conn, token: str, espacio: str,
-                          datos: dict[str, Any]) -> tuple[list[str], list[str]]:
+                          datos: dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
     """La evidencia que se eligió, en palabras de todos los días (`ayuda_al_cargar.
-    evidencia_de_la_carga`), y los otros datos de esta tarea que un criterio propuesto puede
-    nombrar (quién la hace y su área, el objetivo, la tarea que espera), de las opciones de la
-    carga de ese espacio. Si no se pueden leer, `OpcionesIlegibles`: sin ellas no se sabe qué
-    regla le toca al criterio, y no se lo juzga con otra."""
+    evidencia_de_la_carga`), los otros datos de esta tarea que un criterio propuesto puede
+    nombrar (quién la hace y su área, el objetivo, la tarea que espera) y las personas del
+    espacio que el criterio que propone Leda no nombra (J2-26: sus nombres y sus apodos), de las
+    opciones de la carga de ese espacio. Si no se pueden leer, `OpcionesIlegibles`: sin ellas no se
+    sabe qué regla le toca al criterio, y no se lo juzga con otra."""
     from . import ayuda_al_cargar
+    from .db import espacio as en_el_espacio
+    from .motor import apodos
 
     try:
         opciones = _opciones_para_el_juicio(conn, token, espacio)
+        with en_el_espacio(conn, espacio) as cur:
+            del_espacio = [a["apodo"] for a in apodos.vigentes(cur)]
     except Exception as falla:  # noqa: BLE001 -- cualquier falla es que no se leyeron
         _sin_transaccion(conn)
         raise OpcionesIlegibles(f"{type(falla).__name__}: {falla}") from falla
@@ -1046,7 +1051,7 @@ def _lo_que_sabe_la_tarea(conn, token: str, espacio: str,
         fila = next((x for x in opciones.get(lista) or [] if str(x.get(clave)) == valor), None)
         if fila is not None:
             contexto += [str(fila[c]) for c in campos if fila.get(c)]
-    return evidencia, contexto
+    return evidencia, contexto, ayuda_al_cargar.personas_del_espacio(opciones, del_espacio)
 
 
 def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
@@ -1063,7 +1068,7 @@ def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
             return None
     vacio = ayuda_al_cargar.sin_nada_que_juzgar(datos.get("titulo") or "", datos["criterio"])
     try:
-        evidencia, contexto = _lo_que_sabe_la_tarea(conn, token, espacio, datos)
+        evidencia, contexto, personas = _lo_que_sabe_la_tarea(conn, token, espacio, datos)
     except OpcionesIlegibles as falla:
         # Sin saber qué evidencia pide el área no se juzga con la regla de otra (la J2-13 pediría
         # decir cómo se comprueba, que quizás ya lo dice el área): lo vacío o igual al título se
@@ -1078,7 +1083,7 @@ def _lo_del_juicio(conn, token: str, espacio: str, datos: dict[str, Any]):
     except Exception as falla:  # noqa: BLE001 -- queda como `sin_revisar`, con su incidente
         _sin_transaccion(conn)
         ia = IANoConfigurada(f"La IA del espacio no se pudo preparar ({type(falla).__name__}).")
-    return {"ia": ia, "evidencia": evidencia, "contexto": contexto}
+    return {"ia": ia, "evidencia": evidencia, "contexto": contexto, "personas": personas}
 
 
 # J2-21: el juicio de un criterio, por un rato y sólo para la misma sesión de administración, el
@@ -1183,7 +1188,8 @@ async def _juzgar_el_criterio(token: str, espacio: str | None, datos: dict[str, 
                                                 datos.get("descripcion") or ""),
                "criterio": _como_se_escribio(token, espacio, "criterio", criterio),
                "evidencia": list(preparado["evidencia"]),
-               "contexto": list(preparado["contexto"])}
+               "contexto": list(preparado["contexto"]),
+               "personas": list(preparado["personas"])}
     clave = _clave_del_juicio(token, espacio, preparado["ia"], entrada)
     reciente = _JUICIOS_RECIENTES.leer(clave)
     if reciente is not None:
@@ -1548,6 +1554,7 @@ def _revisar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[s
     juicio, fuera del candado, juzgue el criterio con esa evidencia."""
     from . import ayuda_al_cargar
     from .db import espacio as en_el_espacio
+    from .motor import apodos
     from .motor.fichas import integrantes_que_coinciden
 
     with sin_espacio(conn) as cur:
@@ -1563,7 +1570,7 @@ def _revisar_la_ayuda(conn, token: str, preparada: dict[str, Any], crudo: dict[s
             crudo or {}, texto=preparada["texto"], escrito=preparada["escrito"],
             opciones=preparada["opciones"],
             coinciden=lambda dicho: integrantes_que_coinciden(cur, dicho),
-            objetivo_de=objetivo_de)
+            objetivo_de=objetivo_de, apodos=[a["apodo"] for a in apodos.vigentes(cur)])
 
 
 def _cerrar_la_ayuda(conn, token: str, preparada: dict[str, Any], resultado,
@@ -1820,6 +1827,9 @@ def _cerrar_la_ortografia(conn, token: str, preparada: dict[str, Any],
 TEXTO_SIN_DICTADO = ("No pude pasar el audio a texto ahora. Probá de nuevo en un rato o "
                      "escribilo acá.")
 TEXTO_NO_SE_ENTENDIO = "No te entendí; probá de nuevo o escribilo acá."
+# J2-26: Gemini se detuvo por el tope de salida; lo transcripto llega igual, con este aviso.
+TEXTO_DICTADO_CORTADO = ("Pasé a texto sólo una parte: el dictado se cortó. Dictá lo que falta o "
+                         "escribilo acá.")
 
 
 async def _el_cuerpo_con_tope(request: Request, tope: int) -> bytes | None:
@@ -1839,7 +1849,8 @@ async def _el_cuerpo_con_tope(request: Request, tope: int) -> bytes | None:
 async def dictar_al_cargar(espacio_id: str, request: Request):
     """Lo que la persona dictó, como texto: 200 con `texto`; 415 si no es audio de un tipo
     admitido, 413 si pasa de 10 MB, 422 si no hay audio o no se entendió nada; 503 sin la clave de
-    Gemini y 502 si Gemini no respondió, los dos con un texto humano y un incidente."""
+    Gemini y 502 si Gemini no respondió, los dos con un texto humano y un incidente. Si Gemini lo
+    cortó por el tope, 200 con lo transcripto y un `aviso`, y un incidente (J2-26)."""
     from . import dictado
 
     if _de_otro_sitio(request):
@@ -1860,15 +1871,16 @@ async def dictar_al_cargar(espacio_id: str, request: Request):
         return preparado
     if not audio:
         return _json({"error": "no_se_entendio", "texto": TEXTO_NO_SE_ENTENDIO}, 422)
-    texto, falla = None, None
+    transcripcion, falla = None, None
     try:
-        texto = await run_in_threadpool(dictado.transcribir, audio, tipo, preparado["palabras"])
+        transcripcion = await run_in_threadpool(dictado.transcribir, audio, tipo,
+                                                preparado["palabras"])
     except Exception as e:  # noqa: BLE001 -- cualquier falla es que no se pudo pasar a texto
         falla = e
     tamano = len(audio)
     del audio  # El audio no queda en ningún lado.
     return await run_in_threadpool(_con_la_base, lambda conn: _cerrar_el_dictado(
-        conn, token, preparado, tipo, tamano, texto, falla))
+        conn, token, preparado, tipo, tamano, transcripcion, falla))
 
 
 def _preparar_el_dictado(conn, token: str, espacio: str | None):
@@ -1894,7 +1906,7 @@ def _preparar_el_dictado(conn, token: str, espacio: str | None):
 
 
 def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, tamano: int,
-                       texto: str | None, falla: BaseException | None) -> Response:
+                       transcripcion, falla: BaseException | None) -> Response:
     """Con el candado otra vez y en el espacio: la sesión revalidada (cortada mientras respondía
     Gemini, no recibe el texto), la auditoría y, si no se pudo pasar a texto, el incidente, con la
     causa saneada (el tipo de la falla y su motivo, nunca el audio, el texto ni la clave)."""
@@ -1907,8 +1919,9 @@ def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, t
     if sesion is None:
         return _sin_sesion_de_administracion()
     ws = preparado["espacio"]
+    texto = transcripcion.texto if transcripcion is not None else None
     if falla is None:
-        resultado = "texto"
+        resultado = "cortado" if transcripcion.cortada else "texto"
     elif isinstance(falla, dictado.TranscripcionVacia):
         resultado = "vacio"
     elif isinstance(falla, dictado.SinClave):
@@ -1929,6 +1942,16 @@ def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, t
                 " No se guardó el audio y la persona vio un aviso.",
                 severidad="baja", referencia_cruda=f"{type(falla).__name__}{motivo}",
                 etapa=ETAPA_DICTADO_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
+        elif resultado == "cortado":
+            # Lo transcripto llega, con su aviso; el incidente, por si el tope quedó corto.
+            registrar_incidente(
+                cur, ws,
+                "Un administrador dictó lo que quería cargar en la plataforma y Gemini cortó la "
+                "transcripción por el tope de salida: la persona recibió la parte transcripta "
+                "con un aviso de que se cortó. No se guardó el audio.",
+                severidad="baja", referencia_cruda=f"finishReason MAX_TOKENS, tope "
+                                                   f"{dictado.TOPE_DE_SALIDA}",
+                etapa=ETAPA_DICTADO_AL_CARGAR, app_user_id=str(sesion["app_user_id"]))
         registrar_auditoria(
             cur, accion="dictar_al_cargar", workspace_id=ws,
             actor_app_user_id=str(sesion["app_user_id"]), actor_kind="persona",
@@ -1936,11 +1959,14 @@ def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, t
             detalle={"origen": "web", "sesion_de_administracion_id": str(sesion["sesion_id"]),
                      "proveedor": "gemini", "modelo": dictado.MODELO, "tipo": tipo,
                      "tamano": dictado.tramo_de_tamano(tamano),
-                     "respondio": resultado in ("texto", "vacio"), "resultado": resultado,
+                     "respondio": resultado in ("texto", "cortado", "vacio"),
+                     "resultado": resultado,
                      "caracteres": len(texto or "")},
             pack_hash=versiones.pack_hash(cur, ws), nucleo_hash=versiones.nucleo_hash())
     if resultado == "texto":
         return _json({"texto": texto})
+    if resultado == "cortado":
+        return _json({"texto": texto, "aviso": TEXTO_DICTADO_CORTADO})
     if resultado == "vacio":
         return _json({"error": "no_se_entendio", "texto": TEXTO_NO_SE_ENTENDIO}, 422)
     _imprimir(f"  ! no se pudo pasar un dictado a texto ({type(falla).__name__}).")

@@ -11,6 +11,12 @@ nombres del espacio que conviene escribir como están en los datos. Por la API d
 El audio no se guarda ni se registra en ningún lado. Las fallas salen como tres clases con un
 motivo saneado (el tipo de la falla o el estado que devolvió Gemini), nunca el audio, el texto,
 la clave ni la dirección: quien llama deja el incidente y un aviso humano.
+
+La deuda de la J2b (revisión `review-0f465303e17d9ce6`, J2-26): el plazo de `httpx` es por
+operación (conectar, mandar, cada lectura), así que una respuesta que llega de a gotas lo estira
+sin fin; la llamada tiene además un plazo total (`PLAZO_TOTAL_S`), debajo del de la web. Y una
+transcripción que Gemini cortó por el tope de salida no se devuelve como si fuera todo: vuelve
+marcada (`cortada`), para que la persona sepa que falta una parte.
 """
 
 from __future__ import annotations
@@ -18,8 +24,9 @@ from __future__ import annotations
 import base64
 import os
 import re
+import threading
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, NamedTuple
 
 import httpx
 
@@ -42,6 +49,9 @@ TIPOS_DE_AUDIO = frozenset({
 # `DICTATION_TIMEOUT_MS`): una llamada trabada nunca sobrevive a quien espera.
 PLAZO_DEL_PROVEEDOR_S = 30.0
 PLAZO_DE_CONEXION_S = 5.0
+# El plazo de la llamada entera, desde que se conecta hasta que llega la respuesta: vencido, Gemini
+# no respondió, aunque cada operación haya cumplido el suyo. Debajo de los 45 s de la web.
+PLAZO_TOTAL_S = 35.0
 # Dos minutos hablados son unas 300 palabras: menos de 1000 fichas.
 TOPE_DE_SALIDA = 1024
 # Las palabras del espacio para favorecer: las primeras, sin repetir y acotadas.
@@ -65,6 +75,18 @@ class ProveedorNoResponde(Exception):
 
 class TranscripcionVacia(Exception):
     """Gemini respondió, pero sin texto: no se entendió nada."""
+
+
+class Transcripcion(NamedTuple):
+    """Lo que se dictó, como texto, y si Gemini lo cortó por el tope de salida (`cortada`): el
+    texto es sólo una parte."""
+
+    texto: str
+    cortada: bool = False
+
+
+# Lo que dice Gemini cuando se detuvo por el tope de salida (`finishReason`).
+_CORTADA_POR_EL_TOPE = "MAX_TOKENS"
 
 
 def tipo_de_audio(content_type: str | None) -> str | None:
@@ -117,6 +139,32 @@ def _cliente() -> httpx.Client:
                                               connect=PLAZO_DE_CONEXION_S))
 
 
+def _con_plazo_total(cliente: httpx.Client, url: str, clave: str,
+                     cuerpo: Mapping[str, Any]) -> httpx.Response:
+    """El pedido a Gemini, en un hilo aparte que se espera hasta `PLAZO_TOTAL_S`. Vencido, el
+    cliente se cierra (desde otro hilo, sin esperarlo: cortar la conexión despierta la lectura
+    colgada, que termina por su cuenta) y es `ProveedorNoResponde("plazo_total")`. Una falla del
+    pedido se levanta tal cual, como si se hubiera hecho acá."""
+    hecho: dict[str, Any] = {}
+
+    def pedir() -> None:
+        try:
+            hecho["respuesta"] = cliente.post(url, headers={"x-goog-api-key": clave}, json=cuerpo)
+        except BaseException as falla:  # noqa: BLE001 -- se levanta en el hilo de quien llama
+            hecho["falla"] = falla
+
+    hilo = threading.Thread(target=pedir, name="dictado-gemini", daemon=True)
+    hilo.start()
+    hilo.join(PLAZO_TOTAL_S)
+    if hilo.is_alive():
+        threading.Thread(target=cliente.close, name="dictado-cerrar", daemon=True).start()
+        raise ProveedorNoResponde("plazo_total")
+    cliente.close()
+    if "falla" in hecho:
+        raise hecho["falla"]
+    return hecho["respuesta"]
+
+
 def _motivo_de_la_respuesta(respuesta: httpx.Response) -> str:
     """`status_429 RESOURCE_EXHAUSTED`: el código y, si viene, el estado de Gemini (una palabra
     en mayúsculas); nunca su mensaje, que puede repetir lo que se mandó."""
@@ -130,9 +178,10 @@ def _motivo_de_la_respuesta(respuesta: httpx.Response) -> str:
     return motivo
 
 
-def transcribir(audio: bytes, tipo: str, palabras: Sequence[str]) -> str:
-    """El texto de lo que se dictó. Una sola llamada, sin reintento (la persona puede volver a
-    dictar). Levanta `SinClave`, `ProveedorNoResponde` o `TranscripcionVacia`."""
+def transcribir(audio: bytes, tipo: str, palabras: Sequence[str]) -> Transcripcion:
+    """El texto de lo que se dictó y si se cortó por el tope. Una sola llamada, sin reintento (la
+    persona puede volver a dictar), con el plazo total. Levanta `SinClave`, `ProveedorNoResponde`
+    o `TranscripcionVacia`."""
     clave = os.environ.get(VARIABLE_DE_LA_CLAVE, "").strip()
     if not clave:
         raise SinClave(f"falta {VARIABLE_DE_LA_CLAVE}")
@@ -145,9 +194,8 @@ def transcribir(audio: bytes, tipo: str, palabras: Sequence[str]) -> str:
                              "thinkingConfig": {"thinkingBudget": 0}},
     }
     try:
-        with _cliente() as cliente:
-            respuesta = cliente.post(f"{GEMINI_BASE}/models/{MODELO}:generateContent",
-                                     headers={"x-goog-api-key": clave}, json=cuerpo)
+        respuesta = _con_plazo_total(_cliente(), f"{GEMINI_BASE}/models/{MODELO}:generateContent",
+                                     clave, cuerpo)
     except httpx.HTTPError as falla:
         # Sólo el tipo: el mensaje de `httpx` puede traer la dirección.
         raise ProveedorNoResponde(type(falla).__name__) from None
@@ -167,4 +215,4 @@ def transcribir(audio: bytes, tipo: str, palabras: Sequence[str]) -> str:
                     if isinstance(p, dict) and isinstance(p.get("text"), str)).strip()
     if not texto:
         raise TranscripcionVacia("sin texto")
-    return texto
+    return Transcripcion(texto, cortada=primero.get("finishReason") == _CORTADA_POR_EL_TOPE)

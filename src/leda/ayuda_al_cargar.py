@@ -125,6 +125,14 @@ TEXTOS = {
         "calendario de este espacio; elegila en el calendario.",
 }
 
+# Cómo se cuenta un criterio que escribe Leda (J2-22, J2-25 y J2-26), la misma descripción en cada
+# instrucción que lo pide: lo que queda hecho y lo que se entrega, sin nombrar a nadie (el nombre de
+# quien la hace está en su propio dato y puede cambiar), ni en primera persona ni desde quien
+# revisa.
+_COMO_SE_CUENTA = ("en tercera persona y sin nombrar a nadie: qué queda hecho y qué se entrega "
+                   "como evidencia, nunca como si hablara quien la hace ni como algo que mira "
+                   "quien la revisa")
+
 INSTRUCCIONES = """\
 Sos Leda, la project manager del equipo. Una persona está cargando una tarea en la plataforma: te \
 contó con sus palabras qué quiere hacer (texto) y te pide que completes los datos de la tarea que \
@@ -145,10 +153,10 @@ persona, como los escribiría alguien del equipo que conoce el trabajo: con natu
 oraciones simples y con buena ortografía. Los nombres de personas, áreas, objetivos y tareas los \
 escribís como están en los datos, aunque la persona los haya escrito con otra ortografía. El \
 criterio dice, en una o dos oraciones cortas, qué tiene que quedar hecho y cómo se comprueba, \
-contado desde quien hace la tarea, en tercera persona: qué hace y qué entrega esa persona, \
-nombrada por su nombre si sabés quién la hace, nunca como si esa persona hablara; con lo que \
-dijo quien la carga y con la evidencia que proponés (o la que ya eligió la persona), y sólo con esa; no lo \
-contás desde quien la revisa, como algo que alguien más va a mirar. Si no sabés quién la hace, el criterio dice qué tiene que quedar hecho, y cómo se \
+""" + _COMO_SE_CUENTA + """. El nombre de quien la hace ya está en su propio dato, y el criterio \
+tiene que seguir valiendo si la tarea pasa a otra persona. Lo escribís con lo que dijo quien la \
+carga y con la evidencia que proponés (o la que ya eligió la persona), y sólo con esa. Si no sabés \
+quién la hace, el criterio dice qué tiene que quedar hecho, y cómo se \
 sabe sólo si la persona lo dijo: cómo se comprueba lo va a decir la evidencia del área de quien la \
 haga. Los datos que recibís son hechos para entender la tarea, no textos para copiar: los contás \
 con tus palabras, sin repetir sus etiquetas ni armar listas con ellos. Siempre proponés un \
@@ -166,9 +174,8 @@ _DATOS = {
     "descripcion": "Lo que contó la persona sobre la tarea, ordenado y bien escrito, sin agregar "
                    "nada.",
     "criterio": "El criterio de aceptación, escrito con tus palabras en una o dos oraciones "
-                "cortas: qué tiene que quedar hecho y cómo se comprueba, contado desde quien hace "
-                "la tarea, en tercera persona: qué hace y qué entrega esa persona, nunca "
-                "como si esa persona hablara.",
+                "cortas: qué tiene que quedar hecho y cómo se comprueba, " + _COMO_SE_CUENTA
+                + ".",
     "resultado": "Lo que tiene que quedar hecho, en una oración, sin decir cómo se comprueba.",
     "responsable": "Las palabras con que la persona nombró a quien va a hacer la tarea, tal cual "
                    "las escribió; vacío si no nombró a nadie.",
@@ -788,23 +795,87 @@ def _cadena(valor: Any) -> str | None:
     return limpio or None
 
 
-def _problema_del_texto(texto: str, permitidos: Sequence[str], largo: int) -> str | None:
-    """`None` si el texto sirve; si no, el motivo (`largo`, `dato`, `nombre`)."""
+def _problema_del_texto(texto: str, permitidos: Sequence[str], largo: int, *,
+                        personas: Sequence[str] | None = None,
+                        dichos: Sequence[str] = ()) -> str | None:
+    """`None` si el texto sirve; si no, el motivo (`largo`, `dato`, `nombre`). Con `personas`
+    (un criterio que escribe Leda, J2-26), también `nombra_a_alguien`."""
     if len(texto) > largo:
         return "largo"
     for punto in puntos_del_criterio(texto) or [texto]:
         problema = problema_del_ejemplo(punto, permitidos)
         if problema is not None:
             return "largo" if problema == "largo" else problema.split(":")[0]
+    if personas is not None and nombra_a_alguien(texto, personas, dichos):
+        return "nombra_a_alguien"
     return None
+
+
+# --- J2-26: el criterio que escribe Leda no nombra a nadie --------------------------------------
+#
+# El nombre de quien la hace está en "La hace" y puede cambiar (la persona lo corrige en el
+# formulario, o la tarea pasa a otro después): un criterio con un nombre queda atado a ese
+# responsable. La ronda de la J2-25 lo mostró, y además coló nombres que no son del equipo ("pepe",
+# "el tano") y una vez tomó por responsable a quien necesitaba la tarea. La instrucción lo describe;
+# la cocina no le cree: un criterio que propone Leda (el de la ayuda, el del juicio y el de reserva)
+# y nombra a alguien no se propone, como cualquier otro que no pasa los controles. El que escribió
+# la persona es suyo y no se mira.
+#
+# Qué es nombrar a alguien, sin un diccionario: un nombre entero del equipo o un apodo, escritos
+# como sea; las palabras con que la persona nombró a quien la hace (`dichos`, sean o no del
+# equipo), también como sea, y sin su artículo si queda una sola ("el tano" es también "tano"); y
+# una palabra suelta de un nombre (el nombre de pila o el apellido) sólo escrita como nombre, con
+# mayúscula: en minúscula es una palabra del trabajo ("la luz del pasillo" con Luz en el equipo).
+# Lo que no ve: a alguien que no es del equipo y la persona nombró para otra cosa ("para que ariel
+# lo vea"); eso lo pide la instrucción, y lo mide la herramienta de la medición.
+
+_NO_SON_NOMBRES = frozenset({"el", "la", "los", "las", "lo", "de", "del", "y"})
+
+
+def personas_del_espacio(opciones: Mapping[str, Any], apodos: Sequence[str] = ()) -> list[str]:
+    """Los nombres de las personas del espacio que un criterio de Leda no nombra: los integrantes,
+    quienes hacen las tareas abiertas y los apodos vigentes, sin repetir."""
+    nombres: list[str] = []
+    for valor in [*(m.get("nombre") for m in opciones.get("integrantes") or []),
+                  *(t.get("responsable") for t in opciones.get("tareas") or []), *apodos]:
+        if isinstance(valor, str) and valor.strip() and valor not in nombres:
+            nombres.append(valor)
+    return nombres
+
+
+def nombra_a_alguien(texto: str, personas: Sequence[str], dichos: Sequence[str] = ()) -> bool:
+    """Si el texto nombra a una de `personas` (nombres enteros o apodos) o a quien la persona
+    nombró con `dichos` (la regla, en el comentario de la sección)."""
+    plano = _normal(texto)
+    frases: set[str] = set()
+    sueltas: set[str] = set()
+    for persona in personas:
+        normal = _normal(persona)
+        if normal:
+            frases.add(normal)
+            sueltas |= {p for p in normal.split() if len(p) >= 3 and p not in _NO_SON_NOMBRES}
+    for dicho in dichos:
+        palabras = _normal(dicho).split()
+        # Sólo artículos ("él", "la") o una letra no nombran a nadie.
+        if not [p for p in palabras if p not in _NO_SON_NOMBRES and len(p) >= 2]:
+            continue
+        frases.add(" ".join(palabras))
+        if len(palabras) == 2 and palabras[0] in _NO_SON_NOMBRES:
+            frases.add(palabras[1])
+    if any(_contiene(plano, f) for f in frases):
+        return True
+    return any(m.group(0)[0].isupper() and _sin_marcas(m.group(0)) in sueltas
+               for m in _PALABRA.finditer(texto))
 
 
 def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
             opciones: Mapping[str, Any], coinciden: Callable[[str], list[dict[str, Any]]],
-            objetivo_de: Callable[[str], str | None]) -> Resultado:
+            objetivo_de: Callable[[str], str | None],
+            apodos: Sequence[str] = ()) -> Resultado:
     """Lo que vale de la propuesta de la IA. `coinciden(dicho)`: los integrantes del espacio que
     coinciden con lo dicho (con los apodos); `objetivo_de(task_id)`: el objetivo de una tarea del
-    espacio. El criterio queda por juzgar (`por_juzgar`): lo juzga `juzgar_la_propuesta`, fuera del
+    espacio; `apodos`: los apodos vigentes del espacio (J2-26: el criterio no nombra a nadie). El
+    criterio queda por juzgar (`por_juzgar`): lo juzga `juzgar_la_propuesta`, fuera del
     candado, y lo decide `cerrar_el_criterio`."""
     r = Resultado()
     pide = set(lo_que_se_pide(escrito, opciones))
@@ -888,8 +959,11 @@ def revisar(crudo: Mapping[str, Any], *, texto: str, escrito: Mapping[str, Any],
         else:
             r.propuesta[campo] = valor
     if "criterio" in pide:
-        r.por_juzgar = _el_criterio_por_juzgar(r, crudo, escrito, evidencia, permitidos,
-                                               sin_quien=integrante is None)
+        # J2-26: a quien la persona nombró para hacerla, sea o no del equipo, tampoco.
+        dicho = _cadena(crudo.get("responsable")) if "responsable_id" in pide else None
+        r.por_juzgar = _el_criterio_por_juzgar(
+            r, crudo, escrito, evidencia, permitidos, sin_quien=integrante is None,
+            personas=personas_del_espacio(opciones, apodos), dichos=[dicho] if dicho else [])
     return r
 
 
@@ -1030,16 +1104,19 @@ def _evidencia_de_la_tarea(opciones, integrante, objetivo) -> list[str]:
 
 def _el_criterio_por_juzgar(r: Resultado, crudo: Mapping[str, Any], escrito: Mapping[str, Any],
                             evidencia: Sequence[str], permitidos: Sequence[str], *,
-                            sin_quien: bool = False) -> dict[str, Any]:
+                            sin_quien: bool = False, personas: Sequence[str] = (),
+                            dichos: Sequence[str] = ()) -> dict[str, Any]:
     """Lo que se juzga del criterio que escribió la IA: el texto entero, si pasa los controles de
-    lo inventado (si no, vacío: el juicio igual escribe uno), con el título y la descripción de la
-    tarea (los escritos o los propuestos), la evidencia de quien la hace, lo que puede nombrar y
-    si se sabe quién la hace (`sin_quien`, J2-18)."""
+    lo inventado y no nombra a nadie (J2-26; si no, vacío: el juicio igual escribe uno), con el
+    título y la descripción de la tarea (los escritos o los propuestos), la evidencia de quien la
+    hace, lo que puede nombrar, si se sabe quién la hace (`sin_quien`, J2-18) y a quiénes no puede
+    nombrar (`personas` y `dichos`, para el criterio del juicio y el de reserva)."""
     criterio = _cadena(crudo.get("criterio"))
     if criterio is None:
         r.descartar("criterio", "vacio")
     else:
-        problema = _problema_del_texto(criterio, permitidos, LARGOS["criterio"])
+        problema = _problema_del_texto(criterio, permitidos, LARGOS["criterio"],
+                                       personas=personas, dichos=dichos)
         if problema is not None:
             r.descartar("criterio", problema)
             criterio = None
@@ -1052,7 +1129,7 @@ def _el_criterio_por_juzgar(r: Resultado, crudo: Mapping[str, Any], escrito: Map
     return {"titulo": de_la_tarea("titulo"), "descripcion": de_la_tarea("descripcion"),
             "criterio": criterio or "", "evidencia": list(evidencia),
             "contexto": list(permitidos), "resultado": _cadena(crudo.get("resultado")),
-            "sin_quien": sin_quien}
+            "sin_quien": sin_quien, "personas": list(personas), "dichos": list(dichos)}
 
 
 def juzgar_la_propuesta(ia, r: Resultado) -> Juicio | None:
@@ -1065,7 +1142,8 @@ def juzgar_la_propuesta(ia, r: Resultado) -> Juicio | None:
     p = r.por_juzgar
     return juzgar_el_criterio(ia, titulo=p["titulo"], descripcion=p["descripcion"],
                               criterio=p["criterio"], evidencia=p["evidencia"],
-                              contexto=p["contexto"], sin_quien=p.get("sin_quien", False))
+                              contexto=p["contexto"], sin_quien=p.get("sin_quien", False),
+                              personas=p.get("personas", ()), dichos=p.get("dichos", ()))
 
 
 def cerrar_el_criterio(r: Resultado, juicio: Juicio | None) -> None:
@@ -1085,24 +1163,27 @@ def cerrar_el_criterio(r: Resultado, juicio: Juicio | None) -> None:
         r.propuesta["criterio"] = juicio.propuesta
         r.criterio_de = "reserva" if juicio.de_reserva else "juicio"
         return
-    reserva, _ = _de_reserva(p["resultado"], p["evidencia"], p["contexto"])
+    reserva, _ = _de_reserva(p["resultado"], p["evidencia"], p["contexto"],
+                             personas=p.get("personas", ()), dichos=p.get("dichos", ()))
     if reserva is not None:
         r.propuesta["criterio"], r.criterio_de = reserva, "reserva"
         return
     r.descartar("criterio", "sin_propuesta", "sin_proponer")
 
 
-def _de_reserva(resultado: Any, evidencia: Sequence[str],
-                permitidos: Sequence[str]) -> tuple[str | None, str | None]:
+def _de_reserva(resultado: Any, evidencia: Sequence[str], permitidos: Sequence[str], *,
+                personas: Sequence[str] = (),
+                dichos: Sequence[str] = ()) -> tuple[str | None, str | None]:
     """El criterio de reserva, si hay evidencia del área y un resultado que, armado, pasa los
-    controles del texto; si no, `None` y el motivo."""
+    controles del texto y no nombra a nadie (J2-26); si no, `None` y el motivo."""
     resultado = _cadena(resultado)
     if not evidencia:
         return None, "sin_evidencia"
     if resultado is None:
         return None, "vacio"
     candidato = criterio_con_la_evidencia(resultado, evidencia)
-    problema = _problema_del_texto(candidato, permitidos, LARGOS["criterio"])
+    problema = _problema_del_texto(candidato, permitidos, LARGOS["criterio"],
+                                   personas=personas, dichos=dichos)
     return (candidato, None) if problema is None else (None, problema)
 
 
@@ -1114,9 +1195,8 @@ _EL_DE_LEDA = """\
 Además escribís tu propio criterio para esta tarea, que Leda le propone a la persona si el suyo no \
 sirve: como lo escribiría alguien del equipo que conoce el trabajo, con naturalidad, en una o dos \
 oraciones cortas y con buena ortografía, que dice qué tiene que quedar hecho y cómo se comprueba, \
-contado desde quien hace la tarea, en tercera persona: qué hace y qué entrega esa persona, nunca \
-como si esa persona hablara, y no lo que alguien más va a mirar. {como} Usás sólo lo que dicen el título, la descripción y el criterio: ningún \
-número, nombre ni dato que no esté ahí."""
+""" + _COMO_SE_CUENTA + """. {como} Usás sólo lo que dicen el título, la descripción y el \
+criterio: ningún número, nombre ni dato que no esté ahí."""
 
 _DEL_JUICIO = """\
 Sos Leda, la project manager del equipo. Alguien está cargando una tarea en la plataforma y \
@@ -1130,7 +1210,7 @@ cual la parte del criterio que lo dice. No corregís ni completás el criterio.
 """
 
 INSTRUCCIONES_DEL_JUICIO = _DEL_JUICIO + _EL_DE_LEDA.format(
-    como="Cómo se comprueba lo decís con lo que, según la tarea, hace y entrega quien la hace.")
+    como="Cómo se comprueba lo decís con lo que, según la tarea, queda hecho y se entrega.")
 
 # J2-18: al proponer sin saber quién la hace no hay evidencia de un área de donde salga cómo se
 # comprueba, y lo que "la tarea misma deja ver" salía flojo o circular (la ronda de la J2-17). El
@@ -1156,16 +1236,14 @@ la tarea en una oración, sin decir cómo se comprueba.
 
 """ + _EL_DE_LEDA.format(
     como="Cómo se comprueba lo decís con esa evidencia, y sólo con ella, contada con tus palabras "
-         "como lo que entrega quien hace la tarea: es un dato para entender qué se entrega, no un "
+         "como lo que se entrega al terminarla: es un dato para entender qué se entrega, no un "
          "texto para copiar, así que no repetís sus etiquetas ni armás una lista con ellas.")
 
 _CRITERIO_DE_LEDA = {
     "type": "string",
     "description": "Tu propio criterio de aceptación para esta tarea, con tus palabras, en una o "
-                   "dos oraciones cortas: qué tiene que quedar hecho y cómo se comprueba, contado "
-                   "desde quien hace la tarea, en tercera persona: qué hace y qué entrega esa "
-                   "persona, nunca como si esa persona hablara; sin ningún "
-                   "dato que no esté en lo que recibiste."}
+                   "dos oraciones cortas: qué tiene que quedar hecho y cómo se comprueba, "
+                   + _COMO_SE_CUENTA + "; sin ningún dato que no esté en lo que recibiste."}
 
 
 def entrada_del_juicio(titulo: str, descripcion: str, criterio: str,
@@ -1248,7 +1326,8 @@ def sin_nada_que_juzgar(titulo: str, criterio: str) -> bool:
 
 def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
                        evidencia: Sequence[str] = (), contexto: Sequence[str] = (),
-                       sin_quien: bool = False) -> Juicio:
+                       sin_quien: bool = False, personas: Sequence[str] = (),
+                       dichos: Sequence[str] = ()) -> Juicio:
     """Si el criterio sirve. Una sola llamada a la IA del espacio (sin reintento), que lo juzga
     por su sentido y escribe su propio criterio; el código decide.
 
@@ -1266,7 +1345,11 @@ def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
     rechazado sin propuesta y con la falla.
 
     `sin_quien` (al proponer sin saber quién la hace, J2-18): el criterio que escribe la IA no
-    inventa cómo se comprueba (`INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN`)."""
+    inventa cómo se comprueba (`INSTRUCCIONES_DEL_JUICIO_SIN_QUIEN`).
+
+    J2-26: el criterio que propone Leda no nombra a nadie de `personas` (las del espacio) ni de
+    `dichos` (a quien la persona nombró para hacerla); el que se juzga, el de la persona, sí puede:
+    es suyo."""
     titulo, descripcion, criterio = (" ".join((t or "").split())
                                      for t in (titulo, descripcion, criterio))
     evidencia = [e for e in (" ".join(str(x).split()) for x in evidencia) if e]
@@ -1290,7 +1373,8 @@ def juzgar_el_criterio(ia, *, titulo: str, descripcion: str, criterio: str,
         if sirve:
             return Juicio(None)
     permitidos = [titulo, descripcion, criterio, *evidencia, *contexto]
-    propuesta, de_reserva, problema = _propuesta_del_juicio(crudo, evidencia, permitidos)
+    propuesta, de_reserva, problema = _propuesta_del_juicio(crudo, evidencia, permitidos,
+                                                            personas, dichos)
     if propuesta is None:
         return Juicio(rechazo, RespuestaInvalida(
             f"No se pudo proponer un criterio: lo que escribió la IA no sirve ({problema})."))
@@ -1320,18 +1404,22 @@ def _lo_que_dice(crudo: Mapping[str, Any], criterio: str,
 
 
 def _propuesta_del_juicio(crudo: Mapping[str, Any], evidencia: Sequence[str],
-                          permitidos: Sequence[str]) -> tuple[str | None, bool, str | None]:
+                          permitidos: Sequence[str], personas: Sequence[str] = (),
+                          dichos: Sequence[str] = ()) -> tuple[str | None, bool, str | None]:
     """El criterio que propone Leda al rechazar uno: el que escribió la IA, tal cual, si pasa los
-    controles del texto (el largo, y ningún número ni nombre que no esté en la tarea); si no, el de
+    controles del texto (el largo, ningún número ni nombre que no esté en la tarea, y ninguna
+    persona nombrada: J2-26); si no, el de
     reserva (sólo con la evidencia del área); si tampoco, `None` y el motivo. Devuelve también si
     es el de reserva."""
     propio = _cadena(crudo.get("criterio"))
     problema = "vacio"
     if propio is not None:
-        problema = _problema_del_texto(propio, permitidos, LARGOS["criterio"])
+        problema = _problema_del_texto(propio, permitidos, LARGOS["criterio"],
+                                       personas=personas, dichos=dichos)
         if problema is None:
             return propio, False, None
-    reserva, otro = _de_reserva(crudo.get("resultado"), evidencia, permitidos)
+    reserva, otro = _de_reserva(crudo.get("resultado"), evidencia, permitidos,
+                                personas=personas, dichos=dichos)
     if reserva is not None:
         return reserva, True, None
     return None, False, problema if otro in ("sin_evidencia", "vacio") else otro
