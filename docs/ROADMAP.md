@@ -91,7 +91,7 @@ Etapas y criterios de paso a `main` (M1 a M3): [`STATUS.md`](STATUS.md), "Próxi
 ### Lo que sigue a la plataforma, en orden (usuario, 2026-10-13: "el orden que propones es el correcto")
 
 1. **La plataforma según la jerarquía del equipo** ([ADR 0023](decisions/0023-quien-crea-en-la-plataforma.md)):
-   las porciones J1 a J6 de `odd/tasks/plataforma-jerarquias.md`. Con ellas Leda queda completa para un
+   las porciones J1 a J7 de `odd/tasks/plataforma-jerarquias.md`. Con ellas Leda queda completa para un
    equipo: el seguimiento por chat y la plataforma.
 2. **Leda con un equipo real:** el servidor en internet (la VPS) con HTTPS de verdad, que el ADR 0022
    (decisión 16) deja esperando la autorización del usuario; lo que falta para producción (cola de
