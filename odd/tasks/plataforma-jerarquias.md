@@ -1236,6 +1236,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - **J5-D7. Un pedido sin contestar:** Leda se lo recuerda a quien decide cada día hábil, como una pregunta
         sin contestar, sin escalar. Mientras tanto vale la fecha original y los recordatorios siguen sobre ella. A
         quien pidió le avisa que su pedido sigue esperando. Nunca se acepta solo.
+      - **J5-D8. Un pedido nuevo reemplaza al pendiente:** a quien decide le llega uno solo, con su informe y la
+        línea "antes había pedido hasta el 28". Nunca se decide sobre un pedido viejo.
+      Con esto, las decisiones de la J5 están completas.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
