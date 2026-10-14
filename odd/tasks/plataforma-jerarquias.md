@@ -919,6 +919,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       directo).
       Incluye la decisión 6 del 2026-10-14: seguir con una tarea que vence después que su objetivo pide la
       aprobación del referente del objetivo, con la misma maquinaria de las propuestas.
+      Queda para su diseño: si quien carga es Dirección, ¿también puede aceptar la demora sin pedirla, como
+      con los objetivos (decisión 5)?
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
@@ -1013,12 +1015,19 @@ con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue co
   Se construyen en la J3-2b (migración nueva, porque la `0068` ya está aplicada en `leda_motor`).
   4. **Dirección también puede ser referente de un objetivo** (Ismael es el referente del área Dirección):
      queda como está.
-  5. **Un objetivo no vence después que el objetivo del que cuelga.** Lo que cuelga es parte del padre, y el
-     padre no cierra hasta que cierran sus hijos (mecánica §5). Si se carga así, la vista previa ofrece
-     "> cargarlo aparte": pasa a colgar del mismo lugar que el padre, o de ninguno, y se vuelve a ofrecer el
-     tipo. También se puede cambiar la fecha. La base no acepta un hijo que vence después que su padre, y
-     nunca se llega sin salida. Ejemplo del usuario: "Habilitar el laboratorio" (15/12) no cuelga de "Abrir
-     la planta nueva" (30/11): va al lado, como objetivo aparte. Se construye en la J3-3b.
+  5. **Un objetivo que vence después que el objetivo del que cuelga** (revisada por el usuario el 2026-10-14:
+     "aparte" sólo no alcanza, porque puede ser de verdad una parte que se atrasa). Lo que cuelga es parte del
+     padre, y el padre no cierra hasta que cierran sus hijos (mecánica §5). La vista previa frena y ofrece tres
+     salidas:
+     - **cambiar la fecha;**
+     - **"> cargarlo aparte",** si no es parte del padre: pasa a colgar del mismo lugar que el padre, o de
+       ninguno, y se vuelve a ofrecer el tipo. Ejemplo: el laboratorio después de abrir la planta.
+     - **"> aceptar la demora",** si es parte del padre: su fecha se corre a la del hijo, y lo mismo hacia
+       arriba si hace falta. La vista previa muestra cada fecha que cambia, como "Abrir la planta: 30/11 →
+       15/12". Cada corrimiento queda en la auditoría. No hace falta otra aprobación, porque los objetivos
+       sólo los crean Dirección y administración. El aviso a los referentes de los objetivos corridos va con
+       los avisos de la J4.
+     Sin aceptar, la base no acepta un hijo que vence después que su padre. Se construye en la J3-3b.
   6. **Una tarea que vence después que su objetivo** (usuario, 2026-10-14: "leda tiene que frenar esas cosas y
      dar aviso"). Una tarea no puede ir "aparte": el objetivo la necesita, y "Poner el módem en la pared" no
      termina sin "Comprar el estante". Leda frena antes de cargar: "Esta tarea vence después que «Poner el
