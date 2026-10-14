@@ -1155,6 +1155,11 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - **El lenguaje (usuario: "trabado" no deja claro que depende de otra cosa):** en todo lo que ve la persona,
         en el chat y en la web, se reemplazan "trabado" y "bloqueada". La web dice "Esperando el cable
         (Mariano)". Los nombres internos no cambian. Es una tarea aparte, antes de la J5.
+      - **J5-D2. Quién decide más tiempo, con la misma regla de la J4 (D4):** decide quien revisa la tarea. Si
+        Lucas lo pide, decide Martín. Un referente, en una tarea suya, lo cambia él mismo, y Leda sólo lo anota
+        con la fecha original y la prevista. Lo mismo Dirección en una tarea propia. **Si la fecha nueva pasa la
+        del objetivo,** es igual que la decisión 6: Leda frena, avisa que el objetivo se demoraría, y lo **aprueba**
+        el referente del objetivo (Ismael, si el objetivo es de Dirección). Hasta que aprueba, no corre.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
