@@ -250,8 +250,8 @@ def test_un_enlace_anulado_por_otro_no_entra(web, conn, mundo):
 # --- Quién es ---------------------------------------------------------------------------------
 
 def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
-    # Las pestañas (decisión del usuario del 2026-10-14): Dirección no tiene sector; quien puede
-    # pedir tiene "Lo que pedí"; el sector se llama como su área.
+    # Las pestañas (decisiones del usuario del 2026-10-14): Dirección no tiene sector; quien puede
+    # pedir tiene "Lo que pedí"; el sector es "Mi equipo" (MA-3; el área va como dato aparte).
     esperado = {"Sam North": ["tus"], "Taylor Quinn": ["tus", "sector", "pedidas"],
                 "Morgan Hale": ["tus", "equipo", "pedidas"]}
     for nombre, vistas in esperado.items():
@@ -266,7 +266,7 @@ def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
     assert titulos == {"tus": "Mis tareas", "equipo": "Todo el equipo", "pedidas": "Lo que pedí"}
     titulos = {v["vista"]: v["titulo"]
                for v in _entrar(web, conn, mundo, "Taylor Quinn").get("/app/api/yo").json()["vistas"]}
-    assert titulos["sector"] == "Field Services"
+    assert titulos == {"tus": "Mis tareas", "sector": "Mi equipo", "pedidas": "Lo que pedí"}
 
 
 def test_yo_renueva_la_cookie_sin_cambiar_la_sesion(web, conn, mundo):
@@ -439,9 +439,12 @@ def test_el_referente_ve_su_sector_con_atrasos_y_bloqueos(web, conn, mundo):
     navegador = _entrar(web, conn, mundo, "Taylor Quinn")
     datos = _vista(navegador, "sector")
     tareas = _por_titulo(datos)
-    assert datos["titulo"] == "Field Services"
-    assert set(tareas) == {"Pintar el galpón", "Medir el ruido", "Montar la línea",
-                           "Ordenar el depósito"}
+    assert datos["titulo"] == "Mi equipo" and datos["area_del_equipo"] == "Field Services"
+    # "Mi equipo" es su gente (MA-3): su propia tarea, "Ordenar el depósito", queda en "Mis
+    # tareas" y no se repite acá.
+    assert set(tareas) == {"Pintar el galpón", "Medir el ruido", "Montar la línea"}
+    suyas = _por_titulo(_vista(navegador, "tus"))
+    assert suyas["Ordenar el depósito"]["papel"] == "mia"
     assert tareas["Pintar el galpón"]["vencida"] is True
     assert tareas["Medir el ruido"]["bloqueo_abierto"] is True
     assert tareas["Medir el ruido"]["esperas"][0]["que"] == "falta una pieza"
@@ -712,3 +715,32 @@ def test_si_la_base_falla_la_persona_no_ve_nada_tecnico(web, conn, mundo, monkey
     assert r.status_code == 503 and r.json() == {"error": "no_disponible"}
     _tiene_las_cabeceras(r)
     assert "10.0.0.1" not in capsys.readouterr().out
+
+
+# --- MA-3: "Mi equipo" y "Sin empezar" (prueba del usuario en el iPhone) ------------------------
+
+def test_mi_equipo_no_aparece_si_el_referente_no_tiene_a_nadie_a_cargo(web, conn, mundo):
+    """Sin nadie activo en sus áreas, "Mi equipo" quedaría vacía o con sus propias tareas: no hay
+    pestaña, y la vista se niega."""
+    taylor = _persona(mundo, "Taylor Quinn")
+    with admin(conn) as cur:
+        cur.execute("""update membership set activo = false
+                        where workspace_id = %s and id <> %s
+                          and area_id in (select id from area where referente_membership_id = %s)""",
+                    (mundo["north-lab"]["id"], taylor, taylor))
+    conn.commit()
+    navegador = _entrar(web, conn, mundo, "Taylor Quinn")
+    vistas = [v["vista"] for v in navegador.get("/app/api/yo").json()["vistas"]]
+    assert "sector" not in vistas and vistas[0] == "tus"
+    r = navegador.get("/app/api/tareas", params={"vista": "sector"})
+    assert r.status_code == 403 and r.json() == {"error": "vista_no_disponible"}
+
+
+def test_sin_empezar_cuenta_las_asignadas_que_nadie_empezo(web, conn, mundo):
+    for nombre, vista in (("Morgan Hale", "equipo"), ("Taylor Quinn", "sector"),
+                          ("Sam North", "tus")):
+        datos = _vista(_entrar(web, conn, mundo, nombre), vista)
+        assert datos["sin_empezar"] == sum(1 for t in datos["tareas"] if t["estado"] == "asignada")
+    datos = _vista(_entrar(web, conn, mundo, "Morgan Hale"), "equipo")
+    assert datos["sin_empezar"] > 0, "el mundo de la prueba tiene alguna sin empezar"
+

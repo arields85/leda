@@ -2,8 +2,9 @@ import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { signOut } from '../api';
 
-/** "salir": closes the session on this phone, after one confirmation, because coming back
- * needs a new link from Leda. The administration door passes its own `action`. */
+/** "salir": closes the session on this computer, after one confirmation, because coming back
+ * needs the QR again. Only in a browser: inside the Mini App each opening identifies the person
+ * (MA-3). The administration door passes its own `action`. */
 export function SignOut({
   onDone,
   action = signOut,
@@ -37,7 +38,7 @@ export function SignOut({
       <span>
         {step === 'failed'
           ? 'No se pudo cerrar la sesión. Probá de nuevo en un rato.'
-          : 'Para volver a entrar vas a necesitar un enlace nuevo de Leda.'}
+          : 'Para volver a entrar vas a tener que escanear el código otra vez.'}
       </span>
       <span className="flex gap-3">
         <button type="button" className={link} onClick={() => setStep('idle')} disabled={step === 'busy'}>

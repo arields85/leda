@@ -114,6 +114,52 @@ export interface ViewData {
   pedidas?: Requested[];
   // Only in "Tu sector" (J4): to whom the referente may pass a task of the sector.
   pasar_a?: Teammate[];
+  // Assigned and not started yet (MA-3): the counter "Sin empezar", apart from the four colours.
+  sin_empezar?: number;
+  // Only in "Mi equipo" (MA-3): the referente's area (or areas), shown under the title.
+  area_del_equipo?: string | null;
+}
+
+/** A task related to the one in the detail (it waits for it, or it waits for this one). Of one
+ * the person may not see, only that it exists (`ve: false`). */
+export interface RelatedTask {
+  ve: boolean;
+  titulo?: string;
+  estado?: string;
+  responsable?: string | null;
+}
+
+/** A piece of evidence in the detail, as the server's task page shows it. */
+export interface DetailEvidence {
+  clase: string;
+  texto: string | null;
+  enlace: string | null;
+  nombre: string | null;
+  imagen: boolean;
+  archivo: string | null;
+  quien: string | null;
+  cuando: string | null;
+  retirada: boolean;
+  motivo_del_retiro: string | null;
+}
+
+/** The detail of a task inside the app (MA-3), under the rule of who sees what: the server
+ * returns it only to someone who may see the task. States in plain words. */
+export interface TaskDetail {
+  titulo: string;
+  estado: string;
+  objetivo: string | null;
+  area: string | null;
+  responsable: string | null;
+  revisa: string | null;
+  pidio: string | null;
+  vence: string | null;
+  prevision: string | null;
+  criterio: string | null;
+  pide: { que: string; cubierto: boolean }[];
+  evidencia: DetailEvidence[];
+  espera_a: RelatedTask[];
+  la_esperan: RelatedTask[];
 }
 
 /** The session is gone (cut, expired cookie, or the person left the team). */
@@ -203,13 +249,11 @@ export function reopenTask(taskId: string, reason: string): Promise<ActionResult
   return postJson(`/app/api/tareas/${encodeURIComponent(taskId)}/reabrir`, { motivo: reason });
 }
 
-/** The page of a task (J4 phone test; ADR 0024, "Ver la tarea"): the server opens an access for
- * the session's person, under the rule of who sees what, and says where it is (same origin).
- * `null` when the person may not see it. */
-export async function openTaskPage(taskId: string): Promise<string | null> {
+/** The detail of a task inside the app (MA-3): `null` when the person may not see it. */
+export async function fetchTaskDetail(taskId: string): Promise<TaskDetail | null> {
   let response: Response;
   try {
-    response = await fetch(`/app/api/tareas/${encodeURIComponent(taskId)}/pagina`, {
+    response = await fetch(`/app/api/tareas/${encodeURIComponent(taskId)}/detalle`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
@@ -220,8 +264,7 @@ export async function openTaskPage(taskId: string): Promise<string | null> {
   if (response.status === 401) throw new SessionClosedError();
   if (response.status === 403 || response.status === 404) return null;
   if (!response.ok) throw new RequestError(response.status);
-  const body = (await response.json()) as { direccion?: unknown };
-  return typeof body.direccion === 'string' && body.direccion.startsWith('/tarea/') ? body.direccion : null;
+  return (await response.json()) as TaskDetail;
 }
 
 /** Closes this session on the server; the server also clears the cookie. */

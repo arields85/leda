@@ -51,7 +51,7 @@ describe('TaskCard', () => {
         })}
       />,
     );
-    expect(screen.getByText('[TRABADA]')).toHaveClass('text-trabada');
+    expect(screen.getByText('[ESPERANDO]')).toHaveClass('text-trabada');
     expect(screen.getByText('[VENCIDA +3d]')).toHaveClass('text-vencida');
     expect(screen.getByText('└─ espera: falta el cable (Lucas)')).toBeInTheDocument();
   });
@@ -73,7 +73,7 @@ describe('TaskCard', () => {
         })}
       />,
     );
-    expect(container.textContent).not.toMatch(/VENCIDA|TRABADA|espera:|prevé/);
+    expect(container.textContent).not.toMatch(/VENCIDA|ESPERANDO|TRABADA|espera:|prevé/);
     expect(container.innerHTML).not.toMatch(/text-(vencida|trabada)/);
     expect(screen.getByText('[ASIGNADA]')).toHaveClass('text-ink-dim');
     expect(screen.getByText('19.10')).toBeInTheDocument();
@@ -148,7 +148,7 @@ describe('TaskCard', () => {
         })}
       />,
     );
-    expect(screen.getByText('[TRABADA]')).toHaveClass('text-trabada');
+    expect(screen.getByText('[ESPERANDO]')).toHaveClass('text-trabada');
     expect(screen.getByText('└─ espera: servidor de la planta (Ariel)')).toBeInTheDocument();
   });
 

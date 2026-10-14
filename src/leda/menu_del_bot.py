@@ -3,7 +3,7 @@
 
 Al lado de donde se escribe, Telegram muestra el botón del menú del bot. Con `setChatMenuButton`
 sin `chat_id` se fija el de todos los chats del bot: un botón `web_app` que abre la Mini App. El
-del bot de un espacio dice "Tareas" y abre la puerta del equipo de ese espacio
+del bot de un espacio dice "Mi panel" y abre la puerta del equipo de ese espacio
 (`/app/e/<espacio>/`); el del bot de administración dice "Administración" y abre esa puerta. Los
 dos pasan por el lanzador (`/app/abrir/...`), que en Telegram de la computadora abre la web en el
 navegador.
@@ -20,7 +20,8 @@ from typing import Any, Callable
 
 from . import config as configuracion
 
-TEXTO_DEL_EQUIPO = "Tareas"
+# "Mi panel" (MA-3, prueba del usuario en el iPhone; antes, "Tareas").
+TEXTO_DEL_EQUIPO = "Mi panel"
 TEXTO_DE_LA_ADMINISTRACION = "Administración"
 # El bot de administración, por su nombre en la configuración (`LEDA_BOT_TOKEN_ADMIN`).
 SLUG_DE_LA_ADMINISTRACION = "admin"

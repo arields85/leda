@@ -5,7 +5,7 @@ import { ComputerSession } from './admin/ComputerSession';
 import { onAPhone, POLL_MS, QrCode, SignIn } from './components/SignIn';
 import { rememberedSpace, rememberSpace, spaceOfPath } from './door';
 import { bindBackButton, bootTelegram, enterWithTelegram, LEDA_DARK, telegramWebApp } from './telegram';
-import { me, task, view } from './test/fixtures';
+import { detail, me, task, view } from './test/fixtures';
 import { options } from './test/adminFixtures';
 
 // ADR 0024 in the web: the Mini App boot, the QR sign-in, the chat's deep links and the task page.
@@ -71,7 +71,7 @@ describe('the Mini App', () => {
     expect(telegramWebApp()).not.toBeNull();
   });
 
-  it("boots ready, expanded (never full screen), in Leda's dark and inside the safe areas", () => {
+  it("boots ready, expanded where full screen is not available (MA-3), in Leda's dark and inside the safe areas", () => {
     const app = fakeTelegram();
     const root = document.createElement('div');
     bootTelegram(app, root);
@@ -202,31 +202,28 @@ describe("the chat's buttons lead straight to their target", () => {
     expect(await screen.findByRole('button', { name: '> volver a las tareas' })).toBeInTheDocument();
   });
 
-  it("«Ver la tarea» opens that task's page", async () => {
+  it("«Ver la tarea» opens that task's detail inside the app", async () => {
     window.history.replaceState(null, '', '/app/e/corework/?tarea=t1');
-    const assign = vi.fn();
-    vi.stubGlobal('location', { ...window.location, search: '?tarea=t1', pathname: '/app/e/corework/', assign });
     serve({
       'GET /app/api/yo': ok(me()),
       'GET /app/api/tareas?vista=tus': ok(view()),
-      'POST /app/api/tareas/t1/pagina': ok({ direccion: '/tarea/abc' }),
+      'POST /app/api/tareas/t1/detalle': ok(detail({ titulo: 'Cablear el tablero' })),
     });
     render(<App />);
-    await waitFor(() => expect(assign).toHaveBeenCalledWith('/tarea/abc'));
+    expect(await screen.findByRole('article', { name: 'La tarea Cablear el tablero' })).toBeInTheDocument();
   });
 
-  it('every task card opens its page', async () => {
-    const assign = vi.fn();
-    vi.stubGlobal('location', { ...window.location, search: '', pathname: '/app/', assign });
+  it('every task card opens its detail inside the app, never leaving the page', async () => {
     const calls = serve({
       'GET /app/api/yo': ok(me()),
       'GET /app/api/tareas?vista=tus': ok(view({ tareas: [task({ id: 't9', titulo: 'Probar el módem' })] })),
-      'POST /app/api/tareas/t9/pagina': ok({ direccion: '/tarea/xyz' }),
+      'POST /app/api/tareas/t9/detalle': ok(detail({ titulo: 'Probar el módem' })),
     });
     render(<App />);
     fireEvent.click(await screen.findByRole('link', { name: 'Ver la tarea Probar el módem' }));
-    await waitFor(() => expect(assign).toHaveBeenCalledWith('/tarea/xyz'));
-    expect(calls.some((c) => c.key === 'POST /app/api/tareas/t9/pagina')).toBe(true);
+    expect(await screen.findByRole('article', { name: 'La tarea Probar el módem' })).toBeInTheDocument();
+    expect(calls.some((c) => c.key === 'POST /app/api/tareas/t9/detalle')).toBe(true);
+    expect(calls.some((c) => c.key.endsWith('/pagina'))).toBe(false);
   });
 
   it("remembers the space for this computer's next sign-in", async () => {
@@ -266,7 +263,7 @@ describe('the review of the MA', () => {
     serve({
       'GET /app/api/yo': ok(me()),
       'GET /app/api/tareas?vista=tus': ok(view({ tareas: [task({ id: 't9', titulo: 'Probar el módem' })] })),
-      'POST /app/api/tareas/t9/pagina': { status: 403, body: { error: 'no_la_ve' } },
+      'POST /app/api/tareas/t9/detalle': { status: 403, body: { error: 'no_la_ve' } },
     });
     render(<App />);
     fireEvent.click(await screen.findByRole('link', { name: 'Ver la tarea Probar el módem' }));

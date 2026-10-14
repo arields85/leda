@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { Notice } from '../components/Notice';
 import { SignIn } from '../components/SignIn';
 import { SignOut } from '../components/SignOut';
+import { telegramWebApp } from '../telegram';
 import { ComputerSession } from './ComputerSession';
 import { adminSignOut, fetchAdminMe, fetchOptions, type AdminMe, type Options } from './api';
 import { Dropdown } from './Dropdown';
@@ -81,6 +82,8 @@ export function AdminApp() {
   const [options, setOptions] = useState<OptionsLoad>({ kind: 'loading' });
   const [closed, setClosed] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
+  // Inside the Mini App there is no "salir" (MA-3): each opening identifies the person again.
+  const [inMiniApp] = useState(() => telegramWebApp() !== null);
   const [kind, setKind] = useState<Kind>('tarea');
   // The space whose objective form was opened: from then on it stays mounted (hidden while the
   // task is chosen), so switching never drops what was typed in either form (RDD
@@ -234,7 +237,7 @@ export function AdminApp() {
         person={open ? admin?.administrador : undefined}
       />
       <main className="flex min-w-0 flex-col gap-4 pt-4">{body}</main>
-      {open && (
+      {open && !inMiniApp && (
         <footer className="mt-auto flex justify-end pb-[22px] pt-6">
           <SignOut action={adminSignOut} onDone={() => setSignedOut(true)} />
         </footer>

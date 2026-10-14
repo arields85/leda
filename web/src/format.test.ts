@@ -18,7 +18,7 @@ describe('format', () => {
 
   it('labels every mark the server gave, blocked first', () => {
     expect(stateLabels(task({ marcas: ['trabada', 'vencida'], dias_de_atraso: 2 }))).toEqual([
-      { text: '[TRABADA]', marca: 'trabada' },
+      { text: '[ESPERANDO]', marca: 'trabada' },
       { text: '[VENCIDA +2d]', marca: 'vencida' },
     ]);
     expect(stateLabels(task({ marcas: [], estado: 'asignada' }))).toEqual([

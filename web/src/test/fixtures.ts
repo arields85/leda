@@ -1,4 +1,4 @@
-import type { Finished, Me, Task, ViewData } from '../api';
+import type { Finished, Me, Task, TaskDetail, ViewData } from '../api';
 
 export function task(overrides: Partial<Task> = {}): Task {
   return {
@@ -62,6 +62,26 @@ export function me(overrides: Partial<Me> = {}): Me {
     espacio: 'CoreWork',
     vistas: [{ vista: 'tus', titulo: 'Tus tareas' }],
     chat_con_leda: null,
+    ...overrides,
+  };
+}
+
+export function detail(overrides: Partial<TaskDetail> = {}): TaskDetail {
+  return {
+    titulo: 'Configurar alarmas del SCADA',
+    estado: 'en curso',
+    objetivo: 'Modernizar la planta',
+    area: 'Automatización',
+    responsable: 'Marcos',
+    revisa: 'Ismael',
+    pidio: 'Ariel',
+    vence: '2026-10-30',
+    prevision: null,
+    criterio: 'Las alarmas suenan en la sala de control.',
+    pide: [{ que: 'Una foto de la pantalla', cubierto: false }],
+    evidencia: [],
+    espera_a: [{ ve: true, titulo: 'Cablear el tablero', estado: 'en curso', responsable: 'Juan' }],
+    la_esperan: [{ ve: false }],
     ...overrides,
   };
 }

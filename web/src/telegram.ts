@@ -41,7 +41,15 @@ export interface TelegramWebApp {
   safeAreaInset?: Insets;
   contentSafeAreaInset?: Insets;
   onEvent?(event: string, callback: () => void): void;
+  // Bot API 8.0: the whole screen, with Telegram's "Cerrar" and "…" floating over the page.
+  requestFullscreen?(): void;
+  isVersionAtLeast?(version: string): boolean;
+  close?(): void;
 }
+
+/** Phones, where the Mini App goes full screen (MA-3); a computer never gets here (the launcher
+ * sends it to the browser). */
+export const PHONES = ['ios', 'android', 'android_x'];
 
 /** The Mini App, only when Telegram opened this page with its signed data; else `null`. */
 export function telegramWebApp(win: Window = window): TelegramWebApp | null {
@@ -67,11 +75,33 @@ function safely(action: () => void): void {
   }
 }
 
-/** Ready, large but leaving Telegram's bar with "Cerrar" (`expand()`, never full screen), Leda's
- * colours, and the safe areas as CSS variables (`--tg-safe-top` and the rest). */
+/** Full screen on a phone (MA-3, the user's iPhone test: `requestFullscreen`, Bot API 8.0),
+ * where Telegram's "Cerrar" and "…" float over the page: the safe areas keep the page clear of
+ * them. Where it is not available, as large as Telegram allows (`expand()`). */
+function grow(app: TelegramWebApp): void {
+  const phone = typeof app.platform === 'string' && PHONES.includes(app.platform);
+  let fullscreen = false;
+  safely(() => {
+    fullscreen = phone && typeof app.requestFullscreen === 'function'
+      && (typeof app.isVersionAtLeast !== 'function' || app.isVersionAtLeast('8.0'));
+  });
+  if (fullscreen) {
+    try {
+      app.requestFullscreen?.();
+      return;
+    } catch {
+      // Below: as large as it can.
+    }
+  }
+  safely(() => app.expand());
+}
+
+/** Ready, full screen on a phone or else large (`grow`), Leda's colours, and the safe areas as
+ * CSS variables (`--tg-safe-top` and the rest): the device's (status bar, notch) plus Telegram's
+ * own (its floating "Cerrar" and "…" in full screen). */
 export function bootTelegram(app: TelegramWebApp, root: HTMLElement = document.documentElement): void {
   safely(() => app.ready());
-  safely(() => app.expand());
+  grow(app);
   safely(() => app.setHeaderColor(LEDA_DARK));
   safely(() => app.setBackgroundColor(LEDA_DARK));
   const insets = () => {
@@ -102,6 +132,17 @@ export function bindBackButton(app: TelegramWebApp | null, canGoBack: boolean, o
     safely(() => button.offClick(onBack));
     safely(() => button.hide());
   };
+}
+
+/** "Volver al chat" inside the Mini App: closes it, back to the chat it came from. */
+export function closeMiniApp(app: TelegramWebApp | null = telegramWebApp()): boolean {
+  if (!app || typeof app.close !== 'function') return false;
+  try {
+    app.close();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** What happened when the page sent Telegram's signature to its door. */

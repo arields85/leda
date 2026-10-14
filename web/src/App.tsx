@@ -2,10 +2,11 @@ import { RotateCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchMe,
+  fetchTaskDetail,
   fetchView,
-  openTaskPage,
   SessionClosedError,
   type Me,
+  type TaskDetail as Detail,
   type ViewData,
   type ViewId,
 } from './api';
@@ -17,14 +18,14 @@ import { NewObjective } from './admin/NewObjective';
 import { NewTask } from './admin/NewTask';
 import { teamObjectives } from './admin/objectiveApi';
 import { FinishedList } from './components/FinishedList';
+import { Footer } from './components/Footer';
 import { PassTask } from './components/PassTask';
 import { RequestedList } from './components/RequestedList';
 import { Header } from './components/Header';
 import { Notice } from './components/Notice';
-import { SignOut } from './components/SignOut';
 import { StatePanel } from './components/StatePanel';
-import { TalkButton } from './components/TalkButton';
 import { TaskCard } from './components/TaskCard';
+import { TaskDetail } from './components/TaskDetail';
 import { ViewSwitch } from './components/ViewSwitch';
 import { WeekStrip } from './components/WeekStrip';
 
@@ -116,6 +117,10 @@ export function App() {
   const [opening, setOpening] = useState(false);
   // A task that could not be opened says so (review R3-open-task-silent-failure).
   const [unopened, setUnopened] = useState(false);
+  // The detail of a task, as a view of the app (MA-3): it takes the list's place until "> volver".
+  const [detail, setDetail] = useState<Detail | null>(null);
+  // Inside the Mini App: no "salir", and "Volver al chat" closes it (MA-3). Decided once.
+  const [inMiniApp] = useState(() => telegramWebApp() !== null);
 
   useEffect(() => {
     const request = new AbortController();
@@ -150,19 +155,23 @@ export function App() {
     return () => request.abort();
   }, [view, attempt]);
 
-  // Telegram's "Atrás" closes the form the page is showing (ADR 0024, decision 10).
+  // Telegram's "Atrás" closes the form or the task's detail the page is showing (ADR 0024,
+  // decision 10; MA-3): the same as their "> volver", never closing the Mini App.
   useEffect(
-    () => bindBackButton(telegramWebApp(), creating !== null, () => setCreating(null)),
-    [creating],
+    () => bindBackButton(telegramWebApp(), creating !== null || detail !== null, () => {
+      setDetail(null);
+      setCreating(null);
+    }),
+    [creating, detail],
   );
 
-  /** A task's page (J4 phone test): same origin, with an access for this person. */
+  /** A task's detail inside the app (MA-3): the server says what this person may see of it. */
   async function openTask(taskId: string) {
     setOpening(true);
     setUnopened(false);
     try {
-      const where = await openTaskPage(taskId);
-      if (where) window.location.assign(where);
+      const found = await fetchTaskDetail(taskId);
+      if (found) setDetail(found);
       else setUnopened(true);
     } catch (error) {
       if (error instanceof SessionClosedError) setMe({ kind: 'closed' });
@@ -173,6 +182,7 @@ export function App() {
   }
 
   function choose(next: ViewId) {
+    setDetail(null);
     setView(next);
     try {
       window.history.replaceState(null, '', `?vista=${next}`);
@@ -188,12 +198,17 @@ export function App() {
     ? creating === 'tarea'
       ? 'Nueva tarea'
       : 'Nuevo objetivo'
-    : (ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda');
+    : detail
+      ? 'Tarea'
+      : (ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda');
 
   const enter = () => {
     setSignedOut(false);
     retry();
   };
+  // What stays fixed at the top of the list, under the header (MA-3: only the cards scroll): the
+  // tabs, "> nuevo objetivo", the counters and the week.
+  let fixed = null;
   let body;
   if (signedOut) {
     body = <SessionClosed byPerson onIn={enter} />;
@@ -203,6 +218,8 @@ export function App() {
     body = <Failed onRetry={retry} />;
   } else if (person === null || view === null) {
     body = me.kind === 'loading' ? <Notice title="Cargando…" /> : <SessionClosed onIn={enter} />;
+  } else if (detail && !creating) {
+    body = <TaskDetail detail={detail} onBack={() => setDetail(null)} />;
   } else if (creating) {
     body = (
       <>
@@ -232,31 +249,34 @@ export function App() {
       </>
     );
   } else {
-    body = (
+    fixed = (
       <>
         <ViewSwitch views={person.vistas} current={view} onChange={choose} />
-        {(person.carga_tareas || person.crea_objetivos) && (
+        {/* "> Nueva tarea" is the big button at the bottom (MA-3); the objective stays here. */}
+        {person.crea_objetivos && (
           <div className="flex flex-wrap gap-1.5">
-            {person.carga_tareas && (
-              <button
-                type="button"
-                onClick={() => setCreating('tarea')}
-                className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-soft"
-              >
-                &gt; nueva tarea
-              </button>
-            )}
-            {person.crea_objetivos && (
-              <button
-                type="button"
-                onClick={() => setCreating('objetivo')}
-                className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-soft"
-              >
-                &gt; nuevo objetivo
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setCreating('objetivo')}
+              className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-soft"
+            >
+              &gt; nuevo objetivo
+            </button>
           </div>
         )}
+        {ready && ready.vista !== 'pedidas' && (
+          <>
+            <StatePanel panel={ready.panel} notStarted={ready.sin_empezar} />
+            {/* On a small phone the week gives way first: the rule stays, only the cards scroll. */}
+            <div className="min-h-0 shrink">
+              <WeekStrip days={ready.semana} tasks={ready.tareas} />
+            </div>
+          </>
+        )}
+      </>
+    );
+    body = (
+      <>
         {tasks.kind === 'loading' && <Notice title="Cargando…" />}
         {opening && <Notice title="Abriendo la tarea…" />}
         {unopened && (
@@ -274,8 +294,6 @@ export function App() {
         )}
         {ready && ready.vista !== 'pedidas' && (
           <>
-            <StatePanel panel={ready.panel} />
-            <WeekStrip days={ready.semana} tasks={ready.tareas} />
             {ready.tareas.length === 0 ? (
               <p className="m-0 pt-1 text-body text-ink-soft">{EMPTY[ready.vista] ?? EMPTY.tus}</p>
             ) : (
@@ -298,24 +316,40 @@ export function App() {
   }
 
   const open = !signedOut && person !== null && me.kind === 'ready' && tasks.kind !== 'closed';
+  // One screen, no page scroll (MA-3): the header, the tabs, the counters and the week fixed at
+  // the top, "> Nueva tarea" and "Volver al chat" fixed at the bottom, and only the middle (the
+  // cards, or the detail or the form) scrolls. Its height leaves out the safe areas the root
+  // already keeps clear (the status bar and Telegram's floating "Cerrar" and "…").
   return (
-    <div className="mx-auto flex min-h-dvh w-full min-w-0 overflow-x-clip max-w-[32rem] flex-col px-5">
-      <Header
-        space={person?.espacio ?? ''}
-        title={signedOut || !open ? 'Leda' : title}
-        person={open ? person?.persona : undefined}
-        active={open ? ready?.activas : undefined}
-        today={open ? ready?.hoy : undefined}
-        isoWeek={open ? ready?.semana_iso : undefined}
-      />
-      <main className="flex min-w-0 flex-col gap-3.5 pt-3.5">{body}</main>
+    <div className="mx-auto flex h-[calc(100dvh-var(--tg-safe-top,0px)-var(--tg-safe-bottom,0px))] w-full min-w-0 max-w-[32rem] flex-col overflow-hidden px-5">
+      <div data-testid="fixed-top" className="flex min-w-0 shrink-0 flex-col gap-3.5">
+        <Header
+          space={person?.espacio ?? ''}
+          title={signedOut || !open ? 'Leda' : title}
+          person={open ? person?.persona : undefined}
+          today={open ? ready?.hoy : undefined}
+          isoWeek={open ? ready?.semana_iso : undefined}
+          subtitle={open && !creating && !detail && ready?.vista === 'sector' ? ready.area_del_equipo : null}
+        />
+        {fixed}
+      </div>
+      <main
+        data-testid="scroll"
+        className="-mx-5 flex min-h-0 min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain px-5 pb-1 pt-3.5"
+      >
+        {body}
+      </main>
       {open && (
-        <footer className="mt-auto flex flex-col gap-3 pb-[22px] pt-5">
-          <TalkButton href={person?.chat_con_leda ?? null} />
-          <div className="flex justify-end">
-            <SignOut onDone={() => setSignedOut(true)} />
-          </div>
-        </footer>
+        <Footer
+          inMiniApp={inMiniApp}
+          chat={person?.chat_con_leda ?? null}
+          canLoad={Boolean(person?.carga_tareas) && creating === null}
+          onNewTask={() => {
+            setDetail(null);
+            setCreating('tarea');
+          }}
+          onSignedOut={() => setSignedOut(true)}
+        />
       )}
     </div>
   );

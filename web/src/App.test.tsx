@@ -46,7 +46,9 @@ describe('App', () => {
     expect(screen.getByText('LEDA · COREWORK')).toBeInTheDocument();
     expect(screen.getByText('SEM 44 · LUN 26.10')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Vistas' })).toBeNull();
-    expect(screen.getByRole('link', { name: '> consultar a leda' })).toHaveAttribute(
+    // MA-3: "> consultar a leda" is gone; in a browser, "Volver al chat" opens the bot's chat.
+    expect(screen.queryByText('> consultar a leda')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Volver al chat' })).toHaveAttribute(
       'href',
       'https://t.me/LedaCoreWorkBot',
     );
@@ -103,12 +105,12 @@ describe('App', () => {
       ),
     });
     render(<App />);
-    const nav = await screen.findByRole('navigation', { name: 'Vistas' });
-    const buttons = [...nav.querySelectorAll('button')].map((b) => b.textContent);
-    expect(buttons).toEqual(['Tus tareas', 'Tu sector']);
+    await screen.findByRole('navigation', { name: 'Vistas' });
+    const tabs = screen.getAllByRole('tab').map((b) => b.textContent);
+    expect(tabs).toEqual(['Tus tareas', 'Tu sector']);
     expect(screen.queryByText('El equipo')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tu sector' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Tu sector' }));
     expect(await screen.findByText('Ordenar el depósito')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tu sector');
     expect(window.location.search).toBe('?vista=sector');
@@ -160,7 +162,8 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByText('No tenés tareas abiertas.')).toBeInTheDocument();
     expect(screen.getByText('Relevar tableros de la línea 2')).toBeInTheDocument();
-    expect(screen.getByText(/0 activas/)).toBeInTheDocument();
+    // MA-3: no total of open tasks anywhere (the user's decision).
+    expect(screen.getByRole('banner')).not.toHaveTextContent(/activas/);
   });
 
   it('salir asks once and closes the session', async () => {

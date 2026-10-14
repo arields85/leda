@@ -145,12 +145,13 @@ TIPOS_DE_LA_WEB = {
     ".webmanifest": "application/manifest+json", ".txt": "text/plain", ".html": "text/html",
 }
 
-# Las pestañas de la puerta del equipo y su nombre, en un solo lugar (decisión del usuario del
-# 2026-10-14, prueba por Telegram de la J4): "Mis tareas"; el sector de un referente, con el nombre
-# de su área (de los datos, `_titulo_de_la_vista`); "Todo el equipo", de Dirección, que no tiene
-# sector (el suyo es Dirección misma, que repetía sus tareas); "Lo que pedí", de quien puede pedir
-# (un referente y Dirección; un integrante, cuando tenga pedidos).
-VISTAS = {"tus": "Mis tareas", "sector": "Mi sector", "equipo": "Todo el equipo",
+# Las pestañas de la puerta del equipo y su nombre, en un solo lugar (decisiones del usuario del
+# 2026-10-14, pruebas de la J4 y de la Mini App en el iPhone, MA-3): "Mis tareas"; "Mi equipo", la
+# gente del área de un referente, sin sus propias tareas, y sólo si tiene a alguien a cargo (el
+# nombre del área va como dato debajo del título, `area_del_equipo`); "Todo el equipo", de
+# Dirección, que no tiene sector (el suyo es Dirección misma, que repetía sus tareas); "Lo que
+# pedí", de quien puede pedir (un referente y Dirección; un integrante, cuando tenga pedidos).
+VISTAS = {"tus": "Mis tareas", "sector": "Mi equipo", "equipo": "Todo el equipo",
           "pedidas": "Lo que pedí"}
 DIAS_CORTOS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
 
@@ -400,6 +401,9 @@ def _pestanas(cur, token: str, sesion: dict[str, Any], vistas: list[str],
     el sector a Dirección, y "Lo que pedí" a quien puede pedir o ya pidió algo."""
     direccion = bool(persona and persona["direccion"])
     pestanas = [v for v in vistas if v in VISTAS and not (direccion and v == "sector")]
+    if "sector" in pestanas and not _a_quien_la_puede_pasar(cur, str(sesion["membership_id"])):
+        # "Mi equipo" sin nadie a cargo quedaría vacía o con sus propias tareas repetidas (MA-3).
+        pestanas.remove("sector")
     if direccion or (persona and persona["referente"]) or _pidio_algo(cur, token):
         pestanas.append("pedidas")
     return [{"vista": v, "titulo": _titulo_de_la_vista(cur, v, str(sesion["membership_id"]))}
@@ -413,15 +417,18 @@ def _pidio_algo(cur, token: str) -> bool:
 
 
 def _titulo_de_la_vista(cur, vista: str, membership_id: str) -> str:
-    """El nombre de una pestaña: el de `VISTAS`, salvo el sector, que se llama como el área (o
-    las áreas) de quien la encabeza."""
-    if vista == "sector":
-        cur.execute("""select nombre from area where referente_membership_id = %s
-                        order by nombre""", (membership_id,))
-        areas = [f["nombre"] for f in cur.fetchall()]
-        if areas:
-            return " y ".join(areas)
+    """El nombre de una pestaña, el de `VISTAS` (MA-3: el del sector es "Mi equipo", y el
+    nombre del área va debajo del título, `_area_del_equipo`)."""
     return VISTAS[vista]
+
+
+def _area_del_equipo(cur, membership_id: str) -> str | None:
+    """El área (o las áreas) de las que la persona es referente, para debajo del título de "Mi
+    equipo" (MA-3)."""
+    cur.execute("""select nombre from area where referente_membership_id = %s
+                    order by nombre""", (membership_id,))
+    areas = [f["nombre"] for f in cur.fetchall()]
+    return " y ".join(areas) or None
 
 
 def _chat_con_leda(usuario: str | None) -> str | None:
@@ -451,7 +458,7 @@ def tareas(request: Request, vista: str = "tus"):
             cur.execute("select vistas from vistas_de_la_sesion(%s)", (_hash(token),))
             vistas = cur.fetchone()
             if vistas is not None:
-                cur.execute("""select coalesce(r.autoridad_final, false) as direccion,
+                cur.execute("""select i.nombre, coalesce(r.autoridad_final, false) as direccion,
                                       exists (select 1 from area a
                                                where a.referente_membership_id = i.membership_id)
                                         as referente
@@ -481,14 +488,21 @@ def tareas(request: Request, vista: str = "tus"):
                 cur.execute("select * from terminadas_de_la_sesion(%s, %s, %s)",
                             (_hash(token), vista, ahora))
                 terminadas = cur.fetchall()
-            pedidas = pasar_a = None
+            pedidas = pasar_a = area_del_equipo = None
             if vista in ("tus", "pedidas"):
                 # Lo que pidió desde otra área o a Dirección (J4; decisiones D1b y D14).
                 cur.execute("select * from pedidas_de_la_sesion(%s, %s)", (_hash(token), ahora))
                 pedidas = cur.fetchall()
             if vista == "sector":
                 pasar_a = _a_quien_la_puede_pasar(cur, str(sesion["membership_id"]))
+                area_del_equipo = _area_del_equipo(cur, str(sesion["membership_id"]))
             calendario = Calendario.desde_base(cur, ws)
+        if vista == "sector":
+            # "Mi equipo" es la gente a su cargo, nunca sus propias tareas, que ya están en "Mis
+            # tareas" (MA-3): ni las abiertas ni las terminadas.
+            filas = [f for f in filas if f["papel"] != "mia"]
+            nombre = persona["nombre"] if persona else None
+            terminadas = [f for f in terminadas if f["responsable"] != nombre]
         if vista == "tus" and pedidas:
             # Lo que pidió vive sólo en "Lo que pedí" (prueba por Telegram de la J4): en sus
             # tareas no aparece repetido como una que espera; la suya que lo espera sigue
@@ -502,6 +516,8 @@ def tareas(request: Request, vista: str = "tus"):
             vista_armada["pedidas"] = [_pedida(f, calendario) for f in pedidas or []]
         if pasar_a is not None:
             vista_armada["pasar_a"] = pasar_a
+        if vista == "sector":
+            vista_armada["area_del_equipo"] = area_del_equipo
         return _json(vista_armada)
 
     return _con_la_base(leer)
@@ -525,6 +541,8 @@ def armar_vista(vista: str, filas: list[dict[str, Any]], esperas: list[dict[str,
         "vista": vista, "titulo": VISTAS[vista],
         "hoy": hoy.isoformat(), "semana_iso": hoy.isocalendar()[1],
         "panel": panel, "activas": len(tareas_),
+        # Asignadas y sin empezar (MA-3): el contador "Sin empezar", aparte de los cuatro colores.
+        "sin_empezar": sum(1 for t in tareas_ if t["estado"] == "asignada"),
         "semana": _semana(calendario, hoy, vencen),
         "tareas": tareas_,
         "terminadas": [_terminada(f, calendario) for f in terminadas or []],
@@ -1294,6 +1312,108 @@ def abrir_la_pagina_de_la_tarea(task_id: str, request: Request):
         return _json({"direccion": f"{pagina_de_tarea.CAMINO}{acceso}"})
 
     return _con_la_base(abrir)
+
+
+@router.post("/api/tareas/{task_id}/detalle")
+def detalle_de_la_tarea(task_id: str, request: Request):
+    """El detalle de una tarea como vista de la web del equipo (MA-3, prueba del usuario en el
+    iPhone): lo mismo que la página de la tarea (`leer_pagina_de_tarea` y, desde la 0075, quién la
+    pidió y sus esperas), en JSON. La regla es la de la página (`puede_ver_tarea`): a quien no la
+    puede ver, 403. Se abre un acceso para la persona de la sesión, como `/pagina`, y su token sólo
+    va en las direcciones de los archivos de la evidencia (las mismas que la página)."""
+    from . import pagina_de_tarea
+    from .db import espacio as en_el_espacio
+
+    if _de_otro_sitio(request):
+        return _json({"error": "origen_no_verificado"}, 403)
+    token = _token_de_la_cookie(request)
+    if token is None:
+        return _sin_sesion()
+    tarea = _espacio_de(task_id)
+    if tarea is None:
+        return _json({"error": "no_existe"}, 404)
+
+    def leer(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            sesion = _sesion(cur, token)
+        if sesion is None:
+            return _sin_sesion()
+        with en_el_espacio(conn, str(sesion["workspace_id"])) as cur:
+            acceso = pagina_de_tarea.emitir(cur, str(sesion["membership_id"]), tarea)
+        if acceso is None:
+            return _json({"error": "no_la_ve"}, 403)
+        with sin_espacio(conn) as cur:
+            datos = pagina_de_tarea.leer(cur, acceso)
+        if datos is None:
+            return _json({"error": "no_la_ve"}, 403)
+        return _json(detalle_en_json(datos, acceso))
+
+    return _con_la_base(leer)
+
+
+def detalle_en_json(datos: dict[str, Any], acceso: str) -> dict[str, Any]:
+    """Lo que la web muestra del detalle, con lo que devolvió la base: los estados en palabras
+    (`tarea_vista.ESTADOS`), las fechas como días del equipo y, de lo relacionado que quien mira
+    no puede ver, sólo que existe (la base no manda más)."""
+    from zoneinfo import ZoneInfo
+
+    from .pagina_de_tarea import CAMINO
+    from .tarea_vista import ESTADOS, IMAGENES_QUE_SE_VEN
+
+    zona = ZoneInfo(datos.get("zona_horaria") or "UTC")
+    t = datos.get("tarea") or {}
+    relaciones = datos.get("relaciones") or {}
+
+    def dia(valor: str | None) -> str | None:
+        if not valor:
+            return None
+        if len(valor) == 10:
+            return valor
+        return datetime.fromisoformat(valor).astimezone(zona).date().isoformat()
+
+    def relacionada(r: dict[str, Any]) -> dict[str, Any]:
+        if not r.get("ve"):
+            return {"ve": False}
+        return {"ve": True, "titulo": r.get("titulo"),
+                "estado": ESTADOS.get(r.get("estado") or "", "sin estado"),
+                "responsable": r.get("responsable")}
+
+    def pieza(p: dict[str, Any]) -> dict[str, Any]:
+        retirada = bool(p.get("retirada") or p.get("retirada_por_la_administracion"))
+        con_archivo = (not retirada and p.get("clase") in ("imagen", "archivo")
+                       and p.get("id") is not None)
+        return {
+            "clase": p.get("clase"),
+            "texto": None if retirada else p.get("texto"),
+            "enlace": None if retirada else p.get("enlace"),
+            "nombre": None if retirada else p.get("nombre"),
+            "imagen": con_archivo and p.get("tipo_de_archivo") in IMAGENES_QUE_SE_VEN,
+            "archivo": f"{CAMINO}{acceso}/evidencia/{p['id']}" if con_archivo else None,
+            "quien": p.get("quien"),
+            "cuando": dia(p.get("cuando")),
+            "retirada": retirada,
+            "motivo_del_retiro": (p.get("motivo_del_retiro")
+                                  if p.get("retirada_por_la_administracion") else None),
+        }
+
+    prevision = t.get("prevision") or {}
+    return {
+        "titulo": t.get("titulo"),
+        "estado": ESTADOS.get(t.get("estado") or "", "sin estado"),
+        "objetivo": t.get("objetivo"),
+        "area": t.get("area"),
+        "responsable": t.get("responsable"),
+        "revisa": t.get("quien_aprueba"),
+        "pidio": relaciones.get("pidio"),
+        "vence": dia(t.get("fecha_objetivo")),
+        "prevision": dia(prevision.get("fecha")),
+        "criterio": t.get("criterio_aceptacion"),
+        "pide": [{"que": p.get("en_palabras") or str(p.get("tipo") or "").replace("_", " "),
+                  "cubierto": bool(p.get("cubierto"))} for p in datos.get("pide") or []],
+        "evidencia": [pieza(p) for p in datos.get("evidencia") or []],
+        "espera_a": [relacionada(r) for r in relaciones.get("espera_a") or []],
+        "la_esperan": [relacionada(r) for r in relaciones.get("la_esperan") or []],
+    }
 
 
 def _pasar(conn, token: str, tarea: str | None, a: str | None) -> Response:

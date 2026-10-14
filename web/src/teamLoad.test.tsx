@@ -88,7 +88,7 @@ describe('the team door load form', () => {
       'POST /app/api/tareas': { status: 201, body: { task_id: 't-1', avisos: [], repetida: false } },
     });
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '> nueva tarea' }));
+    fireEvent.click(await screen.findByRole('button', { name: '> Nueva tarea' }));
     await screen.findByRole('form', { name: 'Cargar tarea' });
     expect(screen.queryByLabelText('Quién la decidió')).toBeNull();
     // A referente does not choose who reviews it.
@@ -117,11 +117,11 @@ describe('the team door load form', () => {
     expect(calls.some((c) => c.key.includes('/admin/'))).toBe(false);
   });
 
-  it('a member does not see "> nueva tarea"', async () => {
+  it('a member does not see "> Nueva tarea"', async () => {
     serve({ 'GET /app/api/yo': ok(me({ carga_tareas: false })), 'GET /app/api/tareas?vista=tus': ok(view()) });
     render(<App />);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(screen.queryByRole('button', { name: '> nueva tarea' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '> Nueva tarea' })).toBeNull();
   });
 
   it('Dirección chooses who reviews, never who does it', async () => {
@@ -133,7 +133,7 @@ describe('the team door load form', () => {
       })),
     });
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '> nueva tarea' }));
+    fireEvent.click(await screen.findByRole('button', { name: '> Nueva tarea' }));
     await screen.findByRole('form', { name: 'Cargar tarea' });
     pick('Quién la hace', 'm-marcos');
     fireEvent.click(screen.getByLabelText('Quién la revisa'));

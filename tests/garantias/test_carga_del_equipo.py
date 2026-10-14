@@ -1019,6 +1019,73 @@ def test_lo_pedido_no_se_repite_en_mis_tareas(web, conn, equipo):
     assert [p["titulo"] for p in pedidas["pedidas"]] == ["Aprobar la compra del módem"]
 
 
+def test_el_detalle_de_una_tarea_es_una_vista_de_la_web_con_la_regla_de_la_pagina(
+        web, conn, equipo, monkeypatch):
+    """MA-3 (prueba del usuario en el iPhone): tocar una tarea abre su detalle dentro de la web,
+    en JSON, con lo mismo que la página: estado en palabras, fechas, criterio, evidencia, quién la
+    hace, quién la revisa y quién la pidió, y sus esperas. La regla es la de la página
+    (`puede_ver_tarea`): de otro espacio, 403; un id que no es un id, 404; otro sitio, 403."""
+    from leda import entrada
+
+    monkeypatch.setattr(entrada, "_conn_de_paginas", lambda: conn)
+    taylor = _navegador(web, conn, equipo, "Taylor Quinn")
+    tarea = taylor.post("/app/api/tareas", json=_cuerpo(equipo)).json()["task_id"]
+    r = taylor.post(f"/app/api/tareas/{tarea}/detalle")
+    assert r.status_code == 200, r.text
+    detalle = r.json()
+    assert detalle["titulo"] == "Colgar el módem en la pared"
+    assert detalle["estado"] == "asignada, sin empezar"
+    assert detalle["responsable"] == "Sam Noble 1"
+    assert detalle["criterio"] == "El módem queda colgado y prende"
+    assert detalle["vence"] == VIERNES.isoformat()
+    assert {"revisa", "pidio", "pide", "evidencia", "espera_a", "la_esperan"} <= set(detalle)
+    assert detalle["espera_a"] == [] and detalle["la_esperan"] == []
+    assert "en_curso" not in r.text and "asignada\"" not in r.text
+    # De otro espacio, no; un id inventado, tampoco; desde otro sitio, nada.
+    oeste = equipo["west-studio"]
+    with admin(conn) as cur:
+        cur.execute("""insert into task (workspace_id, objective_id, titulo, area_id,
+                                         responsable_membership_id)
+                       select %s, %s, 'Una de West Studio', m.area_id, m.id
+                         from membership m where m.workspace_id = %s limit 1
+                       returning id""",
+                    (oeste["id"], oeste["objectives"][0], oeste["id"]))
+        ajena = str(cur.fetchone()["id"])
+    conn.commit()
+    r = taylor.post(f"/app/api/tareas/{ajena}/detalle")
+    assert r.status_code == 403 and "West Studio" not in r.text
+    assert taylor.post("/app/api/tareas/no-es-un-id/detalle").status_code == 404
+    assert taylor.post(f"/app/api/tareas/{tarea}/detalle",
+                       headers={"Origin": "https://otro.example"}).status_code == 403
+    assert web().post(f"/app/api/tareas/{tarea}/detalle").status_code == 401
+
+
+def test_el_detalle_no_dice_de_una_tarea_relacionada_que_quien_mira_no_ve(web, conn, equipo,
+                                                                         monkeypatch):
+    """De lo que espera la tarea, si quien mira no lo puede ver, sólo que existe."""
+    from leda import entrada
+
+    monkeypatch.setattr(entrada, "_conn_de_paginas", lambda: conn)
+    taylor = _navegador(web, conn, equipo, "Taylor Quinn")
+    tarea = taylor.post("/app/api/tareas", json=_cuerpo(equipo)).json()["task_id"]
+    norte = _norte(equipo)
+    with admin(conn) as cur:
+        cur.execute("""insert into task (workspace_id, objective_id, titulo, area_id,
+                                         responsable_membership_id)
+                       values (%s, %s, 'Secreto de otra área', %s, %s) returning id""",
+                    (norte["id"], norte["objectives"][0], norte["areas"]["direction"],
+                     _id(equipo, "Morgan Hale")))
+        oculta = str(cur.fetchone()["id"])
+        cur.execute("""insert into dependency (workspace_id, origen_task_id, destino_task_id)
+                       values (%s, %s, %s)""", (norte["id"], oculta, tarea))
+    conn.commit()
+    noble = _navegador(web, conn, equipo, "Sam Noble")
+    r = noble.post(f"/app/api/tareas/{tarea}/detalle")
+    assert r.status_code == 200, r.text
+    assert r.json()["espera_a"] == [{"ve": False}]
+    assert "Secreto de otra área" not in r.text
+
+
 def test_cada_tarea_abre_su_pagina_desde_la_web_con_la_regla_de_quien_ve_que(web, conn, equipo,
                                                                              monkeypatch):
     """Prueba por Telegram de la J4: tocar una tarea abre su detalle, la página de la tarea de
