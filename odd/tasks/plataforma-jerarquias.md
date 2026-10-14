@@ -1137,6 +1137,25 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       con la prueba de la mini app, recordámelo"): el botón de borrar, "confirmar" apagado, las pestañas "Tarea" y
       "Objetivo", los nombres objetivo general, etapa y objetivo de área, y "Es parte de". Con su visto bueno se
       cierra la J3. Va como pasos del guion de la MA.
+      **Construida** (escritor delegado, 2026-10-14), con la migración `0073_entrar_con_telegram` y los commits
+      `b907b9ae`, `f5b03cd4`, `70c0900b`, `ad46fd6a`, `cc57015b`, `3dc4c206`, `7ebf2a8c` y `c324bfcf`:
+      - **La entrada:** la firma de Telegram se comprueba en el servidor, vale 10 minutos y una sola vez.
+      - **El QR** para la computadora, con `src/leda/qr.py`, un codificador sin dependencias.
+      - **Los bots:** "Entrar en la compu" y "Administración".
+      - **Botones en lugar de enlaces,** que llevan directo a lo que dicen.
+      - **La Mini App en la web:** `ready`, `expand`, los colores de Leda y el botón "Atrás".
+      - **El tiempo de la computadora,** configurable por equipo.
+      - **Los arreglos de la prueba de la J4,** salvo lo que sigue.
+      Pendientes:
+      - el detalle de la tarea no muestra quién la pidió, qué espera ni quién la espera;
+      - la ortografía de la puerta del equipo: las dos puertas mandan lo mismo a la IA, así que hay que mirarla
+        con la IA real;
+      - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento).
+      IA real, conversaciones 50 y 52 a 54: 12 de 12. `leda_motor`: respaldo
+      `leda_motor-antes-0073-20261014.dump`, ensayo previo y la `0073` aplicada. Guion de la prueba:
+      `docs/product/guion-celular-ma.md`.
+      RDD commit por commit: siete revisiones aprobadas, con WARNING de casos de borde. El `70c0900b` no entraba en
+      el presupuesto del revisor y se revisa en cuatro tramos.
       **Decisiones del usuario (2026-10-14):**
       - **MA1. En el celular, sólo la Mini App: los enlaces desaparecen.** Hay que revisar cada lugar donde Leda
         ofrece o manda un enlace (el pedido de acceso, el ofrecimiento de una sola vez, la bienvenida, los avisos
