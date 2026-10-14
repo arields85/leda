@@ -1255,6 +1255,23 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       Si quien carga es Dirección o administración (usuario, 2026-10-14): Leda le avisa que demora el objetivo;
       si acepta, se carga directo, sin pedirle la aprobación al referente del objetivo, y el referente recibe un
       aviso de Leda con la decisión de Dirección. Esa parte va en la J4, con la carga de Dirección y sus avisos.
+      **Decisiones del usuario (2026-10-14, antes del código; mapa del explorador en esta sesión):**
+      - **J6-D1. Hacerlo lo más simple posible para el integrante** (usuario: "él se basa en sus tareas"). Nahuel no
+        ve objetivos en ningún formulario.
+        - **Subtareas** (mecánica §1, `task.parent_task_id`, que hoy no se usa): desde su tarea, "> agregar una
+          subtarea" ("Comprar los tornillos" dentro de "Colocar el estante"), con la ayuda de la IA. Hereda el
+          objetivo. La tarea no se da por terminada con subtareas abiertas, así que no hace falta marcar una espera.
+          La aprueba su referente, que ve antes el informe de "en qué afecta".
+        - **Sólo para sí mismo:** si necesita que lo haga otro, lo pide.
+      - **J6-D2. "Lo que pedí" también para el integrante, unificado con "Me falta algo para seguir".** Lo que no
+        depende de él ("necesito el cable de 10 metros") se lo pide a su referente.
+        - Marcos decide: lo hace él (la compra), lo pasa, o dice que no, con el motivo.
+        - Nahuel ve en "Lo que pedí" en qué está su pedido.
+        - Al resolverse, le llega el aviso y su tarea puede seguir.
+        - "Me falta algo para seguir" (J5-D1) es lo mismo: queda como un pedido en "Lo que pedí" a quien se ocupa,
+          con el seguimiento del bloqueo que ya hace el motor, y la tarea lo espera. Antes de trabarse se llama
+          "pedir", después "me falta algo": es una sola cosa.
+        - La regla para todos: a quien está arriba se le pide lo que no depende de uno.
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
