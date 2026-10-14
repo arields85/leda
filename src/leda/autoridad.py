@@ -192,10 +192,11 @@ def verificar(cur: psycopg.Cursor, quien: Solicitante, accion: str,
 
 
 def quien_revisa_la_tarea(cur: psycopg.Cursor, task_id) -> str | None:
-    """Quién revisa el trabajo de una tarea: quien aprueba el trabajo de quien era la tarea antes
-    de su primer pase o, si nunca cambió de manos, el de su responsable (C-7, decisiones 28 y 43
-    del usuario). Puede ser quien la hace ahora. La regla es una sola y vive en la base
-    (`quien_revisa_la_tarea`)."""
+    """Quién revisa el trabajo de una tarea: el que se eligió al cargarla
+    (`task.revisor_membership_id`, J4, migración 0071) o, sin él, quien aprueba el trabajo de quien
+    era la tarea antes de su primer pase o, si nunca cambió de manos, el de su responsable (C-7,
+    decisiones 28 y 43 del usuario). Puede ser quien la hace ahora. La regla es una sola y vive en
+    la base (`quien_revisa_la_tarea`)."""
     cur.execute("select quien_revisa_la_tarea(%s) as quien", (str(task_id),))
     fila = cur.fetchone()
     return str(fila["quien"]) if fila and fila["quien"] else None
