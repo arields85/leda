@@ -895,6 +895,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         ON_ERROR_STOP=1` como `postgres`, sin error. Los nombres de los niveles se llenan al reimportar el pack;
         hasta entonces la web muestra los de siempre, que son los de CoreWork.
         Windows se reinició solo a la noche y cortó la sesión; la suite completa se está corriendo de nuevo.
+  - [ ] J3-2b · Las decisiones del usuario del 2026-10-14: la fecha obligatoria, en día hábil, y el
+        referente, que tiene que ser un referente activo de un área (`0069`).
   - [ ] J3-3 · La web: el formulario de objetivos en las dos puertas, compartiendo las piezas de la J2.
   - [ ] J3-4 · La ayuda de la IA para objetivos (y la ortografía y el dictado en la puerta del equipo), con su
         herramienta de medición; una ronda con la IA real.
@@ -989,13 +991,12 @@ Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de ba
 Lo que el agente, trabajando solo desde la noche del 2026-10-13, necesita que decida el usuario. Cada punto,
 con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue con lo que no depende de eso.
 
-- **J3: ¿los objetivos llevan fecha?** Ejemplo: "Poner el módem colgando en la pared", ¿para cuándo? El ADR
-  0023 pide sólo nombre, de dónde cuelga y referente. **Mientras tanto:** sin fecha. Agregarla después es
-  chico: el campo ya existe en la base y la web ya tiene el calendario.
-- **J3: el objetivo nace activo.** Dirección (o el administrador) lo crea y queda en marcha, sin otra
-  aprobación. Si preferís que nazca "propuesto" hasta que alguien lo apruebe, se cambia.
-- **J3: el referente puede ser cualquier integrante activo**, no sólo el referente de un área. Ejemplo: Marcos,
-  que no es referente de ningún área, puede ser referente de "Poner el módem en la pared".
+- **Decididas por el usuario (2026-10-14, a la mañana):**
+  1. **El objetivo lleva fecha, obligatoria,** con el mismo calendario que las tareas (sólo días hábiles del
+     espacio).
+  2. **Nace activo:** "ok".
+  3. **El referente es siempre un referente activo de un área,** no cualquier integrante.
+  Se construyen en la J3-2b (migración nueva, porque la `0068` ya está aplicada en `leda_motor`).
 
 ## Criterio de aceptación
 
