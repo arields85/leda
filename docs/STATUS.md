@@ -88,7 +88,10 @@ Para probar en el celular: el agente levanta la web y el túnel en segundo plano
 (dirección `observations-guide-tsunami-guitar`); en una sesión nueva, hay que volver a levantarlos. Lo que sigue a
 la plataforma, en orden: `ROADMAP.md`.
 
-**La IA real:** una ronda por vez y ninguna repetición sin preguntarle al usuario. La lanza el coordinador
+**La IA real:** autorizada de forma permanente para todas las pruebas (usuario, 2026-10-14), sin preguntar
+antes de cada ronda ni de una repetición. Se sigue gastando poco: una ronda por vez y sólo los casos afectados.
+Al primer error de cupo se para todo lo de la IA real y queda pendiente hasta que el usuario cambie de cuenta;
+mientras tanto sigue lo demás. La lanza el coordinador
 en segundo plano, con la salida a un archivo que guarda `salida=$?` del corredor (probado el 2026-10-09: un
 proceso de 90 minutos sobrevivió y avisó al terminar); nunca un escritor. El corredor se corta solo al primer error de cupo (sale con 4). Si se
 corta, el usuario cambia de cuenta a mano (`leda chatgpt salir` y `login`); decidió no rotar cuentas
