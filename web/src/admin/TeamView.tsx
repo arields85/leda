@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
 import { SessionClosedError } from '../api';
 import { Notice } from '../components/Notice';
+import { AreaEditor, type AreaWork } from './AreaEditor';
+import { CREATED } from './controls';
 import type { Team, TeamApi, TeamArea, TeamChange, TeamPerson, TeamRead } from './teamApi';
 
 type Load = { kind: 'loading' } | { kind: 'read'; read: TeamRead } | { kind: 'failed' };
 
 const HEADING = 'm-0 text-mini font-bold tracking-wide text-ink-dim';
+
+// The small actions of the view ("> crear área", "> renombrar", "> archivar"), like its
+// "probar de nuevo".
+const SMALL = 'w-fit rounded-card border-hard border-line bg-card px-2.5 py-1 text-small text-ink shadow-hard';
+
+/** How each piece of a change is named; an id is not shown. */
+const CHANGE_KEYS: Record<string, string> = { quien_aprueba: 'quién aprueba' };
 
 /** What each kind of change is called (`cambio_del_equipo.clase`). */
 const CHANGES: Record<string, string> = {
@@ -62,7 +71,17 @@ function PersonLine({ person }: { person: TeamPerson }) {
   );
 }
 
-function AreaCard({ area, people }: { area: TeamArea; people: Map<string, TeamPerson> }) {
+function AreaCard({
+  area,
+  people,
+  onWork,
+  editor,
+}: {
+  area: TeamArea;
+  people: Map<string, TeamPerson>;
+  onWork: (work: AreaWork) => void;
+  editor: React.ReactNode;
+}) {
   const members = area.personas.map((id) => people.get(id)).filter((p): p is TeamPerson => Boolean(p));
   const referente = area.referente
     ? `Referente: ${area.referente.nombre}${area.referente.activo ? '' : ' (ya no está)'}`
@@ -92,12 +111,26 @@ function AreaCard({ area, people }: { area: TeamArea; people: Map<string, TeamPe
       ) : (
         <span className="text-small text-ink-dim">Nadie en esta área.</span>
       )}
+      {/* An archived area stays as it is (J7-4): it is never renamed nor deleted. */}
+      {!area.archivada && !editor && (
+        <span className="flex flex-wrap gap-2">
+          <button type="button" className={SMALL} onClick={() => onWork({ kind: 'renombrar', area })}>
+            &gt; renombrar
+          </button>
+          <button type="button" className={SMALL} onClick={() => onWork({ kind: 'archivar', area })}>
+            &gt; archivar
+          </button>
+        </span>
+      )}
+      {editor}
     </li>
   );
 }
 
 function ChangeLine({ change }: { change: TeamChange }) {
-  const keys = Array.from(new Set([...Object.keys(change.antes ?? {}), ...Object.keys(change.despues ?? {})]));
+  const keys = Array.from(
+    new Set([...Object.keys(change.antes ?? {}), ...Object.keys(change.despues ?? {})]),
+  ).filter((key) => !key.endsWith('_id'));
   return (
     <li data-change={change.id} className="flex min-w-0 flex-col gap-0.5 border-b border-line-soft pb-1.5">
       <span className="flex min-w-0 justify-between gap-2">
@@ -110,7 +143,7 @@ function ChangeLine({ change }: { change: TeamChange }) {
       </span>
       {keys.map((key) => (
         <span key={key} className="wrap-break-word text-small text-ink-soft">
-          {key}: {change.antes ? `${value(change.antes[key])} → ` : ''}
+          {CHANGE_KEYS[key] ?? key}: {change.antes ? `${value(change.antes[key])} → ` : ''}
           {change.despues ? value(change.despues[key]) : '—'}
         </span>
       ))}
@@ -118,9 +151,43 @@ function ChangeLine({ change }: { change: TeamChange }) {
   );
 }
 
-function TeamBody({ team }: { team: Team }) {
+function TeamBody({
+  team,
+  api,
+  onChanged,
+  onClosed,
+}: {
+  team: Team;
+  api: TeamApi;
+  onChanged: () => void;
+  onClosed: () => void;
+}) {
   const people = new Map(team.personas.map((p) => [p.membership_id, p]));
   const gone = team.personas.filter((p) => !p.activo);
+  const [work, setWork] = useState<AreaWork | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  function open(next: AreaWork) {
+    setDone(null);
+    setWork(next);
+  }
+
+  // One change at a time; the editor sits where the change happens.
+  const editor = work && (
+    <AreaEditor
+      key={work.kind === 'crear' ? 'crear' : `${work.kind}-${work.area.id}`}
+      api={api}
+      team={team}
+      work={work}
+      onCancel={() => setWork(null)}
+      onClosed={onClosed}
+      onDone={(message) => {
+        setWork(null);
+        setDone(message);
+        onChanged();
+      }}
+    />
+  );
   return (
     <>
       {team.problemas.length > 0 && (
@@ -137,12 +204,30 @@ function TeamBody({ team }: { team: Team }) {
       )}
       <section aria-label="Áreas" className="flex flex-col gap-[11px]">
         <h2 className={HEADING}>ÁREAS</h2>
+        {done && (
+          <p role="status" className={`m-0 text-body font-bold ${CREATED}`}>
+            {done}
+          </p>
+        )}
+        {work?.kind === 'crear' ? (
+          editor
+        ) : (
+          <button type="button" className={SMALL} onClick={() => open({ kind: 'crear' })}>
+            &gt; crear área
+          </button>
+        )}
         {team.areas.length === 0 ? (
           <p className="m-0 text-body text-ink-soft">Este equipo todavía no tiene áreas.</p>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-[11px] p-0">
             {team.areas.map((area) => (
-              <AreaCard key={area.id} area={area} people={people} />
+              <AreaCard
+                key={area.id}
+                area={area}
+                people={people}
+                onWork={open}
+                editor={work && work.kind !== 'crear' && work.area.id === area.id ? editor : null}
+              />
             ))}
           </ul>
         )}
@@ -178,14 +263,16 @@ function TeamBody({ team }: { team: Team }) {
 /** "Equipo" (J7-3): the areas with their referente and their people (role, who approves each one,
  * «sin conectar»), what does not add up, who left, and the team's changes, newest first. The same
  * view through both doors (like `NewObjective`): Dirección's own team, or any space's from the
- * administration. Read only: changing the team comes in the next portions. */
+ * administration. The areas are created, renamed and archived from here (J7-4), each with its
+ * preview first; the other changes to the team come in the next portions. */
 export function TeamView({ api, onClosed }: { api: TeamApi; onClosed: () => void }) {
   const [attempt, setAttempt] = useState(0);
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
 
   useEffect(() => {
     const request = new AbortController();
-    setLoad({ kind: 'loading' });
+    // Reading again after a change keeps the team on screen until the new one arrives.
+    setLoad((current) => (current.kind === 'read' && current.read.kind === 'team' ? current : { kind: 'loading' }));
     api
       .read(request.signal)
       .then((read) => setLoad({ kind: 'read', read }))
@@ -218,7 +305,12 @@ export function TeamView({ api, onClosed }: { api: TeamApi; onClosed: () => void
   if (read.kind === 'gone') return <Notice title="Ese espacio ya no está disponible." />;
   return (
     <div data-testid="team" className="flex min-w-0 flex-col gap-4">
-      <TeamBody team={read.team} />
+      <TeamBody
+        team={read.team}
+        api={api}
+        onChanged={() => setAttempt((n) => n + 1)}
+        onClosed={onClosed}
+      />
     </div>
   );
 }

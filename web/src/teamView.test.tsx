@@ -8,7 +8,8 @@ import { me, view } from './test/fixtures';
 
 // "Equipo" through each door (J7-3; ADR 0023, decisions 4 and 5): Dirección's own team, as one more
 // tab of her views, and any space's from the administration, chosen at the top. The same view in
-// both; each door reads its own address. Read only: nothing changes the team yet.
+// both; each door reads its own address. Creating, renaming and archiving an area is in
+// `teamAreas.test.tsx` (J7-4).
 
 type Reply = { status: number; body?: unknown };
 
@@ -141,6 +142,7 @@ function team(overrides: Partial<Team> = {}): Team {
         despues: { nombre: 'Gestión' },
       },
     ],
+    tipos_de_evidencia: [],
     ...overrides,
   };
 }
@@ -174,9 +176,11 @@ function expectTheTeam() {
   expect(items[0]).toHaveTextContent('rol: Integrante → Referente');
   expect(items[1]).toHaveTextContent('Área nueva');
   expect(items[1]).toHaveTextContent('nombre: Gestión');
-  // Nothing to fix: no problems section, and nothing that edits the team.
+  // Nothing to fix: no problems section. Only the areas change from here (J7-4): an archived one
+  // offers nothing, and nobody is added or removed yet.
   expect(screen.queryByRole('region', { name: 'Lo que no cuadra' })).toBeNull();
-  expect(screen.queryByRole('button', { name: /agregar|dar de alta|archivar|editar/i })).toBeNull();
+  expect(within(areas.getByText('Depósito').closest('li') as HTMLElement).queryByRole('button')).toBeNull();
+  expect(screen.queryByRole('button', { name: /agregar|dar de alta|editar/i })).toBeNull();
 }
 
 afterEach(() => {
