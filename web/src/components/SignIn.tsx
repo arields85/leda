@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { insideTelegram } from '../telegram';
+import { insideTelegram, REOPEN_TEXT } from '../telegram';
 import { Notice } from './Notice';
 
 // Entering from a computer, or from a phone's browser outside Telegram (ADR 0024, decisions 4 and
@@ -148,7 +148,8 @@ export function SignIn({ door, space, onIn, phone = onAPhone() }: {
   if (inTelegram) {
     return (
       <Notice title="No se pudo abrir la sesión.">
-        <p className="m-0">Cerrá Leda y volvé a abrirla desde el chat de Telegram.</p>
+        {/* What to do, in plain words (MA-5): Telegram's «Cerrar» and the bot's menu button. */}
+        <p className="m-0">{REOPEN_TEXT[door]}</p>
       </Notice>
     );
   }

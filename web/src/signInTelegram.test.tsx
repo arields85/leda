@@ -35,7 +35,16 @@ describe('Telegram detection on the sign-in page', () => {
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);
     render(<SignIn door="equipo" space="corework" onIn={() => {}} phone />);
-    expect(await screen.findByText('Cerrá Leda y volvé a abrirla desde el chat de Telegram.')).toBeInTheDocument();
+    expect(await screen.findByText('Cerrá esta ventana con «Cerrar», arriba, y tocá «Mi espacio» otra vez.')).toBeInTheDocument();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('inside Telegram the administration door names its own button', async () => {
+    telegramOn('ios');
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    render(<SignIn door="administracion" space={null} onIn={() => {}} phone />);
+    expect(await screen.findByText('Cerrá esta ventana con «Cerrar», arriba, y tocá «Administración» otra vez.')).toBeInTheDocument();
     expect(fetcher).not.toHaveBeenCalled();
   });
 });

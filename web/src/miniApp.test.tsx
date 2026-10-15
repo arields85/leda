@@ -300,7 +300,7 @@ describe('the review of the MA', () => {
     fakeTelegram();
     const calls = serve({});
     render(<SignIn door="equipo" space="corework" onIn={() => {}} phone={false} />);
-    expect(await screen.findByText('Cerrá Leda y volvé a abrirla desde el chat de Telegram.')).toBeInTheDocument();
+    expect(await screen.findByText('Cerrá esta ventana con «Cerrar», arriba, y tocá «Mi espacio» otra vez.')).toBeInTheDocument();
     expect(calls).toHaveLength(0);
   });
 
