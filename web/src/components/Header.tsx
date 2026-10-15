@@ -6,7 +6,7 @@ interface HeaderProps {
   person?: string;
   /** The person's area, under the name (MA-4). */
   area?: string | null;
-  /** Under the title of "Mi equipo": the referente's area (MA-3), as data. */
+  /** Under the title of "Mi área": the referente's area (MA-3), as data. */
   subtitle?: string | null;
   /** Under the name and the area: "Cerrar sesión", only on the computer (MA-7). */
   signOut?: ReactNode;

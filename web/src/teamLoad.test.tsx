@@ -188,7 +188,7 @@ describe('what the requester sees', () => {
       'POST /app/api/tareas/t-modem/reabrir': { status: 200, body: { task_id: 't-modem', responsable_membership_id: 'm-marcos' } },
     });
     render(<App />);
-    const list = await screen.findByRole('region', { name: 'Lo que pediste' });
+    const list = await screen.findByRole('region', { name: 'Mis pedidos' });
     expect(within(list).getByText('[TERMINADA]')).toBeInTheDocument();
     expect(within(list).getByText('[EN CURSO]')).toBeInTheDocument();
     // The same words as the cards and the counters (MA-3): waiting, not "trabada"; not started.

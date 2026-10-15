@@ -729,10 +729,10 @@ def test_si_la_base_falla_la_persona_no_ve_nada_tecnico(web, conn, mundo, monkey
     assert "10.0.0.1" not in capsys.readouterr().out
 
 
-# --- MA-3: "Mi equipo" y "Sin empezar" (prueba del usuario en el iPhone) ------------------------
+# --- MA-3: "Mi área" y "Sin empezar" (prueba del usuario en el iPhone) ------------------------
 
 def test_mi_equipo_no_aparece_si_el_referente_no_tiene_a_nadie_a_cargo(web, conn, mundo):
-    """Sin nadie activo en sus áreas, "Mi equipo" quedaría vacía o con sus propias tareas: no hay
+    """Sin nadie activo en sus áreas, "Mi área" quedaría vacía o con sus propias tareas: no hay
     pestaña, y la vista se niega."""
     taylor = _persona(mundo, "Taylor Quinn")
     with admin(conn) as cur:

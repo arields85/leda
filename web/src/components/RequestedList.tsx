@@ -3,7 +3,7 @@ import { type ActionProblem, reopenTask, type Requested, SessionClosedError } fr
 import { INPUT, PRIMARY, SECONDARY, WARN } from '../admin/controls';
 import { shortDate } from '../format';
 
-const TITLE = 'Lo que pediste';
+const TITLE = 'Mis pedidos';
 
 /** How each state reads in the list, the same words as the cards and the counters (MA-3): a
  * blocked task is waiting for something ("trabada" is no longer said). */

@@ -525,7 +525,7 @@ def tareas(request: Request, vista: str = "tus", area: str | None = None):
             return _vista_de_areas(areas, area_de, area, filas, esperas, terminadas, calendario,
                                    ahora)
         if vista == "sector":
-            # "Mi equipo" es la gente a su cargo, nunca sus propias tareas, que ya están en "Mis
+            # "Mi área" es la gente a su cargo, nunca sus propias tareas, que ya están en "Mis
             # tareas" (MA-3): ni las abiertas ni las terminadas.
             filas = [f for f in filas if f["papel"] != "mia"]
             nombre = persona["nombre"] if persona else None
