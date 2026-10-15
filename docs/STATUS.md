@@ -40,7 +40,7 @@ La unidad en curso es [`../odd/tasks/plataforma-jerarquias.md`](../odd/tasks/pla
 [ADR 0024](decisions/0024-entrar-con-telegram.md).
 
 **Hecho:** J1, J2, J3, J4 y la MA, cerradas (la MA y la J4, el 2026-10-15 a la madrugada, con la prueba de cierre
-del usuario: MA-4 a MA-6, detalle y commits en el documento de la unidad). `leda_motor` en la `0076` (último
+del usuario: MA-4 a MA-6, detalle y commits en el documento de la unidad). **Noche del 2026-10-15, sola:** MA-7, la ronda real de la 50 y la 55 (10 de 10), las deudas de la MA (falta la ortografía con la IA real), las preguntas de la J7 y el ensayo de propiedad (abrió la T8), todo con RDD y subido; en curso, "Lenguaje" (lo claro). Lista de la noche y su avance: el documento de la unidad. `leda_motor` en la `0076` (último
 respaldo `db/respaldos/leda_motor-antes-0076-20261014.dump`).
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si no responde aunque `pg_ctl
