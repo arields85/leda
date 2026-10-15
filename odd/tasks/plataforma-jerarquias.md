@@ -1432,6 +1432,23 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         línea "antes había pedido…" (cambiado por la regla general de los avisos, J6-D4). Nunca se decide sobre un
         pedido viejo.
       Con esto, las decisiones de la J5 están completas.
+      **Plan en porciones** (planificador de sólo lectura, 2026-10-15, noche; las preguntas que dejó abiertas
+      están en "Para decidir al despertar", "J5: lo que las decisiones no alcanzan a fijar"):
+      - **S0.** ADR 0025 (enmienda el 0018, 9a y 9i: una fecha más tarde deja de anotarse sola; y el 0022,
+        decisiones 8 y 9), propuesta hasta que la acepte el usuario.
+      - **S1.** Conversaciones de prueba primero: 56 (pedir más tiempo por el propio trabajo), 57 (el motivo es
+        de otro: los dos botones), 58 (quien decide se la cambia a sí mismo, con vista previa), 59 (pasa la
+        fecha del objetivo), 60 (no aceptado, con motivo), 61 (un pedido nuevo reemplaza al pendiente), 62
+        (cambio de fecha directo); reescribir la 02 y revisar las doce que usan `anotar_prevision`.
+      - **S2.** La base: el cambio de fecha auditado (`cambio_de_fecha`, con el molde de
+        `cambio_de_responsable`); hoy `bloquear_estado_directo` no deja cambiar la fecha.
+      - **S3.** El pedido con su estado, la previsión aceptada y la fecha prevista de los objetivos.
+      - **S4.** "En qué afecta", una sola regla en la base para el chat y la web.
+      - **S5.** "> aceptar la demora" en los objetivos (web; decisiones 5 a 7).
+      - **S6.** "> cambiar la fecha" directo (J5-D5).
+      - **S7 a S9.** El chat: pedir más tiempo, el motivo de otro y los dos botones, decidir y lo que sigue.
+      - **S10 y S11.** La web: los dos botones de quien la hace y el bloque de decisión del referente.
+      - **S12.** Rondas con la IA real de las conversaciones tocadas, la prueba en el celular y RDD por commit.
 
 - [ ] **J6 · La propuesta del integrante** (sólo el integrante propone; Dirección y los referentes crean
       directo).
