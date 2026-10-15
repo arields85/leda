@@ -1636,13 +1636,13 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
     `pytest -q tests/motor`, 1493 passed; `pytest -q tests/conversaciones`, 231 passed; el resto de
     `tests/*.py`, 824 passed y 1 failed (`test_bloqueos.py`, reescrita: 14 passed); `correr --ia guionada
     --veces 1` (en seco), 54 de 54 bien. `db/pruebas.sql` no se corrió. Revisión RDD: pendiente.
-
       RDD aprobada por commit: T8 (`81bd7f0d`), `review-9d14e51631b3b100` (advertencia: el rollback de la 0078 sobre
       una instalación limpia le sacaría privilegios que ésta espera; los rollbacks se usan sobre bases migradas);
       el grafo (`36c6120a`), `review-32c808e9334f970d`, con una **advertencia que se arregla**: varios eventos de la
       misma tarea en una sola sentencia se comparan todos contra el estado de antes de la sentencia, así que dos
       saltos desde el mismo estado pasarían (por ejemplo, cancelar y seguir en la misma sentencia). Arreglo:
       comparar contra el último evento de la tarea, que dentro de la misma sentencia sí se ve.
+
 ## De qué se parte en cada porción (explorador de sólo lectura, 2026-10-13)
 
 Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de base para no arrancar de cero".
