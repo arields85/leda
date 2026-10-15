@@ -348,5 +348,7 @@ def test_el_dato_para_la_compu_es_un_booleano_de_la_jugada():
     from leda.motor.ia_real import DATOS
 
     tipo, descripcion = DATOS["para_la_compu"]
-    assert tipo == "boolean" and "computadora" in descripcion
+    assert tipo == "boolean" and "computadora sin Telegram" in descripcion
+    # Un hecho, sin frases de ejemplo (MA-5).
+    assert not re.search(r"[\"“”«»]", descripcion)
     assert "para_la_compu" in FICHAS["pedir_acceso_web"].opcional
