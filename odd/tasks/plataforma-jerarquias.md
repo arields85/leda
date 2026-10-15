@@ -1786,18 +1786,27 @@ ejemplo y recomendación, y sigue con otra cosa.
   y técnico. *Recomendación:* «Uy, no pude contestarte ahora. Ya avisé para que lo revisen; probá de nuevo en un
   rato.» (la constitución §10 pide un mensaje humano y genérico, y lo cumple). Alternativa: lo mismo sin "probá
   de nuevo".
-- **«Mi espacio» cuando Telegram no fijó el botón del menú** (advertencia de RDD de la MA-5). Ante "quiero ver
+- **«Mi espacio» cuando Telegram no fijó el botón del menú** — **DECIDIDO (usuario, 2026-10-15): la
+  recomendación** (el botón debajo del mensaje sólo en ese caso). (Advertencia de RDD de la MA-5). Ante "quiero ver
   mis tareas", Leda contesta que toque «Mi espacio», el botón fijo del menú, sin botón en el mensaje (tu
   decisión del 14/10). Si al arrancar Telegram no aceptó fijar ese botón (queda un incidente), Leda igual lo
   nombra y la persona no lo encuentra. *Recomendación:* cuando el botón del menú no se pudo fijar, Leda manda
   el botón «Mi espacio» debajo del mensaje, como excepción. Es raro (pasa sólo si falla Telegram o falta la
   dirección pública), por eso no se construyó sin preguntarte.
-- **Cuánto dura la sesión de administración en la compu** (deuda de la MA). Hoy no vence nunca: quien entró a
+- **Cuánto dura la sesión de administración en la compu** — **DECIDIDO (usuario, 2026-10-15): 12 horas sin
+  uso por omisión, configurable desde la plataforma de administración** (inventario en
+  `docs/product/plataforma-pendientes.md`). (Deuda de la MA). Hoy no vence nunca: quien entró a
   la administración desde una compu sigue adentro hasta que toca «Cerrar sesión». La del equipo dura lo que
   elige el administrador para cada equipo. *Recomendación:* que la de administración venza sola a las 12 horas
   sin uso, porque desde ahí se cargan tareas y objetivos de cualquier espacio. Ejemplo: Ariel entra a la
   administración a la mañana, se olvida la compu abierta y a la noche ya pide el QR de nuevo.
-- **Grafo de transiciones de estado** (tarea agregada el 15/10; un explorador mapeó el código). Hoy nada
+- **Grafo de transiciones de estado** — **CONTESTADO (usuario, 2026-10-15):** 1. cancelar, sólo quien la
+  pidió (o su referente) y Dirección, con motivo obligatorio, desde cualquier estado menos "terminada"; si el
+  responsable cree que no tiene sentido, Leda se lo plantea a quien decide; 2. reabrir una terminada, sí, las
+  mismas personas, con motivo y aviso al responsable; 3. **deshacer "la empecé", siempre y sin límite de tiempo**
+  (usuario: "si dice que no la empezó, no la empezó. Es la realidad"; el margen de 10 minutos que recomendaba el
+  agente era burocrático); 4. los estados de los objetivos, cuando se construya cerrar un objetivo (`ROADMAP.md`).
+  Lo de abajo es la pregunta tal como se hizo. (Tarea agregada el 15/10; un explorador mapeó el código). Hoy nada
   impide que una tarea pase de cualquier estado a cualquier otro por la herramienta `actualizar_estado`
   (aunque la conversación sólo la usa para "empecé" y para deshacerlo). Esta noche se construye sólo lo que la
   mecánica §3 ya dice: el estado de partida anotado tiene que ser el real, de "cancelada" no se sale, y al

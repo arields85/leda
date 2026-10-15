@@ -60,6 +60,7 @@ paquete del espacio y la consola hasta la segunda versión.
 | Qué | Hoy | Referencia |
 |---|---|---|
 | Proveedor y modelo de lenguaje, con el cambio atribuido | `python -m leda modelo <id> --proveedor <p>` (escribe `model_config`) | ROADMAP, "Panel de plataforma" |
+| Cuánto dura sin uso la sesión de administración en la compu | No vence: sigue abierta hasta «Cerrar sesión» | Decisión del usuario (2026-10-15): 12 horas sin uso por omisión, configurable desde la plataforma de administración (deuda de la MA, `odd/tasks/plataforma-jerarquias.md`) |
 | Dónde vive la clave de cada proveedor | Una sola `LEDA_LLM_API_KEY` en `.env`, leída al arrancar | `PENDIENTE` |
 | Modelo por espacio (`model_config` ya lo admite) | Sin superficie | `PENDIENTE` |
 | **Importante (pedido del usuario, 2026-10-03).** Elegir el modelo y fijar el tope de salida de cada modelo (`tope_conduccion` para el alta, `tope_ruteo` para el ruteo), para los modelos que razonan por dentro antes de responder | A mano en `model_config.parametros` (rama `feat/flujo-de-un-mensaje`); Gemini 3.8 flash: 4000 y 3000; sin valor, 700 y 512 | Hallazgo del 2026-10-03: con el tope fijo de 700, Gemini gastaba todo en razonar y no respondía. Más tope permite razonar más y puede costar latencia: medirlo por modelo (tarea 0-24 de la rama de flujo) |
