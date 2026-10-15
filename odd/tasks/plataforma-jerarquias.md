@@ -1588,12 +1588,13 @@ ejemplo y recomendación, y sigue con otra cosa.
   si la empezaste, para cuándo la terminás o si está trabada.» Sale de un código interno que la IA copia tal
   cual (`si_esta_trabada`), igual que pasó con "previsión"; hay 64 nombres de datos más con "trab" o "bloque"
   que le llegan a la IA, y lo mismo dicen la bienvenida («si algo te está trabando»), el historial de la tarea
-  en la web («Se trabó: …», «Se destrabó el …») y el tablero («Bloqueos abiertos»). Candidatas: **"frenada"**
-  («¿algo te está frenando?», «ya puede seguir», «Se frenó: falta el repuesto») o **"parada"**. En la web ya se
-  decidió «ESPERANDO» para el estado (MA-3), pero en el chat "espera" ya quiere decir "espera otra tarea" o
-  "espera la revisión", y se confundiría. *Recomendación:* "frenada" en el chat y en los textos, y «ESPERANDO»
-  sólo como etiqueta del estado en la web. Con la respuesta, se renombran los datos en el borde de la redacción
-  (como "previsión"), se reescriben sus explicaciones, una prueba impide que vuelvan, y una ronda con la IA real
+  en la web («Se trabó: …», «Se destrabó el …») y el tablero («Bloqueos abiertos»). Lo que ya decidiste (J5-D1,
+  14/10): "trabado" no deja claro que depende de otra cosa; la web dice «Esperando el cable (Mariano)» y el
+  botón es «> Me falta algo para seguir». Falta la forma en el chat. *Recomendación:* la misma idea que la web,
+  decir qué falta y quién se ocupa: «¿te falta algo para seguir?», «está esperando el cable, que consigue
+  Mariano», «ya puede seguir». Se descartó "frenada" (era la primera idea del agente): tampoco dice que
+  depende de otro. Con la respuesta, se renombran los datos en el borde de la redacción (como "previsión"), se
+  reescriben sus explicaciones, una prueba impide que vuelvan, y una ronda con la IA real
   lo comprueba. Mientras tanto se arregla sólo lo que no depende de la palabra.
 - **El mensaje cuando la IA falla** (tarea "Lenguaje"). Hoy, si la IA no responde, la persona recibe: «Tuve un
   problema y no pude responder tu mensaje. Ya quedó registrado para que lo revise un administrador.» Suena frío
