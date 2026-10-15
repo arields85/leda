@@ -1722,7 +1722,10 @@ ejemplo y recomendación, y sigue con otra cosa.
   título "└─ te la pidió Marcos Tarquini", chico y gris, como el "└─ de Ariel · te espera". Sólo en sus propias
   tareas, sólo si la pidió otra persona, y con el nombre entero. *Recomendación:* dejarlo así; si se prefiere
   el nombre corto ("te la pidió Marcos") o que diga también el área, es un cambio chico.
-- **Lenguaje: qué palabra reemplaza a "trabada" y "bloqueada"** (tarea "Lenguaje"; un explorador midió las
+- **Lenguaje: qué palabra reemplaza a "trabada" y "bloqueada"** — **DECIDIDO (usuario, 2026-10-15, "si"):
+  la recomendación. En lo que ve la persona, decir qué falta y quién se ocupa («¿te falta algo para seguir?»,
+  «está esperando el cable, que consigue Mariano», «ya puede seguir»); los nombres internos no cambian.
+  En curso: tarea "Lenguaje (porción 2)".** (Tarea "Lenguaje"; un explorador midió las
   rondas del 14/10). Leda dijo "trabada" 25 veces, todas en "cómo vienen tus tareas" (conversación 55): «Contame
   si la empezaste, para cuándo la terminás o si está trabada.» Sale de un código interno que la IA copia tal
   cual (`si_esta_trabada`), igual que pasó con "previsión"; hay 64 nombres de datos más con "trab" o "bloque"
