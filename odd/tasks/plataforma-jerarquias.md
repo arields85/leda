@@ -1452,7 +1452,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         escribe la función que lo use (S6). Quién puede cambiar una fecha y la fecha del objetivo quedan
         para la S6. Evidencia: `pytest tests/garantias/test_cambio_de_fecha.py test_migraciones.py
         test_capacidades.py test_aislamiento.py`, 42 passed (antes, en rojo: 10 de las 15 nuevas);
-        `pytest tests/garantias`, 1124 passed (22 min).
+        `pytest tests/garantias`, 1124 passed (22 min). RDD aprobada, `review-36dd84fc5a98440e`; advertencia: "ya
+        pasó" se mide contra el `at` que trae la fila (el reloj de Leda, como el resto de los eventos), así que
+        quien escribe la fila lo fija; la S6 lo pasa siempre desde `reloj.ahora()`.
       - **S3.** El pedido con su estado, la previsión aceptada y la fecha prevista de los objetivos.
       - **S4.** "En qué afecta", una sola regla en la base para el chat y la web.
       - **S5.** "> aceptar la demora" en los objetivos (web; decisiones 5 a 7).
