@@ -102,7 +102,11 @@ viejo corriendo.
    - RDD por commit, sobre una copia en LF si hace falta;
    - la ronda con la IA real de lo que haya cambiado;
    - el usuario reinicia el escuchador y repite la prueba de la MA (`docs/product/guion-celular-ma.md`).
-3. **Prueba de la MA:** el usuario sólo tiene a Ariel en el celular. Marcos e Ismael se prueban en Telegram de
+3. **Próximo paso al retomar:** la **MA-4**, con los ajustes del usuario tras probar MA-2 y MA-3 ("muy bueno como
+   quedó"). Los seis puntos están en el documento de la unidad, nota "Prueba de MA-2 y MA-3". No se empezó: el
+   usuario pidió hacerla en la sesión siguiente. Después, la ronda con la IA real de las conversaciones 50 y 55, y
+   una última mirada del usuario para cerrar la MA y la J4.
+4. **Prueba de la MA:** el usuario sólo tiene a Ariel en el celular. Marcos e Ismael se prueban en Telegram de
    escritorio, donde el botón tiene que abrir el navegador. En el QR entra la cuenta que lo escanea.
    - Probado con Ariel: el botón del menú y la Mini App andan, y el detalle de la tarea se abrió (con el estilo
      viejo, ya en corrección).
