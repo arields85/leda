@@ -1262,9 +1262,20 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       tiempo que elige el administrador para cada equipo (cerrar la pestaña no la cierra; opción A), y vuelve
       un **botón "Cerrar sesión" sólo en la compu**, debajo del nombre y el área de arriba a la derecha; nunca
       en la Mini App. Es la **MA-7**, para la próxima sesión (no se empezó).
-- [ ] **MA-7 · "Cerrar sesión" en la compu** (decisión de arriba). Reusar `/app/salir` y `/app/admin/salir`, que
+- [x] **MA-7 · "Cerrar sesión" en la compu** (decisión de arriba). Reusar `/app/salir` y `/app/admin/salir`, que
       siguen en el servidor; borrar el `SignOut` sin uso; también en la administración en la compu. Prueba
       primero (vitest: se ve en el navegador, no en la Mini App), RDD y la mirada del usuario cuando esté.
+      **Hecha (2026-10-15; escritor delegado):** `f89f5599`. El `SignOut` pasó a ser el "Cerrar sesión" del
+      encabezado, debajo del nombre y el área, chico y gris, con su confirmación ("Para volver a entrar vas a
+      tener que escanear el código otra vez." · "no, seguir" / "sí, cerrar") y su aviso si falla; en la página
+      del equipo y en la administración (el "salir" del pie de la administración se fue). Nunca adentro de
+      Telegram (`insideTelegram()`, en las dos puertas: desde ahí no se puede escanear el QR). Después de
+      cerrar, la página del equipo dice "Cerraste la sesión." con la entrada por Telegram, igual que la
+      administración. Prueba primero: `web/src/ma7.test.tsx` (8 casos) y los de MA-3, MA-4 y `AdminApp`
+      ajustados; RED observado (7 fallas), después `npm test` 338 passed y 30 archivos, `npm run build` bien
+      (`web/dist` no está en Git). Pendiente: RDD y la mirada del usuario en la compu. El comentario de
+      `web/src/components/Footer.tsx` todavía dice que la sesión de la compu se cierra por chat: corregirlo
+      en la próxima porción que toque la web.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
