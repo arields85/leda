@@ -1273,9 +1273,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       cerrar, la página del equipo dice "Cerraste la sesión." con la entrada por Telegram, igual que la
       administración. Prueba primero: `web/src/ma7.test.tsx` (8 casos) y los de MA-3, MA-4 y `AdminApp`
       ajustados; RED observado (7 fallas), después `npm test` 338 passed y 30 archivos, `npm run build` bien
-      (`web/dist` no está en Git). Pendiente: RDD y la mirada del usuario en la compu. El comentario de
-      `web/src/components/Footer.tsx` todavía dice que la sesión de la compu se cierra por chat: corregirlo
-      en la próxima porción que toque la web.
+      (`web/dist` no está en Git). El comentario de `web/src/components/Footer.tsx` se corrigió en `e8b81a99`.
+      RDD aprobada, `review-07077f99f348d3fc` (un WARNING: no hay prueba de volver a entrar después de cerrar,
+      `web/src/App.tsx:275-278`; va con las deudas de la MA). Pendiente: la mirada del usuario en la compu.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
