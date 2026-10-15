@@ -21,6 +21,7 @@
     --line-strong: rgba(236, 235, 230, 0.30);
     --wait: #e3a27a;
     --doing: #9cc7a4;
+    --late: #e5877d;
     --gutter: 16px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -59,7 +60,34 @@
   .hero h2 { font-size: 38px; line-height: 44px; font-weight: 600; letter-spacing: -0.02em; }
   .hero h2 em { font-style: normal; color: var(--wait); }
   .hero .why { margin-top: 6px; font-size: 16px; line-height: 22px; color: var(--ink-soft); }
-  .hero .count { margin-top: 6px; font-size: 14px; line-height: 20px; color: var(--ink-mute); }
+  .tally {
+    display: flex; margin: 16px var(--gutter) 0; list-style: none;
+    background: var(--raised); border: 1px solid var(--hair); border-radius: 12px; overflow: hidden;
+  }
+  .tally li { flex: 1 1 auto; min-width: 0; }
+  .tally button {
+    display: flex; flex-direction: column; gap: 2px; width: 100%; height: 100%;
+    padding: 10px 7px 10px 9px; white-space: nowrap; text-align: left;
+  }
+  .tally button:hover:not(:disabled) { background: rgba(236, 235, 230, 0.04); }
+  .tally button[aria-pressed="true"] { background: rgba(236, 235, 230, 0.09); }
+  .tally button[aria-pressed="true"] span { color: var(--ink); font-weight: 600; }
+  .tally button:disabled { cursor: default; }
+  .listhead { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px 8px; }
+  .listhead h3 { padding: 0; }
+  .listhead .all { font-size: 14px; line-height: 20px; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
+  .listhead .all:hover { color: var(--ink); }
+  .group li[hidden] { display: none; }
+  .group li.first { border-top: 0; }
+  .tally li + li { border-left: 1px solid var(--hair); }
+  .tally b { font-size: 22px; line-height: 26px; font-weight: 600; color: var(--ink-mute); }
+  .tally span { font-size: 12px; line-height: 14px; color: var(--ink-mute); }
+  .tally .late b { color: var(--late); }
+  .tally .idle b { color: var(--ink); }
+  .tally .doing b { color: var(--doing); }
+  .tally .wait b { color: var(--wait); }
+  .tally .review b { color: var(--ink); }
+  .tally .zero b { color: var(--ink-mute); opacity: 0.6; }
 
   .week { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 20px var(--gutter) 0; }
   .day {
@@ -124,7 +152,6 @@
   <section class="hero" aria-label="Resumen">
     <h2><em>1</em> vence mañana</h2>
     <p class="why">Pedir el plano rev. C · falta la firma de Ismael</p>
-    <p class="count">3 abiertas · 1 esperando</p>
   </section>
 
   <section class="week" aria-label="Esta semana">
@@ -134,22 +161,35 @@
     <div class="day is-today" aria-current="date">jue<b>15</b><small>hoy</small></div>
     <div class="day">vie<b>16</b><small class="due">1 vence</small></div>
   </section>
+  <ul class="tally" aria-label="Mostrar tus tareas por estado">
+    <li class="late zero"><button data-f="late" aria-pressed="false" disabled><b>0</b><span>Vencidas</span></button></li>
+    <li class="idle"><button data-f="idle" aria-pressed="false"><b>1</b><span>Sin empezar</span></button></li>
+    <li class="doing"><button data-f="doing" aria-pressed="false"><b>1</b><span>En curso</span></button></li>
+    <li class="wait"><button data-f="wait" aria-pressed="false"><b>1</b><span>Esperando</span></button></li>
+    <li class="review"><button data-f="review" aria-pressed="false"><b>1</b><span>Entregadas</span></button></li>
+  </ul>
 
   <main>
+    <div class="listhead"><h3>Abiertas</h3><button class="all" hidden>Ver todas</button></div>
     <ol class="group" aria-label="Abiertas">
-      <li><button class="task">
+      <li data-estado="wait"><button class="task">
         <span class="t">Pedir el plano rev. C</span><span class="d">vie 16/10</span>
         <span class="s wait">esperando</span>
         <span class="x">Falta la firma de Ismael; se ocupa Ismael.</span>
       </button></li>
-      <li><button class="task">
+      <li data-estado="doing"><button class="task">
         <span class="t">Revisar el tablero</span><span class="d">lun 19/10</span>
         <span class="s doing">en curso</span>
       </button></li>
-      <li><button class="task">
+      <li data-estado="idle"><button class="task">
         <span class="t">Calibrar el sensor</span><span class="d">jue 22/10</span>
         <span class="s idle">sin empezar</span>
         <span class="x">Te la pidió Martín Forte.</span>
+      </button></li>
+      <li data-estado="review"><button class="task">
+        <span class="t">Cablear el tablero 2</span><span class="d">mar 13/10</span>
+        <span class="s idle">entregada</span>
+        <span class="x">La revisa Ismael.</span>
       </button></li>
     </ol>
 
@@ -173,5 +213,33 @@
         Lo que pedí
       </a>
     </nav>
+<script>
+  (() => {
+    const buttons = [...document.querySelectorAll('.tally button')];
+    const rows = [...document.querySelectorAll('main .group > li[data-estado]')];
+    const head = document.querySelector('.listhead h3');
+    const all = document.querySelector('.listhead .all');
+    let current = null;
+    function show(filter) {
+      current = filter;
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.f === filter)));
+      let first = true;
+      rows.forEach((r) => {
+        const visible = filter
+          ? r.dataset.estado === filter || (filter === 'late' && r.dataset.vencida === 'si')
+          : r.dataset.estado !== 'review';
+        r.hidden = !visible;
+        r.classList.toggle('first', visible && first);
+        if (visible) first = false;
+      });
+      const b = buttons.find((x) => x.dataset.f === filter);
+      head.textContent = b ? b.querySelector('span').textContent : 'Abiertas';
+      all.hidden = !filter;
+    }
+    buttons.forEach((b) => b.addEventListener('click', () => show(current === b.dataset.f ? null : b.dataset.f)));
+    all.addEventListener('click', () => show(null));
+    show(null);
+  })();
+</script>
 </body>
 </html>

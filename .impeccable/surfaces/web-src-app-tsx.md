@@ -36,6 +36,22 @@ FORM: «El pizarrón» (candidato 3 de la lista propia de la ronda 3, asignado p
 usuario; seed key 71b06f5b.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
 
+## Decidido con el usuario (2026-10-15, noche)
+
+- **Orden de la pantalla:** resumen grande (lo más urgente), semana, contadores (Vencidas · Sin empezar · En curso ·
+  Esperando · Entregadas) y la lista. Tocar un contador filtra la lista a ese estado; tocarlo de nuevo, todas. Un
+  contador en cero no se toca. Vencidas va en coral (`#e5877d`); el número toma color sólo si no es cero.
+- **Qué va en el resumen grande** (gana el primero que exista): 1. una vencida (la más atrasada: «1 vencida desde
+  el lunes»); 2. alguien te espera para seguir (una entrega a revisar, una firma, algo tuyo que frena a otro:
+  «Marcos espera tu firma»); 3. vence hoy o el próximo día hábil («1 vence mañana»); 4. una tuya lleva días esperando
+  algo de otro; 5. si no hay nada, la buena noticia («Nada vence esta semana»). Varias del mismo nivel: la cifra las
+  cuenta y el texto nombra la más urgente. Sale siempre de datos de la cocina.
+- **La lista:** sin filtro («Abiertas», el título chico arriba de la lista) van las que la persona tiene que mover
+  (sin empezar, en curso, esperando), en el mismo orden de urgencia que el resumen grande, así su primera fila es lo
+  que está en grande. Las entregadas (esperan la aprobación de otro) no van ahí: se ven sólo al tocar su contador
+  (opción B). Con un filtro: sólo ese estado, por fecha (vencidas: la más atrasada primero, en cualquier estado). El
+  título pasa a ser el del filtro, con «Ver todas». «Terminadas esta semana» queda siempre abajo.
+
 ## Pendiente
 
 - Ajustes que el usuario va a seguir pidiendo (dijo "vamos por buen camino, tenemos que seguir haciendo
