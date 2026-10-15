@@ -78,9 +78,11 @@ PERMITIDOS: dict[str, set[str] | None] = {
     "entrar_con_telegram": {"CODIGO", "PUERTA_DE_ADMINISTRACION", "PUERTA_DEL_EQUIPO",
                             "es_un_uuid", "aprobar_pedido", "ver_pedido"},
     # El botón del menú de cada bot, al arrancar el escuchador (ADR 0024; `menu_del_bot`).
-    # Desde la MA-2, el incidente va por `registrar_sin_fallar`, con la causa real.
+    # Desde la MA-2, el incidente va por `registrar_sin_fallar`, con la causa real. Desde la MA-5,
+    # `fichas` lee el texto del botón ("Mi espacio") para el hecho que le dice a la persona cómo
+    # abrir su espacio.
     "menu_del_bot": {"SLUG_DE_LA_ADMINISTRACION", "fijar_el_menu", "causa_de_la_falla",
-                     "registrar_sin_fallar"},
+                     "registrar_sin_fallar", "TEXTO_DEL_EQUIPO"},
 }
 
 # Los módulos de los flujos A y B, borrados en la E3-4, por si volvieran. La escalera, el reloj
