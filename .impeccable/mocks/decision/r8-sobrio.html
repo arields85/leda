@@ -368,12 +368,17 @@
       ctx.clearRect(0, 0, w, h);
       const ox = t * 0.000045, oy = -t * 0.00003;
       for (const d of dots) {
-        // The cloud drifts; a soft bias keeps more light toward the top, as in the reference.
-        let n = fbm(d.x * 0.0085 + ox, d.y * 0.0085 + oy) + 0.18 * (1 - d.y / h) - 0.12;
-        const edge = 0.42 + 0.22 * d.th;
+        // The field lives in the lower part: nothing above a third, denser toward the bottom edge.
+        // The noise keeps drifting, so the ragged border undulates without leaving that zone.
+        const yy = d.y / h;
+        const low = yy < 0.33 ? 0 : Math.min(1, (yy - 0.33) / 0.47);
+        if (low === 0) continue;
+        const env = low * low * (3 - 2 * low);
+        let n = 0.62 * fbm(d.x * 0.008 + ox, d.y * 0.008 + oy) + 0.78 * env - 0.12;
+        const edge = 0.36 + 0.24 * d.th;
         if (n < edge) continue;
-        const k = Math.min(1, (n - edge) / 0.3);
-        const size = 0.5 + (0.6 + 0.9 * d.sz) * k * 1.6;
+        const k = Math.min(1, (n - edge) / 0.32);
+        const size = 0.5 + (0.6 + 0.9 * d.sz) * k * (1.3 + 0.8 * env);
         ctx.fillStyle = `rgba(232, 232, 230, ${(0.05 + 0.13 * k).toFixed(3)})`;
         ctx.fillRect(d.x - size / 2, d.y - size / 2, size, size);
       }
