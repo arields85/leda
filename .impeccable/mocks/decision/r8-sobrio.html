@@ -339,6 +339,7 @@
     const STEP = 7;
     // ?invertir shows the inverted version: dark dots on a lighter screen.
     const INVERT = location.search.includes('invertir');
+    const LIGHT = location.search.includes('claros');
     let w = 0, h = 0, dots = [];
     // Stable per-dot randomness: the dithering threshold and a size bias, like a printed halftone.
     function rand(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
@@ -398,8 +399,12 @@
           ctx.fillRect(d.x - dark / 2, d.y - dark / 2, dark, dark);
           continue;
         }
-        ctx.fillStyle = `rgba(232, 232, 230, ${(0.05 + 0.13 * k).toFixed(3)})`;
-        ctx.fillRect(d.x - size / 2, d.y - size / 2, size, size);
+        // Dark dots by default (the user's choice); ?claros shows the light ones.
+        ctx.fillStyle = LIGHT
+          ? `rgba(232, 232, 230, ${(0.05 + 0.13 * k).toFixed(3)})`
+          : `rgba(4, 4, 5, ${(0.45 + 0.5 * k).toFixed(3)})`;
+        const s2 = LIGHT ? size : size * 1.15 + 0.3;
+        ctx.fillRect(d.x - s2 / 2, d.y - s2 / 2, s2, s2);
       }
     }
     let raf = 0, last = 0;
