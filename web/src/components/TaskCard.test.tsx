@@ -75,7 +75,7 @@ describe('TaskCard', () => {
     );
     expect(container.textContent).not.toMatch(/VENCIDA|ESPERANDO|TRABADA|espera:|prevé/);
     expect(container.innerHTML).not.toMatch(/text-(vencida|trabada)/);
-    expect(screen.getByText('[ASIGNADA]')).toHaveClass('text-ink-dim');
+    expect(screen.getByText('[SIN EMPEZAR]')).toHaveClass('text-ink-dim');
     expect(screen.getByText('19.10')).toBeInTheDocument();
     expect(screen.getByText('└─ de Ariel · la esperás')).toBeInTheDocument();
   });

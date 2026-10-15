@@ -179,6 +179,10 @@ describe('what the requester sees', () => {
             area: 'Automatización', fecha_objetivo: '2026-10-16', terminada_el: '2026-10-22', puede_pedir_cambios: true },
           { id: 't-rack', titulo: 'Medir el rack', estado: 'en_curso', responsable: 'Marcos',
             area: 'Automatización', fecha_objetivo: '2026-10-30', terminada_el: null, puede_pedir_cambios: false },
+          { id: 't-cable', titulo: 'Pasar el cable', estado: 'bloqueada', responsable: 'Marcos',
+            area: 'Automatización', fecha_objetivo: '2026-10-30', terminada_el: null, puede_pedir_cambios: false },
+          { id: 't-caja', titulo: 'Abrir la caja', estado: 'asignada', responsable: 'Marcos',
+            area: 'Automatización', fecha_objetivo: '2026-10-30', terminada_el: null, puede_pedir_cambios: false },
         ],
       })),
       'POST /app/api/tareas/t-modem/reabrir': { status: 200, body: { task_id: 't-modem', responsable_membership_id: 'm-marcos' } },
@@ -187,6 +191,9 @@ describe('what the requester sees', () => {
     const list = await screen.findByRole('region', { name: 'Lo que pediste' });
     expect(within(list).getByText('[TERMINADA]')).toBeInTheDocument();
     expect(within(list).getByText('[EN CURSO]')).toBeInTheDocument();
+    // The same words as the cards and the counters (MA-3): waiting, not "trabada"; not started.
+    expect(within(list).getByText('[ESPERANDO]')).toBeInTheDocument();
+    expect(within(list).getByText('[SIN EMPEZAR]')).toBeInTheDocument();
     expect(within(list).getAllByRole('button', { name: '> pedir cambios' })).toHaveLength(1);
     fireEvent.click(within(list).getByRole('button', { name: '> pedir cambios' }));
     fireEvent.change(within(list).getByLabelText('Qué hay que cambiar'), { target: { value: 'Quedó torcido' } });

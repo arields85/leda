@@ -51,11 +51,12 @@ export const STATE_TEXT: Record<Marca, string> = {
   entregada: 'text-entregada',
 };
 
-// A task without a colored state shows its plain state in gray.
+// A task without a colored state shows its plain state in gray. An assigned task reads as the
+// counters say it (MA-3): not started.
 const PLAIN_STATES: Record<string, string> = {
   propuesta: 'PROPUESTA',
   pendiente_aprobacion: 'POR APROBAR',
-  asignada: 'ASIGNADA',
+  asignada: 'SIN EMPEZAR',
 };
 
 export interface StateLabel {

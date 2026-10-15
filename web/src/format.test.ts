@@ -17,7 +17,7 @@ describe('format', () => {
       { text: '[VENCIDA +2d]', marca: 'vencida' },
     ]);
     expect(stateLabels(task({ marcas: [], estado: 'asignada' }))).toEqual([
-      { text: '[ASIGNADA]', marca: null },
+      { text: '[SIN EMPEZAR]', marca: null },
     ]);
   });
 });

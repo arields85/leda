@@ -5,11 +5,12 @@ import { shortDate } from '../format';
 
 const TITLE = 'Lo que pediste';
 
-/** How each state reads in the list, the same words as the cards. */
+/** How each state reads in the list, the same words as the cards and the counters (MA-3): a
+ * blocked task is waiting for something ("trabada" is no longer said). */
 const STATE: Record<string, string> = {
-  asignada: 'asignada',
+  asignada: 'sin empezar',
   en_curso: 'en curso',
-  bloqueada: 'trabada',
+  bloqueada: 'esperando',
   en_revision: 'entregada',
   terminada: 'terminada',
 };

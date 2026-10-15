@@ -25,12 +25,14 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 # Los estados de una tarea, como los dice una persona.
+# A blocked task is waiting for something: the same word as the web's cards and counters (MA-3,
+# "trabada" is no longer said).
 ESTADOS = {
     "propuesta": "propuesta",
     "pendiente_aprobacion": "esperando que la aprueben para empezar",
     "asignada": "asignada, sin empezar",
     "en_curso": "en curso",
-    "bloqueada": "trabada",
+    "bloqueada": "esperando",
     "en_revision": "en revisión",
     "terminada": "terminada",
     "cancelada": "cancelada",
