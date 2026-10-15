@@ -1674,9 +1674,49 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         vieja de un área (`importador.py:635-642`), un camino de la confirmación sin prueba propia y el
         reintento con la misma clave en la web sin prueba). `leda_motor` en la `0083` (respaldo
         `db/respaldos/leda_motor-antes-0083-20261015.dump`, ensayada en una copia).
-      - **J7-5** · alta (`0084`): `dar_de_alta`, «> copiar el enlace de activación», "sin conectar", reactivar a
+      - [x] **J7-5** · alta (`0084`): `dar_de_alta`, «> copiar el enlace de activación», "sin conectar", reactivar a
         quien vuelve; `activar` une la cuenta de quien ya está en otro espacio; el token pasa a guardarse como
         huella.
+        **Hecha** (2026-10-15; escritor delegado), `ff257246` (base y servidor), `3a7ee9ed` (web) y
+        `416792f9` (la frontera del motor). Como las áreas: primero `vista_previa_de_alta` (hace el
+        cambio y lo deshace, con su huella, quién la aprueba y los problemas que dejaría), después
+        `dar_de_alta` o `reactivar_integrante` con la clave de un solo uso y esa huella; adentro, sin
+        `execute` para nadie, `cambiar_el_alta` y `confirmar_alta` (`cambio_del_equipo` `alta` o
+        `reactivacion` con el antes y el después, y la auditoría; vuelve a correr
+        `problemas_del_equipo` y se niega sólo ante un problema nuevo). **El alta:** nombre (hasta 80),
+        área vigente y rol (el de la autoridad final, no: se pasa); quién la aprueba, por omisión el
+        referente activo del área y, sin él (o con la autoaprobación y sin referente), Dirección; se
+        puede elegir a cualquier integrante activo. Siempre crea una persona nueva: con el nombre de
+        alguien del equipo, la vista previa sólo avisa (`mismo_nombre`, o `estuvo_en_el_equipo` si se
+        la puede volver a sumar). **Reactivar**, a propósito y por el id: la membresía de antes vuelve
+        con el área, el rol y quien la aprueba que se eligen (nadie se aprueba a sí mismo).
+        **El enlace** (`emitir_enlace_de_activacion`): para una persona activa y sin Telegram; anula el
+        anterior sin usar, vence a los 14 días y devuelve el usuario del bot del espacio (sin él, no
+        escribe nada). El token lo arma el servidor y sale una sola vez; `activation_token.token` pasó
+        a `token_hash` (los vigentes se migraron a su huella; el rollback los deja sin servir).
+        **El canje** (`onboarding.canjear`, el que usa `motor.recibir`): busca por la huella; si la
+        cuenta de Telegram de quien abre el enlace ya es de alguien de este equipo, se rechaza como
+        antes; si es de alguien de otro espacio, la membresía nueva pasa a esa cuenta (el mismo
+        `app_user`) y la auditoría dice `cuenta_unida` sin nada del otro espacio. Nunca por el nombre.
+        Servidor: `POST …/equipo/personas/revisar`, `POST …/equipo/personas` y `POST
+        …/equipo/personas/enlace`, en las dos puertas. Web: «> dar de alta» junto a «> crear área»
+        (nombre, área, rol, quién aprueba con el de por omisión a la vista), «> volver a sumar» en
+        "Ya no están en el equipo", y «> copiar el enlace de activación» en la persona recién dada de
+        alta y en cada «sin conectar»: lo copia y lo muestra una vez, con «Mandáselo por donde se
+        hablen; vence en 14 días.». A quien no conectó Leda no le manda nada (ya era así: el aviso se
+        omite con `destinatario_sin_telegram`; ahora con prueba desde el alta).
+        **Para decidir:** al unir la cuenta, el nombre es el de la cuenta (`app_user.nombre`, uno por
+        persona en toda Leda): el espacio nuevo ve el que la persona ya tenía en el otro, no el que
+        escribió Dirección.
+        **Evidencia:** RED observado (27 de 28 de `test_alta_del_equipo.py` sin la migración; 7 de 7
+        de `teamPeople.test.tsx` con la vista de antes). `pytest tests/garantias/test_alta_del_equipo.py
+        tests/garantias/test_areas_del_equipo.py tests/garantias/test_ver_el_equipo.py
+        tests/garantias/test_migraciones.py tests/garantias/test_capacidades.py tests/test_onboarding.py`:
+        103 passed (paridad y rollback de la `0084`). `pytest tests/garantias`: 1240 passed. `pytest
+        tests/motor`: 1509 passed y 1 failed (`test_frontera`: `canjear` sin permitir; arreglado en
+        `416792f9`, después `test_frontera.py`, `test_alta_sin_conectar.py` y `test_escucha.py`: 54
+        passed). `npm test` en `web/`: 365 passed; `npm run build`: bien. En seco, `correr --ia
+        guionada --veces 1`: 54 de 54 bien. `leda_motor` sigue en la `0083`: la `0084` no se aplicó.
       - **J7-6** · mover tareas por un cambio del equipo (`0085`, base): `cambio_de_responsable` acepta un
         cambio del equipo además de un pase; `cambio_de_revisor`.
       - **J7-7** · aprobador, rol y cambio de área (`0086`).
