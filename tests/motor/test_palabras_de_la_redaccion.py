@@ -83,6 +83,51 @@ def test_cada_nombre_para_redactar_dice_lo_mismo_y_no_choca_con_otro():
     assert {n for n in NOMBRES if hechos.es_un_concepto_de_la_cocina(n)} == set(para)
 
 
+# --- The meanings and the moves' sentences also reach the AI (task "Lenguaje", 2026-10-15) ----
+#
+# The names are guarded above; the AI also reads each name's meaning (`hechos.SIGNIFICADOS`, in
+# the list of meanings) and what each move is for (`Ficha.para_que`, when Leda says what she can
+# do). A cooking concept written there as prose ("el reencuadre", "un aviso previo") is copied
+# just the same, so the same words are checked there, written as prose: without underscores and
+# without accents.
+
+# Prose that matches a concept's words but does not name the concept, each with why.
+NO_NOMBRAN_EL_CONCEPTO = {
+    # The task's state itself, not Leda asking how a task is going.
+    ("estado", "el_estado"),
+    ("tareas_que_esperaba", "el_estado"),
+    # Question types: the question of this message keeps "pregunta" (decision 78).
+    ("cuando_se_destraba", "pregunta_a_quien"),
+    ("decidir_el_pase", "pregunta_a_quien"),
+    ("tomar_la_tarea", "pregunta_a_quien"),
+    # "Aprobar" stays for the decision itself (decision 18); rewording it would change what the
+    # AI is told about who decides.
+    ("la_aprobo_al_entregarla", "para_aprobar"),
+}
+
+
+def _sin_acentos(texto: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", texto.lower())
+                   if unicodedata.category(c) != "Mn")
+
+
+def _conceptos_en_la_prosa() -> set[tuple[str, str]]:
+    textos = [(n, s) for n, s in hechos.SIGNIFICADOS.items()]
+    textos += [(n, f.para_que) for n, f in FICHAS.items()]
+    return {(nombre, concepto) for nombre, texto in textos
+            for concepto in hechos.CONCEPTOS_DE_LA_COCINA
+            if re.search(r"\b" + re.escape(concepto.replace("_", " ")), _sin_acentos(texto))}
+
+
+def test_ningun_significado_ni_para_que_nombra_un_concepto_de_la_cocina():
+    encontrados = _conceptos_en_la_prosa()
+
+    assert encontrados - NO_NOMBRAN_EL_CONCEPTO == set()
+    # An exception that no longer matches is dropped from the list.
+    assert NO_NOMBRAN_EL_CONCEPTO <= encontrados, sorted(NO_NOMBRAN_EL_CONCEPTO - encontrados)
+
+
 def test_lo_que_alguien_escribio_llega_tal_cual():
     """El mensaje de la persona y los textos de los últimos turnos son lo que alguien escribió:
     nunca se traducen, aunque nombren un concepto o sean una sola palabra de la cocina."""

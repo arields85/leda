@@ -129,11 +129,11 @@ SIGNIFICADOS: Mapping[str, str] = {
     "tipo_de_evidencia": "El código de una cosa que pide la tarea para entregarla: sirve para "
                          "nombrarla en una jugada; a la persona se le dice con sus palabras.",
     "en_palabras": "Cómo se le dice a la persona esa cosa que pide la tarea.",
-    "el_texto_cubre": "Los códigos de lo que pide la tarea que la persona describe con lo que "
-                      "escribió (por ejemplo, cómo quedó y cómo lo probó).",
+    "el_texto_cubre": "Los códigos de lo que pide la tarea que la persona describe en su texto "
+                      "(por ejemplo, cómo quedó y cómo lo probó).",
     "saca": "Las piezas (por su alias) que la persona saca de su entrega.",
-    "entrega": "La entrega de la tarea, pieza por pieza, como se le muestra a la persona: lo "
-               "que escribió, cada foto, video, archivo o enlace y lo que mandó antes durante la "
+    "entrega": "La entrega de la tarea, pieza por pieza, como se le muestra a la persona: su "
+               "descripción, cada foto, video, archivo o enlace y lo que mandó antes durante la "
                "tarea, que entra sólo si lo deja.",
     "lo_mostrado": "Lo que Leda le mostró a la persona con esa pregunta: las piezas de la "
                    "entrega, con su alias.",
@@ -175,8 +175,8 @@ SIGNIFICADOS: Mapping[str, str] = {
                                              "decía la entrega anterior de esta tarea, antes "
                                              "del pedido de cambios, y siguen contando en esta "
                                              "entrega: la persona no tiene que volver a "
-                                             "decirlos. Lo que escribió ahora es lo que dice "
-                                             "cada pieza (dice).",
+                                             "decirlos. Su descripción de ahora es lo que "
+                                             "dice cada pieza (dice).",
     "le_falta_del_criterio": "Los puntos del criterio de aceptación que la descripción de la "
                              "persona todavía no dice entero, tal cual están escritos. De cada "
                              "uno, lo que falta saber de la tarea es la parte que la descripción "
@@ -200,7 +200,7 @@ SIGNIFICADOS: Mapping[str, str] = {
                                         "revisión.",
     "aviso_a_quien_aprueba": "Lo que se le avisa a quien revisa la tarea entregada: a quién (a) "
                              "y cuándo se entera (llega).",
-    "lo_que_entrego": "Lo que entregó la persona responsable, pieza por pieza: lo que escribió, "
+    "lo_que_entrego": "Lo que entregó la persona responsable, pieza por pieza: su descripción, "
                       "cada foto, video, archivo o enlace, y lo que cubre de lo que pide la "
                       "tarea. El sistema sabe qué llegó y nunca su contenido: qué muestra una "
                       "foto o qué dice un archivo no se sabe.",
@@ -349,7 +349,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "si_no_la_entrega_queda_con_la_tarea": "Lo que la persona mandó ya quedó con la tarea: si "
                                            "no confirma la entrega que Leda le ofrece, sigue "
                                            "con la tarea y se suma cuando la entregue.",
-    "lo_que_escribio": "Lo que escribió quien entrega la tarea: su descripción del trabajo.",
+    "lo_que_escribio": "La descripción del trabajo que escribió quien entrega la tarea.",
     "el_ejemplo_que_acepto": "Una descripción que Leda le propuso a quien entrega la tarea "
                              "para lo que faltaba y que esa persona aceptó tal cual: vale como "
                              "lo que describe; la aceptó, no la escribió.",
@@ -665,8 +665,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "proximo_aviso": "Lo próximo que Leda le va a escribir a la persona sobre esa tarea: qué "
                      "aviso es y cuándo le llega.",
     "seguimiento": "Cómo sigue el seguimiento de la tarea, con su código.",
-    "detenido_mientras_siga_trabada": "Mientras la tarea siga trabada, Leda no le pide el "
-                                      "estado: el seguimiento vuelve cuando la persona cuenta "
+    "detenido_mientras_siga_trabada": "Mientras la tarea siga trabada, Leda no le consulta "
+                                      "cómo viene: el seguimiento vuelve cuando la persona cuenta "
                                       "que se destrabó.",
     "ya_no_va_a_pasar": "Lo que Leda le contó a la persona en un mensaje anterior que iba a "
                         "pasar y ya no va a pasar, con su motivo.",
@@ -745,7 +745,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "sin_bloqueo_abierto": "La tarea no tiene un bloqueo abierto.",
     "varios_bloqueos_abiertos": "La tarea tiene más de un bloqueo abierto: falta saber cuál se "
                                 "resolvió (causas dice cuáles son).",
-    "nadie_pidio_el_estado": "Leda no le había pedido el estado de esa tarea.",
+    "nadie_pidio_el_estado": "Leda no le había consultado cómo viene esa tarea.",
     "la_entrega_todavia_no_se_recibe_por_chat": "La entrega de una tarea todavía no se recibe "
                                                 "por chat.",
     "cambiar_el_responsable_no_es_por_chat": "Cambiar quién es responsable de una tarea no se "
@@ -784,9 +784,11 @@ SIGNIFICADOS: Mapping[str, str] = {
     "cambio_el_vencimiento": "Cambió el día en que vence la tarea.",
     "cambio_el_responsable": "Cambió quién es responsable de la tarea.",
     "tarea_inexistente": "La tarea ya no existe.",
-    "ya_vencio": "La tarea ya llegó a su vencimiento: un aviso previo ya no es previo.",
+    "ya_vencio": "La tarea ya llegó a su vencimiento: un aviso de que vence pronto ya no "
+                 "corresponde.",
     "reemplazado_por_un_avance": "Lo reemplazó el pedido que sigue a un avance.",
-    "reemplazado_por_el_reencuadre": "Lo reemplazó el reencuadre después de una ausencia.",
+    "reemplazado_por_el_reencuadre": ("Lo reemplazó el mensaje con que Leda retoma el "
+                                      "seguimiento después de una ausencia."),
     "destinatario_inactivo": "Quien lo iba a recibir ya no está activo en el equipo.",
     "destinatario_sin_telegram": "Quien lo iba a recibir no tiene un chat con Leda.",
     "tipo_sin_declarar": "El aviso no es de un tipo que Leda manda.",
