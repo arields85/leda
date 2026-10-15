@@ -395,6 +395,9 @@ def yo(request: Request):
             # Si la web le ofrece "> nuevo objetivo": sólo a Dirección (ADR 0023, decisión 1). La
             # base igual rechaza a cualquier otro (`crear_objetivo_web`).
             "crea_objetivos": bool(persona and persona["direccion"]),
+            # Si la web le ofrece "Equipo": sólo a Dirección (ADR 0023, decisión 4; J7-3). La base
+            # igual rechaza a cualquier otro (`equipo_de`).
+            "organiza_el_equipo": bool(persona and persona["direccion"]),
             # Si la web le ofrece "> nueva tarea": Dirección y los referentes de área (ADR 0023,
             # decisión 3; J4). La base igual rechaza a cualquier otro (`cargar_tarea_web`).
             "carga_tareas": bool(persona and (persona["direccion"] or persona["referente"]))})
@@ -1156,15 +1159,7 @@ TEXTO_SIN_AUTORIDAD_PARA_CARGAR = (
 def _sin_lo_que_rechaza_la_carga(resultado: dict[str, Any], puerta: str) -> Response | None:
     """Sin sesión (401, se corta la cookie de esa puerta), sin autoridad (403: no es Dirección ni
     referente) o sin espacio (404): la base lo dice así."""
-    errores = {(e.get("campo"), e.get("motivo")) for e in resultado.get("errores") or []}
-    if ("sesion", "sin_autoridad") in errores:
-        return _json({"error": "sin_autoridad", "texto": TEXTO_SIN_AUTORIDAD_PARA_CARGAR}, 403)
-    if any(campo == "sesion" for campo, _ in errores):
-        return (_sin_sesion() if puerta == PUERTA_DEL_EQUIPO
-                else _sin_sesion_de_administracion())
-    if any(campo == "espacio" for campo, _ in errores):
-        return _espacio_que_no_existe()
-    return None
+    return rechazo_de_la_base(resultado, puerta, TEXTO_SIN_AUTORIDAD_PARA_CARGAR)
 
 
 def _leer_las_opciones_de_la_carga(conn, puerta: str, token: str, espacio: str | None
@@ -2161,15 +2156,7 @@ def _sin_lo_que_rechaza_la_base_del_objetivo(resultado: dict[str, Any], puerta: 
                                               ) -> Response | None:
     """Sin sesión (401, se corta la cookie de esa puerta), sin autoridad (403: no es Dirección) o
     sin espacio (404): la base lo dice así."""
-    errores = {(e.get("campo"), e.get("motivo")) for e in resultado.get("errores") or []}
-    if ("sesion", "sin_autoridad") in errores:
-        return _json({"error": "sin_autoridad", "texto": TEXTO_SIN_AUTORIDAD}, 403)
-    if any(campo == "sesion" for campo, _ in errores):
-        return (_sin_sesion() if puerta == PUERTA_DEL_EQUIPO
-                else _sin_sesion_de_administracion())
-    if any(campo == "espacio" for campo, _ in errores):
-        return _espacio_que_no_existe()
-    return None
+    return rechazo_de_la_base(resultado, puerta, TEXTO_SIN_AUTORIDAD)
 
 
 def _leer_las_opciones_del_objetivo(conn, puerta: str, token: str, espacio: str | None
@@ -3309,6 +3296,68 @@ def _cerrar_el_dictado(conn, token: str, preparado: dict[str, Any], tipo: str, t
     _imprimir(f"  ! no se pudo pasar un dictado a texto ({type(falla).__name__}).")
     return _json({"error": "sin_dictado", "texto": TEXTO_SIN_DICTADO},
                  503 if resultado == "sin_clave" else 502)
+
+
+# --- Para los módulos de la web que viven aparte (J7-3: `web_equipo.py`) -----------------------
+#
+# Los mismos controles de las rutas de acá (la cookie de cada puerta, la sesión revalidada en la
+# base, el espacio del camino, la conexión de a un pedido y las respuestas sin detalles), públicos
+# para no copiarlos.
+
+def json_de_la_web(datos: dict[str, Any], status_code: int = 200) -> JSONResponse:
+    """Una respuesta JSON con las cabeceras de la web."""
+    return _json(datos, status_code)
+
+
+def hash_del_token(token: str) -> str:
+    """La huella del token de una cookie, como la guarda la base."""
+    return _hash(token)
+
+
+def con_la_version_del_nucleo(cur) -> None:
+    _con_la_version_del_nucleo(cur)
+
+
+def leer_por_la_puerta(request: Request, puerta: str, espacio_id: str | None,
+                       leer: Callable[[Any, str, str | None], Response]) -> Response:
+    """Un pedido de lectura por una puerta: sin la cookie de esa puerta, 401; si no,
+    `leer(conn, token, espacio)` con la conexión de la web. Por la de administración, la sesión se
+    revalida antes y el espacio del camino tiene que ser un id (si no, 404); por la del equipo, el
+    espacio sale de la sesión (`None`), nunca del pedido."""
+    if puerta == PUERTA_DE_ADMINISTRACION:
+        token = _token_de_administracion(request)
+        if token is None:
+            return _sin_sesion_de_administracion()
+        espacio = _espacio_de(espacio_id) if espacio_id is not None else None
+
+        def trabajo(conn) -> Response:
+            with sin_espacio(conn) as cur:
+                if _sesion_de_administracion(cur, token) is None:
+                    return _sin_sesion_de_administracion()
+            if espacio is None:
+                return _espacio_que_no_existe()
+            return leer(conn, token, espacio)
+
+        return _con_la_base(trabajo)
+    token = _token_de_la_cookie(request)
+    if token is None:
+        return _sin_sesion()
+    return _con_la_base(lambda conn: leer(conn, token, None))
+
+
+def rechazo_de_la_base(resultado: dict[str, Any], puerta: str, texto_sin_autoridad: str
+                       ) -> Response | None:
+    """Lo que la base rechaza al resolver la puerta: sin sesión (401, se corta la cookie de esa
+    puerta), sin autoridad (403, con `texto_sin_autoridad`) o sin espacio (404)."""
+    errores = {(e.get("campo"), e.get("motivo")) for e in resultado.get("errores") or []}
+    if ("sesion", "sin_autoridad") in errores:
+        return _json({"error": "sin_autoridad", "texto": texto_sin_autoridad}, 403)
+    if any(campo == "sesion" for campo, _ in errores):
+        return (_sin_sesion() if puerta == PUERTA_DEL_EQUIPO
+                else _sin_sesion_de_administracion())
+    if any(campo == "espacio" for campo, _ in errores):
+        return _espacio_que_no_existe()
+    return None
 
 
 # --- La web -----------------------------------------------------------------------------------

@@ -119,9 +119,9 @@ COLUMNAS_POR_FUNCION: dict[tuple[str, str], tuple[str, ...]] = {
     # ejemplo que usa `test_eximir_una_columna_por_funcion_no_exime_su_nombre_en_otra_tabla`.
     ("task", "pedida_por_membership_id"): ("cargar_tarea_web", "puede_ver_tarea",
                                            "pedidas_que_ve", "reabrir_tarea"),
-    # `area.archivada_en` (migración 0081; J7-1): un área se archiva, no se borra. Por ahora la lee
-    # sólo `problemas_del_equipo`; la escribe la J7-4 (archivar un área).
-    ("area", "archivada_en"): ("problemas_del_equipo",),
+    # `area.archivada_en` (migración 0081; J7-1): un área se archiva, no se borra. La leen
+    # `problemas_del_equipo` y `equipo_de` (J7-3, la vista "Equipo"); la escribe la J7-4.
+    ("area", "archivada_en"): ("problemas_del_equipo", "equipo_de"),
 }
 
 # Las tablas del motor de conversación (migraciones 0030 y 0031) estuvieron

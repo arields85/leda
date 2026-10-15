@@ -1904,6 +1904,146 @@ end $$;
 comment on function problemas_del_equipo(uuid) is
   'J7-1 (migración 0081; ADR 0023, decisión 4; mecánica §7): los problemas del equipo del espacio de la transacción, cada uno con su código y en palabras de todos los días; vacía, el equipo cuadra. Cada función de la J7 la vuelve a correr dentro de su transacción y se niega si no está vacía.';
 
+-- Ver el equipo (migración 0082; J7-3; ADR 0023, decisiones 4 y 5): quién organiza el equipo de un
+-- espacio y lo que ve de él. Nada cambia el equipo todavía.
+-- - `quien_organiza_el_equipo`: la puerta de todas las funciones de la J7, con la regla de
+--   `quien_crea_el_objetivo` (la de administración, en cualquier espacio; la del equipo, sólo
+--   Dirección, en el suyo). No es elevada: la llaman funciones que ya corren como `leda_owner`.
+-- - `equipo_de`: las áreas (su referente, si declararon la autoaprobación, su gente, cuántas
+--   tareas abiertas tienen y si están archivadas), las personas (área, rol, quién las aprueba, si
+--   siguen en el equipo y si conectaron Leda), los roles y los problemas del equipo
+--   (`problemas_del_equipo`).
+-- - `cambios_del_equipo`: la historia de `cambio_del_equipo` del espacio, lo más nuevo primero.
+create or replace function quien_organiza_el_equipo(
+    p_puerta text, p_token_hash text, p_workspace_id uuid)
+returns jsonb
+language plpgsql set search_path = leda, public, pg_temp as $$
+begin
+  -- Organiza el equipo quien tiene la autoridad final (ADR 0023, decisión 4) y el administrador de
+  -- plataforma, en cualquier espacio (decisión 5): las mismas puertas que crear un objetivo.
+  return quien_crea_el_objetivo(p_puerta, p_token_hash, p_workspace_id);
+end $$;
+
+create or replace function equipo_de(p_puerta text, p_token_hash text, p_workspace_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_quien jsonb;
+        v_espacio uuid;
+        v_resultado jsonb;
+begin
+  v_quien := quien_organiza_el_equipo(p_puerta, p_token_hash, p_workspace_id);
+  if not (v_quien ->> 'ok')::boolean then
+    perform set_config('leda.workspace_id', previo, true);
+    return v_quien;
+  end if;
+  -- Desde acá, la RLS acota todo a ese espacio; el filtro explícito, además.
+  v_espacio := (v_quien ->> 'workspace_id')::uuid;
+  v_resultado := jsonb_build_object(
+    'ok', true,
+    'espacio', (select jsonb_build_object('id', w.id, 'nombre', w.nombre)
+                  from workspace w where w.id = v_espacio),
+    -- Las áreas vigentes primero; una archivada (nunca se borra), al final y marcada.
+    'areas', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', a.id, 'slug', a.slug, 'nombre', a.nombre,
+               'archivada', a.archivada_en is not null,
+               'referente', case when r.id is null then null
+                                 else jsonb_build_object('membership_id', r.id,
+                                                         'nombre', ur.nombre,
+                                                         'activo', r.activo) end,
+               'autoaprobacion', exists (
+                 select 1 from approval_policy p
+                  where p.workspace_id = v_espacio and p.area_id = a.id
+                    and p.autoaprobacion_declarada),
+               'personas', coalesce((
+                 select jsonb_agg(m.id order by u.nombre, m.id)
+                   from membership m join app_user u on u.id = m.app_user_id
+                  where m.workspace_id = v_espacio and m.area_id = a.id and m.activo),
+                 '[]'::jsonb),
+               'tareas_abiertas', (
+                 select count(*) from task t
+                  where t.workspace_id = v_espacio and t.area_id = a.id
+                    and t.estado not in ('terminada', 'cancelada')))
+             order by a.archivada_en is not null, a.nombre, a.id)
+        from area a
+        left join membership r on r.id = a.referente_membership_id
+        left join app_user ur on ur.id = r.app_user_id
+       where a.workspace_id = v_espacio), '[]'::jsonb),
+    -- Las personas: las que siguen en el equipo primero. «Sin conectar» es quien todavía no
+    -- activó su enlace (`onboarding.pendientes_de_activar`): sin cuenta de Telegram.
+    'personas', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'membership_id', m.id, 'nombre', u.nombre, 'activo', m.activo,
+               'conectado', u.telegram_user_id is not null,
+               'area_id', m.area_id, 'area', a.nombre,
+               'rol_id', m.rol_id, 'rol', r.nombre, 'autoridad_final', r.autoridad_final,
+               'aprobador', case when ap.id is null then null
+                                 else jsonb_build_object('membership_id', ap.id,
+                                                         'nombre', ua.nombre,
+                                                         'activo', ap.activo) end,
+               'referente_de', coalesce((
+                 select jsonb_agg(x.nombre order by x.nombre, x.id)
+                   from area x
+                  where x.workspace_id = v_espacio and x.referente_membership_id = m.id
+                    and x.archivada_en is null), '[]'::jsonb))
+             order by not m.activo, u.nombre, m.id)
+        from membership m
+        join app_user u on u.id = m.app_user_id
+        join area a on a.id = m.area_id
+        join rol r on r.id = m.rol_id
+        left join membership ap on ap.id = m.aprobador_membership_id
+        left join app_user ua on ua.id = ap.app_user_id
+       where m.workspace_id = v_espacio), '[]'::jsonb),
+    'roles', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', r.id, 'slug', r.slug, 'nombre', r.nombre,
+               'autoridad_final', r.autoridad_final,
+               'personas', (select count(*) from membership m
+                             where m.workspace_id = v_espacio and m.rol_id = r.id
+                               and m.activo))
+             order by r.autoridad_final desc, r.nombre, r.id)
+        from rol r
+       where r.workspace_id = v_espacio), '[]'::jsonb),
+    'problemas', problemas_del_equipo(v_espacio));
+  perform set_config('leda.workspace_id', previo, true);
+  return v_resultado;
+end $$;
+
+create or replace function cambios_del_equipo(p_puerta text, p_token_hash text, p_workspace_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        v_quien jsonb;
+        v_espacio uuid;
+        v_resultado jsonb;
+begin
+  v_quien := quien_organiza_el_equipo(p_puerta, p_token_hash, p_workspace_id);
+  if not (v_quien ->> 'ok')::boolean then
+    perform set_config('leda.workspace_id', previo, true);
+    return v_quien;
+  end if;
+  v_espacio := (v_quien ->> 'workspace_id')::uuid;
+  -- Quién lo hizo, por su nombre, y por qué puerta: el administrador de plataforma no es miembro.
+  v_resultado := jsonb_build_object(
+    'ok', true,
+    'cambios', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', c.id, 'clase', c.clase, 'puerta', c.puerta, 'quien', u.nombre,
+               'at', c.at, 'antes', c.antes, 'despues', c.despues)
+             order by c.at desc, c.id)
+        from cambio_del_equipo c
+        join app_user u on u.id = c.hecho_por_app_user_id
+       where c.workspace_id = v_espacio), '[]'::jsonb));
+  perform set_config('leda.workspace_id', previo, true);
+  return v_resultado;
+end $$;
+
+comment on function equipo_de(text, text, uuid) is
+  'J7-3 (migración 0082; ADR 0023, decisiones 4 y 5): el equipo del espacio para la vista "Equipo" de la web: áreas, personas, roles y problemas. Sólo Dirección, por la puerta del equipo, y el administrador de plataforma, por la suya.';
+comment on function cambios_del_equipo(text, text, uuid) is
+  'J7-3 (migración 0082): la historia de cambio_del_equipo del espacio, lo más nuevo primero, para quienes organizan el equipo.';
+
 comment on table pase_de_tarea is
   'El Motor (C-7; ADR 0017, enmienda a la decisión 2): el pedido de pasarle una tarea a otra persona, quién lo pidió, quién lo decide (el encargado del sector de quien recibe) y cómo terminó. Cambia de estado sólo hacia adelante; la_tomo, sólo con su cambio_de_responsable.';
 comment on table cambio_de_responsable is
@@ -7316,6 +7456,17 @@ grant select, insert on cambio_del_equipo to leda_owner;
 alter function problemas_del_equipo(uuid) owner to leda_owner;
 revoke execute on function problemas_del_equipo(uuid) from public;
 grant execute on function problemas_del_equipo(uuid) to leda_app, leda_admin;
+
+-- Ver el equipo (migración 0082): quién organiza se resuelve adentro de las dos funciones de la
+-- web, que ejecuta sólo `leda_app`.
+alter function quien_organiza_el_equipo(text, text, uuid) owner to leda_owner;
+alter function equipo_de(text, text, uuid) owner to leda_owner;
+alter function cambios_del_equipo(text, text, uuid) owner to leda_owner;
+revoke execute on function quien_organiza_el_equipo(text, text, uuid) from public;
+revoke execute on function equipo_de(text, text, uuid) from public;
+revoke execute on function cambios_del_equipo(text, text, uuid) from public;
+grant execute on function equipo_de(text, text, uuid) to leda_app;
+grant execute on function cambios_del_equipo(text, text, uuid) to leda_app;
 
 alter function emitir_acceso_tablero(uuid, text, timestamptz)
   owner to leda_owner;

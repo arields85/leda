@@ -49,6 +49,7 @@ from .config import config
 from .db import admin, conectar, espacio
 from .entrar_con_telegram import router as router_de_entrar
 from .web_app import router as router_de_la_web
+from .web_equipo import router as router_del_equipo
 
 app = FastAPI(title="Leda", docs_url=None, redoc_url=None)
 router = APIRouter()
@@ -470,6 +471,9 @@ app.include_router(router)
 # Entrar con Telegram (ADR 0024): la Mini App y el QR. Antes que la web, cuya última ruta toma
 # cualquier página bajo `/app`.
 app.include_router(router_de_entrar)
+# Ver y organizar el equipo desde la web (J7; ADR 0023, decisiones 4 y 5), también antes que la
+# web.
+app.include_router(router_del_equipo)
 # La plataforma web (ADR 0022): su API interna, del mismo origen que la página de la tarea.
 app.include_router(router_de_la_web)
 
