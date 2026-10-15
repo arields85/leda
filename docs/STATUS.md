@@ -60,13 +60,14 @@ administración (12 h sin uso, configurable), el grafo (cancelar, reabrir, desha
 hallazgos de la ronda. Cada respuesta está escrita en su punto, marcada DECIDIDO o CONTESTADO.
 
 **Dónde quedó (cierre del 2026-10-15, tarde):** J7-0 a J7-5 y J7-5b hechas (equipo que cuadra, el pack sólo arma
-un equipo vacío, ver el equipo, áreas, alta con enlace, nombre por espacio). **Primero en la sesión nueva:** la RDD
-de `9d871545` partida en pedazos (no entró entera), corregir el alta duplicada (`PersonEditor.tsx:113-119`),
-aplicar la `0085` a `leda_motor` con respaldo, reiniciar la web; después J7-6 en adelante. **Diseño:** con
-impeccable (siempre por su proceso, nunca a mano): `PRODUCT.md`, `DESIGN.md`, la dirección en
-`.impeccable/surfaces/web-src-app-tsx.md` y las referencias `.impeccable/mocks/decision/r7-profundidad*.html`;
-en `live` el usuario aceptó la barra de pestañas pegada al borde de abajo (en la pantalla de Marcos); falta llevarla a
-la de Dirección y actualizar `DESIGN.md`; sigue ajustando con `/impeccable live`.
+un equipo vacío, ver el equipo, áreas, alta con enlace, nombre por espacio). **2026-10-15, noche:** RDD de
+`9d871545` aprobada en tres pedazos; alta duplicada corregida (`a71d2623`, también en áreas; RDD aprobada);
+`0085` aplicada a `leda_motor` (respaldo `db/respaldos/leda_motor-antes-0085-20261015.dump`, ensayo limpio); web
+reiniciada. **Sigue:** J7-6 en adelante. **Diseño:** con impeccable (siempre por su proceso, nunca a mano):
+`PRODUCT.md`, `DESIGN.md`, la dirección en `.impeccable/surfaces/web-src-app-tsx.md` y las referencias
+`.impeccable/mocks/decision/r7-profundidad*.html`; la barra pegada al borde ya está en las dos y en `DESIGN.md`
+(`e793e57e`); el usuario sigue ajustando con `/impeccable live` (el script de `live` se inyecta en las muestras:
+nunca commitearlo).
 
 **Lo que sigue, a construir, en este orden** (usuario, 2026-10-15: "todo lo que requiera armar equipo,
 configurar equipo… quisiera darle prioridad; las otras son mejoras"; "ese es el orden correcto"): 1. **la J7**, armar

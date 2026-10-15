@@ -1756,7 +1756,16 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         **Alta duplicada, corregida** (`a71d2623`): tras una confirmación sin respuesta, la clave se queda aunque
         se vuelva y se revise de nuevo, como en `LoadForm`; igual en `AreaEditor.tsx`, que tenía el mismo
         defecto. RED observado (`web/src/admin/teamConfirmKey.test.tsx`: 2 de 5 fallaban, la segunda
-        confirmación iba con otra clave); `npm test` en `web/`: 370 passed; `npm run build`: bien.
+        confirmación iba con otra clave); `npm test` en `web/`: 370 passed; `npm run build`: bien. RDD aprobada
+        (`review-77cb815c6360baf8`); advertencias: el clasificador de «antes de mirar la clave» es una lista de
+        exclusión (`AreaEditor.tsx:55-61`) y faltan pruebas de las excepciones.
+        **Cerrado (2026-10-15, noche):** RDD de `9d871545` aprobada partida en tres (esquema y migración con su
+        prueba `review-245a40ea34f16eb6`, rollback `review-8e70ee1158e6e51b`, Python y pruebas
+        `review-6606563f0c2ffc79`); advertencias: el relleno del nombre sin prueba propia, `historia` con actor
+        nulo, otros escritores de `membership` contra el `not null`, caminos de la página y del administrador sin
+        cubrir, el importador sin prueba de que no pisa el nombre. `0085` aplicada a `leda_motor` (respaldo
+        `db/respaldos/leda_motor-antes-0085-20261015.dump`, ensayada antes en una copia descartable: 7 de 7
+        membresías con nombre). Web reiniciada (`/salud` bien).
       - **J7-6** · mover tareas por un cambio del equipo (`0085`, base): `cambio_de_responsable` acepta un
         cambio del equipo además de un pase; `cambio_de_revisor`.
       - **J7-7** · aprobador, rol y cambio de área (`0086`).
