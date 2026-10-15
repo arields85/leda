@@ -99,10 +99,24 @@ problema y menor impacto. No se incluye sin autorización explícita.
       rollback de `0004` era parcial: revertía propiedad y privilegios pero
       dejaba el cuerpo nuevo de `aplicar_evento_tarea`, que existe únicamente
       porque el dueño dejó de saltear la RLS. Corregido. *Ruta: inline.*
-- [ ] **T6** — Verificar el propietario efectivo contra un clúster limpio, no
+- [x] **T6** — Verificar el propietario efectivo contra un clúster limpio, no
       contra el entorno de desarrollo. Cierra el `PENDIENTE` registrado en
-      `docs/architecture/frontera.md:133-136`.
-- [ ] **T7** — Actualizar `frontera.md` (regla 1 pasa a cumplida) y `STATUS.md`.
+      `docs/architecture/frontera.md` ("Límite que se conserva"). Hecho el
+      2026-10-15 con `tools/ensayo_propiedad.py`; comandos y resultados en
+      "Ensayo sobre un clúster limpio (T6)". Pasa la propiedad (criterio 3) y la
+      RLS; la convergencia de la matriz (criterio 5) pasa contra `leda_motor`
+      pero no contra una base migrada desde el principio: queda T8. *Ruta:
+      delegada.*
+- [x] **T7** — Actualizar `frontera.md` (regla 1 pasa a cumplida) y `STATUS.md`.
+      `frontera.md`, 2026-10-15: el límite del clúster limpio quedó cerrado.
+      `STATUS.md` ("Seguridad de la base") sigue diciendo `PENDIENTE` y lo
+      actualiza el coordinador: el escritor de T6 no tenía ese archivo en su
+      alcance.
+- [ ] **T8** — Que una base migrada desde el principio converja a la misma
+      matriz de privilegios que la instalación limpia (criterio 5). El ensayo
+      de T6 encontró tres diferencias; causa y arreglo propuesto en "Ensayo
+      sobre un clúster limpio (T6)". La prueba de paridad no las ve porque sólo
+      compara los privilegios de `leda_app`.
 
 ## Criterios de aceptación
 
@@ -232,16 +246,69 @@ y `0004` cableadas, así que el rollback de `0005` nacía sin ejercitar. Ahora
 recorre la cadena descubriéndola del directorio y exige que cada migración
 tenga su rollback.
 
+## Ensayo sobre un clúster limpio (T6)
+
+2026-10-15, autorizado por el usuario. Un clúster nuevo, sin ningún rol `leda_*`,
+con los mismos binarios que el servidor de la máquina (PostgreSQL 18.6, Scoop), en
+una carpeta temporal fuera del repositorio:
+
+| Paso | Comando | Resultado |
+|---|---|---|
+| Crear el clúster | `initdb -D <tmp>/cluster-limpio/datos -U postgres --auth=trust --encoding=UTF8 --locale=C` | Completado (`trust` sólo para `127.0.0.1/32`, `::1/128` y el socket local) |
+| Arrancarlo | `pg_ctl -D <tmp>/cluster-limpio/datos -l <tmp>/cluster-limpio/servidor.log -o "-p 5433 -c listen_addresses=localhost" -w start` | `pg_isready -p 5433`: aceptando conexiones; `select count(*) from pg_roles where rolname like 'leda%'` = 0 |
+| Instalación limpia | `psql -c "create database leda_limpia"` y `PGCLIENTENCODING=UTF8 psql -v ON_ERROR_STOP=1 -1 -f db/esquema.sql` (una transacción, como `python -m leda esquema`) | salida 0, sin errores; crea `leda_admin`, `leda_app`, `leda_gateway` y `leda_owner` |
+| Base migrada desde el principio | `leda_migrada`: `db/esquema.sql` de `efa8ee2` con `a_nombres_actuales` (igual que la prueba de paridad) y después cada `db/migrations/0002..0076` con `psql -v ON_ERROR_STOP=1 -f`, en orden | 71 migraciones aplicadas, ningún `ERROR` en el registro |
+| Ensayo contra `leda_motor` | `python tools/ensayo_propiedad.py "host=localhost port=5433 user=postgres dbname=leda_limpia" "host=localhost port=5432 user=postgres dbname=leda_motor"` (sólo lectura) | salida 0: a y b pasan en las dos; la matriz **converge** en las 11 categorías (1921 privilegios por relación, 178 `execute`, 97 funciones, 77 dueños) |
+| Ensayo contra la migrada | `python tools/ensayo_propiedad.py "...dbname=leda_limpia" "...dbname=leda_migrada"` (las dos en 5433) | salida 1: a y b pasan en las dos; la matriz **difiere** en "privilegios por relación" (1921 contra 1913) |
+| Apagar | `pg_ctl -D <tmp>/cluster-limpio/datos stop` | detenido; la carpeta queda |
+
+Lo comprobado en la instalación limpia: las 48 funciones `security definer` son de
+`leda_owner` (no superusuario, sin `bypassrls`, sin login, `noinherit`), todas con
+`search_path` terminado en `pg_temp` y ninguna ejecutable por `public`; las 69
+tablas con `workspace_id` tienen RLS encendida y forzada, salvo las siete
+excepciones declaradas en `tests/garantias/test_aislamiento.py`, a las que no
+llegan ni `leda_app` ni `leda_gateway`.
+
+**Las tres diferencias** de la base migrada desde el principio (todas de roles sin
+login o con `bypassrls`; ninguna da a `leda_app` ni a `leda_gateway` algo que la
+limpia no da):
+
+1. `admin_notice_enlace`: en la limpia `leda_owner` tiene todos los privilegios; en
+   la migrada, ninguno. `db/esquema.sql` crea la tabla antes del
+   `grant all privileges on all tables in schema leda to leda_owner` general; la
+   `0054` sólo la concede a `leda_admin`, y el `grant` general de la `0004` corrió
+   antes de que la tabla existiera.
+2. `greeting_state`: en la limpia `leda_admin` tiene todos los privilegios; en la
+   migrada, ninguno. La limpia los recibe del `grant all on all tables in schema
+   leda to leda_admin` del final de `esquema.sql`; la `0018` concede a `leda_owner`
+   y a `leda_app`, no a `leda_admin`.
+3. La vista `integrante`: en la migrada `leda_owner` tiene todos los privilegios; en
+   la limpia, ninguno. La vista ya existía cuando corrió el `grant` general de la
+   `0004`; en `esquema.sql` se crea después del `grant` general a `leda_owner`.
+
+`leda_motor` no muestra ninguna porque se recreó desde `esquema.sql` el 2026-10-12 y
+sólo recibió por migración de la `0057` en adelante. La prueba de paridad
+(`test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento`) no las ve
+porque compara sólo los privilegios de `leda_app`.
+
+**Arreglo propuesto (T8, sin hacer):** una migración nueva que lleve la base migrada
+a la matriz de la limpia (`grant all on admin_notice_enlace to leda_owner`,
+`grant all on greeting_state to leda_admin`, `revoke all on integrante from
+leda_owner`), con su rollback; o, si se decide que lo correcto es lo de la migrada,
+el cambio inverso en `esquema.sql`. Y que la prueba de paridad compare la matriz
+completa de los cuatro roles (lo que hace `tools/ensayo_propiedad.py`), para que la
+próxima diferencia aparezca en la suite.
+
 ## Estado de la unidad
 
-Cerradas T1 a T5 y T7. Suite en **310 passed, 0 failed**. La regla 1 de
+Cerradas T1 a T7 (T6 y T7, el 2026-10-15); abierta T8. Suite en **310 passed, 0 failed**. La regla 1 de
 `docs/architecture/frontera.md` pasó a cumplida.
 
 Queda abierto, todo registrado en `docs/STATUS.md`:
 
-- **T6 parcial.** La propiedad de las funciones se verifica sobre una base
-  nueva dentro de un clúster existente. Un ensayo sobre un clúster enteramente
-  limpio sigue siendo más fuerte y está `PENDIENTE`.
+- **T6 cerrada el 2026-10-15** (ver "Ensayo sobre un clúster limpio (T6)"). Queda
+  **T8**: tres diferencias de privilegios entre la instalación limpia y una base
+  migrada desde el principio.
 - `confirmar_borrador_tarea` fija el espacio con el valor que recibe de quien
   la llama. Contenida a `leda_gateway` y fuera del alcance de `leda_app`,
   pero es el patrón que la regla 6 rechaza. Pertenece al ingreso autenticado.

@@ -177,9 +177,16 @@ Dos verificaciones sostienen la regla, ambas contra bases reales: el rechazo del
 cruce con indistinguibilidad frente a un identificador inexistente, y la
 convergencia entre instalación limpia y base migrada leyendo el catálogo efectivo.
 
-Límite que se conserva: la propiedad se verifica sobre una base nueva dentro de un
-clúster existente. Un ensayo sobre un clúster enteramente limpio sigue siendo una
-comprobación más fuerte y está `PENDIENTE`.
+El ensayo sobre un clúster enteramente limpio se hizo el 2026-10-15
+(`tools/ensayo_propiedad.py`; comandos y resultados en
+`odd/tasks/aislamiento-entre-clientes.md`, T6): en un clúster recién creado con
+`initdb`, sin ningún rol `leda_*`, `db/esquema.sql` deja las 48 funciones
+`security definer` a nombre de `leda_owner` (no superusuario, sin `bypassrls`), con
+`search_path` terminado en `pg_temp` y sin `execute` para `public`, y las tablas con
+`workspace_id` con RLS forzada salvo las excepciones declaradas. Su matriz de
+privilegios coincide con la de `leda_motor`. Una base migrada desde el principio
+difiere en tres privilegios de roles sin login o con `bypassrls`, ninguno de
+`leda_app` ni de `leda_gateway`: `PENDIENTE` como T8 de esa unidad.
 
 `confirmar_borrador_tarea` todavía fija el espacio con el valor que recibe de quien
 la llama. Está acotada a `leda_gateway` y fuera del alcance de `leda_app`, pero
