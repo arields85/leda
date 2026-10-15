@@ -93,10 +93,10 @@
   .tally::before {
     content: ""; position: absolute; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: -24px; bottom: -28px;
     z-index: -1; pointer-events: none; opacity: 0; transition: opacity 180ms ease-out;
-    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-    -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
-    background: linear-gradient(to bottom, rgba(20, 21, 22, 0.96) 0%, rgba(18, 19, 20, 0.82) 70%, rgba(16, 17, 18, 0) 100%);
+    -webkit-backdrop-filter: blur(26px) saturate(150%); backdrop-filter: blur(26px) saturate(150%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    background: linear-gradient(to bottom, rgba(44, 46, 49, 0.42) 0%, rgba(36, 38, 41, 0.34) 70%, rgba(30, 32, 34, 0) 100%);
   }
   .tally.stuck { border-bottom-color: transparent; }
   .tally.stuck::before { opacity: 1; }
@@ -108,10 +108,10 @@
   .top::before {
     content: ""; position: absolute; inset: 0 0 -28px 0; z-index: -1; pointer-events: none;
     opacity: 0; transition: opacity 200ms ease-out;
-    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
-    background: linear-gradient(to bottom, rgba(26, 27, 28, 0.97) 0%, rgba(22, 23, 24, 0.9) 75%, rgba(16, 17, 18, 0) 100%);
+    -webkit-backdrop-filter: blur(26px) saturate(150%); backdrop-filter: blur(26px) saturate(150%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+    background: linear-gradient(to bottom, rgba(48, 50, 53, 0.5) 0%, rgba(40, 42, 45, 0.4) 78%, rgba(30, 32, 34, 0) 100%);
   }
   .top.compact::before { opacity: 1; }
   .top header.band, .top .hero { transition: padding 200ms ease-out; }
