@@ -38,13 +38,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 ## Pendiente
 
-- Llevar la barra pegada al borde (aceptada en la de Marcos) a la pantalla de Dirección
-  (`r7-profundidad-direccion.html`, todavía con la cápsula flotante), y actualizar `DESIGN.md` (dice "barra
-  flotante").
-
 - Ajustes que el usuario va a seguir pidiendo (dijo "vamos por buen camino, tenemos que seguir haciendo
   ajustes").
 - La pantalla de una tarea abierta en este estilo (le gustó la disposición «una tarea por pantalla»).
-- El resumen grande sale de datos reales (en la muestra de Ismael decía «2 vencen esta semana» con una sola esta
-  semana: error de la muestra).
+- El resumen grande sale de datos reales (la muestra de Ismael ya dice «1 vence mañana», 2026-10-15).
 - Después: aplicar a `web/` con impeccable, revisión final (finish reviewer) y `DESIGN.md` (documenter).

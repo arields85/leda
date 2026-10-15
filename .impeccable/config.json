@@ -569,6 +569,12 @@
         ],
         "createdAt": "2026-10-15T17:33:06.613Z",
         "reason": "agent: false positive, the detector splits 'Source Sans 3', which DESIGN.md declares"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "sans 3",
+        "createdAt": "2026-10-15T17:40:53.004Z",
+        "reason": "false positive: DESIGN.md declares Source Sans 3; the detector splits the family name"
       }
     ]
   }

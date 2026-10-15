@@ -73,7 +73,7 @@
   .day small { font-size: 12px; line-height: 16px; min-height: 16px; }
   .day small.due { color: var(--wait); }
 
-  main { padding: 20px var(--gutter) calc(108px + env(safe-area-inset-bottom, 0px)); }
+  main { padding: 20px var(--gutter) calc(110px + env(safe-area-inset-bottom, 0px)); }
   .group { background: var(--raised); border: 1px solid var(--hair); border-radius: 12px; list-style: none; overflow: hidden; }
   .group li + li { border-top: 1px solid var(--hair); }
   .task { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; row-gap: 2px; width: 100%; text-align: left; padding: 14px 16px; }
@@ -92,19 +92,21 @@
   .done .name { color: var(--ink-soft); }
 
   .tabbar {
-    position: fixed; left: 12px; width: 366px; bottom: 12px; z-index: 10;
-    display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 6px;
-    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-    background: var(--bar); border: 1px solid var(--line); border-radius: 20px;
-    box-shadow: 0 6px 18px rgba(10, 13, 15, 0.28);
+    position: fixed; left: 0; width: 390px; bottom: 0; z-index: 10;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;
+    padding: 6px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--bottom); border-top: 1px solid var(--line);
   }
   .tabbar a {
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    min-height: 54px; border-radius: 14px; color: var(--ink-mute); text-decoration: none;
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-height: 52px; color: var(--ink-mute); text-decoration: none;
     font-size: 12px; line-height: 14px; white-space: nowrap;
   }
   .tabbar a:hover { color: var(--ink); }
-  .tabbar a[aria-current="page"] { background: rgba(236, 235, 230, 0.10); color: var(--ink); font-weight: 600; }
+  .tabbar a[aria-current="page"] { color: var(--ink); font-weight: 600; }
+  .tabbar a[aria-current="page"]::before {
+    content: ""; position: absolute; top: -7px; width: 28px; height: 2px; border-radius: 4px; background: var(--ink);
+  }
 </style>
 </head>
 <body>
@@ -120,8 +122,8 @@
   </header>
 
   <section class="hero" aria-label="Resumen">
-    <h2><em>2</em> vencen esta semana</h2>
-    <p class="why">Pedir el plano rev. C (Marcos) · falta tu firma</p>
+    <h2><em>1</em> vence mañana</h2>
+    <p class="why">Firmar el plano rev. C · lo espera Marcos para seguir</p>
     <p class="count">5 abiertas en el equipo · 1 esperando</p>
   </section>
 
