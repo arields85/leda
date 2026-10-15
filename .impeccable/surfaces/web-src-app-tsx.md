@@ -57,5 +57,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 - Ajustes que el usuario va a seguir pidiendo (dijo "vamos por buen camino, tenemos que seguir haciendo
   ajustes").
 - La pantalla de una tarea abierta en este estilo (le gustó la disposición «una tarea por pantalla»).
-- El resumen grande sale de datos reales (la muestra de Ismael ya dice «1 vence mañana», 2026-10-15).
+- El resumen grande sale de datos reales (la muestra de Ismael dice «Marcos espera tu firma»: gana el punto 2).
+- `DESIGN.md` todavía no tiene los contadores, el filtro ni el coral de «Vencidas»: pasarlos con el documenter
+  cuando el usuario cierre esta pantalla.
 - Después: aplicar a `web/` con impeccable, revisión final (finish reviewer) y `DESIGN.md` (documenter).
