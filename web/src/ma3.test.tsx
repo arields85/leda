@@ -171,7 +171,7 @@ describe('the bottom buttons (item 4)', () => {
     window.history.replaceState(null, '', '/app/admin/');
     render(<AdminApp />);
     await screen.findAllByText(/Cargar tarea|Crear objetivo/);
-    expect(screen.queryByRole('button', { name: /salir/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /salir|cerrar sesión/i })).toBeNull();
   });
 });
 

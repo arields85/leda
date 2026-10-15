@@ -14,7 +14,7 @@ import {
 } from './api';
 import { SignIn } from './components/SignIn';
 import { rememberedSpace, rememberSpace, spaceOfPath } from './door';
-import { bindBackButton, telegramWebApp } from './telegram';
+import { bindBackButton, insideTelegram, telegramWebApp } from './telegram';
 import { teamTasks } from './admin/api';
 import { NewObjective } from './admin/NewObjective';
 import { NewTask } from './admin/NewTask';
@@ -25,6 +25,7 @@ import { PassTask } from './components/PassTask';
 import { RequestedList } from './components/RequestedList';
 import { Header } from './components/Header';
 import { Notice } from './components/Notice';
+import { SignOut } from './components/SignOut';
 import { AreaOverview } from './components/AreaOverview';
 import { StatePanel } from './components/StatePanel';
 import { TaskCard } from './components/TaskCard';
@@ -103,9 +104,14 @@ function Failed({ onRetry }: { onRetry: () => void }) {
 }
 
 /** Without a session: enter with Telegram (ADR 0024, decisions 4 and 5), never asking for a
- * link. */
-function SessionClosed({ onIn }: { onIn: () => void }) {
-  return <SignIn door="equipo" space={spaceForSignIn()} onIn={onIn} />;
+ * link. After "Cerrar sesión" (MA-7), it first says so. */
+function SessionClosed({ byPerson = false, onIn }: { byPerson?: boolean; onIn: () => void }) {
+  return (
+    <>
+      {byPerson && <Notice title="Cerraste la sesión." />}
+      <SignIn door="equipo" space={spaceForSignIn()} onIn={onIn} />
+    </>
+  );
 }
 
 export function App() {
@@ -128,6 +134,9 @@ export function App() {
   const [unopened, setUnopened] = useState(false);
   // The detail of a task, as a view of the app (MA-3): it takes the list's place until "> volver".
   const [detail, setDetail] = useState<Detail | null>(null);
+  // "Cerrar sesión" (MA-7): only in a browser outside Telegram, where the QR brings the person back.
+  const [inMiniApp] = useState(() => insideTelegram());
+  const [signedOut, setSignedOut] = useState(false);
 
   useEffect(() => {
     const request = new AbortController();
@@ -263,12 +272,17 @@ export function App() {
       ? 'Tarea'
       : (ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda');
 
-  const enter = retry;
+  const enter = () => {
+    setSignedOut(false);
+    retry();
+  };
   // What stays fixed at the top of the list, under the header (MA-3: only the cards scroll): the
   // tabs, the counters and the week.
   let fixed = null;
   let body;
-  if (me.kind === 'closed' || listing.kind === 'closed') {
+  if (signedOut) {
+    body = <SessionClosed byPerson onIn={enter} />;
+  } else if (me.kind === 'closed' || listing.kind === 'closed') {
     body = <SessionClosed onIn={enter} />;
   } else if (me.kind === 'failed') {
     body = <Failed onRetry={retry} />;
@@ -373,7 +387,7 @@ export function App() {
     );
   }
 
-  const open = person !== null && me.kind === 'ready' && listing.kind !== 'closed';
+  const open = !signedOut && person !== null && me.kind === 'ready' && listing.kind !== 'closed';
   // One screen, no page scroll (MA-3): the header, the tabs, the counters and the week fixed at
   // the top, "> Nueva tarea" and "> Nuevo objetivo" fixed at the bottom, and only the middle (the
   // cards, or the detail or the form) scrolls. Its height leaves out the safe areas the root
@@ -387,6 +401,7 @@ export function App() {
           title={open ? title : 'Leda'}
           person={open ? person?.persona : undefined}
           area={open ? person?.area : undefined}
+          signOut={open && !inMiniApp && <SignOut onDone={() => setSignedOut(true)} />}
         />
         {fixed}
       </div>

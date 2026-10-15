@@ -93,15 +93,17 @@ describe('no "Volver al chat" nor "salir" (item 5)', () => {
     render(<App />);
     await screen.findByText('Configurar alarmas del SCADA');
     expect(screen.queryByText(/Volver al chat/)).toBeNull();
-    expect(screen.queryByRole('button', { name: /salir/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /salir|cerrar sesión/i })).toBeNull();
   });
 
-  it('in the computer browser', async () => {
+  it('in the computer browser (only "Cerrar sesión", under the name, came back: MA-7)', async () => {
     serve({ 'GET /app/api/yo': ok(me({ chat_con_leda: 'https://t.me/LedaCoreWorkBot' })), 'GET /app/api/tareas?vista=tus': ok(view()) });
     render(<App />);
     await screen.findByText('Configurar alarmas del SCADA');
     expect(screen.queryByText(/Volver al chat/)).toBeNull();
     expect(screen.queryByRole('button', { name: /salir/ })).toBeNull();
+    const button = within(screen.getByTestId('who')).getByRole('button', { name: 'Cerrar sesión' });
+    expect(screen.getAllByRole('button', { name: /cerrar sesión/i })).toEqual([button]);
   });
 });
 

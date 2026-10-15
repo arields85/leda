@@ -2,9 +2,10 @@ import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { signOut } from '../api';
 
-/** "salir": closes the session on this computer, after one confirmation, because coming back
- * needs the QR again. Only in a browser: inside the Mini App each opening identifies the person
- * (MA-3). The administration door passes its own `action`. */
+/** "Cerrar sesión" (MA-7): closes the session on this computer, after one confirmation, because
+ * coming back needs the QR again. It goes in the header, under the name and the area, and only in
+ * a browser outside Telegram: inside the Mini App each opening identifies the person and a QR
+ * cannot be scanned (MA-3). The administration door passes its own `action`. */
 export function SignOut({
   onDone,
   action = signOut,
@@ -27,14 +28,14 @@ export function SignOut({
   const link = 'bg-transparent p-0 text-small text-ink-dim underline-offset-2 hover:text-ink hover:underline';
   if (step === 'idle') {
     return (
-      <button type="button" className={`inline-flex items-center gap-1 ${link}`} onClick={() => setStep('confirm')}>
+      <button type="button" className={`mt-1 inline-flex items-center gap-1 ${link}`} onClick={() => setStep('confirm')}>
         <LogOut aria-hidden="true" size={12} strokeWidth={2} />
-        salir
+        Cerrar sesión
       </button>
     );
   }
   return (
-    <div className="flex flex-col items-end gap-1 text-right text-small text-ink-dim">
+    <span className="mt-1 flex max-w-[18rem] flex-col items-end gap-1 text-right text-small text-ink-dim">
       <span>
         {step === 'failed'
           ? 'No se pudo cerrar la sesión. Probá de nuevo en un rato.'
@@ -45,9 +46,9 @@ export function SignOut({
           no, seguir
         </button>
         <button type="button" className={`${link} text-ink`} onClick={confirm} disabled={step === 'busy'}>
-          sí, salir
+          sí, cerrar
         </button>
       </span>
-    </div>
+    </span>
   );
 }

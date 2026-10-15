@@ -907,7 +907,7 @@ describe('AdminApp', () => {
     serve({ 'GET /app/admin/api/yo': { status: 401, body: { error: 'sin_sesion' } } });
     render(<AdminApp />);
     expect(await screen.findByText(/Entrá con Telegram|Esta dirección no sirve/)).toBeInTheDocument();
-    expect(screen.queryByText('salir')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cerrar sesión' })).toBeNull();
   });
 
   it('a space the server no longer finds re-reads the spaces once and never loops', async () => {
