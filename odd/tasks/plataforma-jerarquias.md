@@ -1541,6 +1541,47 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         tarea madre, y el pedido junto con "Me falta algo para seguir".
       - **J6-12.** Rondas con la IA real, la prueba en el celular y RDD por commit.
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
+      **Primera en el orden** (usuario, 2026-10-15: "todo lo que requiera armar equipo, configurar equipo… darle
+      prioridad"). Las 10 respuestas, en "Para decidir al despertar" (J7, CONTESTADO).
+      **Plan en porciones** (planificador de sólo lectura, 2026-10-15, de mañana). Las reglas del equipo (una sola
+      autoridad final, todos con aprobador activo y sin ciclos, cada área con referente, autoaprobación o
+      Dirección) no se pueden exigir en las tablas (pruebas y el importador pasan por estados intermedios): las
+      comprueba una función que cada función de la J7 vuelve a correr dentro de su transacción.
+      - **De qué se parte:** `importador.validar` (ya tiene las reglas) e `importar` (pisa todo en cada
+        importación); `onboarding.generar_enlaces`/`activar` (el token, en claro, 14 días; `activar` rechaza una
+        cuenta de Telegram ya usada en otro espacio); `sesion_vigente` corta con `dejo_el_equipo`;
+        `quien_revisa_la_tarea` se calcula en el momento (cambiar el aprobador mueve solas las entregas que
+        esperan); los moldes `cambio_de_responsable` y `cambio_de_fecha`; `leda_app` todavía puede escribir
+        `area`, `rol`, `membership`, `approval_policy` y `escalation_route`; avisos que se juntan en
+        `motor/carga.py`; no existen preferencias de avisos ni un resumen personal.
+      - **J7-0** · diseño corto y ADR (documentos): las 10 respuestas; la 9 cambia el ADR 0023, punto 10 (al
+        administrador no le llega el pase de la autoridad final).
+      - **J7-1** · el equipo cuadra (`0081`): `problemas_del_equipo`, `area.archivada_en` (un área nunca se
+        borra: se archiva), la tabla `cambio_del_equipo` (sólo se agrega, antes y después), y se le quita a
+        `leda_app` la escritura de las tablas del equipo.
+      - **J7-2** · el pack sólo arma un equipo vacío (sin migración): en un espacio con gente no toca áreas,
+        roles, personas, aprobadores, referentes ni rutas.
+      - **J7-3** · ver el equipo (`0082`): `equipo_de`, `cambios_del_equipo`, módulo `web_equipo.py`, la vista
+        "Equipo" y "Cambios del equipo" en las dos puertas.
+      - **J7-4** · áreas (`0083`): crear, renombrar, archivar. Espera la pregunta 2.
+      - **J7-5** · alta (`0084`): `dar_de_alta`, «> copiar el enlace de activación», "sin conectar", reactivar a
+        quien vuelve; `activar` une la cuenta de quien ya está en otro espacio; el token pasa a guardarse como
+        huella.
+      - **J7-6** · mover tareas por un cambio del equipo (`0085`, base): `cambio_de_responsable` acepta un
+        cambio del equipo además de un pase; `cambio_de_revisor`.
+      - **J7-7** · aprobador, rol y cambio de área (`0086`).
+      - **J7-8** · avisos del cambio (chat: conversación de prueba primero y ronda real).
+      - **J7-9** · baja (`0087`; chat). Espera la pregunta 3.
+      - **J7-10** · nombrar referente (`0088`; chat).
+      - **J7-11** · pasar la autoridad final (`0089`; chat): la acepta quien la recibe; Ismael la puede retirar.
+      - **J7-12** · preferencias de avisos (`0090`; chat). Espera la pregunta 1.
+      - **Riesgos:** quitar permisos a `leda_app` rompe pruebas que escriben `membership` directo; abrir
+        `cambio_de_responsable` toca los pases; un cambio de aprobador no tiene que dar un aviso doble; unir
+        cuentas de Telegram entre espacios es delicado.
+      - **Sale de lo ya decidido:** área sin referente → la decide Dirección (J6-D6); el rol acompaña a ser
+        referente o Dirección (ADR 0019, 7b), y el de Dirección sólo se da con el pase.
+      - **Preguntas** (en texto, de a una): 1. qué avisos informativos se eligen en la J7; 2. la evidencia de un
+        área nueva; 3. si Leda le escribe a quien se da de baja.
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
 libre, "Contame qué querés hacer y te ayudo" (escrito o dictado), y el botón "> completar con Leda". Es
