@@ -95,7 +95,9 @@ TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     # objetivo y la clave de un solo uso de cada creación.
                     "objective", "creacion_de_objetivo",
                     # La reapertura de una tarea pedida (migración 0071; J4).
-                    "reapertura_de_tarea")
+                    "reapertura_de_tarea",
+                    # El cambio de fecha de una tarea (migración 0077; J5, ADR 0025).
+                    "cambio_de_fecha")
 
 # La configuración de cada espacio (migración 0041): `leda_app` la lee directamente y tiene su
 # política. `model_config` admite espacio nulo para el modelo global.
@@ -859,7 +861,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # la 0073, cuya marca del botón de la web apunta a la tarea y cuyo pedido de entrada,
             # a la membresía). Antes que ninguna, la 0075, cuya función del detalle de la tarea
             # lee quién la pidió (la columna de la 0071). Y antes aún la 0076, cuyo pase de la
-            # computadora deja pedidos de entrada (la tabla de la 0073).
+            # computadora deja pedidos de entrada (la tabla de la 0073). Antes que todas, la 0077,
+            # cuyo cambio de fecha también apunta a la membresía (quién lo decidió).
+            (rollback_0077,) = (ROOT / "db" / "rollbacks").glob("0077_*.sql")
+            db.execute(_sql_script(rollback_0077))
             (rollback_0076,) = (ROOT / "db" / "rollbacks").glob("0076_*.sql")
             db.execute(_sql_script(rollback_0076))
             (rollback_0075,) = (ROOT / "db" / "rollbacks").glob("0075_*.sql")

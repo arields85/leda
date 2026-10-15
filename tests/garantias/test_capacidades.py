@@ -94,6 +94,11 @@ TABLAS_POR_FUNCION = ("acceso_tablero", "acceso_tarea", "vista_de_tarea",
                       # `reabrir_tarea`, y la leen `motivo_no_cierra_tarea` y
                       # `tipos_de_evidencia_que_faltan`.
                       "reapertura_de_tarea",
+                      # El cambio de fecha de una tarea (migración 0077; J5, porción S2): por
+                      # ahora sólo lo lee su disparador, `aplicar_cambio_de_fecha`. Lo escriben
+                      # las porciones S6 ("> cambiar la fecha") y S9 (decidir por el chat); cuando
+                      # el código lo use, sale de esta lista.
+                      "cambio_de_fecha",
                       # La entrada con Telegram (migración 0073; ADR 0024): la huella de cada
                       # firma y el pedido de entrada del QR, sólo desde sus funciones.
                       "firma_de_telegram", "pedido_de_entrada")

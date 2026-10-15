@@ -1648,6 +1648,41 @@ create table cambio_de_responsable (
 
 create index cambio_de_responsable_tarea_at on cambio_de_responsable (task_id, at);
 
+-- El cambio de fecha de una tarea (migración 0077; ADR 0025, decisión 6; J5, porción S2), con el
+-- molde de `cambio_de_responsable`: sólo se agrega, y agregarlo es lo único que cambia la fecha de
+-- una tarea (`aplicar_cambio_de_fecha`). Dice la fecha que tenía la tarea (uno viejo se rechaza),
+-- la nueva, el motivo, quién lo hizo (un usuario: también el administrador de plataforma, que no
+-- es miembro del espacio, como en `cargar_tarea`) y quién lo decidió. Quién puede cambiar una
+-- fecha lo deciden las funciones que lo escriban (porción S6), no esta tabla. `clase` deja lugar a
+-- otras formas de cambiarla; aceptar más tiempo no es una (ADR 0025, decisión 5: anota la fecha
+-- prevista y la fecha comprometida queda).
+create table cambio_de_fecha (
+  id                          uuid primary key default gen_random_uuid(),
+  workspace_id                uuid not null references workspace(id) on delete cascade,
+  task_id                     uuid not null,
+  fecha_anterior              timestamptz,
+  fecha_nueva                 timestamptz not null,
+  motivo                      text not null,
+  clase                       text not null,
+  cambiada_por_app_user_id    uuid not null references app_user(id),
+  decidida_por_membership_id  uuid not null,
+  at                          timestamptz not null,
+  constraint cambio_de_fecha_tarea
+    foreign key (workspace_id, task_id) references task(workspace_id, id) on delete cascade,
+  constraint cambio_de_fecha_decidida_por
+    foreign key (workspace_id, decidida_por_membership_id)
+    references membership(workspace_id, id),
+  constraint cambio_de_fecha_motivo
+    check (btrim(motivo) <> '' and char_length(motivo) <= 500),
+  constraint cambio_de_fecha_clase check (clase in ('cambio_directo')),
+  constraint cambio_de_fecha_cambia check (fecha_nueva is distinct from fecha_anterior)
+);
+
+create index cambio_de_fecha_tarea_at on cambio_de_fecha (task_id, at);
+
+comment on table cambio_de_fecha is
+  'J5 (ADR 0025, decisión 6; migración 0077): el cambio de la fecha comprometida de una tarea, con la fecha que tenía, la nueva, el motivo, quién lo hizo y quién lo decidió. Sólo se agrega; agregarlo aplica la fecha en la tarea (aplicar_cambio_de_fecha), y es lo único que la cambia.';
+
 comment on table pase_de_tarea is
   'El Motor (C-7; ADR 0017, enmienda a la decisión 2): el pedido de pasarle una tarea a otra persona, quién lo pidió, quién lo decide (el encargado del sector de quien recibe) y cómo terminó. Cambia de estado sólo hacia adelante; la_tomo, sólo con su cambio_de_responsable.';
 comment on table cambio_de_responsable is
@@ -5590,6 +5625,51 @@ create trigger trg_aplicar_cambio_de_responsable
   before insert on cambio_de_responsable
   for each row execute function aplicar_cambio_de_responsable();
 
+-- Agregar un cambio de fecha aplica la fecha nueva en la tarea (migración 0077; ADR 0025, decisión
+-- 6). Comprueba que la tarea sea del espacio del cambio y siga abierta, que la fecha anterior sea la
+-- que tiene la tarea ahora (un cambio pensado sobre otra fecha se rechaza, nunca se pisa) y que la
+-- nueva sea un día hábil del espacio (`es_dia_habil`, la misma regla de la carga; decisión 56) de
+-- hoy en adelante, en su zona. Corre con los privilegios de `leda_owner`, que no saltea la RLS: sólo
+-- ve el espacio de la transacción, así que una tarea de otro espacio no existe, igual que un id
+-- inventado. La marca `leda.aplicando_cambio_de_fecha` abre sólo la fecha
+-- (`bloquear_estado_directo`).
+create or replace function aplicar_cambio_de_fecha() returns trigger
+security definer set search_path = leda, public, pg_temp as $$
+declare t task%rowtype;
+        zona text;
+        dia date;
+begin
+  select * into t from task where id = new.task_id for update;
+  if not found or t.workspace_id <> new.workspace_id then
+    raise exception 'cambio_de_fecha: la tarea no existe';
+  end if;
+  if t.estado not in ('asignada', 'en_curso', 'bloqueada', 'en_revision') then
+    raise exception 'cambio_de_fecha: la tarea ya no cambia de fecha';
+  end if;
+  if t.fecha_objetivo is distinct from new.fecha_anterior then
+    raise exception 'cambio_de_fecha: la fecha de la tarea ya cambió';
+  end if;
+  select w.zona_horaria into zona from workspace w where w.id = t.workspace_id;
+  dia := (new.fecha_nueva at time zone zona)::date;
+  if dia < (new.at at time zone zona)::date then
+    raise exception 'cambio_de_fecha: la fecha nueva ya pasó';
+  end if;
+  if not es_dia_habil(t.workspace_id, dia) then
+    raise exception 'cambio_de_fecha: la fecha nueva no es un día hábil del espacio';
+  end if;
+  perform set_config('leda.aplicando_cambio_de_fecha', '1', true);
+  update task
+     set fecha_objetivo = new.fecha_nueva,
+         actualizado_en = new.at
+   where id = t.id;
+  perform set_config('leda.aplicando_cambio_de_fecha', '0', true);
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_aplicar_cambio_de_fecha
+  before insert on cambio_de_fecha
+  for each row execute function aplicar_cambio_de_fecha();
+
 -- Un pedido del detalle lo decide el encargado del sector de la tarea, empieza esperando su
 -- decisión y sólo avanza: los datos del pedido no cambian y uno terminado no se reabre
 -- (migración 0050). Lo decide el encargado de ahora, nunca uno anterior (migración
@@ -5888,11 +5968,16 @@ begin
      or new.titulo is distinct from old.titulo
      or new.descripcion is distinct from old.descripcion
      or new.area_id is distinct from old.area_id
-     or new.fecha_objetivo is distinct from old.fecha_objetivo
      or new.criterio_aceptacion is distinct from old.criterio_aceptacion
      or new.evidencia_requerida is distinct from old.evidencia_requerida
      or new.evidencia_policy_version is distinct from old.evidencia_policy_version
      or new.source_draft_id is distinct from old.source_draft_id then
+    raise exception 'Los campos de compromiso de una tarea son inmutables.';
+  end if;
+  -- La fecha cambia sólo con un cambio de fecha (migración 0077; ADR 0025, decisión 6): lo aplica
+  -- `aplicar_cambio_de_fecha`, al agregarse el cambio en `cambio_de_fecha`.
+  if new.fecha_objetivo is distinct from old.fecha_objetivo
+     and coalesce(current_setting('leda.aplicando_cambio_de_fecha', true), '0') <> '1' then
     raise exception 'Los campos de compromiso de una tarea son inmutables.';
   end if;
   -- Quién la tiene y de quién era cambian sólo con un pase confirmado por quien lo pidió, quien
@@ -6408,7 +6493,7 @@ begin
     'pedido_de_detalle','tarea_compartida','apodo',
     'enlace_de_entrada','sesion_web','carga_de_tarea',
     'message_outbox_entrada_web','ofrecimiento_web','creacion_de_objetivo',
-    'reapertura_de_tarea']
+    'reapertura_de_tarea','cambio_de_fecha']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -6460,6 +6545,8 @@ revoke update, delete on dicho_de_quien_destraba from leda_app;
 -- sólo se agrega.
 revoke delete on pase_de_tarea from leda_app;
 revoke update, delete on cambio_de_responsable from leda_app;
+-- Un cambio de fecha (migración 0077), igual: sólo se agrega.
+revoke update, delete on cambio_de_fecha from leda_app;
 -- El detalle de una tarea (migración 0050): un pedido avanza y lo compartido se revoca; nada
 -- se borra.
 revoke delete on pedido_de_detalle, tarea_compartida from leda_app;
@@ -6575,6 +6662,8 @@ alter function aplicar_evento_objetivo()
   owner to leda_owner;
 alter function aplicar_cambio_de_responsable()
   owner to leda_owner;
+alter function aplicar_cambio_de_fecha()
+  owner to leda_owner;
 alter function estado_previo_a_bloqueo(uuid)
   owner to leda_owner;
 alter function estado_previo_a_revision(uuid)
@@ -6587,6 +6676,7 @@ grant execute on function resolver_pendiente(text, uuid, timestamptz) to leda_ap
 revoke execute on function aplicar_evento_tarea() from public;
 revoke execute on function aplicar_evento_objetivo() from public;
 revoke execute on function aplicar_cambio_de_responsable() from public;
+revoke execute on function aplicar_cambio_de_fecha() from public;
 revoke execute on function estado_previo_a_bloqueo(uuid) from public;
 grant execute on function estado_previo_a_bloqueo(uuid) to leda_app;
 revoke execute on function estado_previo_a_revision(uuid) from public;
