@@ -2,8 +2,8 @@ const BIG = 'flex h-12 min-w-0 flex-1 basis-0 select-none items-center gap-2 rou
 
 /** The bottom of the team's page (MA-3 and MA-4, the user's tests on the iPhone and the computer):
  * "> Nueva tarea", to whoever loads tasks, and next to it "> Nuevo objetivo", only to Dirección,
- * both in the primary style and side by side. Nothing else: no "Volver al chat" nor "salir" (the
- * Mini App identifies the person on each opening, and the computer's session is closed by chat). */
+ * both in the primary style and side by side. Nothing else: no "Volver al chat" (the computer's
+ * "Cerrar sesión" lives in the header, under the name, MA-7). */
 export function Footer({
   canLoad,
   canCreateObjective,
