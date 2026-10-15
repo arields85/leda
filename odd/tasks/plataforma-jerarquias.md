@@ -1277,6 +1277,31 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       (`web/dist` no está en Git). El comentario de `web/src/components/Footer.tsx` se corrigió en `e8b81a99`.
       RDD aprobada, `review-07077f99f348d3fc` (un WARNING: no hay prueba de volver a entrar después de cerrar,
       `web/src/App.tsx:275-278`; va con las deudas de la MA). Pendiente: la mirada del usuario en la compu.
+- [x] **Deudas de la MA** (2026-10-15; escritor delegado; prueba primero en cada una):
+      - **Quién pidió una tarea propia** (`cc286185`): en "Mis tareas", una tarea propia que pidió otra
+        persona dice debajo del título "└─ te la pidió Marcos Tarquini" (el nombre entero, como lo da la
+        base); la que pidió la misma persona, o la que nadie pidió, no. El servidor lo agrega a la lista
+        de "Mis tareas" (`_quien_las_pidio`: `task.pedida_por_membership_id`, sólo de las tareas que la
+        base ya le mostró a la sesión y en su espacio); sin migración. **Se hizo así y se puede
+        cambiar** (anotado en "Para decidir al despertar"). RED observado (`KeyError: 'pidio'` y la
+        tarjeta sin la línea), después verde.
+      - **El pase de la compu en los registros** (`a713e751`, advertencia de la MA-5): ningún registro
+        del servidor, a ningún nivel, escribe el pase ni la firma (emitir y canjear, usado o no, en las
+        dos puertas; la prueba confirma que la captura anda porque el navegador de la prueba sí anota la
+        dirección), y `python -m leda servir` arranca uvicorn sin el registro de accesos. Pasó de
+        entrada: no se registraba; queda como guarda. El riesgo que queda es arrancar uvicorn a mano
+        sin `--no-access-log`.
+      - **Volver a entrar después de cerrar la sesión** (`476e86aa`, advertencia de la MA-7): el QR de
+        "Cerraste la sesión." vuelve a pedir quién es y sus tareas. Pasó de entrada; rompiendo `enter`
+        a propósito, falla.
+      - **El área de la dirección** (`0585cd6c`, advertencia de la MA-6, `App.tsx:117`): un área que el
+        servidor no conoce para esa persona (404) vuelve a "Áreas", sin la página de error; quien no
+        tiene "Áreas" ve sus tareas y no le aparece el «Atrás» de Telegram. El servidor ya lo negaba
+        (`test_areas_es_solo_de_direccion_y_de_su_espacio`: área de otro espacio o inventada, 404; quien
+        no es Dirección, 403). RED observado (dos fallas), después verde.
+      Verificación: `npm test` 343 passed y 30 archivos; `npm run build` bien; pytest de
+      `test_quien_ve_que`, `test_entrar_con_telegram`, `test_enlace_y_sesion`, `test_lectura`,
+      `test_api_de_la_plataforma` y `test_capacidades`: 184 passed.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
@@ -1546,6 +1571,12 @@ Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de ba
 **Sesión autónoma que sigue al 2026-10-15** (el usuario se fue a dormir y pidió trabajar solo, con la IA real
 autorizada): el agente agrega acá, debajo de esta línea, cada pregunta que dependa del usuario (MA-7 a J7), con
 ejemplo y recomendación, y sigue con otra cosa.
+
+- **Quién pidió una tarea propia, en "Mis tareas"** (deuda de la MA, `cc286185`): **se hizo así y se puede
+  cambiar.** Ejemplo: en "Mis tareas" de Ismael, la tarjeta "Aprobar la compra del módem" dice debajo del
+  título "└─ te la pidió Marcos Tarquini", chico y gris, como el "└─ de Ariel · te espera". Sólo en sus propias
+  tareas, sólo si la pidió otra persona, y con el nombre entero. *Recomendación:* dejarlo así; si se prefiere
+  el nombre corto ("te la pidió Marcos") o que diga también el área, es un cambio chico.
 
 - **J7 · las jerarquías y los integrantes desde la web de Dirección** (preguntas preparadas el 2026-10-15 a la
   noche; nada construido). Hoy no hay ninguna función, comando ni pantalla para dar de alta o de baja a alguien,
