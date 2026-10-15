@@ -107,7 +107,8 @@ viejo corriendo.
 4. **Deudas abiertas de la MA:**
    - los WARNING menores de la última RDD (documento de la unidad);
    - la ortografía al confirmar en la puerta del equipo falló dos veces el 14/10: verla con la IA real;
-   - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento).
+   - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento);
+   - desde Telegram Web no apareció ningún QR (usuario, 2026-10-14): para revisar más adelante.
 Acuerdos del 2026-10-14:
 - las decisiones de cada porción se traen al principio, de a una y en texto;
 - RDD y las rondas con la IA real, sin preguntar; al primer error de cupo, se para y espera;

@@ -1155,7 +1155,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - el detalle de la tarea no muestra quién la pidió, qué espera ni quién la espera;
       - la ortografía de la puerta del equipo: las dos puertas mandan lo mismo a la IA, así que hay que mirarla
         con la IA real;
-      - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento).
+      - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento);
+      - desde Telegram Web no apareció ningún QR (usuario, 2026-10-14): queda para revisar más adelante.
       IA real, conversaciones 50 y 52 a 54: 12 de 12. `leda_motor`: respaldo
       `leda_motor-antes-0073-20261014.dump`, ensayo previo y la `0073` aplicada. Guion de la prueba:
       `docs/product/guion-celular-ma.md`.
