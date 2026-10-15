@@ -20,6 +20,8 @@ import { teamTasks } from './admin/api';
 import { NewObjective } from './admin/NewObjective';
 import { NewTask } from './admin/NewTask';
 import { teamObjectives } from './admin/objectiveApi';
+import { ownTeam } from './admin/teamApi';
+import { TeamView } from './admin/TeamView';
 import { FinishedList } from './components/FinishedList';
 import { Footer } from './components/Footer';
 import { PassTask } from './components/PassTask';
@@ -131,6 +133,9 @@ export function App() {
   const [creating, setCreating] = useState<'tarea' | 'objetivo' | null>(null);
   const objectives = useMemo(teamObjectives, []);
   const tasksApi = useMemo(teamTasks, []);
+  // "Equipo" (J7-3), only to Dirección: one more tab, whose view takes the list's place.
+  const [onTeam, setOnTeam] = useState(false);
+  const team = useMemo(ownTeam, []);
   // The chat's button that opened the page, followed once (ADR 0024, decision 2).
   const link = useRef(deepLink());
   const [opening, setOpening] = useState(false);
@@ -191,6 +196,7 @@ export function App() {
     const data = me.data;
     function follow() {
       setDetail(null);
+      setOnTeam(false);
       setView(pickView(data, viewInAddress()));
       setArea(areaInAddress());
     }
@@ -202,15 +208,17 @@ export function App() {
   // decision 10; MA-3), or leaves an area for the overview of "Áreas" (MA-6): the same as their
   // "> volver" or "‹ Áreas", never closing the Mini App.
   useEffect(
-    () => bindBackButton(telegramWebApp(), creating !== null || detail !== null || inArea !== null, () => {
+    () => bindBackButton(telegramWebApp(), creating !== null || detail !== null || inArea !== null || onTeam, () => {
       if (creating !== null || detail !== null) {
         setDetail(null);
         setCreating(null);
+      } else if (onTeam) {
+        setOnTeam(false);
       } else {
         backToAreas();
       }
     }),
-    [creating, detail, inArea],
+    [creating, detail, inArea, onTeam],
   );
 
   /** A task's detail inside the app (MA-3): the server says what this person may see of it. */
@@ -231,6 +239,7 @@ export function App() {
 
   function choose(next: ViewId) {
     setDetail(null);
+    setOnTeam(false);
     setArea(null);
     setView(next);
     try {
@@ -276,7 +285,9 @@ export function App() {
       : 'Nuevo objetivo'
     : detail
       ? 'Tarea'
-      : (ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda');
+      : onTeam
+        ? 'Equipo'
+        : (ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda');
 
   const enter = () => {
     setSignedOut(false);
@@ -327,8 +338,23 @@ export function App() {
   } else {
     fixed = (
       <>
-        <ViewSwitch views={person.vistas} current={view} onChange={choose} />
-        {view === 'areas' && area !== null && (
+        <ViewSwitch
+          views={person.vistas}
+          current={view}
+          onChange={choose}
+          team={
+            person.organiza_el_equipo
+              ? {
+                  open: onTeam,
+                  onOpen: () => {
+                    setDetail(null);
+                    setOnTeam(true);
+                  },
+                }
+              : undefined
+          }
+        />
+        {!onTeam && view === 'areas' && area !== null && (
           <div>
             <button
               type="button"
@@ -339,7 +365,7 @@ export function App() {
             </button>
           </div>
         )}
-        {ready && ready.vista !== 'pedidas' && (
+        {!onTeam && ready && ready.vista !== 'pedidas' && (
           <>
             <StatePanel panel={ready.panel} notStarted={ready.sin_empezar} />
             {/* On a small phone the week gives way first: the rule stays, only the cards scroll. */}
@@ -350,7 +376,9 @@ export function App() {
         )}
       </>
     );
-    body = (
+    body = onTeam ? (
+      <TeamView api={team} onClosed={() => setMe({ kind: 'closed' })} />
+    ) : (
       <>
         {listing.kind === 'loading' && <Notice title="Cargando…" />}
         {opening && <Notice title="Abriendo la tarea…" />}

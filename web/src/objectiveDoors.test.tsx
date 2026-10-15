@@ -72,7 +72,7 @@ describe('the administration door', () => {
     });
     render(<AdminApp />);
     await screen.findByRole('form', { name: 'Cargar tarea' });
-    const kinds = screen.getByRole('group', { name: 'Qué cargar' });
+    const kinds = screen.getByRole('group', { name: 'Qué hacer' });
     expect(within(kinds).getByRole('button', { name: 'Tarea' })).toHaveAttribute('aria-pressed', 'true');
     // The objective's options are read only when it is chosen.
     expect(calls.some((c) => c.key === `GET ${BASE}/opciones`)).toBe(false);
@@ -118,7 +118,7 @@ describe('the administration door', () => {
     });
     render(<AdminApp />);
     await screen.findByRole('form', { name: 'Cargar tarea' });
-    fireEvent.click(within(screen.getByRole('group', { name: 'Qué cargar' })).getByRole('button', { name: 'Objetivo' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Qué hacer' })).getByRole('button', { name: 'Objetivo' }));
     const form = await screen.findByRole('form', { name: 'Crear objetivo' });
     fireEvent.change(within(form).getByLabelText('Contame qué querés hacer y te ayudo'), {
       target: { value: 'la planta del 2027' },
@@ -148,7 +148,7 @@ describe('the administration door', () => {
     });
     render(<AdminApp />);
     await screen.findByRole('form', { name: 'Cargar tarea' });
-    const kinds = screen.getByRole('group', { name: 'Qué cargar' });
+    const kinds = screen.getByRole('group', { name: 'Qué hacer' });
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Configurar alarmas del SCADA' } });
     fireEvent.click(within(kinds).getByRole('button', { name: 'Objetivo' }));
     await screen.findByRole('form', { name: 'Crear objetivo' });

@@ -28,6 +28,9 @@ export interface Me {
   // Whether this person loads tasks (Dirección and the area referentes, ADR 0023, decision 3; J4):
   // only then the page offers "> Nueva tarea". The server refuses anyone else anyway.
   carga_tareas?: boolean;
+  // Whether this person sees "Equipo" (Dirección, ADR 0023, decision 4; J7-3). The server refuses
+  // anyone else anyway.
+  organiza_el_equipo?: boolean;
 }
 
 export interface Wait {

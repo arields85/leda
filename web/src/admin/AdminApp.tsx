@@ -12,6 +12,8 @@ import { Dropdown } from './Dropdown';
 import { LoadForm } from './LoadForm';
 import { NewObjective } from './NewObjective';
 import { adminObjectives } from './objectiveApi';
+import { adminTeam } from './teamApi';
+import { TeamView } from './TeamView';
 
 type Load<T> =
   | { kind: 'loading' }
@@ -58,18 +60,23 @@ function Failed({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-/** What the administrator loads: a task (ADR 0022) or an objective (ADR 0023, decision 5). */
-type Kind = 'tarea' | 'objetivo';
+/** What the administrator does in a space: load a task (ADR 0022) or an objective (ADR 0023,
+ * decision 5), or see its team (J7-3; decision 5: the platform administrator can do everything in
+ * any space). */
+type Kind = 'tarea' | 'objetivo' | 'equipo';
 
 const KINDS: SwitchItem<Kind>[] = [
   { value: 'tarea', label: 'Tarea' },
   { value: 'objetivo', label: 'Objetivo' },
+  { value: 'equipo', label: 'Equipo' },
 ];
 
-/** The choice at the top of the load area: a task or an objective, with the tabs of the team's
- * views (`Switch`). */
+const TITLES: Record<Kind, string> = { tarea: 'Cargar tarea', objetivo: 'Crear objetivo', equipo: 'Equipo' };
+
+/** The choice at the top of the space: a task, an objective or the team, with the tabs of the
+ * team's views (`Switch`). */
 function KindSwitch({ current, onChange }: { current: Kind; onChange: (kind: Kind) => void }) {
-  return <Switch label="Qué cargar" items={KINDS} current={current} onChange={onChange} />;
+  return <Switch label="Qué hacer" items={KINDS} current={current} onChange={onChange} />;
 }
 
 /** The administration door (ADR 0022, decisions 6 and 10): who is in, which space, and the form
@@ -96,6 +103,7 @@ export function AdminApp() {
   const optionsNow = useRef<OptionsLoad>(options);
   optionsNow.current = options;
   const objectives = useMemo(() => (spaceId ? adminObjectives(spaceId) : null), [spaceId]);
+  const team = useMemo(() => (spaceId ? adminTeam(spaceId) : null), [spaceId]);
 
   useEffect(() => {
     const request = new AbortController();
@@ -147,7 +155,7 @@ export function AdminApp() {
   function chooseKind(next: Kind) {
     if (next === kind) return;
     if (next === 'tarea') setReread((n) => n + 1);
-    else setObjectiveSpace(spaceId);
+    else if (next === 'objetivo') setObjectiveSpace(spaceId);
     setKind(next);
   }
 
@@ -200,6 +208,9 @@ export function AdminApp() {
             />
           </div>
         )}
+        {team && options.kind !== 'gone' && kind === 'equipo' && (
+          <TeamView key={`equipo-${spaceId}`} api={team} onClosed={() => setClosed(true)} />
+        )}
         {kind === 'tarea' && options.kind === 'loading' && <Notice title="Cargando…" />}
         {kind === 'tarea' && options.kind === 'failed' && <Failed onRetry={retry} />}
         {options.kind === 'gone' && (
@@ -234,7 +245,7 @@ export function AdminApp() {
     <div className="mx-auto flex min-h-dvh w-full min-w-0 overflow-x-clip max-w-[72rem] flex-col px-5">
       <Header
         space={open && spaceName ? `administración · ${spaceName}` : 'administración'}
-        title={open ? (kind === 'objetivo' ? 'Crear objetivo' : 'Cargar tarea') : 'Leda'}
+        title={open ? TITLES[kind] : 'Leda'}
         person={open ? admin?.administrador : undefined}
         signOut={open && !inMiniApp && <SignOut action={adminSignOut} onDone={() => setSignedOut(true)} />}
       />
