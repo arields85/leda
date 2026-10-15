@@ -120,8 +120,9 @@ COLUMNAS_POR_FUNCION: dict[tuple[str, str], tuple[str, ...]] = {
     ("task", "pedida_por_membership_id"): ("cargar_tarea_web", "puede_ver_tarea",
                                            "pedidas_que_ve", "reabrir_tarea"),
     # `area.archivada_en` (migración 0081; J7-1): un área se archiva, no se borra. La leen
-    # `problemas_del_equipo` y `equipo_de` (J7-3, la vista "Equipo"); la escribe la J7-4.
-    ("area", "archivada_en"): ("problemas_del_equipo", "equipo_de"),
+    # `problemas_del_equipo` y `equipo_de` (J7-3, la vista "Equipo"); la escribe
+    # `cambiar_un_area` (J7-4, migración 0083).
+    ("area", "archivada_en"): ("problemas_del_equipo", "equipo_de", "cambiar_un_area"),
 }
 
 # Las tablas del motor de conversación (migraciones 0030 y 0031) estuvieron

@@ -155,3 +155,35 @@ def test_reimportar_no_pisa_el_equipo_y_aplica_lo_demas(conn, tmp_path):
         assert cur.fetchone()
         cur.execute("select count(*) n from app_user where telegram_user_id = 1234567")
         assert cur.fetchone()["n"] == 0
+
+
+def test_reimportar_no_borra_la_evidencia_de_un_area_creada_en_la_web(conn, tmp_path):
+    """J7-4: un área creada en la web no está en el archivo; volver a importarlo no le borra su
+    evidencia (sin ella, sus tareas no se podrían cargar), y las áreas del archivo la reciben."""
+    os.environ["LEDA_BOT_TOKEN_COREWORK"] = "prueba:token"
+    pack = _pack()
+    r = importar(conn, _escribir(tmp_path, pack), activar=True)
+    conn.commit()
+    ws = r.workspace_id
+    with admin(conn) as cur:
+        cur.execute("""insert into area (workspace_id, slug, nombre)
+                       values (%s, 'compras', 'Compras') returning id""", (ws,))
+        compras = cur.fetchone()["id"]
+        cur.execute("""insert into task_evidence_policy (workspace_id, area_id, evidencia_requerida)
+                       values (%s, %s, array['explicacion'])""", (ws, compras))
+    conn.commit()
+
+    pack["evidencia"]["por_area"]["it"] = ["explicacion"]
+    importar(conn, _escribir(tmp_path, pack, "otra.yaml"), activar=True)
+    conn.commit()
+
+    with admin(conn) as cur:
+        cur.execute("select evidencia_requerida from task_evidence_policy where area_id = %s",
+                    (compras,))
+        assert cur.fetchone()["evidencia_requerida"] == ["explicacion"]
+        cur.execute(
+            """select p.evidencia_requerida from task_evidence_policy p
+                 join area a on a.id = p.area_id
+                where a.workspace_id = %s and a.slug = 'it'""", (ws,))
+        assert cur.fetchone()["evidencia_requerida"] == ["explicacion"]
+    conn.commit()

@@ -3345,6 +3345,34 @@ def leer_por_la_puerta(request: Request, puerta: str, espacio_id: str | None,
     return _con_la_base(lambda conn: leer(conn, token, None))
 
 
+async def escribir_por_la_puerta(request: Request, puerta: str, espacio_id: str | None,
+                                 escribir: Callable[[Any, str, str | None, Any], Response]
+                                 ) -> Response:
+    """Un pedido que escribe por una puerta (J7-4): los controles de los que escriben (otro sitio,
+    JSON, la cookie de esa puerta y el tamaño) y después `escribir(conn, token, espacio, cuerpo)`
+    con la conexión de la web, fuera del hilo del pedido. Por la de administración, la sesión se
+    revalida antes y el espacio del camino tiene que ser un id (si no, 404); por la del equipo, el
+    espacio sale de la sesión (`None`). El cuerpo llega leído, o `None` si no se pudo leer."""
+    pedido = await (_el_pedido_del_equipo(request) if puerta == PUERTA_DEL_EQUIPO
+                    else _el_pedido_de_la_administracion(request))
+    if isinstance(pedido, Response):
+        return pedido
+    token, cuerpo = pedido
+    if puerta == PUERTA_DE_ADMINISTRACION:
+        espacio = _espacio_de(espacio_id) if espacio_id is not None else None
+
+        def trabajo(conn) -> Response:
+            with sin_espacio(conn) as cur:
+                if _sesion_de_administracion(cur, token) is None:
+                    return _sin_sesion_de_administracion()
+            if espacio is None:
+                return _espacio_que_no_existe()
+            return escribir(conn, token, espacio, cuerpo)
+
+        return await run_in_threadpool(_con_la_base, trabajo)
+    return await run_in_threadpool(_con_la_base, lambda conn: escribir(conn, token, None, cuerpo))
+
+
 def rechazo_de_la_base(resultado: dict[str, Any], puerta: str, texto_sin_autoridad: str
                        ) -> Response | None:
     """Lo que la base rechaza al resolver la puerta: sin sesión (401, se corta la cookie de esa

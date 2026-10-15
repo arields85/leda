@@ -186,7 +186,8 @@ def test_direccion_ve_su_equipo(conn, intake_world, web):
     respuesta = navegador.get(EQUIPO)
     assert respuesta.status_code == 200, respuesta.text
     datos = respuesta.json()
-    assert set(datos) == {"espacio", "areas", "personas", "roles", "problemas", "cambios"}
+    assert set(datos) == {"espacio", "areas", "personas", "roles", "problemas", "cambios",
+                          "tipos_de_evidencia"}
     assert datos["espacio"] == {"id": intake_world["north-lab"]["id"], "nombre": "North Lab"}
     assert [a["nombre"] for a in datos["areas"]] == ["Field Services", "Quality Guild"]
     field = datos["areas"][0]

@@ -355,7 +355,7 @@ def importar(
             _importar_equipo(cur, ws, pack)
 
         _importar_configuracion(cur, ws, pack)
-        _importar_politica_evidencia(cur, ws, pack)
+        _importar_politica_evidencia(cur, ws, pack, equipo_existente=equipo_existente)
         _importar_cadencia(cur, ws, pack)
         _importar_ajustes(cur, ws, pack)
         _importar_objetivo_inicial(cur, ws, pack)
@@ -627,15 +627,19 @@ def _tipos_del_area(pack: dict[str, Any]) -> dict[str, Any]:
             and isinstance(d.get("en_palabras"), str) and d["en_palabras"].strip()}
 
 
-def _importar_politica_evidencia(cur, ws, pack) -> None:
+def _importar_politica_evidencia(cur, ws, pack, *, equipo_existente: bool = False) -> None:
+    """La evidencia que pide cada área del archivo. En un espacio vacío, el archivo arma todo: la
+    de un área que no nombra se borra. Con gente (J7-4), las áreas que no nombra son de la web y
+    conservan la suya: sin ella, sus tareas no se podrían cargar."""
     por_area = (pack.get("evidencia") or {}).get("por_area") or {}
-    cur.execute(
-        """delete from task_evidence_policy p
-            where p.workspace_id = %s
-              and not exists (
-                select 1 from area a
-                 where a.id = p.area_id and a.slug = any(%s))""",
-        (ws, list(por_area)))
+    if not equipo_existente:
+        cur.execute(
+            """delete from task_evidence_policy p
+                where p.workspace_id = %s
+                  and not exists (
+                    select 1 from area a
+                     where a.id = p.area_id and a.slug = any(%s))""",
+            (ws, list(por_area)))
     for area_slug, evidencia in por_area.items():
         # Las clases de cada tipo van con la política, y la versión cambia también si cambian
         # ellas (ADR 0019, decisión 5: dato del pack, versionado con la política).
