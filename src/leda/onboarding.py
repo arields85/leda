@@ -11,10 +11,14 @@ a recibir su seguimiento. Van uno a uno, siempre.
 
 Precauciones que este módulo aplica:
   - token largo y aleatorio;
+  - la base guarda sólo su huella (migración 0084): quien lea la tabla no puede canjearlo;
   - un solo uso;
   - vencimiento;
   - un enlace vigente por persona;
-  - una cuenta de Telegram ya vinculada no puede canjear otro token.
+  - una cuenta de Telegram que ya es de alguien de este equipo no puede canjear otro token.
+
+Quien ya está en otro espacio (J7-5): al abrir el enlace con su Telegram, la membresía nueva queda
+unida a su cuenta (el mismo `app_user`). Lo decide sólo quien abre el enlace, nunca el nombre.
 
 Sin activar, la persona existe igual: tiene tareas, aparece en los informes y
 cuenta para el cierre de un objetivo. Lo único que falta es el canal privado.
@@ -22,6 +26,7 @@ cuenta para el cierre de un objetivo. Lo único que falta es el canal privado.
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -35,6 +40,20 @@ VIGENCIA = timedelta(days=14)
 
 class ActivacionInvalida(Exception):
     pass
+
+
+@dataclass
+class Activacion:
+    """Cómo terminó un canje: la persona vinculada, su membresía y si su cuenta ya era de
+    alguien de otro espacio (quedó unida)."""
+    nombre: str
+    membership_id: str
+    cuenta_unida: bool
+
+
+def huella_del_token(token: str) -> str:
+    """La huella con que la base guarda el token de un enlace (sha256, en hexadecimal)."""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 @dataclass
@@ -80,9 +99,9 @@ def generar_enlaces(cur: psycopg.Cursor, workspace_id: str, bot_username: str,
         token = secrets.token_urlsafe(24)
         cur.execute(
             """insert into activation_token
-                 (workspace_id, membership_id, token, expira_en, creado_por)
+                 (workspace_id, membership_id, token_hash, expira_en, creado_por)
                values (%s, %s, %s, %s, %s)""",
-            (workspace_id, p["membership_id"], token, expira, creado_por))
+            (workspace_id, p["membership_id"], huella_del_token(token), expira, creado_por))
         enlaces.append(Enlace(
             nombre=p["nombre"], membership_id=str(p["membership_id"]),
             token=token, url=f"https://t.me/{bot_username}?start={token}",
@@ -92,7 +111,17 @@ def generar_enlaces(cur: psycopg.Cursor, workspace_id: str, bot_username: str,
 
 def activar(cur: psycopg.Cursor, workspace_id: str, token: str,
             telegram_user_id: int, ahora: datetime | None = None) -> str:
-    """Canjea un token. Devuelve el nombre de la persona vinculada.
+    """Canjea un token. Devuelve el nombre de la persona vinculada."""
+    return canjear(cur, workspace_id, token, telegram_user_id, ahora).nombre
+
+
+def canjear(cur: psycopg.Cursor, workspace_id: str, token: str,
+            telegram_user_id: int, ahora: datetime | None = None) -> Activacion:
+    """Canjea un token: vincula la cuenta de Telegram de quien lo abrió con la persona del enlace.
+
+    Si esa cuenta ya es de alguien de otro espacio, la membresía del enlace pasa a esa cuenta (el
+    mismo `app_user`): una persona, una cuenta. Si ya es de alguien de este equipo, se rechaza. Se
+    busca sólo por la cuenta que abrió el enlace, nunca por el nombre.
 
     Corre con permisos de administración: tiene que escribir en app_user, que
     es una tabla global.
@@ -105,8 +134,9 @@ def activar(cur: psycopg.Cursor, workspace_id: str, token: str,
              from activation_token t
              join membership m on m.id = t.membership_id
              join app_user u on u.id = m.app_user_id
-            where t.token = %s and t.workspace_id = %s""",
-        (token, workspace_id))
+            where t.token_hash = %s and t.workspace_id = %s and m.workspace_id = %s
+              for update of t, m""",
+        (huella_del_token(token), workspace_id, workspace_id))
     fila = cur.fetchone()
 
     if not fila:
@@ -118,19 +148,31 @@ def activar(cur: psycopg.Cursor, workspace_id: str, token: str,
     if fila["telegram_user_id"] is not None:
         raise ActivacionInvalida("Esa persona ya está activada.")
 
-    # Una cuenta de Telegram no puede quedar vinculada a dos personas.
-    cur.execute("select nombre from app_user where telegram_user_id = %s",
+    # Una cuenta de Telegram es de una sola persona. Si ya es de alguien de este equipo, no toma
+    # otra identidad; si es de alguien de otro espacio, es la misma persona que ahora también
+    # está en este: la membresía nueva pasa a su cuenta (J7-5). La persona que el enlace había
+    # creado queda sin membresía y sin Telegram: no se borra (la auditoría la puede nombrar).
+    cur.execute("select id, nombre from app_user where telegram_user_id = %s for update",
                 (telegram_user_id,))
     ya = cur.fetchone()
+    unida = False
     if ya:
-        raise ActivacionInvalida("Esa cuenta de Telegram ya está en uso.")
-
-    cur.execute("update app_user set telegram_user_id = %s where id = %s",
-                (telegram_user_id, fila["app_user_id"]))
+        cur.execute("select 1 from membership where workspace_id = %s and app_user_id = %s",
+                    (workspace_id, ya["id"]))
+        if cur.fetchone():
+            raise ActivacionInvalida("Esa cuenta de Telegram ya está en uso.")
+        cur.execute("update membership set app_user_id = %s where id = %s",
+                    (ya["id"], fila["membership_id"]))
+        nombre, unida = ya["nombre"], True
+    else:
+        cur.execute("update app_user set telegram_user_id = %s where id = %s",
+                    (telegram_user_id, fila["app_user_id"]))
+        nombre = fila["nombre"]
     cur.execute(
         "update activation_token set usado_en = %s, usado_por = %s where id = %s",
         (ahora, telegram_user_id, fila["id"]))
-    return fila["nombre"]
+    return Activacion(nombre=nombre, membership_id=str(fila["membership_id"]),
+                      cuenta_unida=unida)
 
 
 def bienvenida(cur: psycopg.Cursor, workspace_id: str, nombre: str) -> str:

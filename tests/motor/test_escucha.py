@@ -26,6 +26,7 @@ from leda.motor.escucha import BotTelegram, Escucha
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import ETAPA_FUERA_DE_LA_LISTA, TEXTO_SI_LA_IA_FALLA
+from leda.onboarding import huella_del_token
 from leda.salida import enqueue_outbox
 
 from tests.motor.ayudantes import (AHORA, ID_DEL_BOT, TelegramFalso, cuantas,
@@ -265,10 +266,12 @@ def test_un_enlace_de_activacion_vincula_a_la_persona_y_le_da_la_bienvenida(conn
                        values (%s, %s, %s, %s) returning id""",
                     (mundo["id"], usuario, base["area_id"], base["rol_id"]))
         membresia = cur.fetchone()["id"]
-        cur.execute("""insert into activation_token (workspace_id, membership_id, token,
+        # La base guarda la huella del token, nunca el token (migración 0084).
+        cur.execute("""insert into activation_token (workspace_id, membership_id, token_hash,
                                                      expira_en)
-                       values (%s, %s, 'enlace-de-prueba', %s)""",
-                    (mundo["id"], membresia, AHORA.replace(year=2027)))
+                       values (%s, %s, %s, %s)""",
+                    (mundo["id"], membresia, huella_del_token("enlace-de-prueba"),
+                     AHORA.replace(year=2027)))
         cur.execute("insert into greeting_state (membership_id, workspace_id, "
                     "ultima_fecha_local) values (%s, %s, '9999-12-31')",
                     (membresia, mundo["id"]))

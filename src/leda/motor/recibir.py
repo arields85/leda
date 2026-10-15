@@ -88,7 +88,7 @@ from ..despachador import (Transporte, despachar, registrar_falla_del_retiro,
 from ..entrada import VENTANA_TURNO_EN_CURSO, clave_de_candado_del_mensaje, sql_respondido
 from ..incidentes import (ETAPA_TURNO_CONVERSACION, REFERENCIA_INBOUND_MESSAGE,
                           registrar_incidente)
-from ..onboarding import (ActivacionInvalida, activar, bienvenida, destino_de_la_bienvenida,
+from ..onboarding import (ActivacionInvalida, bienvenida, canjear, destino_de_la_bienvenida,
                           ofrecer_la_web_en_la_bienvenida, ofrecimiento_de_la_web)
 from ..salida import enqueue_outbox
 
@@ -698,20 +698,25 @@ class Recepcion:
 
     def _activar(self, texto: str, tg_user: int, chat_id: int, message_id: int) -> None:
         """El mecanismo de activación de siempre (`leda.onboarding`), con permisos de
-        administración: escribe en `app_user`, que es global."""
+        administración: escribe en `app_user`, que es global. El token se busca por su huella; si
+        la cuenta de quien lo abre ya es de alguien de otro espacio, la membresía queda unida a
+        ella (J7-5) y la auditoría lo dice, sin nada de ese otro espacio."""
         partes = texto.split(maxsplit=1)
         with admin(self.conn) as cur:
             membership_id = None
             if len(partes) == 2:
                 try:
-                    nombre = activar(cur, self.ws, partes[1].strip(), tg_user,
-                                     self.reloj.ahora())
+                    canje = canjear(cur, self.ws, partes[1].strip(), tg_user,
+                                    self.reloj.ahora())
                 except ActivacionInvalida as e:
                     cuerpo = f"{e} Pedile uno nuevo a quien te lo pasó."
                 else:
                     registrar_auditoria(cur, accion="activacion", workspace_id=self.ws,
-                                        actor_kind="persona", detalle={"nombre": nombre})
-                    cuerpo = bienvenida(cur, self.ws, nombre)
+                                        actor_kind="persona",
+                                        detalle={"nombre": canje.nombre,
+                                                 "membership_id": canje.membership_id,
+                                                 "cuenta_unida": canje.cuenta_unida})
+                    cuerpo = bienvenida(cur, self.ws, canje.nombre)
                     membership_id = self._membresia(cur, tg_user)
             else:
                 membership_id = self._membresia(cur, tg_user)

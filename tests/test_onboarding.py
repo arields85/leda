@@ -12,7 +12,7 @@ import pytest
 
 from leda.db import admin
 from leda.onboarding import (ActivacionInvalida, activar, bienvenida, encolar_presentacion,
-                               generar_enlaces, pendientes_de_activar)
+                               generar_enlaces, huella_del_token, pendientes_de_activar)
 
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=timezone.utc)
 
@@ -57,6 +57,19 @@ def test_genera_un_enlace_por_persona(sin_activar, conn):
     # Tokens distintos y largos: no se adivinan.
     tokens = {e.token for e in enlaces}
     assert len(tokens) == 7 and all(len(t) >= 24 for t in tokens)
+
+
+def test_la_base_guarda_solo_la_huella_del_token(sin_activar, conn):
+    """Quien lea la tabla no puede canjear un enlace (migración 0084): el token en claro sólo lo
+    tiene quien lo emitió."""
+    ws = sin_activar.workspace_id
+    with admin(conn) as cur:
+        (enlace,) = generar_enlaces(cur, ws, "bot", solo=["Marcos"], ahora=AHORA)
+        cur.execute("select * from activation_token where membership_id = %s",
+                    (enlace.membership_id,))
+        (fila,) = cur.fetchall()
+    assert fila["token_hash"] == huella_del_token(enlace.token) != enlace.token
+    assert all(enlace.token not in str(valor) for valor in fila.values())
 
 
 def test_piloto_con_algunos(sin_activar, conn):

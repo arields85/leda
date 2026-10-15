@@ -118,7 +118,12 @@ TABLAS_DE_LA_ADMINISTRACION = ("admin_notice", "admin_notice_enlace",
                                # La entrada con Telegram (migración 0073; ADR 0024): la huella de
                                # cada firma y el pedido de entrada del QR, sin política (sólo sus
                                # funciones las tocan).
-                               "firma_de_telegram", "pedido_de_entrada")
+                               "firma_de_telegram", "pedido_de_entrada",
+                               # Los enlaces de activación (migración 0084; J7-5): el token pasa a
+                               # guardarse como huella. Sin política por espacio (excepción de
+                               # `test_aislamiento.py`): sólo la conexión administrativa y la
+                               # función que los emite.
+                               "activation_token")
 
 # Las políticas de más de una tabla, además de la de aislamiento: `acceso_tarea` (migración
 # 0036) se encuentra por el hash del token antes de saber su espacio, sólo desde las funciones

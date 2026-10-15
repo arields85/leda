@@ -177,8 +177,10 @@ EXCEPCIONES_SIN_RLS = {
         "los enlaces del tablero: sólo se llega por las funciones que los emiten y resuelven "
         "(security definer, dueño leda_owner); leda_app no tiene privilegio sobre la tabla"),
     "activation_token": (
-        "los enlaces de activación: los emite y los canjea la conexión administrativa (alta "
-        "de integrantes), nunca la aplicación"),
+        "los enlaces de activación, guardados como huella (migración 0084): los emite la "
+        "conexión administrativa o `emitir_enlace_de_activacion` (security definer, dueño "
+        "leda_owner, sólo para quien organiza el equipo) y los canjea la conexión "
+        "administrativa, nunca la aplicación"),
     "admin_notice": (
         "la cola del bot de administración: no tiene un único espacio dueño (workspace_id "
         "admite nulo y queda en nulo si se borra el espacio); la escribe "
