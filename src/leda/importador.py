@@ -300,10 +300,6 @@ def importar(
     faltan = [p for p in pendientes
               if not p.endswith("telegram_user_id") and p not in tolerados]
     sin_activar = sum(1 for p in pendientes if p.endswith("telegram_user_id"))
-    if sin_activar:
-        advertencias.append(
-            f"{sin_activar} persona(s) todavía no activaron su enlace de "
-            f"Telegram. Hasta que lo hagan no reciben seguimiento privado.")
 
     if activar and faltan:
         bloqueantes.append(
@@ -344,9 +340,21 @@ def importar(
             (ws, version, pack_hash, aprobado_por),
         )
 
-        _importar_taxonomia(cur, ws, pack)
-        _importar_personas(cur, ws, pack)
-        _importar_politica(cur, ws, pack)
+        # El pack sólo arma un equipo vacío (J7-2; usuario, 2026-10-15, J7 punto 1): con gente,
+        # el equipo lo gobierna la web y el archivo no lo pisa.
+        cur.execute("select exists (select 1 from membership where workspace_id = %s) as hay",
+                    (ws,))
+        equipo_existente = cur.fetchone()["hay"]
+        if equipo_existente:
+            advertencias.append(AVISO_EQUIPO_EXISTENTE)
+        else:
+            if sin_activar:
+                advertencias.append(
+                    f"{sin_activar} persona(s) todavía no activaron su enlace de "
+                    f"Telegram. Hasta que lo hagan no reciben seguimiento privado.")
+            _importar_equipo(cur, ws, pack)
+
+        _importar_configuracion(cur, ws, pack)
         _importar_politica_evidencia(cur, ws, pack)
         _importar_cadencia(cur, ws, pack)
         _importar_ajustes(cur, ws, pack)
@@ -357,6 +365,7 @@ def importar(
             actor_app_user_id=aprobado_por, actor_kind="persona",
             sujeto_tipo="workspace", sujeto_id=ws, pack_hash=pack_hash,
             detalle={"version": version, "activado": activar,
+                     "equipo_del_pack": "no_aplicado" if equipo_existente else "aplicado",
                      "advertencias": advertencias, "pendientes": pendientes},
         )
 
@@ -373,7 +382,22 @@ def _entero(v: Any) -> int | None:
         return None
 
 
-def _importar_taxonomia(cur, ws, pack) -> None:
+# Lo que dice el importador cuando el espacio ya tiene gente (J7-2).
+AVISO_EQUIPO_EXISTENTE = (
+    "El equipo ya existe: las personas, las áreas y quién aprueba a quién se cambian desde la "
+    "web; el archivo no los tocó.")
+
+
+def _importar_equipo(cur, ws, pack) -> None:
+    """Las áreas, los roles, las personas con su aprobador, los referentes, la política de
+    aprobación y las rutas de escalamiento: sólo en un espacio sin gente (J7-2)."""
+    _importar_areas_y_roles(cur, ws, pack)
+    _importar_personas(cur, ws, pack)
+    _importar_politica(cur, ws, pack)
+    _importar_escalamiento(cur, ws, pack)
+
+
+def _importar_areas_y_roles(cur, ws, pack) -> None:
     for a in pack.get("areas") or []:
         cur.execute(
             """insert into area (workspace_id, slug, nombre) values (%s, %s, %s)
@@ -395,6 +419,9 @@ def _importar_taxonomia(cur, ws, pack) -> None:
                 "update rol set autoridad_final = true where workspace_id = %s and slug = %s",
                 (ws, r["slug"]))
 
+
+def _importar_configuracion(cur, ws, pack) -> None:
+    """El calendario, el glosario y cómo habla Leda: se aplican en cada importación."""
     cal = pack.get("calendario") or {}
     if cal:
         inicio, _, fin = str(cal.get("horario", "09:00-17:00")).partition("-")
@@ -530,6 +557,8 @@ def _importar_politica(cur, ws, pack) -> None:
                        values (%s, 'area', (select id from area where workspace_id = %s and slug = %s))""",
                     (pol, ws, str(req)[5:]))
 
+
+def _importar_escalamiento(cur, ws, pack) -> None:
     cur.execute("delete from escalation_route where workspace_id = %s", (ws,))
     for i, e in enumerate(pack.get("escalamiento") or []):
         destino = str(e.get("destino", ""))
