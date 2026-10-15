@@ -1508,6 +1508,24 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         el informe antes de decidir; si la aprueba así, es aceptar la demora de la tarea (fecha original más prevista,
         J5-D4); si además pasa la fecha del objetivo, también la aprueba el referente del objetivo (decisión 6).
       Con esto, las decisiones de la J6 están completas.
+      **Plan en porciones** (planificador de sólo lectura, 2026-10-15, noche; preguntas en "Para decidir al
+      despertar", "J6: lo que las decisiones no alcanzan a fijar"). La propuesta vive en su propia tabla y la
+      tarea nace al aprobarla: la base no deja corregir una tarea ya cargada (`bloquear_estado_directo`), y
+      una tarea "propuesta" contaría como abierta para unos 20 lugares que mandan recordatorios; un objetivo
+      "propuesto" ya cuenta como abierto para la carga, así que tampoco puede ser una fila de `objective`.
+      - **J6-0.** ADR 0026, "La propuesta y el pedido" (propuesta): enmienda el 0023 §3 y el punto 9.
+      - **J6-1.** Conversaciones de prueba 63 a 70 primero, y reescribir la 53 y la 54.
+      - **J6-2 y J6-3.** La base: la propuesta y sus acciones (proponer, corregir, "ya no hace falta") y
+        decidirla (aprobar, corregir y aprobar, no, dársela a otro); la carga comparte una sola función con
+        `cargar_tarea_web`; "subtareas abiertas" entra en `motivo_no_cierra_tarea`.
+      - **J6-4 y J6-5.** El servidor y los avisos (`motor/propuestas.py`, con el molde de `carga.py`, que ya
+        agrupa diez minutos y relee al salir), y la web del integrante ("> agregar una subtarea", "Mis
+        pedidos").
+      - **J6-6.** El bloque "Para decidir" del referente (espera "en qué afecta", J5 S4).
+      - **J6-7 y J6-8.** El chat ofrece el lugar correcto; un referente propone un objetivo (J6-D5).
+      - **J6-9 a J6-11.** Lo que espera a la J5: la tarea después de su objetivo, la subtarea después de su
+        tarea madre, y el pedido junto con "Me falta algo para seguir".
+      - **J6-12.** Rondas con la IA real, la prueba en el celular y RDD por commit.
 - [ ] **J7 · Las jerarquías y los integrantes desde la web de Dirección.**
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
@@ -1753,6 +1771,33 @@ ejemplo y recomendación, y sigue con otra cosa.
       información.
   12. **Cada cuánto se le recuerda a quien decide.** Hoy una pregunta sin contestar se repite cada día los
       primeros tres y después día por medio. *Recomendación:* cada día hábil, como dice la J5-D7.
+- **J6: lo que las decisiones no alcanzan a fijar** (un planificador armó la J6 en porciones el 15/10 a la
+  noche; plan en la J6). La propuesta vive en una tabla propia y la tarea nace recién al aprobarla (la base no
+  deja corregir una tarea ya cargada, y una tarea "propuesta" recibiría recordatorios). De a una:
+  1. **Quién decide una subtarea de una tarea con revisor elegido a mano.** Ejemplo: Ismael le carga una tarea
+     a Nahuel y pone de revisor a Martín; Nahuel propone una subtarea. *Recomendación:* quien revisa la tarea
+     madre (Martín), para que proponer, entregar y aprobar pasen por la misma persona.
+  2. **Un referente o Dirección agrega una subtarea a una tarea propia.** Ejemplo: Marcos agrega "Pedir el
+     plano" a "Revisar el tablero". *Recomendación:* entra directo, con el mismo formulario, sin propuesta.
+  3. **"Dársela a otro" fuera del área del referente.** Ejemplo: Marcos quiere que la haga Lucas (IT).
+     *Recomendación:* sólo a gente de su área; si no, pasa a ser un pedido a la otra área (como en la J4).
+  4. **La tarea madre se cierra mientras una propuesta espera.** Ejemplo: Marcos aprueba "Colocar el estante"
+     con "Comprar los tornillos" sin decidir. *Recomendación:* la propuesta pasa a "ya no hace falta: la tarea
+     se cerró", sin mensaje.
+  5. **Una corrección después de que el aviso ya salió.** Ejemplo: a las 10:10 le llegó a Marcos "12
+     tornillos" y a las 10:30 Nahuel lo cambia a 16. *Recomendación:* no sale otro mensaje; la web y el próximo
+     recordatorio muestran la versión de ahora.
+  6. **El referente de un objetivo propuesto.** Ejemplo: Martín propone "Migrar el correo". *Recomendación:*
+     Martín, y Ismael lo puede cambiar al corregir.
+  7. **Una tarea que vence después de su objetivo, mientras espera la aprobación.** Ejemplo: Marcos se la carga
+     a Nahuel y la tiene que aprobar Ismael. *Recomendación:* Nahuel no la ve hasta que se apruebe; Marcos la
+     ve en "Mis pedidos" como "esperando a Ismael".
+  8. **La administración y las propuestas.** *Recomendación:* las ve pero no las decide: decidir es del equipo.
+  9. **Cada cuánto se le recuerda a quien decide** (la misma que la pregunta 12 de la J5). *Recomendación:* cada
+     día hábil.
+  Decidido por el agente, por ser técnico (se puede cambiar): los pedidos de más tiempo de la J5 y las
+  propuestas de la J6 comparten una sola tabla, con su clase, para que los recordatorios, "ya no hace falta" y
+  "uno nuevo reemplaza al pendiente" vivan en un solo lugar.
 
 Lo que el agente, trabajando solo desde la noche del 2026-10-13, necesita que decida el usuario. Cada punto,
 con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue con lo que no depende de eso.
