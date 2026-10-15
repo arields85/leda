@@ -6,8 +6,8 @@ interface ViewSwitchProps {
   onChange: (view: ViewId) => void;
 }
 
-/** The tabs between the views a person has ("Mis tareas", "Mi equipo", "Mis pedidos"; Dirección,
- * "Mi área"), only when there is more than one. Real tabs in one row that never wraps
+/** The tabs between the views a person has ("Mis tareas", "Mi área", "Mis pedidos"), only when
+ * there is more than one. Real tabs in one row that never wraps
  * (MA-3, the user's iPhone test): each takes an equal share of the width and cuts its name before
  * going to a second line; the selected one has the ink text and a mark underneath. */
 export function ViewSwitch({ views, current, onChange }: ViewSwitchProps) {

@@ -147,12 +147,12 @@ TIPOS_DE_LA_WEB = {
 
 # Las pestañas de la puerta del equipo y su nombre, en un solo lugar (decisiones del usuario del
 # 2026-10-14, pruebas de la J4 y de la Mini App en el iPhone, MA-3 y MA-4): "Mis tareas"; "Mi
-# equipo", la gente del área de un referente, sin sus propias tareas, y sólo si tiene a alguien a
-# cargo (el nombre del área va como dato debajo del título, `area_del_equipo`); "Mi área", lo de
-# todo el equipo, de Dirección, que no tiene sector (el suyo es Dirección misma, que repetía sus
-# tareas); "Mis pedidos", de quien puede pedir (un referente y Dirección; un integrante, cuando
-# tenga pedidos).
-VISTAS = {"tus": "Mis tareas", "sector": "Mi equipo", "equipo": "Mi área",
+# área", la gente del área de un referente, sin sus propias tareas, y sólo si tiene a alguien a
+# cargo (prueba del usuario del 2026-10-14, noche: antes "Mi equipo"; el área ya se ve arriba a
+# la derecha, y `area_del_equipo` sigue como dato); "Mi área" también, lo de todo el equipo, de
+# Dirección, que no tiene sector (el suyo es Dirección misma, que repetía sus tareas); "Mis
+# pedidos", de quien puede pedir (un referente y Dirección; un integrante, cuando tenga pedidos).
+VISTAS = {"tus": "Mis tareas", "sector": "Mi área", "equipo": "Mi área",
           "pedidas": "Mis pedidos"}
 DIAS_CORTOS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
 
@@ -423,8 +423,8 @@ def _pidio_algo(cur, token: str) -> bool:
 
 
 def _titulo_de_la_vista(cur, vista: str, membership_id: str) -> str:
-    """El nombre de una pestaña, el de `VISTAS` (MA-3: el del sector es "Mi equipo", y el
-    nombre del área va debajo del título, `_area_del_equipo`)."""
+    """El nombre de una pestaña, el de `VISTAS` (el del sector es "Mi área", como el de
+    Dirección)."""
     return VISTAS[vista]
 
 

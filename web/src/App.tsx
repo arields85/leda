@@ -303,7 +303,6 @@ export function App() {
           title={open ? title : 'Leda'}
           person={open ? person?.persona : undefined}
           area={open ? person?.area : undefined}
-          subtitle={open && !creating && !detail && ready?.vista === 'sector' ? ready.area_del_equipo : null}
         />
         {fixed}
       </div>

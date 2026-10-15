@@ -119,7 +119,8 @@ export interface ViewData {
   pasar_a?: Teammate[];
   // Assigned and not started yet (MA-3): the counter "Sin empezar", apart from the four colours.
   sin_empezar?: number;
-  // Only in "Mi equipo" (MA-3): the referente's area (or areas), shown under the title.
+  // Only in a referente's "Mi área" (MA-3): the referente's area (or areas). Not shown since
+  // the area went top right (MA-4).
   area_del_equipo?: string | null;
 }
 

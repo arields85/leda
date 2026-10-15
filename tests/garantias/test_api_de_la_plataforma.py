@@ -251,8 +251,9 @@ def test_un_enlace_anulado_por_otro_no_entra(web, conn, mundo):
 
 def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
     # Las pestañas (decisiones del usuario del 2026-10-14): Dirección no tiene sector; quien puede
-    # pedir tiene "Mis pedidos"; el sector es "Mi equipo" (MA-3; el área va como dato aparte), y
-    # lo de todo el equipo, de Dirección, "Mi área" (MA-4).
+    # pedir tiene "Mis pedidos"; el sector de un referente y lo de todo el equipo, de Dirección,
+    # se llaman los dos "Mi área" (MA-4; el del referente, desde la prueba del usuario del
+    # 2026-10-14, noche).
     esperado = {"Sam North": ["tus"], "Taylor Quinn": ["tus", "sector", "pedidas"],
                 "Morgan Hale": ["tus", "equipo", "pedidas"]}
     for nombre, vistas in esperado.items():
@@ -272,7 +273,7 @@ def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
     assert titulos == {"tus": "Mis tareas", "equipo": "Mi área", "pedidas": "Mis pedidos"}
     titulos = {v["vista"]: v["titulo"]
                for v in _entrar(web, conn, mundo, "Taylor Quinn").get("/app/api/yo").json()["vistas"]}
-    assert titulos == {"tus": "Mis tareas", "sector": "Mi equipo", "pedidas": "Mis pedidos"}
+    assert titulos == {"tus": "Mis tareas", "sector": "Mi área", "pedidas": "Mis pedidos"}
 
 
 def test_yo_renueva_la_cookie_sin_cambiar_la_sesion(web, conn, mundo):
@@ -445,8 +446,8 @@ def test_el_referente_ve_su_sector_con_atrasos_y_bloqueos(web, conn, mundo):
     navegador = _entrar(web, conn, mundo, "Taylor Quinn")
     datos = _vista(navegador, "sector")
     tareas = _por_titulo(datos)
-    assert datos["titulo"] == "Mi equipo" and datos["area_del_equipo"] == "Field Services"
-    # "Mi equipo" es su gente (MA-3): su propia tarea, "Ordenar el depósito", queda en "Mis
+    assert datos["titulo"] == "Mi área" and datos["area_del_equipo"] == "Field Services"
+    # "Mi área" es su gente (MA-3): su propia tarea, "Ordenar el depósito", queda en "Mis
     # tareas" y no se repite acá.
     assert set(tareas) == {"Pintar el galpón", "Medir el ruido", "Montar la línea"}
     suyas = _por_titulo(_vista(navegador, "tus"))

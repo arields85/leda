@@ -178,7 +178,7 @@ describe('the bottom buttons (item 4)', () => {
 describe('the tabs (item 5)', () => {
   const tabs = [
     { vista: 'tus' as const, titulo: 'Mis tareas' },
-    { vista: 'sector' as const, titulo: 'Mi equipo' },
+    { vista: 'sector' as const, titulo: 'Mi área' },
     { vista: 'pedidas' as const, titulo: 'Mis pedidos' },
   ];
 
@@ -189,22 +189,24 @@ describe('the tabs (item 5)', () => {
     expect(list).toHaveClass('flex', 'flex-nowrap');
     expect(list.className).not.toMatch(/flex-wrap(?!-)|\bwrap\b/);
     const all = within(list).getAllByRole('tab');
-    expect(all.map((t) => t.textContent)).toEqual(['Mis tareas', 'Mi equipo', 'Mis pedidos']);
+    expect(all.map((t) => t.textContent)).toEqual(['Mis tareas', 'Mi área', 'Mis pedidos']);
     // Equal shares of one row (375 px less the page's 2 × 20 px: 111 px each), cut before wrapping.
     for (const tab of all) expect(tab).toHaveClass('flex-1', 'basis-0', 'min-w-0', 'truncate', 'whitespace-nowrap');
     expect(all[0]).toHaveAttribute('aria-selected', 'true');
     expect(all[1]).toHaveAttribute('aria-selected', 'false');
   });
 
-  it('"Mi equipo" shows the area under its title', async () => {
+  it('a referente\'s "Mi área" has no subtitle: the area is already top right (MA-4)', async () => {
     window.history.replaceState(null, '', '/app/?vista=sector');
     serve({
-      'GET /app/api/yo': ok(me({ vistas: tabs })),
-      'GET /app/api/tareas?vista=sector': ok(view({ vista: 'sector', titulo: 'Mi equipo', area_del_equipo: 'Software e interfaz HMI' })),
+      'GET /app/api/yo': ok(me({ vistas: tabs, area: 'OT y automatización' })),
+      'GET /app/api/tareas?vista=sector': ok(view({ vista: 'sector', titulo: 'Mi área', area_del_equipo: 'Software e interfaz HMI' })),
     });
     render(<App />);
-    expect(await screen.findByText('Software e interfaz HMI')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mi equipo');
+    await screen.findByText('Configurar alarmas del SCADA');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mi área');
+    expect(screen.queryByText('Software e interfaz HMI')).toBeNull();
+    expect(screen.getAllByText('OT y automatización')).toHaveLength(1);
   });
 });
 
