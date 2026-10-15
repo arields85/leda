@@ -59,9 +59,13 @@ construir la respuesta pendiente antes de decirlo), «Mi espacio» sin el botón
 administración (12 h sin uso, configurable), el grafo (cancelar, reabrir, deshacer "la empecé" siempre) y los
 hallazgos de la ronda. Cada respuesta está escrita en su punto, marcada DECIDIDO o CONTESTADO.
 
-**Lo que sigue, a construir** (el orden lo confirma el usuario): las chicas decididas (sesión de administración,
-«Mi espacio», grafo parte 2), los hallazgos 1 y 3 (conversación de prueba primero), la respuesta pendiente
-cuando la IA falla, la J5 desde la S1 (conversaciones 56 a 62), la J6 desde la J6-0 y la J7 (plan en porciones).
+**Lo que sigue, a construir, en este orden** (usuario, 2026-10-15: "todo lo que requiera armar equipo,
+configurar equipo… quisiera darle prioridad; las otras son mejoras"; "ese es el orden correcto"): 1. **la J7**, armar
+el equipo desde la web (plan en porciones primero); 2. **configurar el equipo desde la web** (horario, feriados,
+cadencias, informe, evidencia por área, límites, la sesión de administración y exportar como respaldo: la
+"segunda versión" del ADR 0022; sus decisiones de a una antes del código); 3. **ausencias y suplente de
+Dirección**; 4. la J5; 5. la J6; 6. las mejoras chicas («Mi espacio», cancelar y reabrir, los hallazgos, la
+respuesta pendiente cuando falla la IA).
 Falta que el usuario mire en la compu la MA-7 y "te la pidió".
 
 **Sin el usuario, si queda tiempo:** las advertencias de RDD anotadas en cada entrada del documento de la unidad
