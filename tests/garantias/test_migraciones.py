@@ -232,9 +232,31 @@ def _seguridad_de_las_funciones_elevadas(url):
                 order by 1""").fetchall()
 
 
+def _matriz_de_privilegios(url):
+    """La matriz de privilegios completa de los cuatro roles `leda_*` (T8 de
+    `odd/tasks/aislamiento-entre-clientes.md`): privilegios por relación (tablas y vistas),
+    por columna y por secuencia, `execute` por función, uso del esquema, dueños y privilegios
+    por omisión. Son las consultas de `tools/ensayo_propiedad.py`, cargadas de ahí para no
+    duplicarlas: comparar sólo los de `leda_app` dejó pasar tres diferencias de `leda_owner` y
+    `leda_admin` entre una instalación limpia y una base migrada desde el principio."""
+    import importlib.util
+
+    import psycopg
+    from psycopg.rows import dict_row
+
+    spec = importlib.util.spec_from_file_location(
+        "ensayo_propiedad", ROOT / "tools" / "ensayo_propiedad.py")
+    ensayo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ensayo)
+    with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db, \
+            db.cursor() as cur:
+        return ensayo._matriz(cur)
+
+
 def _retrato_migratorio(url, tablas):
     return {"tablas": _retrato_de_aislamiento(url, tablas),
-            "funciones": _retrato_de_funciones(url)}
+            "funciones": _retrato_de_funciones(url),
+            "privilegios": _matriz_de_privilegios(url)}
 
 
 def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
@@ -356,6 +378,17 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
             assert limpia[tabla] == migrada[tabla], (
                 f"{tabla}: la instalación limpia y la base migrada no "
                 f"convergen.\nlimpia:  {limpia[tabla]}\nmigrada: {migrada[tabla]}")
+
+        # La matriz completa de los cuatro roles, no sólo la de `leda_app` (T8).
+        matrices = {clave: _matriz_de_privilegios(url) for clave, url in urls.items()}
+        for categoria in matrices["limpia"]:
+            solo_limpia = sorted(matrices["limpia"][categoria]
+                                 - matrices["migrada"][categoria], key=repr)
+            solo_migrada = sorted(matrices["migrada"][categoria]
+                                  - matrices["limpia"][categoria], key=repr)
+            assert not solo_limpia and not solo_migrada, (
+                f"{categoria}: la instalación limpia y la base migrada no convergen."
+                f"\nsólo en la limpia:  {solo_limpia}\nsólo en la migrada: {solo_migrada}")
 
         for tabla in con_politica:
             assert limpia[tabla]["seguridad"]["relrowsecurity"]

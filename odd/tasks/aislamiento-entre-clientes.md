@@ -112,11 +112,15 @@ problema y menor impacto. No se incluye sin autorización explícita.
       `STATUS.md` ("Seguridad de la base") sigue diciendo `PENDIENTE` y lo
       actualiza el coordinador: el escritor de T6 no tenía ese archivo en su
       alcance.
-- [ ] **T8** — Que una base migrada desde el principio converja a la misma
-      matriz de privilegios que la instalación limpia (criterio 5). El ensayo
-      de T6 encontró tres diferencias; causa y arreglo propuesto en "Ensayo
-      sobre un clúster limpio (T6)". La prueba de paridad no las ve porque sólo
-      compara los privilegios de `leda_app`.
+- [x] **T8** — Que una base migrada desde el principio converja a la misma
+      matriz de privilegios que la instalación limpia (criterio 5). Hecho el
+      2026-10-15: en las tres diferencias vale la instalación limpia (sigue la
+      regla del resto del esquema), y la migración `0078_la_matriz_de_privilegios_converge`
+      (con su rollback) lleva la migrada hasta ahí; `esquema.sql` no cambia. La
+      prueba de paridad compara ahora la matriz completa de los cuatro roles
+      (las consultas de `tools/ensayo_propiedad.py`), y la de los rollbacks
+      también la mira. Evidencia en "Ensayo sobre un clúster limpio (T6)".
+      *Ruta: delegada.*
 
 ## Criterios de aceptación
 
@@ -291,7 +295,7 @@ sólo recibió por migración de la `0057` en adelante. La prueba de paridad
 (`test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento`) no las ve
 porque compara sólo los privilegios de `leda_app`.
 
-**Arreglo propuesto (T8, sin hacer):** una migración nueva que lleve la base migrada
+**Arreglo propuesto (T8, hecho el 2026-10-15; ver abajo):** una migración nueva que lleve la base migrada
 a la matriz de la limpia (`grant all on admin_notice_enlace to leda_owner`,
 `grant all on greeting_state to leda_admin`, `revoke all on integrante from
 leda_owner`), con su rollback; o, si se decide que lo correcto es lo de la migrada,
@@ -299,16 +303,28 @@ el cambio inverso en `esquema.sql`. Y que la prueba de paridad compare la matriz
 completa de los cuatro roles (lo que hace `tools/ensayo_propiedad.py`), para que la
 próxima diferencia aparezca en la suite.
 
+**T8, hecho (2026-10-15).** Las tres se resuelven a favor de la instalación limpia:
+`leda_owner` tiene todo sobre todas las tablas y `leda_admin` también (los `grant` generales
+de `esquema.sql`), y ninguna función de `leda_owner` lee la vista `integrante` (menor
+privilegio). La `0078` concede las dos primeras y revoca la tercera; su rollback lo
+deshace en una base migrada. `test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento`
+compara la matriz completa (`_matriz` de `tools/ensayo_propiedad.py`) y
+`test_los_rollbacks_devuelven_la_base_al_estado_anterior` también la incluye en su retrato.
+
+| Paso | Comando | Resultado |
+|---|---|---|
+| Rojo, antes de la `0078` | `pytest -q -x tests/garantias/test_migraciones.py -k "convergen or rollbacks"` | 1 failed (paridad: "privilegios por relación", las tres diferencias exactas), 1 passed (rollbacks, con la matriz en el retrato) |
+| Verde, con la `0078` | `pytest -q tests/garantias/test_migraciones.py tests/garantias/test_aislamiento.py` | 22 passed |
+
 ## Estado de la unidad
 
-Cerradas T1 a T7 (T6 y T7, el 2026-10-15); abierta T8. Suite en **310 passed, 0 failed**. La regla 1 de
+Cerradas T1 a T8 (T6, T7 y T8, el 2026-10-15). Suite en **310 passed, 0 failed**. La regla 1 de
 `docs/architecture/frontera.md` pasó a cumplida.
 
 Queda abierto, todo registrado en `docs/STATUS.md`:
 
-- **T6 cerrada el 2026-10-15** (ver "Ensayo sobre un clúster limpio (T6)"). Queda
-  **T8**: tres diferencias de privilegios entre la instalación limpia y una base
-  migrada desde el principio.
+- **T6 y T8 cerradas el 2026-10-15** (ver "Ensayo sobre un clúster limpio (T6)"): la
+  base migrada desde el principio converge a la matriz de la limpia (`0078`).
 - `confirmar_borrador_tarea` fija el espacio con el valor que recibe de quien
   la llama. Contenida a `leda_gateway` y fuera del alcance de `leda_app`,
   pero es el patrón que la regla 6 rechaza. Pertenece al ingreso autenticado.
