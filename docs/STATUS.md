@@ -65,9 +65,12 @@ un equipo vacío, ver el equipo, áreas, alta con enlace, nombre por espacio). *
 `0085` aplicada a `leda_motor` (respaldo `db/respaldos/leda_motor-antes-0085-20261015.dump`, ensayo limpio); web
 reiniciada. **Sigue:** J7-6 en adelante. **Diseño:** con impeccable (siempre por su proceso, nunca a mano):
 `PRODUCT.md`, `DESIGN.md`, la dirección en `.impeccable/surfaces/web-src-app-tsx.md` y las referencias
-`.impeccable/mocks/decision/r7-profundidad*.html`; la barra pegada al borde ya está en las dos y en `DESIGN.md`
-(`e793e57e`); el usuario sigue ajustando con `/impeccable live` (el script de `live` se inyecta en las muestras:
-nunca commitearlo).
+`.impeccable/mocks/decision/r7-profundidad*.html`. Decidido (en el brief): resumen grande por urgencia (5 niveles),
+semana, contadores que filtran la lista, entregadas sólo por su contador. **Alternativa nueva, la que más le gusta
+al usuario:** `r8-sobrio*.html` (sus referencias: casi negro con degradado, bandas con filetes, cifras finas, Kanit
+servida desde `.impeccable/mocks/fonts/kanit/`, barra sin fondo con desenfoque progresivo); la r7 se guarda.
+`DESIGN.md` sigue con la r7 hasta que adopte la r8. El script de `live` se inyecta en las muestras: nunca
+commitearlo.
 
 **Lo que sigue, a construir, en este orden** (usuario, 2026-10-15: "todo lo que requiera armar equipo,
 configurar equipo… quisiera darle prioridad; las otras son mejoras"; "ese es el orden correcto"): 1. **la J7**, armar
