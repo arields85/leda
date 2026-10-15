@@ -243,12 +243,12 @@ def test_resolver_bloqueo_no_reingresa_a_bloqueada_si_ya_salio_por_otro_camino(
     """Corrección tras revisión (defecto 2).
 
     `actualizar_estado` no exige tener los bloqueos cerrados para salir de
-    `bloqueada` — es una deuda conocida, `docs/STATUS.md` "Pendiente": no hay
-    todavía un disparador que valide qué transiciones son legítimas. Si eso ya
-    movió la tarea a otro estado, resolver el último bloqueo abierto no tiene
-    que "volver" a ningún lado: la tarea ya no está en `bloqueada`, y antes de
-    esta corrección la reingresaba a la fuerza (o rompía, según qué evento
-    quedara último).
+    `bloqueada`. Desde la migración 0079 la base sólo deja salir al estado que
+    la tarea tenía antes (o cancelarla), así que el otro camino es ése: la tarea
+    vuelve a `asignada` con el bloqueo todavía abierto. Resolver después el
+    último bloqueo no tiene que "volver" a ningún lado: la tarea ya no está en
+    `bloqueada`, y antes de esta corrección la reingresaba a la fuerza (o
+    rompía, según qué evento quedara último).
     """
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -258,16 +258,16 @@ def test_resolver_bloqueo_no_reingresa_a_bloqueada_si_ya_salio_por_otro_camino(
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         H.ejecutar(cur, quien, "actualizar_estado",
-                   {"tarea_id": tid, "estado": "en_curso"}, ya_confirmada=True)
+                   {"tarea_id": tid, "estado": "asignada"}, ya_confirmada=True)
         cur.execute("select estado from task where id = %s", (tid,))
-        assert cur.fetchone()["estado"] == "en_curso"
+        assert cur.fetchone()["estado"] == "asignada"
 
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
                        {"bloqueo_id": bid, "resolucion": "listo"}, ya_confirmada=True)
         assert r == {"resuelto": True, "tarea_desbloqueada": False}
 
         cur.execute("select estado from task where id = %s", (tid,))
-        assert cur.fetchone()["estado"] == "en_curso"
+        assert cur.fetchone()["estado"] == "asignada"
 
     with admin(conn) as cur:
         cur.execute(

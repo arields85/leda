@@ -104,9 +104,13 @@ $$, 'sin un bloqueo abierto');
 -- 4. No cierra sin criterio, sin evidencia ni sin aprobación
 -- =========================================================================
 
+-- Un evento por sentencia: cada uno sale del estado que dejó el anterior (migración 0079), y la
+-- proyección se aplica al terminar cada sentencia.
 insert into task_state_event (task_id, estado_anterior, estado_nuevo, actor_kind) values
-  ('10000000-0000-0000-0000-000000000001', null, 'asignada','leda'),
-  ('10000000-0000-0000-0000-000000000001','asignada','en_curso','persona'),
+  ('10000000-0000-0000-0000-000000000001', null, 'asignada','leda');
+insert into task_state_event (task_id, estado_anterior, estado_nuevo, actor_kind) values
+  ('10000000-0000-0000-0000-000000000001','asignada','en_curso','persona');
+insert into task_state_event (task_id, estado_anterior, estado_nuevo, actor_kind) values
   ('10000000-0000-0000-0000-000000000001','en_curso','en_revision','persona');
 
 select debe_fallar($$

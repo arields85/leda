@@ -43,7 +43,9 @@ def _tarea(cur, ws: str, titulo: str, persona: str, estado: str) -> str:
                    'Tablero cerrado y probado') returning id""",
         (ws, objetivo, titulo, _membresia(cur, ws, persona), _membresia(cur, ws, persona)))
     tarea = str(cur.fetchone()["id"])
-    for anterior, nuevo in (("asignada", "en_curso"), ("en_curso", "en_revision")):
+    # El evento que la crea y después cada paso desde el estado vigente (migración 0079).
+    for anterior, nuevo in ((None, "asignada"), ("asignada", "en_curso"),
+                            ("en_curso", "en_revision")):
         cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
                                                      actor_kind)
                        values (%s, %s, %s, 'persona')""", (tarea, anterior, nuevo))
