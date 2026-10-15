@@ -91,19 +91,40 @@
   /* Counters stay reachable: they stick to the top, compact, over the same progressive blur as the tab bar. */
   .tally { position: sticky; top: 0; z-index: 5; isolation: isolate; }
   .tally::before {
-    content: ""; position: absolute; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: 0; bottom: -28px;
+    content: ""; position: absolute; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: -24px; bottom: -28px;
     z-index: -1; pointer-events: none; opacity: 0; transition: opacity 180ms ease-out;
     -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
     -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
     mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
-    background: linear-gradient(to bottom, rgba(16, 17, 18, 0.88) 0%, rgba(16, 17, 18, 0.6) 70%, rgba(16, 17, 18, 0) 100%);
+    background: linear-gradient(to bottom, rgba(20, 21, 22, 0.96) 0%, rgba(18, 19, 20, 0.82) 70%, rgba(16, 17, 18, 0) 100%);
   }
   .tally.stuck { border-bottom-color: transparent; }
   .tally.stuck::before { opacity: 1; }
   .tally b, .tally button { transition: font-size 180ms ease-out, line-height 180ms ease-out, padding 180ms ease-out; }
   .tally.stuck button { padding: 8px 0 10px; }
   .tally.stuck b { font-size: 24px; line-height: 28px; }
-  .stick-sentinel { height: 1px; }
+  /* The urgent zone stays fixed: full size at the top, compact once the page scrolls, over a progressive blur. */
+  .top { position: fixed; top: 0; left: 0; z-index: 6; width: 390px; isolation: isolate; }
+  .top::before {
+    content: ""; position: absolute; inset: 0 0 -28px 0; z-index: -1; pointer-events: none;
+    opacity: 0; transition: opacity 200ms ease-out;
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    background: linear-gradient(to bottom, rgba(26, 27, 28, 0.97) 0%, rgba(22, 23, 24, 0.9) 75%, rgba(16, 17, 18, 0) 100%);
+  }
+  .top.compact::before { opacity: 1; }
+  .top header.band, .top .hero { transition: padding 200ms ease-out; }
+  .top .hero .n, .top .hero .what strong, .top .hero .why { transition: font-size 200ms ease-out, line-height 200ms ease-out, margin 200ms ease-out; }
+  .top.compact header.band { padding: 12px 0 10px; border-bottom-color: transparent; }
+  .top.compact .hero { padding: 0 0 12px; border-bottom-color: transparent; }
+  .top.compact .hero .row { gap: 10px; }
+  .top.compact .hero .n { font-size: 40px; line-height: 40px; }
+  .top.compact .hero .what { flex-direction: row; align-items: baseline; gap: 8px; }
+  .top.compact .hero .what strong { font-size: 20px; line-height: 24px; }
+  .top.compact .hero .why { margin-top: 4px; font-size: 13px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tally { top: var(--top-compact, 0px); }
+  .top.measure, .top.measure * { transition: none !important; }
   main { margin: 0 var(--gutter); padding: 18px 0 calc(104px + env(safe-area-inset-bottom, 0px)); }
   .listhead { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 4px; }
   .listhead .all { font-size: 12px; line-height: 16px; letter-spacing: 0.14em; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line); }
@@ -165,6 +186,7 @@
 </style>
 </head>
 <body>
+  <div class="top">
   <header class="band">
     <h1 class="who">Marcos <span>· tableros</span></h1>
     <button class="new" aria-label="Nueva tarea">
@@ -180,6 +202,8 @@
     </div>
     <p class="why">Pedir el plano rev. C · falta la firma de Ismael</p>
   </section>
+  </div>
+  <div class="top-spacer" aria-hidden="true"></div>
 
   <section class="band week" aria-label="Esta semana, jueves 15 de octubre">
     <div class="day"><span class="lbl">lun</span><b>12</b><small></small></div>
@@ -189,7 +213,6 @@
     <div class="day"><span class="lbl">vie</span><b>16</b><small class="due">1 vence</small></div>
   </section>
 
-  <div class="stick-sentinel" aria-hidden="true"></div>
   <ul class="band tally" aria-label="Mostrar tus tareas por estado">
     <li class="late zero"><button data-f="late" aria-pressed="false" disabled><b>0</b><span class="lbl">vencidas</span></button></li>
     <li class="idle"><button data-f="idle" aria-pressed="false"><b>4</b><span class="lbl">sin empezar</span></button></li>
@@ -277,11 +300,26 @@
       all.hidden = !filter;
     }
     const tally = document.querySelector('.tally');
-    new IntersectionObserver(([e]) => tally.classList.toggle('stuck', !e.isIntersecting))
-      .observe(document.querySelector('.stick-sentinel'));
+    const top = document.querySelector('.top');
+    const spacer = document.querySelector('.top-spacer');
+    spacer.style.height = top.offsetHeight + 'px';
+    top.classList.add('measure', 'compact');
+    const compactH = top.offsetHeight;
+    top.classList.remove('compact');
+    void top.offsetHeight;
+    top.classList.remove('measure');
+    document.documentElement.style.setProperty('--top-compact', compactH + 'px');
+    let compact = false;
+    function onScroll() {
+      const next = compact ? window.scrollY > 8 : window.scrollY > 24;
+      if (next !== compact) { compact = next; top.classList.toggle('compact', compact); }
+      tally.classList.toggle('stuck', tally.getBoundingClientRect().top <= compactH + 0.5);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
     function toListTop() {
       if (!tally.classList.contains('stuck')) return;
-      const y = document.querySelector('main').getBoundingClientRect().top + window.scrollY - tally.offsetHeight;
+      const y = document.querySelector('main').getBoundingClientRect().top + window.scrollY - tally.offsetHeight - compactH;
       window.scrollTo({ top: y, behavior: 'smooth' });
     }
     buttons.forEach((b) => b.addEventListener('click', () => { show(current === b.dataset.f ? null : b.dataset.f); toListTop(); }));
