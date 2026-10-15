@@ -100,6 +100,15 @@ def _dice(conn, escribe, *jugadas: Jugada, nombre: str = "Marcos", texto: str = 
     return resultado.hechos, ia
 
 
+def _con_boton(conn, mundo, escribe):
+    """Una respuesta a Marcos con un botón de la web ("Cargar la tarea": es referente). Pedir
+    abrir la app ya no lleva ninguno (MA-5)."""
+    with admin(conn) as cur:
+        cur.execute("update area set referente_membership_id = %s", (_membresia(mundo),))
+    conn.commit()
+    return _dice(conn, escribe, Jugada("pedir_crear", {"que_quiere_crear": "tarea"}))
+
+
 def _ofrecimiento(conn, mundo, nombre: str = "Marcos") -> dict | None:
     filas = todos(conn, """select reservado_en, ofrecido_en from ofrecimiento_web
                             where membership_id = %s""", _membresia(mundo, nombre))
@@ -215,11 +224,24 @@ def test_con_el_enlace_de_una_tarea_espera_al_turno_siguiente(conn, mundo, escri
     assert hechos == [OFRECIMIENTO]
 
 
-def test_quien_pide_el_enlace_ya_lo_recibio_y_no_se_le_ofrece_despues(conn, mundo, escribe,
-                                                                       nunca):
-    """Ya tiene el botón: el ofrecimiento sería repetirlo."""
+def test_quien_pide_abrir_la_app_ya_sabe_donde_esta_y_no_se_le_ofrece_despues(conn, mundo,
+                                                                               escribe, nunca):
+    """Ya sabe que la abre con el botón del menú (MA-5): el ofrecimiento sería repetirlo, y con
+    un botón en el mensaje, el que pedir ya no lleva."""
     hechos, _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
-    assert [h["resultado"] for h in hechos] == ["boton_para_abrir_la_web"]
+    assert [h["resultado"] for h in hechos] == ["se_abre_con_el_boton_del_menu"]
+    assert _marcas(conn) == []
+    assert _ofrecimiento(conn, mundo)["ofrecido_en"] is not None
+    hechos, _ = _dice(conn, escribe)
+    assert hechos == []
+    [mensaje, _] = _despachar(conn, mundo).enviados
+    assert _boton_de_la_web(mensaje) is None
+
+
+def test_quien_recibio_un_boton_de_la_web_no_recibe_el_ofrecimiento_despues(conn, mundo,
+                                                                             escribe, nunca):
+    """Ya tiene un botón de la web: el ofrecimiento sería repetirlo."""
+    _con_boton(conn, mundo, escribe)
     # Mientras su botón no salió, tampoco.
     hechos, _ = _dice(conn, escribe)
     assert hechos == []
@@ -279,7 +301,7 @@ def test_perdi_el_celular_anula_un_enlace_que_todavia_no_salio(conn, mundo, escr
     """La advertencia de la revisión de la A-3: la respuesta anterior, con el enlace, sigue en la
     salida (por ejemplo, esperando su reintento); después del corte no sale, ni se emite su
     enlace, y queda el incidente."""
-    _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
+    _con_boton(conn, mundo, escribe)
     _dice(conn, escribe, Jugada("perdi_el_celular", {}))
     assert [m["estado"] for m in _marcas(conn)] == ["descartado"]
     enviados = _despachar(conn, mundo).enviados
@@ -313,7 +335,7 @@ def test_pedir_otro_enlace_en_el_mismo_mensaje_del_corte_no_lo_manda(conn, mundo
 def test_el_corte_por_la_consola_tambien_anula_lo_que_no_salio(conn, mundo, escribe, direccion):
     from leda import web_app
 
-    _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
+    _con_boton(conn, mundo, escribe)
     with espacio(conn, mundo["id"]) as cur:
         web_app.cortar_sesiones(cur, _membresia(mundo))
     conn.commit()
@@ -323,7 +345,7 @@ def test_el_corte_por_la_consola_tambien_anula_lo_que_no_salio(conn, mundo, escr
 
 def test_el_corte_no_toca_lo_que_no_lleva_el_enlace_ni_lo_de_otra_persona(conn, mundo, escribe,
                                                                          direccion):
-    _dice(conn, escribe, Jugada("pedir_acceso_web", {}), nombre="Ismael")
+    _dice(conn, escribe, Jugada("pedir_crear", {"que_quiere_crear": "tarea"}), nombre="Ismael")
     _dice(conn, escribe, Jugada("consultar_pendientes", {}))
     _dice(conn, escribe, Jugada("perdi_el_celular", {}))
     assert [m["estado"] for m in _marcas(conn)] == ["listo"]

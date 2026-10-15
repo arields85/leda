@@ -29,7 +29,11 @@ tareas:
 # contestó sólo con la pregunta abierta, como si la hubiera contestado. Pedir abrir la aplicación
 # de Leda es `pedir_acceso_web`, que deja el botón que la abre (ADR 0024); un pedido que ninguna
 # jugada hace es `fuera_de_la_lista`, nunca ninguna jugada (ADR 0018). En los dos casos la
-# pregunta abierta sigue abierta y vuelve después de contestar lo que pidió.
+# pregunta abierta sigue abierta y vuelve después de contestar lo que pidió. Prueba en la
+# computadora (2026-10-14, MA-5): a "Abrí Leda en el navegador", Leda dijo que se abre dentro de
+# Telegram y no en el navegador. Desde la decisión del usuario del 2026-10-14 (noche, MA-5), pedir
+# abrirla no lleva botón: los hechos dicen que la abre con el botón fijo «Mi espacio» del menú (en
+# el celular, dentro de Telegram; en Telegram de la computadora, en el navegador).
 pasos:
   - paso: 1
     quien: Leda
@@ -53,20 +57,20 @@ pasos:
       - {nombre: pedir_acceso_web}
     efectos: {}
     hechos:
-      - {jugada: pedir_acceso_web, resultado: boton_para_abrir_la_web,
-         lleva_el_boton: Mi espacio}
+      - {jugada: pedir_acceso_web, resultado: se_abre_con_el_boton_del_menu,
+         boton_del_menu: Mi espacio}
     pregunta: {tipo: como_vienen_sus_tareas, desde_antes: true}
     enlace: false
-    enlace_web: true
+    enlace_web: false
     estado_despues:
       pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
     dice:
-      - "primero, que la abre tocando «Mi espacio»"
+      - "primero, que la abre con el botón «Mi espacio» del menú, al lado de donde escribe"
       - "después, la pregunta de cómo vienen sus tareas, sin pedir que repita nada"
     no_dice:
       - un enlace, o que pida uno
       - "sólo la pregunta de cómo vienen, sin decir nada de la app"
-      - si se abre dentro de Telegram o en el navegador
+      - que toque un botón de este mensaje
 
   - paso: 3
     quien: Marcos
@@ -109,3 +113,25 @@ pasos:
     no_dice:
       - "sólo la pregunta de cómo vienen, como si la hubiera contestado"
       - un pronóstico
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-26 10:45"
+    escribe: "Abrí Leda en el navegador"
+    jugadas:
+      - {nombre: pedir_acceso_web}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_acceso_web, resultado: se_abre_con_el_boton_del_menu,
+         boton_del_menu: Mi espacio}
+    pregunta: {tipo: como_vienen_sus_tareas, desde_antes: true}
+    enlace: false
+    enlace_web: false
+    estado_despues:
+      pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
+    dice:
+      - "que la abre con el botón «Mi espacio» del menú, al lado de donde escribe"
+      - "después, la pregunta de cómo vienen sus tareas"
+    no_dice:
+      - que Leda no se abre en el navegador
+      - que se abre sólo dentro de Telegram

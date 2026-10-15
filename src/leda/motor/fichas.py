@@ -1280,6 +1280,11 @@ CORTA_EL_ACCESO_EN_ESTE_MENSAJE = "corta_el_acceso_en_este_mensaje"
 LLEVA_EL_BOTON = "lleva_el_boton"
 BOTON_PARA_ABRIR_LA_WEB = "boton_para_abrir_la_web"
 DIRECCION_PARA_LA_COMPU = "direccion_para_la_compu"
+# A pedido, ningún botón en el mensaje (decisión del usuario del 2026-10-14, noche, MA-5): la
+# persona abre su espacio con el botón fijo del menú del chat (`menu_del_bot`), y el hecho dice
+# su texto.
+SE_ABRE_CON_EL_BOTON_DEL_MENU = "se_abre_con_el_boton_del_menu"
+BOTON_DEL_MENU = "boton_del_menu"
 
 
 def lleva_el_boton(destino: str) -> dict[str, str]:
@@ -1318,11 +1323,15 @@ def es_el_ofrecimiento_web(marca: tuple[str, str]) -> bool:
 
 def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None,
                       destino: str | None = None) -> dict:
-    """El botón que abre la web de la persona, debajo de la respuesta (ADR 0024, decisiones 1 y
-    2): "Mi espacio" (MA-4; a Dirección, en "Mi área"), o el destino que pide quien llama. Si la
-    persona pide la dirección para la computadora (`para_la_compu`), la dirección sola, sin
-    botón: no da acceso por sí misma (ahí se entra con el QR; decisión 4). Sin la dirección
-    pública configurada, nada se promete. Nada cambia hasta mandar."""
+    """Cómo abre la persona la web. Pedida por ella (la jugada, sin `destino`), ningún botón en
+    el mensaje (decisión del usuario del 2026-10-14, noche, MA-5): el hecho dice que la abre con
+    el botón fijo del menú del chat, y ya no se le ofrece después (`turno._ofrecer_la_web`). Con
+    el destino que pide quien llama ("Cargar la tarea", "Crear el objetivo"; ADR 0024, decisión
+    2), el botón que lleva ahí, debajo de la respuesta, uno por mensaje. Si la persona pide la
+    dirección para la computadora (`para_la_compu`), la dirección sola, sin botón: no da acceso
+    por sí misma (ahí se entra con el QR; decisión 4). Sin la dirección pública configurada,
+    nada se promete (tampoco hay botón del menú). Nada cambia hasta mandar."""
+    from .. import web_app
     from ..config import config
     from ..despachador import direccion_de_la_web
     from .enlace import SIN_PAGINA
@@ -1340,9 +1349,15 @@ def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None,
         slug = ctx.cur.fetchone()["slug"]
         return {"resultado": DIRECCION_PARA_LA_COMPU,
                 DIRECCION_PARA_LA_COMPU: direccion_de_la_web(config.base_url, slug, "inicio")}
+    if destino is None:
+        from ..menu_del_bot import TEXTO_DEL_EQUIPO
+
+        # Ya sabe dónde está: el ofrecimiento de una sola vez sería repetirlo. En la transacción
+        # del turno: si la IA no redacta, se deshace con lo demás.
+        web_app.quedo_ofrecido(ctx.cur, yo, ctx.ahora)
+        return {"resultado": SE_ABRE_CON_EL_BOTON_DEL_MENU, BOTON_DEL_MENU: TEXTO_DEL_EQUIPO}
     if ya and ya[0] != (ENTRADA_WEB, yo):
         return {"resultado": "no_se_puede", "motivo": YA_LLEVA_OTRO_ENLACE}
-    destino = destino or destino_de_sus_tareas(ctx.quien)
     if not ya:
         ya.append((ENTRADA_WEB, yo))
         ctx.destino_de_la_web[:] = [destino]
@@ -1882,19 +1897,20 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "tarea que espera su revisión es otra jugada."),
     Ficha("pedir_acceso_web", "abrir la aplicación de Leda, donde ve sus tareas",
           necesita=(), opcional=("para_la_compu",),
-          comprueba="que la web esté disponible y que el mensaje no lleve ya el enlace de una "
-                    "tarea (uno solo por mensaje)",
-          hace="marca la respuesta para que lleve el botón que abre el espacio de la persona en "
-               "la aplicación de Leda; con para_la_compu, da la dirección para abrirla en la computadora; "
-               "no cambia nada",
-          despues="el código pone el botón debajo de la respuesta; la dirección para la "
-                  "computadora sola no da acceso: ahí se entra escaneando el QR que muestra",
+          comprueba="que la web esté disponible",
+          hace="dice cómo abre la persona su espacio en la aplicación de Leda: con el botón fijo "
+               "del menú del chat; con para_la_compu, da la dirección para abrirla en una "
+               "computadora sin Telegram; no cambia nada",
+          despues="la respuesta no lleva ningún botón: la persona abre su espacio con el botón "
+                  "del menú, al lado de donde escribe; la dirección para la computadora sola no "
+                  "da acceso: ahí se entra escaneando el QR que muestra",
           manejar=_pedir_acceso_web,
-          es="La persona quiere abrir, ver o entrar a la aplicación de Leda (la que se abre "
-             "dentro de Telegram, que también es una web), donde ve sus tareas, o dice que no le "
-             "anda. Leda le deja el botón que la abre. Si pide la dirección para abrirla en la "
-             "computadora, para_la_compu es verdadero. Pedir el enlace a la página de una tarea "
-             "es otra jugada."),
+          es="La persona quiere abrir, ver o entrar a la aplicación de Leda, donde ve sus "
+             "tareas, o dice que no le anda. Se abre con el botón fijo del menú del chat, al "
+             "lado de donde escribe: en el celular, dentro de Telegram; en Telegram de la "
+             "computadora, en el navegador. Si pide la dirección para abrirla en una "
+             "computadora sin Telegram, para_la_compu es verdadero. Pedir el enlace a la página "
+             "de una tarea es otra jugada."),
     Ficha("pedir_crear", "decir dónde se crea una tarea o un objetivo",
           necesita=("que_quiere_crear",), opcional=(),
           comprueba="quién es la persona: Dirección crea tareas y objetivos; un referente de "

@@ -6,6 +6,10 @@ App de Telegram (lo pone el código, no la IA); ningún enlace se emite ni se an
 corte del paso 6 la persona vuelve a abrir la web desde el chat de Leda. El YAML es la versión
 vigente.
 
+**Enmienda (decisión del usuario, 2026-10-14, noche; MA-5):** a pedido (paso 4), la respuesta ya
+no lleva ningún botón: Leda le dice que la abre con el botón fijo "Mi espacio" del menú del chat,
+al lado de donde escribe. El ofrecimiento del paso 1 y la bienvenida siguen con su botón.
+
 **Qué prueba:** cada integrante recibe por chat su entrada a la plataforma web y la puede cortar si
 pierde el celular. Leda le ofrece el acceso, una sola vez y al final de su respuesta, a quien nunca
 entró; lo manda de nuevo a pedido, con el aviso de que sirve una vez y vence en 24 horas, y el

@@ -991,12 +991,18 @@ SIGNIFICADOS: Mapping[str, str] = {
                                         "tarea o el de la web), y lleva uno solo: el de ésta "
                                         "se puede pedir aparte.",
     # --- La entrada a la web por chat (`fichas`: `pedir_acceso_web`, `perdi_el_celular`) -------
-    "boton_para_abrir_la_web": "Leda le deja a la persona el botón que abre su espacio en la "
-                               "aplicación de Leda, donde ve sus tareas.",
+    "se_abre_con_el_boton_del_menu":
+        "La persona abre su espacio en la aplicación de Leda, donde ve sus tareas, con el botón "
+        "fijo del menú del chat, al lado de donde escribe: en el celular se abre dentro de "
+        "Telegram; en Telegram de la computadora, en el navegador. Este mensaje no lleva ningún "
+        "botón ni enlace.",
+    "boton_del_menu": "El texto del botón fijo del menú del chat que abre su espacio en la "
+                      "aplicación de Leda.",
     "lleva_el_boton":
         "Debajo de este mensaje va un botón con este texto, que abre su espacio en la aplicación "
         "de Leda. El botón lo pone el código; la IA no escribe ninguna dirección ni enlace.",
-    "para_la_compu": "Si la persona pidió la dirección de la web para abrirla en la computadora.",
+    "para_la_compu": "Si la persona pidió la dirección de la web para abrirla en una "
+                     "computadora sin Telegram.",
     "direccion_para_la_compu":
         "La dirección de la web para abrir en la computadora, que la IA escribe tal cual. Sola "
         "no da acceso: en la computadora aparece un código QR que se escanea con la cámara del "
@@ -1542,7 +1548,7 @@ PARA_LA_REDACCION: Mapping[str, str] = {
     "pedir_cambios": "devolver_la_entrega_con_cambios",
     "ver_entrega": "mostrar_la_entrega_para_revisar",
     "pedir_enlace": "pasar_el_enlace_a_la_pagina_de_una_tarea",
-    "pedir_acceso_web": "dejar_el_boton_para_abrir_la_web",
+    "pedir_acceso_web": "decir_como_abrir_su_espacio_en_la_aplicacion",
     "pedir_crear": "decir_donde_se_crea_una_tarea_o_un_objetivo",
     "perdi_el_celular": "cortar_el_acceso_a_la_web_por_el_celular_perdido",
     "decir_cuando_destraba": "anotar_para_cuando_destraba_la_tarea_de_otra_persona",

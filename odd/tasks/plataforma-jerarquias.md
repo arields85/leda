@@ -1269,6 +1269,11 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         - con la VPS, el botón fijo del menú: **"Tareas"**.
         No va en cada mensaje (recordatorios, preguntas) ni en grupos, donde Telegram no lo permite. Si se
         reinicia el túnel, los botones viejos dejan de andar: se toca uno nuevo.
+        - **2026-10-14, noche (usuario, MA-5):** cuando la persona le pide a Leda abrir o entrar a la app
+          (`pedir_acceso_web`), la respuesta ya no lleva botón: Leda le dice que la abre con el botón fijo
+          "Mi espacio" del menú, al lado de donde escribe. La bienvenida conserva su botón "Mi espacio"
+          exactamente como hoy; los de un destino concreto ("Ver la tarea", "Cargar la tarea", "Crear el
+          objetivo") siguen igual.
       - **MA4. Cómo se ve:**
         - el aspecto oscuro de Leda, gris y con letra de máquina, sin tomar los colores de cada Telegram;
         - grande, pero dejando la barrita de Telegram con "Cerrar": se usa `expand()`, no la pantalla completa;

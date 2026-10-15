@@ -2,12 +2,12 @@
 decisiones 1, 2 y 4, que enmiendan la decisión 4 del ADR 0022; decisión 3 del usuario del
 2026-10-12; conversación 50).
 
-- `pedir_acceso_web`: la respuesta lleva la marca del botón de la web de la persona
-  (`message_outbox_entrada_web`); el despachador lo arma al mandar, como Mini App del bot del
-  espacio: "Mi espacio", para todos (MA-4); a Dirección la abre en "Mi área". No se emite ningún
-  enlace. Los hechos dicen qué dice el botón; la IA nunca ve ni escribe una dirección. Pedida la dirección para la
-  computadora, la dirección sola (no da acceso: ahí se entra con el QR). Un mensaje lleva uno
-  solo (decisión técnica 2): con el enlace de una tarea, el botón no se promete.
+- `pedir_acceso_web`: la respuesta no lleva ningún botón (decisión del usuario del 2026-10-14,
+  noche, MA-5): los hechos dicen que la persona abre su espacio con el botón fijo del menú del
+  chat, "Mi espacio", y ya no se le ofrece la web después. No se emite ningún enlace; la IA nunca
+  ve ni escribe una dirección. Pedida la dirección para la computadora, la dirección sola (no da
+  acceso: ahí se entra con el QR). Los botones de un destino ("Cargar la tarea", "Crear el
+  objetivo") siguen siendo uno por mensaje (decisión técnica 2).
 - `perdi_el_celular`: corta enseguida, sin confirmación, todas las sesiones de la persona y su
   enlace sin usar, con el motivo `perdio_el_celular` y la persona como actor; el corte queda en la
   auditoría también sin sesiones (decisión técnica 3).
@@ -40,8 +40,8 @@ DIRECCION = "https://leda.invalid/"
 MINI_APP = "https://leda.invalid/app/abrir/e/prueba/"
 WEB = "https://leda.invalid/app/e/prueba/"
 
-BOTON = {"jugada": "pedir_acceso_web", "resultado": "boton_para_abrir_la_web",
-         "lleva_el_boton": "Mi espacio"}
+MENU = {"jugada": "pedir_acceso_web", "resultado": "se_abre_con_el_boton_del_menu",
+        "boton_del_menu": "Mi espacio"}
 
 
 @pytest.fixture
@@ -128,7 +128,8 @@ def test_lo_que_es_cada_jugada_no_trae_frases_de_ejemplo():
 
 
 def test_cada_clave_y_codigo_de_sus_hechos_tiene_significado():
-    for codigo in ("boton_para_abrir_la_web", "lleva_el_boton", "direccion_para_la_compu",
+    for codigo in ("se_abre_con_el_boton_del_menu", "boton_del_menu", "lleva_el_boton",
+                   "direccion_para_la_compu",
                    "acceso_cortado", "sesiones_cortadas",
                    "recuerda_cerrar_telegram_en_ese_celular", "vuelve_a_entrar_desde_telegram",
                    "ya_lleva_otro_enlace"):
@@ -142,27 +143,29 @@ def test_cada_clave_y_codigo_de_sus_hechos_tiene_significado():
 
 # --- Pedir el acceso ------------------------------------------------------------------------
 
-def test_pedir_el_acceso_lleva_el_boton_que_abre_la_web_en_telegram(conn, mundo, escribe,
-                                                                     direccion):
+def test_pedir_el_acceso_dice_el_boton_del_menu_y_el_mensaje_no_lleva_ninguno(conn, mundo,
+                                                                              escribe, direccion):
+    """MA-5 (decisión del usuario, 2026-10-14, noche): a pedido, ningún botón en el mensaje; la
+    persona abre su espacio con el botón fijo del menú, el mismo texto que fija `menu_del_bot`."""
+    from leda.menu_del_bot import TEXTO_DEL_EQUIPO
+
     [hecho], pedido = _dice(conn, escribe, Jugada("pedir_acceso_web", {}))
-    assert hecho == BOTON
-    assert _marcas(conn) == [{"persona": _membresia(mundo), "es_ofrecimiento": False,
-                              "destino": "inicio"}]
+    assert hecho == MENU and hecho["boton_del_menu"] == TEXTO_DEL_EQUIPO
+    assert _marcas(conn) == []
     # La IA nunca ve una dirección ni un nombre de la base.
     assert "http" not in repr(pedido) and "leda.invalid" not in repr(pedido)
     [mensaje] = _despachar(conn, mundo).enviados
     assert mensaje.texto == "Listo."
-    assert mensaje.botones[-1].etiqueta == "Mi espacio"
-    assert mensaje.botones[-1].web_app == MINI_APP
-    # Ningún enlace de entrada se emitió: la Mini App identifica a la persona.
+    assert mensaje.botones == []
+    # Ningún enlace de entrada se emitió.
     assert todos(conn, "select 1 from enlace_de_entrada") == []
 
 
-def test_a_direccion_el_boton_lleva_al_equipo(conn, mundo, escribe, direccion):
+def test_a_direccion_tambien_le_dice_el_boton_del_menu(conn, mundo, escribe, direccion):
     [hecho], _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}), nombre="Ismael")
-    assert hecho["lleva_el_boton"] == "Mi espacio"
+    assert hecho == MENU
     [mensaje] = _despachar(conn, mundo).enviados
-    assert mensaje.botones[-1].web_app == MINI_APP + "?vista=equipo"
+    assert mensaje.botones == []
 
 
 def test_la_direccion_para_la_compu_va_sola_y_sin_boton(conn, mundo, escribe, direccion):
@@ -181,34 +184,24 @@ def test_sin_la_direccion_publica_no_se_promete_ningun_boton(conn, mundo, escrib
     assert _marcas(conn) == []
 
 
-def test_pedirlo_dos_veces_en_un_mensaje_lleva_un_solo_boton(conn, mundo, escribe, direccion):
+def test_pedirlo_dos_veces_en_un_mensaje_no_lleva_ningun_boton(conn, mundo, escribe, direccion):
     hechos, _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}),
                       Jugada("pedir_acceso_web", {}))
-    assert [h["resultado"] for h in hechos] == ["boton_para_abrir_la_web"] * 2
-    assert len(_marcas(conn)) == 1
+    assert hechos == [MENU, MENU]
+    assert _marcas(conn) == []
 
 
-def test_con_el_enlace_de_una_tarea_el_boton_no_se_promete(conn, mundo, escribe, direccion):
-    """Uno por mensaje (decisión técnica 2): el enlace de la tarea, pedido primero, sale; el
-    botón de la web va en otro mensaje."""
-    tarea, web = _dice(conn, escribe, Jugada("pedir_enlace", {"tarea": "T1"}),
-                       Jugada("pedir_acceso_web", {}))[0]
-    assert tarea[LLEVA_EL_ENLACE] is True
-    assert web == {"jugada": "pedir_acceso_web", "resultado": "no_se_puede",
-                   "motivo": "ya_lleva_otro_enlace"}
+@pytest.mark.parametrize("primero", ["pedir_enlace", "pedir_acceso_web"])
+def test_el_boton_del_menu_no_le_quita_el_enlace_a_una_tarea(conn, mundo, escribe, direccion,
+                                                              primero):
+    """Sin botón en el mensaje, el enlace de la tarea sale en cualquier orden."""
+    jugadas = [Jugada("pedir_enlace", {"tarea": "T1"}), Jugada("pedir_acceso_web", {})]
+    hechos, _ = _dice(conn, escribe, *(jugadas if primero == "pedir_enlace" else jugadas[::-1]))
+    tarea = next(h for h in hechos if h["jugada"] == "pedir_enlace")
+    web = next(h for h in hechos if h["jugada"] == "pedir_acceso_web")
+    assert tarea[LLEVA_EL_ENLACE] is True and web == MENU
     assert _marcas(conn) == []
     assert len(todos(conn, "select 1 from message_outbox_enlace")) == 1
-
-
-def test_con_el_boton_el_enlace_de_una_tarea_no_se_promete(conn, mundo, escribe, direccion):
-    web, tarea = _dice(conn, escribe, Jugada("pedir_acceso_web", {}),
-                       Jugada("pedir_enlace", {"tarea": "T1"}))[0]
-    assert web["resultado"] == "boton_para_abrir_la_web"
-    assert (tarea["resultado"], tarea["motivo"]) == ("no_se_puede",
-                                                     "ya_lleva_el_enlace_de_otra_tarea")
-    assert LLEVA_EL_ENLACE not in tarea
-    assert todos(conn, "select 1 from message_outbox_enlace") == []
-    assert len(_marcas(conn)) == 1
     assert "botón" in hechos_mod.significado("ya_lleva_el_enlace_de_otra_tarea")
 
 
@@ -222,7 +215,7 @@ def test_si_la_ia_no_redacta_no_sale_ningun_boton(conn, mundo, escribe, direccio
 
     quien, entrante = escribe("Marcos", "-")
     procesar_turno(conn, quien, entrante,
-                   NoRedacta(jugadas=[[Jugada("pedir_acceso_web", {})]] * 2),
+                   NoRedacta(jugadas=[[Jugada("pedir_crear", {"que_quiere_crear": "tarea"})]] * 2),
                    RelojFijo(AHORA))
     conn.commit()
     assert _marcas(conn) == []
@@ -306,6 +299,21 @@ def test_la_jugada_describe_abrir_la_aplicacion_sin_frases_de_ejemplo():
     assert not re.search(r"[\"“”«»]", ficha.es)
 
 
+def test_la_jugada_dice_donde_se_abre_la_aplicacion_en_cada_dispositivo():
+    """MA-5 (b): la definición decía que la aplicación es "la que se abre dentro de Telegram", y
+    la IA le contestó a quien la quería abrir en el navegador que no se abre ahí. El hecho: se
+    abre con el botón fijo del menú; en el celular, dentro de Telegram; en Telegram de la
+    computadora, en el navegador. La dirección (para_la_compu) es para una computadora sin
+    Telegram."""
+    ficha = FICHAS["pedir_acceso_web"]
+    es = " ".join(ficha.es.split())
+    assert "que también es una web" not in es
+    assert all(p in es for p in ("menú", "celular", "computadora", "navegador"))
+    oracion = next(o for o in es.split(". ") if "para_la_compu" in o)
+    assert "computadora sin Telegram" in oracion
+    assert "ningún botón" in " ".join(ficha.despues.split())
+
+
 def test_un_pedido_que_ninguna_jugada_hace_nunca_va_como_ninguna_jugada():
     """La regla general de ADR 0018 (decisión 1), dicha también en la definición de lo que no
     está en la lista: un pedido va ahí, también con una pregunta abierta; y la redacción, con una
@@ -322,18 +330,16 @@ def test_un_pedido_que_ninguna_jugada_hace_nunca_va_como_ninguna_jugada():
 def test_un_boton_por_mensaje_el_primero_decide_y_cada_hecho_dice_ese(conn, mundo, escribe,
                                                                      direccion):
     """R3-destino-overwrite: con dos jugadas que marcan el botón, el primero decide a dónde lleva
-    y los dos hechos dicen el botón que de verdad sale."""
-    with admin(conn) as cur:
-        cur.execute("update area set referente_membership_id = %s",
-                    (mundo["personas"]["Marcos"]["membership_id"],))
-    conn.commit()
+    y los dos hechos dicen el botón que de verdad sale. Pedir abrir la app no marca ninguno."""
     hechos, _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}),
-                      Jugada("pedir_crear", {"que_quiere_crear": "tarea"}))
-    assert [h.get("lleva_el_boton") for h in hechos] == ["Mi espacio", "Mi espacio"]
+                      Jugada("pedir_crear", {"que_quiere_crear": "tarea"}),
+                      Jugada("pedir_crear", {"que_quiere_crear": "objetivo"}), nombre="Ismael")
+    assert hechos[0] == MENU
+    assert [h.get("lleva_el_boton") for h in hechos[1:]] == ["Cargar la tarea"] * 2
     [marca] = _marcas(conn)
-    assert marca["destino"] == "inicio"
+    assert marca["destino"] == "cargar_tarea"
     [mensaje] = _despachar(conn, mundo).enviados
-    assert mensaje.botones[-1].etiqueta == "Mi espacio"
+    assert mensaje.botones[-1].etiqueta == "Cargar la tarea"
 
 
 def test_el_dato_para_la_compu_es_un_booleano_de_la_jugada():

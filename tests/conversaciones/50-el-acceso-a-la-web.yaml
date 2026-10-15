@@ -113,7 +113,8 @@ pasos:
       - el acceso a la web
       - tareas de otras personas
 
-  # A pedido, el botón otra vez (ADR 0024, decisión 1: Leda nunca manda ni hace pedir un enlace).
+  # A pedido, ningún botón (ADR 0024, decisión 1: Leda nunca manda ni hace pedir un enlace;
+  # decisión del usuario del 2026-10-14, noche, MA-5): la abre con el botón fijo del menú.
   - paso: 4
     quien: Marcos
     a_las: "2026-10-20 10:30"
@@ -122,16 +123,16 @@ pasos:
       - {nombre: pedir_acceso_web}
     efectos: {}
     hechos:
-      - {jugada: pedir_acceso_web, resultado: boton_para_abrir_la_web,
-         lleva_el_boton: Mi espacio}
+      - {jugada: pedir_acceso_web, resultado: se_abre_con_el_boton_del_menu,
+         boton_del_menu: Mi espacio}
     pregunta: null
     botones: []
     enlace: false
-    enlace_web: true
+    enlace_web: false
     estado_despues:
       pregunta_abierta: null
     dice:
-      - que toque «Mi espacio», en pocas palabras
+      - que la abre con el botón «Mi espacio» del menú, al lado de donde escribe, en pocas palabras
     no_dice:
       - un enlace nuevo, o que pida otro
       - cómo funciona por dentro
