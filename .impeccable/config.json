@@ -593,6 +593,24 @@
         ],
         "createdAt": "2026-10-15T18:38:21.884Z",
         "reason": "intentional: short lowercase labels tracked like the user's reference image (2026-10-15); body text is not tracked"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "kanit",
+        "files": [
+          ".impeccable/mocks/decision/r8-sobrio.html"
+        ],
+        "createdAt": "2026-10-15T18:49:27.137Z",
+        "reason": "user chose Kanit for the r8 alternative (2026-10-15); DESIGN.md still records r7 until r8 is adopted"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "kanit",
+        "files": [
+          ".impeccable/mocks/decision/r8-sobrio-direccion.html"
+        ],
+        "createdAt": "2026-10-15T18:49:27.342Z",
+        "reason": "user chose Kanit for the r8 alternative (2026-10-15); DESIGN.md still records r7 until r8 is adopted"
       }
     ]
   }
