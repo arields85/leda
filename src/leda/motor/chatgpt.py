@@ -48,6 +48,8 @@ La sesión se guarda fuera del repositorio (`~/.leda/chatgpt.json`, o la ruta de
 `LEDA_CHATGPT_AUTH`), nunca se imprime y nunca entra a un mensaje de error. Lo que se muestra
 es la cuenta enmascarada. La renovación se hace sola; si falla, es `SesionChatGPTVencida`, un
 `LookupError`: para el turno, la IA no respondió (incidente y texto fijo), nunca en silencio.
+Dos procesos con la misma sesión (la escucha y el corredor) renuevan de a uno: el candado del
+sistema sobre `chatgpt.json.lock`, al lado de la sesión (`candado_de_la_sesion`).
 `salir` borra la sesión local; no la revoca en OpenAI (el acceso vence solo).
 """
 
@@ -60,8 +62,11 @@ import json
 import math
 import os
 import secrets
+import tempfile
 import threading
+import time
 import webbrowser
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -90,6 +95,9 @@ RENOVAR_ANTES = timedelta(minutes=5)
 RENOVAR_SIN_VENCIMIENTO = timedelta(days=8)
 ESPERA_DEL_NAVEGADOR_S = 300.0
 PLAZO_DEL_EMISOR_S = 30.0
+# Cuánto espera un proceso a que otro termine de renovar: el plazo del emisor y un margen.
+ESPERA_DEL_CANDADO_S = PLAZO_DEL_EMISOR_S + 15.0
+PAUSA_DEL_CANDADO_S = 0.05
 VARIABLE_RUTA = "LEDA_CHATGPT_AUTH"
 CABECERA_LITE = "x-openai-internal-codex-responses-lite"
 ESPACIO_DE_FUNCIONES = "functions"
@@ -122,6 +130,10 @@ class SesionChatGPTAusente(LookupError):
 
 class SesionChatGPTVencida(LookupError):
     """La sesión no se pudo renovar: hace falta volver a entrar."""
+
+
+class SesionChatGPTOcupada(SesionChatGPTVencida):
+    """Otro proceso de Leda está renovando la sesión y no soltó el candado a tiempo."""
 
 
 class ErrorDeChatGPT(RuntimeError):
@@ -291,22 +303,45 @@ def ruta_de_la_sesion() -> Path:
                                   Path.home() / ".leda" / "chatgpt.json")
 
 
+def _reemplazar(temporal: str, ruta: Path) -> None:
+    """`os.replace`, con unos reintentos breves: en Windows falla con `PermissionError` mientras
+    otro proceso tiene la sesión abierta para leerla, y perder lo renovado rompe la sesión (el
+    token de refresco anterior ya se consumió)."""
+    for intento in range(20):
+        try:
+            os.replace(temporal, ruta)
+            return
+        except PermissionError:
+            if intento == 19:
+                raise
+            time.sleep(PAUSA_DEL_CANDADO_S)
+
+
 def guardar(ruta: Path, tokens: Tokens) -> None:
-    """La sesión, entera o nada (un temporal que se renombra), con permisos sólo para el dueño
-    donde el sistema los tiene."""
+    """La sesión, entera o nada (un temporal propio que se renombra; si algo falla, el temporal
+    se borra y queda la sesión anterior), con permisos sólo para el dueño donde el sistema los
+    tiene."""
     ruta = _fuera_del_repositorio(Path(ruta))
     ruta.parent.mkdir(parents=True, exist_ok=True)
     datos = {k: (v.isoformat() if isinstance(v, datetime) else v)
              for k, v in asdict(tokens).items()}
-    temporal = ruta.with_name(ruta.name + ".tmp")
-    descriptor = os.open(temporal, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as archivo:
-        json.dump(datos, archivo)
+    # Un nombre único por escritura: dos escrituras a la vez no comparten el temporal.
+    descriptor, temporal = tempfile.mkstemp(dir=ruta.parent, prefix=ruta.name + ".",
+                                            suffix=".tmp")
     try:
-        os.chmod(temporal, 0o600)
-    except OSError:
-        pass
-    os.replace(temporal, ruta)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as archivo:
+            json.dump(datos, archivo)
+        try:
+            os.chmod(temporal, 0o600)
+        except OSError:
+            pass
+        _reemplazar(temporal, ruta)
+    except BaseException:
+        try:
+            os.unlink(temporal)
+        except OSError:
+            pass
+        raise
 
 
 def cargar(ruta: Path) -> Tokens:
@@ -315,6 +350,62 @@ def cargar(ruta: Path) -> Tokens:
         if datos.get(campo):
             datos[campo] = datetime.fromisoformat(datos[campo])
     return Tokens(**datos)
+
+
+# The lock is an OS file lock (msvcrt on Windows, flock elsewhere) on a side file, not an
+# O_EXCL "lock file exists" marker: the OS releases it when the holder dies, so a crashed
+# process never leaves a stale lock and no age or pid heuristics are needed (probing a pid with
+# os.kill(pid, 0) on Windows would terminate it). The side file is never deleted, because
+# deleting a lock file while another process waits on it reopens the race.
+if os.name == "nt":
+    import msvcrt
+
+    def _tomar(descriptor: int) -> None:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+
+    def _soltar(descriptor: int) -> None:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    def _tomar(descriptor: int) -> None:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def _soltar(descriptor: int) -> None:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+
+
+@contextmanager
+def candado_de_la_sesion(ruta: Path,
+                         espera_s: float = ESPERA_DEL_CANDADO_S) -> Iterator[None]:
+    """El candado entre procesos de la sesión (`<sesión>.lock`, al lado): sólo un proceso a la
+    vez lee, decide, renueva y guarda. Si otro lo tiene más de `espera_s`,
+    `SesionChatGPTOcupada`, que falla como las demás fallas de la sesión (nunca en silencio)."""
+    ruta = Path(ruta)
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(ruta.with_name(ruta.name + ".lock"), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        limite = time.monotonic() + espera_s
+        while True:
+            try:
+                _tomar(descriptor)
+                break
+            except OSError:
+                if time.monotonic() >= limite:
+                    raise SesionChatGPTOcupada(
+                        f"No se pudo renovar la sesión de ChatGPT: otro proceso de Leda la "
+                        f"está renovando y no terminó en {espera_s:g} s. Probá de nuevo en un "
+                        f"momento; si sigue fallando, volvé a iniciarla: {COMO_ENTRAR}."
+                    ) from None
+                time.sleep(PAUSA_DEL_CANDADO_S)
+        try:
+            yield
+        finally:
+            _soltar(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def enmascarar(tokens: Tokens) -> str:
@@ -335,16 +426,18 @@ def _ahora() -> datetime:
 
 class SesionChatGPT:
     """La sesión guardada, con la renovación automática. Segura entre hilos; entre procesos
-    (la escucha y el corredor a la vez), antes de renovar vuelve a leer el archivo, por si otro
-    ya renovó."""
+    (la escucha y el corredor a la vez), renueva con el candado de la sesión tomado y, ya con
+    él, vuelve a leer el archivo, por si otro ya renovó: sólo uno renueva."""
 
     def __init__(self, ruta: Path, *, transporte: httpx.BaseTransport | None = None,
                  reloj: Callable[[], datetime] | None = None,
-                 plazo_s: float = PLAZO_DEL_EMISOR_S) -> None:
+                 plazo_s: float = PLAZO_DEL_EMISOR_S,
+                 espera_del_candado_s: float = ESPERA_DEL_CANDADO_S) -> None:
         self.ruta = Path(ruta)
         self._transporte = transporte
         self._reloj = reloj or _ahora
         self._plazo_s = plazo_s
+        self._espera_del_candado_s = espera_del_candado_s
         self._tokens: Tokens | None = None
         self._rechazado: str | None = None
         self._candado = threading.Lock()
@@ -373,14 +466,16 @@ class SesionChatGPT:
 
     def credenciales(self) -> tuple[str, str]:
         """El token de acceso vigente y la cuenta, renovando antes de que venza o después de
-        un 401. Si no se puede renovar, `SesionChatGPTVencida`."""
+        un 401. Si no se puede renovar, `SesionChatGPTVencida` (o `SesionChatGPTOcupada`, si
+        otro proceso no suelta el candado a tiempo)."""
         with self._candado:
             ahora = self._reloj()
             tokens = self._tokens or self._leer()
             if self._vencida(tokens, ahora):
-                tokens = self._leer()               # otro proceso pudo haber renovado
-                if self._vencida(tokens, ahora):
-                    tokens = self._renovar(tokens, ahora)
+                with candado_de_la_sesion(self.ruta, self._espera_del_candado_s):
+                    tokens = self._leer()           # otro proceso pudo haber renovado
+                    if self._vencida(tokens, ahora):
+                        tokens = self._renovar(tokens, ahora)
                 self._rechazado = None
             self._tokens = tokens
             return tokens.access_token, tokens.cuenta
@@ -965,8 +1060,9 @@ def iniciar(*, ruta: Path | None = None, manual: bool = False,
         codigo = codigo_del_retorno(vuelta, estado)
         with httpx.Client(transport=transporte, timeout=PLAZO_DEL_EMISOR_S) as cliente:
             tokens = canjear_codigo(cliente, codigo, pkce, retorno, ahora=reloj())
-        guardar(ruta, tokens)
-    except (LoginFallido, ValueError, OSError) as e:
+        with candado_de_la_sesion(ruta):    # que una renovación en curso no pise el ingreso
+            guardar(ruta, tokens)
+    except (LoginFallido, SesionChatGPTOcupada, ValueError, OSError) as e:
         print(f"No se pudo iniciar la sesión: {e}")
         return 1
     finally:
