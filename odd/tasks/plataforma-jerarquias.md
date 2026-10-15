@@ -2316,3 +2316,12 @@ porción en las 3, 5 y 6; se revisan por tramos con RDD.
 - 2026-10-13, noche: la J2-29 se hizo sin CRITICAL ni HIGH y sus arreglos son la J2-30. La suite completa sobre
   `eaf84ed4` dio `3286 passed, 1 warning in 1889.71s`, con `salida=0` (`LEDA_BASE_URL= LEDA_GEMINI_API_KEY=
   .venv/Scripts/python.exe -m pytest -q -p no:cacheprovider`).
+- 2026-10-14 y 15: J3, J4 y la Mini App (MA-2 a MA-7) cerradas; todas las decisiones de J5, J6 y J7 tomadas (ADR
+  0025 aceptado); J7-0 a J7-5b hechas, con su evidencia en cada entrada.
+- 2026-10-15, noche: RDD de `9d871545` (J7-5b) aprobada en tres tramos; alta duplicada corregida (`a71d2623`, RDD
+  aprobada); `0085` aplicada a `leda_motor` (respaldo `leda_motor-antes-0085-20261015.dump`); nombres de pestañas
+  estándar en código, documentos y muestras (`da249f05`, `12c33af7`, `153017bb`). El resto de la sesión fue diseño
+  (la r8 «sobria», en `.impeccable/surfaces/web-src-app-tsx.md`). **La J7-6 no se empezó.**
+- **Próximo paso:** al abrir la sesión nueva, la J7 de fondo, de la J7-6 en adelante, una porción tras otra
+  (escritor delegado, prueba primero, RDD por commit, esta entrada al cerrar cada una); en primer plano, el diseño
+  con el usuario. Punto exacto: `docs/STATUS.md`.
