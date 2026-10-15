@@ -1649,8 +1649,11 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
     passed al repetirlas); sin `LEDA_BASE_URL=` vacío fallan 15 de la cadena por el ofrecimiento de la web, del
     entorno y no del cambio. `npm test` en `web/`, 343 passed. `correr --ia guionada --veces 1` (en seco), 54
     de 54 bien. Con `b12eb445`: `pytest -q tests/garantias/test_pagina_web_de_la_tarea.py
-    tests/test_tarea_vista.py tests/motor/test_palabras_de_la_redaccion.py`, 52 passed. **Queda pendiente la ronda con la IA real** de las conversaciones afectadas (la 55 primero, y
-    las de la cadena: 32 a 35, 40 y 42); la corre el coordinador.
+    tests/test_tarea_vista.py tests/motor/test_palabras_de_la_redaccion.py`, 52 passed. **La ronda con la IA real** (coordinador, 2026-10-15, de mañana; 55, 32 a 35, 40 y 42, `--veces 3`, informe
+    `2026-10-15-0845`): garantías 19 de 21, todo lo automático 10 de 21; "trabada" en la 55, de 25 renglones a 0; en
+    las siete, de 77 a 3, y los 3 repiten la palabra de la persona. Ninguna falla sale del cambio (detalle en la
+    bitácora). RDD de `8f48c5e2`, `25fa8835` y `b12eb445`: aprobados, sólo sugerencias (textos de incidentes y de
+    esperas sin una prueba que los mire).
 - [x] **Grafo de transiciones (parte 1, lo que dice la mecánica)** (2026-10-15, escritor delegado; prueba
   primero). Sólo lo que la mecánica §3 dice explícitamente; lo demás espera las preguntas de "Para decidir al
   despertar" (quién cancela, reabrir, deshacer el empecé, los objetivos) y no se restringió nada de eso.
@@ -1774,7 +1777,11 @@ ejemplo y recomendación, y sigue con otra cosa.
   depende de otro. Con la respuesta, se renombran los datos en el borde de la redacción (como "previsión"), se
   reescriben sus explicaciones, una prueba impide que vuelvan, y una ronda con la IA real
   lo comprueba. Mientras tanto se arregla sólo lo que no depende de la palabra.
-- **El mensaje cuando la IA falla** (tarea "Lenguaje"). Hoy, si la IA no responde, la persona recibe: «Tuve un
+- **El mensaje cuando la IA falla** — **DECIDIDO (usuario, 2026-10-15):** que Leda avise que contesta sola cuando
+  vuelva ("así la persona no tiene que andar probando cada rato"): «Ahora no puedo contestarte; ya avisé para que
+  lo revisen. En cuanto vuelva, te respondo yo, no hace falta que me escribas de nuevo.» Como hoy no se reintenta
+  después del turno, hace falta construirlo antes de decirlo (tarea "La respuesta que quedó pendiente"); hasta
+  entonces sigue el mensaje de hoy. (Tarea "Lenguaje"). Hoy, si la IA no responde, la persona recibe: «Tuve un
   problema y no pude responder tu mensaje. Ya quedó registrado para que lo revise un administrador.» Suena frío
   y técnico. *Recomendación:* «Uy, no pude contestarte ahora. Ya avisé para que lo revisen; probá de nuevo en un
   rato.» (la constitución §10 pide un mensaje humano y genérico, y lo cumple). Alternativa: lo mismo sin "probá
