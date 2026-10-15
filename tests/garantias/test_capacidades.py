@@ -105,7 +105,9 @@ TABLAS_POR_FUNCION = ("acceso_tablero", "acceso_tarea", "vista_de_tarea",
 # (`test_las_columnas_por_funcion_se_usan_en_esas_funciones`): no es una lista de promesas.
 COLUMNAS_POR_FUNCION: dict[tuple[str, str], tuple[str, ...]] = {
     # `task.pedida_por_membership_id` (migración 0071, J4; decisiones D1b y D14): la escribe
-    # `cargar_tarea_web` y la leen `puede_ver_tarea`, `pedidas_que_ve` y `reabrir_tarea`.
+    # `cargar_tarea_web` y la leen `puede_ver_tarea`, `pedidas_que_ve` y `reabrir_tarea`; desde
+    # las deudas de la MA también `web_app.py` ("Mis tareas" dice quién la pidió). Queda como el
+    # ejemplo que usa `test_eximir_una_columna_por_funcion_no_exime_su_nombre_en_otra_tabla`.
     ("task", "pedida_por_membership_id"): ("cargar_tarea_web", "puede_ver_tarea",
                                            "pedidas_que_ve", "reabrir_tarea"),
 }
