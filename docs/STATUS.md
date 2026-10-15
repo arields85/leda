@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-14, tarde: J2 cerrada, J3 pasada, J4 construida y probada, MA construida y en prueba; decisiones de J4, MA, J5 y J6 tomadas. Ver "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-14, cierre de la noche: J2 y J3 cerradas; J4 construida y probada; la Mini App (MA) construida, probada y con su última tanda de ajustes (MA-4) pendiente; decisiones de J4, MA, J5 y J6 tomadas. Ver "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -71,54 +71,52 @@ viejo corriendo.
   Usuario: "quedó perfecto todo".
 - `leda_motor`, en la `0067` (respaldos en `db/respaldos/`, el último `leda_motor-antes-0067-20261013.dump`).
 
-**Punto exacto para seguir** (2026-10-14, tarde; actualizado por contexto, sin cerrar la sesión):
+**Punto exacto para seguir** (cierre de la sesión del 2026-10-14, noche):
 1. **Hecho el 2026-10-14:**
    - **J2:** cerrada (la J2-29 y sus arreglos, la J2-30, y la suite con 3286 passed).
    - **J3:** cerrada (2026-10-14, noche). El tercer nivel pasó a llamarse "objetivo de un área".
    - **J4a y J4b:** construidas y revisadas por RDD. La prueba de la J4 en el celular está hecha y sus hallazgos
      se arreglaron en la MA.
-   - **MA, la Mini App y el QR del ADR 0024:** construida, con la `0073` aplicada en `leda_motor`. La IA real dio
-     12 de 12 y RDD aprobó todo.
+   - **MA, la Mini App y el QR para la computadora (ADR 0024, aceptado, con la precisión del lanzador para Telegram
+     en computadora):** construida, con MA-2 y MA-3 (las correcciones del usuario en el iPhone), las migraciones
+     `0073` a `0075` aplicadas en `leda_motor`, RDD aprobada en todos los tramos e IA real 14 de 15 (la falla es de
+     formato). Probada por el usuario con Ariel en el iPhone, Ismael en Telegram de escritorio (abre el navegador) y
+     el navegador de la compu: "muy bueno como quedó".
    - **Decisiones completas** de la J4, la MA, la J5 y la J6, en el documento de la unidad.
-2. **MA-2 y MA-3, hechas y revisadas por RDD** (`0075` aplicada, web rearmada). Fueron:
-   - **MA-2:**
-     - Telegram de escritorio lleva a la página del QR en el navegador, con el mensaje "Abrí Leda en el navegador";
-     - los WARNING de las últimas RDD de la MA;
-     - el detalle de la tarea completo.
-   - **MA-3, las correcciones del usuario en el iPhone:**
-     - el botón del menú se llama "Mi panel";
-     - el detalle de la tarea se ve dentro de la app, con "> volver";
-     - pantalla completa;
-     - "salir" sólo en la compu;
-     - "> Nueva tarea" abajo, como botón principal, y "Volver al chat" abajo a la izquierda, chico;
-     - las pestañas "Mis tareas", "Mi equipo" y "Lo que pedí" en una fila; "Mi equipo" muestra sólo la gente
-       del referente, con el área como dato;
-     - el título y el nombre en una línea, y el nombre, si no entra, sigue debajo alineado a la derecha;
-     - los contadores Vencidas · Sin empezar · En curso · Esperando · Entregadas, sin "Activas";
-     - todo en una pantalla: sólo se desplazan las tarjetas.
-   Cuando termine:
-   - aplicar la migración que haya, con respaldo y ensayo;
-   - rearmar `web/dist` y reiniciar la web;
-   - RDD por commit, sobre una copia en LF si hace falta;
-   - la ronda con la IA real de lo que haya cambiado;
-   - el usuario reinicia el escuchador y repite la prueba de la MA (`docs/product/guion-celular-ma.md`).
-3. **Próximo paso al retomar:** la **MA-4**, con los ajustes del usuario tras probar MA-2 y MA-3 ("muy bueno como
-   quedó"). Los seis puntos están en el documento de la unidad, nota "Prueba de MA-2 y MA-3". No se empezó: el
-   usuario pidió hacerla en la sesión siguiente. Después, la ronda con la IA real de las conversaciones 50 y 55, y
-   una última mirada del usuario para cerrar la MA y la J4.
-4. **Prueba de la MA:** el usuario sólo tiene a Ariel en el celular. Marcos e Ismael se prueban en Telegram de
-   escritorio, donde el botón tiene que abrir el navegador. En el QR entra la cuenta que lo escanea.
-   - Probado con Ariel: el botón del menú y la Mini App andan, y el detalle de la tarea se abrió (con el estilo
-     viejo, ya en corrección).
-   - Pendiente: los pasos de objetivos y de la J3-6 y la J3-7 (pasos 10 a 12) para cerrar la J3; repetir lo de la J4;
-     la administración; el QR.
+2. **Próximo paso al retomar: la MA-4**, la última tanda de ajustes del usuario. No se empezó: el usuario pidió
+   dejarla para esta sesión. Detalle en el documento de la unidad, nota "Prueba de MA-2 y MA-3":
+   1. el botón se llama **"Mi espacio"** (el del menú y el que manda Leda), y el mensaje de Leda al ofrecerlo
+      queda corto y natural (hoy es tosco y dice "dentro de Telegram, no en el navegador");
+   2. la barra de desplazamiento con el estilo de la app, y en la compu la web ocupa todo el ancho;
+   3. las pestañas: "Todo el equipo" pasa a **"Mi área"**, y "Lo que pedí" a **"Mis pedidos"**;
+   4. arriba a la derecha, en lugar de "SEM 42 · VIE 16.10", el **nombre** de la persona y debajo su **área**,
+      fijos en todas las pestañas;
+   5. se eliminan **"Volver al chat" y "salir"** en la Mini App y en la compu (la sesión de la compu se cierra
+      por chat);
+   6. **"> Nuevo objetivo"** va abajo, junto a "> Nueva tarea", con el mismo estilo.
+   Con un escritor delegado. Recordarle la regla de los finales de línea LF. Después:
+   - rearmar `web/dist` y reiniciar la web y el escuchador;
+   - RDD por commit, sobre una copia en LF si el revisor la rechaza por tamaño;
+   - la ronda con la IA real de las conversaciones 50 y 55;
+   - la mirada final del usuario para **cerrar la MA y la J4**.
+3. **Después de la MA:**
+   - la tarea **"Lenguaje":** que Leda no diga "trabado" ni "bloqueada" en el chat;
+   - la **J5** y la **J6**, con sus decisiones ya tomadas;
+   - la **J7**, cuyas decisiones faltan;
+   - al principio de cada una, las decisiones con el usuario, de a una y en texto.
+4. **Deudas abiertas de la MA:**
+   - los WARNING menores de la última RDD (documento de la unidad);
+   - la ortografía al confirmar en la puerta del equipo falló dos veces el 14/10: verla con la IA real;
+   - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento).
 Acuerdos del 2026-10-14:
 - las decisiones de cada porción se traen al principio, de a una y en texto;
 - RDD y las rondas con la IA real, sin preguntar; al primer error de cupo, se para y espera;
 - los avisos cuentan lo que vale ahora, no la historia;
 - un cambio de plazo trae el informe de "en qué afecta" antes de decidir.
-`leda_motor`: en la `0073` (respaldos `db/respaldos/leda_motor-antes-006x/007x-20261014.dump`). La web corre en
-segundo plano y el túnel es `pharmaceutical-configuring-unix-while`. El escuchador lo reinicia el usuario.
+`leda_motor`: en la `0075` (respaldos `db/respaldos/leda_motor-antes-006x/007x-20261014.dump`). La web corre en
+segundo plano de la sesión, con el túnel `pharmaceutical-configuring-unix-while`: al cerrarla se cortan, y en la sesión
+nueva el agente los vuelve a levantar y pone la dirección nueva en `LEDA_BASE_URL` del `.env`. El escuchador lo
+reinicia el usuario. Para el detalle de cada decisión y de cada prueba: `../odd/tasks/plataforma-jerarquias.md`.
 Para probar en el celular: el agente levanta la web y el túnel en segundo plano y pone la dirección nueva en
 `LEDA_BASE_URL` del `.env`; el usuario emite el enlace con `leda enlace-admin Ariel` (en una terminal sin un
 `$env:LEDA_BASE_URL` viejo). La web y el túnel de la sesión del 2026-10-13 corren en segundo plano de esa sesión
