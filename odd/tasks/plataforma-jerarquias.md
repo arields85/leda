@@ -1807,7 +1807,23 @@ ejemplo y recomendación, y sigue con otra cosa.
      los mueve después de crearlos. *Recomendación:* dejarlos para cuando se construya cerrar un objetivo, y por
      ahora sólo impedir saltos inválidos.
 
-- **J7 · las jerarquías y los integrantes desde la web de Dirección** (preguntas preparadas el 2026-10-15 a la
+- **J7 · las jerarquías y los integrantes desde la web de Dirección** — **CONTESTADO (usuario, 2026-10-15, de mañana):**
+  1. manda la web; el archivo del espacio es sólo plantilla para arrancar con la web en cero y respaldo exportable
+  (`ROADMAP.md`, `1d7efb4b`); 2. entra todo lo del equipo (altas, bajas, área, rol, referentes, quién aprueba,
+  áreas, los avisos informativos que elige cada persona, pasar la autoridad final); ausencias y suplente de
+  Dirección, en la porción siguiente; 3 y 4. «> nombrar referente» es un paso (decisión 33) cuya vista previa
+  muestra todo lo que arrastra y **pregunta qué pasa con el anterior** (usuario: "es raro que de referente pase
+  a ser integrante"): se va (camino de la baja), pasa a otro sector, o queda como integrante; lo que lo
+  esperaba pasa al nuevo con un solo aviso; las tareas con él como revisor a mano pasan al nuevo (sin opción si
+  se va; por omisión, destildables, si se queda); 5. la baja reparte cada tarea abierta (o "que lo decida el
+  referente"), no borra, corta sesiones, y la autoridad final se pasa antes; 6. alta con nombre, área y rol,
+  aprobador = referente del área, «> copiar el enlace de activación», "sin conectar" hasta abrirlo; 7. al
+  cambiar de área, cada tarea abierta por omisión la termina él y la revisa el referente del área de la tarea, o
+  pasa a otro de esa área; 8. un área no se borra con gente ni con tareas abiertas; renombrar cambia sólo el
+  nombre; 9. aviso corto a cada afectado, historial "Cambios del equipo" para Dirección, auditoría; **al
+  administrador de la plataforma no le llega nada de la organización interna** (usuario: "se ocupa de la parte
+  técnica, no de los grupos de trabajo"; el administrador del equipo es Dirección); 10. ya estaba en el ADR
+  0023, decisión 5. Lo de abajo es la pregunta tal como se hizo. (preguntas preparadas el 2026-10-15 a la
   noche; nada construido). Hoy no hay ninguna función, comando ni pantalla para dar de alta o de baja a alguien,
   ni para cambiar su área, su rol o quién lo aprueba: todo sale del pack (`espacios/corework.yaml`). Las
   preguntas van de la que más frena a la que menos; se contestan de a una.
