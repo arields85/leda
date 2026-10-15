@@ -1442,6 +1442,17 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         (cambio de fecha directo); reescribir la 02 y revisar las doce que usan `anotar_prevision`.
       - **S2.** La base: el cambio de fecha auditado (`cambio_de_fecha`, con el molde de
         `cambio_de_responsable`); hoy `bloquear_estado_directo` no deja cambiar la fecha.
+        **S2 hecha (2026-10-15; escritor delegado):** `44747b27`, con la migración `0077_el_cambio_de_fecha`
+        (y su rollback; `leda_motor` sigue en la `0076`, sin aplicarla). Sólo el mecanismo: la fecha de una
+        tarea cambia sólo al agregarse una fila en `cambio_de_fecha` (fecha anterior, nueva, motivo
+        obligatorio, quién lo hizo, quién lo decidió y la clase `cambio_directo`), que nadie edita ni borra.
+        Su disparador (`aplicar_cambio_de_fecha`, de `leda_owner`) rechaza un cambio pensado sobre otra
+        fecha, una tarea cerrada, una de otro espacio (igual que un id inventado) y una fecha que ya pasó o
+        que no es un día hábil del espacio (`es_dia_habil`). No escribe auditoría: el molde tampoco; la
+        escribe la función que lo use (S6). Quién puede cambiar una fecha y la fecha del objetivo quedan
+        para la S6. Evidencia: `pytest tests/garantias/test_cambio_de_fecha.py test_migraciones.py
+        test_capacidades.py test_aislamiento.py`, 42 passed (antes, en rojo: 10 de las 15 nuevas);
+        `pytest tests/garantias`, 1124 passed (22 min).
       - **S3.** El pedido con su estado, la previsión aceptada y la fecha prevista de los objetivos.
       - **S4.** "En qué afecta", una sola regla en la base para el chat y la web.
       - **S5.** "> aceptar la demora" en los objetivos (web; decisiones 5 a 7).
