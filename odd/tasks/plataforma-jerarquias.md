@@ -1642,6 +1642,17 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
       misma tarea en una sola sentencia se comparan todos contra el estado de antes de la sentencia, así que dos
       saltos desde el mismo estado pasarían (por ejemplo, cancelar y seguir en la misma sentencia). Arreglo:
       comparar contra el último evento de la tarea, que dentro de la misma sentencia sí se ve.
+      **Arreglada** (2026-10-15, escritor delegado; prueba primero), `b81b89ff`: la migración
+      `0080_el_grafo_en_una_sola_sentencia` (con su rollback y `esquema.sql`) le da a cada evento de tarea y de
+      objetivo su número en la historia (`numero`, único por tarea y por objetivo; lo pone el disparador con la
+      fila tomada `for update`, aunque quien inserta mande otro) y compara contra el último evento numerado, que
+      dentro de la misma sentencia sí se ve; sin eventos numerados, contra el estado de la fila. No se ordena por
+      `at`: el de los objetivos es `now()`, igual en toda la transacción. `estado_previo_a_bloqueo` ordena por el
+      número antes que por la hora. Una cadena válida en una sola sentencia pasa (empezar y entregar juntos).
+      Pruebas: 6 nuevas en `test_grafo_de_estados.py` (rojo antes de la `0080`: 5 fallaban; la de salir de
+      `cancelada` en la segunda fila ya se rechazaba). Evidencia (2026-10-15): `pytest -q
+      tests/garantias/test_grafo_de_estados.py tests/garantias/test_migraciones.py`, 35 passed; `pytest -q
+      tests/garantias`, 1143 passed; `pytest -q tests/motor`, 1502 passed. Revisión RDD: pendiente.
 - [x] **Candado de la sesión de ChatGPT** (2026-10-15, escritor delegado; prueba primero; deuda de
   `docs/STATUS.md`). La escucha y una ronda del corredor podían renovar la sesión a la vez y romperla.
   - `5ad5fd2e`: `src/leda/motor/chatgpt.py` renueva con un candado del sistema (`msvcrt` en Windows, `flock`
