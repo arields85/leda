@@ -1632,6 +1632,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         rollback y matriz de los cuatro roles los descubre solos `test_migraciones`). `pytest
         tests/garantias`: 1189 passed. `npm test` en `web/`: 350 passed; `npm run build`: bien.
         `leda_motor` sigue en la `0081`: la `0082` no se aplicó.
+        RDD de `f278397f` y `05569578`: aprobadas (advertencias: el botón de volver y el reintento de la vista
+        Equipo sin prueba; sugerencias menores). `leda_motor` en la `0082` (respaldo
+        `db/respaldos/leda_motor-antes-0082-20261015.dump`, ensayada en una copia).
       - **J7-4** · áreas (`0083`): crear, renombrar, archivar. Espera la pregunta 2.
       - **J7-5** · alta (`0084`): `dar_de_alta`, «> copiar el enlace de activación», "sin conectar", reactivar a
         quien vuelve; `activar` une la cuenta de quien ya está en otro espacio; el token pasa a guardarse como
