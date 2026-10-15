@@ -1615,6 +1615,37 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
     `fichas.py` importa `leda.menu_del_bot`, desde `98c5758f`, MA-5); `pytest` de `test_onboarding`,
     `test_tarea_vista`, `test_pagina_de_la_tarea`, `test_carga_del_equipo` y `test_api_de_la_plataforma`, en
     verde; `correr --ia guionada --veces 1` (en seco), 54 de 54 bien.
+- [x] **Lenguaje (porción 2, "trabada")** (2026-10-15, escritor delegado; prueba primero en cada arreglo). La
+  decisión del usuario: en lo que ve la persona, qué falta y quién se ocupa, nunca "trabada", "se trabó",
+  "destrabar" ni "bloqueo". Los nombres de la cocina (el estado `bloqueada`, las jugadas, los hechos
+  guardados) no cambiaron.
+  - `8f48c5e2`: lo que lee la IA para redactar. Como con "previsión", en el borde de la redacción
+    (`hechos.PARA_LA_REDACCION`): 62 nombres y códigos con "trab" o "bloque" tienen el suyo (por ejemplo
+    `si_esta_trabada` → `si_le_falta_algo_para_seguir`, `bloqueada` → `esperando_algo_para_seguir`,
+    `quien_destraba` → `quien_se_ocupa_de_lo_que_falta`, `se_destrabo` → `dijo_que_ya_puede_seguir`), y los de
+    seis jugadas que todavía lo decían; se reescribieron 106 significados y el para qué de ocho jugadas, con el
+    mismo sentido. La prueba de las palabras de la redacción suma "trabad", "trabo", "destrab", "bloqueo" y
+    "bloquead" a los conceptos de la cocina y revisa nombres, valores, significados y para qué ("trabajo" queda
+    afuera). Los avisos de incidente al administrador lo dicen igual.
+  - `25fa8835`: los textos fijos. La bienvenida dice «para ver cómo venís y si te falta algo para seguir»; el
+    historial de la tarea, «Quedó esperando: el cable (lo dijo Marcos). Ya pudo seguir el …» (decía «Se trabó»
+    y «Se destrabó»); el tablero, «Esperando algo para seguir» y «Ninguna tarea está esperando algo para
+    seguir.»; los errores de la espera en la web, «otra no puede quedar esperándola» (decía «no puede trabar a
+    otra»).
+  - **Sin hacer, fuera de lo autorizado:** en el historial de la tarea siguen «dijo que no sabe quién la
+    destraba», «no hay otra persona que la destrabe», «dijo que la destraba …», «Quedó asentado que sigue
+    trabada» y «nadie toma el bloqueo»: tres los afirma `tests/garantias/test_pagina_web_de_la_tarea.py`, que
+    no estaba en la superficie del escritor. Propuesta: «no sabe quién se ocupa de lo que falta», «no hay otra
+    persona que se ocupe», «dijo que de eso se ocupa X», «dijo que lo consigue el …», «Quedó asentado que sigue
+    esperando» y «nadie se ocupa de lo que le falta». Tampoco se tocó lo que lee la IA para elegir jugadas
+    (`Ficha.es`, `ia_real.DATOS`, `INSTRUCCIONES_JUGADAS`): no lo escribe a la persona.
+  - Evidencia (2026-10-15): `LEDA_BASE_URL= pytest -q tests/motor tests/test_onboarding.py
+    tests/test_tarea_vista.py tests/garantias/test_tablero.py`, 1537 passed y 2 failed, las dos de
+    `test_avisos_sin_nombre_ni_hora.py` que esperaban los nombres viejos y se corrigieron en el mismo commit (12
+    passed al repetirlas); sin `LEDA_BASE_URL=` vacío fallan 15 de la cadena por el ofrecimiento de la web, del
+    entorno y no del cambio. `npm test` en `web/`, 343 passed. `correr --ia guionada --veces 1` (en seco), 54
+    de 54 bien. **Queda pendiente la ronda con la IA real** de las conversaciones afectadas (la 55 primero, y
+    las de la cadena: 32 a 35, 40 y 42); la corre el coordinador.
 - [x] **Grafo de transiciones (parte 1, lo que dice la mecánica)** (2026-10-15, escritor delegado; prueba
   primero). Sólo lo que la mecánica §3 dice explícitamente; lo demás espera las preguntas de "Para decidir al
   despertar" (quién cancela, reabrir, deshacer el empecé, los objetivos) y no se restringió nada de eso.
