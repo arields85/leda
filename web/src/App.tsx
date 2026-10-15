@@ -5,6 +5,7 @@ import {
   fetchMe,
   fetchTaskDetail,
   fetchView,
+  RequestError,
   SessionClosedError,
   type AreasOverview,
   type Me,
@@ -119,8 +120,11 @@ export function App() {
   const [me, setMe] = useState<Load<Me>>({ kind: 'loading' });
   const [view, setView] = useState<ViewId | null>(null);
   const [tasks, setTasks] = useState<Load<ViewData>>({ kind: 'loading' });
-  // "Áreas" (MA-6): the area chosen, or none (the overview, one card per area).
+  // "Áreas" (MA-6): the area chosen, or none (the overview, one card per area). The one in the
+  // address is only a hint: it counts only inside "Áreas" (`inArea`), and one the server does not
+  // know for this person falls back to the overview.
   const [area, setArea] = useState<string | null>(areaInAddress);
+  const inArea = view === 'areas' ? area : null;
   const [overview, setOverview] = useState<Load<AreasOverview>>({ kind: 'loading' });
   // Dirección creating an objective (ADR 0023, decision 1), or Dirección or a referente loading a
   // task (decision 3; J4): the form takes the page's place.
@@ -173,7 +177,9 @@ export function App() {
       fetchView(view, request.signal, view === 'areas' ? area : null)
         .then((data) => setTasks({ kind: 'ready', data }))
         .catch((error: unknown) => {
-          if (!request.signal.aborted) setTasks(failure(error));
+          if (request.signal.aborted) return;
+          if (view === 'areas' && error instanceof RequestError && error.status === 404) backToAreas();
+          else setTasks(failure(error));
         });
     }
     return () => request.abort();
@@ -196,7 +202,7 @@ export function App() {
   // decision 10; MA-3), or leaves an area for the overview of "Áreas" (MA-6): the same as their
   // "> volver" or "‹ Áreas", never closing the Mini App.
   useEffect(
-    () => bindBackButton(telegramWebApp(), creating !== null || detail !== null || area !== null, () => {
+    () => bindBackButton(telegramWebApp(), creating !== null || detail !== null || inArea !== null, () => {
       if (creating !== null || detail !== null) {
         setDetail(null);
         setCreating(null);
@@ -204,7 +210,7 @@ export function App() {
         backToAreas();
       }
     }),
-    [creating, detail, area],
+    [creating, detail, inArea],
   );
 
   /** A task's detail inside the app (MA-3): the server says what this person may see of it. */

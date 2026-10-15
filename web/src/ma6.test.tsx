@@ -78,6 +78,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  delete (window as unknown as { Telegram?: unknown }).Telegram;
 });
 
 describe('«Áreas», Dirección\'s view', () => {
@@ -148,5 +149,37 @@ describe('«Áreas», Dirección\'s view', () => {
     render(<App />);
     expect(await screen.findByRole('list', { name: 'Áreas' })).toBeInTheDocument();
     expect(calls).not.toContain('GET /app/api/tareas?vista=equipo');
+  });
+});
+
+// The area in the address is only a hint (review of MA-6, App.tsx:117): a stale or crafted address
+// never shows what the person cannot see (the server refuses it anyway) nor leaves her stuck.
+describe('an area in the address that does not fit', () => {
+  it('an area that does not exist (or is not of this space) falls back to the overview', async () => {
+    const calls = serve(routes());
+    window.history.replaceState(null, '', '/app/?vista=areas&area=otra');
+    render(<App />);
+    expect(await screen.findByRole('list', { name: 'Áreas' })).toBeInTheDocument();
+    expect(calls).toContain('GET /app/api/tareas?vista=areas&area=otra');
+    expect(window.location.search).toBe('?vista=areas');
+    expect(screen.queryByText('No se pudo cargar la página.')).toBeNull();
+    expect(screen.queryByRole('button', { name: '‹ Áreas' })).toBeNull();
+  });
+
+  it("someone without «Áreas» gets her own tasks, and Telegram's «Atrás» stays hidden", async () => {
+    const back = { show: vi.fn(), hide: vi.fn(), onClick: vi.fn(), offClick: vi.fn() };
+    (window as unknown as { Telegram: unknown }).Telegram = {
+      WebApp: { initData: 'query_id=1&hash=abc', platform: 'ios', ready: vi.fn(), expand: vi.fn(), BackButton: back },
+    };
+    const calls = serve({
+      ...routes(),
+      'GET /app/api/yo': ok(me({ persona: 'Marcos', vistas: [{ vista: 'tus', titulo: 'Mis tareas' }] })),
+    });
+    window.history.replaceState(null, '', '/app/?vista=areas&area=a1');
+    render(<App />);
+    expect(await screen.findByText('Configurar alarmas del SCADA')).toBeInTheDocument();
+    expect(calls.some((c) => c.includes('vista=areas'))).toBe(false);
+    expect(screen.queryByRole('button', { name: '‹ Áreas' })).toBeNull();
+    expect(back.show).not.toHaveBeenCalled();
   });
 });
