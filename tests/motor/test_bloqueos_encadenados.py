@@ -570,5 +570,7 @@ def test_una_tarea_suya_que_el_mensaje_no_traba_sigue_sin_anotarse_asi(conn, mun
 
 
 def test_el_motivo_dice_cual_tarea_no_esta_trabada():
-    """Para que la IA no lo diga de la tarea de la otra persona: es la suya que nombró."""
-    assert "su_tarea_trabada" in hechos_mod.significado("su_tarea_no_esta_trabada")
+    """Para que la IA no lo diga de la tarea de la otra persona: es la suya que nombró, con el
+    nombre que la IA lee al redactar."""
+    assert hechos_mod.para_redactar("su_tarea_trabada") in hechos_mod.significado(
+        "su_tarea_no_esta_trabada")

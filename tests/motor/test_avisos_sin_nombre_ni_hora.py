@@ -100,7 +100,7 @@ def test_lo_demas_del_aviso_queda_a_la_vista():
 
     assert recibido[0]["se_le_consulta_a"] == {
         "solo_si_pregunta": {"a": "Ariel", "llega": MAS_TARDE}}
-    assert recibido[6]["aviso_a_quien_destrababa"] == {
+    assert recibido[6]["aviso_a_quien_se_ocupaba_de_lo_que_faltaba"] == {
         "llega": "ya_le_llego", "solo_si_pregunta": {"a": "Ariel"}}
     assert recibido[8]["avisos_a_quienes_esperan"] == [
         {"aviso_a_quien_espera": {"tarea": "Cablear",
@@ -117,7 +117,7 @@ def test_un_aviso_que_ya_no_va_a_pasar_tampoco_nombra_a_quien_iba():
     recibido = _lo_que_recibe_la_redaccion(pedido)
 
     assert recibido["ya_no_va_a_pasar"] == [
-        {"anuncio": "aviso_a_quien_esta_trabado", "tarea": "Cablear",
+        {"anuncio": "aviso_a_quien_le_falta_algo_para_seguir", "tarea": "Cablear",
          "llega": "no_le_va_a_llegar", "motivo": "ya_no_esta_entregada",
          "solo_si_pregunta": {"a": "Ariel"}}]
 

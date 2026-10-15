@@ -184,8 +184,9 @@ def _asentar(m: Momento, tarea: dict[str, Any], bloqueo_id: str, aviso_id: str, 
     if sin_a_quien:
         avisar_que_no_hay_a_quien(
             m.cur, m.workspace_id,
-            f"El bloqueo de la tarea «{tarea['titulo']}» lleva {dias} días hábiles abierto y no "
-            f"le llega a nadie que decida: {por_que_no_hay_a_quien(sin_a_quien)}. Quedó "
+            f"A la tarea «{tarea['titulo']}» le falta algo para seguir desde hace {dias} días "
+            f"hábiles y no le llega a nadie que decida: "
+            f"{por_que_no_hay_a_quien(sin_a_quien)}. Quedó "
             f"asentado en la historia de la tarea y se le dijo a quien la tiene.")
 
 

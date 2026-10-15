@@ -345,7 +345,8 @@ def preguntarle(ctx: Contexto, tarea: dict[str, Any], bloqueo: dict[str, Any], d
         hecho = {"no_se_le_puede_escribir_a": {"a": destraba["nombre"], "motivo": motivo}}
         if motivo == SIN_TELEGRAM:
             hecho[SE_LE_AVISO_AL_ADMINISTRADOR] = avisar_para_que_lo_conecte(
-                ctx, destraba["nombre"], f"para destrabar la tarea «{tarea['titulo']}»")
+                ctx, destraba["nombre"],
+                f"para conseguir lo que le falta a la tarea «{tarea['titulo']}»")
         return hecho
     if mismo is not None:
         hecho = {"se_le_pregunta_a": {"a": quien["nombre"],
@@ -1548,8 +1549,8 @@ def _asentar_sin_a_quien(ctx: Contexto, tarea: dict[str, Any], destraba: dict[st
                      "at": ctx.ahora.isoformat(), "inbound_message_id": ctx.entrante_id})
     avisar_que_no_hay_a_quien(
         ctx.cur, ctx.quien.workspace_id,
-        f"La cadena del bloqueo de la tarea «{tarea['titulo']}» de {destraba['responsable']} se "
-        f"cortó (nadie lo toma) y no le llega a nadie que decida: "
+        f"Nadie se ocupa de lo que le falta a la tarea «{tarea['titulo']}» de "
+        f"{destraba['responsable']} (la cadena se cortó) y no le llega a nadie que decida: "
         f"{por_que_no_hay_a_quien(motivo)}. Quedó asentado en la historia de la tarea.",
         referencia_tipo=REFERENCIA_INBOUND_MESSAGE if ctx.entrante_id else None,
         referencia_id=ctx.entrante_id, chat_id=ctx.chat_id, app_user_id=ctx.quien.app_user_id)

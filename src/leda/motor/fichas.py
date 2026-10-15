@@ -1697,7 +1697,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "no puede avanzar. Una fecha nueva que reemplaza otra que dio antes es otra "
              "previsión, no una corrección. El porqué de una fecha que ya dio, cuando Leda se "
              "lo pregunta, también es esta jugada, con esa misma fecha."),
-    Ficha("anotar_bloqueo", "anotar que una tarea está trabada y por qué",
+    Ficha("anotar_bloqueo", "anotar que a una tarea le falta algo para seguir y qué",
           necesita=("tarea",), opcional=("causa",),
           comprueba="que sea el responsable y que la tarea esté abierta",
           hace="sin causa, nada; con causa, registra el bloqueo (registrar_bloqueo)",
@@ -1710,7 +1710,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona dice que no puede avanzar con una tarea: está trabada o parada. Su "
              "causa es lo que le falta o lo que frena el trabajo, si la dice. Explicar por qué "
              "se corre una fecha no es un bloqueo: es el porqué de una previsión."),
-    Ficha("anotar_quien_destraba", "anotar quién puede destrabar un bloqueo",
+    Ficha("anotar_quien_destraba", "anotar quién se ocupa de lo que le falta a una tarea",
           necesita=(), opcional=("tarea", "quien", "no_sabe", "nadie_mas"),
           comprueba="que haya un bloqueo abierto en una tarea suya",
           hace="anota quién destraba: un integrante, alguien de afuera, que no se sabe o "
@@ -1729,7 +1729,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "El bloqueo es uno abierto antes o el que anota una jugada anterior del mismo "
              "mensaje. Quién lo destraba es un hecho distinto de la causa, aunque los dos "
              "vengan en la misma frase: cada uno va en su jugada."),
-    Ficha("destrabar", "anotar que una tarea trabada ya puede seguir",
+    Ficha("destrabar", "anotar que una tarea que esperaba algo ya puede seguir",
           necesita=("tarea",), opcional=(),
           comprueba="que sea el responsable y que la tarea esté bloqueada, con un solo bloqueo "
                     "abierto",
@@ -1965,8 +1965,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "la lista como espera_que_decida_si_la_comparte) y dice si se la comparte, tocando "
              "su botón o escribiéndolo: acepta es verdadero si dice que sí, falso si dice que "
              "no; por_que, sus palabras si dice por qué."),
-    Ficha("decir_cuando_destraba", "anotar para cuándo destraba la tarea trabada de otra "
-                                   "persona",
+    Ficha("decir_cuando_destraba", "anotar para cuándo consigue lo que le falta a la tarea de "
+                                   "otra persona",
           necesita=(), opcional=("tarea", "para_cuando", "ya_esta", "lo_que_dice",
                                  "ya_lo_hablaron", "su_tarea_trabada"),
           comprueba="que quien escribe sea quien destraba ahora un bloqueo abierto de esa tarea "
@@ -1994,8 +1994,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "persona que Leda le informó que sigue trabada (está en la lista como "
              "se_le_informo_que_sigue_trabada). Es lo que dice sobre lo que traba la tarea de "
              "otro: no es un hecho de una tarea suya."),
-    Ficha("decir_que_no_le_toca", "decir que no le corresponde destrabar la tarea trabada de "
-                                  "otra persona",
+    Ficha("decir_que_no_le_toca", "decir que no le corresponde ocuparse de lo que le falta a la "
+                                  "tarea de otra persona",
           necesita=(), opcional=("tarea", "quien", "no_sabe", "lo_que_dice"),
           comprueba="que quien escribe sea quien destraba ahora un bloqueo abierto de esa tarea",
           hace="anota que no le corresponde y, si lo dice, quién se encarga, atribuido y "
@@ -2011,7 +2011,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "corresponde destrabarla: quien es quién se encarga, como lo nombró, si lo dice; "
              "no_sabe, si dice que no sabe quién; lo_que_dice, sus palabras. No es una fecha "
              "para destrabarla ni que ya está."),
-    Ficha("no_escribirle", "no escribirle a quien destraba una tarea trabada",
+    Ficha("no_escribirle", "no escribirle a quien se ocupa de lo que le falta a una tarea",
           necesita=(), opcional=("tarea", "quien"),
           comprueba="que sea el responsable de la tarea y que Leda le haya guardado un mensaje "
                     "a quien la destraba",
@@ -2025,8 +2025,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona trabada pide que Leda no le escriba a quien destraba su tarea (por "
              "ejemplo, porque ya habló con esa persona). quien es a quién, como lo nombró. No "
              "cambia quién destraba ni cierra el bloqueo."),
-    Ficha("contar_lo_que_arreglaron", "anotar lo que la persona trabada arregló con quien "
-                                      "destraba su tarea",
+    Ficha("contar_lo_que_arreglaron", "anotar lo que la persona arregló con quien se ocupa de lo "
+                                      "que le falta a su tarea",
           necesita=(), opcional=("tarea", "para_cuando", "lo_que_dice"),
           comprueba="que sea el responsable de la tarea y que su bloqueo más nuevo tenga a otra "
                     "persona que lo destraba",
@@ -2042,8 +2042,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
              "le pasó de esa persona o le contesta algo que esa persona dijo. No es decir que "
              "ya puede seguir: eso es salir del bloqueo. Nombrar a otra persona que lo destraba "
              "es otra jugada."),
-    Ficha("pedirselo_y_contar", "que la persona trabada se lo pida directamente a quien "
-                                "destraba su tarea y le cuente a Leda cómo le fue",
+    Ficha("pedirselo_y_contar", "que la persona se lo pida directamente a quien se ocupa de lo "
+                                "que le falta a su tarea y le cuente a Leda cómo le fue",
           necesita=(), opcional=("tarea", "quien"),
           comprueba="que sea el responsable y que la tarea tenga un bloqueo abierto",
           hace="anota que se lo pide directamente, auditado; Leda no le escribe a quien "

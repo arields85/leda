@@ -113,8 +113,8 @@ def por_que_no_hay_a_quien(motivo: str) -> str:
     """Por qué el bloqueo no le llega a nadie, en palabras para el resumen del incidente."""
     from .persecucion import INACTIVO, SIN_REFERENTE
     if motivo == SIN_REFERENTE:
-        return ("su sector no tiene referente y nadie aprueba el trabajo de la persona trabada "
-                "(o el referente es ella misma)")
+        return ("su sector no tiene referente y nadie aprueba el trabajo de la persona que "
+                "tiene la tarea (o el referente es ella misma)")
     # Each reason in words, never its code (task "Lenguaje"): `alcanzable` gives INACTIVO or
     # SIN_TELEGRAM; anything else reads as the latter, without the code.
     if motivo == INACTIVO:

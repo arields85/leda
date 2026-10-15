@@ -128,6 +128,73 @@ def test_ningun_significado_ni_para_que_nombra_un_concepto_de_la_cocina():
     assert NO_NOMBRAN_EL_CONCEPTO <= encontrados, sorted(NO_NOMBRAN_EL_CONCEPTO - encontrados)
 
 
+# --- What is missing and who handles it, never "trabada" (task "Lenguaje", porción 2) ----------
+#
+# User decision (2026-10-15): in everything a person sees, Leda says what is missing and who is
+# handling it ("¿te falta algo para seguir?", "está esperando el cable, que consigue Mariano",
+# "ya puede seguir"), never "trabada", "se trabó", "destrabar" or "bloqueo". In conversation 55
+# Leda wrote 25 times "Contame si la empezaste, para cuándo la terminás o si está trabada.",
+# copying the code `si_esta_trabada`. The kitchen keeps its names (the database state
+# `bloqueada`, the moves, the stored facts); at the drafting boundary every name, code, meaning
+# and move purpose says it with the new words. "Trabajo" is another word and stays.
+# Not inside another word ("mostraba"), and "trabajo" is another word.
+TRABADA = re.compile(r"(?<![a-z])(?:des)?trab(?!aj)|bloque[oa]")
+
+
+def test_ningun_nombre_para_redactar_dice_trabada_ni_bloqueo():
+    dicen = sorted({hechos.para_redactar(n) for n in NOMBRES
+                    if TRABADA.search(hechos.para_redactar(n))})
+    assert dicen == []
+
+
+def test_ningun_significado_ni_para_que_dice_trabada_ni_bloqueo():
+    textos = [(n, s) for n, s in hechos.SIGNIFICADOS.items()]
+    textos += [(n, f.para_que) for n, f in FICHAS.items()]
+    dicen = sorted(n for n, texto in textos if TRABADA.search(_sin_acentos(texto)))
+    assert dicen == []
+
+
+def test_lo_que_recibe_la_redaccion_no_dice_trabada_ni_bloqueo():
+    """What the real AI gets to draft: the facts, the last turns and the list of meanings."""
+    recibido, sistema = _lo_que_recibe_la_redaccion(_con_todos_los_nombres())
+
+    assert sorted(n for n in hechos._nombres(recibido) if TRABADA.search(n)) == []
+    lista = sistema.split(hechos.ENCABEZADO_DEL_BLOQUE, 1)[1].split("\n\n", 1)[0]
+    assert [m.group(0) for m in TRABADA.finditer(_sin_acentos(lista))] == []
+
+
+def test_lo_que_falta_saber_dice_si_le_falta_algo_para_seguir():
+    """Conversation 55: the code the AI copied is now what is missing to keep going."""
+    assert hechos.para_redactar("si_esta_trabada") == "si_le_falta_algo_para_seguir"
+    assert hechos.para_redactar("bloqueada") == "esperando_algo_para_seguir"
+    assert hechos.para_redactar("se_destrabo") == "dijo_que_ya_puede_seguir"
+    assert hechos.para_redactar("quien_destraba") == "quien_se_ocupa_de_lo_que_falta"
+    pedido = {"hoy": "2026-10-20", "persona": "Marcos", "mensaje": None, "pregunta": None,
+              "hechos": [{"aviso": "pedido_de_estado", "tarea": "Cablear el tablero",
+                          "estado": "asignada",
+                          "espera_algo_cierto": ["si_la_empezo", "para_cuando_la_termina",
+                                                 "si_esta_trabada"]},
+                         {"jugada": "consultar_pendientes",
+                          "tareas": [{"titulo": "Pedir el cable", "estado": "bloqueada"}]}],
+              "ultimos_turnos": []}
+
+    recibido, _ = _lo_que_recibe_la_redaccion(pedido)
+
+    assert recibido["hechos"][0]["espera_algo_cierto"] == [
+        "si_la_empezo", "para_cuando_la_termina", "si_le_falta_algo_para_seguir"]
+    assert recibido["hechos"][1]["tareas"][0]["estado"] == "esperando_algo_para_seguir"
+    assert pedido["hechos"][1]["tareas"][0]["estado"] == "bloqueada"   # the kitchen's, untouched
+
+
+def test_el_motivo_de_un_incidente_al_administrador_no_dice_trabada():
+    """The administrator is a person too: the reason an incident gives says it in words."""
+    from leda.motor.asentado import por_que_no_hay_a_quien
+    from leda.motor.persecucion import INACTIVO, SIN_REFERENTE, SIN_TELEGRAM
+
+    for motivo in (SIN_REFERENTE, INACTIVO, SIN_TELEGRAM):
+        assert not TRABADA.search(por_que_no_hay_a_quien(motivo)), motivo
+
+
 def test_lo_que_alguien_escribio_llega_tal_cual():
     """El mensaje de la persona y los textos de los últimos turnos son lo que alguien escribió:
     nunca se traducen, aunque nombren un concepto o sean una sola palabra de la cocina."""
@@ -272,8 +339,8 @@ def test_lo_que_espera_una_decision_se_dice_revision():
     espera como aprobación son conceptos de la cocina y la redacción recibe el suyo."""
     for de, para in (("queda_esperando_la_aprobacion_de", "queda_esperando_la_revision_de"),
                      ("entrega_para_aprobar", "entrega_para_revisar"),
-                     ("aprobacion_trabada", "revision_trabada"),
-                     ("aprobacion_destrabada", "revision_destrabada")):
+                     ("aprobacion_trabada", "revision_que_espera_hace_dias"),
+                     ("aprobacion_destrabada", "la_revision_que_esperaba_ya_se_decidio")):
         assert hechos.es_un_concepto_de_la_cocina(de), de
         assert hechos.para_redactar(de) == para
     for decision in ("aprobar", "tarea_aprobada", "cerrada_con_la_aprobacion", "ya_la_aprobo"):
