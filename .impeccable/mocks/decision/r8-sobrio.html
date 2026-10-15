@@ -88,6 +88,22 @@
   .tally button[aria-pressed="true"] .lbl { color: var(--ink); }
   .tally button[aria-pressed="true"]::after { content: ""; position: absolute; left: calc(50% - 11px); bottom: 4px; width: 22px; height: 1px; background: var(--ink); }
 
+  /* Counters stay reachable: they stick to the top, compact, over the same progressive blur as the tab bar. */
+  .tally { position: sticky; top: 0; z-index: 5; isolation: isolate; }
+  .tally::before {
+    content: ""; position: absolute; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: 0; bottom: -28px;
+    z-index: -1; pointer-events: none; opacity: 0; transition: opacity 180ms ease-out;
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+    background: linear-gradient(to bottom, rgba(16, 17, 18, 0.88) 0%, rgba(16, 17, 18, 0.6) 70%, rgba(16, 17, 18, 0) 100%);
+  }
+  .tally.stuck { border-bottom-color: transparent; }
+  .tally.stuck::before { opacity: 1; }
+  .tally b, .tally button { transition: font-size 180ms ease-out, line-height 180ms ease-out, padding 180ms ease-out; }
+  .tally.stuck button { padding: 8px 0 10px; }
+  .tally.stuck b { font-size: 24px; line-height: 28px; }
+  .stick-sentinel { height: 1px; }
   main { margin: 0 var(--gutter); padding: 18px 0 calc(104px + env(safe-area-inset-bottom, 0px)); }
   .listhead { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 4px; }
   .listhead .all { font-size: 12px; line-height: 16px; letter-spacing: 0.14em; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line); }
@@ -173,10 +189,11 @@
     <div class="day"><span class="lbl">vie</span><b>16</b><small class="due">1 vence</small></div>
   </section>
 
+  <div class="stick-sentinel" aria-hidden="true"></div>
   <ul class="band tally" aria-label="Mostrar tus tareas por estado">
     <li class="late zero"><button data-f="late" aria-pressed="false" disabled><b>0</b><span class="lbl">vencidas</span></button></li>
-    <li class="idle"><button data-f="idle" aria-pressed="false"><b>1</b><span class="lbl">sin empezar</span></button></li>
-    <li class="doing"><button data-f="doing" aria-pressed="false"><b>1</b><span class="lbl">en curso</span></button></li>
+    <li class="idle"><button data-f="idle" aria-pressed="false"><b>4</b><span class="lbl">sin empezar</span></button></li>
+    <li class="doing"><button data-f="doing" aria-pressed="false"><b>2</b><span class="lbl">en curso</span></button></li>
     <li class="wait"><button data-f="wait" aria-pressed="false"><b>1</b><span class="lbl">esperando</span></button></li>
     <li class="review"><button data-f="review" aria-pressed="false"><b>1</b><span class="lbl">entregadas</span></button></li>
   </ul>
@@ -193,8 +210,24 @@
         <span><span class="t">Revisar el tablero</span><span class="meta"><i class="doing">en curso</i></span></span>
       </button></li>
       <li data-estado="idle"><button class="task">
+        <span class="when"><small>mar</small><b>20</b></span>
+        <span><span class="t">Cambiar el contactor del tablero 3</span><span class="meta"><i>sin empezar</i> · te la pidió Ismael</span></span>
+      </button></li>
+      <li data-estado="idle"><button class="task">
         <span class="when"><small>jue</small><b>22</b></span>
         <span><span class="t">Calibrar el sensor</span><span class="meta"><i>sin empezar</i> · te la pidió Martín Forte</span></span>
+      </button></li>
+      <li data-estado="doing"><button class="task">
+        <span class="when"><small>vie</small><b>23</b></span>
+        <span><span class="t">Probar el PLC de la línea 2</span><span class="meta"><i class="doing">en curso</i></span></span>
+      </button></li>
+      <li data-estado="idle"><button class="task">
+        <span class="when"><small>lun</small><b>26</b></span>
+        <span><span class="t">Actualizar los planos eléctricos</span><span class="meta"><i>sin empezar</i></span></span>
+      </button></li>
+      <li data-estado="idle"><button class="task">
+        <span class="when"><small>mié</small><b>28</b></span>
+        <span><span class="t">Ordenar el pañol</span><span class="meta"><i>sin empezar</i> · te la pidió Martín Forte</span></span>
       </button></li>
       <li data-estado="review"><button class="task">
         <span class="when"><small>mar</small><b>13</b></span>
@@ -243,8 +276,16 @@
       head.textContent = b ? b.querySelector('.lbl').textContent : 'abiertas';
       all.hidden = !filter;
     }
-    buttons.forEach((b) => b.addEventListener('click', () => show(current === b.dataset.f ? null : b.dataset.f)));
-    all.addEventListener('click', () => show(null));
+    const tally = document.querySelector('.tally');
+    new IntersectionObserver(([e]) => tally.classList.toggle('stuck', !e.isIntersecting))
+      .observe(document.querySelector('.stick-sentinel'));
+    function toListTop() {
+      if (!tally.classList.contains('stuck')) return;
+      const y = document.querySelector('main').getBoundingClientRect().top + window.scrollY - tally.offsetHeight;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+    buttons.forEach((b) => b.addEventListener('click', () => { show(current === b.dataset.f ? null : b.dataset.f); toListTop(); }));
+    all.addEventListener('click', () => { show(null); toListTop(); });
     show(null);
   })();
 </script>
