@@ -96,6 +96,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   pulgar (pedido del usuario), sólo con palabras y la vista activa subrayada debajo. Muestra:
   `.impeccable/mocks/decision/r8-sobrio-equipo.html` (`?vista=estructura|cambios`).
 
+- **«Mi área» (referente), r8** (extensión de «Mis tareas», sin sorteo): lo mismo que «Mis tareas» con las
+  tareas de la gente del área (no las propias); el resumen grande con la regla de urgencia aplicada al área; cada
+  fila con «de X» y, en las que se pueden pasar (sin empezar, en curso, esperando), «pasarla» a la derecha; una
+  entregada dice «la revisás vos». Muestra: `.impeccable/mocks/decision/r8-sobrio-mi-area.html`.
+
 ## Pendiente
 
 - Ajustes que el usuario va a seguir pidiendo (dijo "vamos por buen camino, tenemos que seguir haciendo
