@@ -1652,7 +1652,13 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
       Pruebas: 6 nuevas en `test_grafo_de_estados.py` (rojo antes de la `0080`: 5 fallaban; la de salir de
       `cancelada` en la segunda fila ya se rechazaba). Evidencia (2026-10-15): `pytest -q
       tests/garantias/test_grafo_de_estados.py tests/garantias/test_migraciones.py`, 35 passed; `pytest -q
-      tests/garantias`, 1143 passed; `pytest -q tests/motor`, 1502 passed. Revisión RDD: pendiente.
+      tests/garantias`, 1143 passed; `pytest -q tests/motor`, 1502 passed. RDD aprobada,
+      `review-59287add32800be2`; advertencias sin arreglar (son el segundo arreglo seguido del mismo mecanismo:
+      se para y se mira con el usuario, AGENTS.md punto 4): el control confía en el último evento numerado antes
+      que en el estado de la fila, y el camino de los eventos viejos sin número no tiene prueba propia.
+      `leda_motor` llevada hasta la `0080` el 2026-10-15 (respaldo
+      `db/respaldos/leda_motor-antes-0077-a-0080-20261015.dump`, `pg_restore --list` bien; las cuatro ensayadas
+      en una copia descartable, que se borró; aplicadas con `psql -v ON_ERROR_STOP=1 -f` como `postgres`).
 - [x] **Candado de la sesión de ChatGPT** (2026-10-15, escritor delegado; prueba primero; deuda de
   `docs/STATUS.md`). La escucha y una ronda del corredor podían renovar la sesión a la vez y romperla.
   - `5ad5fd2e`: `src/leda/motor/chatgpt.py` renueva con un candado del sistema (`msvcrt` en Windows, `flock`
