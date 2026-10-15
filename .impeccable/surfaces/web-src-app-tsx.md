@@ -69,6 +69,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   que está en grande. Las entregadas (esperan la aprobación de otro) no van ahí: se ven sólo al tocar su contador
   (opción B). Con un filtro: sólo ese estado, por fecha (vencidas: la más atrasada primero, en cualquier estado). El
   título pasa a ser el del filtro, con «Ver todas». «Terminadas esta semana» queda siempre abajo.
+- **La fila de una tarea en la r8** (variante A, «agenda», elegida 2026-10-15 de `r8-lista-variantes.html`): la
+  fecha a la izquierda (día chico, número fino como la semana); a la derecha el título y un solo renglón con el
+  estado en su color y lo que falta («esperando · falta la firma de Ismael»). La r8 también deja el desenfoque
+  progresivo bajo la barra (aceptado) y los contadores en cinco columnas iguales, alineados con la semana.
 
 ## Pendiente
 

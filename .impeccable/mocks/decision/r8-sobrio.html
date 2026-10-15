@@ -96,19 +96,21 @@
   .list li + li { border-top: 1px solid var(--hair); }
   .list li[hidden] { display: none; }
   .list li.first { border-top: 0; }
-  .task { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; row-gap: 3px; width: 100%; text-align: left; padding: 16px 0; }
+  .task { display: grid; grid-template-columns: 44px 1fr; column-gap: 16px; width: 100%; text-align: left; padding: 16px 0; align-items: start; }
   .task:active .t { color: var(--ink-soft); }
-  .t { font-size: 17px; line-height: 24px; font-weight: 300; }
-  .d { font-size: 15px; line-height: 24px; font-weight: 300; color: var(--ink-soft); text-align: right; }
-  .s { grid-column: 1 / -1; font-size: 12px; line-height: 16px; letter-spacing: 0.12em; color: var(--ink-mute); }
-  .s.wait { color: var(--wait); }
-  .s.doing { color: var(--doing); }
-  .x { grid-column: 1 / -1; font-size: 15px; line-height: 21px; font-weight: 300; color: var(--ink-soft); margin-top: 3px; }
+  .when { display: flex; flex-direction: column; align-items: center; }
+  .when small { font-size: 11px; line-height: 14px; letter-spacing: 0.1em; color: var(--ink-mute); }
+  .when b { font-size: 26px; line-height: 30px; font-weight: 200; }
+  .t { display: block; font-size: 17px; line-height: 24px; font-weight: 400; }
+  .meta { display: block; margin-top: 2px; font-size: 14px; line-height: 20px; color: var(--ink-mute); }
+  .meta i { font-style: normal; }
+  .meta .wait { color: var(--wait); }
+  .meta .doing { color: var(--doing); }
 
   .done-head { padding: 26px 0 4px; }
-  .done { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 0; font-size: 15px; line-height: 22px; font-weight: 300; color: var(--ink-mute); }
+  .done { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; font-size: 14px; line-height: 20px; font-weight: 300; color: var(--ink-mute); }
   .done + .done { border-top: 1px solid var(--hair); }
-  .done .name { color: var(--ink-soft); }
+  .done .name { color: var(--ink-mute); }
 
   .tabbar {
     position: fixed; left: 0; bottom: 0; z-index: 10; width: 390px;
@@ -183,23 +185,20 @@
     <div class="listhead"><h2 class="lbl">abiertas</h2><button class="all" hidden>ver todas</button></div>
     <ol class="list" aria-label="Tus tareas">
       <li data-estado="wait"><button class="task">
-        <span class="t">Pedir el plano rev. C</span><span class="d">vie 16/10</span>
-        <span class="s wait">esperando</span>
-        <span class="x">Falta la firma de Ismael; se ocupa Ismael.</span>
+        <span class="when"><small>vie</small><b>16</b></span>
+        <span><span class="t">Pedir el plano rev. C</span><span class="meta"><i class="wait">esperando</i> · falta la firma de Ismael</span></span>
       </button></li>
       <li data-estado="doing"><button class="task">
-        <span class="t">Revisar el tablero</span><span class="d">lun 19/10</span>
-        <span class="s doing">en curso</span>
+        <span class="when"><small>lun</small><b>19</b></span>
+        <span><span class="t">Revisar el tablero</span><span class="meta"><i class="doing">en curso</i></span></span>
       </button></li>
       <li data-estado="idle"><button class="task">
-        <span class="t">Calibrar el sensor</span><span class="d">jue 22/10</span>
-        <span class="s">sin empezar</span>
-        <span class="x">Te la pidió Martín Forte.</span>
+        <span class="when"><small>jue</small><b>22</b></span>
+        <span><span class="t">Calibrar el sensor</span><span class="meta"><i>sin empezar</i> · te la pidió Martín Forte</span></span>
       </button></li>
       <li data-estado="review"><button class="task">
-        <span class="t">Cablear el tablero 2</span><span class="d">mar 13/10</span>
-        <span class="s">entregada</span>
-        <span class="x">La revisa Ismael.</span>
+        <span class="when"><small>mar</small><b>13</b></span>
+        <span><span class="t">Cablear el tablero 2</span><span class="meta"><i>entregada</i> · la revisa Ismael</span></span>
       </button></li>
     </ol>
 
