@@ -1586,8 +1586,25 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         tests/test_onboarding.py tests/test_esqueleto.py tests/test_mensajes_huerfanos.py`: 61 passed; las
         del despachador y el saludo: 72 passed; los 14 archivos de `tests/motor` que escriben el equipo:
         532 passed. En seco, `correr --ia guionada --veces 1`: 54 de 54 bien.
-      - **J7-2** · el pack sólo arma un equipo vacío (sin migración): en un espacio con gente no toca áreas,
+      - [x] **J7-2** · el pack sólo arma un equipo vacío (sin migración): en un espacio con gente no toca áreas,
         roles, personas, aprobadores, referentes ni rutas.
+        **Hecha** (2026-10-15; escritor delegado), `8eb06df3`. `importar` separa el equipo
+        (`_importar_equipo`: áreas y roles, personas con su aprobador, referentes, `approval_policy` y
+        `escalation_route`) de la configuración (`_importar_configuracion`: calendario, glosario y cómo habla
+        Leda). Si el espacio ya tiene alguna membresía, no aplica el equipo ni los `telegram_user_id` y lo dice:
+        «El equipo ya existe: las personas, las áreas y quién aprueba a quién se cambian desde la web; el
+        archivo no los tocó.» en el resultado (y en lo que imprime `leda importar`), y `equipo_del_pack`
+        (`aplicado` o `no_aplicado`) en el detalle de la auditoría; el aviso de "N personas no activaron su
+        enlace", que sale del archivo, sólo con el equipo vacío. Lo demás se aplica como siempre (espacio,
+        calendario, glosario, persona, evidencia por área, cadencias, ajustes, objetivo inicial). Un espacio
+        vacío se arma igual que antes. `plataforma-pendientes.md`: las filas de integrantes, aprobación y
+        escalamiento. **Queda para la J7-4:** la evidencia por área sigue borrando la de un área que el archivo
+        no nombra; con áreas creadas en la web, reimportar se la borraría.
+        **Evidencia:** RED observado (las 2 pruebas fallan sin el cambio). `pytest
+        tests/test_importar_no_pisa_el_equipo.py tests/test_esqueleto.py tests/test_onboarding.py` y las de
+        `garantias` que importan (`test_api_de_la_plataforma`, `test_creacion_de_objetivos`, `test_evidencia`,
+        `test_pagina_de_la_tarea`): 205 passed. `pytest tests/garantias`: 1173 passed. En seco, `correr --ia
+        guionada --veces 1`: 54 de 54 bien.
       - **J7-3** · ver el equipo (`0082`): `equipo_de`, `cambios_del_equipo`, módulo `web_equipo.py`, la vista
         "Equipo" y "Cambios del equipo" en las dos puertas.
       - **J7-4** · áreas (`0083`): crear, renombrar, archivar. Espera la pregunta 2.
