@@ -1608,8 +1608,30 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         `garantias` que importan (`test_api_de_la_plataforma`, `test_creacion_de_objetivos`, `test_evidencia`,
         `test_pagina_de_la_tarea`): 205 passed. `pytest tests/garantias`: 1173 passed. En seco, `correr --ia
         guionada --veces 1`: 54 de 54 bien.
-      - **J7-3** · ver el equipo (`0082`): `equipo_de`, `cambios_del_equipo`, módulo `web_equipo.py`, la vista
+      - [x] **J7-3** · ver el equipo (`0082`): `equipo_de`, `cambios_del_equipo`, módulo `web_equipo.py`, la vista
         "Equipo" y "Cambios del equipo" en las dos puertas.
+        **Hecha** (2026-10-15; escritor delegado), `f278397f` (base y servidor) y `05569578` (web). Sólo
+        lectura: nada cambia el equipo todavía. `quien_organiza_el_equipo` (no elevada, ni para
+        `leda_app`) es la puerta de las funciones de la J7: hoy, la misma regla de `quien_crea_el_objetivo`
+        (Dirección en su espacio, el administrador de plataforma en cualquiera). `equipo_de` y
+        `cambios_del_equipo` (`security definer` de `leda_owner`, camino fijado, sólo `leda_app`) fijan
+        ellas mismas el espacio y lo devuelven como estaba: las áreas (referente, autoaprobación, su gente,
+        tareas abiertas, archivada al final), las personas (área, rol, quién las aprueba, si siguen y
+        «sin conectar»: sin cuenta de Telegram, como `onboarding.pendientes_de_activar`), los roles, los
+        problemas (`problemas_del_equipo`) y la historia, lo más nuevo primero, con quién y por qué puerta.
+        `GET /app/api/equipo` y `GET /app/admin/api/espacios/{id}/equipo` (las dos cosas en una
+        respuesta), montadas antes de la última ruta de la web; un referente o un integrante, 403 («Organizar
+        el equipo le corresponde a Dirección.»). `web_app.py` expone sus controles de puerta
+        (`leer_por_la_puerta`, `rechazo_de_la_base` y tres más) en vez de copiarlos. La web: una sola
+        `TeamView`; Dirección la abre con la pestaña "Equipo" después de sus vistas (`organiza_el_equipo`
+        en `/api/yo`) y la administración con "Equipo" junto a "Tarea" y "Objetivo" (el grupo pasa a
+        llamarse "Qué hacer"). Los problemas, en el color de lo que falta; quien ya no está, aparte.
+        **Evidencia:** RED observado (14 de 16 de `test_ver_el_equipo.py` fallan sin la migración; 6 de
+        7 de `teamView.test.tsx` fallan con la web de antes). `pytest tests/garantias/test_ver_el_equipo.py
+        tests/garantias/test_migraciones.py tests/garantias/test_capacidades.py`: 37 passed (paridad,
+        rollback y matriz de los cuatro roles los descubre solos `test_migraciones`). `pytest
+        tests/garantias`: 1189 passed. `npm test` en `web/`: 350 passed; `npm run build`: bien.
+        `leda_motor` sigue en la `0081`: la `0082` no se aplicó.
       - **J7-4** · áreas (`0083`): crear, renombrar, archivar. Espera la pregunta 2.
       - **J7-5** · alta (`0084`): `dar_de_alta`, «> copiar el enlace de activación», "sin conectar", reactivar a
         quien vuelve; `activar` une la cuenta de quien ya está en otro espacio; el token pasa a guardarse como
