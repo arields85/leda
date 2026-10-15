@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import re
 import secrets
 import time
@@ -1084,3 +1085,63 @@ def test_el_pase_no_queda_en_la_consola(web, conn, intake_world, capsys):
     salida = capsys.readouterr()
     pase = direccion.rsplit("/", 1)[1]
     assert init_data not in salida.out + salida.err and pase not in salida.out + salida.err
+
+
+# El navegador de la prueba (httpx) anota cada dirección que pide: es el cliente, no el servidor.
+REGISTROS_DEL_NAVEGADOR_DE_LA_PRUEBA = ("httpx", "httpcore")
+
+
+def test_el_pase_no_queda_en_ningun_registro_del_servidor(web, conn, intake_world, caplog):
+    """Revisión de la MA-5 (RDD): el pase va en la dirección, y ningún registro del servidor (a
+    cualquier nivel, de cualquier módulo) la escribe, ni al emitirlo ni al canjearlo, usado o no;
+    tampoco la firma. Las dos puertas."""
+    morgan = intake_world["north-lab"]["people"]["Morgan Hale"]
+    _otorgar(conn, morgan["app_user_id"])
+    caplog.set_level(logging.DEBUG)
+    secretos = []
+    for camino, cuerpo, destino in (
+            ("/app/api/entrar/pase",
+             {"espacio": "north-lab",
+              "init_data": firmar(TOKEN_NORTE, _tg(intake_world, "Sam North"))},
+             "/app/e/north-lab/"),
+            ("/app/admin/api/entrar/pase",
+             {"init_data": firmar(TOKEN_ADMIN, morgan["telegram"])}, "/app/admin/")):
+        r = web().post(camino, json=cuerpo)
+        assert r.status_code == 201, r.text
+        direccion = r.json()["direccion"]
+        for _ in range(2):      # el canje que entra y el del pase ya usado
+            assert web().get(direccion, params={"a": destino}).status_code == 303
+        secretos += [direccion.rsplit("/", 1)[1], cuerpo["init_data"]]
+    # La captura funciona: el navegador de la prueba sí anotó la dirección con el pase.
+    assert any(secretos[0] in r.getMessage() for r in caplog.records
+               if r.name.startswith(REGISTROS_DEL_NAVEGADOR_DE_LA_PRUEBA))
+    del_servidor = [f"{r.name} {r.getMessage()} {r.args!r}" for r in caplog.records
+                    if not r.name.startswith(REGISTROS_DEL_NAVEGADOR_DE_LA_PRUEBA)]
+    for secreto in secretos:
+        assert not any(secreto in registro for registro in del_servidor)
+
+
+def test_servir_arranca_la_web_sin_el_registro_de_accesos(monkeypatch):
+    """El registro de accesos de uvicorn escribiría la dirección entera, con el pase (y las del
+    tablero y la página de una tarea): `python -m leda servir` lo arranca sin él."""
+    import uvicorn
+
+    from leda import cli
+    from leda.motor import fondo
+
+    class _Conexion:
+        def close(self):
+            pass
+
+    class _Fondo:
+        def start(self):
+            pass
+
+    arranques = []
+    monkeypatch.setattr(cli, "conectar", lambda: _Conexion())
+    monkeypatch.setattr(cli, "_verificar_esquema_o_salir", lambda _conn: None)
+    monkeypatch.setattr(fondo, "montar", lambda _conectar: _Fondo())
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: arranques.append((a, k)))
+    assert cli.main(["servir"]) == 0
+    assert len(arranques) == 1
+    assert arranques[0][1].get("access_log") is False
