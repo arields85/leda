@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react';
 import { SessionClosedError } from '../api';
 import { Notice } from '../components/Notice';
+import { ActivationLink } from './ActivationLink';
 import { AreaEditor, type AreaWork } from './AreaEditor';
-import { CREATED } from './controls';
+import { CREATED, SMALL } from './controls';
+import { PersonEditor, type PersonWork } from './PersonEditor';
 import type { Team, TeamApi, TeamArea, TeamChange, TeamPerson, TeamRead } from './teamApi';
 
 type Load = { kind: 'loading' } | { kind: 'read'; read: TeamRead } | { kind: 'failed' };
 
 const HEADING = 'm-0 text-mini font-bold tracking-wide text-ink-dim';
 
-// The small actions of the view ("> crear área", "> renombrar", "> archivar"), like its
-// "probar de nuevo".
-const SMALL = 'w-fit rounded-card border-hard border-line bg-card px-2.5 py-1 text-small text-ink shadow-hard';
-
 /** How each piece of a change is named; an id is not shown. */
-const CHANGE_KEYS: Record<string, string> = { quien_aprueba: 'quién aprueba' };
+const CHANGE_KEYS: Record<string, string> = { quien_aprueba: 'quién aprueba', area: 'área' };
 
 /** What each kind of change is called (`cambio_del_equipo.clase`). */
 const CHANGES: Record<string, string> = {
@@ -50,8 +48,9 @@ function value(v: unknown): string {
   return JSON.stringify(v);
 }
 
-/** One person under her area: her role, who approves her work and whether she connected Leda. */
-function PersonLine({ person }: { person: TeamPerson }) {
+/** One person under her area: her role, who approves her work and whether she connected Leda; to
+ * someone «sin conectar», her activation link (J7-5). */
+function PersonLine({ person, link }: { person: TeamPerson; link: (person: TeamPerson) => React.ReactNode }) {
   const details = [
     person.rol,
     person.autoridad_final ? 'tiene la autoridad final' : null,
@@ -67,6 +66,7 @@ function PersonLine({ person }: { person: TeamPerson }) {
         {!person.conectado && <span className="text-ink-dim"> · «sin conectar»</span>}
       </span>
       <span className="wrap-break-word text-small text-ink-dim">└─ {details.join(' · ')}</span>
+      {!person.conectado && link(person)}
     </li>
   );
 }
@@ -76,11 +76,13 @@ function AreaCard({
   people,
   onWork,
   editor,
+  link,
 }: {
   area: TeamArea;
   people: Map<string, TeamPerson>;
   onWork: (work: AreaWork) => void;
   editor: React.ReactNode;
+  link: (person: TeamPerson) => React.ReactNode;
 }) {
   const members = area.personas.map((id) => people.get(id)).filter((p): p is TeamPerson => Boolean(p));
   const referente = area.referente
@@ -105,7 +107,7 @@ function AreaCard({
       {members.length > 0 ? (
         <ul aria-label={`Personas de ${area.nombre}`} className="m-0 flex list-none flex-col gap-1.5 p-0 text-body">
           {members.map((person) => (
-            <PersonLine key={person.membership_id} person={person} />
+            <PersonLine key={person.membership_id} person={person} link={link} />
           ))}
         </ul>
       ) : (
@@ -165,12 +167,47 @@ function TeamBody({
   const people = new Map(team.personas.map((p) => [p.membership_id, p]));
   const gone = team.personas.filter((p) => !p.activo);
   const [work, setWork] = useState<AreaWork | null>(null);
+  const [personWork, setPersonWork] = useState<PersonWork | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // Who was just given a place, for her link right there (J7-5).
+  const [joined, setJoined] = useState<{ membershipId: string; nombre: string } | null>(null);
 
+  // One change at a time: opening one editor closes the other.
   function open(next: AreaWork) {
     setDone(null);
+    setJoined(null);
+    setPersonWork(null);
     setWork(next);
   }
+
+  function openPerson(next: PersonWork) {
+    setDone(null);
+    setJoined(null);
+    setWork(null);
+    setPersonWork(next);
+  }
+
+  const link = (person: TeamPerson) =>
+    person.activo && person.membership_id !== joined?.membershipId ? (
+      <ActivationLink api={api} membershipId={person.membership_id} nombre={person.nombre} onClosed={onClosed} />
+    ) : null;
+
+  const personEditor = personWork && (
+    <PersonEditor
+      key={personWork.kind === 'alta' ? 'alta' : `reactivar-${personWork.person.membership_id}`}
+      api={api}
+      team={team}
+      work={personWork}
+      onCancel={() => setPersonWork(null)}
+      onClosed={onClosed}
+      onDone={(message, membershipId, nombre) => {
+        setPersonWork(null);
+        setDone(message);
+        setJoined(personWork.kind === 'alta' ? { membershipId, nombre } : null);
+        onChanged();
+      }}
+    />
+  );
 
   // One change at a time; the editor sits where the change happens.
   const editor = work && (
@@ -209,12 +246,22 @@ function TeamBody({
             {done}
           </p>
         )}
+        {joined && (
+          <ActivationLink api={api} membershipId={joined.membershipId} nombre={joined.nombre} onClosed={onClosed} />
+        )}
         {work?.kind === 'crear' ? (
           editor
+        ) : personWork?.kind === 'alta' ? (
+          personEditor
         ) : (
-          <button type="button" className={SMALL} onClick={() => open({ kind: 'crear' })}>
-            &gt; crear área
-          </button>
+          <span className="flex flex-wrap gap-2">
+            <button type="button" className={SMALL} onClick={() => open({ kind: 'crear' })}>
+              &gt; crear área
+            </button>
+            <button type="button" className={SMALL} onClick={() => openPerson({ kind: 'alta' })}>
+              &gt; dar de alta
+            </button>
+          </span>
         )}
         {team.areas.length === 0 ? (
           <p className="m-0 text-body text-ink-soft">Este equipo todavía no tiene áreas.</p>
@@ -227,6 +274,7 @@ function TeamBody({
                 people={people}
                 onWork={open}
                 editor={work && work.kind !== 'crear' && work.area.id === area.id ? editor : null}
+                link={link}
               />
             ))}
           </ul>
@@ -237,8 +285,17 @@ function TeamBody({
           <h2 className={HEADING}>YA NO ESTÁN EN EL EQUIPO</h2>
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
             {gone.map((person) => (
-              <li key={person.membership_id} data-person={person.membership_id} className="text-ink-dim">
-                {person.nombre} · {person.area}
+              <li key={person.membership_id} data-person={person.membership_id} className="flex min-w-0 flex-col gap-1.5 text-ink-dim">
+                <span>
+                  {person.nombre} · {person.area}
+                </span>
+                {personWork?.kind === 'reactivar' && personWork.person.membership_id === person.membership_id ? (
+                  personEditor
+                ) : (
+                  <button type="button" className={SMALL} onClick={() => openPerson({ kind: 'reactivar', person })}>
+                    &gt; volver a sumar
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -263,8 +320,9 @@ function TeamBody({
 /** "Equipo" (J7-3): the areas with their referente and their people (role, who approves each one,
  * «sin conectar»), what does not add up, who left, and the team's changes, newest first. The same
  * view through both doors (like `NewObjective`): Dirección's own team, or any space's from the
- * administration. The areas are created, renamed and archived from here (J7-4), each with its
- * preview first; the other changes to the team come in the next portions. */
+ * administration. The areas are created, renamed and archived from here (J7-4), and people are
+ * given a place, or brought back, with their activation link (J7-5), each with its preview first;
+ * the other changes to the team come in the next portions. */
 export function TeamView({ api, onClosed }: { api: TeamApi; onClosed: () => void }) {
   const [attempt, setAttempt] = useState(0);
   const [load, setLoad] = useState<Load>({ kind: 'loading' });

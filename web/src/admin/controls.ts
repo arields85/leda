@@ -29,6 +29,10 @@ export const PRIMARY = `inline-flex h-11 items-center gap-2 rounded-card border-
 // "> empezar de nuevo"), without the primary's weight and shadow.
 export const SECONDARY = `inline-flex h-11 items-center rounded-card border-hard border-line-strong bg-transparent px-3.5 ${TEXT_SIZE} text-ink ${OFF}`;
 
+// The small actions of the "Equipo" view ("> crear área", "> renombrar", "> dar de alta",
+// "> copiar el enlace de activación"), like its "probar de nuevo".
+export const SMALL = `w-fit rounded-card border-hard border-line bg-card px-2.5 py-1 text-small text-ink shadow-hard ${OFF}`;
+
 // A square button with an icon, the same height as the others (the microphone and "borrar el
 // texto" of the free box).
 export const ICON = `inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-card border-hard border-line-strong bg-transparent text-ink ${OFF}`;

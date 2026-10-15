@@ -176,11 +176,12 @@ function expectTheTeam() {
   expect(items[0]).toHaveTextContent('rol: Integrante → Referente');
   expect(items[1]).toHaveTextContent('Área nueva');
   expect(items[1]).toHaveTextContent('nombre: Gestión');
-  // Nothing to fix: no problems section. Only the areas change from here (J7-4): an archived one
-  // offers nothing, and nobody is added or removed yet.
+  // Nothing to fix: no problems section. The areas change from here (J7-4) and people are given a
+  // place (J7-5): an archived area offers nothing, and nobody is removed or edited yet.
   expect(screen.queryByRole('region', { name: 'Lo que no cuadra' })).toBeNull();
   expect(within(areas.getByText('Depósito').closest('li') as HTMLElement).queryByRole('button')).toBeNull();
-  expect(screen.queryByRole('button', { name: /agregar|dar de alta|editar/i })).toBeNull();
+  expect(screen.getByRole('button', { name: '> dar de alta' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /agregar|dar de baja|editar/i })).toBeNull();
 }
 
 afterEach(() => {

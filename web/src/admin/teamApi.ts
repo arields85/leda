@@ -112,7 +112,47 @@ export interface AreaPreview {
   problemas_nuevos: TeamProblem[];
 }
 
+/** Giving a person a place in the team (J7-5; migration 0084): a new person, always (never looked
+ * up by name), or someone who left and comes back. No approver means the default: the area's
+ * active referente or, without one, Dirección. */
+export type PersonChange =
+  | { accion: 'alta'; nombre: string; area_id: string | null; rol_id: string | null; aprobador_id: string | null }
+  | {
+      accion: 'reactivar';
+      membership_id: string;
+      area_id: string | null;
+      rol_id: string | null;
+      aprobador_id: string | null;
+    };
+
+/** What giving a person a place would do, in words, with who approves her work, the warnings that
+ * do not stop it (someone with the same name) and its fingerprint. */
+export interface PersonPreview {
+  accion: PersonChange['accion'];
+  antes: Record<string, unknown> | null;
+  despues: Record<string, unknown> | null;
+  aprobador: { membership_id: string; nombre: string; por_omision: boolean };
+  avisos: TeamProblem[];
+  huella: string;
+  problemas: TeamProblem[];
+  problemas_nuevos: TeamProblem[];
+}
+
+/** An activation link, shown once (the server keeps only its fingerprint). */
+export interface ActivationLink {
+  membership_id: string;
+  nombre: string;
+  enlace: string;
+  expira_en: string;
+  vence_en_dias: number;
+}
+
 export type PreviewResult = { kind: 'preview'; preview: AreaPreview } | { kind: 'rejected'; errors: Problem[] };
+export type PersonPreviewResult = { kind: 'preview'; preview: PersonPreview } | { kind: 'rejected'; errors: Problem[] };
+export type PersonResult =
+  | { kind: 'done'; membershipId: string; repeated: boolean }
+  | { kind: 'rejected'; errors: Problem[] };
+export type LinkResult = { kind: 'link'; link: ActivationLink } | { kind: 'rejected'; errors: Problem[] };
 export type ChangeResult =
   | { kind: 'done'; areaId: string; repeated: boolean }
   | { kind: 'rejected'; errors: Problem[] };
@@ -136,6 +176,14 @@ export interface TeamApi {
   /** 201 does it; 200 means this key already did it (a retry); 422 or 403, what does not allow it.
    * Anything else throws, so the view keeps the key for a retry. */
   confirm(change: AreaChange, clave: string, huella: string): Promise<ChangeResult>;
+  /** The same for a person (J7-5): 200, what the alta would do; 422 or 403, what does not allow
+   * it. Writes nothing. */
+  previewPerson(change: PersonChange): Promise<PersonPreviewResult>;
+  /** 201 does it; 200 means this key already did it; 422 or 403, what does not allow it. */
+  confirmPerson(change: PersonChange, clave: string, huella: string): Promise<PersonResult>;
+  /** A new activation link for someone not connected yet, replacing the previous unused one: 200,
+   * the link, once; 422 or 403, what does not allow it. */
+  issueLink(membershipId: string): Promise<LinkResult>;
 }
 
 async function refusal(response: Response): Promise<Problem[]> {
@@ -193,6 +241,33 @@ export function teamApi(base: string): TeamApi {
         const body = (await response.json()) as { area_id: string; repetida?: boolean };
         return { kind: 'done', areaId: body.area_id, repeated: Boolean(body.repetida) };
       }
+      if (response.status === 422 || response.status === 403) {
+        return { kind: 'rejected', errors: await refusal(response) };
+      }
+      throw new RequestError(response.status);
+    },
+    async previewPerson(change) {
+      const response = await post(`${base}/personas/revisar`, change);
+      if (response.ok) return { kind: 'preview', preview: (await response.json()) as PersonPreview };
+      if (response.status === 422 || response.status === 403) {
+        return { kind: 'rejected', errors: await refusal(response) };
+      }
+      throw new RequestError(response.status);
+    },
+    async confirmPerson(change, clave, huella) {
+      const response = await post(`${base}/personas`, { ...change, clave, huella });
+      if (response.status === 201 || response.status === 200) {
+        const body = (await response.json()) as { membership_id: string; repetida?: boolean };
+        return { kind: 'done', membershipId: body.membership_id, repeated: Boolean(body.repetida) };
+      }
+      if (response.status === 422 || response.status === 403) {
+        return { kind: 'rejected', errors: await refusal(response) };
+      }
+      throw new RequestError(response.status);
+    },
+    async issueLink(membershipId) {
+      const response = await post(`${base}/personas/enlace`, { membership_id: membershipId });
+      if (response.ok) return { kind: 'link', link: (await response.json()) as ActivationLink };
       if (response.status === 422 || response.status === 403) {
         return { kind: 'rejected', errors: await refusal(response) };
       }

@@ -49,7 +49,8 @@ function text(v: unknown): string {
   return typeof v === 'string' || typeof v === 'number' ? String(v) : JSON.stringify(v);
 }
 
-function Errors({ errors }: { errors: Problem[] }) {
+/** What the server said cannot be, in its words (shared with the people's editor, J7-5). */
+export function Errors({ errors }: { errors: Problem[] }) {
   if (errors.length === 0) return null;
   return (
     <ul role="alert" className={`m-0 flex list-none flex-col gap-0.5 p-0 text-body font-bold ${WARN}`}>
