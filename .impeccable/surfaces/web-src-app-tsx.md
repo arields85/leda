@@ -101,6 +101,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   fila con «de X» y, en las que se pueden pasar (sin empezar, en curso, esperando), «pasarla» a la derecha; una
   entregada dice «la revisás vos». Muestra: `.impeccable/mocks/decision/r8-sobrio-mi-area.html`.
 
+- **«Mis pedidos» (referente), r8** (2026-10-15, noche, página de decisión, sorteo `694c203f`): elegida
+  **abiertos · terminados**: la lista tipo agenda de lo pedido (fecha a la izquierda; título; estado · a quién ·
+  área · lo que falta), con el selector «abiertos · terminados» encima de la barra, como en «Equipo»;
+  «terminados» muestra los de los últimos 30 días con «pedir cambios». Sin semana ni contadores, como hoy.
+  Muestra: `.impeccable/mocks/decision/r8-sobrio-pedidos.html` (`?vista=terminados`); descartadas «un trayecto
+  por pedido» y «por a quién» (`pedidos-*.html`).
+
 ## Pendiente
 
 - Ajustes que el usuario va a seguir pidiendo (dijo "vamos por buen camino, tenemos que seguir haciendo
