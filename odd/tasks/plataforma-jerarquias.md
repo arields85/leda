@@ -1214,6 +1214,16 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - la pantalla fija no se adapta a un celular muy bajo;
       - algunas pruebas no demuestran lo que dicen.
       Falta la prueba del usuario.
+      **Prueba de MA-2 y MA-3 (2026-10-14, noche):** "muy bueno como quedó", con Ariel en el iPhone e Ismael y Marcos en
+      el navegador de la compu. Los botones de arriba de la Mini App: "espectaculares". Ajustes (MA-4, escritor
+      delegado):
+      1. el botón se llama "Mi espacio" (el del menú y el del chat), y Leda lo ofrece en pocas palabras;
+      2. la barra de desplazamiento con el estilo de la app, y la web usa todo el ancho en la compu;
+      3. las pestañas "Mi área" (antes "Todo el equipo") y "Mis pedidos" (antes "Lo que pedí");
+      4. el nombre y el área de la persona arriba a la derecha, en lugar de la semana y la fecha, fijos en todas las
+         pestañas;
+      5. se eliminan "Volver al chat" y "salir"; la sesión de la compu se cierra por chat;
+      6. "> Nuevo objetivo" va abajo, junto a "> Nueva tarea".
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
