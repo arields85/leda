@@ -1556,9 +1556,33 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         `motor/carga.py`; no existen preferencias de avisos ni un resumen personal.
       - **J7-0** · diseño corto y ADR (documentos): las 10 respuestas; la 9 cambia el ADR 0023, punto 10 (al
         administrador no le llega el pase de la autoridad final).
-      - **J7-1** · el equipo cuadra (`0081`): `problemas_del_equipo`, `area.archivada_en` (un área nunca se
+      - [x] **J7-1** · el equipo cuadra (`0081`): `problemas_del_equipo`, `area.archivada_en` (un área nunca se
         borra: se archiva), la tabla `cambio_del_equipo` (sólo se agrega, antes y después), y se le quita a
         `leda_app` la escritura de las tablas del equipo.
+        **Hecha** (2026-10-15; escritor delegado), `115a5fb5`. `problemas_del_equipo(uuid)` (`leda_owner`,
+        sólo para el espacio de la transacción; otro espacio o ninguno se rechaza) devuelve la lista de
+        problemas con código y en palabras de todos los días: `sin_autoridad_final`,
+        `mas_de_una_autoridad_final`, `sin_aprobador`, `aprobador_inactivo`, `ciclo_de_aprobacion` (cada
+        vuelta una vez), `se_aprueba_a_si_mismo` (además lo impide la tabla), `referente_inactivo` (salvo
+        con la autoaprobación declarada; sin referente cuadra, J6-D6) e `integrante_en_area_archivada`
+        (ADR 0023, decisión 4: un área no se archiva con gente). `cambio_del_equipo`: clase, puerta
+        (`equipo`, con la membresía; `administracion`, sin ella), quién, antes y después, clave única por
+        espacio y huella; no se edita ni se borra (disparador, también para la administración); `leda_app`
+        no tiene nada y `leda_owner` sólo lee y agrega. **Lo que quedó de `leda_app`:** el único que
+        escribía el equipo en `src/` es el importador, con `leda_admin` (`activar` escribe `app_user` y
+        `activation_token`); pero `despachador._preview_vigente` lee la membresía `for share`, que pide
+        `update`: le queda `update` sólo sobre `membership.workspace_id`, que la política del espacio no
+        deja cambiar (probado). Pruebas que cambiaban la membresía como `leda_app` pasan a `leda_admin`
+        (`test_borradores.py`); `test_capacidades.py` exime la tabla y la columna (por función).
+        **Evidencia:** RED observado (30 de 30 fallan sin la migración). `pytest tests/garantias/
+        test_el_equipo_cuadra.py tests/garantias/test_migraciones.py`: 46 passed (rollback y paridad con la
+        matriz de los cuatro roles). `pytest tests/garantias`: 1171 passed y 2 failed, `test_capacidades`
+        (columnas nuevas sin declarar, arreglado: 5 passed) y `test_frontera` (su subproceso no pudo leer
+        la salida de esa falla); después del arreglo, `pytest tests/garantias/test_frontera.py` (que corre
+        las garantías en un subproceso): 4 passed. `pytest
+        tests/test_onboarding.py tests/test_esqueleto.py tests/test_mensajes_huerfanos.py`: 61 passed; las
+        del despachador y el saludo: 72 passed; los 14 archivos de `tests/motor` que escriben el equipo:
+        532 passed. En seco, `correr --ia guionada --veces 1`: 54 de 54 bien.
       - **J7-2** · el pack sólo arma un equipo vacío (sin migración): en un espacio con gente no toca áreas,
         roles, personas, aprobadores, referentes ni rutas.
       - **J7-3** · ver el equipo (`0082`): `equipo_de`, `cambios_del_equipo`, módulo `web_equipo.py`, la vista
