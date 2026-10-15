@@ -1157,7 +1157,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - la ortografía de la puerta del equipo: las dos puertas mandan lo mismo a la IA, así que hay que mirarla
         con la IA real;
       - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento);
-      - desde Telegram Web no apareció ningún QR (usuario, 2026-10-14): queda para revisar más adelante.
+      - desde Telegram Web no apareció ningún QR (usuario, 2026-10-14): resuelto por la MA-5, que entra sin QR
+        desde Telegram en la compu (prueba de cierre, 2026-10-15).
       IA real, conversaciones 50 y 52 a 54: 12 de 12. `leda_motor`: respaldo
       `leda_motor-antes-0073-20261014.dump`, ensayo previo y la `0073` aplicada. Guion de la prueba:
       `docs/product/guion-celular-ma.md`.
@@ -1257,6 +1258,13 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       "quiero crear una tarea" ofrece "Cargar la tarea". El "te espera" que se esperaba en el pedido a Dirección
       era un error del guion: sólo aparece cuando una tarea de otro espera la de la persona.
       Pendiente: la ronda con la IA real de las conversaciones 50 y 55 sobre la MA-5 (con el escuchador apagado).
+      **Cómo se cierra la sesión de la compu** (usuario, 2026-10-15, madrugada): la compu sigue recordada el
+      tiempo que elige el administrador para cada equipo (cerrar la pestaña no la cierra; opción A), y vuelve
+      un **botón "Cerrar sesión" sólo en la compu**, debajo del nombre y el área de arriba a la derecha; nunca
+      en la Mini App. Es la **MA-7**, para la próxima sesión (no se empezó).
+- [ ] **MA-7 · "Cerrar sesión" en la compu** (decisión de arriba). Reusar `/app/salir` y `/app/admin/salir`, que
+      siguen en el servidor; borrar el `SignOut` sin uso; también en la administración en la compu. Prueba
+      primero (vitest: se ve en el navegador, no en la Mini App), RDD y la mirada del usuario cuando esté.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
@@ -1522,6 +1530,10 @@ Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de ba
 - **La etiqueta congelada** sólo aporta el mismo `crear_objetivo` de hoy; nada de más tiempo ni de integrantes.
 
 ## Para decidir al despertar
+
+**Sesión autónoma que sigue al 2026-10-15** (el usuario se fue a dormir y pidió trabajar solo, con la IA real
+autorizada): el agente agrega acá, debajo de esta línea, cada pregunta que dependa del usuario (MA-7 a J7), con
+ejemplo y recomendación, y sigue con otra cosa.
 
 Lo que el agente, trabajando solo desde la noche del 2026-10-13, necesita que decida el usuario. Cada punto,
 con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue con lo que no depende de eso.

@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-15, madrugada: J2, J3, J4 y la Mini App (MA, con MA-4 a MA-6) cerradas; decisiones de J5 y J6 tomadas. Ver "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-15, madrugada, cierre de sesión: J1 a J4 y la Mini App (MA-4 a MA-6) cerradas; sigue la MA-7 y la próxima sesión trabaja sola (ver "Punto exacto para retomar"). Ver "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -32,102 +32,68 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-13, noche)
+## Punto exacto para retomar (2026-10-15, madrugada)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
 La unidad en curso es [`../odd/tasks/plataforma-jerarquias.md`](../odd/tasks/plataforma-jerarquias.md): el
-[ADR 0023](decisions/0023-quien-crea-en-la-plataforma.md) (quién crea qué según la jerarquía del equipo,
-aceptado el 2026-10-13) en seis porciones, J1 a J6, con "De qué se parte en cada porción". La Fase C, en
-[`../odd/tasks/fase-c.md`](../odd/tasks/fase-c.md); la plataforma, en el
-[ADR 0022](decisions/0022-plataforma-web-de-tareas.md) y en `odd/tasks/plataforma-p1.md` y `plataforma-p2.md`.
+[ADR 0023](decisions/0023-quien-crea-en-la-plataforma.md) en porciones J1 a J7, y la Mini App (MA), en el
+[ADR 0024](decisions/0024-entrar-con-telegram.md).
 
-**Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si está caído, levantarlo con
-`levantar-postgres.bat` (o `pg_ctl ... start`, fuera del sandbox). Si `pg_ctl` dice que otro servidor puede
-estar en ejecución, cerrar los procesos `postgres` colgados y reintentar. Comprobar que no quede un escuchador
-viejo corriendo.
+**Hecho:** J1, J2, J3, J4 y la MA, cerradas (la MA y la J4, el 2026-10-15 a la madrugada, con la prueba de cierre
+del usuario: MA-4 a MA-6, detalle y commits en el documento de la unidad). `leda_motor` en la `0076` (último
+respaldo `db/respaldos/leda_motor-antes-0076-20261014.dump`).
 
-**Lo hecho del 12 al 13 de octubre** (el detalle y la evidencia, en cada documento):
-- La prueba por Telegram de la Fase C pasó y la rama llegó a `main` (`80d6945`, 2026-10-12).
-- Las correcciones de esa prueba, T1 a T10: `../odd/tasks/correcciones-prueba-telegram.md`.
-- El acceso a la web por chat, A-1 a A-6, y la prueba en el celular, pasada ("salio perfecto"):
-  `../odd/tasks/acceso-por-chat.md` y la bitácora de flujos.
-- Los bots nuevos del usuario, `@Leda_PM_bot` y `@Leda_Admin_bot` (sus tokens, en el `.env`, los pone el
-  usuario); `bot_usuario: Leda_PM_bot` en el pack.
-- Las decisiones de la plataforma por jerarquía: el ADR 0023 y `../odd/tasks/plataforma-p2.md` ("Para decidir").
-- La J1 (las esperas en el formulario), cerrada y pasada en el celular.
-- La J2 (la ayuda de la IA al cargar: "Contame qué querés hacer y te ayudo"), construida, revisada por RDD y
-  probada en el celular; con la IA real, 29 de 33 y después 48 de 48. Tras la segunda prueba del usuario, la
-  J2-13 (`a4428fd9`, `73a32f9e`): el criterio se arma con la evidencia del área y lo juzga la IA por su sentido
-  (salió la lista de palabras, porque un sinónimo dejaba pasar un criterio circular); lo que la ayuda no pudo
-  completar se ve en su campo; los puntos de "completando…" se animan. El aspecto del formulario, ajustado
-  con el usuario hasta "quedó perfecto la parte visual".
-- **La J2, cerrada en el celular** (2026-10-13, tarde y noche; detalle y evidencia en el documento de la unidad,
-  J2-14 a J2-28 y J2b): Leda completa todo lo que puede (quién la hace, la evidencia que corresponde, el
-  objetivo, la espera; la fecha sólo si se dijo); todo lo que propone lo escribe la IA con naturalidad; el
-  criterio va en tercera persona, sin nombres, y "no sé" trae una propuesta; la ortografía se corrige sola,
-  sin marcas (la vista previa a la pausa, el campo al salir); "> empezar de nuevo"; el dictado con Gemini
-  (`gemini-3.8-flash`, pantalla encendida, barras del audio). Cada área conoce los cinco tipos de evidencia
-  del pack (lo que pide es un mínimo informativo; `leda_motor` reimportada). IA real: 79 de 84 (bitácora).
-  Usuario: "quedó perfecto todo".
-- `leda_motor`, en la `0067` (respaldos en `db/respaldos/`, el último `leda_motor-antes-0067-20261013.dump`).
+**Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si no responde aunque `pg_ctl
+status` diga que corre (pasó el 2026-10-14: error de memoria compartida), cerrar con `taskkill /F` TODOS los
+`postgres.exe` y arrancar con `pg_ctl ... start -l` a un registro nuevo (el viejo puede quedar tomado), fuera
+del sandbox. Antes de una ronda con la IA real, comprobar que no corra el escuchador del usuario (`tasklist`): si
+corre, la ronda queda pendiente; el escuchador no se apaga, es del usuario.
 
-**Punto exacto para seguir** (cierre de la sesión del 2026-10-14, noche):
-1. **Hecho el 2026-10-14:**
-   - **J2:** cerrada (la J2-29 y sus arreglos, la J2-30, y la suite con 3286 passed).
-   - **J3:** cerrada (2026-10-14, noche). El tercer nivel pasó a llamarse "objetivo de un área".
-   - **J4a y J4b:** construidas y revisadas por RDD. La prueba de la J4 en el celular está hecha y sus hallazgos
-     se arreglaron en la MA.
-   - **MA, la Mini App y el QR para la computadora (ADR 0024, aceptado, con la precisión del lanzador para Telegram
-     en computadora):** construida, con MA-2 y MA-3 (las correcciones del usuario en el iPhone), las migraciones
-     `0073` a `0075` aplicadas en `leda_motor`, RDD aprobada en todos los tramos e IA real 14 de 15 (la falla es de
-     formato). Probada por el usuario con Ariel en el iPhone, Ismael en Telegram de escritorio (abre el navegador) y
-     el navegador de la compu: "muy bueno como quedó".
-   - **Decisiones completas** de la J4, la MA, la J5 y la J6, en el documento de la unidad.
-2. **La MA y la J4, cerradas** (2026-10-15, madrugada, prueba de cierre del usuario pasada): MA-4 a MA-6 (el
-   botón "Mi espacio", la entrada sin QR desde Telegram en la compu con la `0076`, la Mini App recargada que
-   conserva su sesión, "Áreas" para Dirección); detalle y commits en el documento de la unidad. Quedan:
-   - la decisión del usuario sobre **cómo se cierra la sesión de la compu por chat** (se sacó "salir");
-   - la ronda con la IA real de las 50 y 55 sobre la MA-5, con el escuchador apagado.
-   La lista original de la MA-4, como referencia: Detalle en el documento de la unidad, nota "Prueba de MA-2 y MA-3":
-   1. el botón se llama **"Mi espacio"** (el del menú y el que manda Leda), y el mensaje de Leda al ofrecerlo
-      queda corto y natural (hoy es tosco y dice "dentro de Telegram, no en el navegador");
-   2. la barra de desplazamiento con el estilo de la app, y en la compu la web ocupa todo el ancho;
-   3. las pestañas: "Todo el equipo" pasa a **"Mi área"**, y "Lo que pedí" a **"Mis pedidos"**;
-   4. arriba a la derecha, en lugar de "SEM 42 · VIE 16.10", el **nombre** de la persona y debajo su **área**,
-      fijos en todas las pestañas;
-   5. se eliminan **"Volver al chat" y "salir"** en la Mini App y en la compu (la sesión de la compu se cierra
-      por chat);
-   6. **"> Nuevo objetivo"** va abajo, junto a "> Nueva tarea", con el mismo estilo.
-   Con un escritor delegado. Recordarle la regla de los finales de línea LF. Después:
-   - rearmar `web/dist` y reiniciar la web y el escuchador;
-   - RDD por commit, sobre una copia en LF si el revisor la rechaza por tamaño;
-   - la ronda con la IA real de las conversaciones 50 y 55;
-   - la mirada final del usuario para **cerrar la MA y la J4**.
-3. **Después de la MA:**
-   - la tarea **"Lenguaje":** que Leda no diga "trabado" ni "bloqueada" en el chat;
-   - la **J5** y la **J6**, con sus decisiones ya tomadas;
-   - la **J7**, cuyas decisiones faltan;
-   - al principio de cada una, las decisiones con el usuario, de a una y en texto.
-4. **Deudas abiertas de la MA:**
-   - los WARNING menores de la última RDD (documento de la unidad);
+**Cómo se trabaja en la próxima sesión** (usuario, 2026-10-15, al irse a dormir): **de forma autónoma**. El
+agente avanza solo con todo lo que no dependa del usuario; la IA real está autorizada para todas las pruebas,
+sin preguntar (al primer error de cupo, para lo de la IA real y sigue con lo demás). Lo que dependa del usuario
+se anota en "Para decidir al despertar" del documento de la unidad, con un ejemplo y la recomendación, y el
+agente sigue con otra cosa sin esperar. Commits por tarea; la rama se sube al cerrar cada tramo; `main`, no.
+
+**Orden de trabajo:**
+1. **MA-7, el botón "Cerrar sesión" sólo en la compu** (usuario, 2026-10-15). La sesión de la compu sigue
+   recordada el tiempo que elige el administrador para cada equipo (opción A; cerrar la pestaña no la cierra).
+   El botón va debajo del nombre y el área, arriba a la derecha, sólo en el navegador fuera de Telegram (nunca en
+   la Mini App); también en la administración en la compu. Reusar `/app/salir` y `/app/admin/salir`, que
+   siguen en el servidor, y borrar el `SignOut` que quedó sin uso.
+2. **La ronda con la IA real de las conversaciones 50 y 55 sobre la MA-5** (cambió `pedir_acceso_web`), sin
+   escuchador corriendo.
+3. **Deudas de la MA que no dependen del usuario:**
+   - quién pidió una tarea propia: en "Mis tareas", una tarea pedida por otro (por ejemplo "Aprobar la compra
+     del módem", de Ismael, pedida por Marcos) no dice quién la pidió. Construir la línea "└─ te la pidió Marcos
+     Tarquini" y anotar en "Para decidir" que se hizo así y se puede cambiar;
+   - las advertencias de RDD: Leda nombra «Mi espacio» aunque Telegram no haya fijado el botón del menú; falta
+     una prueba de que el pase de la compu no quede en un registro de accesos; `web/src/App.tsx:117` (MA-6);
    - la ortografía al confirmar en la puerta del equipo falló dos veces el 14/10: verla con la IA real;
-   - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento);
-   - desde Telegram Web no apareció ningún QR (usuario, 2026-10-14): para revisar más adelante.
-Acuerdos del 2026-10-14:
-- las decisiones de cada porción se traen al principio, de a una y en texto;
-- RDD y las rondas con la IA real, sin preguntar; al primer error de cupo, se para y espera;
-- los avisos cuentan lo que vale ahora, no la historia;
-- un cambio de plazo trae el informe de "en qué afecta" antes de decidir.
-`leda_motor`: en la `0076` (respaldos `db/respaldos/leda_motor-antes-006x/007x-20261014.dump`, el último
-`leda_motor-antes-0076-20261014.dump`). Túnel de la sesión del 2026-10-14 a la noche: `edgar-changed-thinks-declined`. La web corre en
-segundo plano de la sesión, con el túnel `pharmaceutical-configuring-unix-while`: al cerrarla se cortan, y en la sesión
-nueva el agente los vuelve a levantar y pone la dirección nueva en `LEDA_BASE_URL` del `.env`. El escuchador lo
-reinicia el usuario. Para el detalle de cada decisión y de cada prueba: `../odd/tasks/plataforma-jerarquias.md`.
-Para probar en el celular: el agente levanta la web y el túnel en segundo plano y pone la dirección nueva en
-`LEDA_BASE_URL` del `.env`; el usuario emite el enlace con `leda enlace-admin Ariel` (en una terminal sin un
-`$env:LEDA_BASE_URL` viejo). La web y el túnel de la sesión del 2026-10-13 corren en segundo plano de esa sesión
-(dirección `observations-guide-tsunami-guitar`); en una sesión nueva, hay que volver a levantarlos. Lo que sigue a
-la plataforma, en orden: `ROADMAP.md`.
+   - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento): a "Para decidir".
+4. **La tarea "Lenguaje":** que Leda no diga "trabado" ni "bloqueada" en el chat, y la auditoría del lenguaje
+   que sale del código ("Deudas registradas"). Un explorador arma la lista con ejemplos y arreglo propuesto;
+   las palabras de reemplazo que no estén decididas van a "Para decidir", y se arregla lo que ya es claro.
+5. **J5, el pedido de más tiempo y el cambio de fecha,** con sus decisiones tomadas (incluida la 7: la fecha
+   prevista de los objetivos y "> aceptar la demora").
+6. **J6, la propuesta del integrante,** con sus decisiones tomadas.
+7. **J7, las jerarquías y los integrantes desde la web de Dirección:** sus decisiones faltan. Escribir las
+   preguntas en "Para decidir al despertar", de a una, con ejemplo y recomendación; no construir sin respuesta.
+
+En cada porción: explorar lo que existe ("De qué se parte"), conversación de prueba antes que el código cuando
+toca el chat, escritor delegado con la regla de LF, prueba primero, RDD por commit (`tools/rdd_ciclo.py` en un
+worktree temporal), la ronda real de las conversaciones afectadas, y al cerrar cada tarea el documento de la
+unidad, este punto, Engram y la memoria. Para el celular hacen falta la web y el túnel: sólo cuando el usuario
+esté; el escuchador lo reinicia él.
+
+**Acuerdos** (2026-10-14): las decisiones de cada porción se traen al principio, de a una y en texto; los avisos
+cuentan lo que vale ahora, no la historia; un cambio de plazo trae el informe de "en qué afecta" antes de
+decidir; pedir a Leda que abra la app no lleva botón (dice que toque «Mi espacio»), y la bienvenida sí.
+
+**Para probar en el celular:** el agente levanta la web (`uvicorn leda.entrada:app ... --no-access-log`; sin
+`--no-access-log` el registro mostraría el pase de la compu) y el túnel en segundo plano, y pone la dirección
+nueva en `LEDA_BASE_URL` del `.env`. Si la Mini App dice "No se pudo entrar" con una apertura nueva, reiniciar la
+web (pasó una vez el 2026-10-14, causa no encontrada). Lo que sigue a la plataforma, en orden: `ROADMAP.md`.
 
 **La IA real:** autorizada de forma permanente para todas las pruebas (usuario, 2026-10-14), sin preguntar
 antes de cada ronda ni de una repetición. Se sigue gastando poco: una ronda por vez y sólo los casos afectados.
