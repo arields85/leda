@@ -1717,6 +1717,33 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         `416792f9`, después `test_frontera.py`, `test_alta_sin_conectar.py` y `test_escucha.py`: 54
         passed). `npm test` en `web/`: 365 passed; `npm run build`: bien. En seco, `correr --ia
         guionada --veces 1`: 54 de 54 bien. `leda_motor` sigue en la `0083`: la `0084` no se aplicó.
+      - [x] **J7-5b** · cada espacio ve su propio nombre para una persona (`0085`): resuelve el "Para
+        decidir" de la J7-5, que era una fuga entre espacios (constitución §13).
+        **Hecha** (2026-10-15; escritor delegado), `9d871545`. `membership.nombre` (no nulo): el
+        nombre que usa cada espacio; se llena con el de la cuenta y, para quien llegó por un alta
+        desde la web, con el que escribió Dirección (`cambio_del_equipo`, clase `alta`).
+        `app_user.nombre` queda interno, de la plataforma (el administrador, la consola). Pasan a la
+        membresía: la vista `integrante` (y con ella todo lo que la cocina y el motor leen de ella),
+        `problemas_del_equipo`, `equipo_de`, `cambios_del_equipo` (quién lo hizo, como lo nombra el
+        espacio; el administrador que no es del equipo, por su nombre de la plataforma),
+        `cambiar_un_area`, `cambiar_el_alta` (el alta escribe el nombre en la membresía; el aviso
+        `mismo_nombre` compara dentro del espacio), `emitir_enlace_de_activacion`,
+        `relaciones_de_la_pagina_de_tarea`, `leer_pagina_de_tarea` (también la historia: quien cambió
+        el estado, por su membresía del espacio), `tareas_que_ve`, `terminadas_que_ve`,
+        `esperas_que_ve`, `pedidas_que_ve`, `opciones_de_la_carga_en`,
+        `opciones_de_la_carga_del_equipo` y `opciones_del_objetivo`; en Python, `onboarding`
+        (`canjear` devuelve el nombre de la membresía y no pisa el de la cuenta; enlaces,
+        bienvenida y "sin activar"), `autoridad.identificar`, `motor.recibir`, `cli`, `siembra` y el
+        importador (escribe el nombre en la membresía, no pisa el de la cuenta y reconoce a alguien
+        sin Telegram por su nombre sólo dentro del mismo espacio: antes lo buscaba en toda Leda y
+        podía unir a dos personas distintas). `db/pruebas.sql` (fuera de la superficie) inserta
+        membresías sin nombre: queda para ajustar.
+        **Evidencia:** RED observado (`tests/garantias/test_nombre_por_espacio.py`, 5 de 5 con
+        error: el canje devolvía «Lucas Pérez» al espacio que lo dio de alta como «Lucas P.»).
+        `pytest tests/garantias`: 1245 passed (paridad y rollback de la `0085`). `pytest
+        tests/motor`: 1510 passed. `pytest tests/test_onboarding.py tests/test_esqueleto.py
+        tests/test_importar_no_pisa_el_equipo.py`: 32 passed. `npm test` en `web/`: 365 passed. En
+        seco, `correr --ia guionada --veces 1`: 54 de 54 bien. `leda_motor` sigue en la `0083`.
       - **J7-6** · mover tareas por un cambio del equipo (`0085`, base): `cambio_de_responsable` acepta un
         cambio del equipo además de un pase; `cambio_de_revisor`.
       - **J7-7** · aprobador, rol y cambio de área (`0086`).
