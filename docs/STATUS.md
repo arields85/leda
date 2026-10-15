@@ -63,14 +63,17 @@ hallazgos de la ronda. Cada respuesta está escrita en su punto, marcada DECIDID
 un equipo vacío, ver el equipo, áreas, alta con enlace, nombre por espacio). **2026-10-15, noche:** RDD de
 `9d871545` aprobada en tres pedazos; alta duplicada corregida (`a71d2623`, también en áreas; RDD aprobada);
 `0085` aplicada a `leda_motor` (respaldo `db/respaldos/leda_motor-antes-0085-20261015.dump`, ensayo limpio); web
-reiniciada. **Sigue:** J7-6 en adelante. **Diseño:** con impeccable (siempre por su proceso, nunca a mano):
-`PRODUCT.md`, `DESIGN.md`, la dirección en `.impeccable/surfaces/web-src-app-tsx.md` y las referencias
-`.impeccable/mocks/decision/r7-profundidad*.html`. Decidido (en el brief): resumen grande por urgencia (5 niveles),
-semana, contadores que filtran la lista, entregadas sólo por su contador. **Alternativa nueva, la que más le gusta
-al usuario:** `r8-sobrio*.html` (sus referencias: casi negro con degradado, bandas con filetes, cifras finas, Kanit
-servida desde `.impeccable/mocks/fonts/kanit/`, barra sin fondo con desenfoque progresivo); la r7 se guarda.
-`DESIGN.md` sigue con la r7 hasta que adopte la r8. El script de `live` se inyecta en las muestras: nunca
-commitearlo.
+reiniciada. Nombres de pestañas estándar en todo (MA-4/MA-6: «Mis tareas · Mi área · Mis pedidos»; Dirección
+«Mis tareas · Áreas · Equipo»; `da249f05`, `12c33af7`). **Sigue:** J7-6 en adelante. **Diseño** (cierre de la
+noche, `5bf0cf81`): con impeccable (sorteo + página de decisión para pantallas nuevas; extensiones heredan), todo
+en `.impeccable/surfaces/web-src-app-tsx.md`. La **r8 «sobria»** (referencias del usuario; Kanit en
+`.impeccable/mocks/fonts/kanit/`; fondo con huecos animado; zona urgente fija que se achica; vidrio; contadores que
+filtran) cubre todas las pantallas: `r8-sobrio.html` (Mis tareas), `-mi-area`, `-pedidos`, `-direccion`, `-areas`,
+`-area-it`, `-equipo`, `-tarea`; la r7 se guarda. **Próximo:** el usuario decide si se adopta la r8 como oficial
+(documenter reescribe `DESIGN.md`, que sigue en la r7, y `.impeccable/design.json`, que aún describe la barra
+flotante); después, pasarla a `web/`. La tarea abierta necesita que la historia viaje a la Mini App
+(`detalle_en_json`). El script de `live` se inyecta en las muestras: nunca commitearlo; los bocetos de la página
+de decisión se escriben **después** de levantarla.
 
 **Lo que sigue, a construir, en este orden** (usuario, 2026-10-15: "todo lo que requiera armar equipo,
 configurar equipo… quisiera darle prioridad; las otras son mejoras"; "ese es el orden correcto"): 1. **la J7**, armar
