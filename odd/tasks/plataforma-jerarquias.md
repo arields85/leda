@@ -1306,8 +1306,9 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       desde `825676d7` (con el ensayo de propiedad), `review-f874480b32eaa102`; advertencias sin arreglar,
       casos de borde: un 404 de un área vuelve con `history.back()` y podría caer en otra entrada vieja
       (`App.tsx:180-182`); la prueba de otro espacio en "te la pidió" podría pasar vacía
-      (`test_quien_ve_que.py:657-666`). Queda de esta tarea: la ortografía al confirmar en la puerta del
-      equipo, con la IA real (no se corre mientras un escritor edita `src/`).
+      (`test_quien_ve_que.py:657-666`). La ortografía con la IA real (`tools/medir_ayuda_al_cargar.py
+      --veces 1`, 2026-10-15): los tres casos de ortografía bien (bitácora); las dos fallas del 14/10 no se
+      repitieron.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
