@@ -75,6 +75,12 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   estado en su color y lo que falta («esperando · falta la firma de Ismael»). La r8 también deja el desenfoque
   progresivo bajo la barra (aceptado) y los contadores en cinco columnas iguales, alineados con la semana.
 
+- **«Áreas» (Dirección), r8** (2026-10-15, noche, página de decisión de impeccable, sorteo `bdb69d68`): el
+  **mosaico**, una baldosa por área en dos columnas separadas por filetes; en cada una, las abiertas en una cifra
+  grande y fina, el nombre del área, «referente X» (o «sin referente») y sólo los estados que tienen algo, en su
+  color. Muestra: `.impeccable/mocks/decision/r8-sobrio-areas.html`; descartadas «por dónde mirar primero» y
+  «matriz de estados» (`areas-*.html`). Falta: el detalle de un área (al tocar una baldosa) y «Equipo».
+
 ## Pendiente
 
 - Ajustes que el usuario va a seguir pidiendo (dijo "vamos por buen camino, tenemos que seguir haciendo
