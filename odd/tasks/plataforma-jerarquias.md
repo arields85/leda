@@ -1883,7 +1883,10 @@ ejemplo y recomendación, y sigue con otra cosa.
       *Recomendación:* no: cambia la autoridad del equipo, no lo que Leda puede hacer, así que alcanza con la
       confirmación de Dirección. Las excepciones: la autoridad final (la acepta quien la recibe) y que Dirección
       cambie su propio rol, que no se puede.
-- **Tres hallazgos de la ronda del 15/10 (todas las conversaciones, una vez; repetidas 3 veces: el 1 y el 3 fallan siempre, el 2 una de tres).** Ninguno viene de los cambios de
+- **Tres hallazgos de la ronda del 15/10** — **DECIDIDO (usuario, 2026-10-15): las recomendaciones del 1
+  y del 3** ("perdí el celular" dicho al pasar pregunta antes de cortar; el nombre se separa del área dicha al
+  lado, como regla general, y si el área no coincide, pregunta). El 2 no necesita decisión: va con la regla de
+  las preguntas. Primero, sus conversaciones de prueba. (Todas las conversaciones, una vez; repetidas 3 veces: el 1 y el 3 fallan siempre, el 2 una de tres).** Ninguno viene de los cambios de
   la noche; se anotan como conversación de prueba antes de tocar nada (regla general, no parche).
   1. **"Perdí el celular" dicho al pasar corta el acceso a la web.** En la conversación 42, Ariel escribe
      "perdon perdi el celular, …" en medio de otro tema y Leda le corta el acceso a la web (lo que decidiste
