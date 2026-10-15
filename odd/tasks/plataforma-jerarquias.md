@@ -1225,6 +1225,18 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
          pestañas;
       5. se eliminan "Volver al chat" y "salir"; la sesión de la compu se cierra por chat;
       6. "> Nuevo objetivo" va abajo, junto a "> Nueva tarea".
+      **MA-4, construida (2026-10-14, noche; escritor delegado, ruta delegada por tocar web y servidor):**
+      `4816e96b` (la web: nombre y área arriba, las dos altas abajo, todo el ancho, la barra, sin "Volver al chat"
+      ni "salir"), `266d0d7c` (el botón del menú "Mi espacio"; el "dentro de Telegram" salía de los hechos de la
+      cocina, `hechos.py` y `fichas.py`, y se corrigió ahí, sin tocar las instrucciones de la IA) y `719b59e2` (el
+      botón del chat que abre la app dice "Mi espacio" para todos; Dirección sigue entrando por "Mi área"; los
+      botones que llevan a algo concreto conservan su nombre, MA3). `npm test` 313 passed; pytest de los archivos
+      tocados 145 passed y 41 de 41 en la API; repetido por el coordinador: 43 passed. RDD (`tools/rdd_ciclo.py`,
+      base `6cd5541e`): **aprobada**, reconocida `review-78fd7aaba69d3c5d`; dos WARNING (no queda forma de cerrar la
+      sesión de la compu; el componente `SignOut` quedó sin uso) y seis sugerencias menores. IA real, 50 y 55,
+      `--veces 3`: **5 de 6**, garantías 6 de 6; la falla es la deuda de formato conocida (55, vez 3: la pregunta
+      a Marcos en un renglón de más de 140 caracteres). Pendiente: **cómo se cierra la sesión de la compu por
+      chat** (hoy sólo "perdí el celular", que corta todas) y la prueba del usuario.
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza

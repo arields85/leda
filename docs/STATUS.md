@@ -83,8 +83,10 @@ viejo corriendo.
      formato). Probada por el usuario con Ariel en el iPhone, Ismael en Telegram de escritorio (abre el navegador) y
      el navegador de la compu: "muy bueno como quedó".
    - **Decisiones completas** de la J4, la MA, la J5 y la J6, en el documento de la unidad.
-2. **Próximo paso al retomar: la MA-4**, la última tanda de ajustes del usuario. No se empezó: el usuario pidió
-   dejarla para esta sesión. Detalle en el documento de la unidad, nota "Prueba de MA-2 y MA-3":
+2. **La MA-4, construida** (2026-10-14, noche: `4816e96b`, `266d0d7c`, `719b59e2`; RDD aprobada; IA real 50 y 55,
+   5 de 6, la falla de formato conocida). Falta: la decisión del usuario sobre **cómo se cierra la sesión de la
+   compu por chat** (se sacó "salir" y hoy sólo existe "perdí el celular"), y su prueba para cerrar la MA y la
+   J4. Lo que sigue es la lista original, como referencia: Detalle en el documento de la unidad, nota "Prueba de MA-2 y MA-3":
    1. el botón se llama **"Mi espacio"** (el del menú y el que manda Leda), y el mensaje de Leda al ofrecerlo
       queda corto y natural (hoy es tosco y dice "dentro de Telegram, no en el navegador");
    2. la barra de desplazamiento con el estilo de la app, y en la compu la web ocupa todo el ancho;
