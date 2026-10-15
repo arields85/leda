@@ -13,7 +13,7 @@ La web y el túnel ya están levantados con el código nuevo, y `leda_motor` est
    → Se abre la Mini App dentro de Telegram, grande, con la barrita de "Cerrar" arriba. Entra sola, sin
    pedir nada. Se ve oscura, como siempre.
 3. Mirá las pestañas.
-   → "Mis tareas", "OT y automatización" y "Lo que pedí".
+   → "Mis tareas", "Mi área" y "Mis pedidos".
 4. Tocá una tarea.
    → Se abre su detalle.
 5. **Marcos**, en Telegram: `quiero crear una tarea`.

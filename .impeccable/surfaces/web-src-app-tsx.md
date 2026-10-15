@@ -15,7 +15,7 @@ segundos qué tienen, qué vence y qué les falta. La compu, para lo complejo.
 
 **Referencias aprobadas** (abrir en el navegador): `.impeccable/mocks/decision/r7-profundidad.html` (Marcos,
 referente, tres pestañas) y `.impeccable/mocks/decision/r7-profundidad-direccion.html` (Ismael, Dirección,
-cinco pestañas). Recorrido: «La etiqueta» → sorteos audaz y seguro → disposición «una tarea por pantalla» (gustó
+tres pestañas). Recorrido: «La etiqueta» → sorteos audaz y seguro → disposición «una tarea por pantalla» (gustó
 la lectura, no la letra ni los íconos) → oscuros minimalistas: eligió «El pizarrón» sin la tiza → «Pizarra
 técnica» (nítida pero simple) → «Profundidad» → con las pestañas siempre visibles.
 
@@ -31,7 +31,8 @@ pulgar.
 FIRST VIEWPORT: nombre y área arriba a la izquierda, «+ Nueva» a la derecha; el resumen grande («1 vence mañana»,
 la tarea y lo que falta, el conteo); la semana con hoy recuadrado; la lista agrupada; terminadas; barra flotante
 pegada al borde de abajo, de lado a lado, fondo sólido, línea fina arriba, ícono y palabra en cada pestaña
-(3 a 5 según el rol) y una rayita sobre la activa (aceptada en `impeccable live` el 2026-10-15).
+(tres: Mis tareas, Mi área y Mis pedidos para un referente; Mis tareas, Áreas y Equipo para Dirección) y
+una rayita sobre la activa (aceptada en `impeccable live` el 2026-10-15).
 FORM: «El pizarrón» (candidato 3 de la lista propia de la ronda 3, asignado por el sorteo), refinado por el
 usuario; seed key 71b06f5b.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.

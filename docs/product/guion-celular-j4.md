@@ -55,5 +55,5 @@ que esperar.
 
 14. **Ariel**, en su web, mira "Tu sector".
     → Está "Configurar el router…", pedida por Marcos.
-15. **Marcos**, en su web, mira "Lo que pediste".
+15. **Marcos**, en su web, mira "Mis pedidos".
     → Están el pedido a Ariel y el pedido a Ismael, cada uno con su estado.

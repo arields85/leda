@@ -121,14 +121,13 @@
 
   .tabbar {
     position: fixed; left: 0; width: 390px; bottom: 0; z-index: 10;
-    display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;
-    padding: 6px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    padding: 6px 12px calc(10px + env(safe-area-inset-bottom, 0px));
     background: var(--bottom); border-top: 1px solid var(--line);
   }
   .tabbar a {
-    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    min-height: 52px; color: var(--ink-mute); text-decoration: none;
-    font-size: 12px; line-height: 14px; white-space: nowrap;
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    min-height: 52px; color: var(--ink-mute); text-decoration: none; font-size: 13px; line-height: 16px;
   }
   .tabbar a:hover { color: var(--ink); }
   .tabbar a[aria-current="page"] { color: var(--ink); font-weight: 600; }
@@ -193,14 +192,6 @@
     <a href="#" aria-current="page">
       <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5l2 2 3.5-3.5M13 8h7M4 16.5l2 2 3.5-3.5M13 17h7"/></svg>
       Mis tareas
-    </a>
-    <a href="#">
-      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
-      Mi sector
-    </a>
-    <a href="#">
-      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
-      Lo que pedí
     </a>
     <a href="#">
       <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/></svg>

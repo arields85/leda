@@ -1483,12 +1483,12 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
           objetivo. La tarea no se da por terminada con subtareas abiertas, así que no hace falta marcar una espera.
           La aprueba su referente, que ve antes el informe de "en qué afecta".
         - **Sólo para sí mismo:** si necesita que lo haga otro, lo pide.
-      - **J6-D2. "Lo que pedí" también para el integrante, unificado con "Me falta algo para seguir".** Lo que no
+      - **J6-D2. "Mis pedidos" también para el integrante, unificado con "Me falta algo para seguir".** Lo que no
         depende de él ("necesito el cable de 10 metros") se lo pide a su referente.
         - Marcos decide: lo hace él (la compra), lo pasa, o dice que no, con el motivo.
-        - Nahuel ve en "Lo que pedí" en qué está su pedido.
+        - Nahuel ve en "Mis pedidos" en qué está su pedido.
         - Al resolverse, le llega el aviso y su tarea puede seguir.
-        - "Me falta algo para seguir" (J5-D1) es lo mismo: queda como un pedido en "Lo que pedí" a quien se ocupa,
+        - "Me falta algo para seguir" (J5-D1) es lo mismo: queda como un pedido en "Mis pedidos" a quien se ocupa,
           con el seguimiento del bloqueo que ya hace el motor, y la tarea lo espera. Antes de trabarse se llama
           "pedir", después "me falta algo": es una sola cosa.
         - La regla para todos: a quien está arriba se le pide lo que no depende de uno.
@@ -1511,7 +1511,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
           línea. Si lo resolvió él: "Ya no hace falta: Nahuel lo resolvió (los encontró en el taller)". Si fue otra
           cosa: sólo "Ya no hace falta", sin inventar que lo resolvió.
       - **J6-D5. La propuesta de objetivo de un referente no existe para nadie hasta que Dirección la aprueba.** Martín
-        la ve sólo en "Lo que pedí" ("esperando a Ismael") y no le puede cargar tareas. Ismael aprueba, corrige o dice
+        la ve sólo en "Mis pedidos" ("esperando a Ismael") y no le puede cargar tareas. Ismael aprueba, corrige o dice
         que no con el motivo.
       - **J6-D6. A quién se pide:** siempre al referente propio. Algo de otra área lo pide a Marcos, que si está de
         acuerdo lo convierte en un pedido entre áreas (J4); Nahuel nunca tiene que saber a quién pedirle. Si no hay
@@ -1839,7 +1839,7 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
   lo que no depende de la palabra que reemplaza a "trabada": esa palabra espera en "Para decidir al
   despertar" y no se tocó nada con "trab" o "bloque" en el motor, los hechos, los significados ni el chat.
   - `74170e5e`: la web dice lo mismo en todas partes. Una tarea asignada se lee «SIN EMPEZAR» en su
-    tarjeta (decía «[ASIGNADA]»); en "Lo que pediste", una bloqueada dice «esperando» (decía «trabada») y
+    tarjeta (decía «[ASIGNADA]»); en "Mis pedidos", una bloqueada dice «esperando» (decía «trabada») y
     una asignada «sin empezar»; el estado del detalle de una tarea (`tarea_vista.ESTADOS`) dice «esperando».
     El historial de la tarea («Se trabó», «Se destrabó») sigue igual hasta que se decida la palabra.
   - `597c284c`: los textos fijos. La bienvenida dice «Ahora tenés 1 tarea abierta.» o «Ahora tenés 3
