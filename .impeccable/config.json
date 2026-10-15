@@ -575,6 +575,24 @@
         "value": "sans 3",
         "createdAt": "2026-10-15T17:40:53.004Z",
         "reason": "false positive: DESIGN.md declares Source Sans 3; the detector splits the family name"
+      },
+      {
+        "rule": "wide-tracking",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/r8-sobrio.html"
+        ],
+        "createdAt": "2026-10-15T18:38:21.669Z",
+        "reason": "intentional: short lowercase labels tracked like the user's reference image (2026-10-15); body text is not tracked"
+      },
+      {
+        "rule": "wide-tracking",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/r8-sobrio-direccion.html"
+        ],
+        "createdAt": "2026-10-15T18:38:21.884Z",
+        "reason": "intentional: short lowercase labels tracked like the user's reference image (2026-10-15); body text is not tracked"
       }
     ]
   }
