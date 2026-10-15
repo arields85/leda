@@ -131,9 +131,9 @@ components:
 # Design System: Leda
 
 > **Estado (2026-10-15).** Este sistema se registró a partir de las dos referencias aprobadas por el usuario,
-> `.impeccable/mocks/decision/r7-profundidad.html` (Marcos, referente, tres pestañas) y
-> `.impeccable/mocks/decision/r7-profundidad-direccion.html` (Ismael, Dirección, cinco pestañas); las dos llevan
-> la barra de pestañas pegada al borde de abajo que el usuario aceptó en `live` el 2026-10-15. **La app real
+> `.impeccable/mocks/decision/r7-profundidad.html` (Marcos, referente: «Mis tareas», «Mi área», «Mis pedidos») y
+> `.impeccable/mocks/decision/r7-profundidad-direccion.html` (Ismael, Dirección: «Mis tareas», «Áreas», «Equipo»); las dos
+> llevan tres pestañas en la barra pegada al borde de abajo que el usuario aceptó en `live` el 2026-10-15. **La app real
 > de `web/` todavía no se migró**: sigue con el estilo anterior (oscuro, monoespaciado). Lo que aquí se describe
 > es la dirección elegida, con ajustes pendientes que el usuario anunció; la pantalla de una tarea abierta aún no
 > existe en este estilo. Al migrar `web/`, volver a documentar desde el código.
@@ -221,9 +221,8 @@ porque la escala de tamaños y los tonos de tinta hacen el resto. Todas las cifr
 - **Label** (400, 14px, 20px): el estado de una tarea, el conteo, la fecha de hoy. En 600 y tinta apagada, el
   encabezado de sección («Terminadas esta semana»). Siempre en minúscula de oración, nunca en versalitas.
 - **Numeral** (400, 20px, 24px): el número de cada día de la semana; 600 y tinta plena en hoy.
-- **Caption** (400, 13px, 16px): el nombre del día y la palabra de cada pestaña (con tres pestañas).
-- **Micro** (400, 12px, 16px): «hoy» y «1 vence» bajo el día; la palabra de cada pestaña cuando son cinco
-  (12px, 14px de línea).
+- **Caption** (400, 13px, 16px): el nombre del día y la palabra de cada pestaña.
+- **Micro** (400, 12px, 16px): «hoy» y «1 vence» bajo el día.
 
 ### Named Rules
 **La regla de los dos pesos.** Sólo 400 y 600. La jerarquía se arma con tamaño y tono de tinta, no con negritas
@@ -298,12 +297,11 @@ Un único botón visible por pantalla, sobrio y táctil.
 ### Navigation
 - **Barra de pestañas pegada al borde:** fija al pie del viewport, de ancho completo (390px, desde el borde
   izquierdo), fondo liso de pizarra honda, un filete de 1px en línea sólo arriba, sin esquinas y sin sombra.
-  Grilla de tantas columnas como pestañas tenga el rol: tres para un referente (Mis tareas, Mi sector, Lo que
-  pedí), con relleno de 6px arriba y 12px a los lados, y cinco para Dirección (más Áreas y Equipo), con 6px
-  arriba, 8px a los lados y 2px entre pestañas. Debajo, en los dos casos, 10px más el área segura.
-- **Cada pestaña:** ícono de trazo de 24px arriba y la palabra abajo, siempre los dos, 52px de alto mínimo. Con
-  tres pestañas: 4px entre ícono y palabra, 13px con 16px de línea. Con cinco: 3px, 12px con 14px de línea, sin
-  cortar la palabra.
+  Siempre tres pestañas, en una grilla de tres columnas iguales: para un referente «Mis tareas», «Mi área» y
+  «Mis pedidos»; para Dirección «Mis tareas», «Áreas» y «Equipo». Relleno de 6px arriba y 12px a los lados, y
+  debajo 10px más el área segura.
+- **Cada pestaña:** ícono de trazo de 24px arriba y la palabra abajo, siempre los dos, 52px de alto mínimo, 4px
+  entre ícono y palabra, la palabra en Caption (13px con 16px de línea).
 - **Estados:** sin fondo ni píldora en ningún estado. Inactiva en tinta apagada; hover en tinta plena; activa
   (`aria-current="page"`) en tinta plena y 600, con una raya de tinta de 28px por 2px y esquina de 4px apoyada
   sobre la pestaña, 7px por encima de su borde superior.
@@ -328,7 +326,7 @@ número en 600 y tinta plena, con `aria-current="date"`.
 - **Do** abrir cada vista con el resumen grande y dejar el resto en tamaños chicos y tintas suaves.
 - **Do** agrupar las tareas en la superficie elevada con filetes entre filas y 12px de esquina.
 - **Do** mantener la barra de pestañas pegada al borde de abajo, de ancho completo y con fondo liso, con ícono
-  y palabra en cada pestaña, de tres a cinco según el rol, y marcar la activa con la raya de tinta de arriba.
+  y palabra en cada una de las tres pestañas, y marcar la activa con la raya de tinta de arriba.
 - **Do** decir en el detalle de una tarea qué falta y quién se ocupa, en palabras de todos los días.
 
 ### Don't:
