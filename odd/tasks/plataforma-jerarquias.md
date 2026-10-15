@@ -1673,6 +1673,41 @@ ejemplo y recomendación, y sigue con otra cosa.
       *Recomendación:* no: cambia la autoridad del equipo, no lo que Leda puede hacer, así que alcanza con la
       confirmación de Dirección. Las excepciones: la autoridad final (la acepta quien la recibe) y que Dirección
       cambie su propio rol, que no se puede.
+- **J5: lo que las decisiones no alcanzan a fijar** (un planificador armó la J5 en porciones el 15/10 a la
+  noche). Ojo, un cambio grande: hoy, si Nahuel dice "lo termino el 28", Leda lo anota enseguida y los
+  recordatorios pasan al 28 (la conversación 02 lo prueba). Con la J5-D3 eso deja de ser así: queda como pedido
+  para Marcos y sigue valiendo el 21. Esta noche se construye sólo la base que no depende de estas preguntas (el
+  cambio de fecha auditado en la base) y se escribe el ADR 0025 como propuesta. De a una:
+  1. **Una fecha anterior a la que tenía** ("lo termino el 18", vence el 21). *Recomendación:* se anota
+     directo, como hoy, sin que nadie decida: no atrasa a nadie.
+  2. **Qué mensajes llevan los dos botones** ("> Me falta algo para seguir" y "> pedir más tiempo").
+     *Recomendación:* el pedido de cómo viene y los recordatorios desde el día del vencimiento; nunca el aviso
+     del día anterior, que no pide respuesta.
+  3. **Cuándo una tarea que espera "llega justo" y cuándo "se atrasa".** *Recomendación:* la que espera puede
+     empezar el día hábil siguiente a la fecha nueva; si eso cae después de su vencimiento, se atrasa; si no,
+     llega justo. El informe dice un nivel con fechas y nombra los de más abajo sin fechas.
+  4. **Al aceptar más tiempo, ¿se corren solas las fechas de las tareas que esperan?** Ejemplo: aceptan el 28 y
+     «Pasar los cables» de Lucas vencía el 24. *Recomendación:* no se corren solas: se avisa y cada referente
+     decide (es el mismo pedido o un cambio de fecha suyo).
+  5. **El informe nombra una tarea que quien decide no puede ver** (de otra área). *Recomendación:* que vea sólo
+     el título, el responsable y las fechas, como excepción escrita en el ADR.
+  6. **Quien decide la tarea y el referente del objetivo son personas distintas.** Ejemplo: Lucas pide el 30,
+     decide Martín, pero eso pasa la fecha del objetivo de Ismael. *Recomendación:* primero decide Martín y
+     después aprueba Ismael; si es la misma persona, es una sola decisión.
+  7. **Los recordatorios mientras el pedido espera.** *Recomendación:* a Lucas le siguen llegando sobre la
+     fecha original y le dicen que su pedido sigue esperando; el escalamiento por esa tarea se reemplaza por el
+     recordatorio a quien tiene que decidir.
+  8. **El freno de un objetivo que ya tiene fecha prevista:** ¿se compara con la original o con la prevista?
+     *Recomendación:* con la prevista, que es la que se sigue.
+  9. **"> ya no hace falta" para retirar un pedido que espera** (lo pide la J6-D4 para las propuestas).
+     *Recomendación:* sí, también acá.
+  10. **Cambiar la fecha desde la administración, y cambiar la fecha de un objetivo directamente.**
+      *Recomendación:* desde la administración sí, como la carga; la fecha de un objetivo, más adelante.
+  11. **"Una tarea que espera algo de otro y se demora"** (J5-D3c). *Recomendación:* cuando quien se ocupa da un
+      día que pasa el vencimiento de la tarea que espera, el referente de esa tarea recibe el informe, como
+      información.
+  12. **Cada cuánto se le recuerda a quien decide.** Hoy una pregunta sin contestar se repite cada día los
+      primeros tres y después día por medio. *Recomendación:* cada día hábil, como dice la J5-D7.
 
 Lo que el agente, trabajando solo desde la noche del 2026-10-13, necesita que decida el usuario. Cada punto,
 con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue con lo que no depende de eso.
