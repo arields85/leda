@@ -121,3 +121,19 @@ def test_con_informe_al_grupo_el_equipo_esta_al_tanto(conn, mundo, dias):
     hechos = _hasta_el_tercer_pedido(dias)
 
     assert hechos["si_no_hay_respuesta"][QUEDA_ASENTADO] == {FIGURA_EN_EL_INFORME_AL_GRUPO: True}
+
+
+# --- Why nobody receives it, in words for the administrator (task "Lenguaje") ---------------
+
+def test_por_que_no_hay_a_quien_lo_dice_con_palabras_y_sin_codigos():
+    """The incident summary never carries a raw reason code like `destinatario_sin_telegram`."""
+    from leda.motor.asentado import por_que_no_hay_a_quien
+    from leda.motor.persecucion import INACTIVO, SIN_REFERENTE, SIN_TELEGRAM
+
+    assert por_que_no_hay_a_quien(SIN_TELEGRAM) == (
+        "quien tendría que recibirlo todavía no tiene Leda conectada")
+    assert por_que_no_hay_a_quien(INACTIVO) == (
+        "quien tendría que recibirlo ya no está activo en el equipo")
+    for motivo in (SIN_REFERENTE, SIN_TELEGRAM, INACTIVO, "otro_motivo"):
+        texto = por_que_no_hay_a_quien(motivo)
+        assert motivo not in texto and "_" not in texto, texto

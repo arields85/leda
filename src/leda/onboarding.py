@@ -159,8 +159,9 @@ def bienvenida(cur: psycopg.Cursor, workspace_id: str, nombre: str) -> str:
              f"venís y si algo te está trabando. Si un mensaje no necesita "
              f"respuesta te lo aclaro.")
     if abiertas:
-        texto += f"\n\nAhora mismo tenés {abiertas} tarea(s) abierta(s). "\
-                 f"Escribime «qué tengo» cuando quieras verlas."
+        # Singular or plural as a person says it, never "tarea(s) abierta(s)".
+        tareas = "1 tarea abierta" if abiertas == 1 else f"{abiertas} tareas abiertas"
+        texto += f"\n\nAhora tenés {tareas}. Escribime «qué tengo» cuando quieras verlas."
     return texto
 
 

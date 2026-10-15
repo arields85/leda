@@ -1039,7 +1039,8 @@ TEXTOS_DE_LA_CARGA = {
         "Quien la decidió tiene que ser Dirección o el referente del área de la tarea.",
     ("decidio", "no_corresponde"): "Por esta puerta, la decide quien la carga.",
 }
-TEXTO_DE_UN_DATO_MAL_FORMADO = "Este dato no es válido."
+# Short and human, as the web says it next to the field (task "Lenguaje").
+TEXTO_DE_UN_DATO_MAL_FORMADO = "Esto no se pudo leer; revisalo."
 
 # Cómo se llama cada dato en el cuerpo del pedido, y el `campo` con que lo nombra la base.
 _CAMPOS_ID = {"objetivo": "objetivo_id", "responsable": "responsable_id",

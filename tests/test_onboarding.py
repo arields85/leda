@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from leda.db import admin
-from leda.onboarding import (ActivacionInvalida, activar, encolar_presentacion,
+from leda.onboarding import (ActivacionInvalida, activar, bienvenida, encolar_presentacion,
                                generar_enlaces, pendientes_de_activar)
 
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=timezone.utc)
@@ -138,3 +138,34 @@ def test_presentacion_va_al_grupo(sin_activar, conn):
         # La presentación no lleva enlaces: esos van uno a uno.
         assert "t.me" not in fila["cuerpo"] and "start=" not in fila["cuerpo"]
         assert not encolar_presentacion(cur, ws, ahora=AHORA)   # no duplica
+
+
+class _CursorDeLaBienvenida:
+    """The two reads of the welcome: the team's persona and how many open tasks the person has."""
+
+    def __init__(self, abiertas: int):
+        self._filas = [{"nombre_visible": "Leda", "equipo": "CoreWork"}, {"n": abiertas}]
+
+    def execute(self, *_args):
+        pass
+
+    def fetchone(self):
+        return self._filas.pop(0)
+
+
+@pytest.mark.parametrize("abiertas, frase", [
+    (1, "Ahora tenés 1 tarea abierta."),
+    (3, "Ahora tenés 3 tareas abiertas."),
+])
+def test_la_bienvenida_cuenta_las_tareas_abiertas_en_singular_o_plural(abiertas, frase):
+    """The welcome says it as a person would: no "tarea(s) abierta(s)"."""
+    texto = bienvenida(_CursorDeLaBienvenida(abiertas), "ws", "Marcos Tarquini")
+
+    assert frase in texto
+    assert "(s)" not in texto
+
+
+def test_la_bienvenida_sin_tareas_abiertas_no_las_nombra():
+    texto = bienvenida(_CursorDeLaBienvenida(0), "ws", "Marcos Tarquini")
+
+    assert "tarea" not in texto and texto.startswith("Listo, Marcos.")

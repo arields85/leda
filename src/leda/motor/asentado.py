@@ -111,8 +111,12 @@ def avisar_que_el_sector_no_tiene_encargado(cur, workspace_id: str, area_id: str
 
 def por_que_no_hay_a_quien(motivo: str) -> str:
     """Por qué el bloqueo no le llega a nadie, en palabras para el resumen del incidente."""
-    from .persecucion import SIN_REFERENTE
+    from .persecucion import INACTIVO, SIN_REFERENTE
     if motivo == SIN_REFERENTE:
         return ("su sector no tiene referente y nadie aprueba el trabajo de la persona trabada "
                 "(o el referente es ella misma)")
-    return f"quien tendría que recibirlo no tiene Leda conectada ({motivo})"
+    # Each reason in words, never its code (task "Lenguaje"): `alcanzable` gives INACTIVO or
+    # SIN_TELEGRAM; anything else reads as the latter, without the code.
+    if motivo == INACTIVO:
+        return "quien tendría que recibirlo ya no está activo en el equipo"
+    return "quien tendría que recibirlo todavía no tiene Leda conectada"
