@@ -151,8 +151,11 @@ TIPOS_DE_LA_WEB = {
 # cargo (prueba del usuario del 2026-10-14, noche: antes "Mi equipo"; el área ya se ve arriba a
 # la derecha, y `area_del_equipo` sigue como dato); "Mi área" también, lo de todo el equipo, de
 # Dirección, que no tiene sector (el suyo es Dirección misma, que repetía sus tareas); "Mis
-# pedidos", de quien puede pedir (un referente y Dirección; un integrante, cuando tenga pedidos).
-VISTAS = {"tus": "Mis tareas", "sector": "Mi área", "equipo": "Mi área",
+# pedidos", de quien puede pedir (un referente; un integrante, cuando tenga pedidos). MA-6
+# (decisión del usuario del 2026-10-14, noche): Dirección ve "Mis tareas" y "Áreas" (una tarjeta
+# por área, y al tocarla, las tareas de esa área), nunca "Mis pedidos". "Áreas" lee lo de todo el
+# equipo (`equipo`), que sigue pudiendo pedir quien tiene "Áreas" (los botones viejos del chat).
+VISTAS = {"tus": "Mis tareas", "sector": "Mi área", "equipo": "Mi área", "areas": "Áreas",
           "pedidas": "Mis pedidos"}
 DIAS_CORTOS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
 
@@ -404,13 +407,15 @@ def yo(request: Request):
 def _pestanas(cur, token: str, sesion: dict[str, Any], vistas: list[str],
               persona: dict[str, Any] | None) -> list[dict[str, str]]:
     """Las pestañas de la persona, con su nombre (`VISTAS`): las vistas que le da la base, sin
-    el sector a Dirección, y "Mis pedidos" a quien puede pedir o ya pidió algo."""
+    el sector a Dirección, que en lugar de todo el equipo ve "Áreas" (MA-6), y "Mis pedidos" a
+    un referente o a quien ya pidió algo, nunca a Dirección."""
     direccion = bool(persona and persona["direccion"])
-    pestanas = [v for v in vistas if v in VISTAS and not (direccion and v == "sector")]
+    pestanas = [("areas" if direccion and v == "equipo" else v) for v in vistas
+                if v in VISTAS and not (direccion and v == "sector")]
     if "sector" in pestanas and not _a_quien_la_puede_pasar(cur, str(sesion["membership_id"])):
-        # "Mi equipo" sin nadie a cargo quedaría vacía o con sus propias tareas repetidas (MA-3).
+        # "Mi área" sin nadie a cargo quedaría vacía o con sus propias tareas repetidas (MA-3).
         pestanas.remove("sector")
-    if direccion or (persona and persona["referente"]) or _pidio_algo(cur, token):
+    if not direccion and ((persona and persona["referente"]) or _pidio_algo(cur, token)):
         pestanas.append("pedidas")
     return [{"vista": v, "titulo": _titulo_de_la_vista(cur, v, str(sesion["membership_id"]))}
             for v in pestanas]
@@ -448,8 +453,10 @@ def _chat_con_leda(usuario: str | None) -> str | None:
 # --- Las tareas de una vista ------------------------------------------------------------------
 
 @router.get("/api/tareas")
-def tareas(request: Request, vista: str = "tus"):
-    """Lo que muestra una vista de la persona de la sesión (decisión 18)."""
+def tareas(request: Request, vista: str = "tus", area: str | None = None):
+    """Lo que muestra una vista de la persona de la sesión (decisión 18). "Áreas" (MA-6): sin
+    `area`, una tarjeta por área del espacio con sus números; con `area`, las tareas de esa área,
+    como las de todo el equipo."""
     if vista not in VISTAS:
         return _json({"error": "vista_desconocida"}, 404)
     token = _token_de_la_cookie(request)
@@ -474,9 +481,12 @@ def tareas(request: Request, vista: str = "tus"):
                 pestanas = _pestanas(cur, token, sesion, vistas["vistas"], persona)
         if vistas is None:
             return _sin_sesion()
-        if vista not in {p["vista"] for p in pestanas}:
+        disponibles = {p["vista"] for p in pestanas}
+        if vista not in disponibles and not (vista == "equipo" and "areas" in disponibles):
             return _json({"error": "vista_no_disponible"}, 403)
-        titulo = next(p["titulo"] for p in pestanas if p["vista"] == vista)
+        titulo = next((p["titulo"] for p in pestanas if p["vista"] == vista), VISTAS[vista])
+        # Lo que lee la base: "Áreas" es lo de todo el equipo, por área.
+        lectura = "equipo" if vista == "areas" else vista
         ws = str(sesion["workspace_id"])
         ahora = _ahora(conn, ws)
         with sin_espacio(conn) as cur:
@@ -486,14 +496,17 @@ def tareas(request: Request, vista: str = "tus"):
             filas = esperas = terminadas = []
             if vista != "pedidas":
                 cur.execute("select * from tareas_de_la_sesion(%s, %s, %s)",
-                            (_hash(token), vista, ahora))
+                            (_hash(token), lectura, ahora))
                 filas = cur.fetchall()
                 cur.execute("select * from esperas_de_la_sesion(%s, %s, %s)",
-                            (_hash(token), vista, ahora))
+                            (_hash(token), lectura, ahora))
                 esperas = cur.fetchall()
                 cur.execute("select * from terminadas_de_la_sesion(%s, %s, %s)",
-                            (_hash(token), vista, ahora))
+                            (_hash(token), lectura, ahora))
                 terminadas = cur.fetchall()
+            areas = area_de = None
+            if vista == "areas":
+                areas, area_de = _areas_del_espacio(cur, ws, filas + terminadas)
             pedidas = pasar_a = area_del_equipo = None
             if vista in ("tus", "pedidas"):
                 # Lo que pidió desde otra área o a Dirección (J4; decisiones D1b y D14).
@@ -503,6 +516,9 @@ def tareas(request: Request, vista: str = "tus"):
                 pasar_a = _a_quien_la_puede_pasar(cur, str(sesion["membership_id"]))
                 area_del_equipo = _area_del_equipo(cur, str(sesion["membership_id"]))
             calendario = Calendario.desde_base(cur, ws)
+        if vista == "areas":
+            return _vista_de_areas(areas, area_de, area, filas, esperas, terminadas, calendario,
+                                   ahora)
         if vista == "sector":
             # "Mi equipo" es la gente a su cargo, nunca sus propias tareas, que ya están en "Mis
             # tareas" (MA-3): ni las abiertas ni las terminadas.
@@ -527,6 +543,52 @@ def tareas(request: Request, vista: str = "tus"):
         return _json(vista_armada)
 
     return _con_la_base(leer)
+
+
+def _areas_del_espacio(cur, workspace_id: str, filas: list[dict[str, Any]]
+                       ) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Las áreas del espacio de la sesión, en un orden estable (por nombre, como en la carga),
+    con su referente; y el área de cada tarea que dio la base (por su id, no por su nombre)."""
+    cur.execute("""select a.id, a.nombre, i.nombre as referente
+                     from area a
+                     left join integrante i on i.membership_id = a.referente_membership_id
+                    where a.workspace_id = %s
+                    order by a.nombre, a.id""", (workspace_id,))
+    areas = [{"id": str(f["id"]), "nombre": f["nombre"], "referente": f["referente"]}
+             for f in cur.fetchall()]
+    ids = list({str(f["task_id"]) for f in filas})
+    area_de: dict[str, str] = {}
+    if ids:
+        cur.execute("""select id, area_id from task
+                        where workspace_id = %s and id = any(%s::uuid[])""", (workspace_id, ids))
+        area_de = {str(f["id"]): str(f["area_id"]) for f in cur.fetchall()}
+    return areas, area_de
+
+
+def _vista_de_areas(areas: list[dict[str, Any]], area_de: dict[str, str], area: str | None,
+                    filas: list[dict[str, Any]], esperas: list[dict[str, Any]],
+                    terminadas: list[dict[str, Any]], calendario, ahora: datetime) -> Response:
+    """"Áreas" (MA-6): sin `area`, una tarjeta por área con los números de su lista, contados
+    igual que los de arriba (`armar_vista`); con `area`, sus tareas, su semana y sus terminadas.
+    Un área que no es del espacio de la sesión no existe."""
+    def de(area_id: str, lista: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [f for f in lista if area_de.get(str(f["task_id"])) == area_id]
+
+    if not area:
+        tarjetas = []
+        for a in areas:
+            armada = armar_vista("areas", de(a["id"], filas), [], calendario, ahora)
+            tarjetas.append({**a, "panel": armada["panel"], "sin_empezar": armada["sin_empezar"],
+                             "activas": armada["activas"]})
+        return _json({"vista": "areas", "titulo": VISTAS["areas"], "areas": tarjetas})
+    elegida = next((a for a in areas if a["id"] == area), None)
+    if elegida is None:
+        return _json({"error": "area_no_existe"}, 404)
+    vista_armada = armar_vista("areas", de(area, filas), esperas, calendario, ahora,
+                               de(area, terminadas))
+    vista_armada["titulo"] = elegida["nombre"]
+    vista_armada["area"] = elegida
+    return _json(vista_armada)
 
 
 def armar_vista(vista: str, filas: list[dict[str, Any]], esperas: list[dict[str, Any]],

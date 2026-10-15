@@ -251,11 +251,11 @@ def test_un_enlace_anulado_por_otro_no_entra(web, conn, mundo):
 
 def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
     # Las pestañas (decisiones del usuario del 2026-10-14): Dirección no tiene sector; quien puede
-    # pedir tiene "Mis pedidos"; el sector de un referente y lo de todo el equipo, de Dirección,
-    # se llaman los dos "Mi área" (MA-4; el del referente, desde la prueba del usuario del
-    # 2026-10-14, noche).
+    # pedir tiene "Mis pedidos"; el sector de un referente se llama "Mi área" (MA-4, prueba del
+    # usuario del 2026-10-14, noche); Dirección ve "Mis tareas" y "Áreas", nunca "Mis pedidos"
+    # (MA-6).
     esperado = {"Sam North": ["tus"], "Taylor Quinn": ["tus", "sector", "pedidas"],
-                "Morgan Hale": ["tus", "equipo", "pedidas"]}
+                "Morgan Hale": ["tus", "areas"]}
     for nombre, vistas in esperado.items():
         r = _entrar(web, conn, mundo, nombre).get("/app/api/yo")
         assert r.status_code == 200
@@ -270,7 +270,7 @@ def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
             assert datos["area"] == cur.fetchone()["nombre"]
     titulos = {v["vista"]: v["titulo"]
                for v in _entrar(web, conn, mundo, "Morgan Hale").get("/app/api/yo").json()["vistas"]}
-    assert titulos == {"tus": "Mis tareas", "equipo": "Mi área", "pedidas": "Mis pedidos"}
+    assert titulos == {"tus": "Mis tareas", "areas": "Áreas"}
     titulos = {v["vista"]: v["titulo"]
                for v in _entrar(web, conn, mundo, "Taylor Quinn").get("/app/api/yo").json()["vistas"]}
     assert titulos == {"tus": "Mis tareas", "sector": "Mi área", "pedidas": "Mis pedidos"}
@@ -756,3 +756,89 @@ def test_sin_empezar_cuenta_las_asignadas_que_nadie_empezo(web, conn, mundo):
     datos = _vista(_entrar(web, conn, mundo, "Morgan Hale"), "equipo")
     assert datos["sin_empezar"] > 0, "el mundo de la prueba tiene alguna sin empezar"
 
+
+
+# --- MA-6: "Áreas", la vista de Dirección (decisión del usuario del 2026-10-14, noche) ----------
+
+def _areas(navegador, area: str | None = None):
+    return navegador.get("/app/api/tareas",
+                         params={"vista": "areas", **({"area": area} if area else {})})
+
+
+def _contar(tareas: list[dict]) -> dict:
+    """Lo que cuentan los números de arriba (`armar_vista`): las marcas que dio el servidor y las
+    asignadas sin empezar."""
+    panel = {"vencida": 0, "trabada": 0, "en_curso": 0, "entregada": 0}
+    for tarea in tareas:
+        for marca in tarea["marcas"]:
+            panel[marca] += 1
+    return {"panel": panel, "sin_empezar": sum(1 for t in tareas if t["estado"] == "asignada"),
+            "activas": len(tareas)}
+
+
+def test_areas_abre_con_una_tarjeta_por_area_y_los_numeros_de_siempre(web, conn, mundo):
+    norte = mundo["north-lab"]
+    with admin(conn) as cur:
+        cur.execute("""insert into area (workspace_id, slug, nombre)
+                       values (%s, 'archive', 'Archive') returning id""", (norte["id"],))
+        vacia = str(cur.fetchone()["id"])
+    conn.commit()
+    navegador = _entrar(web, conn, mundo, "Morgan Hale")
+    r = _areas(navegador)
+    assert r.status_code == 200, r.text
+    _tiene_las_cabeceras(r)
+    datos = r.json()
+    assert (datos["vista"], datos["titulo"]) == ("areas", "Áreas")
+    # Un orden estable: por nombre.
+    assert [a["nombre"] for a in datos["areas"]] == ["Archive", "Field Services", "Quality Guild"]
+    por_nombre = {a["nombre"]: a for a in datos["areas"]}
+    assert por_nombre["Field Services"]["referente"] == "Taylor Quinn 1"
+    assert por_nombre["Quality Guild"]["referente"] is None
+    assert por_nombre["Archive"]["id"] == vacia
+    assert {k: por_nombre["Archive"][k] for k in ("activas", "sin_empezar")} == {
+        "activas": 0, "sin_empezar": 0}
+    # Los números de cada área son los de su lista: las mismas reglas que los de arriba.
+    todo = _vista(navegador, "equipo")["tareas"]
+    for area in datos["areas"]:
+        suyas = [t for t in todo if t["area"] == area["nombre"]]
+        assert {k: area[k] for k in ("panel", "sin_empezar", "activas")} == _contar(suyas), \
+            area["nombre"]
+    assert sum(a["activas"] for a in datos["areas"]) == len(todo)
+
+
+def test_una_area_muestra_sus_tareas_con_la_lista_y_la_semana_de_todo_el_equipo(web, conn, mundo):
+    navegador = _entrar(web, conn, mundo, "Morgan Hale")
+    todo = _vista(navegador, "equipo")
+    campo = mundo["north-lab"]["areas"]["field"]
+    r = _areas(navegador, campo)
+    assert r.status_code == 200, r.text
+    datos = r.json()
+    assert datos["vista"] == "areas" and datos["titulo"] == "Field Services"
+    assert datos["area"] == {"id": campo, "nombre": "Field Services",
+                             "referente": "Taylor Quinn 1"}
+    esperadas = [t for t in todo["tareas"] if t["area"] == "Field Services"]
+    assert datos["tareas"] == esperadas
+    assert {k: datos[k] for k in ("panel", "sin_empezar", "activas")} == _contar(esperadas)
+    assert datos["semana"] and datos["hoy"] == todo["hoy"]
+    assert all(t["area"] == "Field Services" for t in datos["terminadas"])
+
+
+def test_areas_es_solo_de_direccion_y_de_su_espacio(web, conn, mundo):
+    oeste = mundo["west-studio"]["areas"]["field"]
+    r = _areas(_entrar(web, conn, mundo, "Morgan Hale"), oeste)
+    assert r.status_code == 404 and r.json() == {"error": "area_no_existe"}
+    r = _areas(_entrar(web, conn, mundo, "Morgan Hale"), "no-es-un-area")
+    assert r.status_code == 404
+    for nombre in ("Taylor Quinn", "Sam North"):
+        r = _areas(_entrar(web, conn, mundo, nombre))
+        assert r.status_code == 403 and r.json() == {"error": "vista_no_disponible"}
+    # En su otro espacio, sólo las áreas de ése.
+    r = _areas(_entrar(web, conn, mundo, "Morgan Hale", "west-studio"))
+    ids = {a["id"] for a in r.json()["areas"]}
+    assert ids == set(mundo["west-studio"]["areas"].values())
+
+
+def test_direccion_no_tiene_mis_pedidos(web, conn, mundo):
+    navegador = _entrar(web, conn, mundo, "Morgan Hale")
+    r = navegador.get("/app/api/tareas", params={"vista": "pedidas"})
+    assert r.status_code == 403 and r.json() == {"error": "vista_no_disponible"}

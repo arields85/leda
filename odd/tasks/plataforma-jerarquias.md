@@ -1274,6 +1274,13 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
           "Mi espacio" del menú, al lado de donde escribe. La bienvenida conserva su botón "Mi espacio"
           exactamente como hoy; los de un destino concreto ("Ver la tarea", "Cargar la tarea", "Crear el
           objetivo") siguen igual.
+        - **2026-10-14, noche (usuario, MA-6):** las pestañas de Dirección pasan a "Mis tareas" y "Áreas", sin
+          "Mis pedidos". "Áreas" abre con una tarjeta por área (nombre · referente, y debajo sólo los números
+          que tienen algo, con los colores de siempre; sin nada abierto, en gris); al tocarla, la lista y la
+          semana de esa área, con "‹ Áreas" para volver; la dirección guarda dónde está (`?vista=areas&area=`).
+          Los números los cuenta el servidor con las mismas reglas que los de arriba. El orden de las áreas
+          es por nombre: la base no guarda el orden del pack. El botón del chat a todo el equipo
+          (`?vista=equipo`) abre "Áreas". Referentes e integrantes, sin cambios.
       - **MA4. Cómo se ve:**
         - el aspecto oscuro de Leda, gris y con letra de máquina, sin tomar los colores de cada Telegram;
         - grande, pero dejando la barrita de Telegram con "Cerrar": se usa `expand()`, no la pantalla completa;

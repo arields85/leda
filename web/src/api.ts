@@ -3,7 +3,8 @@
 
 export type Marca = 'vencida' | 'trabada' | 'en_curso' | 'entregada';
 // "Mis pedidos" is a tab of its own (J4 phone test); the names come from the server (`VISTAS`).
-export type ViewId = 'tus' | 'sector' | 'equipo' | 'pedidas';
+// "Áreas" (`areas`, MA-6) is Dirección's: one card per area, then that area's tasks.
+export type ViewId = 'tus' | 'sector' | 'equipo' | 'areas' | 'pedidas';
 
 export interface ViewRef {
   vista: ViewId;
@@ -122,6 +123,30 @@ export interface ViewData {
   // Only in a referente's "Mi área" (MA-3): the referente's area (or areas). Not shown since
   // the area went top right (MA-4).
   area_del_equipo?: string | null;
+  // Only in one area of "Áreas" (MA-6): which area it is.
+  area?: AreaRef;
+}
+
+/** An area of the space, with its referente (MA-6). */
+export interface AreaRef {
+  id: string;
+  nombre: string;
+  referente: string | null;
+}
+
+/** One card of "Áreas": the area and the counters of its list, counted by the server with the
+ * same rules as the tiles (MA-6). */
+export interface AreaCard extends AreaRef {
+  panel: Record<Marca, number>;
+  sin_empezar: number;
+  activas: number;
+}
+
+/** "Áreas" before choosing one: a card per area of the space, in a stable order. */
+export interface AreasOverview {
+  vista: 'areas';
+  titulo: string;
+  areas: AreaCard[];
 }
 
 /** A task related to the one in the detail (it waits for it, or it waits for this one). Of one
@@ -201,8 +226,14 @@ export function fetchMe(signal?: AbortSignal): Promise<Me> {
   return getJson<Me>('/app/api/yo', signal);
 }
 
-export function fetchView(view: ViewId, signal?: AbortSignal): Promise<ViewData> {
-  return getJson<ViewData>(`/app/api/tareas?vista=${encodeURIComponent(view)}`, signal);
+export function fetchView(view: ViewId, signal?: AbortSignal, area?: string | null): Promise<ViewData> {
+  const inArea = area ? `&area=${encodeURIComponent(area)}` : '';
+  return getJson<ViewData>(`/app/api/tareas?vista=${encodeURIComponent(view)}${inArea}`, signal);
+}
+
+/** "Áreas" before choosing one (MA-6). */
+export function fetchAreas(signal?: AbortSignal): Promise<AreasOverview> {
+  return getJson<AreasOverview>('/app/api/tareas?vista=areas', signal);
 }
 
 /** One problem the server found with a pass or a reopening, in plain words. */

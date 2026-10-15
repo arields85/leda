@@ -1,10 +1,12 @@
 import { RotateCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  fetchAreas,
   fetchMe,
   fetchTaskDetail,
   fetchView,
   SessionClosedError,
+  type AreasOverview,
   type Me,
   type TaskDetail as Detail,
   type ViewData,
@@ -23,6 +25,7 @@ import { PassTask } from './components/PassTask';
 import { RequestedList } from './components/RequestedList';
 import { Header } from './components/Header';
 import { Notice } from './components/Notice';
+import { AreaOverview } from './components/AreaOverview';
 import { StatePanel } from './components/StatePanel';
 import { TaskCard } from './components/TaskCard';
 import { TaskDetail } from './components/TaskDetail';
@@ -39,6 +42,7 @@ const EMPTY: Record<ViewId, string> = {
   tus: 'No tenés tareas abiertas.',
   sector: 'No hay tareas abiertas en tu sector.',
   equipo: 'No hay tareas abiertas en el equipo.',
+  areas: 'No hay tareas abiertas en esta área.',
   pedidas: 'No pediste nada a otra área ni a Dirección.',
 };
 
@@ -58,14 +62,22 @@ function failure(error: unknown): { kind: 'closed' } | { kind: 'failed' } {
   return error instanceof SessionClosedError ? { kind: 'closed' } : { kind: 'failed' };
 }
 
-/** The view in the address (`/app/?vista=sector`), if this person has it; else the first. */
+/** The view in the address (`/app/?vista=sector`), if this person has it; else the first. The
+ * chat's button to the whole team (`?vista=equipo`) opens "Áreas" for whoever has it (MA-6). */
 function pickView(me: Me, wanted: string | null): ViewId | null {
   const allowed = me.vistas.map((v) => v.vista);
-  return allowed.find((v) => v === wanted) ?? allowed[0] ?? null;
+  const asked = wanted === 'equipo' && allowed.includes('areas') ? 'areas' : wanted;
+  return allowed.find((v) => v === asked) ?? allowed[0] ?? null;
 }
 
 function viewInAddress(): string | null {
   return new URLSearchParams(window.location.search).get('vista');
+}
+
+/** The area of "Áreas" in the address (`?vista=areas&area=<id>`), if any (MA-6). */
+function areaInAddress(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('vista') === 'areas' ? params.get('area') : null;
 }
 
 function Retry({ onClick }: { onClick: () => void }) {
@@ -101,6 +113,9 @@ export function App() {
   const [me, setMe] = useState<Load<Me>>({ kind: 'loading' });
   const [view, setView] = useState<ViewId | null>(null);
   const [tasks, setTasks] = useState<Load<ViewData>>({ kind: 'loading' });
+  // "Áreas" (MA-6): the area chosen, or none (the overview, one card per area).
+  const [area, setArea] = useState<string | null>(areaInAddress);
+  const [overview, setOverview] = useState<Load<AreasOverview>>({ kind: 'loading' });
   // Dirección creating an objective (ADR 0023, decision 1), or Dirección or a referente loading a
   // task (decision 3; J4): the form takes the page's place.
   const [creating, setCreating] = useState<'tarea' | 'objetivo' | null>(null);
@@ -137,23 +152,50 @@ export function App() {
   useEffect(() => {
     if (view === null) return;
     const request = new AbortController();
-    setTasks({ kind: 'loading' });
-    fetchView(view, request.signal)
-      .then((data) => setTasks({ kind: 'ready', data }))
-      .catch((error: unknown) => {
-        if (!request.signal.aborted) setTasks(failure(error));
-      });
+    if (view === 'areas' && area === null) {
+      setOverview({ kind: 'loading' });
+      fetchAreas(request.signal)
+        .then((data) => setOverview({ kind: 'ready', data }))
+        .catch((error: unknown) => {
+          if (!request.signal.aborted) setOverview(failure(error));
+        });
+    } else {
+      setTasks({ kind: 'loading' });
+      fetchView(view, request.signal, view === 'areas' ? area : null)
+        .then((data) => setTasks({ kind: 'ready', data }))
+        .catch((error: unknown) => {
+          if (!request.signal.aborted) setTasks(failure(error));
+        });
+    }
     return () => request.abort();
-  }, [view, attempt]);
+  }, [view, area, attempt]);
+
+  // The browser's back and forward buttons (MA-6): the page follows the address.
+  useEffect(() => {
+    if (me.kind !== 'ready') return;
+    const data = me.data;
+    function follow() {
+      setDetail(null);
+      setView(pickView(data, viewInAddress()));
+      setArea(areaInAddress());
+    }
+    window.addEventListener('popstate', follow);
+    return () => window.removeEventListener('popstate', follow);
+  }, [me]);
 
   // Telegram's "Atrás" closes the form or the task's detail the page is showing (ADR 0024,
-  // decision 10; MA-3): the same as their "> volver", never closing the Mini App.
+  // decision 10; MA-3), or leaves an area for the overview of "Áreas" (MA-6): the same as their
+  // "> volver" or "‹ Áreas", never closing the Mini App.
   useEffect(
-    () => bindBackButton(telegramWebApp(), creating !== null || detail !== null, () => {
-      setDetail(null);
-      setCreating(null);
+    () => bindBackButton(telegramWebApp(), creating !== null || detail !== null || area !== null, () => {
+      if (creating !== null || detail !== null) {
+        setDetail(null);
+        setCreating(null);
+      } else {
+        backToAreas();
+      }
     }),
-    [creating, detail],
+    [creating, detail, area],
   );
 
   /** A task's detail inside the app (MA-3): the server says what this person may see of it. */
@@ -174,6 +216,7 @@ export function App() {
 
   function choose(next: ViewId) {
     setDetail(null);
+    setArea(null);
     setView(next);
     try {
       window.history.replaceState(null, '', `?vista=${next}`);
@@ -182,9 +225,36 @@ export function App() {
     }
   }
 
+  /** An area of "Áreas" (MA-6): a new entry in the browser's history, so "back" returns. */
+  function enterArea(id: string) {
+    setDetail(null);
+    setArea(id);
+    try {
+      window.history.pushState({ ledaArea: true }, '', `?vista=areas&area=${encodeURIComponent(id)}`);
+    } catch {
+      // The address is a convenience; the area already opened.
+    }
+  }
+
+  /** "‹ Áreas": back to the overview, the browser's own way when the area was opened here. */
+  function backToAreas() {
+    setDetail(null);
+    setArea(null);
+    try {
+      const state = window.history.state as { ledaArea?: boolean } | null;
+      if (state?.ledaArea) window.history.back();
+      else window.history.replaceState(null, '', '?vista=areas');
+    } catch {
+      // The address is a convenience; the overview already shows.
+    }
+  }
+
   const retry = () => setAttempt((n) => n + 1);
   const person = me.kind === 'ready' ? me.data : null;
-  const ready = tasks.kind === 'ready' ? tasks.data : null;
+  // "Áreas" before choosing one (MA-6): the overview takes the list's place.
+  const inOverview = view === 'areas' && area === null;
+  const listing: Load<unknown> = inOverview ? overview : tasks;
+  const ready = !inOverview && tasks.kind === 'ready' ? tasks.data : null;
   const title = creating
     ? creating === 'tarea'
       ? 'Nueva tarea'
@@ -198,7 +268,7 @@ export function App() {
   // tabs, the counters and the week.
   let fixed = null;
   let body;
-  if (me.kind === 'closed' || tasks.kind === 'closed') {
+  if (me.kind === 'closed' || listing.kind === 'closed') {
     body = <SessionClosed onIn={enter} />;
   } else if (me.kind === 'failed') {
     body = <Failed onRetry={retry} />;
@@ -238,6 +308,17 @@ export function App() {
     fixed = (
       <>
         <ViewSwitch views={person.vistas} current={view} onChange={choose} />
+        {view === 'areas' && area !== null && (
+          <div>
+            <button
+              type="button"
+              onClick={backToAreas}
+              className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-dim"
+            >
+              ‹ Áreas
+            </button>
+          </div>
+        )}
         {ready && ready.vista !== 'pedidas' && (
           <>
             <StatePanel panel={ready.panel} notStarted={ready.sin_empezar} />
@@ -251,14 +332,17 @@ export function App() {
     );
     body = (
       <>
-        {tasks.kind === 'loading' && <Notice title="Cargando…" />}
+        {listing.kind === 'loading' && <Notice title="Cargando…" />}
         {opening && <Notice title="Abriendo la tarea…" />}
         {unopened && (
           <Notice title="No se pudo abrir esa tarea.">
             <p className="m-0">Puede que ya no la veas, o que no haya conexión. Probá de nuevo en un rato.</p>
           </Notice>
         )}
-        {tasks.kind === 'failed' && <Failed onRetry={retry} />}
+        {listing.kind === 'failed' && <Failed onRetry={retry} />}
+        {inOverview && overview.kind === 'ready' && (
+          <AreaOverview areas={overview.data.areas} onOpen={enterArea} />
+        )}
         {ready && ready.vista === 'pedidas' && (
           ready.pedidas && ready.pedidas.length > 0 ? (
             <RequestedList items={ready.pedidas} onChanged={retry} onClosed={() => setMe({ kind: 'closed' })} />
@@ -289,7 +373,7 @@ export function App() {
     );
   }
 
-  const open = person !== null && me.kind === 'ready' && tasks.kind !== 'closed';
+  const open = person !== null && me.kind === 'ready' && listing.kind !== 'closed';
   // One screen, no page scroll (MA-3): the header, the tabs, the counters and the week fixed at
   // the top, "> Nueva tarea" and "> Nuevo objetivo" fixed at the bottom, and only the middle (the
   // cards, or the detail or the form) scrolls. Its height leaves out the safe areas the root
