@@ -8,6 +8,7 @@ tal. Cada prueba de acá abajo corresponde a una fila de la tabla de amenazas de
 from __future__ import annotations
 
 import contextlib
+import re
 from datetime import datetime, timedelta, timezone
 
 import psycopg
@@ -249,7 +250,10 @@ def test_la_pantalla_dice_lo_que_todavia_no_puede_medir(
     assert "no significa cero" in r.text
     assert "Dependencias entre tareas" in r.text
     # Y lo vacío de verdad se dice como buena noticia, no como cifra.
-    assert "No hay bloqueos abiertos" in r.text
+    assert "Ninguna tarea está esperando algo para seguir." in r.text
+    # What is missing to keep going, never "bloqueos" (user, 2026-10-15).
+    assert "Esperando algo para seguir" in r.text
+    assert not re.search(r"bloque[oa]|(?<![a-z])(?:des)?trab(?!aj)", r.text.lower())
 
 
 # ---------------------------------------------------------------------------

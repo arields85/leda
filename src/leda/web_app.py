@@ -1017,9 +1017,9 @@ TEXTOS_DE_LA_CARGA = {
         "Quien la decidió tiene que ser integrante activo de este espacio.",
     # La espera (migración 0067; ADR 0023, decisión 2).
     ("espera", "no_existe"): "La tarea que espera no está en este espacio.",
-    ("espera", "esta_cerrada"): "La tarea que espera ya está cerrada: no puede trabar a otra.",
+    ("espera", "esta_cerrada"): "La tarea que espera ya está cerrada: otra no puede quedar esperándola.",
     ("espera", "no_esta_comprometida"):
-        "La tarea que espera todavía no está comprometida: no puede trabar a otra.",
+        "La tarea que espera todavía no está comprometida: otra no puede quedar esperándola.",
     ("espera", "haria_un_ciclo"):
         "Esa espera cerraría un círculo: esa tarea ya espera, directa o indirectamente, a esta.",
     ("clave", "falta"): "No se pudo identificar este envío. Recargá la página y probá de nuevo.",

@@ -169,3 +169,12 @@ def test_la_bienvenida_sin_tareas_abiertas_no_las_nombra():
     texto = bienvenida(_CursorDeLaBienvenida(0), "ws", "Marcos Tarquini")
 
     assert "tarea" not in texto and texto.startswith("Listo, Marcos.")
+
+
+def test_la_bienvenida_dice_lo_que_falta_para_seguir_no_trabada():
+    """User decision (2026-10-15): Leda says what is missing to keep going, never "trabada" or
+    "te está trabando"."""
+    texto = bienvenida(_CursorDeLaBienvenida(0), "ws", "Marcos Tarquini")
+
+    assert "si te falta algo para seguir" in texto
+    assert "trab" not in texto.replace("trabaj", "")

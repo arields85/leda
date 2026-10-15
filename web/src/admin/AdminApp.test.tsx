@@ -551,7 +551,7 @@ describe('AdminApp', () => {
         status: 422,
         body: {
           errores: [
-            { campo: 'espera', motivo: 'esta_cerrada', texto: 'La tarea que espera ya está cerrada: no puede trabar a otra.' },
+            { campo: 'espera', motivo: 'esta_cerrada', texto: 'La tarea que espera ya está cerrada: otra no puede quedar esperándola.' },
           ],
         },
       },

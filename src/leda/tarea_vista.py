@@ -113,11 +113,12 @@ def _hecho(h: dict[str, Any], zona: ZoneInfo) -> str:
         if h.get("comentario"):
             texto += f": «{_e(h['comentario'])}»"
     elif que == "bloqueo":
-        texto = f"Se trabó: {_e(h.get('causa'))}"
+        # What was missing and that it could go on, never "Se trabó" (user, 2026-10-15).
+        texto = f"Quedó esperando: {_e(h.get('causa'))}"
         if h.get("quien"):
             texto += f" (lo dijo {quien})"
         if h.get("resuelto_en"):
-            texto += f". Se destrabó el {_e(_cuando(h['resuelto_en'], zona))}"
+            texto += f". Ya pudo seguir el {_e(_cuando(h['resuelto_en'], zona))}"
     elif que == "prevision":
         verbo = "corrigió el día en que la termina" if h.get("es_correccion") \
             else "dijo que la termina"

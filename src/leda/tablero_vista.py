@@ -31,8 +31,8 @@ CARENCIAS = (
      "el modelo las contempla y todavía nada las crea"),
     ("Prioridad",
      "el campo existe y todavía nada lo completa"),
-    ("Cierre de bloqueos",
-     "un bloqueo se abre y por ahora no se puede marcar resuelto"),
+    ("Lo que le falta a una tarea para seguir",
+     "se anota y por ahora no se puede marcar que ya está"),
 )
 
 _ESTILO = """
@@ -106,11 +106,11 @@ def pagina(datos: dict[str, list[dict]], *, espacio: str, persona: str) -> str:
         "Ninguna tarea está vencida."))
 
     partes.append(_seccion(
-        "Bloqueos abiertos",
+        "Esperando algo para seguir",
         [_fila(f'{_e(b["titulo"])}<br><small>{_e(b["causa"])}</small>',
                f'{b["dias"]} d')
          for b in datos["bloqueos"]],
-        "No hay bloqueos abiertos."))
+        "Ninguna tarea está esperando algo para seguir."))
 
     partes.append(_seccion(
         "Esperando aprobación",

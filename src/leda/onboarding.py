@@ -156,7 +156,7 @@ def bienvenida(cur: psycopg.Cursor, workspace_id: str, nombre: str) -> str:
     texto = (f"Listo, {nombre.split()[0]}. Soy {visible} y desde acá te voy a "
              f"hacer el seguimiento de {equipo}.\n\n"
              f"Te voy a escribir un par de veces por semana para ver cómo "
-             f"venís y si algo te está trabando. Si un mensaje no necesita "
+             f"venís y si te falta algo para seguir. Si un mensaje no necesita "
              f"respuesta te lo aclaro.")
     if abiertas:
         # Singular or plural as a person says it, never "tarea(s) abierta(s)".
