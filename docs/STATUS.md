@@ -270,7 +270,9 @@ Las cifras de pruebas miden el código: **una suite en verde no es evidencia de 
 1. **El outbox está atado a un transporte:** `message_outbox` tiene `chat_id` y `telegram_message_id` y no tiene
    canal; bloquea toda superficie no conversacional.
 2. **Un límite de transporte decide validez de negocio:** `telegram_utf16_units` (`salida.py`).
-3. **No hay grafo de transiciones de estado:** `actualizar_estado` acepta cualquier destino del enumerado.
+3. **El grafo de transiciones de estado, en parte:** desde la `0079` la base exige lo de la mecánica §3 (el
+   evento sale del estado vigente, de `cancelada` no se sale, de `bloqueada` se vuelve al estado previo o se
+   cancela); los demás saltos de `actualizar_estado` esperan las decisiones del usuario (quién cancela, objetivos).
 4. **`confirmar_borrador_tarea` fija el espacio con el valor que recibe:** acotada a `leda_gateway`, pero es el
    patrón que la frontera rechaza.
 5. **La IA por la suscripción del usuario** sirve sólo para uso personal. Depende de un servicio no oficial de

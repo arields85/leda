@@ -1615,6 +1615,27 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
     `fichas.py` importa `leda.menu_del_bot`, desde `98c5758f`, MA-5); `pytest` de `test_onboarding`,
     `test_tarea_vista`, `test_pagina_de_la_tarea`, `test_carga_del_equipo` y `test_api_de_la_plataforma`, en
     verde; `correr --ia guionada --veces 1` (en seco), 54 de 54 bien.
+- [x] **Grafo de transiciones (parte 1, lo que dice la mecánica)** (2026-10-15, escritor delegado; prueba
+  primero). Sólo lo que la mecánica §3 dice explícitamente; lo demás espera las preguntas de "Para decidir al
+  despertar" (quién cancela, reabrir, deshacer el empecé, los objetivos) y no se restringió nada de eso.
+  - `36c6120a`: la migración `0079_el_grafo_de_transiciones` (con su rollback y la misma parte en
+    `esquema.sql`) agrega dos disparadores `before insert`, `security definer` de `leda_owner`, sobre
+    `task_state_event` y `objective_state_event`: el evento sale del estado vigente (la fila tomada
+    `for update`; sin estado de partida, sólo el que la crea y si todavía no tiene ninguno), de `cancelada` y de
+    `cancelado` no se sale, y de `bloqueada` se vuelve al estado previo (`estado_previo_a_bloqueo`) o se
+    cancela. El error es `transicion_invalida: …`; una tarea de otro espacio sigue fallando antes, igual que un
+    id inventado. Nada en `src/` anotaba un estado de partida viejo.
+  - Pruebas: `tests/garantias/test_grafo_de_estados.py` (13; rojo antes de la `0079`: 9 fallaban, 4 caminos
+    válidos pasaban). Dos pruebas viejas se reescribieron por pasos válidos: `test_cierre_con_aprobacion.py`
+    creaba la tarea sin su evento de alta, y `test_bloqueos.py` sacaba una tarea de `bloqueada` a `en_curso`
+    sin haber arrancado (ahora vuelve a `asignada`, su estado previo). `db/pruebas.sql`: un `insert` de tres
+    eventos pasó a tres sentencias (la proyección se aplica al final de cada una).
+  - Evidencia (2026-10-15): `pytest -q tests/garantias/test_grafo_de_estados.py`, 13 passed; `pytest -q tests/garantias`, 1131
+    passed, 1 failed y 5 errores, todos por la regla nueva (`test_cierre_con_aprobacion.py`, reescrita: 5 passed)
+    o arrastrados por ellos (`test_frontera.py`, que corre las garantías en otro proceso: repetida, 4 passed);
+    `pytest -q tests/motor`, 1493 passed; `pytest -q tests/conversaciones`, 231 passed; el resto de
+    `tests/*.py`, 824 passed y 1 failed (`test_bloqueos.py`, reescrita: 14 passed); `correr --ia guionada
+    --veces 1` (en seco), 54 de 54 bien. `db/pruebas.sql` no se corrió. Revisión RDD: pendiente.
 
 ## De qué se parte en cada porción (explorador de sólo lectura, 2026-10-13)
 
