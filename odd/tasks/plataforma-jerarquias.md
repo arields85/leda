@@ -1864,7 +1864,13 @@ ejemplo y recomendación, y sigue con otra cosa.
   3. **"martin de IT" no se reconoce como Martín Forte** (conversación 05): Leda pregunta "¿quién es martin de
      IT?". *Recomendación:* que el reconocimiento de nombres ignore el área dicha al lado ("de IT", "el de
      OT"), y si el área no coincide, que pregunte.
-- **J5: lo que las decisiones no alcanzan a fijar** (un planificador armó la J5 en porciones el 15/10 a la
+- **J5: lo que las decisiones no alcanzan a fijar** — **CONTESTADO (usuario, 2026-10-15, de mañana):** las
+  respuestas están en el [ADR 0025](../../docs/decisions/0025-mas-tiempo-y-cambio-de-fecha.md), puntos 12 a 23, y el
+  ADR quedó aceptado (`d5ddedd6`). Cambiaron respecto de las recomendaciones el 2 ("¿cómo venís?" sin botones;
+  los recordatorios desde el vencimiento con «> Ya la terminé» primero), el 3 (la tarea que espera conserva su
+  ventana de días hábiles), el 4 (al aceptar, la cadena se corre sola como prevista) y el 5 (el informe muestra
+  también la descripción). El 10: cambiar directo la fecha de un objetivo, a `ROADMAP.md` (`35d9a8cb`). Lo de
+  abajo es la pregunta tal como se hizo. (un planificador armó la J5 en porciones el 15/10 a la
   noche). Ojo, un cambio grande: hoy, si Nahuel dice "lo termino el 28", Leda lo anota enseguida y los
   recordatorios pasan al 28 (la conversación 02 lo prueba). Con la J5-D3 eso deja de ser así: queda como pedido
   para Marcos y sigue valiendo el 21. Esta noche se construye sólo la base que no depende de estas preguntas (el
@@ -1899,7 +1905,17 @@ ejemplo y recomendación, y sigue con otra cosa.
       información.
   12. **Cada cuánto se le recuerda a quien decide.** Hoy una pregunta sin contestar se repite cada día los
       primeros tres y después día por medio. *Recomendación:* cada día hábil, como dice la J5-D7.
-- **J6: lo que las decisiones no alcanzan a fijar** (un planificador armó la J6 en porciones el 15/10 a la
+- **J6: lo que las decisiones no alcanzan a fijar** — **CONTESTADO (usuario, 2026-10-15, de mañana):**
+  1. la subtarea la aprueba el revisor elegido a mano; 2. un referente o Dirección agrega una subtarea a una
+  tarea suya directo, sin propuesta (la regla de la J2: "con subtareas se cumple lo mismo"); 3. a otra área
+  nunca se asigna directo: es un pedido a su referente, que elige a quién (la J4, "ya lo habíamos resuelto");
+  4. si la tarea madre se cierra, la propuesta se retira sola, sin mensaje; 5. una corrección antes de decidir
+  no manda otro aviso (la J6-D4, "ya lo habíamos resuelto"); 6. el referente de un objetivo propuesto es quien
+  lo propuso, y Dirección lo puede cambiar al aprobar; 7. sale de la J6-D5 y la J6-D7 (no existe para quien
+  la va a hacer hasta que se aprueba; quien la cargó la ve "esperando a Ismael"); 8. la administración ve las
+  propuestas y no las decide; 9. un recordatorio por día hábil (como la J5). Lección para el agente: varias de
+  estas preguntas ya estaban decididas; antes de preguntar, cruzarlas con las decisiones J2 a J6. Lo de abajo
+  es la pregunta tal como se hizo. (un planificador armó la J6 en porciones el 15/10 a la
   noche; plan en la J6). La propuesta vive en una tabla propia y la tarea nace recién al aprobarla (la base no
   deja corregir una tarea ya cargada, y una tarea "propuesta" recibiría recordatorios). De a una:
   1. **Quién decide una subtarea de una tarea con revisor elegido a mano.** Ejemplo: Ismael le carga una tarea
