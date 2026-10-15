@@ -84,7 +84,15 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 - **El detalle de un área** (extensión de «Mis tareas», sin sorteo): «‹» y el nombre del área, «referente X»
   debajo; el resumen grande con la regla de urgencia aplicada al área; semana; contadores del área; filas tipo
   agenda con «de X» y, si está vencida, la fecha y la palabra en coral. Muestra:
-  `.impeccable/mocks/decision/r8-sobrio-area-it.html` (la baldosa de IT del mosaico lleva ahí). Falta «Equipo».
+  `.impeccable/mocks/decision/r8-sobrio-area-it.html` (la baldosa de IT del mosaico lleva ahí).
+- **«Equipo» (Dirección), r8** (2026-10-15, noche, página de decisión, sorteo `26e02e2f`): elegida «lo que no
+  cuadra, primero», con lo que el usuario tomó de «personas · áreas · cambios»: arriba, en grande, lo que no
+  cuadra (y la buena noticia si todo cuadra); debajo, una de tres vistas: **personas** (nombre, área, rol, quién lo
+  aprueba; «sin conectar» con «copiar el enlace»; «ya no están» con «volver a sumar»), **áreas** (referente o
+  «sin referente: lo decide Dirección», tareas abiertas, su gente, «renombrar» y «archivar») y **cambios** (tipo,
+  fecha y hora, quién, antes → después). El selector de vistas va **encima de la barra de pestañas**, cerca del
+  pulgar (pedido del usuario), sólo con palabras y la vista activa subrayada debajo. Muestra:
+  `.impeccable/mocks/decision/r8-sobrio-equipo.html` (`?vista=areas|cambios`).
 
 ## Pendiente
 
