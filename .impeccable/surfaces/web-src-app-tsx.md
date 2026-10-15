@@ -109,9 +109,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   por pedido» y «por a quién» (`pedidos-*.html`).
 
 - **Una tarea abierta, r8** (2026-10-15, noche, sorteo `061c4247`; el usuario eligió por chat tras cerrar la página):
-  la **línea de tiempo** (se cargó, la empezó, lo entregado, hoy en durazno), y en el último hito, con lo que tomó de
-  «lo que falta, primero»: el vencimiento con **lo que falta para entregarla** (cada pieza con «falta») y quién la
-  revisa; debajo, «qué tiene que cumplir». Muestra: `.impeccable/mocks/decision/r8-sobrio-tarea.html`; bocetos
+  la **línea de tiempo** (se cargó, la empezó, lo entregado, hoy en durazno, y el vencimiento con quién la revisa);
+  debajo, fuera de la línea (lo que falta no es un hito), una sola sección **«para entregarla»** que fusiona el
+  criterio y lo que pide (tomado de «lo que falta, primero»): la meta en una línea y cada pieza con «está» o «falta». Muestra: `.impeccable/mocks/decision/r8-sobrio-tarea.html`; bocetos
   `tarea-*.html`. **Para construirla:** la historia de la tarea hoy no viaja a la Mini App (`detalle_en_json`,
   `web_app.py`, sólo la tiene la página HTML de la tarea): hay que sumarla al servidor.
 
