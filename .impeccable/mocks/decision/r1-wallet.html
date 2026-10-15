@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas · Leda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Spline+Sans+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#14233f; --navy-2:#24365c; --ground:#eef0f4; --stock:#ffffff;
+  --ink:#16213a; --muted:#4a5878; --on-navy:#c3cce0; --hair:#d3d8e3; --perf:#9aa3b5;
+  --carbon:#5b3a8c; --cancel:#c8102e;
+  --sans:"Archivo",system-ui,sans-serif; --mono:"Spline Sans Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden}
+body{background:var(--ground);color:var(--ink);font:400 15px/1.35 var(--sans);display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+::selection{background:var(--carbon);color:#fff}
+:focus-visible{outline:2px solid var(--carbon);outline-offset:2px}
+
+/* Shell */
+.top{background:var(--navy);color:#fff;padding:18px 16px 14px;display:grid;grid-template-columns:1fr auto;align-items:end;row-gap:2px}
+.top h1{font:750 26px/1.1 var(--sans);font-stretch:88%;letter-spacing:-.01em}
+.who{grid-column:1;color:var(--on-navy);font-size:14px}
+.day{grid-column:2;grid-row:1/3;align-self:end;color:#fff;font:500 13px/1 var(--mono);font-variant-numeric:tabular-nums;border:1px solid var(--navy-2);padding:6px 8px;border-radius:3px}
+
+.list{flex:1;overflow-y:auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin;scrollbar-color:var(--perf) transparent}
+
+/* Coupon */
+.cpn{display:block;background:var(--stock);color:inherit;text-decoration:none;border-radius:6px;overflow:hidden;
+  box-shadow:0 1px 2px rgba(20,35,63,.10),0 6px 14px -8px rgba(20,35,63,.28);transition:box-shadow .18s ease-out}
+.cpn:hover{box-shadow:0 1px 2px rgba(20,35,63,.14),0 10px 20px -10px rgba(20,35,63,.38)}
+.cpn:active{box-shadow:0 1px 1px rgba(20,35,63,.18)}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px 9px}
+.head span{font:700 15px/1.15 var(--sans);font-stretch:82%;text-transform:uppercase;letter-spacing:.06em}
+.head svg{flex:none;width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.75;opacity:.6}
+
+/* Stub: hairline-ruled field boxes behind a perforation */
+.stub{position:relative;display:grid;grid-template-columns:104px 1fr 96px;gap:1px;background:var(--hair);
+  background-clip:padding-box;border-top:1.5px dashed var(--perf)}
+.stub::before,.stub::after{content:"";position:absolute;top:-8px;width:14px;height:14px;border-radius:50%;background:var(--ground)}
+.stub::before{left:-7px}.stub::after{right:-7px}
+.f{background:var(--stock);padding:6px 10px 8px;min-width:0}
+.f .k{display:block;font:600 11px/1 var(--sans);font-stretch:90%;letter-spacing:.1em;color:var(--muted);margin-bottom:5px}
+.f .v{font-size:15px;font-weight:500}
+.c23{grid-column:2/4}.c12{grid-column:1/3}.c13{grid-column:1/4}
+
+/* Signature: carbon-copy dates struck into fixed fields */
+.carbon{font:600 15px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--carbon);display:inline-block;
+  transform:translate(1px,-1px) rotate(-.6deg);text-shadow:.5px .4px .6px rgba(91,58,140,.45)}
+
+/* States, in words */
+.st{font-weight:600}
+.wait .head{background:var(--navy);color:#fff}
+.wait .st{color:var(--navy);display:inline-flex;align-items:center;gap:6px}
+.wait .st::before{content:"";width:8px;height:8px;background:var(--navy);border-radius:1px}
+.note{font:500 13px/1.2 var(--mono);color:var(--muted);padding:7px 10px 8px}
+
+/* Done coupon: stays in the stack, stamped */
+.done{position:relative}
+.done .head span{color:var(--muted)}
+.stamp{position:absolute;right:18px;bottom:12px;display:grid;justify-items:center;gap:2px;padding:5px 10px 6px;
+  border:2px solid var(--carbon);border-radius:4px;color:var(--carbon);transform:rotate(-7deg);opacity:.88;mix-blend-mode:multiply;pointer-events:none}
+.stamp b{font:800 16px/1 var(--sans);font-stretch:80%;letter-spacing:.14em}
+.stamp i{font:600 11px/1 var(--mono);font-style:normal;font-variant-numeric:tabular-nums}
+
+/* Action bar */
+.bar{padding:10px 16px 18px;background:var(--ground);border-top:1px solid var(--hair)}
+.cta{display:flex;align-items:center;justify-content:center;width:100%;height:50px;border:0;border-radius:6px;
+  background:var(--navy);color:#fff;font:650 16px/1 var(--sans);letter-spacing:.01em;cursor:pointer;transition:background .15s ease-out}
+.cta:hover{background:var(--navy-2)}
+.cta:active{background:#0d182d}
+.cta:disabled{background:var(--perf);cursor:not-allowed}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Mis tareas</h1>
+  <p class="who">Nahuel · Tableros</p>
+  <time class="day" datetime="2026-10-15">jueves 15/10</time>
+</header>
+
+<main class="list" aria-label="Tus tareas, por vencimiento">
+  <a class="cpn wait" href="#pasar-los-cables">
+    <div class="head"><span>Pasar los cables</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></div>
+    <div class="stub">
+      <div class="f"><span class="k">VENCE</span><time class="carbon" datetime="2026-10-16">vie 16/10</time></div>
+      <div class="f c23"><span class="k">ESTADO</span><span class="v st">esperando</span></div>
+      <div class="f c12"><span class="k">FALTA</span><span class="v">la IP del servidor de Corelabs</span></div>
+      <div class="f"><span class="k">SE OCUPA</span><span class="v">Ariel</span></div>
+    </div>
+  </a>
+
+  <a class="cpn" href="#armar-el-tablero">
+    <div class="head"><span>Armar el tablero</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></div>
+    <div class="stub">
+      <div class="f"><span class="k">VENCE</span><time class="carbon" datetime="2026-10-20">mar 20/10</time></div>
+      <div class="f c23"><span class="k">ESTADO</span><span class="v st">en curso</span></div>
+    </div>
+  </a>
+
+  <a class="cpn" href="#probar-el-plc">
+    <div class="head"><span>Probar el PLC</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></div>
+    <div class="stub">
+      <div class="f"><span class="k">VENCE</span><time class="carbon" datetime="2026-10-28">mié 28/10</time></div>
+      <div class="f c23"><span class="k">ESTADO</span><span class="v st">sin empezar</span></div>
+      <div class="f c13 note">└─ te la pidió Marcos Tarquini</div>
+    </div>
+  </a>
+
+  <a class="cpn" href="#revisar-el-plano">
+    <div class="head"><span>Revisar el plano</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></div>
+    <div class="stub">
+      <div class="f c12"><span class="k">ESTADO</span><span class="v st">en revisión</span></div>
+      <div class="f"><span class="k">LA REVISA</span><span class="v">Marcos</span></div>
+    </div>
+  </a>
+
+  <a class="cpn done" href="#medir-la-tierra">
+    <div class="head"><span>Medir la tierra</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></div>
+    <div class="stub">
+      <div class="f c13"><span class="k">ESTADO</span><span class="v st">terminada</span></div>
+    </div>
+    <div class="stamp" aria-hidden="true"><b>TERMINADA</b><i>lun 12/10</i></div>
+  </a>
+</main>
+
+<footer class="bar">
+  <button class="cta" type="button">&gt; Contarle algo a Leda</button>
+</footer>
+</body>
+</html>

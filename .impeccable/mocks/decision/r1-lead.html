@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#f3e9f7; --ink:#2a2440; --ink-2:#564b6e; --keyline:#ffffff;
+  --area:#7b4bb0;
+  --espera:#14a89c; --espera-deep:#0b6f68;
+  --curso:#ff6b4a; --curso-tint:#ffe2da;
+  --revision:#6e9cff; --revision-tint:#dde7fd;
+  --sin:#d9c7ea; --sin-tint:#ebdff4;
+  --hecha:#4a4752; --hecha-tint:#e4e3e8;
+  --r:24px; --gap:10px;
+}
+*{box-sizing:border-box}
+html,body{width:390px;height:844px;margin:0;overflow:hidden}
+body{
+  display:flex;flex-direction:column;padding:22px 16px 16px;
+  background:var(--ground);color:var(--ink);
+  font:400 14px/1.4 'Figtree',system-ui,sans-serif;
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--curso);color:var(--ink)}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:3px solid var(--area);outline-offset:3px}
+
+/* Encabezado */
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{margin:0;font:800 32px/1 'Baloo 2',sans-serif;letter-spacing:-0.01em}
+.who{display:flex;align-items:center;gap:7px;margin-top:6px;font-weight:600;color:var(--ink-2)}
+.who svg{flex:none}
+.day{font:600 14px/1 'Figtree',sans-serif;color:var(--ink-2);padding-bottom:4px}
+
+/* El elenco: cada tarea es una celda redondeada con su cinta de estado */
+.cast{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);margin-top:18px}
+.cell{
+  display:flex;flex-direction:column;overflow:hidden;
+  border:3px solid var(--keyline);border-radius:var(--r);
+  background:var(--tint);transition:transform .18s cubic-bezier(.16,1,.3,1);
+}
+.cell:hover{transform:translateY(-2px)}
+.cell:active{transform:translateY(0)}
+.wide{grid-column:span 2}
+.rib{
+  padding:4px 14px 3px;background:var(--rib);color:var(--rib-ink,var(--ink));
+  font:700 13px/1.25 'Baloo 2',sans-serif;letter-spacing:.01em;
+}
+.body{display:flex;flex-direction:column;gap:4px;padding:10px 14px 13px}
+.plate{margin:0;font:700 19px/1.1 'Baloo 2',sans-serif;text-wrap:balance}
+.bday{display:flex;align-items:baseline;gap:6px;color:var(--ink-2)}
+.bday b{font:700 15px/1.2 'Figtree',sans-serif;color:var(--ink)}
+.note{margin:2px 0 0;color:var(--ink-2);font-size:13.5px;line-height:1.35}
+.note strong{color:var(--ink);font-weight:600}
+.asked{margin:2px 0 0;padding-left:3ch;text-indent:-3ch;font-size:12.5px;color:var(--ink-2)}
+
+/* Estados */
+.espera{--tint:var(--espera);--rib:var(--espera-deep);--rib-ink:#fff}
+.curso{--tint:var(--curso-tint);--rib:var(--curso)}
+.sin{--tint:var(--sin-tint);--rib:var(--sin)}
+.revision{--tint:var(--revision-tint);--rib:var(--revision)}
+
+/* Urgencia en una sola escala: cuanto más cerca vence, más pesa la celda */
+.u1 .body{padding:12px 16px 16px;gap:6px}
+.u1 .plate{font-size:30px;font-weight:800}
+.u1 .bday,.u1 .note,.u1 .note strong{color:var(--ink)}
+.u1 .bday b{font-size:20px}
+.u1 .note{font-size:15px}
+.u2 .plate{font-size:23px;font-weight:700}
+.u2 .bday b{font-size:16px}
+.u3 .plate{font-size:19px;font-weight:600}
+
+/* Terminadas */
+.done{margin-top:16px}
+.done h2{margin:0 0 8px;font:700 16px/1.2 'Baloo 2',sans-serif;color:var(--ink-2)}
+.retired{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 9px 9px 14px;border:3px solid var(--keyline);border-radius:18px;
+  background:var(--hecha-tint);color:var(--hecha);filter:grayscale(1);
+}
+.retired .name{font:600 16px/1.2 'Baloo 2',sans-serif}
+.retired .when{margin-left:auto;font-weight:500}
+.retired .rib{--rib:var(--hecha);--rib-ink:#fff;border-radius:999px;padding:3px 10px 2px}
+
+/* Acción principal */
+.say{
+  margin-top:auto;width:100%;height:54px;border:0;border-radius:999px;cursor:pointer;
+  background:var(--ink);color:#fff;font:700 18px/1 'Baloo 2',sans-serif;
+  transition:background .18s cubic-bezier(.16,1,.3,1);
+}
+.say:hover{background:#3b3358}
+.say:active{background:#1d1830}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div>
+      <h1>Mis tareas</h1>
+      <div class="who">
+        <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="5" fill="#7b4bb0"/></svg>
+        Nahuel · Tableros
+      </div>
+    </div>
+    <div class="day">jueves 15/10</div>
+  </div>
+</header>
+
+<main class="cast" aria-label="Tareas por vencimiento">
+  <a class="cell wide espera u1" href="#pasar-los-cables">
+    <span class="rib">esperando</span>
+    <div class="body">
+      <h2 class="plate">Pasar los cables</h2>
+      <div class="bday">vence <b>vie 16/10</b></div>
+      <p class="note">Le falta <strong>la IP del servidor de Corelabs</strong>; la consigue Ariel.</p>
+    </div>
+  </a>
+
+  <a class="cell wide curso u2" href="#armar-el-tablero">
+    <span class="rib">en curso</span>
+    <div class="body">
+      <h2 class="plate">Armar el tablero</h2>
+      <div class="bday">vence <b>mar 20/10</b></div>
+    </div>
+  </a>
+
+  <a class="cell sin u3" href="#probar-el-plc">
+    <span class="rib">sin empezar</span>
+    <div class="body">
+      <h2 class="plate">Probar el PLC</h2>
+      <div class="bday">vence <b>mié 28/10</b></div>
+      <p class="asked">└─ te la pidió Marcos Tarquini</p>
+    </div>
+  </a>
+
+  <a class="cell revision u3" href="#revisar-el-plano">
+    <span class="rib">en revisión</span>
+    <div class="body">
+      <h2 class="plate">Revisar el plano</h2>
+      <p class="note">La revisa Marcos.</p>
+    </div>
+  </a>
+</main>
+
+<section class="done" aria-labelledby="t-hechas">
+  <h2 id="t-hechas">Terminadas esta semana</h2>
+  <a class="retired" href="#medir-la-tierra">
+    <span class="name">Medir la tierra</span>
+    <span class="when">lun 12/10</span>
+    <span class="rib">terminada</span>
+  </a>
+</section>
+
+<button class="say" type="button">&gt; Contarle algo a Leda</button>
+</body>
+</html>

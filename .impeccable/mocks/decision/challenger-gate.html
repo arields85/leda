@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --board:#0f1720; --rule:#1f2b36; --hover:#15202a; --ink:#e9edf0; --ink-2:#a3b0bb; --ink-3:#7f8e9b;
+  --change:#ff8a1f; --change-bg:#30261d; --ok:#3cc47c;
+  --paper:#e9edf0; --paper-ink:#0f1720; --paper-2:#4b5866; --paper-rule:#c3ccd4;
+  --note-bg:#ffe2c4; --note-ink:#5b2c05; --btn:#1b2733; --btn-line:#3a4a58;
+}
+html,body{margin:0;width:390px;height:844px;overflow:hidden;background:var(--board);color:var(--ink)}
+body{position:relative;font-family:Barlow,system-ui,sans-serif;font-size:15px;line-height:1.35;-webkit-font-smoothing:antialiased}
+::selection{background:var(--change);color:var(--board)}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:6px}
+.cond{font-family:'Barlow Semi Condensed',Barlow,sans-serif}
+.num{font-variant-numeric:tabular-nums lining-nums}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;padding:18px 16px 14px;border-bottom:1px solid var(--rule)}
+h1{margin:0;font-size:28px;line-height:1.05;font-weight:700;letter-spacing:-0.01em}
+.who{margin:5px 0 0;font-size:14px;color:var(--ink-2)}
+.today{font-size:13px;font-weight:600;color:var(--ink-2);text-align:right;line-height:1.1}
+.today b{display:block;font-size:22px;font-weight:600;color:var(--ink)}
+
+main{padding:0 16px}
+h2{margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.board{margin-top:18px}
+.grid{margin:0 -8px}
+.cols,.row{display:grid;grid-template-columns:58px 1fr 92px;column-gap:10px;align-items:start}
+.cols{padding:0 8px 6px;font-size:11px;font-weight:600;letter-spacing:.12em;color:var(--ink-3);border-bottom:1px solid var(--rule)}
+.cols span:last-child,.st{text-align:right}
+ol{list-style:none;margin:0;padding:0}
+.row{padding:9px 8px;border-bottom:1px solid var(--rule);transition:background-color .2s cubic-bezier(.16,1,.3,1)}
+.row:hover{background:var(--hover)}
+.row.chg{margin-top:4px;background:var(--change-bg);border:1px solid var(--change);border-radius:6px}
+.d{font-size:17px;font-weight:600;line-height:1.05}
+.d small{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.chg .d small{color:var(--change)}
+.t{font-size:16px;font-weight:600;padding-top:6px}
+.st{font-size:12px;font-weight:700;letter-spacing:.06em;padding-top:8px}
+.wait{color:var(--change)} .ok{color:var(--ok)} .idle{color:var(--ink-2)} .rev{color:var(--ink)}
+.sub{grid-column:2/4;display:flex;align-items:center;gap:8px;margin-top:3px;font-size:13px;color:var(--ink-2)}
+.new{display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 5px;border-radius:4px;background:var(--change);color:var(--board);font-size:12px;font-weight:700;letter-spacing:.02em;line-height:1.2}
+.new svg{flex:none}
+
+.pass{position:relative;margin-top:16px;background:var(--paper);color:var(--paper-ink);border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.pass dl{margin:0}
+.seg{padding:11px 14px}
+.pass dt{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--paper-2)}
+.pass dd{margin:2px 0 0;font-size:17px;font-weight:600}
+.pass .big{font-size:22px;font-weight:700;letter-spacing:-.01em;line-height:1.15}
+.pass .new{position:absolute;top:12px;right:14px}
+.split{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--paper-rule)}
+.stub{grid-template-columns:1fr 108px;border-top:0}
+.split .seg+.seg{border-left:1px solid var(--paper-rule)}
+.perf{position:relative;height:18px}
+.perf::before{content:"";position:absolute;left:16px;right:16px;top:8px;border-top:2px dashed var(--paper-rule)}
+.perf::after{content:"";position:absolute;left:-9px;top:0;width:18px;height:18px;border-radius:50%;background:var(--board);box-shadow:358px 0 0 var(--board)}
+.note{margin:0;padding:9px 14px 11px;border-radius:0 0 12px 12px;background:var(--note-bg);color:var(--note-ink);font-size:14px;font-weight:500}
+
+.done{margin-top:18px}
+.done .row{border-bottom:0}
+
+.cta{position:absolute;left:16px;right:16px;bottom:16px;height:50px;border:1px solid var(--btn-line);border-radius:10px;background:var(--btn);color:var(--ink);font:600 17px/1 Barlow,system-ui,sans-serif;cursor:pointer;transition:background-color .2s cubic-bezier(.16,1,.3,1)}
+.cta:hover{background:#223140}
+.cta:active{background:#26384a}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>Mis tareas</h1>
+    <p class="who">Nahuel · Tableros</p>
+  </div>
+  <time class="today cond num" datetime="2026-10-15">jueves <b>15/10</b></time>
+</header>
+
+<main>
+  <section class="board" aria-labelledby="h-prox">
+    <h2 id="h-prox" class="cond">Próximos vencimientos</h2>
+    <div class="grid">
+      <div class="cols cond" aria-hidden="true"><span>VENCE</span><span>TAREA</span><span>ESTADO</span></div>
+      <ol>
+        <li><a class="row chg" href="#t1" aria-describedby="m1">
+          <span class="d cond num"><small>vie</small>16/10</span>
+          <span class="t">Pasar los cables</span>
+          <span class="st cond wait">ESPERANDO</span>
+          <span class="sub"><span class="new" id="m1"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 8.6V1.8M2 4.6 5 1.6l3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>cambió hoy</span>la consigue Ariel</span>
+        </a></li>
+        <li><a class="row" href="#t2">
+          <span class="d cond num"><small>mar</small>20/10</span>
+          <span class="t">Armar el tablero</span>
+          <span class="st cond ok">EN CURSO</span>
+        </a></li>
+        <li><a class="row" href="#t3">
+          <span class="d cond num"><small>mié</small>28/10</span>
+          <span class="t">Probar el PLC</span>
+          <span class="st cond idle">SIN EMPEZAR</span>
+          <span class="sub">└─ te la pidió Marcos Tarquini</span>
+        </a></li>
+        <li><a class="row" href="#t4">
+          <span class="d cond num" aria-label="sin fecha"><small>&nbsp;</small>—</span>
+          <span class="t">Revisar el plano</span>
+          <span class="st cond rev">EN REVISIÓN</span>
+          <span class="sub">la revisa Marcos</span>
+        </a></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="pass" id="t1" aria-label="Pasar los cables, detalle">
+    <span class="new cond"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 8.6V1.8M2 4.6 5 1.6l3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>cambió hoy</span>
+    <dl>
+      <div class="seg"><dt class="cond">TAREA</dt><dd class="big">Pasar los cables</dd></div>
+      <div class="split">
+        <div class="seg"><dt class="cond">VENCE</dt><dd class="cond num">vie 16/10</dd></div>
+        <div class="seg"><dt class="cond">ESTADO</dt><dd>esperando</dd></div>
+      </div>
+      <div class="perf" aria-hidden="true"></div>
+      <div class="split stub">
+        <div class="seg"><dt class="cond">FALTA</dt><dd>la IP del servidor de Corelabs</dd></div>
+        <div class="seg"><dt class="cond">SE OCUPA</dt><dd>Ariel</dd></div>
+      </div>
+    </dl>
+    <p class="note">Ariel avisó hoy que la IP llega el lunes <span class="num">19/10</span>.</p>
+  </section>
+
+  <section class="done" aria-labelledby="h-done">
+    <h2 id="h-done" class="cond">Terminadas esta semana</h2>
+    <div class="grid">
+      <a class="row" href="#t5">
+        <span class="d cond num"><small>lun</small>12/10</span>
+        <span class="t">Medir la tierra</span>
+        <span class="st cond ok">TERMINADA</span>
+      </a>
+    </div>
+  </section>
+</main>
+
+<button class="cta" type="button">&gt; Contarle algo a Leda</button>
+</body>
+</html>

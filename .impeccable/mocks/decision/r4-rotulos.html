@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leda · Rótulos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #0b0c0d;
+    --plate: #141618;
+    --rule: #1f2225;
+    --rule-strong: #2c3034;
+    --ink: #f2f2f0;
+    --ink-2: #b4b7ba;
+    --ink-3: #8b8f93;
+    --run: #3ddc84;
+    --wait: #ffb020;
+    --off: #4c5155;
+    --engrave: "Saira Condensed", "Arial Narrow", sans-serif;
+    --body: "Public Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--ground); }
+  body {
+    width: 390px; height: 844px; overflow: hidden; position: relative;
+    color: var(--ink); font: 400 15px/1.45 var(--body);
+    font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--ink); color: var(--ground); }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .caps {
+    font-family: var(--engrave); font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.16em; font-size: 13px; line-height: 1;
+  }
+  header { padding: 20px 16px 14px; display: flex; align-items: baseline; justify-content: space-between; }
+  header h1 { font: 600 22px/1.15 var(--body); letter-spacing: -0.01em; }
+  header p { color: var(--ink-2); font-size: 14px; margin-top: 2px; }
+  header time { color: var(--ink-2); font-size: 14px; }
+  nav { display: flex; padding: 0 16px; border-bottom: 1px solid var(--rule); }
+  nav button {
+    flex: 1; background: none; border: 0; color: var(--ink-3); cursor: pointer;
+    padding: 14px 0 12px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  nav button:hover { color: var(--ink-2); }
+  nav button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+  .week { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 16px 16px 4px; }
+  .day { text-align: center; padding: 8px 0 7px; border: 1px solid transparent; border-radius: 2px; }
+  .day .caps { font-size: 11px; color: var(--ink-3); }
+  .day b { display: block; font: 500 17px/1.2 var(--body); margin-top: 5px; color: var(--ink-2); }
+  .day small { display: block; font-size: 11px; line-height: 1.2; margin-top: 3px; color: var(--wait); min-height: 13px; }
+  .day.today { border-color: var(--rule-strong); background: var(--plate); }
+  .day.today .caps, .day.today b { color: var(--ink); }
+  .plate {
+    display: inline-block; background: var(--plate); border: 1px solid var(--rule-strong);
+    border-radius: 2px; padding: 6px 9px 5px; color: var(--ink);
+  }
+  section { padding: 0 16px; }
+  section > h2 { margin: 26px 0 6px; }
+  ul { list-style: none; }
+  li { padding: 14px 0 15px; border-bottom: 1px solid var(--rule); }
+  li:last-child { border-bottom: 0; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .title { font-weight: 500; font-size: 16px; }
+  .due { color: var(--ink-2); font-size: 14px; white-space: nowrap; }
+  .due.soon { color: var(--ink); font-weight: 600; }
+  .state { display: flex; align-items: center; gap: 8px; margin-top: 7px; color: var(--ink-2); font-size: 14px; }
+  .lamp {
+    width: 11px; height: 11px; border-radius: 50%; flex: none;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.45), inset 0 -1px 2px rgba(0,0,0,0.35);
+  }
+  .lamp.run { background: var(--run); }
+  .lamp.wait { background: var(--wait); }
+  .lamp.off { background: var(--ground); border: 2px solid var(--off); box-shadow: inset 0 1px 1px rgba(255,255,255,0.08); }
+  .detail { margin-top: 5px; color: var(--ink-3); font-size: 14px; }
+  .done li { padding: 12px 0; }
+  .done .title { color: var(--ink-2); font-weight: 400; font-size: 15px; }
+  footer {
+    position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 10px;
+    padding: 12px 16px 26px; background: var(--ground); border-top: 1px solid var(--rule);
+  }
+  footer button {
+    flex: 1; height: 48px; border-radius: 2px; cursor: pointer;
+    font-size: 14px; letter-spacing: 0.14em;
+  }
+  .primary { background: var(--ink); color: var(--ground); border: 1px solid var(--ink); }
+  .primary:hover { background: #ffffff; }
+  .secondary { background: var(--plate); color: var(--ink); border: 1px solid var(--rule-strong); }
+  .secondary:hover { border-color: var(--ink-3); }
+  footer button:disabled { opacity: 0.45; cursor: not-allowed; }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Marcos</h1>
+      <p>Tableros</p>
+    </div>
+    <time datetime="2026-10-15">jueves 15/10</time>
+  </header>
+
+  <nav role="tablist" aria-label="Vistas">
+    <button class="caps" role="tab" aria-selected="true">Mis tareas</button>
+    <button class="caps" role="tab" aria-selected="false">Mi sector</button>
+    <button class="caps" role="tab" aria-selected="false">Lo que pedí</button>
+  </nav>
+
+  <div class="week" aria-label="Esta semana">
+    <div class="day"><span class="caps">lun</span><b>12</b><small></small></div>
+    <div class="day"><span class="caps">mar</span><b>13</b><small></small></div>
+    <div class="day"><span class="caps">mié</span><b>14</b><small></small></div>
+    <div class="day today" aria-current="date"><span class="caps">jue</span><b>15</b><small></small></div>
+    <div class="day"><span class="caps">vie</span><b>16</b><small>1 vence</small></div>
+  </div>
+
+  <section>
+    <h2 class="caps plate">Por vencimiento</h2>
+    <ul>
+      <li>
+        <div class="top"><span class="title">Pedir el plano rev. C</span><span class="due soon">vie 16/10</span></div>
+        <div class="state"><span class="lamp wait" aria-hidden="true"></span>esperando</div>
+        <p class="detail">Falta la firma de Ismael; se ocupa Ismael.</p>
+      </li>
+      <li>
+        <div class="top"><span class="title">Revisar el tablero</span><span class="due">lun 19/10</span></div>
+        <div class="state"><span class="lamp run" aria-hidden="true"></span>en curso</div>
+      </li>
+      <li>
+        <div class="top"><span class="title">Calibrar el sensor</span><span class="due">jue 22/10</span></div>
+        <div class="state"><span class="lamp off" aria-hidden="true"></span>sin empezar</div>
+        <p class="detail">Te la pidió Martín Forte.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section class="done">
+    <h2 class="caps plate">Terminadas esta semana</h2>
+    <ul>
+      <li><div class="top"><span class="title">Medir la tierra</span><span class="due">lun 12/10</span></div></li>
+    </ul>
+  </section>
+
+  <footer>
+    <button class="caps primary" type="button">Nueva tarea</button>
+    <button class="caps secondary" type="button">Nuevo objetivo</button>
+  </footer>
+</body>
+</html>

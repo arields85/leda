@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Tableros · Marcos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #20262a;
+    --plate: #262d31;
+    --raised: #2c3438;
+    --ink: #ecebe6;
+    --ink-soft: #b9bab5;
+    --ink-mute: #9fa19e;
+    --line: rgba(236, 235, 230, 0.14);
+    --line-strong: rgba(236, 235, 230, 0.34);
+    --wait: #e3a27a;
+    --doing: #9cc7a4;
+    --cool: #7fb8d6;
+    --gutter: 16px;
+    --grid:
+      linear-gradient(rgba(236, 235, 230, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(236, 235, 230, 0.05) 1px, transparent 1px),
+      linear-gradient(rgba(236, 235, 230, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(236, 235, 230, 0.025) 1px, transparent 1px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; background-color: var(--ground); }
+  body {
+    position: relative; color: var(--ink);
+    background-image: var(--grid); background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+    font: 400 16px/1.4 "Source Sans 3", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--ink); color: var(--ground); }
+  :focus-visible { outline: 1.5px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  svg { display: block; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+  header { height: 48px; padding: 16px var(--gutter) 0; display: flex; align-items: baseline; justify-content: space-between; }
+  .who { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; line-height: 32px; }
+  .who span { color: var(--ink-mute); font-weight: 400; }
+  .today { color: var(--ink-soft); font-size: 15px; }
+
+  nav {
+    margin: 16px var(--gutter) 0; height: 56px; display: grid; grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--ground);
+  }
+  .seg {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    color: var(--ink-mute); font-size: 13px; line-height: 16px;
+  }
+  .seg + .seg { border-left: 1px solid var(--line); }
+  .seg:hover { color: var(--ink-soft); background: rgba(236, 235, 230, 0.03); }
+  .seg[aria-selected="true"] { background: var(--raised); color: var(--ink); font-weight: 600; }
+  .seg[aria-selected="true"]::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--cool); }
+  .seg svg { width: 20px; height: 20px; }
+
+  .hero { padding: 16px var(--gutter) 0; height: 128px; }
+  .hero strong { display: block; font-size: 38px; line-height: 48px; font-weight: 600; letter-spacing: -0.02em; }
+  .hero p { font-size: 16px; line-height: 24px; color: var(--ink-soft); }
+  .hero small { display: block; margin-top: 8px; font-size: 14px; line-height: 16px; color: var(--ink-mute); }
+  .hero small em { font-style: normal; color: var(--wait); }
+
+  .week {
+    margin: 0 var(--gutter); height: 72px; padding: 7px 8px; display: grid; grid-template-columns: repeat(5, 1fr);
+    background: var(--plate); border: 1px solid var(--line); border-radius: 4px;
+  }
+  .day {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--ink-mute); font-size: 13px; line-height: 16px;
+  }
+  .day b { font-weight: 400; font-size: 20px; line-height: 24px; color: var(--ink-soft); }
+  .day small { font-size: 12px; line-height: 16px; min-height: 16px; }
+  .day small.due { color: var(--wait); }
+  .day.is-today, .day.is-today b { color: var(--cool); }
+  .day.is-today b { font-weight: 600; }
+
+  main { padding: 8px var(--gutter) 0; }
+  h2 { font-size: 13px; line-height: 16px; font-weight: 600; color: var(--ink-mute); padding: 24px 0 8px; letter-spacing: 0.02em; }
+  ol { list-style: none; }
+  li { border-bottom: 1px solid var(--line); }
+  .task { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; row-gap: 4px; width: 100%; text-align: left; padding: 16px 0 15px; }
+  .task:hover .t { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; }
+  .t { font-size: 17px; line-height: 24px; font-weight: 600; letter-spacing: -0.005em; }
+  .d { font-size: 15px; line-height: 24px; color: var(--ink-soft); text-align: right; }
+  .s { font-size: 14px; line-height: 20px; grid-column: 1 / -1; }
+  .s.wait { color: var(--wait); }
+  .s.doing { color: var(--doing); }
+  .s.idle { color: var(--ink-mute); }
+  .x { grid-column: 1 / -1; font-size: 15px; line-height: 20px; color: var(--ink-soft); max-width: 34ch; }
+
+  .done { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 16px 0 15px; color: var(--ink-mute); font-size: 16px; line-height: 24px; border-bottom: 1px solid var(--line); }
+  .done .name { color: var(--ink-soft); }
+  .done .tag { margin-left: 8px; font-size: 14px; }
+
+  footer {
+    position: absolute; left: 0; right: 0; top: 760px; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 16px var(--gutter) 20px; border-top: 1px solid var(--line);
+    background-color: var(--ground); background-image: var(--grid); background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  }
+  .btn {
+    height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    border: 1px solid var(--line-strong); border-radius: 6px; font-size: 16px; font-weight: 600; background: var(--raised);
+  }
+  .btn svg { width: 16px; height: 16px; }
+  .btn:hover { border-color: var(--ink); }
+  .btn:active { background: var(--plate); }
+  .btn.quiet { background: var(--ground); border-color: var(--line); color: var(--ink-soft); font-weight: 400; }
+  .btn.quiet:hover { color: var(--ink); border-color: var(--line-strong); }
+</style>
+</head>
+<body>
+  <header>
+    <h1 class="who">Marcos <span>· Tableros</span></h1>
+    <p class="today">jueves 15/10</p>
+  </header>
+
+  <nav role="tablist" aria-label="Vistas">
+    <button class="seg" role="tab" aria-selected="true">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5l1.75 1.75L8.5 4M11 6h5.5M3.5 12.5l1.75 1.75L8.5 11M11 13h5.5"/></svg>
+      Mis tareas
+    </button>
+    <button class="seg" role="tab" aria-selected="false">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14v12H3zM10 4v6.5h7M3 10.5h3.5M10 13.5V16"/></svg>
+      Mi sector
+    </button>
+    <button class="seg" role="tab" aria-selected="false">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 11.5V16h13v-4.5M10 3.5v8.5M6.75 6.75L10 3.5l3.25 3.25"/></svg>
+      Lo que pedí
+    </button>
+  </nav>
+
+  <section class="hero" aria-label="Resumen">
+    <strong>1 vence mañana</strong>
+    <p>Pedir el plano rev. C · falta la firma de Ismael</p>
+    <small>3 abiertas · <em>1 esperando</em></small>
+  </section>
+
+  <section class="week" aria-label="Esta semana">
+    <div class="day">lun<b>12</b><small></small></div>
+    <div class="day">mar<b>13</b><small></small></div>
+    <div class="day">mié<b>14</b><small></small></div>
+    <div class="day is-today" aria-current="date">jue<b>15</b><small>hoy</small></div>
+    <div class="day">vie<b>16</b><small class="due">1 vence</small></div>
+  </section>
+
+  <main>
+    <ol>
+      <li><button class="task">
+        <span class="t">Pedir el plano rev. C</span><span class="d">vie 16/10</span>
+        <span class="s wait">esperando</span>
+        <span class="x">Falta la firma de Ismael; se ocupa Ismael.</span>
+      </button></li>
+      <li><button class="task">
+        <span class="t">Revisar el tablero</span><span class="d">lun 19/10</span>
+        <span class="s doing">en curso</span>
+      </button></li>
+      <li><button class="task">
+        <span class="t">Calibrar el sensor</span><span class="d">jue 22/10</span>
+        <span class="s idle">sin empezar</span>
+        <span class="x">Te la pidió Martín Forte.</span>
+      </button></li>
+    </ol>
+
+    <h2>Terminadas esta semana</h2>
+    <div class="done">
+      <span><span class="name">Medir la tierra</span><span class="tag">terminada</span></span>
+      <span>lun 12/10</span>
+    </div>
+  </main>
+
+  <footer>
+    <button class="btn"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>Nueva tarea</button>
+    <button class="btn quiet"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>Nuevo objetivo</button>
+  </footer>
+</body>
+</html>

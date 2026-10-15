@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Tableros · Marcos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #16191b;
+    --ink: #eceeed;
+    --muted: #8b9397;
+    --faint: #5d666b;
+    --line: rgba(236, 238, 237, 0.10);
+    --line-strong: rgba(236, 238, 237, 0.24);
+    --wait: #f0a97a;
+    --doing: #8fd1a8;
+    --idle: #5d666b;
+    --gutter: 16px;
+    --num: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; background: var(--ground); }
+  body {
+    position: relative; color: var(--ink);
+    font: 400 16px/1.4 "Hanken Grotesk", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--ink); color: var(--ground); }
+  :focus-visible { outline: 1.5px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  header { padding: 20px var(--gutter) 0; display: flex; align-items: baseline; justify-content: space-between; }
+  .who { font-size: 24px; font-weight: 600; letter-spacing: -0.015em; }
+  .who span { color: var(--muted); font-weight: 400; }
+  .today { color: var(--muted); font-size: 15px; }
+
+  nav { display: flex; gap: 24px; padding: 18px var(--gutter) 0; border-bottom: 1px solid var(--line); }
+  .tab { padding: 6px 0 12px; margin-bottom: -1px; font-size: 16px; color: var(--muted); border-bottom: 2px solid transparent; }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+
+  .week { padding: 16px var(--gutter) 14px; border-bottom: 1px solid var(--line); }
+  .chart { display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; height: 72px; }
+  .col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 5px; }
+  .n { font: 400 12px/1 var(--num); color: var(--muted); }
+  .n.has { color: var(--ink); }
+  .bar { width: 6px; height: 2px; background: var(--faint); border-radius: 1px; }
+  .bar.v1 { height: 36px; background: var(--ink); }
+  .base { height: 1px; background: var(--line-strong); }
+  .labels { display: grid; grid-template-columns: repeat(5, 1fr); padding-top: 8px; }
+  .lab { text-align: center; font-size: 13px; color: var(--muted); }
+  .lab b { font-weight: 500; }
+  .lab.is-today, .lab.is-today b { color: var(--ink); font-weight: 600; }
+  .legend { display: flex; justify-content: space-between; margin-top: 10px; font-size: 13px; color: var(--muted); }
+
+  main { padding: 0 var(--gutter); }
+  h2 { font-size: 13px; font-weight: 600; color: var(--muted); padding: 26px 0 6px; letter-spacing: 0.02em; }
+  ol { list-style: none; padding-top: 6px; }
+  li { border-bottom: 1px solid var(--line); }
+  .task { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 4px; width: 100%; text-align: left; padding: 15px 0; }
+  .task:hover .t { text-decoration: underline; text-decoration-color: var(--line-strong); text-decoration-thickness: 1px; text-underline-offset: 4px; }
+  .t { font-size: 17px; font-weight: 600; letter-spacing: -0.005em; }
+  .d { font: 400 13px/1.9 var(--num); color: var(--muted); text-align: right; align-self: baseline; }
+  .s { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; color: var(--muted); grid-column: 1 / -1; }
+  .s::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .s.wait { color: var(--wait); }
+  .s.doing { color: var(--doing); }
+  .s.idle::before { background: var(--idle); }
+  .x { grid-column: 1 / -1; font-size: 15px; color: var(--muted); max-width: 34ch; }
+
+  .done { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 3px; padding: 12px 0; }
+  .done .t { font-size: 16px; font-weight: 500; color: var(--muted); }
+  .done .s::before { background: var(--faint); }
+
+  footer {
+    position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    padding: 12px var(--gutter) 28px; background: var(--ground); border-top: 1px solid var(--line);
+  }
+  .btn { height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; font-size: 16px; font-weight: 600; }
+  .btn:hover { border-color: var(--ink); }
+  .btn:active { background: rgba(236, 238, 237, 0.06); }
+  .btn.quiet { border-color: transparent; color: var(--muted); font-weight: 400; }
+  .btn.quiet:hover { color: var(--ink); border-color: var(--line); }
+</style>
+</head>
+<body>
+  <header>
+    <h1 class="who">Marcos <span>· Tableros</span></h1>
+    <p class="today">jueves 15/10</p>
+  </header>
+
+  <nav role="tablist" aria-label="Vistas">
+    <button class="tab" role="tab" aria-selected="true">Mis tareas</button>
+    <button class="tab" role="tab" aria-selected="false">Mi sector</button>
+    <button class="tab" role="tab" aria-selected="false">Lo que pedí</button>
+  </nav>
+
+  <section class="week" aria-label="Tareas que vencen cada día de esta semana">
+    <div class="chart" aria-hidden="true">
+      <div class="col"><span class="n">0</span><span class="bar"></span></div>
+      <div class="col"><span class="n">0</span><span class="bar"></span></div>
+      <div class="col"><span class="n">0</span><span class="bar"></span></div>
+      <div class="col"><span class="n">0</span><span class="bar"></span></div>
+      <div class="col"><span class="n has">1</span><span class="bar v1"></span></div>
+    </div>
+    <div class="base"></div>
+    <div class="labels">
+      <span class="lab">lun <b>12</b></span>
+      <span class="lab">mar <b>13</b></span>
+      <span class="lab">mié <b>14</b></span>
+      <span class="lab is-today" aria-current="date">jue <b>15</b></span>
+      <span class="lab">vie <b>16</b></span>
+    </div>
+    <p class="legend"><span>Vencen esta semana</span><span>1 el viernes</span></p>
+  </section>
+
+  <main>
+    <ol>
+      <li><button class="task">
+        <span class="t">Pedir el plano rev. C</span><span class="d">vie 16/10</span>
+        <span class="s wait">esperando</span>
+        <span class="x">Falta la firma de Ismael; se ocupa Ismael.</span>
+      </button></li>
+      <li><button class="task">
+        <span class="t">Revisar el tablero</span><span class="d">lun 19/10</span>
+        <span class="s doing">en curso</span>
+      </button></li>
+      <li><button class="task">
+        <span class="t">Calibrar el sensor</span><span class="d">jue 22/10</span>
+        <span class="s idle">sin empezar</span>
+        <span class="x">Te la pidió Martín Forte.</span>
+      </button></li>
+    </ol>
+
+    <h2>Terminadas esta semana</h2>
+    <div class="done">
+      <span class="t">Medir la tierra</span><span class="d">lun 12/10</span>
+      <span class="s">terminada</span>
+    </div>
+  </main>
+
+  <footer>
+    <button class="btn">Nueva tarea</button>
+    <button class="btn quiet">Nuevo objetivo</button>
+  </footer>
+</body>
+</html>

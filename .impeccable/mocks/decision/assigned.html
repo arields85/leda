@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700;800&family=Kalam&display=swap" rel="stylesheet">
+<style>
+:root{
+  --shell:#16303f; --shell-ink:#e8eef1; --shell-mute:#a9bcc6;
+  --ground:#dfe6ea; --panel:#f7f9fa; --panel-hover:#ffffff;
+  --ink:#0d1a22; --steel:#4a6676; --mute:#476070;
+  --tag:#f2661c; --ok:#2f8f5b; --ok-ink:#1f6b43; --metal:#a7b3ba; --tie:#1b252b;
+  --row:15px; --gut:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden}
+body{background:var(--ground);color:var(--ink);font:400 var(--row)/1.35 "Barlow",sans-serif;
+  font-variant-numeric:tabular-nums;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+::selection{background:var(--shell);color:var(--shell-ink)}
+a{color:inherit;text-decoration:none}
+a:focus-visible{outline:2px solid var(--shell);outline-offset:2px}
+
+/* shell */
+.top{background:var(--shell);color:var(--shell-ink);padding:18px var(--gut) 16px}
+.top h1{font:700 30px/1 "Barlow Condensed",sans-serif;letter-spacing:.01em}
+.top p{display:flex;justify-content:space-between;margin-top:8px;color:var(--shell-mute);font-weight:500}
+.top time{color:var(--shell-ink)}
+
+/* list */
+main{flex:1;padding:14px var(--gut) 0}
+.cols{display:grid;grid-template-columns:52px 1fr auto;column-gap:12px;padding:0 14px 6px;
+  font:600 var(--row)/1 "Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.list{list-style:none;display:grid;gap:8px}
+.task{position:relative;display:grid;grid-template-columns:52px 1fr;column-gap:12px;
+  background:var(--panel);border-radius:4px;padding:12px 14px 13px}
+.task:hover{background:var(--panel-hover)}
+.due{display:flex;flex-direction:column}
+.due b,.st,.done h2{font:600 var(--row)/1.35 "Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.06em}
+.due b{color:var(--steel)}
+.due span{font-weight:500}
+.due .none{color:var(--mute)}
+.body{display:flex;flex-direction:column;min-width:0}
+.st{color:var(--steel)}
+.st.now{color:var(--ink);font-weight:700}
+.ti{font-weight:600}
+.meta{color:var(--mute)}
+.waits{min-height:206px}
+.waits .body{padding-right:150px}
+
+/* signature: the hung tag */
+.hole{position:absolute;top:9px;right:12px;width:11px;height:11px;border-radius:50%;
+  background:var(--ground);box-shadow:inset 0 1px 2px rgba(13,26,34,.35)}
+.tie{position:absolute;top:12px;right:9px;width:17px;height:36px;border:3px solid var(--tie);
+  border-radius:9px;z-index:2;transform:rotate(5deg)}
+.tag-wrap{position:absolute;top:30px;right:-5px;width:158px;transform:rotate(4deg);
+  transform-origin:132px 12px;filter:drop-shadow(0 3px 4px rgba(13,26,34,.28))}
+.tag{background:var(--tag);color:var(--ink);padding:30px 12px 12px;
+  clip-path:polygon(16px 0,calc(100% - 16px) 0,100% 16px,100% 100%,0 100%,0 16px)}
+.grommet{position:absolute;top:7px;left:118px;width:18px;height:18px;border-radius:50%;
+  background:var(--panel);border:3px solid var(--metal);box-shadow:0 0 0 1px rgba(13,26,34,.35)}
+.stamp{display:inline-block;background:var(--ink);color:var(--tag);padding:1px 7px 0;
+  font:800 var(--row)/1.3 "Barlow Condensed",sans-serif;letter-spacing:.16em}
+.field{display:block;font:400 var(--row)/1.3 "Kalam",cursive;padding:4px 0 2px;
+  border-bottom:1px solid rgba(13,26,34,.42)}
+.field:first-of-type{margin-top:6px}
+
+/* done */
+.done{margin-top:18px}
+.done h2{color:var(--steel);font-weight:700;padding:0 14px 6px}
+.done .task{background:transparent;padding-top:4px}
+.done .st{color:var(--ok-ink);display:flex;align-items:center;gap:6px}
+.done .st svg{flex:none}
+
+/* ask */
+.ask{padding:12px var(--gut) 22px;background:var(--ground)}
+.btn{display:block;background:var(--shell);color:var(--shell-ink);border-radius:4px;padding:14px 16px;
+  font:700 17px/1 "Barlow Condensed",sans-serif;letter-spacing:.04em}
+.btn:hover{background:#1d3d50}
+.btn:active{background:#0f2430}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Mis tareas</h1>
+  <p><span>Nahuel · Tableros</span><time datetime="2026-10-15">jueves 15/10</time></p>
+</header>
+
+<main>
+  <div class="cols" aria-hidden="true"><span>Vence</span><span>Estado y tarea</span><span>4 abiertas</span></div>
+  <ol class="list">
+    <li>
+      <a class="task waits" href="#">
+        <span class="due"><b>vie</b><span>16/10</span></span>
+        <span class="body">
+          <span class="st">esperando</span>
+          <span class="ti">Pasar los cables</span>
+        </span>
+        <span class="hole" aria-hidden="true"></span>
+        <span class="tie" aria-hidden="true"></span>
+        <span class="tag-wrap">
+          <span class="tag" style="display:block">
+            <span class="grommet" aria-hidden="true"></span>
+            <span class="stamp">FALTA</span>
+            <span class="field">la IP del servidor de Corelabs</span>
+            <span class="field">la consigue Ariel</span>
+            <span class="field">desde lun 13/10</span>
+          </span>
+        </span>
+      </a>
+    </li>
+    <li>
+      <a class="task" href="#">
+        <span class="due"><b>mar</b><span>20/10</span></span>
+        <span class="body">
+          <span class="st now">en curso</span>
+          <span class="ti">Armar el tablero</span>
+        </span>
+      </a>
+    </li>
+    <li>
+      <a class="task" href="#">
+        <span class="due"><b>mié</b><span>28/10</span></span>
+        <span class="body">
+          <span class="st">sin empezar</span>
+          <span class="ti">Probar el PLC</span>
+          <span class="meta">└─ te la pidió Marcos Tarquini</span>
+        </span>
+      </a>
+    </li>
+    <li>
+      <a class="task" href="#">
+        <span class="due"><b class="none" aria-label="sin fecha">—</b></span>
+        <span class="body">
+          <span class="st">en revisión</span>
+          <span class="ti">Revisar el plano</span>
+          <span class="meta">la está revisando Marcos</span>
+        </span>
+      </a>
+    </li>
+  </ol>
+
+  <section class="done">
+    <h2>Terminadas esta semana</h2>
+    <a class="task" href="#">
+      <span class="due"><b>lun</b><span>12/10</span></span>
+      <span class="body">
+        <span class="st">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="#2f8f5b"/><path d="M3.8 7.2l2.2 2.2 4.2-4.6" fill="none" stroke="#f7f9fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          terminada
+        </span>
+        <span class="ti">Medir la tierra</span>
+      </span>
+    </a>
+  </section>
+</main>
+
+<footer class="ask">
+  <a class="btn" href="#">&gt; Contarle algo a Leda</a>
+</footer>
+</body>
+</html>

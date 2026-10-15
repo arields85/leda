@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#0e1114; --hover:#151a1e; --line:#22282e; --line-2:#363e46;
+  --ink:#e9ecef; --ink-2:#b8c0c7; --muted:#8b949d;
+  --orange:#f08a4b; --green:#4fb37a;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --sans:"Hanken Grotesk",system-ui,sans-serif;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden;background:var(--ground);color:var(--ink)}
+body{font-family:var(--sans);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;position:relative}
+::selection{background:var(--ink);color:var(--ground)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a:focus-visible,button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;border-radius:4px}
+
+/* header */
+.top{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 16px 0}
+.top h1{font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.15}
+.top .area{font-size:13px;color:var(--muted);margin-top:2px}
+.top .day{font-size:12px;color:var(--ink-2);padding-top:5px}
+
+/* tabs */
+.tabs{position:relative;display:flex;margin:18px 16px 0}
+.tabs::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line)}
+.tabs button{position:relative;z-index:1;flex:1 1 0;min-width:0;min-height:44px;border-bottom:2px solid transparent;font-size:14px;font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s var(--ease)}
+.tabs button:hover{color:var(--ink-2)}
+.tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+
+/* week strip */
+.week{display:grid;grid-template-columns:repeat(5,1fr);margin:20px 16px 0;list-style:none;font-family:var(--mono);text-align:center}
+.week li{display:flex;flex-direction:column;align-items:center;gap:3px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.week .d{font-size:11px;color:var(--muted)}
+.week .n{font-size:17px;font-weight:500;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.week .c{font-size:11px;color:var(--muted);min-height:15px}
+.week .has .n{color:var(--ink)}
+.week .has .c{color:var(--ink-2)}
+.week .today{border-bottom:2px solid var(--ink);padding-bottom:9px}
+.week .today .d,.week .today .n{color:var(--ink)}
+
+/* list */
+.list{list-style:none;margin-top:14px}
+.list li+li a{border-top:1px solid var(--line)}
+.row{display:block;margin:0 16px;padding:15px 0 16px;min-height:44px;transition:background .2s var(--ease)}
+.row:hover{background:var(--hover)}
+.l1{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.l1 h2{font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.date{flex:none;font-size:13px;color:var(--ink-2)}
+.state{display:block;margin-top:5px;font-size:12px;color:var(--muted)}
+.state.wait{color:var(--orange)}
+.state.run{color:var(--green)}
+.detail{margin-top:6px;font-size:14px;color:var(--muted);line-height:1.4}
+.detail.mono{font-size:13px}
+
+/* finished */
+.done{margin:22px 16px 0}
+.done h3{font-size:13px;font-weight:500;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--line)}
+.done a{display:flex;justify-content:space-between;align-items:center;min-height:44px;color:var(--ink-2);font-size:15px;transition:background .2s var(--ease)}
+.done a:hover{background:var(--hover)}
+.done .date{color:var(--muted)}
+
+/* actions, fixed */
+.actions{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 16px 22px;background:var(--ground);border-top:1px solid var(--line)}
+.actions button{min-height:48px;padding:0 12px;border:1px solid var(--line-2);border-radius:4px;font-family:var(--mono);font-size:13px;font-weight:500;text-align:left;color:var(--ink);transition:background .2s var(--ease),border-color .2s var(--ease)}
+.actions button:hover{background:var(--hover);border-color:#4a535c}
+.actions button:active{transform:translateY(1px)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <h1>Marcos</h1>
+    <div class="area">Tableros</div>
+  </div>
+  <div class="day mono">jueves 15/10</div>
+</header>
+
+<nav aria-label="Vistas">
+  <div class="tabs" role="tablist" aria-label="Vistas">
+    <button type="button" role="tab" aria-selected="true">Mis tareas</button>
+    <button type="button" role="tab" aria-selected="false">Mi sector</button>
+    <button type="button" role="tab" aria-selected="false">Lo que pedí</button>
+  </div>
+</nav>
+
+<ol class="week" aria-label="La semana: cuántas tareas vencen cada día">
+  <li><span class="d">lun</span><span class="n">12</span><span class="c">&nbsp;</span></li>
+  <li><span class="d">mar</span><span class="n">13</span><span class="c">&nbsp;</span></li>
+  <li><span class="d">mié</span><span class="n">14</span><span class="c">&nbsp;</span></li>
+  <li class="today" aria-current="date"><span class="d">jue</span><span class="n">15</span><span class="c">hoy</span></li>
+  <li class="has"><span class="d">vie</span><span class="n">16</span><span class="c">1 vence</span></li>
+</ol>
+
+<ul class="list" aria-label="Mis tareas, por vencimiento">
+  <li><a class="row" href="#t1">
+    <div class="l1"><h2>Pedir el plano rev. C</h2><span class="date mono">vie 16/10</span></div>
+    <span class="state wait mono">esperando</span>
+    <p class="detail">Falta la firma de Ismael; se ocupa Ismael.</p>
+  </a></li>
+  <li><a class="row" href="#t2">
+    <div class="l1"><h2>Revisar el tablero</h2><span class="date mono">lun 19/10</span></div>
+    <span class="state run mono">en curso</span>
+  </a></li>
+  <li><a class="row" href="#t3">
+    <div class="l1"><h2>Calibrar el sensor</h2><span class="date mono">jue 22/10</span></div>
+    <span class="state mono">sin empezar</span>
+    <p class="detail mono">└─ te la pidió Martín Forte</p>
+  </a></li>
+</ul>
+
+<section class="done" aria-label="Terminadas esta semana">
+  <h3>Terminadas esta semana</h3>
+  <a href="#t0"><span>Medir la tierra</span><span class="date mono">lun 12/10</span></a>
+</section>
+
+<div class="actions">
+  <button type="button">&gt; Nueva tarea</button>
+  <button type="button">&gt; Nuevo objetivo</button>
+</div>
+
+</body>
+</html>

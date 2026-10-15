@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #ffffff; --ink: #111827; --ink-2: #4b5563; --ink-3: #6b7280;
+    --rule: #eceef2; --rule-strong: #d9dce3; --accent: #4f46e5; --accent-soft: #eef2ff;
+    --wait: #b45309; --wait-soft: #fffbeb; --review: #6d28d9;
+    --gutter: 20px; --check: 22px; --gap: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; background: var(--ground); }
+  body { font-family: "Geist", ui-sans-serif, system-ui, sans-serif; color: var(--ink);
+    font-size: 15px; line-height: 1.4; -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums; display: flex; flex-direction: column; }
+  ::selection { background: var(--accent-soft); color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+  header { padding: 28px var(--gutter) 18px; display: grid; grid-template-columns: 1fr auto;
+    align-items: end; row-gap: 4px; border-bottom: 1px solid var(--rule); }
+  h1 { font-size: 28px; line-height: 1.1; font-weight: 600; letter-spacing: -0.025em; }
+  .who { grid-column: 1; font-size: 14px; color: var(--ink-3); }
+  .today { grid-column: 2; grid-row: 1 / span 2; align-self: end; font-size: 13px; color: var(--ink-2);
+    font-weight: 500; padding: 5px 10px; border: 1px solid var(--rule-strong); border-radius: 999px; }
+
+  main { flex: 1; overflow: hidden; }
+  section { padding-top: 22px; }
+  h2 { display: flex; justify-content: space-between; padding: 0 var(--gutter) 6px;
+    font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  h2 span { color: var(--ink-3); font-weight: 500; }
+
+  ul { list-style: none; }
+  li { display: grid; grid-template-columns: var(--check) 1fr auto; column-gap: var(--gap);
+    padding: 13px var(--gutter) 14px; position: relative; }
+  li + li::before { content: ""; position: absolute; top: 0; right: 0;
+    left: calc(var(--gutter) + var(--check) + var(--gap)); border-top: 1px solid var(--rule); }
+
+  .box { width: var(--check); height: var(--check); border-radius: 50%; margin-top: 1px;
+    border: 1.5px solid var(--rule-strong); background: var(--ground); display: grid; place-items: center; }
+  .box.review { border-color: var(--review); border-style: dashed; }
+  .box.done { background: var(--accent); border-color: var(--accent); }
+  .box svg { width: 12px; height: 12px; }
+
+  .title { font-size: 16px; font-weight: 500; line-height: 1.35; letter-spacing: -0.005em; }
+  .done-row .title { color: var(--ink-3); text-decoration: line-through;
+    text-decoration-color: var(--rule-strong); }
+  .due { font-size: 13px; color: var(--ink-2); text-align: right; line-height: 1.6; white-space: nowrap; }
+  .due small { display: block; font-size: 11px; color: var(--ink-3); line-height: 1.2; }
+
+  .meta { grid-column: 2 / span 2; display: flex; align-items: center; gap: 6px;
+    margin-top: 4px; font-size: 13px; color: var(--ink-3); }
+  .state { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+  .state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .s-wait { color: var(--wait); }
+  .s-doing { color: var(--accent); }
+  .s-todo { color: var(--ink-3); }
+  .s-todo::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+  .s-review { color: var(--review); }
+
+  .note { grid-column: 2 / span 2; margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+    background: var(--wait-soft); font-size: 13.5px; line-height: 1.45; color: #78350f; }
+  .note b { font-weight: 600; color: #451a03; }
+  .from { grid-column: 2 / span 2; margin-top: 6px; font-size: 13px; color: var(--ink-3); white-space: pre; }
+  .from b { font-weight: 500; color: var(--ink-2); }
+
+  footer { padding: 12px var(--gutter) 26px; border-top: 1px solid var(--rule); background: var(--ground); }
+  .cta { width: 100%; height: 50px; border: 0; border-radius: 12px; background: var(--accent);
+    color: #fff; font: 600 16px/1 "Geist", ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.005em;
+    display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
+    box-shadow: 0 1px 2px rgba(17,24,39,.08), 0 4px 12px -4px rgba(79,70,229,.45); }
+  .cta:hover { background: #4338ca; }
+  .cta:active { transform: translateY(1px); }
+  .cta svg { width: 18px; height: 18px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Mis tareas</h1>
+    <p class="who">Nahuel · Tableros</p>
+    <p class="today">jueves 15/10</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="h-abiertas">
+      <h2 id="h-abiertas">A tu cargo <span>3</span></h2>
+      <ul>
+        <li>
+          <span class="box" aria-hidden="true"></span>
+          <p class="title">Pasar los cables</p>
+          <p class="due"><small>vence</small>vie 16/10</p>
+          <p class="meta"><span class="state s-wait">esperando</span></p>
+          <p class="note">Falta <b>la IP del servidor de Corelabs</b>. La consigue Ariel.</p>
+        </li>
+        <li>
+          <span class="box" aria-hidden="true"></span>
+          <p class="title">Armar el tablero</p>
+          <p class="due"><small>vence</small>mar 20/10</p>
+          <p class="meta"><span class="state s-doing">en curso</span></p>
+        </li>
+        <li>
+          <span class="box" aria-hidden="true"></span>
+          <p class="title">Probar el PLC</p>
+          <p class="due"><small>vence</small>mié 28/10</p>
+          <p class="meta"><span class="state s-todo">sin empezar</span></p>
+          <p class="from">└─ te la pidió <b>Marcos Tarquini</b></p>
+        </li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="h-revision">
+      <h2 id="h-revision">Entregadas <span>1</span></h2>
+      <ul>
+        <li>
+          <span class="box review" aria-hidden="true"></span>
+          <p class="title">Revisar el plano</p>
+          <p class="due"></p>
+          <p class="meta"><span class="state s-review">en revisión</span><span>· la revisa Marcos</span></p>
+        </li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="h-terminadas">
+      <h2 id="h-terminadas">Terminadas esta semana <span>1</span></h2>
+      <ul>
+        <li class="done-row">
+          <span class="box done" aria-hidden="true">
+            <svg viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 8.6 9.5 3.6"/></svg>
+          </span>
+          <p class="title">Medir la tierra</p>
+          <p class="due">lun 12/10</p>
+          <p class="meta"><span>terminada</span></p>
+        </li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <button class="cta" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>
+      Contarle algo a Leda
+    </button>
+  </footer>
+</body>
+</html>

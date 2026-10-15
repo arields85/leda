@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-10-15T14:40:03.087Z",
+        "reason": "agent: the canon card deliberately shows the category standard, which uses this face"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          ".impeccable/mocks/decision/r4-canon.html"
+        ],
+        "createdAt": "2026-10-15T15:29:34.651Z",
+        "reason": "agent: the dark canon card deliberately shows the category default face"
+      }
+    ]
+  }
+}

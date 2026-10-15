@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Tableros · Marcos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --slate: #22282b;
+    --ink: #ecebe6;
+    --ink-soft: #b9bab5;
+    --ink-mute: #9fa19e;
+    --line: rgba(236, 235, 230, 0.14);
+    --line-strong: rgba(236, 235, 230, 0.34);
+    --wait: #e3a27a;
+    --doing: #9cc7a4;
+    --gutter: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; background: var(--slate); }
+  body {
+    position: relative; color: var(--ink);
+    font: 400 16px/1.4 "Source Sans 3", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--ink); color: var(--slate); }
+  :focus-visible { outline: 1.5px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  header { padding: 24px var(--gutter) 0; display: flex; align-items: baseline; justify-content: space-between; }
+  .who { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; line-height: 32px; }
+  .who span { color: var(--ink-mute); font-weight: 400; }
+  .today { color: var(--ink-soft); font-size: 15px; }
+
+  nav { display: flex; gap: 24px; padding: 16px var(--gutter) 0; border-bottom: 1px solid var(--line); }
+  .tab { position: relative; padding: 8px 0 16px; font-size: 16px; line-height: 24px; color: var(--ink-mute); }
+  .tab:hover { color: var(--ink-soft); }
+  .tab[aria-selected="true"] { color: var(--ink); font-weight: 600; }
+  .tab[aria-selected="true"]::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ink);
+  }
+
+  .week { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 16px var(--gutter); border-bottom: 1px solid var(--line); }
+  .day {
+    display: flex; flex-direction: column; align-items: center; gap: 0; padding: 8px 0;
+    color: var(--ink-mute); font-size: 13px; line-height: 16px;
+    border: 1px solid transparent; border-radius: 4px;
+  }
+  .day b { font-weight: 400; font-size: 20px; line-height: 24px; color: var(--ink-soft); margin: 4px 0; }
+  .day.is-today { color: var(--ink); border-color: var(--line-strong); }
+  .day.is-today b { color: var(--ink); font-weight: 600; }
+  .day small { font-size: 12px; line-height: 16px; min-height: 16px; }
+  .day small.due { color: var(--wait); }
+
+  main { padding: 0 var(--gutter); }
+  h2 { font-size: 13px; line-height: 16px; font-weight: 600; color: var(--ink-mute); padding: 24px 0 8px; letter-spacing: 0.02em; }
+  ol { list-style: none; padding-top: 8px; }
+  li { border-bottom: 1px solid var(--line); }
+  .task { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; row-gap: 4px; width: 100%; text-align: left; padding: 16px 0; }
+  .task:hover .t { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; }
+  .t { font-size: 17px; line-height: 24px; font-weight: 600; letter-spacing: -0.005em; }
+  .d { font-size: 15px; line-height: 24px; color: var(--ink-soft); text-align: right; align-self: baseline; }
+  .s { font-size: 14px; line-height: 20px; grid-column: 1 / -1; }
+  .s.wait { color: var(--wait); }
+  .s.doing { color: var(--doing); }
+  .s.idle { color: var(--ink-mute); }
+  .x { grid-column: 1 / -1; font-size: 15px; line-height: 20px; color: var(--ink-soft); max-width: 34ch; }
+
+  .done { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 16px 0; color: var(--ink-mute); font-size: 16px; line-height: 24px; }
+  .done .name { color: var(--ink-soft); }
+  .done .tag { margin-left: 8px; font-size: 14px; color: var(--ink-mute); }
+
+  footer {
+    position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 16px var(--gutter) 32px; background: var(--slate); border-top: 1px solid var(--line);
+  }
+  .btn { height: 48px; border: 1px solid var(--line-strong); border-radius: 6px; font-size: 16px; font-weight: 600; }
+  .btn:hover { border-color: var(--ink); }
+  .btn:active { background: rgba(236, 235, 230, 0.06); }
+  .btn.quiet { border-color: transparent; color: var(--ink-soft); font-weight: 400; }
+  .btn.quiet:hover { color: var(--ink); border-color: var(--line); }
+</style>
+</head>
+<body>
+  <header>
+    <h1 class="who">Marcos <span>· Tableros</span></h1>
+    <p class="today">jueves 15/10</p>
+  </header>
+
+  <nav role="tablist" aria-label="Vistas">
+    <button class="tab" role="tab" aria-selected="true">Mis tareas</button>
+    <button class="tab" role="tab" aria-selected="false">Mi sector</button>
+    <button class="tab" role="tab" aria-selected="false">Lo que pedí</button>
+  </nav>
+
+  <section class="week" aria-label="Esta semana">
+    <div class="day">lun<b>12</b><small></small></div>
+    <div class="day">mar<b>13</b><small></small></div>
+    <div class="day">mié<b>14</b><small></small></div>
+    <div class="day is-today" aria-current="date">jue<b>15</b><small>hoy</small></div>
+    <div class="day">vie<b>16</b><small class="due">1 vence</small></div>
+  </section>
+
+  <main>
+    <ol>
+      <li><button class="task">
+        <span class="t">Pedir el plano rev. C</span><span class="d">vie 16/10</span>
+        <span class="s wait">esperando</span>
+        <span class="x">Falta la firma de Ismael; se ocupa Ismael.</span>
+      </button></li>
+      <li><button class="task">
+        <span class="t">Revisar el tablero</span><span class="d">lun 19/10</span>
+        <span class="s doing">en curso</span>
+      </button></li>
+      <li><button class="task">
+        <span class="t">Calibrar el sensor</span><span class="d">jue 22/10</span>
+        <span class="s idle">sin empezar</span>
+        <span class="x">Te la pidió Martín Forte.</span>
+      </button></li>
+    </ol>
+
+    <h2>Terminadas esta semana</h2>
+    <div class="done">
+      <span><span class="name">Medir la tierra</span><span class="tag">terminada</span></span>
+      <span>lun 12/10</span>
+    </div>
+  </main>
+
+  <footer>
+    <button class="btn">Nueva tarea</button>
+    <button class="btn quiet">Nuevo objetivo</button>
+  </footer>
+</body>
+</html>

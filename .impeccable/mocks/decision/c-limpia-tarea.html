@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Revisar el tablero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#0e1114; --hover:#151a1e; --line:#242a30; --line-2:#363e46;
+  --ink:#e9ecef; --ink-2:#b3bbc3; --ink-3:#8b949d;
+  --green:#4fb37a; --orange:#f08a4b;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --sans:"Hanken Grotesk",system-ui,sans-serif;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden;background:var(--ground);color:var(--ink)}
+body{font-family:var(--sans);-webkit-font-smoothing:antialiased;position:relative}
+::selection{background:var(--green);color:var(--ground)}
+a,button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-decoration:none}
+a:focus-visible,button:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* navigation: back to the list, position in it */
+.nav{position:absolute;inset:0 0 auto 0;height:56px;padding:6px 16px 0;display:flex;justify-content:space-between;align-items:center}
+.back{display:inline-flex;align-items:center;min-height:44px;margin-left:-8px;padding:0 8px;font-size:15px;font-weight:500;color:var(--ink-2);transition:color .2s var(--ease)}
+.back:hover{color:var(--ink)}
+.pos{font-size:12px;color:var(--ink-3)}
+
+/* business days from today to the due date */
+.days{position:absolute;left:16px;right:16px;top:104px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);list-style:none}
+.days li{position:relative;padding-top:14px;font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.days b{display:block;font-size:22px;font-weight:500;letter-spacing:-.02em;color:var(--ink-2);margin-bottom:2px}
+.days li::before{content:"";position:absolute;top:-1px;left:0;width:16px;height:2px}
+.days .today::before{background:var(--green)}
+.days .today b{color:var(--ink)}
+.days .due::before{background:var(--ink)}
+.days .due,.days .due b{color:var(--ink)}
+
+/* the task, anchored low-left */
+.task{position:absolute;left:16px;width:196px;bottom:96px}
+.meta{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:var(--ink-2);margin-bottom:14px}
+.state{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--green);line-height:20px}
+.meta .obj{line-height:20px}
+.task h2{font-size:34px;line-height:1.06;font-weight:600;letter-spacing:-.02em;text-wrap:balance}
+.due-line{margin-top:10px;font-family:var(--mono);font-size:14px;font-weight:500}
+.task p{margin-top:14px;font-size:14px;line-height:1.45;color:var(--ink-2)}
+.rev{margin-top:14px;font-size:14px;color:var(--ink-2)}
+
+/* actions, stacked on the right, best one first */
+.acts{position:absolute;right:16px;bottom:96px;width:140px;list-style:none;border-top:1px solid var(--line)}
+.acts li{border-bottom:1px solid var(--line)}
+.act{display:block;width:100%;min-height:52px;padding:10px 0;font-family:var(--mono);font-size:13px;font-weight:500;line-height:1.4;text-align:left;color:var(--ink-2);transition:color .2s var(--ease),background .2s var(--ease)}
+.act:hover{background:var(--hover);color:var(--ink)}
+.act.done{color:var(--green);font-weight:600}
+.act.need{color:var(--orange)}
+.act.done:hover{color:#6fcb96}
+.act.need:hover{color:#f6a36f}
+
+/* latest fact */
+.last{position:absolute;left:16px;right:16px;bottom:36px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="Navegación">
+  <a class="back" href="#mis-tareas">&lsaquo; Mis tareas</a>
+  <span class="pos mono" aria-label="Tarea 2 de 3">2 de 3</span>
+</nav>
+
+<ol class="days" aria-label="Días hábiles hasta el vencimiento">
+  <li class="today" aria-current="date"><b>15</b>hoy</li>
+  <li><b>16</b>vie</li>
+  <li class="due"><b>19</b>lun vence</li>
+</ol>
+
+<article class="task" aria-labelledby="t">
+  <div class="meta"><span class="state">en curso</span><span class="obj">Tablero de planta</span></div>
+  <h2 id="t">Revisar el tablero</h2>
+  <div class="due-line">vence lun 19/10</div>
+  <p>Revisar el tablero de Nahuel contra el plano rev. C antes de energizar.</p>
+  <div class="rev">La revisa Ismael</div>
+</article>
+
+<ul class="acts" aria-label="Qué pasó con esta tarea">
+  <li><button type="button" class="act done">&gt; Ya la terminé</button></li>
+  <li><button type="button" class="act need">&gt; Me falta algo para seguir</button></li>
+  <li><button type="button" class="act">&gt; Pedir más tiempo</button></li>
+</ul>
+
+<p class="last">mar 13 · Empezaste</p>
+
+</body>
+</html>

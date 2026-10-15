@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #fbfbfa;
+    --ink: #20262e;
+    --ink-soft: #545d68;
+    --ink-faint: #6b737d;
+    --rule: #e4e6e9;
+    --press: #f1f2f3;
+    --esperando: #b24f27;
+    --en-curso: #3b6ea8;
+    --terminada: #3f7a51;
+    --margin: 64px;
+    --gutter: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 400 15px/1.4 "Hanken Grotesk", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    caret-color: var(--en-curso);
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+  ::selection { background: #d6e2f0; color: var(--ink); }
+  a { color: inherit; text-decoration: none; }
+  :focus-visible { outline: 2px solid var(--en-curso); outline-offset: 2px; border-radius: 6px; }
+
+  header { padding: 20px var(--gutter) 14px; border-bottom: 1px solid var(--ink); }
+  .top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  h1 { font-size: 28px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; }
+  .hoy { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .quien { margin-top: 6px; display: flex; justify-content: space-between; font-size: 14px; color: var(--ink-soft); }
+  .folio { color: var(--ink-faint); font-size: 13px; }
+
+  ol { list-style: none; }
+  li + li { border-top: 1px solid var(--rule); }
+  .tarea {
+    display: grid;
+    grid-template-columns: var(--margin) 1fr;
+    padding: 16px var(--gutter) 15px 0;
+    transition: background-color 160ms cubic-bezier(.16, 1, .3, 1);
+  }
+  .tarea:hover { background: var(--press); }
+  .tarea:active { background: #eaebed; }
+  .tarea:focus-visible { outline-offset: -2px; border-radius: 0; }
+  .cuerpo { grid-column: 2; }
+  .linea1 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .titulo { font-size: 17px; font-weight: 600; line-height: 1.3; text-wrap: balance; }
+  .estado { flex: none; font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+  .estado.esperando { color: var(--esperando); }
+  .estado.en-curso { color: var(--en-curso); }
+  .estado.terminada { color: var(--terminada); }
+  .vence { margin-top: 2px; font-size: 13px; color: var(--ink-faint); }
+
+  .asiento { grid-column: 1 / -1; display: grid; grid-template-columns: var(--margin) 1fr; margin-top: 10px; }
+  .fecha {
+    padding-left: var(--gutter);
+    font-size: 13px;
+    line-height: 21px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .hecho {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 15.5px;
+    line-height: 21px;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+
+  .pie {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 12px var(--gutter) 22px;
+    background: var(--page);
+    border-top: 1px solid var(--rule);
+  }
+  .contar {
+    width: 100%;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--ink);
+    color: #fbfbfa;
+    font: 600 16px/1 "Hanken Grotesk", system-ui, sans-serif;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(32, 38, 46, .18);
+    transition: background-color 160ms cubic-bezier(.16, 1, .3, 1);
+  }
+  .contar:hover { background: #2e3640; }
+  .contar:active { background: #161a20; }
+  .contar:disabled { background: #9aa1a9; cursor: not-allowed; box-shadow: none; }
+  .contar svg { width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="top">
+      <h1>Mis tareas</h1>
+      <span class="hoy">jueves 15/10</span>
+    </div>
+    <p class="quien"><span>Nahuel · Tableros</span><span class="folio">hoja 1 de 1</span></p>
+  </header>
+
+  <main>
+    <ol>
+      <li>
+        <a class="tarea" href="#pasar-los-cables">
+          <div class="cuerpo">
+            <div class="linea1"><span class="titulo">Pasar los cables</span><span class="estado esperando">esperando</span></div>
+            <p class="vence">vence vie 16/10</p>
+          </div>
+          <p class="asiento"><span class="fecha">mié 14</span><span class="hecho">Ariel dijo que la IP del servidor llega el lunes</span></p>
+        </a>
+      </li>
+      <li>
+        <a class="tarea" href="#armar-el-tablero">
+          <div class="cuerpo">
+            <div class="linea1"><span class="titulo">Armar el tablero</span><span class="estado en-curso">en curso</span></div>
+            <p class="vence">vence mar 20/10</p>
+          </div>
+          <p class="asiento"><span class="fecha">mar 13</span><span class="hecho">Empezaste</span></p>
+        </a>
+      </li>
+      <li>
+        <a class="tarea" href="#probar-el-plc">
+          <div class="cuerpo">
+            <div class="linea1"><span class="titulo">Probar el PLC</span><span class="estado">sin empezar</span></div>
+            <p class="vence">vence mié 28/10</p>
+          </div>
+          <p class="asiento"><span class="fecha">lun 12</span><span class="hecho">Te la pidió Marcos Tarquini</span></p>
+        </a>
+      </li>
+      <li>
+        <a class="tarea" href="#revisar-el-plano">
+          <div class="cuerpo">
+            <div class="linea1"><span class="titulo">Revisar el plano</span><span class="estado">en revisión</span></div>
+          </div>
+          <p class="asiento"><span class="fecha">hoy</span><span class="hecho">Marcos la está revisando</span></p>
+        </a>
+      </li>
+    </ol>
+  </main>
+
+  <div class="pie">
+    <button class="contar" type="button">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>
+      Contarle algo a Leda
+    </button>
+  </div>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #0f0e0d;
+    --ink: #e8e4dc;
+    --muted: #837e76; /* #7c776f nudged to reach 4.7:1 on the ground */
+    --red: #e0452b;   /* only for «esperando» */
+    --serif: "Source Serif 4", Georgia, serif;
+    --sans: "Public Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
+  html, body { background: var(--ground); }
+  body { width: 390px; height: 844px; overflow: hidden; color: var(--ink); font-family: var(--sans);
+    font-size: 14px; line-height: 1.4; caret-color: var(--ink); -webkit-font-smoothing: antialiased; }
+  ::selection { background: var(--ink); color: var(--ground); }
+  a { color: inherit; text-decoration: none; }
+  a:focus-visible, button:focus-visible { outline: 1px solid var(--ink); outline-offset: 3px; }
+  .app { position: relative; width: 390px; height: 844px; }
+  .cap { font-size: 11px; font-weight: 500; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+    font-variant-numeric: tabular-nums; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; padding: 22px 16px 14px; }
+  header h1 { font-family: var(--serif); font-weight: 600; font-size: 26px; letter-spacing: -.01em; }
+  header h1 span { font-family: var(--sans); font-size: 11px; font-weight: 500; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--muted); margin-left: 8px; }
+  header time { font-size: 13px; color: var(--muted); }
+
+  nav { display: flex; margin: 0 16px; border-bottom: 1px solid var(--muted); }
+  nav a { flex: 1; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px;
+    color: var(--muted); border-bottom: 1px solid transparent; margin-bottom: -1px; }
+  nav a[aria-current="page"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+  nav a:hover { color: var(--ink); }
+
+  .week { display: grid; grid-template-columns: repeat(5, 1fr); margin: 14px 16px 0; border: 1px solid var(--muted); }
+  .week li { list-style: none; min-height: 74px; padding: 8px 8px 10px; text-align: center;
+    border-left: 1px solid var(--muted); font-variant-numeric: tabular-nums; }
+  .week li:first-child { border-left: 0; }
+  .week b { display: block; font-family: var(--serif); font-size: 17px; font-weight: 500; color: var(--muted); }
+  .week .cap { display: block; font-size: 11px; letter-spacing: .04em; }
+  .week .today { outline: 1px solid var(--ink); outline-offset: -1px; }
+  .week .today b { color: var(--ink); }
+  .week .due { color: var(--ink); }
+
+  .rail { position: relative; margin: 22px 16px 0; }
+  .rail::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: 30px; border-left: 1px solid var(--muted); }
+  .now { position: relative; display: flex; align-items: center; gap: 14px; height: 20px; padding-left: 24px; }
+  .key { position: absolute; left: 0; width: 9px; height: 9px; border: 1px solid var(--ink); background: var(--ground); }
+  .now .key { background: var(--ink); }
+  .now .cap { color: var(--ink); }
+  .now::after { content: ""; flex: 1; border-top: 1px solid var(--muted); }
+
+  .task { position: relative; display: block; padding: 14px 0 16px 24px; }
+  .task + .task { border-top: 1px solid var(--muted); margin-left: 24px; padding-left: 0; }
+  .task + .task .key { left: -24px; }
+  .task .key { top: 19px; }
+  .meta { display: flex; justify-content: space-between; align-items: baseline; }
+  .state { font-size: 13px; color: var(--muted); }
+  .state.wait { color: var(--red); font-weight: 600; }
+  .task h2 { font-family: var(--serif); font-weight: 500; font-size: 20px; line-height: 1.25; margin-top: 4px;
+    text-wrap: balance; }
+  .task p { font-size: 13.5px; color: var(--muted); margin-top: 4px; max-width: 60ch; }
+  .task:hover h2 { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+
+  .done { margin: 18px 16px 0; padding-top: 16px; border-top: 1px solid var(--muted); }
+  .done h3 { font: inherit; }
+  .done a { display: flex; justify-content: space-between; align-items: baseline; min-height: 44px; padding-top: 10px; }
+  .done a span:first-child { font-family: var(--serif); font-size: 17px; color: var(--muted);
+    text-decoration: line-through; text-decoration-thickness: 1px; }
+  .done a span:last-child { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .actions { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    padding: 14px 16px 26px; background: var(--ground); border-top: 1px solid var(--muted); }
+  .actions button { height: 48px; font: 600 15px var(--sans); color: var(--ink); background: transparent;
+    border: 1px solid var(--ink); cursor: pointer; }
+  .actions .primary { background: var(--ink); color: var(--ground); }
+  .actions button:hover { background: var(--ink); color: var(--ground); }
+  .actions .primary:hover { background: transparent; color: var(--ink); }
+  .actions button:disabled { opacity: .45; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Marcos<span>Tableros</span></h1>
+    <time datetime="2026-10-15">jueves 15/10</time>
+  </header>
+
+  <nav aria-label="Listas">
+    <a href="#" aria-current="page">Mis tareas</a>
+    <a href="#">Mi sector</a>
+    <a href="#">Lo que pedí</a>
+  </nav>
+
+  <ol class="week" aria-label="Esta semana">
+    <li><span class="cap">lun</span><b>12</b></li>
+    <li><span class="cap">mar</span><b>13</b></li>
+    <li><span class="cap">mié</span><b>14</b></li>
+    <li class="today" aria-current="date"><span class="cap">jue</span><b>15</b></li>
+    <li><span class="cap">vie</span><b>16</b><span class="cap due">1 vence</span></li>
+  </ol>
+
+  <section class="rail" aria-label="Mis tareas por vencimiento">
+    <div class="now"><i class="key" aria-hidden="true"></i><span class="cap">Hoy · jue 15/10</span></div>
+
+    <a class="task" href="#">
+      <i class="key" aria-hidden="true"></i>
+      <div class="meta"><span class="cap">vie 16/10</span><span class="state wait">esperando</span></div>
+      <h2>Pedir el plano rev. C</h2>
+      <p>Falta la firma de Ismael; se ocupa Ismael.</p>
+    </a>
+
+    <a class="task" href="#">
+      <i class="key" aria-hidden="true"></i>
+      <div class="meta"><span class="cap">lun 19/10</span><span class="state">en curso</span></div>
+      <h2>Revisar el tablero</h2>
+    </a>
+
+    <a class="task" href="#">
+      <i class="key" aria-hidden="true"></i>
+      <div class="meta"><span class="cap">jue 22/10</span><span class="state">sin empezar</span></div>
+      <h2>Calibrar el sensor</h2>
+      <p>Te la pidió Martín Forte.</p>
+    </a>
+  </section>
+
+  <section class="done" aria-labelledby="done-h">
+    <h3 id="done-h" class="cap">Terminadas esta semana</h3>
+    <a href="#"><span>Medir la tierra</span><span>lun 12/10</span></a>
+  </section>
+
+  <div class="actions">
+    <button type="button" class="primary">Nueva tarea</button>
+    <button type="button">Nuevo objetivo</button>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Tableros de Marcos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1011;--surface:#17181a;--raise:#1d1e21;--line:#25272a;--line-soft:#1e2023;
+  --ink:#e6e6e6;--muted:#8a8f98;--faint:#8a8f98;--accent:#5e6ad2;--accent-ink:#ffffff;
+  --wait:#c9a76b;--wait-bg:rgba(201,167,107,.10);--run:#7e8ae0;--run-bg:rgba(94,106,210,.14);
+  --idle:#8a8f98;--idle-bg:rgba(138,143,152,.10);--done:#5fa97e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden;background:var(--bg)}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);
+  font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;position:relative}
+::selection{background:rgba(94,106,210,.35);color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+header{display:flex;justify-content:space-between;align-items:flex-end;padding:20px 16px 14px}
+h1{font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.date{color:var(--muted);font-size:13px}
+nav{display:flex;gap:4px;padding:0 12px 12px;border-bottom:1px solid var(--line-soft)}
+nav button{padding:7px 12px;border-radius:8px;font-size:14px;font-weight:500;color:var(--muted)}
+nav button:hover{color:var(--ink);background:var(--surface)}
+nav button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.week{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:14px 16px 6px}
+.day{background:var(--surface);border:1px solid var(--line-soft);border-radius:10px;padding:8px 8px 9px;text-align:center}
+.day .dn{font-size:12px;color:var(--muted)}
+.day .dd{font-size:16px;font-weight:500;margin-top:1px}
+.day .dm{font-size:11px;color:var(--faint);margin-top:3px;height:14px}
+.day.today{border-color:var(--accent);background:var(--raise)}
+.day.today .dn{color:var(--run)}
+.day.due .dm{color:var(--wait)}
+h2{font-size:13px;font-weight:500;color:var(--muted);padding:18px 16px 8px;letter-spacing:0}
+.list{margin:0 12px;background:var(--surface);border:1px solid var(--line-soft);border-radius:12px}
+.task{display:grid;grid-template-columns:22px 1fr;gap:12px;padding:13px 14px}
+.task+.task{border-top:1px solid var(--line-soft)}
+.check{width:20px;height:20px;margin-top:1px;border-radius:50%;border:1.5px solid #4a4e55;display:grid;place-items:center}
+.check:hover{border-color:var(--muted)}
+.check.on{background:var(--done);border-color:var(--done)}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.t{font-size:15px;font-weight:500}
+.due{font-size:13px;color:var(--muted);white-space:nowrap}
+.meta{display:flex;align-items:center;gap:8px;margin-top:6px}
+.chip{font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;line-height:1.5}
+.chip.wait{color:var(--wait);background:var(--wait-bg)}
+.chip.run{color:var(--run);background:var(--run-bg)}
+.chip.idle{color:var(--idle);background:var(--idle-bg)}
+.note{font-size:13px;color:var(--muted);margin-top:6px}
+.done .t{color:var(--muted);text-decoration:line-through;text-decoration-color:#4a4e55}
+footer{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  padding:12px 16px 28px;background:var(--bg);border-top:1px solid var(--line-soft)}
+footer button{height:44px;border-radius:10px;font-size:15px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:6px}
+.primary{background:var(--accent);color:var(--accent-ink)}
+.primary:hover{background:#5560c8}
+.secondary{background:var(--surface);border:1px solid var(--line)}
+.secondary:hover{background:var(--raise)}
+svg{display:block}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Marcos</h1>
+    <p class="sub">Tableros</p>
+  </div>
+  <p class="date">jueves 15/10</p>
+</header>
+
+<nav role="tablist" aria-label="Vistas">
+  <button role="tab" aria-selected="true">Mis tareas</button>
+  <button role="tab" aria-selected="false">Mi sector</button>
+  <button role="tab" aria-selected="false">Lo que pedí</button>
+</nav>
+
+<section class="week" aria-label="Esta semana">
+  <div class="day"><p class="dn">lun</p><p class="dd">12</p><p class="dm"></p></div>
+  <div class="day"><p class="dn">mar</p><p class="dd">13</p><p class="dm"></p></div>
+  <div class="day"><p class="dn">mié</p><p class="dd">14</p><p class="dm"></p></div>
+  <div class="day today" aria-current="date"><p class="dn">hoy</p><p class="dd">15</p><p class="dm"></p></div>
+  <div class="day due"><p class="dn">vie</p><p class="dd">16</p><p class="dm">1 vence</p></div>
+</section>
+
+<h2>Por fecha</h2>
+<div class="list">
+  <article class="task">
+    <button class="check" aria-label="Marcar Pedir el plano rev. C"></button>
+    <div>
+      <div class="row"><p class="t">Pedir el plano rev. C</p><p class="due">vie 16/10</p></div>
+      <div class="meta"><span class="chip wait">esperando</span></div>
+      <p class="note">Falta la firma de Ismael; se ocupa Ismael.</p>
+    </div>
+  </article>
+  <article class="task">
+    <button class="check" aria-label="Marcar Revisar el tablero"></button>
+    <div>
+      <div class="row"><p class="t">Revisar el tablero</p><p class="due">lun 19/10</p></div>
+      <div class="meta"><span class="chip run">en curso</span></div>
+    </div>
+  </article>
+  <article class="task">
+    <button class="check" aria-label="Marcar Calibrar el sensor"></button>
+    <div>
+      <div class="row"><p class="t">Calibrar el sensor</p><p class="due">jue 22/10</p></div>
+      <div class="meta"><span class="chip idle">sin empezar</span></div>
+      <p class="note">Te la pidió Martín Forte.</p>
+    </div>
+  </article>
+</div>
+
+<h2>Terminadas esta semana</h2>
+<div class="list">
+  <article class="task done">
+    <span class="check on" aria-hidden="true">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.6l4.5-5" stroke="#0f1011" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </span>
+    <div class="row"><p class="t">Medir la tierra</p><p class="due">lun 12/10</p></div>
+  </article>
+</div>
+
+<footer>
+  <button class="primary">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    Nueva tarea
+  </button>
+  <button class="secondary">Nuevo objetivo</button>
+</footer>
+</body>
+</html>

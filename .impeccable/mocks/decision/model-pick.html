@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --steel: #26394a; --groove: #17242f; --ground: #eef1f3;
+    --ink: #14202b; --ink-2: #45566a; --on-steel: #b9c7d3; --edge: #c3ccd4;
+    --blue: #3a7bd5; --blue-t: #dde8f8;
+    --orange: #e8742a; --orange-t: #fbe4d5;
+    --green: #3f9b62; --green-t: #dcefe3;
+    --violet: #8b86a8; --violet-t: #e7e5ef;
+    --rail: 64px;
+  }
+  * { box-sizing: border-box; }
+  html, body { width: 390px; height: 844px; margin: 0; overflow: hidden; }
+  body {
+    position: relative; background: var(--ground); color: var(--ink);
+    font: 400 14px/20px "Archivo", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--blue); color: #fff; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 6px; }
+
+  /* Shell: steel header that continues as the rack's rail */
+  .top { background: var(--steel); color: #fff; padding: 18px 16px 16px; display: flex; align-items: flex-end; justify-content: space-between; }
+  .top h1 { margin: 0; font-size: 26px; line-height: 30px; font-weight: 800; letter-spacing: -0.01em; }
+  .top p { margin: 4px 0 0; color: var(--on-steel); font-size: 14px; font-weight: 500; }
+  .today { color: var(--on-steel); font-size: 14px; font-weight: 600; padding-bottom: 1px; }
+
+  /* The rack: a steel rail of due days, a groove per slot, T-cards slotted in */
+  .rack { list-style: none; margin: 0; padding: 0 16px 0 0; position: relative; }
+  .rack::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--rail); background: var(--steel); }
+  .slot { position: relative; display: grid; grid-template-columns: var(--rail) 1fr; column-gap: 12px; padding-bottom: 14px; }
+  .slot::after { content: ""; position: absolute; left: var(--rail); right: -16px; top: 40px; height: 6px;
+    background: var(--groove); box-shadow: inset 0 2px 2px rgba(0,0,0,.45); z-index: 1; }
+  .cap { display: grid; grid-template-columns: var(--rail) 1fr; column-gap: 12px; height: 28px; align-items: center; }
+  .cap span { position: relative; align-self: stretch; display: flex; align-items: center; background: var(--steel); padding-left: 14px; color: var(--on-steel); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .cap h3 { margin: 0; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+  .day { position: relative; background: var(--steel); min-height: 40px; box-sizing: border-box; padding: 8px 14px; display: flex; flex-direction: column; justify-content: center; color: #fff; }
+  .day span { color: var(--on-steel); font-size: 11px; line-height: 13px; font-weight: 600; }
+  .day b { font-size: 16px; line-height: 19px; font-weight: 700; }
+
+  .card { display: block; position: relative; color: var(--ink); text-decoration: none; }
+  .head, .head h2, .head .st { color: #0a1016; }
+  .head { position: relative; z-index: 2; min-height: 40px; box-sizing: border-box; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--c); border-radius: 4px 4px 2px 2px; box-shadow: 0 2px 4px rgba(20,32,43,.28); transition: transform .18s cubic-bezier(.16,1,.3,1), box-shadow .18s; }
+  .head h2 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .head .st { flex: none; font-size: 12px; font-weight: 600; }
+  .stem { position: relative; z-index: 0; margin: 0 14px; padding: 14px 12px 10px; background: var(--t);
+    border-radius: 0 0 4px 4px; box-shadow: 0 1px 2px rgba(20,32,43,.16); }
+  .stem p { margin: 0; }
+  .stem .sub { color: var(--ink-2); }
+  .stem strong { font-weight: 700; }
+  .card:hover .head { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(20,32,43,.3); }
+
+  .esperando { --c: var(--orange); --t: var(--orange-t); }
+  .en-curso { --c: var(--blue); --t: var(--blue-t); }
+  .sin-empezar { --c: #fff; --t: #fff; }
+  .sin-empezar .head, .sin-empezar .stem { border: 1px solid var(--edge); }
+  .sin-empezar .stem { border-top: 0; }
+  .en-revision { --c: var(--violet); --t: var(--violet-t); }
+  .terminada { --c: var(--green); --t: var(--green-t); }
+  .done { padding-bottom: 0; }
+
+  /* Action dock */
+  .dock { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 22px; background: var(--ground); border-top: 1px solid #dbe1e6; }
+  .dock button { width: 100%; height: 52px; border: 0; border-radius: 10px; background: var(--steel); color: #fff;
+    font: 700 16px/1 "Archivo", system-ui, sans-serif; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(20,32,43,.25); transition: background .15s; }
+  .dock button:hover { background: #2f4659; }
+  .dock button:active { background: var(--groove); }
+  .dock .pr { color: var(--on-steel); font-weight: 800; }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Mis tareas</h1>
+      <p>Nahuel · Tableros</p>
+    </div>
+    <span class="today">jueves 15/10</span>
+  </header>
+
+  <ul class="rack" aria-label="Tareas por día de vencimiento">
+    <li class="cap" aria-hidden="true"><span>vence</span></li>
+
+    <li class="slot">
+      <div class="day"><span>vie</span><b>16/10</b></div>
+      <a class="card esperando" href="#tarea-cables">
+        <div class="head"><h2>Pasar los cables</h2><span class="st">esperando</span></div>
+        <div class="stem">
+          <p>Falta <strong>la IP del servidor de Corelabs</strong></p>
+          <p class="sub">La consigue Ariel · vence mañana, vie 16/10</p>
+        </div>
+      </a>
+    </li>
+
+    <li class="slot">
+      <div class="day"><span>mar</span><b>20/10</b></div>
+      <a class="card en-curso" href="#tarea-tablero">
+        <div class="head"><h2>Armar el tablero</h2><span class="st">en curso</span></div>
+        <div class="stem"><p class="sub">Vence mar 20/10</p></div>
+      </a>
+    </li>
+
+    <li class="slot">
+      <div class="day"><span>mié</span><b>28/10</b></div>
+      <a class="card sin-empezar" href="#tarea-plc">
+        <div class="head"><h2>Probar el PLC</h2><span class="st">sin empezar</span></div>
+        <div class="stem">
+          <p class="sub">Vence mié 28/10</p>
+          <p class="sub">└─ te la pidió Marcos Tarquini</p>
+        </div>
+      </a>
+    </li>
+
+    <li class="slot">
+      <div class="day"><span>sin</span><b>fecha</b></div>
+      <a class="card en-revision" href="#tarea-plano">
+        <div class="head"><h2>Revisar el plano</h2><span class="st">en revisión</span></div>
+        <div class="stem"><p>La está revisando Marcos</p></div>
+      </a>
+    </li>
+
+    <li class="cap"><span aria-hidden="true"></span><h3>Terminadas esta semana</h3></li>
+
+    <li class="slot done">
+      <div class="day"><span>lun</span><b>12/10</b></div>
+      <a class="card terminada" href="#tarea-tierra">
+        <div class="head"><h2>Medir la tierra</h2><span class="st">terminada</span></div>
+      </a>
+    </li>
+  </ul>
+
+  <div class="dock">
+    <button type="button"><span class="pr" aria-hidden="true">&gt;</span> Contarle algo a Leda</button>
+  </div>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Leda · Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --flap:#0b0b0b; --board:#000; --steel:#9aa3ab; --steel-ink:#22292f; --steel-line:#6c757d;
+  --letter:#f4f4f1; --detail:#c4cbd1; --head:#9aa3ab; --lamp:#ff9f1c; --cancel:#c0392b;
+  --cell-w:12px; --cell-h:24px;
+}
+*{box-sizing:border-box}
+html,body{width:390px;height:844px;margin:0;overflow:hidden}
+body{
+  display:flex;flex-direction:column;padding:20px 16px 20px;color:var(--steel-ink);
+  font:400 15px/1.4 "Barlow",sans-serif;
+  background:var(--steel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='390' height='240'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.004 .9' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+}
+::selection{background:var(--flap);color:var(--letter)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+header{margin-bottom:16px}
+h1{margin:0;font:700 34px/1 "Barlow Condensed",sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--flap)}
+.meta{display:flex;justify-content:space-between;margin-top:6px;font-weight:500;font-size:15px}
+.meta time{font-variant-numeric:tabular-nums}
+.board{color:var(--detail);background:var(--board);border:1px solid var(--steel-line);border-radius:6px;padding:10px 11px 12px}
+table{border-collapse:separate;border-spacing:0}
+th{padding:0 12px 8px 0;text-align:left;font:600 12px/1 "Barlow Condensed",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--head)}
+td{padding:12px 12px 0 0;vertical-align:top}
+th:last-child,td:last-child{padding-right:0}
+tbody+tbody tr:first-child td{border-top:1px solid #1d2125}
+tbody tr:first-child td{padding-top:10px}
+.cells{display:flex;flex-direction:column;gap:1px}
+.ln{display:flex;gap:1px}
+.ln i{
+  position:relative;display:block;width:var(--cell-w);height:var(--cell-h);border-radius:2px;
+  background:var(--flap);color:var(--letter);font:600 18px/24px "Barlow Condensed",sans-serif;
+  font-style:normal;text-align:center;
+}
+.ln i::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--board)}
+.flip .ln i::before{content:"";position:absolute;left:0;right:0;top:0;height:50%;border-radius:2px 2px 0 0;background:rgba(255,255,255,.05)}
+.det{padding-top:7px;font-size:14px;line-height:1.35;color:var(--detail)}
+tbody:last-child .det,tbody .det{padding-bottom:2px}
+.hoy{display:flex;align-items:center;gap:7px;margin-bottom:2px;font:600 13px/1.2 "Barlow Condensed",sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--lamp)}
+.lamp{width:9px;height:9px;border-radius:50%;background:var(--lamp);box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
+@media (prefers-reduced-motion:no-preference){
+  .flip td{perspective:360px}
+  .flip .ln i{animation:flap .7s cubic-bezier(.16,1,.3,1)}
+  .flip td:nth-child(2) .ln i{animation-delay:70ms;animation-fill-mode:backwards}
+  .flip td:nth-child(3) .ln i{animation-delay:140ms;animation-fill-mode:backwards}
+}
+@keyframes flap{from{transform:rotateX(-62deg)}to{transform:rotateX(0)}}
+.done{margin-top:18px}
+h2{margin:0 0 6px;font:600 17px/1.2 "Barlow Condensed",sans-serif;letter-spacing:.02em;color:var(--flap)}
+.done ul{margin:0;padding:0;list-style:none}
+.done li{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--steel-line);font-weight:500}
+.done time{font-variant-numeric:tabular-nums}
+.leda{
+  margin-top:auto;width:100%;min-height:52px;padding:0 18px;border:0;border-radius:6px;cursor:pointer;
+  background:var(--flap);color:var(--letter);text-align:left;
+  font:600 19px/1 "Barlow Condensed",sans-serif;letter-spacing:.04em;
+}
+.leda:hover{background:#1c2024}
+.leda:active{transform:translateY(1px)}
+.leda:focus-visible{outline:2px solid var(--flap);outline-offset:3px}
+.leda span{color:var(--head);margin-right:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Mis tareas</h1>
+  <p class="meta"><span>Nahuel · Tableros</span><time datetime="2026-10-15">jueves 15/10</time></p>
+</header>
+
+<main>
+<div class="board">
+<table>
+  <caption class="sr">Mis tareas, ordenadas por vencimiento</caption>
+  <thead><tr><th scope="col">Vence</th><th scope="col">Tarea</th><th scope="col">Estado</th></tr></thead>
+
+  <tbody class="flip">
+    <tr>
+      <td rowspan="2"><span class="sr">vie 16/10</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>V</i><i>I</i><i>E</i><i></i><i></i></span>
+        <span class="ln"><i>1</i><i>6</i><i>/</i><i>1</i><i>0</i></span></span></td>
+      <td><span class="sr">Pasar los cables</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>P</i><i>A</i><i>S</i><i>A</i><i>R</i><i></i><i>L</i><i>O</i><i>S</i><i></i></span>
+        <span class="ln"><i>C</i><i>A</i><i>B</i><i>L</i><i>E</i><i>S</i><i></i><i></i><i></i><i></i></span></span></td>
+      <td><span class="sr">esperando</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>E</i><i>S</i><i>P</i><i>E</i><i>R</i><i>A</i><i>N</i><i>D</i><i>O</i></span>
+        <span class="ln"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span></td>
+    </tr>
+    <tr><td colspan="2" class="det">
+      <span class="hoy"><span class="lamp" aria-hidden="true"></span>Cambió hoy</span>
+      Falta la IP del servidor de Corelabs; la consigue Ariel.</td></tr>
+  </tbody>
+
+  <tbody>
+    <tr>
+      <td><span class="sr">mar 20/10</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>M</i><i>A</i><i>R</i><i></i><i></i></span>
+        <span class="ln"><i>2</i><i>0</i><i>/</i><i>1</i><i>0</i></span></span></td>
+      <td><span class="sr">Armar el tablero</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>A</i><i>R</i><i>M</i><i>A</i><i>R</i><i></i><i>E</i><i>L</i><i></i><i></i></span>
+        <span class="ln"><i>T</i><i>A</i><i>B</i><i>L</i><i>E</i><i>R</i><i>O</i><i></i><i></i><i></i></span></span></td>
+      <td><span class="sr">en curso</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>E</i><i>N</i><i></i><i>C</i><i>U</i><i>R</i><i>S</i><i>O</i><i></i></span>
+        <span class="ln"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span></td>
+    </tr>
+  </tbody>
+
+  <tbody>
+    <tr>
+      <td rowspan="2"><span class="sr">mié 28/10</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>M</i><i>I</i><i>É</i><i></i><i></i></span>
+        <span class="ln"><i>2</i><i>8</i><i>/</i><i>1</i><i>0</i></span></span></td>
+      <td><span class="sr">Probar el PLC</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>P</i><i>R</i><i>O</i><i>B</i><i>A</i><i>R</i><i></i><i>E</i><i>L</i><i></i></span>
+        <span class="ln"><i>P</i><i>L</i><i>C</i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span></td>
+      <td><span class="sr">sin empezar</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>S</i><i>I</i><i>N</i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="ln"><i>E</i><i>M</i><i>P</i><i>E</i><i>Z</i><i>A</i><i>R</i><i></i><i></i></span></span></td>
+    </tr>
+    <tr><td colspan="2" class="det">Te la pidió Marcos Tarquini.</td></tr>
+  </tbody>
+
+  <tbody>
+    <tr>
+      <td rowspan="2"><span class="sr">sin fecha</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="ln"><i>-</i><i>-</i><i>/</i><i>-</i><i>-</i></span></span></td>
+      <td><span class="sr">Revisar el plano</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>R</i><i>E</i><i>V</i><i>I</i><i>S</i><i>A</i><i>R</i><i></i><i>E</i><i>L</i></span>
+        <span class="ln"><i>P</i><i>L</i><i>A</i><i>N</i><i>O</i><i></i><i></i><i></i><i></i><i></i></span></span></td>
+      <td><span class="sr">en revisión</span><span class="cells" aria-hidden="true">
+        <span class="ln"><i>E</i><i>N</i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="ln"><i>R</i><i>E</i><i>V</i><i>I</i><i>S</i><i>I</i><i>Ó</i><i>N</i><i></i></span></span></td>
+    </tr>
+    <tr><td colspan="2" class="det">La revisa Marcos.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<section class="done" aria-labelledby="done-h">
+  <h2 id="done-h">Terminadas esta semana</h2>
+  <ul><li><span>Medir la tierra</span><time datetime="2026-10-12">lun 12/10</time></li></ul>
+</section>
+</main>
+
+<button class="leda" type="button"><span aria-hidden="true">&gt;</span>Contarle algo a Leda</button>
+</body>
+</html>

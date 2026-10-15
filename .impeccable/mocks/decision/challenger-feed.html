@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Mis tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#101418; --raise:#171c21; --line:#262d34;
+  --ink:#ffffff; --ink-2:#b4bcc4; --ink-3:#8b949d;
+  --orange:#f2661c; --green:#3f9b62; --green-ink:#7fd19c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden;background:var(--ground);color:var(--ink)}
+body{font-family:"Archivo",system-ui,sans-serif;font-variation-settings:"wdth" 100;-webkit-font-smoothing:antialiased;position:relative;font-feature-settings:"tnum" 1}
+::selection{background:var(--orange);color:#101418}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:999px}
+
+/* top line */
+.top{position:absolute;inset:0 0 auto 0;height:64px;padding:14px 16px 0;display:flex;justify-content:space-between;align-items:flex-start}
+.top h1{font-size:15px;font-weight:700;letter-spacing:-.005em}
+.top h1 span{color:var(--ink-3);font-weight:500}
+.top .who{font-size:13px;color:var(--ink-2);margin-top:3px}
+.top .day{font-size:13px;color:var(--ink-2);text-align:right;padding-top:2px}
+
+/* position in the feed: 4 dots, ordered by due */
+.dots{position:absolute;left:6px;top:286px;display:flex;flex-direction:column;gap:7px;list-style:none}
+.dots li{width:4px;height:4px;border-radius:2px;background:#3a434c}
+.dots li[aria-current]{height:18px;background:var(--ink)}
+
+/* runway: business days from today to due */
+.runway{position:absolute;left:24px;right:24px;top:118px}
+.track{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line)}
+.track div{position:relative;padding-top:14px;font-size:13px;color:var(--ink-3)}
+.track div::before{content:"";position:absolute;top:-4px;left:0;width:7px;height:7px;border-radius:50%;background:#3a434c}
+.track b{display:block;font-size:22px;font-weight:600;color:var(--ink-2);letter-spacing:-.01em;margin-bottom:2px}
+.track .today::before{background:var(--green);box-shadow:0 0 0 3px var(--ground)}
+.track .today b{color:var(--ink)}
+.track .due{color:var(--ink)}
+.track .due::before{background:var(--ink);border-radius:1px;transform:rotate(45deg)}
+.track .due b{color:var(--ink)}
+
+/* caption, anchored low-left */
+.scrim{position:absolute;inset:auto 0 0 0;height:470px;background:linear-gradient(to bottom,rgba(16,20,24,0) 0%,rgba(10,13,16,.55) 55%,rgba(10,13,16,.85) 100%);pointer-events:none}
+.task{position:absolute;left:20px;width:278px;bottom:102px}
+.meta{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-2);margin-bottom:12px}
+.state{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:12px;background:rgba(63,155,98,.16);color:var(--green-ink);font-weight:600}
+.state::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green)}
+.task h2{font-size:44px;line-height:.98;font-weight:800;font-variation-settings:"wdth" 82;letter-spacing:-.025em;text-wrap:balance}
+.due-line{margin-top:10px;font-size:16px;font-weight:600}
+.task p{margin-top:12px;font-size:15px;line-height:1.45;color:var(--ink-2);max-width:34ch}
+.rev{margin-top:14px;display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-2)}
+.av{width:24px;height:24px;border-radius:50%;background:#2a3238;color:var(--ink);display:grid;place-items:center;font-size:12px;font-weight:700}
+
+/* right rail of actions */
+.rail{position:absolute;right:10px;bottom:110px;width:72px;display:flex;flex-direction:column;gap:16px;list-style:none}
+.act{display:flex;flex-direction:column;align-items:center;gap:6px;width:72px;font-size:12px;font-weight:600;line-height:1.15;text-align:center}
+.act .g{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--raise);border:1px solid var(--line);transition:background .2s cubic-bezier(.16,1,.3,1),transform .2s cubic-bezier(.16,1,.3,1)}
+.act:hover .g{background:#1f262c}
+.act:active .g{transform:scale(.94)}
+.act svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.act[aria-pressed="true"] .g{background:var(--green);border-color:var(--green);box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.act.need .g{color:var(--orange);border-color:rgba(242,102,28,.45)}
+.act.done .g{color:var(--green-ink);border-color:rgba(63,155,98,.55)}
+
+/* peek of the next task */
+.next{position:absolute;left:0;right:0;bottom:0;height:84px;background:var(--raise);border-top:1px solid var(--line);border-radius:18px 18px 0 0;padding:10px 20px 0;display:block;text-align:left;width:100%}
+.next::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:#3a434c;margin:0 auto 12px}
+.next .l1{font-size:15px;font-weight:700}
+.next .l1 span{color:var(--ink-3);font-weight:500}
+.next .l2{margin-top:4px;font-size:13px;color:var(--ink-2);display:flex;gap:8px;align-items:center}
+.next .idle{display:inline-flex;align-items:center;gap:6px}
+.next .idle::before{content:"";width:6px;height:6px;border-radius:50%;border:1.5px solid var(--ink-3)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <h1>Mis tareas <span>· 1 de 4</span></h1>
+    <div class="who">Nahuel · Tableros</div>
+  </div>
+  <div class="day">jueves 15/10</div>
+</header>
+
+<ol class="dots" aria-label="Tarea 1 de 4, ordenadas por vencimiento">
+  <li aria-current="step"></li><li></li><li></li><li></li>
+</ol>
+
+<section class="runway" aria-label="Días hábiles hasta el vencimiento">
+  <div class="track">
+    <div class="today"><b>15</b>hoy</div>
+    <div><b>16</b>vie</div>
+    <div><b>19</b>lun</div>
+    <div class="due"><b>20</b>vence</div>
+  </div>
+</section>
+
+<div class="scrim" aria-hidden="true"></div>
+
+<article class="task" aria-labelledby="t1">
+  <div class="meta"><span class="state">en curso</span><span>Tablero de planta</span></div>
+  <h2 id="t1">Armar el tablero</h2>
+  <div class="due-line">vence mar 20/10</div>
+  <p>Montar y cablear el tablero principal según el plano rev. C.</p>
+  <div class="rev"><span class="av" aria-hidden="true">M</span>la revisa Marcos</div>
+</article>
+
+<ul class="rail" aria-label="Qué pasó con esta tarea">
+  <li><button type="button" class="act" aria-pressed="true">
+    <span class="g"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg></span>Empecé</button></li>
+  <li><button type="button" class="act need">
+    <span class="g"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 2.8 19.5h18.4z"/><path d="M12 10v4.2"/><path d="M12 17.2h.01"/></svg></span>Me falta algo</button></li>
+  <li><button type="button" class="act">
+    <span class="g"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="13" r="7.5"/><path d="M11 9v4l2.5 1.6"/><path d="M19 3v5M16.5 5.5h5"/></svg></span>Más tiempo</button></li>
+  <li><button type="button" class="act done">
+    <span class="g"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg></span>Ya la terminé</button></li>
+</ul>
+
+<button type="button" class="next" aria-label="Ver la siguiente tarea: Probar el PLC">
+  <div class="l1"><span>Siguiente:</span> Probar el PLC</div>
+  <div class="l2"><span>vence mié 28/10</span><span aria-hidden="true">·</span><span class="idle">sin empezar</span></div>
+</button>
+
+</body>
+</html>

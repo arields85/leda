@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Tableros · Marcos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #1d2327;
+    --ink: #e8ecee;
+    --ink-soft: #c1c9cd;
+    --muted: #9aa5ab;
+    --line: rgba(232, 236, 238, 0.12);
+    --line-strong: rgba(232, 236, 238, 0.3);
+    --accent: #7fc8c2;
+    --wait: #e5a173;
+    --doing: #8fd1a8;
+    --idle: rgba(232, 236, 238, 0.28);
+    --gutter: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; background: var(--ground); }
+  body {
+    position: relative; color: var(--ink);
+    font: 400 16px/1.4 "Schibsted Grotesk", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: var(--ground); }
+  :focus-visible { outline: 1.5px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  header { padding: 20px var(--gutter) 0; display: flex; align-items: baseline; justify-content: space-between; }
+  .who { font-size: 24px; font-weight: 600; letter-spacing: -0.015em; }
+  .who span { color: var(--muted); font-weight: 400; }
+  .today { color: var(--ink-soft); font-size: 15px; }
+
+  nav { display: flex; gap: 24px; padding: 18px var(--gutter) 0; border-bottom: 1px solid var(--line); }
+  .tab { position: relative; padding: 6px 0 12px; font-size: 16px; color: var(--muted); }
+  .tab:hover { color: var(--ink-soft); }
+  .tab[aria-selected="true"] { color: var(--ink); font-weight: 600; }
+  .tab[aria-selected="true"]::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--accent);
+  }
+
+  .label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+  }
+  .week-wrap { padding: 16px var(--gutter) 16px; border-bottom: 1px solid var(--line); }
+  .week { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 12px; }
+  .day { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); font-size: 13px; }
+  .day b { font-weight: 400; font-size: 20px; color: var(--ink-soft); line-height: 1.2; padding-bottom: 3px; }
+  .day.is-today { color: var(--ink); }
+  .day.is-today b { color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); padding: 0 4px 3px; }
+  .day small { font-size: 12px; min-height: 16px; }
+  .day.is-today small { color: var(--accent); }
+  .day small.due { color: var(--wait); }
+
+  main { padding: 0 var(--gutter); }
+  ol { list-style: none; }
+  li { border-bottom: 1px solid var(--line); }
+  .task {
+    position: relative; display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 4px;
+    width: 100%; text-align: left; padding: 15px 0 15px 14px;
+  }
+  .task::before {
+    content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 2px; background: var(--idle);
+  }
+  .task.wait::before { background: var(--wait); }
+  .task.doing::before { background: var(--doing); }
+  .task:hover { background: rgba(232, 236, 238, 0.03); }
+  .t { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .d { font-size: 15px; color: var(--ink-soft); text-align: right; align-self: baseline; }
+  .s { font-size: 14px; font-weight: 500; grid-column: 1 / -1; }
+  .wait .s { color: var(--wait); }
+  .doing .s { color: var(--doing); }
+  .idle .s { color: var(--muted); font-weight: 400; }
+  .x { grid-column: 1 / -1; font-size: 15px; color: var(--ink-soft); max-width: 34ch; }
+
+  .section-done { padding-top: 26px; }
+  .done {
+    display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 2px;
+    padding: 12px 0 12px 14px; color: var(--muted); font-size: 16px; border-bottom: 1px solid var(--line);
+    margin-top: 6px;
+  }
+  .done small { font-size: 14px; }
+
+  footer {
+    position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    padding: 12px var(--gutter) 28px; background: var(--ground); border-top: 1px solid var(--line);
+  }
+  .btn { height: 46px; border: 1px solid var(--line-strong); border-radius: 6px; font-size: 16px; font-weight: 600; }
+  .btn:hover { border-color: var(--ink); }
+  .btn:active { background: rgba(232, 236, 238, 0.06); }
+  .btn.quiet { border-color: transparent; color: var(--ink-soft); font-weight: 400; }
+  .btn.quiet:hover { color: var(--ink); border-color: var(--line); }
+</style>
+</head>
+<body>
+  <header>
+    <h1 class="who">Marcos <span>· Tableros</span></h1>
+    <p class="today">jueves 15/10</p>
+  </header>
+
+  <nav role="tablist" aria-label="Vistas">
+    <button class="tab" role="tab" aria-selected="true">Mis tareas</button>
+    <button class="tab" role="tab" aria-selected="false">Mi sector</button>
+    <button class="tab" role="tab" aria-selected="false">Lo que pedí</button>
+  </nav>
+
+  <section class="week-wrap" aria-labelledby="sem">
+    <h2 class="label" id="sem">Esta semana</h2>
+    <div class="week">
+      <div class="day">lun<b>12</b><small></small></div>
+      <div class="day">mar<b>13</b><small></small></div>
+      <div class="day">mié<b>14</b><small></small></div>
+      <div class="day is-today" aria-current="date">jue<b>15</b><small>hoy</small></div>
+      <div class="day">vie<b>16</b><small class="due">1 vence</small></div>
+    </div>
+  </section>
+
+  <main>
+    <ol style="padding-top: 6px">
+      <li><button class="task wait">
+        <span class="t">Pedir el plano rev. C</span><span class="d">vie 16/10</span>
+        <span class="s">esperando</span>
+        <span class="x">Falta la firma de Ismael; se ocupa Ismael.</span>
+      </button></li>
+      <li><button class="task doing">
+        <span class="t">Revisar el tablero</span><span class="d">lun 19/10</span>
+        <span class="s">en curso</span>
+      </button></li>
+      <li><button class="task idle">
+        <span class="t">Calibrar el sensor</span><span class="d">jue 22/10</span>
+        <span class="s">sin empezar</span>
+        <span class="x">Te la pidió Martín Forte.</span>
+      </button></li>
+    </ol>
+
+    <section class="section-done" aria-labelledby="term">
+      <h2 class="label" id="term">Terminadas esta semana</h2>
+      <div class="done">
+        <span>Medir la tierra</span><span>lun 12/10</span>
+        <small>terminada</small>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <button class="btn">Nueva tarea</button>
+    <button class="btn quiet">Nuevo objetivo</button>
+  </footer>
+</body>
+</html>

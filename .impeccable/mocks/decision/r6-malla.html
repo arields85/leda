@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<title>Tableros · Marcos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --slate: #22282b;
+    --ink: #ecebe6;
+    --ink-soft: #b9bab5;
+    --ink-mute: #9fa19e;
+    --line: rgba(236, 235, 230, 0.14);
+    --line-strong: rgba(236, 235, 230, 0.34);
+    --wait: #e3a27a;
+    --doing: #9cc7a4;
+    --gutter: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; background: var(--slate); }
+  body {
+    position: relative; color: var(--ink);
+    font: 400 16px/1.4 "Source Sans 3", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Malla de puntos: 1px cada 16px, se apaga hacia abajo */
+  body::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(circle at 1px 1px, rgba(236, 235, 230, 0.06) 1px, transparent 1.5px);
+    background-size: 16px 16px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 35%, rgba(0, 0, 0, 0.35) 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 35%, rgba(0, 0, 0, 0.35) 100%);
+  }
+  header, .hero, .week, main { position: relative; }
+  ::selection { background: var(--ink); color: var(--slate); }
+  :focus-visible { outline: 1.5px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  svg { display: block; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+  header { padding: 20px var(--gutter) 0; display: flex; align-items: flex-start; justify-content: space-between; }
+  .who { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; line-height: 32px; }
+  .who span { color: var(--ink-mute); font-weight: 400; }
+  .today { color: var(--ink-soft); font-size: 15px; line-height: 20px; }
+  .new {
+    display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; margin-top: 0;
+    border: 1px solid var(--line-strong); border-radius: 6px; font-size: 15px; font-weight: 600; background: var(--slate);
+  }
+  .new svg { width: 18px; height: 18px; }
+  .new:hover { border-color: var(--ink); }
+  .new:active { background: #2a3134; }
+
+  .hero { padding: 24px var(--gutter) 20px; border-bottom: 1px solid var(--line); }
+  .big { font-size: 40px; line-height: 44px; font-weight: 600; letter-spacing: -0.025em; text-wrap: balance; }
+  .what { margin-top: 8px; font-size: 16px; line-height: 24px; color: var(--ink-soft); }
+  .tally { margin-top: 8px; font-size: 13px; line-height: 20px; color: var(--ink-mute); }
+  .tally .wait { color: var(--wait); }
+
+  .week { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 12px var(--gutter); border-bottom: 1px solid var(--line); }
+  .day {
+    display: flex; flex-direction: column; align-items: center; padding: 8px 0;
+    color: var(--ink-mute); font-size: 13px; line-height: 16px;
+    border: 1px solid transparent; border-radius: 4px;
+  }
+  .day b { font-weight: 400; font-size: 20px; line-height: 24px; color: var(--ink-soft); margin: 4px 0; }
+  .day.is-today { color: var(--ink); border-color: var(--line-strong); background: var(--slate); }
+  .day.is-today b { color: var(--ink); font-weight: 600; }
+  .day small { font-size: 12px; line-height: 16px; min-height: 16px; }
+  .day small.due { color: var(--wait); }
+
+  main { padding: 0 var(--gutter); }
+  h2 { font-size: 13px; line-height: 16px; font-weight: 600; color: var(--ink-mute); padding: 24px 0 8px; letter-spacing: 0.02em; }
+  ol { list-style: none; }
+  li { border-bottom: 1px solid var(--line); }
+  .task { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; row-gap: 4px; width: 100%; text-align: left; padding: 16px 0; }
+  .task:hover .t { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; }
+  .t { font-size: 17px; line-height: 24px; font-weight: 600; letter-spacing: -0.005em; }
+  .d { font-size: 15px; line-height: 24px; color: var(--ink-soft); text-align: right; align-self: baseline; }
+  .s { font-size: 14px; line-height: 20px; grid-column: 1 / -1; }
+  .s.wait { color: var(--wait); }
+  .s.doing { color: var(--doing); }
+  .s.idle { color: var(--ink-mute); }
+  .x { grid-column: 1 / -1; font-size: 15px; line-height: 20px; color: var(--ink-soft); max-width: 34ch; }
+
+  .done { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 0; color: var(--ink-mute); font-size: 16px; line-height: 24px; }
+  .done .name { color: var(--ink-soft); }
+  .done .tag { margin-left: 8px; font-size: 14px; color: var(--ink-mute); }
+
+  nav {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    padding: 0 8px max(24px, env(safe-area-inset-bottom));
+    background: var(--slate); border-top: 1px solid var(--line);
+  }
+  .tab {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 0 6px; font-size: 12px; line-height: 16px; color: var(--ink-mute); text-decoration: none;
+  }
+  .tab svg { width: 24px; height: 24px; }
+  .tab:hover { color: var(--ink-soft); }
+  .tab[aria-current="page"] { color: var(--ink); font-weight: 600; }
+  .tab[aria-current="page"]::before {
+    content: ""; position: absolute; top: -1px; left: 50%; width: 20px; height: 2px; margin-left: -10px;
+    background: var(--ink); border-radius: 0 0 1px 1px;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1 class="who">Marcos <span>· Tableros</span></h1>
+      <p class="today">jueves 15/10</p>
+    </div>
+    <button class="new" aria-label="Nueva tarea u objetivo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nueva
+    </button>
+  </header>
+
+  <section class="hero" aria-label="Resumen">
+    <p class="big">1 vence mañana</p>
+    <p class="what">Pedir el plano rev. C · falta la firma de Ismael</p>
+    <p class="tally">3 abiertas · <span class="wait">1 esperando</span></p>
+  </section>
+
+  <section class="week" aria-label="Esta semana">
+    <div class="day">lun<b>12</b><small></small></div>
+    <div class="day">mar<b>13</b><small></small></div>
+    <div class="day">mié<b>14</b><small></small></div>
+    <div class="day is-today" aria-current="date">jue<b>15</b><small>hoy</small></div>
+    <div class="day">vie<b>16</b><small class="due">1 vence</small></div>
+  </section>
+
+  <main>
+    <ol>
+      <li><button class="task">
+        <span class="t">Pedir el plano rev. C</span><span class="d">vie 16/10</span>
+        <span class="s wait">esperando</span>
+        <span class="x">Falta la firma de Ismael; se ocupa Ismael.</span>
+      </button></li>
+      <li><button class="task">
+        <span class="t">Revisar el tablero</span><span class="d">lun 19/10</span>
+        <span class="s doing">en curso</span>
+      </button></li>
+      <li><button class="task">
+        <span class="t">Calibrar el sensor</span><span class="d">jue 22/10</span>
+        <span class="s idle">sin empezar</span>
+        <span class="x">Te la pidió Martín Forte.</span>
+      </button></li>
+    </ol>
+
+    <h2>Terminadas esta semana</h2>
+    <div class="done">
+      <span><span class="name">Medir la tierra</span><span class="tag">terminada</span></span>
+      <span>lun 12/10</span>
+    </div>
+  </main>
+
+  <nav aria-label="Vistas">
+    <a class="tab" href="#" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5l2 2 3.5-3.5M13 7.5h7M4 16l2 2 3.5-3.5M13 16h7"/></svg>Mis tareas
+    </a>
+    <a class="tab" href="#">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19c.6-3 2.8-4.8 5.5-4.8s4.9 1.8 5.5 4.8M15.5 5.3a3 3 0 0 1 0 5.4M17.5 14.6c1.6.6 2.6 2.1 3 4.4"/></svg>Mi sector
+    </a>
+    <a class="tab" href="#">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4.5M12 15V4M7.5 8.5L12 4l4.5 4.5"/></svg>Lo que pedí
+    </a>
+  </nav>
+</body>
+</html>
