@@ -1556,6 +1556,34 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
   escrito), con la marca "propuesto por Leda" hasta que la persona lo cambia; el texto libre queda en su
   recuadro. La vista previa y "confirmar" no cambian: se carga lo que la persona ve y confirma.
 
+- [x] **Lenguaje (porción 1, lo claro)** (2026-10-15, escritor delegado; prueba primero en cada arreglo). Sólo
+  lo que no depende de la palabra que reemplaza a "trabada": esa palabra espera en "Para decidir al
+  despertar" y no se tocó nada con "trab" o "bloque" en el motor, los hechos, los significados ni el chat.
+  - `74170e5e`: la web dice lo mismo en todas partes. Una tarea asignada se lee «SIN EMPEZAR» en su
+    tarjeta (decía «[ASIGNADA]»); en "Lo que pediste", una bloqueada dice «esperando» (decía «trabada») y
+    una asignada «sin empezar»; el estado del detalle de una tarea (`tarea_vista.ESTADOS`) dice «esperando».
+    El historial de la tarea («Se trabó», «Se destrabó») sigue igual hasta que se decida la palabra.
+  - `597c284c`: los textos fijos. La bienvenida dice «Ahora tenés 1 tarea abierta.» o «Ahora tenés 3
+    tareas abiertas.» (decía «tarea(s) abierta(s)»); un dato mal formado en la web, «Esto no se pudo leer;
+    revisalo.»; el incidente al administrador cuando una cadena no le llega a nadie dice el motivo con
+    palabras («todavía no tiene Leda conectada» o «ya no está activo en el equipo»), sin el código.
+  - `9cb79d63`: una prueba nueva revisa también los significados (`hechos.SIGNIFICADOS`) y el para qué de
+    cada jugada (`Ficha.para_que`) contra los conceptos de la cocina. Encontró cinco y se reescribieron con
+    el mismo sentido: «el reencuadre», «un aviso previo», «pedir el estado» (dos) y «lo que escribió»
+    (cinco significados de la entrega, que ahora dicen «su descripción»). Quedan anotadas, con su porqué,
+    las coincidencias que no nombran un concepto (el estado de una tarea como sustantivo, las preguntas de
+    este mensaje y «aprobar» para la decisión misma). Las huellas de las instrucciones no cambiaron, pero
+    los significados sí llegan a la IA: **queda pendiente una ronda con la IA real** de las conversaciones
+    que usan esos datos.
+  - Sin hacer: borrar `NO_EFFECT_STATUS` de `salida.py`. No es código muerto del todo: lo usa
+    `with_no_effect_status`, que nada usa en `src/` pero sí prueba `tests/garantias/test_contrato_de_salida.py`.
+    Borrarlo es retirar esa prueba de garantías, y eso queda para otra porción.
+  - Evidencia (2026-10-15): `npm test` en `web/`, 343 passed; `npm run build`, bien; `pytest -q tests/motor`,
+    1492 passed y 1 failed, que ya fallaba antes (`test_frontera.py::test_el_motor_importa_de_leda_solo_lo_permitido`:
+    `fichas.py` importa `leda.menu_del_bot`, desde `98c5758f`, MA-5); `pytest` de `test_onboarding`,
+    `test_tarea_vista`, `test_pagina_de_la_tarea`, `test_carga_del_equipo` y `test_api_de_la_plataforma`, en
+    verde; `correr --ia guionada --veces 1` (en seco), 54 de 54 bien.
+
 ## De qué se parte en cada porción (explorador de sólo lectura, 2026-10-13)
 
 Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de base para no arrancar de cero".
