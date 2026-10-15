@@ -337,6 +337,8 @@
     // ?mover forces motion in this mock even when the system asks to reduce it, so the effect can be judged.
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches && !location.search.includes('mover');
     const STEP = 7;
+    // ?invertir shows the inverted version: dark dots on a lighter screen.
+    const INVERT = location.search.includes('invertir');
     let w = 0, h = 0, dots = [];
     // Stable per-dot randomness: the dithering threshold and a size bias, like a printed halftone.
     function rand(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
@@ -369,16 +371,33 @@
       const ox = t * 0.000045, oy = -t * 0.00003;
       for (const d of dots) {
         // The field lives in the lower part: nothing above a third, denser toward the bottom edge.
-        // The noise keeps drifting, so the ragged border undulates without leaving that zone.
+        // The large noise drifts (the ragged border undulates); a smaller, faster noise makes the
+        // inside breathe, so the whole field moves, not only its edge.
         const yy = d.y / h;
         const low = yy < 0.33 ? 0 : Math.min(1, (yy - 0.33) / 0.47);
         if (low === 0) continue;
         const env = low * low * (3 - 2 * low);
-        let n = 0.62 * fbm(d.x * 0.008 + ox, d.y * 0.008 + oy) + 0.78 * env - 0.12;
+        const n = 0.62 * fbm(d.x * 0.008 + ox, d.y * 0.008 + oy) + 0.62 * env - 0.12;
+        if (INVERT) {
+          // Inverted, first the screen: a continuous lighter field that fades in smoothly (no dithering).
+          const lit = Math.max(0, Math.min(1, (n - 0.2) / 0.5));
+          if (lit > 0) {
+            ctx.fillStyle = `rgba(232, 232, 230, ${(0.085 * lit).toFixed(3)})`;
+            ctx.fillRect(d.x - STEP / 2, d.y - STEP / 2, STEP, STEP);
+          }
+        }
         const edge = 0.36 + 0.24 * d.th;
         if (n < edge) continue;
-        const k = Math.min(1, (n - edge) / 0.32);
-        const size = 0.5 + (0.6 + 0.9 * d.sz) * k * (1.3 + 0.8 * env);
+        const breath = noise(d.x * 0.022 - t * 0.00012, d.y * 0.022 + t * 0.00009);
+        const k = Math.max(0, Math.min(1, ((n - edge) / 0.55) * (0.45 + 0.75 * breath)));
+        const size = 0.5 + (0.6 + 0.9 * d.sz) * k * (1.4 + 0.9 * env);
+        if (INVERT) {
+          // Then the dark dots punched into it.
+          ctx.fillStyle = `rgba(14, 15, 16, ${(0.55 + 0.35 * k).toFixed(3)})`;
+          const dark = 0.8 + 2.4 * k * (0.8 + 0.4 * d.sz);
+          ctx.fillRect(d.x - dark / 2, d.y - dark / 2, dark, dark);
+          continue;
+        }
         ctx.fillStyle = `rgba(232, 232, 230, ${(0.05 + 0.13 * k).toFixed(3)})`;
         ctx.fillRect(d.x - size / 2, d.y - size / 2, size, size);
       }
