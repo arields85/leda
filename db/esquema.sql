@@ -3677,6 +3677,81 @@ begin
   return jsonb_build_object('estado', 'adentro', 'sesion_id', nueva);
 end $$;
 
+-- El pase de la computadora (migración 0076; MA-5, ADR 0024, precisión del 2026-10-14, noche):
+-- en Telegram de la computadora, el lanzador manda la firma y el navegador entra con el pase,
+-- que canjea `canjear_pedido_de_entrada` (la sesión de la computadora, origen `qr`). El servidor ya validó la firma con el token del bot de esa puerta
+-- (el del espacio `p_slug`, o el de administración); acá se exige que siga vigente, se gasta, se
+-- revisa quién es y se deja el pedido aprobado, auditado. El código del pedido (el que llevaría
+-- un QR) es al azar y nadie lo conoce: el pase no se ve ni se aprueba desde un bot.
+create or replace function emitir_pase_a_la_compu(
+    p_puerta text, p_slug text, p_telegram_user_id bigint, p_huella text, p_vence_en timestamptz,
+    p_pase_hash text, p_desde text)
+returns jsonb
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
+declare previo text := coalesce(current_setting('leda.workspace_id', true), '');
+        espacio uuid;
+        persona uuid;
+        usuario uuid;
+        nuevo uuid;
+        codigo text := encode(sha256(convert_to(gen_random_uuid()::text || clock_timestamp()::text,
+                                                'UTF8')), 'hex');
+begin
+  if p_puerta is null or p_puerta not in ('equipo', 'administracion')
+     or p_huella is null or p_huella !~ '^[0-9a-f]{64}$'
+     or p_pase_hash is null or p_pase_hash !~ '^[0-9a-f]{64}$'
+     or p_telegram_user_id is null or p_vence_en is null
+     or p_desde is null or length(p_desde) not between 1 and 120 then
+    return jsonb_build_object('ok', false, 'motivo', 'mal_formado');
+  end if;
+  -- La firma vale 10 minutos desde que Telegram la emitió (como en la 0074).
+  if p_vence_en <= now() or p_vence_en > now() + interval '11 minutes' then
+    return jsonb_build_object('ok', false, 'motivo', 'firma_vencida');
+  end if;
+  if p_puerta = 'equipo' then
+    select w.id into espacio from workspace w where w.slug = p_slug and w.activo;
+    if espacio is null then
+      return jsonb_build_object('ok', false, 'motivo', 'sin_espacio');
+    end if;
+  end if;
+  if not gastar_firma_de_telegram(p_huella, p_puerta, p_vence_en) then
+    return jsonb_build_object('ok', false, 'motivo', 'firma_usada');
+  end if;
+  if p_puerta = 'equipo' then
+    perform set_config('leda.workspace_id', espacio::text, true);
+    select m.id, m.app_user_id into persona, usuario
+      from membership m join app_user u on u.id = m.app_user_id
+     where m.workspace_id = espacio and u.telegram_user_id = p_telegram_user_id and m.activo;
+    if persona is null then
+      perform set_config('leda.workspace_id', previo, true);
+      return jsonb_build_object('ok', false, 'motivo', 'sin_membresia');
+    end if;
+  else
+    select u.id into usuario from app_user u
+     where u.telegram_user_id = p_telegram_user_id and es_administrador_de_plataforma(u.id);
+    if usuario is null then
+      return jsonb_build_object('ok', false, 'motivo', 'sin_rol');
+    end if;
+  end if;
+  insert into pedido_de_entrada (puerta, workspace_id, codigo_hash, secreto_hash, desde, estado,
+                                 vence_en, aprobado_en, aprobado_por_membership_id,
+                                 aprobado_por_app_user_id)
+       values (p_puerta, espacio, codigo, p_pase_hash, p_desde, 'aprobado',
+               now() + interval '1 minute', now(), persona,
+               case when p_puerta = 'administracion' then usuario end)
+    returning id into nuevo;
+  if p_puerta = 'equipo' then
+    perform auditar_acceso_web(
+      espacio, usuario, 'persona', 'emitir_pase_a_la_compu', 'pedido_de_entrada', nuevo,
+      jsonb_build_object('membership_id', persona, 'desde', p_desde));
+    perform set_config('leda.workspace_id', previo, true);
+  else
+    perform auditar_acceso_de_administracion(
+      usuario, 'persona', 'emitir_pase_a_la_compu', 'pedido_de_entrada', nuevo,
+      jsonb_build_object('desde', p_desde));
+  end if;
+  return jsonb_build_object('ok', true, 'pedido_id', nuevo);
+end $$;
+
 -- Cuánto dura la sesión de la computadora en un espacio (decisión 5): 1, 7, 30 o 90 días, o sin
 -- vencimiento (`null`). Sólo con una sesión de administración vigente; queda auditado.
 create or replace function fijar_sesion_en_la_compu(
@@ -6659,6 +6734,8 @@ alter function pedir_entrada_por_qr(text, text, text, text, text) owner to leda_
 alter function ver_pedido_de_entrada(text, text, text) owner to leda_owner;
 alter function aprobar_pedido_de_entrada(uuid, text, text, bigint) owner to leda_owner;
 alter function canjear_pedido_de_entrada(uuid, text, text, text) owner to leda_owner;
+alter function emitir_pase_a_la_compu(text, text, bigint, text, timestamptz, text, text)
+  owner to leda_owner;
 alter function fijar_sesion_en_la_compu(text, uuid, integer) owner to leda_owner;
 alter function sesion_en_la_compu(text, uuid) owner to leda_owner;
 
@@ -6671,6 +6748,8 @@ revoke execute on function pedir_entrada_por_qr(text, text, text, text, text) fr
 revoke execute on function ver_pedido_de_entrada(text, text, text) from public;
 revoke execute on function aprobar_pedido_de_entrada(uuid, text, text, bigint) from public;
 revoke execute on function canjear_pedido_de_entrada(uuid, text, text, text) from public;
+revoke execute on function emitir_pase_a_la_compu(text, text, bigint, text, timestamptz, text,
+                                                  text) from public;
 revoke execute on function fijar_sesion_en_la_compu(text, uuid, integer) from public;
 revoke execute on function sesion_en_la_compu(text, uuid) from public;
 -- La web (`leda_app`): abrir la sesión, pedir y canjear el pedido, y el ajuste de la
@@ -6685,6 +6764,9 @@ grant execute on function ver_pedido_de_entrada(text, text, text) to leda_app, l
 grant execute on function aprobar_pedido_de_entrada(uuid, text, text, bigint)
   to leda_app, leda_admin;
 grant execute on function canjear_pedido_de_entrada(uuid, text, text, text) to leda_app;
+-- El pase de la computadora (migración 0076): lo pide el lanzador, después de validar la firma.
+grant execute on function emitir_pase_a_la_compu(text, text, bigint, text, timestamptz, text, text)
+  to leda_app;
 grant execute on function fijar_sesion_en_la_compu(text, uuid, integer) to leda_app;
 grant execute on function sesion_en_la_compu(text, uuid) to leda_app;
 

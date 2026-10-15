@@ -810,10 +810,11 @@ def test_el_lanzador_solo_se_deja_enmarcar_por_telegram(todo_el_servidor, camino
     politica = _directivas(r)
     assert politica["frame-ancestors"] == TELEGRAM_EN_LA_WEB
     assert "x-frame-options" not in r.headers
-    # Sólo sus propios scripts (el de Telegram y el del lanzador), sin pedidos ni formularios.
+    # Sólo sus propios scripts (el de Telegram y el del lanzador), sin formularios.
     assert politica["script-src"] == "'self'"
     assert politica["default-src"] == "'none'"
-    assert politica["connect-src"] == "'none'"
+    # Sólo a este mismo sitio: el pase de la computadora (MA-5).
+    assert politica["connect-src"] == "'self'"
     assert politica["form-action"] == "'none'"
     assert r.headers["cache-control"] == "no-store"
     assert '<script src="/app/telegram-web-app.js"></script>' in r.text
@@ -891,3 +892,195 @@ def test_los_botones_de_la_mini_app_pasan_por_el_lanzador_y_la_direccion_para_la
     assert direccion_de_la_web("https://l.example", "north-lab", "inicio") == (
         "https://l.example/app/e/north-lab/")
     assert direccion_de_la_administracion("https://l.example") == "https://l.example/app/admin/"
+
+
+# --- El pase de la computadora: Telegram en la computadora entra sin el QR (MA-5) ---------------
+#
+# Decisión del usuario (2026-10-14, noche): en Telegram de escritorio o Telegram Web, el lanzador
+# manda la firma de Telegram al servidor, que la valida como la puerta de la Mini App y devuelve un
+# pase de un solo uso, que vence al minuto y del que la base guarda sólo la huella; el navegador lo
+# canjea al abrirse y queda adentro con la sesión de la computadora (la del QR).
+
+def _emitir_pase(conn, telegram_user_id, *, puerta="equipo", slug="north-lab", huella=None,
+                 vence="now() + interval '10 minutes'"):
+    pase = secrets.token_urlsafe(32)
+    with sin_espacio(conn) as cur:
+        cur.execute(f"""select emitir_pase_a_la_compu(%s, %s, %s, %s, {vence}, %s,
+                                                      'Telegram en Windows') as r""",
+                    (puerta, slug if puerta == "equipo" else None, telegram_user_id,
+                     huella or secrets.token_hex(32), _hash(pase)))
+        r = cur.fetchone()["r"]
+    conn.commit()
+    return r, pase
+
+
+def test_el_pase_abre_la_sesion_de_la_computadora_una_sola_vez(conn, intake_world):
+    r, pase = _emitir_pase(conn, _tg(intake_world, "Sam North"))
+    assert r["ok"] is True
+    pedido = r["pedido_id"]
+    with admin(conn) as cur:
+        cur.execute("""select estado, extract(epoch from vence_en - pedido_en) as dura,
+                              secreto_hash, aprobado_por_membership_id from pedido_de_entrada
+                        where id = %s""", (pedido,))
+        fila = cur.fetchone()
+    assert fila["estado"] == "aprobado" and 50 <= fila["dura"] <= 70
+    assert fila["secreto_hash"] == _hash(pase) and pase not in str(fila)
+    assert str(fila["aprobado_por_membership_id"]) == _membresia(intake_world, "Sam North")
+    resultado, _sesion = _canjear(conn, pedido, pase)
+    assert resultado["estado"] == "adentro"
+    assert _canjear(conn, pedido, pase)[0] == {"estado": "no_esta"}
+    with admin(conn) as cur:
+        cur.execute("select origen from sesion_web where id = %s", (resultado["sesion_id"],))
+        assert cur.fetchone()["origen"] == "qr"
+        cur.execute("""select accion, detalle from audit_log
+                        where sujeto_id in (%s, %s) order by at""", (pedido, resultado["sesion_id"]))
+        filas = cur.fetchall()
+    assert [f["accion"] for f in filas] == ["emitir_pase_a_la_compu", "abrir_sesion_web"]
+    assert filas[0]["detalle"]["membership_id"] == _membresia(intake_world, "Sam North")
+    assert filas[1]["detalle"]["origen"] == "qr"
+
+
+def test_el_pase_vence_al_minuto(conn, intake_world):
+    r, pase = _emitir_pase(conn, _tg(intake_world, "Sam North"))
+    with admin(conn) as cur:
+        cur.execute("""update pedido_de_entrada set vence_en = now() - interval '1 second',
+                              pedido_en = now() - interval '61 seconds' where id = %s""",
+                    (r["pedido_id"],))
+    conn.commit()
+    assert _canjear(conn, r["pedido_id"], pase)[0] == {"estado": "vencido"}
+
+
+def test_la_firma_del_pase_sirve_una_sola_vez_tambien_con_la_mini_app(conn, intake_world):
+    huella = secrets.token_hex(32)
+    assert _emitir_pase(conn, _tg(intake_world, "Sam North"), huella=huella)[0]["ok"] is True
+    assert _emitir_pase(conn, _tg(intake_world, "Sam North"), huella=huella)[0] == {
+        "ok": False, "motivo": "firma_usada"}
+    otra = secrets.token_hex(32)
+    assert _abrir(conn, "north-lab", _tg(intake_world, "Sam North"), otra)["ok"] is True
+    usada = _emitir_pase(conn, _tg(intake_world, "Sam North"), huella=otra)[0]
+    assert usada["motivo"] == "firma_usada"
+
+
+def test_el_pase_pide_la_membresia_del_espacio_del_bot_y_una_firma_vigente(conn, intake_world):
+    otro = _tg(intake_world, "Sam North", "west-studio")
+    assert _emitir_pase(conn, otro)[0] == {"ok": False, "motivo": "sin_membresia"}
+    assert _emitir_pase(conn, otro, slug="no-existe")[0] == {"ok": False, "motivo": "sin_espacio"}
+    for vence in ("now() - interval '1 second'", "now() + interval '30 minutes'"):
+        assert _emitir_pase(conn, _tg(intake_world, "Sam North"), vence=vence)[0] == {
+            "ok": False, "motivo": "firma_vencida"}
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from pedido_de_entrada")
+        assert cur.fetchone()["n"] == 0
+
+
+def test_el_pase_de_la_administracion_pide_el_rol_de_plataforma(conn, intake_world):
+    morgan = intake_world["north-lab"]["people"]["Morgan Hale"]
+    assert _emitir_pase(conn, morgan["telegram"], puerta="administracion")[0] == {
+        "ok": False, "motivo": "sin_rol"}
+    _otorgar(conn, morgan["app_user_id"])
+    r, pase = _emitir_pase(conn, morgan["telegram"], puerta="administracion")
+    assert r["ok"] is True
+    # Por la puerta del equipo no se canjea.
+    assert _canjear(conn, r["pedido_id"], pase)[0] == {"estado": "no_esta"}
+    resultado, _ = _canjear(conn, r["pedido_id"], pase, puerta="administracion")
+    assert resultado["estado"] == "adentro"
+    with admin(conn) as cur:
+        cur.execute("select origen from sesion_de_administracion where id = %s",
+                    (resultado["sesion_id"],))
+        assert cur.fetchone()["origen"] == "qr"
+
+
+def test_leda_app_emite_el_pase_y_la_funcion_es_del_dueno(conn, intake_world):
+    firma = "leda.emitir_pase_a_la_compu(text, text, bigint, text, timestamptz, text, text)"
+    with admin(conn) as cur:
+        cur.execute("select has_function_privilege('leda_app', %s, 'execute') as si", (firma,))
+        assert cur.fetchone()["si"] is True
+        cur.execute("""select p.proowner::regrole::text dueno, p.prosecdef
+                         from pg_proc p where p.oid = %s::regprocedure""", (firma,))
+        fila = cur.fetchone()
+    assert (fila["dueno"], fila["prosecdef"]) == ("leda_owner", True)
+
+
+def _pase(navegador, init_data, slug="north-lab"):
+    return navegador.post("/app/api/entrar/pase", json={"espacio": slug, "init_data": init_data})
+
+
+def test_telegram_en_la_compu_abre_el_navegador_ya_adentro(web, conn, intake_world):
+    r = _pase(web(), firmar(TOKEN_NORTE, _tg(intake_world, "Sam North")))
+    assert r.status_code == 201, r.text
+    direccion = r.json()["direccion"]
+    assert re.fullmatch(r"/app/entrar/pase/[0-9a-f-]{36}/[A-Za-z0-9_-]{43}", direccion)
+    # Telegram no queda con ninguna sesión: es la del navegador.
+    assert "set-cookie" not in r.headers
+    navegador = web()
+    r = navegador.get(direccion, params={"a": "/app/e/north-lab/?tarea=t-1"})
+    assert r.status_code == 303
+    assert r.headers["location"] == "/app/e/north-lab/?tarea=t-1"
+    cookie = r.headers["set-cookie"]
+    assert "leda_sesion=" in cookie and "HttpOnly" in cookie and "Secure" in cookie
+    assert "SameSite=strict" in cookie and "Path=/app" in cookie
+    assert navegador.get("/app/api/yo").json()["persona"] == "Sam North 1"
+    # Una sola vez: otra vez lleva al mismo lugar, sin sesión (ahí está el QR).
+    r = web().get(direccion, params={"a": "/app/e/north-lab/"})
+    assert (r.status_code, r.headers["location"]) == (303, "/app/e/north-lab/")
+    assert "set-cookie" not in r.headers
+
+
+def test_la_firma_del_pase_no_sirve_dos_veces_ni_de_otro_bot(web, conn, intake_world):
+    init_data = firmar(TOKEN_NORTE, _tg(intake_world, "Sam North"))
+    assert _pase(web(), init_data).status_code == 201
+    assert _pase(web(), init_data).status_code == 409
+    r = _pase(web(), firmar(TOKEN_OESTE, _tg(intake_world, "Sam North")))
+    assert (r.status_code, r.json()["error"]) == (401, "firma_invalida")
+    r = _pase(web(), firmar(TOKEN_NORTE, _tg(intake_world, "Sam North", "west-studio")))
+    assert (r.status_code, r.json()["error"]) == (403, "sin_membresia")
+    assert r.json()["texto"]
+    r = web().post("/app/api/entrar/pase", headers={"origin": "https://otro.example"},
+                   json={"espacio": "north-lab",
+                         "init_data": firmar(TOKEN_NORTE, _tg(intake_world, "Sam North"))})
+    assert r.status_code == 403
+
+
+@pytest.mark.parametrize("a", ["//otro.example/", "https://otro.example/", "/app/../x",
+                               "/app/e/north-lab/?x=<script>", "/otro/", "", "/app/admin/",
+                               "/app/e/north-lab//x"])
+def test_el_pase_nunca_lleva_fuera_de_su_puerta(web, conn, intake_world, a):
+    r = _pase(web(), firmar(TOKEN_NORTE, _tg(intake_world, "Sam North")))
+    r = web().get(r.json()["direccion"], params={"a": a})
+    assert (r.status_code, r.headers["location"]) == (303, "/app/")
+
+
+def test_el_pase_de_la_administracion_solo_con_su_bot(web, conn, intake_world):
+    morgan = intake_world["north-lab"]["people"]["Morgan Hale"]
+    _otorgar(conn, morgan["app_user_id"])
+    r = web().post("/app/admin/api/entrar/pase",
+                   json={"init_data": firmar(TOKEN_NORTE, morgan["telegram"])})
+    assert r.status_code == 401
+    r = web().post("/app/admin/api/entrar/pase",
+                   json={"init_data": firmar(TOKEN_ADMIN, morgan["telegram"])})
+    assert r.status_code == 201, r.text
+    direccion = r.json()["direccion"]
+    assert direccion.startswith("/app/admin/entrar/pase/")
+    navegador = web()
+    r = navegador.get(direccion, params={"a": "/app/admin/"})
+    assert (r.status_code, r.headers["location"]) == (303, "/app/admin/")
+    assert "leda_admin=" in r.headers["set-cookie"]
+    assert "Path=/app/admin" in r.headers["set-cookie"]
+    assert navegador.get("/app/admin/api/yo").status_code == 200
+    # El pase de la administración no abre la puerta del equipo.
+    assert navegador.get("/app/api/yo").status_code == 401
+    r = web().get(direccion, params={"a": "/app/e/north-lab/"})
+    assert r.headers["location"] == "/app/admin/"
+    r = web().post("/app/admin/api/entrar/pase",
+                   json={"init_data": firmar(TOKEN_ADMIN, _tg(intake_world, "Sam North"))})
+    assert (r.status_code, r.json()["error"]) == (403, "sin_rol")
+
+
+def test_el_pase_no_queda_en_la_consola(web, conn, intake_world, capsys):
+    init_data = firmar(TOKEN_NORTE, _tg(intake_world, "Sam North"))
+    direccion = _pase(web(), init_data).json()["direccion"]
+    web().get(direccion, params={"a": "/app/e/north-lab/"})
+    web().get(direccion, params={"a": "/app/e/north-lab/"})
+    salida = capsys.readouterr()
+    pase = direccion.rsplit("/", 1)[1]
+    assert init_data not in salida.out + salida.err and pase not in salida.out + salida.err

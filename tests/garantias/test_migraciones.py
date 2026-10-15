@@ -858,7 +858,10 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             # ahí; antes aún, la 0072, que deja quién revisa como la dejó la 0071; y antes de todas,
             # la 0073, cuya marca del botón de la web apunta a la tarea y cuyo pedido de entrada,
             # a la membresía). Antes que ninguna, la 0075, cuya función del detalle de la tarea
-            # lee quién la pidió (la columna de la 0071).
+            # lee quién la pidió (la columna de la 0071). Y antes aún la 0076, cuyo pase de la
+            # computadora deja pedidos de entrada (la tabla de la 0073).
+            (rollback_0076,) = (ROOT / "db" / "rollbacks").glob("0076_*.sql")
+            db.execute(_sql_script(rollback_0076))
             (rollback_0075,) = (ROOT / "db" / "rollbacks").glob("0075_*.sql")
             db.execute(_sql_script(rollback_0075))
             (rollback_0074,) = (ROOT / "db" / "rollbacks").glob("0074_*.sql")

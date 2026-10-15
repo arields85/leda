@@ -116,6 +116,22 @@ una firma que el servidor comprueba con el token del bot.
       tiene sesión, datos ni formularios.
     - Todo lo demás sigue con `frame-ancestors 'none'` y `X-Frame-Options: DENY`. Esto precisa la decisión 10.
 
+### Precisión (2026-10-14, noche: el pase de la computadora)
+
+13. **Telegram en la computadora abre el navegador ya adentro, sin el QR** (usuario, MA-5). Esto precisa las
+    decisiones 4 y 12.
+    - El lanzador manda la firma de Telegram al servidor, que la valida igual que la puerta de la Mini App: el token
+      del bot de esa puerta, 10 minutos, y la base la gasta una sola vez (la misma huella que la Mini App).
+    - La base revisa la membresía activa del espacio de ese bot (o el rol de plataforma) y deja un pedido de entrada
+      ya aprobado por esa persona, como el del QR, que vence al minuto, sirve una vez y guarda sólo la huella del
+      pase. Queda auditado (`emitir_pase_a_la_compu`; migración 0076).
+    - El navegador abre la dirección del pase, lo canjea y entra donde llevaba el botón, con la sesión de la
+      computadora: dura lo que eligió el equipo (decisión 5).
+    - Si algo falla (un Telegram viejo, el servidor, una firma vencida, una cuenta que no es del equipo), el lanzador
+      abre la dirección sola, donde se entra con el QR, y lo dice en palabras, nunca con un error técnico.
+    - El lanzador puede pedirle sólo a este mismo sitio (`connect-src 'self'`). El QR sigue para una computadora sin
+      Telegram.
+
 ## Qué texto reemplaza a cuál
 
 - **ADR 0022, decisión 2,** "una sola web, responsive, que se instala en el celular": la web sigue

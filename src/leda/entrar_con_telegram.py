@@ -26,11 +26,23 @@ Rutas, todas bajo `/app` y del mismo origen que la web (la cookie de cada puerta
 - `GET /app/abrir/e/<espacio>/` y `GET /app/abrir/admin/`: el lanzador que abren los botones de la
   Mini App y el del menú (`despachador.direccion_de_la_mini_app`). En el celular sigue a la web
   dentro de Telegram; en Telegram de la computadora, que muestra la Mini App dentro de un marco,
-  abre la web en el navegador, donde se entra con el QR (decisión del usuario, 2026-10-14). Es lo
-  único que se deja enmarcar, y sólo por Telegram: no tiene sesión, ni datos, ni formularios.
+  abre la web en el navegador, ya adentro con el pase de la computadora (abajo), o donde se entra
+  con el QR si el pase no se pudo (decisión del usuario, 2026-10-14). Es lo único que se deja
+  enmarcar, y sólo por Telegram: no tiene sesión, ni datos, ni formularios, y sólo le pide a este
+  mismo sitio.
+- `POST /app/api/entrar/pase` y `POST /app/admin/api/entrar/pase` (MA-5, migración 0076): el
+  lanzador, en Telegram de la computadora, manda la firma de Telegram como la Mini App; se valida
+  igual (el token del bot de esa puerta, 10 minutos) y la base la gasta, revisa la membresía (o el
+  rol) y deja un pedido de entrada ya aprobado que vence al minuto, con sólo la huella del pase.
+  Devuelve la dirección del pase, que abre el navegador.
+- `GET /app/entrar/pase/{pedido}/{pase}` y `GET /app/admin/entrar/pase/{pedido}/{pase}`: el
+  navegador canjea el pase (`canjear_pedido_de_entrada`, la del QR: la sesión de la computadora)
+  y va a donde llevaba el botón (`?a=`, sólo una página de esa puerta). Un pase usado, vencido o
+  inventado lleva al mismo lugar sin sesión, donde se entra con el QR.
 
-**Nunca se registran** `initData`, la firma, los tokens de los bots ni los de las sesiones: en la
-consola, sólo el tipo de una falla.
+**Nunca se registran** `initData`, la firma, los tokens de los bots, los de las sesiones ni el
+pase: en la consola, sólo el tipo de una falla (la web corre sin el registro de accesos de
+uvicorn, `--no-access-log`, que imprimiría la dirección del pase).
 """
 
 from __future__ import annotations
@@ -48,15 +60,15 @@ from typing import Any
 from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from . import qr
 from .config import config
 from .db import admin as conexion_admin
 from .db import espacio as en_el_espacio
 from .db import sin_espacio
-from .web_app import (BOT_USUARIO, CAMINO_DE_ADMINISTRACION, COOKIE, COOKIE_DE_ADMINISTRACION,
-                      LARGO_MAXIMO_DEL_TOKEN, USUARIO_DEL_BOT, _con_la_base,
+from .web_app import (BOT_USUARIO, CABECERAS_DE_LA_WEB, CAMINO_DE_ADMINISTRACION, COOKIE,
+                      COOKIE_DE_ADMINISTRACION, LARGO_MAXIMO_DEL_TOKEN, USUARIO_DEL_BOT, _con_la_base,
                       _con_la_version_del_nucleo, _de_otro_sitio, _hash, _imprimir, _json,
                       _no_existe, _sin_sesion_de_administracion, _token_de_administracion)
 
@@ -252,6 +264,11 @@ def _respuesta_de_la_apertura(resultado: dict[str, Any], puerta: str, sesion: st
         respuesta = _json({"ok": True})
         _poner_cookie(respuesta, puerta, sesion, DURACION_DE_LA_MINI_APP_S)
         return respuesta
+    return _respuesta_del_rechazo(resultado)
+
+
+def _respuesta_del_rechazo(resultado: dict[str, Any]) -> Response:
+    """Lo que la base no aceptó de una firma (la Mini App o el pase), en palabras para la web."""
     motivo = resultado.get("motivo")
     if motivo == "firma_usada":
         # La misma apertura otra vez (la Mini App se recargó): la web sigue con la sesión que ya
@@ -288,9 +305,10 @@ async def _en_un_hilo(funcion, *args):
 # Windows y en Mac, según la versión, la abre directo en su navegador interno, sin marco). La web
 # no se deja enmarcar, así que el botón abre este lanzador, que sí, y sólo por ese origen. En un
 # celular (`ios`, `android`) sigue a la web dentro de Telegram, con lo que Telegram le pasó en el
-# fragmento (la firma); en la computadora abre la web en el navegador (`openLink`), sin la firma,
-# y muestra "Abrí Leda en el navegador" con un botón para volver a abrirla. La lógica está en
-# `web/public/abrir.js`; esta página no tiene nada del pedido, ni sesión, ni datos.
+# fragmento (la firma); en la computadora pide el pase de la computadora (MA-5) y abre la web en
+# el navegador (`openLink`) con él, o sin él (el QR) si no se pudo, y muestra "Abrí Leda en el
+# navegador" con un botón para volver a abrirla. La lógica está en `web/public/abrir.js`; esta
+# página no tiene nada del pedido, ni sesión, ni datos, y sólo puede pedirle a este mismo sitio.
 
 ORIGENES_QUE_ENMARCAN_EL_LANZADOR = ("https://web.telegram.org",)
 # A dónde puede llevar: la puerta del equipo de un espacio, o la de administración.
@@ -303,7 +321,7 @@ CABECERAS_DEL_LANZADOR = {
     # Sin `X-Frame-Options`: no admite una lista de orígenes, y `frame-ancestors` la reemplaza.
     "Content-Security-Policy": ("default-src 'none'; script-src 'self'; "
                                 "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; "
-                                "connect-src 'none'; frame-ancestors "
+                                "connect-src 'self'; frame-ancestors "
                                 + " ".join(ORIGENES_QUE_ENMARCAN_EL_LANZADOR)),
 }
 PAGINA_DEL_LANZADOR = """<!doctype html>
@@ -533,6 +551,104 @@ async def pedir_el_qr_de_la_administracion(request: Request):
 @router.get("/admin/api/entrar/qr/{pedido_id}")
 def preguntar_por_el_qr_de_la_administracion(pedido_id: str, request: Request):
     return _preguntar_por_el_qr(request, PUERTA_DE_ADMINISTRACION, pedido_id)
+
+
+# --- El pase de la computadora: Telegram en la computadora entra sin el QR (MA-5) ---------------
+
+CAMINO_DEL_PASE = {PUERTA_DEL_EQUIPO: "/app/entrar/pase",
+                   PUERTA_DE_ADMINISTRACION: f"{CAMINO_DE_ADMINISTRACION}/entrar/pase"}
+# A dónde puede llevar el pase (`?a=`): sólo una página de su puerta, con una consulta simple; si
+# no, el principio de la puerta.
+DESTINO_DEL_PASE = {
+    PUERTA_DEL_EQUIPO: re.compile(r"^/app/e/[a-z0-9][a-z0-9-]{0,63}/(?:\?[A-Za-z0-9=&_.%-]*)?$"),
+    PUERTA_DE_ADMINISTRACION: re.compile(r"^/app/admin/(?:\?[A-Za-z0-9=&_.%-]*)?$")}
+PRINCIPIO_DE_LA_PUERTA = {PUERTA_DEL_EQUIPO: "/app/",
+                          PUERTA_DE_ADMINISTRACION: f"{CAMINO_DE_ADMINISTRACION}/"}
+
+
+async def _pedir_el_pase(request: Request, puerta: str) -> Response:
+    """La firma de Telegram del lanzador, validada como la de la Mini App, por un pase de un solo
+    uso que vence al minuto. Nunca pone una cookie: la sesión es la del navegador."""
+    if _de_otro_sitio(request):
+        return _json({"error": "origen_no_verificado"}, 403)
+    cuerpo = await _cuerpo(request)
+    if cuerpo is None:
+        return _json({"error": "cuerpo_invalido"}, 415)
+    slug = cuerpo.get("espacio") if puerta == PUERTA_DEL_EQUIPO else None
+    init_data = cuerpo.get("init_data")
+    if (puerta == PUERTA_DEL_EQUIPO and not es_un_espacio(slug)) or not isinstance(init_data, str):
+        return _json({"error": "cuerpo_invalido"}, 422)
+    token = _token_del_bot(slug if puerta == PUERTA_DEL_EQUIPO else "admin")
+    firma = validar_init_data(init_data, token or "")
+    if firma is None:
+        return _json({"error": "firma_invalida", "texto": TEXTO_FIRMA_INVALIDA}, 401)
+    pase = secrets.token_urlsafe(32)
+    desde = desde_donde(request)
+
+    def emitir(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            _con_la_version_del_nucleo(cur)
+            cur.execute("select emitir_pase_a_la_compu(%s, %s, %s, %s, %s, %s, %s) as r",
+                        (puerta, slug, firma.telegram_user_id, firma.huella, firma.vence_en,
+                         _hash(pase), desde))
+            resultado = cur.fetchone()["r"]
+        if resultado.get("ok"):
+            return _json({"direccion":
+                          f"{CAMINO_DEL_PASE[puerta]}/{resultado['pedido_id']}/{pase}"}, 201)
+        return _respuesta_del_rechazo(resultado)
+
+    return await _en_la_base(emitir)
+
+
+def _canjear_el_pase(request: Request, puerta: str, pedido_id: str, pase: str) -> Response:
+    """El navegador abre el pase: si sirve, queda adentro con la sesión de la computadora; sirva
+    o no, va a donde llevaba el botón (o al principio de la puerta), donde sin sesión aparece el
+    QR. Nunca muestra un error técnico."""
+    pedido = request.query_params.get("a") or ""
+    destino = (pedido if DESTINO_DEL_PASE[puerta].match(pedido)
+               else PRINCIPIO_DE_LA_PUERTA[puerta])
+
+    def llevar() -> Response:
+        return RedirectResponse(destino, status_code=303, headers=CABECERAS_DE_LA_WEB)
+
+    if not es_un_uuid(pedido_id) or not 0 < len(pase) <= LARGO_MAXIMO_DEL_TOKEN:
+        return llevar()
+    sesion = secrets.token_urlsafe(32)
+
+    def canjear(conn) -> Response:
+        with sin_espacio(conn) as cur:
+            _con_la_version_del_nucleo(cur)
+            cur.execute("select canjear_pedido_de_entrada(%s, %s, %s, %s) as r",
+                        (pedido_id, puerta, _hash(pase), _hash(sesion)))
+            resultado = cur.fetchone()["r"]
+        respuesta = llevar()
+        if resultado.get("estado") == "adentro":
+            _poner_cookie(respuesta, puerta, sesion, DURACION_DE_LA_COOKIE_S)
+        return respuesta
+
+    respuesta = _con_la_base(canjear)
+    # Si la base no estuvo, igual a la página: ahí se entra con el QR.
+    return respuesta if isinstance(respuesta, RedirectResponse) else llevar()
+
+
+@router.post("/api/entrar/pase")
+async def pedir_el_pase_del_equipo(request: Request):
+    return await _pedir_el_pase(request, PUERTA_DEL_EQUIPO)
+
+
+@router.post("/admin/api/entrar/pase")
+async def pedir_el_pase_de_la_administracion(request: Request):
+    return await _pedir_el_pase(request, PUERTA_DE_ADMINISTRACION)
+
+
+@router.get("/entrar/pase/{pedido_id}/{pase}", include_in_schema=False)
+def canjear_el_pase_del_equipo(pedido_id: str, pase: str, request: Request):
+    return _canjear_el_pase(request, PUERTA_DEL_EQUIPO, pedido_id, pase)
+
+
+@router.get("/admin/entrar/pase/{pedido_id}/{pase}", include_in_schema=False)
+def canjear_el_pase_de_la_administracion(pedido_id: str, pase: str, request: Request):
+    return _canjear_el_pase(request, PUERTA_DE_ADMINISTRACION, pedido_id, pase)
 
 
 # --- Cuánto dura la sesión de la computadora (decisión 5) ---------------------------------------
