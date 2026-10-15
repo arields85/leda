@@ -1559,7 +1559,10 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       - [x] **J7-1** · el equipo cuadra (`0081`): `problemas_del_equipo`, `area.archivada_en` (un área nunca se
         borra: se archiva), la tabla `cambio_del_equipo` (sólo se agrega, antes y después), y se le quita a
         `leda_app` la escritura de las tablas del equipo.
-        **Hecha** (2026-10-15; escritor delegado), `115a5fb5`. `problemas_del_equipo(uuid)` (`leda_owner`,
+        **Hecha** (2026-10-15; escritor delegado), `115a5fb5`. RDD aprobada (sólo sugerencias: una prueba de la
+        puerta de administración sin aserción, los que llaman a la escritura quitada y la exactitud de los grants
+        del rollback). `leda_motor` en la `0081` (respaldo `db/respaldos/leda_motor-antes-0081-20261015.dump`,
+        ensayada antes en una copia descartable). `problemas_del_equipo(uuid)` (`leda_owner`,
         sólo para el espacio de la transacción; otro espacio o ninguno se rechaza) devuelve la lista de
         problemas con código y en palabras de todos los días: `sin_autoridad_final`,
         `mas_de_una_autoridad_final`, `sin_aprobador`, `aprobador_inactivo`, `ciclo_de_aprobacion` (cada

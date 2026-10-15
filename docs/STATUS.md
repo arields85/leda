@@ -44,7 +44,7 @@ detalle en el documento de la unidad): la MA-7 ("Cerrar sesión" en la compu), l
 (10 de 10), las deudas de la MA, lo claro de "Lenguaje", el ADR 0025 (propuesta), la base del cambio de fecha
 (J5 S2), el ensayo de propiedad sobre un clúster limpio y la T8, la parte 1 del grafo de transiciones (más su
 arreglo para varias filas), el candado de la sesión de ChatGPT y los planes de la J5 y la J6. `leda_motor` en la
-`0080` (último respaldo `db/respaldos/leda_motor-antes-0077-a-0080-20261015.dump`).
+`0081` (último respaldo `db/respaldos/leda_motor-antes-0081-20261015.dump`).
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si no responde aunque `pg_ctl
 status` diga que corre (pasó el 2026-10-14: error de memoria compartida), cerrar con `taskkill /F` TODOS los
@@ -173,7 +173,7 @@ validador de invariantes. Destino de cada uno:
   `deteccion_pregunta`, `jev` y `local`) y la escalera, el reloj y el ciclo viejos.
 - **La auditoría vuelve a la cocina:** cada `herramientas.ejecutar` y cada efecto propio del motor deja su fila
   en `audit_log`, con `pack_hash` y `nucleo_hash`.
-- **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0080` (la plataforma, el acceso por chat, el cambio de fecha y el grafo) en la rama. La `0032` borra las tablas del alta.
+- **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0081` (la plataforma, el acceso por chat, el cambio de fecha, el grafo y el equipo que cuadra) en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   Ensayo de propiedad sobre un clúster limpio, 2026-10-15 (`tools/ensayo_propiedad.py`): propietarios y RLS
