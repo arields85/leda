@@ -185,7 +185,9 @@ validador de invariantes. Destino de cada uno:
 - **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0066` (la plataforma y el acceso por chat) en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
-  `PENDIENTE`: un ensayo de propiedad sobre un clúster limpio.
+  Ensayo de propiedad sobre un clúster limpio, 2026-10-15 (`tools/ensayo_propiedad.py`): propietarios y RLS
+  bien; una base migrada desde el principio difiere en 3 privilegios de roles sin acceso de la app (T8 de
+  `odd/tasks/aislamiento-entre-clientes.md`).
 - **Las pruebas de garantías** están en `tests/garantias/`, con fronteras que impiden importar código viejo. Las
   del motor, en `tests/motor/`. El corredor y las 20 conversaciones de prueba, en `tests/conversaciones/`
   (`python -m tests.conversaciones.correr --ia …`).
