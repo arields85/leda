@@ -271,3 +271,123 @@ def test_de_un_objetivo_cancelado_no_se_sale(conn, equipo):
         assert _rechazo_objetivo(conn, objetivo, "cancelado", destino).startswith(
             "transicion_invalida"), destino
     assert _estado_objetivo(conn, objetivo) == "cancelado"
+
+
+# --- Varios eventos en una sola sentencia (migración 0080) ----------------------------------------
+# La proyección (`aplicar_evento_*`, `after insert`) se aplica al final de cada sentencia: antes de
+# la 0080, cada fila de un `insert` de varias se comparaba contra el estado de antes de la
+# sentencia, y dos saltos desde el mismo estado pasaban los dos (advertencia de la revisión del
+# grafo, `36c6120a`). Desde la 0080 cada fila se compara contra el último evento registrado, que
+# dentro de la misma sentencia sí se ve: una cadena válida en una sola sentencia sigue pasando.
+
+def _eventos(cur, tarea: str, pares: list[tuple[str | None, str]]) -> None:
+    filas = ", ".join(["(%s, %s::estado_tarea, %s::estado_tarea, 'sistema', 'prueba del grafo')"]
+                      * len(pares))
+    cur.execute(f"""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                  actor_kind, motivo)
+                    values {filas}""",
+                [v for anterior, nuevo in pares for v in (tarea, anterior, nuevo)])
+
+
+def _pasan_juntos(conn, mundo, tarea: str, pares: list[tuple[str | None, str]]) -> None:
+    with espacio(conn, mundo.workspace_id) as cur:
+        _eventos(cur, tarea, pares)
+    conn.commit()
+    assert _estado(conn, tarea) == pares[-1][1]
+
+
+def _rechazo_juntos(conn, mundo, tarea: str, pares: list[tuple[str | None, str]]) -> str:
+    antes = _estado(conn, tarea)
+    with espacio(conn, mundo.workspace_id) as cur:
+        with pytest.raises(psycopg.errors.RaiseException) as e:
+            with conn.transaction():
+                _eventos(cur, tarea, pares)
+    conn.rollback()
+    assert _estado(conn, tarea) == antes
+    return e.value.diag.message_primary
+
+
+def test_dos_eventos_desde_el_mismo_estado_en_una_sentencia_se_rechazan(conn, equipo):
+    """Cancelar y entregar en la misma sentencia: la tarea saldría de `cancelada`."""
+    tarea = equipo.tareas["COM"]
+    _pasa(conn, equipo, tarea, "asignada", "en_curso")
+    mensaje = _rechazo_juntos(conn, equipo, tarea,
+                              [("en_curso", "cancelada"), ("en_curso", "en_revision")])
+    assert mensaje.startswith("transicion_invalida")
+
+
+def test_salir_de_cancelada_en_la_segunda_fila_se_rechaza(conn, equipo):
+    tarea = equipo.tareas["COM"]
+    mensaje = _rechazo_juntos(conn, equipo, tarea,
+                              [("asignada", "cancelada"), ("cancelada", "asignada")])
+    assert mensaje.startswith("transicion_invalida")
+
+
+def test_una_cadena_valida_en_una_sola_sentencia_pasa(conn, equipo):
+    """Empezar y entregar juntos encadena; la sentencia siguiente sale del último."""
+    tarea = equipo.tareas["COM"]
+    _pasan_juntos(conn, equipo, tarea, [("asignada", "en_curso"), ("en_curso", "en_revision")])
+    _pasa(conn, equipo, tarea, "en_revision", "en_curso")
+    assert _rechazo(conn, equipo, tarea, "en_revision", "en_curso").startswith(
+        "transicion_invalida")
+
+
+def test_salir_de_bloqueada_en_la_misma_sentencia_vuelve_al_estado_previo(conn, equipo):
+    tarea = equipo.tareas["COM"]
+    with admin(conn) as cur:
+        cur.execute("""insert into blocker (workspace_id, task_id, causa, abierto_por)
+                       values (%s, %s, 'Falta el cable', %s)""",
+                    (equipo.workspace_id, tarea, equipo.personas["Marcos"]["membership_id"]))
+    conn.commit()
+    mensaje = _rechazo_juntos(conn, equipo, tarea,
+                              [("asignada", "bloqueada"), ("bloqueada", "en_curso")])
+    assert mensaje.startswith("transicion_invalida")
+    _pasan_juntos(conn, equipo, tarea, [("asignada", "bloqueada"), ("bloqueada", "asignada")])
+
+
+def test_el_numero_del_evento_lo_pone_la_base(conn, equipo):
+    """Quien inserta no elige el orden: el número que manda se reemplaza por el siguiente."""
+    tarea = equipo.tareas["COM"]
+    with admin(conn) as cur:
+        cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                     actor_kind, numero)
+                       values (%s, 'asignada', 'en_curso', 'sistema', 1000)""", (tarea,))
+        cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                     actor_kind, numero)
+                       values (%s, 'en_curso', 'en_revision', 'sistema', 1)""", (tarea,))
+        cur.execute("""select array_agg(numero order by numero) n from task_state_event
+                        where task_id = %s and numero is not null""", (tarea,))
+        numeros = cur.fetchone()["n"]
+    conn.commit()
+    assert len(numeros) >= 2 and numeros == list(range(1, len(numeros) + 1))
+    assert _estado(conn, tarea) == "en_revision"
+
+
+def _eventos_objetivo(cur, objetivo: str, pares: list[tuple[str | None, str]]) -> None:
+    filas = ", ".join(["(%s, %s::estado_objetivo, %s::estado_objetivo, 'sistema')"]
+                      * len(pares))
+    cur.execute(f"""insert into objective_state_event (objective_id, estado_anterior,
+                                                       estado_nuevo, actor_kind)
+                    values {filas}""",
+                [v for anterior, nuevo in pares for v in (objetivo, anterior, nuevo)])
+
+
+def test_el_objetivo_tampoco_salta_dos_veces_en_una_sentencia(conn, equipo):
+    objetivo = _objetivo(conn, equipo)
+    _evento_objetivo(conn, objetivo, None, "activo")
+    for pares in ([("activo", "cancelado"), ("activo", "suspendido")],
+                  [("activo", "cancelado"), ("cancelado", "activo")]):
+        with admin(conn) as cur:
+            with pytest.raises(psycopg.errors.RaiseException) as e:
+                with conn.transaction():
+                    _eventos_objetivo(cur, objetivo, pares)
+        conn.rollback()
+        assert e.value.diag.message_primary.startswith("transicion_invalida"), pares
+        assert _estado_objetivo(conn, objetivo) == "activo"
+    with admin(conn) as cur:
+        _eventos_objetivo(cur, objetivo, [("activo", "suspendido"), ("suspendido", "activo"),
+                                          ("activo", "suspendido")])
+    conn.commit()
+    assert _estado_objetivo(conn, objetivo) == "suspendido"
+    _evento_objetivo(conn, objetivo, "suspendido", "activo")
+    assert _estado_objetivo(conn, objetivo) == "activo"
