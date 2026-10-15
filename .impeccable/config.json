@@ -620,6 +620,15 @@
         ],
         "createdAt": "2026-10-15T18:57:47.431Z",
         "reason": "user chose Kanit for the r8 alternative (2026-10-15)"
+      },
+      {
+        "rule": "wide-tracking",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/r8-lista-variantes.html"
+        ],
+        "createdAt": "2026-10-15T18:58:02.819Z",
+        "reason": "intentional: short lowercase labels tracked like the user's reference (2026-10-15); body text is not tracked"
       }
     ]
   }
