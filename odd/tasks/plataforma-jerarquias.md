@@ -1632,19 +1632,24 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
     y «Se destrabó»); el tablero, «Esperando algo para seguir» y «Ninguna tarea está esperando algo para
     seguir.»; los errores de la espera en la web, «otra no puede quedar esperándola» (decía «no puede trabar a
     otra»).
-  - **Sin hacer, fuera de lo autorizado:** en el historial de la tarea siguen «dijo que no sabe quién la
-    destraba», «no hay otra persona que la destrabe», «dijo que la destraba …», «Quedó asentado que sigue
-    trabada» y «nadie toma el bloqueo»: tres los afirma `tests/garantias/test_pagina_web_de_la_tarea.py`, que
-    no estaba en la superficie del escritor. Propuesta: «no sabe quién se ocupa de lo que falta», «no hay otra
-    persona que se ocupe», «dijo que de eso se ocupa X», «dijo que lo consigue el …», «Quedó asentado que sigue
-    esperando» y «nadie se ocupa de lo que le falta». Tampoco se tocó lo que lee la IA para elegir jugadas
-    (`Ficha.es`, `ia_real.DATOS`, `INSTRUCCIONES_JUGADAS`): no lo escribe a la persona.
+  - `b12eb445`: el resto del historial de la tarea (con la superficie ampliada por el coordinador a
+    `tests/garantias/test_pagina_web_de_la_tarea.py`): «dijo que no sabe quién se ocupa de lo que falta», «dijo
+    que no hay otra persona que se ocupe», «dijo que de eso se ocupa Mariano», «dijo que lo consigue el vie
+    23/10», «Quedó asentado que sigue esperando: 5 días hábiles» y «Quedó asentado que nadie se ocupa de lo que
+    le falta» (decían «quién la destraba», «que la destrabe», «la destraba», «sigue trabada» y «nadie toma el
+    bloqueo»). En `tarea_vista.py` sólo quedan nombres internos y comentarios.
+  - **Sin tocar, a propósito:** lo que lee la IA para elegir jugadas (`Ficha.es`, `ia_real.DATOS`,
+    `INSTRUCCIONES_JUGADAS`), que no se le escribe a la persona; `herramientas.py` (las vistas previas de las
+    herramientas, como «Registré el bloqueo…», que el motor no muestra) y `cli.py` («Bloqueos abiertos», para
+    quien opera), fuera de esta porción; y el texto de resolución que guarda `destrabar` cuando la persona no
+    escribió nada («la causa del bloqueo ya no está», `fichas.py`), que nada muestra hoy.
   - Evidencia (2026-10-15): `LEDA_BASE_URL= pytest -q tests/motor tests/test_onboarding.py
     tests/test_tarea_vista.py tests/garantias/test_tablero.py`, 1537 passed y 2 failed, las dos de
     `test_avisos_sin_nombre_ni_hora.py` que esperaban los nombres viejos y se corrigieron en el mismo commit (12
     passed al repetirlas); sin `LEDA_BASE_URL=` vacío fallan 15 de la cadena por el ofrecimiento de la web, del
     entorno y no del cambio. `npm test` en `web/`, 343 passed. `correr --ia guionada --veces 1` (en seco), 54
-    de 54 bien. **Queda pendiente la ronda con la IA real** de las conversaciones afectadas (la 55 primero, y
+    de 54 bien. Con `b12eb445`: `pytest -q tests/garantias/test_pagina_web_de_la_tarea.py
+    tests/test_tarea_vista.py tests/motor/test_palabras_de_la_redaccion.py`, 52 passed. **Queda pendiente la ronda con la IA real** de las conversaciones afectadas (la 55 primero, y
     las de la cadena: 32 a 35, 40 y 42); la corre el coordinador.
 - [x] **Grafo de transiciones (parte 1, lo que dice la mecánica)** (2026-10-15, escritor delegado; prueba
   primero). Sólo lo que la mecánica §3 dice explícitamente; lo demás espera las preguntas de "Para decidir al
