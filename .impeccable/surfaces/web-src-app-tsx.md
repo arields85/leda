@@ -36,6 +36,24 @@ FORM: «El pizarrón» (candidato 3 de la lista propia de la ronda 3, asignado p
 usuario; seed key 71b06f5b.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
 
+## Direction contract — alternativa «Sobria» (r8, en prueba; la r7 sigue vigente)
+
+Fijada por el usuario (2026-10-15, noche) con tres referencias (un lanzador de Android negro con bandas y cifras
+finas; un reloj circular plano en gris; y, menos, un panel de entrenamiento negro). Pedido: "bien sobrio, muy limpio";
+la r7 no se pierde.
+THESIS: Leda como un instrumento sobrio: cifras grandes y finas, bandas separadas por filetes, nada más; rechaza
+superficies elevadas, tarjetas y gradientes.
+OWN-WORLD: fondo casi negro plano (#18191a), tinta neutra (#e8e8e6), grises; Source Sans 3 en 200/300 para las
+cifras y 400/600 para el texto; etiquetas en minúscula con espaciado amplio; filetes horizontales entre bandas, con
+margen; el color del estado sólo en cifras y palabras, apagado. Gesto propio: hoy, dentro de un anillo de 1px.
+STORY: la persona abre, lee lo urgente en una cifra grande y fina, ve la semana y cuántas tiene en cada estado, toca
+uno y la lista se filtra.
+FIRST VIEWPORT: nombre y «nueva» arriba; el resumen como cifra grande con dos líneas a la derecha; la semana; los
+cinco contadores como cifras finas; la lista en filas con filetes; la barra de pestañas pegada abajo, en gris un tono
+más claro.
+FORM: fijada por el usuario (sin sorteo); seed key: ninguna.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+
 ## Decidido con el usuario (2026-10-15, noche)
 
 - **Orden de la pantalla:** resumen grande (lo más urgente), semana, contadores (Vencidas · Sin empezar · En curso ·
