@@ -59,7 +59,8 @@ PERMITIDOS: dict[str, set[str] | None] = {
                    "REFERENCIA_INBOUND_MESSAGE"},
     "llm": None,
     "config": None,
-    "onboarding": {"activar", "bienvenida", "ActivacionInvalida", "ofrecimiento_de_la_web",
+    # `canjear` (J7-5, migración 0084): el canje del enlace, con si la cuenta quedó unida.
+    "onboarding": {"canjear", "bienvenida", "ActivacionInvalida", "ofrecimiento_de_la_web",
                    "destino_de_la_bienvenida", "ofrecer_la_web_en_la_bienvenida"},
     "versiones": None,
     "huerfanos": {"barrer"},
