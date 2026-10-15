@@ -4,10 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
 <title>Tableros · Marcos</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@200;300;400;600&display=swap" rel="stylesheet">
 <style>
+  @font-face { font-family: "Kanit"; font-weight: 100; font-display: swap; src: url("../fonts/kanit/Kanit-Thin.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 200; font-display: swap; src: url("../fonts/kanit/Kanit-ExtraLight.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 300; font-display: swap; src: url("../fonts/kanit/Kanit-Light.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 400; font-display: swap; src: url("../fonts/kanit/Kanit-Regular.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 500; font-display: swap; src: url("../fonts/kanit/Kanit-Medium.ttf") format("truetype"); }
   :root {
     --ground: #18191a;
     --bar: #242628;
@@ -34,7 +36,7 @@
   }
   body {
     position: relative; color: var(--ink); background: transparent;
-    font: 400 16px/1.4 "Source Sans 3", system-ui, sans-serif;
+    font: 300 16px/1.4 "Kanit", system-ui, sans-serif;
     font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1, "lnum" 1;
     -webkit-font-smoothing: antialiased;
   }
@@ -44,12 +46,12 @@
   svg { display: block; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
 
   /* Tracked lowercase labels: the reference's quiet voice. */
-  .lbl { font-size: 12px; line-height: 16px; letter-spacing: 0.14em; text-transform: lowercase; color: var(--ink-mute); }
+  .lbl { font-size: 12px; line-height: 16px; font-weight: 300; letter-spacing: 0.14em; text-transform: lowercase; color: var(--ink-mute); }
 
   .band { margin: 0 var(--gutter); border-bottom: 1px solid var(--hair); }
 
   header.band { display: flex; justify-content: space-between; align-items: center; padding: 18px 0 16px; }
-  .who { font-size: 16px; line-height: 22px; font-weight: 600; }
+  .who { font-size: 16px; line-height: 22px; font-weight: 400; }
   .who span { font-weight: 300; color: var(--ink-mute); }
   .new { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 2px 0 8px; }
   .new .ring { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 999px; transition: border-color 160ms ease-out; }
@@ -58,7 +60,7 @@
 
   .hero { padding: 26px 0 24px; }
   .hero .row { display: flex; align-items: center; gap: 16px; }
-  .hero .n { font-size: 88px; line-height: 80px; font-weight: 200; letter-spacing: -0.04em; color: var(--wait); }
+  .hero .n { font-size: 92px; line-height: 84px; font-weight: 100; letter-spacing: -0.04em; color: var(--wait); }
   .hero .what { display: flex; flex-direction: column; gap: 2px; }
   .hero .what strong { font-size: 30px; line-height: 34px; font-weight: 300; letter-spacing: -0.01em; }
   .hero .why { margin-top: 14px; font-size: 15px; line-height: 21px; font-weight: 300; color: var(--ink-soft); }
@@ -96,7 +98,7 @@
   .list li.first { border-top: 0; }
   .task { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; row-gap: 3px; width: 100%; text-align: left; padding: 16px 0; }
   .task:active .t { color: var(--ink-soft); }
-  .t { font-size: 17px; line-height: 24px; font-weight: 400; }
+  .t { font-size: 17px; line-height: 24px; font-weight: 300; }
   .d { font-size: 15px; line-height: 24px; font-weight: 300; color: var(--ink-soft); text-align: right; }
   .s { grid-column: 1 / -1; font-size: 12px; line-height: 16px; letter-spacing: 0.12em; color: var(--ink-mute); }
   .s.wait { color: var(--wait); }
