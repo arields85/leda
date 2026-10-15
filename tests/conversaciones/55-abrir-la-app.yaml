@@ -54,14 +54,14 @@ pasos:
     efectos: {}
     hechos:
       - {jugada: pedir_acceso_web, resultado: boton_para_abrir_la_web,
-         lleva_el_boton: Ver mis tareas}
+         lleva_el_boton: Mi espacio}
     pregunta: {tipo: como_vienen_sus_tareas, desde_antes: true}
     enlace: false
     enlace_web: true
     estado_despues:
       pregunta_abierta: {tipo: como_vienen_sus_tareas, tarea: null}
     dice:
-      - "primero, que la abre tocando «Ver mis tareas»"
+      - "primero, que la abre tocando «Mi espacio»"
       - "después, la pregunta de cómo vienen sus tareas, sin pedir que repita nada"
     no_dice:
       - un enlace, o que pida uno

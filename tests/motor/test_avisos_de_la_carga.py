@@ -119,7 +119,7 @@ def test_las_tareas_cargadas_seguidas_van_en_un_mensaje_despues_de_la_ultima(con
 
 def test_con_la_direccion_publica_lleva_el_boton_que_abre_la_tarea(conn, equipo, monkeypatch):
     """ADR 0024, decisión 2: el aviso de una tarea lleva "Ver la tarea", que abre esa tarea (no la
-    página principal); el de varias, "Ver mis tareas"."""
+    página principal); el de varias, "Mi espacio"."""
     import dataclasses
 
     from leda import config as config_mod
@@ -141,7 +141,7 @@ def test_con_la_direccion_publica_lleva_el_boton_que_abre_la_tarea(conn, equipo,
             titulo="Medir la señal")
     [hecho] = _hechos(_enviar(conn, equipo, AHORA + timedelta(hours=2)), "Sam North")
     assert len(hecho["tareas_que_le_cargaron"]) == 2
-    assert hecho["lleva_el_boton"] == "Ver mis tareas"
+    assert hecho["lleva_el_boton"] == "Mi espacio"
 
 
 def test_fuera_del_horario_sale_al_empezar_el_siguiente(conn, equipo):

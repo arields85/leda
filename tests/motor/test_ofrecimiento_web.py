@@ -38,7 +38,7 @@ from tests.motor.ayudantes import (AHORA, TelegramFalso, mensaje_de_telegram,
 DIRECCION = "https://leda.invalid/"
 ENLACE_WEB = re.compile(r"\nhttps://leda\.invalid/app/entrar/([A-Za-z0-9_-]{43})$")
 
-OFRECIMIENTO = {"ofrecimiento": "acceso_a_la_web", "lleva_el_boton": "Ver mis tareas"}
+OFRECIMIENTO = {"ofrecimiento": "acceso_a_la_web", "lleva_el_boton": "Mi espacio"}
 MINI_APP = "https://leda.invalid/app/abrir/e/prueba/"
 
 
@@ -150,7 +150,7 @@ def test_la_primera_respuesta_a_lo_que_escribe_lleva_el_ofrecimiento_al_final(co
                               "estado": "listo"}]
     [mensaje] = _despachar(conn, mundo).enviados
     boton = _boton_de_la_web(mensaje)
-    assert (boton.etiqueta, boton.web_app) == ("Ver mis tareas", MINI_APP)
+    assert (boton.etiqueta, boton.web_app) == ("Mi espacio", MINI_APP)
     assert not ENLACE_WEB.search(mensaje.texto)
     assert _ofrecimiento(conn, mundo)["ofrecido_en"] is not None
     assert todos(conn, "select 1 from enlace_de_entrada") == []
@@ -367,10 +367,10 @@ def test_la_bienvenida_de_quien_nunca_entro_lleva_el_ofrecimiento(conn, mundo, d
     [bienvenida] = _bienvenida(conn, mundo)
     assert bienvenida.texto.startswith("Listo, Marcos.")
     boton = _boton_de_la_web(bienvenida)
-    assert (boton.etiqueta, boton.web_app) == ("Ver mis tareas", MINI_APP)
+    assert (boton.etiqueta, boton.web_app) == ("Mi espacio", MINI_APP)
     assert not ENLACE_WEB.search(bienvenida.texto)
     ofrecimiento = bienvenida.texto.rsplit("\n\n", 1)[-1]
-    assert "web" in ofrecimiento and "«Ver mis tareas»" in ofrecimiento
+    assert "web" in ofrecimiento and "«Mi espacio»" in ofrecimiento
     # Leda nunca sugiere pedir un enlace (ADR 0024, decisión 1).
     assert "enlace" not in ofrecimiento and "pedime" not in ofrecimiento
     assert _ofrecimiento(conn, mundo)["ofrecido_en"] is not None
@@ -399,8 +399,9 @@ def test_la_bienvenida_sin_la_direccion_publica_no_lo_lleva(conn, mundo):
     assert "web" not in bienvenida.texto and _marcas(conn) == []
 
 
-def test_la_bienvenida_de_direccion_lleva_ver_el_equipo(conn, mundo, direccion):
-    """R3-bienvenida-destino-unproved: a Dirección (Ismael, autoridad final), "Ver el equipo"."""
+def test_la_bienvenida_de_direccion_abre_mi_area(conn, mundo, direccion):
+    """R3-bienvenida-destino-unproved: a Dirección (Ismael, autoridad final), "Mi espacio" (MA-4),
+    que abre la web en "Mi área"."""
     from leda.motor.escucha import BotTelegram, Escucha
 
     with admin(conn) as cur:
@@ -417,5 +418,5 @@ def test_la_bienvenida_de_direccion_lleva_ver_el_equipo(conn, mundo, direccion):
     escucha.una_vuelta(espera=0)
     [bienvenida] = salida.enviados
     boton = _boton_de_la_web(bienvenida)
-    assert (boton.etiqueta, boton.web_app) == ("Ver el equipo", MINI_APP + "?vista=equipo")
+    assert (boton.etiqueta, boton.web_app) == ("Mi espacio", MINI_APP + "?vista=equipo")
     assert "lo que hace el equipo" in bienvenida.texto

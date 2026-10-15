@@ -6,7 +6,7 @@ Leda no hace. Prueba de la Mini App en el celular (2026-10-14): "abrí la app" n
 jugada, y Leda contestó sólo con la pregunta abierta, como si se la hubieran contestado.
 
 - Pedir abrir la aplicación de Leda (la que se abre dentro de Telegram) es `pedir_acceso_web`:
-  la respuesta lleva el botón "Ver mis tareas" (ADR 0024, decisiones 1 y 2).
+  la respuesta lleva el botón "Mi espacio" (ADR 0024, decisiones 1 y 2).
 - La dirección para la computadora va sola, sin botón: ahí se entra con el QR (decisión 4).
 - Un pedido que ninguna jugada hace es `fuera_de_la_lista`, nunca ninguna jugada, también con una
   pregunta abierta (ADR 0018, decisión 1; la definición de `fuera_de_la_lista`).
@@ -28,9 +28,9 @@ jugada, y Leda contestó sólo con la pregunta abierta, como si se la hubieran c
 2. **Marcos** escribe (10:30): "abri la app"
    →
    - Jugadas: `pedir_acceso_web`.
-   - La respuesta dice: que la abre tocando «Ver mis tareas», en pocas palabras y sin explicar si
+   - La respuesta dice: que la abre tocando «Mi espacio», en pocas palabras y sin explicar si
      se abre dentro de Telegram o en el navegador (MA-4); después, la pregunta de cómo vienen.
-   - Lleva el botón "Ver mis tareas". La pregunta sigue abierta.
+   - Lleva el botón "Mi espacio". La pregunta sigue abierta.
 3. **Marcos** escribe (10:35): "quiero entrar a la app desde la compu, pasame la direccion"
    →
    - Jugadas: `pedir_acceso_web`, para la computadora.

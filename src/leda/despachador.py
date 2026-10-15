@@ -1178,9 +1178,10 @@ def _enlace_de_la_tarea(cur, workspace_id: str, m) -> str | None:
 ETAPA_ENLACE_DE_ENTRADA_WEB = "enlace_de_entrada_web"
 
 # Lo que dice cada botón de la web, según a dónde lleva (ADR 0024, decisión 2: dice lo que va a
-# pasar y lleva directo a eso).
+# pasar y lleva directo a eso). El que abre la página principal dice "Mi espacio" para todos, como
+# el botón del menú (MA-4); a Dirección la abre en "Mi área".
 ETIQUETA_DEL_BOTON_DE_LA_WEB = {
-    "inicio": "Ver mis tareas", "equipo": "Ver el equipo", "tarea": "Ver la tarea",
+    "inicio": "Mi espacio", "equipo": "Mi espacio", "tarea": "Ver la tarea",
     "cargar_tarea": "Cargar la tarea", "crear_objetivo": "Crear el objetivo"}
 ETIQUETA_ENTRAR_EN_LA_COMPU = "Entrar en la compu"
 # El toque de "Entrar en la compu" (`motor.bot_entrar`): el pedido va en el callback.

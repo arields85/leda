@@ -122,7 +122,7 @@ class Contexto:
     adjuntos_de_la_respuesta: list[str] = field(default_factory=list)
     enlace_de_la_respuesta: list[tuple[str, str]] = field(default_factory=list)
     # A dónde lleva el botón de la web que lleva la respuesta (ADR 0024, decisión 2): `inicio`
-    # ("Ver mis tareas"), `equipo` ("Ver el equipo", a Dirección), `cargar_tarea` o
+    # ("Mi espacio"), `equipo` ("Mi espacio", a Dirección, en "Mi área"), `cargar_tarea` o
     # `crear_objetivo` (uno solo; sin ninguno, `inicio`). Lo deciden las jugadas que marcan la
     # respuesta (`destino_de_la_respuesta`).
     destino_de_la_web: list[str] = field(default_factory=list)
@@ -1296,7 +1296,7 @@ def destino_de_la_respuesta(ctx: Contexto) -> str:
 
 def destino_de_sus_tareas(quien) -> str:
     """A dónde lleva "ver mis tareas" a esa persona: a Dirección, el equipo (ADR 0024, decisión
-    2: "Ver el equipo"); a los demás, sus tareas."""
+    2; MA-4: el botón dice "Mi espacio" y la abre en "Mi área"); a los demás, sus tareas."""
     return "equipo" if quien.autoridad_final else "inicio"
 
 
@@ -1319,7 +1319,7 @@ def es_el_ofrecimiento_web(marca: tuple[str, str]) -> bool:
 def _pedir_acceso_web(ctx: Contexto, datos: dict, tarea: dict | None,
                       destino: str | None = None) -> dict:
     """El botón que abre la web de la persona, debajo de la respuesta (ADR 0024, decisiones 1 y
-    2): "Ver mis tareas" (a Dirección, "Ver el equipo"), o el destino que pide quien llama. Si la
+    2): "Mi espacio" (MA-4; a Dirección, en "Mi área"), o el destino que pide quien llama. Si la
     persona pide la dirección para la computadora (`para_la_compu`), la dirección sola, sin
     botón: no da acceso por sí misma (ahí se entra con el QR; decisión 4). Sin la dirección
     pública configurada, nada se promete. Nada cambia hasta mandar."""

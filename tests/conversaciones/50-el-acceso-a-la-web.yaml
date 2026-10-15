@@ -37,7 +37,7 @@ tareas:
 
 # El ofrecimiento (decisión 2 del usuario) no es una jugada: es un hecho que la cocina suma al
 # final del turno, con la marca del botón, si la persona nunca entró ni se le ofreció. Desde el ADR
-# 0024, el despachador pone el botón "Ver mis tareas", que abre la web como Mini App de Telegram
+# 0024, el despachador pone el botón "Mi espacio", que abre la web como Mini App de Telegram
 # (`enlace_web`): ningún enlace de entrada se emite ni se escribe.
 pasos:
   - paso: 1
@@ -53,7 +53,7 @@ pasos:
         tareas:
           - {titulo: PLC, estado: asignada, vence: "2026-10-26"}
           - {titulo: COM, estado: en_curso, vence: "2026-10-30"}
-      - {ofrecimiento: acceso_a_la_web, lleva_el_boton: Ver mis tareas}
+      - {ofrecimiento: acceso_a_la_web, lleva_el_boton: Mi espacio}
     pregunta: null
     botones: []
     enlace: false
@@ -62,7 +62,7 @@ pasos:
       pregunta_abierta: null
     dice:
       - "sus dos tareas: la del PLC sin empezar, que vence el lun 26/10; la de comunicaciones en curso, que vence el vie 30/10"
-      - al final, que ahora también puede ver sus tareas en la web, tocando «Ver mis tareas»
+      - al final, que ahora también puede ver sus tareas en la web, tocando «Mi espacio»
     no_dice:
       - tareas de otras personas
       - un enlace, o que pida uno
@@ -123,7 +123,7 @@ pasos:
     efectos: {}
     hechos:
       - {jugada: pedir_acceso_web, resultado: boton_para_abrir_la_web,
-         lleva_el_boton: Ver mis tareas}
+         lleva_el_boton: Mi espacio}
     pregunta: null
     botones: []
     enlace: false
@@ -131,7 +131,7 @@ pasos:
     estado_despues:
       pregunta_abierta: null
     dice:
-      - que toque «Ver mis tareas», en pocas palabras
+      - que toque «Mi espacio», en pocas palabras
     no_dice:
       - un enlace nuevo, o que pida otro
       - cómo funciona por dentro

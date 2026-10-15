@@ -302,12 +302,12 @@ def test_el_despachador_arma_el_boton_de_la_mini_app_al_mandar(conn, intake_worl
     [mensaje] = transporte.enviados
     assert mensaje.texto == "Ahí va tu enlace."
     [boton] = mensaje.botones
-    assert (boton.etiqueta, boton.web_app) == ("Ver mis tareas", f"{BASE}/app/abrir/e/north-lab/")
+    assert (boton.etiqueta, boton.web_app) == ("Mi espacio", f"{BASE}/app/abrir/e/north-lab/")
     assert _filas(conn, "select * from enlace_de_entrada") == []
 
 
 @pytest.mark.parametrize("destino, tarea, etiqueta, consulta", [
-    ("equipo", False, "Ver el equipo", "?vista=equipo"),
+    ("equipo", False, "Mi espacio", "?vista=equipo"),
     ("tarea", True, "Ver la tarea", "?tarea="),
     ("cargar_tarea", False, "Cargar la tarea", "?nueva=tarea"),
     ("crear_objetivo", False, "Crear el objetivo", "?nueva=objetivo"),

@@ -4,8 +4,8 @@ decisiones 1, 2 y 4, que enmiendan la decisión 4 del ADR 0022; decisión 3 del 
 
 - `pedir_acceso_web`: la respuesta lleva la marca del botón de la web de la persona
   (`message_outbox_entrada_web`); el despachador lo arma al mandar, como Mini App del bot del
-  espacio: "Ver mis tareas" (a Dirección, "Ver el equipo"). No se emite ningún enlace. Los hechos
-  dicen qué dice el botón; la IA nunca ve ni escribe una dirección. Pedida la dirección para la
+  espacio: "Mi espacio", para todos (MA-4); a Dirección la abre en "Mi área". No se emite ningún
+  enlace. Los hechos dicen qué dice el botón; la IA nunca ve ni escribe una dirección. Pedida la dirección para la
   computadora, la dirección sola (no da acceso: ahí se entra con el QR). Un mensaje lleva uno
   solo (decisión técnica 2): con el enlace de una tarea, el botón no se promete.
 - `perdi_el_celular`: corta enseguida, sin confirmación, todas las sesiones de la persona y su
@@ -41,7 +41,7 @@ MINI_APP = "https://leda.invalid/app/abrir/e/prueba/"
 WEB = "https://leda.invalid/app/e/prueba/"
 
 BOTON = {"jugada": "pedir_acceso_web", "resultado": "boton_para_abrir_la_web",
-         "lleva_el_boton": "Ver mis tareas"}
+         "lleva_el_boton": "Mi espacio"}
 
 
 @pytest.fixture
@@ -152,7 +152,7 @@ def test_pedir_el_acceso_lleva_el_boton_que_abre_la_web_en_telegram(conn, mundo,
     assert "http" not in repr(pedido) and "leda.invalid" not in repr(pedido)
     [mensaje] = _despachar(conn, mundo).enviados
     assert mensaje.texto == "Listo."
-    assert mensaje.botones[-1].etiqueta == "Ver mis tareas"
+    assert mensaje.botones[-1].etiqueta == "Mi espacio"
     assert mensaje.botones[-1].web_app == MINI_APP
     # Ningún enlace de entrada se emitió: la Mini App identifica a la persona.
     assert todos(conn, "select 1 from enlace_de_entrada") == []
@@ -160,7 +160,7 @@ def test_pedir_el_acceso_lleva_el_boton_que_abre_la_web_en_telegram(conn, mundo,
 
 def test_a_direccion_el_boton_lleva_al_equipo(conn, mundo, escribe, direccion):
     [hecho], _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}), nombre="Ismael")
-    assert hecho["lleva_el_boton"] == "Ver el equipo"
+    assert hecho["lleva_el_boton"] == "Mi espacio"
     [mensaje] = _despachar(conn, mundo).enviados
     assert mensaje.botones[-1].web_app == MINI_APP + "?vista=equipo"
 
@@ -329,11 +329,11 @@ def test_un_boton_por_mensaje_el_primero_decide_y_cada_hecho_dice_ese(conn, mund
     conn.commit()
     hechos, _ = _dice(conn, escribe, Jugada("pedir_acceso_web", {}),
                       Jugada("pedir_crear", {"que_quiere_crear": "tarea"}))
-    assert [h.get("lleva_el_boton") for h in hechos] == ["Ver mis tareas", "Ver mis tareas"]
+    assert [h.get("lleva_el_boton") for h in hechos] == ["Mi espacio", "Mi espacio"]
     [marca] = _marcas(conn)
     assert marca["destino"] == "inicio"
     [mensaje] = _despachar(conn, mundo).enviados
-    assert mensaje.botones[-1].etiqueta == "Ver mis tareas"
+    assert mensaje.botones[-1].etiqueta == "Mi espacio"
 
 
 def test_el_dato_para_la_compu_es_un_booleano_de_la_jugada():
