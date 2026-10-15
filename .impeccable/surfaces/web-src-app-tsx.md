@@ -79,7 +79,12 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   **mosaico**, una baldosa por área en dos columnas separadas por filetes; en cada una, las abiertas en una cifra
   grande y fina, el nombre del área, «referente X» (o «sin referente») y sólo los estados que tienen algo, en su
   color. Muestra: `.impeccable/mocks/decision/r8-sobrio-areas.html`; descartadas «por dónde mirar primero» y
-  «matriz de estados» (`areas-*.html`). Falta: el detalle de un área (al tocar una baldosa) y «Equipo».
+  «matriz de estados» (`areas-*.html`). En el mosaico, el total de abiertas no suma las vencidas: una vencida
+  cuenta en su estado (MA-3).
+- **El detalle de un área** (extensión de «Mis tareas», sin sorteo): «‹» y el nombre del área, «referente X»
+  debajo; el resumen grande con la regla de urgencia aplicada al área; semana; contadores del área; filas tipo
+  agenda con «de X» y, si está vencida, la fecha y la palabra en coral. Muestra:
+  `.impeccable/mocks/decision/r8-sobrio-area-it.html` (la baldosa de IT del mosaico lleva ahí). Falta «Equipo».
 
 ## Pendiente
 

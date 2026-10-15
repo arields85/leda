@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover">
+<title>Infraestructura IT · Ismael</title>
+<style>
+  @font-face { font-family: "Kanit"; font-weight: 100; font-display: swap; src: url("../fonts/kanit/Kanit-Thin.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 200; font-display: swap; src: url("../fonts/kanit/Kanit-ExtraLight.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 300; font-display: swap; src: url("../fonts/kanit/Kanit-Light.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 400; font-display: swap; src: url("../fonts/kanit/Kanit-Regular.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 500; font-display: swap; src: url("../fonts/kanit/Kanit-Medium.ttf") format("truetype"); }
+  :root {
+    --ground: #18191a;
+    --bar: #242628;
+    --ink: #e8e8e6;
+    --ink-soft: #b4b5b3;
+    --ink-mute: #a0a2a2;
+    --hair: rgba(232, 232, 230, 0.10);
+    --line: rgba(232, 232, 230, 0.16);
+    --ring: rgba(232, 232, 230, 0.55);
+    --late: #df8a7f;
+    --wait: #d9a386;
+    --doing: #9fc2a6;
+    --gutter: 20px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { overflow-x: hidden; background: #101112; }
+  html, body { width: 390px; min-height: 100vh; min-height: 100dvh; }
+  /* The reference's panel: dark grey at the top, near black below, a soft diagonal light. */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1; width: 390px; pointer-events: none;
+    background:
+      radial-gradient(ellipse 120% 55% at 18% 0%, rgba(232, 232, 230, 0.07), rgba(232, 232, 230, 0) 70%),
+      linear-gradient(172deg, #28292b 0%, #1b1c1d 38%, #121314 72%, #0d0e0f 100%);
+  }
+  body {
+    position: relative; color: var(--ink); background: transparent;
+    font: 300 16px/1.4 "Kanit", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" 1, "lnum" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* A halftone field behind everything: white dots that swell where a slow light drifts by. */
+  .field { position: fixed; top: 0; left: 0; z-index: -1; width: 390px; height: 100vh; height: 100dvh; pointer-events: none; }
+  ::selection { background: var(--ink); color: var(--ground); }
+  :focus-visible { outline: 1px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  svg { display: block; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Tracked lowercase labels: the reference's quiet voice. */
+  .lbl { font-size: 12px; line-height: 16px; font-weight: 300; letter-spacing: 0.14em; text-transform: lowercase; color: var(--ink-mute); }
+
+  .band { margin: 0 var(--gutter); border-bottom: 1px solid var(--hair); }
+
+  header.band { display: flex; justify-content: space-between; align-items: center; padding: 18px 0 16px; }
+  .who { font-size: 16px; line-height: 22px; font-weight: 400; }
+  .who span { font-weight: 300; color: var(--ink-mute); }
+  .titles .sub { margin: 2px 0 0 22px; font-size: 11px; line-height: 14px; letter-spacing: 0.1em; text-transform: none; }
+  .who .back { display: inline-block; width: 22px; margin-left: -4px; color: var(--ink-soft); text-decoration: none; font-weight: 200; font-size: 22px; }
+  .who .back:hover { color: var(--ink); }
+  .hero .n.late { color: var(--late); }
+  .meta .late { color: var(--late); }
+  li[data-vencida] .when b { color: var(--late); }
+  .new { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 2px 0 8px; }
+  .new .ring { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 999px; transition: border-color 160ms ease-out; }
+  .new:hover .ring { border-color: var(--ink); }
+  .new:active .ring { background: rgba(232, 232, 230, 0.06); }
+
+  .hero { padding: 26px 0 24px; }
+  .hero .row { display: flex; align-items: center; gap: 16px; }
+  .hero .n { font-size: 92px; line-height: 84px; font-weight: 100; letter-spacing: -0.04em; color: var(--wait); }
+  .hero .what { display: flex; flex-direction: column; gap: 2px; }
+  .hero .what strong { font-size: 30px; line-height: 34px; font-weight: 300; letter-spacing: -0.01em; }
+  .hero .why { margin-top: 14px; font-size: 15px; line-height: 21px; font-weight: 300; color: var(--ink-soft); }
+
+  .week { display: grid; grid-template-columns: repeat(5, 1fr); padding: 18px 0 16px; }
+  .day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .day b { display: grid; place-items: center; width: 40px; height: 40px; font-size: 22px; font-weight: 200; color: var(--ink-soft); border: 1px solid transparent; border-radius: 999px; }
+  .day.is-today b { color: var(--ink); font-weight: 300; border-color: var(--ring); }
+  .day small { min-height: 14px; font-size: 11px; line-height: 14px; letter-spacing: 0.1em; color: var(--ink-mute); }
+  .day small.due { color: var(--wait); }
+
+  .tally { display: grid; grid-template-columns: repeat(5, 1fr); list-style: none; padding: 6px 0 8px; }
+  .tally li { min-width: 0; }
+  .tally button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; padding: 12px 0; text-align: center; }
+  .tally b { font-size: 34px; line-height: 38px; font-weight: 200; color: var(--ink-mute); }
+  .tally .lbl { font-size: 11px; line-height: 14px; letter-spacing: 0.04em; white-space: nowrap; }
+  .tally .late b { color: var(--late); }
+  .tally .idle b { color: var(--ink); }
+  .tally .doing b { color: var(--doing); }
+  .tally .wait b { color: var(--wait); }
+  .tally .review b { color: var(--ink); }
+  .tally .zero b { opacity: 0.75; color: var(--ink-mute); }
+  .tally button:disabled { cursor: default; }
+  .tally button:hover:not(:disabled) b { font-weight: 300; }
+  .tally button[aria-pressed="true"] .lbl { color: var(--ink); }
+  .tally button[aria-pressed="true"]::after { content: ""; position: absolute; left: calc(50% - 11px); bottom: 4px; width: 22px; height: 1px; background: var(--ink); }
+
+  /* Counters stay reachable: they stick to the top, compact, over the same progressive blur as the tab bar. */
+  .tally { position: sticky; top: 0; z-index: 5; isolation: isolate; }
+  .tally::before {
+    content: ""; position: absolute; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: -24px; bottom: -28px;
+    z-index: -1; pointer-events: none; opacity: 0; transition: opacity 180ms ease-out;
+    -webkit-backdrop-filter: blur(26px) saturate(150%); backdrop-filter: blur(26px) saturate(150%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    background: linear-gradient(to bottom, rgba(44, 46, 49, 0.42) 0%, rgba(36, 38, 41, 0.34) 70%, rgba(30, 32, 34, 0) 100%);
+  }
+  .tally.stuck { border-bottom-color: transparent; }
+  .tally.stuck::before { opacity: 1; }
+  .tally b, .tally button { transition: font-size 180ms ease-out, line-height 180ms ease-out, padding 180ms ease-out; }
+  .tally.stuck button { padding: 8px 0 10px; }
+  .tally.stuck b { font-size: 24px; line-height: 28px; }
+  /* The urgent zone stays fixed: full size at the top, compact once the page scrolls, over a progressive blur. */
+  .top { position: fixed; top: 0; left: 0; z-index: 6; width: 390px; isolation: isolate; }
+  .top::before {
+    content: ""; position: absolute; inset: 0 0 -28px 0; z-index: -1; pointer-events: none;
+    opacity: 0; transition: opacity 200ms ease-out;
+    -webkit-backdrop-filter: blur(26px) saturate(150%); backdrop-filter: blur(26px) saturate(150%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+    background: linear-gradient(to bottom, rgba(48, 50, 53, 0.5) 0%, rgba(40, 42, 45, 0.4) 78%, rgba(30, 32, 34, 0) 100%);
+  }
+  .top.compact::before { opacity: 1; }
+  .top header.band, .top .hero { transition: padding 200ms ease-out; }
+  .top .hero .n, .top .hero .what strong, .top .hero .why { transition: font-size 200ms ease-out, line-height 200ms ease-out, margin 200ms ease-out; }
+  .top.compact header.band { padding: 12px 0 10px; border-bottom-color: transparent; }
+  .top.compact .hero { padding: 0 0 12px; border-bottom-color: transparent; }
+  .top.compact .hero .row { gap: 10px; }
+  .top.compact .hero .n { font-size: 40px; line-height: 40px; }
+  .top.compact .hero .what { flex-direction: row; align-items: baseline; gap: 8px; }
+  .top.compact .hero .what strong { font-size: 20px; line-height: 24px; }
+  .top.compact .hero .why { margin-top: 4px; font-size: 13px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tally { top: var(--top-compact, 0px); }
+  .top.measure, .top.measure * { transition: none !important; }
+  main { margin: 0 var(--gutter); padding: 18px 0 calc(104px + env(safe-area-inset-bottom, 0px)); }
+  .listhead { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 4px; }
+  .listhead .all { font-size: 12px; line-height: 16px; letter-spacing: 0.14em; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line); }
+  .listhead .all:hover { color: var(--ink); }
+  .list { list-style: none; }
+  .list li + li { border-top: 1px solid var(--hair); }
+  .list li[hidden] { display: none; }
+  .list li.first { border-top: 0; }
+  .task { display: grid; grid-template-columns: 44px 1fr; column-gap: 16px; width: 100%; text-align: left; padding: 16px 0; align-items: start; }
+  .task:active .t { color: var(--ink-soft); }
+  .when { display: flex; flex-direction: column; align-items: center; }
+  .when small { font-size: 11px; line-height: 14px; letter-spacing: 0.1em; color: var(--ink-mute); }
+  .when b { font-size: 26px; line-height: 30px; font-weight: 200; }
+  .t { display: block; font-size: 17px; line-height: 24px; font-weight: 300; }
+  .meta { display: block; margin-top: 2px; font-size: 14px; line-height: 20px; color: var(--ink-mute); }
+  .meta i { font-style: normal; }
+  .meta .wait { color: var(--wait); }
+  .meta .doing { color: var(--doing); }
+
+  .done-head { padding: 26px 0 4px; }
+  .done { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; font-size: 14px; line-height: 20px; font-weight: 300; color: var(--ink-mute); }
+  .done + .done { border-top: 1px solid var(--hair); }
+  .done .name { color: var(--ink-mute); }
+
+  .tabbar {
+    position: fixed; left: 0; bottom: 0; z-index: 10; width: 390px;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    isolation: isolate;
+  }
+  /* Progressive blur: what scrolls under the bar softens and darkens gradually, with no edge. */
+  .tabbar::before, .tabbar::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; z-index: -1; pointer-events: none;
+  }
+  .tabbar::before {
+    top: -36px;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 40%);
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 40%);
+    background: linear-gradient(to bottom, rgba(16, 17, 18, 0) 0%, rgba(16, 17, 18, 0.45) 60%);
+  }
+  .tabbar::after {
+    top: 0;
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 55%);
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 55%);
+    background: linear-gradient(to bottom, rgba(16, 17, 18, 0.35) 0%, rgba(16, 17, 18, 0.82) 100%);
+  }
+  .tabbar a {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    min-height: 52px; color: var(--ink-mute); text-decoration: none;
+    font-size: 11px; line-height: 14px; letter-spacing: 0.12em; text-transform: lowercase;
+  }
+  .tabbar a:hover { color: var(--ink); }
+  .tabbar a[aria-current="page"] { color: var(--ink); }
+  .tabbar a[aria-current="page"]::before {
+    content: ""; position: absolute; top: -8px; width: 24px; height: 1px; background: var(--ink);
+  }
+</style>
+</head>
+<body>
+  <canvas class="field" aria-hidden="true"></canvas>
+  <div class="top">
+  <header class="band">
+    <div class="titles"><h1 class="who"><a class="back" href="r8-sobrio-areas.html" aria-label="Volver a áreas">‹</a>Infraestructura IT</h1><p class="lbl sub">referente Martín</p></div>
+    <button class="new" aria-label="Nueva tarea">
+      <span class="lbl">nueva</span>
+      <span class="ring"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+    </button>
+  </header>
+
+  <section class="band hero" aria-label="Lo más urgente">
+    <div class="row">
+      <span class="n late">1</span>
+      <span class="what"><span class="lbl">vencida</span><strong>desde el lunes</strong></span>
+    </div>
+    <p class="why">Renovar el certificado de la VPN · de Lucas</p>
+  </section>
+  </div>
+  <div class="top-spacer" aria-hidden="true"></div>
+
+  <section class="band week" aria-label="Esta semana, jueves 15 de octubre">
+    <div class="day"><span class="lbl">lun</span><b>12</b><small></small></div>
+    <div class="day"><span class="lbl">mar</span><b>13</b><small></small></div>
+    <div class="day"><span class="lbl">mié</span><b>14</b><small></small></div>
+    <div class="day is-today" aria-current="date"><span class="lbl">jue</span><b>15</b><small>hoy</small></div>
+    <div class="day"><span class="lbl">vie</span><b>16</b><small class="due">1 vence</small></div>
+  </section>
+
+  <ul class="band tally" aria-label="Mostrar las tareas del área por estado">
+    <li class="late"><button data-f="late" aria-pressed="false"><b>1</b><span class="lbl">vencidas</span></button></li>
+    <li class="idle"><button data-f="idle" aria-pressed="false"><b>2</b><span class="lbl">sin empezar</span></button></li>
+    <li class="doing"><button data-f="doing" aria-pressed="false"><b>2</b><span class="lbl">en curso</span></button></li>
+    <li class="wait zero"><button data-f="wait" aria-pressed="false" disabled><b>0</b><span class="lbl">esperando</span></button></li>
+    <li class="review zero"><button data-f="review" aria-pressed="false" disabled><b>0</b><span class="lbl">entregadas</span></button></li>
+  </ul>
+
+  <main>
+    <div class="listhead"><h2 class="lbl">abiertas</h2><button class="all" hidden>ver todas</button></div>
+    <ol class="list" aria-label="Tareas del área">
+      <li data-estado="doing" data-vencida="si"><button class="task">
+        <span class="when"><small>lun</small><b>12</b></span>
+        <span><span class="t">Renovar el certificado de la VPN</span><span class="meta"><i class="doing">en curso</i> · <i class="late">vencida</i> · de Lucas</span></span>
+      </button></li>
+      <li data-estado="doing"><button class="task">
+        <span class="when"><small>vie</small><b>16</b></span>
+        <span><span class="t">Configurar el backup del servidor</span><span class="meta"><i class="doing">en curso</i> · de Martín</span></span>
+      </button></li>
+      <li data-estado="idle"><button class="task">
+        <span class="when"><small>mié</small><b>21</b></span>
+        <span><span class="t">Actualizar el inventario de equipos</span><span class="meta"><i>sin empezar</i> · de Lucas</span></span>
+      </button></li>
+      <li data-estado="idle"><button class="task">
+        <span class="when"><small>lun</small><b>26</b></span>
+        <span><span class="t">Migrar el correo de Gestión</span><span class="meta"><i>sin empezar</i> · de Martín · lo pidió Gestión</span></span>
+      </button></li>
+    </ol>
+
+    <h2 class="lbl done-head">terminadas esta semana</h2>
+    <div class="done"><span class="name">Cambiar el switch del taller · de Lucas</span><span>lun 12/10</span></div>
+  </main>
+
+  <nav class="tabbar" aria-label="Vistas">
+    <a href="#">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5l2 2 3.5-3.5M13 8h7M4 16.5l2 2 3.5-3.5M13 17h7"/></svg>
+      mis tareas
+    </a>
+    <a href="#" aria-current="page">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/></svg>
+      áreas
+    </a>
+    <a href="#">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M15.5 5.2a3 3 0 0 1 0 5.6M17 13.6a5.5 5.5 0 0 1 3.5 5.4"/></svg>
+      equipo
+    </a>
+  </nav>
+<script>
+  (() => {
+    const buttons = [...document.querySelectorAll('.tally button')];
+    const rows = [...document.querySelectorAll('.list > li[data-estado]')];
+    const head = document.querySelector('.listhead h2');
+    const all = document.querySelector('.listhead .all');
+    let current = null;
+    function show(filter) {
+      current = filter;
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.f === filter)));
+      let first = true;
+      rows.forEach((r) => {
+        const visible = filter
+          ? r.dataset.estado === filter || (filter === 'late' && r.dataset.vencida === 'si')
+          : r.dataset.estado !== 'review';
+        r.hidden = !visible;
+        r.classList.toggle('first', visible && first);
+        if (visible) first = false;
+      });
+      const b = buttons.find((x) => x.dataset.f === filter);
+      head.textContent = b ? b.querySelector('.lbl').textContent : 'abiertas';
+      all.hidden = !filter;
+    }
+    const tally = document.querySelector('.tally');
+    const top = document.querySelector('.top');
+    const spacer = document.querySelector('.top-spacer');
+    spacer.style.height = top.offsetHeight + 'px';
+    top.classList.add('measure', 'compact');
+    const compactH = top.offsetHeight;
+    top.classList.remove('compact');
+    void top.offsetHeight;
+    top.classList.remove('measure');
+    document.documentElement.style.setProperty('--top-compact', compactH + 'px');
+    let compact = false;
+    function onScroll() {
+      const next = compact ? window.scrollY > 8 : window.scrollY > 24;
+      if (next !== compact) { compact = next; top.classList.toggle('compact', compact); }
+      tally.classList.toggle('stuck', tally.getBoundingClientRect().top <= compactH + 0.5);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    function toListTop() {
+      if (!tally.classList.contains('stuck')) return;
+      const y = document.querySelector('main').getBoundingClientRect().top + window.scrollY - tally.offsetHeight - compactH;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+    buttons.forEach((b) => b.addEventListener('click', () => { show(current === b.dataset.f ? null : b.dataset.f); toListTop(); }));
+    all.addEventListener('click', () => { show(null); toListTop(); });
+    show(null);
+  })();
+</script>
+<script>
+  (() => {
+    const canvas = document.querySelector('.field');
+    const ctx = canvas.getContext('2d');
+    // ?mover forces motion in this mock even when the system asks to reduce it, so the effect can be judged.
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches && !location.search.includes('mover');
+    const STEP = 7;
+    // ?invertir shows the inverted version: dark dots on a lighter screen.
+    const INVERT = location.search.includes('invertir');
+    const LIGHT = location.search.includes('claros');
+    // The dots are cut out of a dark layer, so the ground shows through them (the user's choice);
+    // ?puntos shows dark dots painted on top, ?claros light ones, ?invertir dark dots on a light screen.
+    const HOLES = !/puntos|claros|invertir/.test(location.search);
+    let w = 0, h = 0, dots = [];
+    // Stable per-dot randomness: the dithering threshold and a size bias, like a printed halftone.
+    function rand(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+    function resize() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      w = 390; h = window.innerHeight;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dots = [];
+      let i = 0;
+      for (let y = STEP / 2; y < h; y += STEP)
+        for (let x = STEP / 2; x < w; x += STEP, i++) dots.push({ x, y, th: rand(i), sz: rand(i + 7919) });
+    }
+    // Value noise with smooth interpolation, summed in three octaves: a ragged, cloud-like field.
+    const P = new Uint8Array(512);
+    for (let i = 0; i < 256; i++) P[i] = i;
+    for (let i = 255; i > 0; i--) { const j = Math.floor(rand(i + 99) * (i + 1)); [P[i], P[j]] = [P[j], P[i]]; }
+    for (let i = 0; i < 256; i++) P[i + 256] = P[i];
+    const V = new Float32Array(256).map((_, i) => rand(i + 4242));
+    function noise(x, y) {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+      const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+      const a = V[P[(P[xi & 255] + yi) & 511] & 255], b = V[P[(P[(xi + 1) & 255] + yi) & 511] & 255];
+      const c = V[P[(P[xi & 255] + yi + 1) & 511] & 255], d = V[P[(P[(xi + 1) & 255] + yi + 1) & 511] & 255];
+      return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+    }
+    function fbm(x, y) { return 0.55 * noise(x, y) + 0.3 * noise(x * 2.1, y * 2.1) + 0.15 * noise(x * 4.3, y * 4.3); }
+    function draw(t) {
+      ctx.clearRect(0, 0, w, h);
+      const ox = t * 0.000045, oy = -t * 0.00003;
+      for (const d of dots) {
+        // The field lives in the lower part: nothing above a third, denser toward the bottom edge.
+        // The large noise drifts (the ragged border undulates); a smaller, faster noise makes the
+        // inside breathe, so the whole field moves, not only its edge.
+        const yy = d.y / h;
+        const low = yy < 0.33 ? 0 : Math.min(1, (yy - 0.33) / 0.47);
+        if (low === 0) continue;
+        const env = low * low * (3 - 2 * low);
+        const n = 0.62 * fbm(d.x * 0.008 + ox, d.y * 0.008 + oy) + 0.62 * env - 0.12;
+        if (HOLES) {
+          // Holes: a dark layer over the lower part, with the dots cut out of it so the ground shows through.
+          // Scaled by the zone's own fade-in, so the layer starts at zero and never shows a straight edge.
+          const cover = Math.max(0, Math.min(1, (n - 0.12) / 0.45)) * env;
+          if (cover === 0) continue;
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = `rgba(5, 5, 6, ${(0.5 * cover).toFixed(3)})`;
+          ctx.fillRect(d.x - STEP / 2, d.y - STEP / 2, STEP, STEP);
+          const e2 = 0.36 + 0.24 * d.th;
+          if (n >= e2) {
+            const br = noise(d.x * 0.022 - t * 0.00012, d.y * 0.022 + t * 0.00009);
+            const kk = Math.max(0, Math.min(1, ((n - e2) / 0.55) * (0.45 + 0.75 * br)));
+            const hole = 0.9 + (0.8 + 1.2 * d.sz) * kk * (1.4 + 0.9 * env);
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = `rgba(0, 0, 0, ${(0.6 + 0.4 * kk).toFixed(3)})`;
+            ctx.fillRect(d.x - hole / 2, d.y - hole / 2, hole, hole);
+            ctx.globalCompositeOperation = 'source-over';
+          }
+          continue;
+        }
+        if (INVERT) {
+          // Inverted, first the screen: a continuous lighter field that fades in smoothly (no dithering).
+          const lit = Math.max(0, Math.min(1, (n - 0.2) / 0.5));
+          if (lit > 0) {
+            ctx.fillStyle = `rgba(232, 232, 230, ${(0.085 * lit).toFixed(3)})`;
+            ctx.fillRect(d.x - STEP / 2, d.y - STEP / 2, STEP, STEP);
+          }
+        }
+        const edge = 0.36 + 0.24 * d.th;
+        if (n < edge) continue;
+        const breath = noise(d.x * 0.022 - t * 0.00012, d.y * 0.022 + t * 0.00009);
+        const k = Math.max(0, Math.min(1, ((n - edge) / 0.55) * (0.45 + 0.75 * breath)));
+        const size = 0.5 + (0.6 + 0.9 * d.sz) * k * (1.4 + 0.9 * env);
+        if (INVERT) {
+          // Then the dark dots punched into it.
+          ctx.fillStyle = `rgba(14, 15, 16, ${(0.55 + 0.35 * k).toFixed(3)})`;
+          const dark = 0.8 + 2.4 * k * (0.8 + 0.4 * d.sz);
+          ctx.fillRect(d.x - dark / 2, d.y - dark / 2, dark, dark);
+          continue;
+        }
+        // Painted dots (?puntos dark, ?claros light).
+        ctx.fillStyle = LIGHT
+          ? `rgba(232, 232, 230, ${(0.05 + 0.13 * k).toFixed(3)})`
+          : `rgba(4, 4, 5, ${(0.45 + 0.5 * k).toFixed(3)})`;
+        const s2 = LIGHT ? size : size * 1.15 + 0.3;
+        ctx.fillRect(d.x - s2 / 2, d.y - s2 / 2, s2, s2);
+      }
+    }
+    let raf = 0, last = 0;
+    function loop(t) {
+      raf = requestAnimationFrame(loop);
+      if (t - last < 33) return;
+      last = t; draw(t);
+    }
+    resize();
+    window.addEventListener('resize', () => { resize(); draw(performance.now()); });
+    if (still) { draw(0); return; }
+    raf = requestAnimationFrame(loop);
+    document.addEventListener('visibilitychange', () => {
+      cancelAnimationFrame(raf);
+      if (!document.hidden) raf = requestAnimationFrame(loop);
+    });
+  })();
+</script>
+</body>
+</html>
