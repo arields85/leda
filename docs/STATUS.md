@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-15, de mañana, cierre de la noche autónoma (ver "Punto exacto para retomar").
+**Última actualización documental:** 2026-10-15, a la tarde, cierre de la sesión de decisiones, J7 hasta J7-5b y diseño (ver "Punto exacto para retomar").
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -32,7 +32,7 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-15, de mañana)
+## Punto exacto para retomar (2026-10-15, a la tarde)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
 La unidad en curso es [`../odd/tasks/plataforma-jerarquias.md`](../odd/tasks/plataforma-jerarquias.md): el
@@ -65,7 +65,8 @@ de `9d871545` partida en pedazos (no entró entera), corregir el alta duplicada 
 aplicar la `0085` a `leda_motor` con respaldo, reiniciar la web; después J7-6 en adelante. **Diseño:** con
 impeccable (siempre por su proceso, nunca a mano): `PRODUCT.md`, `DESIGN.md`, la dirección en
 `.impeccable/surfaces/web-src-app-tsx.md` y las referencias `.impeccable/mocks/decision/r7-profundidad*.html`;
-el usuario sigue ajustando con `/impeccable live` (estaba probando la barra de pestañas sin contenedor).
+en `live` el usuario aceptó la barra de pestañas pegada al borde de abajo (en la pantalla de Marcos); falta llevarla a
+la de Dirección y actualizar `DESIGN.md`; sigue ajustando con `/impeccable live`.
 
 **Lo que sigue, a construir, en este orden** (usuario, 2026-10-15: "todo lo que requiera armar equipo,
 configurar equipo… quisiera darle prioridad; las otras son mejoras"; "ese es el orden correcto"): 1. **la J7**, armar
