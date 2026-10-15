@@ -49,6 +49,17 @@ function text(v: unknown): string {
   return typeof v === 'string' || typeof v === 'number' ? String(v) : JSON.stringify(v);
 }
 
+/** Whether the server looked the key up before refusing a confirmation (migrations 0083 and 0084):
+ * not without the session's authority, nor with a malformed value or a missing preview, which it
+ * decides first (shared with the people's editor). */
+export function lookedUpTheKey(problem: Problem): boolean {
+  return (
+    problem.campo !== 'sesion' &&
+    !problem.motivo.startsWith('mal_formad') &&
+    !(problem.campo === 'huella' && problem.motivo === 'falta')
+  );
+}
+
 /** What the server said cannot be, in its words (shared with the people's editor, J7-5). */
 export function Errors({ errors }: { errors: Problem[] }) {
   if (errors.length === 0) return null;
@@ -155,6 +166,10 @@ export function AreaEditor({
   const [none, setNone] = useState(false);
   const [step, setStep] = useState<Step>({ kind: 'edit', sending: work.kind === 'archivar', errors: [] });
   const key = useRef<string | null>(null);
+  // The last confirm got no answer: it may have done the change. Until the server settles it, the
+  // key stays even after going back and reviewing again, so the server can tell (the same change
+  // with that key returns what was done; another one is refused, never done twice).
+  const unknown = useRef(false);
   const people = team.personas.filter((p) => p.activo).sort((a, b) => a.nombre.localeCompare(b.nombre));
   const kinds = team.tipos_de_evidencia ?? [];
 
@@ -176,7 +191,8 @@ export function AreaEditor({
     try {
       const result = await api.preview(asked);
       if (result.kind === 'preview') {
-        key.current = null;
+        // Another review, another attempt: a new key, unless the last confirm's outcome is unknown.
+        if (!unknown.current) key.current = null;
         setStep({ kind: 'preview', preview: result.preview, change: asked, sending: false, failed: false });
       } else {
         setStep({ kind: 'edit', sending: false, errors: result.errors });
@@ -199,14 +215,23 @@ export function AreaEditor({
     setStep({ ...current, sending: true, failed: false });
     try {
       const result = await api.confirm(current.change, key.current, current.preview.huella);
-      if (result.kind === 'done') onDone(DONE[work.kind]);
-      else {
+      if (result.kind === 'done') {
         key.current = null;
+        unknown.current = false;
+        onDone(DONE[work.kind]);
+      } else {
+        // A rejection writes nothing, and the server looked the key up first: nothing was done with
+        // it, unless the key was used with other data or the server refused before looking it up.
+        if (!result.errors.some((e) => e.campo === 'clave' || !lookedUpTheKey(e))) unknown.current = false;
+        if (!unknown.current) key.current = null;
         setStep({ kind: 'edit', sending: false, errors: result.errors });
       }
     } catch (error) {
       if (error instanceof SessionClosedError) onClosed();
-      else setStep({ ...current, sending: false, failed: true });
+      else {
+        unknown.current = true;
+        setStep({ ...current, sending: false, failed: true });
+      }
     }
   }
 

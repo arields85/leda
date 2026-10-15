@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import { SessionClosedError } from '../api';
 import type { Problem } from './api';
-import { Errors } from './AreaEditor';
+import { Errors, lookedUpTheKey } from './AreaEditor';
 import { Completing } from './Completing';
 import { INPUT, PRIMARY, SECONDARY, WARN } from './controls';
 import { newKey } from './draft';
@@ -100,6 +100,10 @@ export function PersonEditor({
   const [aprobador, setAprobador] = useState('');
   const [step, setStep] = useState<Step>({ kind: 'edit', sending: false, errors: [] });
   const key = useRef<string | null>(null);
+  // The last confirm got no answer: it may have given her the place. Until the server settles it,
+  // the key stays even after going back and reviewing again, so the server can tell (the same alta
+  // with that key returns the same person; another one is refused, never a second person).
+  const unknown = useRef(false);
   const people = team.personas.filter((p) => p.activo && p.membership_id !== person?.membership_id).sort(byName);
   const fallback = area ? defaultApprover(team, area, person?.membership_id) : null;
 
@@ -115,7 +119,8 @@ export function PersonEditor({
     try {
       const result = await api.previewPerson(asked);
       if (result.kind === 'preview') {
-        key.current = null;
+        // Another review, another attempt: a new key, unless the last confirm's outcome is unknown.
+        if (!unknown.current) key.current = null;
         setStep({ kind: 'preview', preview: result.preview, change: asked, sending: false, failed: false });
       } else {
         setStep({ kind: 'edit', sending: false, errors: result.errors });
@@ -139,6 +144,8 @@ export function PersonEditor({
     try {
       const result = await api.confirmPerson(current.change, key.current, current.preview.huella);
       if (result.kind === 'done') {
+        key.current = null;
+        unknown.current = false;
         const who = text(current.preview.despues?.nombre);
         onDone(
           person ? `${who} volvió al equipo.` : `${who} quedó en el equipo, «sin conectar» hasta que abra su enlace.`,
@@ -146,12 +153,18 @@ export function PersonEditor({
           who,
         );
       } else {
-        key.current = null;
+        // A rejection writes nothing, and the server looked the key up first: nothing was done with
+        // it, unless the key was used with other data or the server refused before looking it up.
+        if (!result.errors.some((e) => e.campo === 'clave' || !lookedUpTheKey(e))) unknown.current = false;
+        if (!unknown.current) key.current = null;
         setStep({ kind: 'edit', sending: false, errors: result.errors });
       }
     } catch (error) {
       if (error instanceof SessionClosedError) onClosed();
-      else setStep({ ...current, sending: false, failed: true });
+      else {
+        unknown.current = true;
+        setStep({ ...current, sending: false, failed: true });
+      }
     }
   }
 
