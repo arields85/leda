@@ -1604,8 +1604,15 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         cuentas de Telegram entre espacios es delicado.
       - **Sale de lo ya decidido:** área sin referente → la decide Dirección (J6-D6); el rol acompaña a ser
         referente o Dirección (ADR 0019, 7b), y el de Dirección sólo se da con el pase.
-      - **Preguntas** (en texto, de a una): 1. qué avisos informativos se eligen en la J7; 2. la evidencia de un
-        área nueva; 3. si Leda le escribe a quien se da de baja.
+      - **Preguntas, CONTESTADAS (usuario, 2026-10-15):** 1. la pantalla de preferencias trae los avisos
+        informativos que existen, cada uno "en el momento" o "no"; los nuevos se suman solos; "juntos en un
+        resumen", cuando exista un resumen personal (J7-12). 2. Al crear un área, el formulario pregunta qué
+        evidencia piden sus tareas (los tipos del espacio) o «no pide evidencia», a propósito (J7-4). 3. A quien
+        se da de baja Leda le escribe (usuario: el texto seco era "muy frío y cortante"; "desde hoy" no es cierto
+        si escribe después), con los nombres de cada caso, al confirmar la baja y, si escribe después, una vez:
+        «Hola Lucas. Según lo que tengo registrado, ya no formás parte del equipo de CoreWork, así que no voy a
+        poder acompañarte con las tareas. Gracias por el trabajo compartido. Si te parece que es un error,
+        hablalo con Ismael.» (la persona, el equipo y quien tiene la autoridad final; J7-9).
 
 **Diseño corto (J2-1, 2026-10-13; la entrada, del usuario).** Arriba del formulario de carga, un recuadro
 libre, "Contame qué querés hacer y te ayudo" (escrito o dictado), y el botón "> completar con Leda". Es
