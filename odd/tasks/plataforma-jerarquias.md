@@ -1635,7 +1635,41 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         RDD de `f278397f` y `05569578`: aprobadas (advertencias: el botón de volver y el reintento de la vista
         Equipo sin prueba; sugerencias menores). `leda_motor` en la `0082` (respaldo
         `db/respaldos/leda_motor-antes-0082-20261015.dump`, ensayada en una copia).
-      - **J7-4** · áreas (`0083`): crear, renombrar, archivar. Espera la pregunta 2.
+      - [x] **J7-4** · áreas (`0083`): crear, renombrar, archivar.
+        **Hecha** (2026-10-15; escritor delegado), `dfb0caaa` (base y servidor) y `3d9f4aad` (web).
+        Primero la vista previa (`vista_previa_de_area`: hace el cambio y lo deshace, con su huella y
+        los problemas del equipo que dejaría); después `crear_area`, `renombrar_area` o
+        `archivar_area` con la clave de un solo uso y esa huella (si el equipo cambió desde la vista
+        previa, no se confirma). Las cinco de la web (con `opciones_de_areas`: los tipos de evidencia
+        del espacio) son `security definer` de `leda_owner`, camino fijado y sólo para `leda_app`;
+        adentro, sin `execute` para nadie, `cambiar_un_area` (valida y escribe),
+        `confirmar_cambio_de_area` (clave, huella, `cambio_del_equipo` con el antes y el después y la
+        auditoría) y `tipos_de_evidencia_del_espacio`. Cada una vuelve a correr
+        `problemas_del_equipo` y se niega si el cambio deja un problema que el equipo no tenía (no si
+        ya lo tenía: así no traba arreglar un equipo que no cuadra). **Crear:** nombre sin repetir el
+        de otra área vigente (mayúsculas aparte; el de una archivada sí), slug sacado del nombre y
+        fijo (con número si ya existe); quién aprueba su trabajo: su referente (un integrante activo
+        del espacio), el área misma (`approval_policy` con la autoaprobación declarada) o lo decide
+        Dirección; y su evidencia, a propósito: tipos del espacio o «No pide evidencia» (la política
+        del área nace con los tipos del espacio, como en el importador). **Renombrar** cambia sólo el
+        nombre. **Archivar**, sin gente activa ni tareas abiertas (lee la evidencia del área `for
+        update`, así no entra una carga mientras tanto). **Importador:** en un espacio con gente, la
+        evidencia por área ya no borra la de un área que el archivo no nombra (la de la web).
+        Servidor: `POST …/equipo/areas/revisar` y `POST …/equipo/areas` en las dos puertas
+        (`web_app.escribir_por_la_puerta`, con los controles de siempre), y `GET …/equipo` suma
+        `tipos_de_evidencia`. Web: «> crear área» arriba de las áreas, «> renombrar» y «> archivar»
+        en cada área vigente; «> revisar» muestra la vista previa y «> confirmar» la manda; archivar
+        va directo a la vista previa y, si no se puede, dice por qué; después se vuelve a leer el
+        equipo. En "Cambios del equipo" no se muestran los ids.
+        **Evidencia:** RED observado (23 de 23 de `test_areas_del_equipo.py` sin la migración; la
+        prueba del importador falla sin el cambio; 7 de 8 de `teamAreas.test.tsx` con la web de
+        antes). `pytest tests/garantias/test_areas_del_equipo.py tests/garantias/test_ver_el_equipo.py
+        tests/garantias/test_migraciones.py tests/garantias/test_capacidades.py
+        tests/test_importar_no_pisa_el_equipo.py`: 63 passed (paridad y rollback de la `0083`).
+        `pytest tests/garantias`: 1212 passed. `pytest tests/test_esqueleto.py tests/test_onboarding.py`:
+        28 passed. `npm test` en `web/`: 358 passed (una corrida anterior dio 1 falla que no se
+        repitió en dos corridas más); `npm run build`: bien. `leda_motor` sigue en la `0081`: la
+        `0082` y la `0083` no se aplicaron.
       - **J7-5** · alta (`0084`): `dar_de_alta`, «> copiar el enlace de activación», "sin conectar", reactivar a
         quien vuelve; `activar` une la cuenta de quien ya está en otro espacio; el token pasa a guardarse como
         huella.
