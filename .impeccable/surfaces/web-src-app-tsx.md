@@ -30,12 +30,17 @@ STORY: la persona abre y entiende qué vence y qué le falta; toca una tarea par
 pulgar.
 FIRST VIEWPORT: nombre y área arriba a la izquierda, «+ Nueva» a la derecha; el resumen grande («1 vence mañana»,
 la tarea y lo que falta, el conteo); la semana con hoy recuadrado; la lista agrupada; terminadas; barra flotante
-fija abajo con ícono y palabra en cada pestaña (3 a 5 según el rol).
+pegada al borde de abajo, de lado a lado, fondo sólido, línea fina arriba, ícono y palabra en cada pestaña
+(3 a 5 según el rol) y una rayita sobre la activa (aceptada en `impeccable live` el 2026-10-15).
 FORM: «El pizarrón» (candidato 3 de la lista propia de la ronda 3, asignado por el sorteo), refinado por el
 usuario; seed key 71b06f5b.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
 
 ## Pendiente
+
+- Llevar la barra pegada al borde (aceptada en la de Marcos) a la pantalla de Dirección
+  (`r7-profundidad-direccion.html`, todavía con la cápsula flotante), y actualizar `DESIGN.md` (dice "barra
+  flotante").
 
 - Ajustes que el usuario va a seguir pidiendo (dijo "vamos por buen camino, tenemos que seguir haciendo
   ajustes").
