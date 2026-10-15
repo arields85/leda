@@ -1577,6 +1577,50 @@ ejemplo y recomendación, y sigue con otra cosa.
   título "└─ te la pidió Marcos Tarquini", chico y gris, como el "└─ de Ariel · te espera". Sólo en sus propias
   tareas, sólo si la pidió otra persona, y con el nombre entero. *Recomendación:* dejarlo así; si se prefiere
   el nombre corto ("te la pidió Marcos") o que diga también el área, es un cambio chico.
+- **Lenguaje: qué palabra reemplaza a "trabada" y "bloqueada"** (tarea "Lenguaje"; un explorador midió las
+  rondas del 14/10). Leda dijo "trabada" 25 veces, todas en "cómo vienen tus tareas" (conversación 55): «Contame
+  si la empezaste, para cuándo la terminás o si está trabada.» Sale de un código interno que la IA copia tal
+  cual (`si_esta_trabada`), igual que pasó con "previsión"; hay 64 nombres de datos más con "trab" o "bloque"
+  que le llegan a la IA, y lo mismo dicen la bienvenida («si algo te está trabando»), el historial de la tarea
+  en la web («Se trabó: …», «Se destrabó el …») y el tablero («Bloqueos abiertos»). Candidatas: **"frenada"**
+  («¿algo te está frenando?», «ya puede seguir», «Se frenó: falta el repuesto») o **"parada"**. En la web ya se
+  decidió «ESPERANDO» para el estado (MA-3), pero en el chat "espera" ya quiere decir "espera otra tarea" o
+  "espera la revisión", y se confundiría. *Recomendación:* "frenada" en el chat y en los textos, y «ESPERANDO»
+  sólo como etiqueta del estado en la web. Con la respuesta, se renombran los datos en el borde de la redacción
+  (como "previsión"), se reescriben sus explicaciones, una prueba impide que vuelvan, y una ronda con la IA real
+  lo comprueba. Mientras tanto se arregla sólo lo que no depende de la palabra.
+- **El mensaje cuando la IA falla** (tarea "Lenguaje"). Hoy, si la IA no responde, la persona recibe: «Tuve un
+  problema y no pude responder tu mensaje. Ya quedó registrado para que lo revise un administrador.» Suena frío
+  y técnico. *Recomendación:* «Uy, no pude contestarte ahora. Ya avisé para que lo revisen; probá de nuevo en un
+  rato.» (la constitución §10 pide un mensaje humano y genérico, y lo cumple). Alternativa: lo mismo sin "probá
+  de nuevo".
+- **«Mi espacio» cuando Telegram no fijó el botón del menú** (advertencia de RDD de la MA-5). Ante "quiero ver
+  mis tareas", Leda contesta que toque «Mi espacio», el botón fijo del menú, sin botón en el mensaje (tu
+  decisión del 14/10). Si al arrancar Telegram no aceptó fijar ese botón (queda un incidente), Leda igual lo
+  nombra y la persona no lo encuentra. *Recomendación:* cuando el botón del menú no se pudo fijar, Leda manda
+  el botón «Mi espacio» debajo del mensaje, como excepción. Es raro (pasa sólo si falla Telegram o falta la
+  dirección pública), por eso no se construyó sin preguntarte.
+- **Cuánto dura la sesión de administración en la compu** (deuda de la MA). Hoy no vence nunca: quien entró a
+  la administración desde una compu sigue adentro hasta que toca «Cerrar sesión». La del equipo dura lo que
+  elige el administrador para cada equipo. *Recomendación:* que la de administración venza sola a las 12 horas
+  sin uso, porque desde ahí se cargan tareas y objetivos de cualquier espacio. Ejemplo: Ariel entra a la
+  administración a la mañana, se olvida la compu abierta y a la noche ya pide el QR de nuevo.
+- **Grafo de transiciones de estado** (tarea agregada el 15/10; un explorador mapeó el código). Hoy nada
+  impide que una tarea pase de cualquier estado a cualquier otro por la herramienta `actualizar_estado`
+  (aunque la conversación sólo la usa para "empecé" y para deshacerlo). Esta noche se construye sólo lo que la
+  mecánica §3 ya dice: el estado de partida anotado tiene que ser el real, de "cancelada" no se sale, y al
+  destrabar se vuelve al estado anterior. Para el resto, de a una:
+  1. **¿Quién puede cancelar una tarea, desde qué estados, y con motivo obligatorio?** Hoy lo puede hacer el
+     responsable, desde cualquier estado y sin motivo (sólo por la herramienta; nadie lo usa en el chat). La
+     mecánica pide "razón y autoridad". *Recomendación:* sólo quien la pidió o Dirección, con motivo
+     obligatorio, desde cualquier estado salvo "terminada".
+  2. **¿Reabrir una tarea terminada sigue permitido?** Hoy quien la pidió puede reabrirla (vuelve a
+     "asignada"). *Recomendación:* sí, y queda declarado en el grafo.
+  3. **¿Se mantiene "deshacer el empecé"** (de "en curso" a "asignada", cuando la persona se corrige)? La
+     mecánica no lo prevé. *Recomendación:* sí, sólo como corrección dentro del margen para corregir.
+  4. **Los estados de los objetivos** (suspender, cancelar, "completo, falta la aprobación"): hoy ningún código
+     los mueve después de crearlos. *Recomendación:* dejarlos para cuando se construya cerrar un objetivo, y por
+     ahora sólo impedir saltos inválidos.
 
 - **J7 · las jerarquías y los integrantes desde la web de Dirección** (preguntas preparadas el 2026-10-15 a la
   noche; nada construido). Hoy no hay ninguna función, comando ni pantalla para dar de alta o de baja a alguien,
