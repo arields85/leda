@@ -44,7 +44,7 @@ detalle en el documento de la unidad): la MA-7 ("Cerrar sesión" en la compu), l
 (10 de 10), las deudas de la MA, lo claro de "Lenguaje", el ADR 0025 (propuesta), la base del cambio de fecha
 (J5 S2), el ensayo de propiedad sobre un clúster limpio y la T8, la parte 1 del grafo de transiciones (más su
 arreglo para varias filas), el candado de la sesión de ChatGPT y los planes de la J5 y la J6. `leda_motor` en la
-`0083` (último respaldo `db/respaldos/leda_motor-antes-0083-20261015.dump`).
+`0084`, la `0085` sin aplicar hasta su RDD (último respaldo `db/respaldos/leda_motor-antes-0084-20261015.dump`).
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si no responde aunque `pg_ctl
 status` diga que corre (pasó el 2026-10-14: error de memoria compartida), cerrar con `taskkill /F` TODOS los
@@ -58,6 +58,14 @@ la palabra que reemplaza a "trabada" (hecho y probado con la IA real: en la 55, 
 construir la respuesta pendiente antes de decirlo), «Mi espacio» sin el botón del menú, la sesión de
 administración (12 h sin uso, configurable), el grafo (cancelar, reabrir, deshacer "la empecé" siempre) y los
 hallazgos de la ronda. Cada respuesta está escrita en su punto, marcada DECIDIDO o CONTESTADO.
+
+**Dónde quedó (cierre del 2026-10-15, tarde):** J7-0 a J7-5 y J7-5b hechas (equipo que cuadra, el pack sólo arma
+un equipo vacío, ver el equipo, áreas, alta con enlace, nombre por espacio). **Primero en la sesión nueva:** la RDD
+de `9d871545` partida en pedazos (no entró entera), corregir el alta duplicada (`PersonEditor.tsx:113-119`),
+aplicar la `0085` a `leda_motor` con respaldo, reiniciar la web; después J7-6 en adelante. **Diseño:** con
+impeccable (siempre por su proceso, nunca a mano): `PRODUCT.md`, `DESIGN.md`, la dirección en
+`.impeccable/surfaces/web-src-app-tsx.md` y las referencias `.impeccable/mocks/decision/r7-profundidad*.html`;
+el usuario sigue ajustando con `/impeccable live` (estaba probando la barra de pestañas sin contenedor).
 
 **Lo que sigue, a construir, en este orden** (usuario, 2026-10-15: "todo lo que requiera armar equipo,
 configurar equipo… quisiera darle prioridad; las otras son mejoras"; "ese es el orden correcto"): 1. **la J7**, armar
@@ -173,7 +181,7 @@ validador de invariantes. Destino de cada uno:
   `deteccion_pregunta`, `jev` y `local`) y la escalera, el reloj y el ciclo viejos.
 - **La auditoría vuelve a la cocina:** cada `herramientas.ejecutar` y cada efecto propio del motor deja su fila
   en `audit_log`, con `pack_hash` y `nucleo_hash`.
-- **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0083` (la plataforma, el acceso por chat, el cambio de fecha, el grafo y el equipo) en la rama. La `0032` borra las tablas del alta.
+- **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0085` (la plataforma, el acceso por chat, el cambio de fecha, el grafo y el equipo) en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   Ensayo de propiedad sobre un clúster limpio, 2026-10-15 (`tools/ensayo_propiedad.py`): propietarios y RLS

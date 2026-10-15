@@ -1744,6 +1744,15 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         tests/motor`: 1510 passed. `pytest tests/test_onboarding.py tests/test_esqueleto.py
         tests/test_importar_no_pisa_el_equipo.py`: 32 passed. `npm test` en `web/`: 365 passed. En
         seco, `correr --ia guionada --veces 1`: 54 de 54 bien. `leda_motor` sigue en la `0083`.
+        **Cierre de sesión (2026-10-15, tarde):** RDD de `ff257246` y `3a7ee9ed` (J7-5) aprobadas; advertencias:
+        el formulario de alta puede crear a la misma persona dos veces si se reinicia la clave en un reintento
+        (`web/src/admin/PersonEditor.tsx:113-119`) — **a corregir primero**; caminos de falla de la confirmación
+        sin prueba; «no cuadra» sin prueba (`web_equipo.py:330`). La RDD de `9d871545` (J7-5b) **no entró**
+        (`lens_context_budget_exceeded`): revisarla partida en candidatos chicos (por ejemplo, base y migración por
+        un lado, Python y pruebas por otro). `db/pruebas.sql` con el nombre de cada membresía (`cae5a751`); su
+        falla en la línea 119 (criterio vs evidencia) ya estaba antes. `leda_motor` en la `0084` (respaldo
+        `db/respaldos/leda_motor-antes-0084-20261015.dump`); **la `0085` sin aplicar** hasta su RDD. La web en
+        el puerto 8000 corre código viejo: reiniciarla.
       - **J7-6** · mover tareas por un cambio del equipo (`0085`, base): `cambio_de_responsable` acepta un
         cambio del equipo además de un pase; `cambio_de_revisor`.
       - **J7-7** · aprobador, rol y cambio de área (`0086`).
