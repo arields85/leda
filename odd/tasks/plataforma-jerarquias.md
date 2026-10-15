@@ -1753,6 +1753,10 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         falla en la línea 119 (criterio vs evidencia) ya estaba antes. `leda_motor` en la `0084` (respaldo
         `db/respaldos/leda_motor-antes-0084-20261015.dump`); **la `0085` sin aplicar** hasta su RDD. La web en
         el puerto 8000 corre código viejo: reiniciarla.
+        **Alta duplicada, corregida** (`a71d2623`): tras una confirmación sin respuesta, la clave se queda aunque
+        se vuelva y se revise de nuevo, como en `LoadForm`; igual en `AreaEditor.tsx`, que tenía el mismo
+        defecto. RED observado (`web/src/admin/teamConfirmKey.test.tsx`: 2 de 5 fallaban, la segunda
+        confirmación iba con otra clave); `npm test` en `web/`: 370 passed; `npm run build`: bien.
       - **J7-6** · mover tareas por un cambio del equipo (`0085`, base): `cambio_de_responsable` acepta un
         cambio del equipo además de un pase; `cambio_de_revisor`.
       - **J7-7** · aprobador, rol y cambio de área (`0086`).
