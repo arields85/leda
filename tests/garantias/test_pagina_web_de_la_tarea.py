@@ -140,10 +140,12 @@ def test_la_pagina_cuenta_lo_que_quedo_asentado_de_un_bloqueo(web, conn, mundo):
     r = web.get(f"/tarea/{_emitir(conn, mundo, 'Taylor Quinn')}")
 
     assert r.status_code == 200
-    assert "Sam Noble 1 dijo que la destraba Taylor Quinn 1" in r.text
-    assert "Taylor Quinn 1 dijo que la destraba el vie 23/10" in r.text
+    # What is missing and who handles it, never "destraba" or "trabada" (user, 2026-10-15).
+    assert "Sam Noble 1 dijo que de eso se ocupa Taylor Quinn 1" in r.text
+    assert "Taylor Quinn 1 dijo que lo consigue el vie 23/10" in r.text
     assert "la traigo del depósito" in r.text
-    assert "Quedó asentado que sigue trabada: 5 días hábiles" in r.text
+    assert "Quedó asentado que sigue esperando: 5 días hábiles" in r.text
+    assert "destrab" not in r.text and "trabad" not in r.text
     for palabra in ("asentar_", "blocker", "dicho_del_bloqueo", "a_membership_id"):
         assert palabra not in r.text
 

@@ -125,20 +125,20 @@ def _hecho(h: dict[str, Any], zona: ZoneInfo) -> str:
         texto = f"{quien} {verbo}: {_e(_dia(h.get('fecha'), zona))}"
     elif que == "quien_destraba":
         if h.get("no_sabe"):
-            texto = f"{quien} dijo que no sabe quién la destraba"
+            texto = f"{quien} dijo que no sabe quién se ocupa de lo que falta"
         elif h.get("nadie_mas"):
-            texto = f"{quien} dijo que no hay otra persona que la destrabe"
+            texto = f"{quien} dijo que no hay otra persona que se ocupe"
         else:
-            texto = f"{quien} dijo que la destraba {_e(h.get('destraba'))}"
+            texto = f"{quien} dijo que de eso se ocupa {_e(h.get('destraba'))}"
     elif que == "dicho_del_bloqueo":
         texto = _lo_que_dijo_del_bloqueo(h, quien, zona)
     elif que == "asentado":
         if h.get("por") == "sigue_trabada":
-            texto = "Quedó asentado que sigue trabada"
+            texto = "Quedó asentado que sigue esperando"
             if h.get("dias_habiles") is not None:
                 texto += f": {_e(h['dias_habiles'])} días hábiles"
         else:
-            texto = "Quedó asentado que nadie toma el bloqueo"
+            texto = "Quedó asentado que nadie se ocupa de lo que le falta"
     else:
         return ""
     return (f'<li>{texto} <span class="quien">· {_e(_cuando(h.get("cuando"), zona))}'
@@ -154,7 +154,7 @@ def _lo_que_dijo_del_bloqueo(h: dict[str, Any], quien: str, zona: ZoneInfo) -> s
     elif h.get("ya_esta"):
         texto = f"{quien} dijo que ya está"
     elif h.get("para_cuando"):
-        texto = f"{quien} dijo que la destraba el {_e(_dia(h['para_cuando'], zona))}"
+        texto = f"{quien} dijo que lo consigue el {_e(_dia(h['para_cuando'], zona))}"
     else:
         texto = f"{quien} dijo"
     if h.get("lo_que_dice"):
