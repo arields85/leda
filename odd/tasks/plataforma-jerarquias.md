@@ -1257,7 +1257,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       (las tareas aparecen; los avisos por chat quedaron guardados hasta el horario del espacio, como corresponde);
       "quiero crear una tarea" ofrece "Cargar la tarea". El "te espera" que se esperaba en el pedido a Dirección
       era un error del guion: sólo aparece cuando una tarea de otro espera la de la persona.
-      Pendiente: la ronda con la IA real de las conversaciones 50 y 55 sobre la MA-5 (con el escuchador apagado).
+      Ronda con la IA real de las conversaciones 50 y 55 sobre la MA-5 (2026-10-15, `--veces 5`, sobre `ee3fb859`):
+      10 de 10, garantías, comprensión y formato (bitácora).
       **Cómo se cierra la sesión de la compu** (usuario, 2026-10-15, madrugada): la compu sigue recordada el
       tiempo que elige el administrador para cada equipo (cerrar la pestaña no la cierra; opción A), y vuelve
       un **botón "Cerrar sesión" sólo en la compu**, debajo del nombre y el área de arriba a la derecha; nunca
