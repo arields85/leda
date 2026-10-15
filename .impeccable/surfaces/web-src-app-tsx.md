@@ -108,11 +108,17 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   Muestra: `.impeccable/mocks/decision/r8-sobrio-pedidos.html` (`?vista=terminados`); descartadas «un trayecto
   por pedido» y «por a quién» (`pedidos-*.html`).
 
+- **Una tarea abierta, r8** (2026-10-15, noche, sorteo `061c4247`; el usuario eligió por chat tras cerrar la página):
+  la **línea de tiempo** (se cargó, la empezó, lo entregado, hoy en durazno), y en el último hito, con lo que tomó de
+  «lo que falta, primero»: el vencimiento con **lo que falta para entregarla** (cada pieza con «falta») y quién la
+  revisa; debajo, «qué tiene que cumplir». Muestra: `.impeccable/mocks/decision/r8-sobrio-tarea.html`; bocetos
+  `tarea-*.html`. **Para construirla:** la historia de la tarea hoy no viaja a la Mini App (`detalle_en_json`,
+  `web_app.py`, sólo la tiene la página HTML de la tarea): hay que sumarla al servidor.
+
 ## Pendiente
 
 - Ajustes que el usuario va a seguir pidiendo (dijo "vamos por buen camino, tenemos que seguir haciendo
   ajustes").
-- La pantalla de una tarea abierta en este estilo (le gustó la disposición «una tarea por pantalla»).
 - El resumen grande sale de datos reales (la muestra de Ismael dice «Marcos espera tu firma»: gana el punto 2).
 - `DESIGN.md` todavía no tiene los contadores, el filtro ni el coral de «Vencidas»: pasarlos con el documenter
   cuando el usuario cierre esta pantalla.
