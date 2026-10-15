@@ -1588,7 +1588,10 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         532 passed. En seco, `correr --ia guionada --veces 1`: 54 de 54 bien.
       - [x] **J7-2** · el pack sólo arma un equipo vacío (sin migración): en un espacio con gente no toca áreas,
         roles, personas, aprobadores, referentes ni rutas.
-        **Hecha** (2026-10-15; escritor delegado), `8eb06df3`. `importar` separa el equipo
+        **Hecha** (2026-10-15; escritor delegado), `8eb06df3`. RDD aprobada; advertencia: el aviso de
+        "N personas todavía no activaron su enlace" depende de que el equipo se haya aplicado
+        (`importador.py:347-349`), sin una prueba propia; sugerencias: una variable de entorno que la prueba no
+        restaura y el umbral del inventario sin prueba. `importar` separa el equipo
         (`_importar_equipo`: áreas y roles, personas con su aprobador, referentes, `approval_policy` y
         `escalation_route`) de la configuración (`_importar_configuracion`: calendario, glosario y cómo habla
         Leda). Si el espacio ya tiene alguna membresía, no aplica el equipo ni los `telegram_user_id` y lo dice:
