@@ -1301,7 +1301,13 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
         no es Dirección, 403). RED observado (dos fallas), después verde.
       Verificación: `npm test` 343 passed y 30 archivos; `npm run build` bien; pytest de
       `test_quien_ve_que`, `test_entrar_con_telegram`, `test_enlace_y_sesion`, `test_lectura`,
-      `test_api_de_la_plataforma` y `test_capacidades`: 184 passed.
+      `test_api_de_la_plataforma` y `test_capacidades`: 184 passed. Comentario de `test_capacidades`
+      puesto al día (`web_app.py` ya lee `pedida_por_membership_id`). RDD aprobada sobre todo el tramo
+      desde `825676d7` (con el ensayo de propiedad), `review-f874480b32eaa102`; advertencias sin arreglar,
+      casos de borde: un 404 de un área vuelve con `history.back()` y podría caer en otra entrada vieja
+      (`App.tsx:180-182`); la prueba de otro espacio en "te la pidió" podría pasar vacía
+      (`test_quien_ve_que.py:657-666`). Queda de esta tarea: la ortografía al confirmar en la puerta del
+      equipo, con la IA real (no se corre mientras un escritor edita `src/`).
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
