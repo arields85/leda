@@ -52,10 +52,10 @@ def mundo(conn) -> dict:
                            values (%s, %s) returning id""", (telegram, nombre))
             app_user = str(cur.fetchone()["id"])
             aprobador = personas.get("Ismael", {}).get("membership_id")
-            cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id,
+            cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id,
                                                    aprobador_membership_id)
-                           values (%s, %s, %s, %s, %s) returning id""",
-                        (ws, app_user, area, roles[rol], aprobador))
+                           values (%s, %s, (select nombre from app_user where id = %s), %s, %s, %s) returning id""",
+                        (ws, app_user, app_user, area, roles[rol], aprobador))
             personas[nombre] = {"app_user_id": app_user, "telegram": telegram,
                                 "membership_id": str(cur.fetchone()["id"])}
         cur.execute("""insert into objective (workspace_id, tipo, titulo, estado)

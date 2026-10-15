@@ -299,10 +299,10 @@ def intake_world(conn):
             def membership(person, area, role, approver=None):
                 cur.execute(
                     """insert into membership
-                         (workspace_id, app_user_id, area_id, rol_id,
+                         (workspace_id, app_user_id, nombre, area_id, rol_id,
                           aprobador_membership_id)
-                       values (%s, %s, %s, %s, %s) returning id""",
-                    (ws, people[person]["app_user_id"], areas[area], roles[role],
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s, %s) returning id""",
+                    (ws, people[person]["app_user_id"], people[person]["app_user_id"], areas[area], roles[role],
                      approver),
                 )
                 people[person]["membership_id"] = str(cur.fetchone()["id"])

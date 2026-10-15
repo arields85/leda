@@ -64,10 +64,10 @@ def _equipo(conn):
         cur.execute("select rol_id, aprobador_membership_id from membership where id = %s",
                     (nahuel["membership_id"],))
         fila = cur.fetchone()
-        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id,
+        cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id,
                                                aprobador_membership_id)
-                       values (%s, %s, %s, %s, %s) returning id""",
-                    (mundo.workspace_id, usuario, nahuel["area_id"], fila["rol_id"],
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s, %s) returning id""",
+                    (mundo.workspace_id, usuario, usuario, nahuel["area_id"], fila["rol_id"],
                      fila["aprobador_membership_id"]))
         mundo.personas["Pedro"] = {"nombre": "Pedro Paz", "app_user_id": usuario,
                                    "membership_id": str(cur.fetchone()["id"]),

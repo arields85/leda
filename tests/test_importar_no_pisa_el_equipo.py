@@ -114,8 +114,8 @@ def test_reimportar_no_pisa_el_equipo_y_aplica_lo_demas(conn, tmp_path):
         paula = cur.fetchone()["id"]
         cur.execute(
             """insert into membership
-                 (workspace_id, app_user_id, area_id, rol_id, aprobador_membership_id)
-               select %s, %s, a.id, r.id, %s from area a, rol r
+                 (workspace_id, app_user_id, nombre, area_id, rol_id, aprobador_membership_id)
+               select %s, %s, 'Paula Ríos', a.id, r.id, %s from area a, rol r
                 where a.workspace_id = %s and a.slug = 'it'
                   and r.workspace_id = %s and r.slug = 'integrante'""",
             (ws, paula, por_nombre["Martín"], ws, ws))

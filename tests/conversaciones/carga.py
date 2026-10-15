@@ -242,10 +242,10 @@ def _espacio(cur) -> tuple[Mundo, str]:
                     (telegram, nombre))
         app_user = str(cur.fetchone()["id"])
         aprobador = mundo.personas[aprobado_por]["membership_id"] if aprobado_por else None
-        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id,
+        cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id,
                                                aprobador_membership_id)
-                       values (%s, %s, %s, %s, %s) returning id""",
-                    (ws, app_user, areas[area], roles[rol], aprobador))
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s, %s) returning id""",
+                    (ws, app_user, app_user, areas[area], roles[rol], aprobador))
         mundo.personas[corto] = {"nombre": nombre, "app_user_id": app_user,
                                  "membership_id": str(cur.fetchone()["id"]),
                                  "telegram": telegram, "area_id": areas[area],

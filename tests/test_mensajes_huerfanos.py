@@ -542,10 +542,10 @@ def test_una_persona_en_dos_espacios_se_decide_por_su_membresia_de_cada_uno(
                     (oeste["id"],))
         rol = cur.fetchone()["id"]
         cur.execute(
-            """insert into membership (workspace_id, app_user_id, area_id, rol_id,
+            """insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id,
                                        activo)
-               values (%s, %s, %s, %s, false)""",
-            (oeste["id"], yo["app_user_id"], next(iter(oeste["areas"].values())), rol))
+               values (%s, %s, (select nombre from app_user where id = %s), %s, %s, false)""",
+            (oeste["id"], yo["app_user_id"], yo["app_user_id"], next(iter(oeste["areas"].values())), rol))
     conn.commit()
     r_norte = _recibo(conn, norte["id"], yo["app_user_id"], yo["telegram"],
                       hace=EN_CURSO + timedelta(minutes=1), message_id=1)

@@ -140,8 +140,8 @@ def test_quien_ya_esta_en_otro_espacio_queda_unido_por_el_bot(conn, mundo):
         cur.execute("insert into app_user (telegram_user_id, nombre) values (83200, 'Nora Sosa') "
                     "returning id")
         nora = str(cur.fetchone()["id"])
-        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id)
-                       values (%s, %s, %s, %s) returning id""", (otro, nora, area, rol))
+        cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id)
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s) returning id""", (otro, nora, nora, area, rol))
         de_otro = str(cur.fetchone()["id"])
     conn.commit()
     sesion = _sesion_de_ismael(conn, mundo)

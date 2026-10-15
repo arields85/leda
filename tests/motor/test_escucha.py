@@ -262,9 +262,9 @@ def test_un_enlace_de_activacion_vincula_a_la_persona_y_le_da_la_bienvenida(conn
         base = cur.fetchone()
         cur.execute("""insert into app_user (nombre) values ('Nora Sosa') returning id""")
         usuario = cur.fetchone()["id"]
-        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id)
-                       values (%s, %s, %s, %s) returning id""",
-                    (mundo["id"], usuario, base["area_id"], base["rol_id"]))
+        cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id)
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s) returning id""",
+                    (mundo["id"], usuario, usuario, base["area_id"], base["rol_id"]))
         membresia = cur.fetchone()["id"]
         # La base guarda la huella del token, nunca el token (migración 0084).
         cur.execute("""insert into activation_token (workspace_id, membership_id, token_hash,

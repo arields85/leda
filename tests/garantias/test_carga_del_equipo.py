@@ -87,10 +87,10 @@ def equipo(conn, intake_world) -> dict:
         cur.execute("""insert into app_user (telegram_user_id, nombre)
                        values (79001, 'Alex Rivera 1') returning id""")
         usuario = str(cur.fetchone()["id"])
-        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id,
+        cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id,
                                                aprobador_membership_id)
-                       values (%s, %s, %s, %s, %s) returning id""",
-                    (norte["id"], usuario, norte["areas"]["quality"], miembro,
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s, %s) returning id""",
+                    (norte["id"], usuario, usuario, norte["areas"]["quality"], miembro,
                      gente["Sam Noble"]["membership_id"]))
         gente["Alex Rivera"] = {"app_user_id": usuario, "telegram": 79001,
                                 "name": "Alex Rivera 1",

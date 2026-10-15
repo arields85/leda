@@ -118,7 +118,7 @@ def identificar(cur: psycopg.Cursor, telegram_user_id: int, canal: Canal,
     # no hay privilegio para hacerlo, la persona sencillamente no es de acá.
     try:
         cur.execute(
-            """select u.id as app_user_id, u.nombre, m.id as membership_id, m.area_id,
+            """select u.id as app_user_id, m.nombre, m.id as membership_id, m.area_id,
                       r.slug, r.autoridad_final
                  from membership m
                  join app_user u on u.id = m.app_user_id

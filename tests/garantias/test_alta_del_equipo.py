@@ -150,7 +150,7 @@ def _problemas(conn, ws: str) -> list:
 
 
 def _membresia(conn, membership_id: str) -> dict:
-    (fila,) = _filas(conn, """select m.*, u.nombre, u.telegram_user_id
+    (fila,) = _filas(conn, """select m.*, u.telegram_user_id
                                 from membership m join app_user u on u.id = m.app_user_id
                                where m.id = %s""", membership_id)
     return fila

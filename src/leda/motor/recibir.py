@@ -722,9 +722,7 @@ class Recepcion:
                 membership_id = self._membresia(cur, tg_user)
                 if membership_id is None:
                     return                  # un desconocido sin enlace: no se le responde
-                cur.execute("""select u.nombre from membership m
-                                 join app_user u on u.id = m.app_user_id
-                                where m.id = %s""", (membership_id,))
+                cur.execute("select nombre from membership where id = %s", (membership_id,))
                 cuerpo = bienvenida(cur, self.ws, cur.fetchone()["nombre"])
             # A quien nunca entró a la web, la bienvenida también se la ofrece, una sola vez: en
             # el mismo mensaje, que entonces no se parte (lleva el botón debajo).

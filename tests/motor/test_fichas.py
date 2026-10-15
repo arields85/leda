@@ -97,8 +97,8 @@ def otro_espacio(conn) -> dict:
         cur.execute("""insert into app_user (telegram_user_id, nombre)
                        values (82000, 'Nora') returning id""")
         usuario = str(cur.fetchone()["id"])
-        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id)
-                       values (%s, %s, %s, %s) returning id""", (ws, usuario, area, rol))
+        cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id)
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s) returning id""", (ws, usuario, usuario, area, rol))
         persona = str(cur.fetchone()["id"])
         cur.execute("""insert into objective (workspace_id, tipo, titulo, estado)
                        values (%s, 'operativo', 'Ajeno', 'activo') returning id""", (ws,))
@@ -520,9 +520,9 @@ def test_quien_destraba_con_dos_integrantes_que_coinciden_es_un_dato_que_falta(c
         cur.execute("""insert into app_user (telegram_user_id, nombre)
                        values (81500, 'Ismael Otero') returning id""")
         usuario = cur.fetchone()["id"]
-        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id)
-                       values (%s, %s, %s, %s)""",
-                    (mundo["id"], usuario, base["area_id"], base["rol_id"]))
+        cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id)
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s)""",
+                    (mundo["id"], usuario, usuario, base["area_id"], base["rol_id"]))
     conn.commit()
     _jugar(conn, escribe, "Marcos", Jugada(
         "anotar_bloqueo", {"tarea": "T1", "causa": "falta el repuesto"}))

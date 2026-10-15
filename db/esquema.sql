@@ -133,6 +133,9 @@ create table membership (
   id            uuid primary key default gen_random_uuid(),
   workspace_id  uuid not null references workspace(id) on delete cascade,
   app_user_id   uuid not null references app_user(id) on delete cascade,
+  -- Cómo se llama la persona en este espacio (J7-5b, migración 0085): lo que escribió Dirección
+  -- en el alta o lo que trae el pack. Es lo único que un espacio muestra de su nombre.
+  nombre        text not null,
   area_id       uuid not null references area(id),
   rol_id        uuid not null references rol(id),
   -- Quién revisa el trabajo de esta persona. La aprobación sube un nivel:
@@ -151,6 +154,12 @@ comment on table membership is
 
 comment on column membership.aprobador_membership_id is
   'La cadena de aprobación es por persona, no por área: Marcos aprueba a Nahuel aunque estén en áreas distintas.';
+
+comment on column membership.nombre is
+  'J7-5b (migración 0085): cómo se llama la persona en este espacio. Todo lo que un espacio muestra de una persona sale de acá, nunca de app_user.nombre: una cuenta unida a varios espacios (J7-5) tiene un nombre en cada uno, y ninguno ve el de otro (constitución §13).';
+
+comment on column app_user.nombre is
+  'J7-5b (migración 0085): el nombre de la cuenta, interno y de la plataforma (el administrador de plataforma, la consola). Ningún espacio lo muestra: cada uno nombra a la persona por membership.nombre.';
 
 alter table area add constraint area_referente
   foreign key (workspace_id, referente_membership_id) references membership(workspace_id, id)
@@ -1788,10 +1797,9 @@ begin
   end if;
 
   -- Una sola persona activa con la autoridad final.
-  select coalesce(array_agg(u.nombre order by u.nombre), array[]::text[]) into v_finales
+  select coalesce(array_agg(m.nombre order by m.nombre), array[]::text[]) into v_finales
     from membership m
     join rol r on r.id = m.rol_id
-    join app_user u on u.id = m.app_user_id
    where m.workspace_id = p_workspace_id and m.activo and r.autoridad_final;
   if cardinality(v_finales) = 0 then
     v_problemas := v_problemas || jsonb_build_array(jsonb_build_object(
@@ -1807,16 +1815,14 @@ begin
 
   -- Cada persona activa, salvo la autoridad final, con un aprobador activo del equipo.
   for v_fila in
-    select m.id, u.nombre, m.aprobador_membership_id as aprobador, r.autoridad_final,
-           coalesce(a.activo, false) as aprobador_activo, ua.nombre as aprobador_nombre
+    select m.id, m.nombre, m.aprobador_membership_id as aprobador, r.autoridad_final,
+           coalesce(a.activo, false) as aprobador_activo, a.nombre as aprobador_nombre
       from membership m
       join rol r on r.id = m.rol_id
-      join app_user u on u.id = m.app_user_id
       left join membership a
         on a.id = m.aprobador_membership_id and a.workspace_id = m.workspace_id
-      left join app_user ua on ua.id = a.app_user_id
      where m.workspace_id = p_workspace_id and m.activo
-     order by u.nombre, m.id
+     order by m.nombre, m.id
   loop
     if v_fila.aprobador is null then
       if not v_fila.autoridad_final then
@@ -1851,8 +1857,8 @@ begin
       select string_agg(x::text, ',' order by x) into v_clave from unnest(v_vuelta) x;
       if not v_clave = any(v_vueltas) then
         v_vueltas := v_vueltas || v_clave;
-        select array_agg(u.nombre order by u.nombre) into v_nombres
-          from membership m join app_user u on u.id = m.app_user_id
+        select array_agg(m.nombre order by m.nombre) into v_nombres
+          from membership m
          where m.id = any(v_vuelta);
         if cardinality(v_vuelta) = 1 then
           v_problemas := v_problemas || jsonb_build_array(jsonb_build_object(
@@ -1872,10 +1878,9 @@ begin
   -- Cada área sin archivar, con un referente activo, la autoaprobación declarada o sin referente
   -- (la decide Dirección, J6-D6).
   for v_fila in
-    select a.id, a.nombre, u.nombre as referente
+    select a.id, a.nombre, r.nombre as referente
       from area a
       join membership r on r.id = a.referente_membership_id
-      join app_user u on u.id = r.app_user_id
      where a.workspace_id = p_workspace_id and a.archivada_en is null and not r.activo
        and not exists (select 1 from approval_policy p
                         where p.workspace_id = a.workspace_id and p.area_id = a.id
@@ -1890,12 +1895,11 @@ begin
 
   -- Nadie activo en un área archivada.
   for v_fila in
-    select m.id, u.nombre, a.id as area_id, a.nombre as area
+    select m.id, m.nombre, a.id as area_id, a.nombre as area
       from membership m
       join area a on a.id = m.area_id
-      join app_user u on u.id = m.app_user_id
      where m.workspace_id = p_workspace_id and m.activo and a.archivada_en is not null
-     order by u.nombre, m.id
+     order by m.nombre, m.id
   loop
     v_problemas := v_problemas || jsonb_build_array(jsonb_build_object(
       'codigo', 'integrante_en_area_archivada', 'membership_id', v_fila.id,
@@ -1955,15 +1959,15 @@ begin
                'archivada', a.archivada_en is not null,
                'referente', case when r.id is null then null
                                  else jsonb_build_object('membership_id', r.id,
-                                                         'nombre', ur.nombre,
+                                                         'nombre', r.nombre,
                                                          'activo', r.activo) end,
                'autoaprobacion', exists (
                  select 1 from approval_policy p
                   where p.workspace_id = v_espacio and p.area_id = a.id
                     and p.autoaprobacion_declarada),
                'personas', coalesce((
-                 select jsonb_agg(m.id order by u.nombre, m.id)
-                   from membership m join app_user u on u.id = m.app_user_id
+                 select jsonb_agg(m.id order by m.nombre, m.id)
+                   from membership m
                   where m.workspace_id = v_espacio and m.area_id = a.id and m.activo),
                  '[]'::jsonb),
                'tareas_abiertas', (
@@ -1973,32 +1977,30 @@ begin
              order by a.archivada_en is not null, a.nombre, a.id)
         from area a
         left join membership r on r.id = a.referente_membership_id
-        left join app_user ur on ur.id = r.app_user_id
        where a.workspace_id = v_espacio), '[]'::jsonb),
     -- Las personas: las que siguen en el equipo primero. «Sin conectar» es quien todavía no
     -- activó su enlace (`onboarding.pendientes_de_activar`): sin cuenta de Telegram.
     'personas', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'membership_id', m.id, 'nombre', u.nombre, 'activo', m.activo,
+               'membership_id', m.id, 'nombre', m.nombre, 'activo', m.activo,
                'conectado', u.telegram_user_id is not null,
                'area_id', m.area_id, 'area', a.nombre,
                'rol_id', m.rol_id, 'rol', r.nombre, 'autoridad_final', r.autoridad_final,
                'aprobador', case when ap.id is null then null
                                  else jsonb_build_object('membership_id', ap.id,
-                                                         'nombre', ua.nombre,
+                                                         'nombre', ap.nombre,
                                                          'activo', ap.activo) end,
                'referente_de', coalesce((
                  select jsonb_agg(x.nombre order by x.nombre, x.id)
                    from area x
                   where x.workspace_id = v_espacio and x.referente_membership_id = m.id
                     and x.archivada_en is null), '[]'::jsonb))
-             order by not m.activo, u.nombre, m.id)
+             order by not m.activo, m.nombre, m.id)
         from membership m
         join app_user u on u.id = m.app_user_id
         join area a on a.id = m.area_id
         join rol r on r.id = m.rol_id
         left join membership ap on ap.id = m.aprobador_membership_id
-        left join app_user ua on ua.id = ap.app_user_id
        where m.workspace_id = v_espacio), '[]'::jsonb),
     'roles', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -2034,11 +2036,15 @@ begin
     'ok', true,
     'cambios', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'id', c.id, 'clase', c.clase, 'puerta', c.puerta, 'quien', u.nombre,
+               'id', c.id, 'clase', c.clase, 'puerta', c.puerta, 'quien', coalesce(hm.nombre, u.nombre),
                'at', c.at, 'antes', c.antes, 'despues', c.despues)
              order by c.at desc, c.id)
         from cambio_del_equipo c
         join app_user u on u.id = c.hecho_por_app_user_id
+        -- Como lo nombra este espacio, aunque haya entrado por la puerta de administración; el
+        -- administrador de plataforma que no es del equipo, por su nombre de la plataforma (J7-5b).
+        left join membership hm
+          on hm.workspace_id = c.workspace_id and hm.app_user_id = c.hecho_por_app_user_id
        where c.workspace_id = v_espacio), '[]'::jsonb));
   perform set_config('leda.workspace_id', previo, true);
   return v_resultado;
@@ -2193,8 +2199,8 @@ begin
           v_errores := v_errores || jsonb_build_object('campo', 'referente', 'motivo', 'falta');
         else
           -- Leído `for share`: no deja el equipo mientras tanto.
-          select m.id, u.nombre into v_referente, v_referente_nombre
-            from membership m join app_user u on u.id = m.app_user_id
+          select m.id, m.nombre into v_referente, v_referente_nombre
+            from membership m
            where m.id = v_texto::uuid and m.workspace_id = p_espacio and m.activo
              for share of m;
           if v_referente is null then
@@ -2639,7 +2645,7 @@ begin
           v_errores := v_errores || jsonb_build_object('campo', 'persona',
                                                        'motivo', 'ya_esta_en_el_equipo');
         else
-          select u.nombre into v_nombre from app_user u where u.id = v_persona.app_user_id;
+          select m.nombre into v_nombre from membership m where m.id = v_persona.id;
         end if;
       end if;
     end if;
@@ -2715,8 +2721,8 @@ begin
         v_errores := v_errores || jsonb_build_object('campo', 'aprobador',
                                                      'motivo', 'es_la_misma_persona');
       else
-        select m.id, u.nombre into v_aprobador, v_aprobador_nombre
-          from membership m join app_user u on u.id = m.app_user_id
+        select m.id, m.nombre into v_aprobador, v_aprobador_nombre
+          from membership m
          where m.id = v_texto::uuid and m.workspace_id = p_espacio and m.activo
            for share of m;
         if v_aprobador is null then
@@ -2726,19 +2732,18 @@ begin
       end if;
     elsif v_area.id is not null and v_area.archivada_en is null then
       v_por_omision := true;
-      select r.id, u.nombre into v_aprobador, v_aprobador_nombre
-        from membership r join app_user u on u.id = r.app_user_id
+      select r.id, r.nombre into v_aprobador, v_aprobador_nombre
+        from membership r
        where r.id = v_area.referente_membership_id and r.workspace_id = p_espacio and r.activo
          and r.id is distinct from v_persona.id
          for share of r;
       if v_aprobador is null then
-        select m.id, u.nombre into v_aprobador, v_aprobador_nombre
+        select m.id, m.nombre into v_aprobador, v_aprobador_nombre
           from membership m
           join rol x on x.id = m.rol_id
-          join app_user u on u.id = m.app_user_id
          where m.workspace_id = p_espacio and m.activo and x.autoridad_final
            and m.id is distinct from v_persona.id
-         order by u.nombre, m.id
+         order by m.nombre, m.id
          limit 1
            for share of m;
       end if;
@@ -2767,16 +2772,16 @@ begin
   -- Un alta con el nombre de alguien del equipo es otra persona: se avisa, por si es la misma
   -- (alguien que sigue, o que estuvo y se puede volver a sumar).
   if p_accion = 'alta' then
-    if exists (select 1 from membership m join app_user u on u.id = m.app_user_id
+    if exists (select 1 from membership m
                 where m.workspace_id = p_espacio and m.activo
-                  and lower(u.nombre) = lower(v_nombre)) then
+                  and lower(m.nombre) = lower(v_nombre)) then
       v_avisos := v_avisos || jsonb_build_object(
         'codigo', 'mismo_nombre',
         'mensaje', format('Ya hay alguien en el equipo que se llama %s: si es la misma persona, '
                           'no hace falta darla de alta.', v_nombre));
-    elsif exists (select 1 from membership m join app_user u on u.id = m.app_user_id
+    elsif exists (select 1 from membership m
                    where m.workspace_id = p_espacio and not m.activo
-                     and lower(u.nombre) = lower(v_nombre)) then
+                     and lower(m.nombre) = lower(v_nombre)) then
       v_avisos := v_avisos || jsonb_build_object(
         'codigo', 'estuvo_en_el_equipo',
         'mensaje', format('%s estuvo en el equipo: si es la misma persona, volvé a sumarla desde '
@@ -2790,8 +2795,9 @@ begin
   if p_accion = 'alta' then
     v_antes := null;
     insert into app_user (nombre) values (v_nombre) returning id into v_usuario;
-    insert into membership (workspace_id, app_user_id, area_id, rol_id, aprobador_membership_id)
-    values (p_espacio, v_usuario, v_area.id, v_rol.id, v_aprobador)
+    insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id,
+                            aprobador_membership_id)
+    values (p_espacio, v_usuario, v_nombre, v_area.id, v_rol.id, v_aprobador)
     returning id into v_id;
   else
     v_id := v_persona.id;
@@ -2799,7 +2805,7 @@ begin
       'nombre', v_nombre,
       'area', (select a.nombre from area a where a.id = v_persona.area_id),
       'rol', (select r.nombre from rol r where r.id = v_persona.rol_id),
-      'quien_aprueba', (select u.nombre from membership m join app_user u on u.id = m.app_user_id
+      'quien_aprueba', (select m.nombre from membership m
                          where m.id = v_persona.aprobador_membership_id),
       'estado', 'fuera del equipo');
     v_despues := v_despues || jsonb_build_object('estado', 'en el equipo');
@@ -3032,7 +3038,7 @@ begin
     v_errores := v_errores || jsonb_build_object('campo', 'persona', 'motivo', 'falta');
   else
     -- La persona, de este espacio, leída `for update`: dos enlaces a la vez no se pisan.
-    select m.id, m.activo, u.nombre, u.telegram_user_id into v_persona
+    select m.id, m.activo, m.nombre, u.telegram_user_id into v_persona
       from membership m join app_user u on u.id = m.app_user_id
      where m.id = p_membership_id and m.workspace_id = v_espacio
        for update of m;
@@ -3561,7 +3567,7 @@ begin
     return null;
   end if;
   select jsonb_build_object(
-    'pidio', (select u.nombre from membership m join app_user u on u.id = m.app_user_id
+    'pidio', (select m.nombre from membership m
                where m.id = t.pedida_por_membership_id),
     'volver', case when acceso.admin_app_user_id is not null then '/app/admin/'
                    else '/app/e/' || w.slug || '/' end,
@@ -3570,8 +3576,7 @@ begin
         select o.id, o.titulo, v.ve,
                case when v.ve then jsonb_build_object(
                       've', true, 'titulo', o.titulo, 'estado', o.estado,
-                      'responsable', (select u.nombre from membership m
-                                        join app_user u on u.id = m.app_user_id
+                      'responsable', (select m.nombre from membership m
                                        where m.id = o.responsable_membership_id))
                     else jsonb_build_object('ve', false) end as dato
           from dependency d
@@ -3586,8 +3591,7 @@ begin
         select o.id, o.titulo, v.ve,
                case when v.ve then jsonb_build_object(
                       've', true, 'titulo', o.titulo, 'estado', o.estado,
-                      'responsable', (select u.nombre from membership m
-                                        join app_user u on u.id = m.app_user_id
+                      'responsable', (select m.nombre from membership m
                                        where m.id = o.responsable_membership_id))
                     else jsonb_build_object('ve', false) end as dato
           from dependency d
@@ -3639,8 +3643,7 @@ begin
   select jsonb_build_object(
     'espacio', w.nombre,
     'zona_horaria', w.zona_horaria,
-    'persona', coalesce((select u.nombre from membership m
-                           join app_user u on u.id = m.app_user_id
+    'persona', coalesce((select m.nombre from membership m
                           where m.id = acceso.membership_id),
                         (select u.nombre from app_user u
                           where u.id = acceso.admin_app_user_id)),
@@ -3648,19 +3651,17 @@ begin
       'titulo', t.titulo,
       'objetivo', (select o.titulo from objective o where o.id = t.objective_id),
       'area', (select a.nombre from area a where a.id = t.area_id),
-      'responsable', (select u.nombre from membership m join app_user u on u.id = m.app_user_id
+      'responsable', (select m.nombre from membership m
                        where m.id = t.responsable_membership_id),
-      'quien_aprueba', (select u.nombre from membership m
-                          join app_user u on u.id = m.app_user_id
+      'quien_aprueba', (select m.nombre from membership m
                          where m.id = quien_revisa_la_tarea(t.id)),
       'estado', t.estado,
       'fecha_objetivo', t.fecha_objetivo,
       'criterio_aceptacion', t.criterio_aceptacion,
-      'prevision', (select jsonb_build_object('fecha', f.fecha_prevista, 'quien', u.nombre,
+      'prevision', (select jsonb_build_object('fecha', f.fecha_prevista, 'quien', m.nombre,
                                               'cuando', f.at)
                       from task_forecast f
                       join membership m on m.id = f.dicho_por_membership_id
-                      join app_user u on u.id = m.app_user_id
                      where f.task_id = t.id
                        and not exists (select 1 from task_forecast g where g.reemplaza_id = f.id)
                      order by f.at desc limit 1)),
@@ -3673,40 +3674,45 @@ begin
       select jsonb_agg(h.dato order by h.cuando, h.orden) from (
         select e.at as cuando, 1 as orden,
                jsonb_build_object('que', 'estado', 'de', e.estado_anterior, 'a', e.estado_nuevo,
-                                  'quien', u.nombre, 'actor', e.actor_kind, 'cuando', e.at) as dato
-          from task_state_event e left join app_user u on u.id = e.actor_app_user_id
+                                  'quien', coalesce(em.nombre, adm.nombre), 'actor', e.actor_kind,
+                                  'cuando', e.at) as dato
+          from task_state_event e
+          -- Quien lo hizo, como lo nombra este espacio; el administrador de plataforma, que no
+          -- es del equipo, por su nombre de la plataforma (J7-5b).
+          left join membership em
+            on em.workspace_id = t.workspace_id and em.app_user_id = e.actor_app_user_id
+          left join app_user adm
+            on adm.id = e.actor_app_user_id and em.id is null
+           and es_administrador_de_plataforma(adm.id)
          where e.task_id = t.id
         union all
         select ap.at, 2,
                jsonb_build_object('que', case ap.decision when 'aprobado' then 'aprobacion'
                                                           else 'pedido_de_cambios' end,
-                                  'quien', u.nombre, 'comentario', ap.comentario,
+                                  'quien', m.nombre, 'comentario', ap.comentario,
                                   'cuando', ap.at)
           from approval ap
           join membership m on m.id = ap.aprobador_membership_id
-          join app_user u on u.id = m.app_user_id
          where ap.sujeto_tipo = 'tarea' and ap.sujeto_id = t.id
         union all
         select b.abierto_en, 3,
-               jsonb_build_object('que', 'bloqueo', 'causa', b.causa, 'quien', u.nombre,
+               jsonb_build_object('que', 'bloqueo', 'causa', b.causa, 'quien', m.nombre,
                                   'cuando', b.abierto_en, 'resuelto_en', b.resuelto_en)
           from blocker b
           left join membership m on m.id = b.abierto_por
-          left join app_user u on u.id = m.app_user_id
          where b.task_id = t.id
         union all
         select f.at, 4,
                jsonb_build_object('que', 'prevision', 'fecha', f.fecha_prevista,
-                                  'es_correccion', f.es_correccion, 'quien', u.nombre,
+                                  'es_correccion', f.es_correccion, 'quien', m.nombre,
                                   'cuando', f.at)
           from task_forecast f
           join membership m on m.id = f.dicho_por_membership_id
-          join app_user u on u.id = m.app_user_id
          where f.task_id = t.id
         union all
         select u.at, 5,
-               jsonb_build_object('que', 'quien_destraba', 'quien', pu.nombre,
-                                  'destraba', coalesce(du.nombre, u.destraba_externo),
+               jsonb_build_object('que', 'quien_destraba', 'quien', pm.nombre,
+                                  'destraba', coalesce(dm.nombre, u.destraba_externo),
                                   'no_sabe', u.no_sabe,
                                   'nadie_mas', u.destraba_membership_id
                                                = u.dicho_por_membership_id,
@@ -3714,14 +3720,12 @@ begin
           from blocker_unblocker u
           join blocker b on b.id = u.blocker_id
           join membership pm on pm.id = u.dicho_por_membership_id
-          join app_user pu on pu.id = pm.app_user_id
           left join membership dm on dm.id = u.destraba_membership_id
-          left join app_user du on du.id = dm.app_user_id
          where b.task_id = t.id
            and not u.sin_decir_quien
         union all
         select d.at, 6,
-               jsonb_build_object('que', 'dicho_del_bloqueo', 'quien', pu.nombre,
+               jsonb_build_object('que', 'dicho_del_bloqueo', 'quien', pm.nombre,
                                   'para_cuando', d.para_cuando, 'ya_esta', d.ya_esta,
                                   'no_le_corresponde', d.no_le_corresponde,
                                   'lo_que_dice', d.lo_que_dice, 'cuando', d.at)
@@ -3729,7 +3733,6 @@ begin
           join blocker_unblocker u on u.id = d.blocker_unblocker_id
           join blocker b on b.id = u.blocker_id
           join membership pm on pm.id = d.dicho_por_membership_id
-          join app_user pu on pu.id = pm.app_user_id
          where b.task_id = t.id
         union all
         select coalesce((a.detalle ->> 'at')::timestamptz, a.at), 7,
@@ -3753,7 +3756,7 @@ begin
                'enlace', case when e.clase = 'enlace' and not r.retirada then e.uri end,
                'nombre', case when not r.retirada then a.nombre_original end,
                'tipo_de_archivo', a.tipo, 'cubre', e.cubre,
-               'ejemplo_aceptado', e.es_ejemplo_aceptado, 'quien', u.nombre, 'cuando', e.at,
+               'ejemplo_aceptado', e.es_ejemplo_aceptado, 'quien', m.nombre, 'cuando', e.at,
                'retirada', r.retirada, 'retirada_el', r.retirada_el,
                'retirada_por_la_administracion', r.por_la_administracion,
                'motivo_del_retiro', r.motivo_de_la_administracion)
@@ -3761,7 +3764,6 @@ begin
         from evidence e
         left join archivo a on a.workspace_id = e.workspace_id and a.id = e.archivo_id
         left join membership m on m.id = e.entregado_por
-        left join app_user u on u.id = m.app_user_id
         -- Retirada por quien la entregó, o su contenido por la administración: la pieza o
         -- cualquier otra del espacio con el mismo archivo (un archivo se guarda una vez por
         -- huella). De una pieza retirada no sale su contenido (ADR 0019, decisión 3). De un
@@ -4337,7 +4339,7 @@ language sql stable set search_path = leda, public, pg_temp as $$
   select f.id, f.titulo, f.estado::text, f.fecha_objetivo,
          coalesce((select min(e.at) from task_state_event e
                     where e.task_id = f.id and e.estado_nuevo = 'asignada'), f.creado_en),
-         u.nombre, f.area_nombre, f.papel,
+         rm.nombre, f.area_nombre, f.papel,
          -- Ya pasó su fecha y, para quien no ve los atrasos de la tarea, el atraso ya se habló
          -- (la regla a o la b del informe al grupo).
          coalesce(f.sigue and d.hoy > d.vence
@@ -4363,7 +4365,6 @@ language sql stable set search_path = leda, public, pg_temp as $$
          and not exists (select 1 from task_forecast y where y.reemplaza_id = x.id)
        order by x.at desc limit 1) p on true
     left join membership rm on rm.id = f.responsable_membership_id
-    left join app_user u on u.id = rm.app_user_id
    where case p_vista
            when 'tus' then f.papel is not null
            when 'sector' then f.referente_membership_id = f.yo_id
@@ -4429,12 +4430,11 @@ language sql stable set search_path = leda, public, pg_temp as $$
       join yo on yo.workspace_id = t.workspace_id
      where t.estado = 'terminada'
   )
-  select x.id, x.titulo, u.nombre, a.nombre, x.terminada_en
+  select x.id, x.titulo, rm.nombre, a.nombre, x.terminada_en
     from terminadas x
     cross join yo
     join area a on a.id = x.area_id
     left join membership rm on rm.id = x.responsable_membership_id
-    left join app_user u on u.id = rm.app_user_id
    where x.terminada_en >= coalesce(p_ahora, now()) - interval '30 days'
      and case p_vista
            when 'tus' then x.responsable_membership_id = yo.id
@@ -4521,24 +4521,21 @@ language sql stable set search_path = leda, public, pg_temp as $$
   -- ninguna.
   pasos as (
     select d.destino_task_id as tarea, 't' || d.origen_task_id::text as clave,
-           d.origen_task_id as siguiente, o.titulo as que, u.nombre as quien
+           d.origen_task_id as siguiente, o.titulo as que, m.nombre as quien
       from dependency d
       join abiertas o on o.id = d.origen_task_id
       left join membership m on m.id = o.responsable_membership_id
-      left join app_user u on u.id = m.app_user_id
      where d.tipo = 'bloqueante'
     union
-    select p.task_id, 't' || p.esperada::text, p.esperada, o.titulo, u.nombre
+    select p.task_id, 't' || p.esperada::text, p.esperada, o.titulo, m.nombre
       from por_lo_dicho p
       join abiertas o on o.id = p.esperada
       left join membership m on m.id = o.responsable_membership_id
-      left join app_user u on u.id = m.app_user_id
     union
     select b.task_id, 'b' || b.id::text, null::uuid, b.causa,
-           coalesce(u.nombre, b.destraba_externo)
+           coalesce(m.nombre, b.destraba_externo)
       from bloqueos b
       left join membership m on m.id = b.destraba_membership_id
-      left join app_user u on u.id = m.app_user_id
      where not exists (select 1 from por_lo_dicho p where p.blocker_id = b.id)
   ),
   arbol (raiz, ruta, padre, nivel, siguiente, camino, que, quien) as (
@@ -5445,27 +5442,25 @@ begin
       select jsonb_agg(jsonb_build_object(
                'id', t.id, 'titulo', t.titulo, 'estado', t.estado,
                'fecha_objetivo', (t.fecha_objetivo at time zone v_espacio.zona_horaria)::date,
-               'responsable', u.nombre, 'objetivo', o.titulo) order by t.titulo, t.id)
+               'responsable', m.nombre, 'objetivo', o.titulo) order by t.titulo, t.id)
         from task t
         join objective o on o.id = t.objective_id
         left join membership m on m.id = t.responsable_membership_id
-        left join app_user u on u.id = m.app_user_id
        where t.estado in ('asignada', 'en_curso', 'bloqueada', 'en_revision')), '[]'::jsonb),
     'integrantes', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'membership_id', m.id, 'nombre', u.nombre, 'area_id', a.id, 'area', a.nombre,
+               'membership_id', m.id, 'nombre', m.nombre, 'area_id', a.id, 'area', a.nombre,
                'autoridad_final', r.autoridad_final,
                'conectado', u.telegram_user_id is not null,
                'revisa', case when ap.id is null then null
                               else jsonb_build_object('membership_id', ap.id,
-                                                      'nombre', apu.nombre) end)
-             order by u.nombre, m.id)
+                                                      'nombre', ap.nombre) end)
+             order by m.nombre, m.id)
         from membership m
         join app_user u on u.id = m.app_user_id
         join area a on a.id = m.area_id
         join rol r on r.id = m.rol_id
         left join membership ap on ap.id = m.aprobador_membership_id and ap.activo
-        left join app_user apu on apu.id = ap.app_user_id
        where m.activo), '[]'::jsonb),
     -- Las áreas con su referente activo (migración 0071): quién decide en cada una (D10) y a quién
     -- se le pide lo de otra área (D14).
@@ -5474,23 +5469,21 @@ begin
                'id', a.id, 'nombre', a.nombre,
                'referente', case when ref.id is null then null
                                  else jsonb_build_object('membership_id', ref.id,
-                                                         'nombre', refu.nombre) end)
+                                                         'nombre', ref.nombre) end)
              order by a.nombre, a.id)
         from area a
-        left join membership ref on ref.id = a.referente_membership_id and ref.activo
-        left join app_user refu on refu.id = ref.app_user_id), '[]'::jsonb),
+        left join membership ref on ref.id = a.referente_membership_id and ref.activo), '[]'::jsonb),
     -- Quiénes pueden revisar una tarea si quien carga lo elige (D3; migración 0071): Dirección y
     -- los referentes de área activos.
     'revisores', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'membership_id', m.id, 'nombre', u.nombre,
+               'membership_id', m.id, 'nombre', m.nombre,
                'autoridad_final', r.autoridad_final,
                'areas', coalesce((select jsonb_agg(a.nombre order by a.nombre, a.id)
                                     from area a where a.referente_membership_id = m.id),
                                  '[]'::jsonb))
-             order by u.nombre, m.id)
+             order by m.nombre, m.id)
         from membership m
-        join app_user u on u.id = m.app_user_id
         join rol r on r.id = m.rol_id
        where m.activo and puede_ser_quien_revisa(m.id)), '[]'::jsonb),
     'politicas', coalesce((
@@ -5564,18 +5557,18 @@ begin
     'integrantes', coalesce((
       select jsonb_agg(i.fila || jsonb_build_object(
                'como', c.como,
-               'revisa', (select jsonb_build_object('membership_id', ref.id, 'nombre', u.nombre)
-                            from membership ref join app_user u on u.id = ref.app_user_id
+               'revisa', (select jsonb_build_object('membership_id', ref.id, 'nombre', ref.nombre)
+                            from membership ref
                            where ref.id = quien_revisaria(v_persona, c.id, c.como)))
              order by i.orden)
         from jsonb_array_elements(v_resultado -> 'integrantes') with ordinality i(fila, orden)
         cross join lateral (select (i.fila ->> 'membership_id')::uuid as id) m
         cross join lateral (select m.id, como_carga(v_persona, m.id) as como) c
        where c.como is not null), '[]'::jsonb),
-    'yo', (select jsonb_build_object('membership_id', m.id, 'nombre', u.nombre,
+    'yo', (select jsonb_build_object('membership_id', m.id, 'nombre', m.nombre,
                                      'autoridad_final', r.autoridad_final,
                                      'elige_quien_revisa', r.autoridad_final)
-             from membership m join app_user u on u.id = m.app_user_id
+             from membership m
              join rol r on r.id = m.rol_id
             where m.id = v_persona));
   perform set_config('leda.workspace_id', previo, true);
@@ -6095,7 +6088,7 @@ returns table (task_id uuid, titulo text, estado text, fecha_objetivo timestampt
 language sql stable set search_path = leda, public, pg_temp as $$
   select x.id, x.titulo, x.estado, x.fecha_objetivo, x.responsable, x.area, x.terminada_en
     from (
-      select t.id, t.titulo, t.estado::text as estado, t.fecha_objetivo, u.nombre as responsable,
+      select t.id, t.titulo, t.estado::text as estado, t.fecha_objetivo, rm.nombre as responsable,
              a.nombre as area,
              case when t.estado = 'terminada' then
                coalesce((select max(e.at) from task_state_event e
@@ -6106,7 +6099,6 @@ language sql stable set search_path = leda, public, pg_temp as $$
                           and yo.workspace_id = t.workspace_id
         join area a on a.id = t.area_id
         left join membership rm on rm.id = t.responsable_membership_id
-        left join app_user u on u.id = rm.app_user_id
        where t.pedida_por_membership_id = yo.id
          and t.estado <> 'cancelada') x
    where x.terminada_en is null
@@ -6269,12 +6261,11 @@ begin
     -- 2026-10-14), con las áreas de las que es referente.
     'referentes', coalesce((
       select jsonb_agg(jsonb_build_object(
-               'membership_id', m.id, 'nombre', u.nombre,
+               'membership_id', m.id, 'nombre', m.nombre,
                'areas', (select jsonb_agg(a.nombre order by a.nombre, a.id)
                            from area a where a.referente_membership_id = m.id))
-             order by u.nombre, m.id)
+             order by m.nombre, m.id)
         from membership m
-        join app_user u on u.id = m.app_user_id
        where m.activo
          and exists (select 1 from area a where a.referente_membership_id = m.id)), '[]'::jsonb),
     'calendario', jsonb_build_object(
@@ -8600,7 +8591,7 @@ create view integrante with (security_barrier = true) as
          m.activo,
          u.id            as app_user_id,
          u.telegram_user_id,
-         u.nombre
+         m.nombre
     from membership m
     join app_user u on u.id = m.app_user_id
    where m.workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid;

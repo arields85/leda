@@ -471,17 +471,25 @@ def _importar_personas(cur, ws, pack) -> None:
     for p in pack.get("personas") or []:
         tg = _entero(p.get("telegram_user_id"))
         if tg is not None:
+            # La cuenta puede ser de alguien que ya está en otro espacio: se la reconoce por su
+            # Telegram y no se le pisa el nombre (J7-5b). El nombre que ve este espacio es el de
+            # la membresía, abajo.
             cur.execute(
                 """insert into app_user (telegram_user_id, nombre) values (%s, %s)
-                   on conflict (telegram_user_id) do update set nombre = excluded.nombre
+                   on conflict (telegram_user_id)
+                     do update set telegram_user_id = excluded.telegram_user_id
                    returning id""",
                 (tg, p["nombre"]))
             usuario = cur.fetchone()["id"]
         else:
             # Todavía no activó su enlace. Existe como persona del equipo, sin
-            # identidad de Telegram: sus tareas pueden crearse igual.
-            cur.execute("select id from app_user where nombre = %s and telegram_user_id is null",
-                        (p["nombre"],))
+            # identidad de Telegram: sus tareas pueden crearse igual. Al reimportar se la
+            # reconoce por su nombre sólo entre las personas de este espacio: con el de otro
+            # espacio sería otra persona, y unirlas le daría el Telegram de una a la otra.
+            cur.execute("""select u.id from membership m join app_user u on u.id = m.app_user_id
+                            where m.workspace_id = %s and m.nombre = %s
+                              and u.telegram_user_id is null""",
+                        (ws, p["nombre"]))
             fila = cur.fetchone()
             if fila:
                 usuario = fila["id"]
@@ -491,14 +499,15 @@ def _importar_personas(cur, ws, pack) -> None:
                 usuario = cur.fetchone()["id"]
 
         cur.execute(
-            """insert into membership (workspace_id, app_user_id, area_id, rol_id)
-               select %s, %s,
+            """insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id)
+               select %s, %s, %s,
                       (select id from area where workspace_id = %s and slug = %s),
                       (select id from rol  where workspace_id = %s and slug = %s)
                on conflict (workspace_id, app_user_id) do update
-                 set area_id = excluded.area_id, rol_id = excluded.rol_id
+                 set nombre = excluded.nombre, area_id = excluded.area_id,
+                     rol_id = excluded.rol_id
                returning id""",
-            (ws, usuario, ws, p["area"], ws, p["rol"]))
+            (ws, usuario, p["nombre"], ws, p["area"], ws, p["rol"]))
         if p.get("id"):
             por_id[p["id"]] = cur.fetchone()["id"]
 
@@ -570,8 +579,8 @@ def _importar_escalamiento(cur, ws, pack) -> None:
                values (%s, %s,
                  (select id from area where workspace_id = %s and slug = %s),
                  (select id from rol  where workspace_id = %s and slug = %s),
-                 (select m.id from membership m join app_user u on u.id = m.app_user_id
-                   where m.workspace_id = %s and u.nombre = %s),
+                 (select m.id from membership m
+                   where m.workspace_id = %s and m.nombre = %s),
                  %s)""",
             (ws, e["disparador"], ws, e.get("area"), ws, rol_slug,
               ws, _nombre_de(pack, destino), i + 1))

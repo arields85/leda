@@ -77,11 +77,11 @@ def generar_enlaces(cur: psycopg.Cursor, workspace_id: str, bot_username: str,
     # administración y la vista sólo devuelve filas cuando hay un espacio
     # activo declarado en la sesión.
     cur.execute(
-        """select m.id as membership_id, u.nombre
+        """select m.id as membership_id, m.nombre
              from membership m join app_user u on u.id = m.app_user_id
             where m.workspace_id = %s and m.activo
               and u.telegram_user_id is null
-            order by u.nombre""",
+            order by m.nombre""",
         (workspace_id,))
     personas = cur.fetchall()
     if solo:
@@ -121,7 +121,9 @@ def canjear(cur: psycopg.Cursor, workspace_id: str, token: str,
 
     Si esa cuenta ya es de alguien de otro espacio, la membresía del enlace pasa a esa cuenta (el
     mismo `app_user`): una persona, una cuenta. Si ya es de alguien de este equipo, se rechaza. Se
-    busca sólo por la cuenta que abrió el enlace, nunca por el nombre.
+    busca sólo por la cuenta que abrió el enlace, nunca por el nombre. El nombre es el de la
+    membresía, el que le puso este espacio (J7-5b): unirse no pisa el de la cuenta ni trae el que
+    tiene en otro espacio.
 
     Corre con permisos de administración: tiene que escribir en app_user, que
     es una tabla global.
@@ -130,7 +132,7 @@ def canjear(cur: psycopg.Cursor, workspace_id: str, token: str,
 
     cur.execute(
         """select t.id, t.membership_id, t.expira_en, t.usado_en,
-                  m.app_user_id, u.nombre, u.telegram_user_id
+                  m.app_user_id, m.nombre, u.telegram_user_id
              from activation_token t
              join membership m on m.id = t.membership_id
              join app_user u on u.id = m.app_user_id
@@ -152,7 +154,7 @@ def canjear(cur: psycopg.Cursor, workspace_id: str, token: str,
     # otra identidad; si es de alguien de otro espacio, es la misma persona que ahora también
     # está en este: la membresía nueva pasa a su cuenta (J7-5). La persona que el enlace había
     # creado queda sin membresía y sin Telegram: no se borra (la auditoría la puede nombrar).
-    cur.execute("select id, nombre from app_user where telegram_user_id = %s for update",
+    cur.execute("select id from app_user where telegram_user_id = %s for update",
                 (telegram_user_id,))
     ya = cur.fetchone()
     unida = False
@@ -163,11 +165,11 @@ def canjear(cur: psycopg.Cursor, workspace_id: str, token: str,
             raise ActivacionInvalida("Esa cuenta de Telegram ya está en uso.")
         cur.execute("update membership set app_user_id = %s where id = %s",
                     (ya["id"], fila["membership_id"]))
-        nombre, unida = ya["nombre"], True
+        unida = True
     else:
         cur.execute("update app_user set telegram_user_id = %s where id = %s",
                     (telegram_user_id, fila["app_user_id"]))
-        nombre = fila["nombre"]
+    nombre = fila["nombre"]
     cur.execute(
         "update activation_token set usado_en = %s, usado_por = %s where id = %s",
         (ahora, telegram_user_id, fila["id"]))
@@ -189,8 +191,8 @@ def bienvenida(cur: psycopg.Cursor, workspace_id: str, nombre: str) -> str:
         """select count(*) n from task t
             where t.workspace_id = %s
               and t.responsable_membership_id in
-                  (select m.id from membership m join app_user u on u.id = m.app_user_id
-                    where m.workspace_id = %s and u.nombre = %s)
+                  (select m.id from membership m
+                    where m.workspace_id = %s and m.nombre = %s)
               and t.estado in ('asignada','en_curso','bloqueada')""",
         (workspace_id, workspace_id, nombre))
     abiertas = (cur.fetchone() or {}).get("n", 0)
@@ -275,9 +277,9 @@ def encolar_presentacion(cur: psycopg.Cursor, workspace_id: str,
 
 def pendientes_de_activar(cur: psycopg.Cursor, workspace_id: str) -> list[str]:
     cur.execute(
-        """select u.nombre from membership m join app_user u on u.id = m.app_user_id
+        """select m.nombre from membership m join app_user u on u.id = m.app_user_id
             where m.workspace_id = %s and m.activo
               and u.telegram_user_id is null
-            order by u.nombre""",
+            order by m.nombre""",
         (workspace_id,))
     return [f["nombre"] for f in cur.fetchall()]

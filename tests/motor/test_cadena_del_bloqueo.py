@@ -68,10 +68,10 @@ def _integrante(conn, mundo, corto: str, nombre: str, telegram: int | None,
         cur.execute("insert into app_user (telegram_user_id, nombre) values (%s, %s) "
                     "returning id", (telegram, nombre))
         usuario = str(cur.fetchone()["id"])
-        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id,
+        cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id,
                                                aprobador_membership_id)
-                       values (%s, %s, %s, %s, %s) returning id""",
-                    (mundo["id"], usuario, area or mundo["area"], rol,
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s, %s) returning id""",
+                    (mundo["id"], usuario, usuario, area or mundo["area"], rol,
                      mundo["personas"]["Ismael"]["membership_id"]))
         mundo["personas"][corto] = {"app_user_id": usuario, "telegram": telegram,
                                     "membership_id": str(cur.fetchone()["id"])}

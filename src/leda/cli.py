@@ -113,10 +113,10 @@ def _resolver_integrante(cur, ws: str, nombre: str) -> list[dict]:
     Telegram: designar administrador no depende de que ya haya activado su
     cuenta (T11)."""
     cur.execute(
-        """select m.app_user_id, u.nombre, u.telegram_user_id
+        """select m.app_user_id, m.nombre, u.telegram_user_id
              from membership m join app_user u on u.id = m.app_user_id
             where m.workspace_id = %s and m.activo
-            order by u.nombre""",
+            order by m.nombre""",
         (ws,))
     buscado = nombre.lower()
     candidatos = [p for p in cur.fetchall() if buscado in p["nombre"].lower()]
@@ -192,9 +192,8 @@ def _revocar_enlaces(conn, ws: str, a) -> int:
         criterio, de = {"task_id": tarea["id"]}, f"la tarea «{tarea['titulo']}»"
     with admin(conn) as cur:
         if a.persona:
-            cur.execute("""select m.id::text id, u.nombre from membership m
-                             join app_user u on u.id = m.app_user_id
-                            where m.workspace_id = %s order by u.nombre""", (ws,))
+            cur.execute("""select m.id::text id, m.nombre from membership m
+                            where m.workspace_id = %s order by m.nombre""", (ws,))
             persona = _uno_por_nombre(cur.fetchall(), a.persona, f"integrante en '{a.slug}'")
             if persona is None:
                 return 1
@@ -335,7 +334,7 @@ def _retirar_contenido(conn, ws: str, a) -> int:
     with admin(conn) as cur:
         cur.execute(
             """select e.id::text id, e.clase, e.texto, e.uri, a.nombre_original nombre,
-                      u.nombre quien, e.at,
+                      m.nombre quien, e.at,
                       exists (select 1 from evidencia_retirada x where x.evidence_id = e.id
                                  and x.retirada_por_app_user_id is not null) por_la_admin,
                       exists (select 1 from evidencia_retirada x where x.evidence_id = e.id
@@ -343,7 +342,6 @@ def _retirar_contenido(conn, ws: str, a) -> int:
                  from evidence e
                  left join archivo a on a.workspace_id = e.workspace_id and a.id = e.archivo_id
                  left join membership m on m.id = e.entregado_por
-                 left join app_user u on u.id = m.app_user_id
                 where e.task_id = %s and e.workspace_id = %s
                 order by e.at, e.id""", (tarea["id"], ws))
         piezas = cur.fetchall()
@@ -398,24 +396,23 @@ def _estado(conn, ws: str, slug: str) -> int:
         print(f"== {slug} ==\n")
 
         cur.execute(
-            """select u.nombre, a.slug as area, r.slug as rol,
+            """select m.nombre, a.slug as area, r.slug as rol,
                       u.telegram_user_id is not null as activo
                  from membership m
                  join app_user u on u.id = m.app_user_id
                  join area a on a.id = m.area_id
                  join rol r on r.id = m.rol_id
-                where m.workspace_id = %s order by u.nombre""", (ws,))
+                where m.workspace_id = %s order by m.nombre""", (ws,))
         print("Integrantes")
         for p in cur.fetchall():
             marca = "activo" if p["activo"] else "sin activar"
             print(f"  {p['nombre']:22s} {p['area']:14s} {p['rol']:11s} {marca}")
 
         cur.execute(
-            """select t.titulo, t.estado, t.fecha_objetivo, u.nombre,
+            """select t.titulo, t.estado, t.fecha_objetivo, m.nombre,
                       motivo_no_cierra_tarea(t.id) as falta
                  from task t
                  left join membership m on m.id = t.responsable_membership_id
-                 left join app_user u on u.id = m.app_user_id
                 where t.workspace_id = %s
                 order by t.fecha_objetivo nulls last""", (ws,))
         tareas = cur.fetchall()

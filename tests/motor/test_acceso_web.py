@@ -275,9 +275,9 @@ def test_perdi_el_celular_de_un_espacio_no_toca_otro(conn, mundo, escribe):
         cur.execute("""insert into rol (workspace_id, slug, nombre, autoridad_final)
                        values (%s, 'lider', 'lider', true) returning id""", (otro,))
         rol = str(cur.fetchone()["id"])
-        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id)
-                       values (%s, %s, %s, %s) returning id""",
-                    (otro, mundo["personas"]["Marcos"]["app_user_id"], area, rol))
+        cur.execute("""insert into membership (workspace_id, app_user_id, nombre, area_id, rol_id)
+                       values (%s, %s, (select nombre from app_user where id = %s), %s, %s) returning id""",
+                    (otro, mundo["personas"]["Marcos"]["app_user_id"], mundo["personas"]["Marcos"]["app_user_id"], area, rol))
         de_alla = str(cur.fetchone()["id"])
     conn.commit()
     with espacio(conn, otro) as cur:

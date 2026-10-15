@@ -374,8 +374,8 @@ def _objetivo_id(cur: psycopg.Cursor, ws: str, titulo: str) -> str:
 
 def _membership_id(cur: psycopg.Cursor, ws: str, nombre: str) -> str:
     cur.execute(
-        """select m.id from membership m join app_user u on u.id = m.app_user_id
-            where m.workspace_id = %s and u.nombre = %s""", (ws, nombre))
+        """select m.id from membership m
+            where m.workspace_id = %s and m.nombre = %s""", (ws, nombre))
     fila = cur.fetchone()
     if not fila:
         raise SiembraInvalida(

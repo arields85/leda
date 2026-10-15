@@ -87,6 +87,7 @@ def test_cli_administrador_prefiere_la_coincidencia_exacta(corework, conn, monke
     monkeypatch.setattr(cli, "conectar", lambda: conn)
     with admin(conn) as cur:
         cur.execute("update app_user set nombre = 'Mar' where nombre = 'Martín Forte'")
+        cur.execute("update membership set nombre = 'Mar' where nombre = 'Martín Forte'")
     conn.commit()
 
     codigo = cli.main(["administrador", "corework", "mar"])
