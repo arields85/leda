@@ -72,11 +72,11 @@
   .day small { min-height: 14px; font-size: 11px; line-height: 14px; letter-spacing: 0.1em; color: var(--ink-mute); }
   .day small.due { color: var(--wait); }
 
-  .tally { display: flex; justify-content: space-between; gap: 8px; list-style: none; padding: 6px 0 8px; }
-  .tally li { flex: 0 1 auto; min-width: 0; }
-  .tally button { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 12px 0 12px 2px; text-align: left; }
+  .tally { display: grid; grid-template-columns: repeat(5, 1fr); list-style: none; padding: 6px 0 8px; }
+  .tally li { min-width: 0; }
+  .tally button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; padding: 12px 0; text-align: center; }
   .tally b { font-size: 34px; line-height: 38px; font-weight: 200; color: var(--ink-mute); }
-  .tally .lbl { font-size: 11px; line-height: 14px; letter-spacing: 0.06em; white-space: nowrap; }
+  .tally .lbl { font-size: 11px; line-height: 14px; letter-spacing: 0.04em; white-space: nowrap; }
   .tally .late b { color: var(--late); }
   .tally .idle b { color: var(--ink); }
   .tally .doing b { color: var(--doing); }
@@ -86,7 +86,7 @@
   .tally button:disabled { cursor: default; }
   .tally button:hover:not(:disabled) b { font-weight: 300; }
   .tally button[aria-pressed="true"] .lbl { color: var(--ink); }
-  .tally button[aria-pressed="true"]::after { content: ""; position: absolute; left: 2px; bottom: 4px; width: 22px; height: 1px; background: var(--ink); }
+  .tally button[aria-pressed="true"]::after { content: ""; position: absolute; left: calc(50% - 11px); bottom: 4px; width: 22px; height: 1px; background: var(--ink); }
 
   main { margin: 0 var(--gutter); padding: 18px 0 calc(104px + env(safe-area-inset-bottom, 0px)); }
   .listhead { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 4px; }
