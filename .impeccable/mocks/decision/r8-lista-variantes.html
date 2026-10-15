@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lista · variantes</title>
+<style>
+  @font-face { font-family: "Kanit"; font-weight: 200; font-display: swap; src: url("../fonts/kanit/Kanit-ExtraLight.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 300; font-display: swap; src: url("../fonts/kanit/Kanit-Light.ttf") format("truetype"); }
+  @font-face { font-family: "Kanit"; font-weight: 400; font-display: swap; src: url("../fonts/kanit/Kanit-Regular.ttf") format("truetype"); }
+  :root {
+    --ink: #e8e8e6; --ink-soft: #b4b5b3; --ink-mute: #a0a2a2;
+    --hair: rgba(232, 232, 230, 0.10); --line: rgba(232, 232, 230, 0.16);
+    --late: #df8a7f; --wait: #d9a386; --doing: #9fc2a6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; padding: 28px 24px; color: var(--ink); background: #101112;
+    font: 300 16px/1.4 "Kanit", system-ui, sans-serif; font-feature-settings: "tnum" 1, "lnum" 1;
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-wrap: wrap; gap: 28px; justify-content: center;
+  }
+  .phone {
+    width: 390px; padding: 22px 20px 30px; border-radius: 28px;
+    background:
+      radial-gradient(ellipse 120% 55% at 18% 0%, rgba(232, 232, 230, 0.07), rgba(232, 232, 230, 0) 70%),
+      linear-gradient(172deg, #2c2d2f 0%, #1f2021 38%, #151617 72%, #101112 100%);
+  }
+  .tag { font-size: 13px; line-height: 18px; letter-spacing: 0.14em; color: var(--ink-mute); margin-bottom: 4px; }
+  .tag b { color: var(--ink); font-weight: 400; letter-spacing: 0.04em; font-size: 15px; }
+  .note { font-size: 13px; line-height: 18px; color: var(--ink-mute); margin-bottom: 22px; }
+  .lbl { font-size: 12px; line-height: 16px; font-weight: 300; letter-spacing: 0.14em; color: var(--ink-mute); }
+  ol { list-style: none; }
+  .vencida { color: var(--late); }
+
+  /* A · Agenda: the date leads on the left, in the week's thin numerals. */
+  .a li { display: grid; grid-template-columns: 44px 1fr; column-gap: 16px; padding: 16px 0; }
+  .a li + li { border-top: 1px solid var(--hair); }
+  .a .when { display: flex; flex-direction: column; align-items: center; }
+  .a .when small { font-size: 11px; line-height: 14px; letter-spacing: 0.1em; color: var(--ink-mute); }
+  .a .when b { font-size: 26px; line-height: 30px; font-weight: 200; }
+  .a .t { font-size: 17px; line-height: 24px; font-weight: 400; }
+  .a .meta { font-size: 14px; line-height: 20px; color: var(--ink-mute); margin-top: 2px; }
+  .a .meta i { font-style: normal; }
+  .a .meta .wait { color: var(--wait); } .a .meta .doing { color: var(--doing); }
+  .a .done { display: flex; justify-content: space-between; padding: 10px 0; font-size: 14px; color: var(--ink-mute); }
+
+  /* B · The title leads: one quiet line underneath, date folded into it, more air. */
+  .b li { padding: 18px 0; }
+  .b li + li { border-top: 1px solid var(--hair); }
+  .b .t { font-size: 19px; line-height: 26px; font-weight: 400; letter-spacing: -0.005em; }
+  .b .meta { margin-top: 4px; font-size: 13px; line-height: 18px; color: var(--ink-mute); }
+  .b .meta .wait { color: var(--wait); } .b .meta .doing { color: var(--doing); }
+  .b .meta .sep { padding: 0 6px; opacity: 0.6; }
+  .b .x { margin-top: 8px; font-size: 14px; line-height: 20px; color: var(--ink-soft); }
+  .b .done { display: flex; justify-content: space-between; padding: 10px 0; font-size: 14px; color: var(--ink-mute); }
+
+  /* C · A colour mark carries the state; the counters above are its legend. */
+  .c li { display: grid; grid-template-columns: 8px 1fr auto; column-gap: 14px; align-items: baseline; padding: 15px 0; }
+  .c li + li { border-top: 1px solid var(--hair); }
+  .c .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--ink-mute); transform: translateY(-2px); }
+  .c .dot.wait { background: var(--wait); } .c .dot.doing { background: var(--doing); } .c .dot.idle { background: transparent; border: 1px solid var(--ink-mute); }
+  .c .t { font-size: 17px; line-height: 24px; font-weight: 400; }
+  .c .d { font-size: 13px; line-height: 18px; color: var(--ink-mute); }
+  .c .x { grid-column: 2 / -1; margin-top: 3px; font-size: 14px; line-height: 20px; color: var(--ink-mute); }
+  .c .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .c .done { display: flex; justify-content: space-between; padding: 10px 0 10px 22px; font-size: 14px; color: var(--ink-mute); }
+
+  h2.lbl { margin-bottom: 6px; }
+  h3.lbl { margin: 28px 0 4px; }
+</style>
+</head>
+<body>
+
+  <section class="phone a" aria-label="Variante A">
+    <p class="tag"><b>A</b> · agenda</p>
+    <p class="note">La fecha manda a la izquierda, con las cifras finas de la semana. El estado y lo que falta, en un solo renglón.</p>
+    <h2 class="lbl">abiertas</h2>
+    <ol>
+      <li><span class="when"><small>vie</small><b>16</b></span>
+        <span><span class="t">Pedir el plano rev. C</span>
+        <p class="meta"><i class="wait">esperando</i> · falta la firma de Ismael</p></span></li>
+      <li><span class="when"><small>lun</small><b>19</b></span>
+        <span><span class="t">Revisar el tablero</span>
+        <p class="meta"><i class="doing">en curso</i></p></span></li>
+      <li><span class="when"><small>jue</small><b>22</b></span>
+        <span><span class="t">Calibrar el sensor</span>
+        <p class="meta"><i>sin empezar</i> · te la pidió Martín Forte</p></span></li>
+    </ol>
+    <h3 class="lbl">terminadas esta semana</h3>
+    <div class="done"><span>Medir la tierra</span><span>lun 12/10</span></div>
+  </section>
+
+  <section class="phone b" aria-label="Variante B">
+    <p class="tag"><b>B</b> · el título manda</p>
+    <p class="note">El título más grande; debajo, un renglón chico con estado y fecha. Lo que falta, aparte y más suave. Más aire entre tareas.</p>
+    <h2 class="lbl">abiertas</h2>
+    <ol>
+      <li><p class="t">Pedir el plano rev. C</p>
+        <p class="meta"><span class="wait">esperando</span><span class="sep">·</span>vence vie 16/10</p>
+        <p class="x">Falta la firma de Ismael; se ocupa Ismael.</p></li>
+      <li><p class="t">Revisar el tablero</p>
+        <p class="meta"><span class="doing">en curso</span><span class="sep">·</span>vence lun 19/10</p></li>
+      <li><p class="t">Calibrar el sensor</p>
+        <p class="meta"><span>sin empezar</span><span class="sep">·</span>vence jue 22/10</p>
+        <p class="x">Te la pidió Martín Forte.</p></li>
+    </ol>
+    <h3 class="lbl">terminadas esta semana</h3>
+    <div class="done"><span>Medir la tierra</span><span>lun 12/10</span></div>
+  </section>
+
+  <section class="phone c" aria-label="Variante C">
+    <p class="tag"><b>C</b> · marca de color</p>
+    <p class="note">Un punto del color del estado reemplaza la palabra (los contadores de arriba son la referencia). Fecha chica a la derecha.</p>
+    <h2 class="lbl">abiertas</h2>
+    <ol>
+      <li><span class="dot wait" aria-hidden="true"></span>
+        <span class="t">Pedir el plano rev. C<span class="sr"> · esperando</span></span><span class="d">vie 16/10</span>
+        <span class="x">Falta la firma de Ismael; se ocupa Ismael.</span></li>
+      <li><span class="dot doing" aria-hidden="true"></span>
+        <span class="t">Revisar el tablero<span class="sr"> · en curso</span></span><span class="d">lun 19/10</span></li>
+      <li><span class="dot idle" aria-hidden="true"></span>
+        <span class="t">Calibrar el sensor<span class="sr"> · sin empezar</span></span><span class="d">jue 22/10</span>
+        <span class="x">Te la pidió Martín Forte.</span></li>
+    </ol>
+    <h3 class="lbl">terminadas esta semana</h3>
+    <div class="done"><span>Medir la tierra</span><span>lun 12/10</span></div>
+  </section>
+
+</body>
+</html>

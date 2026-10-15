@@ -611,6 +611,15 @@
         ],
         "createdAt": "2026-10-15T18:49:27.342Z",
         "reason": "user chose Kanit for the r8 alternative (2026-10-15); DESIGN.md still records r7 until r8 is adopted"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "kanit",
+        "files": [
+          ".impeccable/mocks/decision/r8-lista-variantes.html"
+        ],
+        "createdAt": "2026-10-15T18:57:47.431Z",
+        "reason": "user chose Kanit for the r8 alternative (2026-10-15)"
       }
     ]
   }
