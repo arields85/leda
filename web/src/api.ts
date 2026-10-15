@@ -65,6 +65,8 @@ export interface Task {
   quedan_dias_habiles: number | null;
   barra: Segment[] | null;
   esperas: Wait[] | null;
+  // Only in "Mis tareas": who asked for the task, when it was someone else (MA debt).
+  pidio?: string | null;
 }
 
 /** A task finished in the last 30 days, with who did it. */

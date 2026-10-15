@@ -507,7 +507,9 @@ def tareas(request: Request, vista: str = "tus", area: str | None = None):
             areas = area_de = None
             if vista == "areas":
                 areas, area_de = _areas_del_espacio(cur, ws, filas + terminadas)
-            pedidas = pasar_a = area_del_equipo = None
+            pedidas = pasar_a = area_del_equipo = pidieron = None
+            if vista == "tus":
+                pidieron = _quien_las_pidio(cur, ws, filas, str(sesion["membership_id"]))
             if vista in ("tus", "pedidas"):
                 # Lo que pidió desde otra área o a Dirección (J4; decisiones D1b y D14).
                 cur.execute("select * from pedidas_de_la_sesion(%s, %s)", (_hash(token), ahora))
@@ -534,6 +536,9 @@ def tareas(request: Request, vista: str = "tus", area: str | None = None):
                      if not (f["papel"] == "espero" and str(f["task_id"]) in pedidas_ids)]
         vista_armada = armar_vista(vista, filas, esperas, calendario, ahora, terminadas)
         vista_armada["titulo"] = titulo
+        if pidieron is not None:
+            for t in vista_armada["tareas"]:
+                t["pidio"] = pidieron.get(t["id"])
         if vista == "pedidas":
             vista_armada["pedidas"] = [_pedida(f, calendario) for f in pedidas or []]
         if pasar_a is not None:
@@ -543,6 +548,23 @@ def tareas(request: Request, vista: str = "tus", area: str | None = None):
         return _json(vista_armada)
 
     return _con_la_base(leer)
+
+
+def _quien_las_pidio(cur, workspace_id: str, filas: list[dict[str, Any]],
+                     membership_id: str) -> dict[str, str]:
+    """Quién pidió cada tarea de la lista, cuando la pidió otra persona (deuda de la MA: "└─ te
+    la pidió Marcos Tarquini" en "Mis tareas"). Sólo de las tareas que la base ya le mostró a la
+    sesión, y en su espacio (la sesión lo dejó fijado)."""
+    ids = list({str(f["task_id"]) for f in filas})
+    if not ids:
+        return {}
+    cur.execute("""select t.id, i.nombre
+                     from task t
+                     join integrante i on i.membership_id = t.pedida_por_membership_id
+                    where t.workspace_id = %s and t.id = any(%s::uuid[])
+                      and t.pedida_por_membership_id <> %s""",
+                (workspace_id, ids, membership_id))
+    return {str(f["id"]): f["nombre"] for f in cur.fetchall()}
 
 
 def _areas_del_espacio(cur, workspace_id: str, filas: list[dict[str, Any]]

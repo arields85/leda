@@ -161,4 +161,27 @@ describe('TaskCard', () => {
     const { container } = render(<TaskCard view="tus" task={task()} />);
     expect(container.textContent).not.toContain('Marcos');
   });
+
+  it('an own task someone else asked for says who, under the title (MA debt)', () => {
+    render(
+      <TaskCard
+        view="tus"
+        task={task({ titulo: 'Aprobar la compra del módem', responsable: 'Ismael', pidio: 'Marcos Tarquini' })}
+      />,
+    );
+    const line = screen.getByText('└─ te la pidió Marcos Tarquini');
+    expect(line).toHaveClass('text-small', 'text-ink-dim');
+    const title = screen.getByText('Aprobar la compra del módem');
+    expect(title.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('no line when nobody else asked for it, nor outside "Mis tareas"', () => {
+    const { container, rerender } = render(<TaskCard view="tus" task={task({ pidio: null })} />);
+    expect(container.textContent).not.toContain('te la pidió');
+    // A waited task is someone else's: who asked for it is not the person's business here.
+    rerender(<TaskCard view="tus" task={task({ papel: 'espero', responsable: 'Lucas', pidio: 'Ariel' })} />);
+    expect(container.textContent).not.toContain('te la pidió');
+    rerender(<TaskCard view="sector" task={task({ responsable: 'Lucas', papel: null, pidio: 'Ariel' })} />);
+    expect(container.textContent).not.toContain('te la pidió');
+  });
 });

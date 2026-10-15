@@ -621,3 +621,46 @@ def test_las_terminadas_no_cruzan_espacios_ni_vistas_ajenas(conn, terminadas):
                     (_persona(mundo, "Morgan Hale", "west-studio"), AHORA))
         assert cur.fetchall() == []
     conn.commit()
+
+
+# --- Quién pidió una tarea propia, en "Mis tareas" (deuda de la MA) ---------------------------
+
+def _mis_tareas_por_la_web(conn, monkeypatch, sesion: str) -> dict[str, dict]:
+    """"Mis tareas" como la pide la web (`GET /app/api/tareas?vista=tus`), por título."""
+    from fastapi.testclient import TestClient
+
+    from leda import entrada, web_app
+
+    monkeypatch.setattr(web_app, "_conn_de_la_web", lambda: conn)
+    monkeypatch.setattr(web_app, "_ahora", lambda _conn, _ws: AHORA)
+    navegador = TestClient(entrada.app, base_url="https://testserver", follow_redirects=False)
+    r = navegador.get("/app/api/tareas", params={"vista": "tus"},
+                      headers={"cookie": f"leda_sesion={sesion}"})
+    assert r.status_code == 200, r.text
+    return {t["titulo"]: t for t in r.json()["tareas"]}
+
+
+def _nombre(conn, mundo: dict, persona: str) -> str:
+    with admin(conn) as cur:
+        cur.execute("select u.nombre from membership m join app_user u on u.id = m.app_user_id "
+                    "where m.id = %s", (_persona(mundo, persona),))
+        return cur.fetchone()["nombre"]
+
+
+def test_mis_tareas_dice_quien_pidio_una_tarea_propia(conn, mundo, monkeypatch):
+    """Una tarea propia que pidió otra persona dice quién la pidió, con su nombre entero; la que
+    pidió la misma persona o la que nadie pidió, no."""
+    with admin(conn) as cur:
+        cur.execute("update task set pedida_por_membership_id = %s where id = %s",
+                    (_persona(mundo, "Sam Noble"), mundo["t"]["montar"]))
+        cur.execute("update task set pedida_por_membership_id = %s where id = %s",
+                    (_persona(mundo, "Sam North"), mundo["t"]["pintar"]))
+        # De otro espacio, con el mismo nombre de persona: nunca cruza.
+        cur.execute("update task set pedida_por_membership_id = %s where titulo = %s",
+                    (_persona(mundo, "Sam Noble", "west-studio"), "Galpón del oeste"))
+    conn.commit()
+    tareas = _mis_tareas_por_la_web(conn, monkeypatch, _entrar(conn, mundo, "Sam North"))
+    assert tareas["Montar la línea"]["pidio"] == _nombre(conn, mundo, "Sam Noble")
+    assert tareas["Pintar el galpón"]["pidio"] is None
+    assert tareas["Medir el ruido"]["pidio"] is None
+    assert "Galpón del oeste" not in tareas

@@ -3,8 +3,10 @@ import { daysLeft, shortDate, STATE_TEXT, stateLabels } from '../format';
 import { WaitTree } from './WaitTree';
 import { WorkdayBar } from './WorkdayBar';
 
-/** Whose task it is, when it is not the person's own: "└─ de Ariel · te espera". */
+/** Whose task it is, when it is not the person's own: "└─ de Ariel · te espera". On her own task
+ * in "Mis tareas", who asked for it when it was someone else: "└─ te la pidió Marcos Tarquini". */
 function ownerLine(task: Task, view: ViewId): string | null {
+  if (view === 'tus' && task.papel === 'mia') return task.pidio ? `└─ te la pidió ${task.pidio}` : null;
   if (!task.responsable) return null;
   if (view !== 'tus') return `└─ de ${task.responsable}`;
   if (task.papel === 'espero') return `└─ de ${task.responsable} · la esperás`;
