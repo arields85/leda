@@ -99,6 +99,10 @@ TABLAS_POR_FUNCION = ("acceso_tablero", "acceso_tarea", "vista_de_tarea",
                       # las porciones S6 ("> cambiar la fecha") y S9 (decidir por el chat); cuando
                       # el código lo use, sale de esta lista.
                       "cambio_de_fecha",
+                      # Los cambios del equipo (migración 0081; J7-1): `leda_app` no tiene nada
+                      # sobre la tabla. La escriben las funciones de la J7 (J7-4 en adelante) y la
+                      # lee `cambios_del_equipo` (J7-3); cuando el código la use, sale de esta lista.
+                      "cambio_del_equipo",
                       # La entrada con Telegram (migración 0073; ADR 0024): la huella de cada
                       # firma y el pedido de entrada del QR, sólo desde sus funciones.
                       "firma_de_telegram", "pedido_de_entrada")
@@ -115,6 +119,9 @@ COLUMNAS_POR_FUNCION: dict[tuple[str, str], tuple[str, ...]] = {
     # ejemplo que usa `test_eximir_una_columna_por_funcion_no_exime_su_nombre_en_otra_tabla`.
     ("task", "pedida_por_membership_id"): ("cargar_tarea_web", "puede_ver_tarea",
                                            "pedidas_que_ve", "reabrir_tarea"),
+    # `area.archivada_en` (migración 0081; J7-1): un área se archiva, no se borra. Por ahora la lee
+    # sólo `problemas_del_equipo`; la escribe la J7-4 (archivar un área).
+    ("area", "archivada_en"): ("problemas_del_equipo",),
 }
 
 # Las tablas del motor de conversación (migraciones 0030 y 0031) estuvieron

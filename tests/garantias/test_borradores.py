@@ -236,10 +236,14 @@ def test_preview_obsoleta_no_crea_tarea(corework, conn, authority_conn,
         resultado = _crear_preview(cur, ws)
         token = _token(cur, resultado["pending_action_id"])
         if obsolescencia == "responsable":
+            # Desde la migración 0081, `leda_app` no escribe el equipo: lo cambia la conexión
+            # administrativa.
+            cur.execute("set local role leda_admin")
             cur.execute(
                 """update membership set activo = false
                     where id = (select membership_id from integrante
                                   where nombre = 'Nahuel Gimenez')""")
+            cur.execute("set local role leda_app")
         elif obsolescencia == "objetivo":
             # Desde la migración 0068, `leda_app` no cambia objetivos: los cambia la conexión
             # administrativa.
@@ -265,6 +269,7 @@ def test_preview_obsoleta_no_crea_tarea(corework, conn, authority_conn,
                         (resultado["draft_id"],))
             cur.execute("set local role leda_app")
         else:
+            cur.execute("set local role leda_admin")
             cur.execute(
                 """update membership
                       set aprobador_membership_id =
@@ -272,6 +277,7 @@ def test_preview_obsoleta_no_crea_tarea(corework, conn, authority_conn,
                             where nombre = 'Ismael Soschinski')
                     where id = (select responsable_membership_id from task_draft
                                   where id = %s)""", (resultado["draft_id"],))
+            cur.execute("set local role leda_app")
 
         telegram = _telegram(cur, "Marcos Tarquini")
     assert _confirmar(authority_conn, ws, token, telegram) is None
