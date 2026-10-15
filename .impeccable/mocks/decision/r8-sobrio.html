@@ -383,7 +383,8 @@
         const n = 0.62 * fbm(d.x * 0.008 + ox, d.y * 0.008 + oy) + 0.62 * env - 0.12;
         if (HOLES) {
           // Holes: a dark layer over the lower part, with the dots cut out of it so the ground shows through.
-          const cover = Math.max(0, Math.min(1, (n - 0.12) / 0.45));
+          // Scaled by the zone's own fade-in, so the layer starts at zero and never shows a straight edge.
+          const cover = Math.max(0, Math.min(1, (n - 0.12) / 0.45)) * env;
           if (cover === 0) continue;
           ctx.globalCompositeOperation = 'source-over';
           ctx.fillStyle = `rgba(5, 5, 6, ${(0.7 * cover).toFixed(3)})`;
