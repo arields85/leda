@@ -88,11 +88,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 - **«Equipo» (Dirección), r8** (2026-10-15, noche, página de decisión, sorteo `26e02e2f`): elegida «lo que no
   cuadra, primero», con lo que el usuario tomó de «personas · áreas · cambios»: arriba, en grande, lo que no
   cuadra (y la buena noticia si todo cuadra); debajo, una de tres vistas: **personas** (nombre, área, rol, quién lo
-  aprueba; «sin conectar» con «copiar el enlace»; «ya no están» con «volver a sumar»), **áreas** (referente o
-  «sin referente: lo decide Dirección», tareas abiertas, su gente, «renombrar» y «archivar») y **cambios** (tipo,
+  aprueba; «sin conectar» con «copiar el enlace»; «ya no están» con «volver a sumar»), **estructura** (cada área con
+  su referente o «sin referente: lo decide Dirección», su gente, «renombrar», «archivar» y «ver sus tareas ›», que
+  lleva al detalle del área en «Áreas»; sin conteos de tareas: el trabajo vive en «Áreas», la organización en
+  «Equipo»; antes se llamaba «áreas» y repetía el nombre de la pestaña) y **cambios** (tipo,
   fecha y hora, quién, antes → después). El selector de vistas va **encima de la barra de pestañas**, cerca del
   pulgar (pedido del usuario), sólo con palabras y la vista activa subrayada debajo. Muestra:
-  `.impeccable/mocks/decision/r8-sobrio-equipo.html` (`?vista=areas|cambios`).
+  `.impeccable/mocks/decision/r8-sobrio-equipo.html` (`?vista=estructura|cambios`).
 
 ## Pendiente
 

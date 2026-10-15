@@ -46,10 +46,11 @@
   .link { font-size:12px; letter-spacing:.08em; color:var(--soft); text-decoration:underline; text-underline-offset:4px; text-decoration-color:var(--line); }
   h3.lbl { margin:22px 0 2px; }
   .area { padding:14px 0 10px; border-top:1px solid var(--hair); }
-  #p-areas .area:first-child { border-top:0; }
+  #p-estructura .area:first-child { border-top:0; }
   .area .top-line { display:flex; justify-content:space-between; align-items:baseline; }
   .area h4 { font-size:16px; line-height:22px; font-weight:400; }
-  .area .cnt { font-size:12px; color:var(--mute); }
+  .area .work { font-size:12px; letter-spacing:.06em; color:var(--soft); text-decoration:none; }
+  .area .work:hover { color:var(--ink); }
   .area .ref { font-size:12px; letter-spacing:.06em; color:var(--soft); margin-top:2px; }
   .area .ppl { margin-top:6px; font-size:14px; line-height:22px; }
   .area .ops { display:flex; gap:16px; margin-top:6px; }
@@ -127,13 +128,13 @@
       <li class="person"><span class="nm">Hernán Ruiz</span><span class="ar">OT y automatización</span><span class="rl"><a class="link" href="#">volver a sumar</a></span></li>
     </ol>
     </section>
-    <section role="tabpanel" id="p-areas" aria-label="Áreas" hidden>
-      <div class="area"><div class="top-line"><h4>Dirección</h4><span class="cnt">2 tareas abiertas</span></div><p class="ref">referente Ismael Soschinski</p><p class="ppl">Ismael Soschinski</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
-      <div class="area"><div class="top-line"><h4>Gestión</h4><span class="cnt">sin tareas abiertas</span></div><p class="ref">sin referente: lo decide Dirección</p><p class="ppl">Sofía Benítez · <span class="off">sin conectar</span></p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
-      <div class="area"><div class="top-line"><h4>Infraestructura IT</h4><span class="cnt">4 tareas abiertas</span></div><p class="ref">referente Martín Forte</p><p class="ppl">Martín Forte · Lucas</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
-      <div class="area"><div class="top-line"><h4>OT y automatización</h4><span class="cnt">8 tareas abiertas</span></div><p class="ref">referente Marcos</p><p class="ppl">Marcos · Nahuel</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
-      <div class="area"><div class="top-line"><h4>Sistemas eléctricos y tableros</h4><span class="cnt">3 tareas abiertas</span></div><p class="ref">referente Mariano</p><p class="ppl">Mariano</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
-      <div class="area"><div class="top-line"><h4>Software e interfaz HMI</h4><span class="cnt">2 tareas abiertas</span></div><p class="ref">referente Ariel</p><p class="ppl">Ariel</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
+    <section role="tabpanel" id="p-estructura" aria-label="Estructura" hidden>
+      <div class="area"><div class="top-line"><h4>Dirección</h4><a class="work" href="#">ver sus tareas ›</a></div><p class="ref">referente Ismael Soschinski</p><p class="ppl">Ismael Soschinski</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
+      <div class="area"><div class="top-line"><h4>Gestión</h4><a class="work" href="#">ver sus tareas ›</a></div><p class="ref">sin referente: lo decide Dirección</p><p class="ppl">Sofía Benítez · <span class="off">sin conectar</span></p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
+      <div class="area"><div class="top-line"><h4>Infraestructura IT</h4><a class="work" href="r8-sobrio-area-it.html">ver sus tareas ›</a></div><p class="ref">referente Martín Forte</p><p class="ppl">Martín Forte · Lucas</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
+      <div class="area"><div class="top-line"><h4>OT y automatización</h4><a class="work" href="#">ver sus tareas ›</a></div><p class="ref">referente Marcos</p><p class="ppl">Marcos · Nahuel</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
+      <div class="area"><div class="top-line"><h4>Sistemas eléctricos y tableros</h4><a class="work" href="#">ver sus tareas ›</a></div><p class="ref">referente Mariano</p><p class="ppl">Mariano</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
+      <div class="area"><div class="top-line"><h4>Software e interfaz HMI</h4><a class="work" href="#">ver sus tareas ›</a></div><p class="ref">referente Ariel</p><p class="ppl">Ariel</p><div class="ops"><a class="link" href="#">renombrar</a><a class="link" href="#">archivar</a></div></div>
     </section>
     <section role="tabpanel" id="p-cambios" aria-label="Cambios" hidden>
     <ol>
@@ -146,7 +147,7 @@
   </main>
   <div class="views" role="tablist" aria-label="Vistas del equipo">
     <button role="tab" aria-selected="true" aria-controls="p-personas" data-v="personas">personas</button>
-    <button role="tab" aria-selected="false" aria-controls="p-areas" data-v="areas">áreas</button>
+    <button role="tab" aria-selected="false" aria-controls="p-estructura" data-v="estructura">estructura</button>
     <button role="tab" aria-selected="false" aria-controls="p-cambios" data-v="cambios">cambios</button>
   </div>
   <nav class="tabbar" aria-label="Vistas">
