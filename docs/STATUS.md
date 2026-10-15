@@ -275,7 +275,11 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
 
 ## Deudas registradas
 
-- **Auditoría del lenguaje que sale del código** (pedido del usuario, 2026-10-13; para antes de la próxima
+- **Auditoría del lenguaje que sale del código** — **hecha en dos porciones** (2026-10-15: lo claro, y
+  "trabada"; tarea "Lenguaje" en `odd/tasks/plataforma-jerarquias.md`, con las dos rondas con la IA real). Queda
+  poco y técnico: borrar `NO_EFFECT_STATUS` (retira una prueba de garantías) y textos que la persona no ve hoy
+  (vistas previas de `herramientas.py`, `cli.py` del operador). La prueba de guarda impide que vuelvan nombres
+  internos a lo que lee la IA. (Pedido del usuario, 2026-10-13; para antes de la próxima
   prueba real grande): que Leda hable siempre natural y cálida. Dos frentes: lo que la cocina le pasa a la IA
   (nombres de datos que escapen a `hechos.para_redactar`, estados internos, fechas técnicas, códigos de
   motivo: lo que la IA pueda copiar tal cual) y los textos que el código manda directo sin la IA (botones,
