@@ -364,11 +364,11 @@
         const x = dots[i], y = dots[i + 1];
         let v = 0;
         for (const l of L) { const dx = x - l.x, dy = y - l.y; v += l.k * Math.exp(-(dx * dx + dy * dy) / l.r2); }
-        if (v < 0.12) continue;
+        if (v < 0.2) continue;
         v = Math.min(1, v);
         const depth = 0.75 + 0.45 * (y / h);
-        const size = (0.5 + 1.3 * v) * depth;
-        ctx.fillStyle = `rgba(232, 232, 230, ${(0.26 * v).toFixed(3)})`;
+        const size = (0.45 + 0.85 * v) * depth;
+        ctx.fillStyle = `rgba(232, 232, 230, ${(0.13 * v * v).toFixed(3)})`;
         ctx.fillRect(x - size / 2, y - size / 2, size, size);
       }
     }
