@@ -64,7 +64,10 @@ un equipo vacío, ver el equipo, áreas, alta con enlace, nombre por espacio). *
 `9d871545` aprobada en tres pedazos; alta duplicada corregida (`a71d2623`, también en áreas; RDD aprobada);
 `0085` aplicada a `leda_motor` (respaldo `db/respaldos/leda_motor-antes-0085-20261015.dump`, ensayo limpio); web
 reiniciada. Nombres de pestañas estándar en todo (MA-4/MA-6: «Mis tareas · Mi área · Mis pedidos»; Dirección
-«Mis tareas · Áreas · Equipo»; `da249f05`, `12c33af7`). **Sigue:** J7-6 en adelante. **Diseño** (cierre de la
+«Mis tareas · Áreas · Equipo»; `da249f05`, `12c33af7`). **Primero en la sesión nueva** (usuario, cierre del
+2026-10-15): arrancar la J7 **de fondo** (J7-6 en adelante, una porción tras otra, escritor delegado, prueba
+primero, RDD, documento de la unidad; las dudas de producto a «Para decidir»), y **en primer plano** seguir
+puliendo el diseño con el usuario. La J7-6 no se empezó en esta sesión. **Diseño** (cierre de la
 noche, `5bf0cf81`): con impeccable (sorteo + página de decisión para pantallas nuevas; extensiones heredan), todo
 en `.impeccable/surfaces/web-src-app-tsx.md`. La **r8 «sobria»** (referencias del usuario; Kanit en
 `.impeccable/mocks/fonts/kanit/`; fondo con huecos animado; zona urgente fija que se achica; vidrio; contadores que
