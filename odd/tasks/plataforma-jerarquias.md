@@ -1642,6 +1642,21 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
       misma tarea en una sola sentencia se comparan todos contra el estado de antes de la sentencia, así que dos
       saltos desde el mismo estado pasarían (por ejemplo, cancelar y seguir en la misma sentencia). Arreglo:
       comparar contra el último evento de la tarea, que dentro de la misma sentencia sí se ve.
+- [x] **Candado de la sesión de ChatGPT** (2026-10-15, escritor delegado; prueba primero; deuda de
+  `docs/STATUS.md`). La escucha y una ronda del corredor podían renovar la sesión a la vez y romperla.
+  - `5ad5fd2e`: `src/leda/motor/chatgpt.py` renueva con un candado del sistema (`msvcrt` en Windows, `flock`
+    en los demás) sobre `chatgpt.json.lock`, al lado de la sesión; ya con el candado vuelve a leer el archivo
+    y, si otro ya renovó, usa eso sin renovar. Si un proceso muere con el candado, el sistema lo suelta solo.
+    Espera hasta 45 s (el plazo del emisor y un margen) y después falla a la vista con
+    `SesionChatGPTOcupada`, un `SesionChatGPTVencida` (incidente y texto fijo, como las demás fallas de la
+    sesión). La sesión se guarda entera o nada, con un temporal propio por escritura que se borra si algo
+    falla; el ingreso (`login`) también toma el candado antes de guardar.
+  - Pruebas: `tests/motor/test_chatgpt_candado.py` (9; rojo antes del cambio: 7 fallaban): dos sesiones a la
+    vez piden una sola renovación y quedan con el mismo token; otro proceso con el candado hace fallar a la
+    vista al vencer la espera; el candado de un proceso muerto no traba; una escritura que falla deja la sesión
+    anterior entera y sin temporales.
+  - Evidencia (2026-10-15): `pytest -q tests/motor -k chatgpt`, 70 passed; `pytest -q tests/motor`, 1502
+    passed. Revisión RDD: pendiente.
 
 ## De qué se parte en cada porción (explorador de sólo lectura, 2026-10-13)
 

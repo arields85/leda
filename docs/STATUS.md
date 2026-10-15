@@ -295,7 +295,7 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
   - Faltan cola de entrada, pool de conexiones, observabilidad, respaldo y restauración.
   - El webhook atiende un mensaje a la vez, bajo un candado global, y el candado de cada mensaje sigue tomado
     mientras responde la IA (revisión de la E3-7).
-- **Sesión de ChatGPT:** falta un candado sobre el archivo, para que dos procesos no la renueven a la vez.
+- **Sesión de ChatGPT:** el candado entre procesos para renovarla, hecho (`5ad5fd2e`, 2026-10-15).
 - **Honestidad en casos de borde** (revisión de la E3-6):
   - un aviso cuya hora ya pasó se anuncia con esa hora (la prueba de M3 lo mostró una vez);
   - el aviso al administrador;
