@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-14, cierre de la noche: J2 y J3 cerradas; J4 construida y probada; la Mini App (MA) construida, probada y con su última tanda de ajustes (MA-4) pendiente; decisiones de J4, MA, J5 y J6 tomadas. Ver "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-15, madrugada: J2, J3, J4 y la Mini App (MA, con MA-4 a MA-6) cerradas; decisiones de J5 y J6 tomadas. Ver "Punto exacto para retomar".
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -83,10 +83,12 @@ viejo corriendo.
      formato). Probada por el usuario con Ariel en el iPhone, Ismael en Telegram de escritorio (abre el navegador) y
      el navegador de la compu: "muy bueno como quedó".
    - **Decisiones completas** de la J4, la MA, la J5 y la J6, en el documento de la unidad.
-2. **La MA-4, construida** (2026-10-14, noche: `4816e96b`, `266d0d7c`, `719b59e2`; RDD aprobada; IA real 50 y 55,
-   5 de 6, la falla de formato conocida). Falta: la decisión del usuario sobre **cómo se cierra la sesión de la
-   compu por chat** (se sacó "salir" y hoy sólo existe "perdí el celular"), y su prueba para cerrar la MA y la
-   J4. Lo que sigue es la lista original, como referencia: Detalle en el documento de la unidad, nota "Prueba de MA-2 y MA-3":
+2. **La MA y la J4, cerradas** (2026-10-15, madrugada, prueba de cierre del usuario pasada): MA-4 a MA-6 (el
+   botón "Mi espacio", la entrada sin QR desde Telegram en la compu con la `0076`, la Mini App recargada que
+   conserva su sesión, "Áreas" para Dirección); detalle y commits en el documento de la unidad. Quedan:
+   - la decisión del usuario sobre **cómo se cierra la sesión de la compu por chat** (se sacó "salir");
+   - la ronda con la IA real de las 50 y 55 sobre la MA-5, con el escuchador apagado.
+   La lista original de la MA-4, como referencia: Detalle en el documento de la unidad, nota "Prueba de MA-2 y MA-3":
    1. el botón se llama **"Mi espacio"** (el del menú y el que manda Leda), y el mensaje de Leda al ofrecerlo
       queda corto y natural (hoy es tosco y dice "dentro de Telegram, no en el navegador");
    2. la barra de desplazamiento con el estilo de la app, y en la compu la web ocupa todo el ancho;
@@ -116,7 +118,8 @@ Acuerdos del 2026-10-14:
 - RDD y las rondas con la IA real, sin preguntar; al primer error de cupo, se para y espera;
 - los avisos cuentan lo que vale ahora, no la historia;
 - un cambio de plazo trae el informe de "en qué afecta" antes de decidir.
-`leda_motor`: en la `0075` (respaldos `db/respaldos/leda_motor-antes-006x/007x-20261014.dump`). La web corre en
+`leda_motor`: en la `0076` (respaldos `db/respaldos/leda_motor-antes-006x/007x-20261014.dump`, el último
+`leda_motor-antes-0076-20261014.dump`). Túnel de la sesión del 2026-10-14 a la noche: `edgar-changed-thinks-declined`. La web corre en
 segundo plano de la sesión, con el túnel `pharmaceutical-configuring-unix-while`: al cerrarla se cortan, y en la sesión
 nueva el agente los vuelve a levantar y pone la dirección nueva en `LEDA_BASE_URL` del `.env`. El escuchador lo
 reinicia el usuario. Para el detalle de cada decisión y de cada prueba: `../odd/tasks/plataforma-jerarquias.md`.

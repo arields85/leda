@@ -981,7 +981,8 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       nuevo" activos, y los tipos con su explicación. Pidió un nombre más claro para el tercer nivel: pasó a
       "objetivo de un área" ("lo que le toca lograr a un área del equipo para que se cumpla lo de arriba"), en
       `3ab0f9e1`, con el pack reimportado.
-- [ ] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.**
+- [x] **J4 · La carga por la web del equipo (Dirección y referentes), con el préstamo.** Cerrada el 2026-10-15,
+      madrugada, con la prueba de cierre de la MA (ver allí).
       **Decisiones del usuario (2026-10-14, antes de escribir código):**
       - **D1. A quién le carga un referente:** a su área, a sí mismo y, como préstamo, a cualquiera de otra área,
         también a otro referente. Cómo funciona el préstamo quedó revisado más abajo ("D1, revisada": lo aprueba
@@ -1129,7 +1130,7 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
             - un referente: "Mis tareas", el nombre de su área ("OT y automatización") y "Lo que pedí";
             - un integrante: "Mis tareas", y "Lo que pedí" desde la J6.
         La prueba se repite con la MA.
-- [ ] **MA · La web como Mini App de Telegram**, adelantada por el usuario (2026-10-14: "quisiera atacar antes
+- [x] **MA · La web como Mini App de Telegram** (cerrada el 2026-10-15, madrugada), adelantada por el usuario (2026-10-14: "quisiera atacar antes
       lo de la mini app"; opción A: apenas termine la J4, antes de J5 a J7). Así las pruebas de J5 a J7 se hacen
       desde el botón del bot, sin pedir enlaces.
       - **No espera a la VPS:** el túnel ya es HTTPS, y Leda manda en el chat un botón "Abrir Leda" con la
@@ -1237,6 +1238,25 @@ Se detallan al llegar a cada una, con su diseño corto, y cada una con la ayuda 
       `--veces 3`: **5 de 6**, garantías 6 de 6; la falla es la deuda de formato conocida (55, vez 3: la pregunta
       a Marcos en un renglón de más de 140 caracteres). Pendiente: **cómo se cierra la sesión de la compu por
       chat** (hoy sólo "perdí el celular", que corta todas) y la prueba del usuario.
+      **MA-5 y MA-6 (2026-10-14, noche; escritor delegado):** `98c5758f` (pedir abrir la app → "tocá «Mi
+      espacio»", sin botón; la bienvenida conserva el suyo), `0ee6162c` (una Mini App recargada con la firma
+      vencida sigue con su sesión; sin sesión, el aviso dice «Cerrar» y «Mi espacio»), `30d8d8f0` (Telegram en la
+      compu abre el navegador ya adentro con un pase de un minuto; migración `0076_el_pase_a_la_compu`, aplicada en
+      `leda_motor` con respaldo `db/respaldos/leda_motor-antes-0076-20261014.dump` y ensayo en una copia),
+      `86196393`, `11be9cc3`, `f5eb1e34` (el referente ve "Mi área", sin el área bajo el título) y `b4b9df87`
+      (Dirección: "Mis tareas" y "Áreas", con una tarjeta por área, por orden alfabético porque la base no guarda
+      el del pack). `npm test` 325 passed y 29 archivos; pytest de lo tocado 304 y 171 passed. RDD aprobada:
+      `review-70c1859cc3a81102` (MA-5; WARNING: si Telegram no fijó el botón del menú, Leda igual lo nombra; no hay
+      prueba de que el pase no quede en un registro de accesos) y `review-43a52c1abab65531` (MA-6; un WARNING
+      menor en `web/src/App.tsx:117`). Falla vista en el celular y resuelta: el primer servidor web de la sesión
+      rechazaba toda firma (causa no encontrada; al reiniciarlo, entró); un registro temporal confirmó dos
+      entradas aceptadas.
+      **Prueba de cierre (usuario, 2026-10-15, madrugada): pasada.** Dirección con "Mis tareas" y "Áreas"; el
+      referente con "Mi área"; Telegram en la compu entra sin QR; Marcos carga para su área y le pide a Dirección
+      (las tareas aparecen; los avisos por chat quedaron guardados hasta el horario del espacio, como corresponde);
+      "quiero crear una tarea" ofrece "Cargar la tarea". El "te espera" que se esperaba en el pedido a Dirección
+      era un error del guion: sólo aparece cuando una tarea de otro espera la de la persona.
+      Pendiente: la ronda con la IA real de las conversaciones 50 y 55 sobre la MA-5 (con el escuchador apagado).
       **Prueba en el celular, paso 1** (usuario, 2026-10-14): "quiero ver mis tareas" se contestó bien, con la lista en el
       chat y sin botón. Decisión del usuario: el **botón fijo del menú del bot** ("Tareas"; "Administración" en el
       bot de administración) siempre a mano; se arma ya con el túnel, porque cada arranque del escuchador actualiza
