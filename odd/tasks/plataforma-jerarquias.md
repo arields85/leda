@@ -1546,6 +1546,51 @@ Pedido del usuario: "revisá si ya no tenemos algo creado que pueda servir de ba
 autorizada): el agente agrega acá, debajo de esta línea, cada pregunta que dependa del usuario (MA-7 a J7), con
 ejemplo y recomendación, y sigue con otra cosa.
 
+- **J7 · las jerarquías y los integrantes desde la web de Dirección** (preguntas preparadas el 2026-10-15 a la
+  noche; nada construido). Hoy no hay ninguna función, comando ni pantalla para dar de alta o de baja a alguien,
+  ni para cambiar su área, su rol o quién lo aprueba: todo sale del pack (`espacios/corework.yaml`). Las
+  preguntas van de la que más frena a la que menos; se contestan de a una.
+  1. **¿Quién manda después de la J7, el pack o la web?** Ejemplo: Ismael nombra en la web a Nahuel referente
+     de OT. Si después alguien vuelve a importar el pack, Marcos vuelve a ser referente sin que nadie se entere
+     (el importador pisa área, rol, aprobador y referentes). *Recomendación:* la base manda; el pack sólo arma
+     el equipo la primera vez. Al reimportar, la parte de personas y jerarquía no se aplica sola: se muestran
+     las diferencias y las aplica el administrador.
+  2. **Qué entra en la J7.** Altas y bajas, cambiar de área, de rol, nombrar referente, elegir quién aprueba a
+     quién, crear, renombrar y borrar áreas, cómo quiere enterarse Dirección de los avisos y pasar la autoridad
+     final (punto 10 del ADR 0023). *Recomendación:* todo eso, con tres opciones de avisos para Dirección (en el
+     momento, juntos en el resumen semanal, ninguno). Las ausencias y el suplente de Dirección, en una porción
+     posterior.
+  3. **Nombrar referente, ¿arrastra lo demás?** Ejemplo: OT pasa de Marcos a Nahuel. *Recomendación:* una sola
+     acción, "nombrar referente", cuya vista previa propone los cambios que siguen (Nahuel pasa a referente y
+     lo aprueba Dirección; los de OT pasan a ser aprobados por Nahuel; el aviso de un problema técnico de OT
+     va a Nahuel; Marcos queda como integrante de OT) y se confirman juntos. Cambiar quién aprueba a una persona
+     sola sigue disponible aparte.
+  4. **Lo que estaba esperando al que deja de revisar.** Ejemplo: Marcos tenía dos entregas de Nahuel por
+     revisar cuando deja de ser referente. *Recomendación:* pasan al nuevo, que recibe un solo aviso con lo que
+     hereda; las tareas que se cargaron con un revisor elegido a mano lo conservan mientras siga activo. Nada
+     se aprueba solo.
+  5. **Dar de baja a alguien con tareas abiertas.** Ejemplo: Lucas se va con tres tareas en curso.
+     *Recomendación:* la vista previa lista sus tareas y Dirección elige un responsable para cada una (o "lo
+     decide Martín"): esa confirmación es la aprobación que pide la mecánica (§8). No se puede dar de baja a
+     quien aprueba a otros sin nombrar reemplazo, ni a Ismael (la autoridad final se pasa con el punto 10). La
+     baja no borra: deja a la persona inactiva y corta sus sesiones.
+  6. **Dar de alta a alguien.** *Recomendación:* nombre, área y rol; quién lo aprueba, el referente del área
+     por omisión. La web muestra "copiar el enlace de activación" para mandarlo por donde se hablen, y la
+     persona figura "sin conectar" hasta que lo abre.
+  7. **Cambiar a alguien de área.** Ejemplo: Lucas pasa de IT a OT. *Recomendación:* cada tarea conserva su
+     área; la vista previa avisa que sus tareas de IT las revisaría Marcos y ofrece dejar a Martín como revisor
+     de esas.
+  8. **Crear y borrar áreas.** *Recomendación:* un área nueva lleva referente o dice explícitamente que se
+     autoaprueba (mecánica §7); se borra sólo sin personas ni tareas abiertas; renombrar cambia sólo el nombre
+     que se ve.
+  9. **Quién se entera de cada cambio.** *Recomendación:* queda en la auditoría con el antes y el después;
+     Dirección ve un historial "cambios del equipo"; cada persona afectada recibe un aviso corto ("Desde hoy tu
+     trabajo lo revisa Martín"); el administrador, sólo el paso de la autoridad final y las bajas.
+  10. **¿Reorganizar el equipo es ampliar la autoridad de Leda (constitución §2, dos firmas)?**
+      *Recomendación:* no: cambia la autoridad del equipo, no lo que Leda puede hacer, así que alcanza con la
+      confirmación de Dirección. Las excepciones: la autoridad final (la acepta quien la recibe) y que Dirección
+      cambie su propio rol, que no se puede.
+
 Lo que el agente, trabajando solo desde la noche del 2026-10-13, necesita que decida el usuario. Cada punto,
 con un ejemplo y lo que el agente recomienda; mientras tanto, el agente sigue con lo que no depende de eso.
 
