@@ -1,10 +1,9 @@
 # ADR 0025: Más tiempo y cambio de fecha: un pedido que decide quien revisa, con su informe de "en qué afecta"
 
-- **Estado:** Propuesta (2026-10-15, de noche, redactada por el agente trabajando solo). Las decisiones son
-  del usuario (2026-10-14, J5-D1 a J5-D8, y las decisiones 5 a 7 de la J3, en
-  `odd/tasks/plataforma-jerarquias.md`); los doce puntos que esas decisiones no fijan están abiertos, con la
-  recomendación del agente, en "Para decidir al despertar" ("J5: lo que las decisiones no alcanzan a fijar").
-  Se acepta cuando el usuario conteste esos puntos; hasta entonces no se construye nada de conversación.
+- **Estado:** Aceptada (2026-10-15, de mañana: el usuario contestó los doce puntos abiertos; quedan en
+  "Puntos que fijó el usuario", abajo). Redactada como propuesta la noche del 2026-10-15 por el agente
+  trabajando solo. Las decisiones son del usuario (2026-10-14, J5-D1 a J5-D8, y las decisiones 5 a 7 de la
+  J3, en `odd/tasks/plataforma-jerarquias.md`).
 - **Fecha:** 2026-10-15.
 - **Alcance:** qué pasa cuando una tarea necesita más tiempo o cambia su fecha, por el chat y por la web, y la
   fecha prevista de los objetivos ("> aceptar la demora").
@@ -72,6 +71,47 @@ Y todo cambio de plazo tiene que mostrar antes a quién afecta ("si no, no tiene
 11. **Las palabras:** en todo lo que ve la persona no se dice "trabado" ni "bloqueada" (la forma en el chat
     está abierta en "Para decidir"). Los nombres internos no cambian.
 
+## Puntos que fijó el usuario (2026-10-15)
+
+12. **Una fecha anterior** a la que tenía ("lo termino el 18", vence el 21) se anota directo, como hoy: no
+    atrasa a nadie.
+13. **Los botones** (usuario: "¿qué pasa si la persona viene bien? Ya de antemano le está ofreciendo botones
+    para demorar"): "¿cómo venís?" no lleva botones, como hoy; es una pregunta abierta que invita a todo
+    ("si ya la terminaste, si te falta algo o si necesitás más tiempo"). Los recordatorios desde el día del
+    vencimiento llevan tres, el bueno primero: «> Ya la terminé» (abre la entrega que ya existe),
+    «> Me falta algo para seguir» y «> Pedir más tiempo». El aviso del día anterior, ninguno.
+14. **La ventana de la tarea que espera** (usuario: "se tiene que mantener en la ventana de tiempo para
+    hacerlo"): una tarea que espera a otra conserva los días hábiles que tenía desde la fecha de la tarea a la
+    que espera (las tareas no tienen fecha de inicio). Si "Armar el tablero" vence el 21 y "Pasar los cables"
+    el 30, Lucas tiene 7 días hábiles; si el tablero se corre 5 días hábiles, el informe dice «"Pasar los
+    cables" de Lucas pasaría del 30/10 al 06/11, para mantener sus 7 días hábiles», y así hacia abajo en la
+    cadena. Reemplaza el criterio de "llega justo" de la propuesta, que no contaba el tiempo de trabajo.
+15. **Al aceptar, la cadena se corre sola:** cada tarea que espera conserva su fecha comprometida y se anota la
+    prevista que mantiene su ventana (como la decisión 5); Leda la sigue sobre la prevista y avisa a su
+    responsable y a su referente. Si la cadena pasa la fecha de un objetivo, frena hasta que apruebe su
+    referente (decisión 2).
+16. **Una tarea de otra área en el informe:** quien decide ve su título, su responsable y su área, su
+    descripción (usuario: "cómo se entera de qué se trata la tarea de otro sector") y cómo se correrían sus
+    fechas; no ve el criterio, la evidencia ni el historial. Es una excepción a quién ve qué, sólo dentro del
+    informe.
+17. **Dos personas deciden** (la tarea y el objetivo): primero quien revisa la tarea; si acepta, le llega al
+    referente del objetivo con el mismo informe y lo que decidió el primero; si el primero dice que no,
+    termina ahí. Si son la misma persona, es una sola decisión. Hasta la última aprobación vale la fecha
+    original.
+18. **Mientras el pedido espera,** a quien pidió le siguen los recordatorios sobre la fecha original, con su
+    pedido a la vista ("tu pedido de pasarla al 28 sigue esperando a Martín"); el escalamiento por esa tarea
+    se reemplaza por el recordatorio a quien decide.
+19. **El freno del objetivo compara con su fecha prevista,** si la tiene: un pedido que entra en ella no
+    necesita al referente del objetivo.
+20. **"> Ya no hace falta"** retira un pedido que espera, por el chat y por la web, sin mensaje a quien
+    decidía; es la misma regla que la de las propuestas de la J6.
+21. **La administración** también puede cambiar la fecha, con motivo y el informe. **Cambiar directamente la
+    fecha de un objetivo** queda para más adelante (`ROADMAP.md`, "Anotado para más adelante").
+22. **Lo que falta de otro se demora:** cuando quien se ocupa da un día que pasa el vencimiento de la tarea que
+    espera, su referente recibe el informe (con la cadena) y decide con «> aceptar la demora» o «> cambiar
+    la fecha»; a quien espera no se lo escala por esa tarea.
+23. **A quien decide se le recuerda una vez por día hábil,** dentro del horario, hasta que decida.
+
 ## Consecuencias
 
 - La conversación 02 y las que usan `anotar_prevision` con una fecha más tarde cambian: se reescriben como
@@ -81,4 +121,5 @@ Y todo cambio de plazo tiene que mostrar antes a quién afecta ("si no, no tiene
   qué pedido; la fecha prevista de los objetivos; y la función de "en qué afecta".
 - Cada pieza nueva de la base lleva `security definer` con propietario explícito, `search_path` fijo, RLS
   forzado, su rollback, la paridad con `esquema.sql` y su fila de auditoría.
-- Puntos abiertos: los doce de "Para decidir al despertar".
+- La función de "en qué afecta" calcula la cadena con la ventana de cada tarea (punto 14), y aceptar escribe
+  la prevista de toda la cadena en una sola operación auditada (punto 15).
