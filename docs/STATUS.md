@@ -52,17 +52,17 @@ status` diga que corre (pasó el 2026-10-14: error de memoria compartida), cerra
 del sandbox. Antes de una ronda con la IA real, comprobar que no corra el escuchador del usuario (`tasklist`): si
 corre, la ronda queda pendiente; el escuchador no se apaga, es del usuario.
 
-**Lo primero, con el usuario:** las decisiones de "Para decidir al despertar" del documento de la unidad, de a
-una y en texto. Bloquean el resto:
-1. **La palabra que reemplaza a "trabada"** en el chat (recomendación: decir qué falta y quién se ocupa, como la
-   web y la J5-D1). Con la respuesta: renombrar los datos en el borde de la redacción y una ronda real.
-2. **Los 12 puntos de la J5** y aceptar el **ADR 0025**; después, la J5 desde la S1 (conversaciones 56 a 62).
-3. **Los 9 puntos de la J6**; después, la J6 desde la J6-0.
-4. **Las 10 preguntas de la J7.**
-5. Sueltas: el mensaje cuando la IA falla, «Mi espacio» sin el botón del menú, cuánto dura la sesión de
-   administración, el grafo (quién cancela, reabrir, deshacer, objetivos), y tres hallazgos de la ronda del 15/10
-   ("perdí el celular" dicho al pasar, una opción en una pregunta sin opciones, "martin de IT").
-6. Mirar en la compu la MA-7 y "te la pidió" en "Mis tareas".
+**Decidido con el usuario (2026-10-15, de mañana):** todo "Para decidir al despertar" del documento de la unidad:
+la palabra que reemplaza a "trabada" (hecho y probado con la IA real: en la 55, de 25 a 0), los 12 puntos de la J5
+(ADR 0025 **aceptado**), los 9 de la J6, las 10 preguntas de la J7, el mensaje cuando la IA falla (hace falta
+construir la respuesta pendiente antes de decirlo), «Mi espacio» sin el botón del menú, la sesión de
+administración (12 h sin uso, configurable), el grafo (cancelar, reabrir, deshacer "la empecé" siempre) y los
+hallazgos de la ronda. Cada respuesta está escrita en su punto, marcada DECIDIDO o CONTESTADO.
+
+**Lo que sigue, a construir** (el orden lo confirma el usuario): las chicas decididas (sesión de administración,
+«Mi espacio», grafo parte 2), los hallazgos 1 y 3 (conversación de prueba primero), la respuesta pendiente
+cuando la IA falla, la J5 desde la S1 (conversaciones 56 a 62), la J6 desde la J6-0 y la J7 (plan en porciones).
+Falta que el usuario mire en la compu la MA-7 y "te la pidió".
 
 **Sin el usuario, si queda tiempo:** las advertencias de RDD anotadas en cada entrada del documento de la unidad
 (ninguna bloquea), y el grafo no se vuelve a tocar sin mirarlo con el usuario (dos arreglos seguidos).
