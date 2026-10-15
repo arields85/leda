@@ -1736,6 +1736,19 @@ ejemplo y recomendación, y sigue con otra cosa.
       *Recomendación:* no: cambia la autoridad del equipo, no lo que Leda puede hacer, así que alcanza con la
       confirmación de Dirección. Las excepciones: la autoridad final (la acepta quien la recibe) y que Dirección
       cambie su propio rol, que no se puede.
+- **Tres hallazgos de la ronda del 15/10 (todas las conversaciones, una vez).** Ninguno viene de los cambios de
+  la noche; se anotan como conversación de prueba antes de tocar nada (regla general, no parche).
+  1. **"Perdí el celular" dicho al pasar corta el acceso a la web.** En la conversación 42, Ariel escribe
+     "perdon perdi el celular, …" en medio de otro tema y Leda le corta el acceso a la web (lo que decidiste
+     para "perdí el celular": cortar enseguida, sin confirmar). *Recomendación:* que siga cortando sin
+     confirmar, pero sólo cuando es lo que la persona está pidiendo; dicho al pasar ("perdón, perdí el celular
+     y no vi tu mensaje"), Leda pregunta "¿querés que corte el acceso desde ese celular?".
+  2. **Elegir una opción en una pregunta que no tiene opciones** (conversación 43: "se lo pido yo y te
+     cuento"). La cocina lo rechaza y Leda vuelve a preguntar; el seguimiento que tocaba no sale. Se mira
+     junto con la regla de las preguntas; sin decisión tuya por ahora.
+  3. **"martin de IT" no se reconoce como Martín Forte** (conversación 05): Leda pregunta "¿quién es martin de
+     IT?". *Recomendación:* que el reconocimiento de nombres ignore el área dicha al lado ("de IT", "el de
+     OT"), y si el área no coincide, que pregunte.
 - **J5: lo que las decisiones no alcanzan a fijar** (un planificador armó la J5 en porciones el 15/10 a la
   noche). Ojo, un cambio grande: hoy, si Nahuel dice "lo termino el 28", Leda lo anota enseguida y los
   recordatorios pasan al 28 (la conversación 02 lo prueba). Con la J5-D3 eso deja de ser así: queda como pedido
