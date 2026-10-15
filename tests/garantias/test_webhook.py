@@ -316,7 +316,7 @@ def test_registrar_webhooks_le_da_a_cada_bot_su_direccion_y_su_secreto(webhook, 
     menus = [p for metodo, p in telegram.llamadas if metodo == "setChatMenuButton"]
     assert len(menus) == len(TOKENS) and all("chat_id" not in p for p in menus)
     botones = {p["menu_button"]["web_app"]["url"]: p["menu_button"]["text"] for p in menus}
-    assert botones["https://leda.example/app/abrir/e/north-lab/"] == "Mi panel"
+    assert botones["https://leda.example/app/abrir/e/north-lab/"] == "Mi espacio"
     assert botones["https://leda.example/app/abrir/admin/"] == "Administración"
     assert pedidos["admin"]["allowed_updates"] == ["message", "callback_query"]
     assert pedidos["west-studio"]["allowed_updates"] == ["message", "callback_query"]

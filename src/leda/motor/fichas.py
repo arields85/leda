@@ -1884,8 +1884,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           necesita=(), opcional=("para_la_compu",),
           comprueba="que la web esté disponible y que el mensaje no lleve ya el enlace de una "
                     "tarea (uno solo por mensaje)",
-          hace="marca la respuesta para que lleve el botón que abre la web de la persona dentro "
-               "de Telegram; con para_la_compu, da la dirección para abrirla en la computadora; "
+          hace="marca la respuesta para que lleve el botón que abre el espacio de la persona en "
+               "la aplicación de Leda; con para_la_compu, da la dirección para abrirla en la computadora; "
                "no cambia nada",
           despues="el código pone el botón debajo de la respuesta; la dirección para la "
                   "computadora sola no da acceso: ahí se entra escaneando el QR que muestra",

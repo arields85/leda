@@ -155,7 +155,7 @@ export function SignIn({ door, space, onIn, phone = onAPhone() }: {
   if (door === 'equipo' && !space) {
     return (
       <Notice title="Entrá desde Telegram.">
-        <p className="m-0">Abrí el chat de Leda de tu equipo y tocá «Ver mis tareas».</p>
+        <p className="m-0">Abrí el chat de Leda de tu equipo y tocá «Mi espacio».</p>
       </Notice>
     );
   }

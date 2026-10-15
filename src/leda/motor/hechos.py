@@ -991,12 +991,11 @@ SIGNIFICADOS: Mapping[str, str] = {
                                         "tarea o el de la web), y lleva uno solo: el de ésta "
                                         "se puede pedir aparte.",
     # --- La entrada a la web por chat (`fichas`: `pedir_acceso_web`, `perdi_el_celular`) -------
-    "boton_para_abrir_la_web": "Leda le deja a la persona el botón que abre su web, donde ve "
-                               "sus tareas, dentro de Telegram.",
+    "boton_para_abrir_la_web": "Leda le deja a la persona el botón que abre su espacio en la "
+                               "aplicación de Leda, donde ve sus tareas.",
     "lleva_el_boton":
-        "Debajo de este mensaje va un botón con este texto: al tocarlo se abre la web de Leda "
-        "dentro de Telegram, justo ahí. El botón lo pone el código; la IA no escribe ninguna "
-        "dirección ni enlace.",
+        "Debajo de este mensaje va un botón con este texto, que abre su espacio en la aplicación "
+        "de Leda. El botón lo pone el código; la IA no escribe ninguna dirección ni enlace.",
     "para_la_compu": "Si la persona pidió la dirección de la web para abrirla en la computadora.",
     "direccion_para_la_compu":
         "La dirección de la web para abrir en la computadora, que la IA escribe tal cual. Sola "
@@ -1021,9 +1020,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     # cocina al final del turno, no es una jugada (`turno._ofrecer_la_web`).
     "ofrecimiento": "Algo que Leda le ofrece a la persona al final de este mensaje, además de "
                     "lo que contesta, sin que lo haya pedido: se dice después de lo demás.",
-    "acceso_a_la_web": "Ahora la persona también puede ver sus tareas en la web de Leda, que "
-                       "se abre dentro de Telegram con el botón de este mensaje. Se le ofrece "
-                       "una sola vez.",
+    "acceso_a_la_web": "Ahora la persona también puede ver sus tareas en la aplicación de Leda, "
+                       "que se abre con el botón de este mensaje. Se le ofrece una sola vez.",
     # --- La persecución del bloqueo (C-5, porción 1; `persecucion.py`) -------------------------
     "se_le_pregunta_a": "A quién le consulta Leda, como Leda y no en nombre de nadie, para "
                         "cuándo destraba la tarea (a), y cuándo le llega (llega).",

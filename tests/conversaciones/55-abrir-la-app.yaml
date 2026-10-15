@@ -66,6 +66,7 @@ pasos:
     no_dice:
       - un enlace, o que pida uno
       - "sólo la pregunta de cómo vienen, sin decir nada de la app"
+      - si se abre dentro de Telegram o en el navegador
 
   - paso: 3
     quien: Marcos

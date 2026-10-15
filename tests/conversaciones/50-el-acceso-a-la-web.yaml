@@ -131,10 +131,11 @@ pasos:
     estado_despues:
       pregunta_abierta: null
     dice:
-      - que toque «Ver mis tareas» y la web se abre ahí mismo, en Telegram
+      - que toque «Ver mis tareas», en pocas palabras
     no_dice:
       - un enlace nuevo, o que pida otro
       - cómo funciona por dentro
+      - si se abre dentro de Telegram o en el navegador
       - una dirección escrita por la IA
 
   # Una charla, no un aviso: no corta nada (el enlace del paso 4 sigue sirviendo).

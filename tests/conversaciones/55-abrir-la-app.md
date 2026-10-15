@@ -28,7 +28,8 @@ jugada, y Leda contestó sólo con la pregunta abierta, como si se la hubieran c
 2. **Marcos** escribe (10:30): "abri la app"
    →
    - Jugadas: `pedir_acceso_web`.
-   - La respuesta dice: que la abre tocando «Ver mis tareas»; después, la pregunta de cómo vienen.
+   - La respuesta dice: que la abre tocando «Ver mis tareas», en pocas palabras y sin explicar si
+     se abre dentro de Telegram o en el navegador (MA-4); después, la pregunta de cómo vienen.
    - Lleva el botón "Ver mis tareas". La pregunta sigue abierta.
 3. **Marcos** escribe (10:35): "quiero entrar a la app desde la compu, pasame la direccion"
    →

@@ -792,7 +792,7 @@ def test_al_arrancar_fija_el_boton_del_menu_de_cada_bot_con_la_direccion_del_mom
     m.escucha.fijar_los_menus()
     [menu] = [p for metodo, p in m.telegram.llamadas if metodo == "setChatMenuButton"]
     assert "chat_id" not in menu
-    assert menu["menu_button"] == {"type": "web_app", "text": "Mi panel",
+    assert menu["menu_button"] == {"type": "web_app", "text": "Mi espacio",
                                    "web_app": {"url": "https://tunel.invalid/app/abrir/e/prueba/"}}
     [admin_menu] = [p for metodo, p in m.telegram_admin.llamadas
                     if metodo == "setChatMenuButton"]

@@ -166,11 +166,11 @@ def bienvenida(cur: psycopg.Cursor, workspace_id: str, nombre: str) -> str:
 
 # El ofrecimiento de la web en la bienvenida (decisión 2 del usuario, 2026-10-12; ADR 0024,
 # decisiones 1 y 2), texto fijo como la bienvenida: el despachador pone el botón debajo, "Ver mis
-# tareas" (a Dirección, "Ver el equipo"), que abre la web dentro de Telegram.
+# tareas" (a Dirección, "Ver el equipo"), que abre la web como Mini App. En pocas palabras, sin
+# explicar dónde se abre (MA-4).
 # Una plantilla, nunca un texto para mandar tal cual (revisión R3-welcome-template): se arma con
 # `ofrecimiento_de_la_web`.
-_PLANTILLA_DEL_OFRECIMIENTO = ("Ahora también podés ver {que} en la web, sin salir de Telegram: tocá "
-                          "«{boton}» cuando quieras.")
+_PLANTILLA_DEL_OFRECIMIENTO = "También podés ver {que} en la web: tocá «{boton}» cuando quieras."
 
 
 def ofrecimiento_de_la_web(destino: str) -> str:
