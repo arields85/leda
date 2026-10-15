@@ -476,7 +476,7 @@ $env:LEDA_BASE_URL = "http://localhost:8001"
 ```
 
 **4. Abrir el enlace** en el navegador de la misma PC y apretar "Entrar": la sesión queda abierta y
-lleva a `/app/`. Para probar los cortes: "salir" en la página, o
+lleva a `/app/`. La página ya no tiene "salir" (MA-4); para probar los cortes:
 
 ```powershell
 ..\motor-de-conversacion\.venv\Scripts\python.exe -m leda cortar-sesiones-web corework --persona Marcos
@@ -522,7 +522,7 @@ hábiles del espacio desde hoy; hoy, sólo antes del cierre de la jornada), el c
 (viene marcada la que pide el área) y quién la decidió. "revisar" muestra la tarea como la va a ver
 el equipo y quién la carga, la decidió y la revisa; "confirmar" la carga y "volver" deja corregir.
 En una computadora, el formulario va a la izquierda y la vista previa a la derecha; en el celular,
-uno debajo del otro. La tarea aparece en "Tus tareas" de su responsable (puerta del equipo).
+uno debajo del otro. La tarea aparece en "Mis tareas" de su responsable (puerta del equipo).
 
 Lo que no se carga vuelve marcado en su campo, en palabras. Si se corta la red al confirmar, los
 datos quedan y "probar de nuevo" manda la misma clave: nunca se cargan dos tareas. Quién la cargó y

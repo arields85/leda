@@ -137,26 +137,11 @@ describe("the task's detail inside the app (item 2)", () => {
 });
 
 describe('the bottom buttons (item 4)', () => {
-  it('inside the Mini App: no "salir", and "Volver al chat" closes it', async () => {
-    const app = miniApp();
-    serve({ 'GET /app/api/yo': ok(me({ chat_con_leda: 'https://t.me/LedaCoreWorkBot' })), 'GET /app/api/tareas?vista=tus': ok(view()) });
-    render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Volver al chat' }));
-    expect(app.close).toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: /salir/ })).toBeNull();
-    expect(screen.queryByText('> consultar a leda')).toBeNull();
-  });
-
-  it('in a browser: "salir" stays and "Volver al chat" opens the bot chat', async () => {
-    serve({ 'GET /app/api/yo': ok(me({ chat_con_leda: 'https://t.me/LedaCoreWorkBot' })), 'GET /app/api/tareas?vista=tus': ok(view()) });
-    render(<App />);
-    expect(await screen.findByRole('link', { name: 'Volver al chat' })).toHaveAttribute('href', 'https://t.me/LedaCoreWorkBot');
-    expect(screen.getByRole('button', { name: /salir/ })).toBeInTheDocument();
-  });
+  // "salir" and "Volver al chat" left both the Mini App and the browser in MA-4 (`ma4.test.tsx`).
 
   it('"> Nueva tarea" is the big button, only to whoever loads, and nothing under the tabs', async () => {
     serve({
-      'GET /app/api/yo': ok(me({ carga_tareas: true, vistas: [{ vista: 'tus', titulo: 'Mis tareas' }, { vista: 'pedidas', titulo: 'Lo que pedí' }] })),
+      'GET /app/api/yo': ok(me({ carga_tareas: true, vistas: [{ vista: 'tus', titulo: 'Mis tareas' }, { vista: 'pedidas', titulo: 'Mis pedidos' }] })),
       'GET /app/api/tareas?vista=tus': ok(view()),
       'GET /app/api/carga/opciones': ok(options()),
     });
@@ -194,7 +179,7 @@ describe('the tabs (item 5)', () => {
   const tabs = [
     { vista: 'tus' as const, titulo: 'Mis tareas' },
     { vista: 'sector' as const, titulo: 'Mi equipo' },
-    { vista: 'pedidas' as const, titulo: 'Lo que pedí' },
+    { vista: 'pedidas' as const, titulo: 'Mis pedidos' },
   ];
 
   it('are real tabs in one row that never wraps, the selected one marked', async () => {
@@ -204,7 +189,7 @@ describe('the tabs (item 5)', () => {
     expect(list).toHaveClass('flex', 'flex-nowrap');
     expect(list.className).not.toMatch(/flex-wrap(?!-)|\bwrap\b/);
     const all = within(list).getAllByRole('tab');
-    expect(all.map((t) => t.textContent)).toEqual(['Mis tareas', 'Mi equipo', 'Lo que pedí']);
+    expect(all.map((t) => t.textContent)).toEqual(['Mis tareas', 'Mi equipo', 'Mis pedidos']);
     // Equal shares of one row (375 px less the page's 2 × 20 px: 111 px each), cut before wrapping.
     for (const tab of all) expect(tab).toHaveClass('flex-1', 'basis-0', 'min-w-0', 'truncate', 'whitespace-nowrap');
     expect(all[0]).toHaveAttribute('aria-selected', 'true');
@@ -224,22 +209,21 @@ describe('the tabs (item 5)', () => {
 });
 
 describe('the title line, the counters and one screen (items 6 and 7, corrected)', () => {
-  it('the title and who is looking share one line: the title never wraps, the name is never cut', async () => {
+  it('the title never wraps, and who is looking (top right since MA-4) is never cut', async () => {
     serve({ 'GET /app/api/yo': ok(me({ persona: 'Ariel De Simone' })), 'GET /app/api/tareas?vista=tus': ok(view({ titulo: 'Mis tareas', activas: 2 })) });
     render(<App />);
     await screen.findByText('Configurar alarmas del SCADA');
     const line = screen.getByTestId('title-line');
-    expect(line).toHaveClass('flex', 'flex-nowrap', 'justify-between');
+    expect(line).toHaveClass('flex', 'flex-nowrap');
     const title = within(line).getByRole('heading', { level: 1 });
     expect(title).toHaveTextContent('Mis tareas');
     expect(title).toHaveClass('shrink-0', 'whitespace-nowrap');
-    const who = within(line).getByTestId('who');
+    const who = within(screen.getByRole('banner')).getByTestId('who');
     expect(who).toHaveTextContent('Ariel De Simone');
-    // Never cut: a long name goes on under itself, right-aligned, and the title stays put.
+    // Never cut: a long name goes on under itself, right-aligned.
     expect(who).not.toHaveClass('truncate');
     expect(who.className).not.toMatch(/ellipsis|line-clamp|whitespace-nowrap/);
     expect(who).toHaveClass('min-w-0', 'text-right', 'wrap-break-word');
-    expect(line).toHaveClass('items-start');
     // "N activas" left the header.
     expect(screen.getByRole('banner')).not.toHaveTextContent(/activas/);
   });
@@ -262,7 +246,7 @@ describe('the title line, the counters and one screen (items 6 and 7, corrected)
 
   it('only the cards scroll: header, tabs, counters and week fixed above, the buttons fixed below', async () => {
     serve({
-      'GET /app/api/yo': ok(me({ carga_tareas: true, vistas: [{ vista: 'tus', titulo: 'Mis tareas' }, { vista: 'pedidas', titulo: 'Lo que pedí' }] })),
+      'GET /app/api/yo': ok(me({ carga_tareas: true, vistas: [{ vista: 'tus', titulo: 'Mis tareas' }, { vista: 'pedidas', titulo: 'Mis pedidos' }] })),
       'GET /app/api/tareas?vista=tus': ok(view()),
     });
     render(<App />);

@@ -92,13 +92,8 @@ function Failed({ onRetry }: { onRetry: () => void }) {
 
 /** Without a session: enter with Telegram (ADR 0024, decisions 4 and 5), never asking for a
  * link. */
-function SessionClosed({ byPerson = false, onIn }: { byPerson?: boolean; onIn: () => void }) {
-  return (
-    <>
-      {byPerson && <Notice title="Cerraste la sesión." />}
-      <SignIn door="equipo" space={spaceForSignIn()} onIn={onIn} />
-    </>
-  );
+function SessionClosed({ onIn }: { onIn: () => void }) {
+  return <SignIn door="equipo" space={spaceForSignIn()} onIn={onIn} />;
 }
 
 export function App() {
@@ -106,7 +101,6 @@ export function App() {
   const [me, setMe] = useState<Load<Me>>({ kind: 'loading' });
   const [view, setView] = useState<ViewId | null>(null);
   const [tasks, setTasks] = useState<Load<ViewData>>({ kind: 'loading' });
-  const [signedOut, setSignedOut] = useState(false);
   // Dirección creating an objective (ADR 0023, decision 1), or Dirección or a referente loading a
   // task (decision 3; J4): the form takes the page's place.
   const [creating, setCreating] = useState<'tarea' | 'objetivo' | null>(null);
@@ -119,8 +113,6 @@ export function App() {
   const [unopened, setUnopened] = useState(false);
   // The detail of a task, as a view of the app (MA-3): it takes the list's place until "> volver".
   const [detail, setDetail] = useState<Detail | null>(null);
-  // Inside the Mini App: no "salir", and "Volver al chat" closes it (MA-3). Decided once.
-  const [inMiniApp] = useState(() => telegramWebApp() !== null);
 
   useEffect(() => {
     const request = new AbortController();
@@ -128,7 +120,6 @@ export function App() {
     fetchMe(request.signal)
       .then((data) => {
         setMe({ kind: 'ready', data });
-        setSignedOut(false);
         rememberSpace(data.espacio_slug);
         setView((current) => pickView(data, current ?? viewInAddress()));
         const { create, task } = link.current;
@@ -202,17 +193,12 @@ export function App() {
       ? 'Tarea'
       : (ready?.titulo ?? person?.vistas.find((v) => v.vista === view)?.titulo ?? 'Leda');
 
-  const enter = () => {
-    setSignedOut(false);
-    retry();
-  };
+  const enter = retry;
   // What stays fixed at the top of the list, under the header (MA-3: only the cards scroll): the
-  // tabs, "> nuevo objetivo", the counters and the week.
+  // tabs, the counters and the week.
   let fixed = null;
   let body;
-  if (signedOut) {
-    body = <SessionClosed byPerson onIn={enter} />;
-  } else if (me.kind === 'closed' || tasks.kind === 'closed') {
+  if (me.kind === 'closed' || tasks.kind === 'closed') {
     body = <SessionClosed onIn={enter} />;
   } else if (me.kind === 'failed') {
     body = <Failed onRetry={retry} />;
@@ -252,18 +238,6 @@ export function App() {
     fixed = (
       <>
         <ViewSwitch views={person.vistas} current={view} onChange={choose} />
-        {/* "> Nueva tarea" is the big button at the bottom (MA-3); the objective stays here. */}
-        {person.crea_objetivos && (
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => setCreating('objetivo')}
-              className="rounded-card border-hard border-line-soft bg-transparent px-2.5 py-1 text-small text-ink-soft"
-            >
-              &gt; nuevo objetivo
-            </button>
-          </div>
-        )}
         {ready && ready.vista !== 'pedidas' && (
           <>
             <StatePanel panel={ready.panel} notStarted={ready.sin_empezar} />
@@ -315,20 +289,20 @@ export function App() {
     );
   }
 
-  const open = !signedOut && person !== null && me.kind === 'ready' && tasks.kind !== 'closed';
+  const open = person !== null && me.kind === 'ready' && tasks.kind !== 'closed';
   // One screen, no page scroll (MA-3): the header, the tabs, the counters and the week fixed at
-  // the top, "> Nueva tarea" and "Volver al chat" fixed at the bottom, and only the middle (the
+  // the top, "> Nueva tarea" and "> Nuevo objetivo" fixed at the bottom, and only the middle (the
   // cards, or the detail or the form) scrolls. Its height leaves out the safe areas the root
-  // already keeps clear (the status bar and Telegram's floating "Cerrar" and "…").
+  // already keeps clear (the status bar and Telegram's floating "Cerrar" and "…"). The whole width,
+  // also on a computer (MA-4).
   return (
-    <div className="mx-auto flex h-[calc(100dvh-var(--tg-safe-top,0px)-var(--tg-safe-bottom,0px))] w-full min-w-0 max-w-[32rem] flex-col overflow-hidden px-5">
+    <div className="flex h-[calc(100dvh-var(--tg-safe-top,0px)-var(--tg-safe-bottom,0px))] w-full min-w-0 flex-col overflow-hidden px-5">
       <div data-testid="fixed-top" className="flex min-w-0 shrink-0 flex-col gap-3.5">
         <Header
           space={person?.espacio ?? ''}
-          title={signedOut || !open ? 'Leda' : title}
+          title={open ? title : 'Leda'}
           person={open ? person?.persona : undefined}
-          today={open ? ready?.hoy : undefined}
-          isoWeek={open ? ready?.semana_iso : undefined}
+          area={open ? person?.area : undefined}
           subtitle={open && !creating && !detail && ready?.vista === 'sector' ? ready.area_del_equipo : null}
         />
         {fixed}
@@ -341,14 +315,16 @@ export function App() {
       </main>
       {open && (
         <Footer
-          inMiniApp={inMiniApp}
-          chat={person?.chat_con_leda ?? null}
           canLoad={Boolean(person?.carga_tareas) && creating === null}
+          canCreateObjective={Boolean(person?.crea_objetivos) && creating === null}
           onNewTask={() => {
             setDetail(null);
             setCreating('tarea');
           }}
-          onSignedOut={() => setSignedOut(true)}
+          onNewObjective={() => {
+            setDetail(null);
+            setCreating('objetivo');
+          }}
         />
       )}
     </div>

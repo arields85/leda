@@ -888,7 +888,7 @@ def test_el_referente_pasa_un_pedido_a_su_gente_desde_la_web(web, conn, equipo):
 def test_quien_la_pidio_ve_lo_pedido_y_pide_cambios_desde_la_web(web, conn, equipo):
     tarea = _pedida_y_terminada(conn, equipo)
     taylor = _navegador(web, conn, equipo, "Taylor Quinn")
-    # "Lo que pedí" es su propia pestaña (prueba por Telegram de la J4).
+    # "Mis pedidos" es su propia pestaña (prueba por Telegram de la J4; MA-4).
     assert "pedidas" not in taylor.get("/app/api/tareas?vista=tus").json()
     pedidas = taylor.get("/app/api/tareas?vista=pedidas").json()["pedidas"]
     assert [(p["id"], p["estado"], p["puede_pedir_cambios"]) for p in pedidas] == [
@@ -1002,7 +1002,7 @@ def test_la_ayuda_del_equipo_no_es_para_un_integrante(web, conn, equipo, ia):
 
 def test_lo_pedido_no_se_repite_en_mis_tareas(web, conn, equipo):
     """Prueba por Telegram de la J4: Taylor pide algo a Dirección y una tarea suya lo espera. En
-    "Mis tareas" queda su tarea (que lo espera), no lo pedido, que vive en "Lo que pedí"."""
+    "Mis tareas" queda su tarea (que lo espera), no lo pedido, que vive en "Mis pedidos"."""
     taylor = _navegador(web, conn, equipo, "Taylor Quinn")
     pedido = taylor.post("/app/api/tareas", json=_cuerpo(
         equipo, responsable_id=_id(equipo, "Morgan Hale"), titulo="Aprobar la compra del módem",
@@ -1015,7 +1015,7 @@ def test_lo_pedido_no_se_repite_en_mis_tareas(web, conn, equipo):
     mis = [t["titulo"] for t in taylor.get("/app/api/tareas?vista=tus").json()["tareas"]]
     assert "Colgar el módem nuevo" in mis and "Aprobar la compra del módem" not in mis
     pedidas = taylor.get("/app/api/tareas?vista=pedidas").json()
-    assert pedidas["titulo"] == "Lo que pedí"
+    assert pedidas["titulo"] == "Mis pedidos"
     assert [p["titulo"] for p in pedidas["pedidas"]] == ["Aprobar la compra del módem"]
 
 

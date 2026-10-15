@@ -176,11 +176,11 @@ describe('the team door', () => {
     window.history.replaceState(null, '', '/app/');
   });
 
-  it('offers "nuevo objetivo" only to Dirección', async () => {
+  it('offers "> Nuevo objetivo" only to Dirección', async () => {
     serve({ 'GET /app/api/yo': ok(me()), 'GET /app/api/tareas?vista=tus': ok(view()) });
     render(<App />);
     await screen.findByText('Configurar alarmas del SCADA');
-    expect(screen.queryByRole('button', { name: '> nuevo objetivo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '> Nuevo objetivo' })).toBeNull();
   });
 
   it('Dirección creates an objective of her team through her own door', async () => {
@@ -192,7 +192,7 @@ describe('the team door', () => {
       'POST /app/api/objetivos': created,
     });
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '> nuevo objetivo' }));
+    fireEvent.click(await screen.findByRole('button', { name: '> Nuevo objetivo' }));
     await screen.findByRole('form', { name: 'Crear objetivo' });
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Nuevo objetivo');
     fill();
@@ -228,7 +228,7 @@ describe('the team door', () => {
       'POST /app/api/objetivos': created,
     });
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '> nuevo objetivo' }));
+    fireEvent.click(await screen.findByRole('button', { name: '> Nuevo objetivo' }));
     await screen.findByRole('form', { name: 'Crear objetivo' });
     fireEvent.change(screen.getByLabelText('Contame qué querés hacer y te ayudo'), {
       target: { value: 'la planta del 2027 la lleva marcos para el viernes' },
@@ -263,7 +263,7 @@ describe('the team door', () => {
       },
     });
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '> nuevo objetivo' }));
+    fireEvent.click(await screen.findByRole('button', { name: '> Nuevo objetivo' }));
     expect(await screen.findByText('Crear objetivos le corresponde a Dirección.')).toBeInTheDocument();
   });
 });

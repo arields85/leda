@@ -13,11 +13,6 @@ export function weekdayOf(iso: string): string {
   return WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
 }
 
-/** The header line: "SEM 44 · LUN 26.10". */
-export function weekLine(isoWeek: number, today: string): string {
-  return `SEM ${isoWeek} · ${weekdayOf(today)} ${shortDate(today)}`;
-}
-
 export function activeCount(n: number): string {
   return n === 1 ? '1 activa' : `${n} activas`;
 }

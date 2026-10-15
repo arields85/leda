@@ -44,14 +44,13 @@ describe('App', () => {
     expect(await screen.findByText('Configurar alarmas del SCADA')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tus tareas');
     expect(screen.getByText('LEDA · COREWORK')).toBeInTheDocument();
-    expect(screen.getByText('SEM 44 · LUN 26.10')).toBeInTheDocument();
+    // MA-4: the name at the top right, in place of the week and the date.
+    expect(screen.getByRole('banner')).not.toHaveTextContent(/SEM \d+/);
+    expect(screen.getByTestId('who')).toHaveTextContent('Marcos');
     expect(screen.queryByRole('navigation', { name: 'Vistas' })).toBeNull();
-    // MA-3: "> consultar a leda" is gone; in a browser, "Volver al chat" opens the bot's chat.
+    // MA-3 and MA-4: neither "> consultar a leda" nor "Volver al chat".
     expect(screen.queryByText('> consultar a leda')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Volver al chat' })).toHaveAttribute(
-      'href',
-      'https://t.me/LedaCoreWorkBot',
-    );
+    expect(screen.queryByText(/Volver al chat/)).toBeNull();
   });
 
   it('a long space name shrinks inside the header instead of pushing the page sideways', async () => {
@@ -164,20 +163,6 @@ describe('App', () => {
     expect(screen.getByText('Relevar tableros de la línea 2')).toBeInTheDocument();
     // MA-3: no total of open tasks anywhere (the user's decision).
     expect(screen.getByRole('banner')).not.toHaveTextContent(/activas/);
-  });
-
-  it('salir asks once and closes the session', async () => {
-    const calls = serve({
-      'GET /app/api/yo': ok(me()),
-      'GET /app/api/tareas?vista=tus': ok(view()),
-      'POST /app/salir': { status: 204 },
-    });
-    render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: /salir/ }));
-    expect(calls).not.toContain('POST /app/salir');
-    fireEvent.click(screen.getByRole('button', { name: 'sí, salir' }));
-    expect(await screen.findByText('Cerraste la sesión.')).toBeInTheDocument();
-    expect(calls).toContain('POST /app/salir');
   });
 
   it('fits a 390px phone: nothing has a fixed width wider than the screen', async () => {

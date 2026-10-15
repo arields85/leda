@@ -146,13 +146,14 @@ TIPOS_DE_LA_WEB = {
 }
 
 # Las pestañas de la puerta del equipo y su nombre, en un solo lugar (decisiones del usuario del
-# 2026-10-14, pruebas de la J4 y de la Mini App en el iPhone, MA-3): "Mis tareas"; "Mi equipo", la
-# gente del área de un referente, sin sus propias tareas, y sólo si tiene a alguien a cargo (el
-# nombre del área va como dato debajo del título, `area_del_equipo`); "Todo el equipo", de
-# Dirección, que no tiene sector (el suyo es Dirección misma, que repetía sus tareas); "Lo que
-# pedí", de quien puede pedir (un referente y Dirección; un integrante, cuando tenga pedidos).
-VISTAS = {"tus": "Mis tareas", "sector": "Mi equipo", "equipo": "Todo el equipo",
-          "pedidas": "Lo que pedí"}
+# 2026-10-14, pruebas de la J4 y de la Mini App en el iPhone, MA-3 y MA-4): "Mis tareas"; "Mi
+# equipo", la gente del área de un referente, sin sus propias tareas, y sólo si tiene a alguien a
+# cargo (el nombre del área va como dato debajo del título, `area_del_equipo`); "Mi área", lo de
+# todo el equipo, de Dirección, que no tiene sector (el suyo es Dirección misma, que repetía sus
+# tareas); "Mis pedidos", de quien puede pedir (un referente y Dirección; un integrante, cuando
+# tenga pedidos).
+VISTAS = {"tus": "Mis tareas", "sector": "Mi equipo", "equipo": "Mi área",
+          "pedidas": "Mis pedidos"}
 DIAS_CORTOS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
 
 # Los cuatro estados con color de la decisión 18. Trabada y vencida pueden ir juntas (decisión 5
@@ -344,7 +345,8 @@ def entrar(token: str, request: Request):
 
 @router.get("/api/yo")
 def yo(request: Request):
-    """Quién es la persona de la sesión, de qué espacio, qué vistas tiene y si crea objetivos."""
+    """Quién es la persona de la sesión, de qué área y de qué espacio, qué vistas tiene y si crea
+    objetivos."""
     token = _token_de_la_cookie(request)
     if token is None:
         return _sin_sesion()
@@ -356,11 +358,13 @@ def yo(request: Request):
                 return _sin_sesion()
             cur.execute("select vistas from vistas_de_la_sesion(%s)", (_hash(token),))
             vistas = cur.fetchone()
-            cur.execute("""select i.nombre, coalesce(r.autoridad_final, false) as direccion,
+            cur.execute("""select i.nombre, su_area.nombre as area,
+                                  coalesce(r.autoridad_final, false) as direccion,
                                   exists (select 1 from area a
                                            where a.referente_membership_id = i.membership_id)
                                     as referente
                              from integrante i left join rol r on r.id = i.rol_id
+                                  left join area su_area on su_area.id = i.area_id
                             where i.membership_id = %s""",
                         (sesion["membership_id"],))
             persona = cur.fetchone()
@@ -378,6 +382,8 @@ def yo(request: Request):
             return _sin_sesion()
         respuesta = _json({
             "persona": persona["nombre"] if persona else "",
+            # Su área, debajo de su nombre arriba a la derecha (MA-4).
+            "area": persona["area"] if persona else None,
             "espacio": espacio["nombre"] if espacio else "",
             # El espacio, para entrar otra vez con el QR desde esta computadora (ADR 0024).
             "espacio_slug": slug["slug"] if slug else None,
@@ -398,7 +404,7 @@ def yo(request: Request):
 def _pestanas(cur, token: str, sesion: dict[str, Any], vistas: list[str],
               persona: dict[str, Any] | None) -> list[dict[str, str]]:
     """Las pestañas de la persona, con su nombre (`VISTAS`): las vistas que le da la base, sin
-    el sector a Dirección, y "Lo que pedí" a quien puede pedir o ya pidió algo."""
+    el sector a Dirección, y "Mis pedidos" a quien puede pedir o ya pidió algo."""
     direccion = bool(persona and persona["direccion"])
     pestanas = [v for v in vistas if v in VISTAS and not (direccion and v == "sector")]
     if "sector" in pestanas and not _a_quien_la_puede_pasar(cur, str(sesion["membership_id"])):
@@ -504,7 +510,7 @@ def tareas(request: Request, vista: str = "tus"):
             nombre = persona["nombre"] if persona else None
             terminadas = [f for f in terminadas if f["responsable"] != nombre]
         if vista == "tus" and pedidas:
-            # Lo que pidió vive sólo en "Lo que pedí" (prueba por Telegram de la J4): en sus
+            # Lo que pidió vive sólo en "Mis pedidos" (prueba por Telegram de la J4): en sus
             # tareas no aparece repetido como una que espera; la suya que lo espera sigue
             # diciendo "la esperás".
             pedidas_ids = {str(f["task_id"]) for f in pedidas}

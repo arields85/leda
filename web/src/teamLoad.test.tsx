@@ -158,10 +158,10 @@ describe('the draft through the team door', () => {
   });
 });
 
-// "Lo que pedí" is a tab of its own (J4 phone test): the page opens on it from the address.
+// "Mis pedidos" is a tab of its own (J4 phone test): the page opens on it from the address.
 const REQUESTER_TABS = [
   { vista: 'tus' as const, titulo: 'Mis tareas' },
-  { vista: 'pedidas' as const, titulo: 'Lo que pedí' },
+  { vista: 'pedidas' as const, titulo: 'Mis pedidos' },
 ];
 
 describe('what the requester sees', () => {
@@ -173,7 +173,7 @@ describe('what the requester sees', () => {
       'GET /app/api/yo': ok(me({ persona: 'Martín', vistas: REQUESTER_TABS })),
       'GET /app/api/tareas?vista=pedidas': ok(view({
         vista: 'pedidas',
-        titulo: 'Lo que pedí',
+        titulo: 'Mis pedidos',
         pedidas: [
           { id: 't-modem', titulo: 'Colgar el módem en la pared', estado: 'terminada', responsable: 'Nahuel',
             area: 'Automatización', fecha_objetivo: '2026-10-16', terminada_el: '2026-10-22', puede_pedir_cambios: true },

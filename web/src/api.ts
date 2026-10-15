@@ -2,7 +2,7 @@
 // which is in Spanish like the rest of Leda's data.
 
 export type Marca = 'vencida' | 'trabada' | 'en_curso' | 'entregada';
-// "Lo que pedí" is a tab of its own (J4 phone test); the names come from the server (`VISTAS`).
+// "Mis pedidos" is a tab of its own (J4 phone test); the names come from the server (`VISTAS`).
 export type ViewId = 'tus' | 'sector' | 'equipo' | 'pedidas';
 
 export interface ViewRef {
@@ -12,17 +12,20 @@ export interface ViewRef {
 
 export interface Me {
   persona: string;
+  // The person's area, under the name at the top right (MA-4).
+  area?: string | null;
   espacio: string;
   // The space's slug, to enter again with the QR from this computer (ADR 0024).
   espacio_slug?: string | null;
   vistas: ViewRef[];
-  // The Telegram chat with the team bot ("> consultar a leda"), when the space declares it.
+  // The Telegram chat with the team bot, when the space declares it (the page no longer shows it:
+  // MA-4 took "Volver al chat" away).
   chat_con_leda: string | null;
   // Whether this person creates the team's objectives (Dirección, ADR 0023, decision 1): only then
-  // the page offers "> nuevo objetivo". The server refuses anyone else anyway.
+  // the page offers "> Nuevo objetivo". The server refuses anyone else anyway.
   crea_objetivos?: boolean;
   // Whether this person loads tasks (Dirección and the area referentes, ADR 0023, decision 3; J4):
-  // only then the page offers "> nueva tarea". The server refuses anyone else anyway.
+  // only then the page offers "> Nueva tarea". The server refuses anyone else anyway.
   carga_tareas?: boolean;
 }
 
@@ -110,7 +113,7 @@ export interface ViewData {
   semana: Day[];
   tareas: Task[];
   terminadas: Finished[];
-  // Only in "Lo que pedí" (J4): what the person asked from another area or from Dirección.
+  // Only in "Mis pedidos" (J4): what the person asked from another area or from Dirección.
   pedidas?: Requested[];
   // Only in "Tu sector" (J4): to whom the referente may pass a task of the sector.
   pasar_a?: Teammate[];

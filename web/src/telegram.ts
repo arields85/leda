@@ -134,17 +134,6 @@ export function bindBackButton(app: TelegramWebApp | null, canGoBack: boolean, o
   };
 }
 
-/** "Volver al chat" inside the Mini App: closes it, back to the chat it came from. */
-export function closeMiniApp(app: TelegramWebApp | null = telegramWebApp()): boolean {
-  if (!app || typeof app.close !== 'function') return false;
-  try {
-    app.close();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** What happened when the page sent Telegram's signature to its door. */
 export type TelegramEntry =
   | { kind: 'in' }

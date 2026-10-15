@@ -251,7 +251,8 @@ def test_un_enlace_anulado_por_otro_no_entra(web, conn, mundo):
 
 def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
     # Las pestañas (decisiones del usuario del 2026-10-14): Dirección no tiene sector; quien puede
-    # pedir tiene "Lo que pedí"; el sector es "Mi equipo" (MA-3; el área va como dato aparte).
+    # pedir tiene "Mis pedidos"; el sector es "Mi equipo" (MA-3; el área va como dato aparte), y
+    # lo de todo el equipo, de Dirección, "Mi área" (MA-4).
     esperado = {"Sam North": ["tus"], "Taylor Quinn": ["tus", "sector", "pedidas"],
                 "Morgan Hale": ["tus", "equipo", "pedidas"]}
     for nombre, vistas in esperado.items():
@@ -261,12 +262,17 @@ def test_yo_dice_quien_es_de_que_espacio_y_sus_vistas(web, conn, mundo):
         datos = r.json()
         assert datos["persona"] == f"{nombre} 1" and datos["espacio"] == "North Lab"
         assert [v["vista"] for v in datos["vistas"]] == vistas
+        # MA-4: arriba a la derecha, el nombre y debajo su área, la de la base.
+        with admin(conn) as cur:
+            cur.execute("""select a.nombre from membership m join area a on a.id = m.area_id
+                            where m.id = %s""", (_persona(mundo, nombre),))
+            assert datos["area"] == cur.fetchone()["nombre"]
     titulos = {v["vista"]: v["titulo"]
                for v in _entrar(web, conn, mundo, "Morgan Hale").get("/app/api/yo").json()["vistas"]}
-    assert titulos == {"tus": "Mis tareas", "equipo": "Todo el equipo", "pedidas": "Lo que pedí"}
+    assert titulos == {"tus": "Mis tareas", "equipo": "Mi área", "pedidas": "Mis pedidos"}
     titulos = {v["vista"]: v["titulo"]
                for v in _entrar(web, conn, mundo, "Taylor Quinn").get("/app/api/yo").json()["vistas"]}
-    assert titulos == {"tus": "Mis tareas", "sector": "Mi equipo", "pedidas": "Lo que pedí"}
+    assert titulos == {"tus": "Mis tareas", "sector": "Mi equipo", "pedidas": "Mis pedidos"}
 
 
 def test_yo_renueva_la_cookie_sin_cambiar_la_sesion(web, conn, mundo):
@@ -459,7 +465,7 @@ def test_la_autoridad_ve_el_equipo_y_nada_de_otro_espacio(web, conn, mundo):
     assert set(tareas) == {"Pintar el galpón", "Medir el ruido", "Montar la línea",
                            "Calibrar la balanza", "Auditar proveedores", "Ordenar el depósito"}
     assert tareas["Auditar proveedores"]["vencida"] is True
-    assert datos["titulo"] == "Todo el equipo"
+    assert datos["titulo"] == "Mi área"
     assert datos["panel"] == {"vencida": 3, "trabada": 1, "en_curso": 0, "entregada": 0}
 
 
@@ -489,6 +495,11 @@ def test_aislamiento_entre_espacios(web, conn, mundo):
     assert set(_por_titulo(oeste)) == {"Galpón del oeste"}
     yo = _entrar(web, conn, mundo, "Morgan Hale", "west-studio").get("/app/api/yo").json()
     assert yo["espacio"] == "West Studio" and yo["persona"] == "Morgan Hale 2"
+    with admin(conn) as cur:
+        cur.execute("""select a.nombre from membership m join area a on a.id = m.area_id
+                        where m.id = %s""",
+                    (_persona(mundo, "Morgan Hale", "west-studio"),))
+        assert yo["area"] == cur.fetchone()["nombre"]
     equipo_oeste = _por_titulo(_vista(_entrar(web, conn, mundo, "Morgan Hale", "west-studio"),
                                       "equipo"))
     assert set(equipo_oeste) == {"Secreto del oeste", "Galpón del oeste"}
