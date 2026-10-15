@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-15, madrugada, cierre de sesión: J1 a J4 y la Mini App (MA-4 a MA-6) cerradas; sigue la MA-7 y la próxima sesión trabaja sola (ver "Punto exacto para retomar"). Ver "Punto exacto para retomar".
+**Última actualización documental:** 2026-10-15, de mañana, cierre de la noche autónoma (ver "Punto exacto para retomar").
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -32,16 +32,19 @@ prueba dio 100 de 100 en las 01 a 20 (2026-10-07, con el margen para corregir); 
 un atraso, garantías y comprensión 5 de 5 en las 01 a 20 y la 24 (2026-10-08). La entrega y la revisión por
 chat (Fase C) pasan las garantías con la IA real y la prueba del usuario por Telegram (bitácora).
 
-## Punto exacto para retomar (2026-10-15, madrugada)
+## Punto exacto para retomar (2026-10-15, de mañana)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`.
 La unidad en curso es [`../odd/tasks/plataforma-jerarquias.md`](../odd/tasks/plataforma-jerarquias.md): el
 [ADR 0023](decisions/0023-quien-crea-en-la-plataforma.md) en porciones J1 a J7, y la Mini App (MA), en el
 [ADR 0024](decisions/0024-entrar-con-telegram.md).
 
-**Hecho:** J1, J2, J3, J4 y la MA, cerradas (la MA y la J4, el 2026-10-15 a la madrugada, con la prueba de cierre
-del usuario: MA-4 a MA-6, detalle y commits en el documento de la unidad). **Noche del 2026-10-15, sola:** MA-7, la ronda real de la 50 y la 55 (10 de 10), las deudas de la MA (falta la ortografía con la IA real), las preguntas de la J7 y el ensayo de propiedad (abrió la T8), todo con RDD y subido; en curso, "Lenguaje" (lo claro). Lista de la noche y su avance: el documento de la unidad. `leda_motor` en la `0076` (último
-respaldo `db/respaldos/leda_motor-antes-0076-20261014.dump`).
+**Hecho:** J1 a J4 y la Mini App, cerradas. **La noche del 2026-10-15, sola** (todo con RDD aprobada, subido;
+detalle en el documento de la unidad): la MA-7 ("Cerrar sesión" en la compu), la ronda real de la 50 y la 55
+(10 de 10), las deudas de la MA, lo claro de "Lenguaje", el ADR 0025 (propuesta), la base del cambio de fecha
+(J5 S2), el ensayo de propiedad sobre un clúster limpio y la T8, la parte 1 del grafo de transiciones (más su
+arreglo para varias filas), el candado de la sesión de ChatGPT y los planes de la J5 y la J6. `leda_motor` en la
+`0080` (último respaldo `db/respaldos/leda_motor-antes-0077-a-0080-20261015.dump`).
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`). Si no responde aunque `pg_ctl
 status` diga que corre (pasó el 2026-10-14: error de memoria compartida), cerrar con `taskkill /F` TODOS los
@@ -49,36 +52,20 @@ status` diga que corre (pasó el 2026-10-14: error de memoria compartida), cerra
 del sandbox. Antes de una ronda con la IA real, comprobar que no corra el escuchador del usuario (`tasklist`): si
 corre, la ronda queda pendiente; el escuchador no se apaga, es del usuario.
 
-**Cómo se trabaja en la próxima sesión** (usuario, 2026-10-15, al irse a dormir): **de forma autónoma**. El
-agente avanza solo con todo lo que no dependa del usuario; la IA real está autorizada para todas las pruebas,
-sin preguntar (al primer error de cupo, para lo de la IA real y sigue con lo demás). Lo que dependa del usuario
-se anota en "Para decidir al despertar" del documento de la unidad, con un ejemplo y la recomendación, y el
-agente sigue con otra cosa sin esperar. Commits por tarea; la rama se sube al cerrar cada tramo; `main`, no.
+**Lo primero, con el usuario:** las decisiones de "Para decidir al despertar" del documento de la unidad, de a
+una y en texto. Bloquean el resto:
+1. **La palabra que reemplaza a "trabada"** en el chat (recomendación: decir qué falta y quién se ocupa, como la
+   web y la J5-D1). Con la respuesta: renombrar los datos en el borde de la redacción y una ronda real.
+2. **Los 12 puntos de la J5** y aceptar el **ADR 0025**; después, la J5 desde la S1 (conversaciones 56 a 62).
+3. **Los 9 puntos de la J6**; después, la J6 desde la J6-0.
+4. **Las 10 preguntas de la J7.**
+5. Sueltas: el mensaje cuando la IA falla, «Mi espacio» sin el botón del menú, cuánto dura la sesión de
+   administración, el grafo (quién cancela, reabrir, deshacer, objetivos), y tres hallazgos de la ronda del 15/10
+   ("perdí el celular" dicho al pasar, una opción en una pregunta sin opciones, "martin de IT").
+6. Mirar en la compu la MA-7 y "te la pidió" en "Mis tareas".
 
-**Orden de trabajo:**
-1. **MA-7, el botón "Cerrar sesión" sólo en la compu** (usuario, 2026-10-15). La sesión de la compu sigue
-   recordada el tiempo que elige el administrador para cada equipo (opción A; cerrar la pestaña no la cierra).
-   El botón va debajo del nombre y el área, arriba a la derecha, sólo en el navegador fuera de Telegram (nunca en
-   la Mini App); también en la administración en la compu. Reusar `/app/salir` y `/app/admin/salir`, que
-   siguen en el servidor, y borrar el `SignOut` que quedó sin uso.
-2. **La ronda con la IA real de las conversaciones 50 y 55 sobre la MA-5** (cambió `pedir_acceso_web`), sin
-   escuchador corriendo.
-3. **Deudas de la MA que no dependen del usuario:**
-   - quién pidió una tarea propia: en "Mis tareas", una tarea pedida por otro (por ejemplo "Aprobar la compra
-     del módem", de Ismael, pedida por Marcos) no dice quién la pidió. Construir la línea "└─ te la pidió Marcos
-     Tarquini" y anotar en "Para decidir" que se hizo así y se puede cambiar;
-   - las advertencias de RDD: Leda nombra «Mi espacio» aunque Telegram no haya fijado el botón del menú; falta
-     una prueba de que el pase de la compu no quede en un registro de accesos; `web/src/App.tsx:117` (MA-6);
-   - la ortografía al confirmar en la puerta del equipo falló dos veces el 14/10: verla con la IA real;
-   - cuánto dura la sesión de administración en la computadora (hoy, sin vencimiento): a "Para decidir".
-4. **La tarea "Lenguaje":** que Leda no diga "trabado" ni "bloqueada" en el chat, y la auditoría del lenguaje
-   que sale del código ("Deudas registradas"). Un explorador arma la lista con ejemplos y arreglo propuesto;
-   las palabras de reemplazo que no estén decididas van a "Para decidir", y se arregla lo que ya es claro.
-5. **J5, el pedido de más tiempo y el cambio de fecha,** con sus decisiones tomadas (incluida la 7: la fecha
-   prevista de los objetivos y "> aceptar la demora").
-6. **J6, la propuesta del integrante,** con sus decisiones tomadas.
-7. **J7, las jerarquías y los integrantes desde la web de Dirección:** sus decisiones faltan. Escribir las
-   preguntas en "Para decidir al despertar", de a una, con ejemplo y recomendación; no construir sin respuesta.
+**Sin el usuario, si queda tiempo:** las advertencias de RDD anotadas en cada entrada del documento de la unidad
+(ninguna bloquea), y el grafo no se vuelve a tocar sin mirarlo con el usuario (dos arreglos seguidos).
 
 En cada porción: explorar lo que existe ("De qué se parte"), conversación de prueba antes que el código cuando
 toca el chat, escritor delegado con la regla de LF, prueba primero, RDD por commit (`tools/rdd_ciclo.py` en un
@@ -182,7 +169,7 @@ validador de invariantes. Destino de cada uno:
   `deteccion_pregunta`, `jev` y `local`) y la escalera, el reloj y el ciclo viejos.
 - **La auditoría vuelve a la cocina:** cada `herramientas.ejecutar` y cada efecto propio del motor deja su fila
   en `audit_log`, con `pack_hash` y `nucleo_hash`.
-- **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0066` (la plataforma y el acceso por chat) en la rama. La `0032` borra las tablas del alta.
+- **Migraciones:** hasta `0025` y de `0030` a `0056` en `main`; de `0057` a `0080` (la plataforma, el acceso por chat, el cambio de fecha y el grafo) en la rama. La `0032` borra las tablas del alta.
   Cada una tiene su rollback y su ensayo de paridad.
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   Ensayo de propiedad sobre un clúster limpio, 2026-10-15 (`tools/ensayo_propiedad.py`): propietarios y RLS
