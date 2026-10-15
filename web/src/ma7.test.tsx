@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminApp } from './admin/AdminApp';
 import { App } from './App';
+import { POLL_MS } from './components/SignIn';
 import { adminMe, options } from './test/adminFixtures';
 import { me, view } from './test/fixtures';
 
@@ -75,6 +76,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   delete (window as unknown as { Telegram?: unknown }).Telegram;
 });
@@ -120,6 +122,36 @@ describe('"Cerrar sesión" in the team page', () => {
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
     expect(calls).not.toContain('POST /app/salir');
     expect(screen.getByText('Configurar alarmas del SCADA')).toBeInTheDocument();
+  });
+
+  it('after closing, entering again with Telegram brings the person back to her tasks', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const calls = await openTeam({
+      'GET /app/api/yo': ok(me({ persona: 'Marcos Tarquini', area: 'Automatización', espacio_slug: 'corework' })),
+      'POST /app/salir': { status: 204 },
+      'POST /app/api/entrar/qr': {
+        status: 201,
+        body: { pedido_id: 'p-1', enlace: 'https://t.me/Leda_PM_bot?start=compu_abc', qr: ['10', '01'] },
+      },
+      'GET /app/api/entrar/qr/p-1': ok({ estado: 'adentro' }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+    fireEvent.click(screen.getByRole('button', { name: 'sí, cerrar' }));
+    expect(await screen.findByText('Cerraste la sesión.')).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'Código para entrar con Telegram' })).toBeInTheDocument();
+    const asked = (key: string) => calls.filter((c) => c === key).length;
+    const before = { me: asked('GET /app/api/yo'), tasks: asked('GET /app/api/tareas?vista=tus') };
+    // The phone approves the QR in Telegram: the page asks the server and finds the person in.
+    await act(async () => {
+      vi.advanceTimersByTime(POLL_MS + 10);
+    });
+    expect(await screen.findByText('Configurar alarmas del SCADA')).toBeInTheDocument();
+    expect(asked('GET /app/api/entrar/qr/p-1')).toBe(1);
+    expect(asked('GET /app/api/yo')).toBe(before.me + 1);
+    expect(asked('GET /app/api/tareas?vista=tus')).toBe(before.tasks + 1);
+    expect(screen.queryByText('Cerraste la sesión.')).toBeNull();
+    expect(within(screen.getByTestId('who')).getByText('Marcos Tarquini')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
   });
 
   it('a failure says so and keeps the page', async () => {
