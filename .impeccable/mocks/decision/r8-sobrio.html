@@ -340,8 +340,9 @@
     // ?invertir shows the inverted version: dark dots on a lighter screen.
     const INVERT = location.search.includes('invertir');
     const LIGHT = location.search.includes('claros');
-    // ?huecos: a dark layer with the dots cut out, so the ground shows through them.
-    const HOLES = location.search.includes('huecos');
+    // The dots are cut out of a dark layer, so the ground shows through them (the user's choice);
+    // ?puntos shows dark dots painted on top, ?claros light ones, ?invertir dark dots on a light screen.
+    const HOLES = !/puntos|claros|invertir/.test(location.search);
     let w = 0, h = 0, dots = [];
     // Stable per-dot randomness: the dithering threshold and a size bias, like a printed halftone.
     function rand(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
@@ -421,7 +422,7 @@
           ctx.fillRect(d.x - dark / 2, d.y - dark / 2, dark, dark);
           continue;
         }
-        // Dark dots by default (the user's choice); ?claros shows the light ones.
+        // Painted dots (?puntos dark, ?claros light).
         ctx.fillStyle = LIGHT
           ? `rgba(232, 232, 230, ${(0.05 + 0.13 * k).toFixed(3)})`
           : `rgba(4, 4, 5, ${(0.45 + 0.5 * k).toFixed(3)})`;
