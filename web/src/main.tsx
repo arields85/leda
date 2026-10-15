@@ -11,7 +11,7 @@ import { App } from './App';
 import { stopFocusZoomOnIOS } from './admin/viewport';
 import { Notice } from './components/Notice';
 import { isAdminDoor, spaceOfPath } from './door';
-import { bootTelegram, enterWithTelegram, FREE_PINCH_ZOOM_IN_MINI_APP, telegramWebApp } from './telegram';
+import { bootTelegram, enterTheMiniApp, FREE_PINCH_ZOOM_IN_MINI_APP, telegramWebApp } from './telegram';
 
 const telegram = telegramWebApp();
 
@@ -30,15 +30,16 @@ async function start(target: HTMLElement) {
     view.render(<StrictMode>{page}</StrictMode>);
     return;
   }
-  // Inside Telegram: the signature goes to the door before anything else (ADR 0024, decision 7).
+  // Inside Telegram: the signature goes to the door before anything else (ADR 0024, decision 7);
+  // an expired one still lets in a person whose session is good (MA-5, `enterTheMiniApp`).
   bootTelegram(telegram);
   view.render(
     <StrictMode>
       <Notice title="Cargando…" />
     </StrictMode>,
   );
-  const entry = await enterWithTelegram(admin ? 'administracion' : 'equipo',
-                                        spaceOfPath(window.location.pathname), telegram.initData);
+  const entry = await enterTheMiniApp(admin ? 'administracion' : 'equipo',
+                                      spaceOfPath(window.location.pathname), telegram.initData);
   if (entry.kind === 'refused') {
     view.render(
       <StrictMode>

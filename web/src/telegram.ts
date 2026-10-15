@@ -1,3 +1,6 @@
+import { fetchAdminMe } from './admin/api';
+import { fetchMe, SessionClosedError } from './api';
+
 // Leda inside Telegram (ADR 0024): the web opens as a Mini App from a button of the team bot or the
 // administration bot. Telegram's own script (`/app/telegram-web-app.js`, served by Leda itself so
 // the CSP stays `script-src 'self'`) gives `window.Telegram.WebApp`; outside Telegram its
@@ -140,11 +143,17 @@ export type TelegramEntry =
   | { kind: 'refused'; text: string }
   | { kind: 'failed' };
 
-/** Sends the Mini App's signed data to the door, before anything else (ADR 0024, decision 7):
- * the team door with the space of the address (`/app/e/<space>/`), the administration door alone.
- * A signature already used (the Mini App reloaded) keeps the session it opened. */
-export async function enterWithTelegram(door: 'equipo' | 'administracion', space: string | null,
-                                        initData: string): Promise<TelegramEntry> {
+/** What to do when Telegram's signature no longer opens the door and there is no session: close
+ * this window with Telegram's own «Cerrar» and tap the bot's menu button again, which signs anew. */
+export const REOPEN_TEXT: Record<'equipo' | 'administracion', string> = {
+  equipo: 'Cerrá esta ventana con «Cerrar», arriba, y tocá «Mi espacio» otra vez.',
+  administracion: 'Cerrá esta ventana con «Cerrar», arriba, y tocá «Administración» otra vez.',
+};
+
+type SignatureReply = TelegramEntry | { kind: 'invalid'; text: string };
+
+async function sendSignature(door: 'equipo' | 'administracion', space: string | null,
+                             initData: string): Promise<SignatureReply> {
   const url = door === 'equipo' ? '/app/api/entrar-telegram' : '/app/admin/api/entrar-telegram';
   let response: Response;
   try {
@@ -159,13 +168,44 @@ export async function enterWithTelegram(door: 'equipo' | 'administracion', space
   }
   if (response.ok || response.status === 409) return { kind: 'in' };
   if (response.status === 401 || response.status === 403) {
+    let text = REOPEN_TEXT[door];
     try {
       const body = (await response.json()) as { texto?: unknown };
-      if (typeof body.texto === 'string' && body.texto) return { kind: 'refused', text: body.texto };
+      if (typeof body.texto === 'string' && body.texto) text = body.texto;
     } catch {
       // Below: a refusal without its words still says what to do.
     }
-    return { kind: 'refused', text: 'No se pudo comprobar que vengas de Telegram. Cerrá y volvé a abrir Leda.' };
+    // 401: the signature itself (expired, used elsewhere, malformed). 403: who the account is
+    // (not of this team, no administration role), which a session never overrides.
+    return response.status === 401 ? { kind: 'invalid', text } : { kind: 'refused', text };
   }
   return { kind: 'failed' };
+}
+
+/** Sends the Mini App's signed data to the door, before anything else (ADR 0024, decision 7):
+ * the team door with the space of the address (`/app/e/<space>/`), the administration door alone.
+ * A signature already used (the Mini App reloaded) keeps the session it opened. */
+export async function enterWithTelegram(door: 'equipo' | 'administracion', space: string | null,
+                                        initData: string): Promise<TelegramEntry> {
+  const reply = await sendSignature(door, space, initData);
+  return reply.kind === 'invalid' ? { kind: 'refused', text: reply.text } : reply;
+}
+
+/** The Mini App's way in (MA-5, the user's iPhone): Telegram keeps a minimized Mini App for hours
+ * and, when it reloads, sends the ORIGINAL signature, older than its 10 minutes. A signature
+ * refused as such does not stop a person whose session is still good: the door's "who am I"
+ * decides. Without a session, the refusal says exactly what to do. A refusal of the account
+ * itself (not of this team, no administration role) always stands. */
+export async function enterTheMiniApp(door: 'equipo' | 'administracion', space: string | null,
+                                      initData: string): Promise<TelegramEntry> {
+  const reply = await sendSignature(door, space, initData);
+  if (reply.kind !== 'invalid') return reply;
+  try {
+    await (door === 'equipo' ? fetchMe() : fetchAdminMe());
+    return { kind: 'in' };
+  } catch (error) {
+    if (error instanceof SessionClosedError) return { kind: 'refused', text: REOPEN_TEXT[door] };
+    // The session could not be read now: the page shows what its session allows.
+    return { kind: 'failed' };
+  }
 }

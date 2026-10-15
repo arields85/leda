@@ -4,9 +4,16 @@ import { App } from './App';
 import { ComputerSession } from './admin/ComputerSession';
 import { onAPhone, POLL_MS, QrCode, SignIn } from './components/SignIn';
 import { rememberedSpace, rememberSpace, spaceOfPath } from './door';
-import { bindBackButton, bootTelegram, enterWithTelegram, LEDA_DARK, telegramWebApp } from './telegram';
+import {
+  bindBackButton,
+  bootTelegram,
+  enterTheMiniApp,
+  enterWithTelegram,
+  LEDA_DARK,
+  telegramWebApp,
+} from './telegram';
 import { detail, me, task, view } from './test/fixtures';
-import { options } from './test/adminFixtures';
+import { adminMe, options } from './test/adminFixtures';
 
 // ADR 0024 in the web: the Mini App boot, the QR sign-in, the chat's deep links and the task page.
 
@@ -113,6 +120,44 @@ describe('the Mini App', () => {
       kind: 'refused',
       text: 'Esta cuenta de Telegram no es de este equipo.',
     });
+  });
+
+  // MA-5 (c), the user's iPhone: a Mini App kept minimized for hours reloads with the ORIGINAL
+  // signature, older than 10 minutes, while its session cookie is still good.
+  const EXPIRED = {
+    status: 401,
+    body: { error: 'firma_invalida', texto: 'No se pudo comprobar que vengas de Telegram.' },
+  };
+
+  it('an expired signature with a valid session goes in', async () => {
+    const calls = serve({ 'POST /app/api/entrar-telegram': EXPIRED, 'GET /app/api/yo': ok(me()) });
+    expect(await enterTheMiniApp('equipo', 'corework', 'viejo')).toEqual({ kind: 'in' });
+    expect(calls.map((c) => c.key)).toEqual(['POST /app/api/entrar-telegram', 'GET /app/api/yo']);
+    serve({ 'POST /app/admin/api/entrar-telegram': EXPIRED, 'GET /app/admin/api/yo': ok(adminMe()) });
+    expect(await enterTheMiniApp('administracion', null, 'viejo')).toEqual({ kind: 'in' });
+  });
+
+  it('an expired signature without a session says exactly what to do', async () => {
+    serve({ 'POST /app/api/entrar-telegram': EXPIRED, 'GET /app/api/yo': { status: 401, body: { error: 'sin_sesion' } } });
+    expect(await enterTheMiniApp('equipo', 'corework', 'viejo')).toEqual({
+      kind: 'refused',
+      text: 'Cerrá esta ventana con «Cerrar», arriba, y tocá «Mi espacio» otra vez.',
+    });
+    serve({ 'POST /app/admin/api/entrar-telegram': EXPIRED, 'GET /app/admin/api/yo': { status: 401, body: {} } });
+    expect(await enterTheMiniApp('administracion', null, 'viejo')).toEqual({
+      kind: 'refused',
+      text: 'Cerrá esta ventana con «Cerrar», arriba, y tocá «Administración» otra vez.',
+    });
+  });
+
+  it('an account that is not of the team stays out even with a session', async () => {
+    const refusal = { error: 'sin_membresia', texto: 'Esta cuenta de Telegram no es de este equipo.' };
+    const calls = serve({ 'POST /app/api/entrar-telegram': { status: 403, body: refusal }, 'GET /app/api/yo': ok(me()) });
+    expect(await enterTheMiniApp('equipo', 'corework', 'firmado')).toEqual({ kind: 'refused', text: refusal.texto });
+    expect(calls.map((c) => c.key)).toEqual(['POST /app/api/entrar-telegram']);
+    const sinRol = { error: 'sin_rol', texto: 'Esta cuenta de Telegram no tiene acceso a la administración de Leda.' };
+    serve({ 'POST /app/admin/api/entrar-telegram': { status: 403, body: sinRol }, 'GET /app/admin/api/yo': ok(adminMe()) });
+    expect(await enterTheMiniApp('administracion', null, 'firmado')).toEqual({ kind: 'refused', text: sinRol.texto });
   });
 
   it('reads the space from the address and remembers the last one entered', () => {
