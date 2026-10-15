@@ -1657,6 +1657,9 @@ escribilo acá." y el recuadro sigue. Nada es automático: Leda completa sólo a
     anterior entera y sin temporales.
   - Evidencia (2026-10-15): `pytest -q tests/motor -k chatgpt`, 70 passed; `pytest -q tests/motor`, 1502
     passed. Revisión RDD: pendiente.
+      RDD aprobada, `review-48b161fe6bc6f276` (advertencias: el reintento de `os.replace` en Windows no tiene
+      prueba propia, y una prueba lee de un subproceso sin tiempo límite). Con la sesión real, las conversaciones 01
+      y 02 una vez (2026-10-15, 03:59): garantías 2 de 2; la 02 falla sólo el formato, una clase conocida.
 
 ## De qué se parte en cada porción (explorador de sólo lectura, 2026-10-13)
 
